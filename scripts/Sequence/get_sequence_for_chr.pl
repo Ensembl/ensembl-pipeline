@@ -36,7 +36,7 @@ my $dbname;
 	    );
 
 unless( $dbhost && $dbname && $chr && $outfile ){
-  print STDERR "Usage: $0 -chr -dbname -dbhost [ -mask -dust -softmase -maskall ] -outfile\n";
+  print STDERR "Usage: $0 -chr -dbname -dbhost [ -mask -dust -softmask -maskall ] -outfile\n";
   exit(0);
 }
 
