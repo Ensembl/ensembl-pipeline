@@ -127,6 +127,8 @@ sub fetch_input{
 
    my $rc = $self->dbobj->get_Contig($self->input_id);
 
+   $self->vcontig($rc);
+
    my $seq = Bio::PrimarySeq->new( -id => $self->input_id, -seq => $rc->seq);
    $self->seq($seq);
 
@@ -197,16 +199,13 @@ sub run{
        $count++;
        my $tempseq = Bio::PrimarySeq->new( -id => $self->input_id."_orf_".$count , -seq => $orf->{'_peptide'} );
 
-       print STDERR $orf->{'_peptide'}."\n";
+       #print STDERR $orf->{'_peptide'}."\n";
        
        my $seganalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_newest_logic_name('Seg');
 
-       print STDERR "TEMPSEQ: $seganalysis\n";
-
-       
-       my $seg = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-clone => $tempseq, -analysis => $seganalysis);
-       
-       print STDERR "Runing Seg\n";
+            
+       my $seg = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-query => $tempseq, -analysis => $seganalysis);
+     
        $seg->run;
     
        
@@ -220,7 +219,7 @@ sub run{
 	   
 	   substr($orf->{'_peptide'},$o->start,$low_length) = 'X' x $low_length;
 	   
-	   print STDERR $orf->{'_peptide'}."\n";
+	   #print STDERR $orf->{'_peptide'}."\n";
        }
    
        my $tempseq2 = Bio::PrimarySeq->new( -id => $self->input_id."seg".$count , -seq => $orf->{'_peptide'});
@@ -228,13 +227,22 @@ sub run{
        
        my $hmmanalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_newest_logic_name("Pfam");
        
-       my $pfam = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-clone => $tempseq2, -analysis=> $hmmanalysis);
+       my $temp = $tempseq2->seq;
+
+       $temp =~ s/X//g;
+
+       print STDERR "TEMPSEQ3: $temp\n";
+
+
+       if (length($temp)>30 ) { 
+  
+	   my $pfam = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-query => $tempseq2, -analysis=> $hmmanalysis);
        
-       $pfam->run;
-       
-       foreach my $domain ( $pfam->output ) {
+	   $pfam->run;
 	   
-	   if($domain->feature1->score > 25) {
+	   foreach my $domain ( $pfam->output ) {
+	       
+	       if($domain->feature1->score > 25) {
 	       
 	       #Get the the genomic sequence corresponding to the orf + dowstream and upstream region (length to be defined)
 	       #my $subseq_start = $orf->start - 100;
@@ -253,21 +261,22 @@ sub run{
 	       #Push each genomic sequence corresponding to a given Hmm
 	       #push (@{$hmmhash{$domain->feature2->seqname}},$subseq);
 	       
-	       my $hmmnames = $domain->feature2->seqname;
+		   my $hmmnames = $domain->feature2->seqname;
 
-	       my $hmmtemp = "/tmp/hmmtemp".$$;
-	       my $hmmfile = $hmmanalysis->db_file();
-	       system("hmmfetch $hmmfile $hmmnames > $hmmtemp ");
-
-	       my $gw = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
-	       $gw->run;
-
-	       #my @f = $gw->output;
-
-	       #foreach my $f (@f) {
-		#   print STDERR ("Aligned output is \t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
-		 #  print $f;
-	       #}
+		   my $hmmtemp = "/tmp/hmmtemp".$$;
+		   my $hmmfile = $hmmanalysis->db_file();
+		   system("hmmfetch $hmmfile $hmmnames > $hmmtemp ");
+		   
+		   my $gw = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
+		   $gw->run;
+		   
+		   print STDERR "HERE1\n";
+		   
+		   $self->convert_output($gw);
+		   print STDERR "OUTPUT".$self->output."\n";
+		   
+		   $self->write_output;
+	       }
 	      
 	   }
        }
@@ -275,23 +284,237 @@ sub run{
    return;
 }
 
-=head2 write_output
 
- Title   : write_output
- Usage   :
- Function:
+
+=head2 convert_output
+
+  Title   :   convert_output
+  Usage   :   $self->convert_output
+  Function:   converts output from each runnable into gene predictions
+  Returns :   nothing, but $self->output contains results
+  Args    :   none
+
+=cut
+
+sub convert_output {
+  my ($self,$gw) =@_;
+  
+  print STDERR "HERE2\n";
+
+  my $trancount = 1;
+  my $genetype;
+  my $runnable = $gw;
+      print STDERR "HERE3\n";
+    my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+
+	#use logic name from analysis object if possible, else take $genetype;
+	my $anal_logic_name = "Genewise";#($self->analysis->logic_name)	?	$self->analysis->logic_name : $genetype	;	
+	
+    my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
+    my $analysis_obj;
+    if(scalar(@analyses) > 1){
+      $self->throw("panic! > 1 analysis for $genetype\n");
+    }
+    elsif(scalar(@analyses) == 1){
+      $analysis_obj = $analyses[0];
+    }
+    else{
+      # make a new analysis object
+      $analysis_obj = new Bio::EnsEMBL::Analysis
+	(-db              => 'NULL',
+	 -db_version      => 'NULL',
+	 -program         => 'genewise',
+	 -program_version => 1,
+	 -gff_source      => 'genewise',
+	 -gff_feature     => 'gene',
+	 -logic_name      => 'Genewise',
+	 -module          => 'BlastMiniGenewise',
+      );
+  }
+
+    my @results = $runnable->output;
+  print STDERR "RESULT: @results\n";
+
+    my @genes = $self->make_genes($genetype, $analysis_obj, \@results);
+
+  print STDERR "GENESSS: @genes\n";
+
+    $self->output(@genes);
+  print STDERR "OUTPUT0".$self->output."\n";
+  
+}
+
+
+=head2 make_genes
+
+  Title   :   make_genes
+  Usage   :   $self->make_genes
+  Function:   makes Bio::EnsEMBL::Genes out of the output from runnables
+  Returns :   array of Bio::EnsEMBL::Gene  
+  Args    :   $genetype: string
+              $analysis_obj: Bio::EnsEMBL::Analysis
+              $results: reference to an array of FeaturePairs
+
+=cut
+
+sub make_genes {
+  my ($self, $genetype, $analysis_obj, $results) = @_;
+  my $contig = $self->vcontig;
+  print STDERR "CONTIG: $contig\n";
+
+  my @tmpf   = @$results;
+  my @genes;
+
+  foreach my $tmpf (@tmpf) {
+      print STDERR "TMP: $tmpf\n";
+    my $gene       = new Bio::EnsEMBL::Gene;
+    my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
+
+    $gene->type($genetype);
+    $gene->analysis($analysis_obj);
+    $gene->add_Transcript($transcript);
+
+      print STDERR "GENE: ".$gene."\n";
+
+    push (@genes, $gene);
+  }
+
+  return @genes;
+
+}
+
+=head2 _make_transcript
+
+ Title   : make_transcript
+ Usage   : $self->make_transcript($gene, $contig, $genetype)
+ Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
+           with sub_SeqFeatures representing exons.
  Example :
- Returns : 
- Args    :
+ Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
+           data), and a Bio::EnsEMBL::translation
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+  $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis
 
 
 =cut
 
-sub write_output{
-   my ($self,@args) = @_;
+sub _make_transcript{
+  my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
+  $genetype = 'unspecified' unless defined ($genetype);
 
-   $self->throw("Ewan has not implemented this function yet");
+  unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
+    {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
+  unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
+    {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
 
+  my $transcript   = new Bio::EnsEMBL::Transcript;
+  my $translation  = new Bio::EnsEMBL::Translation;    
+  $transcript->translation($translation);
+
+  my $excount = 1;
+  my @exons;
+    
+  foreach my $exon_pred ($gene->sub_SeqFeature) {
+    # make an exon
+    my $exon = new Bio::EnsEMBL::Exon;
+    
+    $exon->contig_id($contig->internal_id);
+    $exon->start($exon_pred->start);
+
+
+    $exon->end  ($exon_pred->end);
+    $exon->strand($exon_pred->strand);
+    
+    $exon->phase(1);
+    $exon->attach_seq($contig);
+    
+    # sort out supporting evidence for this exon prediction
+    foreach my $subf($exon_pred->sub_SeqFeature){
+      $subf->feature1->seqname($contig->internal_id);
+      $subf->feature1->source_tag($genetype);
+      $subf->feature1->primary_tag('similarity');
+      $subf->feature1->score(100);
+      $subf->feature1->analysis($analysis_obj);
+	
+      $subf->feature2->source_tag($genetype);
+      $subf->feature2->primary_tag('similarity');
+      $subf->feature2->score(100);
+      $subf->feature2->analysis($analysis_obj);
+      
+      $exon->add_Supporting_Feature($subf);
+    }
+    
+    push(@exons,$exon);
+    
+    $excount++;
+  }
+  
+  if ($#exons < 0) {
+    print STDERR "Odd.  No exons found\n";
+  } 
+  else {
+    
+    print STDERR "num exons: " . scalar(@exons) . "\t".$exons[0]->phase."\n";
+
+    if ($exons[0]->strand == -1) {
+      @exons = sort {$b->start <=> $a->start} @exons;
+    } else {
+      @exons = sort {$a->start <=> $b->start} @exons;
+    }
+    
+    foreach my $exon (@exons) {
+      $transcript->add_Exon($exon);
+    }
+    
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
+    
+    if ($exons[0]->phase == 0) {
+      $translation->start(1);
+    } elsif ($exons[0]->phase == 1) {
+      $translation->start(3);
+    } elsif ($exons[0]->phase == 2) {
+      $translation->start(2);
+    }
+    
+    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+  }
+  
+  return $transcript;
+}
+
+
+=head2 write_output
+
+    Title   :   write_output
+    Usage   :   $self->write_output
+    Function:   Writes output data to db
+    Returns :   array of exons (with start and end)
+    Args    :   none
+
+=cut
+
+sub write_output {
+    my($self,@features) = @_;
+    
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+
+    print STDERR "OUTPUT: ".$self->output."\n";
+
+  GENE: foreach my $gene ($self->output) {
+
+      # do a per gene eval...
+      eval {
+	$gene_adaptor->store($gene);
+	print STDERR "wrote gene " . $gene->dbID . "\n";
+      }; 
+      if( $@ ) {
+	  print STDERR $@;
+	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      }
+	    
+  }
+   
 }
 
 
@@ -369,5 +592,26 @@ sub seq{
       $obj->{'seq'} = $value;
     }
     return $obj->{'seq'};
+
+}
+
+=head2 output
+
+ Title   : output
+ Usage   : $obj->output($newval)
+ Function: 
+ Returns : value of output
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub output{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'output'} = $value;
+    }
+    return $obj->{'output'};
 
 }
