@@ -286,10 +286,11 @@ sub run_analysis {
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
-        print STDERR "\n".$database."\n";
+        print STDERR "\nDatabase: '".$database."'\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
-
-        my $command = $self->program ;
+        
+        #my $command = "ulimit -d 2000; " . $self->program ;
+        my $command  = $self->program;
         my $blastype = "";
         my $filename = $self->filename;
 
@@ -298,15 +299,68 @@ sub run_analysis {
         } else {
             $command .= " $database $filename ";
         }
-        $command .= ' -gi '.$self->options. ' > '.$self->results . ".$db ";
+        $command .= ' -gi '.$self->options. ' 2>&1 > '.$self->results . ".$db ";
 
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-        print STDERR $command."\n";
-        $self->throw("Failed during blast run: $command". ($?/256) . " ". $!) unless (system ($command) == 0);
+        print STDERR "Running cmd: $command\n";
+
+        open(my $fh, "$command |") || $self->throw("Error opening Blast cmd <$command>." .
+                                                   " Returned error $? BLAST EXIT: '" . ($? >> 8) . "'," .
+                                                   " SIGNAL '" . ($? & 127) . "', There was " . ($? & 128 ? 'a' : 'no') . 
+                                                   " core dump");
+        # this loop reads the STDERR from the blast command
+        # checking for FATAL: messages (wublast) [what does ncbi blast say?]
+        # N.B. using simple die() to make it easier for RunnableDB to parse.
+        print STDERR "-------------- Here begins Blast's STDERR ---------------\n";
+        while(<$fh>){
+            print STDERR "$_";
+            if(/FATAL:(.+)/){
+                my $match = $1;
+                if($match =~ /There are no valid contexts in the requested search/){
+                    # $self->input_is_void(1); # not available to runnable only to runnabledb
+                    die qq{"VOID"\n}; # hack instead
+                }
+                elsif($match =~ /Bus Error signal received/){
+                    die qq{"BUS_ERROR"\n}; # can we work out which host?
+                }
+                elsif($match =~ /Segmentation Violation signal received./){
+                    die qq{"SEGMENTATION_FAULT"\n}; # can we work out which host?
+                }
+                elsif($match =~ /Out of memory;(.+)/){
+                    # (.+) will be something like "1050704 bytes were last requested."
+                    die qq{"OUT_OF_MEMORY"\n}; # resent to big mem machine by rulemanager
+                }
+                else{
+                    $self->warn("Something FATAL happened to BLAST we've not seen before, please add it to " . 
+                        "Package: " . __PACKAGE__ . ", File: " . __FILE__);
+                    die qq{"UNKNOWN_ERROR"\n}; # hang around until someone works out what went wrong.
+                }
+            }
+            elsif(/WARNING:(.+)/){
+                # ONLY a warning usually something like hspmax=xxxx was exceeded
+                # skip ...
+            }elsif(/^\s{10}(.+)/){ # ten spaces
+                # Continuation of a WARNING: message
+                # Hope this doesn't catch more than these.
+                # skip ...
+            }
+            #else{ # I really want to check for more here.
+            #    $self->warn("Something happened on STDERR we've not seen before, please add it to " . 
+            #            "Package: " . __PACKAGE__ . ", File: " . __FILE__);
+            #    die qq{"UNKNOWN_ERROR"\n};
+            #}
+        }
+        print STDERR "-------------- Here ends Blast's STDERR ---------------\n";
+        unless(close $fh){
+            # checking for failures when closing.
+            # we should't get here but if we do then $? is translated below see man perlvar
+            $self->warn("Error running Blast cmd <$command>. Returned error $? BLAST EXIT: '" 
+                        . ($? >> 8) . "', SIGNAL '" . ($? & 127) . "', There was " . ($? & 128 ? 'a' : 'no') . " core dump");
+            die qq{"UNKNOWN_ERROR"\n}; # hang around until someone works out what went wrong.
+        }
       }
-  
 }
 
 =head2 fetch_databases
