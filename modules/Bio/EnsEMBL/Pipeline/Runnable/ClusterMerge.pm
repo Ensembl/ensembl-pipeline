@@ -1102,18 +1102,19 @@ sub compare{
   my $comparator = 
     Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator
       ->new(
-	    -comparison_level        => $self->_comparison_level, 
-	    -exon_match               => $self->_exon_match,
-	    -splice_mismatch          => $self->_splice_mismatch,
-	    -intron_mismatch          => $self->_intron_mismatch,
-	    -minimum_order            => 2,
+	    -comparison_level              => $self->_comparison_level, 
+	    -exon_match                    => $self->_exon_match,
+	    -splice_mismatch               => $self->_splice_mismatch,
+	    -intron_mismatch               => $self->_intron_mismatch,
+	    -minimum_order                 => 2,
+	    -restrict_external_splice_site => 0,
 	   );
   
   my %overlap_matrix = %{$self->matrix};
-
+  
   if ( defined( $overlap_matrix{$newtrans}{$trans} ) ){
-      #print STDERR "Using cached matrix\n";
-      return $overlap_matrix{$newtrans}{$trans};
+    #print STDERR "Using cached matrix\n";
+    return $overlap_matrix{$newtrans}{$trans};
   }
   else{
     $overlap_matrix{$newtrans}{$trans} = $comparator->discrete_compare($newtrans, $trans);
