@@ -808,8 +808,9 @@ sub write_output {
 		    push (@est_ids, $est_id_no_version);
 		}
 	    }
-	    print STDERR "(Not writing) Storing pairs $t_id, @est_ids\n";
-	    #$expression_adaptor->store_ensembl_link($t_id,\@est_ids);
+	    
+	    #print STDERR "(Not writing) Storing pairs $t_id, @est_ids\n";
+	    $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
 	}
     }
 }
