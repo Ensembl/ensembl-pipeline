@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/bin/perl -w
 
 #
 #
@@ -194,6 +194,7 @@ sub run {
 	  print STDERR "$_";
 	  #split on whitespace
 	  my @elements = split;
+      
 	  #extract values from output line
 	  my $f1score  = $elements[2];
 	  my $f1start  = $elements[3];
@@ -286,7 +287,7 @@ sub _createfeatures {
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
- 
+
     $self->_growfplist($fp); 
 }
 
@@ -315,12 +316,10 @@ sub _createfiles {
     # Should check we can write to this directory 
     $self->throw("No directory $dirname") unless -e $dirname;
 
-
     #chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
     return ($genfile, $estfile);
 }
     
-
 sub _getname {
     my ($self, $typename) = @_;
     return  $typename."_".$$.".fn"; 
@@ -349,7 +348,6 @@ sub _diskspace {
     }
     close DF || $self->throw("Error from 'df' : $!");
 }
-
 
 sub _deletefiles {
     my ($self, @files) = @_;
