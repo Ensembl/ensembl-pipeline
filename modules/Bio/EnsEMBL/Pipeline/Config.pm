@@ -38,35 +38,26 @@ sub new {
 
   # Files and DB should not be defined
   if (defined $files && defined $db) {
-    $self->throw("Cannot read config from files and dbadaptor at the same time.");
+    $self->throw("Cannot read config from files and db at the same time.");
   }
 
-
   if ($files) {
-
-
     my @files = split(/ /, $files);
 
     $self->_parse_files(@files);
 
-
-    # Store contents of $self->{'config'} in database
-    $self->_write_config_to_db();
-
   } elsif($db) {
-c
     # store the DB
     $self->{'_dbobj'} = $db;
 
     my $config_rows = $self->_read_db($db);
-
   }
 
   $self->_update_all_defaults();
 
   # if using a file, write the contents to the database
   # note this needs to be done *after* the call to _update_all_defaults
-   if (defined $files ) {
+   if ($files ) {
      # Store contents of $self->{'config'} in database
     $self->_write_config_to_db();
    }
@@ -113,7 +104,8 @@ sub _write_config_to_db {
   }
 
   # create the DBAdaptor
-  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor('-host'   => $params{'host'},
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
+                 '-host'   => $params{'host'},
 							   '-port'   => $params{'port'},
 							   '-dbname' => $params{'dbname'},
 							   '-user'   => $params{'user'},
@@ -125,7 +117,8 @@ sub _write_config_to_db {
   my ($count) = $stmt->fetchrow_array;
   $stmt->finish();
   if ($count != 0) {
-    $self->throw("config table in " . $params{'dbname'} . " on " . $params{'host'} . " already contains $count rows; it should be empty");
+    $self->throw("config table in " . $params{'dbname'} . " on " . 
+        $params{'host'} . " already contains $count rows; it should be empty");
   }
 
   # do the insert
