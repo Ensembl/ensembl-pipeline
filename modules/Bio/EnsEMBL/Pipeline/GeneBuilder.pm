@@ -190,9 +190,10 @@ sub build_Genes{
   print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
   
   #test
-  #foreach my $t ( $self->combined_Transcripts ){
+#  foreach my $t ( $self->combined_Transcripts ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
-  #}
+
+#  }
 
   
   if ( $GB_USE_ABINITIO ){
@@ -438,7 +439,6 @@ sub cluster_Transcripts {
 
 sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
-
   # first sort the transcripts
   my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 				 if ($result){
@@ -458,7 +458,6 @@ sub _cluster_Transcripts_by_genomic_range{
   
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
-  
 
   $cluster_starts[$count] = $self->transcript_low($transcripts[0]);
   $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
@@ -469,7 +468,6 @@ sub _cluster_Transcripts_by_genomic_range{
   # loop over the rest of the transcripts
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
-    
     #print STDERR "\nIn cluster ".($count+1)."\n";
     #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
     #print STDERR "comparing:\n";
@@ -855,9 +853,9 @@ sub _bin_sort_transcripts{
     }	
     my @sorted_transcripts = sort { $sizehash{$b} <=> $sizehash{$a} } @{$orflength_bin{$currbin}};
     push(@transcripts, @sorted_transcripts);
+
     $currbin++;
   }
-
 
   # post filter - we want blessed transcripts to be at the top of the list so that 
   # identical build transcripts get properly pruned.
@@ -869,17 +867,18 @@ sub _bin_sort_transcripts{
   my @blessed_transcripts;
   my @heathen_transcripts;
   foreach my $transcript(@transcripts){
+
     if($blessed_genetypes{$transcript->type}){
       push(@blessed_transcripts, $transcript);
     }
     else{
       push(@heathen_transcripts, $transcript);
     }
-
+  }
     @transcripts = ();
     push(@transcripts, @blessed_transcripts);
     push(@transcripts, @heathen_transcripts);
-  }
+
 
   #test
   my $debug = 0;
