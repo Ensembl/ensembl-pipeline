@@ -72,7 +72,10 @@ require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
 			   -GOLDEN_PATH => $path,
-                           -ANALYSIS    => $analysis);
+                           -ANALYSIS    => $analysis,
+			   -VCONTIG     => 1,
+			   -EXTEND      => 400);
+
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
@@ -80,6 +83,11 @@ require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 
+                -vcontig:    determines whether it is running on virtual contigs
+                             or RawContigs
+                -extend:     determines the extension of the virtual contig
+                             note: not implemented yet!
+                -golden_path: determines the name of the golden path to use
 =cut
 
 sub new {
@@ -90,9 +98,12 @@ sub new {
     
     my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
        
-    $vcontig = 1 unless defined($vcontig);
-    
-    $self->vcontig($vcontig);
+    if (! defined $vcontig) {
+       $vcontig = $::genebuild_conf{'vcontig'};
+    } 
+    else {
+       $self->vcontig($vcontig);
+    }
     $self->extend($extend);
 
     # golden path
@@ -226,7 +237,13 @@ sub write_output {
       eval {
 	$gene->analysis($analysis_obj);
 	$gene->type($genetype);
-	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
+	my $newgene;
+	if ($self->vcontig) {
+	  $newgene = $vc->convert_Gene_to_raw_contig($gene);
+	}
+	else {
+	  $newgene = $gene;
+	}
 	push(@newgenes,$newgene);
       };
       if ($@) {
@@ -262,29 +279,32 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
-
     my $contigid  = $self->input_id;
-    $contigid =~ /(.*)\.(.*)\-(.*)/;
+    my $contig;
+
+    if ($self->vcontig) {
+      my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+      
+      $contigid =~ /(.*)\.(.*)\-(.*)/;
+      
+      my $chr   = $1;
+      my $start = $2;
+      my $end   = $3;
     
-    my $chr   = $1;
-    my $start = $2;
-    my $end   = $3;
-    
-#    print STDERR "Chr $chr - $start : $end\n";
-    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
+      #    print STDERR "Chr $chr - $start : $end\n";
+      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
 
-    $contig->primary_seq;
+      $contig->primary_seq;
 
-#    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
-
+      #    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
+    }
+    else {
+      $contig = $self->dbobj->get_Contig($contigid);
+    }
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
 							      '-contig'   => $contig,
 							      '-input_id' => $self->input_id,
 							      );
-
-
-
     $self->addgenebuilder($genebuilder,$contig);
 
 }
