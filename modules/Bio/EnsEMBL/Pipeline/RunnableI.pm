@@ -89,7 +89,7 @@ sub output {
 # These aren't really interfaces more to do with background jobs.
 #########################
 
-sub locate_runnable {
+sub locate_executable {
     my ($self, $runnable) = @_;
     if ($runnable)
     {
