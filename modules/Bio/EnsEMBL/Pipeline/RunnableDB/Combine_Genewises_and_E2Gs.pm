@@ -275,11 +275,11 @@ sub run {
   #}
 
   # first of all, sort gw genes by exonic length and genomic length  
-  @merged_gw_genes = sort { my $result = ( $self->_transcript_exonic_length_in_gene($b) <=>
-					   $self->_transcript_exonic_length_in_gene($a) );
+  @merged_gw_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
+					   $self->_transcript_length_in_gene($a) );
 			    unless ($result){
-			      return ( $self->_transcript_length_in_gene($b) <=>
-				       $self->_transcript_length_in_gene($a) );
+			      return ( $self->_transcript_exonic_length_in_gene($b) <=>
+				       $self->_transcript_exonic_length_in_gene($a) );
 			    }
 			    return $result;
 			  
@@ -1384,8 +1384,8 @@ sub transcript_from_single_exon_genewise {
 	}
 	
 	# need to add back exons, both 5' and 3'
-	$self->add_5prime_exons(\$transcript, $exoncount, @e2g_exons);
-	$self->add_3prime_exons(\$transcript, $exoncount, @e2g_exons);
+	$self->add_5prime_exons($transcript, $exoncount, @e2g_exons);
+	$self->add_3prime_exons($transcript, $exoncount, @e2g_exons);
 	
       }
     return $transcript;
@@ -1461,7 +1461,7 @@ sub transcript_from_multi_exon_genewise {
 	  }
 	  
 	  # add all the exons from the est2genome transcript, previous to this one
-	  $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
+	  $self->add_5prime_exons($transcript, $exoncount, @egexons);
 	  
 	  # fix translation start 
 	  if($gwstart >= $current_start){
@@ -1690,7 +1690,7 @@ sub transcript_from_multi_exon_genewise {
       #      " end_phase: ".$translation->start_exon->end_phase."\n";
       
             
-      $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
+      $self->add_5prime_exons($transcript, $exoncount, @egexons);
       
     }
      # end 5' exon
@@ -1791,10 +1791,11 @@ sub transcript_from_multi_exon_genewise {
 sub add_5prime_exons{
 my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 
-      # add all the exons from the est2genome transcript, previous to this one
-      # db handle will be screwed up, need to make new exons from these
-      my $c = 0;
-      while($c < $exoncount){
+  # add all the exons from the est2genome transcript, previous to this one
+  # db handle will be screwed up, need to make new exons from these
+  my $c = 0;
+  my $modified = 0;
+  while($c < $exoncount){
 	my $newexon = new Bio::EnsEMBL::Exon;
 	my $oldexon = $e2g_exons[$c];
 	$newexon->start($oldexon->start);
@@ -1816,12 +1817,15 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $newexon->add_Supporting_Feature($sf);
 	}
-#	print STDERR "Adding 5prime exon " . $newexon->start . " " . $newexon->end . "\n";
-	$$transcript->add_Exon($newexon);
-	$$transcript->sort;
+	# print STDERR "Adding 5prime exon " . $newexon->start . " " . $newexon->end . "\n";
+	$transcript->add_Exon($newexon);
+	$modified = 1;
+	$transcript->sort;
 	$c++;
       }
-      
+  if ($modified == 1){
+    $transcript->translation->start_exon->phase(-1);
+  }
 }
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
@@ -1999,7 +2003,7 @@ GENE:
 		      if ($exon eq $tran->translation->start_exon()) {
 			  if($vc_strand == 1 && $exon->strand == -1){
 			      print STDERR "vc strand 1, raw strand -1 - flipping translation start/end\n";
-			      $self->warn("something very strange is about to happen to the  exon coordinatesfor transcript ". $tran->dbID);
+			      $self->warn("something very strange is about to happen to the  exon coordinates for transcript ". $tran->dbID);
 			      print STDERR "exon start: ".$exon->start.
 				  " changing to ".$exon->end - ($tran->translation->end -1)."\n";
 			      print STDERR "exon end  : ".$exon->end.
