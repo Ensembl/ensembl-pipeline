@@ -1,8 +1,10 @@
 #!/usr/local/bin/perl -w
 
 # make sure we can find pmatch_modules.pm
+# change this or run with perl -I ...
 BEGIN {
-  unshift (@INC,"/work1/vac/TGW/pmatch_filtering/new_pmatch_filter");
+#  unshift (@INC,"/work1/vac/TGW/pmatch_filtering/new_pmatch_filter");
+  unshift (@INC,"/work2/vac/ensembl-pipeline/scripts");
 }
 
 =head1 NAME
@@ -401,6 +403,7 @@ sub make_mergelist {
     
     push(@hits,$mh);
       
+    CP: 
     foreach my $cp(@cps) {
       # need to compare with the last entry in @merged
       my $prev = $hits[$#hits];
@@ -409,7 +412,10 @@ sub make_mergelist {
       # first the strand
       my $strand = 1;
       if ($cp->qend() < $cp->qstart()) { $strand = -1; }
-      
+
+      # ignore hits that don't extend the current hit
+      next CP if( $cp->tend <= $prev_cps[$#prev_cps]->tend );
+
       # need a fudge factor - pmatch could overlap them by 1 or 2 ... or 3
       if( $strand == $prev->strand &&
 	 ( ($cp->tstart >=  $prev_cps[$#prev_cps]->tend) ||
@@ -437,7 +443,9 @@ sub make_mergelist {
       }
     }
   }
-  
+
+  # try to merge overlapping hits?
+
   my $protlen = read_protlength($ph->id);
   warn "No length for " . $ph->id . "\n" unless $protlen;
   return unless $protlen; 
@@ -522,11 +530,11 @@ sub index_proteins{
 
 sub read_protlength{
   my ($id) = @_;
+
   my $inx  = Bio::Index::Fasta->new(
 				    -filename   => $indexfile, 
-				    -write_flag => 1
 				   );
-  
+  # really ought to catch seq fetching exceptions here ...
   my $seq = $inx->fetch($id);
   return $seq->length;
 }
@@ -545,15 +553,22 @@ sub read_protlength{
 
 sub get_accession{
   my $header = shift;
- my $acc = $header;
+  my $acc = $header;
+
   chomp $acc;
   if($acc =~ /^>(\w+)\s+\S+/){
     $acc = $1;
     $acc =~ s/>//;
+  }  
+  elsif($acc =~ /^>(\w+)/){
+    $acc = $1;
+    $acc =~ s/>//;
   }
+
   elsif($acc =~ /^>\S+\|\S+\|\S+\|(\S+)\|/){
     $acc = $1;
   }
   else { $acc=""; }
+
   return $acc;
 }
