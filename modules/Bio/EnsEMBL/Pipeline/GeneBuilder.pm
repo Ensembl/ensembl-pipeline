@@ -571,7 +571,7 @@ sub prune_Transcripts {
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
 	# make sure we keep it if it's blessed
-	if($blessed_genetypes{transcript->type}){
+	if($blessed_genetypes{$transcript->type}){
 	  push(@newtran, $tran);
 	}
 	else{
