@@ -226,7 +226,6 @@ sub get_Genewises {
 
     TRANSCRIPT:
       foreach my $t ($g->each_Transcript) {
-	
         # set temporary_id to be dbID
 	$t->{'temporary_id'} = ($t->dbID) unless (defined $t->{'temporary_id'} && $t->{'temporary_id'} ne '');
 
@@ -288,14 +287,6 @@ sub get_Predictions {
     my @genscan;
 
     foreach my $f (@preds) {
-#      print STDERR "\nGot feature set " . $f->seqname    . "\t" . 
-#	$f->start      . "\t" . 
-#        $f->end        . "\t" . 
-#        $f->strand     . "\t" . 
-#	$f->score      . "\t" . 
-#	$f->source_tag . "\t" . 
-#	$f->primary_tag ."\n\n";
-
         my $fset = $self->set_phases($f,$contig);
 
       if (defined($fset)) {
@@ -1216,6 +1207,7 @@ sub make_Genes {
         }
       }
     }
+
     # if we get here, the transcript should be fine
     next TRANSCRIPT unless $valid;
     
@@ -1225,13 +1217,13 @@ sub make_Genes {
     
   GENE: foreach my $gene (@genes) {
     EXON: foreach my $gene_exon ($gene->get_all_Exons) {
-	
 	foreach my $exon ($tran->get_all_Exons) {
 	  #next EXON if ($exon->contig_id ne $gene_exon->contig_id);
 	  
 	  if ($exon->overlaps($gene_exon)) {
 	    if ($exon->strand == $gene_exon->strand) {
 	      $found = $gene;
+	      print STDERR "exon overlap\n";
 	      last GENE;
 	    } 
 	    else {
@@ -1250,6 +1242,7 @@ sub make_Genes {
       my $geneid = "TMPG_$contigid.$genecount";
       $gene->{'temporary_id'} = ($geneid);
       $genecount++;
+
       $gene->add_Transcript($tran);
       push(@genes,$gene);
     }
@@ -2628,13 +2621,17 @@ sub prune_gene {
   
   
   my @newgenes;
-  
+  my $maxexons = 0;
   my @transcripts = $gene->each_Transcript;
 
   # sizehash holds transcript length - based on sum of exon lengths
   my %sizehash;
   
   foreach my $tran (@transcripts) {
+
+    # keep track of number of exons in multiexon transcripts
+    my @exons = $tran->get_all_Exons;
+    if(scalar(@exons) > $maxexons){ $maxexons = scalar(@exons); }
     my $length = 0;
     foreach my $e($tran->get_all_Exons){
       $length += $e->end - $e->start + 1;
@@ -2648,8 +2645,11 @@ sub prune_gene {
   # deal with single exon genes
   my @maxexon = $transcripts[0]->get_all_Exons;
   # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
-  if ($#maxexon == 0) {
-    print STDERR "Single exon gene\n";
+  # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
+#  if ($#maxexon == 0) {
+
+# think this should be OK.
+  if ($#maxexon == 0 && $maxexons == 1) {
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('pruned');
     $gene->{'temporary_id'} = ($transcripts[0]->{'temporary_id'});
