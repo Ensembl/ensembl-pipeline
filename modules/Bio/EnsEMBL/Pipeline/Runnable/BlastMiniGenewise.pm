@@ -52,9 +52,9 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
+use Bio::Tools::BPlite;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 
@@ -93,7 +93,7 @@ sub new {
   
   if (defined($ids)) {
     if (ref($ids) eq "ARRAY") {
-      print "Ids @$ids\n";
+#      print "Ids @$ids\n";
       push(@{$self->{'_idlist'}},@$ids);
     } else {
       $self->throw("[$ids] is not an array ref.");
@@ -297,8 +297,9 @@ sub run_blast {
 
     my ($self,$seq,$db) = @_;
     my $tmpdir = $::pipeConf{'nfstmp.dir'};
-    my $blastout = $self->get_tmp_file($tmpdir,"blast","swir.msptmp");
+    my $blastout = $self->get_tmp_file($tmpdir,"blast","out");
     my $seqfile  = $self->get_tmp_file($tmpdir,"seq","fa");
+    my @pairs;
 
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 				-file   => ">$seqfile");
@@ -306,46 +307,51 @@ sub run_blast {
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
     my $tblastn = $::scripts_conf{'tblastn'};
-    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
+    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 > $blastout";
 
-    print (STDERR "Running command $command\n");
+   print (STDERR "Running command $command\n");
     my $status = system($command );
 
-    print("Exit status of blast is $status\n");
-    open (BLAST, "<$blastout") 
-        or $self->throw ("Unable to open Blast output $blastout: $!");    
-    if (<BLAST> =~ /BLAST ERROR: FATAL:  Nothing in the database to search!?/)
-    {
-        print "nothing found\n";
-        return;
-    }
+#    print("Exit status of blast is $status\n");
 
-    my @pairs;
+    my $report = new Bio::Tools::BPlite('-file'=>$blastout);
 
-    eval {
-	my $msp = new Bio::EnsEMBL::Analysis::MSPcrunch(-file => $blastout,
-							-type => 'PEP-DNA',
-							-source_tag => 'genewise',
-							-contig_id => $self->genomic_sequence->id,
-							);
+    while(my $sbjct = $report->nextSbjct){
+      while(my $hsp = $sbjct->nextHSP){
 
 
-	@pairs = $msp->each_Homol;
-	
-	foreach my $pair (@pairs) {
-	    my $strand1 = $pair->feature1->strand;
-	    my $strand2 = $pair->feature2->strand;
-	    
-	    $pair->invert;
-	    $pair->feature2->strand($strand2);
-	    $pair->feature1->strand($strand1);
-	    $pair->hseqname($seq->id);
-	    $self->print_FeaturePair($pair);
+	# strands
+	my $strand = 1;
+	if($hsp->subject->strand != $hsp->query->strand){
+	  $strand = -1;
 	}
-    };
-    if ($@) {
-	$self->warn("Error processing msp file for " . $seq->id . " [$@]\n");
+
+	my $genomic = new Bio::EnsEMBL::SeqFeature(
+						   -start   => $hsp->subject->start,
+						   -end     => $hsp->subject->end,
+						   -strand  => 1,
+						   -seqname => $hsp->subject->seqname,
+						   -score   => $hsp->score,
+						  );
+	# munging protein seqname as BPlite is giving it back like O95793 (577 letters)
+	my $protname = $hsp->query->seqname;
+	$protname =~ s/^(\S+).+/$1/;
+	my $protein = new Bio::EnsEMBL::SeqFeature(
+						   -start   => $hsp->query->start,
+						   -end     => $hsp->query->end,
+						   -strand  => $strand,
+						   -seqname => $protname,
+						   -score   => $hsp->score,
+						   );
+	my $featurepair = new Bio::EnsEMBL::FeaturePair(
+							-feature1 => $genomic,
+							-feature2 => $protein
+						       );
+
+	push (@pairs, $featurepair);
+      }
     }
+  
 
     unlink $blastout;
     unlink $seqfile;
@@ -368,7 +374,7 @@ sub make_blast_db {
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$blastfile");
 
-    print STDERR "Blast db file is $blastfile\n";
+#    print STDERR "Blast db file is $blastfile\n";
 
     foreach my $seq (@seq) {
 	$seqio->write_seq($seq);
@@ -426,9 +432,10 @@ sub validate_sequence {
     my @validated;
     foreach my $seq (@seq)
     {
-        print STDERR ("mrna feature $seq is not a Bio::PrimarySeq or Bio::Seq\n") 
-                                    unless ($seq->isa("Bio::PrimarySeq") ||
-                                            $seq->isa("Bio::SeqI"));
+  #      print STDERR ("mrna feature $seq is not a Bio::PrimarySeq or Bio::Seq\n") 
+  #                                  unless ($seq->isa("Bio::PrimarySeq") ||
+  #                                          $seq->isa("Bio::Seq"));
+
         my $sequence = $seq->seq;
         if ($sequence !~ /[^acgtn]/i)
         {
@@ -449,8 +456,8 @@ sub validate_sequence {
             }
             else
             {
-                $self->warn ("Cleaned up ".$seq->display_id
-                   ." for blast : $invalidCharCount invalid chars \n");
+#               print STDERR ("Cleaned up ".$seq->display_id
+ #                  ." for blast : $invalidCharCount invalid chars \n");
                 $seq->seq($_);
                 push (@validated, $seq);
             }
@@ -478,7 +485,7 @@ sub get_Sequence {
       $self->warn("No id input to get_Sequence");
     }  
     
-    print(STDERR "Sequence id :  is [$id]\n");
+#    print(STDERR "Sequence id :  is [$id]\n");
 
     eval {
       $seq = $seqfetcher->get_Seq_by_acc($id);
@@ -492,7 +499,7 @@ sub get_Sequence {
       $self->warn("Could not find sequence for [$id]");
     }
 
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+#    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
 }
