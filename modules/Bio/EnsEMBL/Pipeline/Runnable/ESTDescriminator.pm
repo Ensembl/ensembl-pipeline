@@ -5,6 +5,7 @@ use Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 use Bio::Align::DNAStatistics;
 use Bio::AlignIO;
+use Bio::LocatableSeq;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info); 
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
@@ -20,7 +21,7 @@ sub new {
      ) = rearrange([qw(GENES
                        EST_DB
                        EST_COVERAGE_CUTOFF
-		       SEQFETCHER
+		       SEQUENCE_FETCHER
                       )],@args);
 
   throw("No genes to analyse")
@@ -30,12 +31,12 @@ sub new {
 
   throw("Constructor needs adaptors to the database which " .
 	"contains your ests.")
-    unless $est_db;
+    unless (defined $est_db);
 
   $self->_est_db($est_db);
 
   throw("Cant proceed without a sequence fetcher.")
-    unless $seqfetcher
+    unless (defined $seqfetcher);  
 
   $self->_seqfetcher($seqfetcher);
 
@@ -44,8 +45,6 @@ sub new {
   } else {
     $self->_est_coverage_cutoff(0.8)
   }
-
-  $self->_work_dir($work_dir)     if $work_dir;
 
   return $self
 }
@@ -138,10 +137,10 @@ sub _cluster_ests_with_genes {
       for (my $k = $i + 1; $k < scalar @$genes_that_share_this_est; $k++) {
 	my %pairwise_comparison = 
 	  ('type'     => 'inter_gene',
-	   'gene_ids' => [$genes_that_share_this_est[$i], 
-			  $genes_that_share_this_est[$k]],
-	   'distance' => $self->_pairwise_distance($genes_that_share_this_est[$i],
-						   $genes_that_share_this_est[$k]));
+	   'gene_ids' => [$genes_that_share_this_est->[$i], 
+			  $genes_that_share_this_est->[$k]],
+	   'distance' => $self->_pairwise_distance($genes_that_share_this_est->[$i],
+						   $genes_that_share_this_est->[$k]));
 	push @est_gene_distances, \%pairwise_comparison;
       }
     }
@@ -149,7 +148,7 @@ sub _cluster_ests_with_genes {
 
     # Sort the array (of hashes) by distance in ascending order.
 
-    my @est_gene_distances = 
+    @est_gene_distances = 
       sort {$a->{distance} <=> $b->{distance}} @est_gene_distances;
 
     # Group the EST to specific genes according
@@ -203,21 +202,28 @@ sub _cluster_ests_with_genes {
 sub _calculate_gene_vs_est_distances {
   my $self = shift;
 
-  my $genes_and_shared_ests = $self->_identify_shared_ests;
+  my $genes_and_shared_ests = $self->_identify_shared_ESTs;
   my %gene_vs_est_distance_matrix;
 
   foreach my $gene_id (keys %$genes_and_shared_ests) {
     # THERE IS A SMARTER WAY TO DO THIS-------------------
     my $transcript = $self->_gene_lookup->{$gene_id}->get_all_Transcripts->[0];
 
+    # Gather all EST features
+    my @est_supporting_features;
+    foreach my $est_id (keys %{$genes_and_shared_ests->{$gene_id}}){
+      push @est_supporting_features, 
+           @{$genes_and_shared_ests->{$gene_id}->{$est_id}};    
+    }
+
     # Obtain an alignment of our transcript with the shared ESTs
     my $evidence_align = 
       Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
         -transcript          => $transcript,
-        -dbadaptor           => $self->_gene_lookup->{$gene_id}->db,
+        -dbadaptor           => $self->_gene_lookup->{$gene_id}->adaptor->db,
         -seqfetcher          => $self->_seqfetcher,
         -padding             => 15,
-        -supporting_features => $genes_and_shared_ests->{$gene_id}
+        -supporting_features => \@est_supporting_features 
         );
 
     my $ens_align = $evidence_align->retrieve_alignment( 
@@ -225,11 +231,34 @@ sub _calculate_gene_vs_est_distances {
                    -remove_introns  => 0,
                    -merge_sequences => 1);
 
+    # A horrible and hopefully temporary hack to 
+    # ensure all sequences are of the same length.
+    # This is due to a failing in Bio::EnsEMBL::Pipeline::Alignmenti::EvidenceAlignment.
+
+    my @ens_align_seqs = @{$ens_align->fetch_AlignmentSeqs};
+    my $longest_seq = 0;
+    foreach my $ens_align_seq (@ens_align_seqs) {
+      my $length = length($ens_align_seq->seq);
+      if ($length > $longest_seq){
+        $longest_seq = length($ens_align_seq->seq)
+      } 
+    }  
+    for (my $i = 0; $i < scalar @ens_align_seqs; $i++) {
+      my $length = length($ens_align_seqs[$i]->seq);
+      if ($length < $longest_seq) {
+        my $shortfall = $longest_seq - $length;
+        my $tack_on = '-' x $shortfall;
+        my $augmented_seq = $ens_align_seqs[$i]->seq . $tack_on;
+        $ens_align_seqs[$i]->seq($augmented_seq); 
+      }  
+    } 
+
     # Convert this alignment into a bioperl AlignI object.
     my $bp_align = Bio::SimpleAlign->new();
 
     my @sequence_order;
-    foreach my $align_seq (@{$ens_align->fetch_AlignmentSeqs}){
+#    foreach my $align_seq (@{$ens_align->fetch_AlignmentSeqs}){
+    foreach my $align_seq (@ens_align_seqs){
 
       # Skip the genomic sequence in our alignment - use the exon
       # sequence for calculating distance
@@ -237,8 +266,14 @@ sub _calculate_gene_vs_est_distances {
 
       my $seq = Bio::Seq->new(-display_id => $align_seq->name,
 	  		      -seq        => $align_seq->seq);
+      my $locatable_seq = Bio::LocatableSeq->new(
+                            -id       => $align_seq->name,
+                            -seq      => $align_seq->seq,
+                            -start    => 1,
+                            -end      => length($align_seq->seq),
+                            -alphabet => 'dna');
 
-      $bp_align->add_seq($seq);
+      $bp_align->add_seq($locatable_seq);
 
       push @sequence_order, $align_seq->name;
     }
@@ -250,12 +285,13 @@ sub _calculate_gene_vs_est_distances {
 					-method => 'Kimura');
 
     # Store result of first column of result matrix (ie. gene vs ests)
-    for (my $row = 0; $row < scalar @$distances; $row++) {
-      next if $sequence_order[$row] = 'exon_sequence';
+    for (my $row = 1; $row < scalar @$distances; $row++) {
+      next if $sequence_order[$row-1] eq 'exon_sequence';
+      next unless defined $distances->[$row];
 
       $self->_pairwise_distance($gene_id, 
-				$sequence_order[$row], 
-				$distances->[$row]->[0])
+				$sequence_order[$row-1], 
+				$distances->[$row]->[1])
     }
   }
 
@@ -282,8 +318,8 @@ sub _calculate_intergene_distances {
 		    -seq        => $longest_transcript->translateable_seq);
 
     push @transcript_seqs, $seq;
-    $gene_transcript_lookup{$transcript->stable_id} = $gene->stable_id;
-    $gene_transcript_lookup{$gene->stable_id} = $transcript->stable_id;
+    $gene_transcript_lookup{$longest_transcript->stable_id} = $gene->stable_id;
+    $gene_transcript_lookup{$gene->stable_id} = $longest_transcript->stable_id;
   }
 
   # Obtain sequences for transcripts and perform an alignment
@@ -300,8 +336,14 @@ sub _calculate_intergene_distances {
 
   my $bp_align = Bio::SimpleAlign->new();
 
+  my @sequence_order;
   foreach my $align_seq (@$aligned_seqs){
-    $bp_align->add_seq($align_seq);
+    my $locatable_seq = Bio::LocatableSeq->new(
+                          -id    => $align_seq->display_id,
+                          -seq   => $align_seq->seq,
+                          -start => 1,
+                          -end   => $align_seq->length);
+    $bp_align->add_seq($locatable_seq);
     push @sequence_order, $align_seq->display_id;
   }
 
@@ -311,12 +353,14 @@ sub _calculate_intergene_distances {
 
   my $distances = $dna_stat->distance(-align  => $bp_align,
 				      -method => 'Kimura');
-
   # Matrix of gene vs gene distances
-  for (my $row = 0; $row < scalar @$distances; $row++) {
+print STDERR "Gene-gene pairwise distances : \n";
+  for (my $row = 1; $row < scalar @$distances; $row++) {
+    next unless defined $distances->[$row];
     for (my $column = $row + 1; $column < scalar @{$distances->[$row]}; $column++){
-      $self->_pairwise_distance($sequence_order[$column], 
-				$sequence_order[$row], 
+print STDERR "Pairwise distance : [$row] [$column] : " . $distances->[$row]->[$column] . "\n";
+      $self->_pairwise_distance($sequence_order[$column - 1], 
+				$sequence_order[$row - 1], 
 				$distances->[$row]->[$column])
     }
   }
@@ -335,7 +379,7 @@ sub _identify_shared_ESTs {
   foreach my $gene (@{$self->_genes}){
     my $overlapping_ests = $self->_find_overlapping_ests($gene);
 
-    my $genes_stable_id = $gene->stable_id;
+    my $gene_stable_id = $gene->stable_id;
 
     foreach my $est (@$overlapping_ests){
       my @est_supporting_features;
@@ -344,7 +388,7 @@ sub _identify_shared_ESTs {
         push @est_supporting_features, @{$exon->get_all_supporting_features} 
       }
 
-      my $est_name = $est_supporting_features->[0]->hseqname;
+      my $est_name = $est_supporting_features[0]->hseqname;
       $genes_with_their_ests{$gene_stable_id}->{$est_name} = \@est_supporting_features;
       $est_comap_counts{$est_name}++;
     }
@@ -466,9 +510,10 @@ sub _pairwise_distance {
 
   if (defined $distance){
     $self->{_pairwise_distances}->{$id1}->{$id2} = $distance;
+    return $distance
   }
 
-  my $distance = undef;
+  $distance = undef;
 
   if (defined $self->{_pairwise_distances}->{$id1}->{$id2}){
     $distance = $self->{_pairwise_distances}->{$id1}->{$id2};
@@ -483,7 +528,7 @@ sub _build_id_lookup {
   my ($self, $genes_and_their_shared_ests) = @_;
 
   foreach my $gene_id (keys %$genes_and_their_shared_ests) {
-    foreach my $est_id (keys %{$genes_and_their_shared_ests{$gene_id}}){
+    foreach my $est_id (keys %{$genes_and_their_shared_ests->{$gene_id}}){
       push @{$self->{_id_lookup}->{$gene_id}}, $est_id;
       push @{$self->{_id_lookup}->{$est_id}}, $gene_id;
     }
@@ -497,7 +542,7 @@ sub _find_shared_ests_by_gene_id {
 
   my $shared_ests = undef;
 
-  if (defined ($self->{_id_lookup}->{$gene_id}){
+  if (defined ($self->{_id_lookup}->{$gene_id})) {
     $shared_ests = $self->{_id_lookup}->{$gene_id}
   }
 
@@ -509,7 +554,7 @@ sub _find_genes_by_est_id {
 
   my $genes = undef;
 
-  if (defined ($self->{_id_lookup}->{$est_id}){
+  if (defined ($self->{_id_lookup}->{$est_id})) {
     $genes = $self->{_id_lookup}->{$est_id}
   }
 
@@ -517,7 +562,7 @@ sub _find_genes_by_est_id {
 }
 
 sub _longest_transcript {
-  my $gene = shift;
+  my ($self, $gene) = @_;
 
   my $longest = 0;
   my $longest_transcript;
@@ -576,7 +621,7 @@ sub _gene_lookup {
   my $self = shift;
 
   unless ($self->{_gene_lookup}) {
-    foreach my $gene (@$self->_genes) {
+    foreach my $gene (@{$self->_genes}) {
       $self->{_gene_lookup}->{$gene->stable_id} = $gene;
     }
   }
@@ -614,10 +659,11 @@ sub _seqfetcher {
   my $self = shift;
 
   if (@_) {
-    $self->{_seqfetche} = shift;
+    $self->{_seqfetcher} = shift;
     throw("Seqfetcher is not a Bio::EnsEMBL::Pipeline::SeqFetcher")
-      unless defined $self->{_seqfetcher} &&
-        $self->{_est_db}->isa("Bio::EnsEMBL::Pipeline::SeqFetcher");
+      unless (defined $self->{_seqfetcher} &&
+        ($self->{_seqfetcher}->isa("Bio::EnsEMBL::Pipeline::SeqFetcher")||
+         $self->{_seqfetcher}->can("get_Seq_by_acc"))); 
   }
 
   return $self->{_seqfetcher}
@@ -627,53 +673,3 @@ sub _seqfetcher {
 
 
 1;
-
-
-
-
-#sub _write_align {
-#  my ($self, $align) = @_;
-
-#  unless (defined $align && $align->isa("Bio::EnsEMBL::Pipeline::Alignment")){
-#    throw("Alignment is not a Bio::EnsEMBL::Pipeline::Alignment, it is a [" . $align . "]")
-#  }
-
-#  my $align_file = $self->_work_dir . '/align.fa';
-#  unlink $align_file if -e $align_file;
-#  my $seqio = Bio::SeqIO->new(-format => 'fasta',
-#			      -file   => ">$align_file");
-
-#  foreach my $align_seq (@{$align->fetch_AlignmentSeqs}){
-#    my $seq = Bio::Seq->new(-display_id => $align_seq->name,
-#			    -seq        => $align_seq->seq);
-
-#    $seqio->write_seq($seq)
-#  }
-
-#  return 1
-#}
-
-#sub _work_dir {
-#  my $self = shift;
-
-#  if (@_){
-#    $work_dir = shift;
-
-#    unless (defined $work_dir && -d $work_dir) {
-#      if (! defined $work_dir){
-#	info("Working directory not specified - defaulting to /tmp");
-#	$work_dir = '/tmp'
-#      }
-#    }
-
-#    $work_dir .= '/est_descrim.' . $$;
-
-#    unless (mkdir $work_dir){
-#      throw("Failed to properly create working directory [$work_dir]")
-#    }
-
-#    $self->{_work_dir} = $work_dir;
-#  }
-
-#  return $self->{_work_dir}
-#}
