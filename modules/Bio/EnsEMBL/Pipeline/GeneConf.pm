@@ -55,11 +55,36 @@ my $prefix='COB';
 
 # Hash containing config info
 %GeneConf = (
+	     # We use several databases to avoid the number of connections to go over the maximum number
+	     # of threads allowed by mysql. If your genome is small, you can probably use the same db 
+	     # for some of these entries. However, reading and writting in the same db is not recommended.
+
 	     # database specific variables
 	     GB_DBHOST                  => 'ecs1c',
 	     GB_DBNAME                  => 'briggsae_intermediate_newschema',
 	     GB_DBUSER                  => 'ensadmin',
 	     GB_DBPASS                  => 'ensembl',
+
+	     # database containing the genewise genes (TGE_gw,similarity_genewise)
+	     GB_GW_DBHOST                  => '',
+	     GB_GW_DBNAME                  => '',
+	     GB_GW_DBUSER                  => '',
+	     GB_GW_DBPASS                  => '',
+
+	     # database where the combined_gw_e2g genes will be stored
+	     # IMPORTANT: we should have copied the genewise genes to this db before hand:
+	     GB_COMB_DBHOST                  => '',
+	     GB_COMB_DBNAME                  => '',
+	     GB_COMB_DBUSER                  => '',
+	     GB_COMB_DBPASS                  => '',
+	     
+	     # database containing the cdnas mapped, to be combined with the genewises
+	     # by putting this info here, we free up ESTConf.pm so that two analysis can
+	     # be run at the same time
+	     GB_cDNA_DBHOST                  => '',
+	     GB_cDNA_DBNAME                  => '',
+	     GB_cDNA_DBUSER                  => '',
+	     GB_cDNA_DBPASS                  => '',
 
 	     #db for writing final genewise genes to - to get round table locks
 	     # this db needs to have clone & contig & static_golden_path tables populated
@@ -140,12 +165,14 @@ my $prefix='COB';
 					  'type'       => 'Swall',
 					  'threshold'  => '200',
 					  'index'      => '/usr/local/ensembl/data/blastdb/Ensembl/swall_270602'
+					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
 # example:
 					 {
 					  'type'       => 'Wormpep',
 					  'threshold'  => '200',
 					  'index'      => '/usr/local/ensembl/data/blastdb/Worms/wormpep'
+					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
 					],
 	     
@@ -166,6 +193,7 @@ my $prefix='COB';
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
 	     GB_COMBINED_MAX_INTRON         => 100000,
 	     #GB_COMBINED_GENETYPE           => 'combined_cdnaorf_e2g',
+	     
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
