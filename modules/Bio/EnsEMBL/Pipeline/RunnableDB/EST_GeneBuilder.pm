@@ -283,7 +283,7 @@ sub fetch_input {
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    my @genes  = $slice->get_Genes_by_Type($genetype);
+    my @genes  = $slice->get_Genes_by_Type($genetype,'evidence');
     
     print STDERR "Number of genes from ests  = " . scalar(@genes) . "\n";
     
@@ -293,7 +293,7 @@ sub fetch_input {
       
       my $cdna_sa = $cdna_db->get_SliceAdaptor();
       $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-      my @cdna_genes  = $cdna_contig->get_Genes_by_type($cDNA_GENETYPE);
+      my @cdna_genes  = $cdna_contig->get_Genes_by_type($cDNA_GENETYPE,'evidence');
       print STDERR "Number of genes from cdnas = " . scalar(@cdna_genes) . "\n";
       push (@genes, @cdna_genes);
 
@@ -311,7 +311,7 @@ GENE:
       
       # skip genes with more than one transcript
       if( scalar(@transcripts) > 1 ){
-	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
+	$self->warn("gene with more than one transcript - skipping it\n");
 	next GENE;
       }
       
@@ -379,7 +379,7 @@ GENE:
     
     # this will return a slice which corresponds to the reversed complement of $slice:
     my $revslice = $slice->invert;
-    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
+    my @revgenes  = $revslice->get_Genes_by_type($genetype,'evidence');
     my @minus_transcripts;
     
     print STDERR "Number of genes from ests  = " . scalar(@revgenes) . "\n";
@@ -387,7 +387,7 @@ GENE:
     
     if ( $USE_cDNA_DB ){
       my $cdna_revslice = $cdna_slice->invert;
-      my @cdna_revgenes  = $cdna_revslice->get_Genes_by_type($cDNA_GENETYPE);
+      my @cdna_revgenes  = $cdna_revslice->get_Genes_by_type($cDNA_GENETYPE,'evidence');
       print STDERR "Number of genes from cdnas = " . scalar(@cdna_revgenes) . "\n";
       push ( @revgenes, @cdna_revgenes ); 
     }
@@ -403,7 +403,7 @@ GENE:
       
       # throw away genes with more than one transcript
       if(scalar(@transcripts) > 1 ){
-	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
+	$self->warn(" gene with more than one transcript - skipping it\n");
 	next REVGENE;
       }
       
@@ -436,7 +436,7 @@ GENE:
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable, $strand);
-#	$runnable->seq($contig->primary_seq);
+#	$runnable->seq($slice);
 	$runnable->add_Transcript($tran);
       }
     }
@@ -566,7 +566,7 @@ sub _check_Transcripts {
       }
       if ( !( $exon->seqname eq $seqname ) ){
 	print STDERR "transcript ".$transcript->dbID." is partly".
-		    " outside the contig, skipping it...\n";
+		    " outside the slice, skipping it...\n";
 	next TRANSCRIPT;
       }
 
@@ -581,7 +581,7 @@ sub _check_Transcripts {
 
      
       # get the supporting_evidence for each exon
-      # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
+      # no need to use ExonAdaptor, this should have been already handled by slice->get_Genes_by_type
 
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
       my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
@@ -2004,10 +2004,10 @@ sub _check_splice_Sites{
   print STDERR "EST_GeneBuilder: checking splice sites in strand $strand...\n";
 
   # get the contig being analysed
-  my $contig = $self->vcontig;
+  my $slice = $self->slice;
   
   # for reverse strand,  invert the contig, since the exons were retrieved in revcontig
-  my $revcontig = $contig->invert;   
+  my $revslice = $slice->invert;   
   
   # upstream/downstream are with respect to the exon
   my ($upstream_AG, $downstream_GT) = (0,0);  # 99%
@@ -2030,7 +2030,7 @@ sub _check_splice_Sites{
         
       # forward strand
       if ($strand == 1){
-	my $seq = $contig->primary_seq; # a Bio::PrimarySeq object
+	my $seq = $slice; # a Bio::PrimarySeq object
 	
 	# catch possible exceptions in gettting the sequence (it might not be there!)
 	eval{
@@ -2083,7 +2083,7 @@ sub _check_splice_Sites{
       
       # reverse strand
       if ($strand == -1 ){
-	my $seq = $revcontig->primary_seq; # a Bio::PrimarySeq object
+	my $seq = $revslice; # a Bio::PrimarySeq object
 	
 	# catch possible exceptions in gettting the sequence (it might not be there!)
 	eval{
@@ -2102,15 +2102,15 @@ sub _check_splice_Sites{
 	  #print STDERR $@;
 	  $downstream = 'NN';
 	}
-	#  in the reverse strand we're looking at coordinates in the reversed-complement contig:
+	#  in the reverse strand we're looking at coordinates in the reversed-complement slice:
 	#
-	#        $contig : --------------------TG----GA------------>  forward strand
+	#        $slice : --------------------TG----GA------------>  forward strand
 	#                                      AC    CT               reverse strand 
 	#                           downstream   EXON   upstream
 	#
 	#
 	#                   upstream   EXON   downstream              
-	#     $revcontig : ----------AG----GT-------------------->    forward strand
+	#     $revslice : ----------AG----GT-------------------->    forward strand
 	#                                                             reverse strand
 	#
 	# and take the reverse complement
@@ -2448,11 +2448,11 @@ sub make_genes {
   my @genes;
 
   my $time  = time; chomp($time);
-  my $contig = $self->vcontig;
+  my $slice = $self->slice;
 
   # are we working on the reverse strand?
   if( $strand == -1 ){
-    $contig = $contig->invert;
+    $slice = $slice->invert;
   }
 
   # transcripts come with a translation, that's sorted out in MiniGenomewise and Genomewise
@@ -2465,11 +2465,9 @@ sub make_genes {
     # create a new gene object out of this transcript
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->temporary_id($contig->id . ".$genetype.$count");
     $gene->analysis($analysis_obj);
 
     # add transcript to gene
-    $transcript->temporary_id($contig->id . ".$genetype.$count");
     $gene->add_Transcript($transcript);
 
     # sort the exons 
@@ -2491,7 +2489,6 @@ sub make_genes {
       
       #print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
       
-      $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->attach_seq($contig->primary_seq);
       
@@ -2517,10 +2514,8 @@ sub make_genes {
       $excount++;
   }
 
-    #put temporary_id (this hasn't been put in neither Genomewise nor MiniGenomewise
     my $translation = $transcript->translation;
-    $translation->temporary_id($contig->id . ".$genetype.$count");
-
+    
     # store only genes that translate ( to check it, we get the Bio::Seq )
     my $sequence = $transcript->translate;
 
@@ -2614,7 +2609,10 @@ sub remap_genes {
       
     };
     if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
+      print STDERR "Couldn't reverse map gene [$@]\n";
+      foreach my $t ( @{$gene->get_all_Transcripts} ){
+	$self->_print_Transcript($t);
+      }
     }
     
     ### check that supporting evidence has been preserved:
@@ -2756,11 +2754,32 @@ sub output{
    return @{$self->{'_output'}};
 }
 
-############################################################
+#########################################################################
+  
+sub _print_Transcript{
+  my ($self,$transcript) = @_;
+  my @exons = @{$transcript->get_all_Exons};
+  my $id;
+  if ( $transcript->dbID ){
+    $id = $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+  print STDERR "transcript id: ".$id."\n";
+  foreach my $exon ( @exons){
+    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
+  }
+  print STDERR "\n";
+  print STDERR "translation start exon: ".
+    $transcript->translation->start_exon->start."-".$transcript->translation->start_exon->end.
+      " start: ".$transcript->translation->start."\n";
+  print STDERR "translation end exon: ".
+    $transcript->translation->end_exon->start."-".$transcript->translation->end_exon->end.
+      " end: ".$transcript->translation->end."\n";
+}
 
-
-
-
+#########################################################################
 1;
 
 
