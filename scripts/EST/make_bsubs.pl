@@ -267,7 +267,9 @@ sub make_EST_GeneBuilder_bsubs{
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder\" $runner -input_id $input_id";
+
+      # if you don't want it to write to the database, eliminate the -write option
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder\" $runner -input_id $input_id -write";
       print OUT "$command\n";
       
       $count = $count + $size;
