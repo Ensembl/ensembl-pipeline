@@ -1639,15 +1639,6 @@ sub remap_genes {
 
 =cut
 
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
-}
 
 # Adapted from Spangle
 
@@ -1755,5 +1746,3 @@ sub output{
 
 
 1;
-
-

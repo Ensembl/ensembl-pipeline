@@ -578,20 +578,7 @@ sub output {
  Returns : value of vc
  Args    : newvalue (optional)
 
-
 =cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
-}
 
 
 1;
-
-
