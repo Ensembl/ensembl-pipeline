@@ -89,11 +89,13 @@ sub new {
 
   my $self = bless {}, $class;
 
+  $self = $self->SUPER::new(@_);
+
   $self->{'_queue'} = [];
 
   $SIG{CHLD} = \&sig_chld;
 
-  return $self->SUPER::new(@_);
+  return $self;
 }
 
 
@@ -217,7 +219,7 @@ sub flush {
 
   my $self = shift;
   my $config = $self->get_Config();
-  my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
+  my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); #  default???
 
   #
   # Take as many jobs off the queue as we can
@@ -280,15 +282,14 @@ sub _start_job {
   my $user   = $db->username();
   my $port   = $db->port();
 
+
   if (my $pid = fork) {	 # fork returns PID of child to parent, 0 to child
     # PARENT
     $children++;
   } else {
     #CHILD
-
     #The child needs its own connection to the database. We don't want the
     #parent's database handle cleaned up when the child exits or vice-versa
-    
     $db->db_handle()->{'InactiveDestroy'} = 1;
 
     $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
@@ -308,22 +309,24 @@ sub _start_job {
 
     POSIX::setsid();  # make session leader, and effectively a daemon
 
+
     # redirect stdout/stderr to files
     # read stdin from /dev/null
     close(STDERR);
     close(STDOUT);
     close(STDIN);
-    open(STDERR, "+>" . $job->stderr_file()) 
+    open(STDERR, "+>" . $job->stderr_file())
       || warn "Error redirecting STDERR to " .  $job->stderr_file();
-    open(STDOUT, "+>" . $job->stdout_file()) 
+    open(STDOUT, "+>" . $job->stdout_file())
       || warn "Error redirecting STDOUT to " .  $job->stdout_file();
     open(STDIN,  "+>/dev/null");
 
-    $job->submission_id($$);
+    $job->submission_id($$); #set submission id to current process id
     $job->adaptor->update($job);
     $job->set_current_status('SUBMITTED');
 
     $job->run();
+
     exit(0);			# child process is finished now!
   }
 
