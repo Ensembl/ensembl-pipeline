@@ -684,7 +684,9 @@ sub _merge_genes {
 
     # order is crucial
     my @trans = @{$unmerged->get_all_Transcripts};
-    if(scalar(@trans) != 1) { $self->throw("expected one transcript for $unmerged\n"); }
+    if(scalar(@trans) != 1) {
+          $self->throw("Gene with dbID ". $unmerged->dbID . " has no related transcript. Check preceding analyses \n"); 
+    }
 
     # check the sanity of the transcript
     next UNMERGED_GENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0],$self->query));
