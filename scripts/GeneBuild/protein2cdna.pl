@@ -172,12 +172,14 @@ sub check_embl {
 
   my $seq;
 
-  open(EFETCH, "$efetch $id |") || die("Error running $efetch for id [$id]");
+  open(EFETCH, "$efetch $id |") or die("Error running $efetch for id [$id]");
   eval {
     my $fh = Bio::SeqIO->new(-fh   => \*EFETCH, "-format"=>'embl');
     $seq = $fh->next_seq();
   };
   close EFETCH;
+
+  return unless defined($seq) && $seq->isa("Bio::Seq");
 
   if($@) {
     print STDERR "problem with $id: [$@]\n";
