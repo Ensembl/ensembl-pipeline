@@ -580,7 +580,11 @@ description: this method computes the largest proper sublist in $list
 sub _test_for_link{
   my ($self, $list, $transcript) = @_;
   
-  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
+  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new( -comparison_level         => 3,
+										      -exon_match               => 0,
+										      -splice_mismatch          => 0,
+										      -intron_mismatch          => 0,
+										    );
   my $sublist;
   my $can_merge = 0;
   
