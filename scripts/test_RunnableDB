@@ -125,9 +125,7 @@ if($verbose){
   }
   print STDERR "have ".@output." results\n";
   foreach my $out (@output) {
-    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
-      print ($out->gffstring . "\n");
-    } elsif ($out->isa("Bio::EnsEMBL::Gene")) {
+    if ($out->isa("Bio::EnsEMBL::Gene")) {
       print "\n";
       foreach my $tran (@{$out->get_all_Transcripts}) {
          foreach my $exon (@{$tran->get_all_Exons}) {
@@ -138,11 +136,25 @@ if($verbose){
          }
       }
     } else {
-      print $out->gffstring . "\n";
+     print_gff($out);
     }
   }
 }
 
+
+
+sub print_gff{
+  my ($feature) = @_;
+  my $str .= (defined $feature->slice) ?  $feature->slice->name()."\t":  "\t";
+    $str .=  "\t"; #source tag
+    $str .=  "\t"; #primary tag
+    $str .= (defined $feature->start)    ?  $feature->start."\t"        :  "\t";
+    $str .= (defined $feature->end)      ?  $feature->end."\t"          :  "\t";
+    $str .= (defined $feature->score)    ?  $feature->score."\t"        :  "\t";
+    $str .= (defined $feature->strand)   ?  $feature->strand."\t"       :  ".\t";
+    $str .=  ".\t"; #phase
+    $str .=  ".\t"; #end phase
+}
 
 sub useage{
 	exec('perldoc', $0);
