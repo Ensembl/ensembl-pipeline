@@ -5,6 +5,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GenePair;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Getopt::Long;
@@ -83,6 +84,7 @@ $mouse_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $mouse_dbhost,
 my $human_adaptor = $human_db->get_GeneAdaptor;
 my $mouse_adaptor = $mouse_db->get_GeneAdaptor;
 
+my $gene_pair = Bio::EnsEMBL::Pipeline::GeneComparison::GenePair->new();
 
 
 unless( $from_file ){
@@ -114,7 +116,10 @@ unless( $from_file ){
     foreach my $homology ( @mouse_homologs ){
       
       print STDERR "comparing $human_id and ".$homology->stable_id."\n";
-      &compare( $human_id, $homology->stable_id );
+      my $human_gene = $human_adaptor->fetch_by_stable_id($human_id,1);
+      my $mouse_gene = 
+	  $mouse_adaptor->fetch_by_stable_id($homology->stable_id,1);
+      $gene_pair->compare( $human_gene, $mouse_gene );
       push (@{$gene_pair{$human_id}},$homology->stable_id);
     }  
   }
@@ -126,7 +131,10 @@ if ( $from_file ){
     my @entries = split;
     print STDERR "\n-------------------------------------------------------------\n\n";
     print STDERR "comparing $entries[0] and $entries[1]\n";
-    &compare( $entries[0], $entries[1]);
+
+    my $human_gene = $human_adaptor->fetch_by_stable_id($entries[0],1);
+    my $mouse_gene = $mouse_adaptor->fetch_by_stable_id($entries[1],1);
+    $gene_pair->compare( $human_gene, $mouse_gene );
     push( @{$gene_pair{$entries[0]}}, $entries[1] );
   }   
 }
@@ -134,12 +142,10 @@ if ( $from_file ){
 ############################################################
 
 sub compare{
-  my ($human_id,$mouse_id) = @_;
+  my ($human_gene,$mouse_gene) = @_;
   
-  my $human_gene        = $human_adaptor->fetch_by_stable_id($human_id,1);
   my @human_transcripts = @{$human_gene->get_all_Transcripts};
 
-  my $mouse_gene = $mouse_adaptor->fetch_by_stable_id( $mouse_id,1);
   my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
   
   
