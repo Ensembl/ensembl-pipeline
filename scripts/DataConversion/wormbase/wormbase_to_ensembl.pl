@@ -120,4 +120,12 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
 
   print "there are ".keys(%$non_translating)." clones with non translating genes\n";
   print "there are ".keys(%$non_transforming)." clones with non translating genes\n";
+
+  foreach my $clone_name(keys(%$non_translating)){
+    my $wormbase_seq = $obda->get_Seq_by_acc($clone_name);
+    my $clone = $db->get_CloneAdaptor->fetch_by_name($clone_name);
+    my ($contig) = @{$clone-get_all_Contigs};
+    my $contig_id = $contig->dbID
+  }
+
 }
