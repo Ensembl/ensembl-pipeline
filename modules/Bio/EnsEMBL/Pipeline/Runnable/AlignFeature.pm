@@ -287,6 +287,9 @@ sub make_miniseq {
 	$start = $f->start - $self->exon_padding;
 	$end   = $f->end   + $self->exon_padding;
 
+        if ($start < 1) { $start = 1;}
+        if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
+
 	my $gap     =    ($start - $prevend);
 	my $cdnagap = abs($f->hstart - $prevcdnaend);
 
