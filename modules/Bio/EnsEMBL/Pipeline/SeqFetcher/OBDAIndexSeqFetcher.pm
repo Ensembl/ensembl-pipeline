@@ -25,7 +25,6 @@
 
   This is basically a wrapper around the SeqFetcher Bio::DB::Flat::OBDAIndex,
 to use it in Ensembl in the same way as other SeqFetcher. 
-It reads some configuration info from pipeConf.pl.
  
   Sequences are fetched from a 
 database previously formatted with indicate (made by Steve Searle)
