@@ -46,6 +46,7 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher;
 use strict;
 use Bio::Root::RootI;
 use Bio::Seq;
+use Bio::SeqIO;
 
 use vars qw(@ISA);
 
@@ -233,21 +234,18 @@ sub run_getz {
   # if getz path not explicitly set, assume it's in $PATH
   $getz          = 'getz' unless defined($getz); 
 
-  open(IN, "getz -e '[libs={$libs}-ID:$id]' |") 
+  open(IN, "getz -e '[libs={$libs}-ID:$id] | [libs-AccNumber:$id]' |") 
     || $self->throw("Error running getz for id [$newid]: $getz");
-  while(<IN>){
-    chomp;
-    $seqstr .= $_ unless $_ =~ /^>/;
-  }
+
+  my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>'EMBL');
+
+  $seq = $fh->next_seq();
   close IN;
 
+  $self->warn("Problem with getz for [$id]") unless defined $seq;
 
-    $seq = new Bio::Seq(-seq => $seqstr, -id  => $newid) 
-      unless (!defined($seqstr) || ($seqstr =~ /getz: No match/));
-    
-  
   return $seq;
-
+  
 }
 
 =head2 parse_header
