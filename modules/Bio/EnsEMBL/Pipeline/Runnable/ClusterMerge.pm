@@ -398,8 +398,25 @@ sub transcript_low{
 	list(i)(a) represents every list that begins with t_i
  
         for each t_j in C, j>i {
+ 
+	  It is possible that we must sort list(i)(a), a = 0...N in
+	  descending order by the number of elements, so that if t_j
+	  links with a proper sublist, we make sure it is also the
+	  largest possible proper sublist. Otherwise it might link to
+	  a smaller one. See example of presentation, where we add a
+	  EST number 7, which could merge with 1,2 and 6. If it is
+	  compared first with 1->2->3 we could conclude that it merges
+          with 1->2, but we would miss 1->2->6 
   
-          for each list(i)(a), a = 0,...,N {
+	  But if the available lists are al of the same size
+	  there will be no way to distinguish them, so we are in
+	  trouble. We should test every list(i)(a) for a given t_j and
+	  then choose the best in this priority: a complete list >>
+	  the longer proper sublist
+
+
+  
+	  for each list(i)(a), a = 0,...,N {
   
             compare t_j with every element t_k in list(i)(a)  
 	  }
@@ -491,6 +508,12 @@ sub link_Transcripts{
 	foreach my $list ( @current_lists ){
 	  
 	  # check whether this trans can be linked to this list or to a proper sublist
+
+           print STDERR "IMPORTANT: this should be checking all the
+	   lists l(i)(a) first and then make the decision, otherwise
+	   t(j) could be added to the wrong sublist, if this is found
+	   earlier than the actual list to which it should be linked";
+
 	  # or maybe to none of the above
 	  my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
 	  
