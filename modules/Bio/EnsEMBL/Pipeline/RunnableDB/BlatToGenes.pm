@@ -175,34 +175,50 @@ sub run{
   
   # print out the results:
   foreach my $gene (@genes){
-      foreach my $trans (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
-	foreach my $exon (@{$trans->get_all_Exons}){
-	    foreach my $evi (@{$exon->get_all_supporting_features}){
-		print STDERR $evi->hseqname." ".
-		    $evi->start." ".$evi->end." ".
-			$evi->hstart." ".$evi->hend." ".
-			    $evi->primary_tag." ".$evi->source_tag."\n";
-	    }
+    print STDERR "gene is a $gene\n";
+    foreach my $trans (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
+      foreach my $exon (@{$trans->get_all_Exons}){
+	foreach my $evi (@{$exon->get_all_supporting_features}){
+	  print STDERR $evi->hseqname." ".
+	    $evi->start." ".$evi->end." ".
+	      $evi->hstart." ".$evi->hend." ".
+		$evi->primary_tag." ".$evi->source_tag."\n";
 	}
       }
+    }
   }
-
+  
   # need to convert coordinates?
-  #my @mapped_genes = $self->convert_to_raw_contig( @genes );
-  print STDERR "transforming genes here\n";
+  my @mapped_genes = $self->convert_coordinates( @genes );
+  print STDERR "mapped_gene is a $mapped_genes[0]\n";
 
-  $self->output(@genes);
+  $self->output(@mapped_genes);
 }
 
 ############################################################
 
 sub write_output{
   my ($self,@output) = @_;
+  
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
+
   unless (@output){
     @output = $self->output;
   }
-
+  foreach my $gene (@output){
+    print STDERR "gene is a $gene\n";
+    print STDERR "about to store gene ".$gene->type." $gene\n";
+    foreach my $tran (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+    }
+    eval{
+      $gene_adaptor->store($gene);
+    };
+    if ($@){
+      $self->warn("Unable to store gene!!\n$@");
+    }
+  }
 }
 
 ############################################################
@@ -214,6 +230,8 @@ sub make_genes{
   foreach my $feature ( @features ){
     my $transcript = Bio::EnsEMBL::Transcript->new();
     my $gene       = Bio::EnsEMBL::Gene->new();
+    $gene->analysis($self->analysis);
+    
     $gene->add_Transcript($transcript);
     
     foreach my $sub_feature ($feature->sub_SeqFeature){
@@ -221,8 +239,8 @@ sub make_genes{
       
       # make the exon out of the feature1 (the genomic feature)
       my $exon = Bio::EnsEMBL::Exon->new();
-      $exon->contig ($sub_feature->feature1->contig);
       $exon->seqname($sub_feature->feature1->seqname);
+      $exon->contig($sub_feature->feature1->contig);
       $exon->start  ($sub_feature->feature1->start);
       $exon->end    ($sub_feature->feature1->end);
       $exon->strand ($sub_feature->feature1->strand);
@@ -252,9 +270,83 @@ sub make_genes{
 }
 
 ############################################################
+
+sub convert_coordinates{
+  my ($self,@genes) = @_;
+  
+  my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
+  my $slice_adaptor     = $self->db->get_SliceAdaptor;
+  
+
+  my @transformed_genes;
+ GENE:
+  foreach my $gene (@genes){
+  TRANSCRIPT:
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      
+      # is it a slice or a rawcontig?
+      my $rawcontig = $rawcontig_adaptor->fetch_by_name($transcript->start_Exon->seqname);
+      if ( $rawcontig ){
+	foreach my $exon (@{$transcript->get_all_Exons}){
+	  $exon->contig( $rawcontig);
+	}
+      }
+      
+      my $contig = $transcript->start_Exon->contig;
+      
+      if ( $contig && $contig->isa("Bio::EnsEMBL::RawContig") ){
+	print STDERR "transcript already in raw contig, no need to transform:\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	next TRANSCRIPT;
+      }
+      my $slice_id      = $transcript->start_Exon->seqname;
+      my $chr_name;
+      my $chr_start;
+      my $chr_end;
+      if ($slice_id =~/$EST_INPUTID_REGEX/){
+	$chr_name  = $1;
+	$chr_start = $2;
+	$chr_end   = $3;
+      }
+      else{
+	$self->warn("It looks that you haven't run on slices. Please check.");
+	next TRANSCRIPT;
+      }
+      
+      my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
+      foreach my $exon (@{$transcript->get_all_Exons}){
+	$exon->contig($slice);
+	foreach my $evi (@{$exon->get_all_supporting_features}){
+	  $evi->contig($slice);
+	}
+      }
+    }
+    
+
+    my $transformed_gene = $gene->transform;
+    push( @transformed_genes, $transformed_gene);
+  }
+  return @transformed_genes;
+}
+
+############################################################
 #
 # get/set methods
 #
+############################################################
+
+############################################################
+
+# must override RunnableDB::output() which is an eveil thing reading out from the Runnable objects
+
+sub output {
+  my ($self, @output) = @_;
+  if (@output){
+    push( @{$self->{_output} }, @output);
+  }
+  return @{$self->{_output}};
+}
+
 ############################################################
 
 sub runnable {
