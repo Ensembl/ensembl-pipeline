@@ -28,9 +28,10 @@ $genscan->output();
 
 =head1 DESCRIPTION
 
-This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed from 
-assembling genscan predicted features to peptide sequence. The resulting blast hits are
-written back as FeaturePairs.
+This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides
+constructed from assembling genscan predicted features to peptide
+sequence. The resulting blast hits are written back as
+DnaDnaAlignFeature's.
 
 The appropriate Bio::EnsEMBL::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
@@ -38,7 +39,7 @@ required for database access.
 
 =head1 CONTACT
 
-Describe contact details here
+B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -60,43 +61,15 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DB          => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
-    Args    :   -db:        A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                -input_id:  Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    $self->{'_runnable'}    = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_transcripts'} = [];
-    $self->{'_parameters'}  = undef;
-
-    $self->{'_featurepairs'}= [];
-
-    $self->throw("Analysis object required") unless (defined($self->analysis));
-    
-    return $self;
-}
 
 =head2 fetch_input
 
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for repeatmasker from the database
-    Returns :   none
-    Args    :   none
+  Args       : none
+  Example    : $runnable->fetch_input
+  Description: Fetches input data for BlastGenscanDNA and makes runnable
+  Returntype : none
+  Exceptions : $self->input_id is not defined
+  Caller     : run_RunnableDB, Bio::EnsEMBL::Pipeline::Job
 
 =cut
 
@@ -106,23 +79,62 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-   # print STDERR "Fetching contig $contigid\n";
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
     my $genseq    = $contig
         or $self->throw("Unable to fetch contig sequence");
 
-    $self->genseq($genseq);
-    my @genscan_peps = 
-      @{$self->db->get_PredictionTranscriptAdaptor->fetch_all_by_RawContig($contig,'Genscan')};
-    #need to get features predicted by genscan
-    $self->transcripts(@genscan_peps);
-    #print STDERR "Got genscan peptides @genscan_peps\n";
-   
+    $self->query($genseq);
+    my @genscan_peps = @{$self->db->get_PredictionTranscriptAdaptor->
+      fetch_all_by_RawContig($contig,'Genscan')};
+    $self->_transcripts(@genscan_peps);
+
+    my ($thr, $thr_type);
+    my %p = $self->parameter_hash;
+
+    if (defined $p{threshold} && defined $p{threshold_type}) {
+        $thr      = $p{threshold};
+        $thr_type = $p{threshold_type};
+    }
+    else {
+        $thr_type = 'PVALUE';
+        $thr      = 0.001;
+    }
+
+    foreach my $t (@genscan_peps) {
+        foreach my $db (split ',', ($self->analysis->db_file)) {
+            $self->runnable(Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
+                -genomic        => $self->query,
+                -peptide        => $t,
+                -database       => $db,
+                -program        => $self->analysis->program_file,
+                -args           => $self->arguments,
+                -threshold      => $thr,
+                -threshold_type => $thr_type
+            ));
+        }
+    }
+    return 1;
+
+
 }
 
-sub transcripts {
+
+=head2 _transcripts
+
+  Args[1..]  : @Bio::EnsEMBL::PredictionTranscript
+  Example    : $runnable->fetch_input
+  Description: Internal method to store/retrieve transcripts
+  Returntype : @Bio::EnsEMBL::PredictionTranscript
+  Exceptions : arg is not a Bio::EnsEMBL::PredictionTranscript
+  Caller     : Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA
+
+=cut
+
+
+sub _transcripts {
     my ($self, @transcripts) = @_;
+    $self->{'_transcripts'} ||= [];
     
     if (@transcripts)
     {
@@ -136,151 +148,5 @@ sub transcripts {
     return @{$self->{'_transcripts'}};
 }
 
-
-sub runnable {
-    my ($self, @runnable) = @_;
-    if (@runnable)
-    {
-        foreach my $runnable (@runnable)
-        {
-            $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") or
-                $self->throw("Input to runnable is not Bio::EnsEMBL::Pipeline::RunnableI");
-        }
-        push (@{$self->{'_runnable'}}, @runnable);
-    }
-    return @{$self->{'_runnable'}};
-}
-
-=head2 run
-
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->run()
-    Returns :   none
-    Args    :   none
-
-=cut
-
-sub run {
-    my ($self) = @_;
-  
-    #need to pass one peptide at a time
-    $self->throw("Input must be fetched before run") unless ($self->genseq);
-    #print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
-
-    #extract parameters into a hash
-    my ($parameter_string) = $self->analysis->parameters();
-    my %parameters;
-    my ($thresh, $thresh_type, $arguments);
-
-    if ($parameter_string)
-    {
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
-        foreach my $pair (@pairs)
-        {
-            my ($key, $value) = split (/=>/, $pair);
-            if ($key eq '-threshold_type' && $value) {
-                $thresh_type = $value;
-            }
-            elsif ($key eq '-threshold' && $value) {
-                $thresh = $value;
-            }
-            else
-            # remaining arguments not of '=>' form
-            # are simple flags (like -p1)
-            {
-                $arguments .= " $key ";
-            }
-        }
-    }
-		
-    my @databases = split ',', ($self->analysis->db_file);
-
-    $parameters{'-genomic'} = $self->genseq;
-    $parameters{'-program'} = $self->analysis->program;
-    $parameters{'-options'} = $arguments if $arguments;
-    if ($thresh && $thresh_type) {
-        $parameters{'-threshold'} = $thresh;
-        $parameters{'-threshold_type'} = $thresh_type;
-    }
-    else {
-        $parameters{'-threshold'} = 1e-3;
-        $parameters{'-threshold_type'} = 'PVALUE';
-    }
-
-    foreach my $db (@databases) {
-
-      $parameters{'-database'} = $db;
-
-      foreach my $transcript ($self->transcripts) {
-
-        $parameters{'-peptide'} = $transcript;
-        my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
-	  %parameters
-        );
-
-        $runnable->run();
-        $self->runnable($runnable);                                        
-
-      }
-    }
-  
-}
-
-=head2 output
-
-    Title   :   output
-    Usage   :   $self->output();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->output()
-    Returns :   An array of Bio::EnsEMBL::FeaturePair objects
-    Args    :   none
-
-=cut
-
-sub output {
-    my ($self) = @_;
-
-    my @output;
-    foreach my $run ($self->runnable) {
-      my @tmp = $run->output;
-      foreach my $f (@tmp) {
-	$f->analysis($self->analysis);
-      }
-      push(@output,@tmp);
-    }
-    return @output;
-}
-
-
-sub write_output{
-  my ($self) = @_;
-
-  my @features = $self->output();
-  my $dna_f_a = $self->db->get_DnaAlignFeatureAdaptor();
- 
-  my $contig;
-  eval 
-    {
-      $contig = 
-	$self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    };
-
-  if ($@) {
-      print STDERR "Contig not found, skipping writing output to db: $@\n";
-      return;
-  }
-  foreach my $f(@features){
-    $f->analysis($self->analysis);
-    $f->attach_seq($contig);
-    if($f->isa('Bio::EnsEMBL::DnaDnaAlignFeature')){
-      $dna_f_a->store($f);
-    }else{
-      $self->throw("don't know how to store $f\n");
-    }
-  }
-
-
-}
 
 1;
