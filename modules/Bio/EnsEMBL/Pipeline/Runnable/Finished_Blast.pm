@@ -383,10 +383,21 @@ sub fetch_databases {
 
 sub get_db_version{
     my ($self, $db) = @_;
+    my $debug_this = 1; # this just shows debug info.
+    my $force_dbi  = 0; # this will force a dbi call SLOW!!!!!!
     unless($self->{'_db_version_searched'}){
         if($db){
-            my $ver = eval { BlastableVersion->new($db) };
+            $BlastableVersion::debug = $debug_this;            
+            warn "BlastableVersion is cvs revision $BlastableVersion::revision \n" if $debug_this;
+            
+            my $ver = eval { 
+                my $blast_ver = BlastableVersion->new();
+                $blast_ver->force_dbi($force_dbi); # if set will be SLOW.
+                $blast_ver->get_version($db);
+                $blast_ver;
+            };
             $self->throw("I failed to get a BlastableVersion for $db") if $@;
+            
             my $dbv = $ver->version();
             my $sgv = $ver->sanger_version();
             my $name = $ver->name();
