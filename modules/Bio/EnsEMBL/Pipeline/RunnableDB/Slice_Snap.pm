@@ -73,18 +73,25 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $slice_str = $self->input_id;
-    my ($chr, $start, $end, $sgp) =
-     $slice_str =~ m!$SLICE_INPUT_ID_REGEX!;
+    my ($chr, $start, $end, $sgp) = $slice_str =~ m!$SLICE_INPUT_ID_REGEX!;
 
     $self->db->assembly_type($sgp) if $sgp;
 
-    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end);
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end) or $self->throw("Unable ot fetch Slice");;
 
-    my $repeat_seq = $slice->get_repeatmasked_seq;
+    my $genseq;
+
+    if (@$SNAP_MASKING) {
+	$genseq = $slice->get_repeatmasked_seq($SNAP_MASKING) or $self->throw("Unable ot fetch seq");;
+    }
+    else {
+	
+	$genseq = $slice;
+    }
 
     $self->throw("Unable to fetch virtual contig") unless $slice;
-
-    $self->query($slice);
+    print STDERR $slice->seq."\n";
+    $self->query($genseq);
     
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Snap(
