@@ -1,4 +1,5 @@
 
+
 =pod
 
 =head1 NAME
@@ -112,12 +113,15 @@ sub new {
 sub run{
   my ($self) = shift;
 
+  print "running SlamDB.pm...lucky guy\n";
+
   my @subslices;
   my %alltranscripts;
   ####################### IF SEQLENGTH > SLAM_MAXLENGTH WE SPLIT #############################
 
   if ( (${$self->slices}[0]->length  || ${$self->slices}[0]->length ) > $SLAM_MAXLENGTH) {
     # run avid on uncutted slices
+
     my $avid = $self->runavid( $self->slices);
 
     # run ApproxAlign on org slices
@@ -125,9 +129,28 @@ sub run{
 
     # cut the first seq according to the positions of the repeats
     # and than try to find equal positions in the second seq by
-    # using the approximate Alignment-aatfile
+    # using the aat-file
 
     my @cuts = @{ $self->calculate_cutting ( $approx_obj ) } ;
+    print "sdb: CALCULATED CUTTING using the repeats out of db:\n";
+    for(@cuts){
+      my @bla =@$_;
+      foreach(@bla){ print "$_\t"; }
+      print "\n";
+    }
+    print "\n\n";
+
+
+    # output for checking the splitting-file
+    my $bug_aat =  $avid->parsed_binary_filename;
+    my $bug_f1  = "/tmp/". $avid->_filename1.".fasta";
+    my $bug_f2  = "/tmp/". $avid->_filename2.".fasta";
+    my $bug_rmf = "/tmp/db_repeats.out";
+
+    #  perl test_slam_cutting.pl /tmp/fasta1.fasta /tmp/fasta2.fasta /tmp/aatfile.aat /tmp/rempeatmsk.out 
+    print "perl  test_slam_cutting.pl  $bug_f1 $bug_f2 $bug_aat $bug_rmf\n";
+
+    exit(0);
 
     # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
@@ -294,14 +317,19 @@ sub calculate_cutting{
 
   # getting attributes of object
   my @slices  = @{$self->slices};
-  my $targetcut = $SLAM_MAXLENGTH;
+
   my @all_repeats = @{$self->get_repeat_features};
 
-  my @cuts1 = (1);
+
   my $len1 = $slices[0]->length;
 
-  while ($targetcut < $len1) {
 
+  print "Length1: $len1\n";
+  print "MaxLen : $SLAM_MAXLENGTH\n";
+
+  my @cuts1 = (1);
+  my $targetcut = $SLAM_MAXLENGTH;
+  while ($targetcut < $len1) {
     my $cut = undef;
     while (1) {
       # $all_repeats[0]->[0] = start of repeat
@@ -340,27 +368,51 @@ sub calculate_cutting{
   push(@cuts1,$len1) if($cuts1[$#cuts1] < $len1);
 
   ################################################################################
-  #
   # Make array of matching cuts in other sequence using the approximate alignement
   #
   # what is the lower bound for the first cut ? What generally is a lowerBound ?
-
   # get first cut for second sequence
-  my @cuts2 = (1+$ApproxAlign->lowerBound($cuts1[0]-1));
+print "myalgo\n";
+  for(my $z=0;$z<100;$z++){
+    print "$z:\t" . ($ApproxAlign->lowerBound($z)) . "\t" . ($ApproxAlign->upperBound($z)) . "\n" ;
+  }
 
+  my @cuts2 = (1+$ApproxAlign->lowerBound($cuts1[0]-1));
+  print "XXX Cuts2[0]\t$cuts2[0]\n";
 
   for (my $i=1; $i < (scalar(@cuts1)-1); $i++) {
     push(@cuts2,sprintf("%d",($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1))/2.0));
+    print "ApproxAlign->lowerBound: " . ($ApproxAlign->lowerBound($cuts1[$i]-1)) . "-- upperbound" . ($ApproxAlign->upperBound($cuts1[$i]-1)) . "\n";
   }
+
+
   push(@cuts2,(1+$ApproxAlign->upperBound($cuts1[$#cuts1]-1)));
+  print "val: " . (1+$ApproxAlign->upperBound($cuts1[$#cuts1]-1)) . "\n";
 
 
 
+
+
+
+  my @splits = ();              # nr of cuts
   $cuts1[0] = $cuts1[0]-1;
   $cuts2[0] = $cuts2[0]-1;
 
-  # now splitting
-  my @splits = ();              # nr of cuts
+
+  ## look at content of cuts1
+  ## the error/diffrent values are in the @cuts2-arrray !!!! 
+  print "------------\n";
+  foreach(@cuts1){
+      print "cuts1: $_\n";
+  }
+  print "------------\n\n";
+
+
+  print "------------\n";
+  foreach(@cuts2){
+      print "cuts2: $_\n";
+  }
+  print "------------\n\n";
   for (my $i=0, my $cutCount=0; $i < (scalar(@cuts1)-1); $i++) {
     if ($cuts2[$i]+1 > $cuts2[$i+1]) {
       # skip if we have an insertion in the base seqeunce.
@@ -549,46 +601,76 @@ sub write_output {
 # ex1:  ..._repeat_repeat_repeat_CUTTINGPOSITION_repeat_repeat_repeat_...
 #
 # ex2:  ..._
+# 
+# gets the repeat features for the first silce !
 
 sub get_repeat_features {
   my $self = shift;
 
   my @slices = @{$self->slices};
-  my (@all_rpt);
+  my $slice = $slices[0];
 
+  my (@all_rpt);
   # repeat-types to look for
   my @repeats =('LTRs','Type I Transposons/LINE','Type I Transposons/SINE');
-
   my @all;
-  # get all repeats of the given types (above)
+
+  # only for testing purpose start
+  my $repeatfilename = "/tmp/db_repeats.out";
+  # only for testing purpose end
+
+
+
+  # get all repeats of the given types (above) and write them in @array
   for my $arpt (@repeats) {
-    for my $rpt ( @{$slices[0]->get_all_RepeatFeatures(undef,"$arpt")}) {
+    for my $rpt ( @{$slice->get_all_RepeatFeatures(undef,"$arpt")}) {
+
       my $rpt_start = $rpt->start;
       my $rpt_end = $rpt->end;
+
       push (@all_rpt , [ $rpt_start , $rpt_end ] );
       push (@all , [ $rpt_start , $rpt_end , $rpt->display_id] );
     }
   }
 
+  # sort the @array
   # writingout a outffile to compare with slam run
 
-  # routine of comparing repeats of db with repeats from repeatmasker-run
-  #  for (@all){
-  #    my @r = @{$_};
-  #    for(@r){
-  #      print "\t $_";
-  #    }
-  #    print "\n";
-  #  }
+#   for (@all){
+#      my @r = @{$_};
+#      @r = sort(@r);
+#      for(@r){
+#        print "\t $_";
+#      }
+#      print "\n";
+#    }
+
+#  # routine of comparing repeats of db with repeats from repeatmasker-run
+#    for (@all){
+#      my @r = @{$_};
+#      @r = sort(@r);
+#      for(@r){
+#        print "\t $_";
+#      }
+#      print "\n";
+#    }
+
+
   # sort startpos of rpt ascending order
   @all_rpt = sort { $a->[0] <=> $b->[0] } @all_rpt;
   # check the sorting
-  #  for my $r (@all_rpt){
-  #    my @r=@{$r};
-  #    for(@r){
-  #      print "\t $_";
-  #    }
-  #    print "\n";
-  #  }
+  print "Writing $repeatfilename\n";
+
+  open(RP,">$repeatfilename") || die "write error $repeatfilename\n";
+    for my $r (@all_rpt){
+      my @r=@{$r};
+      for(@r){
+        print RP "\t $_";
+      }
+      print RP "\n";
+    }
+  close(RP);
+
+  exit(0);
   return \@all_rpt;
 }
