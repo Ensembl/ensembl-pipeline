@@ -306,7 +306,7 @@ sub stdout_file{
    }
 
    if(!$self->{'stdout'}){
-     $self->{'stdout'} ='/dev/null'
+     $self->{'stdout'} ='/dev/zero'
    }
    return $self->{'stdout'};
 }
@@ -320,7 +320,7 @@ sub stderr_file{
      $self->{'stderr'} = $arg;
    }
    if(!$self->{'stderr'}){
-     $self->{'stderr'} ='/dev/null'
+     $self->{'stderr'} ='/dev/zero'
    }
    return $self->{'stderr'};
 }
