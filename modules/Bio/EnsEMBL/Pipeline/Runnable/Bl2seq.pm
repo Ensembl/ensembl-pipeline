@@ -95,8 +95,7 @@ sub new {
   $self->{'_min_eval'} = 0.01; # value for minimum E value "-e" option
   $self->{'_fplist'} = []; # an array of feature pairs (the output)
   $self->{'_workdir'} = "/tmp"; # location of temp directory
-  $self->{'_results'} = "/tmp/results.".$$; # location of result file
-#  $self->{'_results'} = "/tmp/results.".$$; # location of result file
+  $self->{'_results'} = $self->{'_workdir'}."/results.".$$; # location of result file
 
   my ($seq1, $seq2, $program, $alntype, $min_score, $min_eval, $workdir, $results) = 
     $self->_rearrange([qw(SEQ1 SEQ2 PROGRAM ALNTYPE MIN_SCORE MIN_EVAL WORKDIR RESULTS)], @args);
@@ -294,7 +293,7 @@ sub run {
 
 sub run_analysis {
   my ($self,$query,$sbjct) = @_;
-  my ($g,$W,$G,$E,$X) = qw(T 10 -1 0 10);
+  my ($g,$W,$G,$E,$X) = qw(T 10 -1 3 10);
   print STDERR ("Running bl2seq\n" . $self->program .
 		                     " -i $query" .
 		                     " -j $sbjct" .
@@ -327,29 +326,16 @@ sub parse_results {
     $self->throw("Coudn't open file ".$self->results.", $!\n");
   my $filehandle = \*BL2SEQ;
 
-  my $bl2seq_parsing = Bl2seq::Parser->new(-fh => $filehandle,
-					   -alntype => 'blastn',
-					   -min_score => $self->min_score);
+  my $bl2seq_parsing = Bl2seq::Parser->new('-fh' => $filehandle,
+					   '-alntype' => 'blastn',
+					   '-min_score' => $self->min_score,
+					   '-qname' => $self->seq1->id,
+					   '-sname' => $self->seq2->id);
 
-  while (my @blocks = $bl2seq_parsing->nextBlocks) {
-    last unless (scalar @blocks);
-    foreach my $block (@blocks) {
-      my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits) = ($block->qstart,$block->qend,$block->qstrand,$block->sstart,$block->send,$block->sstrand,$block->bits);
-      
-      my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
-
-      $fp->start($qstart);
-      $fp->end($qend);
-      $fp->strand($qstrand);
-      $fp->seqname($self->seq1->id);
-      $fp->hstart($sstart);
-      $fp->hend($send);
-      $fp->hstrand($sstrand);
-      $fp->hseqname($self->seq2->id);
-      $fp->score($bits);
-
-      $self->_add_fp($fp);
-    }
+  while (my $DnaDnaAlignFeature = $bl2seq_parsing->nextHSP) {
+    my @ungapped_features = $DnaDnaAlignFeature->ungapped_features;
+    next unless (scalar @ungapped_features);
+    $self->_add_fp($DnaDnaAlignFeature);
   }
 }
 
@@ -400,6 +386,7 @@ sub workdir{
 package Bl2seq::Parser;
 
 use strict;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Carp;
 use vars qw(@ISA);
 
@@ -415,13 +402,20 @@ sub new {
   $self->{'_alntype'} = undef; # type of blast alignment
   $self->{'_lastline'} = undef; # last line being read in the filehandle
   $self->{'_min_score'} = 0; # last line being read in the filehandle
+  $self->{'_qname'} = undef; # filehandle on results file
+  $self->{'_sname'} = undef; # filehandle on results file
 
-  my ($fh,$alntype,$min_score) = $self->_rearrange([qw(FH ALNTYPE MIN_SCORE)], @args);
+  my ($fh,$alntype,$min_score,$qname,$sname) = $self->_rearrange([qw(FH ALNTYPE MIN_SCORE QNAME SNAME)], @args);
 
-  $self->throw("Must pass in both fh and alntype args") if (! defined $fh || ! defined $alntype);
+  $self->throw("Must pass in both fh and alntype args") if (! defined $fh ||
+							    ! defined $alntype ||
+							    ! defined $qname ||
+							    ! defined $sname);
   $self->fh($fh);
   $self->alntype($alntype);
   $self->min_score($min_score) if (defined $min_score);
+  $self->qname($qname);
+  $self->sname($sname);
 
   return $self;
 }
@@ -477,10 +471,26 @@ sub slength {
     $self->{'_slength'} = $value;
   }
   return $self->{'_slength'};
+}
+
+sub qname {
+  my ($self,$value) = @_;
+  if (defined $value) {
+    $self->{'_qname'} = $value;
+  }
+  return $self->{'_qname'};
 
 }
 
-sub nextBlocks {
+sub sname {
+  my ($self,$value) = @_;
+  if (defined $value) {
+    $self->{'_sname'} = $value;
+  }
+  return $self->{'_sname'};
+}
+
+sub nextHSP {
   my ($self) = @_;
   my $fh = $self->fh;
   unless (defined $self->lastline) {
@@ -502,9 +512,8 @@ sub nextBlocks {
     }
   }
   my $parse_alntype = "parse_".$self->alntype;
-  my @blocks = $self->$parse_alntype($fh,$self->qlength,$self->slength);
-
-  return @blocks;
+  my $DnaDnaAlignFeature = $self->$parse_alntype($fh,$self->qlength,$self->slength);
+  return $DnaDnaAlignFeature
 }
 
 sub parse_blastp {
@@ -595,7 +604,6 @@ sub parse_blastn {
     $shspstart = $shspend;
     $shspend = $tmp;
   }
-
   my $block = Bl2seq::Block->new();
   $block->bits($bits);
   $block->score($score);
@@ -611,15 +619,37 @@ sub parse_blastn {
   $block->slength($slength);
   $block->qseq($qhspseq);
   $block->sseq($shspseq);
-  
-  if (abs($block->qend - $block->qstart) == abs($block->send - $block->sstart)) {
+
+  if (abs($block->qend - $block->qstart) == abs($block->send - $block->sstart) &&
+      $block->qseq !~ /[acgtnACGTN]+/ &&
+      $block->sseq !~ /[acgtnACGTN]+/) {
     push @blocks, $block;
   } else {
     while (my $ungapped_block = $block->nextUngappedBlock) {
       push @blocks, $ungapped_block;
     }
   }
-  return @blocks;
+  my @ungapped_features;
+  foreach my $ungapped_block (@blocks) {
+    my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits,$perc_id) = ($ungapped_block->qstart,$ungapped_block->qend,$ungapped_block->qstrand,$ungapped_block->sstart,$ungapped_block->send,$ungapped_block->sstrand,$ungapped_block->bits,$ungapped_block->identity);
+
+    my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
+
+    $fp->start($qstart);
+    $fp->end($qend);
+    $fp->strand($qstrand);
+    $fp->seqname($self->qname);
+    $fp->hstart($sstart);
+    $fp->hend($send);
+    $fp->hstrand($sstrand);
+    $fp->hseqname($self->sname);
+    $fp->score($bits);
+    $fp->percent_id($perc_id);
+    
+    push @ungapped_features, $fp;
+  }
+  my $DnaDnaAlignFeature = new Bio::EnsEMBL::DnaDnaAlignFeature('-features' => \@ungapped_features);
+  return $DnaDnaAlignFeature;
 }
 
 sub parse_blastx {
