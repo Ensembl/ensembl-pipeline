@@ -55,7 +55,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 		minimum threshold for coverage of the transcript
 		by FeaturePairs, given as total percentage of the
 		transcript involved in any FeaturePairs
-		(-TRANSCRIPT_PERCENT_COVERAGE, defaults to 95)
+		(-TRANSCRIPT_PERCENT_COVERAGE, defaults to 97)
 
 =cut
 
@@ -73,7 +73,7 @@ sub new {
 
   $self->transcript_arrayref($transcript_arrayref);
   $self->cdna_database($cdna_database);
-  $transcript_percent_coverage = 95
+  $transcript_percent_coverage = 97
     unless defined $transcript_percent_coverage;
   $self->transcript_percent_coverage($transcript_percent_coverage);
 
