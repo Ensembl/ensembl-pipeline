@@ -336,9 +336,12 @@ sub run_analysis {
               die qq{"OUT_OF_MEMORY"\n}; # resent to big mem machine by rulemanager
             }
             else{
-              $self->warn("Something FATAL happened to BLAST we've not seen before, please add it to " . 
-                          "Package: " . __PACKAGE__ . ", File: " . __FILE__);
-              die qq{"UNKNOWN_ERROR"\n}; # hang around until someone works out what went wrong.
+              $self->warn("Something FATAL happened to BLAST we've not ".
+                          "seen before, please add it to Package: " 
+                          . __PACKAGE__ . ", File: " . __FILE__);
+              die ($UNKNOWN_ERROR_STRING."\n"); # send appropriate string 
+              #as standard this will be failed so job can be retried
+              #when in pipeline
             }
           }
           elsif(/WARNING:(.+)/){
