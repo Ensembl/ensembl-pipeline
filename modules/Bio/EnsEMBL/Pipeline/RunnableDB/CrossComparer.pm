@@ -202,10 +202,15 @@ sub run {
 
 sub output {
    my ($self,@args) = @_;
-   if(@args) {
+   if (@args) {
      push @{$self->{'output'}}, @args;
    }
-   return @{$self->{'output'}};
+
+   if (defined $self->{'output'}) {
+     return @{$self->{'output'}};
+   } else {
+     return ();
+   }
 }
 
 =head2 _greedy_filter
