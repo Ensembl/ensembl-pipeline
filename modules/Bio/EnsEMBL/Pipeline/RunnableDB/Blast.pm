@@ -45,12 +45,12 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 use vars qw(@ISA);
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-    require "Bio/EnsEMBL/Pipeline/Blast_conf.pl";
 }
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
