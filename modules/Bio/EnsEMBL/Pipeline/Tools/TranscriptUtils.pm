@@ -433,7 +433,7 @@ sub _check_Translation{
 sub _check_low_complexity{
   my ($self, $transcript,$complexity_threshold) = @_;
   my $valid = 1;
-  my $low_complexity;
+ 
   
   eval{
     
@@ -458,12 +458,13 @@ sub _check_low_complexity{
     
     $seg->run;
     
-    
-    if($seg->get_low_complexity_length > $complexity_threshold){
+    my $low_complexity = $seg->get_low_complexity_length;
+    print STDERR "Have low complexity ".$low_complexity.
+      " and complexity threshold $complexity_threshold\n";
+    if($low_complexity > $complexity_threshold){
       warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
       $valid = 0;
     }
-    $valid = 1;
     
     
   };
@@ -1469,7 +1470,7 @@ sub set_stop_codon{
 sub set_start_codon{
   my ( $self, $transcript ) = @_;
 
-  my  $verbose = 1;
+  my  $verbose = 0;
 
   # check transcript has a translation
   if((!defined $transcript->translation) || (!defined $transcript->translation->start_Exon)){
@@ -1489,7 +1490,6 @@ sub set_start_codon{
   }
 
   # always a good plan
-  $transcript->sort;
 
 
   # useful info in genomic coordinates
@@ -1513,13 +1513,13 @@ sub set_start_codon{
 	  return $transcript;
         }
 
-  print "Peptide genomic location = " . $pepgenstart . " " . $pepgenend . "\n";
+  #print "Peptide genomic location = " . $pepgenstart . " " . $pepgenend . "\n";
 
   ############################################################
   # first see whether the transcript already begins with ATG
   my $first_codon = substr($cdna_seq, $cdna_coding_start-1, 3);
 
-  print STDERR "first codon: $first_codon\n";
+  #print STDERR "first codon: $first_codon\n";
 
   if ( uc($first_codon) eq 'ATG' ){
     print STDERR "transcript already starts with ATG - no need to modify\n" if $verbose;
@@ -1710,9 +1710,9 @@ sub set_start_codon{
                            ($start_exon->slice, $codon_start,$codon_end, 
                             $strand)});
     
-    print "Got codon seq " . $codonseq . "\n";
+    #print "Got codon seq " . $codonseq . "\n";
     if ($codonseq ne "ATG") {
-      print STDERR "upstream codon (faling off the slice) is not ATG - not modifying transcript\n";
+      #print STDERR "upstream codon (faling off the slice) is not ATG - not modifying transcript\n";
       return $transcript;
     }
     else{

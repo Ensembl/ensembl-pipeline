@@ -173,7 +173,7 @@ sub fetch_by_Status_Analysis {
            j.temp_dir, j.exec_host
 	FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
-        AND      j.analysis = ?
+        AND      j.analysis_id = ?
         AND      js.status = ?
 	AND      js.is_current = 'y'
         ORDER BY time desc
@@ -584,7 +584,7 @@ sub set_status {
                                 SET    is_current = 'n'
                                 WHERE  job_id = ?
                                });
-	$res = $sth->execute($jobId);
+        $res = $sth->execute($jobId);
         
         $sth = $self->prepare(q{
                                 INSERT into job_status
@@ -606,7 +606,7 @@ sub set_status {
           );
         
         $self->current_status($job, $status);
-        
+        $sth->finish;
       };
     
     if ($@) {
@@ -662,9 +662,10 @@ sub current_status {
           $time    = $rowhash->[0];
         }
         if(!$status){
+          my ($p, $f, $l) = caller;
           $self->warn("Have found no status for ".$job->dbID." ".
                       $job->input_id." ".$job->analysis->dbID.
-                      " assuming is sucessful\n");
+                      " assuming is sucessful $f:$l\n");
           $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
@@ -673,6 +674,7 @@ sub current_status {
                                                             '-created' => $time,
                                                            );
         $job->{'_status'} = $statusobj;
+        $sth->finish;
       }
     return $job->{'_status'};
   }

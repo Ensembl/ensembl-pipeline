@@ -159,7 +159,7 @@ sub new {
   
   # can add extra options as a string
   if ($options){
-    $basic_options .= $options;
+    $basic_options .= " ".$options;
   }
   $self->options( $basic_options);
 

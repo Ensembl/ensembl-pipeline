@@ -294,7 +294,8 @@ sub run_analysis {
         my $blastype = "";
         my $filename = $self->filename;
 
-        if ($BLAST_FLAVOUR{$self->database} eq 'ncbi') {
+        if ($BLAST_FLAVOUR{$self->database} 
+            && $BLAST_FLAVOUR{$self->database} eq 'ncbi') {
             $command .= " -d $database -i $filename ";
         } else {
             $command .= " $database $filename ";

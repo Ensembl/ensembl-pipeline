@@ -417,7 +417,7 @@ sub writefile {
 
       or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
 
-    $clone_out->write_seq($self->$seqobj())
+    $clone_out->write_seq($seqobj)
       or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
       $self->file($seqfilename);
 
