@@ -239,7 +239,8 @@ sub _make_Exon {
   $exon->end       ($exon_prediction->end  );
   $exon->strand    ($exon_prediction->strand);
   $exon->phase     ($exon_prediction->phase);
-  
+  $exon->end_phase ( ( $exon->end - $exon->start + 1 + $exon->phase )%3 );
+
   return $exon;
 }
 
