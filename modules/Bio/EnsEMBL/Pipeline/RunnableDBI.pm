@@ -27,16 +27,6 @@ module, defines methods for reading and writing
 input and output to and from the database which
 stores the analysis.  This separation is so that
 
-=head1 CONTACT
-
-Describe contact details here
-
-=head1 APPENDIX
-
-The rest of the documentation details each of the
-object methods. Internal methods are usually
-preceded with a _
-
 =cut
 
 # Let the code begin...
@@ -53,6 +43,9 @@ use Bio::Root::Object;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object);
 
 =head1 CONCRETE METHODS
+
+These methods are actually implemented by this
+"I" module.
 
 =head2 dbobj
 
@@ -91,11 +84,17 @@ stores it in the object.
 
 =head2 fetch_output
 
-    $self->fetch_output($file);
+    @output = $self->fetch_output($file_name);
 
-
+Fetches an array of output objects stored in file
+C<$file_name>.
 
 =head2 write_output
+
+     $self->write_output;
+
+Writes the objects returned from the analysis to
+the database.
 
 =cut
 

@@ -117,11 +117,13 @@ sub db2 {
     }
     return $self->{_db2};
 }
+
 =head2 fetch_output
 
     Title   :   fetch_output
-    Usage   :   $self->fetch_output
+    Usage   :   $self->fetch_output($file_name);
     Function:   Fetchs output data from a frozen perl object
+                stored in file $file_name
     Returns :   array of exons (with start and end)
     Args    :   none
 
