@@ -155,8 +155,8 @@ sub _align_protein {
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }
-  
-  if ($self->reverse == 1) {
+
+  if (defined($self->reverse) && $self->reverse == 1) {
     $command .= " -trev ";
   }
   
