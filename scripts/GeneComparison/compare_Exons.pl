@@ -44,6 +44,14 @@ my $ref_dbname = $REF_DBNAME;
 my $ref_path   = $REF_PATH;
 my $ref_user   = $REF_DBUSER;
 
+# reference db (where the dna is for the prediction)
+my $ref_host2   = $REF_DBHOST2;
+my $ref_dbname2 = $REF_DBNAME2;
+my $ref_path2   = $REF_PATH2;
+my $ref_user2   = $REF_DBUSER2;
+
+
+
 my $input_id;
 my $write  = 0;
 my $check  = 0;
@@ -79,6 +87,13 @@ my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host,
 $dna_db->static_golden_path_type($ref_path); 
 print STDERR "Connected to dna database $ref_dbname : $ref_host : $ref_user\n";
 
+# connect to the databases 
+my $dna_db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host2,
+						-user  => $ref_user2,
+						-dbname=> $ref_dbname2);
+$dna_db->static_golden_path_type($ref_path2); 
+print STDERR "Connected to dna database $ref_dbname2 : $ref_host2 : $ref_user2\n";
+
 
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
@@ -92,7 +107,7 @@ print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 my $db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host2,
 					    -user  => $user2,
 					    -dbname=> $dbname2,
-					    -dnadb => $dna_db,
+					    -dnadb => $dna_db2,
 					   );
 
 print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
