@@ -50,7 +50,11 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -verbose if you want more information about what the script is doing
     
 
-    -input_type if you want to override the standard input_id types
+    -input_type if you want to specific an input_id_type not already
+     used by the analysis object
+
+    -insert_analysis if you want to insert an analysis object if it doesn't
+     already exist in the database'
 
 =head1 EXAMPLES
 
@@ -112,6 +116,7 @@ my $single;
 my $verbose;
 my $help = 0;
 my $translation_id;
+my $insert_analysis = 0;
 my $name = 'genome';
 &GetOptions(
             'dbhost:s'     => \$host,
@@ -119,20 +124,21 @@ my $name = 'genome';
             'dbuser:s'     => \$user,
             'dbpass:s'     => \$pass,
             'dbname:s'     => \$dbname,
-	    'contig'       => \$contig,
-	    'slice'        => \$slice,
+            'contig'       => \$contig,
+            'slice'        => \$slice,
             'slice_size:s' => \$slice_size,
             'slice_overlap:s' => \$slice_overlap,
             'logic_name:s' => \$logic_name,
             'input_type:s' => \$input_type,
-	    'file'         => \$file,
-	    'dir:s'        => \$dir,
-	    'file_regex:s' => \$regex,
-	    'single'       => \$single,
+            'file'         => \$file,
+            'dir:s'        => \$dir,
+            'file_regex:s' => \$regex,
+            'single'       => \$single,
             'single_name:s'=> \$name,
             'verbose'      => \$verbose,
             'translation_id' => \$translation_id,
             'h|help'            => \$help,
+            'insert_analysis!' => \$insert_analysis,
            );
 
 if ($help) {
@@ -203,19 +209,22 @@ if ($slice) {
 
 
 
-
-if (!($analysis)) {
-    $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name    => $logic_name,
-                                                     -input_id_type => $input_type);
-
-    print "storing analysis ".$analysis->logic_name."\n" if($verbose);
- 
-    $db->get_AnalysisAdaptor->store($analysis);
-    if(!$analysis->logic_name){
-      die "you  must specify a logic_name for your analysis otherwise".
-	" this won't work properly\n";
-    }
+if($insert_analysis && !$analysis){
+  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
+    (-logic_name    => $logic_name,
+     -input_id_type => $input_type);
+  
+  print "storing analysis ".$analysis->logic_name."\n" if($verbose);
+  
+  $db->get_AnalysisAdaptor->store($analysis);
+  if(!$analysis->logic_name){
+    die "you  must specify a logic_name for your analysis otherwise".
+      " this won't work properly\n";
   }
+}elsif(!$analysis){
+  die("Can't run without a defined analysis $logic_name doesn't seem to ".
+      "exist in the database");
+}
 
 print STDERR "have analysis ".$analysis->logic_name ." ".$analysis->input_id_type."\n";
 $analysis->input_id_type($input_type) if(!$analysis->input_id_type); 
