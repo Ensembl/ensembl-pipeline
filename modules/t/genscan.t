@@ -46,8 +46,8 @@ else
 
 #create Genscan object    
 my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (  -CLONE => $clone,
-                                                                -GENSCAN => '/nfs/disk100/humpub/OSFbin/genscan',
-                                                                -MATRIX  => '/nfs/disk100/humpub/OSFbin/HumanIso.smat');
+                                                                -GENSCAN => '/usr/local/ensembl/bin/genscan',
+                                                                -MATRIX  => '/usr/local/ensembl/data/HumanIso.smat');
  
 unless ($genscan)
 { print "not ok 3\n"; }
