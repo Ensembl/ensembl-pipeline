@@ -38,23 +38,19 @@ The steps the script performes:
 
 What YOU need to do:
   1. Fill in the config variables in this script (just below this).
-  2. Run it, check the set-up and re-run if there are errors.
-  3. Check the results
-  4. Clean up any mess by running 'clean'.
-  5. Hand over target-database.
+  2. Check for the existance of two additional programs needed:
+	fastasplit, splitting a fasta file into a number of chunks
+ 	polyA_clipping, removing poly-A tails from sequences
+  3. Run it, check the set-up and re-run if there are errors.
+  4. Check the results
+  5. Clean up any mess by running 'clean'.
+  6. Hand over target-database.
 
 If there is an error and the script dies, the original config files are restored
 without removing the data files and databases, allowing the re-run of the script.
 
 The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs 
 between 5 and 24 h, depending on farm usage.
-
-Two external programs need to be accessible for the script:
-  splitting a fasta file into a number of chunks:
-    /nfs/acari/searle/progs/fastasplit/fastasplit
-
-  removing poly-A tails from sequences:
-    /nfs/acari/searle/progs/ensembl-trunk/ensembl-pipeline/scripts/EST/clip_polyA.pl
 
 =head1 CONTACT
 
@@ -66,13 +62,14 @@ ensembl-dev@ebi.ac.uk
 
 
 # configuration variables, adjust to your needs:
+# all directories without trailing '/'
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-$cvsDIR             = "/nfs/acari/fsk/cvs_checkout";
+$cvsDIR             = "";
 
 # personal data dir (for temporaty & result/error files)
-$dataDIR            = "/ecs2/work3/fsk/cDNA_update";
+$dataDIR            = "";
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans
@@ -80,8 +77,12 @@ $vertrna            = "embl_vertrna-1";
 $vertrna_update     = "emnew_vertrna-1";
 $refseq             = "hs.fna";
 $sourceHost         = "cbi1";
-$sourceDIR          = "/data/blastdb";
-$masked_genome      = "/data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
+$sourceDIR          = ".../blastdb";
+$masked_genome      = ".../blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
+
+# external programs needed:
+$fastasplit         = "~/fastasplit";
+$polyA_clipping     = "~/clip_polyA.pl";
 
 # db parameters
 #admin rights required
@@ -89,20 +90,20 @@ $WB_DBUSER          = "";
 $WB_DBPASS          = "";
 # reference db (current build)
 $WB_REF_DBNAME      = "homo_sapiens_core_29_35b";
-$WB_REF_DBHOST      = "ecs2";
-$WB_REF_DBPORT      = "3364";
+$WB_REF_DBHOST      = "";
+$WB_REF_DBPORT      = "";
 # new source db (PIPELINE)
 $WB_PIPE_DBNAME     = $ENV{'USER'}."_cDNA_pipe";
-$WB_PIPE_DBHOST     = "ecs1a";
-$WB_PIPE_DBPORT     = "3306";
+$WB_PIPE_DBHOST     = "";
+$WB_PIPE_DBPORT     = "";
 # new target db (ESTGENE)
 $WB_TARGET_DBNAME   = $ENV{'USER'}."_cDNA_update";
-$WB_TARGET_DBHOST   = "ecs2";
-$WB_TARGET_DBPORT   = "3362";
+$WB_TARGET_DBHOST   = "";
+$WB_TARGET_DBPORT   = "";
 # new EST db (might not be really necessary)
 $WB_EST_DBNAME      = $ENV{'USER'}."_EST";
-$WB_EST_DBHOST      = "ecs2";
-$WB_EST_DBPORT      = "3366";
+$WB_EST_DBHOST      = "";
+$WB_EST_DBPORT      = "";
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -119,10 +120,11 @@ $configDIR         = $dataDIR."/configbackup";
 $chunkDIR          = $dataDIR."/chunks";
 $outDIR            = $dataDIR."/output";
 my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
-		     configDIR sourceDIR newfile config_file masked_genome WB_DBUSER WB_DBPASS 
-		     WB_REF_DBNAME WB_REF_DBHOST WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST 
-		     WB_PIPE_DBPORT WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT 
-		     WB_EST_DBNAME WB_EST_DBHOST WB_EST_DBPORT);
+		     configDIR sourceDIR newfile config_file masked_genome fastasplit
+                     polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
+                     WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
+                     WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT WB_EST_DBNAME 
+                     WB_EST_DBHOST WB_EST_DBPORT);
 
 
 my $option = $ARGV[0];
@@ -199,12 +201,6 @@ sub config_setup{
   #check existence of source databases
   if(!connect_db($WB_REF_DBHOST, $WB_REF_DBPORT, $WB_REF_DBNAME, $WB_DBUSER, $WB_DBPASS)){
     die "could not find $WB_REF_DBNAME.";
-  }
-  if(!connect_db($WB_PREF_DBHOST, $WB_PREF_DBPORT, $WB_PREF_DBNAME, $WB_DBUSER, $WB_DBPASS)){
-    die "could not find $WB_PREF_DNA_DBNAME.";
-  }
-  if(!connect_db($WB_PREF_DNA_DBHOST, $WB_PREF_DNA_DBPORT, $WB_PREF_DNA_DBNAME, $WB_DBUSER, $WB_DBPASS)){
-    die "could not find $WB_PREF_DNA_DBNAME.";
   }
   #go thru config info to create defined files,
   #back-up the original, write version with filled-in variables
@@ -404,7 +400,7 @@ sub fastafiles{
     if($update){
       #clip ployA tails
       my $newfile2 = $newfile.".clipped";
-      $cmd = "/nfs/acari/searle/progs/ensembl-trunk/ensembl-pipeline/scripts/EST/clip_polyA.pl ".
+      $cmd = "$polyA_clipping ".
 	     "-mRNA $newfile -out $newfile2 -clip";
       if(system($cmd)){
 	die("couldn t clip file.$@\n");
@@ -414,7 +410,7 @@ sub fastafiles{
       my $newfasta = $dataDIR."/".$newfile;
       my $outdir   = $chunkDIR;
       my $chunknum = 1000;   #(<300 sequences / file)
-      $cmd = "/nfs/acari/searle/progs/fastasplit/fastasplit $newfasta $chunknum $outdir";
+      $cmd = "$fastasplit $newfasta $chunknum $outdir";
       if(system($cmd)){
 	die("couldn t split file.$@\n");
       }
