@@ -262,7 +262,7 @@ while (1) {
         last INPUT_ID_TYPE;
       }
 
-      print "\n===\nInput id ".$input_id."\n" if($verbose);
+      print "\n===\nInput id ".$input_id."\n" if ($verbose);
 
       my %analHash;
       my @anals = @{$rulemanager->stateinfocontainer->fetch_analysis_by_input_id($input_id)};
@@ -280,11 +280,11 @@ while (1) {
           }
         }
       }
-      my $current_jobs = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
+      my $current_jobs_hash = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
 
-      print "\n\n Ended up with " . scalar(keys %analHash) . " analyses which pass conditions\n";
+      print "\n\n Ended up with " . scalar(keys %analHash) . " analyses which pass conditions\n" if ($verbose);
       for my $anal (values %analHash) {
-        if ($rulemanager->can_job_run($input_id, $anal,$current_jobs)) {
+        if ($rulemanager->can_job_run($input_id, $anal,$current_jobs_hash)) {
           $submitted++;
         }
       }
@@ -294,10 +294,14 @@ while (1) {
   if (!$done && !$reset) {
     if ($accumulators) {
       %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
+
+      my $accumulator_jobs_hash = $rulemanager->job_adaptor->fetch_hash_by_input_id('ACCUMULATOR');
+
       foreach my $logic_name (keys %accumulator_analyses) {
         if (!exists($incomplete_accumulator_analyses{$logic_name}) &&
             !exists($completed_accumulator_analyses{$logic_name})) {
-          if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name})){
+
+          if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name},$accumulator_jobs_hash)) {
             $submitted++;
           } elsif (exists($incomplete_accumulator_analyses{$logic_name})) {
             print "Accumulator type analysis $logic_name ".

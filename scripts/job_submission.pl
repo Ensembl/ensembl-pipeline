@@ -2,11 +2,13 @@
 
 use strict;
 use Getopt::Long;
+
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Pipeline::RuleManager;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
+
 $| = 1;
 
 my $term_sig =  0;
@@ -21,25 +23,24 @@ my $dbuser    = $ENV{'ENS_DBUSER'};
 my $dbpass    = $ENV{'ENS_DBPASS'};
 my $dbport    = $ENV{'ENS_DBPORT'} || 3306;
 
-#command line args
-my $help; #get docs about script
-my $verbose; #print statements about the running script
-my $queue_manager; #what Bio::EnsEMBL::BatchSubmission module to use
-my $runner; #the runner script to use when running jobs (this will be
-#over ridden by anything in config
-my $output_dir; #the output_dir to use when running jobs (this won't be
-#over ridden when running jobs
-my $mark_awol = 1; #Flag as whether to mark jobs which have gone missing 
-#from the system
-my $rename_on_retry = 1; #Whether to rename jobs stdout/err which are 
-#being retried
-my $config_sanity = 1; #flag as to whether to check configuration sanity
-my $utils_verbosity = 'WARNING'; #how verbose do you want the 
-#Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
-#WARNING as this gives warning and throws but not deprecates or infos
-my $logic_name; #the logic_name of the analysis to be run
-my $force; #force the analysis to run regardless of the rules
-my $ids_to_run; #filepath to file of input_ids to run
+# command line args
+
+my $help;                # get docs about script
+my $verbose;             # print statements about the running script
+my $queue_manager;       # Which Bio::EnsEMBL::BatchSubmission module to use
+my $runner;              # Runner script to use when running jobs (this will be overridden by anything in config)
+my $output_dir;          # Output_dir to use when running jobs (this won't be overridden when running jobs)
+my $mark_awol = 1;       # Flag as whether to mark jobs which have gone missing from the system
+my $rename_on_retry = 1; # Whether to rename jobs stdout/err which are being retried
+my $config_sanity = 1;   # Flag as to whether to check configuration sanity
+
+my $utils_verbosity = 'WARNING'; # how verbose do you want the 
+                                 # Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
+                                 # WARNING as this gives warning and throws but not deprecates or infos
+
+my $logic_name;          # the logic_name of the analysis to be run
+my $force;               # force the analysis to run regardless of the rules
+my $ids_to_run;          # filepath to file of input_ids to run
 my $perldoc;
 my @command_args = @ARGV;
 my $make_input_ids;
@@ -64,65 +65,67 @@ GetOptions(
            'dbuser=s'      => \$dbuser,
            'dbpass=s'      => \$dbpass,
            'dbport=s'      => \$dbport,
-           'help!' => \$help,
-           'verbose!' => \$verbose,
-           'queue_manager=s' => \$queue_manager,
-           'runner=s' => \$runner,
-           'output_dir=s' => \$output_dir,
-           'mark_awol!' => \$mark_awol,
-           'rename_on_retry' => \$rename_on_retry,
-           'config_sanity!' => \$config_sanity,
-           'utils_verbosity=s' => \$utils_verbosity,
-           'perldoc!' => \$perldoc,
-           'logic_name=s' => \$logic_name,
-           'force!' => \$force,
-           'input_id_file=s' => \$ids_to_run,
-           'make_input_ids!' => \$make_input_ids,
-           'coord_system:s'       => \$coord_system,
+           'help!'                  => \$help,
+           'verbose!'               => \$verbose,
+           'queue_manager=s'        => \$queue_manager,
+           'runner=s'               => \$runner,
+           'output_dir=s'           => \$output_dir,
+           'mark_awol!'             => \$mark_awol,
+           'rename_on_retry'        => \$rename_on_retry,
+           'config_sanity!'         => \$config_sanity,
+           'utils_verbosity=s'      => \$utils_verbosity,
+           'perldoc!'               => \$perldoc,
+           'logic_name=s'           => \$logic_name,
+           'force!'                 => \$force,
+           'input_id_file=s'        => \$ids_to_run,
+           'make_input_ids!'        => \$make_input_ids,
+           'coord_system:s'         => \$coord_system,
            'coord_system_version:s' => \$coord_system_version,
-           'slice'        => \$slice,
-           'slice_size:s' => \$slice_size,
-           'slice_overlap:s' => \$slice_overlap,
-           'logic_name:s' => \$logic_name,
-           'file'         => \$file,
-           'dir:s'        => \$dir,
-           'file_regex:s' => \$regex,
-           'single'       => \$single,
-           'single_name:s'=> \$name,
-           'translation_ids' => \$translation_id,
-           'seq_level!' => \$seq_level,
-           'top_level!' => \$top_level,
+           'slice'                  => \$slice,
+           'slice_size:s'           => \$slice_size,
+           'slice_overlap:s'        => \$slice_overlap,
+           'logic_name:s'           => \$logic_name,
+           'file'                   => \$file,
+           'dir:s'                  => \$dir,
+           'file_regex:s'           => \$regex,
+           'single'                 => \$single,
+           'single_name:s'          => \$name,
+           'translation_ids'        => \$translation_id,
+           'seq_level!'             => \$seq_level,
+           'top_level!'             => \$top_level,
            ) or useage(\@command_args);
 
-
-
-
-
 perldoc() if $perldoc;
+
 verbose($utils_verbosity);
+
 unless ($dbhost && $dbname && $dbuser) {
-    print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
-    print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
-      "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
-    $help = 1;
+  print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
+  print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
+               "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
+  $help = 1;
 }
-if(!$logic_name){
+
+if (!$logic_name) {
   print "Can't run without an analysis to run on \n";
   print "specific analysis with -analysis logic_name";
   $help = 1;
 }
-if($help){
+
+if ($help) {
   useage(\@command_args);
 }
 
-if(!defined($mark_awol)){
+if (!defined($mark_awol)) {
   $mark_awol = 0;
 }
-if($make_input_ids && !$force){
+
+if ($make_input_ids && !$force) {
   print STDERR "Setting force to on as if you are making the input ids ".
-    "the odds are any rule won't work/n";
+               "the odds are any rule won't work/n";
   $force = 1;
 }
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                        -host   => $dbhost,
                                                        -dbname => $dbname,
@@ -135,6 +138,7 @@ my $sanity = Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new
   (
    -DB => $db,
   );
+
 my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
   (
    -DB => $db,
@@ -146,23 +150,25 @@ my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
    -OUTPUT_DIR => $output_dir,
    );
    
-if($config_sanity){
+if ($config_sanity) {
   $sanity->config_sanity_check;
 }
 
-my $analysis = $rulemanager->analysis_adaptor->
-  fetch_by_logic_name($logic_name);
+my $analysis = $rulemanager->analysis_adaptor->fetch_by_logic_name($logic_name); 
 
-if(!$analysis || !$analysis->input_id_type || !$analysis->module){
+if (!$analysis || !$analysis->input_id_type || !$analysis->module) {
   throw("Must have an analysis object $logic_name $analysis and analysis ".
         "must have an input_id_type and a module to run\n");
 }
-if($analysis->input_id_type eq 'ACCUMULATOR'){
+
+if ($analysis->input_id_type eq 'ACCUMULATOR') {
   throw("Can't use this script to run accumulators");
 }
+
 if ($ids_to_run && ! -e $ids_to_run) {
   throw("Must be able to read $ids_to_run");
 }
+
 my $input_ids = setup_input_ids($analysis, $rulemanager, $ids_to_run, 
                                 $make_input_ids, $slice, $file, 
                                 $translation_id, $single, $slice_size, 
@@ -171,29 +177,36 @@ my $input_ids = setup_input_ids($analysis, $rulemanager, $ids_to_run,
                                 $logic_name);
 
 
-
 my $rule = $rulemanager->rule_adaptor->fetch_by_goal($analysis);
+
 my %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
-if(@$input_ids == 0){
+
+if (@$input_ids == 0) {
   throw("Can't do anything I have no input ids");
 }
-if($force){
+
+if ($force){
   warning("You are forcing this job to be run without checking if ".
-          "the rules allow it or if it has already run/is running ".
-          "are you sure you want to do this\n");
+          "the rules allow it or if it has already run/is running - ".
+          "are you sure you want to do this?\n");
 }
+
 print STDERR "Trying to submit jobs for ".$analysis->logic_name."\n" 
   if($verbose);
-INPUT_ID:foreach my $input_id(@$input_ids){
+
+INPUT_ID:
+foreach my $input_id (@$input_ids){
   print $input_id."\n" if($verbose);
+
   if ($term_sig) {
     print "Got term signal\n" if($verbose);
     last INPUT_ID;
   }
-  if($force){
-   my $job = $rulemanager->create_and_store_job($input_id, $analysis);
-   $job->batch_runRemote;
-  }else{
+
+  if ($force) {
+    my $job = $rulemanager->create_and_store_job($input_id, $analysis);
+    $job->batch_runRemote;
+  } else {
     my @anals = @{$rulemanager->stateinfocontainer->
                     fetch_analysis_by_input_id($input_id)};
     my $anal = $rule->check_for_analysis
@@ -204,36 +217,43 @@ INPUT_ID:foreach my $input_id(@$input_ids){
     }
   }
 }
+
 $rulemanager->cleanup_waiting_jobs();
 $rulemanager->db->pipeline_unlock;
-sub setup_input_ids{
+
+
+sub setup_input_ids {
   my ($analysis, $rulemanager, $ids_to_run, $make_input_ids,
       $slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
       $verbose, $logic_name) = @_;
   
-  if($ids_to_run){
+  if ($ids_to_run) {
     my $id_hash = $rulemanager->read_id_file($ids_to_run);
     my @types = keys(%$id_hash);
-    if(scalar(@types) != 1){
+
+    if (scalar(@types) != 1) {
       throw("You have passed in a file with ".@types." input ".
             "id types something funny is going on");
     }
-    if($types[0] ne $analysis->input_id_type){
+
+    if ($types[0] ne $analysis->input_id_type) {
       throw("If your input_ids aren't the same tupe are your analysis ".
             $types[0]." compared to ".$analysis->input_id_type." this ".
             "won't work");
     }
+
     my @ids = keys(%{$id_hash->{$analysis->input_id_type}});
     return \@ids;
-  }elsif($make_input_ids){
+
+  } elsif ($make_input_ids) {
     print STDERR "Making input ids\n" if($verbose);
     my $ids = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
                           $verbose, $logic_name, $rulemanager->db);
     return $ids;
-  }else{
+  } else {
     my @ids = @{$rulemanager->stateinfocontainer
                   ->list_input_ids_by_type($analysis->input_id_type)};
     return \@ids;
@@ -242,11 +262,11 @@ sub setup_input_ids{
 
 
 sub termhandler {
-    $term_sig = 1;
+  $term_sig = 1;
 }
 
 
-sub make_input_ids{
+sub make_input_ids {
   my ($slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
       $verbose, $logic_name, $db) = @_;
@@ -275,8 +295,10 @@ sub make_input_ids{
   return $ids;
 }
 
-sub useage{
+
+sub useage {
   my ($command_args) = @_;
+
   print "Your commandline was :\n".
     "job_submission.pl ".join("\t", @$command_args), "\n\n";
 
@@ -306,9 +328,10 @@ sub useage{
     "and -help will print out the help again \n";
   exit(0);
 }
+
 sub perldoc{
-	exec('perldoc', $0);
-	exit(0);
+  exec('perldoc', $0);
+  exit(0);
 }
 
 =pod 

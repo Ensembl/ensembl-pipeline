@@ -15,21 +15,25 @@ $| = 1;
 
 
 #database arguments
-my $dbhost    = $ENV{'ENS_DBHOST'};
-my $dbname    = $ENV{'ENS_DBNAME'};
-my $dbuser    = $ENV{'ENS_DBUSER'};
-my $dbpass    = $ENV{'ENS_DBPASS'};
-my $dbport    = $ENV{'ENS_DBPORT'} || 3306;
-my $help; #get docs about script
-my $verbose; #print statements about the running script
+
+my $dbhost = $ENV{'ENS_DBHOST'};
+my $dbname = $ENV{'ENS_DBNAME'};
+my $dbuser = $ENV{'ENS_DBUSER'};
+my $dbpass = $ENV{'ENS_DBPASS'};
+my $dbport = $ENV{'ENS_DBPORT'} || 3306;
+
+my $help;            #get docs about script
+my $verbose;         #print statements about the running script
 my $perldoc;
 my @command_args = @ARGV;
 my $utils_verbosity = 'WARNING'; #how verbose do you want the 
-#Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
-#WARNING as this gives warning and throws but not deprecates or infos
-my $queue_manager; #what Bio::EnsEMBL::BatchSubmission module to use
+                                 #Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
+                                 #WARNING as this gives warning and throws but not deprecates or infos
+my $queue_manager;   #what Bio::EnsEMBL::BatchSubmission module to use
+
 my $script_dir = `pwd`;
 chomp $script_dir;
+
 my $output_dir;
 my $logic_name;
 my $config_sanity = 1;
@@ -63,90 +67,101 @@ my $open;
 my $submission_interval = 5;
 my $commandline;
 my $pre_exec_command;
+
 GetOptions(
-           'dbhost=s'      => \$dbhost,
-           'dbname=s'      => \$dbname,
-           'dbuser=s'      => \$dbuser,
-           'dbpass=s'      => \$dbpass,
-           'dbport=s'      => \$dbport,
-           'help!' => \$help,
-           'verbose!' => \$verbose,
-           'perldoc!' => \$perldoc,
-           'utils_verbosity=s' => \$utils_verbosity,
-           'queue_manager=s' => \$queue_manager,
-           'script_dir=s' => \$script_dir,
-           'output_dir=s' => \$output_dir,
-           'queue:s' => \$queue,
-           'logic_name=s' => \$logic_name,
-           'config_sanity!' => \$config_sanity,
-           'runnabledb_path=s' =>\$runnabledb_path,
+           'dbhost=s'                  => \$dbhost,
+           'dbname=s'                  => \$dbname,
+           'dbuser=s'                  => \$dbuser,
+           'dbpass=s'                  => \$dbpass,
+           'dbport=s'                  => \$dbport,
+           'help!'                     => \$help,
+           'verbose!'                  => \$verbose,
+           'perldoc!'                  => \$perldoc,
+           'utils_verbosity=s'         => \$utils_verbosity,
+           'queue_manager=s'           => \$queue_manager,
+           'script_dir=s'              => \$script_dir,
+           'output_dir=s'              => \$output_dir,
+           'queue:s'                   => \$queue,
+           'logic_name=s'              => \$logic_name,
+           'config_sanity!'            => \$config_sanity,
+           'runnabledb_path=s'         =>\$runnabledb_path,
            'update_input_id_analysis!' => \$update,
-           'pre_exec!' => \$pre_exec,
-           'script_verbosity!' => \$script_verbosity,
-           'resource_requirements:s' => \$resource,
-           'sub_args:s' => \$sub_args,
-           'input_id_file:s' => \$ids_to_run,
-           'make_input_ids!' => \$make_input_ids,
-           'coord_system:s'       => \$coord_system,
-           'coord_system_version:s' => \$coord_system_version,
-           'slice!'        => \$slice,
-           'slice_size:s' => \$slice_size,
-           'slice_overlap:s' => \$slice_overlap,
-           'file!'         => \$file,
-           'dir:s'        => \$dir,
-           'file_regex:s' => \$regex,
-           'single!'       => \$single,
-           'single_name:s'=> \$name,
-           'translation_ids!' => \$translation_id,
-           'seq_level!' => \$seq_level,
-           'top_level!' => \$top_level,
-           'open!' => \$open,
-           'submission_interval:s' => \$submission_interval,
-           'write!' => \$write,
-           'command:s' => \$commandline,
-           'pre_exec_command:s' => \$pre_exec_command,
+           'pre_exec!'                 => \$pre_exec,
+           'script_verbosity!'         => \$script_verbosity,
+           'resource_requirements:s'   => \$resource,
+           'sub_args:s'                => \$sub_args,
+           'input_id_file:s'           => \$ids_to_run,
+           'make_input_ids!'           => \$make_input_ids,
+           'coord_system:s'            => \$coord_system,
+           'coord_system_version:s'    => \$coord_system_version,
+           'slice!'                    => \$slice,
+           'slice_size:s'              => \$slice_size,
+           'slice_overlap:s'           => \$slice_overlap,
+           'file!'                     => \$file,
+           'dir:s'                     => \$dir,
+           'file_regex:s'              => \$regex,
+           'single!'                   => \$single,
+           'single_name:s'             => \$name,
+           'translation_ids!'          => \$translation_id,
+           'seq_level!'                => \$seq_level,
+           'top_level!'                => \$top_level,
+           'open!'                     => \$open,
+           'submission_interval:s'     => \$submission_interval,
+           'write!'                    => \$write,
+           'command:s'                 => \$commandline,
+           'pre_exec_command:s'        => \$pre_exec_command,
           ) or useage(\@command_args);
+
 perldoc() if $perldoc;
+
 verbose($utils_verbosity);
+
 unless ($dbhost && $dbname && $dbuser) {
-    print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
-    print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
-      "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
-    $help = 1;
-}
-if(!$logic_name){
-  print STDERR "You must specify a logic_name for the analysis you ".
-    "want to run\n";
+  print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
+  print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
+               "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
   $help = 1;
 }
-if($insert_analysis && (!$input_id_type || !$module)){
+
+if (!$logic_name) {
+  print STDERR "You must specify a logic_name for the analysis you want to run\n";
+  $help = 1;
+}
+
+if ($insert_analysis && (!$input_id_type || !$module)) {
   print STDERR "If you want to insert your analysis object into your ".
-    "you must specify input_id_type and module on the commandline too\n";
+               "you must specify input_id_type and module on the commandline too\n";
   $help = 1;
 }
-if($commandline && $pre_exec && !$pre_exec_command){
+
+if ($commandline && $pre_exec && !$pre_exec_command) {
   print STDERR "If you want a pre_exec statement with your custom ".
-    "commandline you must specify it with the -pre_exec_command ".
-      "option\n";
+               "commandline you must specify it with the -pre_exec_command ".
+               "option\n";
   $help = 1;
 }
-if($help){
+
+if ($help) {
   useage(\@command_args);
 }
-if(!$queue_manager){
+
+if (!$queue_manager) {
   $queue_manager = $QUEUE_MANAGER; #found in BatchQueue.pm
 }
-my $batch_q_module = 
-  "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
+
+my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
 my $batch_q_file = "$batch_q_module.pm";
 $batch_q_file =~ s{::}{/}g;
+
 eval {
   require "$batch_q_file";
 };
-if($@){
+if ($@) {
   throw("Can't find $batch_q_file [$@]");
 }
+
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   (
    -host   => $dbhost,
@@ -160,51 +175,63 @@ my $sanity = Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new
   (
    -DB => $db,
   );
-if($config_sanity){
+
+if ($config_sanity) {
   $sanity->config_sanity_check;
 }
+
 my %hash = &set_up_queues;
 
 my $batch_q_key = $logic_name;
-if(!$hash{$batch_q_key}){
+
+if (!$hash{$batch_q_key}) {
   $batch_q_key = 'default';
 }
-if(!$queue){
+
+if (!$queue) {
   $queue = $hash{$batch_q_key}{'queue'};
 }
 
-if(!$runnabledb_path){
+if (!$runnabledb_path) {
   $runnabledb_path = $hash{$batch_q_key}{'runnabledb_path'};
 }
-if(!$resource){
+
+if (!$resource) {
   $resource = $hash{$batch_q_key}{'resource'};
 }
-if(!$sub_args){
+
+if (!$sub_args) {
   $sub_args = $hash{$batch_q_key}{'sub_args'};
 }
-if(!$output_dir){
+
+if (!$output_dir) {
   $output_dir = $hash{$batch_q_key}{'output_dir'};
-  if(!$output_dir){
+
+  if (!$output_dir) {
     $output_dir = $DEFAULT_OUTPUT_DIR;
   }
 }
-if(!-d $output_dir){
+
+if (!-d $output_dir) {
   throw("Can't use output_dir ".$output_dir." as its not a directory");
 }
+
 my $analysis;
-if($insert_analysis){
+if ($insert_analysis) {
   my $analysis = Bio::EnsEMBL::Pipeline::Analysis->new
     (
      -logic_name => $logic_name,
      -module => $module,
      -input_id_type => $input_id_type,
     );
-}else{
+} else {
   $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 }
-if(!$analysis){
+
+if (!$analysis) {
   throw("Can't run without an Analysis object");
 }
+
 #print STDERR "3Have commandline ".$commandline." update ".$update."\n";
 my $input_ids = setup_input_ids($analysis, $db, $ids_to_run, 
                                 $make_input_ids, $slice, $file, 
@@ -215,12 +242,14 @@ my $input_ids = setup_input_ids($analysis, $db, $ids_to_run,
 
 my @batch_submission_objects;
 #print STDERR "4Have commandline ".$commandline." update ".$update."\n";
-foreach my $input_id(@$input_ids){
-  my ($stdout, $stderr) = make_filenames($output_dir, $input_id, 
-                                         $logic_name);
-  if($pre_exec && !$pre_exec_command){
+
+foreach my $input_id (@$input_ids) {
+  my ($stdout, $stderr) = make_filenames($output_dir, $input_id, $logic_name);
+
+  if ($pre_exec && !$pre_exec_command) {
     $pre_exec_command = $script_dir."/test_RunnableDB -check ";
   }
+
   my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $stdout,
@@ -231,8 +260,10 @@ foreach my $input_id(@$input_ids){
        -JOBNAME    => $db->dbname . ':' . $logic_name,
        -RESOURCE   => $resource,
       );
+
   my $command;
-  if(!$commandline){
+
+  if (!$commandline) {
     $command = $script_dir."/test_RunnableDB ";
     $command .= "-dbhost ".$db->host." -dbuser ".$db->username.
       " -dbname ".$db->dbname." -dbport ".$db->port." ";
@@ -242,73 +273,91 @@ foreach my $input_id(@$input_ids){
     $command .= " -write " if($write);
     $command .= " -update_input_id_analysis " if($update);
     $command .= " -runnabledb_path " if($runnabledb_path);
-    #$command .= " -utils_verbosity ".$utils_verbosity." " 
-    #  if($utils_verbosity);
+
+    # $command .= " -utils_verbosity ".$utils_verbosity." " 
+    #   if($utils_verbosity);
+
     $command .= " -input_id_type ".$input_id_type.
       " " if($input_id_type);
     $command .= " -module ".$module." " if($module);
+
     #print STDERR "Have commandline ".$command."\n";
+
   }else{
     $command = $commandline;
     $command =~ s/INPUT_ID/$input_id/;
   }
+
   $batch_job->construct_command_line($command);
   push(@batch_submission_objects, $batch_job);
 }
+
 print STDERR "YOU WILL NOT BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T ".
   "SPECIFY -open \n" if(!$open);
-foreach my $batch_object(@batch_submission_objects){
+
+foreach my $batch_object (@batch_submission_objects) {
   print $batch_object->bsub."\n" if($verbose);
-  if($open){
-    eval{
+
+  if ($open) {
+    eval {
       $batch_object->open_command_line;
     };
-    if($@ || !$batch_object->id){
+    ifi ($@ || !$batch_object->id) {
       throw("Failed to open ".$batch_object->bsub." $@");
     }
+
     print $batch_object->bsub."\n" if($verbose);
     sleep($submission_interval);
-  }else{
+  } else {
     #print $batch_object->bsub."\n";
   }
 }
+
 print STDERR "YOU DIDN'T BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T SPECIFY ".
   "-open \n" if(!$open);
 
-sub setup_input_ids{
+sub setup_input_ids {
   my ($analysis, $db, $ids_to_run, $make_input_ids,
       $slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
       $verbose, $logic_name) = @_;
 
-  if($ids_to_run){
+  if ($ids_to_run) {
     my $id_hash = read_id_file($ids_to_run);
     my @types = keys(%$id_hash);
-    if(scalar(@types) != 1){
+
+    if (scalar(@types) != 1){
       throw("You have passed in a file with ".@types." input ".
             "id types something funny is going on");
     }
-    if($types[0] ne $analysis->input_id_type){
+
+    if ($types[0] ne $analysis->input_id_type) {
       throw("If your input_ids aren't the same tupe are your analysis ".
             $types[0]." compared to ".$analysis->input_id_type." this ".
             "won't work");
     }
+
     my @ids = keys(%{$id_hash->{$analysis->input_id_type}});
     return \@ids;
-  }elsif($make_input_ids){
+
+  } elsif ($make_input_ids) {
+
     print STDERR "Making input ids\n" if($verbose);
+
     my $ids = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
                           $verbose, $logic_name,  $db);
     return $ids;
-  }else{
+  } else {
     my @ids = @{$db->get_StateInfoContainer
                   ->list_input_ids_by_type($analysis->input_id_type)};
     print STDERR "Have ".@ids." ids\n";
     return \@ids;
   }
 }
+
+
 sub read_id_file{
   my ($file) = @_;
 
@@ -321,20 +370,21 @@ sub read_id_file{
   }
   return \@ids
 }
+
+
 sub make_filenames {
   my ($output_dir, $input_id, $logic_name) = @_;
   
   my $num = int(rand(10));
   
   my $dir = $output_dir . "/$num/";
-  if( ! -e $dir ) {
+  if ( ! -e $dir) {
     system( "mkdir $dir" );
   }
 
   my $stub = $input_id.".";
   $stub .= $logic_name.".";
   $stub .= int(rand(1000));
-
  
   my $stdout_file = ($dir.$stub.".out");
   my $stderr_file = ($dir.$stub.".err");
@@ -371,44 +421,48 @@ sub make_input_ids{
   return $ids;
 }
 
+
 sub set_up_queues {
-    my %q;
+  my %q;
 
-    foreach my $queue (@$QUEUE_CONFIG) {
-      my $ln = $queue->{'logic_name'};
-      next unless $ln;
-      delete $queue->{'logic_name'};
-      while (my($k, $v) = each %$queue) {
-        $q{$ln}{$k} = $v;
-        $q{$ln}{'jobs'} = [];
-        $q{$ln}{'last_flushed'} = undef;
-        $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
-        $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
-        $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
-        $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
-        $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
-      }
+  foreach my $queue (@$QUEUE_CONFIG) {
+    my $ln = $queue->{'logic_name'};
+    next unless $ln;
+    delete $queue->{'logic_name'};
 
-	# a default queue for everything else
-	unless (defined $q{'default'}) {
-	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
-            $q{'default'}{'retries'} = $DEFAULT_RETRIES;
-	    $q{'default'}{'last_flushed'} = undef;
-	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
-            $q{'default'}{'jobs'} = [];
-            $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
-       $q{'default'}{'runnabledb_path'} = $DEFAULT_RUNNABLEDB_PATH;
-       $q{'default'}{'output_dir'} = $DEFAULT_OUTPUT_DIR
-	}
+    while (my($k, $v) = each %$queue) {
+      $q{$ln}{$k} = $v;
+      $q{$ln}{'jobs'} = [];
+      $q{$ln}{'last_flushed'} = undef;
+      $q{$ln}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
+      $q{$ln}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
+      $q{$ln}{'retries'}         ||= $DEFAULT_RETRIES;
+      $q{$ln}{'cleanup'}         ||= $DEFAULT_CLEANUP;
+      $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
     }
-    
-    return %q;
+
+    # a default queue for everything else
+    unless (defined $q{'default'}) {
+      $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
+      $q{'default'}{'retries'} = $DEFAULT_RETRIES;
+      $q{'default'}{'last_flushed'} = undef;
+      $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
+      $q{'default'}{'jobs'} = [];
+      $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
+      $q{'default'}{'runnabledb_path'} = $DEFAULT_RUNNABLEDB_PATH;
+      $q{'default'}{'output_dir'} = $DEFAULT_OUTPUT_DIR
+    }
+  }
+  return %q;
 }
 
-sub useage{
+
+sub useage {
   my ($command_args) = @_;
+
   print "Your commandline was :\n".
     "lsf_submission.pl ".join("\t", @$command_args), "\n\n";
+
   print ("lsf_submission.pl is a script which will create and open ".
          "commandlines for the\nappropriate batch submission system ".
          "As standard it will produce command lines to run the\n".
@@ -440,9 +494,11 @@ sub useage{
          "documentation\n\n");
   exit(0);
 }
+
+j
 sub perldoc{
-	exec('perldoc', $0);
-	exit(0);
+  exec('perldoc', $0);
+  exit(0);
 }
 
 =pod 
