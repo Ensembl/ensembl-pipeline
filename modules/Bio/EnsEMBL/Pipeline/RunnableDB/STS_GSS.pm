@@ -4,14 +4,14 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::STS_GSS;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::Config::General;
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::STS_GSS;
 
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -49,12 +49,13 @@ sub fetch_input {
   my %ests;
   my @estseqs;
   $self->throw("No input id") unless defined($self->input_id);
-  
+    
   my $contigid  = $self->input_id;
-  my $contig    = $self->db->get_Contig($contigid);
-  
-  my $genseq   = $contig->primary_seq;
-  my $repeatmasked_seq = $contig->get_repeatmasked_seq;
+  my $rawContigAdaptor = $self->db->get_RawContigAdaptor();
+  my $contig   = $rawContigAdaptor->fetch_by_name($contigid);
+
+  my $genseq = $contig;
+  my $repeatmasked_seq = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING);
  
   my $percent_id = 95;
 
@@ -69,7 +70,6 @@ sub fetch_input {
 								-percent_filter => 1);
   
   $self->runnable($runnable);
-  
 }    
       
   
@@ -122,7 +122,7 @@ sub run {
     
     push (@{$self->{'_output'}}, $runnable->output);
     foreach my $f(@{$self->{'_output'}}){
-      $f->source_tag($self->analysis->db);
+      #$f->source_tag($self->analysis->db);
       #print $f->source_tag."\n";
     }
 }
@@ -159,7 +159,7 @@ sub output {
 sub make_seqfetcher {
   my ( $self ) = @_;
   
-  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
   
 
   return $seqfetcher;
