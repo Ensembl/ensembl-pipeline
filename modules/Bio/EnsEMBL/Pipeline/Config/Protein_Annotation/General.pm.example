@@ -45,8 +45,8 @@ use vars qw( %General );
 
 # Hash containing config info
 %General = (
-	    PA_PEPTIDE_FILE => '/nfs/acari/sw4/JUNK/Peptides', #path to dumped peptides
-	    PA_CHUNKS_DIR => '/nfs/acari/sw4/JUNK/Chunks', #path to directory chunks to be written
+	    PA_PEPTIDE_FILE => '', #path to dumped peptides
+	    PA_CHUNKS_DIR => '', #path to directory chunks to be written
 	    PA_CHUNK_SIZE => 100,
 	    PA_IPRSCAN_DIR => '/acari/analysis/iprscan/bin',	
 	   );
