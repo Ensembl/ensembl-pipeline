@@ -29,10 +29,10 @@ use Bio::EnsEMBL::Pipeline::ESTConf;
 use Getopt::Long;
 
 # ref db holds the exonerate_e2g gene/exon/supporting feature data
-my $refdbname    = $EST_DBNAME;
-my $refuser      = $EST_DBUSER;
-my $refhost      = $EST_DBHOST;
-my $refpass      = $EST_DBPASS;
+my $refdbname    = $EST_E2G_DBNAME;
+my $refuser      = $EST_E2G_DBUSER;
+my $refhost      = $EST_E2G_DBHOST;
+my $refpass      = $EST_E2G_DBPASS;
 
 # exonfile holds a list of exons to be converted
 # select exon_id from exon into outfile
