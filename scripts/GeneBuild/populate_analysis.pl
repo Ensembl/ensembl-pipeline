@@ -127,6 +127,7 @@ my @genebuild_analysis = &analyses_from_config;
 my @pmatch_analysis = &analyses_from_pmatch;
 #print "@analyses\n";;
 
+
 if($insert){ 
     my $dbhash = &insert_into_pipeline(\@genebuild_analysis, \@pmatch_analysis); 
     print STDERR "have dbhash".$dbhash."\n";
@@ -136,6 +137,9 @@ if($insert){
     print STDERR "have dbhash".$dbhash."\n";
     &insert_into_genebuild($dbhash, \@pipeline_analysis, \@genebuild_analysis, \@pmatch_analysis);
 }
+
+
+print "@pipeline_analysis\n@pmatch_analysis\n@genebuild_analysis\n";
 
 sub analyses_from_pipeline {
   # get old analyses from GB_DB
