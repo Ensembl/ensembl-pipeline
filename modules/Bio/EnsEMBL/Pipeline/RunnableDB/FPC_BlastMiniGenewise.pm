@@ -209,12 +209,13 @@ sub write_output {
 	    $sth->execute;
 	    
 	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
-	} else {
-	    $sth = $db->prepare("unlock tables");
-	    $sth->execute;
 	}
 	
     }
+
+    $sth = $db->prepare("unlock tables");
+    $sth->execute;
+
 }
 
 =head2 fetch_input
@@ -238,7 +239,7 @@ sub fetch_input {
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 #    my $contig    = $stadaptor->fetch_VirtualContig_by_fpc_name($self->input_id);
 
-    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($self->input_id,100000,10000,200000,100);
+    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($self->input_id,500000,10000,1000000,100);
 
     foreach my $contig (@contig) {
 	print STDERR "Analysing contig " . $contig->id . "\n";
@@ -323,6 +324,7 @@ sub convert_output {
 	my @genes;
 	
 	foreach my $tmpf (@tmpf) {
+
 	    my $gene   = new Bio::EnsEMBL::Gene;
 	    my $tran   = new Bio::EnsEMBL::Transcript;
 	    my $transl = new Bio::EnsEMBL::Translation;
@@ -402,13 +404,18 @@ sub convert_output {
 		    if ($exon->strand == -1) {
 			$strand = "-";
 		    }
-		    print STDERR $exon->contig_id . "\tgenewise\tsimilarity\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . "\n";
+		    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . "\n";
 		}
 	    }
-	    
-	    my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-	    $newgene->type('genewise');
-	    push(@newf,$newgene);
+
+	    eval {
+		my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+		$newgene->type('genewise');
+		push(@newf,$newgene);
+	    };
+	    if ($@) {
+		print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+	    }
 	}
 	
 	if (!defined($self->{_output})) {

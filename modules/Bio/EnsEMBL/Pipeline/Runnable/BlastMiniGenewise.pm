@@ -206,7 +206,7 @@ sub run {
     my @f = $mg->output;
 
     foreach my $f (@f) {
-	print("Aligned output is " . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
+	print(STDERR "PogAligned output is " . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
 	print $f;
     }
 
@@ -229,6 +229,11 @@ sub blast_ids {
 	my @tmp = $self->run_blast($seq,$blastdb);
 	push(@newfeatures,@tmp);
     }
+
+    unlink $blastdb;
+    unlink $blastdb.".csq";
+    unlink $blastdb.".nhd";
+    unlink $blastdb.".ntb";
 
     return @newfeatures;
 }
@@ -284,14 +289,11 @@ sub run_blast {
 	}
     };
     if ($@) {
-	$self->warn("Error processing msp file for " . $seq->id . "\n");
+	$self->warn("Error processing msp file for " . $seq->id . " [$@]\n");
     }
+
     unlink $blastout;
     unlink $seqfile;
-    unlink $db;
-    unlink "$db.bsq";
-    unlink "$db.ahd";
-    unlink "$db.atb";
 
     return @pairs;
 }
@@ -408,39 +410,32 @@ sub get_Sequence {
     next ID unless defined($id);
 
     print(STDERR "Sequence id :  is [$id]\n");
-    
-    open(IN,"pfetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
 
-    my $seq;
-    
+    open(IN,"pfetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
+	
+    my $seqstr;
+	
     while (<IN>) {
 	chomp;
-	$seq .= $_;
+	$seqstr .= $_;
     }
     
-    if (!defined($seq) || $seq eq "no match") {
-        print STDERR "Using efetch to fetch sequence\n";
-	open(IN,"efetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
-	
-	$seq = "";
-	
-	while (<IN>) {
-	    chomp;
-	    $seq .= $_;
-	}
+    
+
+    if (!defined($seqstr) || $seqstr eq "no match") {
+	$self->warn("Couldn't find sequence for [$id]");
+	return;
     }
+
+    my $seq = new Bio::Seq(-id  => $id,
+			   -seq => $seqstr);
     
-    if (!defined($seq)) {
-	$self->throw("Couldn't find sequence for [$id]");
-    }
-    
-    $seq = new Bio::Seq(-id  => $id,
-			-seq => $seq);
-    
+
     print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
 }
+
 =head2 output
 
   Title   : output

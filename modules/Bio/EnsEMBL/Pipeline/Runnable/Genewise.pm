@@ -154,10 +154,6 @@ sub _align_protein {
 	chomp;
 	if (/^Gene +(\d+)/) {
 	    print STDERR "Found new gene\n";
-	    # First store the old gene
-	    if (defined($sf)) {
-		push(@out,$sf);
-	    }
 	    
 	    $sf = new Bio::EnsEMBL::SeqFeature;
 
@@ -212,7 +208,7 @@ sub _align_protein {
 	    foreach my $sf (@sub) {
 		my $start = $count+1;
 		my $end   = $start + ($sf->end - $sf->start);
-		print STDERR "Start/end $start $end :\n";
+#		print STDERR "Start/end $start $end :\n";
 		$count = $end;
 
 		my $gf = new Bio::EnsEMBL::SeqFeature(-start      => $start,
@@ -229,8 +225,8 @@ sub _align_protein {
 	    }
 	}
     }
-#    unlink $genfile;
-#    unlink $protfile;
+    unlink $genfile;
+    unlink $protfile;
 
     unlink $gwfile;
 }
@@ -259,7 +255,7 @@ sub memory {
 sub genomic {
     my ($self,$arg) = @_;
 
-    print ("Gen $arg\n");
+#    print ("Gen $arg\n");
     if (defined($arg)) {
 	$self->throw("Genomic sequence input is not a Bio::SeqI or Bio::Seq or Bio::PrimarySeqI") unless
 	    ($arg->isa("Bio::SeqI") || 

@@ -252,10 +252,7 @@ sub make_miniseq {
 
     my $strand = 1;
 
-    if ($self->is_reversed(@features)) {
-	$strand = -1;
-    }
-
+    
     print STDERR "Strand is $strand\n";
 
     my $seqname = $features[0]->seqname;;
@@ -273,7 +270,7 @@ sub make_miniseq {
     
     FEAT: foreach my $f (@features) {
 	 print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
-	if ($f->hstrand != $strand) {
+	if ($f->strand != $strand) {
 	    $self->warn("Mixed strands in features set - skipping feature");
 	    next FEAT;
 	}
@@ -647,7 +644,7 @@ sub minirun {
 		$strand = -1;
 	    }
 	    foreach my $f (@f) {
-		$f->strand($strand);
+		$f->strand(1);
 		$f->hstrand($strand);
 		
 		print(STDERR "Aligned output is " . $f->id    . "\t" . 
@@ -714,8 +711,7 @@ sub is_reversed {
     foreach my $f (@features) {
 	if ($f->hstrand == 1) {
 	    $fcount++;
-	}
-	if ($f->hstrand == -1) {
+	} elsif ($f->hstrand == -1) {
 	    $rcount++;
 	}
 
@@ -726,6 +722,8 @@ sub is_reversed {
 	return 1;
     }
 }
+
+
 sub find_extras {
     my ($self,@features) = @_;
 

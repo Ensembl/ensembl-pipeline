@@ -372,7 +372,7 @@ sub make_command {
 
 
     } else {
-	$cmd = "bsub -q " . $self->queue;
+	$cmd = "bsub  -q " . $self->queue;
 	$cmd .= " -o " . $self->stdout_file . " -e " . $self->stderr_file;
 	
 	$cmd .= " \"$stub  -object " . $self->input_object_file . "$useDB\"" ;
@@ -630,12 +630,12 @@ sub make_filenames {
     $self->output_file      ($output_file);
     $self->status_file      ($status_file);
 
-    print STDERR "Not Touching files now\n";
-    #system("touch $input_object_file"); 
-    #system("touch $stdout_file");
-    #system("touch $stderr_file");
-    #system("touch $output_file");
-    #system("touch $status_file");
+    #print STDERR "Not Touching files now\n";
+    system("touch $input_object_file"); 
+    system("touch $stdout_file");
+    system("touch $stderr_file");
+    system("touch $output_file");
+    system("touch $status_file");
 
 }
 

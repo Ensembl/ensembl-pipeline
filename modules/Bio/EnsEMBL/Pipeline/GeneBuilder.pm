@@ -81,6 +81,8 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::MappedExon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::Utils::GTF_handler;
+
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
@@ -154,7 +156,7 @@ sub build_Genes {
 
     #print STDERR "Finished printing genes...\n";
 
-    #$self->print_gff;
+    $self->print_gff;
 
     print STDERR "Out of build Genes...\n";
 
@@ -200,10 +202,13 @@ sub get_Features {
 						$f->source_tag . "\t" . 
 						$f->primary_tag ."\n\n";
 
+
 	    my @fset = $self->set_phases($f,$contig);
-            foreach my $fs (@fset) {
-                  print STDERR "FSET $fs\n";
-            }
+
+#            foreach my $fs (@fset) {
+#                  print STDERR "FSET $fs\n";
+#            }
+
 	    if (defined(@fset) && $f->source_tag eq "genewise") {
 		push(@genewise,@fset);
 
@@ -298,9 +303,11 @@ sub make_genscanExons {
 	  print STDERR "Looking at " . $f->id . "\t" . $f->start . "\t" . $f->end . "\n";  
 	  # Don't include any genscans that are inside a genewise
 	  foreach my $gw ($self->genewise) {
+
 	      if (!(($gw->end < $f->start) || $gw->start > $f->end)) {
 		  my @gwf = $gw->sub_SeqFeature;
-		  if ($#gwf > 0) {
+
+		  if ($#gwf > 0 && ($gwf[0]->strand == $f->strand)) {
 		      print STDERR "Ignoring genscan exon\n";
 		      next EXON;
 		  }
@@ -357,20 +364,20 @@ sub make_genewiseExons {
 	  my $foundex;
 
 	  # Make sure non redundant with all the new exons
-	  foreach my $ex (@newexons) {
-	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
-		  $found = 1;
-		  $foundex = $ex;
-	      }
-	  }
+#	  foreach my $ex (@newexons) {
+#	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
+#		  $found = 1;
+#		  $foundex = $ex;
+#	      }
+#	  }
 
 	  # Make sure non redundant with current sub seqfeatures
-	  foreach my $ex (@gwexons) {
-	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
-		  $found = 1;
-		  $foundex = $ex;
-	      }
-	  }
+#	  foreach my $ex (@gwexons) {
+#	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
+#		  $found = 1;
+#		  $foundex = $ex;
+#	      }
+#	  }
 	  
 	  if ($found == 1) {
 	      print STDERR "\nFound duplicate exon - adding evidence\n";
@@ -422,23 +429,26 @@ sub make_genewise_ExonPairs {
 	      my $f1 = $exons[$count-1];
 	      my $f2 = $exons[$count];
 
-	      print "\nExon pair comparison $count\n";
+	      print "\nExon pair comparison $count " . $f1->seqname . " " . $f2->seqname . "\n";
 	      $self->print_Exon($f1);
 	      $self->print_Exon($f2);
+
 
               my @ev1 = $f1->each_Supporting_Feature;
               my @ev2 = $f2->each_Supporting_Feature;
 
 	      if ($f1->strand == $f2->strand) {
+
+
 		  print "found\n";
 		  my $spliceseq = $f1->{_3splice} . $f2->{_5splice};
 		  print "splice " . $spliceseq;
 		  if ($spliceseq eq "GTAG") {
 		      $makepair = 1;
 		      
-		  }  elsif ($#ev1 >= 0 && $#ev2 >= 0 &&
-                            $ev1[0]->hseqname eq $ev2[0]->hseqname) {
-                      $makepair = 1;
+#		  }  elsif ($#ev1 >= 0 && $#ev2 >= 0 &&
+#                            $ev1[0]->hseqname eq $ev2[0]->hseqname) {
+#                      $makepair = 1;
 		  } elsif ($f1->strand == $f2->strand) {
 		      if ($f1->strand == 1) {
 			  if (abs($f1->end - $f2->start) <= 20) {
@@ -449,7 +459,15 @@ sub make_genewise_ExonPairs {
 			      $makepair = 1;
 			  }
 		      } 
-                  } 
+                  } elsif ($f1->seqname eq $f2->seqname) {
+		      $makepair = 1;
+		  }
+
+		  if (abs($f2->start - $f1->end) > 100000) {
+		      print STDERR "Intron too long - skipping pair\n";
+		      $makepair = 0;
+		  }
+
 		  if ($makepair == 1) {
 		      print "Making pair\n";
 		      
@@ -468,11 +486,14 @@ sub make_genewise_ExonPairs {
 		      } 
 		      if ($found == 0) {
 			  print "Adding pair\n";
-			  $self->add_ExonPair($tmppair);
-			  $tmppair->add_Evidence($f1->each_Supporting_Feature);
-			  $tmppair->add_Evidence($f2->each_Supporting_Feature);
+
+			#  if ($f1->source_tag ne "genewise") {
+			#      $tmppair->add_Evidence($f1->each_Supporting_Feature);
+			#      $tmppair->add_Evidence($f2->each_Supporting_Feature);
+			#  }
 			  $tmppair->splice_seq(new Bio::Seq(-id => "splice", 
 							    -seq => $f1->{_3splice} . $f2->{_5splice}));
+			  $self->add_ExonPair($tmppair);
 		      }
 		  }
 	      }
@@ -1553,7 +1574,7 @@ sub set_phases {
     }
 
     foreach my $ex (@subf) {
-        print STDERR "Found feature $ex\n";
+#        print STDERR "Found feature $ex\n";
 	my $found = 0;
 	foreach my $nex (@nrf) {
 	    if ($ex->start == $nex->start && $ex->end == $nex->end) {
@@ -1596,7 +1617,6 @@ sub set_phases {
     foreach my $f (@nrf) {
 	if ($count > 0) {
 	    my $spliceseq = $nrf[$count-1]{_3splice} . $nrf[$count]{_5splice};
-
 	    if ($spliceseq ne "GTAG") {
 		push(@fset,$sf);
 		$sf = new Bio::EnsEMBL::SeqFeature;
@@ -1674,34 +1694,35 @@ sub filter_Transcripts {
 
     my @new;
 
-    TRAN: foreach my $tran1 (@transcripts) {
-	my $foundstart = 0;
-	my $foundend   = 0;
+    push(@new,@transcripts);
+#    TRAN: foreach my $tran1 (@transcripts) {
+#	my $foundstart = 0;
+#	my $foundend   = 0;
 
-      TRAN2: foreach my $tran2 (@transcripts) {
+#      TRAN2: foreach my $tran2 (@transcripts) {
 	    
-	    next TRAN2 if ($tran1 == $tran2);
+#	    next TRAN2 if ($tran1 == $tran2);
 	    
-	    if (($tran2->first_exon->start > $tran1->first_exon->start) && 
-		($tran2->first_exon->start < $tran1->last_exon->end)) {
-		$foundstart = 1;
-	    }
-	    if (($tran2->last_exon->end > $tran1->first_exon->start) && 
-		($tran2->last_exon->end < $tran1->last_exon->end)) {
-		$foundend = 1;
-	    }
-	}
-	if ($foundstart == 0 || $foundend == 0) {
-	    push(@new,$tran1);
-	}
-    }
-    print "Done first filter\n";
+#	    if (($tran2->first_exon->start > $tran1->first_exon->start) && 
+#		($tran2->first_exon->start < $tran1->last_exon->end)) {
+#		$foundstart = 1;
+#	    }
+#	    if (($tran2->last_exon->end > $tran1->first_exon->start) && 
+#		($tran2->last_exon->end < $tran1->last_exon->end)) {
+#		$foundend = 1;
+#	    }
+#	}
+#	if ($foundstart == 0 || $foundend == 0) {
+#	    push(@new,$tran1);
+#	}
+#    }
+#    print "Done first filter\n";
     
 
     # We now also have to filter transcripts to trim off the satellite single exon genscan genes that
     # happen at the end of genewise genes.
 
-	my @exons = $self->genewise_exons;
+    my @exons = $self->genewise_exons;
     push(@exons,$self->genscan_exons);
     
     my @new2;
@@ -1874,14 +1895,54 @@ sub genscan_exons {
 sub get_all_Features {
     my ($self) = @_;
 
-
     if (!defined($self->{_all_Features})) {
+#	my @gw =	 $self->contig->get_Genes_by_Type('genewise');
+	
+	#print STDERR "GENEWISES @gw\n";
         my @tmp;
-        if ($self->genewise_only == 1) {
-	  @tmp = $self->contig->get_all_SimilarityFeatures_above_score('genewise',1);
-        } else {
-	  @tmp = $self->contig->get_all_SimilarityFeatures;
+	
+	#foreach my $gene (@gw) {
+	#    foreach my $tran ($gene->each_Transcript) {
+	#	my $genewise = new Bio::EnsEMBL::SeqFeature;
+	#	push(@tmp,$genewise);
+		
+	#	foreach my $exon ($tran->each_Exon) {
+	#	    my $gwexon = new Bio::EnsEMBL::SeqFeature;
+	#	    $gwexon->start($exon->start);
+	#	    $gwexon->end  ($exon->end);
+	#	    $gwexon->contig_id($exon->contig_id);
+	#	    $gwexon->strand($exon->strand);
+	#	    $gwexon->id($exon->id);
+	#	    $gwexon->primary_tag('similarity');
+	#	    $gwexon->source_tag('genewise');
+	#	    $gwexon->score($exon->score);
+	#	    $genewise->add_subSeqFeature($gwexon,'EXPAND');
+
+	#	}
+	#    }
+	
+#	}
+
+
+        if ($self->genewise_only != 1) {
+	    my @tmp2 = $self->contig->get_all_SimilarityFeatures;
+	    push(@tmp,@tmp2);
         }
+	my $min = 1000000;
+	my $max = -1000000;
+
+	foreach my $tmp (@tmp) {
+	    if ($tmp->start < $min) {
+		$min = $tmp->start;
+	    }
+	    if ($tmp->end > $max) {
+		$max = $tmp->end;
+	    }
+	}
+		
+	my @gw = $self->readGFF($min,$max);
+	push(@tmp,@gw);
+
 	print STDERR "Got features " . @tmp . "\n";
 	$self->{_all_Features} = [];
 	push(@{$self->{_all_Features}},@tmp);
@@ -2096,9 +2157,11 @@ sub print_ExonPairs {
 sub print_ExonPair {
     my ($self,$pair) = @_;
 
-    print(STDERR "\nExon Pair (splice - " . $pair->splice_seq->seq . ")\n");
     $self->print_Exon($pair->exon1);
     $self->print_Exon($pair->exon2);
+
+    print(STDERR "\nExon Pair (splice - " . $pair->splice_seq->seq . ")\n");
+
     foreach my $ev ($pair->get_all_Evidence) {
 	print(STDERR "   -  " . $ev->hseqname . "\t" . $ev->hstart . "\t" . $ev->hend . "\t" . $ev->strand . "\n");
     }
@@ -2135,7 +2198,7 @@ sub print_Genes {
 sub print_gff {
     my ($self) = @_;
     
-    open (POG,">pog.gff");
+    open (POG,">/nfs/disk100/humpub/birney/ensembl-pipeline/scripts/gene_build/" . $self->contig->id . ".gff");
     
     foreach my $gene ($self->each_Gene) {
 	foreach my $tran ($gene->each_Transcript) {
@@ -2143,14 +2206,34 @@ sub print_gff {
 		print POG $exon->id . "\tSPAN\texon\t" . 
 		    $exon->start . "\t" . $exon->end . "\t100\t" ;
 		if ($exon->strand == 1) {
-		    print POG "+\t.\t";
+		    print POG "+\t" . $exon->phase . "\t";
 		} else {
-		    print POG ("-\t.\t");
+		    print POG ("-\t" . $exon->phase ."\t");
 		}
 		print POG $tran->id . "\n";
 	    }
 	}
     }
+    # build a GTF Handler
+
+    my $gtf = Bio::EnsEMBL::Utils::GTF_handler->new();
+    open(GTF,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".gtf") || die "Cannot open gtf file for ".$self->contig->id."$!";
+    open(PEP,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".pep") || die "Cannot open pep file for ".$self->contig->id."$!";
+
+    $gtf->dump_genes(\*GTF,$self->each_Gene);
+
+
+    my $seqout = Bio::SeqIO->new( '-format' => 'fasta' , -fh => \*PEP);
+    foreach my $gene ( $self->each_Gene ) {
+        foreach my $trans ( $gene->each_Transcript ) {
+             my $pep = $trans->translate();
+            $pep->desc("Gene:".$gene->id." trans:".$trans->id," Input id".$self->contig->id);
+            $seqout->write_seq($pep);
+        }
+    }
+    print (GTF "#Done\n");
+    close(GTF);
+    close(PEP);
 
     foreach my $f ($self->feature) {
 	print POG $f->seqname . "\t" . $f->source_tag . "\tsimilarity\t" .
@@ -2207,6 +2290,80 @@ sub print_gff {
     close(POG);
 }
 
+
+sub readGFF {
+    my ($self,$min,$max) = @_;
+
+    my $clone = $self->contig->id;
+    $clone=~ s/\..*//;
+
+    my $file = "/nfs/disk100/humpub/birney/ensembl-pipeline/scripts/gff/$clone.gff";
+
+    if (-e $file){
+	open(IN,"<$file");
+    } else {
+	$self->throw("Not file $file found\n");
+    }
+
+    my %fhash;
+    my $count = 1;
+
+    while (<IN>) {
+	chomp;
+	$_ =~ s/\n//g;
+
+	my @f = split(/\t/,$_);
+
+
+
+	if ($f[1] eq "genewise") {
+	    my $f = new Bio::EnsEMBL::SeqFeature;
+	    $f->seqname($f[8]);
+	    $f->start  ($f[3]);
+	    $f->end    ($f[4]);
+	    
+	    if ($f[6] eq "-") {
+		$f->strand(-1);
+	    } else {
+		$f->strand(1);
+	    }
+
+	    $f->id ($f[8] . ".$count");
+
+	    if (!defined ($fhash{$f->seqname})) {
+		$fhash{$f->seqname} = [];
+	    }
+#	    if ($f->end  <= $max && $f->start >=$min) {
+		push(@{$fhash{$f->seqname}},$f);
+#	    }
+
+	    $count++;
+	}
+    }
+    close(IN);
+
+    my @fset;
+
+    foreach my $g (keys %fhash) {
+	my @f = @{$fhash{$g}};
+
+
+	@f = sort {$a->start <=> $b->start} @f;
+
+	my $sf = new Bio::EnsEMBL::SeqFeature;
+
+	$sf->source_tag('genewise');
+	$sf->primary_tag('similarity');
+
+	push(@fset,$sf);
+
+	foreach my $f (@f) {
+	    $sf->add_sub_SeqFeature($f,'EXPAND');
+	}
+    }
+    return @fset;
+}
+    
 1;
 
 
