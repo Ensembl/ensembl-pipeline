@@ -62,6 +62,7 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
+							     GB_PROTEIN_SEQFETCHER
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
@@ -74,17 +75,32 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
 							     GB_TARGETTED_SOFTMASK
 							    );
 
+#VAC
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							     GB_GW_DBNAME
+							    );
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
+#VAC
+#  my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
+  my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						       '-host'   => $GB_GW_DBHOST,
+						       '-user'   => $GB_GW_DBUSER,
+						       '-pass'   => $GB_GW_DBPASS,
+						       '-dbname' => $GB_GW_DBNAME,
+						      );
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
-    my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX);
+    my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
     $self->seqfetcher($seqfetcher);
   }
   $self->throw("no output database defined can't store results $!") unless($output_db);
@@ -102,29 +118,33 @@ sub new {
 
  Title   : make_seqfetcher
  Usage   :
- Function: get/set
+ Function: get/set for sequence fetcher
  Example :
  Returns : Bio::DB::RandomAccessI
- Args    :
+ Args    : $indexname - string, $seqfetcher_class - string
 
 
 =cut
 
 sub make_seqfetcher{
-  my ( $self, $index ) = @_;
+  my ( $self, $index, $seqfetcher_class ) = @_;
   my $seqfetcher;
+
+  (my $class = $seqfetcher_class) =~ s/::/\//g;
+  require "$class.pm";
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
-								  '-db' => \@db,
-								 );
+    
+    # make sure that your class is compatible with the index type
+    $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
-    $self->throw("Can't make seqfetcher\n");
+    $self->throw("can't make seqfetcher\n");
   }
 
   return $seqfetcher;
+
 }
 
 =head2 protein_id
@@ -369,8 +389,16 @@ sub convert_gw_output {
     $genetype = 'TGE_gw';
     $self->warn("Setting genetype to $genetype\n");
   }
+
   my @results  = $self->runnable->output;
   print STDERR "BlastMiniGenewise produced ".@results." results\n";
+  
+  # Throw here if zero results? Suggests something v. bad has happened 
+  # - usually corrupt sequence file means sequences not fetched. We should 
+  # never fail to fetch sequences ina a targetted run!
+  $self->throw("Did not expect zero BMG results! \n") unless scalar(@results);
+  
+  
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
