@@ -537,7 +537,16 @@ sub write_output {
 	eval {
 	    $gene_adaptor->store($gene);
 	    print STDERR "wrote gene dbID " . $gene->dbID . "\n";
-	}; 
+	    
+	    ###print some info, so that we know which genes we've stored:
+	    #	    foreach my $tran ( $gene->each_Transcript){
+	    #	      $tran->sort;
+	    #	      foreach my $exon ($tran->get_all_Exons){
+	    #		print STDERR $exon->start."-".$exon->end." length: ".($exon->end-$exon->start+1).
+	    #		  " phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
+	    #	      }
+	    #	    }
+	  }; 
 	if( $@ ) {
 	    print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
 	}
@@ -1603,7 +1612,7 @@ sub transcript_from_multi_exon_genewise {
 	}
 	
 	# finally add any 3 prime e2g exons
-	$self->add_3prime_exons(\$transcript, $exoncount, @egexons);
+	$self->add_3prime_exons($transcript, $exoncount, @egexons);
 	
       } # end 3' exon    
       
@@ -1780,7 +1789,7 @@ sub transcript_from_multi_exon_genewise {
 	$translation->end($orig_tend - $end_translation_shift);
       }
       
-      $self->add_3prime_exons(\$transcript, $exoncount, @egexons);
+      $self->add_3prime_exons($transcript, $exoncount, @egexons);
       
     } # end 3' exon
   }  
@@ -1897,6 +1906,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 
       # add all the exons from the est2genome transcript, subsequent to this one
       my $c = $#e2g_exons;
+      my $modified = 0;
       while($c > $exoncount){
 	my $newexon = new Bio::EnsEMBL::Exon;
 	my $oldexon = $e2g_exons[$c];
@@ -1920,9 +1930,13 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	  $newexon->add_Supporting_Feature($sf);
 	}
 	#	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
-	$$transcript->add_Exon($newexon);
-	$$transcript->sort;
+	$transcript->add_Exon($newexon);
+	$modified = 1;
+	$transcript->sort;
 	$c--;
+      }
+      if ($modified == 1){
+	$transcript->translation->end_exon->end_phase(-1);
       }
 
 }
@@ -1953,16 +1967,17 @@ GENE:
       my $tran = $t[0];
       
       # check that it translates - not the est2genome genes
-      if($gene->type eq 'TGE_gw' || $gene->type eq 'combined_gw_e2g'){
+      if($gene->type eq 'combined_gw_e2g' || $gene->type eq 'TGE_gw'){
 	  
-	  my $translates = $self->check_translation($tran);
-	  next GENE unless $translates;
+	my $translates = $self->check_translation($tran);
+	next GENE unless $translates;
       }
       
       eval {
-	  my $genetype = $gene->type;
-	  my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-	  # need to explicitly add back genetype and analysis.
+	my $genetype = $gene->type;
+	my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+	
+	# need to explicitly add back genetype and analysis.
 	  $newgene->type($genetype);
 	  $newgene->analysis($gene->analysis);
 	  
