@@ -321,7 +321,8 @@ sub filter_output{
 	############################################################
 	# non-best matches are kept only if they are not unspliced with the
 	# best match being spliced - otherwise they could be processed pseudogenes
-	if ( $count > 1 
+	if ( $REJECT_POTENTIAL_PROCESSED_PSEUDOS
+	     && $count > 1 
 	     && $is_spliced 
 	     && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
 	   ){
