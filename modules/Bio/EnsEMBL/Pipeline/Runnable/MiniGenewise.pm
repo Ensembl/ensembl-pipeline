@@ -283,20 +283,24 @@ sub run {
 	  $genomic_exon->slice    ($self->genomic_sequence);
 	
 	  # also need to convert each of the sub alignments back to genomic coordinates
-	  foreach my $aln (@{$exon->get_all_supporting_features}) {
-	    my @alns = $miniseq->convert_PepFeaturePair($aln);
-	    if ($#alns > 0) {
-	      print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
-	    }
-	
-	    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@alns);
-	    $align->seqname($self->genomic_sequence->seq_region_name);
-	    $align->hseqname($self->protein_sequence->id);
-	    $align->slice($self->genomic_sequence);
-	    # needs fix
-	    $align->score(100);
-	    $genomic_exon->add_supporting_features($align);
-
+	  foreach my $sf (@{$exon->get_all_supporting_features}) {
+            my @features;
+            foreach my $aln ($sf->ungapped_features) {
+              my @alns = $miniseq->convert_PepFeaturePair($aln);
+              if ($#alns > 0) {
+                print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
+              }
+          
+              my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@alns);
+              $align->seqname($self->genomic_sequence->seq_region_name);
+              $align->hseqname($self->protein_sequence->id);
+              $align->slice($self->genomic_sequence);
+              # needs fix
+              $align->score(100);
+              push @features,$align;
+            }
+            my $gapped = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@features);
+            $genomic_exon->add_supporting_features($gapped);
 	  }
 	
 	  push(@converted_exons,$genomic_exon);
