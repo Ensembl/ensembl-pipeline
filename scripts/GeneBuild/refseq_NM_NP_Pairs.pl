@@ -3,7 +3,6 @@ use strict;
 use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw(GB_PROTEOME_FILES);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 # script to identify which NM goes with which NP and insert that info into
@@ -11,6 +10,9 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 # The script assumes the early stages (pmatch, targetted) of the build have
 # already been run ie the protein table already has protein_id information in it.
 # options can either be passed in on the command line or read from config files.
+
+# we now have to use the refseq gpff (full genbank) entry file as the fasta headers 
+# have changed and no longer pair up NM and NP. Grrrrr.
 
 my $refseqfile;
 my $dbhost;
@@ -43,43 +45,64 @@ my $sth = $db->prepare($update_string) || $db->throw("can't prepare: $update_str
 
 open(REFSEQ, "<$refseqfile") or die "Can't open $refseqfile : $!";
 
+my $cdna_id;
+my $protein_id;
 
 while(<REFSEQ>){
-#  next unless  /^>\w+\|\w+\|\w+\|(NP\w+)\|\s.\((NM\S+)\)\|/;
-  next unless /^>/;
-# we do NOT want NGs or NCs
-  next unless /^>\w+\|\w+\|\w+\|(NP\S+)\|.*(NM\S+)\)\s+/;
+  next unless /^VERSION|DBSOURCE/;
+#  print $_;
+  if(/VERSION/){
+    if(/(XP\S+)/){
+      print STDERR "skipping [$1]\n";
+    }
 
-  my $cdna_id    = $2;
-  my $protein_id = $1;
+    next unless /(NP\S+)/;
 
-#  print STDERR "$protein_id:$cdna_id\n";
+    if(defined $protein_id){
+      die("previous protein_id [$protein_id] has not been cleared out\n");
+    }
+    if(defined $cdna_id){
+      die("previous cdna_id [$cdna_id] has not been cleared out ...\n");
+    }
 
-  my $res = $sth->execute($cdna_id, $protein_id) || $db->throw("can't execute: $update_string with $cdna_id, $protein_id");
+    $protein_id = $1;
+  }
+
+  if(/DBSOURCE/){
+
+    # don't want NCs or NGs
+    if(/(NC\_\S+)|(NG\_\S+)|(XM\S+)/){
+      print STDERR "Skipping [$_] - matches NC or NG or XM\n";
+      $cdna_id = undef;
+      $protein_id = undef;
+      next;
+    }
+
+    if(!defined $protein_id){
+      die("something very wrong - no protein_id for $_\n");
+    }
+    if (defined $cdna_id){
+      die("previous cdna_id [$cdna_id] has not been cleared out ...\n");
+    }
+
+    next unless /(NM\S+)/;
+
+    $cdna_id = $1;
+
+    print  "$protein_id\t$cdna_id\n";
+    my $res = $sth->execute($cdna_id, $protein_id) || $db->throw("can't execute: $update_string with $cdna_id, $protein_id");
+
+    $cdna_id    = undef;
+    $protein_id = undef;
+  }
 }
 
 close REFSEQ;
 
 sub check_parameters{
   # refseqfile first
-  if(!defined $refseqfile){
-    print STDERR "Checking for refseq file in GB_PROTEOME_FILES\n";
-    # check through entries in GB_PROTEOME FILES to try to identify the refseq file. Give up if we don't find it.
-    foreach my $file( @$GB_PROTEOME_FILES ){
-      my $file_name = $file->{file_path};
-      open (IN, "<$file_name") or die "Can't open $file_name : $!";
-      while(<IN>){
-	next unless /^>/;
-	last unless /^>\w+\|\w+\|\w+\|NP\w+\|\s.\(NM\S+\)\|/;
-	print STDERR "Found refseqfile: $file_name\n";
-	$refseqfile = $file_name;
-      }
-      close IN;
-    }
-  }
-
   if (!defined $refseqfile){
-    print STDERR "You need to define a refseq filename either on the command line or in Config::GeneBuild::Scripts::GB_PROTEOME_FILES\n";
+    print STDERR "You need to define a refseq gpff filename on the command line\n";
     &usage;
     exit;
   }
@@ -118,3 +141,6 @@ sub check_parameters{
   }
 }
 
+sub usage {
+  print STDERR "USAGE: refseq_NM_NP_pairs -refseq refseq.protein.gpff -dbhost -dbport -dbname -dbuser -dbpass\n";
+}
