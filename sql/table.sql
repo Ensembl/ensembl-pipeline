@@ -301,7 +301,7 @@ CREATE TABLE feature (
   hstart        int(11) NOT NULL,
   hend          int(11) NOT NULL,
   hid           varchar(40) NOT NULL,
-  evalue        double(16,4),
+  evalue        varchar(40),
   perc_id       int(10),
   phase         tinyint(1),
   end_phase     tinyint(1),
