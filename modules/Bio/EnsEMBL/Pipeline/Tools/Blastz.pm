@@ -238,10 +238,13 @@ sub nextAlignment {
       }
 
       # calculating the average of percentage identity over the whole HSP-like
+      # not including indels,it probably should...
       my $average_pecent_id = int($sum_match_bases/$sum_block_length*100);
+
       foreach my $feature_pair (@feature_pairs) {
 	$feature_pair->percent_id($average_pecent_id);
       }
+
       my $alignment = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@feature_pairs);
       return $alignment;
     }
