@@ -480,10 +480,9 @@ sub run_blasts {
 							   -filter => $self->filter,
 							   -coverage => $self->coverage,
 							   -prune => $self->prune,
-							   -options => $self->options,
+							   -options => join(" ",split(",",$self->options)),
 							   
 							  );
-
   $blast->run;
  
   my @features =  $blast->output;
@@ -729,19 +728,19 @@ sub run_est2genome {
 									     );
   
   $est2genome->run;
-  my @features = $est2genome->output;
+  my @features = @{$est2genome->output};
   #print "est2 genome outputted ".scalar(@features)."\n";
   my @output;
   foreach my $f (@features) {
-        if($f->score > 6){
+      if($f->score > 6){
 	  $f->start($f->start+$start-1);
-	  $f->end($f->end+$start-1);
+ 	  $f->end($f->end+$start-1);
 	  #$f->strand($strand);
 	  #print "outputting ".$f->seqname." ".$f->start." ".$f->end." ".$f->strand."\n";
 	  push(@output, $f);
 
-	}
       }
+  }
   #print "there are ".scalar(@output)." outputted\n";
    
   
