@@ -48,9 +48,9 @@ BEGIN {
 use Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
-use Bio::EnsEMBL::DBSQL::Contig;
+use Bio::EnsEMBL::DBSQL::RawContig;
 
-@ISA = qw(Bio::Root::Object Bio::EnsEMBL::DB::ContigI);
+@ISA = qw(Bio::Root::Object Bio::EnsEMBL::DB::RawContigI);
 
 # new() is inherited from Bio::Root::Object
 
@@ -74,7 +74,7 @@ sub _initialize {
   $self->_dbobj($dbobj);
 
   $self->{_exon_pairs} = [];
-
+  $self->{_genes}      = [];
   return $make; # success - we hope!
 }
 
@@ -145,9 +145,12 @@ sub make_ExonPairs {
 
 		my %doneidhash;
 
-		foreach my $f1 ($exon1->each_Supporting_Feature) {
+		F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
 		    
-		    foreach my $f2 ($exon2->each_Supporting_Feature) {
+		    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
+
+			next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
+			next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePair")));
 
 			if ($f1->hseqname eq $f2->hseqname &&
 			    $f1->strand   == $f2->strand   &&
@@ -281,4 +284,5 @@ sub get_all_Genes {
     my ($self) = @_;
 
     return @{$self->{_genes}};
+
 }

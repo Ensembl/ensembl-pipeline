@@ -587,14 +587,14 @@ sub _db_handle {
 
 
 sub get_all_ExonPairs {
-    my ($self,@contigs) = @_;
+    my ($self,@contigids) = @_;
 
     my @pairs;
     my $contigstr = "";
 
-    foreach my $contig (@contigs) {
-	$self->throw("Not a Bio::EnsEMBL::DB::ContigI") unless $contig->isa("Bio::EnsEMBL::DB::ContigI");
-	$contigstr .= "'" . $contig->id . "',";
+    foreach my $contig (@contigids) {
+#	$self->throw("Not a Bio::EnsEMBL::DB::ContigI") unless $contig->isa("Bio::EnsEMBL::DB::ContigI");
+	$contigstr .= "'" . $contig . "',";
     }
 
     $contigstr =~ s/(.*)\,$/$1/;
@@ -602,7 +602,7 @@ sub get_all_ExonPairs {
     my ($exon1_id,$exon2_id,$exon1_version,$exon2_version,$created);
 
     # This could be changed so it gets all the exons as well
-
+    
     my $query = "select distinct ep.exon1_id,ep.exon2_id,ep.created,ep.type,exon1_version,exon2_version " . 
 	"from exon_pair as ep,exon as e where " .
         "e.contig in (" . $contigstr . ") and "             .
@@ -680,6 +680,34 @@ sub write_ExonPairs {
     }
 }
 
+=head2 delete_ExonPairs
+    
+ Title   : delete_ExonPairs(@pairs)
+ Usage   : $obj->delete_ExonPairs(@pairs)
+ Function: Deletes all input exon pairs from the database
+ Example : 
+ Returns : Nothing
+ Args    : @Bio::EnsEMBL::Pipeline::ExonPair
+
+=cut
+
+sub delete_ExonPairs {
+    my ($self,@pairs) = @_;
+
+    foreach my $pair (@pairs) {
+	$self->throw("Not an Bio::EnsEMBL::Pipeline::ExonPair") unless $pair->isa("Bio::EnsEMBL::Pipeline::ExonPair");
+
+	my $query = "delete from exon_pair where exon1_id = \""        . $pair->exon1->id      . "\" and " .
+	                                        "exon2_id = \""        . $pair->exon2->id      . "\" and " .
+						"exon1_version = \""   . $pair->exon1->version . "\" and " .
+     				                "exon2_version = \""   . $pair->exon2->version . "\"";
+
+	my $sth = $self->prepare($query);
+	my $res = $sth->execute;
+
+    }
+}
+
 =head2 write_Exon
 
  Title   : write_Exon
@@ -721,12 +749,41 @@ sub write_Exon{
 	       $exon->strand       . ",".
 	       $exon->phase        . ",now(),".
 	       $exon->end_phase    . ")";
-       
+
        my $sth = $self->prepare($exonst);
        $sth->execute();
    }
 }
 
+
+=head2 delete_Exon
+
+ Title   : delete_Exon
+ Usage   : $obj->delete_Exon($exon_id)
+ Function: Deletes exon, including exon_transcript rows
+ Example : $obj->delete_Exon(ENSE000034)
+ Returns : nothing
+ Args    : $exon_id
+
+
+=cut
+
+sub delete_Exon{
+    my ($self,$exon_id) = @_;
+
+    $exon_id || $self->throw ("Trying to delete an exon without an exon_id\n");
+    
+    #Delete exon_transcript rows
+#    my $sth = $self->prepare("delete from exon_transcript where transcript = '".$exon_id."'");
+#    my $res = $sth ->execute;
+
+    #Delete exon rows
+    my $sth = $self->prepare("delete from exon where id = '".$exon_id."'");
+    my $res = $sth->execute;
+
+ #   $self->delete_Supporting_Evidence($exon_id);
+
+}
 
 =head2 _lock_tables
 
