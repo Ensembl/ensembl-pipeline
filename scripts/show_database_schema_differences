@@ -1,0 +1,243 @@
+#!/usr/local/ensembl/bin/perl -w
+                                                             
+use strict;
+use Getopt::Long;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+
+
+#parameters
+
+my $database1;
+my $database2;
+my $host;
+my $user;
+my $port;
+my $pass;
+
+my $help = sub{ exec('perldoc', $0) };
+
+GetOptions('dbhost=s'        => \$host,
+           'dbport=i'        => \$port,
+           'dbname1=s'        => \$database1,
+           'dbuser=s'        => \$user,
+           'dbpass=s'        => \$pass,
+	   'dbname2=s'        => \$database2,
+	   'h|help'          => $help,
+	   ) or $help->();
+unless ($host and $port and $database1 and $database2 and $user) {
+    $help->();
+}
+
+# get mysql db connection 1
+
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+    -host   => $host,
+    -user   => $user,
+    -dbname => $database1,
+    -pass   => $pass,
+    -port   => $port,
+    
+)
+or die ("Failed to create Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor to db $database1 \n");
+
+
+#get statement handle
+
+my $sth = $db->prepare("show tables");
+
+my $res =$sth->execute;
+
+my %dbhash1;
+my %dbhash2;
+my $currentdb='Tables_in_'. $database1;
+my $ref;
+
+while ($ref = $sth->fetchrow_hashref) {
+
+    $dbhash1{$ref->{$currentdb}} = 1;
+
+}
+
+#connect to second database
+
+$sth = $db->prepare("use " . $database2);
+
+$res =$sth->execute;
+
+$sth = $db->prepare("show tables");
+
+$res =$sth->execute;
+
+$currentdb='Tables_in_'. $database2;
+
+while ( $ref = $sth->fetchrow_hashref) {
+
+    $dbhash2{$ref->{$currentdb}} = 1;
+
+}
+
+my @common;
+my @dropped_from_db1;
+my @new_in_db2;
+
+while ( my ( $key, $value ) = each %dbhash1 ) {
+
+    if ( exists $dbhash2{$key} ) {
+	push @common, $key;
+    }
+    if ( ! exists $dbhash2{$key} ) {
+	push @dropped_from_db1 , $key;
+    }
+
+}
+while ( my ( $key2, $value2 ) = each %dbhash2 ) {
+
+    if ( ! exists $dbhash1{$key2} ) {
+	push @new_in_db2, $key2;
+    }
+
+}
+
+print "Output of schema differences in $database1 and $database2 \n\nThe number of tables that were dropped from database 1 $database1 is :  ".scalar(@dropped_from_db1);
+print "\n\nHere are the descriptions of the dropped tables\n\n";
+
+my $count=0;
+
+foreach ( @dropped_from_db1 ) {
+
+    $count++;
+    
+    #get statement handle
+
+    $sth = $db->prepare("show create table $database1.$_");
+
+    $res =$sth->execute;
+    while (my @row=$sth->fetchrow_array) {
+	print "\nTable $count\n @row\n\n";
+    }
+
+}
+
+print "\n\n**************************************************************************************\n\nThe number of tables that were added new in database 2 $database2 is :  ".scalar(@new_in_db2);
+print "\n\nHere are the descriptions of the new tables\n\n";
+$count=0;
+
+foreach ( @new_in_db2 ) {
+    $count++;
+    #get statement handle
+
+    $sth = $db->prepare("show create table $_");
+
+    $res =$sth->execute;
+    while (my @row=$sth->fetchrow_array) {
+	print "\nTable $count\n @row\n\n";
+
+    }
+
+}
+
+print "*********************************************************************************\n\nThe common tables \n\n";
+
+my %diffhash3;
+my %exacthash4;
+
+foreach ( @common ) {
+    
+    #get statement handle
+    $sth = $db->prepare("show create table $_ ");
+    $res =$sth->execute;
+    my $row1=$sth->fetchrow_array;
+    $sth = $db->prepare("show create table $database1.$_ ");
+    $res =$sth->execute;
+    my $row2=$sth->fetchrow_array;
+    my $y=lc($row1);
+    my $x=lc($row2);
+
+    $y=~s/\s+//g;    
+    $x=~s/\s+//g;
+
+    if ( $y eq $x ) {
+
+	$exacthash4{$_}=$row1;
+
+    }
+
+    else {
+
+	$diffhash3{$_}="$database2\n$row1\n\nDatabase:$database1\n$row2";
+
+    }
+
+
+}    
+
+print "\n\nThe following are those which are exactly the same in both databases\n\n";
+
+$count=0;
+
+while ( my ( $key, $value ) = each %exacthash4 ) {
+
+    print ++$count.")$key \nDatabase:$value \n\n";
+
+}
+
+print "\n\n***************************************************\n\nThe following are those which have different create table definitions \n\n";
+
+$count=0;
+
+while ( my ( $key, $value ) = each %diffhash3 ) {
+    print ++$count.")$key \nDatabase:$value \n\n";
+}
+
+
+
+print "\n\n";
+
+
+__END__
+
+=head1 NAME - show_searched_blast_versions
+
+=head1 DESCRIPTION
+
+Displays  a summary of the differences in database schemas in two databases that need to be compared
+
+Displays the dropped tables , newly added tables and the common tables with rep. to the create table definitions of the tables in the two databases.
+
+=head1 SYNOPSIS
+
+  show_database_schema_differences -dbhost <MYSQL_HOSTNAME> -dbport <MYSQL_PORT> -dbname1 <DATABASE_NAME_1> -dbname2 <DATABASE_NAME_2> -dbuser <USER_NAME> [ -dbpass <USER_PASSWORD> ] 
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item -dbhost <MYSQL_HOSTNAME>
+
+Name of the mysql server host eg: B<ecs4>
+
+=item -dbport <MYSQL_PORT>
+
+Port number of the mysql server eg: B<3352>
+
+=item -dbname1 <DATABASE_NAME_1> 
+
+Name of the first database which you would like to compare  eg: B<test1>
+
+=item -dbname2 <DATABASE_NAME_2> 
+
+Name of the second database which you would like to compare  eg: B<test2>
+
+=item -dbuser <USER_NAME>
+
+MySQL user name for connection eg: B<ensuser>
+
+=item -dbpass <USER_PASSWORD>
+
+Password of the mysql user if any eg: B<testpass>
+
+=back
+
+=head1 AUTHOR
+
+Sindhu Pillai B<email> sp1@sanger.ac.uk
