@@ -679,7 +679,8 @@ sub map_temp_Genes_to_real_Genes{
 		#Double check this is right...
 		#Killing all genes in merge that are not largest
 		print $log  "GENE MAP KILLED: $oldgeneid merged into $largest\n";
-		$self->archive->write_deleted_id('gene',$oldgeneid,$largest);
+		my $oldv = $oldg{$oldgeneid}->version;
+		$self->archive->write_deleted_id('gene',$oldgeneid,$oldv,$largest);
 		$killed{$oldgeneid}=1;
 	    }
 	}
@@ -926,7 +927,8 @@ sub map_temp_Genes_to_real_Genes{
     foreach my $gene (@unique) {
 	print $log "GENE MAP KILLED: $gene\n";
 	if (!$killed{$gene}) {
-		$self->archive->write_deleted_id('gene',$gene);
+	    my $oldv = $oldg{$gene}->version;
+	    $self->archive->write_deleted_id('gene',$gene,$oldv);
 	}
     }
     my $final_size=scalar(@final_genes);
@@ -1028,8 +1030,8 @@ sub map_temp_Transcripts_to_real_Transcripts{
 	       my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($oldt->id);
 	       $self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$gene->id,$gene->version,$clone->id,$clone->version);
 	       $self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$gene->id,$gene->version,$clone->id,$clone->version);
-               $self->archive->write_deleted_id('transcript',$old_trans->id);
-               $self->archive->write_deleted_id('translation',$old_trans->translation->id);
+               $self->archive->write_deleted_id('transcript',$old_trans->id,$old_trans->version);
+               $self->archive->write_deleted_id('translation',$old_trans->translation->id,$old_trans->translation->version);
 	   };
 	   if ($@) {
 	       $self->warn("Could not archive ".$oldt->id." because of $@");
