@@ -262,11 +262,11 @@ sub _discard_worst_overlapping {
             push(@hsps, $bin->[0]);
         } else {
             # Remove the hsp with the lowest percent identity
-            # (or highest score or lowest P value)
+            # (or lowest score or highest P value)
             my @bin_hsps = sort {
                 $a->percent <=> $b->percent ||
-                $b->score   <=> $a->score   ||
-                $a->P       <=> $b->P
+                $a->score   <=> $b->score   ||
+                $b->P       <=> $a->P
                 } @$bin;
             shift(@bin_hsps);
             
