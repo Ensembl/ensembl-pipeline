@@ -48,7 +48,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Combine_Genewises_and_E2Gs;
 
 use vars qw(@ISA);
 use strict;
-use Storable qw(dclone);
+
+# no idea what this is:
+#use Storable qw(dclone);
+
 # Object preamble - inheriets from Bio::Root::RootI
 
 
@@ -56,22 +59,9 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_DBHOST
-					 GB_DBNAME
-					 GB_DBUSER
-					 GB_DBPASS
-					 GB_TARGETTED_GW_GENETYPE
-					 GB_SIMILARITY_GENETYPE
-					 GB_COMBINED_GENETYPE
-					 GB_COMBINED_MAX_INTRON
-					);
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					 EST_DBHOST
-					 EST_DBNAME
-					 EST_REFDBUSER
-					);
 
+# all the parameters are read from GeneConf.pm
+use Bio::EnsEMBL::Pipeline::GeneConf;
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -80,49 +70,91 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  # need 2 dbs, one for getting genewises, one for getting e2gs
-  my $genedb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => $GB_DBHOST,
-						   '-user'   => $GB_DBUSER,
-						   '-pass'   => $GB_DBPASS,
-						   '-dbname' => $GB_DBNAME,
+  # IMPORTANT:
+  # SUPER creates dbobj, which is created on run_GeneBuild_runnable
+  # this dbobj is a reference to GB_DBHOST@GB_DBNAME containing
+  # the features and the dna, so here it is used as refdb only
+
+  # db with the genewises
+  my $genewise_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						   '-host'   => $GB_GW_DBHOST,
+						   '-user'   => $GB_GW_DBUSER,
+						   '-pass'   => $GB_GW_DBPASS,
+						   '-dbname' => $GB_GW_DBNAME,
 						  );
   
-  my $cdnadb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-  						   '-host'   => $EST_DBHOST,
-  						   '-user'   => $EST_REFDBUSER,
-  						   '-dbname' => $EST_DBNAME,
-  						   '-dnadb'  => $genedb,
-  						  ); 
   
-  $self->dbobj($genedb);
-  $self->cdnadb($cdnadb);
+  $genewise_db->dnadb($self->dbobj);
+  $self->genewise_db($genewise_db);
 
+  # db with the cdnas
+  my $cdna_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+  						   '-host'   => $GB_cDNA_DBHOST,
+  						   '-user'   => $GB_cDNA_REFDBUSER,
+  						   '-dbname' => $GB_cDNA_DBNAME,
+						   ); 
+  
+  $cdna_db->dnadb($self->dbobj);
+  $self->cdna_db($cdna_db);
+
+
+  # db where we will write the output (different from any of the above):
+  my $comb_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+  						   '-host'   => $GB_COMB_DBHOST,
+  						   '-user'   => $GB_COMB_REFDBUSER,
+  						   '-dbname' => $GB_COMB_DBNAME,
+						   ); 
+  
+  $comb_db->dnadb($self->dbobj);
+  $self->output_db($comb_db);
+
+  
+
+
+
+  #$self->dbobj($genedb);
+ 
   return $self;
 }
 
-=head2 cdnadb
-
-    Title   :   cdnadb
-    Usage   :   $self->cdnadb($obj);
-    Function:   Gets or sets the value of cdnadb. This is a handle to a database 
-                containing cdna based gene predictions.
-    Returns :   A Bio::EnsEMBL::DBSQL::DBAdaptor compliant object
-    Args    :   A Bio::EnsEMBL::DBSQL::DBAdaptor compliant object
-
-=cut
-
-sub cdnadb {
-  my( $self, $value ) = @_;
-  
-  if ($value) 
+sub cdna_db {
+    my( $self, $cdna_db ) = @_;
+    
+    if ($cdna_db) 
     {
-      $value->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-	|| $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
-      $self->{'_cdna_db'} = $value;
+	$cdna_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$cdna_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_cdna_db} = $value;
     }
-  return $self->{'_cdna_db'};
+    return $self->{_cdna_db};
 }
+
+sub genewise_db {
+    my( $self, $genewise_db ) = @_;
+    
+    if ($genewise_db) 
+    {
+	$genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$genewise_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_genewise_db} = $genewise_db;
+    }
+    return $self->{_genewise_db};
+}
+
+
+sub output_db {
+    my( $self, $comb_db ) = @_;
+    
+    if ($comb_db) 
+    {
+	$comb_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$comb_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_output_db} = $output_db;
+    }
+    return $self->{_output_db};
+}
+
+
 
 
 =head2 fetch_input
@@ -133,7 +165,6 @@ sub cdnadb {
  Example :
  Returns : 
  Args    :
-
 
 =cut
 
@@ -149,25 +180,21 @@ sub fetch_input{
   if(!($entry =~ /(.*)\.(.*)\-(.*)/)) {
     $self->throw("Not a valid input id... $entry");
   }
-  
   $chrname    = $1;
   $start   = $2;
   $end     = $3;
-  
-
-  my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
-  $self->vc($vc);
   print STDERR "Chromosome id : $chrname\n";
   print STDERR "Range         : $start - $end\n";
   print STDERR "Contig        : " . $vc->id . " \n";
   
-  # now get vc for cdna db 
-  my $tmpname = $chrname;
-  $tmpname =~ s/chr//;
-
-  $sgpa = $self->cdnadb->get_StaticGoldenPathAdaptor();
-  $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($tmpname,$start,$end);
+  # genewises
+  my $sgpa = $self->genewise_db->get_StaticGoldenPathAdaptor();
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
+  $self->vc($vc);
+  
+  # cdna
+  $sgpa = $self->cdna_db->get_StaticGoldenPathAdaptor();
+  $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
   $self->cdna_vc($vc);
   
 }
@@ -229,7 +256,7 @@ sub run {
   }
 
   $self->e2g_genes(@newe2g);
-
+  
   print STDERR "got " . scalar($self->e2g_genes) . " sensible e2g genes\n";
 
   # find which gw matches which e2gs
@@ -434,22 +461,24 @@ sub output{
 
   
 sub write_output {
-  my($self) = @_;
-  
-  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
-  
- GENE: foreach my $gene ($self->output) {	
-    # do a per gene eval...
-    eval {
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
-    }; 
-    if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+    my($self) = @_;
+    
+    # write genes in the database: GB_COMB_DBNAME@GB_COMB_DBHOST
+    my $gene_adaptor = $self->output_db->get_GeneAdaptor;
+    
+  GENE: 
+    foreach my $gene ($self->output) {	
+	
+	eval {
+	    $gene_adaptor->store($gene);
+	    print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+	}; 
+	if( $@ ) {
+	    print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+	}
+	
     }
     
-  }
-  
 }
 
 =head2 e2g_genes
@@ -550,7 +579,7 @@ sub combine_genes{
     $self->warn("Setting genetype to $genetype\n");
   }
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->output_db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   
   my $analysis_obj;
