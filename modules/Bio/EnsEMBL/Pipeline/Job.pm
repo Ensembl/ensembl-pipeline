@@ -320,7 +320,7 @@ sub flush_runs {
     }
     $cmd .= " -q $queue " if defined $queue;
     $cmd .= " -J $jobname " if defined $jobname;
-    $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
+    $cmd .= " -r -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly (otherwise -pass gets the
