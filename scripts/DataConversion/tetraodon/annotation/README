@@ -1,0 +1,38 @@
+A set of scripts for loading the Tetroadon annotation from Genoscope
+into Ensembl. The scripts can divided into two classes:
+
+A. Convertion of the Genoscop-supplied annotation files (mostly GFF
+   variants) into a standard GFF. These scripts have the name
+   genoscope2*.pl 
+
+B. Loading of this standard GFF into Ensembl. These scripts have the
+   name load_*.pl
+
+In theory, only the scripts in class A are Tetraodon specific. The
+class B script can be used for any import task, as long as your idea
+of "standard" GFF is the same as mine. 
+
+Standard GFF should be pretty obvious for all feature types apart from
+the genes. I my idea os standard gene GFF, gene structures are
+described by "exon" lines and "CDS" lines in genome co-ordinates, and
+the linking of exons into transcripts and transcripts into genes is
+done in the final "group" field. Due to the way the loading script is
+written, transcripts can have at most one translation. 
+
+Here is a areal example from the Tetraodon genome that was loaded with
+the load_genes.pl script:
+
+
+21      GSTEN   exon    4074122 4074385 9055.9334       -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544006"
+21      GSTEN   exon    4073984 4074049 33465.1233      -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544005"
+21      GSTEN   exon    4073733 4073838 33753.2941      -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544004"
+21      GSTEN   exon    4073141 4073259 35214.3040      -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544003"
+21      GSTEN   exon    4072977 4073062 34101.1000      -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544002"
+21      GSTEN   exon    4072476 4072898 3644.9649       -       .       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; exon_id "GSTENE00017544001"
+21      GSTEN   CDS     4074122 4074289 9055.9334       -       0       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+21      GSTEN   CDS     4073984 4074049 33465.1233      -       0       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+21      GSTEN   CDS     4073733 4073838 33753.2941      -       0       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+21      GSTEN   CDS     4073141 4073259 35214.3040      -       2       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+21      GSTEN   CDS     4072977 4073062 34101.1000      -       0       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+21      GSTEN   CDS     4072766 4072898 3644.9649       -       1       transcript_id "GSTENT00017544001"; gene_id "GSTENG00017544001"; translation_id "GSTENP00017544001";
+
