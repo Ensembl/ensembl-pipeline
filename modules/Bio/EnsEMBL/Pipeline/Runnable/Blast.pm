@@ -215,7 +215,7 @@ sub run {
 
     #parse output and create features
     $self->parse_results;
-    #$self->deletefiles();
+    $self->deletefiles();
   }
 
 sub databases {
