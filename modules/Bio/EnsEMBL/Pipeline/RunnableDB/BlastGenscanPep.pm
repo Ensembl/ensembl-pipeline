@@ -252,8 +252,7 @@ sub run {
     }
 
     my (@output);
-    my @runnable = $self->runnable() 
-            or $self->throw("Can't return output - no runnable object(s)");
+    my @runnable = $self->runnable() ;
     #align the output to the contig
     foreach my $run (@runnable)
     {
