@@ -633,32 +633,36 @@ sub run_blastwise {
     $strand = -1;
   }
 
-  foreach my $f (@f) {
+  my $ec = 0;
+ FEAT: foreach my $f (@f) {
+    $ec++;
     # $f is a genomic:protein FP
     $f->strand($strand); # genomic
     $f->hstrand(1);      # protein
     
     my $phase = $f->feature1->{_phase};
-
+    
     # need to convert whole exon back to genomic coordinates
     my @newfeatures = $miniseq->convert_PepFeaturePair($f);         
     
     if ($#newfeatures > 0) {
       # all hell will break loose as the sub alignments will probably not map cheerfully 
-      # onto the first one ...
-      print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
-      }
-  
+      # and we may start introducing in frame stops ...
+      # for now, ignore this feature.
+      print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . " ignoring exon $ec\n";
+      next FEAT;
+    }
     
-  my @genomics;
-  foreach my $nf(@newfeatures) {
+    
+    my @genomics;
+    foreach my $nf(@newfeatures) {
       push(@genomics, $nf->feature1);
     }
-
+    
     # also need to convert each of the sub alignments back to genomic coordinates
     foreach my $aln($f->feature1->sub_SeqFeature) {
       my @alns = $miniseq->convert_PepFeaturePair($aln);
-
+      
       if ($#alns > 0) {
 	# we're in for fun
 	print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
@@ -667,7 +671,7 @@ sub run_blastwise {
 	my $added = 0;
 	$a->strand($strand); # genomic
 	$a->hstrand(1);      # protein
-
+	
 	$a->seqname($aln->seqname);
 	$a->hseqname($aln->hseqname);
 	# shouldn't need to expand ... as long as we choose the right parent feature to add to!
