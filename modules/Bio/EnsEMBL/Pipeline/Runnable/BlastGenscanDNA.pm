@@ -175,7 +175,7 @@ sub run {
     $runnable->run();
   
     $self->align_hits_to_contig($runnable->output);
-#    $self->check_features($transcript->translate->seq,$self->featurepairs);
+    $self->check_features($transcript->translate->seq,$self->featurepairs);
   }
 
 sub check_features {
@@ -186,29 +186,43 @@ sub check_features {
   my %seqhash;
 
   foreach my $f (@f) {
-    if (!defined($seqhash{$f->hseqname})) {
-      my $seq = $self->get_Sequence($f->hseqname);
-      $seqhash{$f->hseqname} = $seq;
-    }
-    my $seq = $seqhash{$f->hseqname};
-    my $fdna = $f->seq;
+      eval {
+	  if (!defined($seqhash{$f->hseqname})) {
+	      my $seq = $self->get_Sequence($f->hseqname);
+	      $seqhash{$f->hseqname} = $seq;
+	  }
+	  my $seq = $seqhash{$f->hseqname};
 
-    if ($f->strand == -1) {
-      $fdna = $f->seq->revcom;
-    }
+	  my $fdna = $f->seq;
+	  my $rdna = $f->seq->revcom;
 
-    my $hdna = substr($seq->seq,$f->hstart-1,($f->hend - $f->hstart + 1));
+	  $rdna = $rdna->seq;
+	  $fdna = $fdna->seq;
+	  
+	  $fdna =~ tr/a-z/A-Z/;
+	  $rdna =~ tr/a-z/A-Z/;
 
-
-    print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " "  . "\n" ;
-      print $fdna->seq . "\n" . $hdna . "\n";
-
+	  my $hdna = substr($seq->seq,$f->hstart-1,($f->hend - $f->hstart + 1));
+	  
+	  
+	  $hdna =~ tr/a-z/A-Z/;
+	  
+	  print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " "  . "\n" ;
+	  print $fdna . "\n$rdna\n" . $hdna . "\n";
+      };
+      if ($@) {
+	  print STDERR "Couldn't fetch sequence for " . $f->hseqname . " No alignment printed [$@]\n";
+      }
   }
 }
 
 sub get_Sequence {
     my ($self,$id) = @_;
 
+    if ($id =~ /\|/) {
+	$id =~ s/.*\|(.*)\|.*/$1/;
+    }
+    $id =~ s/\..*//;
 
     next ID unless defined($id);
 
