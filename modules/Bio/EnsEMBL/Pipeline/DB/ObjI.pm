@@ -89,6 +89,57 @@ sub get_JobsByInputId {
 }
 
 
+=head2 get_JobsByAge {
+
+  Title   : get_JobsByAge
+  Usage   : my @jobs = $db->get_JobsByAge($duration)
+  Function: Retrieves all jobs in the database
+            that are older than than a certain duration given in minutes.
+  Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
+  Args    : int
+
+=cut
+
+sub get_JobsByAge {
+    my ($self) = @_;
+    $self->throw("Method get_JobsByAge not implemented");
+
+}
+
+=head2 get_all_Analysis 
+
+  Title   : get_all_Analysis
+  Usage   : my @analyses = $db->get_all_Analysis()
+  Function: Retrieves all analysis objects
+  Returns : a list of Bio::EnsEMBL::Pipeline::Analysis
+  Args    : none
+
+=cut
+
+sub get_all_Analysis {
+    my ($self) = @_;
+    $self->throw("Method get_all_Analysis not implemented");
+
+}
+
+
+=head2 get_AnalysisSummary 
+
+  Title   : get_AnalysisSummary
+  Usage   : my $analyis = $db->get_AnalysisSummary($id)
+  Function: Retrieves summary of analyses objects matching analysis id
+  Returns : a hash containing summary of analyses
+  Args    : int
+
+=cut
+
+sub get_AnalysisSummary {
+    my ($self) = @_;
+    $self->throw("Method get_AnalysisSummary not implemented");
+
+}
+
+
 =head2 write_Analysis {
 
   Title   : write_Analysis
