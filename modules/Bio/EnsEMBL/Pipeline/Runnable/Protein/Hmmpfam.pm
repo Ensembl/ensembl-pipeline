@@ -84,7 +84,8 @@ sub new {
   
     my ($query, $analysis, $options) = $self->_rearrange([qw(QUERY 
                                                              ANALYSIS
-                                                             OPTIONS)],        
+                                                             OPTIONS
+							     )],        
                                                           @args);
 
 
@@ -132,7 +133,8 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->filename ($self->query.".$$.seq");
+	    $self->filename("query.$$.seq");
+#	    $self->filename ($self->query.".$$.seq");
 	    $self->lsresults ($self->filename.".lsout");
 	    $self->fsresults ($self->filename.".fsout");
 	}
@@ -330,6 +332,8 @@ sub run_program {
     # some of these options require HMMER 2.2g (August 2001)
     
     my @dbfiles = split(/;/,$self->analysis->db_file);
+
+    print STDERR "FILENAME: ".$self->filename."\n";
 
     if ($dbfiles[0] =~ /ls/) {
 	 

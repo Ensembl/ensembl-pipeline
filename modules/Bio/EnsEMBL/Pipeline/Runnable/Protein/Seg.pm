@@ -127,7 +127,7 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->filename ($self->query->id.".$$.seq");
+	    $self->filename ("query.$$.seq");
 	    $self->results ($self->filename.".out");
 	}
 	else {
