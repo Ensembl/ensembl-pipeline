@@ -15,6 +15,13 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 
 =head1 SYNOPSIS
 
+This module allows a transcript to be displayed with its
+attached supporting evidence.  It re-dcreates an alignment
+from the database which is returned as an array of 
+multiply-aligned sequences.  These can be printed as text 
+and used to display the alignment with an alignment 
+viewer/editor.
+
 Quick start - use the following code if you want the 
 alignment of an ensembl transcript with the evidence 
 used to predict it:
@@ -39,13 +46,10 @@ foreach my $align_seq (@$align_seqs){
 }
 
 The '-padding' option specifies the amount of tailing
-sequence left attached to each 'exon'.  If you set this
-to zero be careful, as you could be truncating some
-sequence from the aligned evidence sequences.  If this 
-happens a warning is issued.
+sequence upstream and downstream of the transcript.
 
 Other alignment presentation options exist.  The intronic
-regions of the transcript can be left in the alignment, but 
+regions of the transcript can be left in the alignment, but
 in some cases can make it _very_ big:
 
 my $alignment = 
@@ -65,13 +69,15 @@ my $alignment =
      '-type'            => 'all',
      '-three_letter_aa' => 1,);
 
-It is possible to display a transcript with a set of external 
-supporting features that can come from any source.  Where external
-features are used, the supporting features attached to
-the transcript are ignored and the external set used instead.  It
-usually helps if the external supporting features actually overlap
-the transcript sequence :)  This option is used by passing in 
-supporting features at the time of object creation.
+As it might be mind-bogglingly useful to some folks, it is possible
+to display a transcript with a set of external supporting features
+that can come from any source.  Where external features are used, 
+the supporting features attached to the transcript are ignored and 
+the external set used instead.  This feature is only going to work if 
+the external features are mapped to the same assembly as the transcript.
+It also usually helps if the external supporting features actually overlap
+the transcript sequence :)  External features are attached to the evidence
+alignment object at the time of object creation:
 
 my $evidence_alignment = 
   Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
@@ -79,19 +85,6 @@ my $evidence_alignment =
      '-seqfetcher'          => $seqfetcher,
      '-transcript'          => $transcript,
      '-supporting_features' => \@supporting_features);
-
-
-A few features of the actual alignment can be controled.
-The fasta line length and the amount of 5-prime and
-3-prime padding can be stipulated:
-
-my $evidence_alignment = 
-  Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
-     '-dbadaptor'         => $db,
-     '-seqfetcher'        => $pfetcher,
-     '-transcript'        => $transcript,
-     '-padding'           => 50,
-     '-fasta_line_length' => 60);
 
 
 =head1 DESCRIPTION
@@ -125,16 +118,29 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
 =head2 new
 
-  Arg [1]    :
-  Arg [2]    :
-  Arg [3]    :
-  Arg [4]    : (optional)
-  Arg [5]    : (optional)
-  Example    :
-  Description: 
+  Arg [db]         : a Bio::EnsEMBL::DBSQL::DBAdaptor object.
+  Arg [transcript] : a Bio::EnsEMBL::Transcript object.
+  Arg [seqfetcher] : a Bio::EnsEMBL::Pipeline::SeqFetcher object.
+  Arg [padding]    : (optional) int, default 10, transcript slice padding.
+  Arg [evidence_identity_cutoff] : (optional) percentage id cutoff to be
+                                   applied to supporting features.
+  Arg [supporting_features]      : (optional) a listref of 
+                                   Bio::EnsEMBL::SeqFeature.  These will be
+                                   displayed instead of the evidence attached
+                                   to the transcript.
+  Example    : my $evidence_alignment = 
+                Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
+                 -transcript          => $transcript,
+                 -dbadaptor           => $db,
+                 -seqfetcher          => $seqfetcher,
+                 -padding             => 10);
+  Description: Constructs new EvidenceAlignment object.  If a listref
+               of supporting features is provided, these will be displayed
+               instead of the features attached to the transcript.
   Returntype : Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
-  Exceptions : Will throw if isnt passed 
-               DBAdaptor/Transcript/SeqFetcher
+  Exceptions : Will throw if isnt passed DBAdaptor/Transcript/SeqFetcher.
+               Warns if transcript does not have evidence attached, or if all
+               evidence is discarded or unfetchable.
   Caller     : General
 
 =cut
@@ -149,13 +155,11 @@ sub new {
       $transcript, 
       $seqfetcher, 
       $padding, 
-      $fasta_line_length, 
       $evidence_identity_cutoff,
       $supporting_features) = rearrange([qw(DBADAPTOR
 					    TRANSCRIPT
 					    SEQFETCHER
 					    PADDING
-					    FASTA_LINE_LENGTH
 					    IDENTITY_CUTOFF
 					    SUPPORTING_FEATURES
 					   )],@args);
@@ -216,17 +220,6 @@ sub new {
     $self->_all_supporting_features($supporting_features)
   }
 
-
-  # The line length in the fasta alignment is set to a default
-  # or a user specified value
-
-  if ($fasta_line_length) {
-    $self->_line_length($fasta_line_length);
-  } else {
-    $self->_line_length(60);
-  }
-
-
   # Optional evidence identity cut-off
 
   if ($evidence_identity_cutoff) {
@@ -241,12 +234,21 @@ sub new {
 
 =head2 retrieve_alignment
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [type]            : String.  Alignment type (all, nucleotide, protein).
+  Arg [remove_introns]  : 0 or 1.  Truncate intron sequences from alignment.
+  Arg [three_letter_aa] : 0 or 1.  Display amino acid sequences with three-letter 
+                          instead of single-letter codes.
+  Example    : my $alignment = 
+                $evidence_alignment->retrieve_alignment(
+                 '-type'            => 'all',
+                 '-remove_introns'  => 1,
+                 '-three_letter_aa' => 1,);
+  Description: Retrieves an alignment object of the transcript passed during object
+               construction.  The alignment is not constructed prior to this call,
+               hence this method drives the full alignment reconstruction process.
+  Returntype : Bio::EnsEMBL::Pipeline::Alignment
+  Exceptions : Warns if alignment generation fails.
+  Caller     : General.
 
 =cut
 
@@ -255,10 +257,8 @@ sub retrieve_alignment {
 
   my ($type, 
       $remove_introns, 
-      $show_missing_evidence,
       $three_letter_aa) = rearrange([qw(TYPE
 					REMOVE_INTRONS
-					SHOW_UNALIGNED
        					THREE_LETTER_AA
 				       )],@_);
 
@@ -267,7 +267,6 @@ sub retrieve_alignment {
 
   unless ($self->_is_computed($type)){
     my $alignment_success = $self->_align($type, 
-					  $show_missing_evidence, 
 					  $remove_introns);
     unless ($alignment_success) {
       warning "Alignment generation failed.  There probably were" . 
@@ -276,7 +275,7 @@ sub retrieve_alignment {
     }
   }
 
-  return $self->_create_Alignment_object($type, $show_missing_evidence);
+  return $self->_create_Alignment_object($type);
 }
 
 
@@ -285,17 +284,23 @@ sub retrieve_alignment {
 
 =head2 _align
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [1]    : String.  Alignment type (one of 'all', 'nucleotide' 
+               or 'protein').
+  Arg [2]    : int (1 or 0).  Set to 1 if introns are to be truncated.
+  Example    :  my $status = $self->_align('all', 1);
+  Description: Top level internal method that builds alignment from the
+               database.  While other sudsidary methods perform tasks 
+               such as building sequences from cigar strings, this 
+               method does the difficult reconciliation of multiple
+               pairwise alignments into a single multiple alignment.
+  Returntype : int
+  Exceptions : none.
+  Caller     : retrieve_alignment
 
 =cut
 
 sub _align {
-  my ($self, $type, $show_missing_evidence, $truncate_introns) = @_;
+  my ($self, $type, $truncate_introns) = @_;
 
   my $evidence_sequences = $self->_corroborating_sequences;
 
@@ -446,13 +451,6 @@ sub _align {
 			      $evidence_sequence_hash{$evidence_key});
   }
 
-  # If unaligned fragments are to be shown, find these now.
-
-  if ($show_missing_evidence) {
-    $self->_compute_evidence_coverage;
-    $self->_derive_unmatched_sequences;
-  }
-
   # If introns are to be truncated, do this now.
 
   if ($truncate_introns) {
@@ -469,17 +467,18 @@ sub _align {
 
 =head2 _create_Alignment_object
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [1]    : String.  Alignment type ('all', 'nucleotide' or 'protein').
+  Example    : $self->_create_Alignment_object('all')
+  Description: Builds the final Bio::EnsEMBL::Pipeline::Alignment object
+               and and is responsible for adding each aligned sequence.
+  Returntype : Bio::EnsEMBL::Pipeline::Alignment
+  Exceptions : none
+  Caller     : retrieve_alignment
 
 =cut
 
 sub _create_Alignment_object {
-  my ($self, $type, $show_missing_evidence) = @_;
+  my ($self, $type) = @_;
 
   my $alignment = Bio::EnsEMBL::Pipeline::Alignment->new(
 			      '-name' => 'evidence alignment');
@@ -496,24 +495,20 @@ sub _create_Alignment_object {
     $alignment->add_sequence($evidence_sequence);
   }
 
-  if ($show_missing_evidence && $self->_working_alignment('unaligned')) {
-    foreach my $missing_sequence (@{$self->_working_alignment('unaligned')}){
-      $alignment->add_sequence($missing_sequence);
-    }
-  }
-
   return $alignment;
 }
 
 
 =head2 _truncate_introns
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Args       : none
+  Example    : $self->_truncate_introns
+  Description: This method is responsible for removing intronic regions
+               from the overall sequence alignment.
+  Returntype : int
+  Exceptions : Warns (via info) if the truncation of any intron causes
+               part of the evidence sequence to be discarded.
+  Caller     : _align
 
 =cut
 
@@ -620,12 +615,16 @@ sub _truncate_introns {
 
 =head2 _is_computed
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [1]    : String.  Alignment type ('all', 'nucleotide' or 'protein').
+  Arg [2]    : int (1 or 0).  Set to 1 if alignment has been previously 
+               computed.
+  Example    : $self->_is_computed('nucleotide', 1)
+  Description: Stores information about the type of alignment that may
+               have been previously computed.
+  Returntype : int
+  Exceptions : Warns if alignment previous computed, but of another type.
+               Throws if alignment type is unknown.
+  Caller     : retrieve_alignment, _align
 
 =cut
 
@@ -667,7 +666,7 @@ sub _is_computed {
 	   ($type eq 'all'))){
       $self->_type($type);
     } else {
-      warn "Unknown alignment type.  Can be nucleotide, protein or all.\n";
+      throw("Unknown alignment type.  Can be nucleotide, protein or all.\n");
       return 0;
     }
 
@@ -680,12 +679,13 @@ sub _is_computed {
 
 =head2 _type
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [1]    : String.  Alignment type ('all', 'nucleotide' or 'protein').
+  Example    : $self->_type('all')
+  Description: Stores the type of alignment that has been computed.
+  Returntype : String
+  Exceptions : Throws if alignment type is unknown
+  Caller     : _is_computed, _working_alignment, _corroborating_sequences,
+               _truncate_introns, retrieve_alignment, new
 
 =cut
 
@@ -716,12 +716,25 @@ sub _type {
 
 =head2 _working_alignment
 
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Arg [1]    : String.  Alignment sequence identity (or 'slot').  Should 
+               be one of 'genomic_sequence', 'exon_protein', 
+               'exon_nucleotide', 'evidence', or 'unaligned'.
+
+  Arg [2]    : Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq
+               OR string 'empty'.  Pass an align seq to add it to the 
+               slot or pass 'empty' to clear the slot.
+  Example    : $self->('evidence', $align_seq) or perhaps 
+               $self->('evidence', 'empty')
+  Description: Stores the different types of alignment sequences
+               while the alignment is being built.
+  Returntype : Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq or
+               a list of these objects ('evidence' is an array, while
+               each of the other slots are single sequences).  Returns
+               0 if slot is empty.
+  Exceptions : Throws if slot type is unrecognised.
+               Throws if sequence is not a 
+                Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq.
+  Caller     : _create_Alignment_object, _truncate_introns, _align
 
 =cut
 
@@ -1947,29 +1960,6 @@ sub _set_aa_names {
 			'-' => '---',
 			'X' => 'xxx'}
 }
-
-=head2 _line_length
-
-  Arg [1]    :
-  Example    : 
-  Description: Getter/Setter for the line length in fasta output.
-  Returntype : 
-  Exceptions : 
-  Caller     : 
-
-=cut
-
-
-sub _line_length {
-  my $self = shift;
-
-  if (@_) {
-    $self->{'_fasta_line_length'} = shift;
-  }
-
-  return $self->{'_fasta_line_length'};
-}
-
 
 
 =head2 _translatable
