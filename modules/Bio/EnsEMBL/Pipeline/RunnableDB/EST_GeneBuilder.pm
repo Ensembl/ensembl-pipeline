@@ -71,6 +71,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_EVIDENCE_TAG
 					EST_MIN_EVIDENCE_SIMILARITY
 					EST_MAX_EVIDENCE_DISCONTINUITY
+					EST_MAX_INTRON_SIZE
 					EST_GENOMEWISE_GENETYPE
 					USE_cDNA_DB
 					cDNA_DBNAME
@@ -464,6 +465,10 @@ sub _check_Transcripts {
   # the maximum allowed discontinuity in EST hits
   my $max_est_gap     = $EST_MAX_EVIDENCE_DISCONTINUITY;
 
+  # reject ests with introns larger that this one:
+  my $max_intron_length = $EST_MAX_INTRON_SIZE;
+
+
   print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
 
   my @allexons;       # here we'll put all exons that pass the check
@@ -484,7 +489,6 @@ sub _check_Transcripts {
   foreach my $t (@$ref_transcripts){
       print $t->dbID."\n";
   }
-
 
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
@@ -508,7 +512,7 @@ sub _check_Transcripts {
     EXON:
       foreach my $exon (@$exons){
 	  $exon_count++;
-
+	  
 	  my $hstart;
 	  my $hend;
 	  #print STDERR " --- Exon $exon_count ---\n";
@@ -542,18 +546,12 @@ sub _check_Transcripts {
 		  else{
 		      print STDERR "same bit of evidence is hitting two exons!\n";
 		  }
-		  # test:
-		  #print STDERR "EST evidence with gap: $est_gap\n";
-		  #print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
-		  #print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
 		  
-		  # check the evidence gap between both exons, do not reject anything yet
+                  # check the evidence gap between both exons
 		  if ( $est_gap > $max_est_gap ){
-		      print STDERR "EST evidence with gap too large: $est_gap\n";
-		      print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
-		      print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
-		      # print STDERR "EST with too large gaps skipping it\n";
-		      # next TRANSCRIPT;
+		      print STDERR "Rejecting transript: EST evidence with gap too large: $est_gap\n";
+		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+		      next TRANSCRIPT;
 		  }
 	      }
 	  }
@@ -562,36 +560,21 @@ sub _check_Transcripts {
 	  my $intron_length;
 	  
 	  # 100000 bases is quite tight, we better keep it low for ESTs
-	  my $max_intron_length = 100000;
 	  if ($exon_count > 1 ){
 	      my ( $s, $e, $intron_length);
-	      #if ($strand == 1){
-		  $s             = $previous_exon->end;
-		  $e             = $exon->start;
-		  $intron_length = $e - $s - 1;
-	      #}
-	      #elsif ( $strand == -1 ){
-	#	  $s             = $previous_exon->start;
-	#	  $e             = $exon->end;
-	#	  $intron_length = $s - $e - 1;
-	#      }
-	      #print STDERR "strand: $strand\n";
-	      #print STDERR " $s  - $e  - 1 = $intron_length\n";
-	      
+	      $s             = $previous_exon->end;
+	      $e             = $exon->start;
+	      $intron_length = $e - $s - 1;
 	      if ( $intron_length > $max_intron_length ){
-		  print STDERR "Rejecting transcript $transcript for having intron too long: $intron_length\n";
+		  print STDERR "Rejecting transcript for having too long intron: $intron_length\n";
+		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 		  next TRANSCRIPT;
 	      }
 	  }
 	  
-	  
-	  $previous_exon = $exon;
-
-
-
+      	  $previous_exon = $exon;
 	  
       } # end of EXON
-
 
       # if the transcript made it to this point, keep it
       push (@alltranscripts, $transcript);
