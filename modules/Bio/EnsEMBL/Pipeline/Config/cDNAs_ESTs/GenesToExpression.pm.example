@@ -60,12 +60,12 @@ use vars qw( %GenesToExpression );
 	    ############################################################	    
 	    # your slice ids must be recognised by this regex
 	    EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	    EST_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_EST_RunnableDB', 	   
-	    
+	    	    
 	    ############################################################
 	    # the gene2est analysis is run with this script:
 	    #(put your own path here)
 	    EST_EXPRESSION_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
+
 	    ############################################################
 	    # size of the chunks to run the gene to est map
 	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
