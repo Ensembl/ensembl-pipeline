@@ -201,139 +201,147 @@ sub fetch_input {
     
     my ($chrid, $chrstart, $chrend, $rest_of_input_id) = ($1, $2, $3, $4);
 
-    $self->throw("Input id '$input_id' could not be parsed into chr_name/start/end with $GB_INPUTID_REGEX")
-	if $chrstart !~ /^\d+$/ or $chrend !~ /^\d+$/; 
+    $self->throw("Input id '$input_id' could not be parsed into ".
+                 "chr_name/start/end with $GB_INPUTID_REGEX")
+      if $chrstart !~ /^\d+$/ or $chrend !~ /^\d+$/; 
 
     my ($single_pid_db, $single_pid, $id_pool_bins, $id_pool_index);
-    my @extra_input_id_items = ($input_id =~ /$GB_SIMILARITY_INPUTID_EXTRA_REGEX/);
+    my @extra_input_id_items = ($input_id 
+                                =~ /$GB_SIMILARITY_INPUTID_EXTRA_REGEX/);
 
     if (@extra_input_id_items > 0) {
-	# input id is loaded with something extra
-	if (scalar(@extra_input_id_items) == 2) {
-	    if ($extra_input_id_items[0] =~ /^\d+$/ and 
-		$extra_input_id_items[1] =~ /^\d+$/) {
-		# assume to be a pair of number for splitting protein set. See later
-
-		($id_pool_bins, $id_pool_index) = ($extra_input_id_items[0], $extra_input_id_items[1]);
-		
-		if ($id_pool_index > $id_pool_bins or
-		    $id_pool_index < 1) {
-		    
-		    $self->warn("Could not get sensible values for id_pool_bins ('$id_pool_bins')". 
-				" and id_pool_index ('$id_pool_index'); doing all proteins in region"); 
-		    
-		    ($id_pool_bins, $id_pool_index) = (0,0);
-		}
-	    }
-	    else {
-		# assume to be a database type name (from config) and protein id
-		
-		($single_pid_db, $single_pid) = ($extra_input_id_items[0], $extra_input_id_items[1]);
-	    }
-	}
-	else {
-	    $self->warn("FPC_BlastMiniGenewise does not understand the end of your input id ($input_id); ignoring\n");
-	}
+      # input id is loaded with something extra
+      if (scalar(@extra_input_id_items) == 2) {
+        if ($extra_input_id_items[0] =~ /^\d+$/ and 
+            $extra_input_id_items[1] =~ /^\d+$/) {
+          # assume to be a pair of number for splitting protein set. See later
+          
+          ($id_pool_bins, $id_pool_index) = ($extra_input_id_items[0], 
+                                             $extra_input_id_items[1]);
+          
+          if ($id_pool_index > $id_pool_bins or
+              $id_pool_index < 1) {
+            
+            $self->warn("Could not get sensible values for id_pool_bins ".
+                        "('$id_pool_bins') and id_pool_index ".
+                        "('$id_pool_index'); doing all proteins in region"); 
+            ($id_pool_bins, $id_pool_index) = (0,0);
+          }
+        }else {
+          # assume to be a database type name (from config) and protein id
+          ($single_pid_db, $single_pid) = ($extra_input_id_items[0], 
+                                           $extra_input_id_items[1]);
+        }
+      }else {
+        $self->warn("FPC_BlastMiniGenewise does not understand the end of your input id ($input_id); ignoring\n");
+      }
     }
    
-    my $slice = $self->genewise_db->get_SliceAdaptor->fetch_by_chr_start_end($chrid,
-									     $chrstart,
-									     $chrend);
+    my $slice = $self->genewise_db->get_SliceAdaptor->fetch_by_chr_start_end
+      ($chrid,
+       $chrstart,
+       $chrend);
+
     $self->query($slice);
     $slice->chr_name($chrid);
-
+    
     my $seq;
     if(@$GB_SIMILARITY_MASKING){
-	$seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
+      $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, 
+                                          $GB_SIMILARITY_SOFTMASK);
     }else {
-	$seq = $slice;
+      $seq = $slice;
     }
 
     if ($single_pid_db and $single_pid) {
-	# force a run on this protein, regardless of whether it is masked or killed; 
-	# primarily useful for testing and clean-up after a main run
-
-	my ($database) = grep { $_->{'type'} eq $single_pid_db } @{$GB_SIMILARITY_DATABASES};
+      # force a run on this protein, regardless of whether it is masked or 
+      #killed;  primarily useful for testing and clean-up after a main run
+      
+      my ($database) = grep { $_->{'type'} eq $single_pid_db } 
+        @{$GB_SIMILARITY_DATABASES};
 		
-	if (not $database) {
-	    $self->throw("Your input id ($input_id) refers to a database ($single_pid_db) that isnt present in config\n");
-	}
+      if (not $database) {
+        $self->throw("Your input id ($input_id) refers to a database ".
+                     "($single_pid_db) that isnt present in config\n");
+      }
 
-	printf(STDERR "Restricting to $single_pid from $single_pid_db based on input id\n");
+      printf(STDERR "Restricting to $single_pid from $single_pid_db based ".
+             "on input id\n");
 
-	my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
-									       '-ids'      => [$single_pid],
-									       '-seqfetcher' => $seqfetcher);	
-	$self->runnable($runnable);
-    }
-    else {	
-	# Features will be masked before using them as seeds to BlastMiniGenewise. 
+      my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
+        ('-genomic'  => $seq,
+         '-ids'      => [$single_pid],
+         '-seqfetcher' => $seqfetcher);	
+      $self->runnable($runnable);
+    }else {	
+      # Features will be masked before using them as seeds to 
+      #BlastMiniGenewise. 
 
-	my ($ex_msk_reg_ref) = $self->mask_gene_region_lists($slice);
-	my @exonmask_regions = @$ex_msk_reg_ref;
-
-	my %kill_list = %{$self->fill_kill_list};
+      my ($ex_msk_reg_ref) = $self->mask_gene_region_lists($slice);
+      my @exonmask_regions = @$ex_msk_reg_ref;
+      
+      my %kill_list = %{$self->fill_kill_list};
+      print STDERR "Have ".@{$GB_SIMILARITY_DATABASES}." databases\n";     
+    DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+        my (%features);
         
-        DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
-	    my (%features);
-	    
-	    my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-	    
-	    my @all_feats = @{$pafa->fetch_all_by_Slice_and_score($slice, 
-								  $database->{'threshold'}, 
-								  $database->{'type'})};
-
-	    if ($database->{'upper_threshold'}) {
-		@all_feats = grep { $_->score <= $database->{'upper_threshold'} } @all_feats;
-	    }
-	    
-	    printf(STDERR "Fetched %d features for %s with score above %d from %s\@%s", 
-		   scalar(@all_feats),
-		   $database->{'type'}, 
-		   $database->{'threshold'}, 
-		   $self->db->dbname, 
-		   $self->db->host);
-	    
-	    foreach my $f (@all_feats) {
-		my $name = $f->hseqname;
-		if ($name =~ /(\S+)\.\d+/) { 
+        my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
+        
+        my @all_feats = @{$pafa->fetch_all_by_Slice_and_score
+                            ($slice, 
+                             $database->{'threshold'}, 
+                             $database->{'type'})};
+        
+        
+    
+        printf(STDERR "Fetched %d features for %s with score ".
+               "above %d from %s\@%s", 
+               scalar(@all_feats),
+               $database->{'type'}, 
+               $database->{'threshold'}, 
+               $self->db->dbname, 
+               $self->db->host);
+        
+    foreach my $f (@all_feats) {
+      my $name = $f->hseqname;
+      if ($name =~ /(\S+)\.\d+/) { 
 		    $f->hseqname($1);
-		}
+      }
 		
-		push @{$features{$f->hseqname}}, $f;
-	    }
-	    
-	    printf(STDERR " (feats come from %d proteins)\n", scalar(keys %features));
-	    
-	    # flag IDs that have a feature that overlaps with a mask feature
-	    
-	    my @ids_to_ignore;
+      push @{$features{$f->hseqname}}, $f;
+    }
+    
+    printf(STDERR " (feats come from %d proteins)\n", scalar(keys %features));
+    
+    # flag IDs that have a feature that overlaps with a mask feature
+    
+    my @ids_to_ignore;
 	    SEQID: foreach my $sid (keys %features) {
-		my $ex_idx = 0;
-		#print STDERR "Looking at $sid\n";
-	        FEAT: foreach my $f (sort {$a->start <=> $b->start} @{$features{$sid}}) {
-		    #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
-		    for( ; $ex_idx < @exonmask_regions; ) {
-			my $mask_exon = $exonmask_regions[$ex_idx];
-			
-			#printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
-			if ($mask_exon->{'start'} > $f->end) {
-			    # no exons will overlap this feature
-			    next FEAT;
-			}
-			elsif ( $mask_exon->{'end'} >= $f->start) {
-			    # overlap
-			    push @ids_to_ignore, $f->hseqname;
-			    #printf STDERR "Ignoring %s\n", $f->hseqname;
-			    next SEQID;
-			}			
-			else {
-			    $ex_idx++;
-			}
-		    }
-		}
-	    }
+          my $ex_idx = 0;
+          #print STDERR "Looking at $sid\n";
+        FEAT: foreach my $f (sort {$a->start <=> $b->start} 
+                             @{$features{$sid}}) {
+            #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
+            for( ; $ex_idx < @exonmask_regions; ) {
+              my $mask_exon = $exonmask_regions[$ex_idx];
+              
+              #printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, 
+              #$mask_exon->{'end'};
+              if ($mask_exon->{'start'} > $f->end) {
+                # no exons will overlap this feature
+                next FEAT;
+              } elsif ( $mask_exon->{'end'} >= $f->start) {
+                # overlap
+                push @ids_to_ignore, $f->hseqname;
+                printf STDERR "Ignoring %s\n", $f->hseqname;
+                next SEQID;
+              }	else {
+                $ex_idx++;
+              }
+            }
+          }
+        }
 	    
 	    # remove those IDs that are either masked targetted genes or killed; 
 	    
@@ -368,15 +376,16 @@ sub fetch_input {
 		
 		printf (STDERR "There are %d prots left after Anopheles-style filter\n", scalar(@ids)); 
 	    }
-
-	    if (@ids) {
-		# only make a runnable if there are any ids to do
-		
-		my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
-		my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
-										       '-ids'      => \@ids,
-										       '-seqfetcher' => $seqfetcher);
-		
+     print STDERR "have ".@ids." ids to pass to BMG\n";
+   
+    if (@ids) {
+      # only make a runnable if there are any ids to do
+      my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
+        ('-genomic'  => $seq,
+         '-ids'      => \@ids,
+         '-seqfetcher' => $seqfetcher);
+      
 		$self->runnable($runnable);	
 		# at present, we'll only ever have one ...
 	    }

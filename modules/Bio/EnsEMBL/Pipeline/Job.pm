@@ -518,7 +518,9 @@ sub run_module {
 	  # "RUNNING"
 	  eval {
 	      $self->set_status( "RUNNING" );
-	      $rdb->run;
+	      $rdb->db->disconnect_when_inactive(1); 
+        $rdb->run;
+        $rdb->db->disconnect_when_inactive(0); 
 	  };
 	  if ($err = $@) {
 
