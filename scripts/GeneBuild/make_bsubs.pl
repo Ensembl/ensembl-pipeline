@@ -69,7 +69,7 @@ sub get_chrlengths{
 					      -dbname => $GB_DBNAME,
 					     );
 
-  my $q = "SELECT c.name, max(a.end) 
+  my $q = "SELECT c.name, max(a.chr_end) 
            FROM   chromosome c, assembly a
            WHERE  c.chromosome_id = a.chromosome_id
            GROUP BY c.name";
@@ -93,6 +93,7 @@ sub make_tbsubs {
   my $dbpass      = $GB_DBPASS;
   my $queue       = $GB_QUEUE;
   my $output_dir  = $GB_OUTPUT_DIR . "/$runnable";
+  
   my $pm_out      = $GB_PM_OUTPUT;
 
   $pm_out     .= "pm_best.out";
@@ -115,7 +116,7 @@ sub make_tbsubs {
   closedir(DIR);
   my $outf  = "$GB_OUTPUT_DIR/$runnable.jobs.dat";
 
-  open(OUTF, ">$outf") or die "Can't open outfile $outf\n";
+  open(OUTF, ">$outf") or die "Can't open outfile $outf $!\n";
 
   # generate bsubs, one per protein
   open(PM, "<$pm_out") or die "Can't open pmoutfile $pm_out\n";
@@ -171,7 +172,7 @@ sub make_lbsubs {
   my $queue       = $GB_QUEUE;
   my $size        = $GB_SIZE;
   my $dir         = $GB_OUTPUT_DIR . "/$runnable";
-  
+  print STDERR "outputdir = ".$dir."\n";
 
   # check them!
   foreach my $arg($size, $GB_OUTPUT_DIR){
@@ -190,7 +191,7 @@ sub make_lbsubs {
   system("mkdir $dir") unless opendir(DIR, $dir);
   closedir(DIR);
 
-  my $outf  = "$OUTPUT_DIR/$runnable.jobs.dat";
+  my $outf  = "$GB_OUTPUT_DIR/$runnable.jobs.dat";
   open(OUTF, ">$outf") or die "Can't open $outf\n";
   
   foreach my $chr(keys %chrhash) {
