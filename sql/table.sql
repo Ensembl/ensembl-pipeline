@@ -42,7 +42,7 @@ CREATE TABLE job (
 CREATE TABLE job_status (
   job_id   int(10) unsigned NOT NULL,
   status   enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
-                'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', FAILED) NOT NULL,
+                'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED') NOT NULL,
   time     datetime NOT NULL,
 
   KEY (job_id),
