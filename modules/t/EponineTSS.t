@@ -3,7 +3,7 @@ use strict;
 use Test;
 
 
-BEGIN { $| = 1; plan test => 7;} 
+BEGIN { $| = 1; plan test => 9;} 
 
 use Bio::EnsEMBL::Pipeline::Runnable::EponineTSS;
 use Bio::Seq;
