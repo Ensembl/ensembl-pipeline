@@ -1,5 +1,5 @@
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -104,66 +104,30 @@ sub new {
   $self->regions($input_id);
   $self->db($db);               #super db()
   $self->db_org2;
+  $self->{_verbose}=1;
   return $self;
-}
-
-
-# gets a reference to an array of slices to run avid on
-# returns reference to an avid-object
-sub avid{
-  my ($self,$slices) = @_;
-
-  my $avid =  new Bio::EnsEMBL::Pipeline::Runnable::Avid (
-                                                          -slice1      => ${$slices}[0],
-                                                          -slice2      => ${$slices}[1],
-                                                         );
-  $avid->run;
-  return $avid;
-}
-
-
-# gets name of parsed binary and fastanames
-# returns name of written modified approximate alignment
-sub approx_align{
-  my ($parsed_bin,$fasta1,$fasta2);
-
-  my $approx_obj = new Bio::EnsEMBL::Pipeline::Tools::ApproxAlign(
-                                                                   -aat =>  $parsed_bin,   # /path/to/parsedbinaryfile
-                                                                   -seqY => $fasta1,       # /path/to/firstfasta.fasta
-                                                                   -seqZ => $fasta2        # /path/to/secondfasta.fasta
-                                                                  );
-  $approx_obj->expand($approx_obj->exonbounds);
-  $approx_obj->makeConsistent();
-
-  if ($approx_obj->isConsistent) {
-    my $aatfile = $approx_obj->write(); #can perhaps return the filename instead of getting one
-    print "data written to $aatfile\n"  ;
-  } else {
-    die "Error: final aat is not consistent (shouldn't have happened).\n"
-  }
-  return $approx_obj;
 }
 
 
 sub run{
   my ($self) = shift;
-  my @subslices;
 
-  ####  if seqlength > maxlength we have to split seq ###
+  my @subslices;
+  my %alltranscripts;
+  ####################### IF SEQLENGTH > SLAM_MAXLENGTH WE SPLIT #############################
 
   if ( (${$self->slices}[0]->length  || ${$self->slices}[0]->length ) > $SLAM_MAXLENGTH) {
-
-    # run avid on original slices
-    my $avid = &avid(${$self->slices}[0],${$self->slices}[1] );
+    # run avid on uncutted slices
+    my $avid = $self->runavid( $self->slices);
 
     # run ApproxAlign on org slices
-    my $approx = &approx_align($avid->parsed_binary_filename,$avid->fasta_filename1,$avid->fasta_filename2);
+    my $approx_obj = $self->approx_align( $avid->parsed_binary_filename, $avid->fasta_filename1, $avid->fasta_filename2 );
 
     # cut the first seq according to the positions of the repeats
     # and than try to find equal positions in the second seq by
     # using the approximate Alignment-aatfile
 
-    my @cuts = @{ $self->calculate_cutting ($approx->aatfile) } ;
+    my @cuts = @{ $self->calculate_cutting ( $approx_obj ) } ;
 
     # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
@@ -171,84 +135,158 @@ sub run{
       # store the subslices in 2nd array of arrays
       my ($start1, $end1) = @{$subseqs}[0,1];
       my ($start2, $end2) = @{$subseqs}[2,3];
-
       my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
       my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
       push @subslices, [$subslice1,$subslice2];
     }
-  }else{
-    # we don't need any cutting
+  } else {                      # no cutting
     push @subslices, $self->slices;
   }
 
+  ##################### SEQUENCE IS SPLITTED IN SUBSICES, NOW RUN ANALYSIS ! ##############################
+
+  $alltranscripts{$SLAM_ORG1_NAME} = ();
+  $alltranscripts{$SLAM_ORG2_NAME} = ();
+
+  ####################### RUN AVID APPROXALIGN and SLAM on each SUBSLICE #############################
+
   for my $slices (@subslices) {
 
-    my $avid = &avid(${$slices}[0],${$slices}[1] );
+    my $avid_obj = $self->runavid( $slices );
+#    print "SlamDB.pm:\t  length 1st subslice " . ${$slices}[0]->length;    print "\n\t\t\tlength 2st subslice " . ${$slices}[1]->length;    print "\n";
 
-    # run ApproxAlign on org slices
-    my $approx = &approx_align($avid->parsed_binary_filename,$avid->fasta_filename1,$avid->fasta_filename2);
-
+    # run ApproxAlign on subslice
+    my $approx = $self->approx_align($avid_obj->parsed_binary_filename,$avid_obj->fasta_filename1,$avid_obj->fasta_filename2);
+#    print "SlamDB.pm: approx_align gelaufen!.. now trying to run slam\n";
 
     # make new slam-run with subslice
     my $slamobj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
-                                                            -slice1      => ${$slices}[0],
-                                                            -slice2      => ${$slices}[1],
-                                                            -fasta1        => $avid->fasta_filename1,
-                                                            -fasta2        => $avid->fasta_filename2,
-                                                            -approx_align  => $approx->aafile,
-                                                            -org1          => $SLAM_ORG1_NAME,
-                                                            -org2          => $SLAM_ORG2_NAME,
-                                                            -slam_bin      => $SLAM_BIN,
-                                                            -slam_pars_dir => $SLAM_PARS_DIR,
-                                                            -minlength     => $SLAM_MINLENGTH,
-                                                            -debug         => 0,
-                                                            -verbose       => 0
-                                                           );
-  # run slam, parse results
+                                                              -slice1        => ${$self->slices}[0],
+                                                              -slice2        => ${$self->slices}[1],
+                                                              -fasta1        => $avid_obj->fasta_filename1,
+                                                              -fasta2        => $avid_obj->fasta_filename2,
+                                                              -approx_align  => $approx->aatfile,
+                                                              -org1          => $SLAM_ORG1_NAME,
+                                                              -org2          => $SLAM_ORG2_NAME,
+                                                              -slam_bin      => $SLAM_BIN,
+                                                              -slam_pars_dir => $SLAM_PARS_DIR,
+                                                              -minlength     => $SLAM_MINLENGTH,
+                                                              -debug         => 0,
+                                                              -verbose       => 0
+                                                             );
+    # run slam, parse results and set predict. trscpts for both organisms
     $slamobj->run;
 
-  # set ref to arrays with predicted transcripts for both organisms
-    $self->predtrans_both_org ( $slamobj ->predtrans );
+    # getting reference to array of predicted transcripts  [ ref[arefhumanpt] ref[arefmousept] ]
+    my $predtrans = $slamobj ->predtrans;
 
-  # get back the parsed gff->hang the gff's together
-  # write the results to database
-  # AND WHAT ABOUT THE COORDINATES ???
+
+    # predtrans = [HPT HPT HPT][HM HM HM] or 2 empty arrays [ [] [] ]
+    # testing the length of the predicted transcr
+    my @tmp_arrayrefs = @{$predtrans};
+
+    my $aref1 = $tmp_arrayrefs[0];
+    my $aref2 = $tmp_arrayrefs[1];
+
+    my @array1 = @{$aref1};
+    my @array2 = @{$aref1};
+
+    if (scalar (@array1) >0) {
+#      print "I'll put a refernce to the array in the hash\n";
+      push (@{$alltranscripts{$SLAM_ORG1_NAME}}, $aref1 ); # [HPT]
+    }else { 
+#      print "WARNING ! \n I received an undefined reference. I dont store it\n";
+    }
+
+    if (scalar (@array2) >0) {
+#      print "I'll put a refernce to the array in the hash\n";
+      push (@{$alltranscripts{$SLAM_ORG2_NAME}}, $aref2 ); # [MUS]
+    }else{
+#      print "I received an undefined reference. I dont store it\n";
+    }
   }
-
-
-  # POSSIBILITES :
-  # compare repeats of first seq in db with repeats after RM-run
-  # transfer db-repeats in RM-outfile for first seq 
-  # or 
-  # transfer RM-outfile-repeats in array which is used by this script (format START - END)
-  #
-  # cut the sequence in diffrent parts --- but do we have to to it ? what are the needs for it ?
-  # Which programs are working with it ?
-  # Which programs need to read the files, which get slices ?
-  # Why is the RM done ? (logic in slam.pl)
-  # AND WHAT ABOUT THE COORDINATES ???
+  print "SlamDB: finished all subslices\n";
 
 
 
-}  # end run
+# lets check the length of the two stored arrays
+#  print "checking if storage worked\n";
+#  foreach my $key(keys    %alltranscripts) {
+#    my $stored_arrayref = $alltranscripts{$key};
+#    my @stor_array = @{$stored_arrayref};
+#    for my $item (@stor_array){
+#      my @refs2pt = @{$item};
+#      for my $defpt (@refs2pt){
+#      }
+#    }
+#  }
+
+
+  $self->predtrans_both_org (\%alltranscripts);
+}
+
+
+                               # eor
+################################################################################
+sub write_dbresults {
+  my ($self,$db,$slice,$org,$apt,$analysis) = @_;
+
+  my $pred_adp = $db->get_PredictionTranscriptAdaptor;
+  my %allpredtrans = %$apt;
+
+  # the refrence-"cascade":
+  # step 1: get predictionTranscript $pT  and add exons to it                                : $pT = MY_TRANSCRIPT
+  # step 2: store all predicted Transcripts $pt in an array @prediTrans                      : @prediTrans               = (pt1 pt2 pt3)
+  # step 3: set refrence $ary_ref_prediTrans to the array @predicted_transcripts             : $aref_prediTrans          = \@prediTrans
+  # step 4: add the reference to an array of all predicted transcripts @all_aref_prediTrans  : @all_aref_prediTrans      = ($aref_prediTrans, $aref_prediTrans $aref_prediTrans)
+  # step 5  store reference $aref_allprediTrans to array @allprediTrans                      : $aref_all_aref_prediTrans = \@all_aref_prediTrans
+  # step 6: store the refrence to the array $are_all_aref_prediTrans in a hash (key:organismname)      : $allpredtrans{'H.sapiens'} = $aref_all_aref_allprediTrans
+
+  my $aref_all_aref_prediTrans = $allpredtrans{$org};
+
+  my @all_aref_prediTrans = @{ $aref_all_aref_prediTrans};     # [HPT HPT HPT HPT HPT]  here is the error ! why do we have only 1 ELEMENT ?????
+ # print "length pred_trans " .scalar(@pred_trans_refs) . "\n";
+
+  foreach my $aref_prediTrans (@all_aref_prediTrans) {
+
+    my @prediTrans = @{$aref_prediTrans} ;
+    for my $pT (@prediTrans) {
+      # here are the prediction transcripts we like to process
+      $pT->analysis($analysis);
+    }
+    $pred_adp->store(@prediTrans);
+  }
+}
 
 
 
 
-  ### make cuts according to position of repeats in first sequence
+# POSSIBILITES :
+# compare repeats of first seq in db with repeats after RM-run
+# transfer db-repeats in RM-outfile for first seq 
+# or 
+# transfer RM-outfile-repeats in array which is used by this script (format START - END)
+#
+# cut the sequence in diffrent parts --- but do we have to to it ? what are the needs for it ?
+# Which programs are working with it ?
+# Which programs need to read the files, which get slices ?
+# Why is the RM done ? (logic in slam.pl)
+# AND WHAT ABOUT THE COORDINATES ???  ->no prob, 'cause ya using slices!
 
-    # output-format of aat-file (one row for each base, slam needs the same input)
-    #   base lowerBound upperBound
-    #   0        0          881
-    #   1        2          882
-    #   2        843        883
-    #   3        843        884
-    #   4        849        885
-    #   5        850        886
-    #   6        851        887
-    #   7        852        888
-    #   8        853        889
-    #   9        856        898
+# make cuts according to position of repeats in first sequence
+#   FORMAT OF AN AAT-FILE
+# output-format of aat-file (one row for each base, slam needs the same input)
+#   base lowerBound upperBound
+#   0        0          881
+#   1        2          882
+#   2        843        883
+#   3        843        884
+#   4        849        885
+#   5        850        886
+#   6        851        887
+#   7        852        888
+#   8        853        889
+#   9        856        898
 
 
 sub calculate_cutting{
@@ -275,13 +313,13 @@ sub calculate_cutting{
         # so there are no repeats before target-cuttingposition, so cut
         last;
 
-      }elsif ($all_repeats[0]->[1] >= $targetcut) {
+      } elsif ($all_repeats[0]->[1] >= $targetcut) {
         # end of repeat is "bigger" than targetcut
         # repeat spans target (cool), see example1 above
         $cut = $targetcut;
         last;
 
-      }else {
+      } else {
         # Store end of repeat as the best-yet value, then move on.
         $cut = $all_repeats[0]->[1];
         shift(@all_repeats);
@@ -294,7 +332,7 @@ sub calculate_cutting{
     }
     push(@cuts1,$cut);
     $targetcut = $cut + $SLAM_MAXLENGTH;
-  } # while(1)
+  }                             # while(1)
 
   # last cut is length of seq
   # now we got cutting-positions for the first sequence
@@ -321,16 +359,15 @@ sub calculate_cutting{
   $cuts1[0] = $cuts1[0]-1;
   $cuts2[0] = $cuts2[0]-1;
 
-  # now the splits
-
-  my @splits = ();                   # nr of cuts
-  for(my $i=0, my $cutCount=0; $i < (scalar(@cuts1)-1); $i++) {
-    if($cuts2[$i]+1 > $cuts2[$i+1]) {
+  # now splitting
+  my @splits = ();              # nr of cuts
+  for (my $i=0, my $cutCount=0; $i < (scalar(@cuts1)-1); $i++) {
+    if ($cuts2[$i]+1 > $cuts2[$i+1]) {
       # skip if we have an insertion in the base seqeunce.
       next;
     } else {
-      $cutCount++;                                                      # cuts in the first seq   # cuts in the second seq
-##      push(@splits,[sprintf("%s.%d","mycutfile_dir",$cutCount),$cuts1[$i]+1,$cuts1[$i+1],$cuts2[$i]+1,$cuts2[$i+1]]);
+      $cutCount++;              # cuts in the first seq   # cuts in the second seq
+      ##      push(@splits,[sprintf("%s.%d","mycutfile_dir",$cutCount),$cuts1[$i]+1,$cuts1[$i+1],$cuts2[$i]+1,$cuts2[$i+1]]);
       push(@splits,[ $cuts1[$i]+1, $cuts1[$i+1], $cuts2[$i]+1, $cuts2[$i+1] ] );
       # Format of cutfile:
       # human_contig.fasta_mice_contig.fasta.cut.1      1       100500  1       93943
@@ -341,6 +378,42 @@ sub calculate_cutting{
 }
 
 
+
+
+# gets a reference to an array of slices to run avid on
+# returns reference to an avid-object
+sub runavid{
+  my ($self,$sliceref) = @_;
+
+  my $avid =  new Bio::EnsEMBL::Pipeline::Runnable::Avid (
+                                                          -slice1      => ${$sliceref}[0],
+                                                          -slice2      => ${$sliceref}[1],
+                                                         );
+  $avid->run;
+  return $avid;
+}
+
+
+# gets name of parsed binary and fastanames
+# returns name of written modified approximate alignment
+sub approx_align{
+  my ($self, $parsed_bin,$fasta1,$fasta2) = @_;
+
+  my $approx_obj = new Bio::EnsEMBL::Pipeline::Tools::ApproxAlign(
+                                                                  -aat =>  $parsed_bin, # /path/to/parsedbinaryfile
+                                                                  -seqY => $fasta1, # /path/to/firstfasta.fasta
+                                                                  -seqZ => $fasta2 # /path/to/secondfasta.fasta
+                                                                 );
+  $approx_obj->expand( $approx_obj->exonbounds );
+  $approx_obj->makeConsistent();
+
+  if ($approx_obj->isConsistent) {
+    $approx_obj->write();       #write aatfile ($approx_obj->aatfile)
+  } else {
+    die "Error: final aat is not consistent (shouldn't have happened).\n"
+  }
+  return $approx_obj;
+}
 
 
 
@@ -434,9 +507,9 @@ sub db_org2 {
 
   Title    : predtrans
   Usage    : $obj->predtrans
-  Function : Sets/gets the Predicted transcripts for the first organism
-  Returns  : Ref. to an Array of Arrayrefs. to Bio::EnsEMBL::PredictionTranscript
-  Args     : References to two arrays
+  Function : Sets/gets a hash of predicted transcripts for both organismas
+  Returns  : Ref. to an hash (keys: org1 org2) with 2 arrays of predicted transcripts
+  Args     : References to a hash || none
 
 =cut
 
@@ -452,10 +525,9 @@ sub predtrans_both_org{
 
 sub write_output {
   my ($self) = @_;
-
   #writing output for both organisms to diffrent databases
-  $self->write_dbresults ( $self->db,${$self->slices}[0], ${$self->predtrans_both_org}[0] );
-  $self->write_dbresults ( $self->db_org2, ${$self->slices}[1], ${$self->predtrans_both_org}[1] );
+  $self->write_dbresults ( $self->db,      ${$self->slices}[0], $SLAM_ORG1_NAME , $self->predtrans_both_org, $self->analysis );
+  $self->write_dbresults ( $self->db_org2, ${$self->slices}[1], $SLAM_ORG2_NAME , $self->predtrans_both_org, $self->analysis );
 }
 
 
@@ -463,22 +535,6 @@ sub write_output {
 # writing the results to the given database (mouse/human/rat)
 # gets a database to write to, a slice and a reference to an array of predicted transcripts
 # looks up for the analysis
-
-sub write_dbresults {
-  my ($self,$db,$slice,$pt) = @_;
-
-  my $pred_adp = $db->get_PredictionTranscriptAdaptor;
-  my @pred_trans = @{$pt};
-  my $analysis = $self->analysis;
-  foreach my $tr (@pred_trans) {
-    $tr->analysis($analysis);
-    foreach my $exon (@{$tr->get_all_Exons}) {
-      $exon->slice($slice);
-    }
-  }
-  $pred_adp->store(@pred_trans);
-}
-
 
 
 
@@ -505,7 +561,7 @@ sub get_repeat_features {
 
   my @all;
   # get all repeats of the given types (above)
-  for my $arpt(@repeats){
+  for my $arpt (@repeats) {
     for my $rpt ( @{$slices[0]->get_all_RepeatFeatures(undef,"$arpt")}) {
       my $rpt_start = $rpt->start;
       my $rpt_end = $rpt->end;
@@ -513,23 +569,26 @@ sub get_repeat_features {
       push (@all , [ $rpt_start , $rpt_end , $rpt->display_id] );
     }
   }
-# routine of comparing repeats of db with repeats from repeatmasker-run
-#  for (@all){
-#    my @r = @{$_};
-#    for(@r){
-#      print "\t $_";
-#    }
-#    print "\n";
-#  }
+
+  # writingout a outffile to compare with slam run
+
+  # routine of comparing repeats of db with repeats from repeatmasker-run
+  #  for (@all){
+  #    my @r = @{$_};
+  #    for(@r){
+  #      print "\t $_";
+  #    }
+  #    print "\n";
+  #  }
   # sort startpos of rpt ascending order
   @all_rpt = sort { $a->[0] <=> $b->[0] } @all_rpt;
   # check the sorting
-#  for my $r (@all_rpt){
-#    my @r=@{$r};
-#    for(@r){
-#      print "\t $_";
-#    }
-#    print "\n";
-#  }
+  #  for my $r (@all_rpt){
+  #    my @r=@{$r};
+  #    for(@r){
+  #      print "\t $_";
+  #    }
+  #    print "\n";
+  #  }
   return \@all_rpt;
 }
