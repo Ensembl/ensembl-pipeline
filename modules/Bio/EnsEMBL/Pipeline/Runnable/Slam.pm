@@ -154,16 +154,13 @@ sub new {
                            ], @args
                           );
 
-  $self->slice1($slice1);
-  $self->slice2($slice2);
+  # setting slices
+  $self->slices($slice1,$slice2);
 
-  $self->fasta1($fasta1);
-  $self->fasta2($fasta2);
+  #setting fasta-filenames
+  $self->fasta($fasta1,$fasta2);
 
   $self->approx_align($approx_align);
-
-  $self->org1($org1);
-  $self->org2($org2);
 
   $self->slam_bin($slam_bin);
   $self->slam_pars_dir($slam_pars_dir);
@@ -237,11 +234,10 @@ sub parse_results {
   my $self = shift;
 
   # parsing results of first organism
-  my $arrayref1 = $self->_parser( $self->slice1,$self->fasta1 ) ;
-  $self->predtrans1( $arrayref1 );
+  my $arrayref1 = $self->_parser( ${$self->slices}[0], ${$self->fasta}[0] ) ;
+  my $arrayref2 = $self->_parser( ${$self->slices}[1], ${$self->fasta}[1] );
 
-  my $arrayref2 = $self->_parser( $self->slice2,$self->fasta2 );
-  $self->predtrans2( $arrayref2 );
+  $self->predtrans( $arrayref1,$arrayref2 );
 }
 
 
@@ -255,7 +251,6 @@ sub _parser {
   my (%transcripts);
 
   $gff=~s/(\.fasta)/\.gff/;     # subst. .fasta-suffix with .gff-suffix
-  print "Gfffile: $gff\n";
 
   # processing the written gff-file
   open(IN,"$gff") || die "could not read file $gff";
@@ -355,14 +350,15 @@ sub run {
   my ($self) = @_;
 
   my $gcdir  = $self->_getgcdir;
-  my $fasta1 = $self->fasta1;
-  my $fasta2 = $self->fasta2;
+  my $fasta1 = ${$self->fasta}[0];
+  my $fasta2 = ${$self->fasta}[1];
 
+  my $t = ${$self->org}[1];
   my $command =  $self->slam_bin .
     " -a ".$self->approx_align .
       " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
-        " -org1 ".$self->org1 .
-          " -org2 ".$self->org2;
+        " -org1 ".${$self->org}[0] .
+          " -org2 ".${$self->org}[1];
   $command .= " -v " if $self->verbose;
   $command .= " -debug " if $self->debug;
 
@@ -401,11 +397,11 @@ sub files_to_delete {
 sub _getgcdir{
   my $self = shift;
 
-  my $seq1 = $self->fasta1;
-  my $seq2 = $self->fasta2;
+  my $seq1 = ${$self->fasta}[0];
+  my $seq2 = ${$self->fasta}[1];
 
-  my $org1 = $self->org1;
-  my $org2 = $self->org2;
+  my ($org1,$org2) = @{$self->org};
+
 
   my $gcdirs = {
                 'H.sapiens_M.musculus' => [
@@ -483,69 +479,44 @@ sub _seqlen {
 
 =pod
 
-=head2 fasta1
+=head2 fasta
 
-  Title    : fasta1
-  Usage    : $obj->fasta1
-  Function : sets/gets the path and name of the first fasta-file
-  Returns  : String
-  Args     : opt. String
+  Title    : fasta
+  Usage    : $obj->fasta
+  Function : sets/gets the path and name of the fasta-files
+  Returns  : Array-reference
+  Args     : two strings containing /path/to/fata-files
 
 =cut
 
-sub fasta1 {
-  my $self = shift;
 
-  $self->{_fasta1} = shift   if (@_);
-  return $self->{_fasta1}
+sub fasta {
+  my ($self,$fasta1,$fasta2) = @_;
+
+  $self->{_fasta} = [$fasta1,$fasta2] if ($fasta1 && $fasta2);
+  return $self->{_fasta};
 }
 
 
-sub fasta2 {
-  my $self = shift;
+=head2 predtrans
 
-  $self->{_fasta2} = shift   if (@_);
-  return $self->{_fasta2}
-}
-
-=pod
-
-=head2 predtrans1
-
-  Title    : predtrans1
-  Usage    : $obj->predtrans1
+  Title    : predtrans
+  Usage    : $obj->predtrans
   Function : Sets/gets the Predicted transcripts for the first organism
-  Returns  : Arrayref. to Bio::EnsEMBL::PredictionTranscript
-  Args     : opt.Array
+  Returns  : Ref. to an Array of Arrayrefs. to Bio::EnsEMBL::PredictionTranscript
+  Args     : References to two arrays
 
 =cut
 
+sub predtrans{
+  my ($self,$ref_predtrans1,$ref_predtrans2) = @_;
 
-sub predtrans1{
-  my ($self,$predtrans1) = @_;
-
-  $self->{_predtrans1} = $predtrans1 if (defined $predtrans1);
-  return $self->{_predtrans1};
+  if ($ref_predtrans1 && $ref_predtrans2) {
+    $self->{_ref_predtrans} = [$ref_predtrans1,$ref_predtrans2];
+  }
+  return $self->{_ref_predtrans};
 }
 
-=pod
-
- =head2 predtrans2
-
-  Title    : predtrans2
-  Usage    : $obj->predtrans2
-  Function : Sets/gets the Predicted transcripts for the second organism
-  Returns  : Arrayref. to Bio::EnsEMBL::PredictionTranscript
-  Args     : opt.Arrayref.
-
-=cut
-
-sub predtrans2{
-  my ($self,$predtrans2) = @_;
-
-  $self->{_predtrans2} = $predtrans2 if (defined $predtrans2);
-  return $self->{_predtrans2};
-}
 
 
 sub approx_align {
@@ -556,20 +527,16 @@ sub approx_align {
 }
 
 
-sub org1{
-  my ($self,$org1) = @_;
 
-  $self->{_org1} = 'H.sapiens' if (!defined $org1 && !defined $self->{_org1});
-  $self->{_org1} = $org1 if (defined $org1);
-  return $self->{_org1};
-}
+sub org{
+  my ($self,$org1,$org2) = @_;
 
-sub org2{
-  my ($self,$org2) = @_;
-
-  $self->{_org2} = 'M.musculus' if (!defined $org2 && !defined $self->{_org2});
-  $self->{_org2} = $org2 if (defined $org2);
-  return $self->{_org2};
+  if(!defined $self->{_org}){
+    $org1 = 'H.sapiens'  if (!defined $org1);
+    $org2 = 'M.musculus' if (!defined $org2);
+    $self->{_org} = [$org1,$org2];
+  }
+  return $self->{_org};
 }
 
 
@@ -607,23 +574,17 @@ sub minlength{
   return $self->{_minlength};
 }
 
-sub slice1{
-  my ($self,$slice1) = @_;
 
-  $self->{_slice1} = $slice1 if (defined $slice1);
-  $self->throw("Slam needs a first slice to work on!\n") if (! defined $self->{_slice1} && !defined $slice1);
-  return $self->{_slice1};
+
+sub slices{
+  my ($self,$slice1,$slice2) = @_;
+
+  if (defined $slice2 && defined $slice1){
+  $self->{_slices} = [$slice1,$slice2];
+  }
+
+  return $self->{_slices};
 }
-
-sub slice2{
-  my ($self,$slice2) = @_;
-
-  $self->{_slice2} = $slice2 if (defined $slice2);
-  $self->throw("Slam needs a first slice to work on!\n") if (! defined $self->{_slice2} && !defined $slice2);
-  return $self->{_slice2};
-}
-
-
 
 
 ############################################################
