@@ -94,7 +94,7 @@ GetOptions(
     'analysis=s@'   => \@analyses,
     'input_id_types=s@' => \@input_id_types,
     'start_from=s@' => \@starts_from,	   
-    'v!'            => \$verbose,
+    'v|verbose!'            => \$verbose,
     'dbsanity!'     => \$db_sanity,
     'accumulators!' => \$accumulators,
     'max_job_time=s' => \$max_time,
@@ -382,9 +382,10 @@ while (1) {
                     next RULE;
                 }
                 print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
-    
-                my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses);
-    
+	
+		
+                my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses, $verbose);
+		
                 if ($anal) {
                     print " fullfilled.\n" if $verbose;
                     if ($rule->goalAnalysis->input_id_type ne 'ACCUMULATOR') {
@@ -396,6 +397,7 @@ while (1) {
                     if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
                         $rule->has_condition_of_input_id_type($input_id_type) ) {
 
+	
                         print " Makes ACCUMULATOR " . $rule->goalAnalysis->logic_name  . " incomplete\n" if($verbose);
                         $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
                     }
@@ -800,7 +802,7 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head1 OPTIONS
 
-=head2 DB Connection Details
+DB Connection Details
 
 
    -dbhost     The host where the pipeline database is.
@@ -809,11 +811,13 @@ A Simple script using the Monitor.pm module to display information on the status
    -dbpass     The password to use.
    -dbname   The database name.
 
-=head2 Other Options
+Other Options
 
    -local run the pipeline locally and not using the batch submission 
     system
    -idlist_file a path to a file containing a list of input ids to use
+    this file need to be in the format input_id input_type, for example
+    1.1-100000 SLICE
    -runner path to a runner script (if you want to overide the setting
 				    in BatchQueue.pm)
    -output_dir path to a output dir (if you want to overide the 
