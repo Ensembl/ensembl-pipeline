@@ -254,16 +254,25 @@ sub write_output {
       }
     }
 
-  GENE: foreach my $gene (@newgenes) {	
+  GENE: 
+    foreach my $gene (@newgenes) {	
       # do a per gene eval...
+      #print STDERR "Gene:\n";
+      #my @transcripts = $gene->each_Transcript;
+      #foreach my $tran (@transcripts){
+      #	print STDERR "Transcript:\n";
+      #	foreach my $exon ($tran->get_all_Exons){
+      #	  print STDERR $exon->contig->internal_id." ".$exon->start."-".$exon->end." ".($exon->end-$exon->start+1)."\n";
+      #	}
+      }
+
       eval {
-	$gene_adaptor->store($gene);
+      	$gene_adaptor->store($gene);
 	print STDERR "wrote gene " . $gene->dbID . " \n";
       }; 
       if( $@ ) {
 	print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
       }
-    
     }
 }
 
@@ -294,9 +303,10 @@ sub fetch_input {
       my $start = $2;
       my $end   = $3;
     
-      #    print STDERR "Chr $chr - $start : $end\n";
-      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
-
+      #print STDERR "Chr $chr - $start : $end\n";
+      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start-10000,$end+10000);
+      print STDERR "adding 10000 on either side, to compensante the edge effects from targetted_genewise: chr: $chr, start ".($start-10000).", end ".($end+10000)."\n";
+      
       $contig->primary_seq;
 
       #    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
@@ -304,10 +314,30 @@ sub fetch_input {
     else {
       $contig = $self->dbobj->get_Contig($contigid);
     }
+    my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							 '-host'   => $GB_GW_DBHOST,
+							 '-user'   => $GB_GW_DBNAME,
+							 '-dbname' => $GB_GW_DBUSER,
+							 '-pass'   => $GB_GW_DBPASS,
+							 '-dnadb'  => $self->dbobj,
+							);
+    
+    my $comb_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						     '-host'   => $GB_COMB_DBHOST,
+						     '-user'   => $GB_COMB_DBNAME,
+						     '-dbname' => $GB_COMB_DBUSER,
+						     '-pass'   => $GB_COMB_DBPASS,
+						     '-dnadb'  => $self->dbobj,
+						    );
+
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
 							      '-contig'   => $contig,
 							      '-input_id' => $self->input_id,
-							      );
+							     );
+
+    $genebuilder->genewise_db($genewise_db);
+    $genebuilder->combine_db($comb_db);
+
     $self->addgenebuilder($genebuilder,$contig);
 
 }
