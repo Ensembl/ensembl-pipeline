@@ -99,11 +99,11 @@ sub _initialize {
         if ($@)
         { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
     }
-    if ($arguments) 
-    {   $self->arguments($arguments) ;}
-    else
-    { $self->arguments(' -reverse ') ;      }
-    
+    if ($arguments)  {
+       $self->arguments($arguments) ;
+    } else {
+       $self->arguments(' -reverse ') ;      
+    }    
     return $self; # success - we hope!
 }
 
@@ -127,7 +127,7 @@ sub genomic_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->filename($value->id .".$$.seq");
         $self->results($self->filename.".est_genome.out");
     }
     return $self->{'_genomic_sequence'};
@@ -150,7 +150,7 @@ sub est_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_est_sequence'} = $value;
-        $self->estfilename($self->clone->id.".$$.est.seq");
+        $self->estfilename($value->id.".$$.est.seq");
     }
     return $self->{'_est_sequence'};
 }
@@ -338,4 +338,126 @@ sub parse_results {
 sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
+}
+<<<<<<< Est2Genome.pm
+
+sub _createfeatures {
+    my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
+        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
+    
+    #create analysis object
+    my $analysis_obj    = new Bio::EnsEMBL::Analysis
+                                (-db              => undef,
+                                 -db_version      => undef,
+                                 -program         => "est_genome",
+                                 -program_version => "unknown",
+                                 -gff_source      => $f1source,
+                                 -gff_feature     => $f1primary,);
+    
+
+    #create features
+    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>   $f1start,
+                                              -end =>      $f1end,
+                                              -seqname =>  $f1id,
+                                              -strand =>   $f1strand,
+                                              -score =>    $f1score,
+                                              -source_tag =>   $f1source,
+                                              -primary_tag =>  $f1primary,
+                                              -analysis => $analysis_obj );
+     
+   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
+                                                -end =>      $f2end,
+                                                -seqname =>  $f2id,
+                                                -strand =>   $f2strand,
+                                                -score =>    $f1score,
+                                                -source_tag =>   $f2source,
+                                                -primary_tag =>  $f2primary,
+                                                -analysis => $analysis_obj );
+    #create featurepair
+    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
+                                             -feature2 => $feat2) ;
+
+    $self->_growfplist($fp); 
+}
+
+sub _growfplist {
+    my ($self, $fp) =@_;
+    
+    #load fp onto array using command _grow_fplist
+    push(@{$self->{'_fplist'}}, $fp);
+}
+
+sub _createfiles {
+    my ($self, $genfile, $estfile, $dirname)= @_;
+    
+    #check for diskspace
+    my $spacelimit = 0.01; # 0.01Gb or about 10 MB
+    my $dir ="./";
+    unless ($self->_diskspace($dir, $spacelimit)) 
+    {
+        $self->throw("Not enough disk space ($spacelimit Gb required)");
+    }
+            
+    #if names not provided create unique names based on process ID    
+    $genfile = $self->_getname("genfile") unless ($genfile);
+    $estfile = $self->_getname("estfile") unless ($estfile);    
+    
+    # Should check we can write to this directory 
+    $self->throw("No directory $dirname") unless -e $dirname;
+
+    #chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
+    return ($genfile, $estfile);
+}
+    
+sub _getname {
+    my ($self, $typename) = @_;
+    return  $typename."_".$$.".fn"; 
+}
+
+sub _diskspace {
+    my ($self, $dir, $limit) =@_;
+    my $block_size; #could be used where block size != 512 ?
+    my $Gb = 1024 ** 3;
+    
+    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe");
+    while (<DF>) 
+    {
+        if ($block_size) 
+        {
+            my @L = split;
+            my $space_in_Gb = $L[3] * 512 / $Gb;
+            return 0 if ($space_in_Gb < $limit);
+            return 1;
+        } 
+        else 
+        {
+            ($block_size) = /(\d+).+blocks/i
+                || $self->throw ("Can't determine block size from:\n$_");
+        }
+    }
+    close DF || $self->throw("Error from 'df' : $!");
+}
+
+sub _deletefiles {
+    my ($self, @files) = @_;
+    
+    my $unlinked = unlink(@files);
+
+    if ($unlinked == @files) {
+        return 1;
+    } else {
+        my @fails = grep -e, @files;
+        $self->throw("Failed to remove @fails : $!\n");
+    }
+}
+
+
+
+sub est_genome {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+      $self->{_est_genome} = $arg;
+  }
+  return $self->{_est_genome};
 }
