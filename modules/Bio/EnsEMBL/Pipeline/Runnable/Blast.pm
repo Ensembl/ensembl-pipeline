@@ -1,5 +1,3 @@
-#
-#
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
 # Copyright Michele Clamp
@@ -148,6 +146,17 @@ sub new {
     }
     
     if ($options) {
+#this option varies the number of HSP displayed proportionally to the query contig length
+	  if ($::pipeConf{'B_factor'}){
+		my $b_factor = $::pipeConf{'B_factor'};
+		my $b_value = int ($query->length / 1000 * $b_factor); 
+		if ($::pipeCong{'blast'} eq 'ncbi'){
+			$options .= " -b $b_value" unless ($b_value < 250);
+		}
+		else {
+			$options .= " B=$b_value" unless ($b_value < 250); 
+		}
+	  } 
       $self->options($options);
     } else {
       $self->options(' -p1 ');  
@@ -213,25 +222,23 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR ("Running blast and BPlite:\n " . $self->program  . ' ' .
-                  		                   $self->database . ' ' . 
-		                                   $self->filename . ' ' .
-		                                   $self->options  . ' > ' .
-		                                   $self->results."\n");
-
     # This routine expands the database name into $db-1 etc for
     # split databases
 
     my @databases = $self->fetch_databases;
 
     foreach my $database (@databases) {
+#allow system call to adapt to using ncbi blastall. defaults to WU blast.	
+	my $command = $self->program ;
+	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
+	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
+	$command .= ' '.$self->options. ' >> '.$self->results;
+
+	print STDERR ("Running blast and BPlite:$command\n");    
+
 	$self->throw("Failed during blast run $!\n")
 	    
-	    unless (system ($self->program . ' ' . 
-			    $database      . ' ' .
-			    $self->filename. ' ' .
-			    $self->options . ' >> ' . 
-			    $self->results) == 0) ;
+	    unless (system ($command) == 0) ;
     }
 }
 
@@ -394,14 +401,27 @@ sub parse_results {
 
     }
   } 
-  # re-filter, with pruning
+
+
+# Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
+
+  if ($::pipeConf{'filter_blast'}){
+  # re-filter, with pruning - rewrote to use a local select_feature function instead of FeatureFilter 
+  my @selected_features = $self->select_features($self->output);
+  $self->output(@selected_features);
+  }
+  else {
+   # re-filter, with pruning
   my @allfeatures = $self->output;
   my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune => 1);
   my @pruned = $search->run(@allfeatures);
   print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
   $self->output(@pruned);
+  }
   return $self->output;
+
 }
+
 
 
 sub filter_hits {
@@ -482,7 +502,6 @@ sub filter_hits {
 
 sub split_HSP {
     my ($self,$hsp,$name) = @_;
-
     # First of all some jiggery pokery to find out what sort of alignment
     # we have - (dna-dna, dna-pep, pep-dna etc).
     # We also work out which strand each sequence is on.
@@ -775,6 +794,45 @@ sub _findTypes {
     }
 
     return ($type1,$type2);
+}
+
+sub select_features {
+ 
+	my ($self,@features) = @_;
+ 
+	@features= sort {
+		$a->strand<=> $b->strand
+        	       ||
+		$a->start<=> $b->start
+	} @features;
+ 
+	my @selected_features;
+ 
+	my $best_hit = @features[0];
+ 
+	foreach my $feat (@features){
+		if ($feat->overlaps($best_hit,'strong')) {
+			if ($feat->score > $best_hit->score) {
+				$best_hit = $feat;
+			}
+			}else {
+				push (@selected_features,$best_hit);
+				$best_hit = $feat;
+			}
+	}
+	 
+	my @newfeatures;	
+	FEAT: foreach my $feat (@features){
+ 		foreach my $sf (@selected_features){
+			if (($sf->hseqname eq $feat->hseqname)&&($sf->score == $feat->score)){
+				push (@newfeatures, $feat);
+				next FEAT;	
+			}	
+		}
+	}
+	
+
+	return @newfeatures;
 }
 
 ##############
