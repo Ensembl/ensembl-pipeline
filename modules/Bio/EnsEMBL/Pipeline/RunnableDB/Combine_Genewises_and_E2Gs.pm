@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::Tools::TranslationUtils;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
@@ -129,7 +130,7 @@ sub fetch_input{
   $self->gw_genes( $targetted_genes );
 
   # get blessed genes
-  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if($self->blessed_db);
+  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if ($self->blessed_db);
 
   my @blessed_genes;
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
@@ -137,7 +138,9 @@ sub fetch_input{
   }
 
   print STDERR "got " . scalar(@blessed_genes) . " blessed genes\n";
-  $self->blessed_genes( \@blessed_genes );
+
+  $self->blessed_genes( $blessed_slice, \@blessed_genes );
+
   print STDERR "converted to " . scalar(@{$self->blessed_genes}) . " blessed genes\n";
 
   my $cdna_vc= $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
@@ -153,8 +156,8 @@ sub fetch_input{
   print STDERR "got " . scalar($self->cdna_genes) . " cdnas after filtering\n";
   $self->genewise_db->dbc->disconnect_when_inactive(1);
   $self->cdna_db->dbc->disconnect_when_inactive(1);
-  $self->blessed_db->dbc->disconnect_when_inactive(1) 
-    if($self->blessed_db);
+  $self->blessed_db->dbc->disconnect_when_inactive(1)
+    if ($self->blessed_db);
 }
 
 sub run {
@@ -384,12 +387,18 @@ sub write_output {
   # write genes in the database: GB_COMB_DBNAME@GB_COMB_DBHOST
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
 
+print STDERR "Have " . scalar ($self->output) . "genes to write\n";
+
  GENE:
   foreach my $gene ($self->output) {	
     if(!$gene->analysis ||
        $gene->analysis->logic_name ne $self->analysis->logic_name){
       $gene->analysis($self->analysis);
     }
+
+    # double check gene coordinates
+    $gene->recalculate_coordinates;
+
     eval {
       $gene_adaptor->store($gene);
       print STDERR "wrote gene dbID " . $gene->dbID . "\n";
@@ -398,7 +407,7 @@ sub write_output {
       #      }
     };
     if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      print STDERR "UNABLE TO WRITE GENE " . $gene->dbID. "of type " . $gene->type  . "\n\n$@\n\nSkipping this gene\n";
       #      foreach my $t ( @{$gene->get_all_Transcripts} ){
       #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
       #      }
@@ -684,8 +693,8 @@ sub _merge_genes {
 
     # order is crucial
     my @trans = @{$unmerged->get_all_Transcripts};
-    if(scalar(@trans) != 1) {
-          $self->throw("Gene with dbID ". $unmerged->dbID . " has no related transcript. Check preceding analyses \n"); 
+    if(scalar(@trans) != 1) { 
+      $self->throw("Gene with dbID " . $unmerged->dbID . " has no related transcript. Check preceding analysis \n"); 
     }
 
     # check the sanity of the transcript
@@ -792,6 +801,25 @@ sub _merge_genes {
     $merged_transcript->sort;
     $merged_transcript->translation($cloned_translation);
 
+  my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
+  if (scalar(@seqeds)) {
+    print "Copying sequence edits\n"; 
+    foreach my $se (@seqeds) {
+      my $new_se =
+              Bio::EnsEMBL::SeqEdit->new(
+                -CODE    => $se->code,
+                -NAME    => $se->name,
+                -DESC    => $se->description,
+                -START   => $se->start,
+                -END     => $se->end,
+                -ALT_SEQ => $se->alt_seq
+              );
+      my $attribute = $new_se->get_Attribute();
+      $cloned_translation->add_Attributes($attribute);
+    }
+  }
+
+    
     #print STDERR "merged_transcript:\n";
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
 
@@ -833,6 +861,24 @@ sub combine_genes{
   $translation->end($gw_tran[0]->translation->end);
   $translation->start_Exon($gw_tran[0]->translation->start_Exon);
   $translation->end_Exon($gw_tran[0]->translation->end_Exon);
+
+  my @seqeds = @{$gw_tran[0]->translation->get_all_SeqEdits};
+  if (scalar(@seqeds)) {
+    print "Copying sequence edits\n"; 
+    foreach my $se (@seqeds) {
+      my $new_se =
+              Bio::EnsEMBL::SeqEdit->new(
+                -CODE    => $se->code,
+                -NAME    => $se->name,
+                -DESC    => $se->description,
+                -START   => $se->start,
+                -END     => $se->end,
+                -ALT_SEQ => $se->alt_seq
+              );
+      my $attribute = $new_se->get_Attribute();
+      $translation->add_Attributes($attribute);
+    }
+  }
 
   $newtranscript->translation($translation);
   $newtranscript->translation->start_Exon($newtranscript->start_Exon);
@@ -1788,6 +1834,23 @@ sub _recalculate_translation{
   my ($self, $mytranscript, $strand) = @_;
 
   my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
+
+  my $slice = $self->query;
+
+  Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation($mytranscript);
+
+  # check that everything is sane:
+  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($mytranscript)){
+    print STDERR "problem with the translation. Returning the original transcript\n";
+    return $this_is_my_transcript;
+  }
+  return $mytranscript;
+}
+
+sub _recalculate_translation_old {
+  my ($self, $mytranscript, $strand) = @_;
+
+  my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
   my $transcript;
 
   my $slice = $self->query;
@@ -1942,12 +2005,12 @@ sub gw_genes {
 #  Function: get/set for blessed gene array
 
 sub blessed_genes {
-  my ($self, $genes) = @_;
+  my ($self, $slice, $genes) = @_;
   if (!defined($self->{'_blessed_genes'})) {
     $self->{'_blessed_genes'} = [];
   }
 
-  if (defined $genes && scalar(@{$genes})) {
+  if (defined $slice && defined $genes && scalar(@{$genes})) {
 
     # split input genes into one transcript per gene; keep type the same
   OLDGENE:
@@ -1960,13 +2023,30 @@ sub blessed_genes {
 	# make a new gene
 	my $newgene = new Bio::EnsEMBL::Gene;
 	$newgene->type($gene->type);
-	
+
 	# clone transcript
 	my $newtranscript = new Bio::EnsEMBL::Transcript;
-	$newgene->add_Transcript($newtranscript);
+	$newtranscript->slice($slice);
 
 	# clone translation
 	my $newtranslation = new Bio::EnsEMBL::Translation;
+  my @seqeds = @{$transcript->translation->get_all_SeqEdits};
+  if (scalar(@seqeds)) {
+    print "Copying sequence edits\n"; 
+    foreach my $se (@seqeds) {
+      my $new_se =
+              Bio::EnsEMBL::SeqEdit->new(
+                -CODE    => $se->code,
+                -NAME    => $se->name,
+                -DESC    => $se->description,
+                -START   => $se->start,
+                -END     => $se->end,
+                -ALT_SEQ => $se->alt_seq
+              );
+      my $attribute = $new_se->get_Attribute();
+      $newtranslation->add_Attributes($attribute);
+    }
+  }
 	$newtranscript->translation($newtranslation);
 
 	foreach my $exon(@{$transcript->get_all_Exons}){
@@ -1987,6 +2067,7 @@ sub blessed_genes {
 	  $newtranscript->add_Exon($newexon);
 	}
 
+	$newgene->add_Transcript($newtranscript);
 	push(@{$self->{'_blessed_genes'}}, $newgene);	
 	
       }
@@ -2118,7 +2199,7 @@ sub blessed_db {
       $self->{_blessed_db} = $blessed_db;
     }
     if(!$self->{_blessed_db}){
-      if($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME){
+      if ($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME) {
         $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
           (
            '-host'   => $GB_BLESSED_DBHOST,
