@@ -137,7 +137,9 @@ sub write_output {
     my ($self) = @_;
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
     my @features = $self->output;
-    $proteinFeatureAdaptor->write_Protein_feature (@features);
+    foreach my $f(@features) {
+	$proteinFeatureAdaptor->write_Protein_feature ($f);
+    }
 }
 
 # runnable method
