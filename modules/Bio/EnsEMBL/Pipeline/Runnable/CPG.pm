@@ -59,7 +59,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::SimpleFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
@@ -376,7 +376,7 @@ sub create_feature {
                             -gff_feature     => $feat->{'primary'});
 
     #create and fill Bio::EnsEMBL::Seqfeature object
-    my $cpg = Bio::EnsEMBL::SeqFeature->new
+    my $cpg = Bio::EnsEMBL::SimpleFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},
                             -end     => $feat->{'end'},
@@ -386,6 +386,7 @@ sub create_feature {
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
+    $cpg->display_text('');
     if ($cpg)
       {
 	$cpg->validate();
