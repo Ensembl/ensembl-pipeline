@@ -528,6 +528,7 @@ sub run_single_analysis{
 
   $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
+  $self->environment->setup_paths($logic_name, $self->testdb->species);
   $self->environment->change_blastdb($self->blastdb);
   $self->setup_database;
 
@@ -596,6 +597,7 @@ sub run_pipeline{
   my $cleanup_dir = $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->change_blastdb($self->blastdb);
+  $self->environment->setup_all_paths($self->testdb->species);
   $self->setup_database;
   my $cmd = $self->rulemanager_command();
   print $cmd."\n" if($self->verbosity || $verbose);
@@ -753,6 +755,21 @@ sub compare_simple_feature{
     $feature_comparison->target($target_fs);
     $feature_comparison->compare;
   }
+}
+
+
+sub compare_pmatch_feature{
+  my ($self, $ref_db, $logic_name) = @_;
+  my $data_dir = $self->testdb->curr_dir."/".$self->testdb->species;
+  $ref_db->load_tables(['protein'], $data_dir);
+  my $test_pfa = $self->testdb->db->get_PmatchFeatureAdaptor;
+  my @query_fs = $test_pfa->fetch_by_logic_name($logic_name);
+  my $ref_pfa = $ref_db->db->get_PmatchFeatureAdaptor;
+  my @target_fs = $ref_pfa->fetch_by_logic_name($logic_name);
+  my $feature_comparison = $self->feature_comparison;
+  $feature_comparison->query(\@query_fs);
+  $feature_comparison->target(\@target_fs);
+  $feature_comparison->pmatch_compare;
 }
 
 sub compare_prediction_transcript{
@@ -1059,6 +1076,7 @@ sub fetch_features_by_slice_name{
   }
   return \@features;
 }
+
 
 
 =head2 fetch_features_by_dbID

@@ -48,8 +48,8 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-  DEFAULT_OUTPUT_DIR  => '',
-  DEFAULT_CLEANUP     => 'yes',	
+  DEFAULT_OUTPUT_DIR  => '/ecs2/scratch6/lec/test_out/',
+  DEFAULT_CLEANUP     => 'no',	
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
                       # a certain period of time if you effectively want this never to run set 
@@ -115,7 +115,7 @@ use vars qw(%Config);
     {
       logic_name => 'Fgenesh',        
       batch_size => 10,
-      resource   => 'alpha',
+      resource   => 'select[model==ES451250]',
       retries    => 1,
       sub_args   => '',
       runner     => '',
@@ -176,7 +176,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',
-     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'tRNAscan',
@@ -233,7 +233,39 @@ use vars qw(%Config);
       cleanup    => 'no',        
       runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
-                         
+    {
+      logic_name => 'Uniprot',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    },          
+     {
+      logic_name => 'Pmatch',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'no',
+      output_dir => '',
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+    },
+    {
+      logic_name => 'BestPmatch',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'no',    
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+    },          
   ]
 );
 

@@ -183,6 +183,49 @@ sub compare{
   $self->feature_info(\@target);
 }
 
+
+sub pmatch_compare{
+  my ($self) = @_;
+  my @query = @{$self->query};
+  my @target = @{$self->target};
+  my @q_not_matched;
+  @query = @{$self->fast_sort(\@query)};
+  @target = @{$self->fast_sort(\@target)};
+  print "\nThere are ".@query." query features\n";
+  print "There are ".@target." target features\n\n";
+  my $num_t_feats = scalar(@target);
+  my $start_ind = 0;
+ QUERY:foreach my $feat(@query){
+    if($start_ind > $num_t_feats){
+      push(@q_not_matched, $feat);
+      next QUERY;
+    }
+  TARGET:for (my $i = $start_ind; $i< $num_t_feats; $i++){
+      my $t_feat = $target[$i];
+      next TARGET if(!$t_feat);
+      if($t_feat->start == $feat->start &&
+         $t_feat->end == $feat->end){
+        if($self->verbosity){
+          print "Got match\n";
+          print "t_feat = " . $t_feat->start . " " . $t_feat->end . "\n";
+          print "feat   = " . $feat->start . " " . $feat->end . "\n";
+        }
+        $target[$i] = undef;
+        next QUERY;
+      }elsif($t_feat->start > $feat->start){
+        push(@q_not_matched, $feat);
+        next QUERY;
+      }elsif($t_feat->end < $feat->start){
+        $start_ind++;
+      }
+    }
+  }
+  print "Unmatched query features\n";
+  $self->feature_info(\@q_not_matched);
+  print "\nUnmatched target feature\n";
+  $self->feature_info(\@target);
+}
+
 =head2 feature_info
 
   Arg [1]   : FeatureComparison

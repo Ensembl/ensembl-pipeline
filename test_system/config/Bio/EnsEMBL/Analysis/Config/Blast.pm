@@ -77,65 +77,122 @@ use vars qw(%Config);
 
 %Config = (
            BLAST_CONFIG =>
-           [
-             {
-             logic_name => 'Vertrna',
-             blast_parser => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             parser_params => {
+           {
+            #below is an Uniprot
+            #example => 
+            #{
+            #BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+            #PARSER_PARAMS => {
+            #                   -regex => '^\w+\s+(\w+)',
+            #                   -query_type => 'pep',
+            #                   -database_type => 'pep',
+            #                   -threshold_type => 'PVALUE',
+            #                   -threshold => 0.01,
+            #                  },
+            #BLAST_FILTER =>'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+            #FILTER_PARAMS => {
+            #                  -min_score => 200,
+            #                  -prune => 1,
+            #                 },
+            #BLAST_PARAMS => {
+            #                 -unknown_error_string => 'FAILED',
+            #                 -type => 'wu',
+            #                },
+            #},
+            DEFAULT => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
+             PARSER_PARAMS => {
+                               -regex => '^(\w+)',
+                               -query_type => undef,
+                               -database_type => undef,
+                              },
+             BLAST_FILTER => undef,
+             FILTER_PARAMS => {},
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             }
+            },
+            Uniprot => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
+                               -regex => '^\w+\s+(\w+)',
+                               -query_type => 'pep',
+                               -database_type => 'pep',
+                               -threshold_type => 'PVALUE',
+                               -threshold => 0.01,
+                              },
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
+                               -min_score => 200,
+                               -prune => 1,
+                              },
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             },
+            },
+            Swall => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
+                               -regex => '^\w+\s+(\w+)',
+                               -query_type => 'pep',
+                               -database_type => 'pep',
+                               -threshold_type => 'PVALUE',
+                               -threshold => 0.01,
+                              },
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
+                               -min_score => 200,
+                               -prune => 1,
+                              },
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             },
+            },
+            Vertrna => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
                                -regex => '\w+\s+(\w+)',
                                -query_type => 'pep',
                                -database_type => 'dna',
                                -threshold_type => 'PVALUE',
                                -threshold => 0.001,
                               },
-             blast_filter => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             filter_params => {
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
                                -prune => 1,
                               },
-             blast_params => {
+             BLAST_PARAMS => {
                               -unknown_error_string => 'FAILED',
                               -type => 'wu',
                              },
             },
+            UniGene =>
             {
-             logic_name => 'Unigene',
-             blast_parser => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             parser_params => {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
                                -regex => '\/ug\=([\w\.]+)',
                                -query_type => 'pep',
                                -database_type => 'dna',
                                -threshold_type => 'PVALUE',
                                -threshold => 0.001,
                               },
-             blast_filter => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             filter_params => {
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
                                -prune => 1,
                               },
-             blast_params => {
+             BLAST_PARAMS => {
                               -unknown_error_string => 'FAILED',
                               -type => 'wu',
                              },
             },
-            {
-             logic_name => 'Swall',
-             blast_parser => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             parser_params => {
-                               -regex => '^\w+\s+(\w+)',
-                               -query_type => 'pep',
-                               -database_type => 'pep',
-                               -threshold_type => 'PVALUE',
-                               -threshold => 0.001,
-                              },
-             blast_filter => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             filter_params => {
-                               -prune => 1,
-                              },
-             blast_params => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
-                             },
-            }
-           ],
+           },
            BLAST_AB_INITIO_LOGICNAME => 'Genscan',
           );
 

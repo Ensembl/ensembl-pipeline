@@ -96,9 +96,9 @@ sub table_groups{
                      'repeat_consensus'];
   $tables{'fgenesh'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus'];
-  $tables{'swall'} = ['core', 'pipeline', 'repeat_feature',
-                      'repeat_consensus', 'prediction_exon',
-                      'prediction_transcript'];
+  $tables{'uniprot'} = ['core', 'pipeline', 'repeat_feature',
+                        'repeat_consensus', 'prediction_exon',
+                        'prediction_transcript'];
   $tables{'vertrna'} = ['core', 'pipeline', 'repeat_feature',
                       'repeat_consensus', 'prediction_exon',
                       'prediction_transcript'];
@@ -107,6 +107,8 @@ sub table_groups{
                         'prediction_transcript'];
   $tables{'firstef'} = ['core', 'pipeline', 'repeat_feature',
                          'repeat_consensus'];
+  $tables{'bestpmatch'} = ['pmatch_feature.Pmatch', 'protein', 
+                           'core', 'pipeline'];
   if($tables{$logic_name}){
     return $tables{$logic_name};
   }else{
