@@ -7,6 +7,8 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication::Chooser;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::SeqIO;
 
+my $verbose = 1 if @ARGV;
+
 BEGIN { $| = 1; plan test => 7;}
 
 ok(1);
@@ -37,13 +39,16 @@ my $hit_sort_tool
 	-coverage_cutoff        => 50,
 	-regex_query_species    => 'Hsa',
 	-regex_outgroup_species => ['Lca','Ssc'],
-	-work_dir               => '/tmp');
+	-work_dir               => '/tmp',
+	-genetic_code           => 1);
 
 ok($hit_sort_tool->isa("Bio::EnsEMBL::Pipeline::GeneDuplication::Chooser"));
 
 ok(my $ids = $hit_sort_tool->find_recent_duplications);
 
 ok(@$ids);
+
+exit 1 unless $verbose;
 
 print "Recent paralogues of Gene " . $input_seq->display_id . "\n" if scalar @$ids;
 

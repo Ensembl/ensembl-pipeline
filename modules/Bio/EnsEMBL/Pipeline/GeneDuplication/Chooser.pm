@@ -9,9 +9,6 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication::PAML;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast;
 
-use Bio::EnsEMBL::Pipeline::GeneDuplication::Dupl_Conf qw(GENETIC_CODE
-							  CODEML_EXECUTABLE);
-
 
 my $DEFAULT_BLAST_FLAV      = 'wublastn';
 my $DEFAULT_DISTANCE_CUTOFF = 1;
@@ -42,14 +39,18 @@ sub new {
       $regex_outgroup_species,
       $identity_cutoff,
       $coverage_cutoff,
-      $distance_cutoff) = $self->_rearrange([qw(QUERY_SEQ
+      $distance_cutoff,
+      $genetic_code,
+      $codeml) = $self->_rearrange([qw(QUERY_SEQ
 						BLASTDB
 						WORK_DIR
 						REGEX_QUERY_SPECIES
 						REGEX_OUTGROUP_SPECIES
 						IDENTITY_CUTOFF
 						COVERAGE_CUTOFF
-						DISTANCE_CUTOFF)],@args);
+						DISTANCE_CUTOFF
+						GENETIC_CODE
+						CODEML_EXECUTABLE)],@args);
 
   $self->throw("Blast database must be a Bio::EnsEMBL::Pipeline::Runnable::BlastDB.") 
     unless ($blastdb && $blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
@@ -62,6 +63,8 @@ sub new {
   $self->_regex_outgroup_species($regex_outgroup_species) if $regex_outgroup_species;
   $self->_identity_cutoff($identity_cutoff)               if $identity_cutoff;
   $self->_coverage_cutoff($coverage_cutoff)               if $coverage_cutoff;
+  $self->_genetic_code($genetic_code)                     if $genetic_code;
+  $self->_codeml($codeml)                                 if $codeml;
 
   return $self
 }
@@ -348,13 +351,13 @@ sub _run_pairwise_paml {
 
   my $paml = Bio::EnsEMBL::Pipeline::GeneDuplication::PAML->new(
                              '-work_dir'   => $self->_work_dir,
-			     '-executable' => $CODEML_EXECUTABLE,
+			     '-executable' => $self->_codeml,
 			     '-aligned_seqs' => $aligned_seqs,
 			     '-runmode'    => '-2', 
 			     '-seqtype'    => '1',
 			     '-model'      => '0',
 			     '-nssites'    => '0',
-			     '-icode'      => $GENETIC_CODE);
+			     '-icode'      => ($self->_genetic_code - 1));
 
   my $parser = $paml->run_codeml;
 
@@ -789,6 +792,69 @@ sub _distance_cutoff {
     unless $self->{_distance_cutoff};
 
   return $self->{_distance_cutoff};
+}
+
+
+=head2 _genetic_code
+
+  Args       : int
+  Example    : $self->_genetic_code(1);
+  Description: Holds an integer representing the genetic code.  To 
+               choose the correct integer consult the documentation 
+               used by the Bio::Seq->translate method.  1 is universal, 
+               2 is vertebrate mitochondria.
+  Returntype : int
+  Exceptions : Warns if called while unset.
+  Caller     : $self->new, $self->_run_pairwise_paml
+
+=cut
+
+sub _genetic_code {
+  my $self = shift; 
+
+  if (@_) {
+    $self->{_genetic_code} = shift;
+  }
+
+  $self->throw('Genetic code unset.')
+    unless $self->{_genetic_code};
+
+  return $self->{_genetic_code};
+}
+
+
+=head2 _codeml
+
+  Args       : [optional] String
+  Example    : $self->_codeml('/path/to/codeml')
+  Description: Holds the path to the codeml executable
+  Returntype : String
+  Exceptions : Throws if a full path is included, but the 
+               file is not executable.
+  Caller     : $self->new, $self->_run_pairwise_paml
+
+=cut
+
+sub _codeml {
+  my $self = shift; 
+
+  if (@_) {
+    $self->{_codeml} = shift;
+  }
+
+  $self->{_codeml} = 'codeml'
+    unless $self->{_codeml};
+
+  # If it looks like our executable comes with a full 
+  # path, check that it will work.
+
+  $self->throw("codeml executable not found or not " .
+	       "executable. Trying to execute path " .
+	       "[". $self->{_codeml} ."]")
+    if ($self->{_codeml} =~ /^\//
+	& !-x $self->{_codeml});
+
+  return $self->{_codeml};
 }
 
 return 1;
