@@ -46,7 +46,8 @@
 ###########################
 
 [PIPELINE_MANAGER]
-  check_interval = 10
+  #how often the status of jobs should be retrieved from the db (in seconds):
+  check_interval = 120
 
 
 ###########################
@@ -76,8 +77,7 @@
 [CONTIG_ID_FACTORY]
   module   = Bio::EnsEMBL::Pipeline::IDFactory::Database
   database = ENSEMBL_DATABASE
-  table    = contig
-  column   = name
+  query = SELECT name FROM contig
 
 [SLICE_ID_FACTORY]
   module   = Bio::EnsEMBL::Pipeline::IDFactory::Slice
@@ -98,13 +98,13 @@
   dummy_manual_task = Bio::EnsEMBL::Pipeline::Task
 
 [DEFAULT_TASK]
-  ensdb   = ensembl_database
-  dnadb   = dna_database
-  where   = LSF:acari
-  #timeout in seconds 86400 = 24hours
-  timeout = 86400
-  retries = 0
-
+  where     = LSF:acari
+  #job timeout in seconds 86400 = 24hours
+  timeout   = 86400
+  #number of times to retry failed jobs
+  retries   = 3
+  #number of jobs to create (not execute) at once:
+  batchsize = 100
 
 [DUMMY_NO_DEPS2_TASK]
   dependency_type = NONE
@@ -112,7 +112,6 @@
   id_factory      = FILE_ID_FACTORY
   timeout         = 30
   where           = Local
-  retries         = 3
   description     = This is a dummy task
 
 [DUMMY_NO_DEPS_TASK]
@@ -121,7 +120,6 @@
   id_factory      = CONTIG_ID_FACTORY
   timeout         = 30
   where           = Local
-  retries         = 3
   description     = This is a dummy task
 
 [DUMMY_PARTIAL_DEPS_TASK]
@@ -131,7 +129,6 @@
   id_factory      = CONTIG_ID_FACTORY
   timeout         = 30
   where           = Local
-  retries         = 3
   description     = This is a dummy task
 
 [DUMMY_PARTIAL_DEPS2_TASK]
@@ -141,14 +138,12 @@
   id_factory      = CONTIG_ID_FACTORY
   timeout         = 30
   where           = Local
-  retries         = 3
   description     = This is a dummy task
 
 [DUMMY_MANUAL_TASK]
   dependency_type = FULL
   dependency_list = DUMMY_NO_DEPS_TASK
   id_factory      = MANUAL_ID_FACTORY
-  timeout = 30
-  where = Manual
-  retries = 3
+  timeout         = 30
+  where           = Manual
   description     = This is a dummy manual task
