@@ -29,10 +29,10 @@ use Bio::SeqIO;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+my ($sequence) =  set_seq();
 
 
-my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seq,
+my $seq	   =    Bio::PrimarySeq->new(	-seq         => $sequence,
 					-id          => 'HS97D16',
 					-accession   => 'AL009179',
 					-moltype     => 'dna');

@@ -73,7 +73,7 @@ else
 
 $runobj->write_output();
 my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
-my @features = $contig->adaptor->fetch_all_repeat_features($contig, 'TRF');
+my @features =@{$contig->get_all_RepeatFeatures('TRF')};
 
 display(@features);
 
