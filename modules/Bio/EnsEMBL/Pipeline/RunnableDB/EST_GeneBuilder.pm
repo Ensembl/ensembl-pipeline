@@ -58,40 +58,21 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
-# config file; parameters searched for here if not passed in as @args
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_REFDBHOST
-					EST_REFDBUSER
-					EST_REFDBNAME
-					EST_REFDBPASS
-					EST_GENEBUILDER_INPUT_GENETYPE
-					EST_EVIDENCE_TAG
-					EST_MIN_EVIDENCE_SIMILARITY
-					EST_MAX_EVIDENCE_DISCONTINUITY
-					EST_GENOMEWISE_GENETYPE
-					USE_cDNA_DB
-					cDNA_DBNAME
-					cDNA_DBHOST
-					cDNA_DBUSER
-					cDNA_DBPASS
-					cDNA_GENETYPE
-				       );
-
-# use new Adaptor to get some extra info from the ESTs
-use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
+# config file = ESTConf.pm
+# the available parameters are described in that module
+use Bio::EnsEMBL::Pipeline::ESTConf;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
     my ($class,@args) = @_;
+
+    # the SUPER method will created a dbobj, which
+    # points to the EST_GENE_DB, the db where we'll write the genes
     my $self = $class->SUPER::new(@args);
 
-    ## dbobj input_id mandatory and read in by BlastableDB
-    #if (!defined $self->seqfetcher) {
-    #  my $seqfetcher = $self->make_seqfetcher();
-    #  $self->seqfetcher($seqfetcher);
-    #}
-    # dbobj needs a reference dna database
+
+    # the db with the dna:
     my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						   -host             => $EST_REFDBHOST,
 						   -user             => $EST_REFDBUSER,
@@ -102,8 +83,22 @@ sub new {
     
     $self->dbobj->dnadb($refdb);
     
+    # the db from where we take the est transcripts 
+    my $est_e2g_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							-host             => $EST_E2G_DBHOST,
+							-user             => $EST_E2G_DBUSER,
+							-dbname           => $EST_E2G_DBNAME,
+							-pass             => $EST_E2G_DBPASS,
+							);
     
-   
+    
+    $est_e2g_db->dnadb($refdb);
+    $self->est_e2g_db($est_e2g_db);
+	
+
+
+
+    # only if we want to read also cdnas in this analysis
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       -host             => $cDNA_DBHOST,
@@ -120,6 +115,14 @@ sub new {
     return $self; 
 }
 
+
+sub est_e2g_db{
+    my ($self, $est_e2g_db) = @_;
+    if ($est_e2g_db){
+	$self->{_est_e2g_db} = $est_e2g_db;
+    }
+    return $self->{_est_e2g_db};
+}
 
 sub cdna_db{
  my ($self, $cdna_db);
@@ -191,6 +194,7 @@ sub write_output {
     #print STDERR "not writting genes yet\n";
     #return;
     
+    # this will write the genes in the $EST_GENE_DBNAME@$EST_GENE_DBHOST database
     my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
     
     #print STDERR "EST_GeneBuilder: before writting gene\n";
@@ -201,14 +205,14 @@ sub write_output {
 	print STDERR "about to store gene:\n";
 	my @transcripts = $gene->each_Transcript;
 	#my $tran = $transcripts[0];
-    #my $strand = $tran->start_exon->strand;
+	#my $strand = $tran->start_exon->strand;
 	#print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
-    
-    # test of the supporting evidence. It seems to wrok fine.
+	
+	# test of the supporting evidence. It seems to wrok fine.
 	foreach my $tran (@transcripts){
-    #  print STDERR "\ntranscript: $tran\n";
-    #  print STDERR "exons:\n";
-	  foreach my $exon ($tran->get_all_Exons){
+	    #  print STDERR "\ntranscript: $tran\n";
+	    #  print STDERR "exons:\n";
+	    foreach my $exon ($tran->get_all_Exons){
 	    print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
 	    #  print STDERR "evidence:\n";
     #  foreach my $sf ( $exon->each_Supporting_Feature ){
@@ -267,12 +271,10 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
- 
-    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    # we get the 'exonerate_e2g' genes from $EST_E2G_BDNAME@EST_E2G_DBHOST
+    my $stadaptor = $self->est_e2g_db->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
-   
-    
     $contig->_chr_name($chrid);
     $self->vcontig($contig);
     print STDERR "got vcontig\n";
@@ -332,7 +334,6 @@ GENE:
     print STDERR "($single single exon genes NOT thrown away)\n";
 
     # process transcripts in the forward strand
-    #my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
     if( scalar(@plus_transcripts) ){
 
       my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
@@ -519,6 +520,9 @@ sub _process_Transcripts {
 sub _check_Transcripts {
   my ($self, $ref_transcripts, $strand) = @_;
 
+  # maximum intron size alowed for transcripts
+  my $max_intron_length = $EST_MAX_INTRON_SIZE;
+  
   # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
   my $evidence_tag    = $EST_EVIDENCE_TAG;
   
@@ -533,8 +537,6 @@ sub _check_Transcripts {
   my @allexons;       # here we'll put all exons that pass the check
   my @alltranscripts; # here we'll put all the transcripts that pass the check
   my %hid_trans;
-  my $exon_adaptor    = $self->dbobj->get_ExonAdaptor;
-  my $feature_adaptor = $self->dbobj->get_FeatureAdaptor;
   my $total_rejected        = 0;
   
  TRANSCRIPT: 
@@ -596,7 +598,6 @@ sub _check_Transcripts {
       if ( $exon_count > 1 ){
 	my $est_gap = 0;
 		
-	# $exon_adaptor->fetch_evidence_by_Exon( $exon2 );
 	my @prev_nonsorted_sf = $previous_exon->each_Supporting_Feature; 
 	my @previous_sf = sort { $a->hstart <=> $b->hstart } @prev_nonsorted_sf;
 
@@ -621,20 +622,17 @@ sub _check_Transcripts {
 	  
 	  # check the evidence gap between both exons, do not reject anything yet
 	  if ( $est_gap > $max_est_gap ){
-	    print STDERR "EST evidence with gap too large: $est_gap\n";
-	    print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
-	    print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
-	    # print STDERR "EST with too large gaps skipping it\n";
-	    # next TRANSCRIPT;
+	      print STDERR "EST evidence with gap too large: $est_gap\n";
+	      print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
+	      print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
+	      # print STDERR "EST with too large gaps skipping it\n";
+	      # next TRANSCRIPT;
 	  }
-	}
       }
-     
-      # reject transcript with too large intron length
+    }
+      
+      # reject transcript with too large intron length, according to $EST_MAX_INTRON_SIZE
       my $intron_length;
-
-      # 100000 bases is quite tight, we better keep it low for ESTs
-      my $max_intron_length = 100000;
       if ($exon_count > 1 ){
 	my ( $s, $e, $intron_length);
 	if ($this_strand == 1){
@@ -654,7 +652,7 @@ sub _check_Transcripts {
 	  print STDERR "Rejecting transcript $transcript for having intron too long: $intron_length\n";
 	  next TRANSCRIPT;
 	}
-      }
+    }
 
 
       $previous_exon = $exon;
@@ -1035,6 +1033,41 @@ sub _compare_Transcripts {
 
 #########################################################################
 
+#sub _DFS_visit{
+#  my ($self, $node, $color, $adj, $merge_this) = @_;
+#  # node is a transcript object;
+#  $color->{ $node } = 'gray';
+
+#  foreach my $trans ( @{ $adj->{$node} } ){
+#    if ( $color->{ $trans } eq 'white' ){
+#       $self->_DFS_visit( $trans, $color, $adj );
+#    }
+#  }
+#  unless ( $color->{$node} eq 'black'){
+#    push( @{ $merge_this }, $node );
+#  }
+#  print STDERR "discovered: ";
+#  $self->_print_Transcript($node);
+#  $color->{ $node } = 'black';    
+#  return;
+#}
+  
+#sub _print_Transcript{
+#  my ($self,$transcript) = @_;
+#  print STDERR "transcript: $transcript\n";
+#  foreach my $exon ( $transcript->get_all_Exons ){
+#    print $exon->start."-".$exon->end." ";
+#  }
+#  print STDERR "\n";
+#}
+
+
+
+
+
+
+#########################################################################
+
 =head2
 
  Title   : _merge_Transcripts
@@ -1077,6 +1110,100 @@ sub _merge_Transcripts{
 			  }
 			} @transcripts;
     
+
+#    ### ALTERNATIVE:
+#    # build a graph where each node is a transcript and the edges connect
+#    # two transcripts that can merge. Using Depth-first search we can
+#    # find the connected components of the graph. Each one of the connected components
+#    # can be merged into one transcript.
+    
+#    # creat and Adjacency list for each transcript
+#    # each transcript (key) holds the array of transcripts merging with it
+    
+#    # for tests:
+#    my %myid;
+#    my $label = 1;
+#    foreach my $transcript ( @transcripts ){
+#      $myid{$transcript} = $label;
+#      $label++;
+#    }
+
+#    my %adj;
+#  TRANSCRIPT_1:
+#    for (my $u=0; $u<scalar(@transcripts); $u++){
+      
+#      # go over the rest
+#    TRANSCRIPT_2:
+#      for (my $v=0; $v<scalar(@transcripts); $v++){
+	
+#	next TRANSCRIPT_2 if $v==$u;
+	
+#	$adj{$transcripts[$u]} = [];
+	
+#	my ($merge,$overlaps) = $self->_test_for_Merge( $transcripts[$u], $transcripts[$v] );
+	
+#	if ($merge == 1){
+#	  push (@{ $adj{$transcripts[$u]} }, $transcripts[$v] );
+#	}
+#      } # end of TRAN2
+#    }   # end of TRAN1
+    
+#    print STDERR "\nAdj lists\n";
+#    foreach my $tran (@transcripts){
+#      print STDERR $myid{$tran}." -> ";
+#      foreach my $othertran ( @{ $adj{$tran} } ){
+#	print STDERR $myid{$othertran}." -> ";
+#      }
+#      print STDERR "\n";
+#    }
+
+#    # we should have the same number of adj lists as transcripts we started with
+#    unless ( scalar( keys %adj ) == scalar( @transcripts ) ) {
+#      print STDERR "Odd, the number of adj lists is smaller than the number of transcripts\n";
+#    }
+    
+#    # color all vertices in 'white'
+#    my %color;
+#    foreach my $trans ( @transcripts ){
+#      $color{$trans} = "white";
+#    }
+
+#    # here we'll hold the arrays of transcripts to be merged
+#    my @stuff_to_merge;
+    
+#    # do the depth-first search
+#    foreach my $trans ( @transcripts ){
+#      if ( $color{$trans} eq 'white' ){
+#	my $merge_this = [];
+#	$self->_DFS_visit( $trans, \%color, \%adj, $merge_this);
+#	push ( @stuff_to_merge, $merge_this );
+#      }
+#    }
+    
+#    # check the clusters made:
+#    print STDERR "Check clusters made with the graph:\n";
+#    my $counter = 1;
+#    foreach my $cluster ( @stuff_to_merge ){
+#      print STDERR "cluster: ".$counter++."\n";
+#      foreach my $tran ( @{ $cluster } ){
+#	print STDERR $myid{$tran}."<->";
+#	#$self->_print_Transcript($tran);
+#      }
+#      print STDERR "\n";
+#    }
+    
+    
+#    my @final_transcripts;
+#    foreach my $cluster ( @stuff_to_merge ){
+#      push( @final_transcripts, $self->_produce_Transcript( $cluster, $strand ) );
+#    }
+#    push ( @total_merged_transcripts, @final_transcripts);
+#  }
+		        
+		       
+#  return @total_merged_transcripts;
+		      
+
     #    # test
 
     #print STDERR "\nNew Cluster:\n";
@@ -1091,6 +1218,8 @@ sub _merge_Transcripts{
     # now we loop over the transcripts, 
     my %is_merged;
     
+
+
     # the algorithm goes roughly as follows
     #
     # for each cluster of transcripts T={t}
@@ -1505,8 +1634,7 @@ sub _produce_Transcript{
   # we turn each cluster into an exon and create a new transcript with these exons
   my $transcript    = Bio::EnsEMBL::Transcript->new();
   my @exon_clusters = $cluster_list->sub_SeqFeature;
-  my $exon_adaptor  = $self->dbobj->get_ExonAdaptor;
-
+  
   foreach my $exon_cluster (@exon_clusters){
     my $new_exon = Bio::EnsEMBL::Exon->new();
     $new_exon->start ($exon_cluster->start);
