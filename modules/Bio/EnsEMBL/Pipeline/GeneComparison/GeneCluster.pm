@@ -22,7 +22,7 @@ eae@sanger.ac.uk
 
 # Let the code begin ...
 
-package Bio::EnsEMBL::Utils::GeneCluster;
+package Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 
 use vars qw(@ISA);
 use strict;

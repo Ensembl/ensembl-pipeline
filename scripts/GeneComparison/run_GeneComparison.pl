@@ -21,11 +21,11 @@ and reads as input an input_id in the style of other Runnables, i.e. -input_id c
 use strict;  
 use diagnostics;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Utils::GeneComparison;
+use Bio::EnsEMBL::GeneComparison::GeneComparison;
 use Getopt::Long;
 
 ## load all the parameters
-use Bio::EnsEMBL::Utils::GeneCompConf;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
 
 my $host1   = $DBHOST1;

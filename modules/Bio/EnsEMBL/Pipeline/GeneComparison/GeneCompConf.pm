@@ -10,8 +10,8 @@ Bio::EnsEMBL::Pipeline::GeneConf - imports global variables used by EnsEMBL gene
 
 =head1 SYNOPSIS
 
-    use Bio::EnsEMBL::Utils::GeneCompConf;
-    use Bio::EnsEMBL::Utils::GeneCompConf qw(  );
+    use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
+    use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf qw(  );
 
 =head1 DESCRIPTION
 
@@ -40,7 +40,7 @@ variables.
 
 =cut
 
-package Bio::EnsEMBL::Utils::GeneCompConf;
+package Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
 use strict;
 use vars qw( %GeneCompConf );

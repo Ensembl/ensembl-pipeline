@@ -26,7 +26,7 @@ eae@sanger.ac.uk
 
 # Let the code begin ...
 
-package Bio::EnsEMBL::Utils::TranscriptCluster;
+package Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Transcript;
 use vars qw(@ISA);
 use strict;

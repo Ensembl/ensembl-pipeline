@@ -68,16 +68,16 @@ eae@sanger.ac.uk
 
 # Let the code begin ...
 
-package Bio::EnsEMBL::Utils::GeneComparison;
+package Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Utils::GeneCluster;
-use Bio::EnsEMBL::Utils::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::Root::RootI;
-use Bio::EnsEMBL::Utils::GeneCompConf;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
 @ISA = qw(Bio::Root::RootI);
 
