@@ -309,7 +309,17 @@ sub make_Exons {
   my ($self) = @_;
   
   my @supported_exons;
-  my @features    = sort { $a->start <=> $b->start } $self->features;
+  my @features = map { $_->[1] } sort { $a->[0] <=> $b->[0] } map { [$_->start, $_] } $self->features;
+
+  my $max_feat_len = 0;
+
+  foreach my $feat (@features) {
+    my $len = $feat->length;
+    if ($feat->length > $max_feat_len) {
+      $max_feat_len = $len;
+    }
+  }
+
   my @predictions = $self->predictions;
   my $gscount  = 1;
   
@@ -328,30 +338,32 @@ sub make_Exons {
       # Don't include any genscans that are inside a genewise/combined transcript
       if ($self->annotations){
       OTHER_GENES:
-	foreach my $gene ($self->annotations) {
-	  my @exons    = sort {$a->start <=> $b->start} @{$gene->get_all_Exons};
-	  my $g_start  = $exons[0]->start;
-	  my $g_end    = $exons[$#exons]->end;
-	  my $g_strand = $exons[0]->strand;
-	  
-	  if (!(($g_end < $prediction_exon->start) || $g_start > $prediction_exon->end)) {
-	      if ($g_strand == $prediction_exon->strand) {
-		  $ignored_exons++;
-		  next EXON;
-	      }
-	  }
+# Note '$gene' is an transcript!
+        foreach my $gene ($self->annotations) {
+          my $g_strand = $gene->start_Exon->strand;
+
+          if ($g_strand != $prediction_exon->strand) {
+# Assume gene is on a single strand
+            next OTHER_GENES;
+          }
+          
+          if (!(($gene->end < $prediction_exon->start) || $gene->start > $prediction_exon->end)) {
+            $ignored_exons++;
+            next EXON;
+          }
+        }
       }
-    }
       
       my $newexon = $self->_make_Exon($prediction_exon,$excount,"genscan." . $gscount . "." . $excount );
-      $newexon->find_supporting_evidence(\@features);
+      #$newexon->find_supporting_evidence(\@features);
+      $self->_find_supporting_evidence($newexon,\@features,$max_feat_len);
       
       # take only the exons that get supporting evidence
       if ( @{ $newexon->get_all_supporting_features } ){
-	  push(@supported_exons,$newexon);
-	  $excount++;
+        push(@supported_exons,$newexon);
+        $excount++;
       }
-  }
+    }
     
     $gscount++;
   }
@@ -361,6 +373,87 @@ sub make_Exons {
   }
   $self->supported_exons(@supported_exons);
   return @supported_exons;
+}
+
+sub _bin_search_features {
+  my ($self, $features, $feat) = @_;
+
+  my $bot = 0;
+  my $top = scalar(@$features)-1;
+
+  my $low  = $feat->start;
+  my $high = $feat->end;
+
+  while ($bot <= $top) {
+    my $mid = ($bot + $top)/2;
+    my $midfeat = @$features[$mid];
+
+    my $midlow = $midfeat->start;
+    my $midhigh = $midfeat->end;
+
+    if ($midhigh >= $low && $midlow <= $high) {
+      return $mid;
+    } else {
+      if    ($midlow > $high) { $top = $mid -1; }
+      elsif ($midlow < $low) { $bot = $mid + 1; }
+
+    }
+  }
+  return $bot;
+}
+
+sub _find_supporting_evidence {
+  my ($self,$exon,$features,$max_feat_len) = @_;
+  my @sup;
+
+  my $pos = $self->_bin_search_features($features,$exon);
+
+  my $nfeat= scalar(@$features);
+
+  my $i = $pos;
+  while ($i >= 0 && $i < $nfeat && $exon->start - $features->[$i]->end < $max_feat_len) {
+    my $f = $features->[$i];
+    if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
+      if ($f->entire_seq()->name eq $exon->contig()->name) {
+        push @sup,$f;
+      }
+    }
+    $i--;
+  }
+
+  $i = $pos+1;
+  while ($i < $nfeat && $features->[$i]->start <= $exon->end) {
+    my $f = $features->[$i];
+    if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
+      if ($f->entire_seq()->name eq $exon->contig()->name) {
+        push @sup,$f;
+      }
+    }
+    $i++;
+  }
+
+# This is quite an intensive call - only do once
+  if (scalar(@sup)) {
+    $exon->add_supporting_features(@sup);
+  }
+
+#  foreach my $f (@$features) {
+#    # return if we have a sorted feature array
+#    if ($f->start > $exon->end) {
+#      if (scalar(@sup)) {
+#        $exon->add_supporting_features(@sup);
+#      }
+#      return;
+#    }
+#    if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
+#      if ($f->entire_seq()->name eq $exon->contig()->name) {
+#        print "Got overlap\n";
+#        push @sup,$f;
+#      }
+#    }
+#  }
+## This is quite an intensive call - only do once
+#  $exon->add_supporting_features(@sup);
 }
 
 ############################################################
@@ -394,10 +487,14 @@ sub  make_ExonPairs {
   
   my $gap = 5;  
   my %pairhash;
-  my @forward;
-  my @reverse;
   
- EXON: 
+  my @exon_feats;
+  foreach my $exon (@exons) {
+    my @sorted = sort {$b->score <=> $a->score} @{$exon->get_all_supporting_features};
+    push @exon_feats, \@sorted;
+  }
+
+  EXON: 
   for (my $i = 0; $i < scalar(@exons)-1; $i++) {
     my %idhash;
     my $exon1 = $exons[$i];
@@ -409,13 +506,13 @@ sub  make_ExonPairs {
     
     my $jend   = $i + 2;  
     if ( $jend >= scalar(@exons)) {
-	$jend  = scalar(@exons) - 1;
+      $jend  = scalar(@exons) - 1;
     }
-    
-  J: 
+
+    J:
     for (my $j = $jstart ; $j <= $jend; $j++) {
-      next J if ($i == $j);
-      next J if ($exons[$i]->strand != $exons[$j]->strand);
+      next if ($i == $j);
+      next if ($exons[$i]->strand != $exons[$j]->strand);
       
       my $exon2 = $exons[$j];
       my %doneidhash;
@@ -423,106 +520,102 @@ sub  make_ExonPairs {
       # For the two exons we compare all of their supporting features.
       # If any of the supporting features of the two exons
       # span across an intron a pair is made.
-      my @f1 = sort {$b->score <=> $a->score} @{$exon1->get_all_supporting_features};
+
+      #my @f1 = sort {$b->score <=> $a->score} @{$exon1->get_all_supporting_features};
+
+      my $f1s = $exon_feats[$i];
       #print STDERR scalar(@f1)." supp features for exon1($i)\n";
       
-    F1: 
-      foreach my $f1 (@f1) {
-	  #next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
-	  my @f = sort {$b->score <=> $a->score} @{$exon2->get_all_supporting_features};
-	  #print STDERR scalar(@f)." supp features for exon2($j)\n";
+      F1: 
+      foreach my $f1 (@$f1s) {
+        #my @f = sort {$b->score <=> $a->score} @{$exon2->get_all_supporting_features};
 
-      F2: 
-	  foreach my $f2 (@f) {
-	      #next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
-	  
-	      my @pairs = $self->get_all_ExonPairs;		
-	      
-	      # Do we have hits from the same sequence
-	      # n.b. We only allow each database hit to span once
-	      # across the intron (%idhash) and once the pair coverage between
-	      # the two exons reaches $minimum_coverage we 
-	      # stop finding evidence. (%pairhash)
-	      
-	      if ($f1->hseqname eq $f2->hseqname &&
-		  $f1->strand   == $f2->strand   &&
-		  !(defined($idhash{$f1->hseqname})) &&
-		  !(defined($pairhash{$exon1}{$exon2}))) {
-		  
-		  my $ispair = 0;
-		  my $thresh = $self->threshold;
-		  
-		  if ($f1->strand == 1) {
-		      if (abs($f2->hstart - $f1->hend) < $gap) {
-			  
-			  if (!(defined($doneidhash{$f1->hseqname}))) {
-			      $ispair = 1;
-			  }
-		      }
-		  } 
-		  elsif ($f1->strand == -1) {
-		      if (abs($f1->hend - $f2->hstart) < $gap) {
-			  if (!(defined($doneidhash{$f1->hseqname}))) {
-			      $ispair = 1;
-			  }
-		      }
-		  }
-		  
-		  # This checks if the coordinates are consistent if the 
-		  # exons are on the same contig
-		  if ($ispair == 1) {
-		      if ($exon1->contig->name eq $exon2->contig->name) {
-			  if ($f1->strand == 1) {
-			      if ($f1->end >  $f2->start) {
-				  $ispair = 0;
-			      }
-			  } 
-			  else {
-			      if ($f2->end >  $f1->start) {
-				  $ispair = 0;
-			      }
-			  }
-		      }
-		  }
-		  
-		  # We finally get to make a pair
-		  if ($ispair == 1) {
-		      eval {
-			  my $check = $self->check_link($exon1,$exon2,$f1,$f2);
-			  print STDERR "check failed for this pair\n" unless $check;
-			  next J unless $check;
-			  
-			  # we make an exon pair
-			  my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
-			  
-			  if ( $pair) {
-			      print STDERR "pair created\n";
-			      $idhash    {$f1->hseqname} = 1;
-			      $doneidhash{$f1->hseqname} = 1;
-			      
-			      $pair->add_Evidence($f1);
-			      $pair->add_Evidence($f2);
-			      
-			      if ($pair->is_Covered == 1) {
-				  $pairhash{$exon1}{$exon2}  = 1;
-			      }
-			      next EXON;
-			  }
-			  else{
-			      print STDERR "pair has not been created\n";
-			  }
-			  
-			  
-		      };
-		      if ($@) {
-			  $self->throw("Error making ExonPair from\n".$exon1->gffstring."\nand\n".$exon2->gffstring."\n$@");
-		      }
-		  }
-	      }
-	  }
+        my $f2s = $exon_feats[$j];
+        #print STDERR scalar(@f)." supp features for exon2($j)\n";
+
+        F2: 
+        foreach my $f2 (@$f2s) {
+          # NOT USED ANYWHERE ! my @pairs = $self->get_all_ExonPairs;                
+              
+          # Do we have hits from the same sequence
+          # n.b. We only allow each database hit to span once
+          # across the intron (%idhash) and once the pair coverage between
+          # the two exons reaches $minimum_coverage we 
+          # stop finding evidence. (%pairhash)
+              
+          if ($f1->hseqname eq $f2->hseqname &&
+              $f1->strand   == $f2->strand   &&
+              !(defined($idhash{$f1->hseqname})) &&
+              !(defined($pairhash{$exon1}{$exon2}))) {
+                  
+            my $ispair = 0;
+            my $thresh = $self->threshold;
+                  
+            if ($f1->strand == 1) {
+              if (abs($f2->hstart - $f1->hend) < $gap) {
+                if (!(defined($doneidhash{$f1->hseqname}))) {
+                  $ispair = 1;
+                }
+              }
+            } elsif ($f1->strand == -1) {
+              if (abs($f1->hend - $f2->hstart) < $gap) {
+                if (!(defined($doneidhash{$f1->hseqname}))) {
+                  $ispair = 1;
+                }
+              }
+            }
+                  
+            # This checks if the coordinates are consistent if the 
+            # exons are on the same contig
+            if ($ispair == 1) {
+              if ($exon1->contig->name eq $exon2->contig->name) {
+                if ($f1->strand == 1) {
+                  if ($f1->end >  $f2->start) {
+                    $ispair = 0;
+                  }
+                } else {
+                  if ($f2->end >  $f1->start) {
+                    $ispair = 0;
+                  }
+                }
+              }
+            }
+                  
+            # We finally get to make a pair
+            if ($ispair == 1) {
+              eval {
+                my $check = $self->check_link($exon1,$exon2,$f1,$f2);
+                print STDERR "check failed for this pair\n" unless $check;
+                next J unless $check;
+                          
+                # we make an exon pair
+                my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
+                          
+                if ( $pair) {
+                  print STDERR "pair created\n";
+                  $idhash    {$f1->hseqname} = 1;
+                  $doneidhash{$f1->hseqname} = 1;
+                              
+                  $pair->add_Evidence($f1);
+                  $pair->add_Evidence($f2);
+                              
+                  if ($pair->is_Covered == 1) {
+                    $pairhash{$exon1}{$exon2} = 1;
+                  }
+                  next EXON;
+                } else {
+                  print STDERR "pair has not been created\n";
+                }
+              };
+              if ($@) {
+                $self->throw("Error making ExonPair from\n".$exon1->gffstring."\nand\n".$exon2->gffstring."\n$@");
+              }
+            }
+          }
+        }
       }
+    }
   }
-}
   return $self->get_all_ExonPairs;
 }
 
