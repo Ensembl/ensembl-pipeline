@@ -6,7 +6,8 @@ CREATE TABLE job (
   stdout_file       varchar(200) NOT NULL,
   stderr_file       varchar(200) NOT NULL,
   retry_count       tinyint(2) unsigned default 0,
-
+  temp_dir          varchar(100) DEFAULT '',
+  exec_host         varchar(40) DEFAULT '',       
   PRIMARY KEY (job_id),
   KEY         (input_id),
   KEY         (analysis_id)
