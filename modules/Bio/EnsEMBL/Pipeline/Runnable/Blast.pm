@@ -99,11 +99,11 @@ sub _initialize {
     $self->{_results}   =undef;      #file to store results of analysis
     $self->{_protected} =[];         #a list of files protected from deletion
     $self->{_arguments} =undef;      #arguments for blast
-    
-    
-    my( $clonefile, $blast, $database, $arguments) = 
+      
+    my( $clone, $blast, $database, $arguments) = 
             $self->_rearrange(['CLONE', 'BLAST', 'DB', 'ARGS'], @args);
-    $self->clone($clonefile) if ($clonefile);       
+    
+    $self->clone($clone) if ($clone);       
     
     if ($blast =~ m!/!) #path to blast is provided 
     {   $self->blast($blast) ;}
@@ -124,6 +124,7 @@ sub _initialize {
     {   $self->arguments($arguments) ;}
     else
     { $self->arguments(' ') ;      }
+    
     return $self; # success - we hope!
 }
 
