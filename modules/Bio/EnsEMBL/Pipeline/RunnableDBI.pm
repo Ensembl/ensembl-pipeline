@@ -1,10 +1,6 @@
 #
 # Interface for running programs
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -35,12 +31,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDBI;
 
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
-					      BIOPERLDB
-					     ); 
-if ($BIOPERLDB) {
-  require Bio::DB::SQL::DBAdaptor;
-}
+
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Root;
 
