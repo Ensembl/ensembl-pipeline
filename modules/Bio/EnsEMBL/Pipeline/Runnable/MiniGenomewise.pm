@@ -404,11 +404,38 @@ sub convert_output{
   foreach my $transcript (@transcripts) {
     my @newexons;
 
+    # test
+#    print STDERR "\nIn MiniGenomewise.convert_output\n";
+#    print STDERR " Transcript        : ".$transcript."\n";
+#    print STDERR " Translation       : ".$transcript->translation."\n";
+#    print STDERR " translation starts: ".$transcript->translation->start."\n";
+#    print STDERR " translation ends  : ".$transcript->translation->end."\n";
+#    print STDERR " start exon: ".$transcript->translation->start_exon
+#      ." starts: ".$transcript->translation->start_exon->start
+#      ." ends: ".$transcript->translation->start_exon->end."\n";
+#    print STDERR " end  exon : ".$transcript->translation->end_exon
+#      ." starts: ".$transcript->translation->end_exon->start
+#      ." ends: ".$transcript->translation->end_exon->end."\n";
+    
+    # get the translation from the transcript
+    my $translation = $transcript->translation;
+    my $start_exon  = $translation->start_exon;
+    my $end_exon    = $translation->end_exon;
+    my ($ss,$se)    = ( $start_exon->start, $start_exon->end );
+    my ($es,$ee)    = ( $end_exon->start, $end_exon->end );
+    
+
+    # we need not create a new translation for the new coordinate system
+    #my $new_translation = new Bio::EnsEMBL::Translation;    
+ 
+    # redefine the one we had
+    $translation->start($translation->start);
+    $translation->end  ($translation->end);
+    
     # convert coordinates exon by exon
     my $ec = 0;
   EXON:
-    foreach my $exon($transcript->get_all_Exons){
-
+    foreach my $exon ($transcript->get_all_Exons) {
       $ec++;
 
       my $phase  = $exon->phase;
@@ -417,7 +444,8 @@ sub convert_output{
       my @genomics = $self->miniseq->convert_SeqFeature($exon);         
       if ($#genomics > 0) {
 	# for now, ignore this exon.
-	print STDERR "Warning : miniseq exon converts into > 1 genomic exon " . scalar(@genomics) . " ignoring exon $ec\n";
+	print STDERR "Warning : miniseq exon converts into > 1 genomic exon " 
+	             . scalar(@genomics) . " ignoring exon $ec\n";
 	next EXON;
       }
     
@@ -432,21 +460,32 @@ sub convert_output{
       $new_exon->analysis($analysis_obj);
       #end BUGFIX
       push(@newexons, $new_exon);    
+    
+      # check whether $exon is the start or end exon
+      if ( $exon->start == $ss && $exon->end == $se ) {
+	#print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
+	$translation->start_exon($new_exon);
+      }
+      if ( $exon->start == $es && $exon->end == $ee ) {
+	#print STDERR " >> end_exon found, converting   ".$exon." into ".$new_exon."\n";
+	$translation->end_exon($new_exon);
+      }
     }
-
-  }
- 
-    # flush out old exons from transcript and replace them with newly remapped exons
-    $transcript->flush_Exon;
-    foreach my $exon(@newexons){
-      $transcript->add_Exon($exon);
+      
+      # flush out old exons from transcript and replace them with newly remapped exons
+      $transcript->flush_Exon;
+      foreach my $exon(@newexons){
+	$transcript->add_Exon($exon);
+      }
     }
     $transcript->sort;
+    
+    # include the modified translation
+    $transcript->translation($translation);
+    
     $self->output($transcript);  
   }
-  
 }
-
 
 =head2 output
 
