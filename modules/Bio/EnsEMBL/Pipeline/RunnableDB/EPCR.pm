@@ -109,6 +109,11 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;
+    my $arguments = "";
+
+    # $self->analysis->parameters is a comma-delimited list.
+    # Anything of the form a => b is passed to the runnable's new method.
+    # Other text is given to the runnable as "options"
     
     if ($runnable)
     {
@@ -121,11 +126,18 @@ sub runnable {
             my @pairs = split (/,/, $parameter_string);
             foreach my $pair (@pairs)
             {
-                my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
+		my ($key, $value) = split (/=>/, $pair);
+		if ($key && $value) {
+		    $parameters{$key} = $value;
+		}
+		else
+		{
+		    $arguments .= " $key ";
+		}
             }
         }
         $parameters {'-db'}      = $self->analysis->db_file();  
+        $parameters {'-options'} = $arguments;
         $parameters {'-pcr'}     = $self->analysis->program_file();  
         #creates empty Bio::EnsEMBL::Runnable::EPCR object
         $self->{'_runnable'} = $runnable->new(%parameters);
