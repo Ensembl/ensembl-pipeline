@@ -537,10 +537,10 @@ sub test_for_orthology{
   # run genewise for this gene
   my @orthologues;
   foreach my $target_slice ( @target_slices ){
-    #push( @orthologues, $self->align_with_exonerate( $transcript, $target_slice ) );
-    return $self->align_with_tblastx( $transcript, $target_slice );
+    push( @orthologues, $self->align_with_exonerate( $transcript, $target_slice ) );
+    #return $self->align_with_tblastx( $transcript, $target_slice );
   }
-  exit(0);
+  #exit(0);
   print STDERR "Found ".scalar(@orthologues)." orthologues\n";
   
   if ( @orthologues ){
@@ -676,6 +676,133 @@ sub align_with_exonerate{
 
 ############################################################
 
+=head2 test_for_orthology_with_tblastx
+
+  Args       :  $transcript      -> a transcript to test
+                $db              -> a db with an assembly to which the transcript is associated
+                $focus_db        -> db used by compara for the dna matches
+                $focus_species   -> the species for the transcript $transcript
+                $compara_db      -> compara db holding the dna-dna matches between
+                                    the focus and the target species
+                $target_db       -> db used by compara for the dna matches
+                $target_species  -> the species against which we want to compare $transcript
+                $threshold       -> it will return matches with coverage above this threshold
+  Description: method to try to align a transcript on a syntenic region for a give target species.
+               It is similar to the 'test_for_orthology' method but using tblastx
+               It has many arguments as I have tried to make it independent of the
+               way to get the focus/target databases from compara
+  Returntype : an arrayref with the orthologs in chr coordinates
+               If there are no orthologs it returns undef.
+               If there is no syntenic region it will also return undef.
+=cut
+  
+  
+sub test_for_orthology_with_tblastx{
+  my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold , $gene_id) = @_;
+  
+  # $gene_id is a hashref with transcript objects as keys and gene ids as values, handy for printing reports
+  #unless( $threshold ){
+  #  $threshold = 60;
+  #}
+
+  ############################################################
+  my @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
+  my $low    = $exons[0]->start;
+  my $high   = $exons[$#exons]->end;
+  my $strand = $exons[0]->strand;
+  
+
+  ############################################################
+  # get a slice for the transcript with extra sequence on both sides
+  
+  my $focus_slice;
+  if ($transcript->dbID){
+    $focus_slice = $db->get_SliceAdaptor->fetch_by_transcript_id( $transcript->dbID, 1000 );
+  }
+
+  ############################################################
+  # if no dbID, need to get a slice from the slice where transcript sits:
+  if (  !$transcript->dbID || !$focus_slice  ){
+    my $chr_name  = $exons[0]->contig->chr_name;
+    my $chr_start = $exons[0]->contig->chr_start;
+    my $chr_end   = $exons[0]->contig->chr_end;
+    
+    my $start = $chr_start + $low  - 1;
+
+    my $end   = $chr_start + $high - 1;
+    
+    ############################################################
+    # get slice from the same db where our transcript is
+    $focus_slice = 
+      $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $start - 1000, $end + 1000);
+  }
+  
+  ################################################################
+  # find the slice(s) syntenic to this focus slice where the gene is  
+  my @target_slices;
+  my $target_slices = 
+    $self->get_all_syntenic_slices( $focus_slice, $focus_db, $focus_species, $compara_db, $target_db, $target_species);
+  if ( $target_slices && @{$target_slices} ){
+      @target_slices = @{$target_slices};
+  }
+  else{
+      print STDERR "Could not find any syntenic region\n";
+      return undef;
+  }
+  ############################################################
+  # do some checks on the slices:
+  #print STDERR scalar(@target_slices)." target slices found\n";
+  #foreach my $slice ( @target_slices ){
+  #  print STDERR $slice->chr_name.".".$slice->chr_start."-".$slice->chr_end."\n";
+  #}
+  
+  ############################################################
+  # run genewise for this gene
+  my @orthologues;
+  my @coverage;
+  my $count = 0;
+  foreach my $target_slice ( @target_slices ){
+      ( $orthologues[$count], $coverage[$count] ) = $self->align_with_tblastx( $transcript, $target_slice );
+      $count++;
+  }
+  print STDERR "Found ".scalar(@orthologues)." orthologues\n";
+  
+  if ( @orthologues ){
+      
+      for(my $i=0; $i<$count;$i++){
+	  my $coverage = sprintf "%2.2f",$coverage[$i];
+	  my $id;
+	  my $extent; 
+	  my $sum_percent_id;
+	  my $strand;
+	  foreach my $f ( @{$orthologues[$i]} ){
+	      $id = $f->hseqname;
+	      $sum_percent_id += $f->percent_id;
+	      $extent = $f->seqname;
+	      $strand = $f->strand;
+	  }
+	  my $perc_id = sprintf "%2.2f", (3*$sum_percent_id/scalar( @{$orthologues[$i]} ));
+	  my $g_id = $gene_id->{$transcript};
+	  print STDERR "$focus_species $g_id $id $target_species coverage:$coverage percent_id:$perc_id target_id:$extent strand:$strand\n";
+      }
+      if ($threshold){
+	  my @selected;
+	  for(my $i=0; $i<$count;$i++){
+	      if ( $coverage[$i] >= $threshold ){
+		  push( @selected, $orthologues[$i] );
+	      }
+	  }
+	  return \@selected;
+      }
+      else{
+	  return \@orthologues;
+      }
+  }
+}
+
+
+############################################################
+
 sub align_with_tblastx{
   my ($self, $transcript, $slice) =@_;
   
@@ -756,54 +883,78 @@ sub align_with_tblastx{
   my ($pos_trans_pos_genom_clusters, $neg_trans_pos_genom_clusters) = $self->cluster_all_Features_by_transcript(@pos_strand);
   my ($pos_trans_neg_genom_clusters, $neg_trans_neg_genom_clusters) = $self->cluster_all_Features_by_transcript(@neg_strand);
 
+  my %alignments;
+
   print STDERR "length: $transcript_length\n"; 
-  my $length = 0;
+  my $length  = 0;
+  my $perc_id = 0;
+  my $feature_count = 0;
   foreach my $cluster ( @$pos_trans_pos_genom_clusters ){
-     my ($start,$end);
-     foreach my $fp ( @{$cluster} ){
-       unless ( $start ){
-         $start = $fp->hstart;
-       }
-       unless ( $end ){
-         $end = $fp->hend;
-       }
-       if ( $fp->hstart < $start ){
-         $start = $fp->hstart;
-       }
-       if ( $fp->hend > $end ){
-         $end = $fp->hend;
-       }
-     }
-     $length += ( $end - $start + 1 );
-#     print STDERR "cluster: ".$start."-".$end."\t $length\n";
+    my ($start,$end);
+    foreach my $fp ( @{$cluster} ){
+      unless ( $start ){
+	$start = $fp->hstart;
+      }
+      unless ( $end ){
+	$end = $fp->hend;
+      }
+      if ( $fp->hstart < $start ){
+	$start = $fp->hstart;
+      }
+      if ( $fp->hend > $end ){
+	$end = $fp->hend;
+      }
+      $perc_id += $fp->percent_id;
+      $feature_count++;
+    }
+    $length += ( $end - $start + 1 );
   }
   my $pos_pos_coverage = 100*$length/$transcript_length;
-  print STDERR "coverage on forward transcript - positive strand = $pos_pos_coverage\n";
-
+  my $pos_pos_identity;
+  if ( $feature_count ){
+    $pos_pos_identity = $perc_id/$feature_count;
+  }
+  else{
+    $pos_pos_identity = 0;
+    }
+  print STDERR "coverage on forward transcript - positive strand = $pos_pos_coverage\tperc_id = $pos_pos_identity\n";
+  
   $length = 0;
+  $perc_id = 0;
+  $feature_count = 0;
   foreach my $cluster ( @$neg_trans_pos_genom_clusters ){
-     my ($start,$end);
-     foreach my $fp ( @{$cluster} ){
-       unless ( $start ){
-         $start = $fp->hstart;
-       }
-       unless ( $end ){
-         $end = $fp->hend;
-       }
-       if ( $fp->hstart < $start ){
-         $start = $fp->hstart;
-       }
-       if ( $fp->hend > $end ){
-         $end = $fp->hend;
-       }
-     }
-     $length += ( $end - $start + 1 );
-#          print STDERR "cluster: ".$start."-".$end."\t $length\n";
+    my ($start,$end);
+    foreach my $fp ( @{$cluster} ){
+      unless ( $start ){
+	$start = $fp->hstart;
+      }
+      unless ( $end ){
+	$end = $fp->hend;
+      }
+      if ( $fp->hstart < $start ){
+	$start = $fp->hstart;
+      }
+      if ( $fp->hend > $end ){
+	$end = $fp->hend;
+      }
+      $perc_id += $fp->percent_id;
+      $feature_count++;
+    }
+    $length += ( $end - $start + 1 );
   }
   my $neg_pos_coverage = 100*$length/$transcript_length;
-  print STDERR "coverage on reverse transcript - positive strand = $neg_pos_coverage\n";
-
+  my $neg_pos_identity;
+  if ( $feature_count ){
+    $neg_pos_identity = $perc_id/$feature_count;
+  }
+  else{
+    $neg_pos_identity = 0;
+  }
+  print STDERR "coverage on reverse transcript - positive strand = $neg_pos_coverage\tperc_id = $neg_pos_identity\n";
+  
   $length = 0;
+  $perc_id = 0;
+  $feature_count = 0;
   foreach my $cluster ( @$pos_trans_neg_genom_clusters ){
      my ($start,$end);
      foreach my $fp ( @{$cluster} ){
@@ -819,14 +970,24 @@ sub align_with_tblastx{
        if ( $fp->hend > $end ){
          $end = $fp->hend;
        }
+       $perc_id += $fp->percent_id;
+       $feature_count++;
      }
      $length += ( $end - $start + 1 );
-#     print STDERR "cluster: ".$start."-".$end."\t $length\n";
   }
   my $pos_neg_coverage = 100*$length/$transcript_length;
-  print STDERR "coverage on forward transcript - negative strand = $pos_neg_coverage\n";
+  my $pos_neg_identity;
+  if ( $feature_count ){
+    $pos_neg_identity = $perc_id/$feature_count;
+  }
+  else{
+    $pos_neg_identity = 0;
+  }
+  print STDERR "coverage on forward transcript - negative strand = $pos_neg_coverage\tperc_id = $pos_neg_identity\n";
 
   $length = 0;
+  $perc_id = 0;
+  $feature_count = 0;
   foreach my $cluster ( @$neg_trans_neg_genom_clusters ){
      my ($start,$end);
      foreach my $fp ( @{$cluster} ){
@@ -842,15 +1003,48 @@ sub align_with_tblastx{
        if ( $fp->hend > $end ){
          $end = $fp->hend;
        }
+       $perc_id += $fp->percent_id;
+       $feature_count++;
      }
      $length += ( $end - $start + 1 );
- #         print STDERR "cluster: ".$start."-".$end."\t $length\n";
-
-  }
+   }
   my $neg_neg_coverage = 100*$length/$transcript_length;
-  print STDERR "coverage on reverse transcript - negative strand = $neg_neg_coverage\n";
+  my $neg_neg_identity;
+  if ( $feature_count ){
+    $neg_neg_identity = $perc_id/$feature_count;
+  }
+  else{
+    $neg_neg_identity = 0;
+  }
+  print STDERR "coverage on reverse transcript - negative strand = $neg_neg_coverage\tperc_id = $pos_neg_identity\n";
   
-  return @featurepairs;  
+  ############################################################
+  # calculate the maximum coverage:
+  $alignments{coverage}{pos_pos} = $pos_pos_coverage;
+  $alignments{coverage}{pos_neg} = $pos_neg_coverage;
+  $alignments{coverage}{neg_pos} = $neg_pos_coverage;
+  $alignments{coverage}{neg_neg} = $neg_neg_coverage;
+
+  $alignments{features}{neg_neg} = $neg_trans_neg_genom_clusters;
+  $alignments{features}{pos_pos} = $neg_trans_neg_genom_clusters;
+  $alignments{features}{pos_neg} = $pos_trans_neg_genom_clusters;
+  $alignments{features}{neg_pos} = $neg_trans_pos_genom_clusters;
+  
+  $alignments{identity}{pos_pos} = $pos_pos_identity;
+  $alignments{identity}{pos_neg} = $pos_neg_identity;
+  $alignments{identity}{neg_pos} = $neg_pos_identity;
+  $alignments{identity}{neg_neg} = $neg_neg_identity;
+
+  my @order = sort { $alignments{coverage}{$b} <=> $alignments{coverage}{$a} } keys %{$alignments{coverage}};
+
+  #print STDERR "sorting:\n";
+  #foreach my $order ( @order){
+  #  print STDERR $alignments{coverage}{$order}."\t".$alignments{identity}{$order}."\n";
+  #}
+
+  my @best_features = $alignments{features}{$order[0]};
+  
+  return (\@featurepairs,$alignments{coverage}{$order[0]});  
 }
 
 ############################################################
