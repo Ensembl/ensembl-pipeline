@@ -19,11 +19,11 @@
 =cut
 
 use strict;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBHOST
 					EST_REFDBUSER
 					EST_REFDBNAME
-					EST_GOLDEN_PATH
 				       );
 
 
@@ -33,18 +33,21 @@ my %cids;
 my $analysis = 1; # from ens_UCSC_0801_est
 my $name ='exonerate';
 
-&fetch_golden_contigs;
+&get_golden_contigs;
 
 while(<>){
-  # AC004073.1.1.79612      75445   76005   2293.00 89      1       gi|12779912|emb|AL516419.1|AL516419     296     861     1
+  #print;
+  chomp;
+  #c006201126.1.55275      41440   41695   673.00  74      1       AB006208        142     400     -1      176M1I7M2D1M1D1M1D2M1D4M1I62M
   my ($contig_id, $contig_start, $contig_end, $score, $percent_id, $contig_strand, 
-      $est_id, $est_start, $est_end, $est_strand) = split();
+      $est_id, $est_start, $est_end, $est_strand, $cigar) = split();
   
   next unless $percent_id >= 90;
 
   $est_id =~ s/\S+\|\S+\|\S+\|(\S+)\|\S+/$1/;
 
   my $contig = $cids{$contig_id};
+  #print STDERR "have feature from ".$contig."\n";
   next unless defined $contig;
   
   # if both contig and est strands are the same, convention is to set both to be 1
@@ -59,7 +62,7 @@ while(<>){
   }
   
   # need to print out tab delimited line suitable for mysql. Autogenerate feature internal_id
-  print "\\N\t$contig\t$contig_start\t$contig_end\t$score\t$contig_strand\t$analysis\t$name\t$est_start\t$est_end\t$est_id\tNULL\t$percent_id\t0\t0\n";
+  print "\\N\t$contig\t$analysis\t$contig_start\t$contig_end\t$contig_strand\t$est_start\t$est_end\t$est_id\t$est_strand\tNULL\t$cigar\t0\t$percent_id\t$score\n";
 
 }
 
@@ -79,14 +82,15 @@ sub get_golden_contigs{
 					      -host   => $EST_REFDBHOST,
 					      -user   => $EST_REFDBUSER,
 					      -dbname => $EST_REFDBNAME,
-					     )
+					     );
     
-    my $query = "select contig.id, contig.internal_id from contig, static_golden_path where contig.internal_id=static_golden_path.raw_id and static_golden_path.type=$EST_GOLDEN_PATH";
-  
+    my $query = "select contig.name, contig.contig_id from contig, assembly, meta where contig.contig_id=assembly.contig_id and assembly.type= meta.meta_value and meta.meta_key='assembly.default'";
+  #print STDERR $query."\n";
   my $sth = $db->prepare($query) || $db->throw("can't prepare: $query");
   my $res = $sth->execute        || $db->throw("can't execute: $query");
   
   while( my ($internal_id, $id) = $sth->fetchrow_array) {
+    #print STDERR "have ".$id." ".$internal_id."\n";
     $cids{$internal_id} = $id;
   }
   
