@@ -1,0 +1,7 @@
+
+DUSTEXE=/usr/local/ensembl/bin/dust
+SEQDIR=/acari/work4a/lec/briggsae_sequence/contig_chunks/
+SEQFILE=${SEQDIR}/${JOBID}
+
+BSUB_OPTIONS="-q ecslong"
+
