@@ -79,16 +79,15 @@ sub process_exons{
   open(EXON, "<$exonfile") or die "Can't open $exonfile\n";
 
   while(<EXON>){
-    my ($id, $contig, $seq_start, $seq_end, $strand, $phase, $end_phase, $hstart, $hend, $hid);
-    my $score = 100; # no real score
-
+    my ($id, $contig, $seq_start, $seq_end, $strand, $phase, $end_phase, $hstart, $hend, $hid, $score);
+    
     chomp;
     my $exon_id = $_;
 
     #    print STDERR "$exon_id\n";
 
     my $query = qq(
-		   SELECT exon.exon_id, exon.contig_id, exon.seq_start, exon.seq_end, exon.strand, exon.phase, exon.end_phase, min(hstart), max(hend), hid
+		   SELECT exon.exon_id, exon.contig_id, exon.seq_start, exon.seq_end, exon.strand, exon.phase, exon.end_phase, min(hstart), max(hend), hid, score
 		   FROM exon, supporting_feature
 		   WHERE exon.exon_id = supporting_feature.exon_id
 		   AND exon.exon_id = '$exon_id'
@@ -99,7 +98,7 @@ sub process_exons{
     my $res = $sth->execute;
     
     # bind the columns
-    $sth->bind_columns(undef, \$id, \$contig, \$seq_start, \$seq_end, \$strand, \$phase, \$end_phase, \$hstart, \$hend, \$hid);
+    $sth->bind_columns(undef, \$id, \$contig, \$seq_start, \$seq_end, \$strand, \$phase, \$end_phase, \$hstart, \$hend, \$hid, \$score);
 
     my $count = 0;
   FETCH:
@@ -110,7 +109,7 @@ sub process_exons{
       }
       $count++;
 
-print "\\N\t$contig\t$seq_start\t$seq_end\t$score\t$strand\t$analysis_id\t$name\t$hstart\t$hend\t$hid\t'NULL'\t'NULL'\t$phase\t$end_phase\n";
+print "\\N\t$contig\t$seq_start\t$seq_end\t$score\t$strand\t$analysis_id\t$name\t$hstart\t$hend\t$hid\t'NULL'\t$score\t$phase\t$end_phase\n";
 
     }
 
