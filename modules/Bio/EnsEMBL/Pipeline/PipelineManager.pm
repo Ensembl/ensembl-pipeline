@@ -337,6 +337,12 @@ sub run {
     sleep(2); #save some CPU when endlessly looping
 
   } #end of MAIN LOOP
+
+  # submit any remaining jobs (created but not submitted)
+
+  foreach my $taskname (keys %running_tasks) {
+    $self->_submission_systems->{$taskname}->flush;
+  }
 }
 
 
