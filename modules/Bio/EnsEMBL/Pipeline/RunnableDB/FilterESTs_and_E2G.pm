@@ -591,7 +591,7 @@ sub fetch_input {
 sub run {
   my ($self) = @_;
 
-  $self->throw("Can't run - no runnable objects") unless defined($self->{_runnables});
+  $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
   
   foreach my $runnable($self->runnable) {
     $runnable->run;
