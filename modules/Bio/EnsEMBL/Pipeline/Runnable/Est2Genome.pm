@@ -410,7 +410,9 @@ sub run {
 	  #my $f2strand = $est_orientation;
 	  my $f2primary = $f1primary;
 	  
-	  #ensure start is always less than end
+	  #putting coordinates in righstrand as est2genome
+	  #reports coordinates as per reverse compliment coords so need
+	  # altering
 	  if ($est_strand == 1)
 	    {
 	      $f2start =  $elements[6]; 
@@ -423,7 +425,8 @@ sub run {
 	    }              
 	  if($f1strand == -1){
 	    $f2strand *= -1;
-	  }
+	  } #if gene is on reverse strand need to flip est strand
+
 	  #create array of featurepairs and add them to $self->{'_fplist'}
 	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
 				  $f2start, $f2end, $f2id, $f1source, 
