@@ -109,7 +109,7 @@ sub new {
     $self->{'_pm'}        = 80;
     $self->{'_pi'}        = 10;
     $self->{'_minscore'}  = 50;
-    $self->{'_maxperiod'} = 20; 
+    $self->{'_maxperiod'} = 150; 
 
     my ($clone, $trf, $match, $mismatch, $delta, $pm, $pi, $minscore, $maxperiod) = $self->_rearrange([qw(
 	CLONE

@@ -141,7 +141,7 @@ sub new {
 
       $self->percent_id($percent_id);
     } else {
-      $self->percent_id(50);  
+      $self->percent_id(95);  
     }
      if ($percent_id) {
 
@@ -152,10 +152,14 @@ sub new {
     #print "options = ".$self->options."\n";
     if (defined($threshold)) {
       $self->threshold($threshold);
+    } else {
+          $self->threshold(95);  
     }
 
     if (defined($threshold_type)) {
       $self->threshold_type($threshold_type);
+    }else {
+      $self->threshold_type('PID');
     }
 
     if (defined($filter)) {
@@ -440,12 +444,12 @@ sub run {
   }
   #print STDERR "ran analysis\n";
   #parse output and create features
-  #print "there are ".scalar(@blast_output)." features\n";
+  print "there are ".scalar(@blast_output)." features\n";
   $self->expand_and_merge_features(\@blast_output);
   my @features = $self->each_merged_feature;
   my @results;
   foreach my $feature(@features){
-    #print "running on ".$feature->hseqname." with score ".$feature->score." and evalue ".$feature->p_value."\n";
+    print STDERR "running on ".$feature->hseqname." with score ".$feature->score." and evalue ".$feature->p_value."\n";
     my @genes = $self->run_est2genome($feature);
     #print "there are ".scalar(@genes)." results\n";
     push(@results, @genes);
@@ -696,7 +700,7 @@ sub run_est2genome {
   #print "est2 genome outputted ".scalar(@features)."\n";
   my @output;
   foreach my $f (@features) {
-        if($f->score > 6){
+        if( $f->percent_id >= 98 && $f->score > 6  ){
 	  $f->start($f->start+$start-1);
 	  $f->end($f->end+$start-1);
 	  #$f->strand($strand);
