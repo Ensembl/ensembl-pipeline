@@ -125,11 +125,11 @@ sub new {
 
 
   ########## WRITING SLAM OUTPUT ########################
-  defined $slam_output ? $self->slam_output($slam_output) : $self->slam_output("False");
+  defined $slam_output ? $self->slam_output_opt($slam_output) : $self->slam_output_opt("False");
 
 
   ########## SETTING WORKDIR ############################
-  defined $workdir ? $self->workdir($workdir) : $self->workdir('/tmp/');
+  $self->workdir($workdir);
 
 
   $self->checkdir;
@@ -161,9 +161,12 @@ sub run {
 
 
   # names of fasta files on which avid runs on (there must also be a .masked-file)
-  my $fa_first = @{$self->run_avid_on_files}[0];
-  my $fa_secnd = @{$self->run_avid_on_files}[1];
 
+  my $fa_first = @{$self->file_basename}[0];
+  my $fa_secnd = @{$self->file_basename}[1];
+
+  $fa_first .="fasta";
+  $fa_secnd .="fasta";
 
   my $command = $self->avid_binary  . " " .$self->avid_options;
   $command .=  " " . $fa_first    . " ";
@@ -175,9 +178,9 @@ sub run {
   close(AVID);
 
   # write output for slam 
-  $self->write_slam_output if ($self->slam_output);
+  $self->write_slam_output if ($self->slam_output_opt);
 
-  # store written filenames for deletion
+  # pass written minfo mout.. files for deletion to $self->file
   $self->files_to_delete($fa_first,$fa_secnd);
 
   return 1
@@ -192,9 +195,11 @@ sub files_to_delete {
   my $workdir        =  $self->workdir;
 
   # substitution of workdir-prefix and .fasta-suffix to get filenames written by avid
-  $ff             =~s/$workdir(.+)\.fasta/$1/;
-  $sf             =~s/$workdir(.+)\.fasta/$1/;
+  $ff             =~s/$workdir\/(.+)\.fasta/$1/;
+  $sf             =~s/$workdir\/(.+)\.fasta/$1/;
+
   my $basename = $ff."_".$sf;
+
 
   # option -opsl writes out: .minfo .info .out .psl
   # option -obin writes out: .minfo .mout
@@ -203,7 +208,8 @@ sub files_to_delete {
 
   if ($self->avid_options =~ /obin/) {
     $self->results ( $basename . ".mout" );
-    $self->file ( $basename . ".mout" )
+    $self->file ( $basename . ".mout" );
+    $self->file ( $basename . ".minfo" );
   }
 
   if ($self->avid_options =~ /opsl/) {
@@ -226,7 +232,7 @@ sub query_sequences {
     push @seqs, $slice1, $slice2;
     $self->{_query_sequences} = \@seqs;
   }
-  return @{$self->{_query_sequences}};
+  return $self->{_query_sequences};
 }
 
 ############################################################
@@ -252,16 +258,18 @@ sub avid_options {
 
   $self->{_avid_options} = $opt if (defined $opt);
   $self->{_avid_options} = '-obin' if ( ( !defined $opt) && ( !defined  $self->{_avid_options}));
+
   return $self->{_avid_options};
 }
 
 ############################################################
 
-sub slam_output {
+sub slam_output_opt {
   my ($self,$out) =  @_;
 
   $self->{_slam_output} = "1" if (defined $out);
   $self->{_slam_output} = 'FALSE' if ( ( !defined $out) && ( !defined  $self->{_slam_output}));
+
   return $self->{_slam_output};
 }
 
@@ -272,33 +280,39 @@ sub write_sequences {
   my $self = shift;
 
   my $count = 0;
-  foreach my $slice ( $self->query_sequences ) {
+  foreach my $slice ( @{$self->query_sequences} ) {
 
-    # getting filename of (first) unmasked sequence
-    my $filename = $self->get_tmp_file($self->workdir , @{$self->file_prefix}[$count] , "fasta");
+    # getting first filename for unmasked seq
+    my $file = $self->get_tmp_file($self->workdir , @{$self->file_prefix}[$count] , "");
+
+    #push basefilename in an array of basenames
+    $self->file_basename($file);
+
+    # add .fasta
+    $file .= "fasta";
+
+
+    # writing unmasked sequence
+    my  $seqobj = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
+    $seqobj->write_seq($slice);
+    print "Writing sequence $file\n" if ($self->verbose);
+
 
     # inherited method to store filenames to unlink in @array
-    $self->file($filename);
-
-    # storing the fasta-filenames for avid-run (a little redundant...)
-    $self->run_avid_on_files($filename);
-
-    # writing unmasked fasta-sequence
-    my  $seqobj = Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta');
-    $seqobj->write_seq($slice);
-    print "Writing sequence $filename\n" if ($self->verbose);
+    $self->file($file);
 
     # getting filename of (first) masked sequence 
-    $filename .= ".masked";
-
-    # inherited method to store filenames to unlink in @array
-    $self->file($filename);
+    $file .= ".masked";
 
     # writing masked fasta-sequence
     my $rm_slice = $slice->get_repeatmasked_seq();
-    $seqobj =  Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta');
+    $seqobj =  Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
     $seqobj -> write_seq($rm_slice);
-    print "Writing sequence $filename\n" if ($self->verbose);
+
+    print "Writing sequence $file\n" if ($self->verbose);
+
+    # unlink masked fasta
+    $self->file($file);
     $count++;
   }
 }
@@ -312,8 +326,12 @@ sub write_slam_output {
   my $wdir = $self->workdir;
 
   #getting name of binary slam outputfile
-  (my $ff = @{$self->run_avid_on_files}[0]) =~s/$wdir(.+)\.fasta/$1/;
-  (my $sf = @{$self->run_avid_on_files}[1]) =~s/$wdir(.+)\.fasta/$1/;
+  my $ff = @{$self->file_basename}[0];
+  $ff =~s/\.$//;                #snipping away last dot
+
+  my $sf = @{$self->file_basename}[1];
+  $sf =~s/\.$//;                #snipping away last dot
+
 
   my $binfile = $ff."_".$sf.".mout";
   my $outfile = $ff."_".$sf."_slam_input.txt";
@@ -361,23 +379,9 @@ sub write_slam_output {
     close(OUT);
   }
   ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
-
+  # unlink txt-slam_outputfile
   $self->file($outfile);
   return $outfile;
-}
-
-########### STORING FILENAMES FOR AVID RUN ###########
-
-sub run_avid_on_files {
-  my ($self,$file) = @_;
-
-  if (!defined  $self->{_run_avid_on_files} ) {
-    $self->{_run_avid_on_files} = [];
-  }
-  if (defined $file) {
-    push  @{$self->{_run_avid_on_files}} , $file ;
-  }
-  return $self->{_run_avid_on_files} ;
 }
 
 
@@ -396,6 +400,16 @@ sub file_prefix{
   $self->{_file_prefix} = ["seq1","seq2"]   if (!defined $prefix && !defined $self->{_file_prefix});
 
   return $self->{_file_prefix};
+}
+
+
+
+sub file_basename {
+  my ($self,$base) = @_;
+
+  push @{$self->{_file_basename}},$base if (!defined $self->{file_basename} && defined $base);
+  $self->{_file_basename} = [$base] if (defined $base && !defined $self->{_file_basename});
+  return $self->{_file_basename}; # /tmp/seq1.88796.
 }
 
 
