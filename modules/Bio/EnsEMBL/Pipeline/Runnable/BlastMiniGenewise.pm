@@ -1,3 +1,5 @@
+
+
 #!/usr/local/bin/perl
 
 #
@@ -62,6 +64,7 @@ use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TBLASTN
 					);
+
 require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -74,11 +77,11 @@ sub new {
   
   my( $genomic, $ids, $seqfetcher, 
       $trim, $endbias) = $self->_rearrange([qw(GENOMIC
-					       IDS
-					       SEQFETCHER
-					       TRIM
-					       ENDBIAS)],
-					   @args);
+                                               IDS
+                                               SEQFETCHER
+                                               TRIM
+                                               ENDBIAS)],
+                                           @args);
   
   $self->throw("No genomic sequence input")           unless defined($genomic);
   $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
@@ -143,7 +146,7 @@ sub endbias {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_endbias'} = $arg;
+        $self->{'_endbias'} = $arg;
     }
 
     if (!defined($self->{'_endbias'})) {
@@ -188,7 +191,7 @@ sub get_Ids {
     my ($self) = @_;
 
     if (!defined($self->{'_idlist'})) {
-	$self->{'_idlist'} = [];
+        $self->{'_idlist'} = [];
     }
     return @{$self->{'_idlist'}};
 }
@@ -207,17 +210,17 @@ sub get_Ids {
 sub parse_Header {
     my ($self,$id) = @_;
 
-    if (!defined($id)) {	$self->throw("No id input to parse_Header");
+    if (!defined($id)) {        $self->throw("No id input to parse_Header");
     }
 
     my $newid = $id;
 
     if ($id =~ /^(.*)\|(.*)\|(.*)/) {
-	$newid = $2;
-	$newid =~ s/(.*)\..*/$1/;
-	
+        $newid = $2;
+        $newid =~ s/(.*)\..*/$1/;
+        
     } elsif ($id =~ /^..\:(.*)/) {
-	$newid = $1;
+        $newid = $1;
     }
     $newid =~ s/ //g;
     return $newid;
@@ -251,17 +254,17 @@ sub run {
 
     foreach my $f (@features) {
       if (!defined $scorehash{$f->hseqname} || $f->score > $scorehash{$f->hseqname})  {
-	$scorehash{$f->hseqname} = $f->score;
+        $scorehash{$f->hseqname} = $f->score;
       }
     }
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
 
     my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $self->genomic_sequence,
-								     '-features'   => \@features,
-								     '-seqfetcher' => $self->seqfetcher,
-								     '-forder'     => \@forder,
-								     '-endbias'    => $self->endbias);
+                                                                     '-features'   => \@features,
+                                                                     '-seqfetcher' => $self->seqfetcher,
+                                                                     '-forder'     => \@forder,
+                                                                     '-endbias'    => $self->endbias);
 
     $mg->minirun;
     
@@ -283,8 +286,8 @@ sub blast_ids {
     my @newfeatures;
 
     foreach my $seq (@valid_seq) {
-	my @tmp = $self->run_blast($seq,$blastdb);
-	push(@newfeatures,@tmp);
+        my @tmp = $self->run_blast($seq,$blastdb);
+        push(@newfeatures,@tmp);
     }
 
     unlink $blastdb;
@@ -308,15 +311,14 @@ sub run_blast {
     my @pairs;
 
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
-				-file   => ">$seqfile");
+                                -file   => ">$seqfile");
 
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
     my $tblastn = $GB_TBLASTN;
-
     # default to tblastn
     if(!defined $tblastn || $tblastn eq ''){
-      $tblastn = 'wutblastn.new';
+      $tblastn = 'wutblastn';
     }
     my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 -hitdist=40 > $blastout";
 
@@ -330,36 +332,36 @@ sub run_blast {
     while(my $sbjct = $report->nextSbjct){
       while(my $hsp = $sbjct->nextHSP){
 
+	
+        # strands
+        my $strand = 1;
+        if($hsp->subject->strand != $hsp->query->strand){
+          $strand = -1;
+        }
+	
+        my $genomic = new Bio::EnsEMBL::SeqFeature(
+                                                   -start   => $hsp->subject->start,
+                                                   -end     => $hsp->subject->end,
+                                                   -strand  => $strand,
+                                                   -seqname => $hsp->subject->seqname,
+                                                   -score   => $hsp->score,
+                                                  );
+        # munging protein seqname as BPlite is giving it back like O95793 (577 letters)
+        my $protname = $hsp->query->seqname;
+        $protname =~ s/^(\S+).+/$1/;
+        my $protein = new Bio::EnsEMBL::SeqFeature(
+                                                   -start   => $hsp->query->start,
+                                                   -end     => $hsp->query->end,
+                                                   -strand  => 1,
+                                                   -seqname => $protname,
+                                                   -score   => $hsp->score,
+                                                   );
+        my $featurepair = new Bio::EnsEMBL::FeaturePair(
+                                                        -feature1 => $genomic,
+                                                        -feature2 => $protein
+                                                       );
 
-	# strands
-	my $strand = 1;
-	if($hsp->subject->strand != $hsp->query->strand){
-	  $strand = -1;
-	}
-
-	my $genomic = new Bio::EnsEMBL::SeqFeature(
-						   -start   => $hsp->subject->start,
-						   -end     => $hsp->subject->end,
-						   -strand  => $strand,
-						   -seqname => $hsp->subject->seqname,
-						   -score   => $hsp->score,
-						  );
-	# munging protein seqname as BPlite is giving it back like O95793 (577 letters)
-	my $protname = $hsp->query->seqname;
-	$protname =~ s/^(\S+).+/$1/;
-	my $protein = new Bio::EnsEMBL::SeqFeature(
-						   -start   => $hsp->query->start,
-						   -end     => $hsp->query->end,
-						   -strand  => 1,
-						   -seqname => $protname,
-						   -score   => $hsp->score,
-						   );
-	my $featurepair = new Bio::EnsEMBL::FeaturePair(
-							-feature1 => $genomic,
-							-feature2 => $protein
-						       );
-
-	push (@pairs, $featurepair);
+        push (@pairs, $featurepair);
       }
     }
   
@@ -374,7 +376,7 @@ sub print_FeaturePair {
     my ($self,$pair) = @_;
 
     print STDERR $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . $pair->score . "\t" .
-	$pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
+        $pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
 }
 
 sub make_blast_db {
@@ -386,12 +388,12 @@ sub make_blast_db {
     }
     my $blastfile = $self->get_tmp_file($tmpdir,'blast','fa');
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
-			       -file   => ">$blastfile");
+                               -file   => ">$blastfile");
 
 #    print STDERR "Blast db file is $blastfile\n";
 
     foreach my $seq (@seq) {
-	$seqio->write_seq($seq);
+        $seqio->write_seq($seq);
     }
 
     close($seqio->_filehandle);
@@ -406,7 +408,7 @@ sub get_tmp_file {
 
     
     if ($dir !~ /\/$/) {
-	$dir = $dir . "/";
+        $dir = $dir . "/";
     }
 
 #    $self->check_disk_space($dir);
@@ -415,9 +417,9 @@ sub get_tmp_file {
     my $file = $dir . $stub . "." . $num . "." . $ext;
 
     while (-e $file) {
-	$num = int(rand(10000));
-	$file = $stub . "." . $num . "." . $ext;
-    }			
+        $num = int(rand(10000));
+        $file = $stub . "." . $num . "." . $ext;
+    }                   
     
     return $file;
 }
@@ -428,13 +430,13 @@ sub get_Sequences {
     my @seq;
 
     foreach my $id (@ids) {
-	my $seq = $self->get_Sequence($id);
+        my $seq = $self->get_Sequence($id);
 
-	if (defined($seq) && $seq->length > 0) {
-	    push(@seq,$seq);
-	} else {
-	    print STDERR "Invalid sequence for $id - skipping\n";
-	}
+        if (defined($seq) && $seq->length > 0) {
+            push(@seq,$seq);
+        } else {
+            print STDERR "Invalid sequence for $id - skipping\n";
+        }
     }
 
     return @seq;
@@ -502,13 +504,14 @@ sub get_Sequence {
 #    print(STDERR "Sequence id :  is [$id]\n");
 
     eval {
+      #print STDERR "BlastMiniGenewise: getting sequence for $id\n";
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
     if($@) {
       $self->warn("Problem fetching sequence for id [$id] $@\n");
       return undef;
     }
-
+    
     if(!defined($seq)){
       $self->warn("Could not find sequence for [$id]");
     }
@@ -531,7 +534,7 @@ sub get_Sequence {
 sub output {
     my ($self) = @_;
     if (!defined($self->{'_output'})) {
-	$self->{'_output'} = [];
+        $self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
