@@ -233,17 +233,29 @@ sub resource{
 #############
 
 sub construct_command_line{
-  my($self) = @_;
+  my ($self) = @_;
 
-  $self->throw("this method construct command line must be implemented!\n");
+  $self->throw("this method construct command line must be implemented");
 }
 
 
 sub open_command_line{
   my ($self)= @_;
   
-  $self->throw("open_command_line isn't implemented yet\n");
+  $self->throw("open_command_line isn't implemented yet");
 
+}
+
+sub copy_output{
+  my ($self) = @_;
+
+  $self->throw("this method copy_output must be implemented");
+}
+
+sub delete_output{
+  my ($self) = @_;
+
+  $self->throw("this method delete_output must be implemented");
 }
 
 1;
