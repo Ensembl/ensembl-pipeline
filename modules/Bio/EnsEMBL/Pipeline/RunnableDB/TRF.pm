@@ -63,7 +63,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
-    Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :    -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis
 

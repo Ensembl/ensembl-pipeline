@@ -66,7 +66,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  A virtual contig (e.g. chr_name.start.end)
                 -analysis:  A Bio::EnsEMBL::Analysis 
 

@@ -50,7 +50,6 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
-#use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
@@ -72,7 +71,7 @@ use Data::Dumper;
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -dbobj:      A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 

@@ -68,7 +68,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -dbobj:      A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 

@@ -69,7 +69,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
-    Args    :   -db   :     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -db   :     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  A virtual contig ('chr_name.start.end')
                 -analysis:  A Bio::EnsEMBL::Analysis
 

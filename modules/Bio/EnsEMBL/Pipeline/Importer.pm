@@ -722,8 +722,8 @@ sub mirror_dir {
     Title   :   clones
     Usage   :   @clones = $obj->clones
     Function:   Get/set method for adding a clone and returning all clones
-    Returns :   Bio::EnsEMBL::DB::CloneI
-    Args    :   Bio::EnsEMBL::DB::CloneI
+    Returns :   Bio::EnsEMBL::PerlDB::Clone
+    Args    :   Bio::EnsEMBL::PerlDB::Clone
 
 =cut
 
@@ -731,9 +731,6 @@ sub clones {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
-    if (!($arg->isa("Bio::EnsEMBL::DB::CloneI"))) {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::DB::CloneI");
-    }
     push(@{$self->{'_clones'}},$arg);
   }
 

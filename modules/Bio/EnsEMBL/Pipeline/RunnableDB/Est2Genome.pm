@@ -74,7 +74,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -dbobj:      A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Bio::DB::RandomAccessI Object (required)
 =cut
@@ -124,8 +124,7 @@ sub threshold {
     Usage   :   $self->dbobj($obj);
     Function:   Gets or sets the value of dbobj
     Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
 =head2 input_id
 

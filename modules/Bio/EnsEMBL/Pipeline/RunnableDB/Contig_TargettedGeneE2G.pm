@@ -1399,7 +1399,7 @@ sub _check_coverage{
  Example :
  Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
            data), and a Bio::EnsEMBL::translation
- Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::RawContig,
            $genetype: string, $count: integer
            $analysis_obj: Bio::EnsEMBL::Analysis
 
@@ -1413,8 +1413,6 @@ sub _make_transcript{
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
-  unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
-    {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
   my $translation  = new Bio::EnsEMBL::Translation;    

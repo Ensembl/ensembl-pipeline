@@ -78,7 +78,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
-    Args    :   -db:           A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:           A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:        Contig input id (required), or filename
                 -analysis:        A Bio::EnsEMBL::Analysis (optional)
                 -estfile:         filename

@@ -66,7 +66,7 @@ use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis 
 

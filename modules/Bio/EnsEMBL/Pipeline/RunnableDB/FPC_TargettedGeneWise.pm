@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
-    Args    :   -db:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:      A Bio::EnsEMBL::DBSQL::DBAdaptor,
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 

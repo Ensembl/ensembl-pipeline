@@ -52,7 +52,6 @@ use DBI;
 # Object preamble - inherits from Bio::Root::Object
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::DB::ObjI;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor;
@@ -60,7 +59,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
-@ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 
 sub new {

@@ -2186,7 +2186,7 @@ sub genscan_exons {
  Function: 
  Example : 
  Returns : nothing
- Args    : Bio::EnsEMBL::DB::ContigI
+ Args    : Bio::EnsEMBL::RawContig
            
 
 
@@ -2196,12 +2196,7 @@ sub contig {
     my ($self,$contig) = @_;
     
     if (defined($contig)) {
-	if ($contig->isa("Bio::EnsEMBL::DB::ContigI")) {
 	    $self->{'_contig'} = $contig;
-	} else {
-	    $self->throw("[$contig] is not a Bio::EnsEMBL::DB::ContigI");
-
-	}
     }
     return $self->{'_contig'};
 }

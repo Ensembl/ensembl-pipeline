@@ -122,7 +122,7 @@ sub threshold {
     Usage   :   $self->db($obj);
     Function:   Gets or sets the value of db
     Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
+                (which extends Bio::EnsEMBL::DBSQL::DBAdaptor)
     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
 =cut
@@ -466,7 +466,7 @@ sub make_genes {
  Example :
  Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
            data), and a Bio::EnsEMBL::translation
- Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::RawContig,
   $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis
 
 

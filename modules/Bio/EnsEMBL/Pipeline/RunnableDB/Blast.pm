@@ -69,7 +69,7 @@ BEGIN {
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis 
 

@@ -30,14 +30,14 @@ Bio::EnsEMBL::Pipeline::RunnableDBI.  This object encapsulates the
 basic main methods of a RunnableDB which a subclass may override.
 
 parameters to new
--db:        A Bio::EnsEMBL::DB::Obj (required), 
+-db:        A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
 -input_id:   Contig input id (required), 
 -analysis:  A Bio::EnsEMBL::Analysis (optional) 
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable to add
 functionality for reading and writing to databases.  The appropriate
 Bio::EnsEMBL::Analysis object must be passed for extraction
-of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
+of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is
 required for databse access.
 
 =head1 CONTACT
@@ -76,7 +76,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB object
-    Args    :   -db:         A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:         A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Bio::DB::RandomAccessI Object (required),
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 
@@ -157,9 +157,9 @@ sub parameters {
     Title   :   db
     Usage   :   $self->db($obj);
     Function:   Gets or sets the value of db
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+    Returns :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor compliant object
+                (which extends Bio::EnsEMBL::DBSQL::DBAdaptor)
+    Args    :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor compliant object
 
 =cut
 

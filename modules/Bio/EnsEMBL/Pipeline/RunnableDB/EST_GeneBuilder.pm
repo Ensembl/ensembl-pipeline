@@ -162,7 +162,7 @@ sub cdna_db{
     Usage   :   $self->db($obj);
     Function:   Gets or sets the value of db
     Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
+                (which extends Bio::EnsEMBL::DBSQL::)
     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
 =head2 input_id

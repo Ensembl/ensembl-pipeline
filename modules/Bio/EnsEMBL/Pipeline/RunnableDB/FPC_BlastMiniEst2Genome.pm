@@ -69,7 +69,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome 
                 object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -dbobj:      A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object (required),
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 

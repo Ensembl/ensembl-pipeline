@@ -39,9 +39,8 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::DB::ObjI;
 
-@ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 =head1 ABSTRACT METHODS
 

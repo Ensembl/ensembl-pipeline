@@ -737,7 +737,7 @@ sub check_coverage{
  Example :
  Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
            data), and a Bio::EnsEMBL::translation
- Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::RawContig,
            $genetype: string, $count: integer
            $analysis_obj: Bio::EnsEMBL::Analysis
 

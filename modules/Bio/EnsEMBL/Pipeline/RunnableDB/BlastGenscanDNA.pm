@@ -69,7 +69,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
-    Args    :   -db:        A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -db:        A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis 
 

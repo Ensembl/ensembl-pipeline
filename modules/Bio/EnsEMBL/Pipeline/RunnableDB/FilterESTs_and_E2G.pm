@@ -102,7 +102,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
-    Args    :   -db:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:      A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object (required),
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) ;
