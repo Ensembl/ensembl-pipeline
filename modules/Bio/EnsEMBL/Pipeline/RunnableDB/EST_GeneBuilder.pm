@@ -213,6 +213,7 @@ sub write_output {
     ############################################################
     # put fake stable_ids to keep track of the scoring
     if ( $self->_label ){
+
       my $gene_id;
       my $trans_count = 0;
       foreach my $tran (@trans){
@@ -231,6 +232,9 @@ sub write_output {
  	foreach my $exon ( @{$tran->get_all_Exons} ){
 	  $exon_count++;
 	  $exon->stable_id( $tran_id."_".$exon_count );
+	  $exon->created(1);
+	  $exon->version(1);
+	  $exon->modified(1);
 	  print STDERR "exon: ".$exon->stable_id."\n";
 	}
 	if ( $tran->translation ){
@@ -246,10 +250,10 @@ sub write_output {
       $gene->modified(1);
       $gene->version(1);
     }
-    
-    $gene_adaptor->store($gene);
-    print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
-    
+
+      $gene_adaptor->store($gene);
+      print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
+
     if ( $self->_label ){
       foreach my $tran (@trans){
 	print STDERR "transcript dbID:".$tran->dbID." stable_id:".$tran->stable_id."\n";
