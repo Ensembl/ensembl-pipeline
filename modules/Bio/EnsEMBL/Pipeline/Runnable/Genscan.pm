@@ -610,7 +610,7 @@ sub output_exons {
         push (@exons, $gene->sub_SeqFeature);
     }
     print STDERR "No exons predicted\n" unless (@exons);
-    my @exons = sort { $a->seqname <=> $b->seqname } @exons;
+    @exons = sort { $a->seqname <=> $b->seqname } @exons;
     return @exons;
 }
 
