@@ -240,13 +240,10 @@ sub run {
     my $source_tag  = "est2genome";
     my $dirname     = "/tmp/";
     
-    # one which strand is the 'gene' annotated
+    # this keeps track of genomic and est strands
     my $est_strand; 
-    
-    # this keeps track whether the est/cdna must be reversed (est2genome does that)
-    my $est_orientation;
+    my $genomic_strand;
 
-    my $estOrientation; 
     
     #check inputs
     my $genomicseq = $self->genomic_sequence ||
@@ -303,35 +300,41 @@ sub run {
       print STDERR "firstline: \t$firstline\n";
       # the possible first lines are:
       
-      # Note Best alignment is between forward est and forward genome, and splice  sites imply forward gene
-      # Note Best alignment is between reversed est and forward genome, and splice  sites imply forward gene
-      # Note Best alignment is between forward est and forward genome, but splice  sites imply REVERSED GENE
-      # Note Best alignment is between reversed est and forward genome, but splice sites imply REVERSED GENE
+      # Note Best alignment is between forward est and forward genome, and splice  sites imply forward gene  (1)
+      # Note Best alignment is between reversed est and forward genome, and splice  sites imply forward gene (2)
+      # Note Best alignment is between forward est and forward genome, but splice  sites imply REVERSED GENE (3)
+      # Note Best alignment is between reversed est and forward genome, but splice sites imply REVERSED GENE (4)
       
+      # The four possible results above are handled wrt strand as follows (is the same order as above):
+      #
+      #   (1)  f1strand  =  1  f2strand  =  1
+      #   (2)  f1strand  =  1  f2strand  = -1
+      #   (3)  f1strand  = -1  f2strand  =  1
+      #   (4)  f1strand  = -1  f2strand  = -1
+
       # put the gene on the minus strand if splice sites imply reversed gene
 
       if ($firstline =~/REVERSE/){
-	$est_strand = -1;
+	$genomic_strand = -1;
       }
       else{
-	$est_strand = 1;
+	$genomic_strand = 1;
       }
 
-      if ( $firstline =~/reversed est/ && $est_strand == 1 ){
-	$est_orientation = -1;
-      }
-      else{
-	$est_orientation = 1;
+      if($firstline =~ /reversed est/){
+	  $est_strand = -1;
+      }else {
+	  $est_strand = 1;
       }
 
-      if ($firstline =~ /REVERSE/) { 
-	$estOrientation = -1; }
-      else {$estOrientation = 1}
-     
+      # This hash is used below for looking up exon scores.
+      my %exon_lookup;      
+
       #read output
       while (<ESTGENOME>) {
-	# test
 	#print STDERR $_."\n";
+
+	# test
 	# typical output
 	#
 	# Exon       463  99.6  1001  1468 genomic        469     3 BB761478.1    
@@ -348,20 +351,49 @@ sub run {
 	  close (ESTGENOME) or $self->warn("problem running est2genome program:".$self->est_genome.": $!\n");
 	  return(0);
 	}
-	elsif ($_ =~ /^(Segment|Exon|Span)/) {
-	  
+	elsif ($_ =~ /^(Segment|Exon|Span)/) {	  
+	  # This is a pre-parse unrelated to the following main parsing.  This grabs the exon
+	  # score and percent identity (which are the same value) such that each following 
+	  # segment can be assigned values that are uniform across the exon.  This is important
+	  # later when the exon segments are being sanity checked in BaseAlignFeature->_parse_features.
+	  # If the segment scores within an exon are not all the same the sanity checks will fail.
+	  if ($_ =~ /^Exon/) {
+	    #split on whitespace.
+	    my @pre_elements = split;
+	    #incrementally create our lookup table.
+	    $exon_lookup{$pre_elements[6]} = {'score'      => $pre_elements[2],
+					      'hend'       => $pre_elements[7]
+					     };
+	  }
+
+	  # Get on with main parsing...
+
 	  #split on whitespace
 	  my @elements = split;
+
+	  # Set a score for whole exon features.
+	  my $score = $elements[2];
+	  # If the feature is a segment, get the corresponding exon score from the lookup table.
+	  my $paranoid_toggle = 1;
+	  if ($_ =~ /^Segment/) {
+	    while (my ($exon_begin, $exon_details) = each %exon_lookup){
+	      if (($elements[6] >= $exon_begin)&&($elements[6] <= $exon_details->{'hend'})){
+		$score = $exon_details->{'score'};
+		$paranoid_toggle = 0;
+	      }
+	    } 
+	    if($paranoid_toggle){$self->throw("Didn\'t manage to assign a exon score to segment.  Bad.");}
+	  }
 
 	  #extract values from output line
 
 	  # $f1 will be the genomic feature
-	  my $f1score  = $elements[2];
+	  my $f1score  = $score; #$elements[2];
 	  my $f1start  = $elements[3];
 	  my $f1end    = $elements[4];
 	  my $f1id     = $elements[5];
 	  my $f1source = $source_tag;
-	  my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
+	  my $f1strand = $genomic_strand; # otherwise this is going to get lost later on ....
 	  my $f1primary = $elements[0];
 
 	  # $f2 will the est/cdna feature
@@ -369,7 +401,7 @@ sub run {
 	  my $f2end;
 	  my $f2id     = $elements[8];
 	  my $f2source = $source_tag;
-	  my $f2strand = 1; # leave it like this for now, I'll change it later
+	  my $f2strand = $est_strand; # leave it like this for now, I'll change it later
 	  
 	  # we want to use this, but make sure the information is transferred correctly
 	  # there is some evil code around making hstrand=1 and putting the -1 in the strand.
