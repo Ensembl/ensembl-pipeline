@@ -1,5 +1,7 @@
+
+
 #
-# BioPerl module for Profile.pm
+# EnsEMBL module for ScanProsite
 #
 # Cared for by Emmanuel Mongin <mongin@ebi.ac.uk>
 #
@@ -67,17 +69,8 @@ sub new {
     my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
-    $self->{'_runnable'}    = undef;
-    $self->{'_all'}         = undef;
-
-    my ($all)  = $self->_rearrange([qw(												      ALL																      )],@args);
-    print STDERR "ALL0: $all\n";
-
-    if ($all) {
-	$self->all($all);
-	$self->genseq($all);
-    }
-
+    $self->{'_pepseq'}      = undef;
+    $self->{'_runnable'}    = undef;            
     return $self;
 }
 
@@ -93,49 +86,71 @@ sub new {
 =cut
 
 sub fetch_input {
-    my($self) = @_;
+ my ($self) = @_;
+    my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
+    my $prot;
+    my $peptide;
 
+    eval {
+	$prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id);
+    };
     
-    $self->throw("No input id") unless defined($self->input_id);
-    
-    my $translriptid  = $self->input_id;
-    my $prot_adapt = $self->dbobj->get_Protein_Adaptor();
-    
-    my $prot = $prot_adapt->fetch_Protein_by_dbid($self->input_id);
-    
-    my $pepseq    = $prot->seq;
-    
-    my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
-					   '-id'          => $self->input_id,
-					   '-accession'   => $self->input_id,
-					   '-moltype'     => 'protein');
+    if (!$@) {
+	#The id is a protein id, that's fine, create a PrimarySeq object
+	my $pepseq    = $prot->seq;
+	$peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
+					    '-id'          => $self->input_id,
+					    '-accession'   => $self->input_id,
+					    '-moltype'     => 'protein');
+    }
+
+    else {
+	#An error has been returned...2 solution, either the input is a peptide file and we can go on or its completly rubish and we throw an exeption.
 	
-    $self->genseq($peptide);
-    
+	
+	#Check if the file exists, if not throw an exeption 
+	$self->throw ("The input_id given is neither a protein id nor an existing file") unless (-e $self->input_id);
+	$peptide = $self->input_id;
+    }
 
-# input sequence needs to contain at least 3 consecutive nucleotides
-    my $seq = $self->genseq;
     
+    $self->genseq($peptide);
 }
 
 #get/set for runnable and args
 sub runnable {
-    my ($self) = @_;
-
-    print STDERR "ALL1: ".$self->all."\n";
-
+  my ($self) = @_;
+    
     if (!defined($self->{'_runnable'})) {
-      my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->new(
-									    -query => $self->genseq,
-									    -all   => $self->all,
-									    -analysis  => $self->analysis,
-									    -parameters => $self->analysis->parameters);
- 
-           
-      $self->{'_runnable'} = $run;
+	
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->new(-clone     => $self->genseq,
+									      -analysis  => $self->analysis,
+									      -parameters=> $self->parameters);
+	
+	
+	$self->{'_runnable'} = $run;
     }
     
     return $self->{'_runnable'};
+
+}
+
+=head2 run
+
+    Title   :   run
+    Usage   :   $self->run();
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->run()
+    Returns :   none
+    Args    :   none
+
+=cut
+
+sub run {
+ my ($self,$dir) = @_;
+    $self->throw("Runnable module not set") unless ($self->runnable());
+    $self->throw("Input not fetched")      unless ($self->genseq());
+
+    $self->runnable->run($dir);
 }
 
 
@@ -159,8 +174,8 @@ sub write_output {
      my $feat_Obj= $self->dbobj->get_Protfeat_Adaptor;
 
     foreach my $feat(@features) {
-	
-	$feat_Obj->write_Protein_feature($feat);
+        
+        $feat_Obj->write_Protein_feature($feat);
     }
 
     return 1;
@@ -175,60 +190,7 @@ sub output {
     return $runnable->output;
 }
 
-=head2 all
-
- Title   : all
- Usage   : $obj->all($newval)
- Function: 
- Returns : Location of a peptide dataset if defined
- Args    : newvalue (optional)
-
-
-=cut
-
-sub all{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'all'} = $value;
-    }
-    return $obj->{'all'};
-
-}
-
-
-
-=head2 getseq
-
- Title   : getseq
- Usage   : $obj->getseq($newval)
- Function: 
- Returns : value of getseq
- Args    : newvalue (optional)
-
-
-=cut
-
-sub getseq{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'getseq'} = $value;
-    }
-    return $obj->{'getseq'};
-
-}
-
-
-
 1;
-
-
-
-
-
-
-
 
 
 

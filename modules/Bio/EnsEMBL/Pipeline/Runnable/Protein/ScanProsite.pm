@@ -1,6 +1,6 @@
 
 #
-# Ensembl module for Profile
+# Ensembl module for ScanProsite
 #
 # Cared for by Emmanuel Mongin <mongin@ebi.ac.uk>
 #
@@ -77,58 +77,26 @@ sub new {
     $self->{'_sequence'}  = undef; # location of Bio::Seq object
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
-    $self->{'_database'}  = undef; # Location of the database
     $self->{'_results'}   = undef; # file to store results of ScanProsite
     $self->{'_threshold'} = undef; # Value of the threshod
     $self->{'_parameters'}= undef;
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
-    $self->{'_analysis'} = undef;
-    $self->{'_all'} = undef;
+    
   
-    my( $query, $database, $threshold, $workdir, $analysis, $parameters,$all) = $self->_rearrange([qw(QUERY
-												      DATABASE
-												      THRESHOLD
-												      WORKDIR
-												      ANALYSIS
-												      PARAMETERS
-												      ALL
-												      )],
-												  @args);
-    
-    
-    if ($all) {
-	$self->all($all);
-    }
-
-    if ($query) {
-	$self->clone($query);
-    } 
-
-    else
-    {
-	$self->throw("No query sequence given");
-    }
- 
-    if ($analysis) {
-	$self->analysis($analysis);
-    }
-   
-    
-    if ($threshold) {
-	$self->threshold($threshold);
-    }
-    
-    if (!defined $self->analysis->db) {
-	$self->throw("No database given");
-    }
-    if ($workdir) {
-	$self->workdir($workdir);
-    }
+    my ($clone, $analysis, $parameters) = $self->_rearrange([qw(CLONE 
+								ANALYSIS
+								PARAMETERS)], 
+					       @args);
+  
+    $self->clone ($clone) if ($clone);       
+    $self->analysis ($analysis) if ($analysis);
 
     if ($parameters) {
-	$self->parameters($parameters);
-    }      
-	
+        $self->parameters($parameters);
+    }
+
+    print STDERR "PAR: ".$self->parameters."\n";
+        
     return $self; # success - we hope!
 }
 
@@ -149,22 +117,30 @@ sub new {
 =cut
 
 sub clone{
-    my ($self,$seq) = @_;
-    
-    if (($seq)&&(!$self->all)) {
-	{
-	    unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
-	    {
-		$self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-	    }
+    my ($self, $seq) = @_;
+    if ($seq) {
+	eval {
+	    $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	    };
+	
+	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
+	    $self->clonename ($self->clone->id);
+	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->results ($self->filename.".out");
+	}
+	else {
+	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    $self->{'_sequence'} = $seq ;
+	    $self->filename ("$$.tmp.seq");
 	    
-	    #$self->filename($self->all);
-	    #$self->results("scanprosite.out");
+	    $self->results ("scanprosite.$$.out");
+	    
 	}
     }
     return $self->{'_sequence'};
 }
+
 
 =head2 analysis
 
@@ -181,44 +157,11 @@ sub analysis{
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'_analysis'} = $value;
+      $obj->{'analysis'} = $value;
     }
-    return $obj->{'_analysis'};
+    return $obj->{'analysis'};
 
 }
-
-=head2 all
-
- Title   : all
- Usage   : $obj->all($newval)
- Function: 
- Returns : value of all
- Args    : newvalue (optional)
-
-
-=cut
-
-sub all{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-
-      print STDERR "VALUE: $value\n";
-      unless ($value) 
-	{
-	    $obj->throw("Peptide file is not defined\n");
-	}
-
-      $obj->{'_all'} = $value;
-      
-      $obj->filename($obj->all);
-      $obj->results("scanprosite$$.out");
-
-    }
-    return $obj->{'_all'};
-
-}
-
 
 
 ###########
@@ -236,24 +179,55 @@ sub all{
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+ my ($self, $dir) = @_;
 
-    #my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
+    # check clone
+    my $seq = $self->clone || $self->throw("Clone required for Program");
 
-    $self->workdir('/tmp') unless ($self->workdir($dir));
-    $self->checkdir();
+    # set directory if provided
+    $self->workdir ('/tmp') unless ($self->workdir($dir));
+    $self->checkdir;
 
-    #write sequence to file
-    if (!$self->all) {
+    # reset filename and results as necessary (adding the directory path)
+    my $tmp = $self->workdir;
+    my $input = $tmp."/".$self->filename;
+    $self->filename ($input);
+    $tmp .= "/".$self->results;
+    $self->results ($tmp);
+
+
+ eval {
+	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
 	
-	$self->writefile();
-    }
-    $self->run_analysis();
 
-    #parse output and create features
-    $self->parse_results();
-    #$self->deletefiles();
-  }
+    if (!$@) {
+	#The inputId is a sequence file...got the normal way...
+
+	# write sequence to file
+	$self->writefile;        
+
+	# run program
+	$self->run_analysis;
+
+	# parse output
+	$self->parse_results;
+	$self->deletefiles;
+    }
+    else {
+	#The clone object is not a seq object but a file.
+	#Perhaps should check here or before if this file is fasta format...if not die
+	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
+
+	$self->filename($self->clone);
+
+	# run program
+	$self->run_analysis;
+
+	# parse output
+	$self->parse_results;
+    }
+}
 
 =head2 run_analysis
 
@@ -268,13 +242,19 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    my $run = "/usr/local/bin/perl ".$self->analysis->program . ' -pattern ' .$self->analysis->db. ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.$self->filename . ' > ' .$self->results;
+    my $run = "/usr/local/bin/perl ".$self->analysis->program . 
+	' -pattern ' .$self->analysis->db. 
+	    ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
+		$self->filename . ' > ' .$self->results;
 
     print STDERR "RUNNING: $run\n";
-
-    system($run)==0 || die "$0\Error running '$run' : $!";
-
+    
+    $self->throw("Failed during ScanProsite run $!\n")
+	
+	unless (system ($run) == 0) ;
 }
+
+
 
 =head2 parse_results
 
@@ -288,45 +268,40 @@ sub run_analysis {
 =cut
 sub parse_results {
     my ($self) = @_;
-
-    print STDERR "PARSING\n";
     
     my $filehandle;
     my $resfile = $self->results();
     
     if (-e $resfile) {
-	
-	if (-z $self->results) {  
-	    print STDERR "pfscan didn't find any hits\n";
-	    return; }       
-	else {
-	    open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
-	    }
+        
+        if (-z $self->results) {  
+            print STDERR "pfscan didn't find any hits\n";
+            return; }       
+        else {
+            open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
+            }
     }
     my %printsac;
     my $line;
     
-    #my $sequenceId;
     my @features;
     while (<CPGOUT>) {
-	$line = $_;
-	chomp $line;
-	print STDERR "$line\n";
-	my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
+        $line = $_;
+        chomp $line;
+        print STDERR "$line\n";
+        my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
 
-	#print STDERR "ID: $id\n";
-	#$sequenceId = $id;
 
-	if ($hid) {
-	    my $feat = "$hid,$from,$to,$confirmed,$id";
-	    
-	    push (@features,$feat);
-	}
+        if ($hid) {
+            my $feat = "$hid,$from,$to,$confirmed,$id";
+            
+            push (@features,$feat);
+        }
     }
-		
+                
     foreach my $feats (@features) {
-	$self->create_feature($feats);
-	print STDERR "$feats\n";
+        $self->create_feature($feats);
+        print STDERR "$feats\n";
     }
     @features = 0;
 }
@@ -363,40 +338,44 @@ sub output {
 sub create_feature {
     my ($self, $feat) = @_;
     
+    #create analysis object
+    my $analysis_obj = $self->analysis;
+        
+    
     my @f = split (/,/,$feat);
 
 #Here the score is either the match has been confirmed by emotif patterns or not. If the match has been confirmed: score = 1 if not score = 0    
     my $score = $f[3];
     if ($score eq "?") {
-	$score = 0;
+        $score = 0;
     }
     else {
 	$score = 1;
     }
 
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
-					       -end => $f[2],        
-					       -score => $score,
-					       -analysis => $self->analysis,
-					       -seqname => $f[4],
-					       -percent_id => 'NULL',
-					       -p_value => 'NULL');
+                                               -end => $f[2],        
+                                               -score => $score,
+                                               -analysis => $analysis_obj,
+                                               -seqname => $f[4],
+                                               -percent_id => 'NULL',
+                                               -p_value => 'NULL');
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
-					      -end => 0,
-					      -analysis => $self->analysis,
-					      -seqname => $f[0]);
+                                              -end => 0,
+                                              -analysis => $analysis_obj,
+                                              -seqname => $f[0]);
     
     
     my $feature = new Bio::EnsEMBL::FeaturePair(-feature1 => $feat1,
-						-feature2 => $feat2);
+                                                -feature2 => $feat2);
     
     if ($feature)
     {
-	#$feat1->validate();
-	
-	# add to _flist
-	push(@{$self->{'_flist'}}, $feature);
+        #$feat1->validate();
+        
+        # add to _flist
+        push(@{$self->{'_flist'}}, $feature);
     }
 }
 
@@ -420,5 +399,3 @@ sub parameters{
     return $obj->{'parameters'};
 
 }
-
-
