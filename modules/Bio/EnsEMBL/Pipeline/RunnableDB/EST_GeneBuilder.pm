@@ -235,9 +235,12 @@ sub fetch_input {
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
     $contig->_chr_name($chrid);
-
-    
     $self->vc($contig);
+
+    print STDERR "got vc\n";
+
+    # forward strand
+    print STDERR "*** forward strand\n";
 
     # get genes
     my @genes  = $contig->get_Genes_by_Type('fpc_bme2g', 'evidence');
@@ -245,7 +248,7 @@ sub fetch_input {
     print STDERR "Number of genes = " . scalar(@genes) . "\n";
 
     my @plus_transcripts;
-    my @minus_transcripts;
+
     my $single = 0;
 
     # split by strand
@@ -268,21 +271,13 @@ GENE:
 	push (@plus_transcripts, $transcripts[0]);
 	next GENE;
       }
-      elsif($exons[0]->strand == -1){
-	push (@minus_transcripts, $transcripts[0]);
-	next GENE;
-      }
-      else{
-	$self->warn("No sensible strand for " . $gene->id . " - skipping it\n");
-	next GENE;
-      }
 
     }
     # cluster each strand
     my @plus_clusters  = $self->cluster_transcripts(@plus_transcripts);
-    my @minus_clusters = $self->cluster_transcripts(@minus_transcripts);
 
-    print STDERR scalar(@plus_transcripts) . " forward strand genes, " . scalar(@minus_transcripts) . " minus strand genes, and $single single exon genes\n";
+
+    print STDERR scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
 
     # make a genomewise runnable for each cluster of transcripts
     foreach my $cluster(@plus_clusters){
@@ -291,14 +286,57 @@ GENE:
       my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
       $runnable->seq($contig->primary_seq);
       #    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
-      $self->add_gw_runnable($runnable);
+      $self->add_runnable($runnable);
       foreach my $t(@$cluster){
 	$runnable->add_Transcript($t);
       }
     }
-      
-    # minus clusters need some fancy schmancy feature and contig inversion. Oh crap.
 
+    # minus strand - flip the vc and hope it copes ...
+    # but SLOW - get the same genes twice ...
+    print STDERR "*** reverse strand\n";
+    my $reverse = 1;
+    my $revcontig = $contig->invert;
+    my @revgenes  = $revcontig->get_Genes_by_Type('fpc_bme2g', 'evidence');
+    my @minus_transcripts;
+    
+    print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
+    REVGENE:    
+    foreach my $gene(@revgenes) {
+      my @transcripts = $gene->each_Transcript;
+      if(scalar(@transcripts) > 1 ){
+	$self->warn($gene->id . " has more than one transcript - skipping it\n");
+	next REVGENE;
+      }
+
+      my @exons = $transcripts[0]->each_Exon;
+
+      if(scalar(@exons) == -1){
+	next REVGENE;
+      }
+
+      # these are really - strand, but the VC is reversed, so they are realtively + strand
+      # owwwww my brain hurts
+      elsif($exons[0]->strand == 1){
+	push (@minus_transcripts, $transcripts[0]);
+	next REVGENE;
+      }
+    }
+
+    my @minus_clusters = $self->cluster_transcripts(@minus_transcripts);  
+    # minus clusters need some fancy schmancy feature and contig inversion. 
+    foreach my $cluster(@minus_clusters){
+      print STDERR "new genomewise " . scalar(@$cluster) . "\n";
+
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
+      $runnable->seq($revcontig->primary_seq);
+      #    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
+      $self->add_runnable($runnable, $reverse);
+      foreach my $t(@$cluster){
+	$runnable->add_Transcript($t);
+      }
+    }
+#    $self->vc($revcontig);
 }
  
 =head2 cluster_transcripts
@@ -315,19 +353,24 @@ GENE:
 sub cluster_transcripts {
   my ($self, @alltranscripts) = @_;
 
-  # need all the exons - we're going to cluster them
-  # while we're at it, check consistency of hid & strand
+  # need all the exons - we're going to cluster them; while we're at it, check consistency of hid & strand
   my %est2transcript; # relate transcript to est id
   my %exon2est;        # relate exon to est id
   my @exons = $self->check_transcripts(\%est2transcript, \%exon2est, @alltranscripts);
-  
+ 
+  # store references to the exon and transcript hashes
+  $self->{'_est2transcript'} = \%est2transcript;
+  $self->{'_exon2est'}       = \%exon2est;
+ 
   print STDERR scalar(@exons) . " exons found\n";
   
-  my $main_cluster = $self->make_clusters(@exons);
+  my $main_cluster    = $self->make_clusters(@exons);
  
-  my @linked_clusters = $self->link_clusters($main_cluster, \%exon2est);
+  $main_cluster = $self->find_common_ends($main_cluster);
 
-  my @est_sets = $self->process_clusters(\%exon2est, @linked_clusters);
+  my @linked_clusters = $self->link_clusters($main_cluster);
+
+  my @est_sets        = $self->process_clusters(@linked_clusters);
 
   my @transcript_clusters;
 
@@ -335,11 +378,10 @@ sub cluster_transcripts {
     print STDERR "new transcript set with " .scalar(@$set) .  " ests\n";
     my %transcripts;
 
-    # putting Transcripts into hashes stringifies them. 
-
+    # putting Transcripts as keys into hashes stringifies them  - key by transcript->id instead
     foreach my $est(@$set){
       my $trans = $est2transcript{$est};
-      print STDERR "transcript: " . $trans->id . "\n";
+#      print STDERR "transcript: " . $trans->id . "\n";
       $transcripts{$trans->id} = $trans;
     }
     push (@transcript_clusters, [ values %transcripts ])
@@ -374,7 +416,9 @@ sub check_transcripts {
       my $hend;
 
       # check strand consistency
-      if(!defined $strand) { $strand = $exon->strand; }
+      if(!defined $strand) { 
+	$strand = $exon->strand; 
+      }
       
       if($strand ne $exon->strand){
 	$self->warn("strand not consistent among exons for " . $transcript->id . " - skipping it\n");
@@ -489,6 +533,121 @@ sub make_clusters {
   return $main_cluster;
 }
 
+=head2 find_common_ends
+
+    Title   :   find_common_ends
+    Usage   :   $cluster = $self->find_common_ends($precluster)
+    Function:   Resets the ends of the clusters to the most frequent coordinate
+    Returns :   
+    Args    :   
+
+=cut
+
+# should we introduce some sort of score weighting?
+sub find_common_ends {
+  my ($self, $main_cluster) = @_;
+  my $exon_hid = $self->{'exon2est'};
+  my @clusters = $main_cluster->sub_SeqFeature;
+  @clusters    = sort { $a->start <=> $b->start  } @clusters;
+  my $count    =  0 ;
+
+  foreach my $cluster(@clusters) {
+    my %start;
+    my %end;
+    my $newstart;
+    my $newend;
+    my $maxend = 0;
+    my $maxstart = 0;
+    my $newstart = $cluster->start;
+    my $newend   = $cluster->end;
+
+    # count frequency of starts & ends
+    foreach my $exon ($cluster->sub_SeqFeature) {
+      my $est = $$exon_hid{$exon}{'hid'};
+      $start{$exon->start}++;
+      $end{$exon->end}++;
+      
+    }
+
+    print STDERR "cluster $count\nstarts\n";
+    while ( my ($key, $value) = each %start) {
+      if ($value > $maxstart){
+	$newstart = $key;
+	$maxstart = $value;
+      } elsif ($value == $maxstart){
+	print STDERR "$key is just as common as $newstart - ignoring it\n";
+      }
+      print STDERR "$key => $value\n";
+    }
+
+    print STDERR "ends\n";
+
+    while ( my ($key, $value) = each %end) {
+      if ($value > $maxend){
+	$newend = $key;
+	$maxend = $value;
+      } elsif ($value == $maxend){
+	print STDERR "$key is just as common as $newend - ignoring it\n";
+      }
+      print STDERR "$key => $value\n";
+    }
+
+    # if we haven't got a clear winner, we might as well stick with what we had
+    if( $maxstart <= 1 ) {
+      $newstart = $cluster->start;
+    }
+    if( $maxend <= 1 ) {
+      $newend = $cluster->end;
+    }
+
+    # first and last clusters are special cases - potential UTRs, take the longest one.
+    if( $count == 0) {
+      print STDERR "first cluster\n";
+      $newstart = $cluster->start;
+    } elsif ( $count == $#clusters ) {
+      print STDERR "last cluster\n";
+      $newend = $cluster->end;
+    }
+
+
+    print STDERR "we used to have: " . $cluster->start . " - " . $cluster->end . "\n";
+    print STDERR "and the winners are ... $newstart - $newend\n\n";
+
+    $count++;
+
+    # reset the ends of all the exons in this cluster to $newstart - $newend
+    foreach my $exon($cluster->sub_SeqFeature) {
+      $exon->start($newstart);
+      $exon->end($newend);
+    }
+  }
+
+  return $main_cluster;
+
+}
+
+=head2 is_in_cluster
+
+  Title   : is_in_cluster
+  Usage   : my $in = $self->is_in_cluster($id, $cluster)
+  Function: Checks whether a feature with id $id is in a cluster
+  Returns : 0,1
+  Args    : String,Bio::SeqFeature::Generic
+
+=cut
+
+sub is_in_cluster {
+  my ($self, $id, $cluster) = @_;
+
+  my $exon2est = $self->{'_exon2est'};
+
+  foreach my $exon ( $cluster->sub_SeqFeature ) {
+    return (1) if $$exon2est{$exon}{'hid'} eq $id;
+  }
+
+  return 0;
+
+}
 
 =head2 link_clusters
 
@@ -501,7 +660,8 @@ sub make_clusters {
 =cut
 
 sub link_clusters{
-  my ($self, $main_cluster, $exon_hid, $tol) = @_;
+  my ($self, $main_cluster, $tol) = @_;
+  my $exon_hid = $self->{'_exon2est'};
   $tol = 10 unless $tol; # max allowed discontinuity in sequence
 
   my @clusters = $main_cluster->sub_SeqFeature;
@@ -582,8 +742,8 @@ sub link_clusters{
 
 	    if ($foundlink == 1) {
 	      # We have found a link between p1 and p2
-	      print("Creating link from " . $p1->start . "\t" . $p1->end . "\n");
-	      print("to                 " . $p2->start . "\t" . $p2->end . "\n");
+#	      print("Creating link from " . $p1->start . "\t" . $p1->end . "\n");
+#	      print("to                 " . $p2->start . "\t" . $p2->end . "\n");
 	      push(@{$p1->{_forward}} ,$p2);
 	      push(@{$p2->{_backward}},$p1);
 	      next CLUSTER1;
@@ -603,7 +763,9 @@ sub link_clusters{
 }
 
 sub process_clusters{
-  my ($self, $exon_hid, @clusters) = @_;
+  my ($self, @clusters) = @_;
+
+  my $exon_hid = $self->{'_exon2est'};
 
   # pullout sets of linked transcripts
   my @transcript_sets;
@@ -645,16 +807,23 @@ sub process_clusters{
   return @transcript_sets;
 }
 
-sub add_gw_runnable{
-  my ($self, $value) = @_;
+sub add_runnable{
+  my ($self, $value, $reverse) = @_;
 
-  if (!defined($self->{'_gw_runnables'})) {
-    $self->{'_gw_runnables'} = [];
+  if (!defined($self->{'_forward_runnables'})) {
+    $self->{'_forward_runnables'} = [];
   }
-  
+  if (!defined($self->{'_reverse_runnables'})) {
+    $self->{'_reverse_runnables'} = [];
+  } 
   if (defined($value)) {
     if ($value->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      push(@{$self->{'_gw_runnables'}},$value);
+      if(defined $reverse){
+	push(@{$self->{'_reverse_runnables'}},$value);
+      }
+      else {
+	push(@{$self->{'_forward_runnables'}},$value);
+      }
     } else {
       $self->throw("[$value] is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
@@ -662,35 +831,55 @@ sub add_gw_runnable{
   
 } 
 
-sub each_gw_runnable{
-  my ($self) = @_;
+sub each_runnable{
+  my ($self, $reverse) = @_;
   
-  if (!defined($self->{'_gw_runnables'})) {
-    $self->{'_gw_runnables'} = [];
+  if (!defined($self->{'_forward_runnables'})) {
+    $self->{'_forward_runnables'} = [];
   }
   
-  return @{$self->{'_gw_runnables'}};
+  if (!defined($self->{'_reverse_runnables'})) {
+    $self->{'_reverse_runnables'} = [];
+  } 
+
+  if(defined $reverse){
+    return @{$self->{'_reverse_runnables'}};
+  }
+  else {
+    return @{$self->{'_forward_runnables'}};
+  }
   
 }
 
 sub run {
   my ($self) = @_;
 
-  # run genomewise
-  foreach my $gw_runnable( $self->each_gw_runnable) {
+  # run genomewise 
+  # plus strand
+  foreach my $gw_runnable( $self->each_runnable) {
     print STDERR "about to run genomewise\n";
     $gw_runnable->run;
 
     # convert_output
     $self->convert_output($gw_runnable);
   }
+
+  # minus strand
+  my $reverse = 1;
+  foreach my $gw_runnable( $self->each_runnable($reverse)) {
+    print STDERR "about to run genomewise\n";
+    $gw_runnable->run;
+
+    # convert_output
+    $self->convert_output($gw_runnable, $reverse);
+  }
 }
 
 # convert genomewise output into genes
 sub convert_output {
-  my ($self, $gwr) =@_;
+  my ($self, $gwr, $reverse) = @_;
   
-  my @genes = $self->make_genes($gwr);
+  my @genes = $self->make_genes($gwr, $reverse);
 
   # check translations
   foreach my $gene(@genes){
@@ -703,8 +892,8 @@ sub convert_output {
     }
   }
   
-  my @remapped = $self->remap_genes('genomewise', \@genes);
- # check translations
+  my @remapped = $self->remap_genes('genomewise', \@genes, $reverse);
+  # check translations
   foreach my $gene(@remapped){
     foreach my $trans ( $gene->each_Transcript ) {
       print STDERR "translation: \n";
@@ -729,12 +918,17 @@ sub convert_output {
 
 sub make_genes {
 
-  my ($self, $runnable) = @_;
+  my ($self, $runnable, $reverse) = @_;
   my $count = 0;
   my @genes;
   my $genetype = 'go_est';
   my $time  = time; chomp($time);
+  my $contig = $self->vc;
 
+  # are we working on the reverse strand?
+  if(defined $reverse){
+    $contig = $contig->invert;
+  }
   my @trans = $runnable->output;
   print "transcripts: " . scalar(@trans) . "\n";
 
@@ -742,11 +936,11 @@ sub make_genes {
     $count++;
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($self->vc->id . ".$genetype.$count");
+    $gene->id($contig->id . ".$genetype.$count");
     $gene->version(1);
     
     # add transcript to gene
-    $transcript->id($self->vc->id . ".$genetype.$count");
+    $transcript->id($contig->id . ".$genetype.$count");
     $transcript->version(1);
     $gene->add_Transcript($transcript);
 
@@ -760,12 +954,12 @@ sub make_genes {
     my @exons = $transcript->each_Exon;
 
     foreach my $exon(@exons){
-      $exon->id($self->vc->id . ".$genetype.$count.$excount");
-      $exon->contig_id($self->vc->id);
+      $exon->id($contig->id . ".$genetype.$count.$excount");
+      $exon->contig_id($contig->id);
       $exon->created($time);
       $exon->modified($time);
       $exon->version(1);
-      $exon->attach_seq($self->vc->primary_seq);
+      $exon->attach_seq($contig->primary_seq);
       $excount++;
       }
     
@@ -773,7 +967,7 @@ sub make_genes {
 
     # sort out translation
     my $translation  = new Bio::EnsEMBL::Translation;    
-    $translation->id($self->vc->id . ".$genetype.$count");
+    $translation->id($contig->id . ".$genetype.$count");
     $translation->version(1);    
     
     $translation->start_exon_id($exons[0]->id);
@@ -794,9 +988,12 @@ sub make_genes {
 }
 
 sub remap_genes {
-  my ($self,$genetype,$genes) = @_;
+  my ($self, $genetype, $genes, $reverse) = @_;
   my $contig = $self->vc;
-  
+  if (defined $reverse){
+    $contig = $contig->invert;
+  }
+
   print STDERR "genes before remap: " . scalar(@$genes) . "\n";
   
   my @newf;
