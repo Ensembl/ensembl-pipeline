@@ -50,7 +50,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::SimpleFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
@@ -73,7 +73,7 @@ sub new {
 
   my $self = $class->SUPER::new(@_);    
   
-  $self->{'_flist'} = [];           #an array of Bio::SeqFeatures
+  $self->{'_flist'} = [];           #an array of Bio::SimpleFeatures
   $self->{'_sequence'}  = undef;    #location of Bio::Seq object
   $self->{'_tRNAscan_SE'} = undef;  #location of tRNAscan_SE executable
   $self->{'_workdir'}   = undef;    #location of temp directory
@@ -302,7 +302,7 @@ sub create_feature {
                             -gff_feature     => $feat->{'primary'});
 
     #create and fill Bio::EnsEMBL::Seqfeature object
-    my $tRNA = Bio::EnsEMBL::SeqFeature->new
+    my $tRNA = Bio::EnsEMBL::SimpleFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},
                             -end     => $feat->{'end'},
@@ -311,6 +311,11 @@ sub create_feature {
                             -source_tag  => $feat->{'source'},
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
+
+    # display_label must be a null string, and not undef
+    # can't be set above as it is not known to SeqFeature
+    # (SimpleFeature->new uses SeqFeature->new)
+    $tRNA->display_label('');
 
     if ($tRNA)
       {
