@@ -424,21 +424,21 @@ sub find_executable {
 
 sub writefile {
     my ($self, $seqobj, $seqfilename) = @_;
- 
-  if (defined($seqobj)) {
+  if ($seqobj) {
     $seqfilename = 'filename' unless ($seqfilename);
     #print "Writing sequence to ".$self->$seqfilename()."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
 
       or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
-
-    $clone_out->write_seq($self->$seqobj())
+    $clone_out->write_seq($seqobj)
       or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
       $self->file($seqfilename);
 
 
   } else {
+    #print STDERR "Writing file ".$self->filename."\n";
+    #print STDERR "Writing sequence length ".length($self->query->seq)."\n";
     #print "Writing sequence to ".$self->filename."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
