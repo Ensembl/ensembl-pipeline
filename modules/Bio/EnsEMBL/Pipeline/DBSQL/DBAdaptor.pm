@@ -69,32 +69,32 @@ use Bio::EnsEMBL::Root;
 
 =cut
 
-sub get_JobAdaptor {
-  my ($self) = @_;
+#sub get_JobAdaptor {
+#  my ($self) = @_;
+#
+#  if( ! defined $self->{_JobAdaptor} ) {
+#    require Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
+#    $self->{_JobAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
+#      ( $self );
+#  }
+#
+#  return $self->{_JobAdaptor};
+#}
 
-  if( ! defined $self->{_JobAdaptor} ) {
-    require Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
-    $self->{_JobAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
-      ( $self );
-  }
 
-  return $self->{_JobAdaptor};
-}
-
-
-sub get_PmatchFeatureAdaptor{
-  my ($self) = @_;
-  #print STDERR "getting a pmatch feature adaptor\n";
-  if( ! defined $self->{_PmatchFeatureAdaptor} ) {
-    require Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
-    $self->{_PmatchFeatureAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
-      ( $self );
-  }
-
-  return $self->{_PmatchFeatureAdaptor};
-  
-}
-
+#sub get_PmatchFeatureAdaptor{
+#  my ($self) = @_;
+#  #print STDERR "getting a pmatch feature adaptor\n";
+#  if( ! defined $self->{_PmatchFeatureAdaptor} ) {
+#    require Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
+#    $self->{_PmatchFeatureAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
+#      ( $self );
+#  }
+#
+#  return $self->{_PmatchFeatureAdaptor};
+#  
+#}
+#
 
 =head2 get_RuleAdaptor
 
@@ -107,17 +107,17 @@ sub get_PmatchFeatureAdaptor{
 
 =cut
 
-sub get_RuleAdaptor {
-  my ($self) = @_;
-
-  if( ! defined $self->{_RuleAdaptor} ) {
-    require Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
-    $self->{_RuleAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
-      ( $self );
-  }
-
-  return $self->{_RuleAdaptor};
-}
+#sub get_RuleAdaptor {
+#  my ($self) = @_;
+#
+#  if( ! defined $self->{_RuleAdaptor} ) {
+#    require Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
+#    $self->{_RuleAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
+#      ( $self );
+#  }
+#
+#  return $self->{_RuleAdaptor};
+#}
 
 
 =head2 get_StateInfoContainer
@@ -131,29 +131,29 @@ sub get_RuleAdaptor {
 
 =cut
 
-sub get_StateInfoContainer {
-  my ($self) = @_;
+#sub get_StateInfoContainer {
+#  my ($self) = @_;
+#
+#  if( ! defined $self->{_StateInfoContainer} ) {
+#    require Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
+#    $self->{_StateInfoContainer} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
+#      ( $self );
+#  }
+#
+#  return $self->{_StateInfoContainer};
+#}
 
-  if( ! defined $self->{_StateInfoContainer} ) {
-    require Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-    $self->{_StateInfoContainer} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
-      ( $self );
-  }
-
-  return $self->{_StateInfoContainer};
-}
-
-sub get_AnalysisAdaptor {
-  my ($self) = @_;
-
-  if( ! defined $self->{_AnalysisAdaptor} ) {
-    require Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
-    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
-      ( $self );
-  }
-
-  return $self->{_AnalysisAdaptor};
-}
+#sub get_AnalysisAdaptor {
+#  my ($self) = @_;
+#
+#  if( ! defined $self->{_AnalysisAdaptor} ) {
+#    require Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+#    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
+#      ( $self );
+#  }
+#
+#  return $self->{_AnalysisAdaptor};
+#}
 
 =head2 _db_handle
 
