@@ -113,7 +113,7 @@ sub run {
     }
     
              
-    my $est_genome_command = "est2genome -genome $genfile -est $estfile -space 500000 -out stdout |";
+    my $est_genome_command = "est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout |";
         
     #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
