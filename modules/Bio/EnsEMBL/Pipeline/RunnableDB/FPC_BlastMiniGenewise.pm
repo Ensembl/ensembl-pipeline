@@ -52,8 +52,8 @@ use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_DATABASES

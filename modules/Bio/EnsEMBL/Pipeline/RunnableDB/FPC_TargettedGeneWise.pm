@@ -43,7 +43,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
 					);
