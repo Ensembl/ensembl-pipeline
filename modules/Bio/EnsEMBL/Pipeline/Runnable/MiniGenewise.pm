@@ -347,7 +347,7 @@ sub make_miniseq {
 	
 	$pairaln->addFeaturePair($fp);
 	
-	$self->print_FeaturePair($fp);
+#	$self->print_FeaturePair($fp);
 
 	$current_coord = $cdna_end+1;
     }
@@ -381,7 +381,6 @@ sub exon_padding {
     }
 
     return $self->{'_padding'} || 100;
-#    return $self->{'_padding'} || 1000;
 
 }
 
@@ -458,7 +457,7 @@ sub get_all_Sequences {
 
   Title   : run
   Usage   : $self->run()
-  Function: Runs est2genome on each distinct feature id
+  Function: Runs genewises
   Returns : none
   Args    : 
 
@@ -591,7 +590,7 @@ sub run_blastwise {
 
   my @extras  = $self->find_extras (@$features);
   
-  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
+#  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
   
   return unless (scalar(@extras) >= 1);
   
@@ -614,12 +613,11 @@ sub run_blastwise {
   
   $eg->run;
 
-  # output is a list of FeaturePairs (one per exon) where feature1 = genomic and feature2 = protein
-  # plus sub_SeqFeatures on the genomic feature (feature1)
-  # (representing the ungapped sub alignments for each exon
+  # output is a list of Features (one per exon) with subseqfeatures 
+  # representing the ungapped sub alignments for each exon
   my @f = $eg->output;
 
-  print STDERR "number of exons: " . scalar(@f)  . "\n";
+#  print STDERR "number of exons: " . scalar(@f)  . "\n";
   
   my @newf;
 
@@ -631,31 +629,23 @@ sub run_blastwise {
   my $ec = 0;
  FEAT: foreach my $f (@f) {
     $ec++;
-    # $f is a genomic:protein FP
     $f->strand($strand); # genomic
-    $f->hstrand(1);      # protein
-    
-    my $phase = $f->feature1->phase();
+    my $phase = $f->phase();
     
     # need to convert whole exon back to genomic coordinates
-    my @newfeatures = $miniseq->convert_PepFeaturePair($f);         
+    my @genomics = $miniseq->convert_SeqFeature($f);         
     
-    if ($#newfeatures > 0) {
+    if ($#genomics > 0) {
       # all hell will break loose as the sub alignments will probably not map cheerfully 
       # and we may start introducing in frame stops ...
       # for now, ignore this feature.
-      print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . " ignoring exon $ec\n";
+      print STDERR "Warning : feature converts into > 1 features " . scalar(@genomics) . " ignoring exon $ec\n";
       next FEAT;
     }
     
     
-    my @genomics;
-    foreach my $nf(@newfeatures) {
-      push(@genomics, $nf->feature1);
-    }
-    
     # also need to convert each of the sub alignments back to genomic coordinates
-    foreach my $aln($f->feature1->sub_SeqFeature) {
+    foreach my $aln($f->sub_SeqFeature) {
       my @alns = $miniseq->convert_PepFeaturePair($aln);
       
       if ($#alns > 0) {
