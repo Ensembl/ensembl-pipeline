@@ -43,20 +43,8 @@ use strict;
 use Getopt::Long;
 
 
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
-use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
-use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise;
-use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome;
-use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
-use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
-use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA;
-use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
-use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G;
-
 my $dbtype = 'rdb';
 my $host   = 'ecs1c';
 my $port   = undef;
@@ -79,7 +67,7 @@ my $params;
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,
-	     'write'     => \$write,
+	     'write'       => \$write,
              'check'       => \$check,
              'parameters:s'=> \$params,
 	     );
@@ -88,17 +76,20 @@ $| = 1;
 if ($check) {
    exit(0);
 }
-
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,		
-					    -user => $dbuser,
-					    -dbname => $dbname,
-#                                           -perlonlyfeatures => 0,
-					   );
-
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
+    -host             => $host,
+    -user             => $dbuser,
+    -dbname           => $dbname,
+    -perlonlyfeatures => 0
+);
 
 
 die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
+
+(my $file = $runnable) =~ s/::/\//g;
+require "$file.pm";
+
 
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
 
@@ -129,7 +120,7 @@ foreach my $out (@out) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
       print ($out->gffstring . "\n");
     } else {
-      print $out . "\n";
+      print $out->gffstring . "\n";
     }
 }
 
