@@ -396,6 +396,8 @@ sub run {
     push (@$mg_runnables, $runnable); 
   }
 
+  #print "Made " . scalar(@$mg_runnables) . " runnables\n";
+
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
@@ -525,7 +527,7 @@ sub run_blast {
 
 #sub make_mmgw {
 sub make_object {
-  my ($self, $miniseq, $features) = @_;
+  my ($self, $miniseq, $features, $cluster_start, $cluster_end) = @_;
 
 #  # Before we pass our blast generated features to 
 #  # MultiMiniGenewise we must first convert them from 
@@ -538,20 +540,26 @@ sub make_object {
 #    push(@newf,$newf);
 #  }
 
-  # Create a MultiMiniGenewise object with the features weve
+  # Create a MultiMiniGenewise object with the features we've
   # just converted.
+  my %pars;
+  if (defined($cluster_end)) {
+    $pars{-cluster_start} = $cluster_start;
+    $pars{-cluster_end}   = $cluster_end;
+  }
   my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise(
-                                                                        '-genomic'    => $miniseq,
-									'-features'   => $features,
-									'-seqfetcher' => $self->seqfetcher,
-									'-terminal_padding' => $self->terminal_padding,
-									'-exon_padding'     => $self->exon_padding,
-									'-minimum_intron'   => $self->minimum_intron,
-									'-endbias'    => $self->endbias,
-									'-gap'        => $self->gap,
-									'-extension'  => $self->extension,
-									'-matrix'     => $self->matrix,
-				      );
+                                '-genomic'          => $miniseq,
+                                '-features'         => $features,
+                                '-seqfetcher'       => $self->seqfetcher,
+                                '-terminal_padding' => $self->terminal_padding,
+                                '-exon_padding'     => $self->exon_padding,
+                                '-minimum_intron'   => $self->minimum_intron,
+                                '-endbias'          => $self->endbias,
+                                '-gap'              => $self->gap,
+                                '-extension'        => $self->extension,
+                                '-matrix'           => $self->matrix,
+                                %pars, 
+				);
 
   return $mg;
 }
