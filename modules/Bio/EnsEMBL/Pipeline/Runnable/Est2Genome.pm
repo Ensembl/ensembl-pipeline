@@ -72,9 +72,9 @@ use Bio::Root::Object;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = bless {}, $class;
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     $self->{_clone}  = undef;        #location of Bio::Seq object
@@ -88,7 +88,7 @@ sub _initialize {
     
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange(['GENOMIC','EST', 'E2G', 'ARGS'], @args);
-       
+       print STDERR "Genomic $genomic\n"; 
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
@@ -220,8 +220,8 @@ sub run {
     
     # some constant strings
     my $source_tag  = "est2genome";
-    my $dirname     = "/tmp";
-
+    my $dirname     = "/tmp/";
+    
     #flag for est strand orientation
     my $estOrientation; 
     
@@ -261,7 +261,7 @@ sub run {
       my $firstline = <ESTGENOME>;
       if ($firstline =~ /reverse/i) {$estOrientation = -1;}
       else {$estOrientation = 1}
-      
+     
       #read output
       while (<ESTGENOME>) {
 	
@@ -431,7 +431,8 @@ sub _createfiles {
     
     #check for diskspace
     my $spacelimit = 0.01; # 0.01Gb or about 10 MB
-    my $dir ="./";
+    #my $dir ="./";
+    my $dir =$dirname;
     unless ($self->_diskspace($dir, $spacelimit)) 
     {
         $self->throw("Not enough disk space ($spacelimit Gb required)");
@@ -440,7 +441,8 @@ sub _createfiles {
     #if names not provided create unique names based on process ID    
     $genfile = $self->_getname("genfile") unless ($genfile);
     $estfile = $self->_getname("estfile") unless ($estfile);    
-    
+    $genfile = $dirname . $genfile; 
+    $estfile = $dirname . $estfile; 
     # Should check we can write to this directory 
     $self->throw("No directory $dirname") unless -e $dirname;
 
