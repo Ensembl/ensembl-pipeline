@@ -283,7 +283,7 @@ sub run {
   # delete sequence files
   unlink($query);
   unlink($sbjct);
-  
+
   return 1;
 }
 
@@ -341,7 +341,7 @@ sub parse_results {
 sub _add_fp {
   my ($self,@args) = @_;
   if (@args) {
-    push(@{$self->{'_fp_array'}},@args);
+    push(@{$self->{'_fplist'}},@args);
   } else {
     warn "WARN: Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->_add_fp should have an argument\n";
   }
@@ -359,7 +359,7 @@ sub _add_fp {
 
 sub output {
   my ($self) = @_;
-  return @{$self->{'_fp_array'}};
+  return @{$self->{'_fplist'}};
 }
 
 =head2 workdir
@@ -388,7 +388,7 @@ use strict;
 use Carp;
 use vars qw(@ISA);
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Pipeline::RunnableI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -602,12 +602,6 @@ sub parse_blastn {
   } else {
     while (my $ungapped_block = $block->nextUngappedBlock) {
       push @blocks, $ungapped_block;
-#      print abs($block->qend - $block->qstart)," ",abs($block->send - $block->sstart),"\n";
-#      exit 0;
-      if (abs($block->qend - $block->qstart) == abs($block->send - $block->sstart)) {
-#	push @blocks, $block;
-	last;
-      }
     }
   }
   return @blocks;
