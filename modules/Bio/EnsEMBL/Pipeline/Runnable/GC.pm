@@ -97,7 +97,7 @@ sub new {
   $self->{'_sequence'} = undef; #location of bio::seq object
   $self->{'_window'} = 0; #size of window to be analysed
   
-  print STDERR "args: ", @args, "\n";  
+  #print STDERR "args: ", @args, "\n";  
 
   my($sequence, $window) = $self->_rearrange([qw(QUERY
 						 WINDOW)],
@@ -230,13 +230,20 @@ sub run_gc {
 	{
 	    $end_point=$length;
 	}
-	
+	my $gcfraction;
 	my $chunk = substr($seq, $start_point, $window);
 	my $gccount = $chunk =~ tr/gcGC/gcGC/;
 	my $Ncount = $chunk =~ tr/nN/nN/;
-	my $windowsize = $end_point-$start_point;
-	my $gcfraction = $gccount/($windowsize-$Ncount)*100;
-	#print "gcfraction : ".$gcfraction."\n gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
+	my $windowsize = $end_point-$start_point +1;
+	#print "gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
+	my $division = ($windowsize-$Ncount)*100;
+	if($division == 0){
+	  $gcfraction = 0;
+	}else{
+	  #print "division = ".$division."\n";
+	  $gcfraction = $gccount/$division;
+	}
+	#print "gcfraction : ".$gcfraction."\n";# gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
 	my $analysis_obj = Bio::EnsEMBL::Analysis->new
                         (   -db              => undef,
                             -db_version      => undef,
