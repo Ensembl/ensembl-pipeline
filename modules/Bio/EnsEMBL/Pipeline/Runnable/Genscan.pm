@@ -147,7 +147,7 @@ sub new {
 #get/set methods
 ###################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -156,7 +156,7 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->filename($seq->id.".$$.seq");
         $self->results($self->filename.".genscan");
     }
     return $self->{'_clone'};
@@ -408,7 +408,7 @@ sub parse_results {
     #end of big loop. Now build up genes
     $self->create_genes();
 
-    unless ($self->clone)
+    unless ($self->query)
     {
         print STDERR "Can't calculate phases if Bio::Seq isn't supplied\n";
         return;
@@ -437,7 +437,7 @@ sub calculate_and_set_phases_new {
       my $peptide = $peptides[$i];
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
-      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
+      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->query);
 
 #      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 
@@ -475,7 +475,7 @@ sub calculate_and_set_phases_new {
           foreach my $exon ($tran->get_all_Exons) {
            #print "exon ".$exon->seqname." ".$exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
           }
-          $tran->temporary_id($self->clone->id . "." . $count);
+          $tran->temporary_id($self->query->id . "." . $count);
           $count++;
 	  #print "translation = ".$temp_tran."\n";
 	  if($temp_tran =~/\*/){
@@ -655,7 +655,7 @@ sub output {
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
     #print "\ntranscript ".$transcript->temporary_id." translates to ".$transcript->translate->seq."\n\n";
     foreach my $exon (@exons) {
-      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->query->id.".".$exon->seqname,
                                            -start   => $exon->start,
                                            -end     => $exon->end,
                                            -strand  => $exon->strand,
@@ -666,7 +666,7 @@ sub output {
                                            -source_tag => 'genscan',
                                            -primary_tag => 'prediction',
                                            -analysis     => $analysis);
-      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $self->query->id.".".$exon->seqname,
                                             -start   => $exon->start,
                                             -end     => $exon->end,
                                             -strand  => $exon->strand,
