@@ -96,11 +96,12 @@ sub new {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
-    if(!defined $seqfetcher) {
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-    }
+#    if(!defined $seqfetcher) {
+#      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+#    }
 
-    $self->seqfetcher($seqfetcher);
+    # we can't just default this to pfetch
+    $seqfetcher && $self->seqfetcher($seqfetcher);
 
     # this is an optional field, (I think)
     $analysis && $self->analysis($analysis);
@@ -224,6 +225,9 @@ sub output {
     if (!defined($self->{'_output'})) {
       $self->{'_output'} = [];
     } 
+
+    @{$self->{'_output'}}=$self->runnable->output;
+
     return @{$self->{'_output'}};
 }
 
