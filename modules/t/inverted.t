@@ -63,7 +63,7 @@ unless (@results)
 else
 { print "ok 5\n"; }
 
-my @methods = qw( seqname start end strand hseqname hstart hend hstrand );
+my @methods = qw( seqname start end strand hseqname hstart hend hstrand);
 #Display output
 foreach my $obj (@results)
 {
