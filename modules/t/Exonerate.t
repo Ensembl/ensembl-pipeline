@@ -59,9 +59,6 @@ foreach my $es(@ests) {
 $es->isa("Bio::PrimarySeqI") || die("argh!");
 }
 
-# this is temporary until exonerate centrally installed
-my $executable = '/nfs/europa/vac/ensembl/exonerate/exonerate';
-
 unless (scalar(@ests) && scalar(@genomics)) 
 { print "not ok 2\n"; }
 else
@@ -69,8 +66,7 @@ else
 
 #create Exonerate object    
 my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
-								  -GENOMIC   => \@genomics, 
-								  -EXONERATE => $executable);
+								  -GENOMIC   => \@genomics);
  
 unless ($exonerate)
 { print "not ok 3\n"; }
