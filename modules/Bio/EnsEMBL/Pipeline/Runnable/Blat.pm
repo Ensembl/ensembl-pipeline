@@ -97,10 +97,10 @@ sub new {
   if ($target_type){
     $self->target_type($target_type);
   }
-  else{
-    print STDERR "Defaulting target type to dna\n";
-    $self->target_type('dna');
-  }
+  #else{
+  #  print STDERR "Defaulting target type to dna\n";
+  #  $self->target_type('dna');
+  #}
 
   # Query type: dna  - DNA sequence
   #             rna  - RNA sequence
@@ -111,10 +111,10 @@ sub new {
   if ($query_type){
     $self->query_type($query_type);
   }
-  else{
-    print STDERR "Defaulting query type to dna\n";
-    $self->query_type('dna');
-  }
+  #else{
+  #  print STDERR "Defaulting query type to dna\n";
+  #  $self->query_type('dna');
+  #}
 
   # can choose which blat to use
   $self->blat('blat') unless $blat;
@@ -184,7 +184,11 @@ sub run {
   }
   close( QUERY_SEQ );
   
-  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
+  my $parameters = $self->analysis->parameters;
+
+  #my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
+  my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
+
   print STDERR "running blat: $command\n";
   
   # system calls return 0 (true in Unix) if they succeed
@@ -266,7 +270,14 @@ sub parse_results {
     # first split on spaces:
     chomp;  
       
-    my ($matches, $mismatches, $rep_matches, $n_count, $q_num_insert, $q_base_insert,$t_num_insert,$t_base_insert,$strand,$q_name,$q_length,$q_start,$q_end,$t_name,$t_length,$t_start,$t_end,$block_count,$block_sizes,$q_starts,$t_starts) = split;
+    my (
+            $matches,      $mismatches,    $rep_matches, $n_count, $q_num_insert, $q_base_insert,
+            $t_num_insert, $t_base_insert, $strand,      $q_name,  $q_length,     $q_start,
+            $q_end,        $t_name,        $t_length,    $t_start, $t_end,        $block_count,
+            $block_sizes,  $q_starts,      $t_starts
+          )
+          = split;
+
     
     my $superfeature = Bio::EnsEMBL::SeqFeature->new();
     
@@ -316,8 +327,36 @@ sub parse_results {
     # each line of output represents one possible entire aligment of the query (feat1) and the target(feat2)
     for (my $i=0; $i<$block_count; $i++ ){
       
-      $feat2 {start} = $q_start_positions[$i] + 1;
-      $feat2 {end}   = $feat2{start} + $block_sizes[$i] - 1;
+      #### working out the coordinates: #########################
+      #
+      #                s        e
+      #                ==========   EST
+      #   <----------------------------------------------------| (reversed) genomic of length L
+      #
+      #   we would store this as a hit in the reverse strand, with coordinates:
+      #
+      #   |---------------------------------------------------->
+      #                                   s'       e'
+      #                                   ==========   EST
+      #   where e' = L  - s  
+      #         s' = e' - ( e - s + 1 ) + 1
+      #
+      #   Also, hstrand will be always +1
+      ############################################################
+
+      if ( $strand eq '+' ){
+	$query_start = $q_start_positions[$i] + 1;
+	$query_end   = $query_start + $block_sizes[$i] - 1;
+      }
+      else{
+	$query_end   = $t_length  - $q_start_positions[$i];
+	$query_start = $query_end - $block_sizes[$i] + 1;
+      }
+      
+      #$feat2 {start} = $q_start_positions[$i] + 1;
+      #$feat2 {end}   = $feat2{start} + $block_sizes[$i] - 1;
+      $feat2 {start} = $query_start;
+      $feat2 {end}   = $query_end;
       
       $feat1 {start} = $t_start_positions[$i] + 1;
       $feat1 {end}   = $feat1{start} + $block_sizes[$i] - 1;
