@@ -333,6 +333,7 @@ sub build_runnables {
   my %partitioned_features;
 
   foreach my $raw_feat (@features){
+
     # Imporantly, the features are filtered for low identity matches.
     # This is just for the clustering process.  The full set of features
     # are still passed to genewise.
@@ -353,6 +354,7 @@ sub build_runnables {
     unless ($coverage > 0.75) {
       my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
       push (@mg_runnables, $mmgw);
+
       $runnable_featids{$seqname}++;
       next
     }
@@ -445,9 +447,9 @@ sub build_runnables {
 					   -id  => $self->genomic_sequence->id );
 
 	my $mmgw = $self->make_mmgw($genomic_subseq, $unfiltered_partitioned_features{$seqname});
-	$runnable_featids{$seqname}++;
 	push (@mg_runnables, $mmgw);
 
+	$runnable_featids{$seqname}++;
       }
     
     }else{
@@ -455,9 +457,9 @@ sub build_runnables {
       # in our genomic fragment.  This is "Normal mode".
 
       my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
+      push (@mg_runnables, $mmgw);
 
       $runnable_featids{$seqname}++;
-      push (@mg_runnables, $mmgw);
     }
 
   }
@@ -475,8 +477,7 @@ sub build_runnables {
 
   foreach my $feature_id (keys %feature_ids){
     unless ($runnable_featids{$feature_id} > 0){
-      my $mmgw = $self->make_mmgw($self->genomic_sequence, \@features);
-
+      my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$feature_id});
       push (@mg_runnables, $mmgw);
     }
   }
@@ -662,7 +663,6 @@ sub make_mmgw {
 
   # Create a MultiMiniGenewise object with the features weve
   # just converted.
-
   my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise(
 				       '-genomic'    => $miniseq,
 				       '-features'   => \@newf,
