@@ -345,14 +345,13 @@ sub store {
     
     my ($jobstr) = FreezeThaw::freeze($obj);
     
-    my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue," .
+    my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,queue," .
 		 "input_object_file,stdout_file,stderr_file,output_file,status_file) " .
 		 "values( " . $obj->id .   ",\"" .
 		 $obj->input_id        .   "\"," .
 		 $obj->analysis->id    .   "," .
 		 $obj->LSF_id          .   ",\"" .
 		 $obj->machine         .   "\",\"".
-		 $jobstr               .   "\",\"".
 		 $obj->queue           .   "\",\"" .
 		 $obj->input_object_file . "\",\"".
 		 $obj->stdout_file     .   "\",\"".
@@ -572,13 +571,23 @@ sub make_filenames {
     $self->output_file      ($output_file);
     $self->status_file      ($status_file);
 
+    print STDERR "Touching files\n";
+    system("touch $input_object_file"); 
+    system("touch $stdout_file");
+    system("touch $stderr_file");
+    system("touch $output_file");
+    system("touch $status_file");
+
 }
 
 
 sub get_file {
     my ($self,$stub,$ext) = @_;
 
-    my $dir = "/nfs/disk100/humpub/humpub3/michele/out/";
+    my $dir = "/nfs/disk100/humpub1a/michele/out/";
+
+    my $num = int(rand(10));
+    $dir = $dir . "$num/";
 
     # Should check disk space here.
 

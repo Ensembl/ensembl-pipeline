@@ -315,6 +315,25 @@ sub _parseJob {
     return $job;
 }
 
+
+sub delete_Job {
+    my ($self,$id) = @_;
+
+    $self->throw("No job id for delete_Job") unless defined($id);
+
+    my $query = "delete from job where id = $id";
+    my $sth   = $self->prepare($query);
+    my $res   = $sth ->execute;
+
+    $query = "delete from jobstatus where id = $id";
+    $sth   = $self->prepare($query);
+    $res   = $sth->execute;
+
+    $query = "delete from current_status where id = $id";
+    $sth  = $self->prepare($query);
+    $res  = $sth->execute;
+}
+
 sub get_InputIdsByAnalysis {
     my ($self,$analid) = @_;
     
