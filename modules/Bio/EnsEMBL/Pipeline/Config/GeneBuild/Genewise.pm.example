@@ -56,6 +56,7 @@ use vars qw( %Genewise );
 	     GB_GENEWISE_EXTENSION => 2, # gap extension penatly this is sometimes increased for genomes which are denser than humna for briggsae we used
 					 # 10
 	     GB_GENEWISE_SUBS => 0.0000001, #Substitution error rate
+	     GB_GENEWISE_MATRIX => 'BLOSUM62.bla', #Matrix
 	     GB_GENEWISE_OPTIONS => '-quiet', #other options, -quiet reduces genewises reporting to stderr
 	    );
 
