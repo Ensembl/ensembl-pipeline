@@ -1,5 +1,53 @@
 #!/usr/local/bin/perl
 
+=head1 NAME
+
+make_input_ids  - handles insertion, deletion and listing of rules in a database
+
+=head1 SYNOPSIS
+
+make_input_ids -host ecs1a -user ensadmin -pass **** -dbname pipeline_db -contig
+
+=head1 DESCRIPTION
+
+this script allows input_ids to be generated and written to the input_id_analysis table for
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+
+    -contig    signals to insert contig name input_ids
+    
+    -slice     signals to insert slice type input ids using
+               the format chrname.start-end
+
+    -slice_size the size to make the slice ids
+    
+    -file     if the input_ids are to be a list of filenames from a directory
+    
+    -dir      the directory to read the filenames from
+    
+    -file_regex a regex to impose on the filenames before using them
+    
+    -single if you just want a single dummy input_id ie for genome wide analyses
+    
+    -verbose if you want more information about what the script is doing
+    
+    
+=cut
+
+
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
@@ -24,6 +72,7 @@ my $dir;
 my $regex;
 my $single;
 my $verbose;
+my $help;
 
 
 &GetOptions(
@@ -42,8 +91,12 @@ my $verbose;
 	    'file_regex:s' => \$regex,
 	    'single'       => \$single,
             'verbose'      => \$verbose,
+            'h|help'            => \$help,
            );
 
+if ($help) {
+    exec('perldoc', $0);
+}
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,
@@ -97,7 +150,10 @@ if ($slice) {
       " a directory to get them from"; 
   }
   @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
+}else{
+    exec('perldoc', $0);
 }
+
 
 
 
