@@ -236,7 +236,11 @@ sub filter_by_length{
     foreach my $est ( @$ests ){
 	#print STDERR "est is a $est\n";
 	#print STDERR "exons: ".scalar( @{$est->get_all_Exons} )."\n";
-	my $length = $est->length;
+      my @exons = sort { $a->start <=> $b->start } @{$est->get_all_Exons};
+
+      # we consider the genomic extension of the transcripts
+      # this will not favour big unspliced ESTs over spliced ones with small exons
+      my $length = $exons[-1]->end - $exons[0] + 1 ;  
 	#print STDERR "length: $length\n";
 	push ( @{ $lengths{ $length } }, $est );
 	
