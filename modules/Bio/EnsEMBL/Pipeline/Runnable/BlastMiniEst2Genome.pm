@@ -263,9 +263,12 @@ sub run {
       }
     }
     
-    foreach my $id(keys %esthash) {
-      print STDERR "id: $id "  . scalar(@{$esthash{$id}}) . "hits\n";
-
+ID:    foreach my $id(keys %esthash) {
+      print STDERR "id: $id has "  . scalar(@{$esthash{$id}}) . " blast hits\n";
+      
+      # only use ESTs that have >1 blast hit to cut down on how many e2gs we run.
+      next ID unless scalar(@{$esthash{$id}}) > 1; # ??? too strict?
+      
       # make a set of features per EST
       # should we do some ordering? deal with strands?
       my @features = @{$esthash{$id}};
