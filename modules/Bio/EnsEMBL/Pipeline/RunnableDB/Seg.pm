@@ -85,7 +85,7 @@ sub new {
     my $params = $self->parameters;
     if ($params ne "") { $params .= ","; }
     # get the path to the binaries from the Analysis object (analysisprocess table)
-    $params .= "-seg=>".$self->analysis->program_file.",";
+    $params .= "-program=>".$self->analysis->program_file.",";
     # get the analysisId from the Analysis object (analysisprocess table)
     $params .= "-analysisid=>".$self->analysis->dbID;
     $self->parameters($params);
