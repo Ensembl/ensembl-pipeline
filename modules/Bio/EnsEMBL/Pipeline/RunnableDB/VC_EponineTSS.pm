@@ -20,7 +20,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 
 my $eponine = Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS->new ( 
-                                   -dbobj      => $db,
+                                   -db          => $db,
 			           -input_id   => $input_id
                                    -analysis   => $analysis 
                                     );
@@ -69,7 +69,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -db   :     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:  A virtual contig ('chr_name.start.end')
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
 
@@ -107,9 +107,9 @@ sub fetch_input {
     my $vc_str = $self->input_id;
     my ($chr, $start, $end, $sgp) = $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
-    $self->dbobj->assembly_type($sgp) if $sgp;
+    $self->db->assembly_type($sgp) if $sgp;
 
-    my $vc = $self->dbobj->get_StaticGoldenPathAdaptor->
+    my $vc = $self->db->get_StaticGoldenPathAdaptor->
      fetch_VirtualContig_by_chr_start_end($chr, $start, $end);
 
     my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch virtual contig");
@@ -155,11 +155,11 @@ sub write_output {
     my $contig;
     my ($raw_start, $raw_end);
 
-    my $db=$self->dbobj();
+    my $db=$self->db();
     my @features = $self->output();
     my %feat_by_contig;
   
-    my $vc = $self->vc;
+    my $vc = $self->vcontig;
 
     foreach my $f (@features) {
 	$f->analysis($self->analysis);
