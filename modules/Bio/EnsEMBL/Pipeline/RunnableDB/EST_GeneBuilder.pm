@@ -56,31 +56,6 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
-# config file; parameters searched for here if not passed in as @args
-#use Bio::EnsEMBL::Pipeline::ESTConf qw (
-#					EST_INPUTID_REGEX
-#					EST_REFDBHOST
-#					EST_REFDBUSER
-#					EST_REFDBNAME
-#					EST_REFDBPASS
-#					EST_E2G_DBNAME
-#					EST_E2G_DBHOST
-#					EST_E2G_DBUSER
-#					EST_E2G_DBPASS     
-#					EST_GENEBUILDER_INPUT_GENETYPE
-#					EST_EVIDENCE_TAG
-#					EST_MIN_EVIDENCE_SIMILARITY
-#					EST_MAX_EVIDENCE_DISCONTINUITY
-#					EST_MAX_INTRON_SIZE
-#					EST_GENOMEWISE_GENETYPE
-#					USE_cDNA_DB
-#					cDNA_DBNAME
-#					cDNA_DBHOST
-#					cDNA_DBUSER
-#					cDNA_DBPASS
-#					cDNA_GENETYPE
-#				       );
-
 use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     EST_INPUTID_REGEX
 						     EST_REFDBHOST
@@ -105,7 +80,8 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     cDNA_GENETYPE
 						     REJECT_SINGLE_EXON_TRANSCRIPTS
 						     GENOMEWISE_SMELL
-				       );
+						     GENOMEWISE_MIN_EXON_SIZE
+						     );
 
 
 
@@ -262,7 +238,7 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
-    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
+    my $slice = $self->est_e2g_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
     $slice->chr_name($chrname);
     $self->query($slice);
     
@@ -328,6 +304,7 @@ sub fetch_input {
 									      -genomic  => $slice,
 									      -analysis => $self->analysis,
 									      -smell    => $GENOMEWISE_SMELL,
+									      -skip_small_exons => $GENOMEWISE_MIN_EXON_SIZE,
 									      );
 	  
 	  $self->add_runnable($runnable,$strand);
@@ -388,7 +365,8 @@ sub fetch_input {
 									    -genomic  => $rev_slice,
 									    -analysis => $self->analysis,
 									    -smell    => $GENOMEWISE_SMELL,
-									   );
+									    -skip_small_exons => $GENOMEWISE_MIN_EXON_SIZE,
+									    );
 	$self->add_runnable($runnable, $strand);
 	$runnable->add_Transcript($tran);
       }
@@ -514,7 +492,7 @@ sub _check_Transcripts {
   my @allexons;       # here we'll put all exons that pass the check
   my @alltranscripts; # here we'll put all the transcripts that pass the check
   my %hid_trans;
-  my $exon_adaptor    = $self->db->get_ExonAdaptor;
+  #my $exon_adaptor    = $self->db->get_ExonAdaptor;
   my $total_rejected        = 0;
 
   my $slice;
@@ -525,10 +503,10 @@ sub _check_Transcripts {
       $slice = $self->revcomp_query;
   }
 
-  print STDERR "transcripts:\n";
-  foreach my $t (@$ref_transcripts){
-      print $t->dbID."\n";
-  }
+  #print STDERR "transcripts:\n";
+  #foreach my $t (@$ref_transcripts){
+  #    print $t->dbID."\n";
+  #}
 
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
