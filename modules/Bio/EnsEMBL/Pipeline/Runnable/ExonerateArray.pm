@@ -343,8 +343,13 @@ sub _make_affy_features {
     }
     elsif ($h->{'t_id'} =~ /^(\S+)\..*$/) {
       $seq_region_name = $1;
+    }elsif($h->{'t_id'} =~ /^(\w+):\w+:(\S+):\S+:\S+:\S+/){
+      $coord_system_name = $1;
+      $seq_region_name = $2;
     }
-    
+    if(!$seq_region_name){
+      $self->throw("Failed to parse seq_region name from ".$h->{'t_id'}."\n");
+    }
     $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name);
     if (!$slice) {
       print STDERR "Could not obtain slice for seq_region: $coord_system_name : $seq_region_name\n";
