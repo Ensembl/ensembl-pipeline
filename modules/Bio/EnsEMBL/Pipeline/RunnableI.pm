@@ -409,8 +409,8 @@ sub find_executable {
 
   if (-x $name) {
     return $name;
-  } elsif ($bindir && -x ($name = "$bindir/$name")) {
-    return $name;
+  } elsif ($bindir && -x "$bindir/$name") {
+    return "$bindir/$name";
   } else {
     eval {
       $name = $self->locate_executable($name);
