@@ -194,7 +194,7 @@ sub run_efetch {
   $seqstr = <IN>;
   close IN;
 
-  chomp($seqstr);
+#  chomp($seqstr);
   $seq = new Bio::Seq(-seq => $seqstr, -id  => $newid)
     unless (!defined $seqstr || $seqstr =~ "not found");
   
@@ -237,7 +237,10 @@ sub run_getz {
   open(IN, "getz -e '[libs={$libs}-ID:$id] | [libs-AccNumber:$id]' |") 
     || $self->throw("Error running getz for id [$newid]: $getz");
 
-  my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>'EMBL');
+  # hack just for rikens
+  my $format = 'EMBL';
+  if($libs eq 'mouseprot') { $format = 'Fasta'; }
+  my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>$format);
 
   $seq = $fh->next_seq();
   close IN;
@@ -267,16 +270,29 @@ sub parse_header {
 
     my $newid = $id;
 
-    print STDERR "newid: $newid\n";
-
-    if ($id =~ /^(.*)\|(.*)\|(.*)/) {
+    if ($id =~ /\/ug=(\S+)\s+/){
+      $newid = $1;
+    }
+    
+    elsif ($id =~ /^(.*)\|(.*)\|(.*)/) {
+      if ($2 eq "UG") {
+	$newid = $3;
+      }
+      else {
 	$newid = $2;
-	$newid =~ s/(.*)\..*/$1/;
-	
-    } elsif ($id =~ /^..\:(.*)/) {
+      }
+      $newid =~ s/(.*)\..*/$1/;
+      
+    }
+ 
+    elsif ($id =~ /^..\:(.*)/) {
 	$newid = $1;
     }
+
     $newid =~ s/ //g;
+
+    print STDERR "newid: $newid\n";
+
     return $newid;
 }
 
