@@ -64,6 +64,7 @@ use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw(
 						ESTGENE_DBNAME
 						ESTGENE_DBPASS 
 						ESTGENE_TYPE
+						ESTGENE_MAX_INTRON_LENGTH
 						
 						ENSEMBL_DBHOST
 						ENSEMBL_DBUSER
@@ -292,7 +293,7 @@ sub run{
   # get ensembl genes (from GeneBuilder)
   my @ensembl_genes = $self->ensembl_vc->get_Genes_by_Type( $ENSEMBL_TYPE, 'evidence' );
 
-  # if there no genes, we finish a bit earlier
+  # if there are no genes, we finish earlier
   unless ( $self->estgenes ){
     unless (@ensembl_genes){
       print STDERR "no genes found, leaving...\n";
@@ -325,11 +326,6 @@ sub run{
   TRAN1:
     foreach my $transcript (@transcripts){
       $self->_transcript_Type($transcript,$ENSEMBL_TYPE);
-      my $valid = $self->_check_Transcript($transcript);
-      unless ($valid == 1){
-	print STDERR "skipping this transcript\n";
-	next TRAN1;
-      }
       push (  @original_ens_transcripts, $transcript );
     }
   }
@@ -379,12 +375,36 @@ sub run{
       print STDERR "Matching ".scalar(@ens_genes)." ensembl genes and ".scalar(@est_genes)." est genes\n"; 
       my @ens_transcripts;
       my @est_transcripts;
+      
       foreach my $gene ( @ens_genes ){
-	push ( @ens_transcripts, $gene->each_Transcript );
+      TRAN1:
+	foreach my $transcript ( $gene->each_Transcript ){
+	  my $valid = $self->_check_Transcript($transcript);
+	  unless ($valid == 1){
+	    print STDERR "skipping this transcript\n";
+	    next TRAN1;
+	  }
+	  push ( @ens_transcripts, $transcript );
+	}
       }
+      
       foreach my $gene ( @est_genes ){
-	push ( @est_transcripts, $gene->each_Transcript );
+      TRAN2:
+	foreach my $transcript ( $gene->each_Transcript ){
+	  
+	  # reject those with too long introns
+	  if ( $self->_too_long_intron_size( $transcript ) ){
+	    next TRAN2;
+	  }
+	  my $valid = $self->_check_Transcript($transcript);
+	  unless ($valid == 1){
+	    print STDERR "skipping this transcript\n";
+	    next TRAN2;
+	  }
+	  push ( @est_transcripts, $transcript );
+	}
       }
+      
       my ( $new_ens, $accepted_est ) = $self->_pair_Transcripts( \@ens_transcripts, \@est_transcripts );
       if ( $new_ens ){
 	push ( @transcripts, @$new_ens );
@@ -397,19 +417,46 @@ sub run{
     # else we could have only ensembl genes
     elsif(  @ens_genes && !@est_genes ){
       # we have nothing to modify them, hence we accept them...
-      print STDERR "Accepting ".scalar(@ens_genes)." ensembl genes\n";
+      my @ens_transcripts;
+      
+      # but before we check, just in case, you know
       foreach my $gene ( @ens_genes ){
-	push ( @transcripts, $gene->each_Transcript );
+	TRAN3:
+	foreach my $transcript ( $gene->each_Transcript ){
+	  my $valid = $self->_check_Transcript($transcript);
+	  unless ($valid == 1){
+	    print STDERR "skipping this transcript\n";
+	    next TRAN3;
+	  }
+	  push ( @ens_transcripts, $transcript );
+	}
       }
+      print STDERR "Accepting ".scalar(@ens_transcripts)." ensembl transcripts\n";
+      push ( @transcripts, @ens_transcripts );
     }
-
+    
     # else we could have only est genes
     elsif( !@ens_genes && @est_genes ){
       print STDERR "Checking ".scalar(@est_genes)." est genes\n";
       my @est_transcripts;
+      
       foreach my $gene ( @est_genes ){
-	push ( @est_transcripts, $gene->each_Transcript );
+	TRAN4:
+	foreach my $transcript ( $gene->each_Transcript ){
+	  
+	  # reject those with too long introns
+	  if ( $self->_too_long_intron_size( $transcript ) ){
+	    next TRAN4;
+	  }
+	  my $valid = $self->_check_Transcript($transcript);
+	  unless ($valid == 1){
+	    print STDERR "skipping this transcript\n";
+	    next TRAN4;
+	  }
+	  push ( @est_transcripts, $transcript );
+	}
       }
+      
       # we have to check the est genes to see whether they are ok
       # they must have some common properties in order
       # to form a proper set of alternative forms
@@ -425,10 +472,10 @@ sub run{
   
   # make the genes 
   my @newgenes = $self->_make_Genes(\@transcripts);
-
+  
   print STDERR scalar($self->ensembl_genes)." ensembl genes (".scalar(@original_ens_transcripts)." transcripts) and ".
     scalar($self->estgenes)." estgenes (".scalar(@original_est_transcripts)." transcripts)\n";    
-  print STDERR "produce ".scalar(@transcripts)." transcripts, which are clustered into ".scalar(@newgenes)." genes:\n";
+  print STDERR "have produced ".scalar(@transcripts)." transcripts, which are clustered into ".scalar(@newgenes)." genes:\n";
   my $count = 0;
   foreach my $gene (@newgenes){
     $count++;
@@ -2661,8 +2708,46 @@ sub write_output {
   }
 }
 
+
 ########################################################################
 
+=head2 _too_long_intron_size
+
+Return: returns 1 if it finds an intron of size >  $ESTGENE_MAX_INTRON_LENGTH in the passed in transcript
+
+=cut
+
+
+sub _too_long_intron_size{
+  my ($self,$transcript ) = @_;
+  
+  my $prev_exon;
+  my $exon_count = 0;
+  foreach my $exon ( $transcript->get_all_Exons ){
+    $exon_count++;
+
+    if ( $exon_count > 1 ){
+      
+      my $intron_size = 0;
+      if ($exon->strand == 1) {
+	$intron_size = abs($exon->start - $prev_exon->end   - 1);
+      } 
+      else {
+	$intron_size = abs($exon->end   - $prev_exon->start - 1);
+      }
+      
+      if ($intron_size > $ESTGENE_MAX_INTRON_LENGTH ){ 
+	print STDERR "intron size too long: $intron_size for transcript $transcript\n";
+	return 1;
+      }
+    }
+    $prev_exon = $exon;
+  }
+  return 0;
+}
+
+
+############################################################
 
 
 1;
