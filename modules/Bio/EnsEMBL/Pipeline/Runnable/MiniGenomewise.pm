@@ -67,10 +67,10 @@ sub new {
 									 )],
 								      @args);
     
-    if ($smell){
+    if ( defined($smell) ){
       $self->smell($smell);
     }
-    if ($switch){
+    if ( defined($switch) ){
       $self->switch($switch);
     }
 
@@ -84,9 +84,6 @@ sub new {
 	my @t = @$transcripts;
 	
 	foreach my $t (@t) {
-	  print STDERR "transcript passed to MiniGenomewise::new()\n";
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
-	  
 	  $self->add_Transcript($t);
 	}
       } else {
@@ -387,10 +384,10 @@ sub run {
   my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( 
 								     -seq    => $self->miniseq->get_cDNA_sequence,
 								    );
-  if ( $self->switch ){
+  if ( defined($self->switch) ){
     $genomewise->switch($self->switch);
   }
-  if ( $self->smell  ){
+  if ( defined($self->smell)  ){
     $genomewise->smell($self->smell);
   }
   
@@ -561,7 +558,7 @@ sub output {
 
 sub switch{
   my ($self,$switch) = @_;
-  if( $switch ) {
+  if( defined($switch) ) {
     $self->{_switch} = $switch;
   }
   return $self->{_switch};
@@ -572,7 +569,7 @@ sub switch{
 
 sub smell{
   my ($self,$smell) = @_;
-  if( $smell ) {
+  if( defined($smell) ) {
     $self->{_smell} = $smell;
   }
   return $self->{_smell};

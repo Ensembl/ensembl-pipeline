@@ -24,7 +24,7 @@ where
 -seq    is the sequence where we are going to run genomewise on
 -switch is the cost to switch evidence. It is irrelevant if one only passes 1 transcript to Genomewise.
         With more than one transcript, it is the cost of jumping from one to the other to find the CDS.
--smell  is the space allowed to move off the splice site of the evidence
+-smell  is the space allowed to move off the splice site of the evidence. The minimum is 0.
 
 add evidence in the form of a transcript:
    $genomewise->add_Transcript($transcript);
@@ -84,15 +84,15 @@ sub new {
     }
     $self->seq($seq);
     
-    # read smell argument or default it to 8
-    if ($smell){
+    # read smell argument (can be 0 ) or default it to 8
+    if (defined($smell) ){
       $self->smell($smell);
     }
     else{
       $self->smell(8);
     }
     # read the switch argument or default it to 10000
-    if ($switch){
+    if (defined($switch)){
       $self->switch($switch);
     }
     else{
@@ -520,7 +520,7 @@ sub seq{
 
 sub switch{
   my ($self,$switch) = @_;
-  if( $switch ) {
+  if( defined($switch) ) {
     $self->{_switch} = $switch;
   }
   return $self->{_switch};
@@ -531,7 +531,7 @@ sub switch{
 
 sub smell{
   my ($self,$smell) = @_;
-  if( $smell ) {
+  if( defined($smell) ) {
     $self->{_smell} = $smell;
   }
   return $self->{_smell};
