@@ -18,6 +18,7 @@ sub new{
   $self->{'queue'} = undef;
   $self->{'jobname'} = undef;
   $self->{'nodes'} = undef; #must by a space delimited line of nodes
+  $self->{'resource'} = undef;
 
   my($stdout, 
      $stderr, 
@@ -25,13 +26,16 @@ sub new{
      $pre_exec, 
      $command, 
      $queue, 
-     $jobname) = $self->_rearrange([qw(STDOUT 
+     $jobname,
+     $resource,
+     $nodes) = $self->_rearrange([qw(STDOUT 
 				       STDERR 
 				       PARAMETERS 
 				       PRE_EXEC 
 				       COMMAND 
 				       QUEUE 
 				       JOBNAME
+				       RESOURCE
 				       NODES)],@args);
 
   if(defined($stdout)){
@@ -54,6 +58,12 @@ sub new{
   }
   if(defined($jobname)){
     $self->jobname($jobname);
+  }
+  if(defined($resource)){
+    $self->jobname($resource);
+  }
+  if(defined($nodes)){
+    $self->jobname($nodes);
   }
 
   return $self;
@@ -155,6 +165,16 @@ sub nodes{
    }
 
    return $self->{'nodes'};
+}
+
+sub resource{
+   my ($self, $arg) = @_;
+
+   if(defined($arg)){
+     $self->{'resource'} = $arg;
+   }
+
+   return $self->{'resource'};
 }
 
 
