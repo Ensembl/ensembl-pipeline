@@ -277,7 +277,7 @@ sub run {
    $self->convert_gw_output;
 
    my $tmpfile = $self->{'_tmpfile'};
-   unlink $tmpfile;
+   unlink $tmpfile if ($tmpfile);
 
    $self->output($self->gw_genes);
 }
