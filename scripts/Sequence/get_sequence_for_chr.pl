@@ -47,11 +47,6 @@ my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					   -dbname=> $dbname
 					  );
 
-#unless ($chr && $outfile){
-#  print STDERR "Usage: $0 -chr  -outfile [ -mask -dust -softmask -maskall ]\n";
-#  exit(0);
-#}
-
 
 open OUT, ">$outfile";
 my $out = Bio::SeqIO->new(-format=>'Fasta',
@@ -60,10 +55,6 @@ my $out = Bio::SeqIO->new(-format=>'Fasta',
 
 my $slice = $db->get_SliceAdaptor->fetch_by_chr_name( $chr );
 
-# get chr names and sizes:
-#my ($chr_start,$chr_end) = &get_chr_start_end($db,$chr);
-#print STDERR "fetching $chr . $chr_start - $chr_end\n";
-#my $slice = $sgp->fetch_by_chr_start_end($chr,$chr_start,$chr_end);
 
 my @logic_names;
 my $soft = 0;
@@ -97,19 +88,3 @@ $out->write_seq($seq);
 close OUT;
 
 ############################################################
-
-sub get_chr_start_end{
-  my $db = shift;
-  my $chr = shift;
-  my $q = qq(   SELECT   min(ass.chr_start),max(ass.chr_end)
-		FROM     chromosome chr, assembly ass
-		WHERE    chr.chromosome_id = ass.chromosome_id
-		AND      chr.name='$chr'
-	    );
-  
-  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q"); 
-  my $res = $sth->execute    || $db->throw("can't execute: $q");
-  
-  my ($chr_start, $chr_end) = $sth->fetchrow_array;
-  return ($chr_start,$chr_end);
-}
