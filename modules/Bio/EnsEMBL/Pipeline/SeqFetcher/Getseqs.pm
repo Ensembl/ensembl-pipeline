@@ -175,4 +175,78 @@ sub  get_Seq_by_id {
   return undef;
 }
 
+
+=head2 get_Seqs_by_accs
+
+  Title   : get_Seqs_by_accs
+  Usage   : $self->get_Seqs_by_accs(@accession);
+  Function: Does the sequence retrieval for an array of accesions in one pfetch call
+  Returns : Array of Bio::Seq
+  Args    : 
+
+=cut
+
+sub  get_Seqs_by_accs {
+  my ($self, @acc) = @_;
+  
+  if (!defined(@acc) || scalar(@acc < 1)) {
+    $self->throw("No accession input");
+  }
+
+  print STDERR "getting sequences for " . scalar(@acc) . " ids\n";
+
+  my $newseq;
+  my @seq;
+  my $getseqs = $self->executable;
+  my @seqdb  = $self->db;
+  my $database = $seqdb[0];
+  my $tracker = 0;
+
+ SEQDB:
+  if(!defined $database){
+    $self->warn("can't find database\n");
+    return;
+  }
+
+  my $accstr = join "' '", @acc;
+
+  my $cmd = "$getseqs -raw '$accstr' $database";
+#  print STDERR "$cmd\n";
+ 
+  open(IN,"$cmd 2>/dev/null |") or $self->throw("Error forking getseqs for accession [$accstr]: getseqs");
+
+  while(<IN>){
+    chomp;
+    next if( /--/ );
+    next if (/Nothing/);
+    next if $_ eq "";
+    eval{
+      if(defined $_ && !($_=~/Sorry/)) {
+	$newseq = new Bio::Seq('-seq'               => $_,
+			       '-accession_number'  => $acc[$tracker],
+			       '-desc'              => "",
+			       '-display_id'        => $acc[$tracker]);
+	
+      }
+    };
+
+    if($@){
+      print STDERR "$@\n";
+    }
+    
+    if (defined $newseq){
+      push (@seq, $newseq);
+    }
+    else{
+      $self->warn("Could not getseqs sequence for [" . $acc[$tracker] . "]\n");
+    }
+
+    $tracker++;
+    
+  }
+  
+  close IN or $self->throw("Error running getseqs: $!\n");  
+  return @seq;
+}
+
 1;
