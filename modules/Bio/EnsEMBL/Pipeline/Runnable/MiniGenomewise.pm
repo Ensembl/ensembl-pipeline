@@ -449,8 +449,9 @@ sub convert_output{
     foreach my $exon (@{$transcript->get_all_Exons}) {
       $ec++;
    
-      my $phase  = $exon->phase;
-      my $strand = $exon->strand;
+      my $phase     = $exon->phase;
+      my $end_phase = $exon->end_phase;
+      my $strand    = $exon->strand;
 
       # get the supporting evidence
       my @evidence = @{$exon->get_all_supporting_features};
@@ -468,6 +469,7 @@ sub convert_output{
       $new_exon->start($f->start);
       $new_exon->end($f->end);
       $new_exon->phase($phase);
+      $new_exon->end_phase($end_phase);
       $new_exon->strand($strand);
 
       # transfer the supporting evidence!!!
@@ -495,6 +497,10 @@ sub convert_output{
       # flush out old exons from transcript and replace them with newly remapped exons
       $transcript->flush_Exon;
       foreach my $exon(@newexons){
+###print STDERR "ADDING " . $exon . "\n";
+#while (my ($k, $v) = each %$exon){
+#print "     $k => $v\n";
+#}
 	$transcript->add_Exon($exon);
       }
     }
