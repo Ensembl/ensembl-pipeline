@@ -433,12 +433,12 @@ sub show_jobs_by_status_and_analysis {
   my @err;
   my @retry;
 
-  my $maxjobid;
-  my $maxinputid;
-  my $maxlsf;
-  my $maxout;
-  my $maxerr;
-  my $maxretry;
+  my $maxjobid = 0;
+  my $maxinputid = 0;
+  my $maxlsf = 0;
+  my $maxout = 0;
+  my $maxerr = 0;
+  my $maxretry = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $jobId         = $ref->{'job_id'};
