@@ -99,11 +99,10 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
-
-    print STDERR "Setting genseq to " . $genseq. "\n";
+    
+    print "Setting genseq to " . $genseq. "\n";
 
     $self->genseq($genseq);
-    print STDERR "Set genseq to " . $self->genseq. "\n";
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq->seq;
     if ($seq =~ /[CATG]{3}/) {
@@ -123,6 +122,7 @@ sub runnable {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
+								 -options	=> $self->analysis->parameters, # added  by jerm
 							     -threshold_type => 'PVALUE',
 							     -threshold => 1);
 
