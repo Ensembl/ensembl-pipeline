@@ -20,8 +20,8 @@ my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder->new(
 			      -input_id   => \@sequences,
 			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
-			      -database   => $EST_GENOMIC,
-			      -options    => $EST_EXONERATE_OPTIONS,
+			      -database   => $GENOMIC,
+			      -options    => $EXONERATE_OPTIONS,
 			     );
     
 
@@ -81,15 +81,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
-use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
-use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 
 use vars qw(@ISA);
 
@@ -431,7 +429,7 @@ sub _test_homology{
 							       );
 
   # database where the focus species dna is
-  my $focusdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+  my $focus_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						   '-host'   => $REF_DBHOST,
 						   '-user'   => 'ensro',
 						   '-dbname' => $REF_DBNAME,
@@ -485,14 +483,14 @@ sub _test_homology{
     my @transcripts = @{$gene->get_all_Transcripts};
     my $transcript = $transcripts[0];
 
-    my $gene_ref{$transcript} = $self->_evidence_id($transcript);
+    $gene_ref{$transcript} = $self->_evidence_id($transcript);
     
     ############################################################
     # has it got homology in the first species?
     if ( $target_species ){
       print STDERR "\n--- testing for homology in $target_species ---\n";
       $homology1 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-	->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, \%gene_ref );
+	->test_for_orthology_with_tblastx($transcript, $focus_db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, \%gene_ref );
     }
     
     ############################################################
@@ -500,7 +498,7 @@ sub _test_homology{
     if ( $target_species2 ){
       print STDERR "\n--- testing for homology in $target_species2 ---\n";
       $homology2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-	->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, \%gene_ref );
+	->test_for_orthology_with_tblastx($transcript, $focus_db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, \%gene_ref );
     }
     unless ( $homology1 || $homology2 ){
       push (@selected, $gene);
@@ -532,7 +530,7 @@ sub _has_repeat_in_intron{
 
   ############################################################
   # pseudogene is a transcript
-  my @exons  = sort { $a->start <=> $b->start} @{$pseudogene->get_all_Exons};
+  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
   my $start  = $exons[0]->start;
   my $end    = $exons[$#exons]->end;
   my $strand = $exons[0]->strand;
@@ -549,14 +547,14 @@ sub _has_repeat_in_intron{
 
   ############################################################
   # get slice from the same db where our pseudogene is
-  my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
+  my $slice = $repeat_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
   my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
   
  INTRON:
   for (my $i=0; $i<$#exons; $i++ ){
     my $intron_start  = $exons[$i]->end + 1;
     my $intron_end    = $exons[$i+1]->start - 1;
-    my $intron_stran  = $exons[$i]->strand;
+    my $intron_strand = $exons[$i]->strand;
     my $intron_length = $intron_end - $intron_start + 1;
 
     next INTRON unless ( $intron_length > 9 );
@@ -628,7 +626,7 @@ sub _convert_to_block{
       my $new_transcript  = new Bio::EnsEMBL::Transcript;
       
       my $newexon = Bio::EnsEMBL::Exon->new();
-      my @exons = sort{ $a->start <=> $b->start } @{$transcript->get_all_Exons};
+      my @exons = sort{ $a->start <=> $b->start } @{$tran->get_all_Exons};
       my $strand = $exons[0]->strand;
       
       ############################################################
@@ -639,10 +637,11 @@ sub _convert_to_block{
       $newexon->end_phase(0);
       $newexon->strand   ($strand);
       $newexon->contig   ($exons[0]->contig);
-      $newexon->seqname  ($exons->seqname);
+      $newexon->seqname  ($exons[0]->seqname);
   
       ############################################################
       # transfer supporting evidence
+      my %evidence_hash;
       foreach my $exon ( @exons ){
 	foreach my $sf ( @{$exon->get_all_supporting_features} ){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
@@ -653,7 +652,7 @@ sub _convert_to_block{
 	}
       }
       
-      $new_transcript->add_Exon($new_exon);
+      $new_transcript->add_Exon($newexon);
       $new_gene->add_Transcript($new_transcript);
     }
     push(@new_genes, $new_gene);
@@ -727,41 +726,36 @@ sub write_output{
   # here is the only place where we need to create a db adaptor
   # for the database where we want to write the genes
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					      -host             => $EST_DBHOST,
-					      -user             => $EST_DBUSER,
-					      -dbname           => $EST_DBNAME,
-					      -pass             => $EST_DBPASS,
+					      -host             => $PSEUDO_DBHOST,
+					      -user             => $PSEUDO_DBUSER,
+					      -dbname           => $PSEUDO_DBNAME,
+					      -pass             => $PSEUDO_DBPASS,
 					      );
 
   # Get our gene adaptor, depending on the type of gene tables
   # that we are working with.
   my $gene_adaptor;
 
-  if ($EST_USE_DENORM_GENES) {
-    $gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($db);
-  } else {
-    $gene_adaptor = $db->get_GeneAdaptor;  
-  } 
 
-
-
+  $gene_adaptor = $db->get_GeneAdaptor;  
+  
   unless (@output){
       @output = $self->output;
   }
   foreach my $gene (@output){
-      print STDERR "gene is a $gene\n";
-      print STDERR "about to store gene ".$gene->type." $gene\n";
-      foreach my $tran (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-      }
-      
-      eval{
-	$gene_adaptor->store($gene);
-      };
-
-      if ($@){
-	  $self->warn("Unable to store gene!!\n$@");
-      }
+    print STDERR "gene is a $gene\n";
+    print STDERR "about to store gene ".$gene->type." $gene\n";
+    foreach my $tran (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+    }
+    
+    eval{
+      $gene_adaptor->store($gene);
+    };
+    
+    if ($@){
+      $self->warn("Unable to store gene!!\n$@");
+    }
   }
 }
 
@@ -844,7 +838,7 @@ sub convert_coordinates{
       my $chr_name;
       my $chr_start;
       my $chr_end;
-      if ($slice_id =~/$EST_INPUTID_REGEX/){
+      if ($slice_id =~/$INPUTID_REGEX/){
 	$chr_name  = $1;
 	$chr_start = $2;
 	$chr_end   = $3;
@@ -1085,7 +1079,7 @@ sub check_strand{
 sub get_chr_subseq{
   my ( $self, $chr_name, $start, $end, $strand ) = @_;
 
-  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+  my $chr_file = $GENOMIC."/".$chr_name.".fa";
   my $command = "chr_subseq $chr_file $start $end |";
  
   #print STDERR "command: $command\n";
@@ -1148,7 +1142,7 @@ sub _get_SubseqFetcher {
   } else {
     
     $self->{'_current_chr_name'} = $slice->chr_name;
-    my $chr_filename = $EST_GENOMIC . "/" . $slice->chr_name . "\.fa";
+    my $chr_filename = $GENOMIC . "/" . $slice->chr_name . "\.fa";
 
     $self->{'_chr_subseqfetcher'} = Bio::EnsEMBL::Pipeline::SubseqFetcher->new($chr_filename);
   }
