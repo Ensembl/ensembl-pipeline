@@ -47,10 +47,10 @@ use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
-							      EST_INPUTID_REGEX
-							      EST_EXONERATE_ANALYSIS
-							     );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
+									 EST_INPUTID_REGEX
+									 EST_GENEBUILDER_INPUT_GENETYPE
+									);
 
 
 use vars '@ISA';
@@ -200,8 +200,12 @@ sub get_genes_by_Slice_and_type {
   
   # Make an appropriate analysis object
 
-  my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($EST_EXONERATE_ANALYSIS);
-$self->throw("no analysis object found for $EST_EXONERATE_ANALYSIS from " . $self->db->dbname . "\n") unless defined ($analysis);
+  my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($EST_GENEBUILDER_INPUT_GENETYPE);
+
+  $self->throw("Unable to retrieve analysis with logic_name [$EST_GENEBUILDER_INPUT_GENETYPE]\n" .
+	       "from database [" . $self->db->dbname . "]\n")
+    unless defined ($analysis);
+
  DUMPED_GENE:
   while (my ($dumped_gene_id, $retrieved_gene, $already_mapped) = $sth->fetchrow_array) {
 

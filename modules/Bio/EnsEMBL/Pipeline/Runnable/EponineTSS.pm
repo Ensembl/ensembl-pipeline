@@ -257,10 +257,13 @@ sub run {
 sub run_eponine {
     my ($self) = @_;
     #run eponine
-#    print "Running eponine-scan\n";
-    $self->throw("Error running eponine-scan on ".$self->filename."\n") 
-    
-    if (system ($self->java.' -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
+    my $cmd = $self->java . 
+        ' -jar ' . $self->epojar . 
+        ' -seq ' . $self->filename . 
+        ' -threshold ' . $self->threshold . 
+        " > " . $self->results;
+    print STDERR "Running eponine-scan command '$cmd'\n";
+    $self->throw("Error running eponine-scan on ".$self->filename."\n") if (system ($cmd)); 
 
 }
 
@@ -370,6 +373,8 @@ sub create_feature {
     $tss->display_label('');
     if ($tss)
       {
+	#$tss->validate();
+
 	# add to _flist
 	push(@{$self->{'_flist'}}, $tss);
       }

@@ -42,8 +42,8 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::FirstEF;
-use Bio::EnsEMBL::Pipeline::Config::FirstEF;
-use Bio::EnsEMBL::Pipeline::Config::FirstEF qw(  );
+use Bio::EnsEMBL::Pipeline::Config::General qw(SLICE_INPUT_ID_REGEX
+					       PIPELINE_WORK_DIR);
 
 use vars qw(@ISA);
 
@@ -78,8 +78,8 @@ sub new {
 =cut
 
 sub fetch_input {
-    my( $self) = @_;    
-    
+    my( $self) = @_;
+
     # Check analysis exists
     $self->throw("Analysis object not passed to RunnableDB/FirstEF") 
       unless $self->analysis->isa("Bio::EnsEMBL::Analysis");
@@ -87,22 +87,35 @@ sub fetch_input {
     # Check input id
     $self->throw("No input id passed to RunnableDB/FirstEF (eg. 1.500000-1000000)") 
       unless $self->input_id;
-    
+
     # Fetch slice specified by input id
-    $self->fetch_sequence;
-    
-print "FEF_REPEATMASKED : " . $FEF_REPEATMASKED . "\n";
+    unless ($self->input_id =~ /$SLICE_INPUT_ID_REGEX/ ){
+      $self->throw("Input id [".$self->input_id."] not compatible with ".
+		   "slice input id regex [". $SLICE_INPUT_ID_REGEX ."]");
+    }
+    my $chr   = $1;
+    my $start = $2;
+    my $end   = $3;
+
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+    $self->query($slice);
+
+    my %parameters = $self->parameter_hash;
+
+    my $repeatmasked = 1 if defined($parameters{'-repeatmasked'});
 
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::FirstEF->new(
 		     -query        => $self->query,
-		     -repeatmasked => $FEF_REPEATMASKED,
+		     -repeatmasked => $repeatmasked,
 		     -analysis     => $self->analysis,
-		     -firstef_dir  => $FEF_APPLICATION_DIR,
-		     -param_dir    => $FEF_PARAMETER_DIR);
+		     -firstef_bin  => $self->analysis->program_file,
+		     -param_dir    => $parameters{'-parameters_dir'},
+		     -parse_script => $parameters{'-parse_script'},
+		     -work_dir     => $PIPELINE_WORK_DIR);
 
-							   
+							
     $self->runnable($runnable);
-    
+
     return 1;
 }
 
@@ -112,9 +125,9 @@ sub write_output {
 
     my $db  = $self->db;
     my $sfa = $self->db->get_SimpleFeatureAdaptor;
-    
+
     my @mapped_features;
-  
+
     my $slice = $self->query;
 
     foreach my $f ($self->output) {

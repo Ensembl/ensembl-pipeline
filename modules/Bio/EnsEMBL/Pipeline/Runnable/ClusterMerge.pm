@@ -169,7 +169,7 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
-  $use_score = 1;
+  #$use_score = 1;
   if ( $use_score ){
       $self->use_score($use_score);
   }
