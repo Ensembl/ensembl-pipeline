@@ -132,28 +132,12 @@ sub new {
     Returns :   Bio::DB::RandomAccessI object
     Args    :   Bio::DB::RandomAccessI object
 
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
-
-sub fetch_output {
-    my($self,$output) = @_;
-    
-}
-
 =head2 write_output
 
     Title   :   write_output
     Usage   :   $self->write_output
     Function:   Writes output data to db
-    Returns :   array of exons (with start and end)
+    Returns :   
     Args    :   none
 
 =cut
@@ -256,7 +240,7 @@ sub write_output {
   GENE: foreach my $gene (@newgenes) {	
       # do a per gene eval...
       eval {
-	  
+	  print STDERR $gene->id . "\n";
 	  $gene_obj->write($gene);
       }; 
       if( $@ ) {
@@ -271,7 +255,8 @@ sub write_output {
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for est2genome from the database
+    Function:   Creates virtual contig and fetches Riken hits from the database for input to
+                BlastMiniGenewise
     Returns :   nothing
     Args    :   none
 
@@ -289,8 +274,6 @@ sub fetch_input {
     my $chrstart = $1;
     my $chrend   = $2;
 
-#    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
-
     $self->dbobj->static_golden_path_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
@@ -298,18 +281,8 @@ sub fetch_input {
 
     $contig->_chr_name($chrid);
 
-    foreach my $rc ($contig->_vmap->each_MapContig) {
-	my $strand = "+";
-	if ($rc->orientation == -1) {
-	    $strand = "-";
-	}
-	
-#	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
-    }
-
     my $genseq    = $contig->get_repeatmasked_seq;
 
-#    print STDERR "Length is " . $genseq->length . "\n";
     print STDERR "Fetching features \n";
 
     my @features  = $contig->get_all_SimilarityFeatures_above_score('riken_prot',200);
@@ -320,7 +293,6 @@ sub fetch_input {
     my %idhash;
     
     foreach my $f (@features) {
-#        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
       if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	  defined($f->hseqname) ) {
       $idhash{$f->hseqname} = 1;
@@ -343,6 +315,20 @@ sub fetch_input {
 
 }     
 
+
+=head2 run
+
+ Title   : run
+ Usage   : $self->run
+ Function: calls run for each stored runnable, and converts output to Bio::EnsEMBL::Gene 
+           in RawContig coordinate that are stored in $slef->{'_output'}
+ Example :
+ Returns : 
+ Args    : 
+
+
+=cut
+
 sub run {
     my ($self) = @_;
 
@@ -353,184 +339,168 @@ sub run {
     $self->convert_output;
 }
 
+=head2 convert_output
+
+ Title   : convert_output
+ Usage   : $self->convert_output
+ Function: Converts the output of each runnable into Bio::EnsEMBL::Genes in RawContig coordinates,
+           and stores these in $self->{'_output'}. Each Gene has a single Transcript, which in turn has
+           Exons(with supproting features) and a Translation
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+
 sub convert_output {
   my ($self) =@_;
 
-#$self->throw("exiting before convert_output\n"); 
- 
   my $count = 1;
-  my $time  = time; chomp($time);
-  
-  my $trancount = 1;
-  
-  foreach my $runnable ($self->runnable) {
-    my @genes = $self->make_genes($count,$time,$runnable);
+  my $genetype = 'riken_genewise';
 
-    my @remapped = $self->remap_genes($runnable,@genes);
+  # get the appropriate analysis from the AnalysisAdaptor
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'Riken_BlastMiniGenewise',
+      );
+  }
+
+  foreach my $runnable ($self->runnable) {
+    my @genes = $self->make_genes($count, $genetype, $analysis_obj, $runnable);
+
+    my @remapped = $self->remap_genes($runnable, @genes);
+
+    $self->output(@remapped);
 
     # store the genes
-    if (!defined($self->{'_output'})) {
-      $self->{'_output'} = [];
-    }
-    
-    push(@{$self->{'_output'}},@remapped);
+
     
   }
 }
 
-sub check_splice {
-    my ($self,$f1,$f2) = @_;
+=head2 output
+
+ Title   : output
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub output{
+   my ($self,@genes) = @_;
+
+   if (!defined($self->{'_output'})) {
+     $self->{'_output'} = [];
+   }
     
-    my $splice1 = substr($self->{'_genseq'}->seq,$f1->end,2);
-    my $splice2 = substr($self->{'_genseq'}->seq,$f2->start-3,2);
-    
-    if (abs($f2->start - $f1->end) > 50) {
-	print ("Splices are " . $f1->hseqname . " [" . 
-	                        $splice1      . "][" . 
-	                        $splice2      . "] " . 
-	       ($f2->start - $f1->end)        . "\n");
-    }
+   if(defined @genes){
+     push(@{$self->{'_output'}},@genes);
+   }
+
+   return @{$self->{'_output'}};
 }
+
+=head2 make_genes
+
+ Title   : make_genes
+ Usage   : $self->make_genes($count, $genetype, $analysis_obj, $runnable)
+ Function: converts the output from $runnable into Bio::EnsEMBL::Genes in
+           $contig(VirtualContig) coordinates. The genes have type $genetype, 
+           and have $analysis_obj attached. Each Gene has a single Transcript, 
+           which in turn has Exons(with supporting features) and a Translation
+ Example : 
+ Returns : array of Bio::EnsEMBL::Gene
+ Args    : $count: integer, $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis, 
+           $runnable: Bio::EnsEMBL::Pipeline::RunnableI
+
+
+=cut
 
 sub make_genes {
 
-  my ($self,$count,$time,$runnable) = @_;
+  my ($self, $count, $genetype, $analysis_obj, $runnable) = @_;
   my $contig = $self->{$runnable};
   my @tmpf   = $runnable->output;
-  
+  my $time  = time; chomp($time);
   my @genes;
 
   
   foreach my $tmpf (@tmpf) {
-    my $gene   = new Bio::EnsEMBL::Gene;
-    my $tran   = new Bio::EnsEMBL::Transcript;
-    my $transl = new Bio::EnsEMBL::Translation;
-    
-    $gene->type('test_riken_genewise');
-    $gene->id($self->input_id . ".test_riken_genewise.$count");
+    my $gene       = new Bio::EnsEMBL::Gene;
+    my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $count);
+
+    $gene->type($genetype);
+    $gene->id($self->input_id . ".$genetype.$count");
     $gene->created($time);
     $gene->modified($time);
     $gene->version(1);
-    
-    $tran->id($self->input_id . ".test_riken_genewise.$count");
-    $tran->created($time);
-    $tran->modified($time);
-    $tran->version(1);
-    
-    $transl->id($self->input_id . ".test_riken_genewise.$count");
-    $transl->version(1);
-    
+    $gene->analysis($analysis_obj);
+
     $count++;
     
-    $gene->add_Transcript($tran);
-    $tran->translation($transl);
-    
-    my $excount = 1;
-    my @exons;
-    
-    foreach my $exon_pred ($tmpf->sub_SeqFeature) {
-      # make an exon
-      my $exon = new Bio::EnsEMBL::Exon;
-      
-      $exon->id($self->input_id . ".test_riken_genewise.$count.$excount");
-      $exon->contig_id($contig->id);
-      $exon->created($time);
-      $exon->modified($time);
-      $exon->version(1);
-      
-      $exon->start($exon_pred->start);
-      $exon->end  ($exon_pred->end);
-      $exon->strand($exon_pred->strand);
-      
-#      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
-      
-      #	$exon->phase($subf->feature1->{_phase});
-      $exon->phase($exon_pred->{_phase});
-      $exon->attach_seq($self->{$runnable}->primary_seq);
-
-
-      # sort out supporting evidence for this exon prediction
-      foreach my $subf($exon_pred->sub_SeqFeature){
-	$subf->feature1->source_tag('test_riken_genewise');
-	$subf->feature1->primary_tag('similarity');
-	$subf->feature1->score(100);
-	$subf->feature1->analysis($exon_pred->analysis);
-	
-	$subf->feature2->source_tag('test_riken_genewise');
-	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->score(100);
-	$subf->feature2->analysis($exon_pred->analysis);
-	
-#	print STDERR "*subf " . $subf->gffstring . "\n";
-	$exon->add_Supporting_Feature($subf);
-      }
-      
-      my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
-      
-#      my $tran0 =  $seq->translate('*','X',0)->seq;
-#      my $tran1 =  $seq->translate('*','X',2)->seq;
-#      my $tran2 =  $seq->translate('*','X',1)->seq;
-      
-#      print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
-#      print STDERR "\t exon phase 1 : " . $tran1 . "\n";
-#      print STDERR "\t exon phase 2 : " . $tran2 . "\n";
-      
-      push(@exons,$exon);
-      
-      $excount++;
-    }
-    
-    if ($#exons < 0) {
-      print STDERR "Odd.  No exons found\n";
-    } else {
-      
-      push(@genes,$gene);
-      
-      if ($exons[0]->strand == -1) {
-	@exons = sort {$b->start <=> $a->start} @exons;
-      } else {
-	@exons = sort {$a->start <=> $b->start} @exons;
-      }
-      
-      foreach my $exon (@exons) {
-	$tran->add_Exon($exon);
-      }
-      
-      $transl->start_exon_id($exons[0]->id);
-      $transl->end_exon_id  ($exons[$#exons]->id);
-      
-      if ($exons[0]->phase == 0) {
-	$transl->start(1);
-      } elsif ($exons[0]->phase == 1) {
-	$transl->start(3);
-      } elsif ($exons[0]->phase == 2) {
-	$transl->start(2);
-      }
-      
-      $transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
-    }
+    $gene->add_Transcript($transcript);
+    push (@genes, $gene);
   }
+
   return @genes;
 }
 
+
+=head2 remap_genes
+
+ Title   : remap_genes
+ Usage   : $self->remap_genes($runnable, @genes)
+ Function: converts the coordinates of each Bio@EnsEMBL::Gene in @genes into RawContig
+           coordinates for storage.
+ Example : 
+ Returns : array of Bio::EnsEMBL::Gene in RawContig coordinates
+ Args    : $runnable: Bio::EnsEMBL::Pipeline::RunnableI, @genes: array of Bio::EnsEMBL::Gene 
+           in virtual contig coordinates
+
+
+=cut
+
 sub remap_genes {
-  my ($self,$runnable,@genes) = @_;
+  my ($self, $runnable, @genes) = @_;
   
   my $contig = $self->{$runnable};
-#  print STDERR "genes: " . scalar(@genes) . "\n";
 
   my @newf;
   my $trancount=1;
   foreach my $gene (@genes) {
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-      $newgene->type('test_riken_genewise');
+
+      # need to explicitly add back genetype and analysis.
+      $newgene->type($gene->type);
+      $newgene->analysis($gene->analysis);
+
       foreach my $tran ($newgene->each_Transcript) {
-	# may well fail ...
-	print STDERR "no more tranlsation!\n";
-#	print STDERR "Newgene Translation is " . $tran->translate->seq . "\n";
 	foreach my $exon($tran->each_Exon) {
-	  print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -538,15 +508,6 @@ sub remap_genes {
 	      $sf->start($sf->end);
 	      $sf->end($tmp);
 	    }
-	    
-#	    print STDERR "sub_align: " . 
-#	    $sf->seqname . "\t" .
-#	    $sf->start . "\t" .
-#	    $sf->end . "\t" .
-#	    $sf->strand . "\t" .
-#	    $sf->hseqname . "\t" .
-#	    $sf->hstart . "\t" .
-#	    $sf->hend . "\n";
 	  }
 	}
       }
@@ -554,18 +515,6 @@ sub remap_genes {
 
     };
     if ($@) {
-
-
-      print STDERR "contig: $contig\n";
-      foreach my $tran ($gene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
-	  foreach my $sf($exon->each_Supporting_Feature) {
-	    print STDERR "hid: " . $sf->hseqname . "\n";
-	  }
-	}
-      }
-
-
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
     
@@ -576,33 +525,116 @@ sub remap_genes {
 
 }
 
-sub generate_outfeat {
-  my ($self, @genes) = @_;
+=head2 _make_transcript
 
-  my @newf;
+ Title   : make_transcript
+ Usage   : $self->make_transcript($gene, $contig, $genetype, $count)
+ Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
+           with sub_SeqFeatures representing exons.
+ Example :
+ Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
+           data), and a Bio::EnsEMBL::translation
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+           $genetype: string, $count: integer
 
-  foreach my $gene(@genes) {
-    foreach my $tran($gene->each_Transcript){
-      foreach my $ex($tran->each_Exon){
-	foreach my $sf($ex->each_Supporting_Feature){
-	  # already is a feature pair
-	  # need to sort out prot coords ...
-	  print STDERR "SF: " . 
-	    $sf->seqname . "\t" .
-	    $sf->start . "\t" .
-	    $sf->end . "\t" .
-	    $sf->strand . "\t" .
-	    $sf->hseqname . "\t" .
-	    $sf->hstart . "\t" .
-	    $sf->hend . "\n" ;
-	  push (@newf, $sf);
-	}
-      }
+
+=cut
+
+sub _make_transcript{
+  my ($self, $gene, $contig, $genetype, $count) = @_;
+  $genetype = 'unspecified' unless defined ($genetype);
+  $count = 1 unless defined ($count);
+
+  unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
+    {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
+  unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
+    {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
+
+  my $time  = time; 
+  chomp($time);
+
+  my $transcript   = new Bio::EnsEMBL::Transcript;
+  $transcript->id($contig->id . ".$genetype.$count");
+  $transcript->version(1);
+
+  my $translation  = new Bio::EnsEMBL::Translation;    
+  $translation->id($contig->id . ".$genetype.$count");
+  $translation->version(1);
+
+  $transcript->translation($translation);
+
+  my $excount = 1;
+  my @exons;
+    
+  foreach my $exon_pred ($gene->sub_SeqFeature) {
+    # make an exon
+    my $exon = new Bio::EnsEMBL::Exon;
+    
+    $exon->id($contig->id . ".$genetype.$count.$excount");
+    $exon->contig_id($contig->id);
+    $exon->created($time);
+    $exon->modified($time);
+    $exon->version(1);
+      
+    $exon->start($exon_pred->start);
+    $exon->end  ($exon_pred->end);
+    $exon->strand($exon_pred->strand);
+    
+    $exon->phase($exon_pred->phase);
+    $exon->attach_seq($contig);
+    
+    # sort out supporting evidence for this exon prediction
+    foreach my $subf($exon_pred->sub_SeqFeature){
+      $subf->feature1->source_tag($genetype);
+      $subf->feature1->primary_tag('similarity');
+      $subf->feature1->score(100);
+      $subf->feature1->analysis($exon_pred->analysis);
+	
+      $subf->feature2->source_tag($genetype);
+      $subf->feature2->primary_tag('similarity');
+      $subf->feature2->score(100);
+      $subf->feature2->analysis($exon_pred->analysis);
+      
+      $exon->add_Supporting_Feature($subf);
     }
+    
+    push(@exons,$exon);
+    
+    $excount++;
   }
+  
+  if ($#exons < 0) {
+    print STDERR "Odd.  No exons found\n";
+  } 
+  else {
+    
+    print STDERR "num exons: " . scalar(@exons) . "\n";
 
-  return @newf;
-
+    if ($exons[0]->strand == -1) {
+      @exons = sort {$b->start <=> $a->start} @exons;
+    } else {
+      @exons = sort {$a->start <=> $b->start} @exons;
+    }
+    
+    foreach my $exon (@exons) {
+      $transcript->add_Exon($exon);
+    }
+    
+    $translation->start_exon_id($exons[0]->id);
+    $translation->end_exon_id  ($exons[$#exons]->id);
+    
+    if ($exons[0]->phase == 0) {
+      $translation->start(1);
+    } elsif ($exons[0]->phase == 1) {
+      $translation->start(3);
+    } elsif ($exons[0]->phase == 2) {
+      $translation->start(2);
+    }
+    
+    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+  }
+  
+  return $transcript;
 }
 
 1;
