@@ -84,7 +84,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    ESTGENE_TYPE                   => 'estgene',
 	    
 
-			 # where we have a genome
+			     # where we have a genome (path to the softmasked, dusted chromosomes | scaffolds), same var as used on Exonerate.pm
 			     # It should be a set of fastA files with
 			     # each file as chr_name.fa, all with the same line length
 			 EST_GENOMIC      => '/data/blastdb/Ensembl/NCBI33/genome/',
