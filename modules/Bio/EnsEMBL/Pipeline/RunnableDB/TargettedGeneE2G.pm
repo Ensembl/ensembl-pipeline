@@ -71,7 +71,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH CDNA_SEQFETCHER)], @args);
+  my ($cdna_seqfetcher) = $self->_rearrange([qw(CDNA_SEQFETCHER)], @args);
 
   # broken by test_runnableDB 
   # protein sequence fetcher
