@@ -119,6 +119,13 @@ sub results {
     return $self->{_results};
 }
 
+sub clonename {
+    my ($self, $clonename) = @_;
+    $self->{_clonename} = $clonename if ($clonename);
+    return $self->{_clonename};
+}
+
+
 =head2 protect
 
     Title   :   protect
@@ -204,6 +211,8 @@ sub checkdir {
                         unless ($self->diskspace('./', $spacelimit));
     my $dir = $self->workdir();
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
+    open (PWD, 'pwd|');
+    print STDERR "Working directory set to: ".<PWD>;
 }
 
 sub diskspace {
@@ -274,4 +283,10 @@ sub growfplist {
     my ($self, $fp) =@_;    
     #load fp onto array using command _grow_fplist
     push(@{$self->{'_fplist'}}, $fp);
+}
+
+sub shrinkfplist {
+    my ($self, $fp) =@_;    
+    #load fp onto array using command _grow_fplist
+    return pop(@{$self->{'_fplist'}});
 }
