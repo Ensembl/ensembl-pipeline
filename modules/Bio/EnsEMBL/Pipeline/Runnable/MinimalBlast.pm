@@ -25,14 +25,16 @@ sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
-  
+
   my ($program,
+      $path,
       $blastdb,
       $queryseq,
       $options,
       $workdir,
       $identity_cutoff) = 
 	$self->_rearrange([qw(PROGRAM
+			      PATH
 			      BLASTDB
 			      QUERYSEQ
 			      OPTIONS
@@ -40,6 +42,7 @@ sub new {
 			      IDENTITY_CUTOFF
 			     )],@args);
 
+  $self->path($path)         if defined($path);
   $self->program($program)   if defined($program);
   $self->blastdb($blastdb)   if defined($blastdb);
   $self->queryseq($queryseq) if defined($queryseq);
@@ -54,8 +57,8 @@ sub new {
 sub DESTROY {
   my $self = shift;
 
-  unlink $self->output;
-  rmdir $self->workdir;
+  unlink $self->output  if $self->output;
+  rmdir  $self->workdir if $self->workdir;
 }
 
 sub run {
@@ -115,11 +118,35 @@ sub output {
   return $self->{_output}
 }
 
+sub path {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_path} = shift;
+
+    $self->throw("Directory specified in the path does not\n" .
+		 "exist [".$self->{_path}."].")
+      unless -d $self->{_path};
+
+    # Append a backslash if the path string doesnt already
+    # terminate with one.
+    $self->{_path} .= '/' 
+      unless $self->{_path} =~ /\/$/;
+  }
+
+  return $self->{_program}
+}
+
 sub program {
   my $self = shift;
 
   if (@_) {
     $self->{_program} = shift;
+  }
+
+  if (! defined $self->{_program}){
+    $self->throw("Blast program type not specified " .
+		 "(eg. blastn, wublastp).");
   }
 
   return $self->{_program}
