@@ -61,7 +61,6 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_CDNA_INDEX
 					 );
@@ -73,14 +72,6 @@ sub new {
   my $self = $class->SUPER::new(@args);
 
   my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH CDNA_SEQFETCHER)], @args);
-
-  # golden path
-  if(!defined $path){
-    $path = $GB_GOLDEN_PATH;
-  }
-
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->assembly_type($path);
 
   # broken by test_runnableDB 
   # protein sequence fetcher
