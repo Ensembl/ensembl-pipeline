@@ -93,7 +93,8 @@ sub fetch_input {
     
     if ($seq =~ /[CATG]{3}/) {
         $self->input_is_void(0);
-        } else {
+        $self->check_with_seg($self->query);
+    } else {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
@@ -116,6 +117,61 @@ sub fetch_input {
     $self->runnable($runnable);
 
     return 1;
+}
+
+sub check_with_seg{
+    my ($self, $seqObj_to_test) = @_;
+
+    warn "need a Bio::Seq Obj" unless $seqObj_to_test;
+
+    my ($filename) = $self->_createfiles('/tmp',[qw(seg_checking)]);
+    my $file = Bio::SeqIO->new(-file   => ">$filename", 
+                               -format => 'Fasta') 
+        or $self->throw("Can't create Bio::SeqIO $filename $!");
+    $file->write_seq($seqObj_to_test);
+
+    my $seg_cmd = "seg $filename -a";
+    my $seg = Bio::SeqIO->new(-file   => "$seg_cmd |",
+                              -format => 'Fasta')
+        or $self->throw("Can't create Bio::SeqIO $seg_cmd $!");
+    my $seq;
+    eval{
+        $seq = $seg->next_seq->seq;
+    };
+    unlink($filename);
+    if($@){
+        $self->throw("There was a problem with SEG masking.\nI tried to '$seg_cmd'");
+    }
+    if($seq =~ /[CATG]{3}/){
+        $self->input_is_void(0);
+    }else{
+        $self->input_is_void(1);
+        $self->warn("Need at least 3 nucleotides after SEG filtering");
+    }
+    
+}
+sub _createfiles {
+    my ($self, $dirname, $filenames) = @_;
+    
+    my $unique = {};
+    $unique    = { map { $_, $unique->{$_}++ } @$filenames };
+    my @files  = ();
+
+    $dirname ||= '/tmp';
+    $dirname   =~ s!(\S+)/$!$1!;
+
+    foreach my $file(@$filenames){
+        if($unique->{$file}){
+            #name not unique add random
+            $file .= ".$$.".int(rand(200));
+            push(@files, "$dirname/$file");
+        }else{
+            #name was unique just add it
+            push(@files, "$dirname/$file.$$");
+        }
+    }
+
+    return @files;
 }
 =head2 run
 
