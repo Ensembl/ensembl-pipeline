@@ -243,13 +243,13 @@ while(1){
          $done = 1;
          last INPUT_ID_TYPE;
        }
-
+       print "Input id ".$input_id."\n" if($verbose);
        my %analHash;
        my @anals = @{$rulemanager->stateinfocontainer->
                        fetch_analysis_by_input_id($input_id)};
        foreach my $rule(@{$rulemanager->rules}){
          my $anal = $rule->check_for_analysis
-           (\@anals, $type, \%completed_accumulator_analyses);
+           (\@anals, $type, \%completed_accumulator_analyses, $verbose);
          if(UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')){
            $analHash{$anal->dbID} = $anal;
          }else{
