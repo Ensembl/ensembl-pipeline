@@ -226,7 +226,7 @@ sub run {
   my $command ="exonerate-0.6.7 ".
     $self->options.
       " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
-  print STDERR "running exonerate: $command\n";
+  #print STDERR "running exonerate: $command\n";
   
   # system calls return 0 (true in Unix) if they succeed
   $self->throw("Error running exonerate\n") if (system ($command));
@@ -255,7 +255,7 @@ sub run {
 sub parse_results {
   my ($self, $length) = @_;
 
-  my $verbose = 1;
+  my $verbose = 0;
   my $filehandle;
   my %length = %$length;
   my @features_within_features;
@@ -324,7 +324,7 @@ sub parse_results {
       # M 7 7     /
       # 
     chomp;
-    my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
+    my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
     
     # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
     $q_start++;
@@ -335,23 +335,30 @@ sub parse_results {
     ############################################################
     # initialize the feature
     my (%query, %target);
+    my (%rev_query, %rev_target);
+
     ( $query{score}  , $target{score} )  = ($score,$score);
     ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
     ( $query{source} , $target{source} ) = ('exonerate','exonerate');
-    ( $query{start}  , $target{start})   = ( $q_start, $t_start );
     ( $query{name}   , $target{name})    = ( $q_id, $t_id);
+ 
     if ( $q_strand eq '+' ){ $q_strand = 1; }
     else{ $q_strand = -1; }
     if ( $t_strand eq '+' ){ $t_strand = 1; }
     else{ $t_strand = -1; }
-    
-    if ( $gene_orientation eq '+' ){ $gene_orientation = 1 }
+
+    ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
+
+    ############################################################
+    # coordinates are corrected later according to strand
+    $query{start}  = $q_start;
+    $target{start} = $t_start;
+        
+    ############################################################
+    # orientation is not used at the moment
+    if ( $gene_orientation eq '+' ){   $gene_orientation = 1 }
     elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
     else{ $gene_orientation = 0 }
-    
-    ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
-    
-    
     
     my $transcript = Bio::EnsEMBL::Transcript->new();      
     my $exon = Bio::EnsEMBL::Exon->new();
@@ -366,106 +373,125 @@ sub parse_results {
     for( my $i=0; $i<=$#blocks; $i+=3){
       
       # do not look at splice sites now
-	  if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
-	      next TRIAD;
-	  }
-
-	  ############################################################
-	  # match
-	  if ( $blocks[$i] eq 'M' ){
-	    if ( $in_exon == 0 ){
-	      $in_exon = 1;
-	      
-	      # start a new exon
-	      $exon = Bio::EnsEMBL::Exon->new();
-	      $exon->seqname( $t_id );
-	      $exon->start( $target{start} );
-	      $exon->strand( $t_strand );
-	      $exon->phase( 0 );
-	      $exon->end_phase( 0 );
-	    }
-	    # for every match we increase the end coordinate of the current exon
-	    print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
-	    $exon->end( $exon->start +  $blocks[$i+2] - 1 );
-
-
-	    # start a new feature pair
-	    $query{end}  = $query{start}  + $blocks[$i+1] - 1;
-	    $target{end} = $target{start} + $blocks[$i+2] - 1;
-	    if ($verbose){
-	      print STDERR "FEATURE:\n";
-	      print STDERR "query : $query{start} -  $query{end}\n";
-	      print STDERR "target: $target{start} -  $target{end}\n";
-	    }
-	    
-	    my $feature_pair = $self->create_FeaturePair(\%target, \%query);
-	    #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
-	    push( @features, $feature_pair);
-	    
-	    # re-set the start:
-	    $query{start}  = $query{end}  + 1;
-	    $target{start} = $target{end} + 1;
-	    if ($verbose){
-	      print STDERR "Re-SET POINTERS:\n";
-	      print STDERR "query : $query{start} -  $query{end}\n";
-	      print STDERR "target: $target{start} -  $target{end}\n";
-	    }
-
-	  }
-	  ############################################################
-	  # gap 
-	  if ( $blocks[$i] eq 'G' ){
-	    if ( $in_exon ){
-	      # keep the same exon
-	      
-	      # if the gap is in the query, we move the target
-	      if ( $blocks[$i+2] ){
-		$target{start} += $blocks[$i+2];
-		# also move the exon:
-		$exon->end( $exon->end + $blocks[$i+2]); 
-	      }
-	      # if the gap is in the target, we move the query
-	      if ( $blocks[$i+1] ){
-		$query{start} += $blocks[$i+1];
-		$target_gap_length += $blocks[$i+1]
-	      }
-	      if ($verbose){
-		print STDERR "GAP:\n";
-		print STDERR "query : $query{start} -  $query{end}\n";
-		print STDERR "target: $target{start} -  $target{end}\n";
-	      }
-	    }
-	  }
-	  ############################################################
-	  # intron
-	  if( $blocks[$i] eq 'I' ){
-	      if ( $in_exon ){
-		# emit the current exon
-		if ($verbose){
-		  print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
-		}
-		
-		$transcript->add_Exon($exon);
-		
-		# add the supporting features
-		my $supp_feature;
-		eval{
-		  $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
-		};
-		print STDERR "intron: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
-		$exon->add_supporting_features( $supp_feature );
-		
-		$in_exon = 0;
-		
-		@features = ();
-		
-		# reset the start in the target only
-		my $intron_length = $blocks[$i+2];
-		$target{start} += $intron_length + 1;
-	      }
-	  }
-      } # end of TRIAD
+      if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
+	next TRIAD;
+      }
       
+      ############################################################
+      # match
+      if ( $blocks[$i] eq 'M' ){
+	if ( $in_exon == 0 ){
+	  $in_exon = 1;
+	  
+	  # start a new exon
+	  $exon = Bio::EnsEMBL::Exon->new();
+	  $exon->seqname( $t_id );
+	  $exon->start( $target{start} );
+	  $exon->strand( $t_strand );
+	  $exon->phase( 0 );
+	  $exon->end_phase( 0 );
+	}
+	# for every match we increase the end coordinate of the current exon
+	
+	#print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
+	$exon->end( $exon->start +  $blocks[$i+2] - 1 );
+	
+	# start a new feature pair
+	$query{end}  = $query{start}  + $blocks[$i+1] - 1;
+	$target{end} = $target{start} + $blocks[$i+2] - 1;
+	
+	if ($verbose){
+	  print STDERR "FEATURE:\n";
+	  print STDERR "query length: ".$length{$q_id}."\n";
+	  print STDERR "query : $query{start} -  $query{end}\n";
+	  print STDERR "target: $target{start} -  $target{end}\n";
+	}
+	
+	############################################################
+	# if the query has been inverted we coun from the end and
+	# inver start and end to inforce start < end
+	%rev_query  = %query;
+	%rev_target = %target;
+	if ( $q_strand == -1 ){
+	  $rev_query{end}   = $length{$q_id} - $query{start} + 1;
+	  $rev_query{start} = $length{$q_id} - $query{end} + 1;
+	  
+	  print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
+	  print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
+	  my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);
+	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+	  push( @features, $feature_pair);
+	}
+	else{	      	    
+	  my $feature_pair = $self->create_FeaturePair(\%target, \%query);
+	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+	  push( @features, $feature_pair);
+	}
+	
+	# re-set the start:
+	$query{start}  = $query{end}  + 1;
+	$target{start} = $target{end} + 1;
+	#if ($verbose){
+	#  print STDERR "Re-SET POINTERS:\n";
+	#  print STDERR "query : $query{start} -  $query{end}\n";
+	#  print STDERR "target: $target{start} -  $target{end}\n";
+	#}
+	
+      }
+      ############################################################
+      # gap 
+      if ( $blocks[$i] eq 'G' ){
+	if ( $in_exon ){
+	  # keep the same exon
+	  
+	  # if the gap is in the query, we move the target
+	  if ( $blocks[$i+2] ){
+	    $target{start} += $blocks[$i+2];
+	    # also move the exon:
+	    $exon->end( $exon->end + $blocks[$i+2]); 
+	  }
+	  # if the gap is in the target, we move the query
+	  if ( $blocks[$i+1] ){
+	    $query{start} += $blocks[$i+1];
+	    $target_gap_length += $blocks[$i+1]
+	  }
+	  if ($verbose){
+	    print STDERR "GAP:\n";
+	    print STDERR "query : $query{start} -  $query{end}\n";
+		print STDERR "target: $target{start} -  $target{end}\n";
+	  }
+	}
+      }
+      ############################################################
+      # intron
+      if( $blocks[$i] eq 'I' ){
+	if ( $in_exon ){
+	  # emit the current exon
+	  if ($verbose){
+	    print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
+	  }
+	  
+	  $transcript->add_Exon($exon);
+	  
+	  # add the supporting features
+	  my $supp_feature;
+	  eval{
+	    $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+	  };
+	  print STDERR "intron: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
+	  $exon->add_supporting_features( $supp_feature );
+	  
+	  $in_exon = 0;
+	  
+	  @features = ();
+	  
+	  # reset the start in the target only
+	  my $intron_length = $blocks[$i+2];
+	  $target{start} += $intron_length + 1;
+	}
+      }
+    } # end of TRIAD
+    
     ############################################################
     # emit the last exon and the last set of supporting features
     # and add the supporting features
@@ -477,19 +503,28 @@ sub parse_results {
     if ($verbose){
       print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
     }
-    my $supp_feature;
-    eval{
-      $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
-    };
-    print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
-    $exon->add_supporting_features( $supp_feature );
+    if ( scalar(@features) ){
+      my $supp_feature;
+      eval{
+	$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+      };
+      if ($@){
+	print STDERR $@."\n";
+      }
+      print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
+      $exon->add_supporting_features( $supp_feature );
+    }
+    else{
+      print STDERR "No more features to add" if $verbose;
+    }
     $transcript->add_Exon($exon);
 
 
     ############################################################
     # compute coverage
     # q_start reported by the sugar/cigar lines is one less 
-    my $aligned_length = $q_length - ($q_start + 1) + 1;
+    # as exonerate counts between lines
+    my $aligned_length = $q_end - ($q_start + 1) + 1;
     my $coverage = sprintf "%.2f", 100 * ( $aligned_length - $target_gap_length ) / $length{$q_id};
     
     print STDERR "coverage = ( $aligned_length - $target_gap_length ) / ".$length{$q_id}." =  $coverage\n" if $verbose;
