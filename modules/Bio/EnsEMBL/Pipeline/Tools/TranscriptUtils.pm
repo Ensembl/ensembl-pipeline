@@ -56,11 +56,23 @@ use Bio::EnsEMBL::PredictionTranscript;
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
+
+###########################################################
+#
+# METHODS DOING CHECKS
+#
+###########################################################
+
+# parameter slice is optional. It makes sense to use it when working on fixed length slices.
+# If it is not used, the method can still be used to check consistency of the transcript
+# although always on chromosomal/slice coordinates, never in rawcontig coordinates.
+# note - intron lengths now checked separately using _check_introns
+
 sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
     
     # hardcoded stuff, to go in a config file
-   my $MAX_EXON_LENGTH   = 20000;
+    my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
     my $MAX_INTRON_LENGTH = 200000;
     
@@ -68,7 +80,8 @@ sub _check_Transcript{
     my $valid = 1;
     
     my $strand;
-    
+
+    $transcript->sort;    
     my @exons = @{$transcript->get_all_Exons};
     eval {
       $strand =  $exons[0]->strand;
@@ -84,30 +97,31 @@ sub _check_Transcript{
     # one end, the 'higher' end of the slice
     ############################################################
     if ( $slice ){
+
 	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	    print STDERR "transcript $id outside the slice\n";
+	    print STDERR "check: transcript $id outside the slice\n";
 	    $valid = 0;
 	}
 	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    print STDERR "transcript $id falls off the slice by its lower end\n";
+	    #print STDERR "check: transcript $id falls off the slice by its lower end\n";
 	    $valid = 0;
 	}
     }
     
 
-    #my @exons = @{$transcript->get_all_Exons};
+#    my @exons = @{$transcript->get_all_Exons};
     
     if (scalar(@exons) > 1 ) {
-
+     
     EXON:
 	for (my $i = 0; $i <= $#exons; $i++) {
 
 	  ##############################
 	  # check exon length
 	  ##############################
-	  my $length = $exons[$i]->end - $exons[$i] + 1;
+	  my $length = $exons[$i]->end - $exons[$i]->start + 1;
 	  if ( $length > $MAX_EXON_LENGTH ){
-	    print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+	    print STDERR "check: exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 	    $valid = 0;
 	    last EXON;
 	  }
@@ -120,7 +134,7 @@ sub _check_Transcript{
 		# check strand consistency:
 		##############################
 	        if($exons[$i]->strand != $exons[$i-1]->strand){
-	            print STDERR "transcript $id has mixed strands\n";
+	            print STDERR "check: transcript $id has mixed strands\n";
 	            $valid = 0;
 		    last EXON;
 	        }
@@ -129,46 +143,27 @@ sub _check_Transcript{
 		# check phase consistency:
 		##############################
 		if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-		    print STDERR "transcript $id has phase inconsistency\n";
+		    #print STDERR "check: transcript $id has phase inconsistency\n";
 		    $valid = 0;
 		    last EXON;
 		}
 	    
 
 	    
-		##############################
-		# check intron length
-		##############################
-		if ( $strand == 1 ){
-		    my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
-		elsif( $strand == -1 ){
-		    my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
 		
 		##############################
 		# check for folded transcripts
 		##############################
 		if ($exons[0]->strand == 1) {
 		    if ($exons[$i]->start < $exons[$i-1]->end) {
-			print STDERR "transcript $id folds back on itself\n";
+			print STDERR "check: transcript $id folds back on itself\n";
 			$valid = 0;
 			last EXON;
 		    } 
 		} 
 		elsif ($exons[0]->strand == -1) {
 		    if ($exons[$i]->end > $exons[$i-1]->start) {
-			print STDERR "transcript $id folds back on itself\n";
+			print STDERR "check: transcript $id folds back on itself\n";
 			$valid = 0;
 			last EXON;
 		    } 
@@ -177,29 +172,32 @@ sub _check_Transcript{
 	    ############################################################
 	    # we don't want the NG_ entries going through, they are evil
 	    ############################################################
-	    foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
-		if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
-		    print STDERR "transcript with evil evidence: ".$evidence->hseqname." skippping\n";
-		    $valid = 0;
-		    last EXON;
-		}
-	    }
-	}
+    if($exons[$i]->get_all_supporting_features){
+      foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
+        if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
+          print STDERR "check: transcript with evil evidence: ".$evidence->hseqname." skippping\n";
+          $valid = 0;
+          last EXON;
+        }
+      }
+    }
+  }
+  
 	
     }
     elsif( scalar(@exons) == 1 ){
 	my $length =  $exons[0]->end - $exons[0]->start + 1;
 	if ( $length >  $MAX_EXON_LENGTH ){
-	    print STDERR "single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
+	    print STDERR "check: single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
 	    $valid = 0;
 	}
     }
     else{
-	print STDERR "transcript with no exons\n";
+	print STDERR "check: transcript with no exons\n";
 	$valid = 0;
     }
     if ($valid == 0 ){
-	$self->_print_Transcript($transcript);
+#	$self->_print_Transcript($transcript);
     }
     return $valid;
 }
@@ -211,10 +209,10 @@ sub _check_Transcript{
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
 sub _check_introns{
-    my ($self,$transcript, $slice) = @_;
+    my ($self,$transcript, $slice, $maxintron) = @_;
     
     # hardcoded stuff, to go in a config file
-    my $MAX_INTRON_LENGTH = 200000;
+    my $MAX_INTRON_LENGTH = $maxintron || 200000;
     
     #my $MAX_INTRON_LENGTH = 25000;
 
@@ -242,14 +240,13 @@ sub _check_introns{
     # one end, the 'higher' end of the slice
     ############################################################
     if ( $slice ){
-	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	    print STDERR "transcript $id outside the slice\n";
-	    $valid = 0;
-	}
-	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    print STDERR "transcript $id falls off the slice by its lower end\n";
-	    $valid = 0;
-	}
+      if ( $transcript->start > $slice->length || $transcript->end < 1 ){
+        #print STDERR "transcript $id outside the slice\n";
+        $valid = 0;
+      }elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+        #print STDERR "transcript $id falls off the slice by its lower end\n";
+        $valid = 0;
+      }
     }
     
 
@@ -287,7 +284,7 @@ sub _check_introns{
     }
       
     if ($valid == 0 ){
-      $self->_print_Transcript($transcript);
+      #$self->_print_Transcript($transcript);
     }
     return $valid;
   }
@@ -409,7 +406,8 @@ sub _check_Translation{
     }
   }
   if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
+    #print STDERR "Transcript ".$id." isn't valid\n";
+    #$self->_print_Transcript($transcript);
   }
   return $valid;
 }
@@ -497,7 +495,7 @@ sub transcript_id {
   }
   
   if ($t->type){
-      $id .= " ".$t->type."\n";
+      $id .= " ".$t->type;
   }
   return $id;
 }
@@ -673,6 +671,8 @@ sub _print_SimpleTranscript{
 
 sub _print_Transcript{
   my ($self,$transcript) = @_;
+  my ($p, $f, $l) = caller;
+  print "$f:$l\n";
   my @exons = @{$transcript->get_all_Exons};
   my $id;
   if ($transcript->stable_id){
@@ -767,11 +767,13 @@ sub _print_Evidence{
     else{
       $exon_id = "no id";
     }
-    print STDERR "Exon $exon_id: ".$exon->gffstring."\n";
+    my $exon_info = feature_info($exon_id, $exon);
+    print STDERR "Exon $exon_info\n";
     my @evidence = @{$exon->get_all_supporting_features};
     if (@evidence){
       foreach my $evi ( @evidence ){
-	print STDERR "Evidence: ".$evi->gffstring."\n";
+        my $evi_info = feature_info('', $evi);
+        print STDERR "Evidence: ".$evi_info."\n";
       }
     }	
     else{
@@ -1202,7 +1204,141 @@ print STDERR "check_splice_sites: upstream ".
   }
 }
 
-############################################################
+sub check_canonical_splice_sites{
+  my ($self, $transcript) = @_;
+
+  $self->throw("no transcript passed in") unless defined $transcript;
+  $transcript->sort;
+
+  my $strand = $transcript->start_Exon->strand;
+  my @exons  = @{$transcript->get_all_Exons};
+
+  my $introns  = scalar(@exons) - 1 ; 
+  if ( $introns <= 0 ){
+    return 0;
+  }
+
+  my $correct  = 0;
+  my $wrong    = 0;
+  my $other    = 0;
+
+  # all exons in the transcripts are in the same seqname coordinate system:
+  my $slice = $transcript->start_Exon->contig;
+
+  if ($strand == 1 ){
+
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+      my $upstream_site;
+      my $downstream_site;
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i+1]->start - $exons[$i]->end - 1 );
+
+      next if $intron_length <=9;
+
+      eval{
+	$upstream_site = 
+	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+	$downstream_site = 
+	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+      };
+      unless ( $upstream_site && $downstream_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+
+print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
+      ## good pairs of upstream-downstream intron sites:
+      ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
+
+      ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
+      ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+	return 0;
+      }
+      else{
+	$other++;
+	return 0;
+      }
+    } # end of INTRON
+  }
+  elsif ( $strand == -1 ){
+
+    #  example:
+    #                                  ------CT...AC---... 
+    #  transcript in reverse strand -> ######GA...TG###... 
+    # we calculate AC in the slice and the revcomp to get GT == good site
+
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i]->start - $exons[$i+1]->end - 1 );
+      #print STDERR "intron length: $intron_length\n";
+      next if $intron_length <=9;
+
+      my $upstream_site;
+      my $downstream_site;
+      my $up_site;
+      my $down_site;
+      eval{
+	$up_site = 
+	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+	$down_site = 
+	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+      };
+      unless ( $up_site && $down_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      
+      print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
+	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+	return 0;
+      }
+      else{
+	$other++;
+	return 0;
+      }
+      
+    } # end of INTRON
+  }
+  return 1;
+}
+
+#####
+#######################################################
 # method for putting the stop codon at the end of the translation
 # if it is not already there. If the codon next to the last one is not a stop codon
 # we leav it un-touched.
@@ -1839,7 +1975,11 @@ sub _get_ORF_coverage {
 }
 
 
+sub feature_info{
+  my ($name, $feature) = @_;
 
+  return $name." ".$feature->start." ".$feature->end." ".$feature->strand."\n";
+}
 
 
 1;

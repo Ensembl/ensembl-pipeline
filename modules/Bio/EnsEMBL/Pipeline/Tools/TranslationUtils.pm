@@ -185,7 +185,7 @@ sub run_translate{
     ############################################################
     # create file
     my $file = "/tmp/"."cdna_".$$.".fa";
-    open ( SEQ, ">$file" ) || die("could not open file $!");
+    open ( SEQ, ">$file" ) || die("could not open file $file $!");
     my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
 				 '-fh'     => \*SEQ);
     $seqout->write_seq($seq);
