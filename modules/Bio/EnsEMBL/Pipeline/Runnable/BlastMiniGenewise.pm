@@ -265,6 +265,11 @@ sub run_blast {
   my @valid_seq   = $self->validate_sequence(@seq);
   #print STDERR "there are ".@valid_seq." valid sequences\n";
 
+  # there is no point in continuing if there are no sequences
+  if(scalar(@seq) ==0){
+    $self->throw("No sequences fetched, no point in running blast\n");
+  }
+
   my $blastdb     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(
 					 -sequences => [$self->genomic_sequence],
 					 -type      => 'DNA');
