@@ -67,7 +67,8 @@ sub new {
   
   $self->throw("No database handle input")           unless defined($dbobj);
   
-  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::Obj");
+#  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::Obj");
+  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::DBAdaptor") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::DBAdaptor");
   $self->dbobj($dbobj);
   $dbobj->static_golden_path_type('UCSC');
   
@@ -187,6 +188,33 @@ sub run {
    # remap to raw contig coords
    my @remapped = $self->remap_genes();
    
+   # check translations
+   foreach my $gene(@remapped){
+     next unless $gene->type eq 'combined_gw_e2g';
+     foreach my $trans ( $gene->each_Transcript ) {
+       my $tseq;
+       eval{
+	 $tseq = $trans->translate();
+       };
+       
+       if ($@) {
+	 print STDERR "Couldn't translate: " . $gene->id . "[$@]\n";
+       } 
+       
+       # check for stops
+       if ( $tseq->seq =~ /\*/ ) {
+	 $self->throw("UTR gene translation has stop codons, something is wrong\n");
+       }
+
+       # if we get here, all is well, so print out translation
+       print STDERR "translation: \n";
+       my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+       print STDERR "remapped: ";
+       $seqio->write_seq($trans->translate); 
+       print STDERR "\n ";
+     }
+   }
+
    $self->{'_output'} = \@remapped;
 }
 
@@ -270,32 +298,51 @@ sub write_output {
 	my $exoncount  = 0;
 
 	# get counts of each type of ID we need.
-
+	
 	foreach my $gene ( @newgenes ) {
-	    $genecount++;
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$transcount++;
-		$translcount++;
+	  $genecount++;
+	  
+	  print STDERR "genetype: " . $gene->type . "\n";
+	  
+	  
+	  foreach my $trans ( $gene->each_Transcript ) {
+	    $transcount++;
+	    $translcount++;
+	    if($gene->type eq 'combined_gw_e2g') {
+	      eval {
+		print STDERR "translation: \n";
+		my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+		print STDERR "checktrans: ";
+		$seqio->write_seq($trans->translate); 
+		print STDERR "\n ";
+	      };
+	      
+	      if ($@) {
+		print STDERR "Couldn't translate: " . $gene->id . "[$@]\n";
+	      }
 	    }
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		$exoncount++;
-		foreach my $sf($exon->each_Supporting_Feature) {
-		  print STDERR "***sub_align: " . 
-		    $sf->seqname  . "\t" .
-		    $sf->start    . "\t" .
-		    $sf->end      . "\t" .
-         	    $sf->strand   . "\t" .
-         	    $sf->score   . "\t" .
-		    $sf->hseqname . "\t" .
-		    $sf->hstart   . "\t" .
-		    $sf->hend     . "\n";
 	  }
-
+	  foreach my $exon ( $gene->each_unique_Exon() ) {
+	    $exoncount++;
+	    foreach my $sf($exon->each_Supporting_Feature) {
+	      print STDERR "***sub_align: " . 
+		           $sf->seqname  . "\t" .
+		           $sf->start    . "\t" .
+		           $sf->end      . "\t" .
+		           $sf->strand   . "\t" .
+			   $sf->score   . "\t" .
+			   $sf->hseqname . "\t" .
+			   $sf->hstart   . "\t" .
+			   $sf->hend     . "\n";
+	    }
+	    
 	    }
 	}
-
+	
+	$self->throw("exiting bfore write");
+	
 	# get that number of ids. This locks the database
-
+	
 	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
 	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
 	my @translids=  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
@@ -458,7 +505,7 @@ sub combine_genes{
   my @newtrans = $self->_make_newtranscripts(@merged_gw_genes);
 
   # make some lovely genes
-   my @genes;
+  my @genes;
   my $count=0;
   my $genetype = 'combined_gw_e2g';
   foreach my $trans(@newtrans){
@@ -607,13 +654,92 @@ sub _make_newtranscripts {
       $newtranscript->translation($translation);
       my $eecount = 0;
 
+      print "e2g exons: " . scalar(@eg_ex) . "\n";
+
       foreach my $ee(@eg_ex){
 	$self->warn("gw and e2g exons have different strands - odd things will happen\n") 
 	  if ($ee->strand != $strand);
 
 	# single exon genewise prediction?
-	if(scalar(@gw_ex) == 1) {
-	  print STDERR "single exon gene\n";
+	if(scalar(@gw_ex) == 1) {# eeeep
+	  if ($gw_ex[0]->start >= $ee->start && $gw_ex[0]->end <= $ee->end){
+	    print STDERR "single exon gene\n";	    
+	    # modify the coordinates of the first exon in $newtranscript
+	    my $ex = $newtranscript->start_exon;
+	    
+	    $ex->start($ee->start);
+	    $ex->end($ee->end);
+
+	    print STDERR "eecount: $eecount\n";
+    
+	    # need to add back exons, both 5' and 3'
+	    my $c = 0;
+	    while($c < $eecount){
+	      print STDERR "adding 5' exon\n";
+	      $newtranscript->add_Exon($eg_ex[$c]);
+	      $newtranscript->sort;
+	      $c++;
+	    }
+	    
+	    # add all the exons from the est2genome transcript, subsequent to this one
+	    my $c = $#eg_ex;
+	    while($c > $eecount){
+	      print STDERR "adding 3' exon\n";
+	      $newtranscript->add_Exon($eg_ex[$c]);
+	      $newtranscript->sort;
+	      $c--;
+	    }
+	    
+	    # need to deal with translation start and end this time - varies depending on strand
+	    if($strand == 1){
+	      my $diff = $gw_ex[0]->start - $ex->start;
+	      my $tstart = $translation->start;
+	      my $tend = $translation->end;
+	      
+	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
+	      $translation->start($tstart + $diff);
+	      $translation->end($tend + $diff);
+	    }
+	    elsif($strand == -1){
+	      print STDERR "***reverse\n";
+	      #	    my $diff = $ee->end - $gw_ex[0]->end;
+	      my $diff = $gw_ex[0]->start - $ee->start;
+	      my $tstart = $translation->start;
+	      my $tend = $translation->end;
+	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
+	      
+	      $translation->start($tstart+$diff);
+	      $translation->end($tend + $diff);
+	    }
+	    
+	    
+	    # frameshifts - if > 1 frameshift we may just be buggered. My brain hurts.
+	    if(scalar($ex->sub_SeqFeature) > 1){
+	      print STDERR "uh-oh frameshift\n";
+	      my @sf = $ex->sub_SeqFeature;
+	      
+	      # save current start and end
+	      my $cstart = $ex->start;
+	      my $cend   = $ex->end;
+	      
+	      # get first exon - this has same id as $ex
+	      my $first = shift(@sf);
+	      $ex->end($first->end);
+	      
+	      # get last exon
+	      my $last = pop(@sf);
+	      $last->end($cend);
+	      $newtranscript->add_Exon($last);
+	      
+	      # get any remaining exons
+	      foreach my $s(@sf){
+		$newtranscript->add_Exon($s);
+		$newtranscript->sort;
+	      }
+	      # flush the sub_SeqFeatures
+	      $ex->flush_sub_SeqFeature;
+	    }	      
+	  }
 	}
 	
 	# multiple exon genewise prediction
@@ -845,23 +971,27 @@ sub make_genes {
 
 sub remap_genes {
   my ($self) = @_;
-  
+  my @newf;  
   my $contig = $self->vc;
 
   my @genes = @{$self->{_gw_genes}};
   push(@genes, @{$self->{_e2g_genes}});
   push(@genes, @{$self->{_combined_genes}});
-  
-  my @newf;
-  my $trancount=1;
+
   foreach my $gene (@genes) {
+    print STDERR "about to remap\n";
+    my @t = $gene->each_Transcript;
+    my $tran = $t[0];
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
       $newgene->type($genetype);
+
+      push(@newf,$newgene);
+
+      # sort out supporting feature coordinates
       foreach my $tran ($newgene->each_Transcript) {
 	foreach my $exon($tran->each_Exon) {
-	  print STDERR $exon->contig_id . "\texon\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->phase . "\n";
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -872,9 +1002,38 @@ sub remap_genes {
 	  }
 	}
       }
-      push(@newf,$newgene);
-      
+
+      # is this a special case single coding exon gene with UTRS?
+      if($tran->translation->start_exon_id() eq $tran->translation->end_exon_id() 
+	 && $gene->type eq 'combined_gw_e2g'){
+	print STDERR "single coding exon, with UTRs\n";
+	
+	# problems come about when we switch from + strand on FPC contig to - strand on raw contig.
+	my $fpc_strand;
+
+	foreach my $exon($tran->each_Exon) {
+	  if ($exon->id eq $tran->translation->start_exon_id()) {
+	    $fpc_strand = $exon->strand;
+	    last;
+	  }
+	}
+	
+	foreach my $tran ($newgene->each_Transcript) {
+	  foreach my $exon($tran->each_Exon) {
+	    if ($exon->id eq $tran->translation->start_exon_id()) {
+	      if($fpc_strand == 1 && $exon->strand == -1){
+		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
+		$exon->end($exon->end - ($tran->translation->start -1));
+		$exon->start($exon->end - ($tran->translation->end -1));
+	      }
+	    }
+	  }
+	}
+      } # end special case single coding exon
+
     };
+
+    # did we throw exceptions?
     if ($@) {
       print STDERR "contig: $contig\n";
       foreach my $tran ($gene->each_Transcript) {
@@ -884,16 +1043,13 @@ sub remap_genes {
 	  }
 	}
       }
-
-
+      
+      
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
-    
-
   }
 
   return @newf;
-
 }
 
 
@@ -1041,6 +1197,8 @@ sub _make_transcript{
   } 
   else {
     
+    print STDERR "num exons: " . scalar(@exons) . "\n";
+
     if ($exons[0]->strand == -1) {
       @exons = sort {$b->start <=> $a->start} @exons;
     } else {
