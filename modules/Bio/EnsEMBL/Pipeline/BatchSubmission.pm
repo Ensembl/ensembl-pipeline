@@ -60,10 +60,10 @@ sub new{
     $self->jobname($jobname);
   }
   if(defined($resource)){
-    $self->jobname($resource);
+    $self->resource($resource);
   }
   if(defined($nodes)){
-    $self->jobname($nodes);
+    $self->nodes($nodes);
   }
 
   return $self;

@@ -65,8 +65,8 @@ sub construct_command_line{
     $res = qq{-R $res} unless $res =~ /^-R/;
     $bsub_line .= " $res ";
   }
-  $bsub_line .= " -q ".$self->queue    if defined $self->queue;
-  $bsub_line .= " -J ".$self->jobname  if defined $self->jobname;
+  $bsub_line .= " -q ".$self->queue    if $self->queue;
+  $bsub_line .= " -J ".$self->jobname  if $self->jobname;
   $bsub_line .= " ".$self->parameters." "  if defined $self->parameters;
   if($stderr){
     $bsub_line .= " -e ".$stderr;
