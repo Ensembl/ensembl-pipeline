@@ -10,8 +10,16 @@ use strict;
 
 
 my $gene_id;
+my $check;
+
 &GetOptions('gene_id:s'       => \$gene_id,
-	    );
+	    'check'     => \$check,
+	   );
+
+if ( $check ){
+  exit(0);
+}
+
 
 unless( $gene_id ){
   print "script to test predicted genes for procesed-pseudogene properties\n";
