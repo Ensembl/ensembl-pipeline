@@ -282,7 +282,7 @@ sub make_EST_GeneBuilder_bsubs{
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
   # where out and err files go
-  my $filter = $scratchdir . "/" . $est_genebuilder_dir . "/";
+  my $filter = $scratchdir . "/" . $est_genebuilder_dir. "/";
 
   # genomic size for each job
   my $size   = $EST_GENEBUILDER_CHUNKSIZE;
@@ -334,10 +334,10 @@ sub make_MapGeneToExpression_bsubs{
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
   # where out and err files go
-  my $filter = $scratchdir . "/" . $est_genebuilder_dir . "/";
+  my $filter = $scratchdir . "/" .  $gene2expression_dir . "/";
 
   # genomic size for each job
-  my $size   = $EST_GENEBUILDER_CHUNKSIZE;
+  my $size   = $EST_EXPRESSION_CHUNKSIZE;
   my $runner = $EST_EXPRESSION_RUNNER;
 
   foreach my $chr(keys %chrhash) {
@@ -359,7 +359,7 @@ sub make_MapGeneToExpression_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
 
       # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression -input_id $input_id -write";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression -input_id $input_id -write";
       print OUT "$command\n";
 
       $count = $count + $size;
