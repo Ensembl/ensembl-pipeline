@@ -152,7 +152,7 @@ sub run {
     }
 
     #close BLAT or die "Error running blat pipe '$cmd' : exit($?)";
-    $self->deletefiles;
+    #$self->deletefiles;
 }
 
 
