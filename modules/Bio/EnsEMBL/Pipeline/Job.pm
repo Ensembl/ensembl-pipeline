@@ -454,6 +454,7 @@ sub runLocally {
 sub run_module {
   my $self = shift;
   my $module = $self->analysis->module;
+  print STDERR "Running ".$module." with ".$self."\n";
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
@@ -462,14 +463,17 @@ sub run_module {
     $hash_key = 'default';
   }
   my $runnable_db_path = 
-    $BATCH_QUEUES{$hash_key};
+    $BATCH_QUEUES{$hash_key}{runnabledb_path};
   my $perl_path;
+  print STDERR "Getting ".$hash_key." batchqueue value\n";
   if($module =~ /::/){
+    print STDERR "Module contains path info already\n";
     $module =~ s/::/\//g;
     $perl_path = $module;
   }else{
     $perl_path = $runnable_db_path."/".$module;
   }
+  print STDERR "have perlpath ".$perl_path."\n";
   STATUS: 
   { 
     eval {
