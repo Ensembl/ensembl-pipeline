@@ -162,13 +162,15 @@ sub _check_est_Cluster{
       my @sorted_transcripts = sort { my $result = ( $self->_get_score($b) <=> 
 						     $self->_get_score($a) );
 				      unless($result){
-					  return ( $self->_get_precent_id($b) <=>
+					  return ( $self->_get_percent_id($b) <=>
 						   $self->_get_percent_id($a) );
 				      }
 				      return $result;
 				  } @est_transcripts;
       
-      push( @accepted_transcripts, shift @sorted_transcripts );
+      my $best = shift @sorted_transcripts;
+      print STDERR "score: ".$self->_get_score($best)." percent_id: ".$self->_get_percent_id($best)."\n";
+      push( @accepted_transcripts, $best );
   }
   
   print STDERR "returning ".scalar( @accepted_transcripts)." transcripts\n";
@@ -310,7 +312,7 @@ sub _get_score{
     foreach my $exon ( @{$tran->get_all_Exons} ){
 	$count++;
 	my @evidence = sort { $b->score <=> $a->score } @{$exon->get_all_supporting_features};
-	$score += $evidence[0];
+	$score += $evidence[0]->score;
     }
     my $final_score = $score/$count;
     return $final_score;
@@ -328,7 +330,7 @@ sub _get_percent_id{
     foreach my $exon ( @{$tran->get_all_Exons} ){
 	$count++;
 	my @evidence = sort { $b->percent_id <=> $a->percent_id } @{$exon->get_all_supporting_features};
-	$percent_id += $evidence[0];
+	$percent_id += $evidence[0]->percent_id;
     }
     my $final_percent_id = $percent_id/$count;
     return $final_percent_id;
