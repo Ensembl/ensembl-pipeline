@@ -61,6 +61,8 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_DBNAME
 					 GB_DBUSER
 					 GB_DBPASS
+					 GB_TARGETTED_GW_GENETYPE
+					 GB_SIMILARITY_GENETYPE
 					 GB_COMBINED_GENETYPE
 					);
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
@@ -186,8 +188,8 @@ sub run {
   my ($self,@args) = @_;
   
   # get genewise genes
-  $self->gw_genes( $self->vc->get_Genes_by_Type('TGE_gw','evidence'));
-  $self->gw_genes($self->vc->get_Genes_by_Type('similarity_genewise','evidence'));
+  $self->gw_genes( $self->vc->get_Genes_by_Type($GB_TARGETTED_GW_GENETYPE,'evidence'));
+  $self->gw_genes($self->vc->get_Genes_by_Type($GB_SIMILARITY_GENETYPE,'evidence'));
   print STDERR "got " . scalar($self->gw_genes) . " genewise genes\n";
 
   # get e2g genes
@@ -887,6 +889,11 @@ sub compare_transcripts{
 
   if ($@) {
     print STDERR "Couldn't translate combined gene:[$@]\n";
+    return 0;
+  }
+
+  elsif($combined_translation->seq =~ /\*/){
+    print STDERR "combined translation has stops\n";
     return 0;
   }
   else{
