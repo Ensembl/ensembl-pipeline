@@ -1,56 +1,154 @@
-[DEFAULT_DATABASE]
-host=ecs1g
-user=ensadmin
-pass=ensembl
-port=3306
+#######################
+# DATABASES           #
+#######################
 
-#
-# Database where pipeline config is stored
-# as well as jobs & job_status
-#
+[DEFAULT_DATABASE]
+  host=127.0.0.1
+  user=ensadmin
+  pass=ensembl
+  port=3307
+
+
+# DB where pipeline config is stored as well as jobs & job_status
 [PIPELINE_DATABASE]
-dbname = mcvicker_test_briggsae
+  dbname = mcvicker_test_briggsae
 
 [ENSEMBL_DATABASE]
-dbname = mcvicker_test_briggsae
+  dbname = mcvicker_test_briggsae
 
 [DNA_DATABASE]
-dbname = mcvicker_test_briggsae
+  dbname = mcvicker_test_briggsae
+
+
+
+
+###########################
+# SUBMISSION SYSTEMS      #
+###########################
 
 [LSF]
-output_dir = /tmp
-path = /usr/local/lsfv42/4.2/alpha5/bin/
+  output_dir = /tmp
+  path = /usr/local/lsfv42/4.2/alpha5/bin/
+  runner = /nfs/acari/mcvicker/src/pipeline-experimental/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/runner.pl
+  max_pending = 1000
 
 [LOCAL]
-output_dir = /tmp
-maxjobs = 3
+  output_dir = /tmp
+  #the number of simulataneous processes to run locally:
+  maxjobs = 3
+
+[MANUAL]
+
+
+
+###########################
+# GENERAL                 #
+###########################
 
 [PIPELINE_MANAGER]
-check_interval = 10
+  check_interval = 10
 
-#
+
+###########################
+# ID FACTORIES            #
+###########################
+
+[DUMMY_ID_FACTORY]
+  module  = Bio::EnsEMBL::Pipeline::IDFactory::Config
+  id_list = dummy1;dummy2;dummy3;dummy4;dummy5;dummy6
+
+[MANUAL_ID_FACTORY]
+  module  = Bio::EnsEMBL::Pipeline::IDFactory::Config
+  id_list = MANUAL1;MANUAL2
+
+[FILE_ID_FACTORY]
+  module  = Bio::EnsEMBL::Pipeline::IDFactory::File
+  #can optionally provide base dir otherwise cwd is used
+#  dir     = /nfs/acari/mcvicker/data/
+  files   = input1.txt
+
+[FILENAME_ID_FACTORY]
+  module  = Bio::EnsEMBL::Pipeline::IDFactory::Filename
+  #can optionally provide base dir otherwise cwd is used
+  dir     = /nfs/acari/mcvicker/data
+  regexp  = ^input\d+.txt$
+
+[CONTIG_ID_FACTORY]
+  module   = Bio::EnsEMBL::Pipeline::IDFactory::Database
+  database = ENSEMBL_DATABASE
+  table    = contig
+  column   = name
+
+[SLICE_ID_FACTORY]
+  module   = Bio::EnsEMBL::Pipeline::IDFactory::Slice
+  database = ENSEMBL_DATABASE
+  size     = 1000000
+  overlap  = 1000
+
+###########################
+# TASKS                   #
+###########################
+
 # This is a list of tasks to be run by the pipeline manager
-#
 [TASKS]
-dummy_task = Bio::EnsEMBL::Pipeline::Task::Dummy
+  dummy_no_deps2_task = Bio::EnsEMBL::Pipeline::Task
+  dummy_partial_deps_task = Bio::EnsEMBL::Pipeline::Task
+  dummy_no_deps_task = Bio::EnsEMBL::Pipeline::Task
+  dummy_partial_deps2_task = Bio::EnsEMBL::Pipeline::Task
+  dummy_manual_task = Bio::EnsEMBL::Pipeline::Task
 
-#
-# configuration for tasks follows
-#
 [DEFAULT_TASK]
-ensdb = ensembl_database
-dnadb = dna_database
-where = 
-batchsize = 500
-#timeout in seconds 86400 = 24hours
-timeout = 86400
-retries	= 0
-#max create represents the maxumim number of jobs a Task will create at
-#one time
-max_create = 50
+  ensdb   = ensembl_database
+  dnadb   = dna_database
+  where   = LSF:acari
+  #timeout in seconds 86400 = 24hours
+  timeout = 86400
+  retries = 0
 
-[DUMMY_TASK]
-timeout  = 30
-where = Local
-retries = 3
 
+[DUMMY_NO_DEPS2_TASK]
+  dependency_type = NONE
+  module          = Bio::EnsEMBL::Pipeline::DummyModule
+  id_factory      = FILE_ID_FACTORY
+  timeout         = 30
+  where           = Local
+  retries         = 3
+  description     = This is a dummy task
+
+[DUMMY_NO_DEPS_TASK]
+  dependency_type = NONE
+  module          = Bio::EnsEMBL::Pipeline::DummyModule
+  id_factory      = CONTIG_ID_FACTORY
+  timeout         = 30
+  where           = Local
+  retries         = 3
+  description     = This is a dummy task
+
+[DUMMY_PARTIAL_DEPS_TASK]
+  dependency_type = PARTIAL
+  dependency_list = DUMMY_NO_DEPS_TASK
+  module          = Bio::EnsEMBL::Pipeline::DummyModule
+  id_factory      = CONTIG_ID_FACTORY
+  timeout         = 30
+  where           = Local
+  retries         = 3
+  description     = This is a dummy task
+
+[DUMMY_PARTIAL_DEPS2_TASK]
+  dependency_type = PARTIAL
+  dependency_list = DUMMY_NO_DEPS_TASK;DUMMY_PARTIAL_DEPS_TASK
+  module          = Bio::EnsEMBL::Pipeline::DummyModule
+  id_factory      = CONTIG_ID_FACTORY
+  timeout         = 30
+  where           = Local
+  retries         = 3
+  description     = This is a dummy task
+
+[DUMMY_MANUAL_TASK]
+  dependency_type = FULL
+  dependency_list = DUMMY_NO_DEPS_TASK
+  id_factory      = MANUAL_ID_FACTORY
+  timeout = 30
+  where = Manual
+  retries = 3
+  description     = This is a dummy manual task
