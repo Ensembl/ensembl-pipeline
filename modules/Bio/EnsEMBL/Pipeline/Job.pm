@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::Job;
 
 
-use vars qw(@ISA);
+use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
@@ -500,6 +500,16 @@ sub run_module {
     eval {
       $self->set_status( "WRITING" );
       $rdb->write_output;
+      # -------------------------------------------------------------------
+      if($rdb->can('db_version_searched')){
+      	my $new_db_version = $rdb->db_version_searched();
+      	my $analysis = $self->analysis();
+      	my $old_db_version = $analysis->db_version();
+      	$analysis->db_version($new_db_version);
+      	# where is the analysisAdaptor??
+      	# $self->adaptor->get_AnalysisAdaptor->store($analysis);# if $new_db_version gt $old_db_version;
+      }else{$SAVE_RUNTIME_INFO = 0;}
+      # -------------------------------------------------------------------
       $self->set_status( "SUCCESSFUL" );
     }; 
     if ($err = $@) {
@@ -513,10 +523,13 @@ sub run_module {
   if ($autoupdate) {
     eval {
       my $sic = $self->adaptor->db->get_StateInfoContainer;
+      # -------------------------------------------------------------
       $sic->store_input_id_analysis(
         $self->input_id,
-        $self->analysis
+        $self->analysis,
+		$SAVE_RUNTIME_INFO
       );
+      # -------------------------------------------------------------
     };
     if ($err = $@) {
       print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
