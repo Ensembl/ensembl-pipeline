@@ -325,6 +325,8 @@ sub parse_results {
             $feature {score} = $element[3];
             $feature {start} = $element[1];
             $feature {end} = $element[2];
+	    $feature {pvalue} = $element[7]; #oe isn't a pvalue but needs to be stored somewhere
+	    $feature {percent_id} = $element[6]; #gc isn't percent id but this is the only place to store it
             $feature {strand} = 0;
             $feature {source}= 'cpg';
             $feature {primary}= 'cpg_island';
@@ -387,6 +389,8 @@ sub create_feature {
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
                             -score   => $feat->{'score'},
+			    -p_value => $feat->{pvalue},
+			    -percent_id => $feat->{percent_id},
                             -source_tag  => $feat->{'source'},
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
