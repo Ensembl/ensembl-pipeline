@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use Bio::EnsEMBL::Pipeline::SubmissionSystem;
-use Bio::EnsEMBL::Pipeline::Load;
 use Bio::EnsEMBL::Pipeline::Job;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
@@ -73,16 +72,19 @@ sub submit{
           scalar(@_queue) . " jobs left in queue\n";
 	
       } else {
-        #CHILD        
-        #my $file_prefix = $self->_generate_filename_prefix($job);
-        #$job->stdout_file("${file_prefix}.out");
-        #$job->stderr_file("${file_prefix}.err");
-        
+        #CHILD
+        my $file_prefix = $self->_generate_filename_prefix($job);
+        $job->stdout_file("${file_prefix}.out");
+        $job->stderr_file("${file_prefix}.err");
+	close(STDERR); 
+	close(STDOUT);
+	open(STDERR, ">" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
+        open(STDOUT, ">" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
         print "Executing $job with PID $$\n";
         $job->submission_id($$);
         $job->adaptor->update($job);
         $job->set_current_status('SUBMITTED');
-        
+
         $job->run();
         exit(0); #child process is finished now!
       }
