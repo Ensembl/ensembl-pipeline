@@ -57,8 +57,8 @@ sub new {
 sub DESTROY {
   my $self = shift;
 
-  unlink $self->output  if $self->output;
-  rmdir  $self->workdir if $self->workdir;
+  unlink $self->output_file  if $self->output_file;
+  rmdir  $self->workdir      if $self->workdir;
 }
 
 sub run {
@@ -78,17 +78,18 @@ sub run {
 
   if ($self->blastdb->index_type =~ /wu/) {
 
-    $command = $self->program . ' ' . $self->blastdb->db . ' ' 
+    $command = $self->program . ' ' . $self->blastdb->dbfile . ' ' 
       . $input_file . ' ' . $self->options . ' > ' . $output_file;
 
   } elsif ($self->blastdb->index_type eq 'ncbi') {
 
     $command = 'blastall -p ' . $self->program . ' -d ' 
-      . $self->blastdb->db . ' -i ' . $input_file . ' ' 
+      . $self->blastdb->dbfile . ' -i ' . $input_file . ' ' 
 	. $self->options . ' > ' . $output_file;
     
   }
-print $command . "\n";
+  print $command . "\n";
+
   my $exit_status = system($command);
 
   if ($exit_status) {
@@ -97,25 +98,24 @@ print $command . "\n";
     return 0
   }
 
-  $self->output($output_file);
+  $self->output_file($output_file);
   unlink $input_file;
 
-  my $blast_parser = Bio::Tools::BPlite->new(-file => $self->output);
-  $blast_parser->{_ensrunnable} = $self; # Avoid our untimely destruction.
+  my $blast_parser = Bio::Tools::BPlite->new(-file => $self->output_file);
 
   return $blast_parser
 }
 
 ### Getters/Setters ###
 
-sub output {
+sub output_file {
   my $self = shift;
 
   if (@_) {
-    $self->{_output} = shift;
+    $self->{_output_file} = shift;
   }
 
-  return $self->{_output}
+  return $self->{_output_file}
 }
 
 sub path {
