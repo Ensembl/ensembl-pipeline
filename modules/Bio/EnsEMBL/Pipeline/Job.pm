@@ -457,46 +457,61 @@ sub run_module {
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
-
+  my $runnable_db_path = 
+    $BATCH_QUEUES{$self->analysis->logic_name}{runnabledb_path};
+  my $perl_path;
+  if($module =~ /::/){
+    $module =~ s/::/\//g;
+    $perl_path = $module;
+  }else{
+    $perl_path = $runnable_db_path."/".$module;
+  }
   STATUS: 
   { 
-      # "SUBMITTED"
-      eval {
-	  if( $module =~ /::/ ) {
-	      $module =~ s/::/\//g;
-	      require "${module}.pm";
-	      $module =~ s/\//::/g;
-	      
-	      $rdb = "${module}"->new
-		  ( -analysis => $self->analysis,
-		    -input_id => $self->input_id,
-		    -db => $self->adaptor->db );
-	  } else {
-	      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-	      $module =~ s/\//::/g;
-	      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-		  ( -analysis => $self->analysis,
-		    -input_id => $self->input_id,
-		    -db => $self->adaptor->db );
-	  }
-      };
+    eval {
+      require $perl_path.".pm";
+      $perl_path =~ s/\//::/g;
+      $rdb = $perl_path->new( -analysis => $self->analysis,
+                              -input_id => $self->input_id,
+                              -db => $self->adaptor->db );
+    };
+    # "SUBMITTED"
+    # eval {
+    #	  if( $module =~ /::/ ) {
+    #      $module =~ s/::/\//g;
+    #      require "${module}.pm";
+    #      $module =~ s/\//::/g;
+    
+    #      $rdb = "${module}"->new
+    #        ( -analysis => $self->analysis,
+    #          -input_id => $self->input_id,
+    #          -db => $self->adaptor->db );
+    #    } else {
+    #      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+    #      $module =~ s/\//::/g;
+    #      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
+    #        ( -analysis => $self->analysis,
+    #          -input_id => $self->input_id,
+    #          -db => $self->adaptor->db );
+    #	  }
+    #  };
       
-      if ($err = $@) {
-	  print (STDERR "CREATE: Lost the will to live Error\n");
-	  $self->set_status( "FAILED" );
-	  $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
-      }
-      
-      # "READING"
-      eval {   
-	  $self->set_status( "READING" );
-	  $res = $rdb->fetch_input;
-      };
-      if ($err = $@) {
-	  $self->set_status( "FAILED" );
-	  print (STDERR "READING: Lost the will to live Error\n");
-	  $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
-      }
+    if ($err = $@) {
+      print (STDERR "CREATE: Lost the will to live Error\n");
+      $self->set_status( "FAILED" );
+      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
+    }
+    
+    # "READING"
+    eval {   
+      $self->set_status( "READING" );
+      $res = $rdb->fetch_input;
+    };
+    if ($err = $@) {
+      $self->set_status( "FAILED" );
+      print (STDERR "READING: Lost the will to live Error\n");
+      $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
+    }
       
       if ($rdb->input_is_void) {
 	  $self->set_status( "VOID" );
@@ -854,18 +869,19 @@ sub set_up_queues {
     my %q;
 
     foreach my $queue (@$QUEUE_CONFIG) {
-	my $ln = $queue->{'logic_name'};
-	next unless $ln;
-	delete $queue->{'logic_name'};
-	while (my($k, $v) = each %$queue) {
-	    $q{$ln}{$k} = $v;
-	    $q{$ln}{'jobs'} = [];
-	    $q{$ln}{'last_flushed'} = undef;
-	    $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
-	    $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
-            $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
-	    $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
-	}
+      my $ln = $queue->{'logic_name'};
+      next unless $ln;
+      delete $queue->{'logic_name'};
+      while (my($k, $v) = each %$queue) {
+        $q{$ln}{$k} = $v;
+        $q{$ln}{'jobs'} = [];
+        $q{$ln}{'last_flushed'} = undef;
+        $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
+        $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+        $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+        $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
+        $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+      }
 
 	# a default queue for everything else
 	unless (defined $q{'default'}) {
