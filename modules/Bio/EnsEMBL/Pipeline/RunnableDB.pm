@@ -51,6 +51,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB;
 use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::RunnableI;
 
 use Bio::DB::RandomAccessI;
 
