@@ -21,12 +21,12 @@ package main;
 
 %pipeConf = ( 
     'nfstmp.dir' => '', # working directory for err/outfiles
-    'pep_file'   => '', #
-    'DBI.driver' => 'mysql',
-    'dbhost'     => 'mysql',
-    'dbname'     => '', #Database name for pipeline db
-    'dbuser'     => '', #Database user for pipeline db
-    'queue'      => '', #farm queue
+    'pep_file'   => '',
+    'DBI.driver' => '',
+    'dbhost'     => '',
+    'dbname'     => '', 
+    'dbuser'     => '',
+    'queue'      => '',   # farm queue
     'batchsize'  => 1,         # no of jobs to send to LSF together
     'bindir'     => '',
     'datadir'    => '',
@@ -35,7 +35,12 @@ package main;
     'runner'     => '',        # path to runner.pl, needed by Job.pm
     'cpname'     => '', #this is for crosscomparer comparadb name
     'cpuser'     => '', #and comparadb user
-    'sleep'      => 3600 #sleep time in Rulemanager3
+    'cmname'     => '', #this is for crossmatching, crossmatchdbadaptor to know which database
+    'cmuser'     => '', 
+    'blast'     => '', #ncbi or wu blast? Blast.pm
+    'filter_blast'   => 0 , #filter blast results (1) or prune them (0)? Blast.po 
+    'B_factor'	 => '10', #factor that determines the number of HSP alignments reported when running blast
+    'sleep'      => 60 
     );
 }
 
