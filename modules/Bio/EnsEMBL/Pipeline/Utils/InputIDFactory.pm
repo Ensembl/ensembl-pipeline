@@ -179,6 +179,46 @@ sub get_slice_names{
 
 }
 
+sub get_filenames{
+  my ($self, $dir, $regex) = @_;
+  if(!$dir){
+    $self->throw("need a directory inorder to fetch the filenames to be used as input_ids $!");
+  }
 
+  my @input_ids;
+
+  opendir(DIR, $dir);   
+  my @allfiles = readdir DIR;
+  closedir DIR;
+	
+  foreach my $f(@allfiles) {
+    if($f eq '.' || $f eq '..'){
+      next;
+    }elsif(-d $f){
+      next;
+    }else{
+      my $file;
+      if($regex){
+	if($f =~ m|$regex|){
+	  $file = $f;
+	}
+      }else{
+	$file = $f;
+      }
+      push(@input_ids, $file) if($file);
+    }    
+  }
+  
+  return \@input_ids;
+}
+
+
+sub generate_filename_input_ids{
+   my ($self, $dir, $regex) = @_;
+
+   my $ids = $self->get_filenames($dir, $regex);
+
+   return @$ids;
+}
 
 1;
