@@ -64,23 +64,9 @@ use strict;
 
 # Object preamble
 
-#use FileHandle;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
-
-#use Bio::EnsEMBL::FeaturePair;
-#use Bio::EnsEMBL::SeqFeature;
-#use Bio::EnsEMBL::Analysis;
-#use Bio::PrimarySeq; 
-#use Bio::Seq;
-#use Bio::SeqIO;
-#use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Tools::Blastz;
-
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-#    require "Bio/EnsEMBL/Pipeline/Blast_conf.pl";
-}
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -171,11 +157,11 @@ sub run {
 
 sub run_analysis {
   my ($self) = @_;
-  print STDERR ("Running blastz\n" . $self->program . " " .
-		                     $self->filename . " " .
-		                     $self->database . " " .
-		                     $self->options . " > " .
-		                     $self->results . "\n");
+  print STDERR ("Running blastz...\n" . $self->program . " " .
+		                        $self->filename . " " .
+		                        $self->database . " " .
+		                        $self->options . " > " .
+		                        $self->results . "\n");
 
   $self->throw("Failed during blastz run, $!\n") unless (system ($self->program  . " " .
 								 $self->filename . " " .
@@ -207,10 +193,7 @@ sub query {
     }
     
     $self->{'_query'} = $seq ;
-    
     $self->filename($seq->id.".$$.seq");
-    $self->results($self->filename.".blastz.out");
-    
   }
   return $self->{'_query'};
 }
