@@ -25,7 +25,8 @@ my $clip;
 if(!defined $rnafile    ||
    !defined $seqoutfile 
   ){
-  print  "USAGE: get_human_ests.pl -mRNAfile rnafile -outfile outfile -clip\n";
+  print  "USAGE: $0 -mRNAfile rnafile -outfile outfile -clip\n";
+  print  "the default will be to parse the headers\n";
   exit(1);
 }
 
