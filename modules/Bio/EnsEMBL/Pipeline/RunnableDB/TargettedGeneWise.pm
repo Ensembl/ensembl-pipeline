@@ -57,7 +57,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
-
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
@@ -456,6 +456,9 @@ sub make_genes {
     my $gene;
     # make one gene per valid transcript
     foreach my $valid (@$valid_transcripts){
+      # add a stop codon if appropriate
+      $valid = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($valid);
+
       $gene   = new Bio::EnsEMBL::Gene;
       $gene->type($genetype);
       $gene->analysis($analysis_obj);
