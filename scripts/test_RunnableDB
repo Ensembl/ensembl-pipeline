@@ -1,9 +1,15 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl-pipeline/modules");
-  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl/modules");
-}
+
+# Guys - could we not unshift @INC in a script - it makes developing elsewhere
+# painful. PERL5LIB and/or perl -I is your friend EB
+
+#BEGIN {
+#  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl-pipeline/modules");
+#  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl/modules");
+#}
+
+
 =head1 NAME
 
 test_RunnableDB
@@ -38,19 +44,20 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
+use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA;
+use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 
 my $dbtype = 'rdb';
-my $host   = 'ensrv3';
-my $port   = '410000';
-my $dbname = 'simon_oct07';
-my $dbuser = 'ensadmin';
+my $host   = 'ecs1c';
+my $port   = undef;
+my $dbname = 'ensembl080';
+my $dbuser = 'ensro';
 my $pass   = undef;
 my $runnable;
 my $input_id;

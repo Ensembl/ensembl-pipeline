@@ -125,17 +125,16 @@ sub _initialize {
 sub genomic_sequence {
   my( $self, $value ) = @_;    
   
+  print STDERR "In this function!!!\n";
+
   if ($value) {
-    # $value should be a reference to an array of Bio::Seq objects. These need to be written out to file
-    ref($value) eq 'ARRAY' || $self->throw("Expected an array reference, not $value");
-    foreach my $genomic(@{$value}) {
-      $genomic->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
-    }
-    $self->{'_genomic_sequence'} = $value;
-    $self->filename($value->[0]->id.".$$.seq");
-    $self->results($self->filename.".exonerate.out");
+      $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+      
+      $self->{'_genomic_sequence'} = $value;
+      $self->filename($value->id.".$$.seq");
+      $self->results($self->filename.".exonerate.out");
   }
-  # returns a ref to an array of Bio::Seq
+  # returns a Bio::Seq
   return $self->{'_genomic_sequence'};
 }
 
@@ -257,9 +256,8 @@ sub run {
       or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
     
     #fill inputs
-    foreach my $gseq(@$genomicseq) {
-      $genOutput->write_seq($gseq);
-    }
+    $genOutput->write_seq($genomicseq);
+
     foreach my $eseq(@$estseq) {
       $estOutput->write_seq($eseq);
     }
@@ -318,9 +316,12 @@ sub parse_results {
     if ($_ =~ /exonerate/) {
       next if($_ =~ /^Message/);
       
+
       #split on whitespace
       my @elements = split;
-      
+
+      if( $elements[1] ne 'exonerate' ) { next; }
+
       if($_ =~ /query \"(\w+)\"/) {
 	$queryname = $1;
       }
@@ -403,6 +404,9 @@ sub _createfeatures {
   
   
   #create features
+
+  #print STDERR "Creating with $f1start $f1end \n";
+
   my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
 					     -end         =>   $f1end,
 					     -seqname     =>   $f1id,
