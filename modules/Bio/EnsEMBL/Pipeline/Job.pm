@@ -50,7 +50,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
-
+use Bio::EnsEMBL::Pipeline::DB::JobI;
 #my $nfs_tmpdir = "/nfs/disk100/humpub1/michele/est2genome/";
 my $nfs_tmpdir = "/nfs/disk21/stabenau/tmp";
 # my $nfs_tmpdir = "/nfs/ensembl/ensembl/tmp";
