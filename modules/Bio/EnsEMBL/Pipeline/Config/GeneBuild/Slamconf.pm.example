@@ -49,7 +49,7 @@ use vars qw( %Slamconf );
 
 %Slamconf = (  
 
-              SLAM_ORG1_NAME => 'H.sapiens'  ,           # (valid species : R.Norvegicus, H.sapiens or M.musulus)
+              SLAM_ORG1_NAME => 'H.sapiens'  ,                     # (valid species : R.Norvegicus, H.sapiens or M.musulus)
               SLAM_ORG2_NAME => 'M.musculus' ,
 
 
@@ -57,9 +57,9 @@ use vars qw( %Slamconf );
               
               SLAM_BIN => '/nfs/acari/jhv/bin/slam',
               SLAM_PARS_DIR => '/nfs/acari/jhv/lib/slam_pars_dir',
+              SLAM_MAX_MEMORY_SIZE => '1572864',                   # default is 1572864 (1.5 gig)
               SLAM_MINLENGTH => '250',
-              SLAM_MAXLENGTH => '300000',   #slamdef: 100500 max length of comparing regions (>300kb needs >2GB memory)
-
+              SLAM_MAXLENGTH => '200000',                          # Slam.pm- default is 100500 bp. max length of regions to compare
 
               # DB-configurations for second species
 
