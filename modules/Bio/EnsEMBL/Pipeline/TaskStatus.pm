@@ -41,6 +41,19 @@ use Bio::EnsEMBL::Pipeline::IDSet;
 @ISA = qw(Bio::EnsEMBL::Root);
 
 
+
+=head2 new
+
+  Arg [1]   : list of args @args
+  Function  : create a new Bio::EnsEMBL::Pipeline::TaskStatus
+  Returntype: Bio::EnsEMBL::Pipeline::TaskStatus
+  Exceptions: none
+  Caller    : 
+  Example   : my $taskstatus = Bio::EnsEMBL::Pipeline::TaskStatus->new();
+
+=cut
+
+
 sub new{
   my ($class, @args) = @_;
   my $self = bless {}, $class;
@@ -75,7 +88,21 @@ sub new{
   return $self;
 }
 
-sub check{
+
+
+=head2 _check
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or arrayref
+  Function  : to check what the argument is anc if its a listref create an IDSet
+ Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: if the argument isn't of the required type'
+  Caller    : 
+  Example   : $self->_check
+
+=cut
+
+
+sub _check{
     my ($self, $arg) = @_;
     
     if(ref($arg) == 'ARRAY'){
@@ -92,24 +119,37 @@ sub check{
 }
 
 
+=head2 add methods
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or list ref
+  Function  : add the arg to the appropriate hash element
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : $self->add_created($idset);
+
+=cut
+
+
+
 sub add_created{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_created'} = $idset;
 }
 
 sub add_submitted{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_submitted'} = $idset;
 }
 
 sub add_reading{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_reading'} = $idset;
 }
 
@@ -117,51 +157,66 @@ sub add_reading{
 sub add_running{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_running'} = $idset;
 }
 
 sub add_writing{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_writing'} = $idset;
 }
 
 sub add_successful{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_successful'} = $idset;
 }
 
 sub add_failed{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_failed'} = $idset;
 }
 
 sub add_fatal{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_fatal'} = $idset;
 }
 
 sub add_killed{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_killed'} = $idset;
 }
 
 sub add_existing{
     my ($self, $arg) = @_;
 
-    my $idset = $self->check($arg);
+    my $idset = $self->_check($arg);
     $self->{'_existing'} = $idset;
 }
+
+
+
+=head2 get methods
+
+  Arg [1]   : none
+  Function  : return the requested IDSet
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: none 
+  Caller    : 
+  Example   : my $idset = $self->get_created
+
+=cut
+
+
 
 sub get_created{
     my ($self) = @_;
@@ -224,6 +279,21 @@ sub get_existing{
 }
 
 
+
+=head2 create_existing
+
+  Arg [1]   : none
+  Function  : this takes all IDSets the object holds and performs unions
+              to produce the total set of IDs
+  Returntype: Bio::EnEMBL::Pipeline::IDSet
+  Exceptions: none
+  Caller    : 
+  Example   : my $total = $self->create_exisiting
+
+=cut
+
+
+
 sub create_exisiting{
     my ($self) = @_;
     
@@ -270,6 +340,20 @@ sub create_exisiting{
     
     return $total_ids;
 }
+
+
+
+=head2 status_report
+
+  Arg [1]   : none
+  Function  : prints the number od each status type the object holds
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : $self->status_report
+
+=cut
+
 
 sub status_report{
     my ($self) = @_;
