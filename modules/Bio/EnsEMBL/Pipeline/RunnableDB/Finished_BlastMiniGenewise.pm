@@ -255,7 +255,7 @@ sub convert_output {
     }else{
       $self->throw("I don't know what to do with $runnable");
     }
-     $genetype = "testing";
+     #$genetype = "testing";
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
 
         #use logic name from analysis object if possible, else take $genetype;
