@@ -37,7 +37,7 @@ GetOptions(
 )
 or die ("Couldn't get options");
 
-if( defined $check ) {
+if( $check ) {
   my $host = hostname();
   if ( ! -e $output_dir ) {
     die "output dir $output_dir doesn't exist according to host $host";
@@ -81,13 +81,14 @@ while( $job_id = shift ) {
 
   my $job         = $job_adaptor->fetch_by_dbID($job_id);
 
-  if( !defined $job) {
+  if( !$job) {
     print STDERR ( "Couldnt recreate job $job_id\n" );
     next;
   }
   print STDERR "Running job $job_id\n";
   print STDERR "Module is " . $job->analysis->module . "\n";
   print STDERR "Input id is " . $job->input_id . "\n";
+  print STDERR "Analysis is ".$job->analysis->logic_name."\n";
   print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
 
   eval {

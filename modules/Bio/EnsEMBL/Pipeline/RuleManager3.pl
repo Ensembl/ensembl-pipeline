@@ -78,6 +78,7 @@ my $accumulators = 1; #these two options are on as default but that can
 my $db_sanity = 1; #be switched off by sticiking no infront of the 
                    #standard command line options (see GetOpts long docs)
 my $help;
+my $delete_on_retry = 0;
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -100,7 +101,8 @@ GetOptions(
     'max_job_time=s' => \$max_time,
     'killed_file=s' => \$killed_file,
     'queue_manager=s' => \$queue_manager,	   
-    'h|help'	    => \$help,	  
+    'h|help'	    => \$help,
+    'delete_on_retry!' => \$delete_on_retry,	   
 ) or useage();
 
 if(!$dbhost || !$dbname || !$dbuser){
@@ -437,6 +439,7 @@ while (1) {
       if($accumulators){# this option means you can turn off accumulators
 	#checks if you don't want them checked or they don't need to be
 	#checked, it is on as standard
+	#$verbose = 1;
         my @current_jobs = $job_adaptor->fetch_by_input_id('ACCUMULATOR');
         foreach my $accumulator_logic_name (keys %accumulator_analyses) {
             print "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
@@ -449,7 +452,11 @@ while (1) {
                                              $verbose,
                                              $output_dir,
                                              $job_adaptor);
-                if ($result_flag == 1 && $verbose) { print "Started accumulator type job for anal $accumulator_logic_name\n"; }
+                if ($result_flag == 1 && $verbose) { 
+		  print "Started accumulator type job for anal ".
+		    "$accumulator_logic_name\n"; 
+		   $submitted++; 
+		}
     
             } elsif (exists($incomplete_accumulator_analyses{$accumulator_logic_name})) {
                 print "Accumulator type analysis $accumulator_logic_name conditions unsatisfied\n" if $verbose;
@@ -459,7 +466,7 @@ while (1) {
         }
       }
     }
-    
+    #$verbose = 0;
     if($done || $once){
       &shut_down($db);
     }else{
@@ -488,8 +495,16 @@ sub run_if_new {
 
             if ($cj->analysis->dbID == $anal->dbID) {
                 if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
+		  if($delete_on_retry){
+		    if( -e $cj->stdout_file ) { 
+		      unlink( $cj->stdout_file ) 
+		    }
+		    if( -e $cj->stderr_file ) {
+		      unlink( $cj->stderr_file ) 
+		    }
+		  }
                     $cj->batch_runRemote;
-                    print "Retrying job\n";
+                    print "Retrying job\n" if $verbose;
                 }
                 else {
                     print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n" if $verbose ;
@@ -506,7 +521,7 @@ sub run_if_new {
     } elsif ($retFlag) {
         return 0;
     }
-
+    #print STDERR "creating job with ".$PIPELINE_RUNNER_SCRIPT."\n";
     my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => $id,
                                                -analysis => $anal,
                                                -output_dir => $output_dir,
@@ -828,7 +843,9 @@ Other Options
    -killed_file can overide the path to the $KILLED_INPUT_IDS file from
     General.pm
    -queue_manager can overide the $QUEUE_MANAGER from General.pm
-    		    
+   -delete_on_retry, this means any output already produced will be deleted
+    before a job is retried, this defaults to off currently, it was put in 
+    as LSF appends output and error files and sometimes you don't want this'
    
 -h or -help will print out the help again
 
