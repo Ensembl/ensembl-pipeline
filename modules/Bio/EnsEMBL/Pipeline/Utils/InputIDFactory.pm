@@ -378,7 +378,8 @@ sub get_filenames{
   opendir(DIR, $self->dir);   
   my @allfiles = readdir DIR;
   closedir DIR;
-	
+  my $regexp = $self->regex();
+
   foreach my $f(@allfiles) {
     if($f eq '.' || $f eq '..'){
       next;
@@ -386,8 +387,9 @@ sub get_filenames{
       next;
     }else{
       my $file;
-      if($self->regex){
-        if($f =~ m|$self->regex|){
+      if($regexp){
+
+        if($f =~ m|$regexp|){
           $file = $f;
         }
       }else{
