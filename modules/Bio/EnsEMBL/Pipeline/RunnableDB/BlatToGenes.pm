@@ -67,14 +67,14 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($genomic,$database,$rna_seqs, $query_type, $target_type, $blat, $options) =  $self->_rearrange([qw(GENOMIC
-													 DATABASE
-													 RNA_SEQS
-													 QUERY_TYPE
-													 TARGET_TYPE
-													 BLAT
-													 OPTIONS
-													)], @args);
+  my ($database,$rna_seqs, $query_type, $target_type, $blat, $options) =  $self->_rearrange([qw(
+												DATABASE 
+												RNA_SEQS
+												QUERY_TYPE
+												TARGET_TYPE
+												BLAT
+												OPTIONS
+											       )], @args);
   
   # must have a query sequence
   unless( @{$rna_seqs} ){
@@ -85,12 +85,9 @@ sub new {
   # you can pass a sequence object for the target or a database (multiple fasta file);
   if( $database ){
     $self->database( $database );
-    }
-  elsif ($genomic){
-    $self->genomic($genomic);
   }
   else{
-    $self->throw("BlatToGenes needs a target - genomic: $genomic or  database: $database");
+    $self->throw("BlatToGenes needs a target - database: $database");
   }
   
   # Target type: dna  - DNA sequence
@@ -125,7 +122,7 @@ sub new {
   
   # can add extra options as a string
   if ($options){
-    $self->($options);
+    $self->options($options);
   }
   return $self;
 }
@@ -140,20 +137,32 @@ sub fetch_input {
   if ($self->database ){
     $target = $self->database;
   }
-  elsif( $self->genomic ){
-    $target = $self->genomic;
+  else{
+    $self->throw("sorry, it can only run with a database");
   }
-
-  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blat->new(
-							     -database    => $target,
-							     -query_seqs  => \@sequences,
-							     -query_type  => $self->query_type,
-							     -target_type => $self->target_type,
-							     -blat        => $self->blat,
-							     -options     => $self->options,
-							    );
   
-  $self->runnable($runnable);
+  my @chr_names = $self->get_chr_names;
+  foreach my $chr_name ( @chr_names ){
+    my $database = $target."/".$chr_name.".fa";
+    
+    # check that the file exists:
+    if ( -s $database){
+      
+      print STDERR "creating runnable for target: $database\n";
+      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blat->new(
+								 -database    => $database,
+								 -query_seqs  => \@sequences,
+								 -query_type  => $self->query_type,
+								 -target_type => $self->target_type,
+								 -blat        => $self->blat,
+								 -options     => $self->options,
+								);
+      $self->runnables($runnable);
+    }
+    else{
+      $self->warn("file $database not found. Skipping");
+    }
+  }
 }
 
 ############################################################
@@ -163,15 +172,24 @@ sub run{
   my @results;
 
   # get the funnable
-  $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
-  my $runnable = $self->runnable;
+  $self->throw("Can't run - no runnable objects") unless ($self->runnables);
+  
+  foreach my $runnable ($self->runnables){
 
-  # run the funnable
-  $runnable->run;  
-  push ( @results, $runnable->output );
+    # run the funnable
+    $runnable->run;  
+    
+    # store the results
+    print STDERR scalar(@results)." matches found\n";
+    push ( @results, $runnable->output );
+    
+  }
+  
+  #filter the output
+  my @filtered_results = $self->filter_output(@results);
   
   # make genes out of the features
-  my @genes = $self->make_genes(@results);
+  my @genes = $self->make_genes(@filtered_results);
   
   # print out the results:
   foreach my $gene (@genes){
@@ -193,6 +211,56 @@ sub run{
   print STDERR "mapped_gene is a $mapped_genes[0]\n";
 
   $self->output(@mapped_genes);
+}
+
+############################################################
+
+sub filter_output{
+  my ($self,@results) = @_;
+
+  # recall that the results are Bio::EnsEMBL::SeqFeatures
+  # where each one contains a set of sub_SeqFeatures representing the exons
+
+  my @good_matches;
+
+  my %matches;
+  foreach my $result (@results ){
+    push ( @{$matches{$result->seqname}}, $result );
+  }
+  
+  my %matches_sorted_by_coverage;
+  my %selected_matches;
+  foreach my $rna_id ( keys( %matches ) ){
+    @{$matches_sorted_by_coverage{$rna_id}} = sort { $b->score <=> $a->score  } @{$matches{$rna_id}};
+    
+    my $max_score;
+    print STDERR "matches for $rna_id:\n";
+    foreach my $match ( @{$matches_sorted_by_coverage{$rna_id}} ){
+      unless ($max_score){
+	$max_score = $match->score;
+      }
+      foreach my $sub_feat ( $match->sub_SeqFeature ){
+	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
+      }
+      my $score = $match->score;
+      
+      # we keep anything which is 
+      # within the 2% fo the best score
+      # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
+      if ( $score >= (0.98*$max_score) && 
+	   $score >= $EST_MIN_COVERAGE && 
+	   $match->percent_id >= $EST_MIN_PERCENT_ID ){
+
+	print STDERR "Accept!\n";
+	push( @good_matches, $match);
+      }
+      else{
+	print STDERR "Reject!\n";
+      }
+    }
+  }
+  
+  return @good_matches;
 }
 
 ############################################################
@@ -330,6 +398,27 @@ sub convert_coordinates{
 }
 
 ############################################################
+
+sub get_chr_names{
+  my ($self) = @_;
+  my @chr_names;
+  
+  print STDERR "featching chromosomes info\n";
+  my $chr_adaptor = $self->db->get_ChromosomeAdaptor;
+  my @chromosomes = @{$chr_adaptor->fetch_all};
+  
+  foreach my $chromosome ( @chromosomes ){
+    push( @chr_names, $chromosome->chr_name );
+  }
+  print STDERR "retrieved ".scalar(@chr_names)." chromosome names\n";
+  return @chr_names;
+}
+
+############################################################
+
+
+
+############################################################
 #
 # get/set methods
 #
@@ -349,15 +438,15 @@ sub output {
 
 ############################################################
 
-sub runnable {
+sub runnables {
   my ($self, $runnable) = @_;
   if (defined($runnable) ){
     unless( $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") ){
       $self->throw("$runnable is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
-    $self->{_runnable} = $runnable;
+    push( @{$self->{_runnable}}, $runnable);
   }
-  return $self->{_runnable};
+  return @{$self->{_runnable}};
 }
 
 ############################################################
@@ -446,6 +535,9 @@ sub database {
 }
 
 ############################################################
+
+
+
 
 
 1;
