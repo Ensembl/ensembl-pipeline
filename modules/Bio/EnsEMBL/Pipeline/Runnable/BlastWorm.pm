@@ -20,7 +20,7 @@
 			   -format => 'Fasta');
 
   my $blast =  Bio::EnsEMBL::Pipeline::Runnable::BlastWorm->new 
-    ('-clone'          => $query,
+    ('-query'          => $query,
      '-program'        => 'wublastp' or '/usr/local/pubseq/bin/wublastp',
      '-database'       => 'swissprot',
      '-threshold'      => 1e-3,
@@ -101,8 +101,8 @@ sub new {
     $self->{'_analysis'}  = undef;        # a Bio::EnsEMBL::Analysis
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis,
-        $threshold,  $threshold_type, $options, $filter) = $self->_rearrange([qw(CLONE 
+    my ($query, $analysis,
+        $threshold,  $threshold_type, $options, $filter) = $self->_rearrange([qw(QUERY 
                                                                                  ANALYSIS
                                                                                  THRESHOLD
                                                                                  THRESHOLD_TYPE
@@ -116,7 +116,7 @@ sub new {
         $self->throw("BlastWorm needs an analysis");
     }
 
-    $self->query ($clone) if ($clone);       
+    $self->query ($query) if ($query);       
 
     $self->program ($self->find_executable ($self->analysis->program_file));
   

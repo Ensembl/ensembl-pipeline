@@ -54,7 +54,7 @@ sub new {
 
     my $self = $class->SUPER::new(@args);
 
-    my ($clone) = $self->_rearrange([qw(CLONE)],@args);
+    my ($clone) = $self->_rearrange([qw(QUERY)],@args);
 
     $clone                                  || $self->throw("No input clone object");
     $clone->isa("Bio::EnsEMBL::DB::CloneI") || $self->throw("Clone isn't a Bio::EnsEMBL::DB::CloneI");
