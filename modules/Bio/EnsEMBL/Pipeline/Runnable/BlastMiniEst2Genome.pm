@@ -18,8 +18,9 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new(-genomic  => $genseq,
-									 -blastdb  => $blastdb);
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'    => $genseq,
+									 '-seqfetcher' => $seqfetcher
+									 '-blastdb'    => $blastdb);
 
     $obj->run
 
@@ -49,14 +50,12 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 
-#compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(pfetch efetch); 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
 
@@ -68,18 +67,26 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $blastdb) = $self->_rearrange(['GENOMIC',
-						 'BLASTDB'], @args);
+    my( $genomic, $blastdb, $seqfetcher) = $self->_rearrange(['GENOMIC',
+							      'BLASTDB',
+							      'SEQFETCHER'], @args);
        
-    $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
-
+    $self->throw("No genomic sequence input")           
+      unless defined($genomic);
+    $self->throw("[$genomic] is not a Bio::PrimarySeqI") 
+      unless $genomic->isa("Bio::PrimarySeqI");
     $self->genomic_sequence($genomic) if defined($genomic);
 
-    $self->throw("No blastdb specified") unless defined($blastdb);
+    $self->throw("No blastdb specified") 
+      unless defined($blastdb);
     $self->blastdb($blastdb) if defined($blastdb);
 
-
+    $self->throw("No seqfetcher provided")           
+      unless defined($seqfetcher);
+    $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
+      unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
+    
     return $self; # success - we hope!
 }
 
@@ -101,6 +108,26 @@ sub genomic_sequence {
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
+}
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::EnsEMBL::Pipeline::SeqFetcher object
+    Args    :   Bio::EnsEMBL::Pipeline::SeqFetcher object
+
+=cut
+
+sub seqfetcher {
+    my( $self, $value ) = @_;    
+    if ($value) {
+      #need to check if passed sequence is Bio::EnsEMBL::Pipeline::SeqFetcherI object
+      $self->throw("Input isn't a Bio::DB::RandomAccessI") unless $value->isa("Bio::DB::RandomAccessI");
+      $self->{'_seqfetcher'} = $value;
+    }
+    return $self->{'_seqfetcher'};
 }
 
 =head2 blastdb
@@ -145,10 +172,10 @@ sub blastdb {
 sub get_Ids {
     my ($self) = @_;
 
-    if (!defined($self->{_idlist})) {
-	$self->{_idlist} = [];
+    if (!defined($self->{'_idlist'})) {
+	$self->{'_idlist'} = [];
     }
-    return @{$self->{_idlist}};
+    return @{$self->{'_idlist'}};
 }
 
 
@@ -207,7 +234,7 @@ sub run {
       $result->hseqname($seqname);
       
       # score cutoff? percentID? any EST with any hit > ... gets used
-      if($result->score > 180 || defined ($esthash{$seqname}) ) {
+      if($result->score > 200 || defined ($esthash{$seqname}) ) {
 	push(@{$esthash{$seqname}},$result);
       }
     }
@@ -220,8 +247,9 @@ sub run {
  
       # make MiniEst2Genome runnables
       
-      my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(-genomic  => $self->genomic_sequence,
-								     -features => \@features);
+      my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->genomic_sequence,
+								     '-features' => \@features,
+								     '-seqfetcher' => $self->seqfetcher);
 
       # run runnable
       $e2g->run;
@@ -233,7 +261,7 @@ sub run {
 	#      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
       }
       
-      push(@{$self->{_output}},@f);
+      push(@{$self->{'_output'}},@f);
     }
 }
 
@@ -424,7 +452,7 @@ sub validate_sequence {
     
 sub get_Sequence {
     my ($self,$id) = @_;
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+    my $seqfetcher = $self->seqfetcher;
     my $seq;
 
     if (!defined($id)) {
@@ -433,26 +461,13 @@ sub get_Sequence {
     
     print(STDERR "Sequence id :  is [$id]\n");
 
-    # VAC FIXME
-    # temporarily get rid of pfetch for Riken, or we'll end up with DNA not protein sequences
-    $seq = $seqfetcher->run_bp_search($id,'/data/blastdb/riken_prot.inx','Fasta');
-    
-
-    if(!defined($seq)){
-      print STDERR "no riken prot\N";
-      $seq = $seqfetcher->run_pfetch($id);
+    eval{
+      $seq = $seqfetcher->get_Seq_by_acc($id);
+    };
+    if ($@){
+      $self->throw("Problem with seqfetcher [$id]: [$@]\n");
     }
-
-    # trim off sv if necc.
-    if(!defined($seq)){
-      if($id =~ /(\w+)\.\S+/){
-	print STDERR "trimming $id to $1\n";
-	$id = $1;
-	# try again
-	$seq = $seqfetcher->run_pfetch($id);	
-      }
-    }
-
+	
     if(!defined($seq)){
       $self->throw("Could not find sequence for [$id]");
     }
@@ -474,21 +489,12 @@ sub get_Sequence {
 
 sub output {
     my ($self) = @_;
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
 
-
-sub trim {
-  my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_trim} = $arg;
-  }
-  return $self->{_trim};
-}
 
 1;
 

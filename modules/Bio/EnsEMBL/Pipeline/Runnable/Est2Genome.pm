@@ -344,10 +344,12 @@ sub convert_output {
   # split the different features up
   foreach my $f(@{$self->{'_fplist'}}){
     if ($f->primary_tag eq 'Span'){
-      push(@genes, $f->feature1);
+#      push(@genes, $f->feature1);
+      push(@genes, $f);
     }
     elsif($f->primary_tag eq 'Exon'){
-      push(@exons, $f->feature1);
+#      push(@exons, $f->feature1);
+      push(@exons, $f);
     }
     elsif($f->primary_tag eq 'Segment'){
       push(@supp_feat, $f);
@@ -362,7 +364,7 @@ sub convert_output {
     foreach my $g(@genes){
       if($ex->start >= $g->start  && $ex->end <= $g->end
 	 && $ex->strand == $g->strand && !$added){
-	$g->add_sub_SeqFeature($ex,'');
+	$g->feature1->add_sub_SeqFeature($ex,'');
 	$added = 1;
       }
     }
@@ -376,7 +378,7 @@ sub convert_output {
     foreach my $e(@exons){
       if($sf->start >= $e->start  && $sf->end <= $e->end
 	 && $sf->strand == $e->strand && !$added){
-	$e->add_sub_SeqFeature($sf,'');
+	$e->feature1->add_sub_SeqFeature($sf,'');
 	$added = 1;
       }
     }
