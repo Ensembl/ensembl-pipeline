@@ -52,7 +52,16 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_SIMILARITY_TYPE
+					 GB_SIMILARITY_THRESHOLD
+					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -75,9 +84,41 @@ sub new {
            
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
-
+    my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
     $self->{'_fplist'} = []; #create key to an array of feature pairs
+    
+    if(!defined $type || $type eq ''){
+      $type = $GB_SIMILARITY_TYPE;
+    }
+    if(!defined $threshold){
+      $threshold = $GB_SIMILARITY_THRESHOLD;
+    }
+
+    $type = 'Swall' unless (defined $type && $type ne '');
+    $threshold = 200 unless (defined($threshold));
+
+    $self->type($type);
+    $self->threshold($threshold);
+
     return $self;
+}
+
+sub type {
+  my ($self,$type) = @_;
+
+  if (defined($type)) {
+    $self->{_type} = $type;
+  }
+  return $self->{_type};
+}
+
+sub threshold {
+  my ($self,$threshold) = @_;
+
+  if (defined($threshold)) {
+    $self->{_threshold} = $threshold;
+  }
+  return $self->{_threshold};
 }
 
 
@@ -99,25 +140,38 @@ sub fetch_input {
   my @estseqs;
   $self->throw("No input id") unless defined($self->input_id);
   
-  my $contigid  = $self->input_id;
-  my $contig    = $self->dbobj->get_Contig($contigid);
+  
+  my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
   #print "got contig\n";
-  my $genseq   = $contig->primary_seq;
+  my $genseq   = $contig->get_repeatmasked_seq;
   #print "got dnaseq\n";
-  my @features = $contig->get_all_SimilarityFeatures_above_score("swall", 1);
+  
   #print $features[0]."\n";
   #print "got data\n";
   
-  foreach my $f (@features) {
+  my $alignadaptor = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+  my @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
+  
+  #print STDERR "Number of features = " . scalar(@features) . "\n";
+  my @filtered_features;
+      
+  foreach my $f(@features){
+    #print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
+    if($f->score >= $self->threshold){
+      push(@filtered_features, $f);
+    }
+  }
+  
+  foreach my $f (@filtered_features) {
     if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	defined($f->hseqname)) {
       push(@fps, $f);
     }
   }
   #print "got".scalar(@fps)." feature pairs\n";
-
-  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-genomic'     => $genseq, 
-									    '-features' => \@fps,
+  #print STDERR "have ".$genseq."\n";
+  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-query'     => $genseq, 
+								     '-features' => \@fps,
 								    );
   #print "created HalfwiseHMM Runnable\n";  
   $self->runnable($runnable);
@@ -311,12 +365,12 @@ sub _convert_output {
 
 sub _make_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->dbobj->get_Contig($self->input_id);
+  my $contig =  $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
   my @tmpf   = @$results;
   my @genes;
 #  print "genetype = ".$genetype."\n";
   foreach my $tmpf (@tmpf) {
-    my $gene       = new Bio::EnsEMBL::Gene;
+    my $gene       = Bio::EnsEMBL::Gene->new();;
     my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
     #my $translation = $transcript->translate;
     #if($translation->seq =~ /\*/){
@@ -358,8 +412,8 @@ sub _make_transcript{
   unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
     {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
 
-  my $transcript   = new Bio::EnsEMBL::Transcript;
-  my $translation  = new Bio::EnsEMBL::Translation;    
+  my $transcript   = Bio::EnsEMBL::Transcript->new();
+  my $translation  = Bio::EnsEMBL::Translation->new();    
   $transcript->translation($translation);
 
   my $excount = 1;
@@ -367,9 +421,9 @@ sub _make_transcript{
     
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
-    my $exon = new Bio::EnsEMBL::Exon;
+    my $exon = Bio::EnsEMBL::Exon->new();
     
-    $exon->contig_id($contig->internal_id);
+    $exon->contig_id($contig->dbID);
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -379,14 +433,11 @@ sub _make_transcript{
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->seqname($contig->internal_id);
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
+      $subf->feature1->seqname($contig->dbID);
       $subf->feature1->score(100);
       $subf->feature1->analysis($analysis_obj);
         
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
+      
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
       
