@@ -31,12 +31,41 @@ sub new {
 
   my $self = bless {}, $class;
 
-  my ($files) = $self->_rearrange([qw( FILES )], @_);
+  $self->{'config'} = {};   # hash of hashes that will hold config as we build it up
 
-  my @files = split(/ /, $files);
+  my ($files, $db) = $self->_rearrange([qw( FILES DB )], @_);
 
-  $self->{'config'} = {};
+  # Files and DB should not be defined
+  if (defined $files && defined $db) {
+    $self->throw("Cannot read config from files and dbadaptor at the same time.");
+  }
 
+  if (defined $files ) {
+
+    my @files = split(/ /, $files);
+
+    $self->_parse_files(@files);
+
+  }
+
+  if (defined $db) {
+
+    # TODO DB Stuff
+
+  }
+
+  $self->_update_all_defaults();
+
+  return $self;
+
+}
+
+
+
+sub _parse_files {
+
+  my $self = shift;
+  my @files = shift;
 
   # read each file
 
@@ -84,15 +113,51 @@ sub new {
     }
     close FILE;
   }
+}
 
+# modify the config hash so that default values are stored where no value is specified
+sub _update_all_defaults {
 
- # TODO DB Stuff
+  my $self = shift;
 
-  return $self;
+  my @headers = $self->get_headers();
+
+  foreach my $header (@headers) {
+
+    next if lc($header) =~ "^default";
+
+    if ($header =~ /^\w+_database$/i) { $self->_update_single_header_defaults($header, "DEFAULT_DATABASE"); }
+
+    elsif ($header =~ /^\w+_task$/i) { $self->_update_single_header_defaults($header, "DEFAULT_TASK"); }
+
+    else { $self->_update_single_header_defaults($header, "DEFAULT"); }
+	
+  }
 
 }
 
+# put in defaults for all the keys for a specific header
+sub _update_single_header_defaults {
 
+  my $self = shift;
+  my $header = lc(shift);
+  my $default_header = lc(shift);
+
+  my @default_keys = $self->get_keys($default_header);
+
+  my @current_keys = $self->get_keys($header);
+
+  foreach my $key (@default_keys) {
+
+    # if the key is not defined in current_keys, add the default
+    if (!grep /^$key$/, @current_keys) {
+      my $value = $self->get_parameter($default_header, $key);
+      $self->{'config'}->{$header}->{$key} = $value;
+      print "added default value of $value (from $default_header) for $key in $header\n";
+    }
+  }
+
+}
 
 =head2 get_parameter
 
@@ -123,7 +188,7 @@ sub get_parameter {
 
 =head2 get_keys
 
-  Arg [1]    : string $header 
+  Arg [1]    : string $header
   Example    : 
   Description: Gives a list of keys for a given header.  Keys for defaults
                provided by a DEFAULT class are also provided.
