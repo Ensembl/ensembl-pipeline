@@ -27,6 +27,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 
 use lib 't';
 use EnsTestDB;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Exon;
@@ -41,9 +42,9 @@ my $ens_test = EnsTestDB->new();
     
 # Get an EnsEMBL db object for the test db
 # my $db = $ens_test->get_DBSQL_Obj;
-my $db = new Bio::EnsEMBL::DBSQL::Obj(-host => 'ensrv4',
-                                      -dbname => 'ensembl_freeze17_michele',
-                                      -user => 'ensadmin');
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => 'ecs1e',
+                                      -dbname => 'simon_oct07_2',
+                                      -user   => 'ensadmin');
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep';
