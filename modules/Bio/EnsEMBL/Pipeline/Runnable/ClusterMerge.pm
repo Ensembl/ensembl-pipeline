@@ -63,8 +63,8 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 # config file; parameters searched for here if not passed in as @args
-#use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf;
-use Bio::EnsEMBL::Pipeline::ESTConf;
+use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf;
+#use Bio::EnsEMBL::Pipeline::ESTConf;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -218,7 +218,7 @@ sub _cluster_Transcripts_by_genomic_range{
   }
 
   # first sort the transcripts
-  my @transcripts = sort  sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 				 if ($result){
 				     return $result;
 				 }
@@ -238,8 +238,8 @@ sub _cluster_Transcripts_by_genomic_range{
   
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
-  print STDERR "first cluster:\n";
- Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[0] );
+  #print STDERR "first cluster:\n";
+ #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[0] );
 
   $cluster_starts[$count] = $self->transcript_low( $transcripts[0]);
   $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
@@ -251,10 +251,10 @@ sub _cluster_Transcripts_by_genomic_range{
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
     
-    print STDERR "\nIn cluster ".($count+1)."\n";
-    print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
-    print STDERR "comparing:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
+    #print STDERR "\nIn cluster ".($count+1)."\n";
+    #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
+    #print STDERR "comparing:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
     
     if ( !( $transcripts[$c]->end < $cluster_starts[$count] ||
 	    $transcripts[$c]->start > $cluster_ends[$count] ) ){
@@ -467,10 +467,10 @@ sub link_Transcripts{
 			  }
 			} @transcripts;
     
-    print STDERR "Cluster: (sorted transcripts)\n";
-    foreach my $t ( @transcripts ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-    }
+    #print STDERR "Cluster: (sorted transcripts)\n";
+    #foreach my $t ( @transcripts ){
+    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+    #}
 
     # for each transcript
   TRAN1:
