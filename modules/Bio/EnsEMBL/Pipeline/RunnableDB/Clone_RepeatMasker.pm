@@ -18,7 +18,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker->new ( 
-                                                    -dbobj      => $db,
+                                                    -db      => $db,
 			                                        -input_id   => $input_id
                                                     -analysis   => $analysis );
 $repmask->fetch_input();
@@ -58,13 +58,13 @@ use vars qw(@ISA);
 =head2 new
 
     Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
+    Usage   :   $self->new(-DB       => $db
                            -INPUT_ID    => $id
                            -ANALYSIS    => $analysis);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
-    Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :        -db:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
 
@@ -96,16 +96,17 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
 
-    print STDERR "Input id " . $self->input_id . "\n";
-    print STDERR "Dbobj " . $self->dbobj . "\n";
+#    print STDERR "Input id " . $self->input_id . "\n";
+#    print STDERR "Db " . $self->db . "\n";
     
     my $cloneid     = $self->input_id;
-    my $clone       = $self->dbobj->get_Clone($cloneid);
+    my $clone       = $self->db->get_CloneAdaptor->fetch_by_accession($cloneid);
+    my ($contig) = $clone->get_all_Contigs();
     
-    foreach my $contig  ($clone->get_all_Contigs())
+foreach my $contig  ($clone->get_all_Contigs())
     {       
-      my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
-      $self->runnable($genseq);
+#      my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+      $self->runnable($contig);
     }
 }
 
@@ -116,7 +117,7 @@ sub runnable {
     if ($genseq)
     {
 	my $repeatmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (
-									      -clone    => $genseq,
+									      -query    => $genseq,
 									      );
 	
 	push (@{$self->{'_runnable'}}, $repeatmask);
@@ -192,28 +193,27 @@ sub write_output {
     $self->throw("fetch_input must be called before write_output\n") 
         unless ($self->runnable);
 
-    my $db=$self->dbobj();
+    my $db=$self->db();
     foreach my $runnable ($self->runnable)
     {
         my $contig;
         my @repeats = $runnable->output();
         eval 
         {
-	        $contig = $db->get_Contig($runnable->clone->display_id);
+	    $contig = $db->get_RawContigAdaptor()->fetch_by_name($runnable->query->display_id);
         };
         if ($@) 
         {
-	        print STDERR "Contig not found, skipping writing output to db\n";
+	        print STDERR "Contig not found, skipping writing output to db\n" . $@ . "\n";
         }
         elsif (@repeats) 
         {
-	        foreach my $repeat (@repeats)
+	    foreach my $repeat (@repeats)
             {
-                print STDERR ($repeat->hseqname()."\t");
 		$repeat->analysis($self->analysis);
             }
-            my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	        $feat_adp->store($contig, @repeats);
+		my $feat_adp = $db->get_RepeatFeatureAdaptor;
+	        $feat_adp->store($contig->dbID, @repeats);
         }
         return 1;
     } 
