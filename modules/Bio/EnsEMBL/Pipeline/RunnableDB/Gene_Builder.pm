@@ -185,48 +185,41 @@ sub write_output {
 	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
        push(@newgenes,$newgene);
      }
-    my $sth = $db->prepare("lock tables genetype write, gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
-	$sth->execute;
 
-	eval {
+
+    eval {
+	my $gene_obj = $self->dbobj->gene_Obj();
+
         foreach my $gene (@newgenes) {	    
-           $gene->type('pruned');
-	print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
-	
-	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
-	    =~ s/$GENE_ID_SUBSCRIPT//;
-	(my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
-	    =~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
-	(my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
-	    =~ s/$PROTEIN_ID_SUBSCRIPT//;
-	print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
-	(my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
-	    =~ s/$EXON_ID_SUBSCRIPT//;
+	    $gene->type('pruned');
 
+	    my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
 
-	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
-	    $gcount++;
+	    $gene->id($geneid);
 	    print (STDERR "Writing gene " . $gene->id . "\n");
 
             # Convert all exon ids and save in a hash
             my %namehash;
-
-            foreach my $ex ($gene->each_unique_Exon) {
-                  print STDERR "Exon id " . $ex . " " . $ex->id . " " . $EXON_ID_SUBSCRIPT . "\n";
-                  $namehash{$ex->id} = $EXON_ID_SUBSCRIPT.$ecount;
-                  $ex->id($EXON_ID_SUBSCRIPT.$ecount);
-	   	  $ecount++;
+	    my @exons = $gene->each_unique_Exon();
+	    my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
+	    my $count = 0;
+            foreach my $ex (@exons) {
+		$namehash{$ex->id} = $exonids[$count];
+		$ex->id($exonids[$count]);
+		print STDERR "Exon id is ".$ex->id."\n";
+		$count++;
             }
 
-	    print (STDERR "Transcripts are\n");
-	    foreach my $tran ($gene->each_Transcript) {
-		$tran->id             ($TRANSCRIPT_ID_SUBSCRIPT . $tcount);
-		$tran->translation->id($PROTEIN_ID_SUBSCRIPT . $pcount);
+	    my @transcripts = $gene->each_Transcript;
+	    my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
+	    my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
+	    $count = 0;
+	    foreach my $tran (@transcripts) {
+		$tran->id             ($transcript_ids[$count]);
+		$tran->translation->id($translation_ids[$count]);
+		$count++;
 
 		my $translation = $tran->translation;
-
-		$tcount++;
-		$pcount++;
 
 		print (STDERR "Transcript  " . $tran->id . "\n");
 		print (STDERR "Translation " . $tran->translation->id . "\n");
@@ -248,15 +241,12 @@ sub write_output {
 
 	$gene_obj->write($gene);
        }
-       };
+    };
     if ($@) {
-	    $sth = $db->prepare("unlock tables");
-	    $sth->execute;
 
 	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
 	} else {
-	    $sth = $db->prepare("unlock tables");
-	    $sth->execute;
+	    # nothing
 	}
 
 
