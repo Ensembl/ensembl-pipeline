@@ -204,7 +204,7 @@ sub store {
   $analysis->adaptor( $self );
   $analysis->dbID( $dbID );
   
-  if($analysis->type){
+  if($analysis->input_id_type){
     my $sql = 'insert into input_id_type_analysis(input_id_type, analysis_id) values(?, ?)';
     my $sth = $self->prepare($sql);
     $sth->execute($analysis->input_id_type, $analysis->dbID);
@@ -287,5 +287,25 @@ sub db {
   $self->{_db};;
 }
 
+
+sub remove {
+
+  my $self = shift;
+  my $analysis = shift;
+  
+  if( !$analysis || !($analysis->isa('Bio::EnsEMBL::Pipeline::Analysis'))) {
+    $self->throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
+  }
+  my $sql = 'delete from analysis where analysis_id = ?';
+  my $sth = $self->prepare($sql);
+  $sth->execute($analysis->dbID);
+
+  if($analysis->input_id_type){
+    my $sql = 'delete from input_id_type_analysis where analysis_id = ?';
+    my $sth = $self->prepare($sql);
+    $sth->execute($analysis->dbID);
+  }
+
+}
 
 1;
