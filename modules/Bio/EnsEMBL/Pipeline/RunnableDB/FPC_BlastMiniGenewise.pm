@@ -85,7 +85,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
-							     GB_SLICE_REGEX
+							     GB_INPUTID_REGEX
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
@@ -102,11 +102,11 @@ sub new {
     
     $self->throw("no protein source databases defined in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
-    
     # make all seqfetchers
     foreach my $db(@{$GB_SIMILARITY_DATABASES}){
-      my $seqfetcher =  $self->make_seqfetcher($db->{'index'}, $db->{seqfetcher});  
-      $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
+      my $type = $db->{"type"};
+      my $seqfetcher =  $self->make_seqfetcher($db->{index}, $db->{seqfetcher});  
+      $self->add_seqfetcher_by_type($type, $seqfetcher);
     }
 
     # IMPORTANT
@@ -179,12 +179,12 @@ sub write_output {
   sub fetch_input {
     my( $self) = @_;
     
-    print STDERR "Fetching input id : " . $self->input_id. " \n\n";
+    print STDERR "Fetching input id : " . $self->input_id. " \n";
 
     $self->throw("No input id") unless defined($self->input_id);
     my $input_id = $self->input_id;
    
-    $input_id =~ /$GB_SLICE_REGEX/;
+    $input_id =~ /$GB_INPUTID_REGEX/;
 
     my $chrid    = $1;
     my $chrstart = $2;
