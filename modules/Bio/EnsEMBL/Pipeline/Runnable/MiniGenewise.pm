@@ -358,13 +358,12 @@ sub make_miniseq {
     }
 	
     #changed id from 'Genomic' to seqname
-    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(
-                               -id        => $seqname,
-                              #-id        => 'Genomic',
+    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => $seqname,
 						      -pairalign => $pairaln);
 
-    my $newgenomic = $miniseq->get_cDNA_sequence;
-#    print ("New genomic sequence is " . $newgenomic->seq . "\n");
+    my $newgenomic = $miniseq->get_cDNA_sequence->seq;
+    $newgenomic =~ s/(.{72})/$1\n/g;
+#    print ("New genomic sequence is " . $newgenomic. "\n");
     return $miniseq;
 
 }
@@ -618,7 +617,7 @@ sub minirun {
 	    my $miniseq = $self->make_miniseq(@$features);
 	    my $hseq    = $self->get_Sequence($id);
 	    
-	    my $reverse = $self->is_reversed(@extras);
+	    my $reverse = $self->is_reversed(@$features);
 
 	    print STDERR "Reverse 2 $reverse\n";
 	    print("Hseq $id " . $hseq->seq . "\n");
@@ -653,21 +652,31 @@ sub minirun {
 		      $f->hseqname   . "\t" . 
 		      $f->hstart     . "\t" . 
 		      $f->hend       . "\t(" .
-		      $f->hstrand    . ")\n");
+		      $f->hstrand    . ")\t" .
+		      $f->feature1->{_phase}   . "\n");
 		
+		my $phase = $f->feature1->{_phase};
+		print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
         #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
 		my @newfeatures = $miniseq->convert_FeaturePair($f);         
+
+		if ($#newfeatures > 0) {
+		    print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
+		}
 		push(@newf,@newfeatures);
 		
-		foreach my $nf (@newf) {
-        #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-		  $nf->seqname($f->seqname);
-		  $nf->hseqname($id);
-		  $nf->score   (100);
-		  $nf->analysis($analysis_obj);
-        #end BUGFIX
+		foreach my $nf (@newfeatures) {
+		    $nf->feature1->{_phase} = $phase;
+		    $nf->feature2->{_phase} = $phase;
 		    
-	      }
+        #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+		    $nf->seqname($f->seqname);
+		    $nf->hseqname($id);
+		    $nf->score   (100);
+		    $nf->analysis($analysis_obj);
+        #end BUGFIX
+		}
+		
 	    }
 	    
 	    my $fset = new Bio::EnsEMBL::SeqFeature();
@@ -686,7 +695,9 @@ sub minirun {
 		    $nf->hseqname  . "\t" . 
 		    $nf->hstart    . "\t" . 
 		    $nf->hend      . "\t(" .
-		    $nf->hstrand   . ")\n");
+		    $nf->hstrand   . ")\t:" .
+		    $nf->feature1->{_phase} . ":\t:" . 
+		    $nf->feature2->{_phase} . ":\n");
 	    }
 
 	    push(@{$self->{_output}},$fset);
@@ -715,6 +726,9 @@ sub is_reversed {
 	}
 
     }
+    print STDERR "Number of features is " . scalar(@features) . "\n";
+    print STDERR "Forward/reverse counts " . $fcount . " " . $rcount . "\n";
+
     if ($fcount > $rcount) {
 	return 0;
     } else {

@@ -206,8 +206,8 @@ sub run {
     my @f = $mg->output;
 
     foreach my $f (@f) {
-	print(STDERR "PogAligned output is " . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
-	print $f;
+	print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
+
     }
 
     push(@{$self->{_output}},@f);

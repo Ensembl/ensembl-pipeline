@@ -136,7 +136,7 @@ sub _align_protein {
     $proio->write_seq($self->protein);
     $proio = undef;
 
-    my $command = "genewise $protfile $genfile -genes -kbyte $memory -quiet";
+    my $command = "genewise $protfile $genfile -gff -kbyte $memory -quiet";
 
     if ($self->reverse == 1) {
 	$command .= " -trev ";
@@ -150,13 +150,21 @@ sub _align_protein {
     my $sf;
     my $count = 1;
 
-    while (<GW>) {
+    my $genename;
+    
+    GW: while (<GW>) {
 	chomp;
-	if (/^Gene +(\d+)/) {
+	my @f = split(/\t/,$_);
+	
+	print STDERR "Line is " . $_ . "\n";
+	next GW if ($f[2] ne "cds");
+
+	if ($f[8] ne $genename) {
 	    print STDERR "Found new gene\n";
 	    
+	    $genename = $f[8];
 	    $sf = new Bio::EnsEMBL::SeqFeature;
-
+	    $sf->seqname   ($f[8]);
 	    $sf->id        ($self->protein->id);
 	    $sf->source_tag('genewise');
 	    $sf->primary_tag('similarity');
@@ -164,28 +172,43 @@ sub _align_protein {
 	    push(@out,$sf);
 
 	    $count = 1;
-	} elsif (/^ +Exon +(\d+) +(\d+)/) {
-	    print STDERR "Found exon $1 $2\n";
-	    my $subsf = new Bio::EnsEMBL::SeqFeature;
-	    if ($1 > $2) {
-		$subsf->start($2);
-		$subsf->end  ($1);
-		$subsf->strand(-1);
-	    } else {
-		$subsf->start($1);
-		$subsf->end  ($2);
-		$subsf->strand(1);
-	    }
-
-	    $subsf->id ($self->protein->id . ".$count");
-	    $subsf->source_tag('genewise');
-	    $subsf->primary_tag('similarity');
-
-	    print STDERR "SF " + $subsf->start . " " . $subsf->end . " " . $subsf->strand . "\n";
-	    $count++;
-
-	    $sf->add_sub_SeqFeature($subsf,'EXPAND');
 	}
+
+	my $subsf = new Bio::EnsEMBL::SeqFeature;
+
+	my $strand = $f[6];
+
+	if ($strand eq "+") {
+	    $subsf->strand(1);
+	} else {
+	    $subsf->strand(-1);
+	}
+
+	$subsf->seqname($f[8]);
+
+	if ($f[3] < $f[4]) {
+	    $subsf->start  ($f[3]);
+	    $subsf->end    ($f[4]);
+	} else {
+	    $subsf->start  ($f[4]);
+	    $subsf->end    ($f[3]);
+	}
+	print STDERR "Found exon " . $sf->start . " " . $sf->end . "\n";
+
+	my $phase = $f[7];
+
+	if ($phase == 2) { 
+	    $phase = 1;
+	}	elsif ($phase == 1) { 
+	    $phase = 2;
+	}
+	$subsf->{_phase} = $phase;
+	$subsf->id ($self->protein->id . ".$count");
+
+	print STDERR "SF " . $subsf->start . " " . $subsf->end . " " . $subsf->strand . " " . $subsf->{_phase} . "\n";
+	$count++;
+
+	$sf->add_sub_SeqFeature($subsf,'EXPAND');
 
     }
 
@@ -195,6 +218,13 @@ sub _align_protein {
 
     foreach my $gene (@out) {
 	my @sub = $gene->sub_SeqFeature;
+
+	my $strand = $sub[0]->strand;
+	if ($strand == 1) {
+	    @sub = sort {$a->start <=> $b->start} @sub;
+	} else {
+	    @sub = sort {$b->start <=> $a->start} @sub;
+	}
 
 	if ($#sub >=0) {
 	    if ($sub[0]->strand == 1) {
