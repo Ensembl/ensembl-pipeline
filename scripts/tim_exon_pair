@@ -1,0 +1,254 @@
+#!/usr/local/bin/perl
+
+=head1 NAME
+
+make_exon_pairs - reads in features for a contig object, generates exon_pairs
+                  and writes them to the database.
+                  
+
+=head1 SYNOPSIS
+ 
+  make_exon_pairs
+
+=head1 DESCRIPTION
+
+A contig is retrieved from one database along with its features.  Exon pairs are
+then generated and written into the analysis database.  A final test is to read
+the exon pairs back from the database.
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+    
+    -nowrite   Runs entire script without writing in recipient
+
+    -verbose   Gets all the print STDERR for testing purposes
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
+use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
+use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+
+use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::DBLoader;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $fdbtype = 'rdb';
+my $fhost   = 'obi-wan';
+my $fport   = '410000';
+my $fdbname = 'pogtest';
+my $fdbuser = 'ensro';
+my $fpass   = undef;
+my $tdbtype = 'rdb';
+my $thost   = 'obi-wan';
+my $tport   = '410000';
+my $tdbname = 'analysis';
+my $tdbuser = 'root';
+my $tpass   = undef;
+
+my $fmodule  = "Bio::EnsEMBL::DBSQL::Obj";
+my $tmodule  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+
+my $help;
+my $usefile;
+
+&GetOptions( 
+	     'fdbtype:s'  => \$fdbtype,
+	     'fhost:s'    => \$fhost,
+	     'fport:n'    => \$fport,
+	     'fdbname:s'  => \$fdbname,
+	     'fdbuser:s'  => \$fdbuser,
+	     'fpass:s'    => \$fpass,
+	     'tdbtype:s'  => \$tdbtype,
+	     'thost:s'    => \$thost,
+	     'tport:n'    => \$tport,
+	     'tdbname:s'  => \$tdbname,
+	     'tdbuser:s'  => \$tdbuser,
+	     'tpass:s'    => \$tpass,
+	     'usefile=s'  => \$usefile,
+	     'h|help'    => \$help,
+	     );
+
+
+if ($help) {
+    exec('perldoc', $0);
+}
+
+$| = 1;
+
+my $from_locator     = make_locator_string($fdbtype,$fmodule,$fhost,$fport,$fdbname,$fdbuser,$fpass);
+my $to_locator       = make_locator_string($tdbtype,$tmodule,$thost,$tport,$tdbname,$tdbuser,$tpass);
+
+my @cloneids         = read_clones($usefile,@ARGV);
+
+my $tdb              = new Bio::EnsEMBL::DBLoader($to_locator);
+my $fdb              = new Bio::EnsEMBL::DBLoader($from_locator);
+
+write_analysis($tdb);
+
+foreach my $cloneid (@cloneids) {
+
+    eval {
+
+	my $fclone = $fdb   ->get_Clone($cloneid);
+	my $tclone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone(-disk_id => "none",
+							      -dbobj   => $tdb);
+	my @contig;
+
+	foreach my $contig ($fclone->get_all_Contigs) {
+	    my @features = $contig->get_all_SeqFeatures;
+	    my @genes    = $contig->get_all_Genes;
+	    my $tcontig  = make_contig($contig,$tdb,\@features,\@genes);
+
+	    $tclone->add_Contig($tcontig);
+
+	    push(@contig,$tcontig->id);
+         }
+	
+	my @pairs = make_pairs($tclone);                 # Makes exon pairs from features
+
+	print("Newly created pairs are :\n");
+	print_exon_pairs(@pairs);
+
+	$tdb->write_ExonPairs(@pairs);
+
+	my @newpairs = $tdb->get_all_ExonPairs(@contig);
+
+	print("Pairs from the database are :\n");
+	print_exon_pairs(@newpairs);
+
+	print("Deleting exon pairs\n");
+	$tdb->delete_ExonPairs(@newpairs);
+
+	my @delpairs = $tdb->get_all_ExonPairs(@contig);
+
+	print("Pairs from the database are :\n");
+	print_exon_pairs(@delpairs);
+
+
+    };
+
+    if ($@) {
+	print("ERROR processing clone $cloneid [$@]\n");
+    }
+}
+
+sub print_exon_pairs {
+    my (@pairs) = @_;
+
+    if ($#pairs >= 0) {
+	
+	foreach my $pair (@pairs) {
+	    print("Pair is " . $pair->exon1->id . "\t" . $pair->exon2->id . "\t" . $pair->type . "\n");
+	}
+	
+    }
+}
+
+sub make_pairs {
+    my ($tclone) = @_;
+
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair(-clone => $tclone);
+       $runnable->run;
+
+    my @pairs    = $runnable->output;
+    
+    return @pairs;
+}
+
+sub make_contig {
+    my ($contig,$tdb,$features,$genes) = @_;
+
+    my $tcontig = new Bio::EnsEMBL::Pipeline::DBSQL::Contig(-id    => $contig->id,
+							    -dbobj => $tdb);
+
+    
+    foreach my $f (@$features) {
+	$tcontig->add_SimilarityFeature($f);
+    }
+    
+    foreach my $gene (@$genes) {
+	
+	foreach my $exon ($gene->each_unique_Exon) {
+	    $tdb ->write_Exon($exon);
+	    $exon->find_supporting_evidence($features);
+	}
+	
+	$tcontig->add_Gene($gene);
+    }
+
+    return $tcontig;
+
+}
+
+sub write_analysis {
+    my ($tdb) = @_;
+
+    my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => '__NONE__',
+							  -db_version      => '__NONE__',
+							  -db_file         => '__NONE__',
+							  -program         => 'exon_pair_test',
+							  -program_version => -1,
+							  -program_file    => '__NONE__',
+							  -module          => 'Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair.pm',
+							  -module_version  => 1,
+							  -gff_source      => 'exon_pair',
+							  -gff_feature     => 'prediction',
+							  -parameters      => "");
+    
+    
+    $tdb->write_Analysis($analysis);
+}
+   
+sub read_clones {
+    my ($file,@clones) = @_;
+
+    my @out;
+
+    if (defined($file)) {
+	open(IN,"<$file") || die "Can't open $file";
+    }
+
+    while (<IN>) {
+	chomp;
+	push(@out,$_);
+    }
+
+    push(@out,@clones);
+
+    return @out;
+}
+
+sub make_locator_string {
+    my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
+
+    if ($type eq "rdb") {
+	return 	"$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+    } elsif ($type eq "timdb") {
+	return "Bio::EnsEMBL::TimDB::Obj";
+    } else {
+	die "Database type [$type] not recognised\n";
+    }
+}
+
+
+

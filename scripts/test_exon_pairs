@@ -1,0 +1,164 @@
+#!/usr/local/bin/perl
+
+=head1 NAME
+
+test_exon_pairs - Creates exon pairs writes,fetches and deletes them from the database
+
+=head1 SYNOPSIS
+ 
+  make_exon_pairs
+
+=head1 DESCRIPTION
+
+A contig is retrieved from one database along with its features.  Exon pairs are
+then generated and written into the analysis database.  A final test is to read
+the exon pairs back from the database.
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+    
+    -nowrite   Runs entire script without writing in recipient
+
+    -verbose   Gets all the print STDERR for testing purposes
+
+=cut
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::ExonPair;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+
+use Bio::EnsEMBL::DBLoader;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $fdbtype = 'rdb';
+my $fhost   = 'obi-wan';
+my $fport   = '410000';
+my $fdbname = 'analysis';
+my $fdbuser = 'root';
+my $fpass   = undef;
+my $fmodule  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+
+my $help;
+my $usefile;
+
+&GetOptions( 
+	     'fdbtype:s'  => \$fdbtype,
+	     'fhost:s'    => \$fhost,
+	     'fport:n'    => \$fport,
+	     'fdbname:s'  => \$fdbname,
+	     'fdbuser:s'  => \$fdbuser,
+	     'fpass:s'    => \$fpass,
+	     'h|help'    =>  \$help,
+	     );
+
+
+if ($help) {
+    exec('perldoc', $0);
+}
+
+$| = 1;
+
+# Connect to the rdb
+my $locator = make_locator_string($fdbtype,$fmodule,$fhost,$fport,$fdbname,$fdbuser,$fpass);
+my $db      = new Bio::EnsEMBL::DBLoader($locator);
+
+
+# Create 2 exons to make a pair out of
+my $exon1   = new Bio::EnsEMBL::Exon;
+   $exon1->id('TESTEXON1');
+   $exon1->contig_id("test.contig");
+   $exon1->version  (1);
+   $exon1->start    (1000);
+   $exon1->end      (2000);
+   $exon1->phase    (1);
+   $exon1->strand   (1);
+   $exon1->created  (954851176);
+   $exon1->modified (954851176);
+
+
+my $exon2   = new Bio::EnsEMBL::Exon;
+   $exon2->id('TESTEXON2');
+   $exon2->contig_id("test.contig");
+   $exon2->version  (1);
+   $exon2->start    (3000);
+   $exon2->end      (4000);
+   $exon2->strand   (1);
+   $exon2->phase    (1);
+   $exon2->created  (954851176);
+   $exon2->modified (954851176);
+
+
+# Write the exons into the database
+$db->write_Exon($exon1);
+$db->write_Exon($exon2);
+
+
+# Create an exon pair out of the exons
+my $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
+						-exon2 => $exon2,
+						-type  => 'ABUTTING');
+
+my @pairs   = ($pair);
+my @contigs = ("test.contig");
+
+# Write the pair to the database
+$db->write_ExonPairs(@pairs);
+
+# Fetch the pair from the database
+my @newpairs = $db->get_all_ExonPairs(@contigs);
+
+print_exon_pairs(@newpairs);
+
+# Delete the pair from the database
+print("Deleting exon pairs: \n");
+$db->delete_ExonPairs(@newpairs);
+
+# Check the pair has been deleted
+my @delpairs = $db->get_all_ExonPairs(@contigs);
+
+print("All exon pairs are now: \n");
+print_exon_pairs(@delpairs);
+
+# Finally delete the exons
+$db->delete_Exon($exon1->id);
+$db->delete_Exon($exon2->id);
+
+
+print("Deleted exons\n");
+
+
+sub print_exon_pairs {
+    my (@pairs) = @_;
+
+    if ($#pairs >= 0) {
+	
+	foreach my $pair (@pairs) {
+	    print("Pair is " . $pair->exon1->id . "\t" . $pair->exon2->id . "\t" . $pair->type . "\n");
+	}
+	
+    }
+}
+
+
+sub make_locator_string {
+    my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
+
+    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+
+}
