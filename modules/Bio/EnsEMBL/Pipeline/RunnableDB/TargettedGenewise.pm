@@ -207,14 +207,17 @@ sub fetch_input{
   
   #print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
-  my $chromosome = $sliceadp->fetch_by_chr_name($chr_name);
 
   # we want to give genewise a bit more genomic than the one found by pmatch, 
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
-  
-  $new_start = $chromosome->chr_start if $new_start < $chromosome->chr_start;
-  $new_end = $chromosome->chr_end if $new_end > $chromosome->chr_end;
+
+  # The below checks that the adjusted co-ords are within the bounds of
+  # the chromosome; removed for now due to database load concerns
+
+  # $chromosome = $sliceadp->fetch_by_chr_name($chr_name);  
+  # $new_start = $chromosome->chr_start if $new_start < $chromosome->chr_start;
+  # $new_end = $chromosome->chr_end if $new_end > $chromosome->chr_end;
 
   my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
       
