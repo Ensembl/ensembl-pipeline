@@ -17,7 +17,7 @@ Importer
 
 =head1 SYNOPSIS
 
-  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
       '-host'   => $host,
       '-dbname' => $dbname,
       '-user'   => 'ensadmin'
@@ -69,7 +69,7 @@ use Bio::Root::RootI;
 
 use Bio::EnsEMBL::PerlDB::Contig;
 use Bio::EnsEMBL::PerlDB::Clone;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use FileHandle;
 
@@ -85,7 +85,7 @@ use FileHandle;
 		);
     Function:   Initializes module
     Returns :   
-    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,
+    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor,
                 directory name,
                 species
 
@@ -660,8 +660,8 @@ sub dbobj {
   
 
   if (defined($arg)) {
-    if (!($arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj"))) {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj");
+    if (!($arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor"))) {
+      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
     }
     $self->{'_dbobj'} = $arg;
   }
