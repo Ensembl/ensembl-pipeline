@@ -60,7 +60,9 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 use Data::Dumper;
-use Bio::Root::RootI;
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
@@ -69,10 +71,11 @@ use Bio::Root::RootI;
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
+			   -GOLDEN_PATH => $path,
                            -ANALYSIS    => $analysis);
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder object
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
@@ -85,46 +88,34 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
+    my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
        
     $vcontig = 1 unless defined($vcontig);
     
     $self->vcontig($vcontig);
     $self->extend($extend);
 
-    return $self; # success - we hope!
+    # golden path
+    if(!defined $path){
+    # look in GB_conf.pl
+    $path = $::db_conf{'golden_path'};
+    }
+
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
+
+
+    return $self;
 }
 
-=head2 input_id
-
-    Title   :   input_id
-    Usage   :   $self->input_id($input_id);
-    Function:   Gets or sets the value of input_id
-    Returns :   valid input id for this analysis (if set) 
-    Args    :   input id for this analysis 
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
-
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
-
-sub fetch_output {
-    my($self,$output) = @_;
+sub input_id {
+    my ($self,$arg) = @_;
     
+    if (defined($arg)) {
+	$self->{_input_id} = $arg;
+    }
+    
+    return $self->{_input_id};
 }
 
 =head2 write_output
@@ -139,254 +130,90 @@ sub fetch_output {
 
 
 sub write_output {
-    my($self) = @_;
+    my($self,@genes) = @_;
+#    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => 'ecs1d',		
+#						-user   => 'ensadmin',
+#						-dbname => 'mouse_gb_aug01',
+#						-pass   => 'ensembl',
+#						-dnadb  => $self->dbobj,
+#					       );
 
-    my @genes = $self->output;
-
+    # not ideal, but temporarily write to the same database
     my $db = $self->dbobj;
-  
-    if( !defined $db ) {
-      $self->throw("unable to make write db");
+
+    # sort out analysis
+    my $genetype = 'ensembl';
+    my $anaAdaptor = $db->get_AnalysisAdaptor;
+    my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+    
+    my $analysis_obj;
+    
+    if(scalar(@analyses) > 1){
+      $self->throw("panic! > 1 analysis for $genetype\n");
+    }
+    elsif(scalar(@analyses) == 1){
+      $analysis_obj = $analyses[0];
+    }
+    else{
+      # make a new analysis object
+      $analysis_obj = new Bio::EnsEMBL::Analysis
+	(-db              => 'NULL',
+	 -db_version      => 1,
+	 -program         => $genetype,
+	 -program_version => 1,
+	 -gff_source      => $genetype,
+	 -gff_feature     => 'gene',
+	 -logic_name      => $genetype,
+	 -module          => 'GeneBuilder',
+	);
     }
     
     my %contighash;
-    my $gene_obj = $db->gene_Obj;
+    my $gene_adaptor = $db->get_GeneAdaptor;
 
+    # this now assummes that we are building on a single VC.
     my $genebuilders = $self->get_genebuilders;
-    my ($contig) = keys %$genebuilders;
+    my ($contig)     = keys %$genebuilders;
     my $vc = $genebuilders->{$contig}->contig;
 
+    @genes = $genebuilders->{$contig}->each_Gene;
 
     return unless ($#genes >= 0);
     my @newgenes;
-    
-    foreach my $gene (@genes) {
+
+    foreach my $gene (@genes) { 
       eval {
-	print STDERR "Converting gene " . $gene->id . "\n";
+	print STDERR "Converting gene " . $gene->{'temporary_id'} . "\n";
+	$gene->analysis($analysis_obj);
 	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
+
 	push(@newgenes,$newgene);
+	$newgene->type($genetype);
+	$newgene->analysis($analysis_obj);
       };
       if ($@) {
-	print STDERR "ERROR converting gene " . $gene->id . " " . $gene->type . " [$@]\n";
+	print STDERR "ERROR converting gene " . $gene->{'temporary_id'} . " " . $gene->type . " \n[$@]\n";
       }
     }
-    # get new ids
-    eval {
 
-	my $genecount  = 0;
-	my $transcount = 0;
-	my $translcount = 0;
-	my $exoncount  = 0;
-
-	# get counts of each type of ID we need.
-
-	foreach my $gene ( @newgenes ) {
-	    $genecount++;
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$transcount++;
-		$translcount++;
-	    }
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-	        $exon->seqname($vc->id);
-		$exoncount++;
-		foreach my $sf($exon->each_Supporting_Feature) {
-                  if ($sf->isa("Bio::EnsEMBL::FeaturePair")) {
-		  print STDERR "***sub_align: " . 
-		               $sf->seqname . "\t" .
-		               $sf->start . "\t" .
-			       $sf->end . "\t" .
-			       $sf->strand . "\t" .
-			       $sf->hseqname . "\t" .
-			       $sf->hstart . "\t" .
-			       $sf->hend . "\n";
-                 }
-	  }
-
-	    }
-	}
-
-	# get that number of ids. This locks the database
-
-	my @geneids   =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	my @transids  =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	my @translids =  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-	my @exonsid   =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-
-	# database locks are over.
-
-	# now assign ids. gene and transcripts are easy. Exons are harder.
-	# the code currently assummes that there is one Exon object per unique
-	# exon id. This might not always be the case.
-
-	foreach my $gene ( @newgenes ) {
-	    $gene->id(shift(@geneids));
-	    my %exonhash;
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-
-		my $tempid = $exon->id;
-		$exon->id(shift(@exonsid));
-		$exonhash{$tempid} = $exon->id;
-	    }
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$trans->id(shift(@transids));
-		$trans->translation->id(shift(@translids));
-		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-	    }
-	    
-	}
-
-	# paranoia!
-	if( scalar(@geneids) != 0 || scalar(@exonsid) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
-	    $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonsid));
-	}
-
-    };
-    if( $@ ) {
-	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-    }
-
-
-    # this now assummes that we are building on a single VC.
-
-#    $self->throw("Bailing before real write\n");
-    
   GENE: foreach my $gene (@newgenes) {	
       # do a per gene eval...
       eval {
-	  
-	  $gene_obj->write($gene,'evidence');
+	$gene_adaptor->store($gene);
+	print STDERR "wrote gene " . $gene->dbID . " \n";
       }; 
       if( $@ ) {
-	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+	print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
       }
-	    
-  }
-  }
-sub old_write {
-  my ($self,@genes) = @_;
-
-#    my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=ensrv4.sanger.ac.uk;dbname=arne_freeze05_ewan;user=ensadmin";
     
-#    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
-   
-#    if( !defined $db ) {
-#	$self->throw("unable to make write db");
-#    }
-
-    my $db = $self->dbobj;
-
-    my %contighash;
-    my $gene_obj = $db->gene_Obj;
-
-    # this now assummes that we are building on a single VC.
-
-    my $genebuilders = $self->get_genebuilders;
-    my ($contig) = keys %$genebuilders;
-    my $vc = $genebuilders->{$contig}->contig;
-
-    return unless ($#genes >= 0);
-    my @newgenes;
-
-     foreach my $gene (@genes) { 
-       eval {
-	 my $newgene = $vc->convert_Gene_to_raw_contig($gene);
-	 push(@newgenes,$newgene);
-       };
-       if ($@) {
-	 print STDERR "ERROR converting gene " . $gene->id . " " . $gene->type . "\n";
-       }
-     }
-
-
-    eval {
-
-        foreach my $gene (@newgenes) {	
-
-	    # do a per gene eval...
-	    eval {
-    
-		$gene->type('pruned');
-		
-		my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
-		
-		$gene->id($geneid);
-		print (STDERR "Writing gene " . $gene->id . "\n");
-		
-		# Convert all exon ids and save in a hash
-		my %namehash;
-		my @exons = $gene->each_unique_Exon();
-		my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
-		my $count = 0;
-		foreach my $ex (@exons) {
-		    $namehash{$ex->id} = $exonids[$count];
-		    $ex->id($exonids[$count]);
-		    print STDERR "Exon id is ".$ex->id."\n";
-		    $count++;
-		}
-		
-		my @transcripts = $gene->each_Transcript;
-		my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
-		my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
-		$count = 0;
-		foreach my $tran (@transcripts) {
-		    $tran->id             ($transcript_ids[$count]);
-		    $tran->translation->id($translation_ids[$count]);
-		    $count++;
-		    
-		    my $translation = $tran->translation;
-		    
-		    print (STDERR "Transcript  " . $tran->id . "\n");
-		    print (STDERR "Translation " . $tran->translation->id . "\n");
-		    
-		    foreach my $ex ($tran->each_Exon) {
-			my @sf = $ex->each_Supporting_Feature;
-			print STDERR "Supporting features are " . scalar(@sf) . "\n";
-			
-			if ($namehash{$translation->start_exon_id} ne "") {
-			    $translation->start_exon_id($namehash{$translation->start_exon_id});
-			}
-			if ($namehash{$translation->end_exon_id} ne "") {
-			    $translation->end_exon_id  ($namehash{$translation->end_exon_id});
-			}
-			print(STDERR "Exon         " . $ex->id . "\n");
-		    }
-		    
-		}
-		
-		$gene_obj->write($gene);
-	    }; 
-	    if( $@ ) {
-		print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-	    }
-	    
-	}
-    };
-    if ($@) {
-
-	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
-	} else {
-	    # nothing
-	}
-
-
-     # Set attribute tag on all contigs
-     $db->extension_tables(1);
-
-     foreach my $contig (keys %$genebuilders) {
-        my @contigs = $vc->get_all_RawContigs;
-
-        foreach my $contig (@contigs) {
-            $contig->set_attribute('GENE_BUILD_NOV05',1); 
-        }
-     }
+    }
 }
 
 =head2 fetch_input
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for est2genome from the database
+    Function:   Fetches input data for genebuilder from the database
     Returns :   nothing
     Args    :   none
 
@@ -396,8 +223,6 @@ sub fetch_input {
     my( $self) = @_;
 
     $self->throw("No input id") unless defined($self->input_id);
-
-    $self->dbobj->static_golden_path_type('CLONE');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 
@@ -417,7 +242,16 @@ sub fetch_input {
 
     
     $self->addgenebuilder($genebuilder,$contig);
+}
 
+sub focuscontig {
+    my ($self,$arg) = @_;
+    
+    if (defined($arg)) {
+	$self->{_contig} = $arg;
+    }
+
+    return $self->{_contig};
 }
 
 sub vcontig {
@@ -474,7 +308,7 @@ sub run {
     my $genebuilders = $self->get_genebuilders;
     #my @gene;
 
-    $self->{_output} = [];
+    $self->{'_output'} = [];
     
     my @vcgenes;
     foreach my $contig (keys %$genebuilders) {
@@ -483,37 +317,12 @@ sub run {
 	$genebuilders->{$contig}->build_Genes;
 	@vcgenes = @{$genebuilders->{$contig}{_genes}};
         print STDERR "Genes before conversion\n";
-#	$vc->_dump_map(\*STDERR);
         $genebuilders->{$contig}->print_Genes(@vcgenes);
-        print STDERR "Converting coordinates";
-        #foreach my $g (@vcgenes) {
-        #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
-           #$self->check_gene($newgene);
-	#   push(@gene,$newgene);
-        #}
+        print STDERR "Converting coordinates\n";
     }
     
 	    
-    push(@{$self->{_output}},@vcgenes);
+    push(@{$self->{'_output'}},@vcgenes);
 }
-
-=head2 output
-
-    Title   :   output
-    Usage   :   $self->output()
-    Function:   
-    Returns :   Array of Bio::EnsEMBL::FeaturePair
-    Args    :   None
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
 
 1;
