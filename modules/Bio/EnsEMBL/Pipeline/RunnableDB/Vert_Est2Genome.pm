@@ -67,7 +67,7 @@ sub _initialize {
 						      'INPUT_ID'], @args);
        
     $self->throw("No database handle input")           unless defined($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::Pipeline::DB::ObjI");
+    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
     if (defined($db2)) {
     $self->warn("[$db2] is not a Bio::EnsEMBL::DB::ObjI") unless $db2->isa("Bio::EnsEMBL::DBSQL::Obj");
     }
@@ -103,7 +103,7 @@ sub dbobj {
     my( $self, $value ) = @_;    
     if ($value) {
 
-        $value->isa("Bio::EnsEMBL::Pipeline::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::Pipeline::DB::ObjI");
+        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
         $self->{'_dbobj'} = $value;
     }
     return $self->{'_dbobj'};
@@ -200,7 +200,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->db2->get_Contig($contigid);
+    my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq   = $contig->primary_seq;
     my @features = $contig->get_all_SimilarityFeatures;
     $self->{_genseq} = $genseq;
@@ -286,7 +286,8 @@ sub run {
     my @tmpf = $self->runnable->output;
    
     foreach my $tmpf (@tmpf) {
-
+      $tmpf->seqname($self->input_id);
+      $tmpf->id($self->input_id);
       $tmpf->source_tag("tblastn");
       $tmpf->primary_tag("similarity");
       $tmpf->strand($tmpf->hstrand);
@@ -309,8 +310,9 @@ sub check_splice {
   my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
 
 #  print ("Start/end " . $f1->start . "\t" . $f1->end . "\t" . $f2->start . "\t" . $f2->end . "\n");
-
+    if (abs($f2->start - $f1->end) > 50) {
     print ("Splices are " . $f1->hseqname . " [" . $splice1 . "][" . $splice2 . "] " . ($f2->start - $f1->end) . "\n");
+    }
 }
 
 sub output {
@@ -442,6 +444,7 @@ sub print_FeaturePair {
     print STDERR $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . $pair->score . "\t" .
 	$pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
 }
+
 =head2 parse_Header
 
   Title   : parse_Header
