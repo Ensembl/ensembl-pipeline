@@ -68,8 +68,7 @@ my $shuffle;
 my $output_dir;
 my %analyses;
 my %skip_analyses;
-my %skip_input_id_type;
-my %skip_input_id;
+my %skip_type;
 my $verbose;
 my $rerun_sleep = 300;
 my $base_sleep = 180;
@@ -87,8 +86,11 @@ my $help;
 my $rename_on_retry = 1;
 my $kill_jobs = 1;
 my $die_if_broken = 0;
-
-
+my $rules_die = 1;
+my $rules_sanity = 1;
+my $perldoc = 0;
+my $max_pending_jobs;
+my @command_args = @ARGV;
 GetOptions(
            'dbhost=s'      => \$dbhost,
            'dbname=s'      => \$dbname,
@@ -116,16 +118,26 @@ GetOptions(
            'kill_jobs!' => \$kill_jobs,
            'queue_manager=s' => \$queue_manager,	   
            'h|help'	    => \$help,
-           'rename_on_retry!' => \$rename_on_retry,	   
-          ) or useage();
+           'rename_on_retry!' => \$rename_on_retry,
+           'rules_sanity!' => \$rules_sanity,
+           'rules_die!' => \$rules_die,
+           'rerun_sleep:s' => \$rerun_sleep,
+           'base_sleep:s' => \$base_sleep,
+           'max_sleep:s' => \$max_sleep,
+           'sleep_per_job:s' => \$sleep_per_job,
+           'max_pending_jobs:s' => \$max_pending_jobs,
+           'perldoc!' => \$perldoc,
+          ) or useage(\@command_args);
 
+
+perldoc() if $perldoc;
 if(!$dbhost || !$dbname || !$dbuser){
   print STDERR " you must provide a host and a database name and a user".
   " for you db connection\n";
   $help = 1;
 }
 
-useage() if $help;
+useage(\@command_args) if $help;
 my %created_job_hash;
 if($idlist_file || @analyses || @input_id_types || @starts_from || 
    @skip_analyses || @skip_types || $skip_idfile){
@@ -136,9 +148,10 @@ if($idlist_file || @analyses || @input_id_types || @starts_from ||
   $accumulators = 0;
 }
 &verbose('WARNING');
-my $max_time = $MAX_JOB_TIME unless($max_time);
-my $killed_file = $KILLED_INPUT_IDS unless($killed_file);
-my $queue_manager = $QUEUE_MANAGER unless($queue_manager);
+$max_time = $MAX_JOB_TIME unless($max_time);
+$killed_file = $KILLED_INPUT_IDS unless($killed_file);
+$queue_manager = $QUEUE_MANAGER unless($queue_manager);
+$max_pending_jobs = $MAX_PENDING_JOBS unless($max_pending_jobs);
 if(!$kill_jobs){
   $killed_file = undef;
 }
@@ -201,9 +214,11 @@ my %tmp = logic_name2dbID($ana_adaptor, @starts_from);
 @starts_from = keys %tmp;
 
 if ($idlist_file && ! -e $idlist_file) {
-    die "Must be able to read $idlist_file";
+  throw("Must be able to read $idlist_file");
 }
-
+if($skip_idfile && ! -e $skip_idfile){
+  throw("Must be able to read $skip_idfile");
+}
 
 # Lock to prevent >1 instances of the same pipeline running together
 #
@@ -251,7 +266,7 @@ $db->pipeline_lock($lock_str);
 
 my @rules    = $rule_adaptor->fetch_all;
 $accumulators = $sanity->accumulator_sanity_check(\@rules, $accumulators, $die_if_broken) if($accumulators);
-
+$sanity->rule_type_sanity(\@rules, $rules_die) if($rules_sanity);
 
 my %accumulator_analyses;
 
@@ -272,7 +287,7 @@ alarm $wakeup if $wakeup;
 my %completed_accumulator_analyses;
 my %ids_to_run;
 my %types_to_run;
-
+my %ids_not_to_run;
 if($idlist_file){
   open IDS, "< $idlist_file" or die "Can't open $idlist_file";
   my $count = 0;
@@ -288,13 +303,31 @@ if($idlist_file){
   }
   close IDS;
 }
-
+if($skip_idfile){
+  open IDS, "< $skip_idfile" or die "Can't open $skip_idfile";
+  my $count = 0;
+  while (<IDS>) {
+    chomp;
+    my($id, $type) = split;
+    if(!$type){
+      print STDERR "need to know what type the input ids in the file".
+        " are  format should be input_id type\n";
+      exit(1);
+    }
+    $ids_not_to_run{$type}{$id} = 1;
+  }
+  close IDS;
+}
 if(@input_id_types){
   foreach my $type(@input_id_types){
     $types_to_run{$type} = 1;
   }
 }
-
+if(@skip_types){
+  foreach my $type(@skip_types){
+    $skip_type{$type} = 1;
+  }
+}
 #code to put created jobs back in the system
 
 my @created_jobs = $job_adaptor->fetch_by_Status("CREATED");
@@ -303,7 +336,8 @@ foreach my $j(@created_jobs){
   $j->batch_runRemote;
 }
 
-
+print STDERR "Have ".keys(%analyses)." analyses to run\n" 
+  if((%analyses) &&( $verbose));
 while (1) {
     $submitted = 0;
 
@@ -311,6 +345,7 @@ while (1) {
     # until we have all the input ids.
 
     my $id_type_hash = {};
+    my $ids_not_type_hash = {};
     print "Reading IDs ...\n ";
     if ($idlist_file) {
       $id_type_hash = \%ids_to_run;
@@ -330,7 +365,9 @@ while (1) {
         $id_type_hash = $sic->get_all_input_id_analysis_sets;
       }
     }
-
+     if($skip_idfile){
+      $ids_not_type_hash = \%ids_not_to_run;
+    }
     my @anals = @{$sic->fetch_analysis_by_input_id('ACCUMULATOR')};
 
     foreach my $anal (@anals) {
@@ -360,10 +397,11 @@ while (1) {
 	
       next INPUT_ID_TYPE if ($input_id_type eq 'ACCUMULATOR');
       if(keys(%types_to_run) && !$types_to_run{$input_id_type}){
-	next;
+        next;
       }
-      
-      
+      if($skip_type{$input_id_type}){
+        next INPUT_ID_TYPE;
+      }
       @id_list = keys %{$id_type_hash->{$input_id_type}};
       
       @id_list = &shuffle(@id_list) if $shuffle;
@@ -371,7 +409,9 @@ while (1) {
       print "Checking $input_id_type ids\n" if($verbose);
       
     JOBID: foreach my $id (@id_list) {
-	
+        if($ids_not_type_hash->{$input_id_type}->{$id}){
+          next JOBID;
+        }
 	# handle signals. they are 'caught' in the handler subroutines but
 	# it is only here they we do anything with them. so if the script
 	# is doing something somewhere else (getting IDs at the start of
@@ -382,11 +422,11 @@ while (1) {
 	  $alarm = 0;
 	  
 	  # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-    print STDERR "Max pending jobs = $MAX_PENDING_JOBS\n" if($verbose);
+    print STDERR "Max pending jobs = $max_pending_jobs\n" if($verbose);
     while ($get_pend_jobs && !$term_sig && 
-           &$get_pend_jobs >= $MAX_PENDING_JOBS) {
+           &$get_pend_jobs >= $max_pending_jobs) {
       print STDERR "Sleeping due to too many pending jobs\n" if($verbose);
-		  my $extra_job = (&$get_pend_jobs - $MAX_PENDING_JOBS);
+		  my $extra_job = (&$get_pend_jobs - $max_pending_jobs);
       my $sleep = $extra_job * $sleep_per_job;
       if($sleep < $base_sleep){
         $sleep = $base_sleep;
@@ -810,15 +850,6 @@ sub db_sanity_check{
 }
 
 
-
-sub accumulator_sanity_check{
-  my ($rules, $sanity, $accumulators, $die) = @_;
-
-  $accumulators = $sanity->accumulator_sanity_check
-    ($rules, $accumulators, $die);
-  return $accumulators;
-}
-
 sub job_time_check{
   my ($batch_q_module, $verbose, $running_jobs, $file, $max_time) = @_;
 
@@ -828,17 +859,32 @@ sub job_time_check{
       push(@submission_ids, $job->submission_id);
       $jobs{$job->submission_id} = $job;
     }
-  my $time_hash = $batch_q_module->get_job_time(\@submission_ids);
+  my $time_hash = $batch_q_module->get_job_time();
   foreach my $id(@submission_ids){
     my $job = $jobs{$id};
-    if($time_hash->{$id} >= $max_time){
-      $batch_q_module->kill_job($id);
-      print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
-      print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
-      $job->set_status('KILLED');
+    if($job->current_status->status eq 'RUNNING'){
+      if($time_hash->{$id} >= $max_time){
+        $batch_q_module->kill_job($id);
+        print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
+        print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
+        $job->set_status('KILLED');
+        my @lost_jobs = $job_adaptor->fetch_by_submission_id($id);
+      LOST:foreach my $lj(@lost_jobs){
+          print STDERR "job ".$lj->dbID." is lost at ".
+            $lj->current_status->status."\n";
+          if($lj->dbID == $job->dbID){
+            next LOST;
+          }
+          print KILLED $lj->input_id." ".$lj->analysis->logic_name." ".$lj->analysis->module."\n";
+          $lj->set_status('KILLED');
+        }
+      }
     }
   }
 }
+
+
+
 
 
 sub job_existance{
@@ -883,42 +929,42 @@ sub job_existance{
   return;
 }
 
-#sub job_existance{
-#  my ($batch_q_module, $verbose, $job_hash) = @_;
-#  sleep(15);
-#  my @ids = keys(%$job_hash);
-#  $verbose = 1;
-#  print STDERR "Checking for the existance of jobs \n";
-#  my $lost_ids = $batch_q_module->check_existance(\@ids, $verbose);
-#  ID:foreach my $lost_id(@$lost_ids){
-#    my $job = $job_hash->{$lost_id};
-#    if(!$job){
-#      print STDERR "job with submission id ".$lost_id." isn't ".
-#        "defined\n" if($verbose);
-#      next ID;
-#    }
-#    $job->set_status('AWOL');
-#    my @lost_jobs = $job_adaptor->fetch_by_submission_id($lost_id);
-#  LOST:foreach my $lj(@lost_jobs){
-#      print STDERR "job ".$lj->dbID." is lost at ".
-#        $lj->current_status->status."\n";
-#      if($lj->dbID == $job->dbID){
-#        next LOST;
-#      }
-#      $lj->set_status('AWOL');
-#    }
-#    print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
-#  }
-#  $verbose = 0;
-#}
-
-
 
 
 sub useage{
+  my ($command_args) = @_;
+	print "RuleManager3.pl is the script used to run the pipeline\n\n";
+  print "Everytime you run the rulemanager you must pass in the database ".
+    "options\n\n";
+  print ("-dbhost     The host where the pipeline database is.\n".
+         "-dbport     The port.\n".
+         "-dbuser     The user to connect as.\n".
+         "-dbpass     The password to use.\n".
+         "-dbname   The database name.\n\n");
+  print ("Other options you may find useful are:\n\n".
+         "-once, which means the RuleManager loop only executes once ".
+         "before exiting\n".
+         "-analysis, where you can specific an individual analysis to ".
+         "run\n".
+         "-idlist_file, a file containing a list of input ids to run\n\n");
+  print ("For more information about these options and other options \n".
+         "which  can be used run the script with the -perldoc option \n".
+         "or read the using_the_ensembl_pipeline.txt doc which can be\n ".
+         "found in the ensembl-doc cvs module\n\n");
+  print ("Your commandline was :\n".
+         "RuleManager3.pl ".join("\t", @$command_args), "\n\n");
+
+  print " -h or -help will print out the help again \n";
+
+  exit;
+}
+
+
+sub perldoc{
 	exec('perldoc', $0);
 	exit;
 }
+
 
 =pod
 
@@ -941,31 +987,40 @@ DB Connection Details
    -dbpass     The password to use.
    -dbname   The database name.
 
-Other Options
+Other Useful Options
 
-   -local run the pipeline locally and not using the batch submission 
-    system
    -idlist_file a path to a file containing a list of input ids to use
     this file need to be in the format input_id input_type, for example
     1.1-100000 SLICE
-   -runner path to a runner script (if you want to overide the setting
-				    in BatchQueue.pm)
-   -output_dir path to a output dir (if you want to overide the 
-				     setting in BatchQueue.pm)
+   -skip_idlist_file, file same format as above of ids to skip, note
+    if two different id types use the same input_id the id must be
+    present in the list twice, under both types in order to always be
+    skipped
    -once only run through the RuleManager loop once
    -shuffle before running though the loop shuffle the order of the 
     input ids
    -analysis only run with these analyses objects, can be logic_names or
     analysis ids, this option can appear in the commandline multiple 
     times
-    -skip_analysis  don't run with these analyses objects, like -analysis 
-      can be logic_names or dbIDs and can appear in the commandline
-      multiple times '
-   -v verbose mode
-   -dbsanity peform some db sanity checks, can be switched of with 
-    -nodbsanity
+   -skip_analysis  don't run with these analyses objects, like -analysis 
+    can be logic_names or dbIDs and can appear in the commandline 
+    multiple times '
    -input_id_types, which input id types to run the RuleManager with,
     this option can also appear in the commandline multiple times
+   -skip_id_types, which types of input ids not to run, again this option
+    can appear on the commandline many times
+
+Other options
+
+   -local run the pipeline locally and not using the batch submission 
+    system
+   -runner path to a runner script (if you want to overide the setting
+				    in BatchQueue.pm)
+   -output_dir path to a output dir (if you want to overide the 
+				     setting in BatchQueue.pm)
+   -v verbose mode
+   -dbsanity peform some db sanity checks, can be switched of with 
+             -nodbsanity
    -start_from, this is which analysis to use to gather the input ids
     which will be checked by the RuleManagers central loop
    -accumulators, this flag switches the accumulators on, the 
@@ -986,8 +1041,21 @@ Other Options
    -queue_manager can overide the $QUEUE_MANAGER from General.pm
    -rename_on_retry, this means any output already produced will be deleted
     before a job is retried, this defaults to off currently, it was put in 
-    as LSF appends output and error files and sometimes you don't want this
-   '
+    as LSF appends output and error files and sometimes you don't want 
+    this'
+   -rules_sanity, this checks the types are consistent between rule goals
+    and rule_conditions , it is on by default but can be switched off with
+    -norules_sanity
+   -rerun_sleep, the amout of time to sleep for after a loop when no jobs
+    were submitted, as standard it is 300s
+   -base_sleep, the minumun time to sleep if there are too many pending 
+    jobs, defaults to 180s
+   -max_sleep, the maximum amount of time to sleep for if there are too
+    many pending jobs defaults to 5400s
+   -sleep_per_job, the amount of time to sleep per pending job over the 
+    maximum defaults to 60s
+   -max_pending_jobs defaults ot what is set in MAX_PENDING_JOBs in 
+    BatchQueue.pm
    
 -h or -help will print out the help again
 
@@ -1013,6 +1081,12 @@ perl RuleManager3.pl -dbhost ecs2b -dbuser ensadmin -dbpass ****
  -dbname pipeline_db -analysis RepeatMask -local
 
 this would only run the RepeatMask analysis locally
+
+perl RuleManager3.pl -dbhost ecs2b -dbuser ensadmin -dbpass ****
+ -dbname pipeline_db -input_id_type CONTIG -skip_analysis Genscan
+
+this would try and run analysis on all CONTIG input ids but would
+skip the genscan analysis
 
 obviously when specific analyses are specified their conditions must be 
 met otherwise they still won't be run'
