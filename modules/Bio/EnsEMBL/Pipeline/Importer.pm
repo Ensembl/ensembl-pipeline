@@ -35,6 +35,7 @@ already has the sequence and deletes it if it is a previous version.  If the
 sequence being written is the same or a previous version to that in the database 
 a warning is printed and the sequence isn't written.
 
+Previous versions of clones my be retained with retain_old_versions()
 
 =head1 CONTACT
 
@@ -51,18 +52,18 @@ package Bio::EnsEMBL::Pipeline::Importer;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
 use Bio::EnsEMBL::PerlDB::Contig;
 use Bio::EnsEMBL::PerlDB::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-@ISA = qw(Bio::Root::Object);
+@ISA = qw(Bio::Root::RootI);
 
 =head2 new
 
@@ -84,6 +85,8 @@ sub _initialize {
   $self->{_dbobj}        = undef;     
   $self->{_mirror_dir}   = undef;
   $self->{_clones}       = [];
+  $self->{_chromosome}   = undef;
+  $self->{_retain_old_versions} = undef;
 
   my( $dbobj,$mirror_dir,$species) = 
     $self->_rearrange(['DBOBJ','MIRROR_DIR','SPECIES'], @args);
@@ -112,9 +115,11 @@ sub importClones {
   my ($self) = @_;
 
   my @files   = $self->getNewFiles;
-  my $logfile = $self->mirror_dir . "import.log";
+  my $logfile = $self->logfile;
 
   open(LOG,">>$logfile") || $self->throw("Can't write to logfile $logfile");
+
+  $self->readChromosomes;
 
  FILE: foreach my $file (@files) {
       next FILE if ($file =~ /_cc/); 
@@ -239,16 +244,21 @@ sub checkClones {
 	  }elsif ($oldversion == $clone->embl_version) {
 	    $self->warn("ERROR : Identical clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version. " in file " . $self->{_clonehash}{$clone->id}{file} . "\n");
 	  } else {
+            if ($self->retain_old_versions) {
+	      print STDERR "Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "; keeping old version\n";
+            }
+            else
+            {
+	      print STDERR "Deleting clone : Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "\n";
 	    
-	    print STDERR "Deleting clone : Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "\n";
+	      my $std = $self->dbobj->get_AnalysisAdaptor;
 	    
-	    my $std = $self->dbobj->get_AnalysisAdaptor;
+	      foreach my $contig ($oldclone->get_all_Contigs) {
+	        $std->removeInputId($contig->id,'contig',$analysis[0]);
+	      }
 	    
-	    foreach my $contig ($oldclone->get_all_Contigs) {
-	      $std->removeInputId($contig->id,'contig',$analysis[0]);
-	    }
-	    
-	    $oldclone->delete;
+	      $oldclone->delete;
+            }
 	    push(@newclones,$clone);
 	  }
 
@@ -311,7 +321,7 @@ sub getNewFiles {
   my $logfile = $self->logfile;
 
   $self->throw("Need to specify species: mm or hs")
-   unless ($self->species eq 'mm' or $self->species eq 'hs');
+   unless ($self->species eq 'mm' || $self->species eq 'hs');
 
   open(IN,"<$logfile") || $self->throw("Can't read $logfile file");
 
@@ -324,7 +334,7 @@ sub getNewFiles {
 
   opendir(DIR,"$dir/embl_files") || $self->throw("Can't read directory $dir");
 
-  my @allfiles = readdir(DIR);
+  my @allfiles = sort {$b cmp $a} readdir(DIR); # newest first
 
   closedir(DIR);
 
@@ -368,9 +378,16 @@ sub readFile {
   my $count = 1;
   my $finished = 0;
   my $ccfile;
+  my ($spec,$ftype);
 
   $self->throw("Need to specify species: mm or hs")
-   unless ($self->species eq 'mm' or $self->species eq 'mm');
+   unless ($self->species eq 'mm' || $self->species eq 'hs');
+  if ($self->species eq 'mm') {
+    $ftype = 'ROD';
+  }
+  else {
+    $ftype = 'HUM';
+  }
       
   print STDERR "\nReading fasta file " . $file . "\n\n";
 
@@ -379,7 +396,7 @@ sub readFile {
   }
   else {
     $ccfile = $file;
-    my $spec = $self->species;
+    $spec = $self->species;
     $ccfile =~ s/$spec\_u/$spec\_u_cc/;
     if (! -e "$dir/embl_files/$ccfile") {
       $self->throw("No contig coordinate file [$dir/embl_files/$ccfile]");
@@ -395,16 +412,25 @@ sub readFile {
   while (my $fasta = $seqio->next_seq) {
     printf STDERR  "Sequence %20s %s\n", $fasta->id,$fasta->desc;
     my $id = $fasta->id;
+    if ($finished && $fasta->desc =~ /HTGS_PHASE/) {
+      $self->warn("Found unfinished sequence amongst allegedly finished sequence; skipping "
+      . $fasta->desc);
+      next;
+    }
     $id =~ s/\.(.*)//;
     
     $clonehash->{$id}{seq}     = $fasta;
     $clonehash->{$id}{version} = $1;
     $clonehash->{$id}{file}    = $file;
+    my $accver = "$id." . $clonehash->{$id}{version};
+    $clonehash->{$id}{chr}     = $self->{'_chromosome'}{$accver}
+     if (defined $self->{'_chromosome'}{$accver});
     
     my $desc = $fasta->desc;
-    my ($id,$type,$phase) = split(' ',$desc);
+    # my ($id,$type,$phase) = split(' ',$desc);
+    my ($tmp,$type,$phase) = split(' ',$desc);
     $clonehash->{$id}{id} = $id;
-    if ($type eq "ROD") {
+    if ($type eq $ftype) {
       $clonehash->{$id}{phase} = 4;
     } else {
       $phase =~ s/HTGS_PHASE//;
@@ -424,7 +450,9 @@ sub readFile {
       
       $clonehash->{$1}{version} = $2;
       $clonehash->{$1}{contigs} = [];
-    } elsif ($_ =~ /(\d+)\s+(\d+): contig of/) {
+    } elsif ($_ =~ /(\d+)\s+(\d+):? contig of/) {
+    # disclaimer: this re (^^) should work, but not guaranteed, e.g.
+    # needed ? after : because of file format "inconsistencies"... arrgh!
       my %contighash;
       
       $contighash{start} = $1;
@@ -452,16 +480,26 @@ sub readFile {
 =cut
 
 sub readChromosomes {
-  my ($self,$seqs) = @_;
+  my ($self) = @_;
 
   my $dir = $self->mirror_dir;
+  my $chr_file;
 
-  open(CHR,"<$dir/chrlist/mouse_chr.lis") || $self->throw("Couldn't open chromosome file [$dir/chrlist/mouse_chr.lis");
+  if ($self->species eq 'mm') {
+    $chr_file = 'mouse_chr.lis';
+  }
+  else {
+    $chr_file = 'human_chr.lis';
+  }
+
+  open(CHR,"<$dir/chrlist/$chr_file") || $self->throw("Couldn't open chromosome file [$dir/chrlist/$chr_file");
 
   while (<CHR>) {
     chomp;
     
     my ($acc,$ver,$id,$chr,@dum) = split(' ',$_);
+    my $accver = "$acc.$ver";
+    $self->{_chromosome}{$accver} = $chr;
     
   }
   close(CHR);
@@ -539,13 +577,13 @@ sub makeClones {
       } else {
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  my $contigid  = "$acc.1.1." . $seq->length;
+	  my $contigid  = "$acc.$ver.1" . $seq->length;
 
 
 	  $newcontig->id          ($contigid);
 	  $newcontig->seq         ($seq);    
 	  $newcontig->embl_offset (1);
-	  $newcontig->version     (1);
+	  $newcontig->version     ($ver);
 	  $newcontig->embl_version($ver);
 	  $newcontig->chromosome  ($chr);
 	  $newcontig->embl_order  (1);
@@ -660,8 +698,34 @@ sub logfile {
   my ($self) = @_;
 
   $self->throw("No mirror directory defined") unless defined($self->mirror_dir);
+  $self->throw("No species defined") unless defined($self->species);
 
-  return $self->mirror_dir . "import.log";
+  return $self->mirror_dir . "import_" . $self->species . ".log";
+}
+
+=head2 retain_old_versions
+
+    Title   :   retain_old_versions
+    Usage   :   $dir = $obj->retain_old_versions
+    Function:   Whether to delete or retain old versions of clones
+		true/flase to delete/retain previous versions
+    Returns :   boolean
+    Args    :   boolean
+
+=cut
+
+sub retain_old_versions {
+  my ($self,$arg) = @_;
+
+  if (defined $arg) {
+    if ($arg) {
+      $self->{_retain_old_versions} = 1;
+    }
+    else {
+      $self->{_retain_old_versions} = 0;
+    }
+  }
+  return $self->{_retain_old_versions};
 }
 
 1;
