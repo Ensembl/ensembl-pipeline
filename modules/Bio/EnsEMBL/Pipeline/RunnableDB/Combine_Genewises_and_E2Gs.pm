@@ -322,14 +322,14 @@ sub run {
 	  $result =  ( $$b[1] <=> $$a[1] );
 	}
 	unless ($result){
-	  # else, by exon extent of the cdna
-	  $result = (  $self->_transcript_exonic_length_in_gene($$b[2]) <=>
-		       $self->_transcript_exonic_length_in_gene($$a[2]) );
-	}
-	unless ($result){
 	  # else, by genomic length of the cdna
 	  $result = (  $self->_transcript_length_in_gene($$b[2]) <=>
 		       $self->_transcript_length_in_gene($$a[2]) );
+	}
+	unless ($result){
+	  # else, by exonic extent of the cdna
+	  $result = (  $self->_transcript_exonic_length_in_gene($$b[2]) <=>
+		       $self->_transcript_exonic_length_in_gene($$a[2]) );
 	}
       } @list;
       
