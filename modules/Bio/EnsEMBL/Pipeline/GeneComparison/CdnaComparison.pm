@@ -49,13 +49,16 @@ use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
     Usage   :   my $cdna_comp =
                 Bio::EnsEMBL::Pipeline::GeneComparison::CdnaComparison->new(
                   -TRANSCRIPT_ARRAYREF => \@transcript_seqs,
-		  -CDNA_ARRAYREF       => \@cdna_seqs);
+		  -CDNA_ARRAYREF       => \@cdna_seqs,
+		  -CDNA_DESC_RE        => '\/ug=([\w\.]+)\s/');
     Function:   Initialises CdnaComparison object
     Returns :   A CdnaComparison object
     Args    :   Reference to array of PrimarySeq objects representing
                 transcripts (-TRANSCRIPTS);
 		reference to array of PrimarySeq objects representing
 		cDNAs (-CDNAS);
+		mandatory pattern to extract the desired hit sequence
+		name from the cDNA desc string (-CDNA_DESC_RE);
 		threshold for coverage of the transcript by
 		FeaturePairs, given as total percentage of the
 		transcript involved in any FeaturePairs
@@ -69,10 +72,12 @@ sub new {
 
   my ($transcript_arrayref,
       $cdna_arrayref,
-      $transcript_percent_coverage)
+      $transcript_percent_coverage,
+      $cdna_desc_re)
     = $self->_rearrange([qw(TRANSCRIPT_ARRAYREF
                             CDNA_ARRAYREF
-			    TRANSCRIPT_PERCENT_COVERAGE)],
+			    TRANSCRIPT_PERCENT_COVERAGE
+			    CDNA_DESC_RE)],
 		        @args);
 
   $self->transcript_arrayref($transcript_arrayref);
@@ -80,6 +85,7 @@ sub new {
   $transcript_percent_coverage = 95
     unless defined $transcript_percent_coverage;
   $self->transcript_percent_coverage($transcript_percent_coverage);
+  $self->cdna_desc_re($cdna_desc_re);
 
   return $self; # success - we hope!
 }
@@ -121,6 +127,26 @@ sub cdna_arrayref {
     $self->{_cdna_comparison_cdna_arrayref} = $value;
   }
   return $self->{_cdna_comparison_cdna_arrayref};
+}
+
+=head2 cdna_desc_re
+
+    Title   :   cdna_desc_re
+    Usage   :   $cdna_comp->cdna_desc_re('\/ug=([\w\.]+)\s/');
+    Function:   get/set for pattern to extract desired hit name
+                from cDNA desc string
+    Returns :   string
+    Args    :   optional string
+
+=cut
+
+sub cdna_desc_re {
+  my $self = shift;
+  if( @_ ) {
+    my $value = shift;
+    $self->{_cdna_comparison_cdna_desc_re} = $value;
+  }
+  return $self->{_cdna_comparison_cdna_desc_re};
 }
 
 =head2 get_transcript_mapping
@@ -197,8 +223,13 @@ sub run_transcript_mapping {
     until $cdna_fh = IO::File->new($cdna_fnam, O_RDWR|O_CREAT|O_EXCL);
   my $cdna_stream = Bio::SeqIO->new(-fh     => $cdna_fh,
                                     -format => 'Fasta');
+
+  $self->throw('cdna_desc_re is unset or empty') unless $self->cdna_desc_re;
   my $cdna_seqs_arrayref = $self->cdna_arrayref;
   foreach my $cdna_seq (@$cdna_seqs_arrayref) {
+    my $cdna_name = $cdna_seq->desc;
+    $cdna_name =~ $self->cdna_desc_re;
+    $cdna_seq->display_id($1);
     $self->throw("error writing to $cdna_fnam")
       unless $cdna_stream->write_seq($cdna_seq);
   }
