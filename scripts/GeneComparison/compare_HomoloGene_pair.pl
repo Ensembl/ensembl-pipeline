@@ -6,6 +6,7 @@ use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptPair;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 
 ############################################################
 # refseq mapping is a file with the mappings of locus link
@@ -130,8 +131,7 @@ foreach my $humanNM ( @human_cdnas ){
       print STDERR "Failed to find sequence $mouseNP\n";
       next MOUSE;
     }
-    
-    my ($score,$best_features, $target_coverage, $query_coverage, $perc_id) = 
+    ($score,$best_features, $target_coverage, $query_coverage, $perc_id) = 
       Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptPair
 	->blast_unmapped_proteins( $humanNP_seq, $mouseNP_seq);
     if ( $score && $best_features ){
@@ -183,7 +183,7 @@ foreach my $element1 ( $best_transcript_pairs_object->list1 ){
 }
 
 my $best_protein_pairs_object = $protein_map->stable_marriage;
-my $pair_count = scalar($best_protein_pairs_object->list1);
+$pair_count = scalar($best_protein_pairs_object->list1);
 print STDERR "Protein pairs created: ".$pair_count."\n";
 foreach my $element1 ( $best_protein_pairs_object->list1 ){
   foreach my $partner ( $best_protein_pairs_object->partners( $element1 ) ){

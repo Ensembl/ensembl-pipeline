@@ -22,7 +22,7 @@ my $coding_exons;
 	   );
 
 unless( $input && $tmp_dir){
-  print STDERR "Usage: $0 -tmp_dir /full/path/output_dir -input locuslink_pairs\n";
+  print STDERR "Usage: $0 -tmp_dir /full/path/output_dir -input /full/path/locuslink_pairs\n";
   exit(0);
 }
 
@@ -73,7 +73,7 @@ sub make_bsubs {
     my $file_name = "comparison_".$human_id."_".$mouse_id;
     my $outfile   = $bsubout."/".$file_name;
     my $errfile   = $bsuberr."/".$file_name;
-    my $command   = "bsub $lsf_options -o $outfile -e $errfile -E \"$check -check\" $script -gene_id1 $human_id -gene_id2 $mouse_id";
+    my $command   = "bsub $lsf_options -o $outfile -e $errfile -E \"$check -check\" $script -refseq_mapping $input -gene_id1 $human_id -gene_id2 $mouse_id";
     
     if ( $coding_exons ){
       $command .= " -coding_exons ";
