@@ -36,21 +36,13 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication::Finder;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
-use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_BLASTDB_FILE
+use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_OPTIONS
 						GD_BLAST_EXE
 						GD_BLAST_VARIANT
 						GD_CODEML_EXE
-						GD_INGROUP_REGEX
-						GD_OUTGROUP_REGEXES
-						GD_TRANSL_REGEX
-						GD_HIT_COVERAGE
-						GD_HIT_IDENTITY
-						GD_DISTANCE_CUTOFF
-						GD_GENETIC_CODE
 						GD_WORK_DIR
 						GD_DISTANCE_METHOD
 						GD_OUTPUT_METHOD
-						GD_OUTPUT_DIR
 						GD_OUTPUT_DBNAME
 						GD_OUTPUT_DBHOST
 						GD_OUTPUT_DBUSER
@@ -81,149 +73,10 @@ sub new {
 				  SEQFETCHER
 				  ANALYSIS )], @args);
 
-  unless (defined $input_id) {
-    throw("Must specify input id.")
-  }
-
-  $self->input_id($input_id);
-
-  $self->db($db)    if defined $db;
-  $self->seqfetcher if defined $seqfetcher;
-  $self->analysis   if defined $analysis;
-
-
-  # Verify options set in config file.
-
-    # Check options for output type are compatible
-
-  if ($GD_OUTPUT_METHOD eq 'files') {
-    unless (-d $GD_OUTPUT_DIR) {
-      throw("Output directory [$GD_OUTPUT_DIR] appears not " .
-	    "to exist or is inaccessible.")
-    }	
-  } elsif ($GD_OUTPUT_METHOD eq 'db') {
-    unless (defined $GD_OUTPUT_DBNAME && 
-	    defined $GD_OUTPUT_DBHOST && 
-	    defined $GD_OUTPUT_DBUSER) {
-      throw("Details of output database need to be provided " .
-	    "in order for output to be written to it.")
-    }
-
-    my $outdb = 
-      Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
-        -host   => $GD_OUTPUT_DBHOST,
-	-dbname => $GD_OUTPUT_DBNAME,
-	-port   => $GD_OUTPUT_DBPORT,
-	-user   => $GD_OUTPUT_DBUSER,
-	-pass   => $GD_OUTPUT_DBPASS);
-
-    unless (defined $outdb && 
-	    $outdb->isa("Bio::EnsEMBL::Compara::DBSQL::DBAdaptor")){
-      throw("Unable to connect to output database using options " .
-	    "specified in config ")
-    }
-  } else {
-    throw("Unrecognized output method [$GD_OUTPUT_METHOD].  " .
-	  "Accepted options are \'files\' or \'db\'.")
-  }
-
-    # Check BLAST-related options.
-
-  unless (defined $GD_BLASTDB_FILE && -e $GD_BLASTDB_FILE) {
-    throw("Input BLAST database is either not specified or does " . 
-	  "not exist [$GD_BLASTDB_FILE].")
-  }
-
-  if (defined $GD_BLAST_EXE && $GD_BLAST_EXE ne '' && 
-      ! -x $GD_BLAST_EXE) {
-    throw("Blast binary specified is not executable [$GD_BLAST_EXE]")
-  }
-
-  unless (defined $GD_BLAST_VARIANT &&
-     ($GD_BLAST_VARIANT eq 'ncbi' || 
-      $GD_BLAST_VARIANT eq 'wu_new' || 
-      $GD_BLAST_VARIANT eq 'wu_old' )) {
-    throw("Unrecognised BLAST index type [$GD_BLAST_VARIANT].  Should " .
-	  "be on of either \'ncbi\', \'wu_new\' or \'wu_old\'")
-  }
-
-    # Check codeml, if specified
-
-  if (defined $GD_CODEML_EXE && $GD_CODEML_EXE ne '' 
-      && ! -x $GD_CODEML_EXE) {
-    throw("Codeml binary specified is not executable [$GD_CODEML_EXE]")
-  }
-
-    # Check user regexes.
-
-  unless (defined $GD_INGROUP_REGEX && $GD_INGROUP_REGEX ne '') {
-    throw("No ingroup regular expression specified in config")
-  }
-
-  if (defined $GD_OUTGROUP_REGEXES && ! scalar @{$GD_OUTGROUP_REGEXES}) {
-    throw("Output regular expressions should be specified as " . 
-	  "an anonymous array of strings.")
-  }
-
-  unless (defined $GD_TRANSL_REGEX && $GD_TRANSL_REGEX ne '') {
-    throw("No regular expression for matching translation stable " . 
-	  "ids specified in config")
-  }
-
-    # Warnings if coverage, identity and genetic distance cutoffs not
-    # set.
-
-  unless (defined $GD_HIT_COVERAGE) {
-    warning("Hit coverage cutoff has not been set, using default " .
-	    "value (which might be anything).")
-  }
-
-  unless (defined $GD_HIT_IDENTITY) {
-    warning("Hit identity cutoff has not been set, using default " .
-	    "value (which might be anything).")
-  }
-
-  unless (defined $GD_DISTANCE_CUTOFF) {
-    warning("Genetic distance cutoff has not been set, using default " .
-	    "value (which might be anything).")
-  }
-
-    # Check genetic code.
-
-  unless (defined $GD_GENETIC_CODE) {
-    throw("Genetic code has not been set in config file.  Game over.")
-  }
-
-    # Check whether to return output alignments in nucleotide or amino 
-    # acid coordinates.
-
-  unless (defined $GD_OUTPUT_TYPE && 
-	  ($GD_OUTPUT_TYPE eq 'nucleotide' ||
-	   $GD_OUTPUT_TYPE eq 'aminoacid')) {
-    throw("Must specify mode for result presentation.  Options are " . 
-	  "\'nt\' and \'aa\', but you said [$GD_OUTPUT_TYPE]")
-  }
-
-
-  # Build Runnable with these options
-
-  my $gene_dupl 
-    = Bio::EnsEMBL::Pipeline::GeneDuplication::Finder->new(
-	 '-blastdb'                => $self->_blastdb,
-         '-blast_program'          => $GD_BLAST_EXE,
-         '-blast_index_type'       => $GD_BLAST_VARIANT,
-         '-codeml'                 => $GD_CODEML_EXE,
-	 '-hit_coverage'           => $GD_HIT_COVERAGE,
-	 '-hit_identity'           => $GD_HIT_IDENTITY,
-	 '-distance_cutoff'        => $GD_DISTANCE_CUTOFF,
-	 '-regex_query_species'    => $GD_INGROUP_REGEX,
-	 '-regex_outgroup_species' => $GD_OUTGROUP_REGEXES,
-	 '-genetic_code'           => $GD_GENETIC_CODE,
-	 '-work_dir'               => $GD_WORK_DIR,
-	 '-distance_method'        => $GD_DISTANCE_METHOD,
-	);
-
-  $self->runnable($gene_dupl);
+  $self->input_id($input_id) if defined $input_id;
+  $self->db($db)             if defined $db;
+  $self->seqfetcher          if defined $seqfetcher;
+  $self->analysis            if defined $analysis;
 
   return $self;
 }
@@ -231,10 +84,40 @@ sub new {
 sub fetch_input {
   my $self = shift;
 
+  # Check that an input_id exists.
+
+  unless (defined $self->input_id) {
+    throw("Input_id is unset.  Unable to proceed without it.")
+  }
+
+  # Clean up after any previous runs.
+
+  $self->output(undef);
+
+  # Set options, if this appears necessary.
+  # If the input_id seems to come from a different species to that 
+  # already configured, set config options relevant to new 
+  # input_id/species.
+
+  unless (defined $self->input_id && 
+	  defined $self->_ingroup_regex && 
+	  $self->input_id =~ /^$self->_ingroup_regex/) {
+    $self->_set_options;
+    $self->_verify_options;
+  }
+
+  # Build runnable
+
+  $self->_build_runnable;
+
   # Retrieve input sequence from blast database.  Throw an
   # error if the sequence is not present.
 
   my $runnable = ($self->runnable)[0];
+
+  unless ($self->input_id){
+    throw("Unable to run without an input id.")
+  }
 
   my $input_seq = 
     $runnable->_seq_fetcher->fetch($self->input_id);
@@ -250,11 +133,24 @@ sub run{
   my $runnable = ($self->runnable)[0];
 
   my $result;
+
+### Annoying loop added to retry paml runs if they fail. Remove once paml is replaced.
+ RETRY:
+  for (my $i = 0; $i < 3; $i++) {
+###
+
   eval {
     $result = $runnable->run($self->_input_seq);
   };
 
   if ($@){
+    next RETRY
+  }
+
+  last
+}
+
+  if ($@) {
     # Trying to work around a bloody PAML bug:
     if ($self->_identical_seqs_bug($runnable->alignment)){
       warning("Identical sequences causing mayhem with PAML run.")
@@ -293,6 +189,231 @@ sub output {
   }
 
   return $self->{_output}
+}
+
+sub _set_options {
+  my $self = shift;
+
+  my $id_prefix;
+
+  foreach my $prefix (keys %$GD_OPTIONS){
+print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
+    if ($self->input_id =~ /^$prefix/) {
+      $id_prefix = $prefix;
+      last
+    }
+  }
+
+  unless (defined $id_prefix) {
+    throw("Input sequence id does not match any " . 
+	  "regex/id-prefix in config file.")
+  }
+
+  $self->{_blastdb_file}     = $GD_OPTIONS->{$id_prefix}->{GD_BLASTDB_FILE};
+  $self->{_hit_coverage}     = $GD_OPTIONS->{$id_prefix}->{GD_HIT_COVERAGE};
+  $self->{_hit_identity}     = $GD_OPTIONS->{$id_prefix}->{GD_HIT_IDENTITY};
+  $self->{_distance_cutoff}  = $GD_OPTIONS->{$id_prefix}->{GD_DISTANCE_CUTOFF};
+  $self->{_ingroup_regex}    = $GD_OPTIONS->{$id_prefix}->{GD_INGROUP_REGEX};
+  $self->{_outgroup_regexes} = $GD_OPTIONS->{$id_prefix}->{GD_OUTGROUP_REGEXES};
+  $self->{_transl_regex}     = $GD_OPTIONS->{$id_prefix}->{GD_TRANSL_REGEX};
+  $self->{_genetic_code}     = $GD_OPTIONS->{$id_prefix}->{GD_GENETIC_CODE};
+  $self->{_output_dir}       = $GD_OPTIONS->{$id_prefix}->{GD_OUTPUT_DIR};
+
+  return 1
+}
+
+sub _verify_options {
+  my $self = shift;
+
+  # Verify options set in config file.
+
+    # Check options for output type are compatible
+
+  if ($GD_OUTPUT_METHOD eq 'files') {
+    unless (-d $self->_output_dir) {
+      throw("Output directory [" . $self->_output_dir . "] appears not " .
+	    "to exist or is inaccessible.")
+    }	
+  } elsif ($GD_OUTPUT_METHOD eq 'db') {
+    unless (defined $GD_OUTPUT_DBNAME && 
+	    defined $GD_OUTPUT_DBHOST && 
+	    defined $GD_OUTPUT_DBUSER) {
+      throw("Details of output database need to be provided " .
+	    "in order for output to be written to it.")
+    }
+
+    my $outdb = 
+      Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
+        -host   => $GD_OUTPUT_DBHOST,
+	-dbname => $GD_OUTPUT_DBNAME,
+	-port   => $GD_OUTPUT_DBPORT,
+	-user   => $GD_OUTPUT_DBUSER,
+	-pass   => $GD_OUTPUT_DBPASS);
+
+    unless (defined $outdb && 
+	    $outdb->isa("Bio::EnsEMBL::Compara::DBSQL::DBAdaptor")){
+      throw("Unable to connect to output database using options " .
+	    "specified in config ")
+    }
+  } else {
+    throw("Unrecognized output method [$GD_OUTPUT_METHOD].  " .
+	  "Accepted options are \'files\' or \'db\'.")
+  }
+
+    # Check BLAST-related options.
+
+  unless (defined $self->_blastdb_file && -e $self->_blastdb_file) {
+    throw("Input BLAST database is either not specified or does " . 
+	  "not exist [" . $self->_blastdb_file . "].")
+  }
+
+  if (defined $GD_BLAST_EXE && $GD_BLAST_EXE ne '' && 
+      ! -x $GD_BLAST_EXE) {
+    throw("Blast binary specified is not executable [$GD_BLAST_EXE]")
+  }
+
+  unless (defined $GD_BLAST_VARIANT &&
+     ($GD_BLAST_VARIANT eq 'ncbi' || 
+      $GD_BLAST_VARIANT eq 'wu_new' || 
+      $GD_BLAST_VARIANT eq 'wu_old' )) {
+    throw("Unrecognised BLAST index type [$GD_BLAST_VARIANT].  Should " .
+	  "be on of either \'ncbi\', \'wu_new\' or \'wu_old\'")
+  }
+
+    # Check codeml, if specified
+
+  if (defined $GD_CODEML_EXE && $GD_CODEML_EXE ne '' 
+      && ! -x $GD_CODEML_EXE) {
+    throw("Codeml binary specified is not executable [$GD_CODEML_EXE]")
+  }
+
+    # Check user regexes.
+
+  unless (defined $self->_ingroup_regex && $self->_ingroup_regex ne '') {
+    throw("No ingroup regular expression specified in config")
+  }
+
+  if (defined $self->_outgroup_regexes && ! scalar @{$self->_outgroup_regexes}) {
+    throw("Output regular expressions should be specified as " . 
+	  "an anonymous array of strings.")
+  }
+
+  unless (defined $self->_transl_regex && $self->_transl_regex ne '') {
+    throw("No regular expression for matching translation stable " . 
+	  "ids specified in config")
+  }
+
+    # Warnings if coverage, identity and genetic distance cutoffs not
+    # set.
+
+  unless (defined $self->_hit_coverage) {
+    warning("Hit coverage cutoff has not been set, using default " .
+	    "value (which might be anything).")
+  }
+
+  unless (defined $self->_hit_identity) {
+    warning("Hit identity cutoff has not been set, using default " .
+	    "value (which might be anything).")
+  }
+
+  unless (defined $self->_distance_cutoff) {
+    warning("Genetic distance cutoff has not been set, using default " .
+	    "value (which might be anything).")
+  }
+
+    # Check genetic code.
+
+  unless (defined $self->_genetic_code) {
+    throw("Genetic code has not been set in config file.  Game over.")
+  }
+
+    # Check whether to return output alignments in nucleotide or amino 
+    # acid coordinates.
+
+  unless (defined $GD_OUTPUT_TYPE && 
+	  ($GD_OUTPUT_TYPE eq 'nucleotide' ||
+	   $GD_OUTPUT_TYPE eq 'aminoacid')) {
+    throw("Must specify mode for result presentation.  Options are " . 
+	  "\'nt\' and \'aa\', but you said [$GD_OUTPUT_TYPE]")
+  }
+
+  return 1
+}
+
+sub _blastdb_file {
+  my $self = shift;
+
+  return $self->{_blastdb_file}
+}
+
+sub _hit_coverage {
+  my $self = shift;
+
+  return $self->{_hit_coverage}
+}
+
+sub _hit_identity {
+  my $self = shift;
+
+  return $self->{_hit_identity}
+}
+
+sub _distance_cutoff {
+  my $self = shift;
+
+  return $self->{_distance_cutoff}
+}
+
+sub _ingroup_regex {
+  my $self = shift;
+
+  return $self->{_ingroup_regex}
+}
+
+sub _outgroup_regexes {
+  my $self = shift;
+
+  return $self->{_outgroup_regexes}
+}
+
+sub _transl_regex {
+  my $self = shift;
+
+  return $self->{_transl_regex}
+}
+
+sub _genetic_code {
+  my $self = shift;
+
+  return $self->{_genetic_code}
+}
+
+sub _output_dir {
+  my $self = shift;
+
+  return $self->{_output_dir}
+}
+
+sub _build_runnable {
+  my $self = shift;
+
+  my $gene_dupl 
+    = Bio::EnsEMBL::Pipeline::GeneDuplication::Finder->new(
+	 '-blastdb'                => $self->_blastdb,
+         '-blast_program'          => $GD_BLAST_EXE,
+         '-blast_index_type'       => $GD_BLAST_VARIANT,
+         '-codeml'                 => $GD_CODEML_EXE,
+	 '-hit_coverage'           => $self->_hit_coverage,
+	 '-hit_identity'           => $self->_hit_identity,
+	 '-distance_cutoff'        => $self->_distance_cutoff,
+	 '-regex_query_species'    => $self->_ingroup_regex,
+	 '-regex_outgroup_species' => $self->_outgroup_regexes,
+	 '-genetic_code'           => $self->_genetic_code,
+	 '-work_dir'               => $GD_WORK_DIR,
+	 '-distance_method'        => $GD_DISTANCE_METHOD,
+	);
+
+  $self->runnable($gene_dupl);
 }
 
 sub _write_output_as_text {
@@ -336,7 +457,7 @@ sub _write_output_as_text {
       print OUT join("\t",
 		     $match->{dN},
 		     $match->{dS},
-		     $GD_DISTANCE_CUTOFF,
+		     $self->_distance_cutoff,
 		     $match->{query_id},
 		     $match->{match_id},
 		     $pair_align->{_query_identity},
@@ -349,15 +470,17 @@ sub _write_output_as_text {
 				    $alignment{$match->{match_id}});
 
 
-      ($alignment{$match->{query_id}})->desc =~ /($GD_TRANSL_REGEX.{11})/;
+      my $transl_regex = $self->_transl_regex;
+
+      ($alignment{$match->{query_id}})->desc =~ /($transl_regex\d+)/;
       my $query_translation_id = $1;
 
-      ($alignment{$match->{match_id}})->desc =~ /($GD_TRANSL_REGEX\d{11})/;
+      ($alignment{$match->{match_id}})->desc =~ /($transl_regex\d+)/;
       my $match_translation_id = $1;
 
       unless ($query_translation_id ne '' && $match_translation_id ne '') {
 	warning("Unable to determine translation stable ids.\n" . 
-		"Translation stable id regex is [$GD_TRANSL_REGEX]\n" . 
+		"Translation stable id regex is [" . $transl_regex . "]\n" . 
 		"Query seq desc line is [" .($alignment{$match->{query_id}})->desc . "]\n" .
 		"Match seq desc line is [" .($alignment{$match->{match_id}})->desc . "]")
       }
@@ -391,7 +514,7 @@ sub _write_output_as_text {
 		      $match->{N},
 		      $match->{S},
 		      $match->{lnL},
-		      $GD_DISTANCE_CUTOFF,
+		      $self->_distance_cutoff,
 		      $match->{query_id},
 		      $query_translation_id,
 		      $pair_align->{_query_cigar},
@@ -452,8 +575,8 @@ sub _alignment_vitals_nt {
   }
 
   my %aligned_pair = 
-    ('_query_identity' => (sprintf "%3.2f", ($identical_nt/$query_length)*100),
-     '_match_identity' => (sprintf "%3.2f", ($identical_nt/$match_length)*100),
+    ('_query_identity' => (sprintf "%3.2f", ($identical_nt/$covered_nt)*100),
+     '_match_identity' => (sprintf "%3.2f", ($identical_nt/$covered_nt)*100),
      '_query_coverage' => (sprintf "%3.2f", ($covered_nt/$query_length)*100),
      '_match_coverage' => (sprintf "%3.2f", ($covered_nt/$match_length)*100));
 
@@ -491,10 +614,10 @@ sub _alignment_vitals_aa {
   $match->alphabet('DNA');
 
   my $query_protein 
-    = $query->translate(undef, undef, undef, $GD_GENETIC_CODE)->seq;
+    = $query->translate(undef, undef, undef, $self->_genetic_code)->seq;
 
   my $match_protein 
-    = $match->translate(undef, undef, undef, $GD_GENETIC_CODE)->seq;
+    = $match->translate(undef, undef, undef, $self->_genetic_code)->seq;
 
   my %aligned_pair;
 
@@ -535,12 +658,12 @@ sub _alignment_vitals_aa {
 
   $aligned_pair{_query_end}        = $query_length;
   $aligned_pair{_match_end}        = $match_length;
-  $aligned_pair{_query_identity}   = sprintf "%3.2f", ($identical_aa/$query_length)*100;
-  $aligned_pair{_match_identity}   = sprintf "%3.2f", ($identical_aa/$match_length)*100;
+  $aligned_pair{_query_identity}   = sprintf "%3.2f", ($identical_aa/$covered_aa)*100;
+  $aligned_pair{_match_identity}   = sprintf "%3.2f", ($identical_aa/$covered_aa)*100;
   $aligned_pair{_query_coverage}   = sprintf "%3.2f", ($covered_aa/$query_length)*100;
   $aligned_pair{_match_coverage}   = sprintf "%3.2f", ($covered_aa/$match_length)*100;
-  $aligned_pair{_query_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$query_length)*100;
-  $aligned_pair{_match_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$match_length)*100;
+  $aligned_pair{_query_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$covered_aa)*100;
+  $aligned_pair{_match_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$covered_aa)*100;
 
   return \%aligned_pair;
 }
@@ -613,13 +736,13 @@ sub _identical_seqs_bug {
 sub _make_output_file {
   my $self = shift;
 
-  unless (-d $GD_OUTPUT_DIR) {
-    throw("Output directory [$GD_OUTPUT_DIR] does not exist.")
+  unless (-d $self->_output_dir) {
+    throw("Output directory [" . $self->_output_dir . "] does not exist.")
   }
 
   $self->input_id =~ /(\d\d)$/;
 
-  my $sub_dir = $GD_OUTPUT_DIR . "/" . $1;
+  my $sub_dir = $self->_output_dir . "/" . $1;
   $sub_dir =~ s/\/\//\//g;  # !
 
   unless (-d $sub_dir) {
@@ -639,7 +762,7 @@ sub _blastdb {
   unless (defined $self->{_blastdb}){
     $self->{_blastdb} = 
       Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
-        -dbfile        => $GD_BLASTDB_FILE,
+        -dbfile        => $self->_blastdb_file,
         -molecule_type => 'dna',
         -index_type    => 'wu_new');
 
