@@ -127,6 +127,7 @@ LINE:while(<FH>){
   if($ori eq '-'){
     $strand = -1;
   }
+  
   my ($a_id, $c_id);
   if(!$assembled_ids{$a_name}){
     my $a_piece = $sa->fetch_by_region($assembled_cs->name, $a_name,
@@ -135,14 +136,19 @@ LINE:while(<FH>){
     if(!$a_piece){
       throw($a_name." doesn't seem to exist in the database\n");
     }
+    if($a_piece->length < $a_end){
+      throw($a_name." apparent length ".$a_end. " is longer than ".
+            "the length in the current database ".
+            $a_piece->length."\n");
+    }
     $a_id = $sa->get_seq_region_id($a_piece);
     $assembled_ids{$a_name} = $a_id;
   }else{
     $a_id = $assembled_ids{$a_name};
   }
   if($component_ids{$c_name}){
-    print STDERR ("You are already using ".$c_name." in another place ".
-                  "in your assembly are you sure you want to\n");
+    warning("You are already using ".$c_name." in another place ".
+         "in your assembly are you sure you want to\n");
     $c_id = $component_ids{$c_name};
   }else{
     my $c_piece = $sa->fetch_by_region($component_cs->name, $c_name,
@@ -150,6 +156,11 @@ LINE:while(<FH>){
                                        $component_cs->version);
     if(!$c_piece){
       throw($c_name." doesn't seem to exist in the database\n");
+    }
+    if($c_piece->length < $c_end){
+      throw($c_name." apparent length ".$c_end. " is longer than ".
+            "the length in the current database ".
+            $c_piece->length."\n");
     }
     $c_id = $sa->get_seq_region_id($c_piece);
     $component_ids{$c_name} = $c_id;

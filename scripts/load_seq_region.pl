@@ -61,6 +61,8 @@ table. T
     -agp_file the name of the agp file to be parsed
     -fasta_file, name of the fasta file to be parsed  if the -sequence_level
                  option is also set the sequence will not be stored
+    -verbose, prints the name which is going to be used can be switched 
+              off with -noverbose
     -help      displays this documentation with PERLDOC
 
 =cut
@@ -85,6 +87,7 @@ my $sequence_level = 0;
 my $agp;
 my $fasta;
 my $rank;
+my $verbose = 0;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -99,6 +102,7 @@ my $rank;
             'default_version!' => \$default,
             'agp_file:s' => \$agp,
             'fasta_file:s' => \$fasta,
+            'verbose!' => \$verbose,
             'h|help'     => \$help,
            ) or ($help = 1);
 
@@ -185,11 +189,11 @@ sub parse_fasta{
     #regular experssion to get the sequence you will need to check what 
     #this will produce, if you have checked your ids and you know what
     #you are getting you may want to comment out the warning about this
-    
-    my @values = split /\s+/, $seq->desc;
-    my $name = $values[0];
+    #print STDERR "id ".$seq->id." ".$seq->desc."\n";
+    #my @values = split /\s+/, $seq->desc;
+    my $name = $seq->id;
     warning("You are going to store with name ".$name." are you sure ".
-            "this is what you wanted");
+            "this is what you wanted") if($verbose);
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
     if($store_seq){
       $sa->store($slice, \$seq->seq);
