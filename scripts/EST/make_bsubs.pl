@@ -57,6 +57,13 @@ my $filterdir           = "filter_and_e2g";
 my $est_genebuilder_dir = "est_genebuilder";
 my $gene2expression_dir = "gene2ests";
 
+# get analyses and runnables
+my @entries = @$EST_RUNNABLES;
+my %runnable_hash;
+foreach my $entry ( @entries ){
+  $runnable_hash{$entry->{analysis}} = $entry->{runnable};
+}
+
 # get chr info from the database where you have contig, clone and static_golden_path
 &get_chrlengths();
 
@@ -305,7 +312,7 @@ sub make_EST_GeneBuilder_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
 
       # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder -input_id $input_id -write";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder -analysis genomewise\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder -analysis genomewise -input_id $input_id -write";
       print OUT "$command\n";
       
       $count = $count + $size;
