@@ -318,6 +318,10 @@ sub align_hits_to_contig {
 	}
 
         my ($expep) = ($exon->translate->seq =~ /[^\*]+/g);
+	if ($expep =~ s/x$//i) {
+	    print STDERR "Removed terminal 'X' from exon @{[$exon->id]}\n";
+	}
+
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
 
