@@ -77,6 +77,8 @@ use vars qw( %Similarity );
 	       GB_SIMILARITY_MAX_LOW_COMPLEXITY => 60,
 
 	       # gene type for FPC_BlastMiniGenewise
+               # You have to use the logic_name of the SimilarityGenewise-analysis here, otherwise a new analysis with
+               # a logic_name of $GB_SIMILARITY_GENETYPE will be created in GW_DB
 	       GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
 
 	       # if [] is used no masking will take place 
