@@ -122,8 +122,38 @@ my $gene_comparison = Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->ne
 ## cluster the genes we have passed to $gene_comparison
 
 my @gene_clusters    = $gene_comparison->cluster_Genes;
+my @unclustered = $gene_comparison->unclustered_Genes;
 
-#my @unclustered = $gene_comparison->unclustered_Genes;
+## print out the results of the clustering:
+
+my @unclustered1;
+my @unclustered2;
+
+UNCLUSTER:
+foreach my $uncluster ( @unclustered ){
+  my @gene = $uncluster->get_Genes;
+  if ( scalar(@gene)>1 ){
+    print STDERR "genes @gene are wrongly unclustered\n";
+  }
+  my $this_type = $gene[0]->type;
+  foreach my $type ( @{ $type1 } ){
+    if ( $this_type eq $type ){
+      push( @unclustered1, $uncluster );
+      next UNCLUSTER;
+    }
+  }
+  foreach my $type ( @{ $type2 } ){
+    if ( $this_type eq $type ){
+      push( @unclustered2, $uncluster );
+      next UNCLUSTER;
+    }
+  }
+}
+
+print STDERR scalar(@gene_clusters)." gene clusters formed\n";
+print STDERR scalar(@unclustered1)." genes of type @$type1 left unclustered\n";
+print STDERR scalar(@unclustered2)." genes of type @$type2 left unclustered\n";
+
 
 $gene_comparison->compare_Exons(\@gene_clusters);
 
