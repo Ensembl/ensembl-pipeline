@@ -81,14 +81,16 @@ sub run {
     $runnable || $self->throw("Can't run - no runnable object");
 
     $runnable->run;
-    
-    my @output = $runnable->output;
-    my $dbobj = $self->dbobj;
-    my $seqfetcher = $self->make_seqfetcher;
-    my %ids = map { $_->hseqname, $_ } @output;
-    $seqfetcher->write_descriptions($dbobj, keys(%ids) );
-    
+
+    if ( my @output = $runnable->output ) {
+        my $dbobj      = $self->dbobj;
+        my $seqfetcher = $self->make_seqfetcher;
+        my %ids        = map { $_->hseqname, $_ } @output;
+        $seqfetcher->write_descriptions( $dbobj, keys(%ids) );
+    }
+
 }
+
 
 sub output {
     my ($self) = @_;
