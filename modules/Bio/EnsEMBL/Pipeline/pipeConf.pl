@@ -20,21 +20,22 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '/work1/scp/out',
-                               # working directory for err/outfiles
-    'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
+    'nfstmp.dir' => '', # working directory for err/outfiles
+    'pep_file'   => '', #
     'DBI.driver' => 'mysql',
-    'dbhost'     => 'ecs1e',
-    'dbname'     => 'simon_test',
-    'dbuser'     => 'ensadmin',
-    'queue'      => 'acari',   # farm queue
+    'dbhost'     => 'mysql',
+    'dbname'     => '', #Database name for pipeline db
+    'dbuser'     => '', #Database user for pipeline db
+    'queue'      => '', #farm queue
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bindir'     => '/usr/local/ensembl/bin',
-    'datadir'    => '/usr/local/ensembl/data',
-    'usenodes'   => 'ecsnodes',        # farm nodes to use (default all)
-    'autoupdate' => 1,          # true->update InputIdAnalysis via Job
-    'runner'     => '',          # path to runner.pl, needed by Job.pm
-);
+    'bindir'     => '',
+    'datadir'    => '',
+    'usenodes'   => '',        # farm nodes to use (default all)
+    'autoupdate' => 1,         # true->update InputIdAnalysis via Job
+    'runner'     => '',        # path to runner.pl, needed by Job.pm
+    'cpname'     => '', #this is for crosscomparer comparadb name
+    'cpuser'     => '' #and comparadb user
+    );
 }
 
 1;
