@@ -15,19 +15,19 @@ Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
 
 =head1 SYNOPSIS
 
-    my $gene_machine = Bio::EnsEMBL::Pipeline::Runnable::CusterMerge->new(
-									  -transcripts => \@transcripts,
-									  -exact_merge => $value,
+    my $cluster_merge = Bio::EnsEMBL::Pipeline::Runnable::CusterMerge->new(
+									   -transcripts => \@transcripts,
+									   -exact_merge => $value,
 									  );
-    $gene_machine->run;
+    $cluster_merge->run;
 
     one can retrieve the lists of transcripts that can merge:
-    my @lists = $gene_machine->sub_clusters;
+    my @lists = $cluster_merge->sub_clusters;
    
     where @lists is a list of listrefs, each one cointaining a list of transcript objects
 
     one can retrieve the transcripts already merged:
-    my @merged_transcripts = $gene_machine->output;
+    my @merged_transcripts = $cluster_merge->output;
 
 
 =head1 DESCRIPTION
@@ -60,6 +60,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 # config file; parameters searched for here if not passed in as @args
 use Bio::EnsEMBL::Pipeline::ESTConf;
@@ -478,12 +479,12 @@ sub link_Transcripts{
       #put @current_lists in @lists
       push ( @lists, @current_lists );
 
-      print STDERR "current lists:\n";
-      foreach my $list ( @current_lists ){
-	foreach my $t (@$list){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
-	}
-      }
+      #print STDERR "current lists:\n";
+      #foreach my $list ( @current_lists ){
+      # foreach my $t (@$list){
+      #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+      # }
+      #}
       
     }  
     
