@@ -47,9 +47,6 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
 
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::Pipeline::Status;
-use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 
 
@@ -66,7 +63,7 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count ) 
+    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				LSF_ID
@@ -80,8 +77,8 @@ sub new {
 				)],@args);
 
     $dbID    = -1 unless defined($dbID);
-    $lsfid = -1 unless defined($lsfid);
-    $cls = 'contig' unless defined($cls);
+    $lsfid   = -1 unless defined($lsfid);
+    $cls     = 'contig' unless defined($cls);
 
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
@@ -89,16 +86,16 @@ sub new {
     $analysis->isa("Bio::EnsEMBL::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
 
-    $self->dbID         ($dbID);
-    $self->adaptor  ($adaptor);
-    $self->input_id   ($input_id);
-    $self->class   ($cls);
-    $self->analysis   ($analysis);
-    $self->stdout_file($stdout);
-    $self->stderr_file($stderr);
+    $self->dbID             ($dbID);
+    $self->adaptor          ($adaptor);
+    $self->input_id         ($input_id);
+    $self->class            ($cls);
+    $self->analysis         ($analysis);
+    $self->stdout_file      ($stdout);
+    $self->stderr_file      ($stderr);
     $self->input_object_file($input);
-    $self->retry_count( $retry_count );
-    $self->LSF_id( $lsfid );
+    $self->retry_count      ($retry_count );
+    $self->LSF_id           ($lsfid);
 
     return $self;
 }
@@ -116,17 +113,14 @@ sub new {
 =cut
 
 sub create_by_analysis_inputId {
-  my $dummy = shift;
-  my $analysis = shift;
-  my $inputId = shift;
-  my $class = shift;
+  my ($dummy, $analysis, $inputId, $class) = @_;
 
-  my $job = Bio::EnsEMBL::Pipeline::Job->new
-    ( -input_id    => $inputId,
+  my $job = Bio::EnsEMBL::Pipeline::Job->new(
+      -input_id    => $inputId,
       -analysis    => $analysis,
       -retry_count => 0,
       -class       => $class
-    );
+  );
   $job->make_filenames;
   return $job;
 }
@@ -145,7 +139,7 @@ sub create_by_analysis_inputId {
 
 
 sub dbID {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_dbID'} = $arg;
@@ -166,13 +160,12 @@ sub dbID {
 
 
 sub adaptor {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_adaptor'} = $arg;
     }
     return $self->{'_adaptor'};
-
 }
 
 
@@ -189,7 +182,7 @@ sub adaptor {
 
 
 sub input_id {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_input_id'} = $arg;
@@ -210,7 +203,7 @@ sub input_id {
 
 
 sub class {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_class'} = $arg;
@@ -229,7 +222,8 @@ sub class {
 =cut
 
 sub analysis {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
+
     if (defined($arg)) {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Analysis");
@@ -237,7 +231,6 @@ sub analysis {
 	$self->{'_analysis'} = $arg;
     }
     return $self->{'_analysis'};
-
 }
 
 
@@ -254,10 +247,8 @@ sub analysis {
 =cut
 
 sub flush_runs {
-  my $self = shift;
+  my ($self, $adaptor, $LSF_params) = @_;
 
-  my $adaptor = shift;
-  my $LSF_params = shift;
   my @queues;
   
   my $nodes   = $LSF_params->{'nodes'}   || undef;
@@ -383,8 +374,7 @@ sub flush_runs {
 =cut
 
 sub batch_runRemote {
-  my $self = shift;
-  my $LSF_params = shift;
+  my ($self, $LSF_params) = @_;
 
   my $batchsize = $LSF_params->{'flushsize'} || 1;
   my $queue     = $LSF_params->{'queue'};
@@ -418,7 +408,6 @@ sub batch_runRemote {
 =cut
 
 sub runLocally {
-  print STDERR "Running locally\n"; 
   my $self = shift;
 
   print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
@@ -440,9 +429,7 @@ sub runLocally {
 }
 
 sub runRemote {
-  my $self = shift;
-  my $queue = shift;
-  my $useDB = shift;
+  my ($self, $queue, $useDB) = @_;
 
   local *SUB;
   local *FILE;
@@ -451,10 +438,10 @@ sub runRemote {
     $self->throw( "Cannot run remote without db connection" );
   }
 
-  my $db = $self->adaptor->db;
-  my $host = $db->host;
+  my $db       = $self->adaptor->db;
+  my $host     = $db->host;
   my $username = $db->username;
-  my $dbname = $db->dbname;
+  my $dbname   = $db->dbname;
   my $cmd;
 
   # runner.pl: first look in same directory as Job.pm
@@ -630,7 +617,7 @@ sub resultToDb {
 
 
 sub write_object_file {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     $self->throw("No input object file defined") unless defined($self->input_object_file);
 
@@ -654,7 +641,7 @@ sub write_object_file {
 =cut
 
 sub set_status {
-  my ($self,$arg) = @_;
+  my ($self, $arg) = @_;
   
   $self->throw("No status input" ) unless defined($arg);
   
@@ -679,7 +666,7 @@ sub set_status {
 =cut
 
 sub current_status {
-  my ($self,$arg) = @_;
+  my ($self, $arg) = @_;
   
   if( ! defined( $self->adaptor )) {
     return undef;
@@ -781,7 +768,7 @@ sub create_lsflogfile {
 
 
 sub get_files {
-  my ($self,$stub,@exts) = @_;
+  my ($self, $stub, @exts) = @_;
   my @result;
   my @files;
   my $dir;
@@ -841,7 +828,7 @@ sub get_files {
 =cut
 
 sub stdout_file {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_stdout_file'} = $arg;
@@ -860,7 +847,7 @@ sub stdout_file {
 =cut
 
 sub stderr_file {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_stderr_file'} = $arg;
@@ -879,7 +866,7 @@ sub stderr_file {
 =cut
 
 sub input_object_file {
-    my ($self,$arg) = @_;
+    my ($self, $arg) = @_;
 
     if (defined($arg)) {
 	$self->{'_input_object_file'} = $arg;
@@ -899,6 +886,7 @@ sub input_object_file {
 
 sub LSF_id {
   my ($self, $arg) = @_;
+
   (defined $arg) &&
     ( $self->{'_lsfid'} = $arg );
   $self->{'_lsfid'};
@@ -906,6 +894,7 @@ sub LSF_id {
 
 sub LSF_out {
   my ($self, $arg) = @_;
+
   (defined $arg) &&
     ( $self->{'_lsfout'} = $arg );
   $self->{'_lsfout'};
@@ -913,6 +902,7 @@ sub LSF_out {
 
 sub LSF_err {
   my ($self, $arg) = @_;
+
   (defined $arg) &&
     ( $self->{'_lsferr'} = $arg );
   $self->{'_lsferr'};
