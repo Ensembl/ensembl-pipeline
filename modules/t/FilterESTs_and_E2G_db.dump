@@ -1,0 +1,378 @@
+# MySQL dump 8.10
+#
+# Host: ecs1c    Database: dan_temp101002
+#--------------------------------------------------------
+# Server version	3.23.25-beta
+
+#
+# Dumping data for table 'analysis'
+#
+INSERT INTO analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature) VALUES (1,'2002-09-19 15:50:43','est_exonerate','worm_ests','1',NULL,'exonerate','3',NULL,NULL,'ExonerateESTs',NULL,'exonerate','similarity');
+INSERT INTO analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature) VALUES (2,'2002-09-19 15:50:43','exonerate_e2g','worm_ests','1',NULL,'exonerate_e2g','1',NULL,NULL,'FilterESTs_and_E2G',NULL,'exonerate_e2g','gene');
+INSERT INTO analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature) VALUES (3,'2002-09-19 15:50:43','est','worm_ests','1',NULL,'exonerate_e2g','3',NULL,NULL,'Filter_ESTs_and_E2G',NULL,'exonerate_e2g','similarity');
+
+#
+# Dumping data for table 'assembly'
+#
+
+INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) VALUES (32,1867969,1869013,'cb25.fpc0829',1867969,1869013,1,5394,1,1045,1,'briggsae_170602');
+INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) VALUES (32,1869014,1993320,'cb25.fpc0829',1869014,1993320,1,1339,572,124878,-1,'briggsae_170602');
+INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) VALUES (32,1993321,1993852,'cb25.fpc0829',1993321,1993852,1,5358,1,532,1,'briggsae_170602');
+INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) VALUES (32,1993853,1995812,'cb25.fpc0829',1993853,1995812,1,1338,770,2729,-1,'briggsae_170602');
+INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) VALUES (32,1995813,1996851,'cb25.fpc0829',1995813,1996851,1,5360,1,1039,1,'briggsae_170602');
+
+#
+# Dumping data for table 'assembly_contig'
+#
+
+
+#
+# Dumping data for table 'chromosome'
+#
+
+
+#
+# Dumping data for table 'clone'
+#
+
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (893,'c001601139','c001601139',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (892,'c004600688','c004600688',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5389,'AC084480','AC084480',1,1,3,'2002-07-10 09:43:12','2002-07-10 09:43:12');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (891,'c004600603','c004600603',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (890,'c013501195','c013501195',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (889,'c002201501','c002201501',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (888,'c008201342','c008201342',1,1,3,'2002-05-24 11:45:30','2002-05-24 11:45:30');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (887,'c012700911','c012700911',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (886,'c001900757','c001900757',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5367,'AC084632','AC084632',1,1,3,'2002-07-10 09:43:05','2002-07-10 09:43:05');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (885,'c002800829','c002800829',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (884,'c007000884','c007000884',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (883,'c011201406','c011201406',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5458,'AC090521','AC090521',1,1,3,'2002-07-10 09:43:34','2002-07-10 09:43:34');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (882,'c008000826','c008000826',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (881,'c008000630','c008000630',1,1,3,'2002-05-24 11:45:29','2002-05-24 11:45:29');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (4271,'c006400225','c006400225',1,1,3,'2002-05-24 11:50:49','2002-05-24 11:50:49');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (360,'c005600496','c005600496',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (361,'c005701203','c005701203',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5388,'AC084560','AC084560',1,1,3,'2002-07-10 09:43:11','2002-07-10 09:43:11');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (362,'c002901752','c002901752',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (363,'c007401238','c007401238',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (364,'c005600398','c005600398',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (365,'c008800781','c008800781',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (366,'c012500762','c012500762',1,1,3,'2002-05-24 11:44:50','2002-05-24 11:44:50');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (367,'c004200942','c004200942',1,1,3,'2002-05-24 11:44:51','2002-05-24 11:44:51');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (368,'c001201160','c001201160',1,1,3,'2002-05-24 11:44:51','2002-05-24 11:44:51');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (369,'c012400887','c012400887',1,1,3,'2002-05-24 11:44:51','2002-05-24 11:44:51');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (370,'c012800654','c012800654',1,1,3,'2002-05-24 11:44:51','2002-05-24 11:44:51');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (371,'c012900296','c012900296',1,1,3,'2002-05-24 11:44:51','2002-05-24 11:44:51');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (4619,'c014101204','c014101204',1,1,3,'2002-05-24 11:51:19','2002-05-24 11:51:19');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (4620,'c003800910','c003800910',1,1,3,'2002-05-24 11:51:19','2002-05-24 11:51:19');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (4162,'c000301138','c000301138',1,1,3,'2002-05-24 11:50:37','2002-05-24 11:50:37');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1349,'c006900989','c006900989',1,1,3,'2002-05-24 11:46:32','2002-05-24 11:46:32');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1348,'c004600852','c004600852',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1347,'c005701162','c005701162',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1346,'c002500690','c002500690',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1345,'c002201403','c002201403',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1344,'c007900964','c007900964',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1343,'c010801324','c010801324',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1342,'c007401270','c007401270',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1341,'c005101058','c005101058',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1340,'c006000107','c006000107',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5369,'AC084471','AC084471',1,1,3,'2002-07-10 09:43:05','2002-07-10 09:43:05');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1339,'c003800623','c003800623',1,1,3,'2002-05-24 11:46:31','2002-05-24 11:46:31');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (5349,'AC084461','AC084461',1,1,3,'2002-07-10 09:42:59','2002-07-10 09:42:59');
+INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, created, modified) VALUES (1338,'c003800808','c003800808',1,1,3,'2002-05-24 11:46:30','2002-05-24 11:46:30');
+
+#
+# Dumping data for table 'contig'
+#
+
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (893,'c001601139.1.9816',893,9816,0,893);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (892,'c004600688.1.47901',892,47901,0,892);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5422,'AC084480.33478.34505',5389,1028,0,5422);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (891,'c004600603.1.28369',891,28369,0,891);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (890,'c013501195.1.14637',890,14637,0,890);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (889,'c002201501.1.1491',889,1491,0,889);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (888,'c008201342.1.13109',888,13109,0,888);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (887,'c012700911.1.61861',887,61861,0,887);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (886,'c001900757.1.30207',886,30207,0,886);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5391,'AC084632.21475.22005',5367,531,0,5391);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (885,'c002800829.1.7276',885,7276,0,885);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (884,'c007000884.1.2907',884,2907,0,884);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (883,'c011201406.1.38156',883,38156,0,883);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5540,'AC090521.71956.73005',5458,1050,0,5540);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (882,'c008000826.1.21471',882,21471,0,882);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (881,'c008000630.1.4570',881,4570,0,881);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (4271,'c006400225.1.11455',4271,11455,0,4271);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (360,'c005600496.1.11990',360,11990,0,360);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (361,'c005701203.1.28036',361,28036,0,361);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5421,'AC084560.19972.20505',5388,534,0,5421);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (362,'c002901752.1.246208',362,246208,0,362);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (363,'c007401238.1.67409',363,67409,0,363);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (364,'c005600398.1.82936',364,82936,0,364);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (365,'c008800781.1.165719',365,165719,0,365);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (366,'c012500762.1.66129',366,66129,0,366);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (367,'c004200942.1.5860',367,5860,0,367);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (368,'c001201160.1.37983',368,37983,0,368);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (369,'c012400887.1.62386',369,62386,0,369);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (370,'c012800654.1.9149',370,9149,0,370);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (371,'c012900296.1.104206',371,104206,0,371);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (4619,'c014101204.1.1659',4619,1659,0,4619);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (4620,'c003800910.1.1550',4620,1550,0,4620);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (4162,'c000301138.1.28227',4162,28227,0,4162);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1349,'c006900989.1.19777',1349,19777,0,1349);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1348,'c004600852.1.39769',1348,39769,0,1348);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1347,'c005701162.1.19016',1347,19016,0,1347);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1346,'c002500690.1.5239',1346,5239,0,1346);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1345,'c002201403.1.21576',1345,21576,0,1345);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1344,'c007900964.1.32897',1344,32897,0,1344);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1343,'c010801324.1.32875',1343,32875,0,1343);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1342,'c007401270.1.13997',1342,13997,0,1342);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1341,'c005101058.1.184499',1341,184499,0,1341);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1340,'c006000107.1.100591',1340,100591,0,1340);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5394,'AC084471.86461.87505',5369,1045,0,5394);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1339,'c003800623.1.125326',1339,125326,0,1339);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5358,'AC084461.27974.28505',5349,532,0,5358);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1338,'c003800808.1.2791',1338,2791,0,1338);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5360,'AC084461.30467.31505',5349,1039,0,5360);
+
+#
+# Dumping data for table 'dna'
+#
+
+
+#
+# Dumping data for table 'dna_align_feature'
+#
+
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (35112,885,88,329,-1,1,0,243,'R02946.1',1,'52M1D17M1D172M',0,98,1180);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (6813,882,16208,16345,1,1,30,167,'AV197036.1',1,'137M',0,94,615);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (5651,882,16209,16345,1,1,118,254,'AV185980.1',1,'136M',0,95,626);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (9875,882,16209,16345,1,1,153,289,'AU204678.1',1,'136M',0,95,626);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (22159,1341,3302,3425,1,1,20,143,'BJ122683.1',1,'123M',0,92,534);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (3724,1341,4601,4823,1,1,0,222,'C48252.1',1,'222M',0,90,912);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (3326,1341,4674,4823,1,1,0,149,'C44768.1',1,'149M',0,91,628);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (3725,1341,5210,5352,1,1,218,360,'C48252.1',1,'142M',0,90,593);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (22158,1341,5210,5356,1,1,469,615,'BJ122683.1',1,'146M',0,90,606);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (36596,1341,22930,23125,1,1,34,229,'R05057.1',1,'195M',0,100,975);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (36597,1341,23172,23274,1,1,228,331,'R05057.1',1,'80M1D22M',0,99,502);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (24255,1341,23588,23741,1,1,581,734,'BJ128978.1',1,'153M',0,90,639);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (32461,1341,23588,23731,1,1,580,723,'BJ150356.1',1,'143M',0,90,598);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (34150,1341,23588,23738,1,1,579,729,'BJ154652.1',1,'150M',0,91,633);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (34259,1341,23588,23734,1,1,581,727,'BJ154892.1',1,'146M',0,91,613);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (34956,1340,361,562,1,1,0,200,'R02902.1',1,'46M1I8M1D111M1I34M',0,98,948);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (34957,1340,612,749,1,1,199,336,'R02902.1',1,'137M',0,100,685);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (34958,1340,2326,2499,-1,1,20,192,'R02903.1',1,'43M1I129M',0,100,852);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (13923,1340,65616,65762,1,1,482,628,'AU219402.1',1,'146M',0,90,604);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (3723,1340,65910,66063,-1,1,0,153,'C48341.1',1,'153M',0,91,648);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (31209,1340,65910,66068,1,1,560,718,'BJ147037.1',1,'158M',0,91,673);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (35068,5394,0,122,-1,1,0,122,'R02902.1',1,'65M1D9M1I47M',0,96,566);
+INSERT INTO dna_align_feature (dna_align_feature_id, contig_id, contig_start, contig_end, contig_strand, analysis_id, hit_start, hit_end, hit_name, hit_strand, cigar_line, evalue, perc_ident, score) VALUES (9636,1339,25425,25555,-1,1,0,130,'AU203732.1',1,'130M',0,90,535);
+
+#
+# Dumping data for table 'dnafrag'
+#
+
+
+#
+# Dumping data for table 'est'
+#
+
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (19792,'R02946.1',243);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (158426,'AV197036.1',374);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (11847,'AV185980.1',360);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (186218,'AU204678.1',495);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (114004,'BJ122683.1',615);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (127260,'C48252.1',360);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (54679,'C44768.1',360);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (76208,'R05057.1',400);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (151431,'BJ128978.1',734);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (138683,'BJ150356.1',723);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (83584,'BJ154652.1',730);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (6161,'BJ154892.1',727);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (103169,'R02902.1',336);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (103958,'R02903.1',192);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (181434,'AU219402.1',628);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (8485,'C48341.1',360);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (67008,'BJ147037.1',718);
+INSERT INTO est (est_internal_id, est_id, est_length) VALUES (120971,'AU203732.1',184);
+
+#
+# Dumping data for table 'exon'
+#
+
+
+#
+# Dumping data for table 'exon_stable_id'
+#
+
+
+#
+# Dumping data for table 'exon_transcript'
+#
+
+
+#
+# Dumping data for table 'external_db'
+#
+
+
+#
+# Dumping data for table 'external_synonym'
+#
+
+
+#
+# Dumping data for table 'gene'
+#
+
+
+#
+# Dumping data for table 'gene_description'
+#
+
+
+#
+# Dumping data for table 'gene_stable_id'
+#
+
+
+#
+# Dumping data for table 'identity_xref'
+#
+
+
+#
+# Dumping data for table 'input_id_analysis'
+#
+
+
+#
+# Dumping data for table 'interpro'
+#
+
+
+#
+# Dumping data for table 'job'
+#
+
+
+#
+# Dumping data for table 'job_status'
+#
+
+
+#
+# Dumping data for table 'karyotype'
+#
+
+
+#
+# Dumping data for table 'map_density'
+#
+
+
+#
+# Dumping data for table 'mapannotation'
+#
+
+
+#
+# Dumping data for table 'mapannotationtype'
+#
+
+
+#
+# Dumping data for table 'mapfrag'
+#
+
+
+#
+# Dumping data for table 'mapfrag_mapset'
+#
+
+
+#
+# Dumping data for table 'mapset'
+#
+
+
+#
+# Dumping data for table 'meta'
+#
+
+#
+# Dumping data for table 'object_xref'
+#
+
+
+#
+# Dumping data for table 'prediction_transcript'
+#
+
+
+#
+# Dumping data for table 'protein_align_feature'
+#
+
+
+#
+# Dumping data for table 'protein_feature'
+#
+
+
+#
+# Dumping data for table 'repeat_consensus'
+#
+
+
+#
+# Dumping data for table 'repeat_feature'
+#
+
+
+#
+# Dumping data for table 'rule_conditions'
+#
+
+
+#
+# Dumping data for table 'rule_goal'
+#
+
+
+#
+# Dumping data for table 'simple_feature'
+#
+
+
+#
+# Dumping data for table 'supporting_feature'
+#
+
+
+#
+# Dumping data for table 'transcript'
+#
+
+
+#
+# Dumping data for table 'transcript_stable_id'
+#
+
+
+#
+# Dumping data for table 'translation'
+#
+
+
+#
+# Dumping data for table 'translation_stable_id'
+#
+
+
+#
+# Dumping data for table 'xref'
+#
+
+
