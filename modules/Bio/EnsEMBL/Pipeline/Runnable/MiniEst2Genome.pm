@@ -558,6 +558,8 @@ sub run_blaste2g {
   # subseqfeatures of gene features, and supporting evidence featurepairs as 
   # subseqfeatures of exons.
   my @genes = $eg->output;
+
+  return unless scalar(@genes);
   
   my @newf;
   
@@ -646,16 +648,19 @@ sub run_blaste2g {
   
   # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
   # sub_SeqFeatures representing ungapped alignments making up the exon:EST alignment
-  my $fset = new Bio::EnsEMBL::SeqFeature();
-  
-  foreach my $nf (@genomic_exons) {
-    $fset->add_sub_SeqFeature($nf,'EXPAND');
-    $fset->seqname($nf->seqname);
-    $fset->analysis($analysis_obj);
+
+  if(scalar(@genomic_exons)){
+    my $fset = new Bio::EnsEMBL::SeqFeature();
+    
+    foreach my $nf (@genomic_exons) {
+      $fset->add_sub_SeqFeature($nf,'EXPAND');
+      $fset->seqname($nf->seqname);
+      $fset->analysis($analysis_obj);
+    }
+    
+    push(@{$self->{'_output'}},$fset);
   }
-  
-  push(@{$self->{'_output'}},$fset);
-  
+
 }
 
 sub find_extras {
