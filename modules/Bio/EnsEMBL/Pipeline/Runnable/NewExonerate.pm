@@ -26,7 +26,6 @@ $options   = a string with options ,
 			                                         -target_type   => 'dna',
                                                                  -exonerate     => $exonerate,
 								 -options       => $options,
-								 -analysis_obj  => $analysis_obj,
 								);
 
  $runnable->run; #create and fill Bio::Seq object
@@ -94,7 +93,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options,$analysis_obj) = 
+  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = 
       $self->_rearrange([qw(
 			    DATABASE
 			    QUERY_SEQS
@@ -102,8 +101,7 @@ sub new {
 			    TARGET_TYPE
 			    EXONERATE
 			    OPTIONS
-			    ANALYSIS_OBJ
-			    )
+			   )
 			 ], @args);
   
   
@@ -149,23 +147,13 @@ sub new {
   ############################################################
   # options
   my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
-  #my $basic_options = "  --ryo \"RESULT: %S %p %g %V\\n\" "; 
+  #my $basic_options = "  --ryo \"RESULT: %S %p %V\\n\" "; 
   
   # can add extra options as a string
   if ($options){
     $basic_options .= $options;
   }
   $self->options( $basic_options);
-
-  ############################################################
-  # analysis object for the supporting evidences
-  if( $analysis_obj ){
-    $self->analysis( $analysis_obj);
-  }
-  else{
-    $self->throw("Need analysis object for the supporting evidences");
-  }
-
 
   return $self;
 }
@@ -264,7 +252,7 @@ sub run {
       ############################################################
       # the output is of the format:
       #
-      # --ryo "RESULT: %S %p %g %V\n"
+      # --ryo "RESULT: %S %p %V\n"
       # 
       # It shows the alignments in "sugar" + percent_id + gene orientation + "vulgar blocks" format. 
       #
@@ -331,6 +319,8 @@ sub run {
         
     ############################################################
     # orientation is not used at the moment
+    print STDERR "gene_orientation: $gene_orientation\n" if $verbose;
+
     if ( $gene_orientation eq '+' ){   $gene_orientation = 1 }
     elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
     else{ $gene_orientation = 0 }
@@ -349,6 +339,8 @@ sub run {
       
       # do not look at splice sites now
       if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
+
+	# the re-set of the coordinates is done in the intron triad
 	next TRIAD;
       }
       
@@ -368,23 +360,28 @@ sub run {
 	}
 	# for every match we increase the end coordinate of the current exon
 	
-	#print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
-	$exon->end( $exon->start +  $blocks[$i+2] - 1 );
-	
-	# start a new feature pair
+	if ( $exon->end ){
+	  #print STDERR "shifting exon end to ". ($exon->end +  $blocks[$i+2] )."\n";
+	  $exon->end( $exon->end +  $blocks[$i+2] );
+	}
+	else{
+	  #print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
+	  $exon->end( $exon->start +  $blocks[$i+2] - 1 );
+	}
+	#start a new feature pair
 	$query{end}  = $query{start}  + $blocks[$i+1] - 1;
 	$target{end} = $target{start} + $blocks[$i+2] - 1;
 	
 	if ($verbose){
 	  print STDERR "FEATURE:\n";
-	  print STDERR "query length: ".$length{$q_id}."\n";
+	  #print STDERR "query length: ".$length{$q_id}."\n";
 	  print STDERR "query : $query{start} -  $query{end}\n";
 	  print STDERR "target: $target{start} -  $target{end}\n";
 	}
 	
 	############################################################
-	# if the query has been inverted we coun from the end and
-	# inver start and end to inforce start < end
+	# if the query has been inverted we count from the end and
+	# invert start and end to inforce start < end
 	
 	%rev_query  = %query;
 	%rev_target = %target;
@@ -392,29 +389,20 @@ sub run {
 	  $rev_query{end}   = $length{$q_id} - $query{start} + 1;
 	  $rev_query{start} = $length{$q_id} - $query{end} + 1;
 	  
-	  print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
-	  print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
+	  #print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
+	  #print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
 	  my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);	
 	  
-          #set analysis object to be the one obtained from the RunnableDB
-	  $feature_pair->feature1->analysis($self->analysis);
-	  $feature_pair->feature2->analysis($self->analysis);
-
-	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
 	}
 	else{	      	    
 	  my $feature_pair = $self->create_FeaturePair(\%target, \%query);
-	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
-
-	  #set analysis object to be the one obtained from the RunnableDB
-	  $feature_pair->feature1->analysis($self->analysis);
-	  $feature_pair->feature2->analysis($self->analysis);
 	}
 		
 	
-
 	# re-set the start:
 	$query{start}  = $query{end}  + 1;
 	$target{start} = $target{end} + 1;
@@ -428,6 +416,7 @@ sub run {
       ############################################################
       # gap 
       if ( $blocks[$i] eq 'G' ){
+	print STDERR "in_exon: $in_exon GAP: $blocks[$i+1] $blocks[$i+2]\n" if $verbose;
 	if ( $in_exon ){
 	  # keep the same exon
 	  
@@ -435,6 +424,7 @@ sub run {
 	  if ( $blocks[$i+2] ){
 	    $target{start} += $blocks[$i+2];
 	    # also move the exon:
+	    print STDERR "moving exon end from ". $exon->end. " to ". ( $exon->end + $blocks[$i+2] )."\n" if $verbose;
 	    $exon->end( $exon->end + $blocks[$i+2]); 
 	  }
 	  # if the gap is in the target, we move the query
@@ -442,11 +432,11 @@ sub run {
 	    $query{start} += $blocks[$i+1];
 	    $target_gap_length += $blocks[$i+1]
 	  }
-	  if ($verbose){
-	    print STDERR "GAP:\n";
-	    print STDERR "query : $query{start} -  $query{end}\n";
-		print STDERR "target: $target{start} -  $target{end}\n";
-	  }
+	  #if ($verbose){
+	  #  print STDERR "GAP:\n";
+	  #  print STDERR "query : $query{start} -  $query{end}\n";
+	  #	print STDERR "target: $target{start} -  $target{end}\n";
+	  #  }
 	}
       }
       ############################################################
@@ -474,7 +464,16 @@ sub run {
 	  
 	  # reset the start in the target only
 	  my $intron_length = $blocks[$i+2];
-	  $target{start} += $intron_length + 1;
+	  if ( $i>=3 && ( $blocks[$i-3] eq '3' || $blocks[$i-3] eq '5' ) ){
+	    $intron_length += 2;
+	  }
+	  if ( $blocks[$i+3] eq '5' || $blocks[$i+3] eq '3' ){
+	    $intron_length += 2;
+	  }
+
+	  #print STDERR "intron length = $intron_length\n" if $verbose;
+	  $target{start} += $intron_length;
+	  print STDERR "new target starts at $target{start}\n" if $verbose;
 	}
       }
     } # end of TRIAD
@@ -498,11 +497,11 @@ sub run {
       if ($@){
 	print STDERR $@."\n";
       }
-      print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
+      #print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
       $exon->add_supporting_features( $supp_feature );
     }
     else{
-      print STDERR "No more features to add" if $verbose;
+      #print STDERR "No more features to add" if $verbose;
     }
     $transcript->add_Exon($exon);
 
@@ -590,15 +589,6 @@ sub options {
   return $self->{_options};
 }
 
-############################################################
-
-sub analysis {
-  my ($self, $analysis_obj) = @_;
-  if ($analysis_obj) {
-    $self->{_analysis_obj} = $analysis_obj;
-  }
-  return $self->{_analysis_obj};
-}
 ############################################################
 
 sub output {
