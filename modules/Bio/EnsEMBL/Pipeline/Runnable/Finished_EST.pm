@@ -1,14 +1,12 @@
 
 ### Bio::EnsEMBL::Pipeline::Runnable::Finished_EST
 
-
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 
 use strict;
 use Data::Dumper;
 
 use vars qw(@ISA);
-
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
@@ -148,11 +146,12 @@ sub run {
 sub run_est_genome_on_strand {
     my ( $self, $strand, $feat ) = @_;
 
+
     my $hit_features = {};
     for ( my $i = 0 ; $i < @$feat ; $i++ ) {
-        my $f = $feat->[$i];
+        my $f   = $feat->[$i];
         my $hid = $f->hseqname or $self->throw("Missing hid");
-        ;
+
         next unless $f->strand == $strand;
         $hit_features->{$hid} ||= [];
         push ( @{ $hit_features->{$hid} }, $f );
@@ -169,7 +168,6 @@ sub run_est_genome_on_strand {
     else {
         $is_linear = sub {
             my ( $x, $y ) = @_;
-
             return $x->hend > $y->hend;
         };
     }
@@ -187,8 +185,10 @@ sub run_est_genome_on_strand {
         my @sets = ( [ $flist->[0] ] );
         my $curr = $sets[0];
         for ( my $i = 1 ; $i < @$flist ; $i++ ) {
+
             my $prev = $flist->[ $i - 1 ];
             my $this = $flist->[$i];
+
             if ( &$is_linear( $prev, $this ) ) {
                 push ( @$curr, $this );
             }
