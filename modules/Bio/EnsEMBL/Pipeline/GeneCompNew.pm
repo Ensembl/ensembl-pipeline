@@ -267,7 +267,7 @@ sub map_temp_Exons_to_real_Exons{
    print $log "Getting all old exons...";
    my (@oldexons)=$vc->get_old_Exons($log,$self->maphref);
    
-   foreach my $ke ($vc->unmapped_Exons) {
+   foreach my $ke ($vc->unmapped_exons) {
        $self->_archive_exon($ke);
    }
 
@@ -788,18 +788,9 @@ sub map_temp_Genes_to_real_Genes{
 	}
 	    if( !defined $current_fit ) {
 		#Dead, archive!
-		my $fe = $trans->start_exon;
-		eval {
-		    my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
-		    my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($trans->id);
-		    $self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$oldgeneid, $oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
-		    $self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$oldgeneid,$oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
-		};
-		$self->warn("Could not archive ".$trans->id." because of $@\n");
+		$self->_archive_transcript($trans->id);
 		print $log "TRANSCRIPT MAP: KILLED ",$trans->id,"\n";
 		print $log "TRANSLATION MAP: KILLED ".$trans->translation->id."\n";
-		$self->archive->write_deleted_id('transcript',$trans->id,$trans->version);
-		$self->archive->write_deleted_id('translation',$trans->id,$trans->version);
 		next;
 	    }
 	    
@@ -947,8 +938,7 @@ sub map_temp_Genes_to_real_Genes{
     foreach my $gene (@unique) {
 	print $log "GENE MAP KILLED: $gene\n";
 	if (!$killed{$gene}) {
-	    my $oldv = $oldg{$gene}->version;
-	    $self->archive->write_deleted_id('gene',$gene,$oldv);
+	    $self->_archive_gene($gene);
 	}
     }
     my $final_size=scalar(@final_genes);
@@ -1043,21 +1033,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
        } else {
 	   # it is dead ;)
 	   $should_change = 1;
-	   my $gene=$old_tg{$oldt->id};
-	   my $fe = $oldt->start_exon;
-
-	   eval {
-	       my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
-	       my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($oldt->id);
-	       $self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$gene->id,$gene->version,$clone->id,$clone->version);
-	       $self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$gene->id,$gene->version,$clone->id,$clone->version);
-               $self->archive->write_deleted_id('transcript',$old_trans->id,$old_trans->version);
-               $self->archive->write_deleted_id('translation',$old_trans->translation->id,$old_trans->translation->version);
-	   };
-	   if ($@) {
-	       $self->warn("Could not archive ".$oldt->id." because of $@");
-	   }
-	   
+	   $self->_archive_transcript($oldt->id);
 	   print $log "TRANSCRIPT MAP: KILLED ",$oldt->id,"\n";
 	   print $log "TRANSLATION MAP: KILLED ".$oldt->translation->id."\n";
        }
@@ -1510,7 +1486,7 @@ sub _create_transcript_vseq {
 							-modified => $transcript->modified,
 							-release_number => $old_db->release_number
 							);
-    
+
     my $translation_vseq = $self->create_translation_vseq($trans->translation);
     $vseq->add_relative($translation_vseq);
     
