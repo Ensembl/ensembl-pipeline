@@ -128,7 +128,7 @@ sub make_exonerate_bsubs {
   my $queue         = $::scripts_conf{'queue'};
   my $scriptdir     = $::scripts_conf{'scriptdir'};
   my $check         = $scriptdir . "/check_node.pl";
-  my $exonerate_est = $scriptdir . "/exonerate_est.pl";il
+  my $exonerate_est = $scriptdir . "/exonerate_est.pl";
   my $bsuberr       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stderr/";
   my $bsubout       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stdout/";
   
