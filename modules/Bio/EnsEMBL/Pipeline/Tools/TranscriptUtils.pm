@@ -1113,10 +1113,18 @@ sub set_stop_codon{
       # need to get the slice sequence
       my $adaptor =  $end_exon->contig->adaptor;
       if ( $adaptor ){
-	# the sequence from the current end exon is:
-	my $donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
 	my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
 	my $acceptor_bases_count = 3 - $donor_bases_count;
+
+	# the sequence from the current end exon is:
+	my $donor;
+	if ( $donor_bases_count == 0 ){
+	  $donor = '';
+	}
+	else{
+	  $donor = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+	}
+
 	
 	############################################################
 	# here we distinguish the strands
