@@ -26,11 +26,7 @@ BEGIN {
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 
-my $host   = '';
-my $port   = undef;
-my $dbname = '';
-my $dbuser = 'ensro';
-my $dbpass = undef;
+my $db;
 my $runnable;
 my $input_id;
 my $analysisid;
@@ -48,11 +44,7 @@ my %scripts_conf = %::scripts_conf;
 
 
 &GetOptions( 
-	     'host:s'      => \$host,
-	     'port:n'      => \$port,
-	     'dbname:s'    => \$dbname,
-	     'dbuser:s'    => \$dbuser,
-	     'dbpass:s'    => \$dbpass,
+	     'db:s'      => \$db,
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,
@@ -73,14 +65,6 @@ require "$file.pm";
 if ($check) {
    exit(0);
 }
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-    -host             => $host,
-    -user             => $dbuser,
-    -port             => $port,
-    -dbname           => $dbname,
-    -pass             => $dbpass,
-    -perlonlyfeatures => 0
-);
 
 my $sf;
 
@@ -110,18 +94,6 @@ $runobj->run;
 
 
 $runobj->write_output;
-
-#my @out = $runobj->output;
-
-#foreach my $out (@out) {
-#    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
-#      print ($out->gffstring . "\n");
-#    } else {
-#      print $out->gffstring . "\n";
-#    }
-#}
-
-
 
 
 

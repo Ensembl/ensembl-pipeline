@@ -30,13 +30,23 @@ my $dbname = $::db_conf{'dbname'};
 my $dbhost = $::db_conf{'dbhost'};
 my $dbuser = $::db_conf{'dbuser'};
 my $dbpass = $::db_conf{'dbpass'};
+my $dnadbhost = $::db_conf{'dnadbhost'};
+my $dnadbname = $::db_conf{'dnadbname'};
 
 #Get the DB handler
 
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $::db_conf{'dbhost'},
-					    -user   => $::db_conf{'dbuser'},
-					    -dbname => $::db_conf{'dbname'},
-					    -pass => $::db_conf{'dbpass'},
+my $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+        -user   => 'ensro',
+        -dbname => $dnadbname,
+        -host   => $dnadbhost,
+        );
+
+my $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					     -host             => $dbhost,
+					     -user             => $dbuser,
+					     -dbname           => $dbname,
+					     -pass             => $dbpass,
+					     -dnadb            => $dnadb,
 					    );
 
 #Get the location of the peptide file
@@ -176,7 +186,7 @@ sub run_jobs {
 
 	 if ($chunk == 1) {
 	     foreach my $i(@id) {
-		 my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
+		 my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -db ".$db." -input_id ".$i." -analysis ".$analysis_id;
 				 
 		 print STDERR "RUNNING: $command\n";
 		 
@@ -187,7 +197,7 @@ sub run_jobs {
 
 	 
 	 if ($chunk == 3) {
-	     my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
+	     my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -db ".$db." -input_id ".$pep_file." -analysis ".$analysis_id;
 	    
 
 	     print STDERR "RUNNING: $command\n";
@@ -205,7 +215,7 @@ sub run_jobs {
 	     
 	     foreach my $f(@allfiles) {
 		 if (($f ne ".") && ($f ne "..")) {
-		      my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
+		      my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -db ".$db." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
 		  
 
 		      print STDERR "RUNNING: $command\n";
