@@ -944,7 +944,7 @@ sub print_Genes {
 sub make_Translation {
     my ($self,$transcript) = @_;
 
-    
+ }   
 1;
 
 
