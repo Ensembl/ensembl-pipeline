@@ -406,129 +406,132 @@ sub transcript_id {
 
 =head2 split_Transcript
 
-  Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
-    transcripts that result. 
-    Returns : Ref to @Bio::EnsEMBL::Transcript
-    Args    : Bio::EnsEMBL::Transcript
+  Arg[1]    : Bio::EnsEMBL::Transcript $transcript
+  Arg[2]    : int $max_intron
+  Function  : splits $transcript into multiple transcripts at introns that exceed $max_intron. 
+              Rejects single exon transcripts that result. 
+  ReturnType: undef/Ref to @Bio::EnsEMBL::Transcript
+  Exceptions: warns and returns undef if $transcript is not a Bio::EnsEMBL::Transcript
 
 =cut
     
 sub split_Transcript{
-  my ($transcript,$max_intron) = @_;
-      
+  my ($self, $transcript, $max_intron) = @_;
+  
   $transcript->sort;
-      
-      my @split_transcripts   = ();
-      
-      if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
-	#$self->throw("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
-      }
-      
-      my $prev_exon;
-      my $exon_added = 0;
-      
-      my $curr_transcript = new Bio::EnsEMBL::Transcript;
-      my $translation     = new Bio::EnsEMBL::Translation;
-      
-      $curr_transcript->translation($translation);
-      
-    EXON: foreach my $exon (@{$transcript->get_all_Exons}){
-	
-	$exon_added = 0;
-	
-	# Start a new transcript if we are just starting out
-	
-	if($exon == $transcript->start_Exon){
-	  
-	  $prev_exon = $exon;
-	  
-	  $curr_transcript->add_Exon($exon);
-	  $exon_added = 1;
-	  $curr_transcript->translation->start_Exon($exon);
-	  $curr_transcript->translation->start($transcript->translation->start);
-	  
-	  push(@split_transcripts, $curr_transcript);
-	  next EXON;
-	}
-	
-	# We need to start a new transcript if the intron size between $exon and $prev_exon is too large
-	my $intron = 0;
-	
-	if ($exon->strand == 1) {
-	  $intron = abs($exon->start - $prev_exon->end - 1);
-	} else {
-	  $intron = abs($prev_exon->start - $exon->end - 1);
-	}
-	
-	if ($intron > $max_intron) {
-	  $curr_transcript->translation->end_Exon($prev_exon);
-	  $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
-	  
-	  my $t  = new Bio::EnsEMBL::Transcript;
-	  my $tr = new Bio::EnsEMBL::Translation;
-	  
-	  $t->translation($tr);
-	  
-	  # add exon unless already added, and set translation start and start_Exon
-	  # But the exon will nev er have been added ?
-	  
-	  $t->add_Exon($exon) unless $exon_added;
-	  $exon_added = 1;
-	  
-	  $t->translation->start_Exon($exon);
-	  
-	  if ($exon->phase == 0) {
-	    $t->translation->start(1);
-	  } elsif ($exon->phase == 1) {
-	    $t->translation->start(3);
-	  } elsif ($exon->phase == 2) {
-	    $t->translation->start(2);
-	  }
-	  
-	  $exon->phase(0);
-	  
-	  $curr_transcript = $t;
-	  
-	  push(@split_transcripts, $curr_transcript);
-	}
-	
-	if ($exon == $transcript->end_Exon){
-	  $curr_transcript->add_Exon($exon) unless $exon_added;
-	  $exon_added = 1;
-	  
-	  $curr_transcript->translation->end_Exon($exon);
-	  $curr_transcript->translation->end($transcript->translation->end);
-	} else {
-	  $curr_transcript->add_Exon($exon) unless $exon_added;
-	}
-	
-	foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig->name);
-	}
-	
-	$prev_exon = $exon;
-	
-      }
-      
-      # discard any single exon transcripts
-      my @final_transcripts = ();
-      my $count = 1;
-      
-      foreach my $st (@split_transcripts){
-	$st->sort;
-	
-	my @ex = @{$st->get_all_Exons};
-
-	if(scalar(@ex) > 1){
-	  $st->{'temporary_id'} = $transcript->dbID . "." . $count;
-	  $count++;
-	  push(@final_transcripts, $st);
-
-	}
+  
+  my @split_transcripts   = ();
+  
+  if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+    $self->warn("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+    return undef;
   }
-
- return \@final_transcripts;
+  
+  my $prev_exon;
+  my $exon_added = 0;
+  
+  my $curr_transcript = new Bio::EnsEMBL::Transcript;
+  my $translation     = new Bio::EnsEMBL::Translation;
+  
+  $curr_transcript->translation($translation);
+  
+ EXON: foreach my $exon (@{$transcript->get_all_Exons}){
+    
+    $exon_added = 0;
+    
+    # Start a new transcript if we are just starting out
+    
+    if($exon == $transcript->start_Exon){
       
+      $prev_exon = $exon;
+      
+      $curr_transcript->add_Exon($exon);
+      $exon_added = 1;
+      $curr_transcript->translation->start_Exon($exon);
+      $curr_transcript->translation->start($transcript->translation->start);
+      
+      push(@split_transcripts, $curr_transcript);
+      next EXON;
+    }
+    
+    # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+    my $intron = 0;
+    
+    if ($exon->strand == 1) {
+      $intron = abs($exon->start - $prev_exon->end - 1);
+    } else {
+      $intron = abs($prev_exon->start - $exon->end - 1);
+    }
+    
+    if ($intron > $max_intron) {
+      $curr_transcript->translation->end_Exon($prev_exon);
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
+      
+      my $t  = new Bio::EnsEMBL::Transcript;
+      my $tr = new Bio::EnsEMBL::Translation;
+      
+      $t->translation($tr);
+      
+      # add exon unless already added, and set translation start and start_Exon
+      # But the exon will nev er have been added ?
+      
+      $t->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+      
+      $t->translation->start_Exon($exon);
+      
+      if ($exon->phase == 0) {
+	$t->translation->start(1);
+      } elsif ($exon->phase == 1) {
+	$t->translation->start(3);
+      } elsif ($exon->phase == 2) {
+	$t->translation->start(2);
+      }
+      
+      $exon->phase(0);
+      
+      $curr_transcript = $t;
+      
+      push(@split_transcripts, $curr_transcript);
+    }
+    
+    if ($exon == $transcript->end_Exon){
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+      
+      $curr_transcript->translation->end_Exon($exon);
+      $curr_transcript->translation->end($transcript->translation->end);
+    } else {
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+    }
+    
+    foreach my $sf(@{$exon->get_all_supporting_features}){
+      $sf->seqname($exon->contig->name);
+    }
+    
+    $prev_exon = $exon;
+    
+  }
+  
+  # discard any single exon transcripts
+  my @final_transcripts = ();
+  my $count = 1;
+  
+  foreach my $st (@split_transcripts){
+    $st->sort;
+    
+    my @ex = @{$st->get_all_Exons};
+    
+    if(scalar(@ex) > 1){
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
+      $count++;
+      push(@final_transcripts, $st);
+      
+    }
+  }
+  
+  return \@final_transcripts;
+  
 }
 ############################################################
 #
