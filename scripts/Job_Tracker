@@ -52,7 +52,7 @@ use FreezeThaw;
 
 my $anahost     = 'localhost';
 my $anaport     = '410000';
-my $anadbname   = 'pipeline', #freeze_24
+my $anadbname   = 'ensembl_freeze24';
 my $anadbuser   = 'root';
 my $anapass     =  undef;
 my $status      = 'FAILED';
@@ -145,6 +145,7 @@ if ($dir)
 {
     die ("Directory $dir doesn't exist") unless (-e $dir);
     my $filename = $dir.'jobtracker.output'; #need to add machine info   
+    
     print(  "<TR>$title</TR>"
             ."<TR BGCOLOR=\"00FF55\">"
             ."<TD><a href=\"$filename.created.html\"> CREATED  (".@created.")</a></TD>"
@@ -153,8 +154,7 @@ if ($dir)
             ."<TD><a href=\"$filename.failed.html\"> FAILED (".@failed.")</a></TD>"
             ."</TR>"
             );
-    print("</TABLE>\n");
-    
+    print("</TABLE>\n");    
     printlist($filename.'.created.html', @created);
     printlist($filename.'.submitted.html', @submitted);
     printlist($filename.'.successful.html', @successful);
@@ -230,7 +230,7 @@ sub printlist {
         $statsize       = " ".$statsize         .(" " x (2  - length ($statsize)));
         $lsf            = "| ".$lsf             .(" " x (8  - length ($lsf)));
         
-        print $handle ($status.$jobid.$analysis.$input.$lsf.$stdout.$outsize.$stderr.$errsize.$statfile.$statsize."|\n");                 
+        print $handle ($status.$jobid.$analysis.$input.$lsf.$stdout.$outsize.$stderr.$errsize.$statfile.$statsize."|\n");
     }
     
     print $handle "+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"

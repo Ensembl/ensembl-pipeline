@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/bin/perl -w
 
 =head1 NAME
 
@@ -36,8 +36,9 @@ use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
-
 use vars qw(@ISA);
+
+use Data::Dumper;
 
 @ISA = qw(Bio::Root::Object);
 
@@ -46,7 +47,7 @@ my $host   = 'localhost';
 my $port   = '410000';
 my $dbname = 'ensembl07';
 my $dbuser = 'root';
-my $pass   = undef;
+my $pass   = '';
 my $runnable;
 my $input_id;
 
@@ -66,14 +67,15 @@ my $module  = "Bio::EnsEMBL::DBSQL::Obj";
 
 my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
 
-my $db      = new Bio::EnsEMBL::DBLoader($locator);
+my $db      = new Bio::EnsEMBL::DBLoader($locator) 
+                or warn ("Bio::EnsEMBL::DBloader failed: $!\n");
 
 die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
 
 my $runobj = "$runnable"->new(-dbobj => $db,
-			      -input_id => $input_id,
-			     );
+    		      -input_id => $input_id,
+	    	     );
 $runobj->fetch_input;
 $runobj->run;
 
@@ -82,13 +84,13 @@ my $gfffile = $input_id . ".gff";
 print "GFFfile is $gfffile\n";
 open (GFF,">$gfffile");
 foreach my $out (@out) {
-    print (GFF $out->gffstring . "\n");
+    print (GFF $out->gffstring . "\n") if ($out);
 }
 close(GFF);
 
+
 sub make_locator_string {
     my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
-
     return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
 
 }

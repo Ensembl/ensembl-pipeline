@@ -62,7 +62,7 @@ my $input_id;
 
 $| = 1;
 
-my $module  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+my $module  = "Bio::EnsEMBL::DBSQL::Obj";
 
 my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
 
