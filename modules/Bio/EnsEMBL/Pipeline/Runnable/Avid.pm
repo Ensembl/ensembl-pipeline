@@ -8,25 +8,19 @@
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
-##todo
-## declaring a lot of methods private !!!
+
+
 =pod
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Avid
+ Bio::EnsEMBL::Pipeline::Runnable::Avid
 
 =head1 SYNOPSIS
-$slice1       = the first Bio::Seq object,
-$slice2       = the second Bio::Seq object,
-$avid         = an optional string which specifies the location of the used avid binary
-$avid_options = an optional string with  options (default: binary output (.mout-file))
-$workdir      = an optional string containing the location of the working-directory (def: /tmp:)
-$file_prefix  = an optional array of strings used as file_prefixes for the temporarily written output-files
-$slam_output  = an optional string to convert the binary output to a text-file
 
+ To construct a new Bio::EnsEMBL::Pipeline::Runnable::Avid-Object use
 
-my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
+ $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
                                                       -slice1        => $slice1,
                                                       -slice2        => $slice2,
                                                       -avid          => $avid,
@@ -38,31 +32,61 @@ my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
 
 or
 
-my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
+ $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
                                                       -slice1        => $slice1,
                                                       -slice2        => $slice2,
                                                      );
+
+
+ $obj -> run;
+
+ $result = $obj -> results;
+
+=head1 DESCRIPTION
+
+Avid takes two Bio::Seq (or Bio::PrimarySeq) objects and aligns them
+against each other using their FASTA-sequences and their repeatmasked
+sequences. The setting of a working directory and a prefix for the written
+.fasta and .fasta.masked files is optional.
+
+=head1 OPTIONS
+
+=over
+
+=item  B<-slice1>         reference to the first an Bio::EnsEMBL::Slice - object
+
+=item  B<-slice2>         reference to the second an Bio::EnsEMBL::Slice - object
+
+=item  B<-avid>           optional path to the used avid-binary (default:)
+
+=item  B<-avid_options>   options which are passed to avid
+
+=item  B<-workdir>        optional working-directory (default: /tmp/)
+
+=item  B<-file_prefix>    reference to an array of strings which contain the
+
+                          prefix for written temp-files 
+
+                          (default: ("seq1","seq2")
+
+
+$slam_output  = an optional string to convert the binary output to a text-file
+
 
 
 $obj->run;
 my $resultfile = $obj->results;
 
 
-=head1 DESCRIPTION
-
-Avid takes two Bio::Seq (or Bio::PrimarySeq) objects and aligns them
-against each other using their FASTA-sequences and their repeatmasked
-sequences. The setting of a working directory and a prefix for the written 
-.fasta and .fasta.masked files is optional.
 
 =head1 CONTACT
 
 ensembl-dev@ebi.ac.uk
 
-=head1 APPENDIX
+=head1 METHODS
 
 The rest of the documentation details each of the object methods.
-Internal methods are usually preceded with a _
+Internal (private) methods are usually preceded with a "_".
 
 =cut
 
@@ -86,7 +110,7 @@ use Bio::EnsEMBL::Analysis;
 sub new {
 
   my ($class,@args) = @_;
-  my $self = {};                #construct empty hash
+  my $self = {};
   bless $self,$class;
 
   my (
@@ -98,7 +122,7 @@ sub new {
       $file_prefix,
       $slam_output ) = $self->_rearrange([qw(
                                              SLICE1
-                                             SLICE_2
+                                             SLICE2
                                              AVID
                                              AVID_OPTIONS
                                              WORKDIR
@@ -147,13 +171,16 @@ sub DESTROY {
 }
 
 
-################ RUN METHOD ############################
+
+=pod
 
 =head2 run
 
-Usage    : $obj->run
-Function : runs the avid alignment algorithm against the sequences of the given set of Bio::PrimarySeqI
-objects and their according masked sequences and puts the results into the file $resultfile =$obj->results.
+  Title    : run
+  Usage    : $obj->run
+  Function : aligns the masked and unmasked sequences of the two given Bio::PrimarySeqI-Objects.
+  Returns  : nothing
+  Args     : nothing
 
 =cut
 
@@ -185,7 +212,7 @@ sub run {
   $self->parse_binary if ($self->slam_output_opt);
 
   # pass written minfo mout.. files for deletion to $self->file
-  $self->files_to_delete($fa_first,$fa_secnd);
+#  $self->files_to_delete($fa_first,$fa_secnd); #313 
 
   $self->printvars;
 
@@ -308,7 +335,7 @@ sub write_sequences {
 
 
     # inherited method to store filenames to unlink in @array
-    $self->file($file);
+#    $self->file($file); #313
 
     # getting filename of (first) masked sequence 
     $file .= ".masked";
@@ -321,7 +348,7 @@ sub write_sequences {
     print "Writing sequence $file\n" if ($self->verbose);
 
     # unlink masked fasta
-    $self->file($file);
+#    $self->file($file); #313
     $count++;
   }
 }
