@@ -23,7 +23,7 @@ END { print "not ok 1\n" unless $loaded; }
 
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::Index::Fasta;
 use Bio::PrimarySeq;
 use Bio::Seq;
@@ -63,7 +63,7 @@ $inx->make_index($fasta_filename);
 
 #create BlastMiniGenewise object    
 my @ids = ('HBA_HUMAN');
-my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher->new(-pfetch  => '/usr/local/pubseq/bin/pfetch',
+my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(-executable  => '/usr/local/pubseq/bin/pfetch',
 							 -bp_index => $index_filename);
 my $blastminigenewise = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new('-genomic'   => $genomic_seq,
 										'-ids'	      => \@ids,
