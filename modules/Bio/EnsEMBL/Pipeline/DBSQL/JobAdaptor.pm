@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::JobAdaptor
+Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
 
 =head1 SYNOPSIS
 
@@ -32,7 +32,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::JobAdaptor;
+package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 use vars qw(@ISA);
 use strict;
@@ -41,6 +41,7 @@ use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 use Bio::EnsEMBL::Pipeline::Job;
 
 @ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
+
 
 
 
@@ -70,11 +71,12 @@ sub fetch_by_dbID{
 	 , parameters 
 	 , module
 	 , stderr_file
-	 , stdour_file
+	 , stdout_file
     FROM job
     WHERE job_id = $dbID };  
 	   
   my $sth = $self->prepare($query);
+  $sth->execute;
   my $hashRef;
   my $job;
   if($hashRef = $sth->fetchrow_hashref()){
@@ -111,11 +113,12 @@ sub fetch_all_by_taskname{
 	 , parameters 
 	 , module
 	 , stderr_file
-	 , stdour_file
+	 , stdout_file
     FROM job
-    WHERE taskname = $taskname };  
+    WHERE taskname = '$taskname' };  
 	   
   my $sth = $self->prepare($query);
+  $sth->execute;
   my $hashRef;
   my @jobs;
   while($hashRef = $sth->fetchrow_hashref()){
@@ -214,12 +217,12 @@ sub list_current_status {
   SELECT j.job_id, 
          j.input_id,
          j.taskname,
-  MAX(CONCAT(LPAD(UNIX_TIMESTAMP(js.time), 11,'0'), ':', js.status)) AS max_status,
+  MAX(CONCAT(LPAD(UNIX_TIMESTAMP(js.time), 11,'0'), ':', js.status)) AS max_status
   FROM   job_status js, 
          job j
   WHERE  js.job_id = j.job_id
   GROUP BY js.job_id };
-
+ 
   my $sth = $self->prepare( $q );
   $sth->execute();
 
@@ -277,7 +280,7 @@ sub store{
   my ($self, $job) = @_;
 
   my $query = qq {
-    INSERT INTO JOB ( taskname,
+    INSERT INTO job ( taskname,
 		      input_id,
 		      submission_id,
 		      array_index,

@@ -266,7 +266,7 @@ sub set_current_status{
   if(!$self->adaptor){
     print STDERR ("Can't update the status of a Job if it doesn't have a jobadaptor and a database connection".$self->dbID.":".$self->taskname.":".$self->input_id." $!");
   }else{
-    $self->adaptor->update_job_status($self, $status);
+    $self->adaptor->update_status($self, $status);
   }
   $self->status($status);
 }
