@@ -1,4 +1,3 @@
-
 #!/usr/local/bin/perl
 
 #
@@ -64,7 +63,9 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::Seq;
 use Bio::SeqIO;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+use Data::Dumper;
+
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
 sub _initialize {
     my ($self,@args) = @_;
