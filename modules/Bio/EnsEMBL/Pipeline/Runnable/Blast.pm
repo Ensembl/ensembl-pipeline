@@ -322,8 +322,15 @@ sub parse_results {
   while(my $sbjct = $parser->nextSbjct)  {
 
       my $name = $sbjct->name ;
+
       $name =~ s/^>(\S+).*/$1/;
 
+      if ($name =~ s/\|UG\|(\S+)/) {
+         $name = $1;
+      } elsif ($name =~ /\S+\|\S+\|(\S+)/) {
+         $name = $1;
+      }
+      
     HSP: while (my $hsp = $sbjct->nextHSP) {
 	next HSP if ($hsp->P > $self->threshold);
 	
@@ -415,7 +422,7 @@ sub split_HSP {
     my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
 					      -db_version      => 1,
 					      -program         => $source,
-					      -program_version => $1,
+					      -program_version => 1,
 					      -gff_source      => $source,
 					      -gff_feature     => 'similarity');
     
@@ -644,6 +651,10 @@ sub _findTypes {
 
 sub output {
     my ($self) = @_;
+
+    if (!defined($self->{'_fplist'})) {
+       $self->{'_fplist'} = [];
+    }
     return @{$self->{'_fplist'}};
   }
 
