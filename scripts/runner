@@ -1,11 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-live");
-}
-
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
@@ -24,11 +18,9 @@ use FreezeThaw;
 
 my $object;
 my $objectfile;
-my $outputfile;
 
 &GetOptions(
-             'object=s'  => \$objectfile,
-             'output=s'  => \$outputfile,
+	    'object=s'  => \$objectfile,
              );
 
 print("In runner " . `date` );
@@ -36,11 +28,11 @@ print("In runner " . `date` );
 my $LSF     = new Bio::EnsEMBL::Pipeline::LSF;
 
 if ($objectfile) {
-  open (IN,"<$objectfile");
-  while (<IN>) {
-    $object .= $_;
-  }
-  close(IN);
+    open (IN,"<$objectfile");
+    while (<IN>) {
+	$object .= $_;
+    }
+    close(IN);
 }
 
 my ($obj) = FreezeThaw::thaw($object);
@@ -52,20 +44,25 @@ my $job = $LSF->get_job($obj->LSF_id);
 print("Job/obj [$job][$obj]\n");
 
 if ($job) {
-  $obj->queue  ($job->queue);
-  $obj->machine($job->exec_machine);
+    $obj->queue  ($job->queue);
+    $obj->machine($job->exec_machine);
 }
+my $outputfile=$job->output_file;
+my $statusfile=$job->status_file;
+
 print("Running job\n");
+open(STATUS,">$statusfile");
+print(STATUS "RUNNING\n");
 $obj->run;
 print("Done\n");
 
 my @out    = $obj->output;
 my $outstr = FreezeThaw::freeze(\@out);
-
+print(STATUS "OUTPUT_FROZEN\n");
 open(OUT,">$outputfile");
-  print(OUT "$outstr");
+print(OUT "$outstr");
 close(OUT);
-
+print(STATUS "STORED\n");
 exit(0);
 
 package FreezeThaw;
@@ -576,4 +573,20 @@ sub UNIVERSAL::FreezeEmpty {
   }
 }
 
+END {
+    print(STATUS "PROCESSED\n");
+    close(STATUS);    
+}
 1;
+
+
+
+
+
+
+
+
+
+
+
+

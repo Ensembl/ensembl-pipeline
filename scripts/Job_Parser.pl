@@ -79,17 +79,31 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -pass   => $anapass);
 
 
-my @jobs = $anadb->get_JobsByCurrentStatus('SUBMITTED');
+my @jobs = $anadb->get_JobsByCurrentStatus('FAILED');
 
-foreach my $job (@jobs) {
+JOB:foreach my $job (@jobs) {
+    
     $job->_dbobj($anadb);
     my $module   = $job->analysis->module;
     print(STDERR "Id is " . $job->id . "\t$module\t" . $job->input_id . "\n");
+
+    my $status=$job->status_file();
+    open(OUT,"<$status") || do {print STDERR "Could not open $stdout\n"; next;};
     
+    while(<OUT>){
+	if(/PROCESSED/){
+	    $job->set_status('PROCESSED');
+	}
+	else {
+	    next JOB;
+	}
+    }
+    close OUT;
+
     my $stdout=$job->stdout_file();
     print STDERR "STDOUT file is $stdout\n";
     
-    open(OUT,"<$stdout") || die ("Could not open $stdout\n");
+    open(OUT,"<$stdout") || do {print STDERR "Could not open $stdout\n"; next;};
     my $failed = 1;
     while(<OUT>){
 	if(/Successfully/){
@@ -101,9 +115,31 @@ foreach my $job (@jobs) {
 	    $job->stderr_file($1);
 	}
     }
+    close OUT;
     if ($failed == 1) {
 	$job->set_status('FAILED');
-	print STDERR "Failed job! STDERR file".$job->stderr_file()."\n";
+	my $error=$job->stderr_file();
+	print STDERR "Failed job! (STDERR file $error)\n";
+	open(OUT,"<$error") || do {print STDERR "Could not open $error\n"; next;};
+	while(<OUT>){
+	    if(/Attempting to set the sequence to \[/){
+		print STDERR "bad sequence setting\n";
+		last;
+	    }
+	    if(/Error running \'est_genome/){
+		print STDERR "Error runnning est2genome\n";
+		last;
+	    }
+	    if(/MSG: Not enough disk space/){
+		print STDERR "MSG: Not enough disk space\n";
+		last;
+	    }
+	     if(/Can\'t use an undefined value as an ARRAY reference/){
+		print STDERR "Empty array reference\n";
+		last;
+	    }
+	}
+	close OUT;
     }
     else {
 	my $output= $job->output_file();
