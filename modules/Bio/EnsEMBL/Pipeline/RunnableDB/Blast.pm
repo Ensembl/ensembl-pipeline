@@ -1,9 +1,4 @@
 #
-#
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -18,8 +13,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Blast
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 my $blast   = Bio::EnsEMBL::Pipeline::RunnableDB::Blast->new ( 
-                                                    -dbobj      => $db,
-			                                        -input_id   => $input_id
+                                                    -db         => $db,
+                                                    -input_id   => $input_id
                                                     -analysis   => $analysis );
 $blast->fetch_input();
 $blast->run();
@@ -63,7 +58,7 @@ BEGIN {
 =head2 new
 
     Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
+    Usage   :   $self->new(-DB          => $db
                            -INPUT_ID    => $id
                            -ANALYSIS    => $analysis);
                            
@@ -77,11 +72,13 @@ BEGIN {
 
 sub new {
     my ($class, @args) = @_;
+
     my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;            
+
     return $self;
 }
 
@@ -101,44 +98,42 @@ sub fetch_input {
    
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
-
     
     $self->genseq($genseq);
   
-# input sequence needs to contain at least 3 consecutive nucleotides
+    # input sequence needs to contain at least 3 consecutive nucleotides
+
     my $seq = $self->genseq->seq;
     if ($seq =~ /[CATG]{3}/) {
         $self->input_is_void(0);
-    }
-    else {
+    } else {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
    
 }
 
-#get/set for runnable and args
 sub runnable {
     my ($self) = @_;
     
     if (!defined($self->{'_runnable'})) {
       my $ungapped;
+
       if($::pipeConf{'ungapped'}){
 	$ungapped = 1;
-      }else{
+      } else {
 	$ungapped = undef;
       }
-      #print STDERR "ungapped = ".$ungapped."\n";
-      my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
-							     -database  => $self->analysis->db_file,
-							     -program   => $self->analysis->program,
-							     -options => $self->analysis->parameters,
+
+      my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query          => $self->genseq,
+							     -database       => $self->analysis->db_file,
+							     -program        => $self->analysis->program,
+							     -options        => $self->analysis->parameters,
 							     -threshold_type => 'PVALUE',
-							     -threshold => 1,
-							     -ungapped => $ungapped,
+							     -threshold      => 1,
+							     -ungapped       => $ungapped,
 							    );
 
       $self->{'_runnable'} = $run;
@@ -182,6 +177,7 @@ sub output {
     my ($self) = @_;
 
     my $runnable = $self->runnable;
+
     $runnable || $self->throw("Can't return output - no runnable object");
 
     return $runnable->output;
@@ -192,9 +188,12 @@ sub write_output{
   my ($self) = @_;
 
   my @features = $self->output();
+
   my $dna_f_a = $self->db->get_DnaAlignFeatureAdaptor();
   my $pep_f_a = $self->db->get_ProteinAlignFeatureAdaptor();
+
   my $contig;
+
   eval 
     {
       $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
@@ -204,9 +203,12 @@ sub write_output{
       print STDERR "Contig not found, skipping writing output to db: $@\n";
       return 1;
   }
+
   foreach my $f(@features){
+
     $f->analysis($self->analysis);
     $f->attach_seq($contig);
+
     if($f->isa('Bio::EnsEMBL::DnaDnaAlignFeature')){
       $dna_f_a->store($f);
     }elsif($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
@@ -215,8 +217,6 @@ sub write_output{
       $self->throw("don't know how to store $f\n");
     }
   }
-
-
 }
 
 1;
