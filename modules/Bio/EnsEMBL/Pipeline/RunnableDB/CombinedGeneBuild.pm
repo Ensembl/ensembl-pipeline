@@ -240,11 +240,17 @@ sub make_similarity_runnable {
 #  my $analysis = $self->dbobj->get_Analysis_Adaptor->??;
 
   my $seqfetcher = $self->make_seqfetcher("protein_index", "seqfetch_conf");
-  
+  my $path       = $::db_conf{'path'};
+  my $type       = $::similarity_conf{'type'};
+  my $threshold  = $::similarity_conf{'threshold'};
+
   my $sim = new Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise(
 									  -dbobj      => $self->dbobj,
 									  -input_id   => $self->input_id,
+									  -golden_path=> $path,
 									  -seqfetcher => $seqfetcher,
+									  -type       => $type,
+									  -threshold  => $threshold,
 #									  -analysis   => $analysis,
 									 );
   $self->similarity_runnable($sim);
@@ -299,15 +305,6 @@ sub make_riken_runnable {
 #  analysis setting up? 
 #  my $analysis = $self->dbobj->get_Analysis_Adaptor->??;
   my $seqfetcher = $self->make_seqfetcher("riken_index", "riken_conf");
-#  my $index = $::riken_conf{'riken_index'};
-#  my $seqfetcher;
-
-#  if(defined $index && $index ne ''){
-#    my @db = ( $index );
-#    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
-#								  '-db' => \@db,
-#								 );
-#  }
 
   if($seqfetcher->isa("Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch")){
     $self->warn("no riken_index defined in GB_conf::riken_conf - cannot run Riken_BlastMiniGenewise\n");
@@ -433,8 +430,10 @@ print STDERR "***Running targetted build***\n";
   foreach my $tge($self->targetted_runnable){
     $tge->fetch_input;
     $tge->run;
-   $tge->write_output;
+    $tge->write_output;
   }
+
+$self->{'_targetted_runnables'} = [];
 
 print STDERR "***Running similarity build***\n";
   foreach my $sgw($self->similarity_runnable){
@@ -442,6 +441,7 @@ print STDERR "***Running similarity build***\n";
     $sgw->run;
     $sgw->write_output;
   }
+$self->{'_similarity_runnables'} = [];
 
 print STDERR "***Running riken build***\n";
   foreach my $rgw($self->riken_runnable){
@@ -449,6 +449,7 @@ print STDERR "***Running riken build***\n";
     $rgw->run;
     $rgw->write_output;
   }
+$self->{'_riken_runnables'} = [];
 
 print STDERR "***Running final build***\n";
   foreach my $gb($self->genebuild_runnable){
