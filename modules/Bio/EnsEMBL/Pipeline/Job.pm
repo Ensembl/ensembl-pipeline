@@ -64,56 +64,63 @@ require "$file";
 my %BATCH_QUEUES = &set_up_queues;
 
 sub new {
-    my ($class, @args) = @_;
-    my $self = bless {},$class;
-    my ($p, $f, $l) = caller;
-    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
-	= $self->_rearrange([qw(ADAPTOR
-				ID
-				SUBMISSION_ID
-				INPUT_ID
-				ANALYSIS
-				STDOUT
-				STDERR
-				RETRY_COUNT
-				OUTPUT_DIR
-				RUNNER
-				)],@args);
-    $dbID    = -1 unless defined($dbID);
-    $submission_id   = -1 unless defined($submission_id);
-    $input_id   || $self->throw("Can't create a job object without an input_id");
-    $analysis   || $self->throw("Can't create a job object without an analysis object");
+  my ($class, @args) = @_;
+  my $self = bless {},$class;
+  my ($p, $f, $l) = caller;
 
-    $analysis->isa("Bio::EnsEMBL::Analysis") ||
+  my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
+	= $self->_rearrange([qw(ADAPTOR
+                                ID
+                                SUBMISSION_ID
+                                INPUT_ID
+                                ANALYSIS
+                                STDOUT
+                                STDERR
+                                RETRY_COUNT
+                                OUTPUT_DIR
+                                RUNNER
+                                )],@args);
+
+  $dbID            = -1 unless defined($dbID);
+  $submission_id   = -1 unless defined($submission_id);
+
+  $input_id   || $self->throw("Can't create a job object without an input_id");
+  $analysis   || $self->throw("Can't create a job object without an analysis object");
+
+  $analysis->isa("Bio::EnsEMBL::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
-    
-    $self->dbID($dbID);
-    $self->adaptor($adaptor);
-    $self->input_id($input_id);
-    $self->analysis($analysis);
-    $self->stdout_file($stdout);
-    $self->stderr_file($stderr);
-    $self->retry_count($retry_count);
-    $self->submission_id($submission_id);
-    $self->output_dir($output_dir);
-    if($self->output_dir){
-      $self->make_filenames;
-    }else{
-      my $dir;
-      if(!$BATCH_QUEUES{$analysis->logic_name}{output_dir}){
-        $dir =  $DEFAULT_OUTPUT_DIR;
-      }else{
-        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
-      }
-      $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
-      $self->output_dir($dir);
-      $self->make_filenames;
+  
+  $self->dbID($dbID);
+  $self->adaptor($adaptor);
+  $self->input_id($input_id);
+  $self->analysis($analysis);
+  $self->stdout_file($stdout);
+  $self->stderr_file($stderr);
+  $self->retry_count($retry_count);
+  $self->submission_id($submission_id);
+  $self->output_dir($output_dir);
+
+  if ($self->output_dir) {
+    $self->make_filenames;
+  } else {
+    my $dir;
+
+    if (!$BATCH_QUEUES{$analysis->logic_name}{output_dir}) {
+      $dir =  $DEFAULT_OUTPUT_DIR;
+    } else {
+      $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
     }
-    $self->runner($runner);
-    if(!$self->runner){
-      $self->runner($PIPELINE_RUNNER_SCRIPT);
-    }
-    return $self;
+
+    $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
+    $self->output_dir($dir);
+    $self->make_filenames;
+  }
+
+  $self->runner($runner);
+  if(!$self->runner){
+    $self->runner($PIPELINE_RUNNER_SCRIPT);
+  }
+  return $self;
 }
 
 
@@ -143,7 +150,6 @@ sub create_by_analysis_input_id {
   return $job;
 }
 
-
 =head2 dbID
 
   Title   : dbID
@@ -155,23 +161,21 @@ sub create_by_analysis_input_id {
 =cut
 
 sub dbID {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if ($arg) {
-	$self->{'_dbID'} = $arg;
-    }
-    return $self->{'_dbID'};
-
+  if ($arg) {
+    $self->{'_dbID'} = $arg;
+  }
+  return $self->{'_dbID'};
 }
 
 sub runner {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if ($arg) {
-	$self->{'_runner'} = $arg;
-    }
-    return $self->{'_runner'};
-
+  if ($arg) {
+    $self->{'_runner'} = $arg;
+  }
+  return $self->{'_runner'};
 }
 
 
@@ -186,12 +190,12 @@ sub runner {
 =cut
 
 sub adaptor {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if ($arg) {
-	$self->{'_adaptor'} = $arg;
-    }
-    return $self->{'_adaptor'};
+  if ($arg) {
+    $self->{'_adaptor'} = $arg;
+  }
+  return $self->{'_adaptor'};
 }
 
 
@@ -206,12 +210,12 @@ sub adaptor {
 =cut
 
 sub input_id {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if (defined($arg)) {
-	$self->{'_input_id'} = $arg;
-    }
-    return $self->{'_input_id'};
+  if (defined($arg)) {
+    $self->{'_input_id'} = $arg;
+  }
+  return $self->{'_input_id'};
 }
 
 
@@ -226,15 +230,15 @@ sub input_id {
 =cut
 
 sub analysis {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
+  if (defined($arg)) {
+    $self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Analysis");
 
-	$self->{'_analysis'} = $arg;
-    }
-    return $self->{'_analysis'};
+    $self->{'_analysis'} = $arg;
+  }
+  return $self->{'_analysis'};
 }
 
 
@@ -255,6 +259,7 @@ sub flush_runs {
 
   # flush_runs is optionally sent a queue to deal with
   # @analyses is a list of logic_names (strings)
+
   my @analyses = ($queue) || (keys %BATCH_QUEUES);
   
   if( !defined $adaptor ) {
@@ -336,7 +341,7 @@ sub flush_runs {
     }
     $cmd .= " -output_dir ".$self->output_dir;
     $cmd .= " -queue_manager $QUEUE_MANAGER  " ;
-    if($self->cleanup){
+    if ($self->cleanup) {
       $cmd .= " -cleanup "
     }
     $cmd .= " @job_ids";
@@ -355,7 +360,6 @@ sub flush_runs {
         my $job = $adaptor->fetch_by_dbID($job_id);
         $job->set_status( "FAILED" );
       }
-
     } else {
       #print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
       #."\n";
@@ -408,10 +412,9 @@ sub batch_runRemote {
   my $queue;
   
   if (!$BATCH_QUEUES{$self->analysis->logic_name}) {
-      $queue = 'default';
-  }
-  else {
-      $queue = $self->analysis->logic_name;
+    $queue = 'default';
+  } else {
+    $queue = $self->analysis->logic_name;
   }
   
   push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
@@ -420,10 +423,10 @@ sub batch_runRemote {
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
     $self->flush_runs($self->adaptor, $queue);
-  }else{
-    #print STDERR "Not running ".$self->dbID." yet as batch size is ".
-      #$BATCH_QUEUES{$queue}{'batch_size'}." and there are ".
-      #  scalar(@{$BATCH_QUEUES{$queue}{'jobs'}})." jobs\n";
+  } else {
+    # print STDERR "Not running ".$self->dbID." yet as batch size is ".
+    # $BATCH_QUEUES{$queue}{'batch_size'}." and there are ".
+    #  scalar(@{$BATCH_QUEUES{$queue}{'jobs'}})." jobs\n";
   }
 }
 
@@ -450,16 +453,18 @@ sub runLocally {
   local *STDOUT;
   local *STDERR;
 
-  if( ! open ( STDOUT, ">".$self->stdout_file )) {
+  if ( ! open(STDOUT, ">".$self->stdout_file)) {
     $self->set_status( "FAILED" );
     return;
   }
         
-  if( ! open ( STDERR, ">".$self->stderr_file )) {
+  if( ! open(STDERR, ">".$self->stderr_file)) {
     $self->set_status( "FAILED" );
     return;
   }
-       #print STDERR "Running inLSF\n"; 
+
+  # print STDERR "Running inLSF\n"; 
+
   $self->run_module();
   if ($self->current_status->status eq "SUCCESSFUL"){
     $self->adaptor->remove( $self );
@@ -475,14 +480,14 @@ sub runLocally {
 # we have to parse the output of LSF anyway....
 sub run_module {
   my $self = shift;
-  my $module = $self->analysis->module;
 
-  #print STDERR "Running ".$module." with ".$self."\n";
-
+  my $module     = $self->analysis->module;
+  my $autoupdate = $AUTO_JOB_UPDATE;
+  my $hash_key   = $self->analysis->logic_name;
   my $rdb;
   my ($err, $res);
-  my $autoupdate = $AUTO_JOB_UPDATE;
-  my $hash_key = $self->analysis->logic_name;
+
+  #print STDERR "Running ".$module." with ".$self."\n";
 
   if (!$BATCH_QUEUES{$hash_key}) {
     $hash_key = 'default';
@@ -564,19 +569,21 @@ sub run_module {
       eval {
         $self->set_status( "WRITING" );
         $rdb->write_output;
-        # ------------------------------------------------------------
+
         if ($rdb->can('db_version_searched')) {
           my $new_db_version = $rdb->db_version_searchd();
-          my $analysis = $self->analysis();
+          my $analysis       = $self->analysis();
           my $old_db_version = $analysis->db_version();
+
           $analysis->db_version($new_db_version);
+
           # where is the analysisAdaptor??
           # $self->adaptor->get_AnalysisAdaptor->store($analysis);
           # if $new_db_version gt $old_db_version;
         } else {
           $SAVE_RUNTIME_INFO = 0;
         }
-        # -----------------------------------------------------------
+
         $self->set_status("SUCCESSFUL");
       }; 
       if ($err = $@) {
@@ -591,15 +598,13 @@ sub run_module {
   # update job in StateInfoContainer
   if ($autoupdate) {
     eval {
-	    my $sic = $self->adaptor->db->get_StateInfoContainer;
-	    # -------------------------------------------------------------
-	    $sic->store_input_id_analysis(
+      my $sic = $self->adaptor->db->get_StateInfoContainer;
+      $sic->store_input_id_analysis(
                                     $self->input_id,
                                     $self->analysis,
                                     $self->execution_host,
                                     $SAVE_RUNTIME_INFO
                                    );
-	    # -------------------------------------------------------------
     };
     if ($err = $@) {
       my $error_msg = "Job finished successfully, but could not be ".
@@ -630,7 +635,6 @@ sub set_status {
   
   $self->throw("No status input" ) unless defined($arg);
   
-  
   if (!$self->adaptor) {
     $self->warn("No database connection.  Can't set status to $arg");
     return;
@@ -653,21 +657,23 @@ sub set_status {
 sub current_status {
   my ($self, $arg) = @_;
   
-  if( ! defined( $self->adaptor )) {
+  if ( ! defined( $self->adaptor)) {
     return undef;
   }
+
   my $status;
   eval{
     $status = $self->adaptor->current_status( $self, $arg );
       
   };
-  if($@){
+  if ($@) {
     $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
                  " ".$self->analysis->logic_name." error $@");
   }
+
   #if($status->status eq 'SUCCESSFUL'){
-    #my ($p, $f, $l) = caller;
-    #print STDERR $f.":".$l."\n";
+  #  my ($p, $f, $l) = caller;
+  #  print STDERR $f.":".$l."\n";
   #}
   return $status;
 }
@@ -686,7 +692,7 @@ sub current_status {
 sub get_all_status {
   my ($self) = @_;
   
-  if( $self->adaptor ) {
+  if ($self->adaptor) {
     return $self->adaptor->get_all_status( $self );
   } else {
     return undef;
@@ -707,7 +713,7 @@ sub get_all_status {
 sub get_last_status {
   my ($self) = @_;
   
-  if( $self->adaptor ) {
+  if ($self->adaptor) {
     return $self->adaptor->get_last_status( $self );
   } else {
     return undef;
@@ -725,7 +731,7 @@ sub make_filenames {
   my $num = int(rand(10));
   
   my $dir = $self->output_dir . "/$num/";
-  if( ! -e $dir ) {
+  if ( ! -e $dir) {
     system( "mkdir $dir" );
   }
 
@@ -733,7 +739,6 @@ sub make_filenames {
   $stub .= $self->analysis->logic_name.".";
   $stub .= int(rand(1000));
 
- 
   $self->stdout_file($dir.$stub.".out") unless($self->stdout_file);
   $self->stderr_file($dir.$stub.".err") unless($self->stderr_file);
 }
@@ -750,12 +755,12 @@ sub make_filenames {
 =cut
 
 sub stdout_file {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if (defined($arg)) {
-	$self->{'_stdout_file'} = $arg;
-    }
-    return $self->{'_stdout_file'};
+  if (defined($arg)) {
+    $self->{'_stdout_file'} = $arg;
+  }
+  return $self->{'_stdout_file'};
 }
 
 
@@ -770,16 +775,16 @@ sub stdout_file {
 =cut
 
 sub stderr_file {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if ($arg) {
-      if($arg !~ /err/){
-        my ($p, $f, $l) = caller;
-        $self->throw("You can't set stderr file to ".$arg." $f:$l\n");
-      }
-      $self->{'_stderr_file'} = $arg;
+  if ($arg) {
+    if ($arg !~ /err/){
+      my ($p, $f, $l) = caller;
+      $self->throw("You can't set stderr file to ".$arg." $f:$l\n");
     }
-    return $self->{'_stderr_file'};
+    $self->{'_stderr_file'} = $arg;
+  }
+  return $self->{'_stderr_file'};
 }
 
 
@@ -796,7 +801,7 @@ sub stderr_file {
 sub submission_id {
   my ($self, $arg) = @_;
 
-  if(defined $arg){
+  if (defined $arg) {
     $self->{'_submission_id'} = $arg ;
   }
   return $self->{'_submission_id'};
@@ -804,14 +809,13 @@ sub submission_id {
 
 
 sub output_dir{
- my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
- if($arg){
-   
-   $self->{'_output_dir'} = $arg;
- }
+  if ($arg) {
+    $self->{'_output_dir'} = $arg;
+  }
 
- return $self->{'_output_dir'};
+  return $self->{'_output_dir'};
 }
 
 
@@ -828,9 +832,9 @@ sub output_dir{
 
 sub retry_count {
   my ($self, $arg) = @_;
-  if($arg) {
+  if ($arg) {
     $self->{'_retry_count'} = $arg; 
-   }
+  }
   $self->{'_retry_count'} || 0;
 }
 
@@ -838,16 +842,16 @@ sub can_retry{
   my ($self, $logic_name) = @_;
 
   $logic_name = $self->analysis->logic_name if(!$logic_name);
-  if(!$BATCH_QUEUES{$logic_name}){
-     $logic_name = 'default';
+  if (!$BATCH_QUEUES{$logic_name}) {
+    $logic_name = 'default';
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
-  if(!$self->retry_count){
+  if (!$self->retry_count) {
     return 1;
   }
-  if($self->retry_count && $self->retry_count <= $max_retry){
-     return 1;
-  }else{
+  if ($self->retry_count && $self->retry_count <= $max_retry) {
+    return 1;
+  } else {
     return 0;
   }
 }
@@ -856,12 +860,14 @@ sub cleanup{
   my ($self, $logic_name) = @_;
 
   $logic_name = $self->analysis->logic_name if(!$logic_name);
-  if(!$BATCH_QUEUES{$logic_name}){
-     $logic_name = 'default';
+
+  if (!$BATCH_QUEUES{$logic_name}) {
+    $logic_name = 'default';
   }
-  if($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes'){
+
+  if ($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes') {
     return 1;
-  }else{
+  } else {
     return 0;
   }
 }
@@ -877,21 +883,19 @@ sub cleanup{
 
 =cut
 
-
-
 sub remove {
   my $self = shift;
   my $logic_name = shift;
 
-  if(!$BATCH_QUEUES{$logic_name}){
+  if (!$BATCH_QUEUES{$logic_name}) {
      $logic_name = 'default';
   } 
-  if($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes'){
-    if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
-    if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
+  if ($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes') {
+    if ( -e $self->stdout_file) { unlink( $self->stdout_file ) };
+    if ( -e $self->stderr_file) { unlink( $self->stderr_file ) };
   }
 
-   if( defined $self->adaptor ) {
+   if (defined $self->adaptor) {
      $self->adaptor->remove( $self );
    }
 }
@@ -906,36 +910,39 @@ sub remove {
 # should ideally have this stuff in object(s)
 
 sub set_up_queues {
-    my %q;
+  my %q;
 
-    foreach my $queue (@$QUEUE_CONFIG) {
-      my $ln = $queue->{'logic_name'};
-      next unless $ln;
-      delete $queue->{'logic_name'};
-      while (my($k, $v) = each %$queue) {
-        $q{$ln}{$k} = $v;
-        $q{$ln}{'jobs'} = [];
-        $q{$ln}{'last_flushed'} = undef;
-        $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
-        $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
-        $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
-        $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
-        $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
-      }
+  foreach my $queue (@$QUEUE_CONFIG) {
+    my $ln = $queue->{'logic_name'};
 
-	# a default queue for everything else
-	unless (defined $q{'default'}) {
-	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
-            $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
-	    $q{'default'}{'last_flushed'} = undef;
-	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
-            $q{'default'}{'jobs'} = [];
-            $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
-       $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
-	}
+    next unless $ln;
+
+    delete $queue->{'logic_name'};
+
+    while (my($k, $v) = each %$queue) {
+      $q{$ln}{$k}     = $v;
+      $q{$ln}{'jobs'} = [];
+      $q{$ln}{'last_flushed'} = undef;
+      $q{$ln}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
+      $q{$ln}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
+      $q{$ln}{'retries'}         ||= $DEFAULT_RETRIES;
+      $q{$ln}{'cleanup'}         ||= $DEFAULT_CLEANUP;
+      $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
     }
+
+    # a default queue for everything else
+    unless (defined $q{'default'}) {
+      $q{'default'}{'jobs'} = [];
+      $q{'default'}{'last_flushed'} = undef;
+      $q{'default'}{'batch_size'}        = $DEFAULT_BATCH_SIZE;
+      $q{'default'}{'queue'}             = $DEFAULT_BATCH_QUEUE;
+      $q{'default'}{'retries'}         ||= $DEFAULT_RETRIES;
+      $q{'default'}{'cleanup'}           = $DEFAULT_CLEANUP;
+      $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+    }
+  }
   
-    return %q;
+  return %q;
 }
 
 sub execution_host {
@@ -951,10 +958,10 @@ sub execution_host {
 sub temp_dir {
   my ($self, $arg) = @_;
 
-  if($arg){
+  if ($arg) {
     $self->{'_temp_dir'} = $arg;
   }
-  if(!$self->{'_temp_dir'}){
+  if (!$self->{'_temp_dir'}) {
     $self->{'_temp_dir'} = $self->batch_q_object->temp_filename;
   }
 
@@ -963,18 +970,18 @@ sub temp_dir {
 
 
 sub batch_q_object {
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    if ($arg) {
-      $self->{'_batch_q_object'} = $arg;
-    }
-    if(!$self->{'_batch_q_object'}){
-      my $object = $batch_q_module->new();
-      $self->{'_batch_q_object'} = $object;
-    }
+  if ($arg) {
+    $self->{'_batch_q_object'} = $arg;
+  }
 
+  if (!$self->{'_batch_q_object'}) {
+    my $object = $batch_q_module->new();
+    $self->{'_batch_q_object'} = $object;
+  }
 
-    return $self->{'_batch_q_object'};
+  return $self->{'_batch_q_object'};
 }
 
 
