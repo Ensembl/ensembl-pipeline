@@ -419,6 +419,7 @@ sub link_Transcripts{
   # look in each cluster
  CLUSTER:
   foreach my $cluster ( @{ $transcript_clusters} ){
+
      
     my %overlap_matrix;
     $self->matrix(\%overlap_matrix);
@@ -839,8 +840,10 @@ description: make a transcript for every list built above in link_Transcripts().
 sub _merge_Transcripts{
     my ($self,$lists) = @_;
 	
+    # $list is an arrayref of the ests/cdnas that we can merge
     my @merged_transcripts;
-    
+
+  LIST:
     foreach my $list ( @$lists ){
       
       my @allexons;
@@ -880,7 +883,7 @@ sub _merge_Transcripts{
       my $first_cluster_list = $self->_cluster_Exons( @allexons );
       
       # set start and end of the clusters (using the info collected above)
-	my $cluster_list = $self->_set_splice_Ends($first_cluster_list,\%exon2transcript,\%is_first,\%is_last);
+      my $cluster_list = $self->_set_splice_Ends($first_cluster_list,\%exon2transcript,\%is_first,\%is_last);
       
       # we turn each cluster into an exon and create a new transcript with these exons
       my $transcript    = Bio::EnsEMBL::Transcript->new();
@@ -905,7 +908,8 @@ sub _merge_Transcripts{
       }
       
       push ( @merged_transcripts, $transcript );
-    }
+    
+    } # end of LIST
     return @merged_transcripts;
     
 }
@@ -991,6 +995,9 @@ sub _cluster_Exons{
 
 sub _set_splice_Ends {
   my ($self, $cluster_list, $ref_exon2transcript_hash, $ref_is_first, $ref_is_last) = @_;
+  
+  # $cluster_list is a arrayref of exon-clusters, each cluster 
+  # representing all the exons that can be merged
 
   # hash having exons as keys and mother-transcript as value
   my %exon2transcript = %$ref_exon2transcript_hash;
@@ -1014,93 +1021,89 @@ sub _set_splice_Ends {
   my $need_to_recluster = 0;		      
 
  CLUSTERS:		      
-  foreach my $cluster ( @exon_clusters ){
-    $position_is++;
-    my $fused  = 0;
-
-    # keep track of the transcripts used in this cluster
-    my %seen_transcript;
-    my %exons_from_transcript;
-    
-    foreach my $exon ( $cluster->sub_SeqFeature ){
-
-      push ( @{ $exons_from_transcript{ $exon2transcript{ $exon } } }, $exon );  
-
-      if ( $seen_transcript{ $exon2transcript{$exon} } && 1 == $seen_transcript{ $exon2transcript{$exon} } ){
-	#print STDERR "There is more than one exon from transcript $exon2transcript{ $exon }\n"; 
-	$fused = 1;
-	$need_to_recluster = 1;
-      }
-      $seen_transcript{ $exon2transcript{ $exon } } = 1;
-    } # end of exon loop
-
-    # if it is not fused, simply collect the exons
-    if ( $fused != 1 ){
-      push( @exon_list, $cluster->sub_SeqFeature);
-    }    
-    # if there is fussion going on (be-bop?), get rid of the bad guys and re-cluster
-    elsif ( $fused == 1 ){
-
-      my @exons = sort{ $b->length <=> $a->length } $cluster->sub_SeqFeature;
+ foreach my $cluster ( @exon_clusters ){
+   $position_is++;
+   my $fused  = 0;
+   
+   # keep track of the transcripts used in this cluster
+   my %seen_transcript;
+   my %exons_from_transcript;
+   
+   # each cluster is a SeqFeature with sub_SeqFeatures
+   foreach my $exon ( $cluster->sub_SeqFeature ){
+     
+     push ( @{ $exons_from_transcript{ $exon2transcript{ $exon } } }, $exon );  
+     
+     #if ( $seen_transcript{ $exon2transcript{$exon} } && 1 == $seen_transcript{ $exon2transcript{$exon} } ){
+     #  #print STDERR "There is more than one exon from transcript $exon2transcript{ $exon }\n"; 
+     #  $fused = 1;
+     #  $need_to_recluster = 1;
+     #}
+     $seen_transcript{ $exon2transcript{ $exon } } = 1;
+   } # end of exon loop
+   
+   # if it is not fused, simply collect the exons
+   if ( $fused != 1 ){
+     push( @exon_list, $cluster->sub_SeqFeature);
+   }    
+   
+   ## we don't check any more for fusion. Whether one wants to allow fusion or not should happen during
+   ## the comparison between transcripts.
+   
+   #   elsif ( $fused == 1 ){
       
-    EXONS:
-      foreach my $exon ( @exons ){
-	
-      TRANS_IN_CLUSTER:
-	foreach my $tran ( keys( %exons_from_transcript ) ){
-	  if ( $exon2transcript{$exon} eq $tran ){
-	    next;
-	  }	  
-	  my $overlap_count = 0;
-	  foreach my $exon2 ( @{ $exons_from_transcript{ $tran } } ){
-	    if ( $exon->overlaps($exon2) ){
-	      $overlap_count++;
-	    }
-	  }
-	  # if  $exon overlaps 2 or more exons from the same transcript, in this cluster ...
-	  if ( $overlap_count >= 2 ){
-	    
-	    # ... and $exon is the only one from its transcript in this cluster
-	    if ( scalar( @{ $exons_from_transcript{ $exon2transcript{$exon} } } ) == 1 ){
-	      
-	      # ... and $exon is at the edge of its transcript
-	      if ( $is_first{ $exon } == 1 || $is_last{ $exon } == 1 ){
-	         
-		#print STDERR "ditching one exon\n";
-		# then we ditch it and continue ...
-		next EXONS;
-	      }
-	    }
-	  }
-	} # end of TRANS_IN_CLUSTER
-			   
-	# if it is good, it gets here
-        push ( @exon_list, $exon );
-      
-      }   # end of EXONS
-      
-    }     # end of 'if fused == 1'
+   #     my @exons = sort{ $b->length <=> $a->length } $cluster->sub_SeqFeature;
+   
+   #   EXONS:
+   #     foreach my $exon ( @exons ){
+   
+   #     TRANS_IN_CLUSTER:
+   #       foreach my $tran ( keys( %exons_from_transcript ) ){
+   #	 if ( $exon2transcript{$exon} eq $tran ){
+   #	   next;
+   #	 }	  
+   #	 my $overlap_count = 0;
+   #	  foreach my $exon2 ( @{ $exons_from_transcript{ $tran } } ){
+   #	    if ( $exon->overlaps($exon2) ){
+   #	      $overlap_count++;
+   #	    }
+   #	  }
+   #	  # if  $exon overlaps 2 or more exons from the same transcript, in this cluster ...
+   #	  if ( $overlap_count >= 2 ){
+   
+   #	    # ... and $exon is the only one from its transcript in this cluster
+   #	    if ( scalar( @{ $exons_from_transcript{ $exon2transcript{$exon} } } ) == 1 ){
+   
+   #	      # ... and $exon is at the edge of its transcript
+   #	      if ( $is_first{ $exon } == 1 || $is_last{ $exon } == 1 ){
+   
+   #		#print STDERR "ditching one exon\n";
+   #		# then we ditch it and continue ...
+   #		next EXONS;
+   #	      }
+   #	    }
+   #	  }
+   #	} # end of TRANS_IN_CLUSTER
+   
+   #	# if it is good, it gets here
+   #        push ( @exon_list, $exon );
+   
+   #      }   # end of EXONS
+   
+   #    }     # end of 'if fused == 1'
+   
+   
     
   }       # end of CLUSTERS
-
-  # if needed, re-cluster
-  if ( $need_to_recluster == 1){
-    @exon_clusters   = ();
-    #print STDERR " *** Reclustering ***\n";
-    $cluster_list  = $self->_cluster_Exons( @exon_list );
-    @exon_clusters = $cluster_list->sub_SeqFeature;
-  }
-
-  # at this point we (hopefully) have got rid of the bad fussion, we can set the splice ends on the new clusters
-      
-  # there is a GOTCHA, however. Once we have reclustered the exons, exons that were together before may be 
-  # separated in different clusters, which means they will be part of different potential exons, for the same
-  # transcript! However, it is possible that we have lost the actual connection between those two exons,
-  # creating then a fake exon.
-  # SOLUTION: to introduce here a check for links between the exons clusters, if every two neighbouring
-  # clusters share a est2genome transcript, then it is o.k., otherwise, we should then split the transcript.
-  # This means that we need to return two (or maybe more!) differentiated sets of clusters which will
-  # be then used to create two ( or more ) new transcripts.
+	
+  ## we don't recluster, let's keep things simple
+  ## if needed, re-cluster
+  #if ( $need_to_recluster == 1){
+  #  @exon_clusters   = ();
+  #  #print STDERR " *** Reclustering ***\n";
+  #  $cluster_list  = $self->_cluster_Exons( @exon_list );
+  #  @exon_clusters = $cluster_list->sub_SeqFeature;
+  #}
 
   # keep track of the cluster position
   my $position = 0;
@@ -1117,8 +1120,8 @@ CLUSTER:
   EXON:
     foreach my $exon ($cluster->sub_SeqFeature){
 
-      # for a start-coord in the middle 
-      if ( $position > 1 && $position <= scalar( @exon_clusters ) ){
+	# for a start-coord in the middle 
+	if ( $position > 1 && $position <= scalar( @exon_clusters ) ){
 	
 	# don't use the exon if it is the first of a transcript
 	if ( $is_first{ $exon } == 1 ){
@@ -1176,41 +1179,20 @@ CLUSTER:
     
     # take the most common end (note that we do not resolve ambiguities here)
     
-    ## test:
-    #print STDERR "ends: ";
-    #foreach my $e (@ends){
-    #  print STDERR $e."\t";
-    #}
-    #print STDERR "\n";
-    
     $new_end = shift( @ends );
     $max_end = $end{ $new_end };
     
     # if we have too little exons to obtain the end, take the original value
-    if ( $max_end == 0 ){
+    if ( !defined $max_end ){
       print STDERR "In last position, cluster end wins!\n";
       $new_end = $cluster->end;
     }
     
     # the last cluster is a special case - potential UTRs, take the longest one.
     if( $position == scalar( @exon_clusters ) ) {
-      $new_end = $cluster->end;  
+      $new_end = $cluster->end; # recall that the cluster is expanded  
     }
     
-    #    print STDERR "new_start: $new_start\n";
-    #    print STDERR "start array:\n";
-    #    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
-    #      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
-    #    }
-    #    print STDERR "\n";
-    #    print STDERR "new_end: $new_end\n";
-    #    print STDERR "end array:\n";
-    #    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
-    #      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
-    #    }
-    #    print STDERR "\n";
-    
-
     ######  if new_start> new_end change them in turns until we get start < end ######
     # this can happen when there are many exons in a cluster but they vary greatly in size
     my $other_start = $new_start;
@@ -1220,9 +1202,9 @@ CLUSTER:
     my $stop_end    = 0;
 
     while ( $other_start >= $other_end ){
-      print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+      #print STDERR "*** Trouble: $new_start >= $new_end ***\n";
       $trouble = 1;
-
+      
       # take the next one
       if ( $stop_start == 0 ){
 	my $re_start = shift( @starts );
@@ -1259,24 +1241,23 @@ CLUSTER:
 	## ok, you tried to change, but you got nothing, what can we do about it?
 	print STDERR "Could not reset the start and end coordinates\n";
 	if ( $other_end <= $other_start ){
-	  print STDERR "Sorry will have to put the end= ens of cluster\n";
-	  $new_end   = $cluster->end;
+	  print STDERR "Sorry will have to put the end = end of cluster\n";
+	  $new_end  = $cluster->end;
 	  if ( $new_start >= $new_end ){
 	    print STDERR "Last resort: I'm afraid we'll also have to put start = start of cluster, good luck\n";
 	  }
 	}
       }
     }
-
+    
     # reset the cluster start (that's the coordinate used in _produce_Transcript() )
-    #print STDERR "reseting cluster start to: $new_start\n";
     $cluster->start($new_start);
 
     # reset the cluster end (that's the coordinate used in _produce_Transcript() )
-    #print STDERR "reseting cluster end to: $new_end\n";
     $cluster->end($new_end);
     
-  }
+  } # end of CLUSTER
+
   return $cluster_list;
 }
 
