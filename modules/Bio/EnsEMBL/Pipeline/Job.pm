@@ -326,7 +326,7 @@ sub flush_runs {
     # "connect" command line accordingly (otherwise -pass gets the
     # first job id as password, instead of remaining undef)
 
-    if (defined $pass) {
+    if ($pass) {
       $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
     }
     else {
