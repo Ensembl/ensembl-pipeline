@@ -91,6 +91,8 @@ sub run{
     }
 
     my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
+#    my $est_genome_command = $self->est_genome . " -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
+#/nfs/disk100/pubseq/emboss/bin/
         # use -align to get alignment
     print STDERR "\nRunning command $est_genome_command\n\n";
 
@@ -160,6 +162,7 @@ sub run{
 
     if ($@) {
         $self->throw("Error running est_genome:\n$@");
+	die $@;
     } else {
         return 1;
     }
