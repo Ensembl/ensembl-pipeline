@@ -276,9 +276,9 @@ sub run {
   my $sbjct = $self->workdir."/sbjct.".$$;
 
   $self->filename($query);
-  $self->writefile('seq1');
+  $self->writefile($self->seq1);
   $self->filename($sbjct);
-  $self->writefile('seq2');
+  $self->writefile($self->seq2);
 
   # run blast and parse results
   $self->run_analysis($query,$sbjct);
@@ -309,11 +309,11 @@ sub run_analysis {
 								 " -p " . $self->alntype .
 								 " > ". 
 								 $self->results) == 0);
-}  
-  
+}
+
 sub parse_results { 
   my ($self) = @_;
-  
+
   open BL2SEQ, $self->results || 
     $self->throw("Coudn't open file ".$self->results.", $!\n");
   my $filehandle = \*BL2SEQ;
