@@ -335,16 +335,18 @@ sub _make_affy_features {
     else {
       $coord_system_name = "chromosome";
     }
-    
     if ($h->{'t_id'} =~ /^(\S+)\-1\-.*$/) {
       $seq_region_name = $1;
       $seq_region_name =~ s/\-1$//;
-      #print "seq_region_name is $seq_region_name\n";
-    }
-    elsif ($h->{'t_id'} =~ /^(\S+)\..*$/) {
+    }elsif($h->{'t_id'} =~ /(\S+):\S+:(\S+):\S+:\S+:\S+/){
+      $coord_system_name = $1;
+      $seq_region_name = $2;
+    }elsif ($h->{'t_id'} =~ /^(\S+)\..*$/) {
       $seq_region_name = $1;
     }
-    
+    if(!$seq_region_name){
+      $self->throw("Failed to parse seq_region name from ".$h->{'t_id'}."\n");
+    }
     $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name);
     if (!$slice) {
       print STDERR "Could not obtain slice for seq_region: $coord_system_name : $seq_region_name\n";
