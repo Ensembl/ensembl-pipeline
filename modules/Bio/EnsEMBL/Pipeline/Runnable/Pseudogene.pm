@@ -136,7 +136,7 @@ sub summary {
   print STDERR   $self->pseudogenes." pseudogenes identified \n";  
   print STDERR   scalar(@{$self->discarded_transcripts})." pseudotranscripts to be chucked \n";
   foreach my $transcript (@{$self->discarded_transcripts}) {
-    print STDERR   $transcript->stable_id."\n";
+    print STDERR   $transcript->dbID."\n";
   }
   return 1;
 }
@@ -194,7 +194,7 @@ sub test_genes{
 	  $evidence->{'real_introns'} >= $PS_NUM_REAL_INTRONS &&
 	  $evidence->{'covered_introns'} >= $PS_MAX_INTRON_COVERAGE  ) {
 	push @pseudo_trans, $transcript;
-	print STDERR $gene->stable_id." - repeats in introns in transcript ".$transcript->stable_id."\n";
+	print STDERR $gene->dbID." - repeats in introns in transcript ".$transcript->dbID."\n";
 	print STDERR join (', ',%{$evidence}),"\n";
 	next TRANS;
       }
@@ -413,7 +413,7 @@ sub protein_covered_intron{
       last EXON;
     }
   }
-  $self->throw("real intron not found for gene " . $gene->stable_id . " exons : @all_exons\n")  unless (scalar(@exons) == 2); 
+  $self->throw("real intron not found for gene " . $gene->dbID . " exons : @all_exons\n")  unless (scalar(@exons) == 2); 
   my @exon_features = @{$exons[0]->get_all_supporting_features};
   push @exon_features,@{$exons[1]->get_all_supporting_features};
 
@@ -473,12 +473,12 @@ sub protein_covered_intron{
       my $coverage =  $self->_len_covered($intron,\@feature_blocks)."\n";
       if ($coverage/$intron->length*100 > $PS_MAX_INTRON_COVERAGE) {
 	$identified++;
-	print STDERR $transcript->stable_id." two exon with $key covering intron ".$coverage/$intron->length*100 . "%.\t";
+	print STDERR $transcript->dbID." two exon with $key covering intron ".$coverage/$intron->length*100 . "%.\t";
 
 	# need more than one peice of protein evidence to make the call
 
 	if ($identified >1){
-	  print STDERR "\ncalling ".$transcript->stable_id." as having a protein covered intron\n";
+	  print STDERR "\ncalling ".$transcript->dbID." as having a protein covered intron\n";
 	  return "dodgy";
 	}
 	else{
