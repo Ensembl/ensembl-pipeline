@@ -24,8 +24,8 @@ $options   = a string with options ,
 								 -query_seqs    => \@sequences,
 								 -query_type    => 'dna',
 			                                         -target_type   => 'dna',
-                                                                 -exonerate     => $exonerate,
-								 -options       => $options,
+                                                                 #-exonerate     => $exonerate,
+								 #-options       => $options,
 								);
 
  $runnable->run; #create and fill Bio::Seq object
@@ -58,7 +58,10 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::DnaDnaAlignFeature;
+#use Bio::EnsEMBL::DnaDnaAlignFeature;
+use Bio::EnsEMBL::MiscFeature;
+use Bio::EnsEMBL::Attribute;
+use Bio::EnsEMBL::MiscSet;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Root;
 
@@ -124,7 +127,7 @@ sub new {
   
   $self->exonerate($exonerate);
   
-  my $basic_options = '--showalignment no --showvulgar no --bestn 5 --ryo "myoutput: %S %V %pi\n"';
+  my $basic_options = '--showalignment no --softmasktarget yes  --showvulgar no --ryo "myoutput: %S %V %pi\n" --dnahspthreshold 116';
   
   if ($options){
     $self->options($options);
@@ -183,7 +186,7 @@ sub run {
   ############################################################
   # write the query sequence into a temporary file then
   
-  our (%length,%rec_q_id,%done);
+  our (%length,%rec_q_id,%done,%match);
   
   my $query = "$dir/query_seqs.$$";
   
@@ -200,6 +203,11 @@ sub run {
   }
   
   close( QUERY_SEQ );
+
+  my @lengths = sort {$b<=>$a} values %length;
+  my $max_length = $lengths[0];
+  $self->max_length($max_length);
+
   
   my $command =$self->exonerate." ".$self->options.
     " --querytype $query_type --targettype $target_type --query $query --target $target ";
@@ -226,7 +234,7 @@ sub run {
   while (<EXO>){
     
     print STDERR $_ if $verbose;
-    print $_;
+    
     ############################################################
     # the output is of the format:
     #
@@ -270,19 +278,30 @@ sub run {
       $h->{'t_end'} = $t_end;
       $h->{'t_strand'} = $strand;
       $h->{'score'} = $score;
+      $h->{'probe_length'} = $length{$h->{'q_id'}};
       $h->{'matching_length'} = $matching_length;
       $h->{'percent_id'} = $pid;
       
       ###for affymetrix probe sequence, they are 25 bs long, we require at least 24 bs exact match###
       #if ($h->{'matching_length'} ==24 and $h->{'percent_id'} ==100) {
-      if ($h->{'matching_length'} == $length{$h->{'q_id'}}-1 and $h->{'percent_id'}==100) {
-	print "24 $_\n";
-	$self->_create_features($h);
+      if ($h->{'matching_length'} == $h->{'probe_length'}-1 and $h->{'percent_id'}==100) {
+	#print "24 $_\n";
+	$h->{'match_status'} = "Mismatch";
+	$match{$h->{'q_id'}}{'mis_match_count'}++;
+	push @pro_features, $h;
       } 
       #elsif ($h->{'matching_length'} ==25 and $h->{'percent_id'}>=96) {
-      elsif ($h->{'matching_length'} == $length{$h->{'q_id'}} and $h->{'percent_id'}>=(($length{$h->{'q_id'}}-1)/$length{$h->{'q_id'}}*100)) {
-	print "25 $_\n";
-	$self->_create_features($h);
+      elsif ($h->{'matching_length'} == $h->{'probe_length'} and $h->{'percent_id'}>=(($h->{'probe_length'}-1)/$h->{'probe_length'}*100)) {
+	#print "25 $_\n";
+	if ($h->{'percent_id'} == 100) {
+	  $h->{'match_status'} = "Fullmatch";
+	  $match{$h->{'q_id'}}{'full_match_count'}++;
+	}
+	else {
+	  $h->{'match_status'} = "Mismatch";
+	  $match{$h->{'q_id'}}{'mis_match_count'}++;
+	}
+	push @pro_features, $h;
       }
     }
   }
@@ -290,49 +309,104 @@ sub run {
   
   close(EXO) or $self->throw("couldn't close pipe ");  
   
-  #$self->_create_features(@pro_features);
+  $self->_store_affy_features(@pro_features);
 
+  $self->output_match_count(\%match);
   ############################################################
-  # remove interim files (but do not remove the database if you are using one)
+  
+# remove interim files (but do not remove the database if you are using one)
   unlink $query;
   if ( $self->genomic){
     unlink $target;
   }
 }
 
-sub _create_features {
+sub _store_affy_features {
   
   
-  ###I am not sure how to create MiscFeature, only using the following temperately####
+  my ($self,@h) = @_;
   
-  my ($self,$h) = @_;
-  
-  ###to make DnaDnaAlignFeature, we need to make Analysis_obj and slice_obj###
-  
-  my @features;
+  ###to make MiscFeature, we need to make slice_obj###
   
   my $coord_system_name = "chromosome";
-  my ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
-  my $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name,$h->{'t_start'},$h->{'t_end'});
-  my $feat_pair = Bio::EnsEMBL::FeaturePair->new(
-						 -slice    => $slice,
-						 -start    => $h->{'t_start'},
-						 -end      => $h->{'t_end'},
-						 -strand   => $h->{'t_strand'},
-						 -hseqname => $h->{'q_id'},
-						 -hstart   => $h->{'q_start'},
-						 -hend     => $h->{'q_end'},
-						 -hstrand  => $h->{'q_strand'},
-						 -percent_id => $h->{'percent_id'},
-						 -analysis  => $self->analysis,
-						);
-  
-  my $feat = Bio::EnsEMBL::DnaDnaAlignFeature->new (-features => [$feat_pair]);
-  
-  
-  
-  $self->output($feat);
-  
+
+  foreach my $h (@h) {
+    my ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name,$h->{'t_start'},$h->{'t_end'});
+    
+    my $probe_name = $h->{'q_id'};
+    $probe_name =~ s/^probe\://;
+    my ($probeset_name,$composite_name) = split /\:/, $probe_name;
+    my $misc_feature = Bio::EnsEMBL::MiscFeature->new (
+						       -START  => $h->{'t_start'},
+						       -END    => $h->{'t_end'},
+						       -STRAND => $h->{'t_strand'},
+						       -SLICE  => $slice,
+						      );
+ 
+    $misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeName",
+								 -NAME   => "Probe name",
+								 -DESCRIPTION => "the name of the probe",
+								 -VALUE  => $probe_name,
+								)
+				 );
+ 
+ 
+    #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "compositeName",
+    #								 -NAME   => "Conposite name",
+    #								 -DESCRIPTION => "the name of the composite",
+    #								 -VALUE  => $composite_name,
+    #								)
+    #				 );
+
+    #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeSetName",
+    #								 -NAME   => "Probeset name",
+    #								 -DESCRIPTION => "the name of the probe set",
+    #								 -VALUE  => $probeset_name,
+    #								)
+    #				 );
+
+    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								-CODE   => "probeLength",
+								-NAME   => "Probe length",
+								-DESCRIPTION => "the length of the probe",
+								-VALUE  => $h->{'probe_length'},
+							       )
+				);
+
+    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								-CODE   => "matchLength",
+								-NAME   => "Match length",
+								-DESCRIPTION => "number of base matched",
+								-VALUE  => $h->{'matching_length'},
+							       )
+				);
+
+    
+
+    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								-CODE   => "matchStatus",
+								-NAME   => "Match status",
+								-DESCRIPTION => "full_match or with_mismatch",
+								-VALUE  => $h->{'match_status'}
+							       )
+				);
+    
+    #
+    #  Add as many Attributes as you like
+    #
+    
+    $misc_feature->add_MiscSet( Bio::EnsEMBL::MiscSet->new (
+							    -CODE  => "AffyProbe",
+							    -NAME  => "Affy probe match",
+							    -DESCRIPTION => "data set is $probeset_name ",
+							    -LONGEST_FEATURE => $self->max_length,
+							   )
+			      );
+    
+    $self->output($misc_feature);
+  }
+  #$db->disconnect;
   
 }
 
@@ -424,6 +498,15 @@ sub output {
 
 ############################################################
 
+sub output_match_count {
+  my ($self, $match) = @_;
+  if ($match) {
+    $self->{_match} = $match;
+  }
+  return $self->{_match};
+}
+############################################################
+
 sub database {
   my ($self, $database) = @_;
   if ($database) {
@@ -457,6 +540,16 @@ sub target_type {
     $self->{_target_type} = $type ;
   }
   return $self->{_target_type};
+}
+
+############################################################
+
+sub max_length {
+  my ($self, $max_length) = @_;
+  if (defined($max_length) ){
+    $self->{_max_length} = $max_length;
+  }
+  return $self->{_max_length};
 }
 
 ############################################################
