@@ -116,9 +116,8 @@ sub runnable {
     my ($self) = @_;
     
     if (!defined($self->{'_runnable'})) {
-      my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->genseq,
-							      -database  => $self->analysis->db,
-							      -program   => $self->analysis->program);
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->genseq,
+									 -analysis  => $self->analysis	 );
  
            
       $self->{'_runnable'} = $run;
