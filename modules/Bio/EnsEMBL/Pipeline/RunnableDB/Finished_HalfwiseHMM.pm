@@ -182,7 +182,11 @@ sub getPfamDB{
     }
     return $self->{'_pfam_db'};
 } 
-    
+sub db_version_searched{
+    my $self = @_;
+# remove comment when pfam database has a version in meta table
+#    return $runnable->pfam_db_version();
+}
 =head2  runnable
 
     Arg      : a Bio::EnsEMBL::Pipeline::RunnableI
