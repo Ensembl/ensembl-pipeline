@@ -11,7 +11,6 @@ INSERT INTO analysis (db, db_version, program, module, module_version, gff_sourc
 INSERT INTO analysis (db, db_version, program, module, module_version, gff_source, gff_feature, parameters, logic_name) VALUES ('__NONE__', '__NONE__', 'trf', 'TRF', 1, 'TRF', 'tandem-repeat', '', 'TRF');
 INSERT INTO analysis (db, db_version, program, module, module_version, gff_source, gff_feature, parameters, logic_name) VALUES ('__NONE__', '__NONE__', 'wublastn', 'Blast', 1, 'wublastn', 'similarity', '', 'wublastn');
 
-
 #
 # Dumping data for table 'clone'
 #
@@ -27,25 +26,25 @@ INSERT INTO clone (clone_id, name, embl_acc, version, embl_version, htg_phase, c
 # Dumping data for table 'contig'
 #
 
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (4,'AB015752.00001',1,116160,1,1,4,'');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (2,'AB012723.00001',2,40850,1,1,2,'AB012723.1~1');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13493,'AC015914.00008',3010,17688,65019,8,13493,'AC015914.3~8');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13494,'AC015914.00009',3010,22615,82807,9,13494,'AC015914.3~9');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13495,'AC015914.00006',3010,12955,36952,6,13495,'AC015914.3~6');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13496,'AC015914.00004',3010,12720,10744,4,13496,'AC015914.3~4');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13497,'AC015914.00005',3010,13288,23564,5,13497,'AC015914.3~5');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13498,'AC015914.00001',3010,1916,1,1,13498,'AC015914.3~1');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13499,'AC015914.00002',3010,2747,2017,2,13499,'AC015914.3~2');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13500,'AC015914.00011',3010,33088,136843,11,13500,'AC015914.3~11');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13501,'AC015914.00007',3010,14912,50007,7,13501,'AC015914.3~7');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13502,'AC015914.00010',3010,31221,105522,10,13502,'AC015914.3~10');
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (13503,'AC015914.00003',3010,5780,4864,3,13503,'AC015914.3~3');
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (4,'AB015752.00001',1,116160,1,4);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (2,'AB012723.00001',2,40850,1,2);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13493,'AC015914.00008',3010,17688,65019,13493);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13494,'AC015914.00009',3010,22615,82807,13494);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13495,'AC015914.00006',3010,12955,36952,13495);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13496,'AC015914.00004',3010,12720,10744,13496);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13497,'AC015914.00005',3010,13288,23564,13497);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13498,'AC015914.00001',3010,1916,1,13498);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13499,'AC015914.00002',3010,2747,2017,13499);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13500,'AC015914.00011',3010,33088,136843,13500);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13501,'AC015914.00007',3010,14912,50007,13501);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13502,'AC015914.00010',3010,31221,105522,13502);
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (13503,'AC015914.00003',3010,5780,4864,13503);
 
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (1,'AB000381.00001',42,35863,1,1,1,'AB000381.1~1');
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (1,'AB000381.00001',42,35863,1,1);
 
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (5,'AB016897.00001',5,331211,1,1,5,'AB016897.1~1');
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (5,'AB016897.00001',5,331211,1,5);
 
-INSERT INTO contig (contig_id, name, clone_id, length, offset, corder, dna_id, international_name) VALUES (107814,'AL009179.00001',10,139904,1,1,107814,'AL009179.1~1');
+INSERT INTO contig (contig_id, name, clone_id, length, embl_offset, dna_id) VALUES (107814,'AL009179.00001',10,139904,1,107814);
 
 
 #
