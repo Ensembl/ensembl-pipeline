@@ -67,6 +67,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Analysis::Programs;
+use Bio::Root::Object;
 use Bio::Seq;
 use Bio::SeqIO;
 

@@ -41,11 +41,11 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Analysis::Programs;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::Root::Object);
+@ISA = qw(Bio::Root::RootI);
 
 =head1 ABSTRACT METHODS
 

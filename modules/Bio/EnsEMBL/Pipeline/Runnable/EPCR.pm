@@ -76,6 +76,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::Root::Object;
 #use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );

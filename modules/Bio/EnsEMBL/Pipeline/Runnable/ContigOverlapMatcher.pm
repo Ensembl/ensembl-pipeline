@@ -46,10 +46,11 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::Programs 'phrap.longreads';
 use Bio::EnsEMBL::ContigOverlap;
 use Bio::SeqIO;
+use Bio::Root::Object;
 use File::Path 'rmtree';
 use vars '@ISA';
 
-@ISA = 'Bio::EnsEMBL::Pipeline::RunnableI';
+@ISA = ('Bio::EnsEMBL::Pipeline::RunnableI','Bio::Root::Object');
 
 =head2 new
 
@@ -178,7 +179,7 @@ sub get_all_ContigOverlaps {
     return @{$self->{'_contig_overlap'}};
 }
 
-=cut
+h=cut
 
 =head2 sequence_list
 

@@ -70,6 +70,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::Root::Object;
 use BPlite;
 
 use Data::Dumper;

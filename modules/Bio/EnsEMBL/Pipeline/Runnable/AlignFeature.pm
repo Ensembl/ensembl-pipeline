@@ -62,6 +62,7 @@ use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
+use Bio::Root::Object;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome pfetch); 

@@ -81,6 +81,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::Seq;
+use Bio::Root::Object;
 use Bio::SeqIO;
 
 #use Data::Dumper;

@@ -55,6 +55,8 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
 
+use Bio::Root::Object;
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object);
 
 sub _initialize {
