@@ -86,8 +86,7 @@ foreach my $gene(@genes){
      }
 }
 
-# no gene_external table as yet ...
-#$tgw->write_output();
+$tgd->write_output();
 
 
 
