@@ -1079,7 +1079,13 @@ sub set_stop_codon{
       ############################################################
       # get the next codon
       my $next_bioseq = $next_exon->seq;
-      my $donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+      my $donor;
+      if ( $donor_bases_count == 0 ){
+	$donor = '';
+      }
+      else{
+	$donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+      }
       my $acceptor = $next_bioseq->subseq( 1, $acceptor_bases_count );
       
       my $next_codon = $donor.$acceptor;
