@@ -229,7 +229,7 @@ sub list_inputId_class_by_start_count {
   my @row;
 
   my $query = qq{
-    SELECT input_id, clasS
+    SELECT input_id, class
       FROM input_id_analysis
      GROUP by input_id, class };
 
