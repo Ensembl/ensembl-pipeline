@@ -3,7 +3,7 @@ require Exporter;
 
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes);
+our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check);
 
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
@@ -243,14 +243,16 @@ sub create_transcripts{
     my $time = time;
     #print STDERR "transcript ".$transcript." \n";
     my @exons = @{$transcripts{$transcript}};
-    if($transcript =~ /\w+\.\d+\w+/){
-     ($gene_name) = $transcript =~ /(\w+\.\d+)\w+/;
+    if($transcript =~ /\w+\.\d+[a-z A-Z]/){
+      #print STDERR "parsing gene name\n";
+     ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]/;
      $transcript_id = $transcript;
     }else{
+      #print STDERR "taking gene name as is\n";
       $gene_name = $transcript;
       $transcript_id = $transcript;
     }
-  
+    #print STDERR "have gene name ".$gene_name." and transcript id ".$transcript_id."\n";
     my $transcript = new Bio::EnsEMBL::Transcript;
     my $translation = new Bio::EnsEMBL::Translation;
     my @sorted_exons;
@@ -390,24 +392,8 @@ sub write_genes{
   my %non_transforming;
   
  GENE: foreach my $gene(@$genes){
-    my $translating_gene = translation_check($gene);
-    #print STDERR "gene ".$gene->stable_id." returns this from translation check ".$translating_gene."\n";
-    if(!$translating_gene){
-      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
-      #print STDERR "gene on ".$clone_name." is being put in non_translating hash\n";
-      if(!$non_translating{$clone_name}){
-	$non_translating{$clone_name} = [];
-	push(@{$non_translating{$clone_name}}, $gene);
-	#print STDERR "there are ".keys(%non_translating)." clones with non translating genes\n";
-	next GENE;
-      }else{
-	#print "there are ".keys(%$non_translating)." clones with non translating genes\n";
-	push(@{$non_translating{$clone_name}}, $gene);
-	next GENE;
-      }
-    }
     eval{
-      $translating_gene->transform;
+      $gene->transform;
     };
     if($@){
       warn("gene ".$gene->stable_id." wouldn't transform ".$@);
@@ -421,22 +407,40 @@ sub write_genes{
 	next GENE;
       }
     }
+   # my $translating_gene = translation_check($gene);
+   # #print STDERR "gene ".$gene->stable_id." returns this from translation check ".$translating_gene."\n";
+#    if(!$translating_gene){
+#      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
+#      #print STDERR "gene on ".$clone_name." is being put in non_translating hash\n";
+#      if(!$non_translating{$clone_name}){
+#	$non_translating{$clone_name} = [];
+#	push(@{$non_translating{$clone_name}}, $gene);
+#	#print STDERR "there are ".keys(%non_translating)." clones with non translating genes\n";
+#	next GENE;
+#      }else{
+#	#print "there are ".keys(%$non_translating)." clones with non translating genes\n";
+#	push(@{$non_translating{$clone_name}}, $gene);
+#	next GENE;
+#      }
+#      print "clone ".$clone_name." has ".@{$non_translating{$clone_name}}." genes\n";
+#    }
+  
     my $gene_adaptor = $db->get_GeneAdaptor;
     eval{
-      $gene_adaptor->store($translating_gene);
+      $gene_adaptor->store($gene);
     };
     if($@){
       die "couldn't store ".$gene->stable_id." problems ".$@;
     }
   }
 
-  return \%non_translating, \%non_transforming;
+  #return \%non_translating, \%non_transforming;
 }
 
 sub translation_check{
   my ($gene) = @_;
   
-  
+  #print STDERR "checking translation of ".$gene->stable_id."\n";
   my @transcripts = @{$gene->get_all_Transcripts};
   foreach my $t(@transcripts){
     my $pep = $t->translate->seq;

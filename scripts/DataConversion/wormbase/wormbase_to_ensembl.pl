@@ -11,6 +11,7 @@ use Bio::EnsEMBL::Chromosome;
 use Bio::EnsEMBL::Clone;
 use Bio::EnsEMBL::RawContig;
 
+$| = 1;
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -user => $WB_DBUSER,
@@ -89,7 +90,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
       $db->get_CloneAdaptor->store($clone);
     };
     if($@){
-      die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+      die("couldn't store ".$clone->id." ".$clone->embl_id." $@");
     }
     $contig_id{$id} = $contig->dbID;
   }
@@ -116,43 +117,166 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
 
   my $chr = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
   my $genes = &parse_gff($chromosome_info->{'gff_file'}, $chr);
-  my ($non_translating, $non_transforming) = &write_genes($genes, $db);
+  #my ($non_translating, $non_transforming) = &write_genes($genes, $db);
+  &write_genes($genes, $db);
+  #print "there are ".keys(%$non_translating)." clones with non translating genes\n";
+#  print "there are ".keys(%$non_transforming)." clones with non translating genes\n";
 
-  print "there are ".keys(%$non_translating)." clones with non translating genes\n";
-  print "there are ".keys(%$non_transforming)." clones with non translating genes\n";
+#  foreach my $clone_name(keys(%$non_translating)){
+#    print "remaking ".$clone_name." sequence\n";
+#    my $wormbase_seq = $obda->get_Seq_by_acc($clone_name);
+#    my $clone_adaptor = $db->get_CloneAdaptor;
+#    my $old_clone = $clone_adaptor->fetch_by_name($clone_name);
+#    my ($old_contig) = @{$old_clone->get_all_Contigs};
+#    my $contig_id = $old_contig->dbID;
+#    my $embl_acc = $old_clone->embl_id;
+#    my $version = $old_clone->embl_version;
+#    $clone_adaptor->remove($old_clone);
+#    my $clone     = new Bio::EnsEMBL::Clone;
+#    my $contig    = new Bio::EnsEMBL::RawContig; 
+#    $clone->htg_phase(3);
+#    $clone->id($clone_name); 
+#    $clone->embl_id($embl_acc);
+#    $clone->version(1);
+#    $clone->embl_version($version);
+#    my $contig_name = $embl_acc.".1.".$wormbase_seq->length;
+#    $contig->name($contig_name);
+#    $contig->seq($wormbase_seq->seq);
+#    $contig->length($wormbase_seq->length);
+#    $contig->adaptor($db->get_RawContigAdaptor);
+#    $clone->add_Contig($contig);
+#    my $time = time;
+#    $clone->created($time);
+#    $clone->modified($time);
+#    eval{
+#      $db->get_CloneAdaptor->store($clone);
+#    };
+#    if($@){
+#      die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+#    }
+#    my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
+#    my $assembly_sth = $db->prepare($assembly_sql);
+#    $assembly_sth->execute($contig->dbID, $contig_id);
+#    my $gene_adaptor = $db->get_GeneAdaptor;
+#    foreach my $gene(@{$non_translating->{$clone_name}}){
+#      foreach my $exon(@{$gene->get_all_Exons}){
+#	$exon->contig($contig);
+#      }
+#      print "checking translation of ".$gene->stable_id."\n";
+#      my $translated_gene = &translation_check($gene);
+#      if($translated_gene){
+#	$gene_adaptor->store($translated_gene);
+#      }else{
+#	print STDERR "gene ".$gene->stable_id." doesn't translate at all something odd going on\n";
+#      }
+#    }
+#  }
 
-  foreach my $clone_name(keys(%$non_translating)){
-    my $wormbase_seq = $obda->get_Seq_by_acc($clone_name);
-    my $clone_adaptor = $db->get_CloneAdaptor;
-    my $clone = $clone_adaptor->fetch_by_name($clone_name);
-    my ($contig) = @{$clone-get_all_Contigs};
-    my $contig_id = $contig->dbID;
-    my $embl_acc = $clone->embl_id;
-    my $version = $clone->embl_version;
-    $clone_adaptor->remove($clone);
-    my $clone     = new Bio::EnsEMBL::Clone;
-    my $contig    = new Bio::EnsEMBL::RawContig; 
-    my $clone_name = $WB_ACC_2_CLONE->{$acc};
-    $clone->htg_phase(3);
-    $clone->id($clone_name); 
-    $clone->embl_id($acc);
-    $clone->version(1);
-    $clone->embl_version($version);
-    my $contig_name = $id.".1.".$wormbase_seq->length;
-    $contig->name($contig_name);
-    $contig->seq($wormbase_seq->seq);
-    $contig->length($seq->length);
-    $contig->adaptor($db->get_RawContigAdaptor);
-    $clone->add_Contig($contig);
-    my $time = time;
-    $clone->created($time);
-    $clone->modified($time);
-    eval{
-      $db->get_CloneAdaptor->store($clone);
-    };
-    if($@){
-      die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+  my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
+
+  my @genes = @{$slice->get_all_Genes};
+
+  TRANSLATION: foreach my $gene(@genes){
+    my $translation = &translation_check($gene);
+    if($translation){
+      next TRANSLATION;
+    }else{
+      #print "gene ".$gene->stable_id." doesn't translate\n";
+      #foreach my $transcript(@{$gene->get_all_Transcripts}){
+      #	&display_exons(@{$transcript->get_all_Exons});
+      #	&non_translate($transcript);
+      #      }
+      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\d+/;
+      #print STDERR "have clone ".$clone_name."\n";
+      $gene->transform;
+      my @exons = @{$gene->get_all_Exons};
+      my $old_contig = $exons[0]->contig;
+      my $clone_seq = $obda->get_Seq_by_acc($clone_name);
+      my $clone     = new Bio::EnsEMBL::Clone;
+      my $contig    = new Bio::EnsEMBL::RawContig; 
+      $clone->htg_phase(3);
+      $clone->id($clone_name);
+      #print "old contig name ".$old_contig->name."\n";
+      my ($embl_acc) = $old_contig->name =~ /(\S+\.\d+)\.\d+\.\d+/;
+      my ($version) = $embl_acc =~ /\S+\.(\d+)/;
+      #print "embl_acc = ".$embl_acc." version ".$version."\n";
+      $clone->embl_id($embl_acc);
+      $clone->version(1);
+      $clone->embl_version($version);
+      my $contig_name = $clone_name.".".$version.".1.".$clone_seq->length;
+      $contig->name($contig_name);
+      $contig->seq($clone_seq->seq);
+      $contig->length($clone_seq->length);
+      $contig->adaptor($db->get_RawContigAdaptor);
+      $clone->add_Contig($contig);
+      my $time = time;
+      $clone->created($time);
+      $clone->modified($time);
+      eval{
+	$db->get_CloneAdaptor->store($clone);
+      };
+      if($@){
+	die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+      }
+      #print "changing contig dbid from ".$old_contig->dbID." to ".$contig->dbID."\n";
+      my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
+      my $assembly_sth = $db->prepare($assembly_sql);
+      $assembly_sth->execute($contig->dbID, $old_contig->dbID);
+      my $exon_sql = "update exon set contig_id = ? where contig_id = ?";
+      my $exon_sth = $db->prepare($exon_sql);
+      $exon_sth->execute($contig->dbID, $old_contig->dbID);
+      my $new_seq_gene = $db->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
+      my $checked_gene = &translation_check($new_seq_gene);
+      if($checked_gene){
+	#print "gene translates hurrah\n";
+      }else{
+	print $new_seq_gene->stable_id." still doesn't translate bugger\n";
+	#$gene->transform;
+	#my @exons = @{$new_seq_gene->get_all_Exons};
+	#print "have exon ".$exons[0]."\n";
+	#print "gene lies on contig ".$exons[0]->contig->name."\n";
+	#&display_exons(@exons);
+	#my ($transcript) = @{$new_seq_gene->get_all_Transcripts};
+	#&non_translate($transcript);
+      }
     }
   }
-
 }
+
+
+sub display_exons{
+  my (@exons) = @_;
+
+  @exons = sort{$a->start <=> $b->start || $a->end <=> $b->end} @exons;
+
+  
+  foreach my $e(@exons){
+       print $e->stable_id."\t ".$e->start."\t ".$e->end."\t ".$e->strand."\t ".$e->phase."\t ".$e->end_phase."\n";
+    }
+  
+}
+
+sub non_translate{
+  my (@transcripts) = @_;
+  
+  foreach my $t(@transcripts){
+    
+    my @exons = @{$t->get_all_Exons};
+#    print "transcript sequence :\n".$t->seq."\n";
+    foreach my $e(@exons){
+      my $seq = $e->seq;
+      my $pep0 = $seq->translate('*', 'X', 0);
+      my $pep1 = $seq->translate('*', 'X', 1);
+      my $pep2 = $seq->translate('*', 'X', 2);
+      print "exon sequence :\n".$e->seq->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 0 frame\n ".$pep0->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 1 phase\n ".$pep2->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 2 phase\n ".$pep1->seq."\n\n";
+      print "\n\n";
+      
+    }
+    
+  }
+}
+
+
