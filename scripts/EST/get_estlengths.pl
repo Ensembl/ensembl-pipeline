@@ -1,12 +1,20 @@
 #!/usr/local/bin/perl -w
 use strict;
 $|=1;
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_FILE
-				       );
+use Getopt::Long;
 
-my $estfile = $EST_FILE;
-#my $estfile = 'test.fa';
+my $estfile;
+&GetOptions(
+	    'estfile:s' => \$estfile,
+	   );
+
+unless ( $estfile ){
+  print STDERR "script to dump to STDOUT all the lengths of ests/cdnas\n";
+  
+  print STDERR "Usage: $0 -estfile est-file/cdna-file\n";
+  exit(0);
+}
+
 print STDERR "estfle: $estfile\n";
 open(EST, "<$estfile") or die "Can't open [$estfile]\n";
 
