@@ -178,7 +178,7 @@ sub write_output {
     my @features = $self->output;
     
     foreach my $feat(@features) {
-	$proteinFeatureAdaptor->write_Protein_feature($feat);
+	$proteinFeatureAdaptor->store($feat);
     }
 }
 

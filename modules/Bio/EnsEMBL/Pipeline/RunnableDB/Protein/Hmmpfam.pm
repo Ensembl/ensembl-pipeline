@@ -160,7 +160,7 @@ sub write_output {
     my $proteinFeatureAdaptor = $self->db->get_ProteinFeatureAdaptor();
     my @features = $self->output;
     foreach my $f(@features) {
-	$proteinFeatureAdaptor->write_Protein_feature ($f);
+	$proteinFeatureAdaptor->store($f);
     }
 }
 
@@ -179,15 +179,13 @@ sub write_output {
 =cut
 
 sub runnable {
-my ($self) = @_;
-
-print STDERR "GENESEQ0: ".$self->query."\n";
+    my ($self) = @_;
     
     if (!defined($self->{'_runnable'})) {
 	
 	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-query     => $self->query,
 									  -analysis  => $self->analysis	);
-	
+    
 	
 	$self->{'_runnable'} = $run;
     }

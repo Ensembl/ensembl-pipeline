@@ -151,12 +151,12 @@ sub fetch_input {
 
 sub write_output {
     my ($self) = @_;
-    my $proteinFeatureAdaptor = $self->db->get_Protfeat_Adaptor;
+    my $proteinFeatureAdaptor = $self->db->get_ProteinFeatureAdaptor;
     my @features = $self->output;
     
     if (@features) {
         foreach my $feat(@features) {
-    	    $proteinFeatureAdaptor->write_Protein_feature($feat);
+    	    $proteinFeatureAdaptor->store($feat);
         }
     }
 }

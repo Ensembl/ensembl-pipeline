@@ -161,7 +161,7 @@ sub write_output {
 
     foreach my $feat(@features) {
 	
-	$feat_Obj->write_Protein_feature($feat);
+	$feat_Obj->store($feat);
     }
 
     return 1;

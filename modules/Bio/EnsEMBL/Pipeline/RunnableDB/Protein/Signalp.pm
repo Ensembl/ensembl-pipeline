@@ -189,14 +189,8 @@ sub write_output {
 
     if (@featurepairs) {
         foreach my $feat(@featurepairs) {
-   	    $proteinFeatureAdaptor->write_Protein_feature($feat);
+   	    $proteinFeatureAdaptor->store($feat);
         }
     }
 }
-
-
-# runnable method
-
-
-
 1;
