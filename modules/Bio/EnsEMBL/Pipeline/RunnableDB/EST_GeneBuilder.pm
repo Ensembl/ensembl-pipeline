@@ -27,6 +27,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder
 
 =head1 DESCRIPTION
 
+New version of EST_GeneBuilder to process est2genome gene predictions and feed them
+to genomewise to create transcripts with translations and UTRs.
+The algorithm is different from the original EST_GeneBuilder. This one is more straightforward.
+
 =head1 CONTACT
 
 Describe contact details here
@@ -42,21 +46,25 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder;
 
-#use diagnostics;
+use diagnostics;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-
+use Bio::EnsEMBL::Utils::TranscriptCluster;
 
 # config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+# do FILE == the file FILE gets executed as script
+do "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+
+# use new Adaptor to get some extra info from the ESTs
+use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
@@ -65,12 +73,10 @@ sub new {
 
     # dbobj input_id mandatory and read in by BlastableDB
     if (!defined $self->seqfetcher) {
-       my $seqfetcher = $self->make_seqfetcher();
+      my $seqfetcher = $self->make_seqfetcher();
       $self->seqfetcher($seqfetcher);
     }
-
-
-# dbobj needs a reference dna database
+    # dbobj needs a reference dna database
     my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						  -host             => $::db_conf{'refdbhost'},
 						  -user             => $::db_conf{'refdbuser'},
@@ -150,6 +156,8 @@ sub make_seqfetcher {
     Returns :   valid input id for this analysis (if set) 
     Args    :   input id for this analysis 
 
+############################################################
+
 =head2 write_output
 
     Title   :   write_output
@@ -161,22 +169,29 @@ sub make_seqfetcher {
 =cut
 
 sub write_output {
-    my ($self) = @_;
-
-    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
-   
-  GENE: foreach my $gene ($self->output) {	
-      eval {
-	$gene_adaptor->store($gene);
-	print STDERR "wrote gene " . $gene->dbID . "\n";
-      }; 
-      if( $@ ) {
-	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-      }
-	    
+  my ($self) = @_;
+  
+  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+  
+ GENE: 
+  foreach my $gene ($self->output) {	
+    # test
+    #my @transcripts = $gene->each_Transcript;
+    #my $tran = $transcripts[0];
+    #my $strand = $tran->start_exon->strand;
+    #print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
+      
+    eval {
+     $gene_adaptor->store($gene);
+      print STDERR "wrote gene " . $gene->dbID . "\n";
+    }; 
+    if( $@ ) {
+      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+    }
   }
-   
 }
+
+############################################################
 
 =head2 fetch_input
 
@@ -190,19 +205,19 @@ sub write_output {
 
 sub fetch_input {
     my( $self) = @_;
+    my $strand;
 
-    print STDERR "IN THE 120 BRANCH\n";
+    print STDERR "IN THE 121 BRANCH\n";
 
     # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
     my $genetype =  $::est_genome_conf{'genetype'};
 
-    print STDERR "Fetching input: " . $self->input_id. " \n";
+    #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
-    # get genomic 
-    my $chrid  = $self->input_id;
-       $chrid =~ s/\.(.*)-(.*)//;
-
+    # get genomic region 
+    my $chrid    = $self->input_id;
+    $chrid       =~ s/\.(.*)-(.*)//;
     my $chrstart = $1;
     my $chrend   = $2;
 
@@ -210,14 +225,13 @@ sub fetch_input {
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-
     $contig->_chr_name($chrid);
     $self->vc($contig);
-
     print STDERR "got vc\n";
     print STDERR "length ".$contig->length."\n";
     
     # forward strand
+    $strand = 1;
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
@@ -227,11 +241,8 @@ sub fetch_input {
     if(!scalar(@genes)){
       $self->warn("No forward strand genes found");
     }
-
     my @plus_transcripts;
-
     my $single = 0;
-
     # split by strand
 GENE:    
     foreach my $gene (@genes) {
@@ -243,9 +254,8 @@ GENE:
 	next GENE;
       }
 
-      my @exons = $transcripts[0]->get_all_Exons;
-
       # skip genes with one exon
+      my @exons = $transcripts[0]->get_all_Exons;
       if(scalar(@exons) == 1){
 	$single++;
 	next GENE;
@@ -256,67 +266,39 @@ GENE:
 	push (@plus_transcripts, $transcripts[0]);
 	next GENE;
       }
-    }
+    }  # end of GENE
+
     print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
     print STDERR "($single single exon genes thrown away)\n";
 
-    # cluster each strand
-    if(scalar(@plus_transcripts)){
+    # process transcripts in the foread strand
+    if( scalar(@plus_transcripts) ){
       
-      $self->_flush_Transcripts;  # this empties out the array $self->{'_transcripts'}
-      
-      my @transcripts  = $self->cluster_transcripts(\@plus_transcripts);
-      
-      #my $num1=1;
-#      foreach my $tran (@transcripts){
-#	my @exons = $tran->get_all_Exons;
-
-#	print STDERR "In EST_GeneBuilder.fetch_input()\n";
-#	print STDERR "transcript ".$num1." with ".scalar(@exons)." exons\n";
-#	my $ccount=1;
-#	foreach my $exon (@exons){
-#	  print STDERR "Exon $ccount : ".$exon->start." ".$exon->end."\n";
-#	  $ccount++;
-#	}
-		
-#	$num1++;
-#      }
+      my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
       
       # make a genomewise runnable for each cluster of transcripts
       foreach my $tran (@transcripts){
-	#print STDERR "new genomewise with one ".ref($tran). "\n";
-
+	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $contig->primary_seq,
       								   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
-	$self->add_runnable($runnable);
+	$self->add_runnable($runnable,$strand);
 #	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
       }
     }
     
-    #my @trans = $self->_get_all_Transcripts;
-#    print STDERR "In EST_GeneBuilder.fetch_input() after setting all runnables, forward_strand!!\n";
-#    foreach my $t (@trans){
-#      my $ccount=1;
-#      foreach my $exon ($t->get_all_Exons){
-#	print STDERR "Exon $ccount : ".$exon->start." ".$exon->end."\n";
-#	  $ccount++;
-#	}
-#    }
-	
-
-
     
     # minus strand - flip the vc and hope it copes ...
     # but SLOW - get the same genes twice ...
     
     print STDERR "\n****** reverse strand ******\n\n";
 
+    $strand = -1;
     my $revcontig = $contig->invert;
-    my @revgenes  = $revcontig->get_Genes_by_Type($genetype, 'evidence');
+    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
     my @minus_transcripts;
     
     print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
@@ -325,14 +307,16 @@ GENE:
     }
 
     $single=0;
-    REVGENE:    
+  REVGENE:    
     foreach my $gene (@revgenes) {
       my @transcripts = $gene->each_Transcript;
+      
+      # throw away genes with more than one transcript
       if(scalar(@transcripts) > 1 ){
 	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
 	next REVGENE;
       }
-
+      
       my @exons = $transcripts[0]->get_all_Exons;
       
       # throw away single-exon genes
@@ -340,9 +324,8 @@ GENE:
 	$single++;
 	next REVGENE;
       }
-
+      
       # these are really - strand, but the VC is reversed, so they are realtively + strand
-      # owwwww my brain hurts
       elsif($exons[0]->strand == 1){
 	push (@minus_transcripts, $transcripts[0]);
 	next REVGENE;
@@ -353,58 +336,23 @@ GENE:
     
     if(scalar(@minus_transcripts)){
       
-      $self->_flush_Transcripts;  # this empties out the array $self->{'_transcripts'}
+      my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
       
-#      # test
-#      my $num3=1;
-#      foreach my $tran (@minus_transcripts){
-#	my @exons = $tran->get_all_Exons;
-	
-#	print STDERR "In EST_GeneBuilder.fetch_input() before cluster transcripts\n";
-#	print STDERR "transcript ".$num3." : ".$tran."\n";
-#	my $ccount=1;
-#	foreach my $exon (@exons){
-#	  print STDERR "Exon $ccount : ".$exon->start." ".$exon->end."\n";
-#	  $ccount++;
-#	}
-
-#	$num3++;
-#      } 
-
-      my $reverse = 1;
-      my @transcripts = $self->cluster_transcripts(\@minus_transcripts,$reverse);  
-      
-      # minus transcripts need some fancy schmancy feature and contig inversion. 
-      
-#      my $num2=1;
-#      foreach my $tran (@transcripts){
-#	my @exons = $tran->get_all_Exons;
-	
-#	print STDERR "In EST_GeneBuilder.fetch_input() after cluster transcripts\n";
-#	print STDERR "transcript ".$num2." : ".$tran." exons\n";
-#	my $ccount=1;
-#	foreach my $exon (@exons){
-#	  print STDERR "Exon $ccount : ".$exon->start." ".$exon->end."\n";
-#	  $ccount++;
-#	}
-
-#	$num2++;
-#      } 
-
       foreach my $tran (@transcripts) {
-	#print STDERR "new genomewise with ".$tran."\n";
 	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $revcontig->primary_seq,
       								   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
-	$self->add_runnable($runnable, $reverse);
+	$self->add_runnable($runnable, $strand);
 #	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
       }
     }
 }
+
+############################################################
 
 =head2 _flush_Transcripts
 
@@ -420,854 +368,1097 @@ sub _flush_Transcripts {
   return;
 }
 
-=head2 cluster_transcripts
+############################################################
 
-    Title   :   cluster_transcripts
-    Usage   :   @new_transcripts= $self->cluster_transcripts(@read_transcripts)
-    Function:   clusters input array of transcripts
+=head2 _process_Transcripts
+
+    Title   :   _process_Transcripts
+    Usage   :   @new_transcripts= $self->_cluster_Transcripts(@read_transcripts)
+    Function:   main magic and witchcraft on the transcripts. 
+                It checks, clusters and  merges an input array of transcripts
     Returns :   @Bio::EnsEMBL::Transcript
     Args    :   @Bio::EnsEMBL::Transcript
 
 =cut
 
-sub cluster_transcripts {
-  my ($self, $alltranscripts, $reverse) = @_;
+sub _process_Transcripts {
+  my ($self, $alltranscripts, $strand) = @_;
 
-  # need all the exons - we're going to cluster them; while we're at it, check consistency of hid & strand
-  my %est2transcript;  # relate transcript to est id
-  my %exon2est;        # relate exon to est id
-  
-  my ($ref_transcripts,$ref_exons) = $self->check_transcripts(\%est2transcript, \%exon2est, @$alltranscripts);
-  
-  my @exons = @{ $ref_exons };
-  $self->_filtered_Transcripts( @{ $ref_transcripts } );
+  print STDERR "EST_GeneBuilder: processing input transcripts...\n";
 
-  # store references to the exon and transcript hashes
-  $self->{'_est2transcript'} = \%est2transcript;
-  $self->{'_exon2est'}       = \%exon2est;
+  # first check transcripts and hold info about est_evidence, etc...
+  my @transcripts = $self->_check_Transcripts($alltranscripts,$strand);
+  print STDERR scalar(@transcripts)." transcripts returned from _check_Transcripts\n";
+
+  if ( scalar(@transcripts) == 0 ){
+    print STDERR "No transcripts created, process stopped\n";
+    return;
+  }
  
-  #print STDERR scalar(@exons) . " exons found\n";
-  
-  # cluster the exons
-  my $main_cluster    = $self->make_clusters(@exons);
- 
-  # set start and end in the exons
-  $main_cluster       = $self->find_common_ends($main_cluster,$reverse);
+  # cluster the transcripts according to exon-overlap
+  my @transcript_clusters = $self->_cluster_Transcripts(\@transcripts);
+  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 
-  # form cluster-pairs
-  my @linked_clusters = $self->link_clusters($main_cluster);
-  #print STDERR "linked_clusters are ".ref( $linked_clusters[0] )."\n";
+  # merge the transcripts in each cluster according to consecutive exon overlap
+  my @merged_transcripts  = $self->_merge_Transcripts(\@transcript_clusters,$strand);
+  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
 
-  # link recursively the cluster-pairs to build transcripts
-  my @transcripts     = $self->process_clusters(\@linked_clusters);
+  # check the splice_sites
+  my @resulting_transcripts = $self->_check_splice_Sites(\@merged_transcripts,$strand);
+  print STDERR scalar(@resulting_transcripts)." transcripts returned from _check_splice_Sites\n";
 
-  return @transcripts;
-
+  return @resulting_transcripts;
 }
 
-=head2
-  
-   Title   : _filtered_Transcripts
-   Function: this method gets/sets an array of Bio::EnsEMBL::Transcript objects which have been filtered
-             previously in the method 'check_Transcripts'
+############################################################
 
-=cut
+=head2 _check_Transcripts
 
-sub _filtered_Transcripts {
-   my ($self, @filtered_transcripts) = @_;
-   unless ( $self->{'_filtered_transcripts'} ){
-     $self->{'_filtered_transcripts'} = [];
-   }
-   if ( @filtered_transcripts ){
-     unless ( $filtered_transcripts[0]->isa('Bio::EnsEMBL::Transcript') ){
-       $self->throw('Must pass a Bio::EnsEMBL::Transcript object');
-     }
-     push( @{ $self->{'_filtered_transcripts'} }, @filtered_transcripts );
-   }
-   return @{ $self->{'_filtered_transcripts'} }
-}
-
-=head2 check_transcripts
-
-    Title   :   check_transcripts
-    Usage   :   $self->check_transcripts
+    Title   :   _check_Transcripts
+    Usage   :   @transcripts = $self->_check_Transcripts(@transcripts)
     Function:   checks transcripts obtained from EST2Genome for consistency among exons
-                in strand, hid, and also checks for exon content
-    Returns :   @Bio::EnsEMBL::Exon
-    Args    :   @Bio::EnsEMBL::Transcript, ref to hash for linking hid to transcript, ref to hash for linking exon to hid, 
+                in strand, hit_name (hid), exon content,
+                and also checks that the hits associated to consecutive exons do not have a
+                discontinuity (in hit-coordinates) larger than than a certain limit
+    Returns :   @Bio::EnsEMBL::Transcript
+    Args    :   @Bio::EnsEMBL::Transcript, ref to hash for linking hid to transcript, ref to hash for linking 
+                exon to hid, 
 
 =cut
 
-sub check_transcripts {
-  my ($self, $hid_trans, $exon_hid, @transcripts) = @_;
+sub _check_Transcripts {
+  my ($self, $ref_transcripts, $strand) = @_;
+
+  # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+  my $evidence_tag = $::evidence_conf{'evidence_tag'};
+  
+  # the minimum allowed perc. identity of the evidence per exon 
+  my $min_similarity  = $::evidence_conf{'min_evidence_similarity'};
+
+  # the maximum allowed discontinuity in EST hits
+  my $max_est_gap  = $::evidence_conf{'max_evidence_discontinuity'};
+
+  print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
+
   my @allexons;       # here we'll put all exons that pass the check
   my @alltranscripts; # here we'll put all the transcripts that pass the check
-  my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
-
-  TRANS: 
-  foreach my $transcript (@transcripts){
+  my %hid_trans;
+  my $exon_adaptor    = $self->dbobj->get_ExonAdaptor;
+  my $feature_adaptor = $self->dbobj->get_FeatureAdaptor;
+  my $total_rejected        = 0;
+  
+ TRANSCRIPT: 
+  foreach my $transcript (@$ref_transcripts){
     my @exons = $transcript->get_all_Exons;
+    #print STDERR "Transcript with ".scalar(@exons)." exons\n";
     my $hid;
-    my $strand;
-    my $num4=0;
+    my $this_strand;
+    my @accepted_exons; # here we hold the good exons in this transcript
+    my $rejected = 0;
+    my $exon_count = 0;
+    my $seqname;
     
-    foreach my $exon(@exons){
+  EXON:
+    foreach my $exon (@exons){
       my $hstart;
       my $hend;
-      $num4++;
-    
-      # check strand consistency
-      if(!defined $strand) { 
-	$strand = $exon->strand; 
+      #print STDERR " --- Exon $exon_count ---\n";
+
+      ## check strand consistency
+      if(!defined $this_strand) { 
+	$this_strand = $exon->strand; 
       }
-      if($strand ne $exon->strand){
+      if($this_strand ne $exon->strand){
 	$self->warn("strand not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
-	next TRANS;
+	next TRANSCRIPT;
       }
       
-      # check supporting_feature consistency
-      # print STDERR "In EST_GeneBuilder.check_transcripts()...";
-      $exon_adaptor->fetch_evidence_by_Exon($exon);
-      my @sf = $exon->each_Supporting_Feature;      
+      # check contig consistency
+      unless ($seqname){
+	$seqname = $exon->seqname;
+      }
+      if ( !( $exon->seqname eq $seqname ) ){
+	print STDERR "transcript ".$transcript->stable_id." (".$transcript->dbID.") is partly".
+		    " outside the contig, skipping it...\n";
+	next TRANSCRIPT;
+      }
 
-      # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-      my $evidence_tag = $::evidence_conf{'evidence_tag'};
-    SF:
+      # get the supporting_evidence for each exon
+      $exon_adaptor->fetch_evidence_by_Exon($exon);
+      my @nonsorted_sf = $exon->each_Supporting_Feature;      
+      my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
+            
+      # check that you get suporting_evidence at all
+      if ( scalar( @sf ) == 0 ){
+	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
+		    "exon_id=".$exon->dbID."\n");
+	next EXON;
+      }
+
+#      ## print out all the info ##
+#      print STDERR "exon_id: ".$exon->dbID."\n";
+#      print STDERR "contig: ".$exon->contig->internal_id." start: ".$exon->start." end: ".$exon->end.
+#                   " exon length: ".$exon->length."\n";
+#      print STDERR "supporting evidence:\n";
+#      foreach my $f (@sf){
+#	print STDERR $f->hseqname." score: ".$f->score." hstart: ".$f->hstart." hend: ".$f->hend.
+#	  " seq_start: ".$f->start." seq_end: ".$f->end."\n";
+#      }
+            
+####### check consitency of supporting evidence
+      my $total_length;
+      my $numerator;
+      my $total_evidence_length;
+      my $gap  = 0;
+      my $total_hgap   = 0;
+      my $exon_length  = $exon->length;
+      my $feature_count = 0;
+    
+    EVIDENCE:
       foreach my $feature ( @sf ) {
-	# because we get all the supporting features indiscriminately
-	next SF unless $feature->source_tag eq $evidence_tag;
+	$feature_count++;
+
+	# because we get all the supporting features indiscriminately...
+	next EVIDENCE unless $feature->source_tag eq $evidence_tag;
 	
+	# this might sound weird, but sometimes features are repeated, don't know yet why
+	if ( $feature_count != $#sf+1 ){
+	  if ( $sf[$feature_count]->hstart == $feature->hstart &&
+	       $sf[$feature_count]->hend   == $feature->hend ){
+	    #print STDERR "feature is repeated!, skipping it\n";
+	    next EVIDENCE;
+	  }
+	}
+	# check that all exons have the same feature
 	if(!defined $hid) { 
 	  $hid = $feature->hseqname; 
 	}
-	
 	if($hid ne $feature->hseqname){
 	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
-	  next TRANS;
+	  next TRANSCRIPT;
+	}
+	
+######### calculate percentage identity with respect to the alignment length
+	#
+	#  ESTs -->   ACGTACGT-ACGT --> 3 EST pieces
+	#  exon -->   ACG-ACGTGACGT
+	#             ^^^ ^^^^ ^^^^--> evidence_length
+	#  alignment length = evidence_length + gaps
+	#
+	
+	my $length              = $feature->end - $feature->start + 1;
+	my $score               = $feature->score;
+	my $hgap                = 0;
+	$numerator             += $length * $score;
+	$total_evidence_length += $length;
+
+	if ( $feature_count != $#sf+1 ){
+	  if ( $sf[$feature_count]->hstart > $feature->hend ){
+	    $hgap = $sf[$feature_count]->hstart - $feature->hend - 1;
+	  }
+	  elsif 
+	    ( $sf[$feature_count]->hstart <= $feature->hend && !($sf[$feature_count]->overlaps($feature))){
+	    $hgap = $feature->hstart - $sf[$feature_count]->hend-1;
+	  }
+	  else{
+	    $hgap = 0;
+	  }
+	  if ( $sf[$feature_count]->overlaps( $feature )){
+	    print STDERR "features are overlapping!\n";
+	  }
+	  $total_hgap   += $hgap;
+	}
+	      
+      } # end of EVIDENCE 
+
+###### calculate alignment length and the similarity score (exon_score)
+	
+      $gap           = $exon_length - $total_evidence_length;
+      $total_length  = $total_evidence_length + $gap + $total_hgap;
+      my $exon_score = $numerator / $total_length;
+      
+      # round it up
+      my $number   = 100 * $exon_score;
+      my $decimals = $number % 100;
+      my $addition = int( $decimals / 50 );  # gives 1 ( or 0 ) if $decimals > ( or < ) 50
+      $exon_score  = int( $exon_score ) + $addition;
+      
+      # reject EXONS with perc_identity below $min_similarity = $::evidence_conf{'min_evidence_similarity'}
+      if ($min_similarity > $exon_score ){
+	print STDERR "rejecting Exon due to low percentage identity = $exon_score\n";
+	$rejected++;
+	$total_rejected++;
+
+	# if we have rejected all exons in this transcript, forget about the transcript
+	if ( $rejected == scalar(@exons) ){
+	  print STDERR "all exons rejected in this transcript, rejecting transcript\n";
+	  next TRANSCRIPT;
+	}
+	
+	next EXON;
+      }
+      else{
+	push (@accepted_exons, $exon);
+      }
+ 
+####### alternatively we can get the percentage identity from the feature table
+
+#      # get the percentage identity for the est_hit on this exon from the feature table
+#      my $exon_contig = $exon->contig;
+      
+#      # get the features by hid
+#      my @hid_features = $feature_adaptor->fetch_by_hid($hid); 
+
+#      # keep only the features corresponding to the current exon_contig
+#      my @selected_features;
+#      foreach my $f ( @hid_features ){
+	
+#	# feature->start/end is returned in vc coordinates
+#	  print STDERR "from feature percentage identity: ".$f->percent_id.
+#	    " seq_start: ".$f->start." seq_end: ".$f->end."\n";
+#	if ($f->start == $exon->start && $f->end == $exon->end ){
+#	#  print STDERR "from feature percentage identity: ".$f->percent_id.
+#	#    " seq_start: ".$f->start." seq_end: ".$f->end."\n";
+#	  print STDERR "chosen!\n";
+#	}
+#      }
+
+      
+####### check the gap with the evidence of the next exon
+      # if the ESTs are of good quality, this should not reject any
+      if ( $exon_count != $#exons ){
+	my $est_gap = 0;
+	my $exon2 = $exons[$exon_count+1];
+	
+	$exon_adaptor->fetch_evidence_by_Exon( $exon2 );
+	my @nonsorted_sf2 = $exon2->each_Supporting_Feature; 
+	my @sf2 = sort { $a->hstart <=> $b->hend } @nonsorted_sf2;
+
+	if ( scalar( @sf2 ) != 0 ){
+
+	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
+	  if ( $sf[0]->hstart < $sf2[0]->hstart ){
+	    $est_gap = abs( $sf2[0]->hstart  - $sf[$#sf]->hend );
+	  }
+	  # if hstart decreases that means that the EST runs in the opposite direction
+	  elsif (  $sf[0]->hstart > $sf2[0]->hstart ){
+	    $est_gap = abs( $sf[0]->hstart - $sf2[$#sf2]->hend);
+	  }
+	  # else, same EST piece is hitting two exons, not good!
+	  else{
+	    $self->warn( "same bit of evidence is hitting two exons!\n");
+	  }
+	  
+	  # skip EXONS that have too large gaps in the EST hit
+	  if ( $est_gap > $max_est_gap ){
+	    print STDERR "EST with too large gaps skipping it\n";
+	    next TRANSCRIPT;
+	  }
 	}
       }
-
-      if ( defined( @sf ) && scalar( @sf ) != 0 ) {
-	$hstart = $sf[0]->hstart;
-	$hend   = $sf[$#sf]->hend;
-      }
-
-      $$exon_hid{$exon}{"hid"}    = $hid;
-      $$exon_hid{$exon}{"hstart"} = $hstart;
-      $$exon_hid{$exon}{"hend"}   = $hend;
-    }
-    push(@allexons, @exons);
+      
+    $exon_count++;
     
-    if(defined $hid && defined $$hid_trans{$hid}) { 
+    }  # end of EXON
+
+    # put the accepted exons into this transcript
+    $transcript->flush_Exon;
+    foreach my $exon (@accepted_exons){
+      $transcript->add_Exon($exon);
+    }
+
+    push(@allexons, @accepted_exons);
+    
+    # finally check the one-to-one correspondance between ESTs and input_transcripts
+    if(defined $hid && defined $hid_trans{$hid}) { 
       $self->warn("$hid is being used by more than one transcript!\n"); 
     }
-#    print STDERR "hid: ".$hid."\ttranscript: ".$transcript."\n";
-    $$hid_trans{$hid} = $transcript;
+    # we hold which transcript is associated with each hit
+    $hid_trans{$hid} = $transcript;
+
+    # if the transcript made it to this point, keep it
     push (@alltranscripts, $transcript);
   }
+  print STDERR $total_rejected." exons rejected due to low similarity score\n";
 
-  return (\@alltranscripts,\@allexons);
+  return @alltranscripts;
 }
 
+############################################################
+
+=head2 _cluster_Transcripts
+
+    Title   :   _cluster_Transcripts
+    Usage   :   @clusters = $self->_cluster_Transcripts(\@transcripts)
+    Function:   it clusters transcripts, it is very fast but it may miss some transcripts because
+                it only compares with the current transcript. It could be improved by comparing also
+                with one or two previous clusters
+    
+=cut 
+  
+sub _cluster_Transcripts{
+  my ($self,$ref_transcripts) = @_;
+  my @transcripts = @{ $ref_transcripts };
+  my @clusters;
+  print STDERR "EST_GeneBuilder: clustering transcripts...\n";
+			 
+  # first sort the transcripts by their start position coordinate
+  my %start_table;
+  my $i=0;
+  foreach my $transcript (@transcripts){
+    $start_table{$i} = $transcript->start_exon->start;
+    $i++;
+  }
+  my @sorted_transcripts=();
+  foreach my $pos ( sort { $start_table{$a} <=> $start_table{$b} } keys %start_table ){
+    push (@sorted_transcripts, $transcripts[$pos]);
+  }
+  @transcripts = @sorted_transcripts;
+  foreach my $tran (@transcripts){
+    print STDERR "$tran, start: ".$tran->start_exon->start."\n";
+  }
+  # create a new cluster 
+  my $cluster = Bio::EnsEMBL::Utils::TranscriptCluster->new();
+  my $cluster_count = 1;
+
+  # put the first transcript into these cluster
+  $cluster->put_Transcripts( $sorted_transcripts[0] );
+  push( @clusters, $cluster );
+    
+  # loop over the rest of the genes
+ LOOP1:
+  for (my $c=1; $c<=$#sorted_transcripts; $c++){
+    my $found=0;
+
+    # compare with the transcripts in this cluster
+  LOOP2:
+    foreach my $t_in_cluster ( $cluster->get_Transcripts ){       
+      if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
+	$cluster->put_Transcripts( $sorted_transcripts[$c] );                       
+	$found=1;
+	next LOOP1;
+      }
+    }
+    # if not in this cluster compare to the previous clusters:
+
+    # to restrict this to the ($limit) previous clusters
+    # set my $limit = 6; (for example) and include in the while the following condition
+    # while ( !(...)  && !($lookup > $limit) )
+
+    if ( $found == 0 && $cluster_count > 1 ) {
+      my $lookup = 1;
+      while ( !($cluster_count <= $lookup ) ){ 
+	print STDERR "cluster_count: $cluster_count, looking at ".($cluster_count - $lookup)."\n";
+	my $previous_cluster = $clusters[ $cluster_count - 1 - $lookup ];
+	foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
+	  if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
+	    $previous_cluster->put_Transcripts( $sorted_transcripts[$c] );                       
+	    $found=1;
+	    next LOOP1;
+	  }
+	}
+	$lookup++;
+      }
+    }
+    # if not-clustered create a new TranscriptCluster
+    if ( $found == 0 ){  
+      $cluster = new Bio::EnsEMBL::Utils::TranscriptCluster; 
+      $cluster->put_Transcripts( $sorted_transcripts[$c] );
+      push( @clusters, $cluster );
+      $cluster_count++;
+    }
+  }
+  
+  # print out the clusters
+  my $number  = 1;
+  foreach my $cluster (@clusters){
+    my $count = 1;
+    print STDERR "cluster $number :\n";
+    foreach my $tran ($cluster->get_Transcripts){
+      print STDERR "$count:\n";
+      foreach my $exon ( $tran->get_all_Exons ){
+	print STDERR $exon->start.":".$exon->end." ";
+      }
+      print STDERR "\n";
+      $count++;
+    }
+    $number++;
+  }		
+  
+  return @clusters;
+}
+
+############################################################
+
+=head2 _compare_Transcripts()
+
+ Title: _compare_Transcripts()
+ Usage: compares the exons of two transcripts according to overlap and returns the number of overlaps
+
+=cut
+
+sub _compare_Transcripts {        
+  my ($self,$transcript1,$transcript2) = @_;
+  my @exons1   = $transcript1->get_all_Exons;
+  my @exons2   = $transcript2->get_all_Exons;
+  my $overlaps = 0;
+  
+  foreach my $exon1 (@exons1){
+    foreach my $exon2 (@exons2){
+      if ( ($exon1->overlaps($exon2)) && ($exon1->strand == $exon2->strand) ){
+	return 1;
+      }
+    }
+  }
+  return 0;
+}    
+
+#########################################################################
+
+=head2
+
+ Title   : _merge_Transcripts
+ Function: reads all the est2genome transcripts that have been clustered and merges those that
+           are entirely embedded in each other, producing brand new transcripts from that,
+           see below the description of the algorithm
+=cut
+
+sub _merge_Transcripts{
+  my ($self,$ref_transcript_clusters,$strand) = @_;
+
+  print STDERR "EST_GeneBuilder: merging transcripts...\n";
+
+  my @total_merged_transcripts;
+  
+  # look in each cluster
+  my $count =0;
+ CLUSTER:
+  foreach my $cluster ( @{ $ref_transcript_clusters } ){
+    
+    $count++;
+    my @merged_transcripts = ();
+
+    # get the transcripts in this cluster
+    my @transcripts = $cluster->get_Transcripts;
+    
+    # sort the transcripts by the number of exons
+    @transcripts = sort { scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) } @transcripts;
+    
+    # test
+    #print STDERR "\nNew Cluster:\n";
+    #foreach my $tran (@transcripts){
+    #  print STDERR "transcript: $tran\n";
+    #  foreach my $exon ( $tran->get_all_Exons ){
+    #	print STDERR $exon->start.":".$exon->end."  ";
+    #  }
+    #  print STDERR "\n";
+    #}
+    
+    # now we loop over the transcripts, 
+    my %is_merged;
+    
+    # the algorithm goes roughly as follows
+    #
+    # FOREACH transcript
+    #   loop over the rest
+    #     if it merges, add it to the current 'cluster'
+    #     loop over the rest and only add to the cluster if: at least merges to one in the cluster and 
+    #         with those that doesn't merge it should not overlap at all (to avoid merging things that shouldn't)
+    # 
+    #     allow for transcripts to be used twice
+    #     once we've gone through the whole lot, merge the chosen transcripts and put the resulting transcript
+    #     in an array.
+    #
+    # proceed as above with the next transcript in the list, but once the merged transcript is produced,
+    # before accepting, check that it does not merge with transcripts previously produced, if it does, reject 
+    # (since by construction it is necessarily embedded in that one)
+    #
+    # iterate until you've gone through all transcripts
+    
+    # for each transcript
+  TRAN1:
+    for (my $u=0; $u<scalar(@transcripts); $u++){
+      my @current_list = ();
+      push (@current_list, $transcripts[$u]);
+
+      # go over the rest
+    TRAN2:
+      for (my $v=$u+1; $v<scalar(@transcripts); $v++){
+	
+	my $overlap_ifnot_merged   = 0;
+	my $merge_to_current       = 0;
+	
+	for (my $w=0; $w<scalar(@current_list); $w++){
+	  
+	  # in order to merge a transcript...
+	  #print STDERR "comparing $current_list[$w] ($w) and $transcripts[$v] ($v)\n";
+	  my ($merge,$overlaps) = $self->_test_for_Merge( $current_list[$w], $transcripts[$v] );
+	  #print STDERR "merge = $merge, overlaps = $overlaps\n";
+	  
+	  # ...there must be at least one in @current_list to which $transcripts[$v] merges
+	  if ( 1 == $merge ){
+	    $merge_to_current = 1;
+	  }
+
+	  # ...and it should not overlap with those to which it does not merge
+	  unless (1 == $merge){
+	    $overlap_ifnot_merged += $overlaps;
+	  }
+	}
+	
+	# ... and then it can merge to the list in @current_list
+	if ( 1 == $merge_to_current && 0 == $overlap_ifnot_merged ){
+	  push (@current_list, $transcripts[$v]);
+	}
+	
+      } # end of TRAN2
+      
+      # create a new transcript with those merged above
+      my $new_transcript = $self->_produce_Transcript( \@current_list, $strand );
+      
+      my $found  = 0;
+
+      # for subsequent transcritps iterate through the merged_transcripts to see if it merges to any previous one
+      if ( scalar(@merged_transcripts) >= 1){
+      MERGED:
+	foreach my $merged_tran (@merged_transcripts){
+	  my ($merge,$overlaps) = $self->_test_for_Merge( $new_transcript, $merged_tran );
+	  if ( 1 == $merge ){
+	    $found = 1;
+	    last MERGED;
+	  }
+	}
+      }
+      # if it doesn't merge, then add to @merged_transcripts
+      # this will add as well the first new_transcript created
+      if ($found == 0 ){
+	push( @merged_transcripts, $new_transcript); 
+      }
+      else{
+	# we don't add it
+      }
+    }   # end of TRAN1
+    
+    # test
+    print STDERR "Resulting merged transcripts:".scalar(@merged_transcripts)."\n";
+    foreach my $tran (@merged_transcripts){
+      print STDERR "transcript: $tran\n";
+      foreach my $exon ($tran->get_all_Exons){
+    	print STDERR $exon->start.":".$exon->end."  ";
+      }
+      print STDERR "\n";
+    }
+    
+  push (@total_merged_transcripts, @merged_transcripts);
+  }     # end of CLUSTER		       
+ 
+return @total_merged_transcripts;
+		      
+}
+
+#########################################################################
+
+=head2
+
+ Title   : _test_for_Merge
+ Function: this function is called from _merge_Transcripts and actually checks whether two transcripts
+           inputs merge.
+ Returns : It returns two numbers ($merge,$overlaps), where
+           $merge = 1 (0) when they do (do not) merge,
+           and $overlaps is the number of exon-overlaps.
+
+=cut
+
+sub _test_for_Merge{
+  my ($self,$tran1,$tran2) = @_;
+  my @exons1 = $tran1->get_all_Exons;
+  my @exons2 = $tran2->get_all_Exons;	
+ 
+  my $foundlink = 0; # flag that gets set when starting to link exons
+  my $start     = 0; # start looking at the first one
+  my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
+  my $merge     = 0; # =1 if they merge
+
+EXON1:
+  for (my $j=0; $j<=$#exons1; $j++) {
+  
+  EXON2:
+    for (my $k=$start; $k<=$#exons2; $k++){
+    #print STDERR "comparing ".($j+1)." and ".($k+1)."\n";
+	    
+      # if exon 1 is not the first, check first whether it matches the previous exon2 as well, i.e.
+      #                        ____     ____        
+      #              exons1 --|____|---|____|------ etc... $j
+      #                        ____________  
+      #              exons2 --|____________|------ etc...  $k
+      #
+      if ($foundlink == 1 && $j != 0){
+	if ( $k!= 0 && $exons1[$j]->overlaps($exons2[$k-1]) ){
+	  #print STDERR ($j+1)." <--> ".($k)."\n";
+	  $overlaps++;
+          next EXON1;
+	}
+      }
+      
+      # if texons1[$j] and exons2[$k] overlap go to the next exon1 and  next $exon2
+      if ( $exons1[$j]->overlaps($exons2[$k]) ){
+	#print STDERR ($j+1)." <--> ".($k+1)."\n";
+        $overlaps++;
+	$foundlink = 1;
+      }          
+      else {  
+	# look at the next exon if you haven't found an overlap yet
+	if ( $foundlink == 0 ){
+	  next EXON2;
+	}
+	# leave if we stop finding links between exons before the end of transcripts
+	if ( $foundlink == 1 ){
+	  $merge = 0;
+	  last EXON1;
+	}
+      }
+      
+      # if foundlink = 1 and we get to the end of either transcript, we merge them!
+      if ( $foundlink == 1 && ( $j == $#exons1 || $k == $#exons2 ) ){
+	
+	### some prints for test ###
+	#print STDERR "\nmerging transcripts $tran1 and $tran2:\n";
+	#foreach my $e1 ( @exons1 ){
+	#  print STDERR $e1->start.":".$e1->end."\t";
+	#}
+	#print STDERR "\n";
+	#foreach my $e2 ( @exons2 ){
+	#  print STDERR $e2->start.":".$e2->end."\t";
+	#}
+	#print STDERR "\n\n";
+	
+	# and we can leave
+        $merge = 1;
+	last EXON2;
+      }
+      # if foundlink = 1 but we're not yet at the end, go to the next exon 
+      if ( $foundlink == 1 ){
+	
+	# but first check whether in exons2 there are further exons overlapping exon1, i.e.
+        #                       ____________        
+	#             exons1 --|____________|------ etc...
+	#                       ____     ___  
+	#             exons2 --|____|---|___|------ etc...
+	# 
+	my $addition = 0;
+	while ( $k+1+$addition < scalar(@exons2) && $exons1[$j]->overlaps($exons2[$k+1+$addition]) ){
+	  #print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
+	  $overlaps++;
+          $addition++;
+	}      
+	$start = $k+1+$addition;
+	next EXON1;
+      }    
+    } # end of EXON2 
+  }   # end of EXON1      
+
+  # if we haven't returned at this point, they don't merge, thus
+  return ($merge,$overlaps);
+}
+  
 
 
-sub make_clusters {
+############################################################
+
+=head2
+
+ Title   : _produce_Transcript
+ Function: reads all the est2genome transcript that can be merged and make a single transcript
+           out of them
+=cut
+
+sub _produce_Transcript{
+  my ($self,$merged,$strand) = @_;
+
+  my @allexons;
+  my %exon2transcript;			
+  my %is_first;
+  my %is_last;			
+	       
+  # collect all exons
+  foreach my $tran (@{ $merged }){
+    my @exons = $tran->get_all_Exons;
+    @exons    = sort { $a <=> $b } @exons;
+    
+    push ( @allexons, @exons );
+    
+    # keep track of whether the exons is first or last and the transcript it belongs to
+    for (my $i = 0; $i< scalar( @exons ); $i++){
+      if ( 0 == $i ){
+	$is_first{$exons[$i]} = 1;
+      }
+      else{
+	$is_first{$exons[$i]} = 0;
+      }
+      if ( $#exons == $i ){
+	$is_last{$exons[$i]} = 1;
+      }
+      else{
+	$is_last{$exons[$i]} = 0;
+      }
+      $exon2transcript{$exons[$i]} = $tran;
+    }
+  }
+
+  # cluster them
+  my $cluster_list = $self->_cluster_Exons( @allexons );
+
+  # set start and end in the exons
+  $cluster_list = $self->_set_splice_Ends($cluster_list,\%exon2transcript,\%is_first,\%is_last,$strand);
+
+  # create a new transcript with these exons
+  my $transcript    = Bio::EnsEMBL::Transcript->new();
+  my @exon_clusters = $cluster_list->sub_SeqFeature;
+  
+  foreach my $exon_cluster (@exon_clusters){
+    my $new_exon = Bio::EnsEMBL::Exon->new();
+    $new_exon->start ($exon_cluster->start);
+    $new_exon->end   ($exon_cluster->end);
+    
+    ###  dont't set strand yet, genomewise cannot handle that ###
+    
+    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
+      foreach my $evidence ( $exon->each_Supporting_Feature ){
+	$new_exon->add_Supporting_Feature($evidence);
+      }
+    }
+    $transcript->add_Exon($new_exon);
+  }
+  
+  return $transcript;
+}
+
+############################################################
+
+=head2
+
+ Title   : _cluster_Exons
+ Function: it cluster exons according to exon overlap
+
+=cut
+
+sub _cluster_Exons{
   my ($self, @exons) = @_;
 
-  my $main_cluster = new Bio::EnsEMBL::SeqFeature; # main cluster feature - holds all subclusters
+  #print STDERR "EST_GeneBuilder: clustering exons...\n";
+  
+  # no point if there are no exons!
+  return unless ( scalar( @exons) > 0 );   
+
+  # keep track about in which cluster is each exon
+  my %exon2cluster;
+  
+  # main cluster feature - holds all clusters
+  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  
+  # sort exons by start coordinate
   @exons = sort { $a->start <=> $b->start } @exons;
 
-  return unless ( scalar( @exons) > 0 ); # no point if there are no exons!
-  
-  # Create the first cluster object
-  my $subcluster = new Bio::EnsEMBL::SeqFeature;
+  # Create the first exon_cluster
+  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
   
   # Start off the cluster with the first exon
-  $subcluster->add_sub_SeqFeature($exons[0],'EXPAND');
-  $subcluster->strand($exons[0]->strand);  
-
-  $main_cluster->add_sub_SeqFeature($subcluster,'EXPAND');
+  $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
+  $exon_cluster->strand($exons[0]->strand);    
+  $cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');
   
   # Loop over the rest of the exons
   my $count = 0;
 
  EXON:
-  foreach my $e (@exons) {
-    
+  foreach my $exon (@exons) {
     if ($count > 0) {
-      my @overlap = $self->match($e, $subcluster);    
+      my @overlap = $self->match($exon, $exon_cluster);    
       
       # Add to cluster if overlap AND if strand matches
-      if ( $overlap[0] && ( $e->strand == $subcluster->strand) ) { # strand is not checked in 'match'
-	$subcluster->add_sub_SeqFeature($e,'EXPAND');
+      if ( $overlap[0] && ( $exon->strand == $exon_cluster->strand) ) { 
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
       }  
       else {
 	# Start a new cluster
-	$subcluster = new Bio::EnsEMBL::SeqFeature;
-	$subcluster->add_sub_SeqFeature($e,'EXPAND');
-	$subcluster->strand($e->strand);
-	
+	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+	$exon_cluster->strand($exon->strand);
+		
 	# and add it to the main_cluster feature
-	$main_cluster->add_sub_SeqFeature($subcluster,'EXPAND');	
+	$cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
       }
     }
     $count++;
   }
-    
-  # If we're building genes from ESTs, we remove any clusters that have only 1 exon 
-  # On the other hand, this may cause fragmentation problems ... if only 1 EST spans a gap 
-  # between 2 clusters that really are related
-  
-  # If we're building genes from cDNAs, we need to take clusters with 1 exon as well, since
-  # we have less hits, but these are of better quality than the ESTs
-
-  my @exon_clusters = $main_cluster->sub_SeqFeature;
-  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters found\n";
-  
-## we allow clusters with cDNA (or mRNA) evidence if they have 
-## one or more exons, hence in this case 'strict_lower_bound' = 0, but we don't allow 
-## single-exon clusters with only ESTs as supporting evidence, hence in this case 'strict_lower_bound' = 1
-
-  my $strict_lower_bound = $::evidence_conf{'strict_lower_bound'};
-  
-  # empty out the list of clusters
-  $main_cluster->flush_sub_SeqFeature;
-  print STDERR "keeping clusters with ".($strict_lower_bound+1)." or more exons...\n";
-
-  # store cluster and transcript in which each exon lives:
-  my %exon_in_cluster;
-  my %exon_in_transcript;
-  
-  foreach my $exon_cluster ( @exon_clusters ){
-    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
-      $exon_in_cluster{ $exon } = $exon_cluster;
-    }
-  }
-  my @transcripts   = $self->_filtered_Transcripts; # transcripts filtered in 'check_Transcripts'
-  foreach my $tran ( @transcripts ){
-    foreach my $exon ($tran->get_all_Exons ){
-      $exon_in_transcript{$exon} = $tran;
-    }
-  }
-
-  # prune the exon clusters
- EXON_CLUSTER:
-  foreach my $exon_cluster (@exon_clusters) {
-    my @exons = $exon_cluster->sub_SeqFeature;
-    
-    # throw away empty clusters
-    if ( scalar(@exons) == 0 ){
-      next EXON_CLUSTER;
-    }
-
-    # in drosophila ESTs and cDNAs are together, so we need to differentiate
-   # my $found_est  = 0;
-#    my $found_cdna = 0;
-#    foreach my $exon ( @exons ){
-#      foreach my $feature ( $exon->each_Supporting_Feature ){
-#	my $hid = $feature->hseqname;
-#	if ( $hid =~ /\./g ){  # ESTs have labels like AT19106.5prime or like LD23056.contig.5_3prime
-#	  $found_est = 1;
-#	}
-#	else{                  # whereas cDNAs have labels like AI944764 (without dots)
-#	  $found_cdna = 1;
-#	}
-#      }
-#    }
-#    if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
-#       $strict_lower_bound = 1;
-#    }
-#    else{
-#       $strict_lower_bound = 0;
-#     }
-
-    # throw away clusters with too little exons (this should be set in Bio::EnsEMBL::Pipeline::EST_conf.pl)
-    unless ( scalar(@exons) > $strict_lower_bound ){
-
-      # but allow for sister clusters, i.e. if the exon is part of a transcript...
-      my $transcript = $exon_in_transcript{ $exons[0] };
-
-      # ...with exons which are in clusters with more than one exon
-      my @clusters;
-      foreach my $exon ( $transcript->get_all_Exons ){
-	push ( @clusters, $exon_in_cluster{$exon} );
-      }
-      # my threshold
-      my $howmany=1;
-
-      # count how many clusters there are with more than $howmany exon
-      my $count = 0;
-      foreach my $cluster ( @clusters ){
-	my @exons = $cluster->sub_SeqFeature;
-	if ( scalar(@exons) > $howmany ){
-	  $count++;
-	}
-      }
-      
-      # throw away this cluster unless there is at least $somany sister-cluster with more than one exon
-      my $somany=1;
-      unless ( $count >= $somany ){
-	next EXON_CLUSTER; 
-      }
-    }
-    
-    # keep the rest
-    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
-  }
-  
-  @exon_clusters = $main_cluster->sub_SeqFeature;
-  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters kept\n";
-      
-  return $main_cluster;
+  return $cluster_list;
 }
 
+############################################################
 
- 
 
-=head2 find_common_ends
+=head2 _set_splice_Ends
 
-    Title   :   find_common_ends
-    Usage   :   $cluster = $self->find_common_ends($precluster)
+    Title   :   _set_splice_Ends
+    Usage   :   $cluster_list = $self->_set_splice_Ends($cluster_list)
     Function:   Resets the ends of the clusters to the most frequent coordinate
-    Returns :   
-    Args    :   
-
+   
 =cut
 
-# should we introduce some sort of score weighting?
+sub _set_splice_Ends {
+  my ($self, $cluster_list, $ref_exon2transcript_hash, $ref_is_first, $ref_is_last, $strand) = @_;
 
-sub find_common_ends {
-  my ($self, $main_cluster,$reverse) = @_;
-  my $exon_hid = $self->{'exon2est'};
-  my @clusters = $main_cluster->sub_SeqFeature;
-  @clusters    = sort { $a->start <=> $b->start  } @clusters;
-  my $count    =  0 ;
-  my ($upstream_correct, $downstream_correct) = (0,0);
+  # hash having exons as keys and mother-transcript as value
+  my %exon2transcript = %$ref_exon2transcript_hash;
+
+  # keep track of whether the exon is first or last in the transcript
+  my %is_first = %$ref_is_first;
+  my %is_last  = %$ref_is_last;
+
+  #print STDERR "EST_GeneBuilder: setting common ends...\n";
+
+  # get the exon clusters
+  my @exon_clusters = $cluster_list->sub_SeqFeature;
+
+  # sort clusters according to their start coord.
+  @exon_clusters = sort { $a->start <=> $b->start  } @exon_clusters;
+  my $count =  0;
   
-  print STDERR "finding common ends and checking for splice sites...\n";
-  foreach my $cluster(@clusters) {
+  #### set first the start-coordinates ####
+  my $position = 0;
+ CLUSTER:		     
+  foreach my $cluster (@exon_clusters) {
+    $position++;
     my %start;
-    my %end;
-    my $newstart;
-    my $newend;
-    my $maxend = 0;
-    my $maxstart = 0;
+    my $new_start;
+    my $max_start = 0;
     
-    # count frequency of starts & ends
-    foreach my $exon ($cluster->sub_SeqFeature) {
-      my $est = $$exon_hid{$exon}{'hid'};
-      $start{$exon->start}++;
-      $end{$exon->end}++;
-      
-    }
+  EXON:
+    foreach my $exon ($cluster->sub_SeqFeature){
 
-    #print STDERR "cluster $count\nstarts: ";
-    while ( my ($key, $value) = each %start) {
-      if ($value > $maxstart){
-	$newstart = $key;
-	$maxstart = $value;
-      } elsif ($value == $maxstart){
-	#print STDERR "$key is just as common as $newstart - ignoring it\n";
-      }
-      #print STDERR "$key => $value\n";
-    }
-    #print STDERR "ends: ";
-
-    while ( my ($key, $value) = each %end) {
-      if ($value > $maxend){
-	$newend = $key;
-	$maxend = $value;
-      } elsif ($value == $maxend){
-	#print STDERR "$key is just as common as $newend - ignoring it\n";
-      }
-      #print STDERR "$key => $value\n";
-    }
-
-    # if we haven't got a clear winner, we might as well stick with what we had
-    if( $maxstart <= 1 ) {
-      $newstart = $cluster->start;
-    }
-    if( $maxend <= 1 ) {
-      $newend = $cluster->end;
-    }
-
-    # first and last clusters are special cases - potential UTRs, take the longest one.
-    if( $count == 0) {
-      #print STDERR "first cluster\n";
-      $newstart = $cluster->start;
-    } elsif ( $count == $#clusters ) {
-      #print STDERR "last cluster\n";
-      $newend = $cluster->end;
-    }
-    #print STDERR "we used to have: " . $cluster->start . " - " . $cluster->end . "\n";
-    #print STDERR "and the winners are ... $newstart - $newend\n";
-
-
-    # reset the ends of all the exons in this cluster to $newstart - $newend
-    foreach my $exon ($cluster->sub_SeqFeature) {
-      $exon->start($newstart);
-      $exon->end($newend);
-    }
-    
-    # check the splice sites for the whole cluster
-    my $contig = $self->vc;
-    my ($upstream, $downstream);
-        
-    # take the 2 bases right before the exon and after the exon
-    
-    # forward strand
-    if ($cluster->strand == 1 && !defined( $reverse) ){
-      my $seq = $contig->primary_seq; # a Bio::PrimarySeq object
-      
-      # catch possible exceptions in gettting the sequence (it might not be there!)
-      eval{
-	$upstream   = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
-      };
-      if ($@){
-	print STDERR "Unable to get subsequence (".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
-	print STDERR $@;
-	$upstream = 'NN';
-      }
-      eval{
-	$downstream = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
-      };
-      if ($@){
-	print STDERR "Unable to get subsequence (".(($cluster->end)+1).",".(($cluster->end)+2).")\n";
-	print STDERR $@;
-	$downstream = 'NN';
-      }
-      # print-outs to test it
-#      if ( $count ==0 ){
-#	print STDERR "FIRST EXON-->".$downstream;
-#      }
-#      if ( $count != 0 && $count != $#clusters ){
-#	print STDERR $upstream."-->EXON-->".$downstream;
-#      }
-#      if ( $count == $#clusters ){
-#	print STDERR $upstream."-->LAST EXON";
-#      }
-#      print "\n";
-      
-      # the first and last exon are not checked - potential UTR's
-      if ( $count != 0 && $upstream eq 'AG') {       
-	$upstream_correct++;
-      }
-      if ( $count !=$#clusters && $downstream eq 'GT') { 
-	$downstream_correct++;
-      }
-      $count++;
-    }
-    
-    # reverse strand
-    if ($reverse){
-      my $revcontig = $contig->invert;   # invert the contig, since the exons were retrieved in revcontig
-      my $seq = $revcontig->primary_seq; # a Bio::PrimarySeq object
-      
-      # catch possible exceptions in gettting the sequence (it might not be there!)
-      eval{
-	$upstream = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
-      };
-      if ($@){
-	print STDERR "Unable to get subsequence (".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
-	print STDERR $@;
-	$upstream ='NN';
-      }
-      eval{
-	$downstream   = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
-      };
-      if ($@){
-	print STDERR "Unable to get subsequence (".(($cluster->end)+1).",".(($cluster->end)+2).")\n";
-	print STDERR $@;
-	$downstream = 'NN';
-      }
-      #  the reverse strand we're looking at coordinates in the reversed-complement contig:
-      #
-      #        $contig : --------------------TG----GA---------->  forward strand
-      #                                      AC    CT             reverse strand 
-      #                           downstream   EXON   upstream
-      #
-      #
-      #                   upstream   EXON   downstream              
-      #     $revcontig : ----------AG----GT-------------------->    forward strand
-      #                                                             reverse strand
-      #
-      # and take the reverse complement
-      ( $downstream = reverse( $downstream) ) =~ tr/ACGTacgt/TGCAtgca/;
-      ( $upstream   = reverse( $upstream )  ) =~ tr/ACGTacgt/TGCAtgca/;
-      
-      # so the conserved sequence should be AC<-EXON<-CT printed as in the reverse strand
-
-#      if ( $count ==0 ){
-#	print STDERR "LAST EXON<--".$upstream;
-#      }
-#      if ( $count != 0 && $count != $#clusters ){
-#	print STDERR $downstream."<--EXON<--".$upstream;
-#      }
-#      if ( $count == $#clusters ){
-#	print STDERR $downstream."<--FIRST EXON";
-#      }
-#      print "\n";
-      
-      # the first and last exon are not checked - potential UTR's
-      if ( $count != $#clusters && $downstream eq 'AC') {       
-	$upstream_correct++;
-      }
-      if ( $count != 0 && $upstream eq 'CT') { 
-	$downstream_correct++;
-      }
-      $count++;
-    }
-  }
-  print STDERR "upstream splice-sites correct: ".$upstream_correct. 
-               " out of ".($#clusters)." potential splice-sites\n";
-  print STDERR "downstream splice-sites correct: ".$downstream_correct. 
-               " out of ".($#clusters)." potential splice-sites\n";
-
-  return $main_cluster;
-}
-
-=head2 is_in_cluster
-
-  Title   : is_in_cluster
-  Usage   : my $in = $self->is_in_cluster($id, $cluster)
-  Function: Checks whether a feature with id $id is in a cluster
-  Returns : 0,1
-  Args    : String,Bio::SeqFeature::Generic
-
-=cut
-
-sub is_in_cluster {
-  my ($self, $id, $cluster) = @_;
-
-  my $exon2est = $self->{'_exon2est'};
-
-  foreach my $exon ( $cluster->sub_SeqFeature ) {
-    return (1) if $$exon2est{$exon}{'hid'} eq $id;
-  }
-  return 0;
-}
-
-=head2 link_clusters
-
-    Title   :   link_clusters
-    Usage   :   $self->link_clusters
-    Function:   Links clusters into pairs if any of their exons share the same EST as supporting feature
-    Returns :   an array of exon-clusters (Bio::EnsEMBL::SeqFeature) with the links set
-    Args    :   an array of exon-clusters (Bio::EnsEMBL::SeqFeature) 
-
-=cut
-
-sub link_clusters{
-  my ($self, $main_cluster, $tol) = @_;
-  my $exon_hid = $self->{'_exon2est'};
-  $tol = 10 unless $tol; # max allowed discontinuity in the EST sequence
-  
-  my @clusters = $main_cluster->sub_SeqFeature; # exon clusters
-  print STDERR "Created " . scalar (@clusters) . " clusters\n";
-
-  # Sort the clusters by start position
-  @clusters = sort { $a->start <=> $b->start } @clusters;
-
-  # Loop over all clusters
- CLUSTER1:  
-  for (my $c1 = 0; $c1 < $#clusters; $c1++) {
-    #print "\nFinding links in cluster number $c1... \n";
-    my $cluster1 = $clusters[$c1];             
-    my @exons1   = $cluster1->sub_SeqFeature; 
-    my $c2       = $c1 + 1;
-    my $limit    = 2;  # how many exons away we look to find a link, 2 is the limit used by sub make_ExonPairs 
-                       # in GeneBuilder.pm
-    
-    # NOTE!!!!
-    # Maybe put this definition inside CLUSTER2 loop ?????
-    my %used_evidence; # we keep track of the evidence that have been used to make links
-    
-    # Now look (in each exon ) in the next $limit clusters to find a link
-  CLUSTER2:    
-    while ( $c2 <= ( $c1 + $limit ) && $c2 <= $#clusters ) {
-      # print STDERR "...trying to link clusters $c1 and $c2...\n";
-      my $cluster2 = $clusters[$c2];      
-      my @exons2   = $cluster2->sub_SeqFeature;
-      
-      # Only look at a cluster if it starts after the end of the current cluster 
-      if ($cluster2->start > $cluster1->end) {
-	my $foundlink = 0;
-
-	# Now loop over the supporting features in the first linking cluster
-      EXON1:
-	foreach my $exon1 (@exons1) { 
-	  # Does the second cluster contain this database id?
-	  my $hid1 = $$exon_hid{$exon1}{'hid'}; 
-	  my $exon_link;
-	  
-	EXON2:
-	  foreach my $exon2 (@exons2){ 
-
-	    # if we have the same id in two clusters then...
-	    if ($$exon_hid{$exon2}{'hid'} eq $hid1){
-	      $exon_link = $exon2;
-	      if ( $used_evidence{$hid1} && $used_evidence{$hid1} == 1 ){
-		# print STDERR $hid1." used already, searching further...\n";
-		next EXON2;
-	      }
-	      
-	      # Check the strand is the same and only allow a $tol discontinuity in the h-sequence
-	      my $tol1 = abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'});
-	      my $tol2 = abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'});
-
-	      if ( $exon1->strand == $exon_link->strand && ( $tol1 < $tol || $tol2 < $tol ) ) {
-		push(@{ $cluster1->{'_forward'} } ,$cluster2);
-		print STDERR "*** linking cluster $c1 to cluster $c2 ***";
-		# print STDERR "hid1 : ".$hid1." hid2 : ".$$exon_hid{$exon_link}{'hid'}."\n";
-		
-		# just announcing alternative splicing
-		if ( $c2 >= $c1+$limit && scalar( @{ $cluster1->{'_forward'} } ) ==2 ){
-		  print STDERR " -------------- Alternative Splicing ---------------\n";
-		}
-
-		# we've found a link, we can stop searching in this cluster
-		$used_evidence{$hid1} = 1;
-		$c2++;
-		next CLUSTER2;		
-	      }
-	      # else we search further in the cluster
-	      else{
-		print STDERR "cannot make link: tol1 = $tol1, tol2 = $tol2\n";
-		next EXON2;
-	      }
-	    }
-
-	  } # end of EXON2
-
-	}   # end of EXON1
-
-      }     # end of if ($cluster2->start > $cluster1->end)
-
-      # if we are here that means that no link was found with cluster2
-      # print STDERR "couldn't find link between cluster $c1 and cluster $c2\n";
-      $c2++;
-    }       # end of CLUSTER2
-
-  }         # end of CLUSTER1
-
-  return @clusters;
-
-}
-
-=head2 process_clusters
-
- Title   : process_clusters
- Usage   : my @transcripts = $self->process_clusters(@clusters);
- Function: Links Cluster Pairs into Transcripts
- Example : 
- Returns : Array of Bio::EnsEMBL::Transcript
- Args    : Array of exon-clusters, which here are Bio::EnsEMBL::SeqFeature
-
-=cut
-
-sub process_clusters{
-  my ($self, $clusters) = @_;
-  my @clusters = @{ $clusters };
-
-  # comment: this link all the exon clusters (pairs) into a whole transcript. It starts from the first exon 
-  # (cluster). Is there a possibility to start in the second, maybe third exon? this would provide further 
-  # alternative transcripts. One reason for doing this is that the second (or third) exon pair may have been 
-  # paired due to a different est. Could we push this to say that any exon where an EST is first used could be a 
-  # potential start of an alternative transcript? In any case, this would seem more logical with
-  # cDNA's but a bit risky with EST's since the latter are just one end of the RNA, so different EST's could in 
-  # fact be different pieces of the same RNA. Does this make any sense?
-
-  foreach my $cluster (@clusters){
-    
-    if ( $self->_isHead($cluster,\@clusters) == 1){
-      # only start a transcript on this cluster if it is not linked to another cluster from the left 
-      
-      # get exon from cluster (this is a fresh new object, see _get_RepresentativeExon method)
-      my $exon = $self->_get_RepresentativeExon($cluster);
-      
-      # create a new transcript
-      my $transcript = new Bio::EnsEMBL::Transcript;
-      
-      # with the new representative exon in it
-      $transcript->add_Exon($exon);
-      $self->_put_Transcript($transcript);
-      
-      # cluster the exons into transcripts according to the cluster-pairs made before
-      $self->_recurseTranscript($cluster,$transcript);
-    }
-  }
-  # at this point we could check/set transcript ids, order of exons, etc...
-
-  print STDERR "In EST_GeneBuilder.process_clusters: "
-    .scalar( $self->_get_all_Transcripts )." transcripts have been created\n";
-  return $self->_get_all_Transcripts;
-}
-
-=head2 _recurseTranscript
-
- Title   : _recurseTranscript
- Usage   : $self->_recurseTranscript($cluster,\@clusters);
- Function: borrows from _recurseTranscript in GeneBuilder.pm, it links all cluster pairs
-           recursively to form transcripts, allowing alternative transcripts, and it puts them into
-           $self->{'_transcripts'}
- Returns : nothing
- Args    : it reads an exon-cluster and the transcript it sits in
-
-=cut
-
-sub _recurseTranscript { 
-  my ($self,$cluster,$current_transcript) = @_; 
-  
-  # copy first the information about which clusters the current transcript holds into a temporary transcript
-  my $temp_transcript = new Bio::EnsEMBL::Transcript;
-  foreach my $ex ( $current_transcript->get_all_Exons ){
-    $temp_transcript->add_Exon($ex);  
-  }
-
-  if ( defined( $cluster->{'_forward'} ) ){
-    my @cluster_links = @{ $cluster->{'_forward'} }; # this gives the clusters to which $cluster links
-    my $count = 0;
-  LINK:
-    foreach my $cluster_link ( @cluster_links ){
-      my $exon_link = $self->_get_RepresentativeExon($cluster_link);
-      
-      if ($count>0){ # this occurs for a second link at a given cluster
-	
-	#print STDERR "\n STARTING AN ALTERNATIVE TRANSCRIPT \n\n";
-
-	# Start a new transcript
-	my $new_transcript = new Bio::EnsEMBL::Transcript;
-	
-	# put in it everything we have at this level
-	foreach my $temp_exon ( $temp_transcript->get_all_Exons ){
-	  
-	  # we put a new one to make sure that exons are not shared between transcripts
-	  my $exon_copy = new Bio::EnsEMBL::Exon;
-	  $exon_copy->start($temp_exon->start);
-	  $exon_copy->end($temp_exon->end);
-	  $exon_copy->strand($temp_exon->strand);
-	  foreach my $sf ( $temp_exon->each_Supporting_Feature ){
-	    $exon_copy->add_Supporting_Feature($sf);
-	  }
-	  $new_transcript->add_Exon($exon_copy);
+      # for a start-coord in the middle don't use the exon if it is the first of a transcript
+      if ( $position > 1 && $position <= scalar( @exon_clusters ) ){
+	if ( $is_first{ $exon } == 1 ){
+	  next EXON;
 	}
-	
-	# add the next exon in the link
-	$new_transcript->add_Exon($exon_link);
-	
-	# and add the new transcript to the array of transcripts $self->{'_transcripts'}
-	$self->_put_Transcript($new_transcript);
-	
-	# continue linking from this one
-	$self->_recurseTranscript($cluster_link, $new_transcript);
       }
-      else{ # this occurs for the first time in (the first link) thus fills up the current transcript
-	
-	# add the next exon in the link to the current transcript
-	$current_transcript->add_Exon($exon_link);
-	
-	# continue linking from this one
-	$self->_recurseTranscript($cluster_link, $current_transcript);
+      $start{$exon->start}++;
+    }
+    # take the most common start (note that we do not resolve ambiguities here)
+    while ( my ($key,$value) = each %start ){
+      if ($value > $max_start){
+	$new_start = $key;
+	$max_start = $value;
       }
-      $count++; 
-    }         # end of LINK:
-  }           # end of if-scope
-  return;     # eventually, @cluster_links will be empty, and we return
+    }
+    # if we have too little exons to obtain the start, take the original value
+    if ( $max_start == 0 ){
+      $new_start = $cluster->start;
+    }
+
+    # the first cluster is a special case - potential UTRs, take the longest one.
+    if( $position == 1) {
+      $new_start = $cluster->start;  
+    }   
+    # reset the starts of all the exons in this cluster
+    foreach my $exon ($cluster->sub_SeqFeature) {
+      $exon->start($new_start);
+    } 
+  }
+
+  #### now set the end coordinate ####
+  $position = 0;
+ CLUSTER:		     
+  foreach my $cluster (@exon_clusters) {
+    $position++;
+    my %end;
+    my $new_end;
+    my $max_end = 0;
+    
+  EXON:
+    foreach my $exon ($cluster->sub_SeqFeature){
+
+      # for an end-coord in the middle don't use the exon if it is the last of a transcript
+      if ( $position >= 1 && $position < scalar( @exon_clusters ) ){
+	if ( $is_last{ $exon } == 1 ){
+	  next EXON;
+	}
+      }
+      $end{$exon->end}++;
+    }
+    # take the most common end (note that we do not resolve ambiguities here)
+    while ( my ($key,$value) = each %end ){
+      if ($value > $max_end){
+	$new_end = $key;
+	$max_end = $value;
+      }
+    }
+    # if we have too little exons to obtain the end, take the original value
+    if ( $max_start == 0 ){
+      $new_end = $cluster->end;
+    }
+
+    # the last cluster is a special case - potential UTRs, take the longest one.
+    if( $position == 1) {
+      $new_end = $cluster->end;  
+    }
+    # reset the ends of all the exons in this cluster
+    foreach my $exon ($cluster->sub_SeqFeature) {
+      $exon->end($new_end);
+    } 
+  }
+
+  return $cluster_list;
 }
+
+############################################################
+
  
-=head2 _get_RepresentativeExon
+sub _check_splice_Sites{
+  my ($self, $ref_transcripts, $strand) = @_;
 
- Title   : _get_RepresentativeExon
- Usage   : my $exon = $self->_get_RepresentativeExon($cluster);
- Function: it gives you one exon from the exon clusters, since find_common_ends should have occurred
-           before hand (check taht if you have modified anything), we should get somethings close to
-           a proper exon with the start and end of the $cluster. Note that a new exon object is created,
-           since alternative transcript may share exons, adn we do not want them to share them as objects as well,
-           
- Example : 
- Returns : an Bio::EnsEMBL::Exon object
- Args    : one exon-cluster, which in this context is a Bio::EnsEMBL::SeqFeature
+  print STDERR "EST_GeneBuilder: checking splice sites in strand $strand...\n";
 
-=cut
-
-sub _get_RepresentativeExon {
-  my ($self,$cluster) = @_;
+  # get the contig being analysed
+  my $contig = $self->vc;
   
-  # get the exons in the cluster
-  my @exons = $cluster->sub_SeqFeature; 
-
-  # simply take the first one (any one will do, I guess)
-  my $exon = $exons[0];
-
-  if ( defined($exon) ){
-    unless ( $exon->isa("Bio::EnsEMBL::Exon") ){
-      $self->throw("[$exon] is a ".ref($exon)." but should be a Bio::EnsEMBL::Exon");
-    }
-  }
-  else{
-    $self->throw("exon-cluster [$cluster] does not contain any exon");
-  }
-
-  # make a new exon out of this one, otherwise alternative transcripts will share exons objects
-  # and they will get modified twice (in two different transcripts) by MiniGenomewise
-  my $exon_copy = new Bio::EnsEMBL::Exon;
-  $exon_copy->start($exon->start);
-  $exon_copy->end($exon->end);
-  $exon_copy->strand($exon->strand);
-  foreach my $sf ( $exon->each_Supporting_Feature ){
-    $exon_copy->add_Supporting_Feature($sf);
-  }
-
-  # at this point we could add all the EST-supporting-features of the rest of the exons in the cluster
-  # to the supporting features of this exon, something like:
-  shift @exons;
-  # my $source_tag = $::evidence_conf{'evidence_tag'};
-  foreach my $ex ( @exons ){
-    foreach my $sf ($ex->each_Supporting_Feature){
-      # add only those that relate to EST's?
-      #next unless ( $sf->source_tag eq $source_tag;
-      $exon_copy->add_Supporting_Feature($sf);
-    }
-  }
-
-  return $exon_copy;
-}
+  # for reverse strand,  invert the contig, since the exons were retrieved in revcontig
+  my $revcontig = $contig->invert;   
   
-=head2 _isHead
+  my ($upstream_correct, $downstream_correct) = (0,0);
+  my $site_count = 0;
+  
+ TRANSCRIPT:
+  foreach my $transcript (@$ref_transcripts){
+    
+    # count the number of exons
+    my $count = 0; 
+    my @exons = $transcript->get_all_Exons;
+    
+  EXON:
+    foreach my $exon ( @exons ){
 
- Title   : _isHead
- Usage   : my $is_first_cluster = $self->_isHead($cluster,\@clusters); 
- Function: checks through all clusters in @clusters to see whether
-           $cluster is linked to a preceeding cluster.
- Example : 
- Returns : 0 (if the cluster is not the first), 1 (if the cluster is the first, i.e. the head)
- Args    : one exon-cluster and one Array-ref to exon-clusters, these are Bio::EnsEMBL::SeqFeature
-
-=cut
-
-sub _isHead {
-  my ($self,$cluster,$clusters) = @_;
-  foreach my $cluster2 (@{ $clusters }){
-    foreach my $forward_link ( @{ $cluster2->{'_forward'} } ){
-     
-      my @overlap = $self->match($cluster,$forward_link); 
-      if ( $cluster->start == $forward_link->start ){
-	return 0;
-      }
-     ## this thing below is just an alternative way to see whether two clusters are the same
-
-#      if ( $overlap[0] == 1 && $cluster->strand == $forward_link->strand ){
-#	# if they overlap and share strand, we can infer they are the same
-#	# this method should therefore only be used after make_clusters and find_common_ends have occurred
-#	print STDERR "returning from _isHead\n";
-#	return 0; 
-#      }     
-####################################
+      # take the 2 bases right before the exon and after the exon
+      my ($upstream, $downstream);
+        
+      # forward strand
+      if ($strand == 1){
+	my $seq = $contig->primary_seq; # a Bio::PrimarySeq object
+	
+	# catch possible exceptions in gettting the sequence (it might not be there!)
+	eval{
+	  $upstream   = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
+	};
+	if ($@){
+	  print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
+	  print STDERR $@;
+	  $upstream = 'NN';
+	}
+	eval{
+	  $downstream = $seq->subseq( ($exon->end)+1   , ($exon->end)+2   ); 
+	};
+	if ($@){
+	  print STDERR "Unable to get subsequence (".(($exon->end)+1).",".(($exon->end)+2).")\n";
+	  print STDERR $@;
+	  $downstream = 'NN';
+	}
+	# print-outs to test it
+	#      if ( $count ==0 ){
+	#	print STDERR "FIRST EXON-->".$downstream;
+	#      }
+	#      if ( $count != 0 && $count != $#clusters ){
+	#	print STDERR $upstream."-->EXON-->".$downstream;
+	#      }
+	#      if ( $count == $#clusters ){
+	#	print STDERR $upstream."-->LAST EXON";
+	#      }
+	#      print "\n";
+	
+	# the first and last exon are not checked - potential UTR's
+	if ( $count != 0 && $upstream eq 'AG') {       
+	  $upstream_correct++;
+	}
+	if ( $count !=$#exons && $downstream eq 'GT') { 
+	  $downstream_correct++;
+	}
+	$count++;
+      } # end of forward strand
       
-    }
-  }
-  return 1; 
+      # reverse strand
+      if ($strand == -1 ){
+	my $seq = $revcontig->primary_seq; # a Bio::PrimarySeq object
+	
+	# catch possible exceptions in gettting the sequence (it might not be there!)
+	eval{
+	  $upstream = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
+	};
+	if ($@){
+	  print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
+	  print STDERR $@;
+	  $upstream ='NN';
+	}
+	eval{
+	  $downstream   = $seq->subseq( ($exon->end)+1   , ($exon->end)+2   ); 
+	};
+	if ($@){
+	  print STDERR "Unable to get subsequence (".(($exon->end)+1).",".(($exon->end)+2).")\n";
+	  print STDERR $@;
+	  $downstream = 'NN';
+	}
+	#  in the reverse strand we're looking at coordinates in the reversed-complement contig:
+	#
+	#        $contig : --------------------TG----GA---------->  forward strand
+	#                                      AC    CT             reverse strand 
+	#                           downstream   EXON   upstream
+	#
+	#
+	#                   upstream   EXON   downstream              
+	#     $revcontig : ----------AG----GT-------------------->    forward strand
+	#                                                             reverse strand
+	#
+	# and take the reverse complement
+	( $downstream = reverse( $downstream) ) =~ tr/ACGTacgt/TGCAtgca/;
+	( $upstream   = reverse( $upstream )  ) =~ tr/ACGTacgt/TGCAtgca/;
+	
+	# so the conserved sequence should be AC<-EXON<-CT printed as in the reverse strand
+	
+	#      if ( $count ==0 ){
+	#	print STDERR "LAST EXON<--".$upstream;
+	#      }
+	#      if ( $count != 0 && $count != $#clusters ){
+	#	print STDERR $downstream."<--EXON<--".$upstream;
+	#      }
+	#      if ( $count == $#clusters ){
+	#	print STDERR $downstream."<--FIRST EXON";
+	#      }
+	#      print "\n";
+	
+	# the first and last exon are not checked - potential UTR's
+	if ( $count != $#exons && $downstream eq 'AC') {       
+	  $upstream_correct++;
+	}
+	if ( $count != 0 && $upstream eq 'CT') { 
+	  $downstream_correct++;
+	}
+	$count++;
+      } # end of reverse strand
+            
+    }   # end of EXON
+    
+    $site_count += $#exons; # count the number of splice sites
+    
+  }   # end of TRANSCRIPT
+    
+  print STDERR "upstream splice-sites correct: ".$upstream_correct. 
+    " out of ".($site_count)." splice-sites\n";
+  print STDERR "downstream splice-sites correct: ".$downstream_correct. 
+    " out of ".($site_count)." splice-sites\n";
+  
+  # eventually, we may modify start/end of exons according to these checks
+  return @$ref_transcripts;    
 }
+
+############################################################
 
 =head2 _put_Transcript
 
@@ -1289,6 +1480,7 @@ sub _put_Transcript {
   push( @{ $self->{'_transcripts'} }, $transcript );
 }
 
+############################################################
 
 =head2 _get_all_Transcripts
 
@@ -1311,10 +1503,10 @@ sub _get_all_Transcripts {
   return @trans;
 }
 
-
+############################################################
 
 sub add_runnable{
-  my ($self, $value, $reverse) = @_;
+  my ($self, $value, $strand) = @_;
 
   if (!defined($self->{'_forward_runnables'})) {
     $self->{'_forward_runnables'} = [];
@@ -1323,22 +1515,28 @@ sub add_runnable{
     $self->{'_reverse_runnables'} = [];
   } 
   if (defined($value)) {
+    
     if ($value->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      if(defined $reverse){
+      
+      if( $strand == -1 ){
 	push(@{$self->{'_reverse_runnables'}},$value);
       }
-      else {
+      elsif( $strand == 1){
 	push(@{$self->{'_forward_runnables'}},$value);
       }
-    } else {
+      else{
+	$self->throw( "Cannot add a runnable with strand = $strand" );
+      }
+    
+    } 
+    else {
       $self->throw("[$value] is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
   }
-  
-} 
+}
 
 sub each_runnable{
-  my ($self, $reverse) = @_;
+  my ($self, $strand) = @_;
   
   if (!defined($self->{'_forward_runnables'})) {
     $self->{'_forward_runnables'} = [];
@@ -1348,17 +1546,21 @@ sub each_runnable{
     $self->{'_reverse_runnables'} = [];
   } 
 
-  if(defined $reverse){
+  if( $strand == -1 ){
     return @{$self->{'_reverse_runnables'}};
   }
-  else {
+  elsif ($strand == 1){
     return @{$self->{'_forward_runnables'}};
+  }
+  else{
+    $self->throw( "there are no runnables with strand = $strand" );
   }
   
 }
 
 sub run {
   my ($self) = @_;
+  my $strand;
 
   my $cc=1;
   # run genomewise 
@@ -1394,49 +1596,21 @@ sub run {
   $self->analysis($analysis_obj);
 
   # plus strand
-  
-#  ### test
-#  my $tcount=0;
-#  foreach my $gw_runnable( $self->each_runnable) {
-    
-#    print STDERR "In EST_GeneBuilder...forward_strand...the third, uf!\n";
-#    print STDERR "reading transcripts in ".$gw_runnable."\n";
-#    foreach my $t ($gw_runnable->get_all_Transcripts){
-#      print STDERR "Transcript ".($tcount+1).": ".$t."\n";
-#      my $count=1;
-#      foreach my $exon ($t->get_all_Exons){
-#	print STDERR "Exon $count : ".$exon->start." ".$exon->end."\n";
-#      }
-#      $tcount++;
-#    }
-#  }
-#  print STDERR "In EST_GeneBuilder...from the runnables we have: ".$tcount." transcripts\n";
-#
-#  ### end of test
-
+  $strand = 1;
   my $tcount=0;
-  foreach my $gw_runnable( $self->each_runnable) {
-
-#    print STDERR "In EST_GeneBuilder...forward_strand...about to run genomewise";
-#    my $ttcount=0;
-#    foreach my $t ($gw_runnable->get_all_Transcripts){
-#      $ttcount++;
-#      $tcount++;
-#    }
-#    print STDERR " with $ttcount transcript(s)\n";
-   
+  foreach my $gw_runnable( $self->each_runnable($strand) ){
     $tcount++;
     $gw_runnable->run;
-
+    
     # convert_output
-    $self->convert_output($gw_runnable);
+    $self->convert_output($gw_runnable, $strand);
   }
   print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
 
   # minus strand
-  my $reverse = 1;
+  $strand = -1;
   my $tcount2=0;
-  foreach my $gw_runnable( $self->each_runnable($reverse)) {
+  foreach my $gw_runnable( $self->each_runnable($strand)) {
 
 #    print STDERR "In EST_GeneBuilder...reverse_strand...about to run genomewise";
 #    my $ttcount2=0;
@@ -1450,7 +1624,7 @@ sub run {
     $gw_runnable->run;
     
     # convert_output
-    $self->convert_output($gw_runnable, $reverse);
+    $self->convert_output($gw_runnable, $strand);
   }
   print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
 }
@@ -1480,22 +1654,22 @@ sub analysis {
 # convert genomewise output into genes
 
 sub convert_output {
-  my ($self, $gwr, $reverse) = @_;
+  my ($self, $gwr, $strand) = @_;
 
-  my @genes = $self->make_genes($gwr, $reverse);
+  my @genes = $self->make_genes($gwr, $strand);
 
-  my @remapped = $self->remap_genes(\@genes, $reverse);
+  my @remapped = $self->remap_genes(\@genes, $strand);
 
   # store genes
   $self->output(@remapped);
  
 }
 
-
+############################################################
 
 sub make_genes {
 
-  my ($self, $runnable, $reverse) = @_;
+  my ($self, $runnable, $strand) = @_;
   my $genetype = $self->genetype;
   my $analysis_obj = $self->analysis;
   my $count = 0;
@@ -1505,9 +1679,10 @@ sub make_genes {
   my $contig = $self->vc;
 
   # are we working on the reverse strand?
-  if(defined $reverse){
+  if( $strand == -1 ){
     $contig = $contig->invert;
   }
+
   # transcripts come with a translation, that's sorted out in MiniGenomwise and Genomewise
   my @trans = $runnable->output;
   
@@ -1541,7 +1716,6 @@ sub make_genes {
     $transcript->temporary_id($contig->id . ".$genetype.$count");
     $gene->add_Transcript($transcript);
 
-
     # and store it
     push(@genes,$gene);
 
@@ -1556,7 +1730,11 @@ sub make_genes {
       $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->attach_seq($contig->primary_seq);
+      
+      # if strand = -1 we have inverted the contig, thus
+      $exon->strand(1);
       $excount++;
+      # when the gene gets stored, the strand is flipped automatically
     }
     #put temporary_id (this hasn't been put in neither Genomewise nor MiniGenomewise
     my $translation = $transcript->translation;
@@ -1576,9 +1754,9 @@ sub make_genes {
 =cut
 
 sub remap_genes {
-  my ($self, $genes, $reverse) = @_;
+  my ($self, $genes, $strand) = @_;
   my $contig = $self->vc;
-  if (defined $reverse){
+  if ( $strand == -1 ){
     $contig = $contig->invert;
   }
 
@@ -1595,6 +1773,7 @@ sub remap_genes {
 #foreach my $tran (@trans){
 #      print STDERR "In EST_GeneBuilder.remap_genes: \n";
 #      print STDERR "  transcript        : ".$tran."\n";
+#      print STDERR "  strand            : ".$tran->start_exon->strand."\n";
 #      print STDERR "  translation       : ".$tran->translation."\n";
 #      print STDERR "  translation starts: ".$tran->translation->start."\n";
 #      print STDERR "  translation ends  : ".$tran->translation->end."\n";
@@ -1752,6 +1931,10 @@ sub output{
 
    return @{$self->{'_output'}};
 }
+
+############################################################
+
+
 
 
 1;
