@@ -18,28 +18,29 @@ my ($dbhost, $dbname, $dbpass, $dbuser, $id, $logic, $write);
 	    'write!' => \$write,
 	   );
 							
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host => $dbhost,
-						      -user => $dbuser,
-						      -pass => $dbpass,
-						      -dbname => $dbname,
-						     );
 
 if(!$dbname || !$dbhost || !$dbuser || !$dbpass){
   print STDERR "Usage = -dbname -dbuser -dbhost -dbpass -input_id -analysis -write\n";
   exit(0)
 }
 
-print STDERR "write = ".$write."\n";
-
-my $analysis_adaptor = $db->get_AnalysisAdaptor;
-
-my $ana = $analysis_adaptor->fetch_by_logic_name('BestPmatch');
-
-;			     
 if(!$logic){
   print STDERR "You have provided no logic name assuming it is BestPmatch\n";
   $logic = 'BestPmatch';
 }
+
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host => $dbhost,
+						      -user => $dbuser,
+						      -pass => $dbpass,
+						      -dbname => $dbname,
+						     );
+
+my $analysis_adaptor = $db->get_AnalysisAdaptor;
+
+my $ana = $analysis_adaptor->fetch_by_logic_name($logic);
+			     
+
 
 if(!$id){
   $id = 'genome';

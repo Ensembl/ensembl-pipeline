@@ -49,9 +49,8 @@ BEGIN {
 =cut
 
 use strict;
-use Bio::EnsEMBL::Pipeline::Pmatch::Second_PMF;
-use Bio::EnsEMBL::Pipeline::Pmatch::MergedHit;
-use Bio::EnsEMBL::Pipeline::Pmatch::CoordPair;
+use Bio::EnsEMBL::Pipeline::Tools::Pmatch::Second_PMF;
+use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
@@ -67,6 +66,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
 							  GB_PM_OUTPUT
 							 );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw(
+                                                          GB_INPUTID_REGEX
+                                                         ); 
 
 
 # global vars
@@ -101,6 +104,7 @@ else{
 
 
 # read pmatch results from STDIN
+my $input_id;
 while(<>){
   #ctg12770:1140298,1146110:Q15486:18,140 75.8
   next unless /\S+/;
@@ -113,40 +117,29 @@ while(<>){
   my $tstart  = $5;
   my $tend    = $6;
   my $percent = $7;
-  my $strand  = 1;
-
-	  if ($qend < $qstart) { $strand = -1; }
 	  
-	  my $cp = new Bio::EnsEMBL::Pipeline::Pmatch::CoordPair(
-							 '-query'   => $query,
-							 '-target'  => $target,
-							 '-qstart'  => $qstart,
-							 '-qend'    => $qend,
-							 '-tstart'  => $tstart,
-							 '-tend'    => $tend,
-							 '-percent' => $percent,
-							 '-strand'  => $strand,
-							);
-
-	  my $mh = new Bio::EnsEMBL::Pipeline::Pmatch::MergedHit(
-								 '-query'   => $query,
-								 '-target'  => $target,
-								 '-strand'  => $strand,
-								 '-coverage'=> $percent,
-								);
+	  if($query =~ /$GB_INPUTID_REGEX/)
+	    {
+             $input_id  = $query;
+             $query = $1;  
+            }
+	  my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $target,
+							    -start    => $qstart,
+							    -end      => $qend,
+							    -chr_name => $query,
+							    -coverage => $percent,
+							    );
 	  
-	  $mh->add_CoordPair($cp);
-	  
-	  push (@hits, $mh);
+	  push (@hits, $feature);
 
 }
 
 print STDERR "finished reading\n";
 
  # find the best hit(s) in the genome for each protein in $protfile
-my $pmf2 = new Bio::EnsEMBL::Pipeline::Pmatch::Second_PMF( 
-							  '-phits' => \@hits
-							 );
+my $pmf2 = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::Second_PMF( 
+								 '-phits' => \@hits
+								);
 
 $pmf2->run;
 
@@ -156,21 +149,35 @@ $pmf2->run;
 
 foreach my $hit($pmf2->output) {
   if($chromo_coords){
-    my ($chr_name, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome(
-									  $hit->query, 
-									  $hit->qstart,
-									  $hit->qend
+    my ($chr_name, $chrstart, $chrend) = &convert_coords_to_genomic(
+								    $hit->chr_name, 							    
+                                                                    $hit->start,
+								    $hit->end,
+                                                                    $input_id, 
 									 );
     
     print OUT $chr_name       . ":" . $chrstart      . "," . $chrend        . ":" . 
-      $hit->target   . ":" . $hit->coverage . "\n";
+      $hit->protein_id   . ":" . $hit->coverage . "\n";
   }
   
   else{
-    print OUT $hit->query    . ":" . $hit->qstart   . "," . $hit->qend     . ":" . 
-      $hit->target   . ":" . $hit->coverage . "\n";
+    print OUT $hit->chr_name    . ":" . $hit->start   . "," . $hit->end     . ":" . 
+      $hit->protein_id   . ":" . $hit->coverage . "\n";
   }
 
+}
+
+sub convert_coords_to_genomic{
+  my ($name, $start, $end, $input_id) = @_;
+
+  my ($chr_name, $chr_start, $chr_end) = $input_id =~ /$GB_INPUTID_REGEX/;
+  if($start - 1 == 0){
+    return ($chr_name, $start, $end);
+  }
+  my $genomic_start = $start+$chr_start-1;
+  my $genomic_end = $end+$chr_start-1;
+  
+  return($chr_name, $genomic_start, $genomic_end);
 }
 
 
