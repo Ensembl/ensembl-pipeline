@@ -300,7 +300,7 @@ sub run_exonerate {
   my ($self) = @_;
   my @res;
 
-  my $exr = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate(
+  my $exr = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
 							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
 							    '-genomic'   => $self->genomic_sequence,
 							    '-est'      => $self->blastdb
