@@ -1,11 +1,11 @@
 #
 # Config.pm - Object which reads and stores configuration information
 #
-# 
+#
 # You may distribute this module under the same terms as perl itself
 #
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -27,7 +27,7 @@ Bio::EnsEMBL::Pipeline::Config - Reads and stores configuration information
       print "$key = ", $config->get_parameter($key), "\n";
     }
   }
-  
+
   # Read config which has been stored in the database
   $config = Bio:EnsEMBL::Pipeline::Config->new
     (-dbname => 'pipedb',
@@ -38,7 +38,7 @@ Bio::EnsEMBL::Pipeline::Config - Reads and stores configuration information
 =head1 DESCRIPTION
 
 This module reads a configuration when instantiated, either from a set of 
-files or from a database.  
+files or from a database.
 
 If read from files the configuration is then stored in the database specified 
 within the configuration file.  A required header in the configuration file is
@@ -73,7 +73,7 @@ Configuration files have the following structure:
 
 The headers which begin with DEFAULT_ are special headers and their keys and
 values are propogated to all subsequent headers with the same postfix.  Default
-keys may be overridden, however.  
+keys may be overridden, however.
 
 =head1 CONTACT
 
@@ -88,7 +88,6 @@ methods. Internal methods are usually preceded with a _
 
 use strict;
 use warnings;
-
 
 package Bio::EnsEMBL::Pipeline::Config;
 
@@ -120,7 +119,6 @@ sub new {
 
   my $self = bless {}, $class;
 
- 
   $self->{'config'} = {};  #hash of hashes - will hold config as we build it up
 
   my ($files, $db) = $self->_rearrange([qw( FILES DB )], @_);
@@ -138,6 +136,8 @@ sub new {
     $self->{'_dbobj'} = $db;
 
     my $config_rows = $self->_read_db($db);
+  } else {
+    $self->throw('Either -DB or -FILES argument is required');
   }
 
   $self->_update_all_defaults();
@@ -230,20 +230,15 @@ sub _write_config_to_db {
 
 
 sub _parse_files {
-
-
   my $self = shift;
   my @files = shift;
 
   my %headers;     # will store names of headers and number of keys for each
 
   # read each file
-
   foreach my $file (@files) {
+    $self->throw("Configuration file $file not found\n") if (! -e $file);
 
-    if (! -e $file) {
-      $self->throw("Configuration file $file not found\n");
-    }
     my $header = "";
 
     open (FILE, $file);
@@ -251,37 +246,36 @@ sub _parse_files {
       chomp();
 
       # Comment or blank line
-      next if (/^\s$/ || /^\#/);
+      next if (/^\s*$/ || /^\s*\#/);
 
       # [HEADER]
-      if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
-	$header = lc($1);
-	$headers{$header} = 0;
-	#print "Reading stanza $header\n";
+      if (/^\[(.*)\]$/) {  # $1 will be the header name, without the []
+        $header = lc($1);
+        $headers{$header} = 0;
+        #print "Reading stanza $header\n";
       }
 
       # key=value
-      if (/^(\S+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
+      if (/^\s*(\S+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
+        # keys stored as all lowercase, values have case preserved
+        my $key = lc($1);
+        my $value = $2;
 
-	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
-	my $value = $2;
+        if (length($header) == 0) {
+          $self->throw("Found key/value pair $key/$value outside stanza");
+        }
 
-	if (length($header) == 0) {
-	  $self->throw("Found key/value pair $key/$value outside stanza");
-	}
-
-	#print "Key: $key Value: $value\n";
-
-	# Check if this header/key is already defined
-	if (exists($self->{'config'}->{$header}->{$key})) {
-	  $self->throw("$key is already defined for [$header]; cannot be redefined");
-	} else {
-	  # store them in the config hash
-	  $self->{'config'}->{$header}->{$key} = $value;
-	  #print "$header:$key=$value\n";
-	  $headers{$header}++;  # will be used to check for headers with no keys
-	}
-
+        # Check if this header/key is already defined
+        if (exists($self->{'config'}->{$header}->{$key})) {
+          $self->throw("$key is already defined for [$header];" .
+                       "cannot be redefined");
+        } else {
+          # store them in the config hash
+          $self->{'config'}->{$header}->{$key} = $value;
+          #print "$header:$key=$value\n";
+          # will be used to check for headers with no keys:
+          $headers{$header}++;
+        }
       }
 
     } # while <FILE>
@@ -300,7 +294,8 @@ sub _parse_files {
 
 }
 
-# modify the config hash so that default values are stored where no value is specified
+# modify the config hash so that default values are stored where no 
+# value is specified
 sub _update_all_defaults {
 
   my $self = shift;
@@ -310,38 +305,34 @@ sub _update_all_defaults {
 
     next if lc($header) =~ "^default";
 
-    if ($header =~ /^\w+_database$/i) { $self->_update_single_header_defaults($header, "DEFAULT_DATABASE"); }
-
-    elsif ($header =~ /^\w+_task$/i) { $self->_update_single_header_defaults($header, "DEFAULT_TASK"); }
-
-    else { $self->_update_single_header_defaults($header, "DEFAULT"); }
-	
+    if ($header =~ /^\w+_database$/i) {
+      $self->_update_single_header_defaults($header, "DEFAULT_DATABASE");
+    } elsif ($header =~ /^\w+_task$/i) {
+      $self->_update_single_header_defaults($header, "DEFAULT_TASK");
+    } else {
+      $self->_update_single_header_defaults($header, "DEFAULT");
+    }
   }
-
 }
 
 # put in defaults for all the keys for a specific header
 sub _update_single_header_defaults {
-
   my $self = shift;
   my $header = lc(shift);
   my $default_header = lc(shift);
 
-  if (exists($self->{'config'}->{$default_header})) {  # don't break if no default header is defined
-
+  # don't break if no default header is defined
+  if (exists($self->{'config'}->{$default_header})) {
     my @default_keys = $self->get_keys($default_header);
-
     my @current_keys = $self->get_keys($header);
 
     foreach my $key (@default_keys) {
-
       # if the key is not defined in current_keys, add the default
       if (!grep /^$key$/, @current_keys) {
-	my $value = $self->get_parameter($default_header, $key);
-	$self->{'config'}->{$header}->{$key} = $value;
+        my $value = $self->get_parameter($default_header, $key);
+        $self->{'config'}->{$header}->{$key} = $value;
       }
     }
-
   }
 
 }
@@ -350,11 +341,11 @@ sub _update_single_header_defaults {
 
   Arg [1]    : string $header
   Arg [2]    : string $key
-  Example    : 
+  Example    :
   Description: Gives a value, provided with a config header and key
   Returntype : string
-  Exceptions : 
-  Caller     : 
+  Exceptions :
+  Caller     :
 
 =cut
 
@@ -365,8 +356,8 @@ sub get_parameter {
   my $key    = lc(shift);
 
   if (!exists($self->{'config'}->{$header}->{$key})) {
-    my ($p, $f, $l) = caller;
-    $self->warn("Config key [$key] is not defined in header [$header] $f:$l");
+    #my ($p, $f, $l) = caller;
+    #$self->warn("Config key [$key] is not defined in header [$header] $f:$l");
     return undef;
   }
   return $self->{'config'}->{$header}->{$key};
