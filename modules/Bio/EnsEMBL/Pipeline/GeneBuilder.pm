@@ -106,6 +106,8 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_MIN_FEATURE_LENGTH
 							       GB_ABINITIO_TYPE
 							       GB_ABINITIO_SUPPORTED_TYPE
+							       GB_ABINITIO_PROTEIN_EVIDENCE
+							       GB_ABINITIO_DNA_EVIDENCE
 							       GB_MAXSHORTINTRONLEN
 							       GB_MINSHORTINTRONLEN
 							       GB_MAX_TRANSCRIPTS_PER_GENE
@@ -1400,7 +1402,7 @@ sub get_Predictions {
   my @checked_predictions;
   foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
     $prediction->type("ab-initio");
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
       $self->warn("We let in a prediction with wrong phases!");
     }
@@ -1430,7 +1432,23 @@ sub get_Predictions {
 sub get_Similarities {
   my ($self) = @_;
 
-  my @features = @{ $self->query->get_all_SimilarityFeatures('',$GB_MIN_FEATURE_SCORE) };
+  my @features;
+  if ($GB_ABINITIO_PROTEIN_EVIDENCE) {
+      foreach my $logic (@$GB_ABINITIO_PROTEIN_EVIDENCE) {
+	  push @features, @{ $self->query->get_all_ProteinAlignFeatures($logic,$GB_MIN_FEATURE_SCORE) };
+      }
+  }
+  else {
+      push @features, @{ $self->query->get_all_ProteinAlignFeatures('',$GB_MIN_FEATURE_SCORE) };
+  }
+  if ($GB_ABINITIO_DNA_EVIDENCE) {
+      foreach my $logic (@$GB_ABINITIO_DNA_EVIDENCE) {
+	  push @features, @{ $self->query->get_all_DnaAlignFeatures($logic,$GB_MIN_FEATURE_SCORE) };
+      }
+  }
+  else {
+      push @features, @{ $self->query->get_all_DnaAlignFeatures('',$GB_MIN_FEATURE_SCORE) };
+  }
   
   print STDERR "retrieved ".scalar(@features)." features\n";
   my %idhash;

@@ -48,24 +48,23 @@ use vars qw( %GeneBuilder );
 
 		GB_FINAL_GENETYPE           => 'ensembl',
 
-
-		# parameters for use of genscan predictions in final build
+		# parameters for use of genscan predictions in final build		
 		GB_USE_ABINITIO            => '0',
-
 		GB_ABINITIO_TYPE           => 'ab_initio',
-
 		GB_ABINITIO_SUPPORTED_TYPE => 'ab_initio_supported',
-		
+		GB_ABINITIO_PROTEIN_EVIDENCE => ['Swall'],
+		GB_ABINITIO_DNA_EVIDENCE     => ['Vertrna', 'Unigene'],
 		GB_MIN_GENSCAN_EXONS        => 4,
-
 		GB_GENSCAN_MAX_INTRON       => 15000,
 
-                # If you want to confirm prediction transcripts with pfam. This option is currently only used for anopheles. Use with caution as the result will be drastically different than what you get with the default option.
-	  GB_CONFIRM_PFAM             => '0',
+                # If you want to confirm prediction transcripts with pfam. 
+		# This option is currently only used for anopheles. 
+		# Use with caution as the result will be drastically different 
+		# than what you get with the default option.
+		GB_CONFIRM_PFAM             => '0',
 
-		# lower bound in the 'base align features' retireved in the genebuilder
+		# lower bound in the 'base align features' retrieved in the genebuilder
 		GB_MIN_FEATURE_SCORE        => 50,
-
 		GB_MIN_FEATURE_LENGTH       => 15,
 
 	        # are we running on slices or RawContigs? This may be obsolete
@@ -82,6 +81,10 @@ use vars qw( %GeneBuilder );
 		# introns between smaller than this is considered too short
 		GB_MAXSHORTINTRONLEN    => 15, 
 		
+		#
+		# the rest of these don't seem to be used any more
+		#
+
 		# introns longer than this are too long
 		GB_MINLONGINTRONLEN     => 10000, 
 		
