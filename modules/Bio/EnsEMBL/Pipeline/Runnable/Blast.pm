@@ -453,7 +453,7 @@ sub parse_results {
     # re-filter, with pruning
     my @allfeatures = $self->output;
     if ($self->threshold_type eq "PID") {
-      @allfeatures = sort {$b->percent-id <=> $a->percent_id} @allfeatures;
+      @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
     } else {
       @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
     }
