@@ -204,7 +204,8 @@ sub _clone_Exon{
   $newexon->dbID       ($exon->dbID);
   $newexon->contig     ($exon->contig);
   $newexon->seqname    ($exon->seqname);
-  
+  $newexon->analysis   ($exon->analysis);
+
   if ( defined( $exon->stable_id ) ){
       $newexon->stable_id( $exon->stable_id );
       $newexon->created( $exon->created );
