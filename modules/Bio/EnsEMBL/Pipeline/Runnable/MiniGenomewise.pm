@@ -74,7 +74,7 @@ sub new {
 	    my @t = @$transcripts;
 	    
 	    foreach my $t (@t) {
-		$self->addTranscript($t);
+		$self->add_Transcript($t);
 	    }
 	} else {
 	    $self->throw("[$transcripts] is not an array ref.");
@@ -104,21 +104,21 @@ sub genomic_sequence {
     return $self->{'_genomic_sequence'};
 }
 
-=head2 addTranscript
+=head2 add_Transcript
 
-    Title   :   addTranscript
-    Usage   :   $self->addTranscript($t)
+    Title   :   add_Transcript
+    Usage   :   $self->add_Transcript($t)
     Function:   Adds a transcript to the object for realigning
     Returns :   Bio::EnsEMBL::Transcript
     Args    :   Bio::EnsEMBL::Transcript
 
 =cut
 
-sub addTranscript {
+sub add_Transcript {
     my( $self, $value ) = @_;
     
     if(!defined($self->{'_transcripts'})) {
-	$self->{'_trasncripts'} = [];
+	$self->{'_transcripts'} = [];
     }
 
     if ($value) {
@@ -145,12 +145,33 @@ sub get_all_Transcripts {
     return (@{$self->{'_transcripts'}});
 }
 
+=head2 miniseq
+
+    Title   :   miniseq
+    Usage   :   $self->miniseq($ms)
+    Function:   get/set for miniseq
+    Returns :   Bio::EnsEMBL::Pipeline::MiniSeq
+    Args    :   Bio::EnsEMBL::Pipeline::MiniSeq
+
+=cut
+
+sub miniseq {
+    my( $self, $miniseq ) = @_;
+    
+    if ($miniseq) {
+        $miniseq->isa("Bio::EnsEMBL::Pipeline::MiniSeq") || $self->throw("[$miniseq] isn't a Bio::EnsEMBL::Pipeline::MiniSeq");
+	$self->{'_miniseq'} = $miniseq;
+    }
+
+    return $self->{'_miniseq'};
+}
+
 =head2 make_miniseq
 
     Title   :   make_miniseq
-    Usage   :   my $miniseq = $self->make_miniseq
+    Usage   :   $self->make_miniseq
     Function:   produces a miniseq 
-    Returns :   Bio::EnsEMBL::Pipeline::MiniSeq
+    Returns :   nothing
     Args    :   none
 
 =cut
@@ -180,7 +201,7 @@ sub make_miniseq {
       }
     }
 
-    @exons = sort {$a->start <=> $b->start} @exons;
+
 
     my $count  = 0;
     my $mingap = $self->minimum_intron;
@@ -194,10 +215,10 @@ sub make_miniseq {
 
       my $start = $exon->start;
       my $end   = $exon->end;
-      
+      print STDERR "input exon coords: $start - $end\n";
       $start = $exon->start - $self->exon_padding;
       $end   = $exon->end   + $self->exon_padding;
-
+      print STDERR "padded exon coords: $start - $end\n";
       if ($start < 1) { $start = 1;}
       if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
 
@@ -205,11 +226,9 @@ sub make_miniseq {
 
       if ($count > 0 && ($gap < $mingap)) {
 	  if ($end < $prevend) { $end = $prevend;}
-	    
 	  $genomic_features[$#genomic_features]->end($end);
 	  $prevend = $end;
       } else {
-	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
 	    
 	    $newfeature->seqname   ('genomic');
@@ -258,7 +277,7 @@ sub make_miniseq {
     my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => 'miniseq',
 						      -pairalign => $pairaln);
 
-    return $miniseq;
+    $self->miniseq($miniseq);
 
 }
 
@@ -300,6 +319,7 @@ sub exon_padding {
     }
 
     return $self->{'_padding'} || 100;
+#    return $self->{'_padding'} || 1000;
 
 }
 
@@ -316,26 +336,27 @@ sub exon_padding {
 sub run {
   my ($self) = @_;
   
-  my $analysis_obj    = new Bio::EnsEMBL::Analysis
-    (-db              => undef,
-     -db_version      => undef,
-     -program         => "genomewise",
-     -program_version => 1,
-     -gff_source      => 'genomewise',
-     -gff_feature     => 'similarity');
 
   # make miniseq representation to cover all transcripts
   $self->make_miniseq;
 
   my $genomewise = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
-  $genomewise->seq($miniseq->get_cDNA_sequence);
+  $genomewise->seq($self->miniseq->get_cDNA_sequence);
+  print STDERR ">miniseq\n" . $self->miniseq->get_cDNA_sequence->seq . "\n";
+#  $genomewise->seq($self->genomic_sequence);
   foreach my $t($self->get_all_Transcripts){
     $genomewise->add_Transcript($t);
   }
   
   $genomewise->run;
 
-  $self->convert_output($genomewise->output);
+  foreach my $transcript($genomewise->output){
+    foreach my $exon($transcript->get_all_Exons){
+      print STDERR "predicted exon coords: " . $exon->start . "-" . $exon->end . "\n";
+    }
+  }
+
+#  $self->convert_output($genomewise->output);
 }
 
 
@@ -351,23 +372,33 @@ sub run {
 
 sub convert_output{ 
   my ($self, @transcripts) = @_;
+  my $analysis_obj    = new Bio::EnsEMBL::Analysis
+    (-db              => undef,
+     -db_version      => undef,
+     -program         => "genomewise",
+     -program_version => 1,
+     -gff_source      => 'genomewise',
+     -gff_feature     => 'similarity');
 
   print STDERR "number of transcripts: " . scalar(@transcripts)  . "\n";
   
  TRANSCRIPT: 
-  foreach my $t (@transcripts) {
+  foreach my $transcript (@transcripts) {
     my @newexons;
 
     # convert coordinates exon by exon
     my $ec = 0;
   EXON:
     foreach my $exon($transcript->get_all_Exons){
+
+      print STDERR "output exon coords: " . $exon->start . "-" . $exon->end . "\n";
+
       $ec++;
 
       my $phase  = $exon->phase;
       my $strand = $exon->strand;
 
-      my @genomics = $miniseq->convert_SeqFeature($exon);         
+      my @genomics = $self->miniseq->convert_SeqFeature($exon);         
       if ($#genomics > 0) {
 	# for now, ignore this exon.
 	print STDERR "Warning : miniseq exon converts into > 1 genomic exon " . scalar(@genomics) . " ignoring exon $ec\n";
