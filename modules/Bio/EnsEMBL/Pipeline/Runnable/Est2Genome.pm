@@ -138,7 +138,7 @@ sub genomic_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
         $self->{'_genomic_sequence'} = $value;
-                                                                                                                                               $self->filename($value->id.".$$.seq");
+        $self->filename($value->id.".$$.seq");
         $self->results($self->filename.".est_genome.out");
     }
     return $self->{'_genomic_sequence'};
