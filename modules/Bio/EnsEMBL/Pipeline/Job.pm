@@ -354,8 +354,9 @@ sub flush_runs {
       }
     } else {
     
-      foreach my $jobid ( @{$batched_jobs{$queue}} ) {
-        my $job = $adaptor->fetch_by_dbID( $jobid );
+      # SCP - fetch/update a collection of jobs all at once
+      my @jobs = $adaptor->fetch_by_dbID_list(@{$batched_jobs{$queue}});
+      foreach my $job ( @jobs ) {
         if( $job->retry_count > 0 ) {
           for ( $job->stdout_file, $job->stderr_file ) {
             open( FILE, ">".$_ ); close( FILE );
@@ -365,8 +366,8 @@ sub flush_runs {
         # $job->create_lsflogfile;
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
-        $adaptor->update( $job );
       }
+      $adaptor->update( @jobs );
     }
     $batched_jobs{$queue} = [];
     $batched_jobs_runtime{$queue} = 0;
