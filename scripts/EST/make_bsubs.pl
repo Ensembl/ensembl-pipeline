@@ -41,6 +41,11 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_GENEBUILDER_CHUNKSIZE
 					EST_FILE
 					EST_RUNNER
+					EST_GENE_RUNNER
+					MAP_GENES_TO_ESTS
+					EST_EXPRESSION_RUNNER
+					EST_EXPRESSION_CHUNKSIZE
+					EST_EXPRESSION_BSUBS
 				       );
 
 my %chrhash;
@@ -50,6 +55,7 @@ my $ex_resultsdir       = "exonerate_est/results";
 my $ex_bsubdir          = "exonerate_est/bsub";
 my $filterdir           = "filter_and_e2g";
 my $est_genebuilder_dir = "est_genebuilder";
+my $gene2expression_dir = "gene2ests";
 
 # get chr info from the database where you have contig, clone and static_golden_path
 &get_chrlengths();
@@ -65,6 +71,11 @@ my $est_genebuilder_dir = "est_genebuilder";
 
 # create jobs file for EST_GeneBuilder
 &make_EST_GeneBuilder_bsubs();
+
+# create jobs file MapGeneToExpression 
+if ( $MAP_GENES_TO_ESTS ){
+  &make_MapGeneToExpression_bsubs();
+}
 
 =head2 make_directories
 
@@ -118,7 +129,17 @@ sub make_directories {
     my $chrdir = $estbuilder_path . $chr . "/";
     makedir($chrdir);
   }
-
+  
+  # MapGeneToExpression directories
+  if ( $MAP_GENES_TO_ESTS ){
+    my $gene2expression_path = $scratchdir . "/" . $gene2expression_dir . "/";
+    makedir($gene2expression_path);
+    
+    foreach my $chr (keys %chrhash){
+      my $chrdir = $gene2expression_path . $chr . "/";
+      makedir($chrdir);
+    }
+  }
 }
 
 =head2 get_chrlengths
@@ -293,6 +314,57 @@ sub make_EST_GeneBuilder_bsubs{
 
   close (OUT) or die (" Error closing $jobfile: $!");
 }
+
+=head2 make_MapGeneToExpression_bsubs
+
+    Function: makes bsubs to run MapGeneToExpression
+
+=cut
+
+sub make_MapGeneToExpression_bsubs{
+  my $jobfile    = $EST_EXPRESSION_BSUBS;
+  my $scratchdir = $EST_TMPDIR;
+  my $queue      = $EST_QUEUE;
+  my $scriptdir  = $EST_SCRIPTDIR;
+
+  open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
+
+  # where out and err files go
+  my $filter = $scratchdir . "/" .  $gene2expression_dir . "/";
+
+  # genomic size for each job
+  my $size   = $EST_EXPRESSION_CHUNKSIZE;
+  my $runner = $EST_EXPRESSION_RUNNER;
+
+  foreach my $chr(keys %chrhash) {
+    my $length = $chrhash{$chr};
+    
+    my $chrdir = $filter . "$chr";
+    my $count = 1;
+
+    while($count < $length) {
+      my $start = $count;
+      my $end   = $count + $size -1;
+      
+      if ($end > $length) {
+	$end = $length;
+      }
+      
+      my $input_id = $chr . "." . $start . "-" .  $end;
+      my $outfile  = $chrdir . "/$input_id.out";
+      my $errfile  = $chrdir . "/$input_id.err";
+
+      # if you don't want it to write to the database, eliminate the -write option
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression -input_id $input_id -write";
+      print OUT "$command\n";
+
+      $count = $count + $size;
+    }
+  }
+
+  close (OUT) or die (" Error closing $jobfile: $!");
+}
+
 
 =head2 makedir
 
