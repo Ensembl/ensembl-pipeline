@@ -495,8 +495,8 @@ sub _filter_genes {
       my $coverage = ($matching_bases / $exon_length) * 100;
       print STDERR "matching: $matching_bases / elength: $exon_length  = coverage: $coverage threshold: $threshold\n";
 
-#      next GENE unless $coverage >= $threshold;
-      next GENE unless $coverage ge $threshold;
+      next GENE unless $coverage >= $threshold;
+  #    next GENE unless $coverage ge $threshold;
     }
 
     push(@filtered, $gene);
