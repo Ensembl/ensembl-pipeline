@@ -12,7 +12,9 @@
 ## ok 3  [not ok 3 (if test fails)]
 ##
 ## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+#
+# NOTE - you MUST have an entry in Pipeline/Config/Blast.pm for 'mini_mrna.fa'
+# for the blast runnable to be able to run.
 
 
 ## We start with some black magic to print on failure.
@@ -50,7 +52,7 @@ my $exon = Bio::EnsEMBL::Exon->new;
 $exon->start(33739);
 $exon->end  (33870);
 $exon->strand (1);
-$exon->attach_seq($genomic_seq);
+$exon->seq($genomic_seq);
 $exon->end_phase(0);
 
 $pred_transcript->add_Exon($exon);
@@ -60,7 +62,7 @@ $exon = Bio::EnsEMBL::Exon->new;
 $exon->start(33988);
 $exon->end  (34192);
 $exon->strand (1);
-$exon->attach_seq($genomic_seq);
+$exon->seq($genomic_seq);
 $exon->end_phase(1);
 
 $pred_transcript->add_Exon($exon);
@@ -77,15 +79,16 @@ $db_home .= '/t/data';
 $ENV{'BLASTDB'} = "$db_home";
 $database = 'mini_mrna.fa';
 # Make a BlastGenscanDNA object.
-my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new ( 
-                                                    -genomic    => $genomic_seq,
-                                                    -peptide    => $pred_transcript,
-						    -program    => 'wutblastn',
-                                            # Hardcoded path alert
-                                                    -database   => $database,
-                                                    -threshold  => 1e-6,
-                                                    -options    => 'B=1000'
-                                                    );
+my $blastgenscan = 
+  Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new ( 
+    -genomic    => $genomic_seq,
+    -peptide    => $pred_transcript,
+    -program    => 'wutblastn',
+    # Hardcoded path alert
+    -database   => $database,
+    -threshold  => 1e-6,
+    -options    => 'B=1000'
+  );
 
 unless (defined($blastgenscan))
 { print "not ok 4\n"; }
