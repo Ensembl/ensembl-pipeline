@@ -165,7 +165,7 @@ sub new {
   # $exon_match       = 0,
 
   # to get some blah,blah
-  $self->verbose(1);
+  $self->verbose(0);
 
 
   if ( $comparison_level ){
@@ -223,14 +223,16 @@ sub solutions{
   my ($self,$node) = @_;
   my @all_solutions;
 
-  print STDERR "solution at node: $node\n";
+  my $verbose = $self->verbose;
+
+  print STDERR "solution at node: ".$node->transcript->dbID."\n" if $verbose;
   
   # if node has extension parents
   if ( @{$node->extension_parents} ){
       
       if ( scalar(@{$node->extension_parents}) > 1 ){
 	  my @paps = map { $_->transcript->dbID } @{$node->extension_parents};
-	  print STDERR "node ".$node->transcript->dbID." has ".scalar( @{$node->extension_parents})." parents: @paps\n";
+	  print STDERR "node ".$node->transcript->dbID." has ".scalar( @{$node->extension_parents})." parents: @paps\n" if $verbose;
       }
 
   PARENT:
@@ -269,7 +271,7 @@ sub solutions{
     }
   }
   else{
-    print STDERR "no ext-parent - collecting inclusion-children and itself\n";
+    print STDERR "no ext-parent - collecting inclusion-children and itself\n" if $verbose;
     my $list = [];
     $self->collect_inclusion_children($node,$list);
     #$node->collected(1);
@@ -291,7 +293,10 @@ sub solutions{
 
 sub collect_inclusion_children{
   my ($self, $node, $list) = @_;
-  print STDERR "collecting inclusion tree from node ".$node->transcript->dbID."\n";
+
+  my $verbose = $self->verbose;
+
+  print STDERR "collecting inclusion tree from node ".$node->transcript->dbID."\n" if $verbose;
   my $generation = 1;
   if ( @{$node->inclusion_children} ){
     my @next_generation = @{$node->inclusion_children};
@@ -326,13 +331,13 @@ sub link_Transcripts{
   
   my @all_solutions;  
 
-  my $verbose  = 1;
+  my $verbose  = $self->verbose;
   
   # look in each cluster
  CLUSTER:
   foreach my $cluster ( @{ $transcript_clusters} ){
     
-    print STDERR "~~~ CLUSTER ~~~\n";
+    print STDERR "~~~ CLUSTER ~~~\n" if $verbose;
 
     # matrix for cacheing the comparison results
     my %overlap_matrix;
@@ -356,13 +361,13 @@ sub link_Transcripts{
     
     # just to track the sets
     # take 10 in each cluster
-    my @reduced_cluster;
-    my $count = 0;
-    while ( @transcripts && $count<10 ){
-	push(@reduced_cluster,shift @transcripts);
-	$count++;
-    }
-    @transcripts = @reduced_cluster;
+    #my @reduced_cluster;
+    #my $count = 0;
+    #while ( @transcripts && $count<10 ){
+    #push(@reduced_cluster,shift @transcripts);
+    #$count++;
+    #}
+    #@transcripts = @reduced_cluster;
     
 
     ############################################################
@@ -375,7 +380,7 @@ sub link_Transcripts{
 	# put this in a node
 	my $newnode = Bio::EnsEMBL::Pipeline::Node->new();
 	$newnode->transcript($transcript);
-	print STDERR "newnode: ".$newnode->transcript->dbID."\n";
+	print STDERR "newnode: ".$newnode->transcript->dbID."\n" if $verbose;
 	
 	# initialize the tags
 	$self->flush_visited_tags;
@@ -392,9 +397,9 @@ sub link_Transcripts{
 	my $result = $self->check_tree($newnode,$all_the_leaves);
 	unless ( $result eq 'placed'){
 	    if ( $newnode->is_included ){
-		print STDERR "####### WARNING: adding leaf that is included in other node\n";
+		print STDERR "####### WARNING: adding leaf that is included in other node\n" if $verbose;
 	    }
-	    print STDERR "adding new leaf: ".$newnode->transcript->dbID."\n";
+	    print STDERR "adding new leaf: ".$newnode->transcript->dbID."\n" if $verbose;
 	    push( @$all_the_leaves, $newnode);
 	    
 	}
@@ -419,13 +424,13 @@ sub link_Transcripts{
     ############################################################
     my @solutions;
     my @t = map {$_->transcript->dbID} @$all_the_leaves;
-    print STDERR "**** LEAVES: @t\n";
-    print STDERR "******************************************************\n";
+    print STDERR "**** LEAVES: @t\n" if $verbose;
+    #print STDERR "******************************************************\n";
     
     foreach my $leaf ( @$all_the_leaves ){
-	print STDERR "finding solutions from leaf ".$leaf->transcript->dbID."\n";
+	print STDERR "finding solutions from leaf ".$leaf->transcript->dbID."\n" if $verbose;
 	my @sol = @{$self->solutions($leaf)};
-	print STDERR scalar(@sol)." solutions found\n";
+	print STDERR scalar(@sol)." solutions found\n" if $verbose;
 	push (@solutions, @{$self->solutions($leaf)} );
     }
     # @solutions is a list of listrefs holding the different non-redundant lists
@@ -458,9 +463,11 @@ sub link_Transcripts{
 sub _check_leaves{
     my ($self,$leaves) = @_;
     my $copy_leaves;
+    my $verbose = $self->verbose;
+
     foreach my $leaf (@$leaves){
 	if ( $leaf->is_included || $leaf->is_extended ){
-	    print STDERR "rejecting leaf ".$leaf->transcript->dbID." for being included/extended\n";
+	    print STDERR "rejecting leaf ".$leaf->transcript->dbID." for being included/extended\n" if $verbose;
 	    next;
 	}
 	push( @$copy_leaves, $leaf );
@@ -478,7 +485,7 @@ sub check_tree{
     
     # tree is a ref to a list of leaves
     my @ids = map { $_->transcript->dbID } @$tree;
-    print STDERR "checking tree @ids:\n";
+    print STDERR "checking tree @ids:\n" if $verbose;
     my @nodes_to_check = @$tree;
     
     # as we check we regenerate the leaves as needed
@@ -510,7 +517,7 @@ sub check_tree{
 	    if ( $is_leaf{$node} && !$added{$node} ){
 		push( @$newleaves, $node );
 	    }
-	    print STDERR "skipping visited node\n";
+	    print STDERR "skipping visited node\n" if $verbose;
 	    next NODE;
 	}
 	print STDERR "check_tree(): node = ".$node->transcript->dbID."\n" if $verbose;
@@ -551,7 +558,7 @@ sub check_tree{
 	    # check whether newnode is a new leaf
 	    if ( !$root && !$newnode->is_extended && !$newnode->is_included ){
 		if ( $added{$newnode} ){
-		    print STDERR "newnode is already a leaf\n";
+		    print STDERR "newnode is already a leaf\n" if $verbose;
 		}
 		unless ( $added{$newnode} ){
 		    print STDERR "adding newnode as leaf\n" if $verbose;
@@ -585,7 +592,7 @@ sub check_tree{
 		############################################################
 		# add to the root if it is included in it 
 		if ( $root && $self->compare( $newnode, $root) eq 'inclusion' ){
-		    print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$root->transcript->dbID."\n";
+		    print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$root->transcript->dbID."\n" if $verbose;
 		    $root->add_inclusion_child( $newnode );
 		    $newnode->is_included(1);
 		    $self->tag_extension_ancestors($root);
@@ -643,7 +650,7 @@ sub check_tree{
 		# and our placed node is not extended nor included, it is a new leaf
 		if ( !$root && !$newnode->is_extended && !$newnode->is_included ){
 		    if ( $added{$newnode} ){
-			print STDERR "newnode is already a leaf\n";
+			print STDERR "newnode is already a leaf\n" if $verbose;
 		    }
 		    unless ( $added{$newnode} ){
 			print STDERR "adding newnode as leaf\n" if $verbose;
@@ -664,7 +671,7 @@ sub check_tree{
 	    elsif ($result2 eq 'clash' ){
 		if ( @{$node->extension_parents} ){
 		    my @parents = map { $_->transcript->dbID }  @{$node->extension_parents};
-		    print STDERR "adding extension parents ( @parents) to the list to check\n";
+		    print STDERR "adding extension parents ( @parents) to the list to check\n" if $verbose;
 		    foreach my $parent ( @{$node->extension_parents} ){
 			unless ( $added_parent{ $parent } ){
 			    push( @nodes_to_check, $parent );
@@ -738,7 +745,7 @@ sub _check_for_closed_loops{
 	    next if $parent == $node;
 	    if ( $self->compare( $node, $parent ) eq 'inclusion' ){
 		print STDERR "potential extension parent ".$node->transcript->dbID.
-		    " is included in an extension parent ".$parent->transcript->dbID."\n";
+		    " is included in an extension parent ".$parent->transcript->dbID."\n" if $verbose;
 		return 0;
 	    }
 	}
@@ -766,7 +773,7 @@ sub _recurse_inclusion_tree{
   ############################################################
   # if the inclusion tree is not valid, skip to the next node to check
   elsif( !defined $node->inclusion_tree && @{$node->inclusion_children} ){
-      print STDERR "not-valid inclusion tree -> continue\n";
+      print STDERR "not-valid inclusion tree -> continue\n" if $verbose;
       return 'continue';
   }
   ############################################################
@@ -788,44 +795,29 @@ sub check_node{
   if ( $newnode == $node || $newnode->transcript == $node->transcript ){
     $self->throw( "<<<<<< Comparing node with its self - something has gone wrong - exiting >>>>>");
   }
-
+  
   my $verbose = $self->verbose;
   
   #print STDERR "check_node(): newnode: $newnode, node: $node\n" if $verbose;
   my $result = $self->compare( $newnode, $node );
-  print STDERR "check_node(); result = $result\n";
+  print STDERR "check_node(); result = $result\n" if $verbose;
 
-  ############################################################
-  # if there is no overlap we want to skip it
-  ############################################################
-  if ( $result eq 'no-overlap' ){
-      return 'no-overlap';
-  }
-  ############################################################
-  # extension is picked-up as soon as it happens
-  ############################################################
-  elsif( $result eq 'extension' ){
-      return 'extension';
-  }
-  ############################################################
-  # if clash, return clash, check_tree will recurse on the inclusion tree
-  ############################################################
-  elsif ( $result eq 'clash' ){
-    return 'clash';
-  }
   ############################################################
   # inclusion is recursive in the extension tree
   ############################################################
-  elsif( $result eq 'inclusion' ){
-    print STDERR "inclusion:\n";
-    my $result2 = $self->_recurse_extension_branch( $newnode, $node, 'inclusion');
-    if ( $result eq 'placed' ){
-      return 'placed';
-    }
-    else{
-      print STDERR "returning ".$result2."\n" if $verbose;
-      return $result2;
-    }
+  if( $result eq 'inclusion' ){
+      print STDERR "inclusion:\n" if $verbose;
+      my $result2 = $self->_recurse_extension_branch( $newnode, $node, 'inclusion');
+      if ( $result eq 'placed' ){
+	  return 'placed';
+      }
+      else{
+	  print STDERR "returning ".$result2."\n" if $verbose;
+	  return $result2;
+      }
+  }
+  else{
+      return $result;
   }
 }
 
@@ -840,7 +832,7 @@ sub _recurse_extension_branch{
   ############################################################
   # recurse along the extension branch if there is any
   if ( @{$node->extension_parents} ){
-      print STDERR "inclusion -> go to extension parent\n";
+      print STDERR "inclusion -> go to extension parent\n" if $verbose;
       my $placed = 0;
       
     PARENT:
@@ -848,7 +840,7 @@ sub _recurse_extension_branch{
 	  
 	  # skip if already visited (extended)
 	  if ( $self->is_visited($parent_node) ){
-	      print STDERR "skipping this node - already visited\n";
+	      print STDERR "skipping this node - already visited\n" if $verbose;
 	      next PARENT;
 	  }
 	  
@@ -870,7 +862,7 @@ sub _recurse_extension_branch{
 		      $placed++;
 		  }
 		  ############################################################
-		  # place here is no overlap, we know it is included
+		  # place here if no overlap, we know it is included
 		  elsif( $result3 eq 'continue' || $result3 eq 'no-overlap' ){
 		      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
 		      $node->add_inclusion_child($newnode);
@@ -878,7 +870,7 @@ sub _recurse_extension_branch{
 		      $self->tag_extension_ancestors($node);
 		      if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
 			  print STDERR "adding extension of ".
-			      $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n";
+			      $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
 			  $newnode->add_extension_parent($parent_node);
 			  $parent_node->is_extended(1);
 			  $self->tag_extension_ancestors($parent_node);
@@ -897,7 +889,7 @@ sub _recurse_extension_branch{
 		  $self->tag_extension_ancestors($node);
 		  if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
 		      print STDERR "adding extension of ".
-			  $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n";
+			  $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
 		      $newnode->add_extension_parent($parent_node);
 		      $parent_node->is_extended(1);
 		      $self->tag_extension_ancestors($parent_node);
@@ -916,14 +908,14 @@ sub _recurse_extension_branch{
 	  return 'placed';
       }
       else{
-	  print STDERR "could not place it - continue\n";
+	  print STDERR "could not place it - continue\n" if $verbose;
 	  return 'continue';
       }
   }
   ############################################################
   # else, check the inclusion branch if any
   elsif ( defined $node->inclusion_tree ){
-      print STDERR "inclusion -> go to inclusion tree\n";
+      print STDERR "inclusion -> go to inclusion tree\n" if $verbose;
       return $self->check_tree( $newnode, $node->inclusion_tree , $node);
   }
   #elsif( @{$node->inclusion_children} && !defined $node->inclusion_tree ){
@@ -938,7 +930,7 @@ sub _recurse_extension_branch{
   else{
       
       # place here
-      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n";
+      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
       $node->add_inclusion_child( $newnode );
       $newnode->is_included(1);
       $self->tag_extension_ancestors($node);
@@ -975,8 +967,8 @@ sub compare{
   my %overlap_matrix = %{$self->matrix};
 
   if ( defined( $overlap_matrix{$newtrans}{$trans} ) ){
-    print STDERR "Using cached matrix\n";
-    return $overlap_matrix{$newtrans}{$trans};
+      #print STDERR "Using cached matrix\n";
+      return $overlap_matrix{$newtrans}{$trans};
   }
   else{
     $overlap_matrix{$newtrans}{$trans} = $comparator->discrete_compare($newtrans, $trans);
@@ -1007,9 +999,11 @@ sub is_visited{
   #unless( $self->{_visited} ){
   #  $self->{_visited} = {};
   #}
+  my $verbose = $self->verbose;
+
   if ( $node && defined $boolean){
     $self->{_visited}{$node} = $boolean;
-    print STDERR "tagging node ".$node->transcript->dbID." as visited (".$self->{_visited}{$node}.")\n";
+    print STDERR "tagging node ".$node->transcript->dbID." as visited (".$self->{_visited}{$node}.")\n" if $verbose;
     return $self->{_visited}{$node};
   }
   return $self->{_visited}{$node};
