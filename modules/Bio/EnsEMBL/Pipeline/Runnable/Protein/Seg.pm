@@ -45,7 +45,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 
 use vars qw(@ISA);
 use strict;
-
+use warnings;
 
 use Bio::EnsEMBL::Pipeline::Runnable::Protein_Annotation;
 
@@ -73,8 +73,8 @@ sub multiprotein{
 sub run_analysis {
   my ($self) = @_;
   # run program
-  print STDERR "Running ".$self->program." ".$self->filename." -l > ".
-    $self->results."\n";
+  #print STDERR "Running ".$self->program." ".$self->filename." -l > ".
+  #  $self->results."\n";
   $self->throw ("Error running ".$self->program." on ".$self->filename) 
     unless ((system ($self->program." ".$self->filename." -l > ".
                      $self->results)) == 0); 
@@ -101,7 +101,7 @@ sub parse_results {
   if (-e $resfile) {
     # it's a filename
     if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
+	    #print STDERR $self->program." didn't find anything\n";
 	    return;
     }else {
       open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
@@ -117,12 +117,13 @@ sub parse_results {
     chomp;
     next if /^$/;
     if (/^\>/) {
-      /^\>\s*(\S+)\s*\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
-      my $id = $1;
-      my $start = $2;
-      my $end = $3;
-      my $score = $4;
-      my $fp = $self->create_protein_feature($start, $end, $score, $id, 
+       /^\>(\S+)?\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+       my $tid = $1;
+       my $start = $2;
+       my $end = $3;
+       my $score = $4;
+       
+      my $fp = $self->create_protein_feature($start, $end, $score, $tid, 
                                              0, 0, 'Seg', 
                                              $self->analysis, 0, 0);
       $self->add_to_output($fp);
@@ -200,15 +201,17 @@ sub get_low_complexity_length {
 	my ($self) = @_;
 
 	my $lc_length = 0;
-
+  my ($p, $f, $l) = caller;
 	foreach my $feat ($self->output) {
 		$lc_length += abs($feat->end - $feat->start) + 1;
 	}
     
 	my $low_complexity = ($lc_length)/($self->query->length);
-
+  #print STDERR "Have lc_length ".$lc_length." and query length ".
+  #  $self->query->length." $f:$l\n";
+  #print STDERR "Have low complexity ".$low_complexity."\n";
 	$low_complexity *= 100;
-
+  #print STDERR "Have low complexity*100 ".$low_complexity."\n";
 	return $low_complexity;
 }
 
