@@ -85,6 +85,7 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
     -host             => $host,
     -user             => $dbuser,
     -dbname           => $dbname,
+    -pass             => $pass,
     -perlonlyfeatures => 0
 );
 
