@@ -54,7 +54,8 @@ create a mysql database to hold the information
 
 ---
 
-use the sql file in ensembl-pipeline/sql
+use the sql file in ensembl/sql for most tables
+if you are going to run raw computes you also need ensembl-pipeline/sql
 
 WormBase_analysis.sql to load the analysis table
 
@@ -97,6 +98,18 @@ if you want debug on
 WB_SEQ_IDS, WB_NON_TRANSFORM, WB_NON_TRANSLATE
 
 files to write problem areas info to 
+
+WB_NEW_CONTIGS 
+
+path to file to write data to be loaded into input_id_analysis table if you are running transfer_raw_computes.pl if you have a database with exisiting raw computes in
+
+WB_SUBMIT_CONTIG_ID
+
+the analysis id of the submit contig analysis in the analysis table if running the transfer_raw_compute.pl script
+
+WB_RAW_COMPUTES
+
+set this to 0 there aren't existing raw computes and it will put entries into the input_id_analysis table
 
 ---
 
@@ -170,6 +183,19 @@ the location of the exons and the assembly is changed to reflect the new contig
 
 the translation is checked again if it still doesn't translate the id is written to a file so it can be further investigated
 
+--------------
+ Raw computes
+--------------
+
+If you haven't already got any raw computes set WB_RAW_COMPUTES 0 it will fill the input_id_analysis table then provided you have the rule and analysis tables set up correctly you shuld just have to run the RuleManager3.pl script
+
+if you already have existing raw computes you need to run transfer_raw_computes to put them into the new database then run rule manager on the new contigs if there are any
+
+-------------
+ Data Checks
+-------------
+
+follow the ensembl-docs/post_genebuild_checks.txt to check the data
 
 
 
