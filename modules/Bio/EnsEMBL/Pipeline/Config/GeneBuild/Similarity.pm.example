@@ -78,6 +78,8 @@ use vars qw( %Similarity );
 	     #the above setting will lead to RepeatMasker features being masked out, if [] is used no masking will take place, if [''] is used all repeats in the table will be masked out
 	     #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
 	       GB_SIMILARITY_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
+		#No similarity genes will be build overlapping the gene type put in this list. If nothing is put, the default will be to take Targetted genewise genes
+	       GB_SIMILARITY_GENETYPEMASKED => [],
 	   );
 
 sub import {
