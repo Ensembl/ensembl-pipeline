@@ -70,7 +70,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = bless {}, $class;
 
-  $self->{'_fp_array'} =[];
+  $self->{'_fp_array'} = [];
   my ($seq1, $seq2, $min_score, $min_eval, $workdir) = 
     $self->_rearrange([qw(SEQ1 SEQ2 MIN_SCORE MIN_EVAL WORKDIR)], @args);
 
@@ -212,7 +212,7 @@ sub min_eval {
 
 sub run {
   my ($self) = @_;
-  print "self: ",$self,"\n";
+
   # dump sequences to work directory
   my $query = $self->workdir."/query.".$$;
   my $sbjct = $self->workdir."/sbjct.".$$;
@@ -291,6 +291,16 @@ sub _add_fp {
     warn "WARN: Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->_add_fp should have an argument\n";
   }
 }
+
+=head2 output
+
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   Returns all output feature pairs
+    Returns :   Array of Bio::EnsEMBL::FeaturePairs
+    Args    :   None
+
+=cut
 
 sub output {
   my ($self) = @_;
