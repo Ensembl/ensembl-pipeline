@@ -1,0 +1,17 @@
+INSERT INTO prediction_transcript VALUES (1,1,1,35639,35816,-1,0,8.97,0.643,1,6);
+INSERT INTO prediction_transcript VALUES (1,2,1,33932,34045,-1,1,1.4,0.708,1,6);
+INSERT INTO prediction_transcript VALUES (1,3,1,24872,24980,-1,1,11.12,0.965,1,6);
+INSERT INTO prediction_transcript VALUES (1,4,1,13747,13850,-1,2,-2.8,0.943,1,6);
+INSERT INTO prediction_transcript VALUES (1,5,1,13411,13658,-1,1,7.36,0.927,1,6);
+INSERT INTO prediction_transcript VALUES (1,6,1,12613,12723,-1,0,3.86,0.81,1,6);
+INSERT INTO prediction_transcript VALUES (2,1,1,53839,54032,1,0,7.89,0.889,1,7);
+INSERT INTO prediction_transcript VALUES (2,2,1,57359,57493,1,2,10.16,0.895,1,7);
+INSERT INTO prediction_transcript VALUES (2,3,1,57841,57943,1,2,3.16,0.432,1,7);
+INSERT INTO prediction_transcript VALUES (2,4,1,81608,81708,1,0,3.89,0.499,1,7);
+INSERT INTO prediction_transcript VALUES (2,5,1,109250,109388,1,2,-1.95,0.034,1,7);
+INSERT INTO prediction_transcript VALUES (2,6,1,120362,120740,1,0,12.61,0.266,1,7);
+INSERT INTO prediction_transcript VALUES (2,7,1,122397,122563,1,1,4.4,0.205,1,7);
+INSERT INTO prediction_transcript VALUES (3,1,1,153581,153823,1,0,19.68,0.809,1,3);
+INSERT INTO prediction_transcript VALUES (3,2,1,153953,154204,1,0,6.81,0.351,1,3);
+INSERT INTO prediction_transcript VALUES (3,3,1,159429,159521,1,0,-2.75,0.114,1,3);
+INSERT INTO prediction_transcript VALUES (4,1,1,160892,161470,-1,0,28.22,0.685,1,1);

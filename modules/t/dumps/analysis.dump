@@ -1,0 +1,99 @@
+INSERT INTO analysis (analysis_id, 
+                      created,
+                      logic_name,
+                      db, 
+                      db_version, 
+                      program, 
+                      program_version, 
+                      gff_source, 
+                      gff_feature) VALUES (
+                      null,
+                      now(),
+                      'genscan',
+                      NULL,
+                      NULL,
+                      'Genscan',
+                      '1.0',
+                      'genscan',
+                      'prediction');
+
+INSERT INTO analysis (analysis_id, 
+                      created,
+                      logic_name,
+                      db, 
+                      db_version, 
+                      program, 
+                      program_version, 
+                      gff_source, 
+                      gff_feature) VALUES (
+                      null,
+                      now(),
+                      'RepeatMask',
+                      NULL,
+                      NULL,
+                      'RepeatMask',
+                      '1.0',
+                      'repeat',
+                      'repeat');
+
+INSERT INTO analysis (analysis_id, 
+                      created,
+                      logic_name,
+                      db, 
+                      db_version, 
+                      program, 
+                      program_version, 
+                      gff_source, 
+                      gff_feature) VALUES (
+                      null,
+                      now(),
+                      'wublastx',
+                      NULL,
+                      NULL,
+                      'wublastx',
+                      '1.0',
+                      'wublastx',
+                      'similarity');
+
+INSERT INTO analysis (analysis_id, 
+                      created,
+                      logic_name,
+                      db, 
+                      db_version, 
+                      program, 
+                      program_version, 
+                      gff_source, 
+                      gff_feature) VALUES (
+                      null,
+                      now(),
+                      'wublastn',
+                      NULL,
+                      NULL,
+                      'wublastn',
+                      '1.0',
+                      'wublastn',
+                      'similarity');
+INSERT INTO analysis (analysis_id, created,logic_name,db, db_version, program, program_version, gff_source, gff_feature) VALUES (null,now(),'wublastp','test',NULL,'wublastp','1.0','wublastp','similarity');
+INSERT INTO analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature) VALUES ('__NONE__',' __NONE__', 'blastgenscanPEP', 'swall','__NONE__','t/data/mini_protein.fa','wublastp',1,'wublastp','','Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep',1, 'blastp', 'similarity');
+INSERT INTO analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature) VALUES ('__NONE__',' __NONE__', 'blastgenscanDNA', 'embl_verrna-1','__NONE__','/data/blastdb/Ensembl/embl_vertrna-1','wutblastn',1,'wutblastn','','Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA',1, 'wutblastn', 'similarity');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
