@@ -154,6 +154,9 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # is not very reliable.
 			 MAX_TRANSCRIPTS_PER_GENE => 10,
 
+            # If using denormalised gene table, set this option to 1.
+	    EST_USE_DENORM_GENES => 1,
+
 			 
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
