@@ -53,13 +53,13 @@ this script allows input_ids to be generated and written to the input_id_analysi
     whole proteome this must be proteome
     -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
-    -non_redundant fetch all non redundant pieces
-
     -input_type if you want to override the standard input_id types
     -seq_level if you want the ids for the seq_level seq_regions, can
-    work with slice_size but the -slice options isn't required
-    -top_level if you want the ideas for the top_level regions, again can
-    work with slice_size but -slice isn't needed
+    work with slice_size but the -slice options isn't required'
+    -top_level this will fetch all the non_redundant pieces in
+     the database this may produce ids which are a mixture of different
+     coordinate systems, if -coord_system_version is specified it will
+     be ignored
 =head1 EXAMPLES
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
@@ -121,7 +121,6 @@ my $single;
 my $verbose;
 my $help = 0;
 my $translation_id;
-my $non_redundant;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
@@ -148,7 +147,6 @@ my $top_level;
             'translation_ids' => \$translation_id,
             'seq_level' => \$seq_level,
             'top_level' => \$top_level,
-            'non_redundant' => \$non_redundant,
             'h|help'            => \$help,
            );
 
@@ -231,8 +229,6 @@ if ($slice) {
   @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
 }elsif($translation_id){
   @ids = $inputIDFactory->generate_translation_id_input_ids;
-}elsif($non_redundant){
-  @ids = $inputIDFactory->generate_non_redundant_input_ids;
 }else{
     exec('perldoc', $0);
 }
