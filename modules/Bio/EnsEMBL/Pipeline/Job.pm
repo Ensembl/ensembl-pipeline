@@ -36,6 +36,10 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::Job;
 # use Data::Dumper;
 
+BEGIN {
+  require "Bio/EnsEMBL/Pipeline?pipeConf.pl";
+}
+
 use vars qw(@ISA);
 use strict;
 
@@ -243,6 +247,7 @@ sub runRemote {
   my $dbname = $db->dbname;
   my $cmd;
 
+  
   my $runner = __FILE__;
   $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
@@ -255,7 +260,7 @@ sub runRemote {
   if( $useDB ) {
     # find out db details from adaptor
     # generate the lsf call
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -job ".$self->dbID 
+    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -job ".$self->dbID." -E \"$runner -check\"";
     
   } else {
     # make the object
@@ -448,7 +453,7 @@ sub get_files {
 
   while( 1 ) {
     my $num = int(rand(10));
-    $dir = $nfs_tmpdir . "/$num/";
+    $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
     if( ! -e $dir ) {
       system( "mkdir $dir" );
     }

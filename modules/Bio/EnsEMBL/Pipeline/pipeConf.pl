@@ -13,15 +13,8 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'ControlDB.name' => 'analysis_test',
-    'ControlDB.host' => 'ensrv1.sanger.ac.uk',
-    'ControlDB.user' => 'ensadmin',
-    'EnsEMBL.name' => 'analysis_test',
-    'EnsEMBL.host' => 'ensrv1.sanger.ac.uk',
-    'EnsEMBL.user' => 'ensadmin',
-    'EnsEMBL.pass' => '',
+    'nfstmp.dir' => '/nfs/ensembl/ensembl/tmp',
     'DBI.driver' => 'mysql',
-    'Contig.Masked.repeatdata' => '/nfs/some/stupid/file',
 );
 }
 

@@ -10,10 +10,14 @@ BEGIN {
 #    unshift (@INC,"/nfs/disk100/humpub/mq2");
 #    unshift (@INC,"/nfs/disk65/mq2/ensembl/modules");
 #    unshift (@INC,"/nfs/disk65/mq2/ensembl-pipeline/modules");
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+
 }
 
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Sys::Hostname;
+
 use Getopt::Long;
 
 
@@ -35,12 +39,29 @@ GetOptions(     'host=s'     => \$host,
                 'dbuser=s'   => \$dbuser,
                 'pass=s'     => \$pass,
                 'job=n'      => \$job_id,
+		'check!'    => \$check,
                 'objfile=s'  => \$object_file,
                 'module=s'   => \$module ) or die ("Couldn't get options");
 
-if( defined $job_id) {
+if( defined $check ) {
+  my $host = hostname();
+  if ( ! -e $::pipeConf{'nfstmp.dir'} ) {
+    die "no nfs connection";
+  }
+  my $deadhostfile = $::pipeConf{'nfstmp.dir'}."/deadhosts";
+  open( FILE, $deadhostfile ) or exit 0;
+  while( <FILE> ) {
+    chomp;
+    if( $host eq $_ ) {
+      die "Cant use this host";
+    }
+  } 
+  exit 0;
+}
 
-  my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new 
+
+if( defined $job_id) {
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new 
     (  -host   => $host,
        -user   => $dbuser,
        -dbname => $dbname,
@@ -49,6 +70,8 @@ if( defined $job_id) {
        -perlonlyfeatures  => 1,
        -perlonlysequences => 1 )
     or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
+
+
     
   my $job_adaptor = $db->get_JobAdaptor();
   my $job         = $job_adaptor->fetch_by_dbID($job_id);
