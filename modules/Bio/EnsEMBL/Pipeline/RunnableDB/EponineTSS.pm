@@ -79,7 +79,7 @@ sub new {
     my $self = $class->SUPER::new(@args);
 
     $self->{'_fplist'}      = []; # ???   
-    $self->{'_genseq'}      = undef;
+    $self->{'_query'}       = undef;
     $self->{'_runnable'}    = undef;
     
     $self->throw("Analysis object required") unless ($self->analysis);
@@ -106,7 +106,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
    
-    $self->genseq($contig);
+    $self->query($contig);
 }
 
 #get/set for runnable and args
@@ -160,7 +160,7 @@ sub write_output{
     $simple_f_a->store($f);
   }
 
-
+  1;
 }
 
 

@@ -201,8 +201,6 @@ sub _db_handle {
 sub DESTROY {
    my ($obj) = @_;
 
-   $obj->_unlock_tables();
-
    if( $obj->{'_db_handle'} ) {
        $obj->{'_db_handle'}->disconnect;
        $obj->{'_db_handle'} = undef;
