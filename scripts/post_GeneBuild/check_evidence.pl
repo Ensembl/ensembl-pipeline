@@ -19,7 +19,6 @@ my $dnadbname = 'homo_sapiens_core_9_30';
 my $dnadbpass = undef;
 
 
-my $path = 'NCBI_30';
 my $genetype = 'ensembl';
 
 #my $dbhost = ecs2d;
@@ -44,6 +43,7 @@ my $t_id;
 	    'tstable_id:s' => \$tstable_id,
 	    'dbhost:s'        => \$dbhost,
 	    'dbname:s'        => \$dbname,
+	    'dbuser:s'        => \$dbuser,
 	    'genetype:s'      => \$genetype,
             'path:s'          => \$path,
 );
@@ -67,7 +67,6 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 print "connected to $dbname : $dbhost\n";
 #my $path = $db->assembly_type;
 
-print  "path = $path\n";
 
 #my $sa = $db->get_SliceAdaptor();
 
@@ -79,7 +78,6 @@ my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*STDOUT ) ;
 
 if ( $t_id){
 
-  print "From TranscriptAdaptor: $t_id\n";
   my $tran = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
   my @exons = @{$tran->get_all_Exons};
   print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\strand\tlength\n";
@@ -136,7 +134,7 @@ elsif ( $tstable_id){
   #&check_transcript_without_translation_from_stable_id($db,$tstable_id);
   #print "\n";
 
-  print "From TranscriptAdaptor: $t_id\n";
+  print  "From TranscriptAdaptor: $t_id\n";
   my $tran = $db->get_TranscriptAdaptor->fetch_by_stable_id($tstable_id);
   my @exons = @{$tran->get_all_Exons};
   print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\strand\tlength\n";
@@ -313,13 +311,13 @@ sub print_evidence{
     foreach my $evi ( @evidence ){
       my $length = $evi->end - $evi->start + 1;
       my $hlength = $evi->hend - $evi->hstart + 1;
-      print STDERR "Evidence: ".$evi->dbID."\t".$evi->contig->dbID."\t".$evi->contig->name."\t".
+      print "Evidence: ".$evi->dbID."\t".$evi->contig->dbID."\t".$evi->contig->name."\t".
 	$evi->start."-".$evi->end."\t".$evi->phase."\t".
 	  $evi->end_phase."\t".$evi->strand."\t".$length."\t".
 	    $evi->hstart."-".$evi->hend."\t".$hlength."\t".$evi->hseqname."\n";
     }
   }
   else{
-    print STDERR "No evidence\n";
+    print  "No evidence\n";
   }
 }
