@@ -618,7 +618,7 @@ sub get_Vocabulary_by_Ontology{
 ########################################
 
 sub store_ensembl_link{
-  my ($self, $transcript_id, $est_ids) = @;
+  my ($self, $transcript_id, $est_ids) = @_;
   my @est_ids = @$est_ids;
   my $q = qq(
 	     INSERT into EnsemblTranscript ( Id, ESTAccession )
@@ -633,7 +633,7 @@ sub store_ensembl_link{
 ############################################################
 
 sub store_est_transcript_link{
-  my ($self, $transcript_id, $est_ids) = @;
+  my ($self, $transcript_id, $est_ids) = @_;
   my @est_ids = @$est_ids;
   my $q = qq(
 	     INSERT into EstTranscript ( Id, ESTAccession )
