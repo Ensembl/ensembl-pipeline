@@ -73,6 +73,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
 							     GB_TARGETTED_GW_GENETYPE
 							     GB_TARGETTED_MASKING
 							     GB_TARGETTED_SOFTMASK
+							     GB_TARGETTED_TERMINAL_PADDING
+							     GB_TARGETTED_EXON_PADDING
+							     GB_TARGETTED_MINIMUM_INTRON
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
@@ -197,8 +200,8 @@ sub fetch_input{
     $start = $tmp_start;
   }
   #print STDERR "Have pmatch results ".$start." ".$end." ".protein_id."\n";
-  my $new_start  = $start - 10000;
-  my $new_end    = $end   + 10000;
+  my $new_start  = $start - $GB_TARGETTED_TERMINAL_PADDING;
+  my $new_end    = $end   + $GB_TARGETTED_TERMINAL_PADDING;
   
   #print STDERR "Fetching ".$seq_region." ".$start." ".$end."\n";
   if($new_start < 1){
@@ -237,6 +240,10 @@ sub fetch_input{
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
 								    '-ids'            => [ $protein_id ] ,
 								    '-seqfetcher'     => $self->seqfetcher,
+								    '-endbias'          => 1,
+								    '-terminal_padding' => $GB_TARGETTED_TERMINAL_PADDING,
+								    '-exon_padding'     => $GB_TARGETTED_EXON_PADDING,
+								    '-minimum_intron'   => $GB_TARGETTED_MINIMUM_INTRON,
 								    '-check_repeated' => 1);
  
   $self->runnable($r);
@@ -342,7 +349,7 @@ sub runnable{
 
 sub write_output {
   my($self) = @_;
-  #print STDERR "writing genes\n";
+  print STDERR "writing genes\n";
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
   my @genes = $self->output;
   #print STDERR "have ".@genes." genes\n";
@@ -350,7 +357,7 @@ sub write_output {
     # do a per gene eval...
     eval {
       $gene_adaptor->store($gene);
-      #print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -855,14 +862,15 @@ sub make_transcript{
   my @exons;
   #print "have ".scalar($gene->sub_SeqFeature)." exons\n";
   foreach my $exon_pred ($gene->sub_SeqFeature) {
+
     my $exon = Bio::EnsEMBL::Exon->new;
    
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
     
-    $exon->phase($exon_pred->phase);
-    $exon->end_phase($exon_pred->end_phase);
+#    $exon->phase($exon_pred->phase);
+#    $exon->end_phase($exon_pred->end_phase);
     
     $exon->slice($contig);
     #$exon->adaptor($self->db->get_ExonAdaptor);
@@ -901,8 +909,23 @@ sub make_transcript{
     } else {
       @exons = sort {$a->start <=> $b->start} @exons;
     }
-    
+
+    my $prev_end_phase;
+
     foreach my $exon (@exons) {
+      # sort out phase and end_phase
+      if(!defined $prev_end_phase){ # ie this is the first exon
+	$prev_end_phase = 0;
+      }
+
+      # needs to be strand specific?
+      my $phase = $prev_end_phase;
+      my $end_phase = ($exon->end - $exon->start + 1) %3;
+      $exon->phase($phase);
+      $exon->end_phase($end_phase);
+
+      $prev_end_phase = $end_phase;
+
       $transcript->add_Exon($exon);
     }
      #for forward strand:
