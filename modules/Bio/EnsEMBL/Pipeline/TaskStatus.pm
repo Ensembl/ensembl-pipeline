@@ -57,11 +57,7 @@ use Bio::EnsEMBL::Pipeline::IDSet;
 sub new{
   my ($class, @args) = @_;
   my $self = bless {}, $class;
-  my ($created, $submitted, $reading, $running, $writing,
-
-      $successful, $failed, $fatal, $killed, $existing) = $self->_rearrange([qw(CREATED, SUBMITTED, READING, RUNNING,
-                                                                               WRITING, SUCCESSFUL, FAILED, FATAL,
-                                                                               KILLED, EXISTING)], @args);
+  my ($created, $submitted, $reading, $running, $writing,$successful, $failed, $fatal, $killed, $existing) = $self->_rearrange([qw(CREATED SUBMITTED READING RUNNING WRITING SUCCESSFUL FAILED FATAL KILLED EXISTING)], @args);
 
   $self->{'_created'} = undef;
   $self->{'_submitted'} = undef;
@@ -88,8 +84,6 @@ sub new{
   return $self;
 }
 
-
-
 =head2 _check
 
   Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or arrayref
@@ -101,22 +95,29 @@ sub new{
 
 =cut
 
-
 sub _check{
     my ($self, $arg) = @_;
-    
+    print STDERR "TaskStatus:_check ".$arg."\n";
     if(ref($arg) == 'ARRAY'){
+       print STDERR "TaskStatus:_check  is a listref ".$arg."\n";
        my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
                                                        -ID_LIST => $arg,
                                                      );
        return $idset;
-    }elsif($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
-       return $arg;
-    }else{
-       $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSets or array refs to TaskStatus add methods not $arg : $!");
     }
+    
+    if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
+       return $arg;
+    }
+     
+    $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array refs to TaskStatus add methods not $arg : $!");
+    
 
 }
+
+
+
+
 
 
 =head2 add methods
@@ -134,7 +135,7 @@ sub _check{
 
 sub add_created{
     my ($self, $arg) = @_;
-
+    print STDERR "TaskStatus:add_created ".$arg."\n";
     my $idset = $self->_check($arg);
     if(!$self->{'_created'}){
       $self->{'_created'} = $idset;
@@ -146,7 +147,7 @@ sub add_created{
 
 sub add_submitted{
     my ($self, $arg) = @_;
-
+    print STDERR "TaskStatus:add_submitted ".$arg."\n";
     my $idset = $self->_check($arg);
     if(!$self->{'_submitted'}){
       $self->{'_submitted'} = $idset;
@@ -245,13 +246,12 @@ sub add_killed{
 
 sub add_exisiting{
     my ($self, $arg) = @_;
-
     my $idset = $self->_check($arg);
-    if(!$self->{'_exisiting'}){
-      $self->{'_exisiting'} = $idset;
+    if(!$self->{'_existing'}){
+      $self->{'_existing'} = $idset;
     }else{
       my $total = $self->{'_exisiting'}->or($idset);
-      $self->{'_exisiting'} = $total;
+      $self->{'_existing'} = $total;
     }
 }
 
@@ -271,62 +271,61 @@ sub add_exisiting{
 
 sub get_created{
     my ($self) = @_;
-
-    return $self->{'created'};
+    return $self->{'_created'};
 }
 
 sub get_submitted{
     my ($self) = @_;
 
-    return $self->{'submitted'};
+    return $self->{'_submitted'};
 }
 
 sub get_reading{
     my ($self) = @_;
 
-    return $self->{'reading'};
+    return $self->{'_reading'};
 }
 
 sub get_running{
     my ($self) = @_;
 
-    return $self->{'running'};
+    return $self->{'_running'};
 }
 
 sub get_writing{
     my ($self) = @_;
 
-    return $self->{'writing'};
+    return $self->{'_writing'};
 }
 
 sub get_successful{
     my ($self) = @_;
 
-    return $self->{'successful'};
+    return $self->{'_successful'};
 }
 
 sub get_failed{
     my ($self) = @_;
 
-    return $self->{'failed'};
+    return $self->{'_failed'};
 }
 
 sub get_fatal{
     my ($self) = @_;
 
-    return $self->{'fatal'};
+    return $self->{'_fatal'};
 }
 
 sub get_killed{
     my ($self) = @_;
 
-    return $self->{'killed'};
+    return $self->{'_killed'};
 }
 
 sub get_existing{
     my ($self) = @_;
-
-    return $self->{'existing'};
+   
+    return $self->{'_existing'};
 }
 
 
@@ -345,7 +344,7 @@ sub get_existing{
 
 
 
-sub create_exisiting{
+sub create_existing{
     my ($self) = @_;
     
     my $total_ids = Bio::EnsEMBL::Pipeline::IDSet->new;
@@ -386,7 +385,6 @@ sub create_exisiting{
        my $idset = $total_ids->or($self->get_fatal);
        $total_ids = $idset;
     }
-    
     $self->add_exisiting($total_ids);
     
     return $total_ids;
@@ -397,7 +395,7 @@ sub create_exisiting{
 =head2 status_report
 
   Arg [1]   : none
-  Function  : prints the number od each status type the object holds
+  Function  : prints the number of each status type the object holds
   Returntype: none
   Exceptions: none
   Caller    : 
