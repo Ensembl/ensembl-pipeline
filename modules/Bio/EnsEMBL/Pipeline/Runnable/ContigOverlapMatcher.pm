@@ -493,20 +493,10 @@ sub _make_sorted_spans {
         }
         
         # Store the name and position in the matching contig. This is
-        # the next contig which contibutes to the consensus, and
-        # the matching position is the start coordinate in the next contig
-        # minus 1.  If, however, the start position in this next contig
-        # is 1, then we increase the length of the current
-        # span by 1.
+        # the next contig which contibutes to the consensus.
         # $next won't exist if this is the last contig in the assembly.
         if (my $next = $base_segments[$i+1]) {
             my( $j_name, $j_start ) = @{$next}[2,3];
-            if ($j_start == 1) {
-                $span{$name}->[1]++;
-                $span{$name}->[4]++;
-            } else {
-                $j_start--;
-            }
             $span{$name}->[5] = $j_name;
             $span{$name}->[6] = $j_start;
         }
