@@ -72,6 +72,9 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_BLAT_GENOMIC
 				       );
 
+my $EST_BLAT_RUNMODE = 'easy_slow';
+#my $EST_BLAT_RUNMODE = 'fiddly_fast';
+
 use vars qw(@ISA);
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -210,8 +213,10 @@ sub run{
     my @genes = $self->make_genes(@filtered_results);
 
     # need to convert coordinates?
-#    my @mapped_genes = $self->convert_coordinates( @genes );
-    
+    if ($EST_BLAT_RUNMODE eq 'easy_slow'){
+      my @mapped_genes = $self->convert_coordinates( @genes );
+    }
+
     $self->output(@genes);
     
   }
@@ -293,10 +298,8 @@ sub filter_output{
 sub write_output{
   my ($self) = @_;
   
-
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
+  my $gene_adaptor;
   my @output = $self->output;
-  
   
   foreach my $gene (@output){
     #print STDERR "gene is a $gene\n";
@@ -307,18 +310,23 @@ sub write_output{
     #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     #}
 
-    my $blat_gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor->new($self->db);
+    if ($EST_BLAT_RUNMODE eq 'easy_slow') {
+      $gene_adaptor = $self->db->get_GeneAdaptor;
+    } elsif($EST_BLAT_RUNMODE eq 'fiddly_fast'){
+      $gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor->new($self->db);
+    } else {
+      $self->warn("$self - EST_BLAT_RUNMODE not set appropriately " .
+		  "in ESTConf.  Defaulting to slow running method.");
+    }
 
     eval{
-#      $gene_adaptor->store($gene);
-      $blat_gene_adaptor->store($gene);
+      $gene_adaptor->store($gene);
     };
     if ($@){
-      $self->warn("Unable to store gene!!");
+      $self->warn("Unable to store gene.\n$@");
       foreach my $tran (@{$gene->get_all_Transcripts}){
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
       }
-      print STDERR "Error message:\n$@";
     }
     else{
       print STDERR "stored gene ".$gene->type." ".$gene->dbID."\n";
@@ -479,7 +487,7 @@ print "     $seqname\n";
 sub convert_coordinates{
   my ($self,@genes) = @_;
   
-  my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
+#  my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
   
   
   my @transformed_genes;
@@ -646,9 +654,9 @@ sub check_splice_sites{
 	    my $down_site;
 	    eval{
 		$up_site = 
-		    $nonmapped_slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+		    $chr_seqfetcher->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
 		$down_site = 
-		    $nonmapped_slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+		    $chr_seqfetcher->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
 	    };
 
 #print "SLICE     UP " . $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
