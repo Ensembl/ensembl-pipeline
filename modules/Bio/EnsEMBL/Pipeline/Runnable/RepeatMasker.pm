@@ -31,12 +31,13 @@ my @results = $repmask->output();
 =head1 DESCRIPTION
 RepeatMasker takes a Bio::Seq object and runs RepeatMaskerHum on it. The
 resulting .out file is parsed to produce a set of feature pairs.
-Arguments can be passed to RepeatMaskerHum through the run() method. 
+Arguments can be passed to RepeatMaskerHum through the arguments() method. 
 
 =head2 Methods:
 new($seq_obj)
 repeatmasker($path_to_RepeatMaskerHum)
 workdir($directory_name)
+arguments($args)
 run()
 output()
 
@@ -73,22 +74,28 @@ use Data::Dumper;
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
     Function:   Initialises RepeatMasker object
     Returns :   a RepeatMasker Object
-    Args    :   A Bio::Seq object
+    Args    :   A Bio::Seq object (-CLONE), any arguments for RepeatMaskerHum (-ARGS) 
 
 =cut
 sub _initialize {
     my ($self,@args) = @_;
     my $make = $self->SUPER::_initialize(@_);    
            
-    $self->{_fplist} = [];        #an array of feature pairs
-    $self->{_clone} = undef;        #location of Bio::Seq object
-    $self->{_repeatmasker} = undef; #location of RepeatMaskerHum script
-    $self->{_workdir} = undef;      #location of temp directory
-    $self->{_filename} =undef;      #file to store Bio::Seq object
+    $self->{_fplist} = [];           #an array of feature pairs
+    $self->{_clone}  = undef;        #location of Bio::Seq object
+    $self->{_repeatmasker} = undef;  #location of RepeatMaskerHum script
+    $self->{_workdir}   = undef;     #location of temp directory
+    $self->{_filename}  =undef;      #file to store Bio::Seq object
+    $self->{_results}   =undef;      #file to store results of RepeatMaskerHum
+    $self->{_arguments} =undef;      #arguments for RepeatMaskerHum
     
     $self->repeatmasker('/tmp_mnt/nfs/disk100/humpub/scripts/RepeatMaskerHum');
-    my( $clonefile ) = $self->_rearrange(['CLONE'], @args);
+    my( $clonefile, $arguments) = $self->_rearrange(['CLONE', 'ARGS'], @args);
     $self->clone($clonefile) if ($clonefile);       
+    if ($arguments) 
+    {   $self->arguments($arguments) ;}
+    else
+    { $self->arguments('-low') ;      }
     return $self; # success - we hope!
 }
 
@@ -103,6 +110,7 @@ sub clone {
         $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id."$$.seq");
+        $self->results($self->filename.".Repmask.out");
     }
     return $self->{_clone};
 }
@@ -111,6 +119,12 @@ sub filename {
     my ($self, $filename) = @_;
     $self->{_filename} = $filename if ($filename);
     return $self->{_filename};
+}
+
+sub results {
+    my ($self, $results) = @_;
+    $self->{_results} = $results if ($results);
+    return $self->{_results};
 }
 
 =head2 repeatmasker
@@ -149,6 +163,21 @@ sub workdir {
     return $self->{_workdir};
 }
 
+=head2 arguments
+    Title   :   arguments
+    Usage   :   $obj->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet');
+    Function:   Get/set method for getz arguments arguments
+    Args    :   File path (optional)
+    
+=cut
+sub arguments {
+    my ($self, $args) = @_;
+    if ($args)
+    {
+        $self->{_arguments} = $args ;
+    }
+    return $self->{_arguments};
+}
 ###########
 # Analysis methods
 ##########
@@ -160,11 +189,10 @@ sub workdir {
     Args    :   optional $workdir and $args (e.g. '-ace' for ace file output)
 
 =cut
-    
 sub run {
     my ($self, $dir, $args) = @_;
     #set arguments for repeatmasker
-    $args = '-low' unless ($args);
+    $self->arguments($args) if ($args);
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for RepeatMasker\n");
     #set directory if provided
@@ -172,29 +200,35 @@ sub run {
     $self->checkdir();
     #write sequence to file
     $self->writefile();        
-    $self->run_repeatmasker($args);
+    $self->run_repeatmasker();
     #parse output of repeat masker 
     $self->parse_repmask();
     $self->deletefiles();
 }
 
+sub parsefile {
+    my ($self, $filename) = @_;
+    $self->results($filename) if ($filename);
+    $self->parse_repmask();
+}
+
 sub run_repeatmasker {
-    my ($self, $args) = @_;
+    my ($self) = @_;
     #run RepeatMaskerHum
     print "Running RepeatMasker\n";
-    system ($self->repeatmasker." $args ".$self->filename); 
+    system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename); 
     #or $self->throw("Error running RepeatMasker: $!\n")
     #open repeat predictions
-    open (REPOUT, "<".$self->filename.".RepMask.out")
-            or $self->throw($self->filename.".RepMask.out not created by RepeatMaskerHum\n");   
+    open (REPOUT, "<".$self->results)
+            or $self->throw($self->results." not created by RepeatMaskerHum\n");   
     close REPOUT;
 }
 
 sub parse_repmask {
     my ($self) = @_;
     print "Parsing output\n";
-    open (REPOUT, "<".$self->filename.".RepMask.out")
-        or $self->throw("Error opening ".$self->filename."RepMask.out\n");
+    open (REPOUT, "<".$self->results)
+        or $self->throw("Error opening ".$self->results."\n");
     #check if no repeats found
     if (<REPOUT> =~ /no repetitive sequences detected/)
     {

@@ -90,6 +90,7 @@ sub _initialize {
     $self->{_genscan} = undef;      #location of Genscan script
     $self->{_workdir} = undef;      #location of temp directory
     $self->{_filename} =undef;      #file to store Bio::Seq object
+    $self->{_results}   =undef;     #file to store results of genscan
     $self->{_parameters} =undef;    #location of parameters for genscan
     my($clonefile, $genscan, $parameters) = $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM'], @args);
     
@@ -113,6 +114,7 @@ sub clone {
         $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id."$$.seq");
+        $self->results($self->filename.".genscan");
         $self->seqfeature($seq);
     }
     return $self->{_clone};
@@ -152,6 +154,12 @@ sub filename {
     my ($self, $filename) = @_;
     $self->{_filename} = $filename if ($filename);
     return $self->{_filename};
+}
+
+sub results {
+    my ($self, $results) = @_;
+    $self->{_results} = $results if ($results);
+    return $self->{_results};
 }
 
 =head2 genscan
@@ -259,11 +267,17 @@ sub run_genscan {
     print "Running genscan on ".$self->filename."\n";
     open (OUTPUT, $self->genscan.' '.$self->parameters.' '.$self->filename.'|')
             or $self->throw("Couldn't open pipe to genscan: $!\n");  
-    open (RESULTS, ">".$self->filename.".genscan")
+    open (RESULTS, ">".$self->results)
             or $self->throw("Couldn't create file for genscan results: $!\n");
     print RESULTS <OUTPUT>;
     close OUTPUT;
     close RESULTS;
+}
+
+sub parsefile {
+    my ($self, $filename) = @_;
+    $self->results($filename) if ($filename);
+    $self->parse_genscan();
 }
 
 sub parse_genscan {
@@ -272,8 +286,8 @@ sub parse_genscan {
                      'Init', 'Initial Exon',
                      'Intr', 'Internal Exon',
                      'Term', 'Terminal Exon');
-    open (GENSCAN, "<".$self->filename.".genscan")
-        or $self->throw ("Couldn't open file ".$self->filename.".genscan: $!\n");
+    open (GENSCAN, "<".$self->results)
+        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
     if (<GENSCAN> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
     {
         print "No genes predicted\n";
