@@ -191,18 +191,23 @@ sub run_alignment {
 
     my $aligned_nt_string = '';
 
-    foreach my $aa (@aa_seq_array) {      
+    foreach my $aa (@aa_seq_array) {
       if ($aa eq '.' || $aa eq '-'){
 	$aligned_nt_string .= '---';
       } else {
-	$aligned_nt_string .= shift @nt_seq_array;
+	my $codon = shift @nt_seq_array;
+
+	# Pad out any partial codon (some do exist).
+	unless ($codon =~ /.../){$codon = '---';}
+
+	$aligned_nt_string .= $codon;
       }
     }
 
     # If the nt sequence included a stop codon, tack this
     # on here (the aa sequence will be missing this).
 
-    if (scalar @nt_seq_array == 1){
+    if (scalar @nt_seq_array == 1 && $nt_seq_array[-1] =~ /.../){
       $aligned_nt_string .= join '', @nt_seq_array;
     }
 
