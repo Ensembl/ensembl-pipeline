@@ -225,10 +225,15 @@ sub run {
     $f->invert;
   }
   
-  my @blast_features = sort{$a->start <=> $b->start  
-                              || $a->end <=> $b->end} @blast_features; 
+  @blast_features = sort{$a->start <=> $b->start  
+                           || $a->end <=> $b->end} @blast_features; 
 
-
+  #foreach my $bf(@blast_features){
+    #print STDERR "BLAST RESULTS ".$bf->start." ".$bf->end." ".$bf->strand.
+    #  " ".$bf->hseqname." ".$bf->hstart." ".$bf->hend." ".
+    #    $bf->hstrand." ".$bf->percent_id." ".$bf->p_value." ".$bf->score.
+    #      "\n";
+  #}
   my $mg_runnables;
   if ($self->check_repeated > 0){ 
     $mg_runnables = $self->build_runnables(@blast_features);

@@ -312,24 +312,26 @@ sub parse_results {
     
     # parse
     while (<$filehandle>) {
+      print STDERR;
         chomp;
         next if /^$/;
         if (/^\>/) {
-            /^\>\s*(\S+)\s*\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
-            my $id = $1;
-            my $start = $2;
-            my $end = $3;
-            my $score = $4;
-            my (%feature);
-	    $feature{name} = $id;
-     	    $feature{score} = $score;
-	    $feature{start} = $start;
-	    $feature{end} = $end;
-	    ($feature{source}) = $self->program =~ /([^\/]+)$/;
-	    $feature{primary} = 'low_complexity';
-	    ($feature{program}) = $self->program =~ /([^\/]+)$/;
-            $feature{logic_name} = 'low_complexity';
-  	    $self->create_feature (\%feature);
+          #>(110-122) complexity=2.20 (12/2.20/2.50)
+            #/^\>\s*(\S+)\s*\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+          /^\>\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+          my $start = $1;
+          my $end = $2;
+          my $score = $3;
+          my (%feature);
+          $feature{score} = $score;
+          $feature{start} = $start;
+          $feature{end} = $end;
+          ($feature{source}) = $self->program =~ /([^\/]+)$/;
+          $feature{primary} = 'low_complexity';
+          ($feature{program}) = $self->program =~ /([^\/]+)$/;
+          $feature{logic_name} = 'low_complexity';
+          $self->create_feature (\%feature);
+          print STDERR "have start ".$start." end ".$end."\n";
 	}
     }
     close $filehandle;   
@@ -374,10 +376,10 @@ sub create_feature {
     
     
     my $feature = new Bio::EnsEMBL::FeaturePair(-feature1 => $feat1,
-						-feature2 => $feat2);
+                                                -feature2 => $feat2);
 
     if ($feature) {
-	push (@{$self->{'_flist'}}, $feature);
+      push (@{$self->{'_flist'}}, $feature);
     }
 }
 
@@ -406,6 +408,7 @@ sub get_low_complexity_length {
 	my $lc_length = 0;
 
 	foreach my $feat ($self->output) {
+    print STDERR "Start ".$feat->start." End ".$feat->end."\n";
 		$lc_length += abs($feat->end - $feat->start) + 1;
 	}
     

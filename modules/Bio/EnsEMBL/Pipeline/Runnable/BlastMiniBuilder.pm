@@ -125,7 +125,7 @@ sub build_runnables {
     # give enough coverage to make it worth continuing.
 
     my $coverage = $self->check_coverage($seqname, $partitioned_features{$seqname});
-
+    #print STDERR "BlastMiniBuilder:128 coverage ".$coverage."\n";
     # If only sparse coverage, go home early.
     unless ($coverage > 0.5) {
 
@@ -231,7 +231,7 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
 	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
 		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
 
-print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
+#print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
 
 	my $genomic_subseq = Bio::Seq->new(-seq => $string_seq,
 					   -id  => $self->genomic_sequence->id );
@@ -266,7 +266,7 @@ print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_
   }
 
   foreach my $feature_id (keys %feature_ids){
-    unless ($runnable_featids{$feature_id} > 0){
+    unless ($runnable_featids{$feature_id}){
       my $runnable = $self->make_object($self->genomic_sequence, $unfiltered_partitioned_features{$feature_id});
       push (@runnables, $runnable);
     }
@@ -559,7 +559,7 @@ sub check_coverage {
 
     my $start = $feature->{_hstart};
     my $end = $feature->{_hend};
-
+    #print STDERR "Have ".$seqname." start ".$start." end ".$end."\n";
     ($start, $end) = sort {$a <=> $b} ($start, $end);
 
     for (my $j = $start; $j <= $end; $j++){

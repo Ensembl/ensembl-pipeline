@@ -294,7 +294,8 @@ sub run_analysis {
         my $blastype = "";
         my $filename = $self->filename;
 
-        if ($BLAST_FLAVOUR{$self->database} eq 'ncbi') {
+        if ($BLAST_FLAVOUR{$self->database} && 
+            ($BLAST_FLAVOUR{$self->database} eq 'ncbi')) {
             $command .= " -d $database -i $filename ";
         } else {
             $command .= " $database $filename ";
@@ -461,72 +462,73 @@ sub get_parsers {
 =cut
 
 sub parse_results {
-    my ($self,$fh) = @_;
-    
-    my %ids;
-    my $count = 0;
-    my @parsers;
-    
-    if (defined($fh)) {
-	my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
-	push(@parsers,$parser);
-    } else {
-	@parsers = $self->get_parsers;
-    }
-    
-    if ($self->filter) {
-	%ids = $self->filter_hits(@parsers);
-    }
+  my ($self,$fh) = @_;
   
-    #print STDERR "Ids " . keys(%ids) . "\n";
-    
-    @parsers = ();
-    seek $fh, 0, 0 if ref $fh;
-    
-    if (defined($fh)) {
-	my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
-	push(@parsers,$parser);
-    } else {
-	@parsers = $self->get_parsers;
-    }
-    my $db = $self->database;
-    
-    my $re = $self->get_regex($db);
-    if(!$re){
-	$self->throw("no regex defined for ".$db);
-    }
-    #print STDERR "have ".$re." regular expression\n";
-    foreach my $parser (@parsers) {
-	# print STDERR "New parser\n";
-      NAME: while  ( my $sbjct =$parser->nextSbjct) {
-	  
-	  my $fasta_header = $sbjct->name ;     
-	  my ($name) = $fasta_header =~ /$re/;
-	  unless ($name) {
+  my %ids;
+  my $count = 0;
+  my @parsers;
+  
+  if (defined($fh)) {
+    my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
+    push(@parsers,$parser);
+  } else {
+    @parsers = $self->get_parsers;
+  }
+  
+  if ($self->filter) {
+    %ids = $self->filter_hits(@parsers);
+  }
+  
+  print STDERR "Ids " . keys(%ids) . "\n";
+  
+  @parsers = ();
+  seek $fh, 0, 0 if ref $fh;
+  
+  if (defined($fh)) {
+    my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
+    push(@parsers,$parser);
+  } else {
+    @parsers = $self->get_parsers;
+  }
+  my $db = $self->database;
+  
+  my $re = $self->get_regex($db);
+  if(!$re){
+    $self->throw("no regex defined for ".$db);
+  }
+  #print STDERR "have ".$re." regular expression\n";
+  foreach my $parser (@parsers) {
+    # print STDERR "New parser\n";
+  NAME: while  ( my $sbjct =$parser->nextSbjct) {
+      
+      my $fasta_header = $sbjct->name ;     
+      my ($name) = $fasta_header =~ /$re/;
+      unless ($name) {
 	      $self->throw("Error getting a valid accession from \"" .
-			   $fasta_header .
-			   "\"; check your blast config and / or blast headers");
-	  }
-	  
-	  # print STDERR "Name " . $fasta_header . "\n";
-	  if (($self->filter == 1) && !defined($ids{$fasta_header})) {
+                     $fasta_header .
+                     "\"; check your blast config and / or blast headers");
+      }
+      
+      # print STDERR "Name " . $fasta_header . "\n";
+      if (($self->filter == 1) && !defined($ids{$fasta_header})) {
 	      next NAME;
-	  }
-	  
-	  #print "Parsing name $name\n";
-	  
+      }
+      
+      #print "Parsing name $name\n";
+      
 	  HSP: while (my $hsp = $sbjct->nextHSP) {
-	      
-	      if ($self->threshold_type eq "PID") {
-		  next HSP
-		      if defined $self->threshold and ($hsp->percent < $self->threshold);
-	      } elsif ($self->threshold_type eq "SCORE") {
-		  next HSP
-		      if defined($self->threshold) and ($hsp->score < $self->threshold);
-	      } elsif ($self->threshold_type eq "PVALUE") {
-		  next HSP
-		      if defined($self->threshold) and ($hsp->P > $self->threshold);
-	      }
+	      if($self->threshold_type){
+          if ($self->threshold_type eq "PID") {
+            next HSP
+              if $self->threshold and ($hsp->percent < $self->threshold);
+          } elsif ($self->threshold_type eq "SCORE") {
+            next HSP
+              if ($self->threshold) and ($hsp->score < $self->threshold);
+          } elsif ($self->threshold_type eq "PVALUE") {
+            next HSP
+              if ($self->threshold) and ($hsp->P > $self->threshold);
+          }
+        }
 	      # Each HSP is a gapped alignment.
 	      # This method splits the gapped alignment into
 	      # ungapped pieces
@@ -534,41 +536,47 @@ sub parse_results {
 	      $count++;
 	      $self->split_HSP($hsp,$name);
 	      
-	  }
       }
     }
-
-
-    # Alternate feature filter. 
-    # If option not present in config, should default to FeatureFilter -prune
-    
-    if ($REFILTER{$self->database}){
-	# re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
-	my @selected_features = $self->select_features($self->output);
-	$self->output(@selected_features);
-    } else {
-	# re-filter, with pruning
-	my @allfeatures = $self->output;
-	if ($self->threshold_type eq "PID") {
-	    @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
-	} elsif ($self->threshold_type eq "SCORE") {
-	    @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
-	} else {
-	    @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
-	}
-	if ($self->filter) {
-	    my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
-									     -prune     => $self->prune,
-									     -hardprune => $self->hardprune,
-									     -coverage  => $self->coverage);
-	    my @pruned = $search->run(@allfeatures);
-
-	    #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
-	    $self->output(@pruned);
-	}
+  }
+  
+  print STDERR "have ".$count." hsps\n";
+  # Alternate feature filter. 
+  # If option not present in config, should default to FeatureFilter -prune
+  
+  if ($REFILTER{$self->database}){
+    # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
+    my @selected_features = $self->select_features($self->output);
+    $self->output(@selected_features);
+  } else {
+    # re-filter, with pruning
+    print STDERR "Have ".@allfeatures." fetures to output\n";
+    my @allfeatures = $self->output;
+    if($self->threshold_type){
+      if ($self->threshold_type eq "PID") {
+        @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
+      } elsif ($self->threshold_type eq "SCORE") {
+        @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
+      } else {
+        @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
+      }
     }
-    #print "have parsed resultz\n";
-    return $self->output;   
+    if ($self->filter) {
+      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter
+        (
+         -prune     => $self->prune,
+         -hardprune => $self->hardprune,
+         -coverage  => $self->coverage
+        );
+      my @pruned = $search->run(@allfeatures);
+      
+      #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+      $self->output(@pruned);
+    }
+  }
+  print STDERR "Have ".$self->output." results to output\n";
+  #print "have parsed resultz\n";
+  return $self->output;   
 }
 
 sub prune {
@@ -612,14 +620,18 @@ sub filter_hits {
 	  while (my $hsp = $sbjct->nextHSP) {
       
 	      my $name = $hsp->subject->seqname ;
-	      
-	      if ($self->threshold_type eq "PID") {
-		  next if defined $self->threshold and ($hsp->percent < $self->threshold);
-	      } elsif ($self->threshold_type eq "SCORE") {
-		  next if defined $self->threshold and ($hsp->score < $self->threshold);
-	      } elsif ($self->threshold_type eq "PVALUE") {
-		  next if defined $self->threshold and ($hsp->P > $self->threshold);
-	      } 
+	      if($self->threshold_type){
+          if ($self->threshold_type eq "PID") {
+            next if defined $self->threshold 
+              and ($hsp->percent < $self->threshold);
+          } elsif ($self->threshold_type eq "SCORE") {
+            next if defined $self->threshold 
+              and ($hsp->score < $self->threshold);
+          } elsif ($self->threshold_type eq "PVALUE") {
+            next if defined $self->threshold 
+              and ($hsp->P > $self->threshold);
+          } 
+        }
 	      
 	      my $qstart = $hsp->query->start();
 	      my $hstart = $hsp->subject->start();
@@ -654,17 +666,17 @@ sub filter_hits {
 	  }
       }
   }
-	    
-  if ($self->threshold_type eq "PID") {
+  if($self->threshold_type){
+    if ($self->threshold_type eq "PID") {
       @features = sort {$b->percent_id <=> $a->percent_id} @features;
-  } 
-  elsif ($self->threshold_type eq "SCORE") {
+    } 
+    elsif ($self->threshold_type eq "SCORE") {
       @features = sort {$b->score <=> $a->score} @features;
-  } 
-  elsif ($self->threshold_type eq "PVALUE") {
+    } 
+    elsif ($self->threshold_type eq "PVALUE") {
       @features = sort {$a->p_value <=> $b->p_value} @features;
+    } 
   } 
-  
   my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-coverage => $self->coverage);
   
   my @newfeatures = $search->run(@features);

@@ -263,7 +263,7 @@ sub run {
 
   my ($fhash,$ids) = $self->get_all_features_by_id;
  # print STDERR "have ".@$ids." ids\n";
- 
+  my $failed_count = 0;
   foreach my $id (@$ids) {
     #print STDERR "$id\n";
     
@@ -325,13 +325,19 @@ sub run {
 	  print STDERR $id." had no extra features on the reverse strand\n";
 	 
 	}
-      }
+}
       
     } else {
-      $self->throw("Can't fetch sequence for " . $features[0]->hseqname . "\n");
+      $self->warn("Can't fetch sequence for " . 
+        $features[0]->hseqname . "\n");
+    $failed_count++;
     }
   
-  } 
+  }
+if($failed_count == @$ids){
+    $self->throw("Can't find any sequences for the ids which match ".
+                 $self->genomic_sequence->name); 
+  }
   return 1;
   
 }
