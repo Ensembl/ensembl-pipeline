@@ -1,0 +1,70 @@
+Note is no path is specifed the files mentioned live in 
+ensembl-pipeline/test_system
+
+To run the tests there a couple of things you must first do
+
+First fill out the two conf files
+
+TestDB.conf (an example is found at TestDB.conf.example) and
+RefDB.conf (an example is found at RefDB.conf.example)
+
+These files contain settings for where the test databases are to be created
+whay sql files to use to load the table structures, where the directory
+where the zip file all the data is in is located (the file itself is named
+for the species you are running tests against). There are also other
+settings to do with loaded data into the database and how long the RunTest
+module should sleep for between checking if there are jobs running when
+testing single analyses
+
+When running the tests the perl5lib is modified to point at some prefilled
+config files which live here
+
+config/Bio/EnsEMBL/Pipeline/Config
+
+Prior to running you will need to fill out these options
+
+BatchQueue.pm, DEFAULT_OUTPUT_DIR
+
+
+there are two different types of test
+
+test_single_analysis.pl this takes a species and single logic_name
+and uses the job_submission script to run that analyses then if the
+correct options are specified the results are compared to the reference set
+of data. The script reports how many jobs were sucessful what statuses the
+jobs remaining in the pipeline have, how many results were produced etc
+
+test_whole_pipeline.pl this uses the rule tables defined in the dump to
+run the pipeline with RuleManager, This test will take longer to run as
+it runs all the analyses for the specified species from start to finish
+
+
+Currently there is data for testing the raw computes in human.
+These are the analyses and modules which can be tested and the tables they
+write their data to
+
+RepeatMask      RepeatMasker     repeat_feature
+Dust            Dust             repeat_feature
+TRF             TRF              repeat_feature
+Eponine         EponineTSS       simple_feature     
+FirstEF         FirstEF          simple_feature
+tRNAscan        tRNAscan_SE      simple_feature
+CpG             CPG              simple_feature
+Genscan         Genscan          prediction_transcript
+Vertrna         BlastGenscanDNA  dna_align_feature
+Unigene         BlastGenscanDNA  dna_align_feature
+Swall           BlastGenscanPep  protein_align_feature
+marker          EPCR             marker_feature
+
+To run these tests individually you need a commandline like this
+
+./test_single_analysis -logic_name CpG -feature_table simple_feature
+
+if you want the data compared to the reference data you all need to 
+pass the commandline option -run_comparison
+
+if you don't want the output files or databases deleted after the test is
+run you can specify the -dont_cleanup option
+
+If you run with the don't cleanup option the script should print out
+commandlines for the cleanup

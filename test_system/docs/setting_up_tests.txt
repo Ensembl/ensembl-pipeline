@@ -1,0 +1,80 @@
+In order to run tests a certain amount of data needs to be availible in 
+the first place
+
+The input data your test requires must be availible.
+A reference set of results for comparison must be availible
+A database tables the analysis relies on being filled must also have 
+data availible
+
+All analyses are in the end related to sequence. This means the standard
+sequence tables need to be have data before anything else can run. These 
+standard tables are
+
+meta, meta_coord, coord_system, analysis, attrib_type, seq_region,
+assembly, dna and seq_region_attrib.
+
+If you analyses requires input from a file you will need to make sure that
+file is also availble somewhere 
+
+Currently there are only tests written for analyses whose input is sequence
+based. 
+
+These test first rely on the core tables as listed above and four pipeline
+tables also being filled. These are rule_goal, rule_conditions, 
+input_id_type_analysis and input_id_analysis.
+
+rule_goal and rule_condition are only important for the whole pipeline
+test as single analyses tests don't use the rule table but the 
+input_id_type_analysis and input_id_analysis tables always need to be 
+filled out as this is where test_single_analysis generates the input_ids
+from in the first place
+
+Currently all tests run on human chr 1 1-10000000bp
+
+To dump data one the basis of a slice you can use this script
+
+dev/slice_to_sql.pl
+
+This script you can give information about a slice, coord_system_name, 
+version, seq_region_name, start, end etc and a list of tables and it
+will dump the corresponding information from those tables for that
+slice
+
+This script uses a module Bio::EnsEMBL::Pipeline::Utils::SliceDump
+
+for every table which can be dumped on the basis of a slice there is
+a method which fits the format dump_*table_name*_table. These methods
+then know how to only dump the information which is relevant to the 
+specified slice. The tables are dumped into files with the name format
+table_name.slice_name.
+
+These can be loaded into the database using mysqlimport.
+The TestDB module which sets up test databases currently expects any data
+it is to load to live in a zip file named for a species and for that
+the files in the zip file to be name table_name.sql
+
+The testDB module can be given a list of tables to load. There are also
+methods with the names load_*table_group*_tables which have a predefined
+list of tables which allow easier loading of certain sets of tables. For
+example load_core_tables contains a predefined list of core tables which
+always need to be loaded
+
+
+
+In summary to setup a test for a specific analysis this is what you need
+
+1. an entry in an analysis table
+
+2. an entry in the rule tables (if to be tested as part of the 
+complete pipeline)
+
+3. sequence data for the database
+
+4. some input data, this is sequence data for most analyses but it may also
+be a fasta file of protein or cdna sequences or genes to allow translation
+ids to be used
+
+5. correct configuration (an entry in BatchQueue.pm plus any analysis 
+specific config)
+
+6. reference data to compare the results too

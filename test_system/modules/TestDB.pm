@@ -173,7 +173,7 @@ sub load_databases {
   print "Connecting to ".$locator."\n" if($self->verbosity);
   my $db = DBI->connect($locator, $user, $pass, {RaiseError => 1});
   unless($db) {
-    warning("Can't connect to database $locator");
+    throw("Can't connect to database $locator");
     return;
   }
   $self->dbi_connection($db);
@@ -182,8 +182,9 @@ sub load_databases {
   }
   if(!$dbname){
     if($preloaded){
-      throw("How can you database have preloaded tables if ".
-            "you didn't specify the database name in ".$self->conf_file);
+      $self->exception("How can you database have preloaded tables if ".
+                       "you didn't specify the database name in ".
+                       $self->conf_file);
     }
     $dbname = $self->_create_db_name;
     $self->conf_hash->{'dbname'} = $dbname;
@@ -192,7 +193,7 @@ sub load_databases {
     my $sql = "CREATE DATABASE $dbname";
     print "Creating database ".$sql."\n" if($self->verbosity);
     unless($self->dbi_connection->do("CREATE DATABASE $dbname")) {
-      throw("Couldn't not create database");
+      $self->exception("Couldn't not create database");
     }
   }
   $db->do("use $dbname");
@@ -227,7 +228,8 @@ sub do_sql_files {
 
     foreach my $file (@$files){
       my $sql = '';
-      open SQL, $file or throw "Can't read SQL file '$file' : $!";
+      open SQL, $file or $self->exception("Can't read SQL file ".
+                                          "'$file' : $!");
       while (<SQL>) {
         # careful with stripping out comments; quoted text
         # (e.g. aligments) may contain them. Just warn (once) and ignore
@@ -285,8 +287,8 @@ sub db{
   my ($self, $db) = @_;
   if($db){
     if(!$db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
-      throw("Can't run the RuleManager with $db you need a ".
-            "Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
+      $self->exception("Can't run the RuleManager with $db you need a ".
+                       "Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
     }
     $self->{'pipeline_adaptor'} = $db;
   }
@@ -324,9 +326,9 @@ sub validate_sql {
     if ($statement =~ /insert/i)
     {
         $statement =~ s/\n/ /g; #remove newlines
-        throw ("INSERT should use explicit column names ".
-               "(-c switch in mysqldump)\n$statement\n")
-            unless ($statement =~ /insert.+into.*\(.+\).+values.*\(.+\)/i);
+        $self->exception("INSERT should use explicit column names ".
+                         "(-c switch in mysqldump)\n$statement\n")
+          unless ($statement =~ /insert.+into.*\(.+\).+values.*\(.+\)/i);
     }
 }
 
@@ -357,7 +359,7 @@ sub load_data{
   my $dbname = $db_conf->{'dbname'};
   my $cmd = "mysqlimport -h$host -u$user -p$pass -P$port $dbname $file";
   print $cmd."\n" if($self->verbosity);
-  system($cmd) == 0 or throw("Failed to run ".$cmd);
+  system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   return 1;
 }
 
@@ -385,7 +387,8 @@ sub load_core_tables{
     $data_dir = $self->curr_dir."/".$self->species;
   }
   if(! -d $data_dir){
-    throw("Can't import core tables if ".$data_dir." doesnt exist");
+    $self->exception("Can't import core tables if ".$data_dir.
+                     " doesnt exist");
   }
   $self->load_tables(\@tables, $data_dir);
 }
@@ -398,7 +401,7 @@ sub load_pipeline_tables{
     $data_dir = $self->curr_dir."/".$self->species;
   }
   if(! -d $data_dir){
-    throw("Can't import core tables if ".$data_dir." doesnt exist");
+    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
   }
   $self->load_tables(\@tables, $data_dir);
 }
@@ -414,7 +417,7 @@ sub load_gene_tables{
     $data_dir = $self->curr_dir."/".$self->species;
   }
   if(! -d $data_dir){
-    throw("Can't import core tables if ".$data_dir." doesnt exist");
+    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
   }
   $self->load_tables(\@tables, $data_dir);
 }
@@ -429,7 +432,7 @@ sub load_raw_compute_tables{
     $data_dir = $self->curr_dir."/".$self->species;
   }
   if(! -d $data_dir){
-    throw("Can't import core tables if ".$data_dir." doesnt exist");
+    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
   }
   $self->load_tables(\@tables, $data_dir);
 }
@@ -455,7 +458,7 @@ sub load_tables{
     my $file = $data_dir."/".$table.".sql";
     #print STDERR "Trying to load ".$file."\n";
     if(! -e $file){
-      throw("Can't load ".$data_dir."/".$table." it doesn't exist");
+      $self->exception("Can't load ".$data_dir."/".$table." it doesn't exist");
     }else{
       $self->load_data($file);
     }
@@ -485,24 +488,24 @@ sub unzip_data_files{
     $data_dir = $self->data_dir;
   }
   if(! -d $data_dir){
-    throw("Can't unzip data if directory data lives in: $data_dir ".
+    $self->exception("Can't unzip data if directory data lives in: $data_dir ".
           "doesn't exist");
   }
   my $zip_file = $self->species.".zip";
   my $path = $data_dir."/".$zip_file;
   my $dest_dir = $self->curr_dir."/".$self->species;
   if(!-e $path){
-    throw("Can't unzip ".$zip_file." if ".$path." doesn't exist");
+    $self->exception("Can't unzip ".$zip_file." if ".$path." doesn't exist");
   }
   if(! -d $dest_dir){
     mkdir($dest_dir);
   }elsif(-d $dest_dir){
-    throw("Directory ".$dest_dir." already exists the data might ".
+    $self->exception("Directory ".$dest_dir." already exists the data might ".
           "not be correct");
   }
   my $cmd = "unzip -q $path -d $dest_dir ";
   print $cmd."\n" if($self->verbosity);
-  system($cmd) == 0 or throw("Error running ".$cmd);
+  system($cmd) == 0 or $self->exception("Error running ".$cmd);
 }
 
 
@@ -562,5 +565,70 @@ sub cleanup{
   $self->dbi_connection->disconnect;
 }
 
+=head2 database_args
+
+  Arg [1]   : TestDB
+  Function  : create a string of the standard database args for
+  ensembl-pipeline scripts for the script RunTest runs
+  Returntype: string
+  Exceptions: none
+  Example   : 
+
+=cut
+
+
+sub database_args{
+  my ($self) = @_;
+  my $db_conf = $self->conf_hash;
+  my $dbport = $db_conf->{'port'};
+  my $dbhost = $db_conf->{'host'};
+  my $dbpass = $db_conf->{'pass'};
+  my $dbuser = $db_conf->{'user'};
+  my $dbname = $db_conf->{'dbname'};
+  my $db_args = " -dbhost ".$dbhost." -dbuser ".$dbuser;
+  $db_args .= " -dbpass ".$dbpass if($dbpass);
+  $db_args .= " -dbport ".$dbport if($dbport);
+  $db_args .= " -dbname ".$dbname." ";
+  return $db_args;
+}
+
+=head2 cleanup_command
+
+  Arg [1]   : TestDB
+  Function  : creates a command and prints it to screen to cleanup after
+  a test run. This is to allow easy removal of test databases and output
+  directories if you wish to keep the output for a little while for 
+  investigation
+  Returntype: none
+  Exceptions: 
+  Example   : 
+
+=cut
+sub cleanup_command{
+  my ($self) = @_;
+  my $db_args;
+  if($self->conf_hash->{'dbname'}){
+    $db_args = $self->database_args;
+  }
+  my $data_dir = $self->curr_dir."/".$self->species;
+  my $cleanup_command = "cleanup_output.pl ";
+  $cleanup_command .= $db_args." " if($db_args);
+  $cleanup_command .= " -sql_data_dir ".$data_dir;
+  print "You have specifed -dont_cleanup when running your test \n".
+    "If you want to delete your output you can run this script ".
+      "ensembl-pipeline/test_system/cleanup_output.pl\n".
+        "this is the command you should use \n".$cleanup_command."\n".
+          "If you don't want any of the data sets deleted remove either".
+              " -dbname, -sql_data_dir or -output_dir options from the ".
+                "commandline\n";
+}
+
+
+
+sub exception{
+  my ($self, $msg) = @_;
+  $self->cleanup_command;
+  throw($msg);
+}
 
 1;

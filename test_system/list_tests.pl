@@ -57,8 +57,8 @@ if(! -d $dest_dir){
 my $analysis_file = $dest_dir."/analysis.sql";
 
 open(FH, $analysis_file) or throw("Can't open ".$analysis_file);
-printf("%15s %15s\n", 'logic_name', 'module');
-printf("%15s %15s\n", '----------', '------');
+printf("%-15s %-15s\n", 'logic_name', 'module');
+printf("%-15s %-15s\n", '----------', '------');
 while(<FH>){
   chomp;
   my @values = split /\t/, $_;
@@ -67,7 +67,7 @@ while(<FH>){
     next;
   }
   my $module = $values[10];
-  printf("%15s %15s\n", $logic_name, $module);
+  printf("%-15s %-15s\n", $logic_name, $module);
 }
 
 

@@ -85,15 +85,15 @@ sub new{
     require "$file";
   };
   if($@){
-    throw("Can't find $file [$@]");
+    $self->exception("Can't find $file [$@]");
   }
   if(!$batch_q_module->can('job_stats')){
-    throw($batch_q_module." doesn't have the job_stats method this won't ".
-          "work");
+    $self->exception($batch_q_module." doesn't have the job_stats method ".
+                     "this won't work");
   }
   if(!$tables || ref($tables) ne 'ARRAY'){
-    throw("Must define some tables or table groups to load and ".
-          "this must passed in as an array ref $tables");
+    $self->exception("Must define some tables or table groups to load and".
+                     " this must passed in as an array ref $tables");
   }
   $self->testdb($testdb);
   $self->environment($environment);
@@ -128,6 +128,13 @@ sub testdb{
   $self->{'testdb'} = shift if(@_);
   return $self->{'testdb'};
 }
+
+sub ref_testdb{
+  my $self = shift;
+  $self->{'ref_testdb'} = shift if(@_);
+  return $self->{'ref_testdb'};
+}
+
 sub blastdb{
   my $self = shift;
   $self->{'blastdb'} = shift if(@_);
@@ -164,6 +171,13 @@ sub dont_cleanup_tests{
   $self->{'cleanup_tests'} = shift if(@_);
   return $self->{'cleanup_tests'};
 }
+
+sub cleanup_dir{
+  my $self = shift;
+  $self->{'cleanup_dir'} = shift if(@_);
+  return $self->{'cleanup_dir'};
+}
+
 sub verbosity{
   my $self = shift;
   $self->{'verbose'} = shift if(@_);
@@ -204,7 +218,7 @@ sub job_submission_command{
 
   my $job_submission = "../scripts/job_submission.pl";
   if(! -e $job_submission){
-    throw("Can't run $job_submission if it doesn't exist");
+    $self->execption("Can't run $job_submission if it doesn't exist");
   }
   my $db_args = $self->database_args($self->testdb);
   my $cmd = "perl ".$job_submission." ";
@@ -239,7 +253,7 @@ sub rulemanager_command{
 
   my $job_submission = "../scripts/rulemanager.pl";
   if(! -e $job_submission){
-    throw("Can't run $job_submission if it doesn't exist");
+    $self->exception("Can't run $job_submission if it doesn't exist");
   }
   my $db_args = $self->database_args($self->testdb);
   my $cmd = "perl ".$job_submission." ";
@@ -263,8 +277,8 @@ sub rulemanager_command{
 
 
 sub cleanup{
-  my ($self, $cleanup_dir, $testdb) = @_;
-  if($cleanup_dir){
+  my ($self, $testdb) = @_;
+  if($self->cleanup_dir){
     print "Deleting directory tree ".$self->output_dir."\n" 
       if($self->verbosity);
     rmtree($self->output_dir);
@@ -323,6 +337,20 @@ sub analysis_stats{
   $self->job_details($ja);
 }
 
+
+
+=head2 whole_pipeline_stats
+
+  Arg [1]   : RunTest
+  Function  : produce stats about the pipeline run, This is done using
+  Bio::EnsEMBL::Pipeline::Monitor
+  Returntype: none
+  Exceptions: none
+  Example   : 
+
+=cut
+
+
 sub whole_pipeline_stats{
   my ($self) = @_;
   my $db = $self->testdb->db;
@@ -342,13 +370,10 @@ sub whole_pipeline_stats{
 =head2 job_details
 
   Arg [1]   : RunTest
-  Arg [2]   : arrayref of Bio::EnsEMBL::Pipeline::Jobs
-  Arg [3]   : Bio::EnsEMBL::Analysis, optional
-  Function  : produces a hash keyed on status where each element is the 
-  number of jobs with that status
-  Returntype: hashref
-  Exceptions: throws if passed an analysis but the analysis of the job
-  doesnt match the analysis passed in
+  Arg [2]   : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Function  : prints out information about the jobs in the job table
+  Returntype:
+  Exceptions: 
   Example   : 
 
 =cut
@@ -472,8 +497,9 @@ sub check_output_dir{
       mkdir($self->output_dir);
     };
     if($@){
-      throw("Failed to create ".$self->output_dir." $@");
+      $self->exception("Failed to create ".$self->output_dir." $@");
     }
+    $self->cleanup_dir(1);
     return 1;
   }
 }
@@ -499,13 +525,13 @@ sub check_output_dir{
 
 sub run_single_analysis{
   my ($self, $logic_name, $table_to_fill, $verbose) = @_;
-  my $cleanup_dir = $self->check_output_dir;
+  $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->change_blastdb($self->blastdb);
   $self->setup_database;
   my $cmd = $self->job_submission_command($logic_name, $verbose);
   print $cmd."\n" if($self->verbosity || $verbose);
-  system($cmd) == 0 or throw("Failed to run ".$cmd);
+  system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   my $run = 1;
  RUNNING:while($run == 1){
     my $jobs = $self->queue_manager->job_stats;
@@ -525,6 +551,7 @@ sub run_single_analysis{
     my $tables_to_fill = $self->tables;
     push(@$tables_to_fill, $table_to_fill);
     $self->setup_database($ref_testdb, $tables_to_fill);
+    $self->ref_testdb($ref_testdb);
     my $method = "compare_".$table_to_fill;
     if($self->can($method)){
       $self->$method($ref_testdb, $logic_name);
@@ -536,7 +563,7 @@ sub run_single_analysis{
       $self->cleanup_command($ref_testdb);
     }
   }
-  $self->cleanup($cleanup_dir) unless($self->dont_cleanup_tests);
+  $self->cleanup() unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
     $self->environment->return_environment;
@@ -565,7 +592,7 @@ sub run_pipeline{
   $self->setup_database;
   my $cmd = $self->rulemanager_command();
   print $cmd."\n" if($self->verbosity || $verbose);
-  system($cmd) == 0 or throw("Failed to run ".$cmd);
+  system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   $self->whole_pipeline_stats();
   $self->cleanup($cleanup_dir) unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
@@ -603,8 +630,8 @@ sub cleanup_command{
     "If you want to delete your output you can run this script ".
       "ensembl-pipeline/test_system/cleanup_output.pl\n".
         "this is the command you should use \n".$cleanup_command."\n".
-            "If you don't want any of the data sets deleted remove either ".
-              "-dbname, -sql_data_dir or -output_dir options from the ".
+            "If you don't want any of the data sets deleted remove either".
+              " -dbname, -sql_data_dir or -output_dir options from the ".
                 "commandline\n";
 }
 
@@ -641,6 +668,25 @@ sub database_args{
   return $db_args;
 }
 
+
+
+=head2 compare_tables
+
+  Arg [1]   : RunTest
+  Arg [2]   : TestDB for reference database
+  Arg [3]   : logic_name for analysis to compare
+  Function  : These are a series of methods used for comparing results
+  between the test database and a reference database using the 
+  FeatureComparison module
+  Returntype: none
+  Exceptions: throws if it has no input_ids on which to base its fetching
+  Example   : 
+
+=cut
+
+
+
+
 sub compare_simple_feature{
   my ($self, $ref_db, $logic_name) = @_;
   my ($analysis, $ref_ana, $input_ids) = $self->
@@ -650,8 +696,9 @@ sub compare_simple_feature{
   my $query_fs;
   my $target_fs;
   if(!$test_id){
-    throw("Something is wrong analysis ".$logic_name." of type ".
-          $analysis->input_id_type." has produced no input_ids");
+    $self->exeception("Something is wrong analysis ".$logic_name.
+                      " of type ".$analysis->input_id_type.
+                      " has produced no input_ids");
   }else{
     my @array = split(/:/,$test_id);
     if(scalar(@array) < 3 || scalar(@array) > 6) {
@@ -691,8 +738,9 @@ sub compare_prediction_transcript{
   my $query_fs;
   my $target_fs;
   if(!$test_id){
-    throw("Something is wrong analysis ".$logic_name." of type ".
-          $analysis->input_id_type." has produced no input_ids");
+    $self->exception("Something is wrong analysis ".$logic_name.
+                     " of type ".$analysis->input_id_type.
+                     " has produced no input_ids");
   }else{
     my @array = split(/:/,$test_id);
     if(scalar(@array) < 3 || scalar(@array) > 6) {
@@ -733,8 +781,9 @@ sub compare_repeat_feature{
   my $query_fs;
   my $target_fs;
   if(!$test_id){
-    throw("Something is wrong analysis ".$logic_name." of type ".
-          $analysis->input_id_type." has produced no input_ids");
+    $self->exception("Something is wrong analysis ".$logic_name.
+                     " of type ".$analysis->input_id_type.
+                     " has produced no input_ids");
   }else{
     my @array = split(/:/,$test_id);
     if(scalar(@array) < 3 || scalar(@array) > 6) {
@@ -775,8 +824,9 @@ sub compare_dna_align_feature{
   my $query_fs;
   my $target_fs;
   if(!$test_id){
-    throw("Something is wrong analysis ".$logic_name." of type ".
-          $analysis->input_id_type." has produced no input_ids");
+    $self->exception("Something is wrong analysis ".$logic_name.
+                     " of type ".$analysis->input_id_type.
+                     " has produced no input_ids");
   }else{
     my @array = split(/:/,$test_id);
     if(scalar(@array) < 3 || scalar(@array) > 6) {
@@ -816,8 +866,9 @@ sub compare_protein_align_feature{
   my $query_fs;
   my $target_fs;
   if(!$test_id){
-    throw("Something is wrong analysis ".$logic_name." of type ".
-          $analysis->input_id_type." has produced no input_ids");
+    $self->exception("Something is wrong analysis ".$logic_name.
+                     " of type ".$analysis->input_id_type.
+                     " has produced no input_ids");
   }else{
     my @array = split(/:/,$test_id);
     if(scalar(@array) < 3 || scalar(@array) > 6) {
@@ -846,10 +897,69 @@ sub compare_protein_align_feature{
   }
 }
 
+sub compare_marker_feature{
+  my ($self, $ref_db, $logic_name) = @_;
+  my ($analysis, $ref_ana, $input_ids) = $self->
+    get_analyses_and_input_ids($ref_db, $logic_name);
+  my $data_dir = $self->testdb->curr_dir."/".$self->testdb->species;
+  my $test_id = $input_ids->[0];
+  my $method;
+  my $query_fs;
+  my $target_fs;
+  if(!$test_id){
+    $self->exception("Something is wrong analysis ".$logic_name.
+                     " of type ".$analysis->input_id_type.
+                     " has produced no input_ids");
+  }else{
+    my @array = split(/:/,$test_id);
+    if(scalar(@array) < 3 || scalar(@array) > 6) {
+      $query_fs = $self
+        ->fetch_features_by_dbID($self->testdb->db,
+                                 "get_MarkerFeatureAdaptor",
+                                 $logic_name);
+      $target_fs = $self
+        ->fetch_features_by_dbID($ref_db->db,
+                                 "get_MarkerFeatureAdaptor",
+                                 $logic_name);
+    }else{
+      $query_fs = $self
+        ->fetch_features_by_slice_name($input_ids, $self->testdb->db,
+                                      "get_MarkerFeatureAdaptor",
+                                      $logic_name);
+      $target_fs = $self
+        ->fetch_features_by_slice_name($input_ids, $ref_db->db,
+                                       "get_MarkerFeatureAdaptor",
+                                       $logic_name);
+    }
+    my $feature_comparison = $self->feature_comparison;
+    $feature_comparison->query($query_fs);
+    $feature_comparison->target($target_fs);
+    $feature_comparison->compare;
+  }
+}
+
+
+
+=head2 feature_comparison
+
+  Arg [1]   : RunTest
+  Arg [2]   : FeatureComparision
+  Function  : a container for the FeatureComparison object it will
+  create an empty FeatureComparison object if one isn't passed in
+  Returntype: FeatureComparison
+  Exceptions: throws if passed a second argument which isn't a 
+  FeatureComparison
+  Example   : 
+
+=cut
+
+
+
 sub feature_comparison{
   my ($self, $feature_comparison) = @_;
   if($feature_comparison){
-    throw("Must pass in a FeatureComparison not a ".$feature_comparison)
+    $self->exception("Must pass in a FeatureComparison not a "
+                     .$feature_comparison) 
       unless($feature_comparison->isa('FeatureComparison'));
     $self->{'feature_comparison'} = $feature_comparison;
   }
@@ -862,6 +972,23 @@ sub feature_comparison{
   return $self->{'feature_comparison'};
 }
 
+
+=head2 get_analyses_and_input_ids
+
+  Arg [1]   : RunTest
+  Arg [2]   : TestDB for reference database
+  Arg [3]   : string, logic name for analysis to fetch
+  Function  : fetches the analysis object from both the reference database
+  and the test database and fetched the input_ids from the test database
+  Returntype: Bio::EnsEMBL::Pipeline::Analysis, 
+  Bio::EnsEMBL::Pipeline::Analysis, hashref
+  Exceptions: none
+  Example   : 
+
+=cut
+
+
+
 sub get_analyses_and_input_ids{
   my ($self, $ref_db, $logic_name) = @_;
   my $analysis = $self->testdb->db->get_AnalysisAdaptor
@@ -872,6 +999,25 @@ sub get_analyses_and_input_ids{
     ->list_input_ids_by_type($analysis->input_id_type);
   return($analysis, $ref_ana, $input_ids);
 }
+
+
+
+=head2 fetch_features_by_slice
+
+  Arg [1]   : RunTest
+  Arg [2]   : arrayref of slice names
+  Arg [3]   : dbadaptor
+  Arg [4]   : string method to fetch the appropriate adaptor
+  Arg [5]   : logic_name of the analysis results desired
+  Function  : fetches features on a slice by slice basis
+  using the adaptors fetch_all_by_Slice method
+  Returntype: arrayref of Bio::EnsEMBL::Features
+  Exceptions: 
+  Example   : 
+
+=cut
+
+
 
 sub fetch_features_by_slice_name{
   my ($self, $names, $db, $fetch_adaptor_method, $logic_name) = @_;
@@ -885,6 +1031,23 @@ sub fetch_features_by_slice_name{
   }
   return \@features;
 }
+
+
+=head2 fetch_features_by_dbID
+
+  Arg [1]   : RunTest
+  Arg [2]   : dbadaptor
+  Arg [3]   : string method to fetch the appropriate adaptor
+  Arg [4]   : logic_name of the analysis results desired
+  Function  : when the input_ids for a particular input_id_type
+  doesnt match the standard slice name then all the features are
+  fetched out of the database on the basis of dbID and then the features
+  of appropriate analysis are filtered out
+  Returntype: arrayref of Bio::EnsEMBL::Features
+  Exceptions: 
+  Example   : 
+
+=cut
 
 
 
@@ -919,5 +1082,27 @@ sub fetch_features_by_dbID{
 
 
 
+sub before_throw{
+  my ($self) = @_;
+  if(!$self->dont_cleanup){
+    $self->cleanup;
+    if($self->ref_testdb){
+      $self->cleanup($self->ref_testdb);
+    }
+  }else{
+    $self->cleanup_command;
+    if($self->ref_testdb){
+      $self->cleanup_command($self->ref_testdb);
+    }
+  }
+}
+
+
+
+sub exception{
+  my ($self, $msg) = @_;
+  $self->before_throw;
+  throw($msg);
+}
 
 1;

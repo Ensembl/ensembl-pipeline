@@ -68,7 +68,7 @@ use vars qw(%Config);
                             {
 				    logic_name => 'RepeatMask',
 				    batch_size => 10,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -78,7 +78,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Genscan',	
 				    batch_size => 10,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -88,7 +88,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Swall',	
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -98,7 +98,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Vertrna',	
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -108,7 +108,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Unigene',	
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -118,7 +118,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'CpG',
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -128,7 +128,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Dust',
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -138,7 +138,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'tRNAscan',
 				    batch_size => 200,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -148,7 +148,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'TRF',
 				    batch_size => 200,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -158,7 +158,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'Eponine',	
 				    batch_size => 10,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -168,7 +168,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'marker',	
 				    batch_size => 10,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
@@ -178,7 +178,7 @@ use vars qw(%Config);
 				   {
 				    logic_name => 'FirstEF',	
 				    batch_size => 1,
-				    resource   => '',
+				    resource   => 'select[model==IBMBC2800]',
 				    retries    => 1,
 				    sub_args   => '',
 				    runner     => '',
