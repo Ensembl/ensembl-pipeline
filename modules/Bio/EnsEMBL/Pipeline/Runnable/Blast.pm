@@ -106,7 +106,7 @@ sub _initialize {
       $self->_rearrange(['QUERY', 'PROGRAM', 'DATABASE','THRESHOLD','OPTIONS'], @args);
    
     if ($query) {
-      $self->query($query);
+      $self->clone($query);
     } else {
       $self->throw("No query sequence input.");
     }
@@ -156,7 +156,7 @@ sub _initialize {
 sub run {
     my ($self, $dir) = @_;
 
-    my $seq = $self->query || $self->throw("Query seq required for Blast\n");
+    my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
 
     #set directory if provided (MC this should be in a config file somewhere)
     $self->workdir('/work2/michele') unless ($self->workdir($dir));
@@ -241,8 +241,8 @@ sub parse_results {
       
       my (%feat1, %feat2);
 
-      if ($self->query->id) {
-	$feat1{name}     = $self->query->id;
+      if ($self->clone->id) {
+	$feat1{name}     = $self->clone->id;
       } else {
 	$self->results =~ m!/.+/(.+)|(.+)!; #extract filename
 	$feat1{name} = ($1) ?  $1 :  $2;
@@ -494,7 +494,7 @@ sub output {
 # get/set methods 
 #################
 
-sub query {
+sub clone {
     my ($self, $seq) = @_;
     if ($seq) {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
@@ -503,7 +503,7 @@ sub query {
 
       $self->{_query} = $seq ;
 
-      $self->filename($self->query->id.".$$.seq");
+      $self->filename($self->clone->id.".$$.seq");
       $self->results($self->filename.".blast.out");
       
     }
