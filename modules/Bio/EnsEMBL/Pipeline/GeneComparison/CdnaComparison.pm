@@ -3,8 +3,9 @@
 =head1 DESCRIPTION
 
 Takes two lists of sequences and maps one to the other using sequence
-similarity at the DNA level. Useful for, among other things, mapping
-Unigene cluster IDs to Ensembl transcript IDs. Sequence comparison is
+similarity at the DNA level. Written with the aim of assigning
+Unigene cluster IDs to Ensembl transcript IDs, this module may also
+prove useful for other applications. Sequence comparison is
 performed using Exonerate with intron modelling switched off.
 
 =head1 SYNOPSIS
@@ -13,14 +14,10 @@ performed using Exonerate with intron modelling switched off.
     Bio::EnsEMBL::Pipeline::GeneComparison::CdnaComparison->new(
       -TRANSCRIPTS            => \@ensembl_transcript_seqs,
       -CDNAS                  => \@unigene_cluster_representative_seqs,
-      -TRANSCRIPT_PERCENT_COVERAGE => 99);
+      -TRANSCRIPT_PERCENT_COVERAGE => 97.5);
 
-  my %mapping_by_transcripts = $cdna_comp->get_transcript_mapping;
-  # my %mapping_by_cdnas = $cdna_comp->get_cdna_mapping;
-
-  my $unmapped_ensembl_transcripts =
-    $cdna_comp->get_unmapped_transcripts;
-  my $unmapped_ensembl_transcripts = $cdna_comp->get_unmapped_cdnas;
+  $cdna_comp->run_transcript_mapping;
+  my %mapping_by_transcripts = $cdna_comp->transcript_mapping;
 
 =head1 CONTACT
 
@@ -33,11 +30,13 @@ Ensembl: ensembl-dev@ebi.ac.uk
 package Bio::EnsEMBL::Pipeline::GeneComparison::CdnaComparison;
 
 use strict;
-use vars qw(@ISA);
+
 use constant EXECUTABLE => '/acari/work2/gs2/gs2/bin/exonerate-0.3d';
 use constant ARGS => '-a 400 -p no -w 14 -t 65 -H 150 -D 5 -m 768';
-use POSIX::tmpnam;
+
+use vars qw(@ISA);
 use IO::File;
+use POSIX qw(tmpnam);
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
@@ -50,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
                 = Bio::EnsEMBL::Pipeline::GeneComparison::CdnaComparison->new(
                   -TRANSCRIPT_ARRAYREF => \@ensembl_transcript_seqs,
                   -CDNA_ARRAYREF       => \@unigene_representative_seqs,
-                  -TRANSCRIPT_PERCENT_COVERAGE => 99 );
+                  -TRANSCRIPT_PERCENT_COVERAGE => 97.5 );
 
     Function:   Initialises CdnaComparison object
     Returns :   A CdnaComparison object
@@ -61,14 +60,29 @@ use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 		threshold for coverage of the transcript by
 		featurepairs, given as total percentage of the
 		transcript involved in any featurepairs
-		(-TRANSCRIPT_PERCENT_COVERAGE)
+		(-TRANSCRIPT_PERCENT_COVERAGE, defaults to 95)
 
 =cut
 
 sub new {
+  my ($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);
 
-  FIXME
+  my ($transcript_arrayref,
+      $cdna_arrayref,
+      $transcript_percent_coverage)
+    = $self->_rearrange([qw(TRANSCRIPT_ARRAYREF
+                            CDNA_ARRAYREF
+			    TRANSCRIPT_PERCENT_COVERAGE)],
+		        @args);
 
+  $self->transcript_arrayref($transcript_arrayref);
+  $self->cdna_arrayref($cdna_arrayref);
+  $transcript_percent_coverage = 95
+    unless defined $transcript_percent_coverage;
+  $self->transcript_percent_coverage($transcript_percent_coverage);
+
+  return $self; # success - we hope!
 }
 
 =head2 transcript_arrayref
@@ -107,10 +121,24 @@ sub cdna_arrayref {
   return $self->{_cdna_comparison_cdna_arrayref};
 }
 
+=head2 transcript_mapping
+
+    Title   :   transcript_mapping
+    Usage   :   my $results = $cdna_comp->transcript_mapping;
+    Function:   returns results of run_transcript_mapping
+    Returns :   hash (keys: transcript IDs; values: cDNA IDs)
+
+=cut
+
+sub transcript_mapping {
+  my $self = shift;
+  return %$self->_cdna_comparison_transcript_mapping_hashref;
+}
+
 =head2 transcript_percent_coverage
 
     Title   :   transcript_percent_coverage
-    Usage   :   $cdna_comp->transcript_percent_coverage(99);
+    Usage   :   $cdna_comp->transcript_percent_coverage(97.5);
     Function:   get/set for threshold percentage of a transcript
                 involved in featurepairs with a cDNA
 
@@ -125,19 +153,6 @@ sub transcript_percent_coverage {
     $self->{_cdna_comparison_transcript_percent_coverage} = $value;
   }
   return $self->{_cdna_comparison_transcript_percent_coverage};
-}
-
-=head2 mapping_by_cdnas
-
-    Title   :   mapping_by_cdnas
-    Usage   :   n/a
-    Function:   Not yet implemented
-
-=cut
-
-sub mapping_by_cdnas {
-  my ( $self ) = shift;
-  $self->throw('not yet implemented!');
 }
 
 =head2 _get_coverage
@@ -175,7 +190,7 @@ sub _get_coverage {
       $hit_hash{$hseqname} = [];
     }
     for (my $i = $featurepair->start; $i <= $featurepair->end; $i++) {
-      $$hit_hash{$hseqname}[$i] = 1;
+      $hit_hash{$hseqname}->[$i] = 1;
     }
   }
   
@@ -186,7 +201,7 @@ sub _get_coverage {
   # calculate coverage percentages
   foreach my $hseqname (keys %hit_hash) {
     my $bases_covered = 0;
-    my $coverage_vector_arr_ref = $hit_hash{$hseqname}[$i];
+    my $coverage_vector_arr_ref = $hit_hash{$hseqname};
     for (my $i = 1; $i <= $cdna_length; $i++) {
       $bases_covered += 1 if defined $$coverage_vector_arr_ref[$i];
     }
@@ -197,48 +212,63 @@ sub _get_coverage {
   return \%coverage;
 }
 
-sub get_transcript_mapping {
+=head2 run_transcript_mapping
+
+    Title   :   run_transcript_mapping
+    Usage   :   my %mapping_by_transcripts =
+                  $cdna_comp->run_transcript_mapping;
+    Function:   Generate a mapping of transcript IDs to cDNA IDs.
+                In this mapping, each transcript is represented
+		either zero or one times, but each cDNA is
+		represented zero, one, or more times.
+    Returns :   none (use get_transcript_mapping to obtain results)
+    Args    :   none
+
+=cut
+
+sub run_transcript_mapping {
   my ( $self ) = shift;
 
-  # create uniquely-named 'genomic' (actually, transcript) file
+  # obtain +- unique 'genomic' (actually, transcript) file name
   my $genomic_fnam;
   my $genomic_fh;
-  do { $genomic_fnam = POSIX::tmpnam() }
+  do { $genomic_fnam = tmpnam() }
     until $genomic_fh =
-      IO::File->new($genomic_fnam, O_WR|O_CREAT|O_EXCL);
+      IO::File->new($genomic_fnam, O_RDWR|O_CREAT|O_EXCL);
   close $genomic_fh or die "error closing file $genomic_fnam";
+  unlink $genomic_fnam or die "error deleting file $genomic_fnam";
 
   # write temporary (but uniquely named) file of all cDNAs
   # we only have to do this once
   my $cdna_fnam;
   my $cdna_fh;
-  do { $cdna_fnam = POSIX::tmpnam() }
-    until $cdna_fh = IO::File->new($cdna_fnam, O_WR|O_CREAT|O_EXCL);
+  do { $cdna_fnam = tmpnam() }
+    until $cdna_fh = IO::File->new($cdna_fnam, O_RDWR|O_CREAT|O_EXCL);
   my $cdna_stream = Bio::SeqIO->new(-fh     => $cdna_fh,
                                     -format => 'Fasta');
   my $cdna_seqs_arrayref = $self->cdna_arrayref;
   foreach my $cdna_seq (@$cdna_seqs_arrayref) {
-    $self->throw "error writing to $cdna_fnam"
+    $self->throw("error writing to $cdna_fnam")
       unless $cdna_stream->write_seq($cdna_seq);
   }
   close $cdna_fh or die "error closing file $cdna_fnam";
 
-  # compare transcripts with cDNAs, one transcript at a time
+  # generate mapping
 
-  my $genomic_seqs_arrayref = $self->transcript_arrayref;
-  foreach my $genomic_seq (@$genomic_seqs_arrayref) {
+  my %mapping;
+  foreach my $genomic_seq (@$self->transcript_arrayref) {
 
     # create the 'genomic' file containing the current transcript
-    $genomic_fh = IO::File->new($genomic_fnam, O_WR|O_CREAT|O_EXCL);
+    $genomic_fh = IO::File->new($genomic_fnam, O_RDWR|O_CREAT|O_EXCL);
     $self->throw("temporary file name $genomic_fnam not unique")
       unless $genomic_fh;
     my $genomic_stream = Bio::SeqIO->new(-fh     => $genomic_fh,
                                          -format => 'Fasta');
-    $self->throw "error writing to $genomic_fnam"
+    $self->throw("error writing to $genomic_fnam")
       unless $genomic_stream->write_seq($genomic_seq);
     close $genomic_fh or die "error closing file $genomic_fh";
 
-    # run sequence comparison binary
+    # run sequence comparison
     my $exonerate_obj
       = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
                                            -genomic   => $genomic_fnam,
@@ -249,12 +279,28 @@ sub get_transcript_mapping {
     $exonerate_obj->run();
     my @features = $exonerate_obj->output;
     
+    # store mapping for transcript if best coverage is good enough
     my %coverage_by_hits = %$self->_get_coverage($genomic_seq->length,
                                                  @features);
     my $max_coverage = 0.0;
+    my $mapped_name;
     foreach my $hit (keys %coverage_by_hits) {
       if ($coverage_by_hits{$hit} > $max_coverage) {
-        my $mapped_name = $hit;
+        $mapped_name = $hit;
         $max_coverage = $coverage_by_hits{$hit};
       }
     }
+    if ($max_coverage >= $self->transcript_percent_coverage) {
+      $mapping{$genomic_seq->name} = $mapped_name;
+    }
+
+    unlink $genomic_fnam or die "error deleting file $genomic_fnam";
+  }
+
+  unlink $cdna_fnam or die "error deleting file $cdna_fnam";
+
+  #store results
+  $self->_cdna_comparison_transcript_mapping_hashref = \%mapping;
+}
+
+1;
