@@ -238,18 +238,22 @@ sub _update_single_header_defaults {
   my $header = lc(shift);
   my $default_header = lc(shift);
 
-  my @default_keys = $self->get_keys($default_header);
+  if (exists($self->{'config'}->{$default_header})) {  # don't break if no default header is defined
 
-  my @current_keys = $self->get_keys($header);
+    my @default_keys = $self->get_keys($default_header);
 
-  foreach my $key (@default_keys) {
+    my @current_keys = $self->get_keys($header);
 
-    # if the key is not defined in current_keys, add the default
-    if (!grep /^$key$/, @current_keys) {
-      my $value = $self->get_parameter($default_header, $key);
-      $self->{'config'}->{$header}->{$key} = $value;
-      #print "added default value of $value (from $default_header) for $key in $header\n";
+    foreach my $key (@default_keys) {
+
+      # if the key is not defined in current_keys, add the default
+      if (!grep /^$key$/, @current_keys) {
+	my $value = $self->get_parameter($default_header, $key);
+	$self->{'config'}->{$header}->{$key} = $value;
+	#print "added default value of $value (from $default_header) for $key in $header\n";
+      }
     }
+
   }
 
 }
