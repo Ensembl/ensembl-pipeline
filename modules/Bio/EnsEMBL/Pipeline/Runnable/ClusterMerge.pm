@@ -165,7 +165,7 @@ sub new {
   # $exon_match       = 0,
 
   # to get some blah,blah
-  $self->verbose(0);
+  $self->verbose(1);
 
 
   if ( $comparison_level ){
@@ -183,7 +183,7 @@ sub new {
   }
   
   if ( defined $splice_mismatch ){
-    $self->_splice_mismatch( $splice_mismatch);
+    $self->_splice_mismatch( $splice_mismatch );
     print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
   }
   else{
@@ -191,7 +191,7 @@ sub new {
     print STDERR "defaulting splice mismatch to ".$self->_splice_mismatch."\n";
   }
 
-  if ( $intron_mismatch ){
+  if ( defined $intron_mismatch ){
     $self->_intron_mismatch( $intron_mismatch );
     print STDERR "intron mismatch ".$self->_intron_mismatch."\n";
   }
@@ -1127,11 +1127,11 @@ sub run {
   my @transcripts = $self->input_transcripts;
 	 
   # cluster the transcripts
-  my @transcript_clusters1 = $self->_cluster_Transcripts(@transcripts);
-  print STDERR scalar(@transcript_clusters1)." clusters returned from _cluster_Transcripts\n";
+  my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
+  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
   # restrict the number of ESTs per cluster, for the time being, to avoid deep recursion 
-  my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1,100);
+  #my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1,100);
 
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
@@ -1255,13 +1255,13 @@ sub _cluster_Transcripts_by_genomic_range{
   
   # first sort the transcripts
   @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-				 if ($result){
-				     return $result;
-				 }
-				 else{
-				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-				 }
-			     } @mytranscripts;
+			if ($result){
+			  return $result;
+			}
+			else{
+			  return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+			}
+		      } @mytranscripts;
   
   print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
   
@@ -1287,13 +1287,13 @@ sub _cluster_Transcripts_by_genomic_range{
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
     
-    #print STDERR "\nIn cluster ".($count+1)."\n";
-    #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
-    #print STDERR "comparing:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
+    print STDERR "\nIn cluster ".($count+1)."\n";
+    print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
+    print STDERR "comparing:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
     
-    if ( !( $transcripts[$c]->end < $cluster_starts[$count] ||
-	    $transcripts[$c]->start > $cluster_ends[$count] ) ){
+    if ( !( $self->transcript_high($transcripts[$c]) < $cluster_starts[$count] ||
+	    $self->transcript_low($transcripts[$c])  > $cluster_ends[$count] ) ){
       $cluster->put_Transcripts( $transcripts[$c] );
       
       # re-adjust size of cluster
@@ -1318,7 +1318,10 @@ sub _cluster_Transcripts_by_genomic_range{
   }
   return @clusters;
 }
+
 ############################################################
+
+
 
 =head2 by_transcript_high
 
@@ -1374,15 +1377,8 @@ Description: it returns the highest coordinate of a transcript
 
 sub transcript_high{
   my ($self,$tran) = @_;
-  my $high;
-  
-  if ( $tran->start_Exon->strand == 1){
-    $high = $tran->end_Exon->end;
-  }
-  else{
-    $high = $tran->start_Exon->end;
-  }
-  return $high;
+  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_Exons};
+  return $exons[-1]->end;
 }
 
 ############################################################
@@ -1395,14 +1391,8 @@ Description: it returns the lowest coordinate of a transcript
 
 sub transcript_low{
   my ($self,$tran) = @_;
-  my $low;
-  if ( $tran->start_Exon->strand == 1){
-    $low = $tran->start_Exon->start;
-  }
-  else{
-    $low = $tran->end_Exon->start;
-  }
-  return $low;
+  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_Exons};
+  return $exons[0]->start;
 }
 
 ############################################################
@@ -1991,7 +1981,7 @@ sub _comparison_level{
 
 sub _splice_mismatch{
   my ($self, $mismatch ) = @_;
-  if ($mismatch){
+  if (defined $mismatch){
     $self->{_splice_mismatch} = $mismatch;
   }
   return $self->{_splice_mismatch};
@@ -2011,7 +2001,7 @@ sub _exon_match{
 
 sub _intron_mismatch{
   my ($self, $mismatch ) = @_;
-  if ($mismatch){
+  if (defined $mismatch){
     $self->{_intron_mismatch} = $mismatch;
   }
   return $self->{_intron_mismatch};
@@ -2021,7 +2011,7 @@ sub _intron_mismatch{
 
 sub _mismatch_allowed{
   my ($self, $mismatch) = @_;
-  if ($mismatch){
+  if (defined $mismatch){
     $self->{_mismatch_allowed} = $mismatch;
   }
   return $self->{_mismatch_allowed};
