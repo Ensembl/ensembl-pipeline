@@ -342,7 +342,11 @@ sub parse_results {
 	    # starting at 0 - fudge by setting to 1
 	    $hit_start = 1 if $hit_start == 0;
 	    $hit_end   = 1 if $hit_end   == 0;
-
+      if($hit_end < $hit_start){
+        $temp_end = $hit_start;
+        $hit_start = $hit_end;
+        $hit_end = $temp_end;
+      }
 	    my $rc = $self->_get_consensus($repeat_name, $repeat_class);
 
 	    my $rf = Bio::EnsEMBL::RepeatFeature->new;
@@ -369,10 +373,10 @@ sub _get_consensus {
     my $cons;
 
     unless (defined ($cons = $self->{'_consensi'}{$name})) {
-	$cons = new Bio::EnsEMBL::RepeatConsensus;
-	$cons->name($name);
-	$cons->repeat_class($class);
-	$self->{'_consensi'}{$name} = $cons;
+      $cons = new Bio::EnsEMBL::RepeatConsensus;
+      $cons->name($name);
+      $cons->repeat_class($class);
+      $self->{'_consensi'}{$name} = $cons;
     }
 
     return $cons;
