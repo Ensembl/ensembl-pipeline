@@ -104,6 +104,7 @@ foreach my $gene_id ( @gene_ids){
 
  TRANSCRIPT:
   foreach my $tran_id ( @transcript_ids ){
+   
     print STDERR "checking transcript dbID: ".$tran_id."\n";
     my ($exons,$info) = &check_transcript($db,$tran_id);
     #&print_transcript($exons,$info);
@@ -237,11 +238,11 @@ sub check_transcript{
 	      ass.chromosome_id=c.chromosome_id AND                              
 	      ass.contig_id=e.contig_id AND 
 	      ass.type = '$path' AND
-	      tr.transcript_id = 243 AND  
+	      tr.transcript_id = '$t_id' AND  
 	      tr.translation_id=tl.translation_id
 	      ORDER BY et.rank
 	    );
-
+  #print $q."\n";
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
   my $res = $sth->execute || $db->throw("can't execute: $q");
   
