@@ -19,7 +19,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder
 
 my $db          = Bio::EnsEMBL::DBLoader->new($locator);
 my $genefinder     = Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder->new ( 
-                                                    -dbobj      => $db,
+                                                    -db      => $db,
 			                                        -input_id   => $input_id
                                                     -analysis   => $analysis );
 $genefinder->fetch_input();
@@ -57,20 +57,20 @@ use Data::Dumper;
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+
 =head2 new
 
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);      
-                          
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder object
-    Args    :   -db:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
+  Arg [1]   : RunnableDB standard args
+  Function  : creates a Genefinder Runnable DB
+  Returntype: self
+  Exceptions: is no analysis object is passed in
+  Caller    : 
+  Example   : my $runnabledb = Bio::EnsEMBL::Pipeline::RunnableDB::GeneFinder->new(-input_id => $seq,
+                                                                                   -analysis => $analysis
+                                                                                   -db => $db);
 =cut
+
+
 
 sub new {
     my ($class, @args) = @_;
@@ -93,19 +93,22 @@ sub new {
 
 =head2 fetch_input
 
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for repeatmasker from the database
-    Returns :   none
-    Args    :   none
+  Arg [1]   : none
+  Function  : get data for runnable from database
+  Returntype: non
+  Exceptions: throws if no input id is set
+  Caller    : 
+  Example   : 
 
 =cut
+
+
+
 
 sub fetch_input {
     my($self) = @_;
     #print STDERR "in genefinder\n";
     #print STDERR "using db ".$self->db->dbname."\n";
-    $self->throw("No input id") unless ($self->input_id);
     #print STDERR "input id ".$self->input_id."\n";
     $self->throw("No input id") unless ($self->input_id);
     #my $contigid  = $self->input_id;
@@ -151,11 +154,24 @@ sub result_quality_tag {
     }
 }
 
+
+=head2 create_PredictionTranscripts
+
+  Arg [1]   : none
+  Function  : makes Prediction transcripts from results from runnable
+  Returntype: the valid transcripts
+  Exceptions: none
+  Caller    : $self
+  Example   : $self->create_PredictionTranscripts
+
+=cut
+
+
 sub create_PredictionTranscripts{
   my $self = shift;
 
   my @ptranscripts;
-
+  my @checked_transcripts;
   my $genefinder_runnable = ($self->runnable())[0];
   my @transcripts = $genefinder_runnable->each_Transcript();
   if( ! @transcripts ) { return; }
@@ -179,9 +195,28 @@ sub create_PredictionTranscripts{
     }
     push(@ptranscripts, $ptrans);
   }
-
-  return @ptranscripts;
+  
+  foreach my $pt(@ptranscripts){
+    my $checked = $self->check_translation($pt);
+    if($checked){
+      push(@checked_transcripts, $checked);
+    }
+  }
+  return @checked_transcripts;
 }
+
+
+=head2 write_output
+
+  Arg [1]   : none
+  Function  : writes output to db
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
 
 sub write_output {
    my $self = shift;
@@ -196,6 +231,50 @@ sub write_output {
    }
   
 }
+
+
+=head2 check_translation
+
+  Arg [1]   : Bio::EnsEMBL::PredictionTranscript
+  Function  : check if transcript translates
+  Returntype: valid transcript or undef
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+sub check_translation{
+  my ($self, $transcript) = @_; 
+  my @exons = @{$transcript->get_all_Exons};
+  if($exons[0]->strand == 1){
+    @exons = sort{$a->start <=> $b->start} @exons;
+  }else{
+    @exons = sort{$b->start <=> $a->start} @exons;
+  }
+  print STDERR "checking translation\n";
+  #foreach my $e(@exons){
+  #  print STDERR $e->seqname."\t ".$e->start."\t ".$e->end."\t ".$e->strand."\t ".$e->phase."\t ".$e->end_phase."\n";
+  #}
+
+  my $pep = $transcript->translate->seq;
+ 
+  my $translate = 1;
+  if($pep =~ /\*/){
+    print STDERR "translation ".$pep." doesn't translate\n";
+    return undef;
+  }
+  
+  if(!$translate){
+    $self->throw("there isn't a translation without stops the code shouldn't have got here $!");
+  }else{
+    return $transcript;
+  }
+}
+
+
+
 
 1;
 
