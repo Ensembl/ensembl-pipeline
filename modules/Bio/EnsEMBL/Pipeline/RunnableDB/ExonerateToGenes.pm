@@ -72,6 +72,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 use vars qw(@ISA);
 
@@ -170,6 +171,7 @@ sub fetch_input {
 	      -options     => $self->options,
 	      -target_type => $self->target_type,
 	      -query_type  => $self->query_type,
+	      -analysis_obj  => $self->analysis,
 	     );
       $self->runnables($runnable);
     }
@@ -344,6 +346,8 @@ sub write_output{
       foreach my $tran (@{$gene->get_all_Transcripts}){
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       }
+      
+      
       eval{
 	  $gene_adaptor->store($gene);
       };
