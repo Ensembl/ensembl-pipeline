@@ -328,11 +328,18 @@ sub _store_affy_features {
   
   ###to make MiscFeature, we need to make slice_obj###
   
-  my $coord_system_name = "chromosome";
-
   foreach my $h (@h) {
-    my ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
-    my $slice;
+    my ($coord_system_name,$seq_region_name,$slice) ;
+    
+    if ($h->{'t_id'} =~/Zebrafish/i) {
+      $coord_system_name = undef;
+      $seq_region_name = $h->{'t_id'} =~ /^Contig\:(\S+)\..*$/;
+    }
+    else {
+      $coord_system_name = "chromosome";
+      $seq_region_name = $h->{'t_id'} =~ /^(\S+)\..*$/;
+    }
+    
     $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name);
     if (!$slice) {
       print STDERR "Could not obtain slice for seq_region: $coord_system_name : $seq_region_name\n";
@@ -341,10 +348,10 @@ sub _store_affy_features {
     my $probe_name = $h->{'q_id'};
     $probe_name =~ s/^probe\://;
     my ($probeset_name,$composite_name) = split /\:/, $probe_name;
-
+    $composite_name =~ s/\;$//;
     my $xref_name = $probeset_name;
-    $xref_name =~ s/-/_//g;  ###this to keep name same as in code corresponds to external_db.db_name
-
+    $xref_name =~ s/-/_/g;  ###this to keep name same as in code corresponds to external_db.db_name
+    
     my $misc_feature = Bio::EnsEMBL::MiscFeature->new (
 						       -START  => $h->{'t_start'}, ###it's been added 1 already
 						       -END    => $h->{'t_end'},
