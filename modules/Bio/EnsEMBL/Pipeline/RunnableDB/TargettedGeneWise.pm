@@ -185,7 +185,7 @@ sub fetch_input{
   my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$newstart,$newend);
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$new_start,$new_end);
   
   $self->vc($vc);
   $self->protein_id($protein_id);
@@ -454,10 +454,11 @@ sub validate_transcript {
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
   $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1);$i++){
+  for (my $i=0;$i<(scalar(@exons)-1);$i++){
     my $endphase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
-    if ( $phase != $end_phase ){
+    if ( $phase != $endphase ){
+      $self->warn("rejecting transcript with inconsistent phases( $phase - $endphase) ");
       return undef;
     }
   }
