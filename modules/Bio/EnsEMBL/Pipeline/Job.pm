@@ -537,6 +537,7 @@ sub runInLSF {
 		-dbobj => $self->adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+          $module =~ s/\//::/g;
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
