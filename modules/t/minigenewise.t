@@ -1,26 +1,8 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 15;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
@@ -30,94 +12,76 @@ use Bio::SeqIO;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
+ok(1);
 
-# make PrimarySeq objects for genomic and protein sequences.
-my ($gseq, $pseq) =  set_seq();
+ok(my ($gseq, $pseq) =  set_seq());
 
 my $genomic_seq	   =  Bio::PrimarySeq->new(	-seq         => $gseq,
 						-id          => 'Z84721.1.1.43058',
 						-accession   => 'Z84721',
 						-moltype     => 'dna');
 
+ok($genomic_seq);
+
 my $protein_seq = Bio::PrimarySeq->new(		-seq         => $pseq,
 						-id          => 'HBA_HUMAN',
 						-accession   => 'P01922',
 						-moltype     => 'protein');
 
-unless (defined($genomic_seq) && defined($protein_seq)) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
-
+ok($protein_seq);
 
 # Manually making a *really* minimal FeaturePair to pass to new MiniGenewise object- It seems only the 
 # sequence names are used from these.
 
-my $f1 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'Z84721');
-my $f2 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'HBA_HUMAN');
-my $feat_pair = Bio::EnsEMBL::FeaturePair->new(	-feature1 => $f1,
-						-feature2 => $f2,
-					      );
-
-unless (defined($feat_pair))
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+ok(my $f1 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'Z84721'));
+ok(my $f2 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'HBA_HUMAN'));
+ok(my $feat_pair = Bio::EnsEMBL::FeaturePair->new(	-feature1 => $f1,
+																										-feature2 => $f2,
+																								 ));
 
 # Gotta make a SeqFetcher object too.
   # write protein sequence to a file that will be subsequently indexed (great, a one sequence index...)
-  my $fasta_filename = '/tmp/pseq.fa';
-  my $index_filename = '/tmp/pseq.inx';
+my $fasta_filename = '/tmp/pseq.fa';
+my $index_filename = '/tmp/pseq.inx';
 
-  my $seq_stream = Bio::SeqIO->new('-format' => 'Fasta','-file' => ">$fasta_filename");
-  $seq_stream->write_seq($protein_seq);
+ok(my $seq_stream = Bio::SeqIO->new('-format' => 'Fasta','-file' => ">$fasta_filename"));
+ok($seq_stream->write_seq($protein_seq));
 
-  #create a bioperl index to be used by SeqFetcher
-  my $inx = Bio::Index::Fasta->new('-filename'   => $index_filename,
-				 '-write_flag' => 1);
-  $inx->make_index($fasta_filename);
+#create a bioperl index to be used by SeqFetcher
+my $inx = Bio::Index::Fasta->new('-filename'   => $index_filename,
+																 '-write_flag' => 1);
+$inx->make_index($fasta_filename);
 
-  #create SeqFetcher::Pfetch object    
-  my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-								-executable  => '/usr/local/pubseq/bin/pfetch',
-								-bp_index => $index_filename);
+ok(1);
 
-unless (defined($seqfetcher))
-{ print "not ok 4\n"; }
-else
-{ print "ok 4\n"; }
+#create SeqFetcher::Pfetch object    
+my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(-executable  => '/usr/local/ensembl/bin/pfetch',
+																																 -bp_index    => $index_filename);
 
+ok($seqfetcher);
 
 # Make the actualy MiniGenewise object
-my @bloody_array = ($feat_pair);
+
 my $minigenewise = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new('-genomic'    => $genomic_seq,
-								       '-features'   => \@bloody_array,
-								       '-seqfetcher' => $seqfetcher);
+																																			 '-features'   => [$feat_pair],
+																																			 '-seqfetcher' => $seqfetcher);
 
  
-unless ($minigenewise)
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
+ok($minigenewise);
 
-#run MiniGenewise runnable                            
 $minigenewise->run();
-print "ok 6\n"; # 4th test passed
 
-#get and store the output
-my @results = $minigenewise->output();
+ok(1);
+
+ok(my @results = $minigenewise->output());
+
 display(@results);
-
-unless (@results) 
-{ print "not ok 7\n"; }
-else
-{ print "ok 7\n"; }
 
 # clean up sequence and index files 
 unlink ($fasta_filename);
 unlink ($index_filename);
+
+ok(1);
 
 sub display {
   my @results = @_;
