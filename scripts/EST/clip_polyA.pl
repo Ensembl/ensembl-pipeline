@@ -142,8 +142,8 @@ while (<RNA>){
       # take 3 by 3 bases from the beginning
       while ( $length_to_chop < $length ){
 	my $chunk = substr( $seq, $length_to_chop + 3, $piece );
-	print STDERR "length to chop: $length_to_chop\n";
-	print "chunk: $chunk\n";
+	#print STDERR "length to chop: $length_to_chop\n";
+	#print "chunk: $chunk\n";
 	$count = $chunk =~ tr/Tt//;
 	if ( $count >= 2*( $piece )/3 ){
 	  $length_to_chop +=3;
@@ -153,7 +153,7 @@ while (<RNA>){
 	  
 	}
       }
-      if ( $length_to_chop > 0 ){
+      if ( $length_to_chop >= 0 ){
 	# do not chop the last base if it is not a A:
 	#print STDERR "clipping sequence $seq\n";
 	my $last_base        = substr( $seq, ( $length_to_chop + 3 - 1 ), 1 );
