@@ -153,7 +153,7 @@ sub new{
     $self->internal_splice_overlap($internal_splice_overlap);
   }
 
-  $self->verbose(0);
+  $self->verbose(1);
 
   return $self;  
 }
@@ -916,11 +916,19 @@ sub _process_comparison{
     elsif ( ( $is_first{ $list1[0] } && !$is_last{ $list1[0] } 
 	      &&
 	      $is_last{ $list2[0] }  && !$is_first{$list2[0] }
+	      &&
+	      $self->_check_simple_low_site( $list1[0] , $list2[0] )
+	      &&
+	      $self->_check_simple_high_site( $list2[0], $list1[0] )
 	    )
 	    ||
 	    ( $is_first{ $list2[0] } && !$is_last{ $list2[0] }  
 	      && 
 	      $is_last{ $list1[0] }  && !$is_first{$list1[0] }
+	      &&
+	      $self->_check_simple_low_site( $list2[0] , $list1[0] )
+	      &&
+	      $self->_check_simple_high_site( $list1[0], $list2[0] )
 	    )
 	  ){
       print STDERR "here 3 --- merge ---\n" if $verbose;
@@ -933,6 +941,7 @@ sub _process_comparison{
       print STDERR "No merge\n" if $verbose;
       $merge = 0;
     }
+    print STDERR "point 1: returning merge = $merge\n" if $verbose;
     return $merge;  
   }
   
@@ -985,6 +994,7 @@ sub _process_comparison{
       }
       else{
 	print STDERR "CLASH\n" if $verbose;
+	print STDERR "point 2: returning 0\n" if $verbose;
 	return 0;
       }
     
@@ -1028,6 +1038,7 @@ sub _process_comparison{
       }
       else{
         print STDERR "CLASH\n" if $verbose;
+	print STDERR "point 3: returning 0\n" if $verbose;
 	return 0;
       }
     
@@ -1044,10 +1055,12 @@ sub _process_comparison{
     }
     else{	    
       print STDERR "here3: CLASH\n" if $verbose;
+      print STDERR "point 4: returning 0\n" if $verbose;
       return 0;
     }
   } # end of PAIR
   
+  print STDERR "last point: returning merge = $merge\n" if $verbose;
   return $merge;
 }
 
@@ -1059,15 +1072,15 @@ sub _process_comparison{
 #          #######-----################
 #         ########-----#########------#########
 #                      middle_exon
+#
+# middle_exon is from tran, and last_exon is from the other transcript (not used here)
 
 sub _check_high_site{
   my ($self, $last_exon, $middle_exon, $tran ) = @_;
   
-  # middle_exon is from tran, and last_exon is from the other transcript (not used here)
   #print STDERR "check_high_site(): checking exon ".$last_exon->start."-".$last_exon->end."\n";
   #print STDERR "against:\n";
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
-
 
   ############################################################
   # allow any excess, as long as it does not overlap the next exon
@@ -1085,13 +1098,14 @@ sub _check_high_site{
 	
 	############################################################
 	# if we restrict external splice sites, 
-	# we simply check that they do not exceed the splice_mismatch
+	# we simply check that they do not exceed the given value ( = $self->internal_splice_overlap ) 
 	############################################################
 	if ( defined $self->internal_splice_overlap ){
 	  if ($last_exon->end - $middle_exon->end <= $self->internal_splice_overlap ){
 	    return 1;
 	  }
 	  else{
+	    print STDERR "external exon overlaps intron with overlap = ".$last_exon->end - $middle_exon->end."\n";
 	    return 0;
 	  }
 	}
@@ -1111,16 +1125,18 @@ sub _check_high_site{
 #                ###############------########
 #         ########-----#########------#########
 #                      middle_exon
+#
+# middle_exon is from tran, and first_exon is from the other transcript (not used here)
 
 sub _check_low_site{
   my ($self, $first_exon, $middle_exon, $tran ) = @_;
+
+  
   #print STDERR "check_low_site(): checking exon ".$first_exon->start."-".$first_exon->end."\n";
   #print STDERR "against:\n";
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
   
-
-  # middle_exon is from tran, and first_exon is from the other transcript (not used here)
-  
+    
   ############################################################
   # allow any excess, as long as it does not overlap the previous exon
   ############################################################
@@ -1137,7 +1153,7 @@ sub _check_low_site{
 	
 	############################################################
 	# if we restrict external splice sites, 
-	# we simply check that they do not exceed the splice_mismatch
+	# we simply check that they do not exceed the the given value ( = $self->internal_splice_overlap )
 	############################################################
 	if ( defined $self->internal_splice_overlap ){
 	  if ($middle_exon->start - $first_exon->start <= $self->internal_splice_overlap ){
@@ -1145,6 +1161,7 @@ sub _check_low_site{
 	  }
 	  else{
 	    return 0;
+	    print STDERR "external exon overlaps intron with overlap = ".$middle_exon->start - $first_exon->start."\n";
 	  }
 	}
 	return 1;
@@ -1157,6 +1174,65 @@ sub _check_low_site{
 
 ############################################################
 
+
+############################################################
+# this method checks whether the high end of a last exon overlaps the intron of the other transcript
+# sometimes we want this to be a clash, to be able to model alternative 3' UTRs
+#
+#                       last_exon
+#          #######-----################
+#                      #########-----------#########
+#                        first_exon
+#
+sub _check_simple_high_site{
+  my ($self, $last_exon, $first_exon) = @_;
+  
+  ############################################################
+  # if we restrict external splice sites, 
+  # we simply check that they do not exceed the given value ( = $self->internal_splice_overlap ) 
+  ############################################################
+  if ( defined $self->internal_splice_overlap ){
+    if ($last_exon->end - $first_exon->end <= $self->internal_splice_overlap ){
+      return 1;
+    }
+    else{
+      print STDERR "external exon overlaps intron with overlap = ".$last_exon->end - $first_exon->end."\n";
+      return 0;
+    }
+  }
+  # if we have not set $self->internal_splice_overlap - we allow any overlap
+  return 1;
+}
+
+############################################################
+# this method checks whether the low end of an external exon overlaps the intron in the other
+# transcript.
+#
+#                      first_exon
+#                    ##############------########
+#         ########--------#########
+#                         last_exon
+#
+sub _check_simple_low_site{
+  my ($self, $first_exon, $last_exon) = @_;
+
+  ############################################################
+  # if we restrict external splice sites, 
+  # we simply check that they do not exceed the the given value ( = $self->internal_splice_overlap )
+  ############################################################
+  if ( defined $self->internal_splice_overlap ){
+    if ($last_exon->start - $first_exon->start <= $self->internal_splice_overlap ){
+      return 1;
+    }
+    else{
+      return 0;
+      print STDERR "external exon overlaps intron with overlap = ".$last_exon->start - $first_exon->start."\n";
+    }
+  }
+  return 1;
+}
+
+############################################################
 
 
 1;
