@@ -793,7 +793,7 @@ sub _compare_to_reference {
   # once.
   my $align_unit = 1;
 
-  # If we are dealing this protein alignments we have to
+  # If we are dealing with protein alignments we have to
   # multiply this by three.
   $align_unit *= 3 if ($evidence_align_seq->type eq 'protein');
 
@@ -1654,7 +1654,8 @@ sub _corroborating_sequences {
     $exon_placemarker++;
   }
 
-  unless (scalar @{$self->{'_corroborating_sequences'}} > 0) {
+  unless (defined $self->{'_corroborating_sequences'} &&
+	  scalar @{$self->{'_corroborating_sequences'}} > 0) {
     warning("There are no displayable supporting features for this transcript [" .
 	    $self->_transcript->stable_id . "].  " .
 	    "Try setting the -type attribute to 'all', instead of just " . 
