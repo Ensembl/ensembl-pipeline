@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Protein::Coil;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -143,6 +143,14 @@ sub query {
 	}
     }
     return $self->{'_sequence'};
+}
+
+sub clone{
+  my ( $self, $clone ) = @_;
+  if ($clone){
+    $self->query($clone);
+  }
+  return $self->query;
 }
 
 
