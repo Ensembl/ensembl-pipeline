@@ -228,7 +228,7 @@ sub run{
     my @all_features;
     
     # collect all the features
-    foreach my $hseqname ( @eccepted_hids ){
+    foreach my $hseqname ( @accepted_hids ){
       push ( @all_features, @{$hitarray{$hseqname}} );
     }
      
