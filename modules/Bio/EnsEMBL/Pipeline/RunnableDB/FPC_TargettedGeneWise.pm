@@ -62,6 +62,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
 							     GB_KILL_LIST
 							    );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    qw (
+							     GB_FINAL_PMATCH_LOGICNAME
+							    );
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
@@ -197,7 +201,7 @@ sub make_targetted_runnables {
   $self->output_db($genewise_db);
   my %kill_list = %{$self->fill_kill_list};
 
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
+  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end, $GB_FINAL_PMATCH_LOGICNAME)){
 
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
