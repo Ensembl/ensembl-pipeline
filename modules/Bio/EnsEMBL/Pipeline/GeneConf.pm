@@ -65,13 +65,13 @@ my $prefix='COB';
 	     # this db needs to have clone & contig & static_golden_path tables populated
 	     GB_FINALDBHOST             => 'ecs1c',
 	     GB_FINALDBNAME             => 'briggsae_genebuild_newschema',
-
+	     GB_INPUTID_REGEX => '',
 	     # general variables
 	     # path to run_GeneBuild_RunnableDB
 	     GB_RUNNER      => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
 	     GB_TMPDIR      => '/acari/scratch4/ensembl/lec/new_out',
 	     # LSF queue plus any options you want to use
-	     GB_QUEUE       => 'acarilong',
+	     GB_QUEUE       => 'acari',
 	     GB_TBLASTN     => '',
 	     
 	     # pmatch related variables - for Targetted build
@@ -101,8 +101,8 @@ my $prefix='COB';
 
 	     # targetted genewise/geneE2G specific parameters
 	     # species specific protein index
-	     #GB_TARGETTED_PROTEIN_INDEX => '/usr/local/ensembl/data/blastdb/Worms/prepare_cdnas.fa',
-	     GB_TARGETTED_PROTEIN_INDEX => '/acari/work4a/lec/cDNAs/prepare_cdnas.fa',
+	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Worms/proteome82.fa',
+	     #GB_TARGETTED_PROTEIN_INDEX => '/acari/work4a/lec/briggsae_sequence/proteome82.fa',
 	     GB_TARGETTED_CDNA_INDEX    => '',
 	     # minimum required coverage for multiexon predictions
 	     GB_TARGETTED_MULTI_EXON_COVERAGE      => '25',
@@ -137,13 +137,13 @@ my $prefix='COB';
 					 # fill in one complete hash for each database from which blast 
 					 # features are to be retrieved
 					 {				  
-					  'type'       => 'Ensembl/swall',
+					  'type'       => 'Swall',
 					  'threshold'  => '200',
 					  'index'      => '/usr/local/ensembl/data/blastdb/Ensembl/swall_270602'
 					 },
 # example:
 					 {
-					  'type'       => 'Worms/wormpep79.pep',
+					  'type'       => 'Wormpep',
 					  'threshold'  => '200',
 					  'index'      => '/usr/local/ensembl/data/blastdb/Worms/wormpep'
 					 },

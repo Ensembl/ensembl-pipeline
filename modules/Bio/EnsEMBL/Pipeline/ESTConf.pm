@@ -56,6 +56,7 @@ use vars qw( %ESTConf );
 	    # general options for scripts
 
 	    # path to run_ESTRunnableDB
+	    EST_INPUT_ID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
 	    EST_RUNNER                  => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
 	
 	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
