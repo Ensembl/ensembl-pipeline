@@ -146,6 +146,9 @@ sub _process_for_same_species_duplicates {
  PARTITION_HITS:
   while (my $sbjct = $bplite_report->nextSbjct){
 
+    # Mangle the BPLite::Sbjct object for its own good.
+    $sbjct = $self->_fix_sbjct($sbjct);
+
     $report_empty = 0;
 
     # Skip hit if it is a match to self.
@@ -205,8 +208,7 @@ sub _process_for_same_species_duplicates {
   foreach my $species (keys %species_hash) {
 
     my @sorted_hits 
-      = sort {$hit_distance{$a->name} <=> 
-		$hit_distance{$b->name}} 
+      = sort {$hit_distance{$a->name} <=> $hit_distance{$b->name}} 
 	@{$species_hash{$species}};
 
     $sorted_species_hits{$species} = \@sorted_hits;
@@ -242,6 +244,37 @@ sub _process_for_same_species_duplicates {
 }
 
 
+=head2 _fix_sbjct
+
+  Args[1]    :
+  Example    :
+  Description: A work-around for a BPLite::Sbjct annoyance.  The 
+               sbjct->name object returns the whole fasta description 
+               line for a subject hit.  If the input fasta sequence 
+               file includes more than an id on the description line, 
+               this will be passed back every time the name method is 
+               called.  This is a real pest is you are trying to 
+               match ids via a regex or use the ids as hash keys.
+  Returntype :
+  Exceptions :
+  Caller     :
+
+=cut
+
+sub _fix_sbjct {
+  my ($self, $sbjct) = @_;
+
+  my $sbjct_name = $sbjct->name;
+
+  $sbjct_name =~ s/\W*(\w+).*/$1/;
+
+  # BAD!
+  $sbjct->{NAME} = $sbjct_name;
+
+  return $sbjct;
+}
+
+
 =head2 _calculate_pairwise_distance
 
   Args[1]    :
@@ -261,18 +294,12 @@ sub _calculate_pairwise_distance {
   my @seqs = ($self->_fetch_seq($input_id_1), 
 	      $self->_fetch_seq($input_id_2));
 
-print "Input seq 1 : " . $seqs[0]->display_id . "\n" .
-  "Input seq 2 : " . $seqs[1]->display_id . "\n";
-
   return 0 if ($seqs[0]->display_id eq $seqs[1]->display_id);
 
   $self->throw("Didnt correctly obtain two sequences for alignment.")
     unless scalar @seqs == 2;
 
   my $align = $self->_pairwise_align(\@seqs);
-
-#  $self->throw("Alignment FAILED!  You can bet that the next PAML step will too.\n$@")
-#    if $@;
 
   my $paml_parser;
 
@@ -512,8 +539,7 @@ sub _force_cache {
 
   if ($self->{_cache}->{$seq->display_id}){
     $self->warn('Sequence [' . $seq->display_id . 
-		'] already exists in cache.');
-    return 0
+		'] already exists in cache, but will replace.');
   }
 
   $self->{_cache}->{$seq->display_id} = $seq;
