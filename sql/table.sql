@@ -104,7 +104,7 @@ CREATE TABLE RuleConditions (
 
 CREATE TABLE InputIdAnalysis (
   inputId varchar(20) not null,
-  class enum( "clone","contig","vc","gene" ),
+  class enum( "clone","contig","vc","gene" ) not null,
   analysisId int not null,
   created datetime not null,
 
