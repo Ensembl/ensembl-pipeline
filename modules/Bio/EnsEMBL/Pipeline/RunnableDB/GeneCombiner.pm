@@ -55,6 +55,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 # config file; parameters searched for here if not passed in as @args
 
@@ -279,12 +280,16 @@ sub fetch_input {
   my $ensembl_gpa = $self->ensembl_db->get_SliceAdaptor();
   my $estgene_gpa = $self->estgene_db->get_SliceAdaptor();
 
-  my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+  print STDERR "chr: $chrid, start: $chrstart, end: $chrend\n";
+  my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
   
   $self->ensembl_vc( $ensembl_vc );
   $self->estgene_vc( $estgene_vc );
 
+  print STDERR $self->ensembl_vc."\t".$self->estgene_vc."\n";
+
+  
 }
   
 ############################################################
@@ -392,7 +397,7 @@ sub run{
       TRAN1:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN1;
@@ -409,7 +414,7 @@ sub run{
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN2;
 	  }
-	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->estgene_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN2;
@@ -439,7 +444,7 @@ sub run{
       TRAN3:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN3;
@@ -466,7 +471,7 @@ sub run{
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN4;
 	  }
-	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->estgene_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN4;
@@ -560,7 +565,8 @@ sub cluster_Genes {
   return @clusters;
 }
 ############################################################
-sub cluster_Genes_by_genomic_range{
+
+sub _cluster_Genes_by_genomic_range{
   my ($self, @genes) = @_;
 
   # first sort the genes by the left-most position coordinate ####
@@ -1205,17 +1211,17 @@ sub _clone_Transcript{
   my $newtranscript  = new Bio::EnsEMBL::Transcript;
   my $newtranslation = new Bio::EnsEMBL::Translation;
   
-  my $translation_start_exon = $transcript->translation->start_exon;
-  my $translation_end_exon   = $transcript->translation->end_exon; 
+  my $translation_start_exon = $transcript->translation->start_Exon;
+  my $translation_end_exon   = $transcript->translation->end_Exon; 
   
   foreach my $exon ( @{$transcript->get_all_Exons} ){
     my $newexon = $self->_clone_Exon($exon);
     if ($exon == $translation_start_exon){
-      $newtranslation->start_exon($newexon);
+      $newtranslation->start_Exon($newexon);
       $newtranslation->start($transcript->translation->start);
     }
     if ($exon == $translation_end_exon){
-      $newtranslation->end_exon($newexon);
+      $newtranslation->end_Exon($newexon);
       $newtranslation->end($transcript->translation->end);
     }
     $newtranscript->add_Exon($newexon);
@@ -1239,13 +1245,13 @@ sub _clone_Exon{
   $newexon->end_phase  ($exon->end_phase);
   $newexon->strand     ($exon->strand);
   $newexon->dbID       ($exon->dbID);
-  $newexon->contig_id  ($exon->contig_id);
+  $newexon->contig     ($exon->contig);
   $newexon->sticky_rank($exon->sticky_rank);
   $newexon->seqname    ($exon->seqname);
-  $newexon->attach_seq ($self->ensembl_vc->primary_seq);
+  $newexon->attach_seq ($self->ensembl_vc);
 
-  foreach my $evidence ( @{$exon->get_all_Supporting_Feature} ){
-    $newexon->add_Supporting_Feature( $evidence );
+  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
+    $newexon->add_supporting_features( $evidence );
   }
   return $newexon;
 }
@@ -1858,8 +1864,8 @@ sub _check_UTRMatches{
   #my $ens_t_end_exon   = $ens_translation->end_Exon;
   my @est_exons = @{$est_tran->get_all_Exons};
   
-  my $ens_start_exon = $ens_tran->start_exon;
-  my $ens_end_exon   = $ens_tran->end_exon;
+  my $ens_start_exon = $ens_tran->start_Exon;
+  my $ens_end_exon   = $ens_tran->end_Exon;
 
   # sorting paranoia
   if ( $strand == 1 ){
@@ -1923,8 +1929,8 @@ sub _extend_UTRs{
   my $ens_translation = new Bio::EnsEMBL::Translation;
   $ens_translation->start($ens_tran->translation->start);
   $ens_translation->end($ens_tran->translation->end);
-  $ens_translation->start_exon($ens_tran->translation->start_exon);
-  $ens_translation->end_exon($ens_tran->translation->end_exon);
+  $ens_translation->start_Exon($ens_tran->translation->start_Exon);
+  $ens_translation->end_Exon($ens_tran->translation->end_Exon);
 
   $ens_tran->sort;
   $est_tran->sort;
@@ -1932,11 +1938,11 @@ sub _extend_UTRs{
   my @ens_exons        = @{$ens_tran->get_all_Exons};
   my $strand           = $ens_exons[0]->strand;
 
-  my $ens_t_start_exon = $ens_tran->start_exon;
-  my $ens_t_end_exon   = $ens_tran->end_exon;
+  my $ens_t_start_exon = $ens_tran->start_Exon;
+  my $ens_t_end_exon   = $ens_tran->end_Exon;
 
-  my $ens_translation_start_exon = $ens_translation->start_exon;
-  my $ens_translation_end_exon   = $ens_translation->end_exon;
+  my $ens_translation_start_exon = $ens_translation->start_Exon;
+  my $ens_translation_end_exon   = $ens_translation->end_Exon;
 
   my @est_exons = @{$est_tran->get_all_Exons};
   
@@ -1995,8 +2001,8 @@ sub _extend_UTRs{
 	  $ens_t_start_exon->start( $est_exons[$i]->start );
 
 	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence ( @{$est_exons[$i]->get_all_Supporting_Feature} ){
-	    $ens_t_start_exon->add_Supporting_Feature( $evidence );
+	  foreach my $evidence ( @{$est_exons[$i]->get_all_supporting_features} ){
+	    $ens_t_start_exon->add_supporting_features( $evidence );
 	  }
 	  
 	  # we need to add any possible extra UTR est_exons
@@ -2027,7 +2033,7 @@ sub _extend_UTRs{
 	if ( $ok ){
 	  if ( $ens_t_end_exon == $ens_translation_end_exon ){
 	    $ens_t_end_exon->end_phase(-1);
-	    $ens_translation->end_exon( $ens_t_end_exon );
+	    $ens_translation->end_Exon( $ens_t_end_exon );
 	    
 	    # since the start coordinate does not change as we are in the forward strand
 	    # we don't need to change the translation start/end
@@ -2036,8 +2042,8 @@ sub _extend_UTRs{
 	  $ens_t_end_exon->end( $est_exons[$i]->end );
 
 	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence (@{ $est_exons[$i]->get_all_Supporting_Feature} ){
-	    $ens_t_end_exon->add_Supporting_Feature( $evidence );
+	  foreach my $evidence (@{ $est_exons[$i]->get_all_supporting_features} ){
+	    $ens_t_end_exon->add_supporting_features( $evidence );
 	  }
 	  
 	  # we need to add any possible extra UTR est_exons
@@ -2080,14 +2086,14 @@ sub _extend_UTRs{
 	    $tstart += ( $est_exons[$i]->end - $ens_t_start_exon->end );
 	    $ens_translation->start($tstart);
 	    $ens_t_start_exon->phase(-1);
-	    $ens_translation->start_exon($ens_t_start_exon);
+	    $ens_translation->start_Exon($ens_t_start_exon);
 	  }
 	  # let's merge them
 	  $ens_t_start_exon->end( $est_exons[$i]->end );
 	  
 	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence ( @{$est_exons[$i]->get_all_Supporting_Feature} ){
-	    $ens_t_start_exon->add_Supporting_Feature( $evidence );
+	  foreach my $evidence ( @{$est_exons[$i]->get_all_supporting_features} ){
+	    $ens_t_start_exon->add_supporting_features( $evidence );
 	  }
 	  
 	  # we need to add any possible extra UTR est_exons
@@ -2118,7 +2124,7 @@ sub _extend_UTRs{
 	}
 	if ( $ok ){
 	  if ( $ens_t_end_exon == $ens_translation_end_exon ){
-	    $ens_translation->end_exon( $ens_t_end_exon );
+	    $ens_translation->end_Exon( $ens_t_end_exon );
 	    $ens_t_end_exon->end_phase(-1);
 	    # no need to change ens of translation as this is counted from the end of the
 	    # translation->end_exon
@@ -2127,8 +2133,8 @@ sub _extend_UTRs{
 	  $ens_t_end_exon->start( $est_exons[$i]->start );
 	  
 	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence ( @{$est_exons[$i]->get_all_Supporting_Feature} ){
-	    $ens_t_end_exon->add_Supporting_Feature( $evidence );
+	  foreach my $evidence ( @{$est_exons[$i]->get_all_supporting_features} ){
+	    $ens_t_end_exon->add_supporting_feature( $evidence );
 	  }
 	  
 	  # we need to add any possible extra UTR est_exons
@@ -2185,7 +2191,7 @@ sub _add_5prime_exons{
     # (second case in the picture above)
     my $overlap = 0;
     if ( $strand == 1 ){
-      my $start_range = $ens_tran->start_exon->start;
+      my $start_range = $ens_tran->start_Exon->start;
       my $end_range   = $est_exon_UTR->start;
       foreach my $ens_exon ( @{$ens_tran->get_all_Exons} ){
 	if ( $ens_exon->start >= $start_range && $ens_exon->end < $end_range ){
@@ -2196,7 +2202,7 @@ sub _add_5prime_exons{
     # the same check but in the reverse strand
     if ( $strand == -1 ){
       my $start_range = $est_exon_UTR->end;
-      my $end_range   = $ens_tran->start_exon->end;
+      my $end_range   = $ens_tran->start_Exon->end;
       foreach my $ens_exon ( @{$ens_tran->get_all_Exons} ){
 	if ( $ens_exon->start > $start_range && $ens_exon->end <= $end_range ){
 	  $overlap = 1;
@@ -2239,7 +2245,7 @@ sub _add_3prime_exons{
     # (second case in the picture above)
     if ( $strand == 1){
       my $start_range = $est_exon_UTR->end;
-      my $end_range   = $ens_tran->end_exon->end;
+      my $end_range   = $ens_tran->end_Exon->end;
       foreach my $ens_exon ( @{$ens_tran->get_all_Exons} ){
 	if ( $ens_exon->start > $start_range && $ens_exon->end <= $end_range ){
 	  $overlap = 1;
@@ -2248,7 +2254,7 @@ sub _add_3prime_exons{
     }
     # the same check but in the reverse strand
     if ( $strand == -1 ){
-      my $start_range = $ens_tran->end_exon->start;
+      my $start_range = $ens_tran->end_Exon->start;
       my $end_range   = $est_exon_UTR->start;
       foreach my $ens_exon ( @{$ens_tran->get_all_Exons} ){
 	if ( $ens_exon->start >= $start_range && $ens_exon->end < $end_range ){
@@ -2291,44 +2297,15 @@ sub _make_Genes{
   my @transcripts = @{ $transcripts };
 
   my $genetype = $FINAL_TYPE;
-  
-  # sort out analysis here or we will get into trouble with duplicate analyses
-  my $ana_Adaptor = $self->dbobj->get_AnalysisAdaptor;
-  my @analyses = $ana_Adaptor->fetch_by_logic_name($genetype);
-  my $analysis_obj;
+  my $analysis = $self->analysis;
 
-  if(scalar(@analyses) > 1){
-    $self->throw("panic! > 1 analysis for $genetype\n");
-  }
-  elsif(scalar(@analyses) == 1){
-    $analysis_obj = $analyses[0];
-    print STDERR "make_Genes():found one analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
-  }
-  else{
-    # make a new analysis object
-    $analysis_obj = new Bio::EnsEMBL::Analysis( -db              => 'NULL',
-					        -db_version      => 1,
-					        -program         => $genetype,
-					        -program_version => 1,
-					        -gff_source      => $genetype,
-					        -gff_feature     => 'gene',
-					        -logic_name      => $genetype,
-					        -module          => 'GeneCombiner',
-					      );
-    print STDERR "make_Genes():Created an analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
-    
-  }
-
-  $self->_analysis($analysis_obj);
-  
   my @selected_transcripts;
-  my $contig = $self->vc;
   my $count  = 0;
 
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
     $count++;
-    unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+    unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->ensembl_vc)
 	    && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
       print STDERR "skipping this transcript\n";
       next TRANSCRIPT;
@@ -2338,7 +2315,7 @@ sub _make_Genes{
   my @genes = $self->_cluster_into_Genes(@transcripts);
   foreach my $gene ( @genes ){
     $gene->type($genetype);
-    $gene->analysis($analysis_obj);
+    $gene->analysis($analysis);
   }
 
   return @genes;
@@ -2352,7 +2329,7 @@ sub _remap_Genes {
   my @new_genes;
 
   my $final_db  = $self->final_db; 
-  my $final_gpa = $self->final_db->get_StaticGoldenPathAdaptor();
+  my $final_gpa = $self->final_db->get_SliceAdaptor();
   my $chrid     = $self->input_id;
   print STDERR "input_id: $chrid\n";
   if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
@@ -2361,157 +2338,33 @@ sub _remap_Genes {
   $chrid       =~ s/\.(.*)-(.*)//;
   my $chrstart = $1;
   my $chrend   = $2;
-  my $final_vc = $final_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $final_vc = $final_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   my $genetype = $FINAL_TYPE;
 
-
-
-  ## sort out analysis
-#  unless ($genetype){
-#    $self->throw("No genetype set, you must set variable FINAL_TYPE in GeneCombinerConf");
-#  }
-#  my $anaAdaptor = $final_db->get_AnalysisAdaptor;
-  
-#  my $anal_logic_name = $genetype;
-  
-#  if (defined $self->analysis){
-#    #use logic name from $self->analysis object is possible, else take $genetype;
-#    $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
-#  }
-  
-#  my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
-  
-#  my $analysis_obj;
-  
-#  if(scalar(@analyses) > 1){
-#    $self->throw("panic! > 1 analysis for $genetype\n");
-#  }
-#  elsif(scalar(@analyses) == 1){
-#    $analysis_obj = $analyses[0];
-#    print STDERR "found one analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
-#  }
-#  else{
-#    # make a new analysis object
-#    $analysis_obj = new Bio::EnsEMBL::Analysis
-#      (-db              => 'NULL',
-#       -db_version      => 1,
-#       -program         => $genetype,
-#       -program_version => 1,
-#       -gff_source      => $genetype,
-#       -gff_feature     => 'gene',
-#       -logic_name      => $genetype,
-#       -module          => 'GeneCombiner',
-#      );
-#     print STDERR "Created an analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
-    
-#  }
-
- 
-  
  GENE:  
   foreach my $gene (@genes) {
     
+    $gene->analysis($self->_analysis);
+    $gene->type($genetype);
+    my @trans = @{$gene->get_all_Transcripts};
+    my $new_gene;
+    # convert to raw contig coords
     eval {
-      $gene->analysis($self->_analysis);
-      $gene->type($genetype);
-      #print STDERR "about to convert a $gene\n";
-      #print STDERR "with $final_vc, ".$final_vc->length."\n";
-
-      my $new_gene = $final_vc->convert_Gene_to_raw_contig($gene);
-      push( @new_genes, $new_gene);
-      
-      # need to explicitly add back genetype and analysis.
-      #$new_gene->type($genetype);
-      #$new_gene->analysis($gene->analysis);
-      
-      #      # DO WE REALLY NEED TO DO THIS???
-      #      # sort out supporting feature coordinates
-#      foreach my $tran ($new_gene->get_all_Transcripts) {
-#	foreach my $exon($tran->get_all_Exons) {
-#	  foreach my $sf ($exon->get_all_Supporting_Feature) {
-	    
-#	    # this should be sorted out by the remapping to rawcontig ... strand is fine
-#	    if ($sf->start > $sf->end) {
-#	      my $tmp = $sf->start;
-#	      $sf->start($sf->end);
-#	      $sf->end($tmp);
-#	    }
-#	  }
-#	}
-#      }
-
-#      # is this a special case single coding exon gene with UTRS?
-#      if($tran->translation->start_exon() eq $tran->translation->end_exon() 
-#	 && $gene->type eq 'est_combined'){
-#	#	print STDERR "single coding exon, with UTRs\n";
-	
-#	# problems come about when we switch from + strand on FPC contig to - strand on raw contig.
-#	my $fpc_strand;
-	
-#	foreach my $exon($tran->get_all_Exons) {
-#	  if ($exon eq $tran->translation->start_exon()) {
-#	    $fpc_strand = $exon->strand;
-#	    last;
-#	  }
-#	}
-	
-#	foreach my $tran ($new_gene->get_all_Transcripts) {
-#	  foreach my $exon($tran->get_all_Exons) {
-	    
-#	    # oh dear oh dear oh dear
-#	    # this is still giving some problems
-#	    print STDERR "oh dear, strand problems with single-conding-exon gene\n";
-#	    if ($exon eq $tran->translation->start_exon()) {
-#	      if($fpc_strand == 1 && $exon->strand == -1){
-#		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
-#		$exon->end($exon->end - ($tran->translation->start -1));
-#		$exon->start($exon->end - ($tran->translation->end -1));
-#	      }
-#	    }
-#	  }
-#	}
-	
-#      } # end special case single coding exon
-      
-#      # final exon coord sanity check
-#      foreach my $exon($new_gene->get_all_Exons){
-#	# make sure we deal with stickies!
-#	if($exon->isa("Bio::EnsEMBL::StickyExon")){
-#	  foreach my $ce($exon->each_component_Exon){
-#	    # exon start and end must both be within the raw contig!!!
-#	    if($ce->start < 1){
-#	      $self->throw("can't set exon->start < 1 (" . $ce->start . ") - discarding gene\n");
-#	    }
-	    
-#	    if($ce->end > $ce->contig->primary_seq->length){
-#	      $self->throw("exon extends beyond end of contig - discarding gene\n");
-#	    }
-#	  }
-#	}
-#	else{
-#	  # regular exon
-#	  # exon start and end must both be within the raw contig!!!
-#	  if($exon->start < 1){
-#	    $self->throw("can't set exon->start < 1 (" . $exon->start . ") - discarding gene\n");
-#	  }
-	  
-#	  if($exon->end > $exon->contig->primary_seq->length){
-#	    $self->throw("exon extends beyond end of contig - discarding gene\n");
-#	  }
-#	}
-#      }
-#      # if we get to here, the gene is fine, so push it onto the array to be returned
-#      push( @new_genes, $new_gene );
-      
+      # transforming gene to raw contig coordinates.
+      $new_gene = $gene->transform;
     };
-    
-   
-    # did we throw exceptions?
     if ($@) {
-      print STDERR "Couldn't reverse map gene:  [$@]\n";
+      print STDERR "Couldn't reverse map gene [$@]\n";
+      foreach my $t ( @{$gene->get_all_Transcripts} ){
+	$self->_print_Transcript($t);
+      }
+      next;
     }
+    $new_gene->type($gene->type);
+    $new_gene->analysis($gene->analysis);  
+    push( @new_genes, $new_gene);
+    
   }
-  
   return @new_genes;
 }
 
@@ -2540,7 +2393,7 @@ sub _cluster_into_Genes{
       if (!($trans_start > $cluster->end || $trans_end < $cluster->start) &&
 	  $trans_strand == $cluster->strand) {
 	
-	foreach my $cluster_transcript ($cluster->get_Transcripts) {
+	foreach my $cluster_transcript (@{$cluster->get_Transcripts}) {
 	  foreach my $exon1 (@{$tran->get_all_Exons}) {
 	    foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
 	      if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
@@ -2566,7 +2419,7 @@ sub _cluster_into_Genes{
       my @new_clusters;
       my $merged_cluster = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
       foreach my $clust (@matching_clusters) {
-         $merged_cluster->put_Transcripts($clust->get_Transcripts);
+         $merged_cluster->put_Transcripts(@{$clust->get_Transcripts});
       }
       $merged_cluster->put_Transcripts($tran);
       push @new_clusters,$merged_cluster;
@@ -2599,7 +2452,7 @@ sub _cluster_into_Genes{
   my @genes;
   foreach my $cluster (@clusters){
     my $gene = new Bio::EnsEMBL::Gene;
-    foreach my $transcript ($cluster->get_Transcripts){
+    foreach my $transcript ( @{$cluster->get_Transcripts} ){
       $gene->add_Transcript($transcript);
     }
     
@@ -2622,19 +2475,19 @@ sub _check_Clusters{
     my $ntrans = 0;
     my %trans_check_hash;
     foreach my $cluster (@$clusters) {
-	$ntrans += scalar($cluster->get_Transcripts);
-	foreach my $trans ($cluster->get_Transcripts) {
+	$ntrans += scalar(@{$cluster->get_Transcripts});
+	foreach my $trans (@{$cluster->get_Transcripts}) {
 	    if (defined($trans_check_hash{$trans})) {
 		$self->throw("Transcript " . $trans->dbID . " added twice to clusters\n");
 	    }
 	    $trans_check_hash{$trans} = 1;
 	}
-	if (!scalar($cluster->get_Transcripts)) {
-	    $self->throw("Empty cluster");
+	if (!scalar(@{$cluster->get_Transcripts})) {
+	  $self->throw("Empty cluster");
 	}
-    }
+      }
     if ($ntrans != $num_transcripts) {
-	$self->throw("Not all transcripts have been added into clusters $ntrans and " . $num_transcripts. " \n");
+      $self->throw("Not all transcripts have been added into clusters $ntrans and " . $num_transcripts. " \n");
     } 
     return;
 }
@@ -2648,22 +2501,22 @@ sub by_transcript_high {
   my $ahigh;
   my $bhigh;
 
-  if ($a->start_exon->strand == 1) {
-    $alow = $a->start_exon->start;
-    $ahigh = $a->end_exon->end;
+  if ($a->start_Exon->strand == 1) {
+    $alow = $a->start_Exon->start;
+    $ahigh = $a->end_Exon->end;
   } 
   else {
-    $alow = $a->end_exon->start;
-    $ahigh = $a->start_exon->end;
+    $alow = $a->end_Exon->start;
+    $ahigh = $a->start_Exon->end;
   }
 
-  if ($b->start_exon->strand == 1) {
-    $blow = $b->start_exon->start;
-    $bhigh = $b->end_exon->end;
+  if ($b->start_Exon->strand == 1) {
+    $blow = $b->start_Exon->start;
+    $bhigh = $b->end_Exon->end;
   } 
   else {
-    $blow = $b->end_exon->start;
-    $bhigh = $b->start_exon->end;
+    $blow = $b->end_Exon->start;
+    $bhigh = $b->start_Exon->end;
   }
 
   if ($ahigh != $bhigh) {
@@ -2681,8 +2534,8 @@ sub get_transcript_start_end_strand {
   my $start;
   my $end;
   
-  my $start_exon = $transcript->start_exon;
-  my $end_exon = $transcript->end_exon;
+  my $start_exon = $transcript->start_Exon;
+  my $end_exon = $transcript->end_Exon;
   
   if ($start_exon->strand == 1) {
     $start = $start_exon->start;
@@ -2725,11 +2578,11 @@ sub prune_Exons {
       
       if (defined($found)) {
 	push(@newexons,$found);
-	if ($exon == $tran->translation->start_exon){
-	  $tran->translation->start_exon($found);
+	if ($exon == $tran->translation->start_Exon){
+	  $tran->translation->start_Exon($found);
 	}
-	if ($exon == $tran->translation->end_exon){
-	  $tran->translation->end_exon($found);
+	if ($exon == $tran->translation->end_Exon){
+	  $tran->translation->end_Exon($found);
 	}
       } 
       else {
@@ -2737,7 +2590,7 @@ sub prune_Exons {
 	push(@unique_Exons, $exon);
       }
     }          
-    $tran->flush_Exon;
+    $tran->flush_Exons;
     foreach my $exon (@newexons) {
       $tran->add_Exon($exon);
     }
