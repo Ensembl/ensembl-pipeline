@@ -56,11 +56,13 @@ my $write  = 0;
 my $check  = 0;
 my $params;
 my $pepfile;
+my $analysis;
 
 # can override db options on command line
 &GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
+             'analysis:s'    => \$analysis,
 	     'write'         => \$write,
              'check'         => \$check,
              'parameters:s'  => \$params,
@@ -91,6 +93,8 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -perlonlyfeatures => 0,
 );
 
+my $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
+
 die "No input id entered" unless defined ($input_id);
 
 my %hparams;
@@ -106,7 +110,8 @@ if (defined $params){
 
 my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
-			      %hparams,
+			      -analysis => $analysis_obj,
+                              %hparams,
 			     );
 
 $runobj->fetch_input;
