@@ -150,10 +150,8 @@ sub score_Transcripts{
       next CLUSTER;
     }
 
-    
     my @sites = $self->get_alternative_sites( $cluster );
-    
-       
+           
     ############################################################
     # now get the sites of alternative splicing
     # contained in each transcript
@@ -204,21 +202,23 @@ sub score_Transcripts{
 
       foreach my $pair (@site_pairs){
 	my $covered = 0;
+	print STDERR "pair: ".$pair->[0]->start."-".$pair->[0]->end." ".$pair->[1]->start."-".$pair->[1]->end."\n";
 	foreach my $est ( @list ){
 	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
 	  
 	  ############################################################
 	  # a pair is covered if there is at least an est overlapping
 	  # with both features defining the site pair
-	  if ( $est->start <= $pair->[0]->end 
+	  if ( $est_start <= $pair->[0]->end 
 	       &&
-	       $est->end   >  $pair->[0]->end
+	       $est_end   >  $pair->[0]->end
 	       &&
-	       $est->end   >= $pair->[1]->start
+	       $est_end   >= $pair->[1]->start
 	       &&
-	       $est->start <  $pair->[1]->start
+	       $est_start <  $pair->[1]->start
 	     ){
 	    $covered = 1;
+	    print STDERR "covered by est: $est_start-$est_end\n";
 	    $pair_coverage{ $pair }++;
 	    unless ( $pair_coverage{ $pair } > 1 ){
 	      push( @covered_sites, $pair );
@@ -358,6 +358,7 @@ sub get_alternative_sites{
   ############################################################
   # sites of alternative splicing are described by a cluster of exons 
   # which has genomic coordinates
+  print STDERR scalar(@sites)." sites found\n";
   return @sites;
 }
   
