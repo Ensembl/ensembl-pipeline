@@ -77,6 +77,8 @@ sub new {
   $self->{'_discarded_transcripts'} = [];# array ref to discarded transcripts
   $self->{'_genes'} = []; #array of genes to test;
   $self->{'_repeats'} = {}; # hash of repeat blocks corresponding to each gene;
+  $self->{'_real'} = 0; # scalar number of real genes identified
+  $self->{'_pseudogenes'} = 0; #scalar number of pseudogenes identified
 
   my( $genes,$repeats,$max_intron_length, $max_intron_coverage, $max_exon_coverage) = $self->_rearrange([qw(
 												   GENES
@@ -85,8 +87,7 @@ sub new {
 												   MAX_INTRON_COVERAGE
 												   MAX_EXON_COVERAGE
 												  )], @args);
-  
-#  $self->_check_slice($slice) if ($slice);
+
   if ($max_intron_length){
     $self->max_intron_length($max_intron_length);
   }
@@ -165,17 +166,80 @@ sub max_exon_coverage {
   return $self->{'_max_exon_coverage'};
 }
 
+=head2 modified_genes
+
+  Arg [1]    : array ref
+  Description: get/set modified gene set to return 
+  Returntype : array ref to Bio::EnsEMBL::Gene objects
+  Exceptions : throws if not a Bio::EnsEMBL::Gene
+  Caller     : general
+
+=cut
+
+sub modified_genes {
+  my ($self, $modified_genes) = @_;
+  if ($modified_genes){
+    unless  ($modified_genes->isa("Bio::EnsEMBL::Gene")){
+      $self->throw("Input isn't a Bio::EnsEMBL::Gene, it is a $modified_genes\n$@");
+    }
+  push @{$self->{'_modified_genes'}}, $modified_genes;
+  }
+  return $self->{'_modified_genes'};
+}
+
+=head2 discarded transcripts
+
+  Arg [1]    : array ref
+  Description: get/set modified gene set to throw away
+  Returntype : array ref to Bio::EnsEMBL::Gene objects
+  Exceptions : throws if not a Bio::EnsEMBL::Gene
+  Caller     : general
+
+=cut
+
+sub discarded_transcripts {
+  my ($self, $discarded_transcripts) = @_;
+  if ( $discarded_transcripts){
+    unless  ($discarded_transcripts->isa("Bio::EnsEMBL::Transcript")){
+      $self->throw("Input isn't a Bio::EnsEMBL::Gene, it is a $discarded_transcripts\n$@");
+    }
+  push @{$self->{'_discarded_transcripts'}}, $discarded_transcripts;
+  }
+  return $self->{'_discarded_transcripts'};
+}
+
+=head2 genes
+
+  Arg [1]    : array ref
+  Description: get/set gene set to run over
+  Returntype : array ref to Bio::EnsEMBL::Gene objects
+  Exceptions : throws if not a Bio::EnsEMBL::Gene
+  Caller     : general
+
+=cut
 
 sub genes {
   my ($self, $genes) = @_;
+  if($genes){
   foreach my $gene (@{$genes}){
     unless  ($gene->isa("Bio::EnsEMBL::Gene")){
-      $self->throw("Input isn't a Bio::EnsEMBL::Gene, it is a $gene");
+      $self->throw("Input isn't a Bio::EnsEMBL::Gene, it is a $gene\n$@");
     }
   }
   $self->{'_genes'} = $genes;
+  }
   return $self->{'_genes'};
 }
+
+=head2 repeats
+
+  Arg [1]    : array ref
+  Description: set repeat set to test genes against
+  Returntype : none
+  Exceptions : throws if not a Bio::EnsEMBL::SeqFeature
+  Caller     : general
+
+=cut
 
 sub repeats {
   my ($self, $repeats) = @_;
@@ -187,9 +251,60 @@ sub repeats {
     }
   }
   $self->{'_repeats'} = $repeats;
-  return $self->{'_repeats'};
+  return  1;
 }
 
+=head2 get_repeats
+
+  Arg [1]    : array ref
+  Description: get repeat array using a gene object as the key
+  Returntype : array ref to Bio::EnsEMBL::SeqFeature objects
+  Exceptions : warns if no values corresponding to key
+  Caller     : general
+
+=cut
+
+sub get_repeats {
+  my ($self, $gene) = @_;
+  unless ( $self->{'_repeats'}->{$gene}){
+    warn ("repeat array not found for gene object $gene\n$@");
+  }
+  return  $self->{'_repeats'}->{$gene};
+}
+
+
+=head2 real
+
+  Arg [1]    : none
+  Description: scalar number of real genes found
+  Returntype : scalar integer
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub real {
+  my ($self) = @_;
+  $self->{'_real'}++;
+  return $self->{'_real'};
+}
+
+
+=head2 pseudogenes
+
+  Arg [1]    : none
+  Description: scalar number of pseudogenes found
+  Returntype : scalar integer
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub pseudogenes{
+  my ($self) = @_;
+  $self->{'_pseudogenes'}++;
+  return $self->{'_pseudogenes'};
+}
 
 
 =head2 run
@@ -222,10 +337,10 @@ sub run {
 
 sub summary {
   my ($self) = @_;
-  print STDERR   $self->{'_real'}." real genes identified \n";
-  print STDERR   $self->{'_pseudogenes'}." pseudogenes identified \n";  
-  print STDERR   scalar(@{$self->{'_discarded_transcripts'}})." pseudotranscripts to be chucked \n";
-  foreach my $transcript(@{$self->{'_discarded_transcripts'}}){
+  print STDERR   $self->real." real genes identified \n";
+  print STDERR   $self->pseudogenes." pseudogenes identified \n";  
+  print STDERR   scalar(@{$self->discarded_transcripts})." pseudotranscripts to be chucked \n";
+  foreach my $transcript(@{$self->discarded_transcripts}){
     print STDERR   $transcript->stable_id."\n";
   }
   return 1;
@@ -240,7 +355,7 @@ sub summary {
   genes are classed as pseudogenes if the following criteria are met:
 
 1. At least 80% of the introns are covered with repeats and the total intron length 
-is smaller than 5kb (deFAULT VALUES).
+is smaller than 5kb and the gene has a least 1 real and 1 frameshifted intron (default values).
 
 2. All of the introns are short frameshifted introns
   Returntype : none
@@ -254,7 +369,7 @@ sub test_genes{
   my @evidence;
   my $num=0;
   my $pseudo= undef;
-  my @genes = @{$self->{'_genes'}};
+  my @genes = @{$self->genes};
 
 
   foreach my $gene(@genes){
@@ -263,6 +378,7 @@ sub test_genes{
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       $num++;
       my $evidence = $self->transcript_evidence($transcript,$gene);
+;
       $pseudo = undef;
       #transcript tests
 
@@ -275,7 +391,8 @@ sub test_genes{
 	 $evidence->{'real_introns'} >= 1 &&
 	 $evidence->{'covered_introns'} >=  $self->{'_max_intron_coverage'} ){
 	$pseudo = 1;
-	print STDERR $transcript->stable_id." - repeats in introns\n";
+	print STDERR $gene->stable_id." - repeats in introns in transcript ".$transcript->stable_id."\n";
+	print STDERR join (', ',%{$evidence}),"\n"
       }
       #ALL FRAMESHIFTED
 
@@ -307,12 +424,12 @@ sub test_genes{
       @pseudo_trans = sort {$a->length <=> $b->length} @pseudo_trans;
       my $only_transcript_to_keep = pop  @pseudo_trans;
       foreach my $pseudo_transcript (@pseudo_trans){
-	push @{$self->{'_discarded_transcripts'}},$pseudo_transcript;
+	$self->discarded_transcripts($pseudo_transcript);
 	$pseudo_transcript->translation(undef);
 	$self->_remove_transcript_from_gene($gene,$pseudo_transcript);
       }
-      push@{$self->{'_modified_genes'}}, $gene;   
-      $self->{'_pseudogenes'}++;
+      $self->modified_genes($gene);
+      $self->pseudogenes;
     }
 
 
@@ -326,9 +443,9 @@ sub test_genes{
 	$trans->translation(undef);
 	$self->_remove_transcript_from_gene($gene,$trans); 
       }
-      push @{$self->{'_modified_genes'}}, $gene;
-      push @{$self->{'_discarded_transcripts'}},@pseudo_trans;
-      $self->{'_real'}++;
+      $self->modified_genes($gene);
+      $self->discarded_transcripts(@pseudo_trans);
+      $self->real;
       if ($gene->type eq 'pseudogene'){$gene->type('changed');}
     }
 
@@ -337,8 +454,8 @@ sub test_genes{
 
 
     if (scalar(@pseudo_trans) == 0 && scalar(@real_trans) > 0){
-      push (@{$self->{'_modified_genes'}},$gene); 
-      $self->{'_real'}++;
+      $self->modified_genes($gene); 
+      $self->real;
       if ($gene->type eq 'pseudogene'){$gene->type('changed');}
     }
   }
@@ -363,7 +480,7 @@ Arg [none] : Bio::EnsEMBL::Transcript
 sub transcript_evidence{
 
   my ($self,$transcript,$gene) =@_;
-  my $repeat_blocks = $self->{'_repeats'}->{$gene};;
+  my $repeat_blocks = $self->get_repeats($gene);
   my $results;
   my  @exons =  @{$transcript->get_all_Exons};
   @exons = sort {$a->start <=> $b->start} @exons;
@@ -497,7 +614,7 @@ sub _remove_transcript_from_gene {
 
 sub output {
     my ($self) = @_;
-    return $self->{'_modified_genes'};
+    return $self->modified_genes;
 }
 
 
