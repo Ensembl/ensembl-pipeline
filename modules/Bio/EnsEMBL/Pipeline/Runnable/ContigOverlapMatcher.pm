@@ -193,7 +193,8 @@ Contig objects.
 sub sequence_list {
     my($self, @seqs) = @_;
     
-    return map $_->primary_seq, $self->get_all_Contigs;
+    my @contigs = $self->get_all_Contigs;
+    return map $_->primary_seq, @contigs;
 }
 
 =head2 get_Contig_sequence_length
@@ -217,9 +218,9 @@ sub get_Contig_sequence_length {
 
 Returns a hash describing the redundant contigs
 found by C<phrap>.  Each key of the hash is the
-name of a redundant contig, and the value is the
-name of the contig whose sequence completely
-subsumes the sequence of the redundant contig.
+name of a redundant contig, and the value is an
+anonymous array containing a list of the contigs
+which engulf the contig.
 
 =cut
 
@@ -237,9 +238,9 @@ sub redundant_contigs {
     }
 }
 
-=head2 _add_redundant_contigs
+=head2 _add_redundant_contig
 
-    $matcher->_add_redundant_contigs(%contig_name_hash);
+    $matcher->_add_redundant_contig(%contig_name_hash);
 
 Adds C<%contig_name_hash> to the hash of
 redundant contigs described in the
@@ -247,15 +248,12 @@ C<redundant_contigs> method.
 
 =cut
 
-sub _add_redundant_contigs {
-    my($self, @names) = @_;
+sub _add_redundant_contig {
+    my($self, $redundant, @engulfing) = @_;
     
-    $self->throw("Odd number of arguments: ". join(',', map "'$_'", @names))
-        if @names % 2;
-    my %n = @names;
-    while (my($redundant, $parent) = each %n) {
-        $self->{'_redundant_contigs'}{$redundant} = $parent;
-    }
+    $self->throw("No engulfing name(s)") unless @engulfing;
+    $self->{'_redundant_contigs'}{$redundant} ||= [];
+    push( @{$self->{'_redundant_contigs'}{$redundant}}, @engulfing );
 }
 
 =head2 _tmp_dir_name
@@ -344,7 +342,7 @@ sub run {
         my $ace_file = "$seq_file.ace";
         $self->_process_ace_file($ace_file);
     };
-        
+     
     rmtree($tmp_dir);
     $self->_was_run(1);
     
@@ -433,7 +431,7 @@ sub _process_ace_file {
             };
             unless ($orig_len) {
                 # Skip the DNA for the consensus
-                warn "No sequence length for $contig_name\n";
+                #warn "No sequence length for $contig_name\n";
                 next;
             }
             $dna =~ s/[\s\*]//g;
@@ -444,10 +442,10 @@ sub _process_ace_file {
         }
         # Look at base segments
         elsif (my @base_segments = map {[split]} /^Base_segment (.+)/mg) {
+            next if @base_segments == 1;    # Skip singletons
             my @sorted_span = $self->_make_sorted_spans(@base_segments);
             $self->_remove_redundant_contigs(\@sorted_span);
             $self->_make_overlap_helpers(@sorted_span);
-            #print map {join("\t", @$_), "\n"} @sorted_span;
         }
     }
     close PHRAP_ACE;
@@ -497,7 +495,7 @@ sub _make_sorted_spans {
         # the next contig which contibutes to the consensus, and
         # the matching position is the start coordinate in the next contig
         # minus 1.  If, however, the start position in this next contig
-        # is 1, then we adjust increase the length of the current
+        # is 1, then we increase the length of the current
         # span by 1.
         # $next won't exist if this is the last contig in the assembly.
         if (my $next = $base_segments[$i+1]) {
@@ -513,13 +511,9 @@ sub _make_sorted_spans {
         }
     }
     my @sorted_span = sort {$a->[0] <=> $b->[0]} values %span;
-    
-    # Increase the length of overlapping sequences by 1
-    for (my $i = 0; $i < (@sorted_span - 1); $i++) {
-        $sorted_span[$i][1]++;
-        $sorted_span[$i][4]++;
-    }
-    print STDERR map {join("\t", @$_),"\n"} @sorted_span;
+
+    #print STDERR "\n";
+    #map {printf STDERR "%6d %6d %-20s %6d %6d %-20s %6d\n", @$_} @sorted_span;
     return @sorted_span;
 }
 
@@ -537,25 +531,55 @@ of the redundant contigs in the object.
 sub _remove_redundant_contigs {
     my( $self, $span ) = @_;
     
-    my( %removed );
-    for (my $i = 1; $i < @$span;) {
-        # Get the start, end and name of the previous contig in the assembly
-        my($p_start, $p_end, $p_name) = @{$span->[$i-1]};
-        # Get the start, end and name of the current contig in the assembly
-        my($start, $end, $name)       = @{$span->[$i]};
+    # Remove the redundant contigs from the list
+    my( %redundant );
+    for (my $i = 0; $i < (@$span - 1); $i++) {
+        my $a_name = $span->[$i][2];
+        my $b_name = $span->[$i][5];
         
-        # Remove the current contig if it is completely overlapped
-        # by the previous contig in the assembly
-        if ($start <= $p_start and $end >= $p_end) {
-            $removed{$name} = $p_name;
-            splice(@$span, $i, 1);
-            # Don't move pointer if we've removed an element
-        } else {
-            # Move pointer to next element
-            $i++;
+        while (my $next = $span->[$i+1]) {
+            my $next_name = $next->[2];
+            
+            if ($next_name eq $b_name) {
+                last;
+            } else {
+                $redundant{$next_name} = splice(@$span, $i+1, 1);
+            }
         }
     }
-    $self->_add_redundant_contigs(%removed);
+    
+    while (my($name, $x) = each %redundant) {
+        my( @engulf );
+        # If I was clever, we wouldn't have to look
+        # throught the entire list of contigs again!
+        foreach my $y (@$span) {
+            if (_overlaps($x, $y)) {
+                push(@engulf, $y->[2]);
+            }
+        }
+        $self->throw("Failed to find the engulfing clone(s)") unless @engulf;
+        foreach ($name, @engulf) {
+            s{\.comp$}{};
+            $_ = $self->get_Contig_by_ID($_)->internal_id;
+        }
+        $self->_add_redundant_contig($name, @engulf);
+    }
+}
+
+sub _overlaps {
+    my( $span_x, $span_y ) = @_;
+    
+    my @x = @{$span_x}[0,1];
+    my @y = @{$span_y}[0,1];
+    
+    # Return true if either end of x is within y
+    foreach my $i (@x) {
+        return 1 if $i >= $y[0] or $i <= $y[1];
+    }
+    # Return true if both ends of x are outside the range of y
+    return 1 if $x[0] < $y[0] and $x[1] > $y[1];
+    
+    return 0;
 }
 
 =head2 _make_overlap_helpers
@@ -613,14 +637,13 @@ Contig D to Contig E = left2left
     sub _make_overlap_helpers {
         my( $self, @span ) = @_;
 
-        my( @overlap );
         # Loop through every element but the last one
         # (which is the trailing contig, and doesn't 
         # therefore overlap anything).
         for (my $i = 0; $i < (@span - 1); $i++) {
             # Get the data that we're interested in from the row
             my($a_name, $a_pos, $b_name, $b_pos) = @{$span[$i]}[2,4,5,6];
-
+            
             # Get the direction of each sequence
             my $a_dir = ($a_name =~ s/\.comp$//) ? 'rev' : 'fwd';
             my $b_dir = ($b_name =~ s/\.comp$//) ? 'rev' : 'fwd';
