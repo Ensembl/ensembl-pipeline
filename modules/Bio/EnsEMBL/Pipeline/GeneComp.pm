@@ -370,17 +370,6 @@ sub map_temp_Exons_to_real_Exons{
 	       print $log $tempexon->version."\n";
 	       print $log "Assigning moved to ".$oldexon->id."\n";
 	       $moved{$oldexon->id} = 1;
-
-	       # remove old exons we never need to look at again
-	       # because they will never overlap with tempexons
-	       
-	       while( my $tempoldexon = shift @oldexons ) {
-		   if( $tempoldexon->end >= $tempexon->start ) {
-		       unshift(@oldexons,$tempoldexon);
-		       last;
-		   }
-	       }
-	       
 	       next IDENTICAL;
 	   }
        }
@@ -394,6 +383,8 @@ sub map_temp_Exons_to_real_Exons{
    print $log "Looking for BEST fits for remaining exons...\n";
    my $size = scalar (@tempexons2);
    print $log "Going to do bestfit/new on $size remaining exons...\n";
+   $size = scalar (@oldexons);
+   print $log "Checking against $size old exons...\n";
    # we can't map some exons directly. Second scan over all exons to see whether
    # there is significant overlap
 BESTFIT:foreach my $tempexon2 (@tempexons2) {
@@ -404,26 +395,29 @@ BESTFIT:foreach my $tempexon2 (@tempexons2) {
 	 next;
      }
      foreach my $oldexon ( @oldexons ) {
+	
 	 if ($tempexon2->start > $oldexon->end) {
 	     #Skip this old exon, it ends before temp starts
+	     #print $log "Skipping, ends before start\n";
 	     next;
 	 }
 	 if( $oldexon->start > $tempexon2->end ) {
 	     #Go out of loop, reached old exon after temp
+	     #print $log "Get out, starts after end...\n";
 	     last;
 	 }
-	 
 	 print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
-	 
 	 if( $oldexon->overlaps($tempexon2) && $moved{$oldexon->id} == 0 ) {
-	     my ($tstart,$tend,$tstrand) = $oldexon->intersection($tempexon2);
+	     my $intexon = $oldexon->intersection($tempexon2);
+	     my $tovsize = ($intexon->end - $intexon->start +1); 
+	     print STDERR "Overlap size: $tovsize\n";
 	     if( !defined $biggestoverlap ) {
 		 $biggestoverlap = $oldexon;
-		 $overlapsize = ($tend - $tstart +1); 
+		 $overlapsize = $tovsize; 
 	     } else {
-		 if( ($tend - $tstart +1) > $overlapsize ) {
+		 if( $tovsize > $overlapsize ) {
 		     $biggestoverlap = $oldexon;
-		     $overlapsize = ($tend - $tstart +1);
+		     $overlapsize = $tovsize;
 		 }
 	     }
 	 }
