@@ -80,6 +80,9 @@ use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::MappedExon;
 use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Analysis;
+
+use FreezeThaw;
 
 use vars qw(@ISA);
 use strict;
@@ -96,14 +99,27 @@ sub _initialize {
     my ($contig) = $self->_rearrange([qw(CONTIG
 					 )],@args);
 
-
     $self->throw("Must input a contig to GeneBuilder") unless defined($contig);
     
     $self->contig($contig);
+    $self->get_all_Features;
 
     return $make; # success - we hope!
 }
 
+sub get_all_Features {
+    my ($self) = @_;
+
+
+    if (!defined($self->{_all_Features})) {
+	my @tmp = $self->contig->get_all_SimilarityFeatures;
+
+	$self->{_all_Features} = [];
+	push(@{$self->{_all_Features}},@tmp);
+    }
+
+    return @{$self->{_all_Features}};
+}
 
 =head2 contig
 
@@ -149,28 +165,24 @@ sub contig {
 sub build_Genes {
     my ($self) = @_;
 
-    print STDERR "Building genes\n";
+    print STDERR "Buildling genes\n";
 
-    print STDERR "\nGetting features\n";
-    my ($features,$genscan) = $self->get_Features;
+    my ($features,$genscan,$repeats) = $self->get_Features;
     
-    print STDERR "\nMaking exons\n";
     my @exons               = $self->make_Exons    ($features,$genscan);
-
-    print STDERR "\nMaking exon pairs\n";
     my @pairs               = $self->make_ExonPairs(@exons);
     
     $self->print_ExonPairs;
     
-    print STDERR "\nLinking exon pairs\n";
     my @transcripts         = $self->link_ExonPairs(@exons);
-#    my @contigoverlaps      = $self->order_Contigs (@transcripts);
-
-    print STDERR "\nMaking genes\n";
+    my @contigoverlaps      = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
 
+    push(@{$self->{_genes}},@genes);
+
     $self->print_Genes(@genes);
-    $self->print_gff(\@genes,$features,$genscan);
+    $self->print_gff  (\@genes,$features,$genscan,$repeats);
+
 }
 
 =head2 get_Features
@@ -185,41 +197,75 @@ sub build_Genes {
 
 =cut
 
-
 sub get_Features {
     my ($self) = @_;
 
+    if (defined($self->{_features}) && defined($self->{_genscan})) {
+           return ($self->{_features},$self->{_genscan});
+    }
     
     my @features;
     my @genscan;
+
 
     my $contig = $self->contig;
 
     # This is just working with all the similarity features here
     # When EST2genome features are in we need to be more selective
     
-    my @tmp = $contig->get_all_SimilarityFeatures;
-    my $gcount = 1;
+    my @tmp     = $self->get_all_Features;
+
+    my @extras;
 
     foreach my $f (@tmp) {
 
 	if ($f->source_tag eq "genscan") {
-	    
-	    $f = $self->set_genscan_phases($f,$contig,$gcount);
-	    
-	    if (defined($f)) {
-		push(@genscan,$f);
-		$gcount++;
-	    } 
+	    my $newgs = $self->set_genscan_phases($f,$contig);
+
+	    if (defined $newgs) {
+		push(@genscan,$newgs);
+	    } else {
+		print STDERR "Problem with genscan prediction : skipping\n";
+	    }
 
 	} elsif ($f->primary_tag eq "similarity") {
 	    $f->seqname($contig->id);
-	    push(@features,$f);
+	    if ($f->source_tag eq "vert_est2genome") {
+		push(@extras,$f);
+	    } elsif ($f->source_tag eq "hmmpfam" && $f->score > 25) {
+		push(@features,$f);
+            } elsif ($f->score > 100) {
+		push(@features,$f);
+            }
 	}
     }
-    
+
+#    foreach my $x (@extras) {
+#	print ($x->gffstring . "\n");
+#    }
+
+    my @merged = $self->merge_features(@extras);
+
+
+#    foreach my $x (@merged) {
+#	print ($x->gffstring . "\n");
+#    }
+
     $self->predictions(@genscan);
+
+    $self->{_features} = [];
+    $self->{_genscan}  = [];
+    $self->{_extras}   = [];
+
+    push(@{$self->{_features}},@features);
+    push(@{$self->{_features}},@merged);
+    push(@{$self->{_merged}},@merged);
+
+    push(@{$self->{_genscan}},@genscan);
     
+    print STDERR "Number of similarity features " . scalar(@features) . "\n";
+    print STDERR "Number of genscans "            . scalar(@genscan)  . "\n";
+#    print STDERR "Number of repeats "            . scalar(@repeats)  . "\n";
     return (\@features,\@genscan);
 }
 
@@ -230,7 +276,9 @@ sub predictions {
 	$self->{_pred} = [];
 	push(@{$self->{_pred}},@pred);
     }
-
+    if (!defined($self->{_pred})) {
+        $self->{_pred} = [];
+    }
     return @{$self->{_pred}};
 }
 
@@ -268,7 +316,7 @@ sub make_Exons {
 	foreach my $f ($gs->sub_SeqFeature) {
 
 	    my $exon  = new Bio::EnsEMBL::MappedExon;
-	    $exon->id       ($contigid . ".$gscount.$excount");
+	    $exon->id       ("TMPE_" . $contigid . ".$gscount.$excount");
 	    $exon->seqname  ($contigid . ".$gscount.$excount");
 	    $exon->contig_id($contigid);
 	    $exon->start    ($f->start);
@@ -282,15 +330,44 @@ sub make_Exons {
 	$gscount++;
     }
     
+#    my @extraexons = $self->find_extra_exons(@exons,@{$self->{_merged}});
+#    my $excount = 1;
+    
+#    foreach my $ex (@extraexons) {
+#	my $contig = $self->contig;
+#	my $contigid = $contig->id;
+	
+#	print (STDERR "Extra exon " . $ex->id . " "  . $ex->start . " " . $ex->end . "\n");
+
+#	my $exon  = new Bio::EnsEMBL::MappedExon;
+
+#	$exon->id       ("TMPE_" . $contigid . ".extra.$excount");
+#	$exon->seqname  ($contigid . ".extra.$excount");
+#	$exon->contig_id($contigid);
+#	$exon->start    ($ex->start);
+#	$exon->end      ($ex->end  );
+#	$exon->strand   ($ex->strand);
+#	$exon->attach_seq($self->contig->primary_seq);
+#	push(@exons,$exon);
+#	$excount++;
+#    }
+
+
     foreach my $ex (@exons) {
 	$ex->contig_id($self->contig->id);
 	$ex->find_supporting_evidence($features);
 	my @support = $ex->each_Supporting_Feature;
+	
+	foreach my $s (@support) {
+	    $self->add_toExonHash($s,$ex);
+	}
 
-
+	my $time = time; chomp($time);
 	if ($#support >= 0) {
 	    push(@supported_exons,$ex);
-
+	    $ex->version(1);
+	    $ex->created($time);
+	    $ex->modified($time);
 	    $self->set_ExonEnds($ex);
 	}
     }
@@ -299,24 +376,44 @@ sub make_Exons {
 
 }
 
+sub find_extra_exons {
+    my ($self,@exons,@features) = @_;
 
-=head2 merge_Features
+    my @newexons;
 
- Title   : merge_Features
- Usage   : my @features = $self->merge_Features(@features)
- Function: Turns lots of small gapped features into one big featurew
- Example : 
- Returns : Array of Bio::EnsEMBL::SeqFeature
- Args    : Array of Bio::EnsEMBL::SeqFeature
+    foreach my $f (@features) {
+	my $found = 1;
+	print (STDERR "Feature = " . $f->gffstring . "\n");
 
-=cut
-
-sub  merge_Features {
-    my ($self,@features) = @_;
-
+	foreach my $ex (@exons) {
+	    print (STDERR "Comparing to " . $ex->start . " " . $ex->end . " " . $ex->strand . "\n");
+	    if ($ex->overlaps($f)) {
+		$found = 0;
+	    }
+	}
+	if ($found == 1) {
+	    push(@newexons,$f);
+	}
+    }
+    return @newexons;
 }
 
 
+sub add_toExonHash {
+    my ($self,$f,$exon) = @_;
+
+    if (!defined($self->{_exonhash}{$f->hseqname})) {
+	$self->{_exonhash}{$f->hseqname} = [];
+    }
+
+    push(@{$self->{_exonhash}{$f->hseqname}},$exon);
+}
+
+sub get_ExonHash {
+    my ($self,$hid) = @_;
+
+    return $self->{_exonhash}{$hid};
+}
 
 =head2 cluster_Features
 
@@ -352,6 +449,7 @@ sub  make_ExonPairs {
 
     my %pairhash;
 
+    @exons = sort { $a->start <=> $b->start } @exons;
 
     #  We can cut down the number of searches we do if we
     #  only search forward exons within one contig - I
@@ -364,7 +462,10 @@ sub  make_ExonPairs {
 	my %idhash;
 	my $exon1 = $exons[$i];
 	
-	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
+	my $jstart = $i - 10;  if ($jstart < 0) {$jstart = 0;}
+	my $jend   = $i + 10;  if ($jend > scalar(@exons)) {$jend    = scalar(@exons);}
+
+	J: for (my $j = $jstart ; $j < $jend; $j++) {
 	    next J if ($i == $j);
             next J if ($exons[$i]->strand != $exons[$j]->strand);
 	    next J if ($exons[$i]->id     eq $exons[$j]->id);
@@ -373,19 +474,23 @@ sub  make_ExonPairs {
 
 	    my %doneidhash;
 
+#	    print ("EXONS : " . $exon1->id . "\t" . $exon1->start . "\t" . $exon1->end . "\t" . $exon1->strand . "\n");
+#	    print ("EXONS : " . $exon2->id . "\t" . $exon2->start . "\t" . $exon2->end . "\t" . $exon2->strand . "\n");
 
 	    # For the two exons we compare all of their supporting features.
 	    # If any of the supporting features of the two exons
             # span across an intron a pair is made.
 	  F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
-
+#	      print ("FEATURE1 " . $f1->gffstring . "\n");
 	    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
 
+#		print ("FEATURE2 " . $f1->gffstring . "\n");
 		my @pairs = $self->get_all_ExonPairs;
 
-		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
-		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePair")));
+		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePairI")));
+		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePairI")));
 
+#		print ("pog\n");
 		# Do we have hits from the same sequence
 		# n.b. We only allow each database hit to span once
 		# across the intron (%idhash) and once the pair coverage between
@@ -403,18 +508,14 @@ sub  make_ExonPairs {
 		    my $thresh = $self->threshold;
 
 		    if ($f1->strand == 1) {
-			if (abs($f2->hstart - $f1->hend) < $gap && 
-			    $f2->score > $thresh                &&
-			    $f1->score > $thresh) {
+			if (abs($f2->hstart - $f1->hend) < $gap) {
 
 			    if (!(defined($doneidhash{$f1->hseqname}))) {
 				$ispair = 1;
 			    }
 			}
 		    } elsif ($f1->strand == -1) {
-			if (abs($f1->hend - $f2->hstart) < $gap && 
-			    $f2->score > $thresh                &&
-			    $f1->score > $thresh) {
+			if (abs($f1->hend - $f2->hstart) < $gap) {
 			    if (!(defined($doneidhash{$f1->hseqname}))) {
 				$ispair = 1;
 			    }
@@ -468,6 +569,24 @@ sub  make_ExonPairs {
     return $self->get_all_ExonPairs;
 }
 
+sub find_ExonSet {
+    my ($self,$exon) = $_;
+
+    my %set;
+    
+    foreach my $f ($exon->each_SupportingFeature) {
+	my @ex = $self->get_ExonHash($f->hseqname);
+	
+	foreach my $exon (@ex) {
+	    $set{$exon->id} = $exon;
+	}
+    }
+
+    my @out = values %set;
+
+    return @out;
+}
+
 
 =head2 makePair
 
@@ -505,6 +624,7 @@ sub makePair {
     }
 
     if ($found == 0 && $self->check_ExonPair($tmppair)) {
+	print STDERR "Adding new pair\n";
 	$self->add_ExonPair($tmppair);
 	return $tmppair;
     }
@@ -578,14 +698,37 @@ sub link_ExonPairs {
     my ($self,@exons) = @_;
 
     if (!defined(@exons)) {
-	$self->throw("No array of exons input to link_ExonPairs");
+	$self->warn("No array of exons input to link_ExonPairs");
+	return $self->get_all_Transcripts;
     }
+    my $contigid = $self->contig->id;
+
+    my @newexons;
+    foreach my $exon (@exons) {
+	if (defined($exon->phase)) {
+	    push(@newexons,$exon);
+	}
+    }
+
     
-    EXON: foreach my $exon (@exons) {
+  EXON: foreach my $exon (@newexons) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
 
 	if ($self->isHead($exon) == 1) {
-	    next EXON if $self->isTail($exon);
+
+	    # We have a higher score threshold for single exons
+	    # and we need a protein hit
+
+	    if ($self->isTail($exon)) {
+		my $found = 0;
+		foreach my $f ($exon->each_Supporting_Feature) {
+		    if ($f->analysis->db eq "swir" && $f->score > 200) {
+			$found = 1;
+		    } 
+		}
+		next EXON unless ($found == 1);
+
+	    }
 
 	    print STDERR "Found new transcript start [" . $exon->id . "]\n";
 
@@ -597,8 +740,12 @@ sub link_ExonPairs {
 	    $self->_recurseTranscript($exon,$transcript);
 	}
     }
+    my $count = 1;
     foreach my $tran ($self->get_all_Transcripts) {
-	$self->make_Translation($tran);
+	$tran->id ("F24T" . $contigid.$count);
+	$tran->version(1);
+	$self->make_Translation($tran,$count);
+	$count++;
     }
     return $self->get_all_Transcripts;
 
@@ -862,11 +1009,9 @@ sub make_Genes {
     
     my $trancount = 1;
     my $genecount = 1;
+    my $contigid = $self->contig->id;
 
     foreach my $tran (@transcripts) {
-	my $tranid = "DummyTranscript.$trancount";
-
-	$tran->id($tranid);
 	$trancount++;
 	
 	my $found = undef;
@@ -877,7 +1022,7 @@ sub make_Genes {
 
 	      foreach my $exon ($tran->each_Exon) {
 		  next EXON if ($exon->contig_id ne $gene_exon->contig_id);
-
+		
 		  if ($exon->overlaps($gene_exon) && $exon->strand == $gene_exon->strand) {
 		      $self->print_Exon($exon);
 		      $self->print_Exon($gene_exon);
@@ -888,13 +1033,17 @@ sub make_Genes {
 	  }
 	}
 
+	my $time = time; chomp($time);
+
 	if (defined($found)) {
 	    $found->add_Transcript($tran);
 	} else {
 	    my $gene = new Bio::EnsEMBL::Gene;
-	    my $geneid = "DummyGeneId.$genecount";
+	    my $geneid = "TMPG_$contigid.$genecount";
 	    $gene->id($geneid);
-
+	    $gene->created($time);
+	    $gene->modified($time);
+	    $gene->version(1);
 	    $genecount++;
 	    $gene->add_Transcript($tran);
 	    push(@genes,$gene);
@@ -902,6 +1051,82 @@ sub make_Genes {
     }
 
     return @genes;
+}
+
+sub make_id_hash {
+    my ($self,@features) = @_;
+
+    my %id;
+
+    foreach my $f (@features) {
+	if (!defined($id{$f->hseqname})) {
+	    $id{$f->hseqname} = [];
+	}
+	push(@{$id{$f->hseqname}},$f);
+    }
+
+    return \%id;
+}
+
+sub merge_features {
+    my ($self,@features) = @_;
+
+    my $idhash = $self->make_id_hash(@features);
+
+    my @newfeatures;
+
+    foreach my $hid (keys %$idhash) {
+	my @f = @{$idhash->{$hid}};
+	my @mergef = $self->merge_feature_array(@f);
+
+	push(@newfeatures,@mergef);
+    }
+
+    return @newfeatures;
+}
+
+sub merge_feature_array {
+    my ($self,@features) = @_;
+    
+    my $gap = 5;
+    my @newfeatures;
+    
+    @features = sort { $a->start <=> $b->start } @features;
+
+    FEAT: foreach my $f (@features) {
+	my $found = 0;
+
+	foreach my $newf (@newfeatures) {
+
+	    if ($newf->strand == $f->strand) {
+
+		if ($f->strand == 1) {
+		    if (abs($f->start  - $newf->end) <= $gap &&
+			abs($f->hstart - $newf->hend) <= $gap) {
+
+			$newf->end($f->end);
+			$newf->hend($f->hend);
+			$found = 1;
+			next FEAT;
+		    }
+		} elsif ($f->strand == -1) {
+		    if (abs($f->start - $newf->end) <= $gap && 
+			abs($f->hend - $newf->hstart) <= $gap) {
+			$newf->end($f->end);
+			$newf->hstart($f->hstart);
+			$found = 1;
+			next FEAT;
+		    }
+		}
+	    }
+	}
+	if ($found == 0) {
+	    my $newf = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature1,
+						     -feature2 => $f->feature2);
+	    push(@newfeatures,$newf);
+	}
+    }
+    return @newfeatures;
 }
 
 
@@ -954,7 +1179,7 @@ sub print_Genes {
 }
 
 sub print_gff {
-    my ($self,$genes,$features,$genscan) = @_;
+    my ($self,$genes,$features,$genscan,$repeats) = @_;
     
     open (POG,">pog.gff");
     
@@ -975,6 +1200,19 @@ sub print_gff {
 
     foreach my $f (@$features) {
 	print POG $f->seqname . "\t" . $f->source_tag . "\tsimilarity\t" .
+	    $f->start . "\t" . $f->end . "\t" . $f->score . "\t";
+	if ($f->strand == 1) {
+	    print POG "+\t.\t";
+	} else {
+	    print POG ("-\t.\t");
+	}
+	if (ref($f) =~ "FeaturePair") {
+	    print (POG $f->hseqname . "\t" . $f->hstart . "\t" . $f->hend . "\n");
+	}
+
+    }
+    foreach my $f (@$repeats) {
+	print POG $f->seqname . "\t" . $f->source_tag . "\tRepeatMasker\t" .
 	    $f->start . "\t" . $f->end . "\t" . $f->score . "\t";
 	if ($f->strand == 1) {
 	    print POG "+\t.\t";
@@ -1013,40 +1251,41 @@ sub translate_Exon {
 }
 
 sub make_Translation{
-    my ($self,$transcript) = @_;
+    my ($self,$transcript,$count) = @_;
 
     my $translation = new Bio::EnsEMBL::Translation;
+
     my @exons = $transcript->each_Exon;
-
-
     my $exon  = $exons[0];
 
+    $translation->id("TMPP_" . $exon->contig_id . "." . $count);
+    $translation->version(1);
     print("Starting exon is " . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n");
 
     if ($exon->phase != 0) {
 	my $tmpphase = $exon->phase;
 	print ("Old coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
 
-	print ("Old translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-	print ("Old translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-	print ("Old translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+#	print ("Old translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+#	print ("Old translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+#	print ("Old translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
 	
 	print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
 	if ($exon->strand == 1) {
 	    my $tmpstart = $exon->start;
 	    $exon->start($tmpstart + 3 - $tmpphase);
 	    $exon->phase(0);
-	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
 	} else {
 	    my $tmpend= $exon->end;
 	    $exon->end($tmpend - 3 + $tmpphase);
 	    print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
 	    $exon->phase(0);
-	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+#	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
 	}
 	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
     }   
@@ -1261,7 +1500,8 @@ sub check_ExonPair {
 
     $pair->splice_seq($spliceseq);
 
-    print ("Splice " . $spliceseq->seq ."\n");
+    print (STDERR "Splice " . $spliceseq->seq ."\n");
+
     return 0 if ($spliceseq ->seq ne "GTAG");
     return 1 if ($pair->exon1->end_phase == $pair->exon2->phase);
     return 0;
@@ -1274,7 +1514,7 @@ sub check_ExonPair {
 	
 	$exon1->phase($frame-1);
 	my $endphase = $exon1->end_phase;
-	print ("Looking for exon2 phase of " . $endphase+1 . "\n");
+	print (STDERR "Looking for exon2 phase of " . $endphase+1 . "\n");
 
 	if ($frame2->{$endphase+1} == 1) {
 	    print STDERR "Hooray! Found matching phases\n";
@@ -1284,8 +1524,8 @@ sub check_ExonPair {
 	    my $trans1 = $exon1->seq->translate('*','X',(3-$exon1->phase)%3)->seq;
 	    my $trans2 = $exon2->seq->translate('*','X',(3-$exon2->phase)%3)->seq;
 
-	    print("exon 1 " . $exon1->id . " translation $frame : " . $trans1. "\n");
-	    print("exon 2 " . $exon2->id . " translation " . ($endphase+1) . " : " . $trans2. "\n");
+	    print(STDERR "exon 1 " . $exon1->id . " translation $frame : " . $trans1. "\n");
+	    print(STDERR "exon 2 " . $exon2->id . " translation " . ($endphase+1) . " : " . $trans2. "\n");
 
 	    if ($self->add_ExonPhase($exon1) && $self->add_ExonPhase($exon2)) {
 		return $match;
@@ -1346,127 +1586,70 @@ sub add_ExonPhase {
 
 
 }
-sub make_Transcript {
-    my ($self,$contig,$gs,@exons) = @_;
 
-    my $transcript = new Bio::EnsEMBL::Transcript;
-    
-    $transcript->id($contig->id . "." . $gs->id);
-    
-
-    my $translation = new Bio::EnsEMBL::Translation;
-    $translation->id($contig->id);
-    
-    if ($exons[0]->strand == 1) {
-	@exons = sort {$a->start <=> $b->start} @exons;
-	$translation->start        ($exons[0]->start);
-	$translation->end          ($exons[$#exons]->end);
-	
-    } else {
-	@exons = sort {$b->start <=> $a->start} @exons;
-	$translation->start        ($exons[0]->end);
-	$translation->end          ($exons[$#exons]->start);
-	
-    }
-    
-    $translation->start_exon_id($exons[0]->id);
-    $translation->end_exon_id  ($exons[$#exons]->id);
-    
-    my $endphase = 0;
-    
-    foreach my $exon (@exons) {
-	$exon->phase         ($endphase);
-	$transcript->add_Exon($exon);
-	$endphase = $exon->end_phase;
-    }
-    
-    $transcript->translation($translation);
-    
-    my $seq = $transcript->dna_seq;
-    
-    my $found;
-    my $phase;
-    
-    my $seq0    = $seq->translate('*','X',0);
-    my $seqstr0 = $seq0->seq; chop($seqstr0);
-    
-    if ($seqstr0 !~ /\*/) {
-	$found = $seqstr0;
-	$phase = 0;
-    }
-    
-    my $seq1    = $seq->translate('*','X',2);
-    my $seqstr1 = $seq1->seq; chop($seqstr1);
-    
-    if ($seqstr1 !~ /\*/) {
-	$found = $seqstr1;
-	$phase = 1;
-    }
-    
-    my $seq2    = $seq->translate('*','X',1);
-    my $seqstr2 = $seq2->seq; chop($seqstr2);
-    
-    if ($seqstr2 !~ /\*/) {
-	$found = $seqstr2;
-	$phase = 2;
-    }
-    
-    if (defined($found)) {
-	print (STDERR "Found is $phase:$found : " . $exons[0]->contig_id . "\n");
-	my $endphase = $phase;
-	$gs->flush_sub_SeqFeature;
-	
-	foreach my $exon (@exons) {
-	    $exon      ->phase   ($endphase);
-	    $transcript->add_Exon($exon);
-	    $endphase = $exon->end_phase;
-
-	    $gs->add_sub_SeqFeature($exon);
-	}
-	$gs->attach_seq($contig->primary_seq);	
-	return $gs;
-	
-    } else {
-	$transcript->warn("Couldn't translate " . $transcript->id . "\n");
-	return $gs;
-    }
-}
-    
 sub set_genscan_phases {
     my ($self,$gs,$contig) = @_;
     my $strand;
     
-    print STDERR "\nFinding correct genscan phase\n";
-    
-    my @exons;
-    my $count    = 1;
-    
-    
-    foreach my $f ($gs->sub_SeqFeature) {
-	print STDERR "Found exon " . $f->id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n";
-	
-	my $exon  = new Bio::EnsEMBL::Exon;
-	$exon->id       ($contig->id . ".$count");
-	$exon->contig_id($contig->id);
-	$exon->start    ($f->start);
-	$exon->end      ($f->end  );
-	$exon->strand   ($f->strand);
-	$exon->attach_seq($contig->primary_seq);
-	
-	push(@exons,$exon);
-	$count++;
-	
-    }
-    
-    if (my $g = $self->make_Transcript($contig,$gs,@exons)) {
-	return $g;
-    } else {
-	foreach my $ex (@exons) {
-	    $ex->strand($ex->strand*-1);
-	}
+    $gs->attach_seq($contig->primary_seq);
+    print STDERR "Got contig primary_seq\n";
+    my $mrna = "";
 
-	return $self->make_Transcript($contig,$gs,@exons);
+    foreach my $f ($gs->sub_SeqFeature) {
+       print STDERR "Fetching seq for " . $f->id . " "  . $f->start  . " " . $f->end . "\n";
+	$mrna .= $f->seq->seq;
+	$strand = $f->strand;
     }
+    
+    my $dnaseq = new Bio::PrimarySeq(-id  => "mrna",
+				     -seq => $mrna);
+    
+    my $phase;
+    if ($dnaseq->translate('*','X',0)->seq !~ /\*/) {
+	$phase = 0;
+    } elsif ($dnaseq->translate('*','X',2)->seq !~ /\*/) {
+	$phase = 1;
+    } elsif ($dnaseq->translate('*','X',1)->seq !~ /\*/) {
+	$phase = 2;
+    } else {
+	$self->warn("No translateable frame for genscan prediction".$strand.":".$gs->seqname);
+	return;
+    }
+
+
+    print(STDERR "genscan translation = " . $gs->id . " " . $dnaseq->translate('*','X',(3-$phase)%3)->seq . "\n");
+    foreach my $f ($gs->sub_SeqFeature) {
+	print(STDERR "Genscan exon ids " . $f->id . ":". $f->seq->seq . "\n");
+	$f->{phase} = $phase;
+	my $len   = $f->end() - $f->start() + 1;
+	my $left_overhang = (3 - $phase)%3;
+
+	$phase = ($len - $left_overhang)%3;
+
+	$f->{'end_phase'} = $phase;
+
+	my $splice1;
+	my $splice2;
+	
+	my $spliceseq;
+
+	if ($f->strand == 1) {
+	$splice1 = $contig->primary_seq->subseq($f->end+1,$f->end+2);
+	$splice2 = $contig->primary_seq->subseq($f->start-2,$f->start-1);
+	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice1$splice2");
+    } else {
+	$splice1 = $contig->primary_seq->subseq($f->start-2,$f->start-1);
+	$splice2 = $contig->primary_seq->subseq($f->end+1,$f->end+2);
+	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice2$splice1");
+	$spliceseq = $spliceseq->revcom;
+    }
+
+    print (STDERR "Genscan splices : " . $spliceseq->seq ."\n");
+
+	
+    }
+
+    return $gs;
 }
 
 1;
