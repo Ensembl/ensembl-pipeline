@@ -213,7 +213,7 @@ sub writefile {
   
   if (defined($seqobj)) {
     $seqfilename = 'filename' unless ($seqfilename);
-    print "Writing sequence to ".$self->$seqfilename()."\n";
+    #print "Writing sequence to ".$self->$seqfilename()."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
       
@@ -224,7 +224,7 @@ sub writefile {
 
 
   } else {
-    print "Writing sequence to ".$self->filename."\n";
+    #print "Writing sequence to ".$self->filename."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
@@ -262,7 +262,7 @@ sub checkdir {
                         unless ($self->diskspace($dir, $spacelimit));
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
     open (PWD, 'pwd|');
-    print STDERR "Working directory set to: ".<PWD>;
+    #print STDERR "Working directory set to: ".<PWD>;
 }
 
 sub diskspace {

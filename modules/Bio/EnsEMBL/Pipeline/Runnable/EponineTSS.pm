@@ -95,8 +95,8 @@ sub new {
   $self->{'_results'}   = undef; # file to store results of eponine-scan
   $self->{'_protected'} = [];    # a list of files protected from deletion ???
   $self->{'_threshold'} = 0.999; # minimum posterior for filtering predictions 
-  
-  print STDERR "args: ", @args, "\n";
+
+  #print STDERR "args: ", @args, "\n";  
 
   my( $sequence, $java, $epojar, $threshold) = $self->_rearrange([qw(QUERY 
 								     JAVA
@@ -261,7 +261,7 @@ sub run {
 sub run_eponine {
     my ($self) = @_;
     #run eponine
-    print "Running eponine-scan\n";
+#    print "Running eponine-scan\n";
     $self->throw("Error running eponine-scan on ".$self->filename."\n") 
         if (system ($self->java.' -fast -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
 }
