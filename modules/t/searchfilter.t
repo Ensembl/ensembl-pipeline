@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..5\n"; 
+BEGIN { $| = 1; print "1..6\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -42,34 +42,39 @@ else
 { print "ok 2\n"; }
 
 #create blast object    
-my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
-                                                             -BLAST => 'wublastn',
-                                                             -DB    => 'dbSTS-1',
-                                                             -THRESHOLD => 1,
-                                                             -ARGS  => '');
+my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -query => $clone,
+                                                             -program => 'wublastn',
+                                                             -database    => 'dbSTS-1',
+                                                             -threshold => 1,
+                                                          );
  
+unless ($blast)
+{ print "not ok 3\n"; }
+else
+{ print "ok 3\n"; }
+
 
 my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -runnable => $blast,
 							         -coverage => 1, 
 								 -minscore => 150);
 
 unless ($search)
-{ print "not ok 3\n"; }
+{ print "not ok 4\n"; }
 else
-{ print "ok 3\n"; }
+{ print "ok 4\n"; }
 
 
-$search->run();
-print "ok 4\n"; # 4th test passed
+$search->run('/tmp/');
+print "ok 5\n"; # 4th test passed
 
 #get and store the output
 my @results = $search->output();
 display (@results);
 
 unless (@results) 
-{ print "not ok 5\n"; }
+{ print "not ok 6\n"; }
 else
-{ print "ok 5\n"; }
+{ print "ok 6\n"; }
 
 
 #Display output
