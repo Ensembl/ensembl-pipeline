@@ -8,29 +8,29 @@
 #
 # POD documentation - main docs before the code
 
-=pod 
+#=pod 
 
-=head1 NAME
+#=head1 NAME
 
-Bio::EnsEMBL::Pipeline::IDSet
+#Bio::EnsEMBL::Pipeline::IDSet
 
-=head1 SYNOPSIS
+#=head1 SYNOPSIS
 
-=head1 DESCRIPTION
+#=head1 DESCRIPTION
 
-stores a list of input_ids from a pipeline and will generate unions intersections and differences between the list it holds and a list it is passed
+#stores a list of input_ids from a pipeline and will generate unions intersections and differences between the list it holds and a list it is passed
 
-=head1 CONTACT
+#=head1 CONTACT
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+#Post general queries to B<ensembl-dev@ebi.ac.uk>
 
-=head1 APPENDIX
+#=head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+#The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
 
-=cut
+#=cut
 
-package Bio::EnsEMBL::Pipeline::IDSet;
+#package Bio::EnsEMBL::Pipeline::IDSet;
 
 use vars qw(@ISA);
 use strict;
@@ -216,13 +216,13 @@ sub or{
 =head2 not
 
   Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet
-  Function  : to return all the ids on the objects current list but not on 
+  Function  : to return all the ids on the objects current list but not on
   the list passed to the function this is the simple difference this is done
   by creating a hash of the list for comparision and returning an IDSet of
   all the elements in the current IDset which aren't in that hash'
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: throws if not passed an IDSet
-  Caller    : 
+  Caller    :
   Example   : $c = $a->not($b);
 
 =cut
@@ -230,7 +230,7 @@ sub or{
 
 #as a not given all these methods return IDSets they can be chained together
 #to return a set of things present in two list or not a third for example
-# $d = $a->not($b)->and($c); 
+# $d = $a->not($b)->and($c);
 
 sub not{
   my ($self, $idlist) = @_;
@@ -261,7 +261,7 @@ sub not{
   on list or the other and not both
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: none
-  Caller    : 
+  Caller    :
   Example   : $c = $a->symmetric_difference($b);
 
 =cut
@@ -270,7 +270,7 @@ sub not{
 
 sub symmetric_difference{
   my ($self, $idlist) = @_;
-  
+
   my %count = %{$self->_calculate($idlist)};
   my @and;
   foreach my $e(keys(%count)){
@@ -283,3 +283,15 @@ sub symmetric_difference{
 						);
   return $idset;
 }
+
+sub count{
+  my ($self) = @_;
+
+  if(@{$self->{'_ID_list'}}){
+     return scalar(@{$self->{'_ID_list'}});
+  }else{
+    return 0;    	
+  }
+}
+
+1;
