@@ -638,7 +638,7 @@ sub _merge_gw_genes {
 	# combine the two
 	$prev_exon->end($exon->end);
 	$prev_exon->add_sub_SeqFeature($exon,'');
-	  next EXON;
+	next EXON;
       }
       
       else{
@@ -650,7 +650,7 @@ sub _merge_gw_genes {
       }
       
     }
-    
+
     # transcript
     my $transcript   = new Bio::EnsEMBL::Transcript;
     $transcript->id($contig->id . ".combined.$count");
@@ -666,13 +666,29 @@ sub _merge_gw_genes {
     $gene->add_Transcript($transcript);
     push(@merged, $gene);
     $count++;
+
+    # phase check??
+    print STDERR "Phase check\n";
+    $transcript->sort;
+    $trans[0]->sort;
+    print STDERR "new transcript\n";
+    foreach my $e($transcript->each_Exon) {
+      foreach my $sf($e->sub_SeqFeature){
+	print STDERR $sf->start . " - " . $sf->end . " " .$sf->phase . "\t" . $sf->end_phase . "\n";
+      }
+    }
+    print STDERR "original transcript\n";
+    foreach my $e($trans[0]->each_Exon) {
+      print STDERR $e->start . " - " . $e->end . " " . $e->phase . "\t" . $e->end_phase . "\n";
+    }
+
   }
   return @merged;
 }
 
-=head2 _merge_gw_genes
+=head2 _make_newtranscripts
 
- Title   : _merge_gw_genes
+ Title   : _make_newtranscripts
  Usage   :
  Function: makes new transcripts by combining the genewise and est2genome predictions. Its a monster.
  Example :
@@ -732,213 +748,16 @@ sub _make_newtranscripts {
 
 	# single exon genewise prediction?
 	if(scalar(@gw_ex) == 1) {# eeeep
-	  if ($gw_ex[0]->start >= $ee->start && $gw_ex[0]->end <= $ee->end){
-	    print STDERR "single exon gene\n";	    
-	    # modify the coordinates of the first exon in $newtranscript
-	    my $ex = $newtranscript->start_exon;
-	    
-	    $ex->start($ee->start);
-	    $ex->end($ee->end);
 
-#	    print STDERR "eecount: $eecount\n";
-    
-	    # need to add back exons, both 5' and 3'
-	    my $c = 0;
-	    while($c < $eecount){
-	      print STDERR "adding 5' exon\n";
-	      $newtranscript->add_Exon($eg_ex[$c]);
-	      $newtranscript->sort;
-	      $c++;
-	    }
-	    
-	    # add all the exons from the est2genome transcript, subsequent to this one
-	    $c = $#eg_ex;
-	    while($c > $eecount){
-	      print STDERR "adding 3' exon\n";
-	      $newtranscript->add_Exon($eg_ex[$c]);
-	      $newtranscript->sort;
-	      $c--;
-	    }
-	    
-	    # need to deal with translation start and end this time - varies depending on strand
-	    if($strand == 1){
-	      my $diff = $gw_ex[0]->start - $ex->start;
-	      my $tstart = $translation->start;
-	      my $tend = $translation->end;
-	      
-#	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
-	      $translation->start($tstart + $diff);
-	      $translation->end($tend + $diff);
-	    }
-	    elsif($strand == -1){
-#	      print STDERR "***reverse\n";
-	      #	    my $diff = $ee->end - $gw_ex[0]->end;
-	      my $diff = $gw_ex[0]->start - $ee->start;
-	      my $tstart = $translation->start;
-	      my $tend = $translation->end;
-#	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
-	      
-	      $translation->start($tstart+$diff);
-	      $translation->end($tend + $diff);
-	    }
-	    
-	    
-	    # frameshifts - if > 1 frameshift we may just be buggered. My brain hurts.
-	    if(scalar($ex->sub_SeqFeature) > 1){
-	      print STDERR "uh-oh frameshift\n";
-	      my @sf = $ex->sub_SeqFeature;
-	      
-	      # save current start and end
-	      my $cstart = $ex->start;
-	      my $cend   = $ex->end;
-	      
-	      # get first exon - this has same id as $ex
-	      my $first = shift(@sf);
-	      $ex->end($first->end);
-	      
-	      # get last exon
-	      my $last = pop(@sf);
-	      $last->end($cend);
-	      $newtranscript->add_Exon($last);
-	      
-	      # get any remaining exons
-	      foreach my $s(@sf){
-		$newtranscript->add_Exon($s);
-		$newtranscript->sort;
-	      }
-	      # flush the sub_SeqFeatures
-	      $ex->flush_sub_SeqFeature;
-	    }	      
-	  }
+	  $newtranscript = $self->transcript_from_single_exon_genewise( $ee, $gw_ex[0], $newtranscript, $translation, $eecount, @eg_ex);
+	  
 	}
 	
 	# multiple exon genewise prediction
-	else {
-
-	  # compare to the first genewise exon
-	  if($strand == 1){
-	    if ($gw_ex[0]->end == $ee->end && $ee->start <= $gw_ex[0]->start){
-	      print STDERR "5' exon match!\n";
-	      # modify the coordinates of the first exon in $newtranscript
-	      my $ex = $newtranscript->start_exon;
-	      $ex->start($ee->start);
-	      
-	      # add all the exons from the est2genome transcript, previous to this one
-	      my $c = 0;
-	      while($c < $eecount){
-		$newtranscript->add_Exon($eg_ex[$c]);
-		$newtranscript->sort;
-		$c++;
-	      }
-	      
-	      # fix translation start 
-	      # take what it was for the gw gene, and add on the extra
-	      my $tstart = $translation->start;
-	      $tstart += ($gw_ex[0]->start - $ex->start);
-	      $translation->start($tstart);
-	      
-	    } # end 5' exon
-	    
-	    elsif ($gw_ex[$#gw_ex]->start == $ee->start && $ee->end >= $gw_ex[$#gw_ex]->end){
-	      print STDERR "3' exon match\n";
-	      
-	      # modify the coordinates of the last exon in $newtranscript
-	      my $ex = $newtranscript->end_exon;
-	      $ex->end($ee->end);
-	      
-	      # is it a frameshifted one?	3' exon is a special case as its end might have changed
-	      if(scalar($ex->sub_SeqFeature) > 1){
-		print STDERR "3' exon frameshift\n";
-#		print STDERR $ex->id . "\n";
-#		print STDERR " before: " . $ex->id . " : " .$ex->start . "-" . $ex->end . "\n";
-		my @sf = $ex->sub_SeqFeature;
-		my $last = pop(@sf);
-		
-		# ids will be messed up
-		
-		$ex->start($last->start); # but don't you dare touch the end!
-		$ex->id($last->id);
-#		print STDERR " after: " . $ex->id . " : " .$ex->start . "-" . $ex->end . "\n";
-		# add back the remaining component exons
-		foreach my $s(@sf){
-		  $newtranscript->add_Exon($s);
-		  print STDERR "added exon: " . $s->id . " : " . $s->start . "-" . $s->end . "\n";
-		  $newtranscript->sort;
-		}
-		# flush the sub_SeqFeatures so we don't try to add this one again later
-		$ex->flush_sub_SeqFeature;
-	      }
-	      
-	      # add all the exons from the est2genome transcript, subsequent to this one ($ee)
-	      my $c = $#eg_ex;
-	      while($c > $eecount){
-		$newtranscript->add_Exon($eg_ex[$c]);
-		$c--;
-	      }
-	      
-	    } # end 3' exon
-	    
-	  }
-
-	  elsif($strand == -1){
-#	    print STDERR "***reverse strand\n";
-	    # first is last and last is first
-	    if ($gw_ex[0]->start == $ee->start && $ee->end >= $gw_ex[0]->end){
-	      print STDERR "5' exon match!\n";
-	      
-	      # modify the coordinates of the first exon in $newtranscript
-	      my $ex = $newtranscript->start_exon;
-	      $ex->end($ee->end);
-#	      print STDERR " here\n";
-	      # need to add back exons
-	      my $c = 0;
-	      while($c < $eecount){
-		$newtranscript->add_Exon($eg_ex[$c]);
-		$newtranscript->sort;
-		$c++;
-	      }
-	      
-	      # need to deal with translation start
-	      my $tstart = $translation->start;
-	      my $diff = $ee->end - $gw_ex[0]->end;
-	      $translation->start($tstart+$diff);
-	      
-	      
-	      
-	    } # end 5' exon
-	    
-	    elsif ($gw_ex[$#gw_ex]->end == $ee->end && $ee->start <= $gw_ex[$#gw_ex]->start){
-	      print STDERR "3' exon match\n";
-	      
-	      # modify the coordinates of the last exon in $newtranscript
-	      my $ex = $newtranscript->end_exon;
-	      $ex->start($ee->start);
-	      
-	      # need to deal with frameshifts - 3' exon is a special case as its end might have changed
-	      if(scalar($ex->sub_SeqFeature) > 1){
-		print STDERR "3' exon frameshift\n";
-		my @sf = $ex->sub_SeqFeature;
-		my $last = pop(@sf);
-		$ex->start($last->start); # but don't you dare touch the end!
-		# add back the remaining component exons
-		foreach my $s(@sf){
-		  $newtranscript->add_Exon($s);
-		  $newtranscript->sort;
-		}
-		# flush the sub_SeqFeatures?
-		$ex->flush_sub_SeqFeature;
-	      }
-	      
-	      # add all the exons from the est2genome transcript, subsequent to this one
-	      my $c = $#eg_ex;
-	      while($c > $eecount){
-		$newtranscript->add_Exon($eg_ex[$c]);
-		$c--;
-	      }
-	      
-	    } # end 3' exon
-	  }
-	}
+	else {#multi
+	  $newtranscript = $self->transcript_from_multi_exon_genewise($ee, $newtranscript, 
+								      $translation, $eecount, $gene, $eg)
+	} # end multi exon predictions
   
 	# increment the exon
 	$eecount++;
@@ -971,40 +790,275 @@ sub _make_newtranscripts {
 	  $ex->contig_id($self->vc->id);
 	}
 	
-	eval {
-	  print STDERR "translation: \n";
-	  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-
-	  print STDERR "genewise: \n";
-	  $seqio->write_seq($gw_tran[0]->translate);
-
-	  print STDERR "combined: \n";
-	  $seqio->write_seq($newtranscript->translate); 
-	  print STDERR "\n ";
-	};
-	
-	if ($@) {
-	  print STDERR "Couldn't translate: " . $gene->id . " plus " . $eg->id  . "[$@]\n";
-	}
-	
-	my $gseq = $gw_tran[0]->translate;
-	my $cseq = $newtranscript->translate;
-	if($gseq->seq eq $cseq->seq) {
-	  $foundtrans = 1;
-	  push (@newtrans, $newtranscript); 	
-	}
-	else {
-	  $self->warn("UTR prediction is not the same as genewise prediction - discarding it\n");
+	# compare UTR-gene translation with genewise translation NB NOT the merged gw gene 
+	# we have been using for building!!!
+      GWG:	foreach my $gwg($self->gw_genes) {
+	  if ($gwg->id eq $gene->id){
+	    my @gwgtran = $gwg->each_Transcript;
+	    if(scalar(@gwgtran != 1)) {
+	      $self->warn("Panic! Got " . scalar(@gwgtran) . " transcripts from " . $gwg->id . "\n");
+	      next GWG;
+	    }
+	    
+	    my $genewise;
+	    my $combined;
+	    
+	    eval {
+	      $genewise = $gwgtran[0]->translate;
+	      $combined = $newtranscript->translate;
+	    };
+	    
+	    if ($@) {
+	      print STDERR "Couldn't translate: " . $gene->id . " plus " . $eg->id  . "[$@]\n";
+	    }
+	    
+	    print STDERR "translation: \n";
+	    my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+	    print STDERR "genewise: \n";	      
+	    $seqio->write_seq($genewise);	      
+	    print STDERR "combined: \n";
+	    $seqio->write_seq($combined); 
+	    print STDERR "\n ";
+	    
+	    if($genewise->seq eq $combined->seq) {
+	      $foundtrans = 1;
+	      push (@newtrans, $newtranscript); 	
+	    }
+	    else {
+	      $self->warn("UTR prediction is not the same as genewise prediction - discarding it\n");
+	    }
+	  }
 	}
       }
-      #      $foundtrans = 1;
-      #      push (@newtrans, $newtranscript); 
     }
   }
   return @newtrans;
-
+  
 }
 
+sub transcript_from_single_exon_genewise {
+  my ($self, $eg_exon, $gw_exon, $transcript, $translation, $exoncount, @e2g_exons) = @_;
+  if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
+    print STDERR "single exon gene\n";	    
+    # modify the coordinates of the first exon in $newtranscript
+    my $ex = $transcript->start_exon;
+    
+    $ex->start($eg_exon->start);
+    $ex->end($eg_exon->end);
+    
+    #	    print STDERR "eecount: $eecount\n";
+    
+    # need to add back exons, both 5' and 3'
+    my $c = 0;
+    while($c < $exoncount){
+      print STDERR "adding 5' exon\n";
+      $transcript->add_Exon($e2g_exons[$c]);
+      $transcript->sort;
+      $c++;
+    }
+	    
+    # add all the exons from the est2genome transcript, subsequent to this one
+    $c = $#e2g_exons;
+    while($c > $exoncount){
+      print STDERR "adding 3' exon\n";
+      $transcript->add_Exon($e2g_exons[$c]);
+      $transcript->sort;
+      $c--;
+    }
+	    
+    # need to deal with translation start and end this time - varies depending on strand
+    if($gw_exon->strand == 1){
+      my $diff = $gw_exon->start - $ex->start;
+      my $tstart = $translation->start;
+      my $tend = $translation->end;
+	      
+      #	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
+      $translation->start($tstart + $diff);
+      $translation->end($tend + $diff);
+    }
+
+    elsif($gw_exon->strand == -1){
+      #	      print STDERR "***reverse\n";
+      #	    my $diff = $e2g_exon->end - $gw_ex[0]->end;
+      my $diff = $gw_exon->start - $eg_exon->start;
+      my $tstart = $translation->start;
+      my $tend = $translation->end;
+      #	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
+      
+      $translation->start($tstart+$diff);
+      $translation->end($tend + $diff);
+    }
+    
+    
+    # frameshifts - if > 1 frameshift we may just be buggered. My brain hurts.
+    if(scalar($ex->sub_SeqFeature) > 1){
+      print STDERR "uh-oh frameshift\n";
+      my @sf = $ex->sub_SeqFeature;
+      
+      # save current start and end
+      my $cstart = $ex->start;
+      my $cend   = $ex->end;
+      
+      # get first exon - this has same id as $ex
+      my $first = shift(@sf);
+      $ex->end($first->end);
+      
+      # get last exon
+      my $last = pop(@sf);
+      $last->end($cend);
+      $transcript->add_Exon($last);
+      
+      # get any remaining exons
+      foreach my $s(@sf){
+	$transcript->add_Exon($s);
+	$transcript->sort;
+      }
+      # flush the sub_SeqFeatures
+      $ex->flush_sub_SeqFeature;
+    }	      
+  }
+  return $transcript
+}
+
+
+sub transcript_from_multi_exon_genewise {
+  my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
+  
+  my @gwtran  = $gw_gene->each_Transcript;
+  my @gwexons = $gwtran[0]->each_Exon;
+  
+  my @egtran  = $eg_gene->each_Transcript;
+  my @egexons = $egtran[0]->each_Exon;
+
+  
+  # compare to the first genewise exon
+  if($gwexons[0]->strand == 1){
+    if ($gwexons[0]->end == $current_exon->end && $current_exon->start <= $gwexons[0]->start){
+      print STDERR "5' exon match!\n";
+      # modify the coordinates of the first exon in $newtranscript
+      my $ex = $transcript->start_exon;
+      $ex->start($current_exon->start);
+	      
+      # add all the exons from the est2genome transcript, previous to this one
+      my $c = 0;
+      while($c < $exoncount){
+	$transcript->add_Exon($egexons[$c]);
+	$transcript->sort;
+	$c++;
+      }
+      
+      # fix translation start 
+      # take what it was for the gw gene, and add on the extra
+      my $tstart = $translation->start;
+      $tstart += ($gwexons[0]->start - $ex->start);
+      $translation->start($tstart);
+      
+    } # end 5' exon
+    
+    elsif ($gwexons[$#gwexons]->start == $current_exon->start && $current_exon->end >= $gwexons[$#gwexons]->end){
+      print STDERR "3' exon match\n";
+      
+      # modify the coordinates of the last exon in $newtranscript
+      my $ex = $transcript->end_exon;
+      $ex->end($current_exon->end);
+      
+      # is it a frameshifted one?	3' exon is a special case as its end might have changed
+      if(scalar($ex->sub_SeqFeature) > 1){
+	print STDERR "3' exon frameshift + strand\n";
+	my @sf = $ex->sub_SeqFeature;
+	my $last = pop(@sf);
+	
+	# sort out start, id & phase
+	$ex->start($last->start); # but don't you dare touch the end!
+	$ex->id($last->id);
+	$ex->phase($last->phase);
+
+	# add back the remaining component exons
+	foreach my $s(@sf){
+	  $transcript->add_Exon($s);
+	  print STDERR "added exon: " . $s->id . " : " . $s->start . "-" . $s->end . " end phase " . $s->end_phase . "\n";
+	  $transcript->sort;
+	}
+	# flush the sub_SeqFeatures so we don't try to add this one again later
+	$ex->flush_sub_SeqFeature;
+      }
+
+      # add all the exons from the est2genome transcript, subsequent to this one ($current_exon)
+      my $c = $#egexons;
+      while($c > $exoncount){
+	$transcript->add_Exon($egexons[$c]);
+	$c--;
+      }
+      
+    } # end 3' exon
+    
+  }
+  
+  elsif($gwexons[0]->strand == -1){
+    #	    print STDERR "***reverse strand\n";
+    # first is last and last is first
+    if ($gwexons[0]->start == $current_exon->start && $current_exon->end >= $gwexons[0]->end){
+      print STDERR "5' exon match!\n";
+      
+      # modify the coordinates of the first exon in $newtranscript
+      my $ex = $transcript->start_exon;
+      $ex->end($current_exon->end);
+      #	      print STDERR " here\n";
+      # need to add back exons
+      my $c = 0;
+      while($c < $exoncount){
+	$transcript->add_Exon($egexons[$c]);
+	$transcript->sort;
+	$c++;
+      }
+      
+      # need to deal with translation start
+      my $tstart = $translation->start;
+      my $diff = $current_exon->end - $gwexons[0]->end;
+      $translation->start($tstart+$diff);
+      
+      
+      
+    } # end 5' exon
+    
+    elsif ($gwexons[$#gwexons]->end == $current_exon->end && $current_exon->start <= $gwexons[$#gwexons]->start){
+      print STDERR "3' exon match\n";
+      
+      # modify the coordinates of the last exon in $newtranscript
+      my $ex = $transcript->end_exon;
+      $ex->start($current_exon->start);
+      
+      # need to deal with frameshifts - 3' exon is a special case as its end might have changed
+      if(scalar($ex->sub_SeqFeature) > 1){
+	print STDERR "3' exon frameshift - strand\n";
+	my @sf = $ex->sub_SeqFeature;
+	my $last = pop(@sf);
+
+	# sort out start, id & phase
+	$ex->start($last->start); # but don't you dare touch the end!
+	$ex->id($last->id);
+	$ex->phase($last->phase);
+
+	# add back the remaining component exons
+	foreach my $s(@sf){
+	  $transcript->add_Exon($s);
+	  $transcript->sort;
+	}
+	# flush the sub_SeqFeatures?
+	$ex->flush_sub_SeqFeature;
+      }
+      
+      # add all the exons from the est2genome transcript, subsequent to this one
+      my $c = $#egexons;
+      while($c > $exoncount){
+	$transcript->add_Exon($egexons[$c]);
+	$c--;
+      }
+      
+    } # end 3' exon
+  }  
+ return $transcript; 
+}
 
 =head2 make_genes
 
