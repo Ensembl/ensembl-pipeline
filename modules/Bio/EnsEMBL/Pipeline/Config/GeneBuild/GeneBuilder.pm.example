@@ -109,6 +109,7 @@ use vars qw( %GeneBuilder );
 		GB_MAX_EXONSTRANSCRIPT  => 150, 
 
 		GB_MAXTRANSCRIPTS       => 10, 
+		GB_MAXGENELEN           => 2_000_000, 
 
 		GB_IGNOREWARNINGS       => 1, 	    
 
