@@ -30,7 +30,7 @@ use Bio::SeqIO;
 $loaded = 1;
 print "ok 1\n";
 
-my $seqin = Bio::SeqIO->new( -file => "t/human.genomic");
+my $seqin = Bio::SeqIO->new( -file => "t/data/human.genomic");
 
 my $gen = $seqin->next_seq();
 
@@ -88,7 +88,7 @@ if( $seen == 1 ) {
 }
 
 
-$seqin = Bio::SeqIO->new( -file => "t/genomewise2.seq");
+$seqin = Bio::SeqIO->new( -file => "t/data/genomewise2.seq");
 
 $gen = $seqin->next_seq();
 
