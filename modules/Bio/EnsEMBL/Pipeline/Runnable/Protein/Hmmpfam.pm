@@ -90,7 +90,7 @@ sub run_analysis {
     print STDERR "FILENAME: ".$self->filename."\n";
 
     if ($dbfiles[0] =~ /ls/) {
-      my $cmd = $self->program .' --acc --cut_ga --cpu 1 '.
+      my $cmd = $self->program .' --acc --cut_ga  '.
         $self->parameters .' '.$dbfiles[0].' '.$self->filename.' > '.
           $self->lsresults;
       print STDERR "$cmd\n";   
@@ -103,7 +103,7 @@ sub run_analysis {
 
     if ($dbfiles[1] =~ /fs/) { 
        
-      my $cmd = $self->program .' --acc --cut_ga --cpu 1 '.
+      my $cmd = $self->program .' --acc --cut_ga '.
 	        $self->parameters.' '.$dbfiles[1]      .' '.$self->filename.
             ' > '.$self->fsresults;
       print STDERR "$cmd\n";   

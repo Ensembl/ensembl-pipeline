@@ -219,7 +219,11 @@ sub check_existance{
     } 
     my @values = split;
     if($values[0] =~ /\d+/){
-      return $values[0];
+      print STDERR $values[0]." ".$values[2]."\n" if($verbose);
+      if($values[2] eq 'RUN' || $values[2] eq 'PEND' ){
+        return $values[0];
+      }
+      return undef;
     }
   }
   close(BJOB);
