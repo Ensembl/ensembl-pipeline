@@ -106,7 +106,7 @@ sub new {
   $self->_aaratefile($aaratefile)        if $aaratefile;
   $self->_model('set', $model);
   $self->_nssites($nssites);
-  $self->_icode($icode)                  if $icode;
+  $self->_icode($icode);
   $self->_treefile($mgene)               if $mgene;
   $self->_treefile($fix_kappa)           if $fix_kappa;
   $self->_treefile($kappa)               if $kappa;
@@ -126,7 +126,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-
+  
   unlink $self->_config_file if $self->_config_file; 
   unlink $self->_seqfile if $self->_seqfile;
 
@@ -139,7 +139,7 @@ sub DESTROY {
 
   unlink $self->_outfile if $self->_outfile;
 
-  $self->throw("Could not remove working directory.\n$!") 
+  $self->throw("Could not remove working directory [". $self->work_dir ."].\n$!") 
     if (! rmdir $self->work_dir);
 }
 
@@ -155,7 +155,7 @@ sub run_codeml {
   $self->_write_config_file;
 
   my $command = $self->_codeml_executable . " " . $self->_config_file;
-#  print STDERR $command . "\n";
+  #print STDERR $command . "\n";
 
   eval {
     system($command)
@@ -238,20 +238,6 @@ sub _write_config_file {
 }
 
 
-# Is this still used?
-
-sub outfile {
-  my ($self, $which_file) = @_;
-
-  if (-e $self->_working_dir . "/" . $which_file){
-    return $self->_working_dir . "/" . $which_file;
-  }
-
-  return 0;
-}
-
-
-
 ### Files and executables ###
 
 
@@ -302,7 +288,7 @@ sub _aligned_seqs {
   my ($self, $aligned_seqs) =  @_;
 
   if ($aligned_seqs){
-    
+
     my $filename = $self->_seqfile;  #MUST HAVE A PROPER WAY OF DOING THIS.
 
     system("rm -f $filename");
@@ -318,7 +304,7 @@ sub _aligned_seqs {
     close(OUT);
 
   }
-#print "Alignment for PAML : " . $self->{_aligned_seqs} . "\n";
+
   return $self->{_aligned_seqs}
 }
 
@@ -539,7 +525,7 @@ sub _icode {
   }
 
   unless (defined $self->{_icode}){
-#    print STDERR "Defaulting to Universal Genetic Code.\n";
+    $self->warn("PAML: Defaulting to Universal Genetic Code.\n");
     return 0 # Universal code
   } 
 
