@@ -81,7 +81,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
-							     GB_INPUTID_REGEX
+							     GB_SLICE_REGEX
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
@@ -109,6 +109,13 @@ sub new {
     # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
     # features and dna
     # Here it is used as refdb only and we need to make a connection to GB_GW_DBNAME@GB_GW_DBHOST
+
+    $GB_GW_DBHOST = $self->db->host     if (!defined($GB_GW_DBHOST) || $GB_GW_DBHOST eq '');
+    $GB_GW_DBUSER = $self->db->username if (!defined($GB_GW_DBUSER) || $GB_GW_DBUSER eq '');
+    $GB_GW_DBPASS = $self->db->password if (!defined($GB_GW_DBPASS) || $GB_GW_DBPASS eq '');
+    $GB_GW_DBNAME = $self->db->dbname   if (!defined($GB_GW_DBNAME) || $GB_GW_DBNAME eq '');
+
+
     my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 							 '-host'   => $GB_GW_DBHOST,
 							 '-user'   => $GB_GW_DBUSER,
@@ -172,8 +179,9 @@ sub write_output {
     $self->throw("No input id") unless defined($self->input_id);
     my $input_id = $self->input_id;
    
-    $input_id =~ /$GB_INPUTID_REGEX/;
-    my $chrid = $1;
+    $input_id =~ /$GB_SLICE_REGEX/;
+
+    my $chrid    = $1;
     my $chrstart = $2;
     my $chrend   = $3;
 
@@ -645,6 +653,8 @@ sub output_db {
 sub fill_kill_list {
   my ($self) = @_;
   my %kill_list;
+
+  if (defined($GB_KILL_LIST) && $GB_KILL_LIST ne '') {
   open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
   while (<KILL_LIST>) {
 
@@ -655,7 +665,7 @@ sub fill_kill_list {
   }
 
   close KILL_LIST or die "error closing $GB_KILL_LIST\n";
-
+  }
   return \%kill_list;
 }
 
