@@ -9,65 +9,80 @@ use vars qw( %WormBaseConf );
 		 WB_CHR_INFO => [
 				 { 
 				  chr_name => 'I',
-				  agp_file => '',
-				  length => '15080471',
-				  gff_file => '',
+				  agp_file => 'CHROMOSOME_I.agp',
+				  length => '15080552',
+				  gff_file => 'CHROMOSOME_I.gff',
 				 },
 				 { 
 				  chr_name => 'II',
-				  agp_file => '',
-				  length => '15279300',
-				  gff_file => '',
+				  agp_file => 'CHROMOSOME_II.agp',
+				  length => '15279311',
+				  gff_file => 'CHROMOSOME_II.gff',
 				 },
 				 { 
 				  chr_name => 'III',
-				  agp_file => '',
-				  length => '13783262',
-				  gff_file => '',
+				  agp_file => 'CHROMOSOME_III.agp',
+				  length => '13783317',
+				  gff_file => 'CHROMOSOME_III.gff',
 				 },
 				 { 
 				  chr_name => 'IV',
-				  agp_file => '',
-				  length => '17493790',
-				  gff_file => '',
+				  agp_file => 'CHROMOSOME_IV.agp',
+				  length => '17493785',
+				  gff_file => 'CHROMOSOME_IV.gff',
 				 },
 				 { 
 				  chr_name => 'V',
-				  agp_file => '',
-				  length => '20916335',
-				  gff_file => '',
+				  agp_file => 'CHROMOSOME_V.agp',
+				  length => '20922231',
+				  gff_file => 'CHROMOSOME_V.gff',
 				 },
 				 { 
 				  chr_name => 'X',
-				  agp_file => '',
-				  length => '17705013',
+				  agp_file => 'CHROMOSOME_X.agp',
+				  length => '17718850',
+				  gff_file => 'CHROMOSOME_X.gff',
+				 },
+				 { 
+				  chr_name => 'MtDNA',
+				  agp_file => 'CHROMOSOME_MtDNA.agp',
+				  length => '14088',
 				  gff_file => '',
 				 }
 			       ],
-		 WB_AGP_TYPE => '', # agp type which gets written to database meta
-		 
+
+		 # agp type which gets written to database meta
+		 WB_AGP_TYPE => '',
+
 		 # database to put sequnece and genes into
-		 WB_DBNAME => '',
-		 WB_DBHOST => '',
-		 WB_DBUSER => '',
-		 WB_DBPASS => '',   
-     WB_DBPORT => '',      
-		 # logic name of analysis object to be assigned to genes
-		 WB_LOGIC_NAME => 'wormbase',
+		 WB_DBNAME  => '',
+		 WB_DBHOST  => 'ecs1a',
+		 WB_DBUSER  => 'ensadmin',
+		 WB_DBPASS  => 'ensembl',
+		 WB_DBPORT  => '3306',
+
 		 # if want the debug statements in wormbase to ensembl scripts printed
-		 WB_DEBUG => 1,
+		 WB_DEBUG   => 1,
+
 		 # location to write file containing dodgy seq ids
 		 WB_SEQ_IDS => '',
+
 		 # location to write ids of genes which don't translate
 		 WB_NON_TRANSLATE => '',
-		 # location to write ids of genes which don't transform
-     #set to 0 will write entries to input_id_analysis table
-		 WB_OPERON_LOGIC_NAME => '', #logic names
-		 WB_RNAI_LOGIC_NAME => '',  # for simple features to be 
-		 WB_EXPR_LOGIC_NAME => '', # parsed out of the gff
-		 WB_PSEUDO_LOGIC_NAME => 'Pseudogene',
-     WB_CLONE_SYSTEM_NAME => 'Clone',
-     WB_CHROMOSOME_SYSTEM_NAME => 'Chromosome',
+
+		 #coordinate-system / base feature names
+		 WB_CLONE_SYSTEM_NAME      => 'clone',
+		 WB_CHROMOSOME_SYSTEM_NAME => 'chromosome',
+
+		 # logic name of analysis objectsto be parsed out of the gff
+		 WB_LOGIC_NAME             => 'wormbase',
+		 WB_OPERON_LOGIC_NAME      => 'Operon',
+		 WB_RNAI_LOGIC_NAME        => 'RNAi',
+		 WB_EXPR_LOGIC_NAME        => 'Expression_profile',
+		 WB_PSEUDO_LOGIC_NAME      => 'Pseudogene',
+		 WB_TRNA_LOGIC_NAME        => 'tRNA',
+		 #WB_SL1_LOGIC_NAME        => 'SL1',
+		 #WB_SL2_LOGIC_NAME        => 'SL2',
 		);
 
 sub import {
@@ -84,7 +99,6 @@ sub import {
          . join(' ', map { '$'.$_ } @vars) . ")";
     die $@ if $@;
 
-
     foreach (@vars) {
 	if ( defined $WormBaseConf{ $_ } ) {
             no strict 'refs';
@@ -99,5 +113,3 @@ sub import {
 }
 
 1;
-
-
