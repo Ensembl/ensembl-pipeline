@@ -187,7 +187,7 @@ sub run {
 sub run_tRNAscan_SE {
     my ($self) = @_;
     #run tRNAscan_SE
-    print "Running tRNAscan_SE\n";
+    print "Running tRNAscan_SE cmd:<".$self->tRNAscan_SE.' -q '.$self->filename." > ".$self->results.">\n";
     $self->throw("Error running tRNAscan_SE on ".$self->filename."\n") 
         if (system ($self->tRNAscan_SE.' -q '.$self->filename." > ".$self->results)); 
 }
