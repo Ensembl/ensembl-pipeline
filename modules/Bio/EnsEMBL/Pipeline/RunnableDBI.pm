@@ -36,6 +36,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDBI;
 use vars qw(@ISA);
 use strict;
 
+use Bio::DB::SQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::Root::RootI;
 
