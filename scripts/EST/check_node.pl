@@ -19,9 +19,12 @@
 =cut
 
 use strict;
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
-my %scripts_conf = %::scripts_conf;
- 
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+                                        EST_CHUNKDIR
+					EST_GENOMIC
+
+                                       );
+
 my $chunkname = $ARGV[0];
 
 if(!defined $chunkname){
@@ -29,10 +32,10 @@ if(!defined $chunkname){
   exit(1);
 }
 
-my $estfiledir = $scripts_conf{'estfiledir'};
+my $estfiledir = $EST_CHUNKDIR;
 my $estfile = $estfiledir . "/" . $chunkname;
 
-my $input_id   = $scripts_conf{'genomic'};
+my $input_id   = $EST_GENOMIC;
 
 # check to see if can find $estfile
 if (! -e $estfile){

@@ -8,7 +8,7 @@
  
   filter_and_e2g.pl
   Runs RunnableDB::FilterESTs_and_E2G over a chromosomal region and writes output to
-  est database specified in EST_conf.pl
+  est database specified in ESTConf.pm
 
 =head1 DESCRIPTION
 
@@ -16,13 +16,22 @@
 =head1 OPTIONS
 
   -input_id in form chrname.start-end
-  all other options set in EST_conf.pl
+  all other options set in ESTConf.pm
 
 =cut
 
 use strict;
 use Getopt::Long;
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_RUNNER
+					EST_FILTER_RUNNABLE
+					EST_REFDBNAME
+					EST_REFDBUSER
+					EST_REFDBHOST
+					EST_DBNAME
+					EST_DBUSER
+					EST_DBHOST
+				       );
 
 my $runner;
 my $runnable;
@@ -63,14 +72,14 @@ sub get_variables {
 	      'input_id:s'      => \$input_id,
 	     );
 
-  $runner     = $::scripts_conf{'runner'};
-  $runnable   = $::est_genome_conf{'est_genome_runnable'};
-  $refdbname  = $::db_conf{'refdbname'};
-  $refdbuser  = $::db_conf{'refdbuser'};
-  $refdbhost  = $::db_conf{'refdbhost'};
-  $estdbname  = $::db_conf{'estdbname'};
-  $estdbuser  = $::db_conf{'estdbuser'};
-  $estdbhost  = $::db_conf{'estdbhost'};
+  $runner     = $EST_RUNNER;
+  $runnable   = $EST_FILTER_RUNNABLE;
+  $refdbname  = $EST_REFDBNAME;
+  $refdbuser  = $EST_REFDBUSER;
+  $refdbhost  = $EST_REFDBHOST;
+  $estdbname  = $EST_DBNAME;
+  $estdbuser  = $EST_DBUSER;
+  $estdbhost  = $EST_DBHOST;
 
   if(!(defined $refdbhost && defined $refdbname & defined $refdbuser &&
        defined $estdbhost && defined $estdbname && defined $estdbuser &&

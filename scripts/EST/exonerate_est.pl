@@ -1,7 +1,5 @@
 #!/usr/local/bin/perl
 
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
-
 =head1 NAME
 
   exonerate_est.pl
@@ -18,11 +16,23 @@ require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 =head1 OPTIONS
    -chunkname name of the EST chunk to run with
-   everything else is got from EST_conf.pl configuration file
+   everything else is got from ESTConf.pm configuration file
 =cut
 
 use strict;
 use Getopt::Long;
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+                                        EST_RUNNER
+                                        EST_EXONERATE_RUNNABLE
+                                        EST_EXONERATE
+                                        EST_REFDBNAME
+                                        EST_REFDBUSER
+                                        EST_REFDBHOST
+                                        EST_CHUNKDIR
+                                        EST_GENOMIC
+                                        EST_TMPDIR
+                                       );
+
 
 my $runner;
 my $runnable;
@@ -84,29 +94,29 @@ sub get_variables {
 	      'chunkname:s'      => \$chunkname,
 	     );
 
-  $runner     = $::scripts_conf{'runner'};
-  $runnable   = $::exonerate_conf{'exonerate_runnable'};
-  $exonerate  = $::exonerate_conf{'exonerate'};
-  $dbname     = $::db_conf{'refdbname'};
-  $dbuser     = $::db_conf{'refdbuser'};
-  $host       = $::db_conf{'refdbhost'};
-  $estfiledir = $::scripts_conf{'estfiledir'};
-  $input_id   = $::scripts_conf{'genomic'};
-  $outdir     = $::scripts_conf{'tmpdir'};
+  $runner     = $EST_RUNNER;
+  $runnable   = $EST_EXONERATE_RUNNABLE;
+  $exonerate  = $EST_EXONERATE;
+  $dbname     = $EST_REFDBNAME;
+  $dbuser     = $EST_REFDBUSER;
+  $host       = $EST_REFDBHOST;
+  $estfiledir = $EST_CHUNKDIR;
+  $input_id   = $EST_GENOMIC;
+  $outdir     = $EST_TMPDIR;
 
   if(!(defined $host       && defined $dbname    && defined $dbuser &&
        defined $runner     && defined $runnable  && defined $exonerate &&
        defined $estfiledir && defined $chunkname && 
        defined $input_id   && defined $outdir)){
     print "Usage: exonerate_est.pl -chunkname\n" .
-      "Additional options to be set in EST_conf.pl: runner, exonerate_runnable, exonerate, refdbname, refdbuser, refdbhost, estfiledir, genomic and tmpdir\n";
+      "Additional options to be set in ESTConf.pm: EST_RUNNER, EST_EXONERATE_RUNNABLE, EST_EXONERATE, EST_REFDBNAME, EST_REFDBUSER, EST_REFDBHOST, EST_CHUNKDIR, EST_GENOMIC and EST_TMPDIR\n";
     exit (1);
   }
 
   # output directories have been created by make_bsubs.pl
-  $outdir .= "/exonerate_est/results/";
+  $outdir   .= "/exonerate_est/results/";
   my $errdir = $outdir . "stderr/";
-  $outdir .= "stdout/";
+  $outdir   .= "stdout/";
 
   die("can't open directory $errdir\n") unless opendir(DIR, $errdir);
   closedir DIR;
