@@ -53,21 +53,33 @@ use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_SIMILARITY_DATABASES
-					 GB_SIMILARITY_COVERAGE
-					 GB_SIMILARITY_MAX_INTRON
-					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
-					 GB_SIMILARITY_GENETYPE
-					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
-					 GB_INPUTID_REGEX
-					 GB_TARGETTED_GW_GENETYPE
-					 GB_REPEAT_MASKING
-					);
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_GW_DBNAME
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
+							     GB_SIMILARITY_DATABASES
+							     GB_SIMILARITY_COVERAGE
+							     GB_SIMILARITY_MAX_INTRON
+							     GB_SIMILARITY_MIN_SPLIT_COVERAGE
+							     GB_SIMILARITY_GENETYPE
+							     GB_SIMILARITY_MAX_LOW_COMPLEXITY
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
+							     GB_TARGETTED_GW_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
+							     GB_INPUTID_REGEX
+							     GB_REPEAT_MASKING
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -77,7 +89,7 @@ sub new {
       
     # make sure at least one protein source database has been defined
     
-    $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
+    $self->throw("no protein source databases defined in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
     
     # make all seqfetchers
@@ -86,6 +98,21 @@ sub new {
       $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
     }
 
+    # IMPORTANT
+    # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
+    # features and dna
+    # Here it is used as refdb only and we need to make a connection to GB_GW_DBNAME@GB_GW_DBHOST
+    my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							 '-host'   => $GB_GW_DBHOST,
+							 '-user'   => $GB_GW_DBUSER,
+							 '-pass'   => $GB_GW_DBPASS,
+							 '-dbname' => $GB_GW_DBNAME,
+							);
+    
+    
+    $genewise_db->dnadb($self->db);
+    $self->output_db($genewise_db);
+    
     return $self; 
   }
 
@@ -103,7 +130,7 @@ sub new {
 sub write_output {
     my($self,@features) = @_;
 
-    my $gene_adaptor = $self->db->get_GeneAdaptor;
+    my $gene_adaptor = $self->output_db->get_GeneAdaptor;
     my @genes = $self->output;
     print STDERR "have ".@genes." genes\n";
   GENE: foreach my $gene (@genes) {	
@@ -213,6 +240,7 @@ sub write_output {
       
 
       my @ids = keys %idhash;
+
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
       
@@ -472,6 +500,7 @@ sub validate_transcript {
 
   # check coverage of parent protein
   my $coverage  = $self->check_coverage($transcript);
+
   if ($coverage < $GB_SIMILARITY_COVERAGE){
     $self->warn (" rejecting transcript for low coverage: $coverage\n");
     $valid = 0;
@@ -975,7 +1004,7 @@ sub make_seqfetcher {
   Title   :   each_seqfetcher
   Usage   :   my @seqfetchers = $self->each_seqfetcher
   Function:   Returns an array of Bio::DB::RandomAccessI representing the various sequence indices 
-              listed in GeneConf::GB_SIMILARITY_DATABASES
+              listed in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES
   Returns :   Array of Bio::DB::RandomAccessI
   Args    :   none
 
@@ -997,7 +1026,7 @@ sub each_seqfetcher {
   Title   :   each_seqfetcher_by_type
   Usage   :   my %seqfetchers_by_type = $self->each_seqfetcher_by_type
   Function:   Returns a hash of Bio::DB::RandomAccessI representing the various sequence indices 
-              listed in GeneConf::GB_SIMILARITY_DATABASES keyed by type listed therein.
+              listed in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES keyed by type listed therein.
   Returns :   Hash of all seqfetchers linking db_type to Bio::DB::RandomAccessI
   Args    :   none
 
@@ -1038,7 +1067,7 @@ sub add_seqfetcher_by_type{
 
   Title   :   get_seqfetcher_by_type
   Usage   :   my $seqfetcher = $self->get_seqfetcher_by_type('swall')
-  Function:   Fetches the seqfetcher associated with a particular db type as specified in GeneConf::GB_SIMILARITY_DATABASES
+  Function:   Fetches the seqfetcher associated with a particular db type as specified in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES
   Returns :   Bio::DB::RandomAccessI
   Args    :   $type - string representing db type
 
@@ -1051,6 +1080,29 @@ sub get_seqfetcher_by_type{
       return $seqfetchers{$dbtype};
     }
   }
+}
+
+=head2 output_db
+
+ Title   : output_db
+ Usage   : needs to be moved to a genebuild base class
+ Function: 
+           
+ Returns : 
+ Args    : 
+
+=cut
+
+sub output_db {
+    my( $self, $output_db ) = @_;
+    
+    if ($output_db) 
+    {
+	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_output_db} = $output_db;
+    }
+    return $self->{_output_db};
 }
 
 1;
