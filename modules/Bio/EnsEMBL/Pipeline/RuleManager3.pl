@@ -84,7 +84,7 @@ my $bsub      = $::pipeConf{'bsub_opt'};
 
 $| = 1;
 
-my $chunksize    = 1000000;   # How many InputIds to fetch at one time
+my $chunksize    = 1000000;   # How many Input_ids to fetch at one time
 my $currentStart = 0;       # Running total of job ids
 my $completeRead = 0;       # Have we got all the input ids yet?
 my $local        = 0;       # Run failed jobs locally
@@ -243,7 +243,7 @@ while (1) {
 
         if (!$completeRead) {
             print "Reading IDs ... ";
-            my @tmp = $sic->list_inputId_class_by_start_count($currentStart, $chunksize);
+            my @tmp = $sic->list_input_id_class_by_start_count($currentStart, $chunksize);
 
             print "got ", scalar(@tmp), "\n";
 
@@ -308,13 +308,13 @@ while (1) {
             $gotsig = 0;
         }
 
-        my @anals = $sic->fetch_analysis_by_inputId_class($id->[0], $id->[1]);
+        my @anals = $sic->fetch_analysis_by_input_id_class($id->[0], $id->[1]);
 
         my %analHash;
 
         # check all rules, which jobs can be started
 
-        my @current_jobs = $jobAdaptor->fetch_by_inputId($id->[0]);
+        my @current_jobs = $jobAdaptor->fetch_by_input_id($id->[0]);
 
         RULE: for my $rule (@rules)  {
             if (keys %analysis && ! defined $analysis{$rule->goalAnalysis->dbID}) {
@@ -373,7 +373,7 @@ while (1) {
                 next JOBID;
               }
 
-            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId($anal, $id->[0], $id->[1]);
+            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id($anal, $id->[0], $id->[1]);
 
 
             print "Store ", $id->[0], " - ", $anal->logic_name, "\n";
