@@ -135,15 +135,15 @@ sub compare_exons_base_pair_level{
     my @predicted_exons;
 
     #my $gene_comparison = 
-  #Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison
-  #    ->new(
-#	    '-annotation_genes' => $self->annotation_Genes,
-#	    '-prediction_genes' => $self->prediction_Genes,
-#	    );
+    #Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison
+    #    ->new(
+    #	    '-annotation_genes' => $self->annotation_Genes,
+    #	    '-prediction_genes' => $self->prediction_Genes,
+    #	    );
     
     ############################################################
     ## cluster the genes we have passed to $gene_comparison
- #   my @gene_clusters    = $gene_comparison->cluster_Genes;
+    #   my @gene_clusters    = $gene_comparison->cluster_Genes;
     
     ############################################################
     my $total_ann_length;
@@ -155,65 +155,65 @@ sub compare_exons_base_pair_level{
     
     # CLUSTER:
     #   foreach my $cluster ( @gene_clusters ){
-#	my @annotated_exons;
-#	my @predicted_exons;
-#
-#	my @annotated_genes;
-#	my @predicted_genes;
-#
-#	foreach my $type ( @{$self->annotated_Types} ){
-#	    push( @annotated_genes , $cluster->get_Genes_by_Type( $type ) );
-#	}
-#	foreach my $type ( @{$self->predicted_Types} ){
-#	    push( @predicted_genes , $cluster->get_Genes_by_Type( $type ) );
-#	}
+    #	my @annotated_exons;
+    #	my @predicted_exons;
+    #
+    #	my @annotated_genes;
+    #	my @predicted_genes;
+    #
+    #	foreach my $type ( @{$self->annotated_Types} ){
+    #	    push( @annotated_genes , $cluster->get_Genes_by_Type( $type ) );
+    #	}
+    #	foreach my $type ( @{$self->predicted_Types} ){
+    #	    push( @predicted_genes , $cluster->get_Genes_by_Type( $type ) );
+    #	}
     
     unless ( $coding ){
-	
-	############################################################
-	# get all annotated exons
-	foreach my $gene ( @annotated_genes ){
-	    push( @annotated_exons, @{$gene->get_all_Exons} );
-	}
-	
-	############################################################
-	# get all predicted exons and cluster them
-	foreach my $gene ( @predicted_genes ){
-	    push( @predicted_exons, @{$gene->get_all_Exons} );
-	}
-	
+      
+      ############################################################
+      # get all annotated exons
+      foreach my $gene ( @annotated_genes ){
+	push( @annotated_exons, @{$gene->get_all_Exons} );
+      }
+      
+      ############################################################
+      # get all predicted exons and cluster them
+      foreach my $gene ( @predicted_genes ){
+	push( @predicted_exons, @{$gene->get_all_Exons} );
+      }
+      
     }
     if ($coding ){
-	
-	############################################################
-	# get all annotated exons
-	my %ann_seen;
-	foreach my $gene ( @annotated_genes ){
-	    foreach my $tran ( @{$gene->get_all_Transcripts} ){
-		if ( defined $tran->translation ){
-		    foreach my $exon ( @{$tran->get_all_translateable_Exons} ){
-			next if $ann_seen{$exon->start}{$exon->end}{$exon->strand};
-			push( @annotated_exons, $exon );
-			$ann_seen{$exon->start}{$exon->end}{$exon->strand} = 1;
-		    }
-		}
+      
+      ############################################################
+      # get all annotated exons
+      my %ann_seen;
+      foreach my $gene ( @annotated_genes ){
+	foreach my $tran ( @{$gene->get_all_Transcripts} ){
+	  if ( defined $tran->translation ){
+	    foreach my $exon ( @{$tran->get_all_translateable_Exons} ){
+	      next if $ann_seen{$exon->start}{$exon->end}{$exon->strand};
+	      push( @annotated_exons, $exon );
+	      $ann_seen{$exon->start}{$exon->end}{$exon->strand} = 1;
 	    }
+	  }
 	}
-	
-	############################################################
-	# get all predicted exons and cluster them
-	my %pred_seen;
-	foreach my $gene ( @predicted_genes ){
-	    foreach my $tran ( @{$gene->get_all_Transcripts} ){
-		if ( defined $tran->translation ){
-		    foreach my $exon ( @{$tran->get_all_translateable_Exons} ){
-			next if $pred_seen{$exon->start}{$exon->end}{$exon->strand};
-			push( @predicted_exons, $exon );
-			$pred_seen{$exon->start}{$exon->end}{$exon->strand} = 1;
-		    }
-		}
+      }
+      
+      ############################################################
+      # get all predicted exons and cluster them
+      my %pred_seen;
+      foreach my $gene ( @predicted_genes ){
+	foreach my $tran ( @{$gene->get_all_Transcripts} ){
+	  if ( defined $tran->translation ){
+	    foreach my $exon ( @{$tran->get_all_translateable_Exons} ){
+	      next if $pred_seen{$exon->start}{$exon->end}{$exon->strand};
+	      push( @predicted_exons, $exon );
+	      $pred_seen{$exon->start}{$exon->end}{$exon->strand} = 1;
 	    }
+	  }
 	}
+      }
     }
     
     
@@ -226,29 +226,29 @@ sub compare_exons_base_pair_level{
     
     my %seen_pred;
     foreach my $ann_cluster ( @ann_clusters ){
-	foreach my $pred_cluster ( @pred_clusters ){
-	    
-	    next if ( $pred_cluster->start > $ann_cluster->end 
-		      || 
-		      $pred_cluster->end < $ann_cluster->start );
-	    
-	    next if ( $pred_cluster->strand != $ann_cluster->strand );
-	    
-	    $total_ann_length  += ( $ann_cluster->end - $ann_cluster->start + 1 );
-	    unless( $seen_pred{$pred_cluster} ){
-		$total_pred_length += ( $pred_cluster->end - $pred_cluster->start + 1 );
-	    }
-	    $seen_pred{$pred_cluster} = 1;
-	    
-	    $covered += $self->min($ann_cluster->end,$pred_cluster->end) - $self->max($ann_cluster->start,$pred_cluster->start) + 1;
-	    
-	    
-	    $missed += $self->max(0,$pred_cluster->start - $ann_cluster->start);
-	    $missed += $self->max(0,$ann_cluster->end - $ann_cluster->end);
-	    
-	    $overpredicted += $self->max(0,$ann_cluster->start - $pred_cluster->start);
-	    $overpredicted += $self->max(0,$pred_cluster->end - $ann_cluster->end);
+      
+      $total_ann_length  += ( $ann_cluster->end - $ann_cluster->start + 1 );
+      foreach my $pred_cluster ( @pred_clusters ){
+	
+	unless( $seen_pred{$pred_cluster} ){
+	  $total_pred_length += ( $pred_cluster->end - $pred_cluster->start + 1 );
 	}
+	$seen_pred{$pred_cluster} = 1;
+	
+	next if ( $pred_cluster->start > $ann_cluster->end 
+		  || 
+		  $pred_cluster->end < $ann_cluster->start );
+	
+	next if ( $pred_cluster->strand != $ann_cluster->strand );
+	
+	$covered += $self->min($ann_cluster->end,$pred_cluster->end) - $self->max($ann_cluster->start,$pred_cluster->start) + 1;
+	
+	$missed += $self->max(0,$pred_cluster->start - $ann_cluster->start);
+	$missed += $self->max(0,$ann_cluster->end - $ann_cluster->end);
+	
+	$overpredicted += $self->max(0,$ann_cluster->start - $pred_cluster->start);
+	$overpredicted += $self->max(0,$pred_cluster->end - $ann_cluster->end);
+      }
     }
     #} # end of CLUSTER
 	
