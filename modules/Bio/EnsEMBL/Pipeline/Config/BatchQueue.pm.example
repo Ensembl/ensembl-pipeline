@@ -50,19 +50,52 @@ use vars qw(%Config);
     MAX_PENDING_JOBS   => 500,
     QUEUE_CONFIG       => [
 	{
+	    logic_name => 'RepeatMask',
+	    batch_size => 20,
+	    resource   => '',
+	    retries    => 3,
+	    sub_args   => '',
+	    runner     => ''
+	},
+	{
+	    logic_name => 'Genefinder',
+	    batch_size => 20,
+	    resource   => '',
+	    retries    => 3,
+	    sub_args   => '',
+	    runner     => ''
+	},
+	{
+	    logic_name => 'CPG',
+	    batch_size => 20,
+	    resource   => '',
+	    retries    => 3,
+	    sub_args   => '',
+	    runner     => ''
+	},
+	{		   
+	    logic_name => 'tRNA',
+	    batch_size => 20,
+	    resource   => '',
+	    retries    => 3,
+	    sub_args   => '',
+	    runner     => ''
+	},
+	{
+	    logic_name => 'TRF',
+	    batch_size => 20,
+	    resource   => '',
+	    retries    => 3,
+	    sub_args   => '',
+	    runner     => ''
+	},
+	{
 	    logic_name => 'Genscan',
 	    batch_size => 20,
 	    resource   => 'alpha',
 	    retries    => 3,
 	    sub_args   => '',
 	    runner     => ''
-	},
-	{
-	    logic_name => 'RepeatMask',
-	    batch_size => 1,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => ''
 	}
     ]
 );
