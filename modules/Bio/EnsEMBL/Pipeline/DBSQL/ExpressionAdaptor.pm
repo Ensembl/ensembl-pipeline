@@ -493,15 +493,26 @@ sub _get_term_by_node_id{
 # this method gets the last term in the tree from which the library is hanging:
 
 sub get_last_terms_by_library_Name{
-  my ($self,$lib_name) = @_;
-  
-  my $q = qq ( SELECT Vocabulary.Term
-	       FROM   Vocabulary, Mapping, Clonelib
-	       WHERE  Clonelib.Name  = '$lib_name'
-	       AND    Clonelib.Id    = Mapping.ClonelibId
-	       AND    Mapping.NodeID - Vocabulary.NodeId
-	     );
-  
+  my ($self,$lib_name,$ontology) = @_;
+  my $q;
+  if ($ontology){
+      $q = qq ( SELECT Vocabulary.Term
+		FROM   Vocabulary, Mapping, Clonelib, Node
+		WHERE  Clonelib.Name  = '$lib_name'
+		AND    Clonelib.Id    = Mapping.ClonelibId
+		AND    Mapping.NodeId = Vocabulary.NodeId
+		AND    Mapping.NodeId = Node.Id
+		AND    Node.OntologyId = $ontology
+		);
+  }
+  else{
+      $q = qq ( SELECT Vocabulary.Term
+		FROM   Vocabulary, Mapping, Clonelib
+		WHERE  Clonelib.Name  = '$lib_name'
+		AND    Clonelib.Id    = Mapping.ClonelibId
+		AND    Mapping.NodeID = Vocabulary.NodeId
+		);
+  }
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
   my $res = $sth->execute      || $self->throw("can't execute: $q");
   
