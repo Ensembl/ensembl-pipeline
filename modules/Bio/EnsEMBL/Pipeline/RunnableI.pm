@@ -328,8 +328,11 @@ sub create_FeaturePair {
 
     if($seq &&($seq->isa('Bio::EnsEMBL::Slice'))){
       $fp->slice($seq);
+    }else{
+      #print STDERR "Have seq ".$seq." ".$seq->display_id."\n"; 
+      $fp->seqname($seq->display_id);
     }
-    
+    #print STDERR "Have fp ".$fp->seqname." ".$fp->hseqname."\n";
     return $fp;
 }
 

@@ -68,8 +68,7 @@ sub new {
   my ($db, $format) = $self->_rearrange(['DB', 'FORMAT'], @args);
   
   # expect an array of dbs
-  print STDERR "you have passed a ".ref($db)."\n";
-$self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
+  $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
 
   # $db is a reference to an array of databases:
   if ($db) {
@@ -82,7 +81,6 @@ $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARR
   foreach my $database ( $self->db ){
     # we want the form '/path/to/index/dir', so remove the last if there is any '/'
     if ( $database =~/(\S+)\/$/ ){
-      print STDERR "changing $database to $1\n";
       $database = $1;
     }
 
@@ -111,7 +109,6 @@ $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARR
       $format = 'FASTA';
     }
 
-    print STDERR "making a OBDAIndex fetcher with db_name = $db_name, index_dir = $index_dir, format = $format\n"; 
 
     my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $index_dir,
 						   -dbname    => $db_name,
@@ -195,7 +192,7 @@ sub  get_Seq_by_acc {
       $self->warn("problem fetching sequence for $acc");
     }
     
-    if ( defined $seq ){
+    if ( $seq ){
       $seq->display_id( $acc );
       $seq->accession_number( $acc );
       $seq->desc("");
@@ -203,8 +200,9 @@ sub  get_Seq_by_acc {
     }
   }
 
-  if(!defined $seq){
-    $self->warn("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name."\n");
+  if(!$seq){
+    my ($p, $f, $l) = caller;
+    $self->warn("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name." $f:$l\n");
     
   FETCHER:
     foreach my $seqfetcher ( $self->_seqfetcher ){

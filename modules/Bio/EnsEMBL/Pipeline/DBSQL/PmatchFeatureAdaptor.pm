@@ -218,7 +218,7 @@ sub get_PmatchFeatures_by_chr_start_end {
   if($analysis){
     $query .= " and analysis_id = ".$analysis->dbID;
   }
-  print $query." ".$self->db->dbname."\n";
+ 
   my $sth = $self->prepare($query);
   my $res = $sth->execute;
 

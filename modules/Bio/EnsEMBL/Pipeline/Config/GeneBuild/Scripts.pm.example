@@ -66,15 +66,15 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 	     # transposable elements 
 	     # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
 	    
-	    GB_KILL_LIST   => '',	
+	    GB_KILL_LIST   => '/ecs2/work1/lec/code/briggsae/ensembl-pipeline/scripts/Genebuild/kill_list.txt',	
 
 	    # information about the different protein sources used by new_prepare_proteome.pl,
 	    # the header regex should be a regex to pull out the desired id from the fasta header
 
 	    GB_PROTEOME_FILES => [
 				  {
-				   file_path => '',
-				   header_regex => '',
+				   file_path => '/data/blastdb/Worms/wormpep117.pep',
+				   header_regex => '\S+\s+(\S+)',
 				  },
 				  #{
 				  # file_path => 'swall',

@@ -566,13 +566,13 @@ while (1) {
       }
     }
     if($batch_q_module->can('check_existance')){
-      print STDERR "Checking job existance\n";
-      my @ids = @{$job_adaptor->list_dbIDs};
-      $job_adaptor->lock_tables;
-    JOB:foreach my $id(@ids){
-        &job_existance($batch_q_module, $verbose, $job_adaptor, $id);
-      }
-      $job_adaptor->unlock_tables;
+      #      print STDERR "Checking job existance\n";
+      #      my @ids = @{$job_adaptor->list_dbIDs};
+      #$job_adaptor->lock_tables;
+      #JOB:foreach my $id(@ids){
+      #}
+      #$job_adaptor->unlock_tables;
+      &job_existance($batch_q_module, $verbose, $job_adaptor);
     }
     if(!$done){
       print STDERR "Checking whether to shut down\n";
@@ -890,46 +890,73 @@ sub job_time_check{
 
 
 sub job_existance{
-  my ($batch_q_module, $verbose, $job_adaptor, $id) = @_;
-  
-  my $job = $job_adaptor->fetch_by_dbID($id);
-  if(!$job){
-    return;
-  }
-  my $status = $job->current_status->status;
-  my $exists;
-  if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
-     $status eq 'READING' ||$status eq 'WRITING' ||
-     $status eq 'WAITING'){
-    if(!$job->submission_id){
-      print STDERR "Job ".$job->dbID." status ".$status." doesn't have ".
-        "a submission_id\n";
-      return;
-    }
-    $exists = $batch_q_module->check_existance
-      ($job->submission_id, $verbose);
-    if($exists){
-      return;
-    }
-  }else{
-    return;
-  }
-  if(!$exists){
-    $job->set_status('AWOL');
-    my @lost_jobs = $job_adaptor->fetch_by_submission_id
-      ($job->submission_id);
-  LOST:foreach my $lj(@lost_jobs){
-      print STDERR "job ".$lj->dbID." is lost at ".
-        $status."\n" if($verbose);
-      if($lj->dbID == $job->dbID){
-        next LOST;
+  my ($batch_q_module, $verbose, $job_adaptor) = @_;
+  my @jobs = $job_adaptor->fetch_all;
+  my %job_submission_ids;
+  $job_adaptor->lock_tables;
+  foreach my $job(@jobs){
+    my $status = $job->current_status->status;
+    if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
+       $status eq 'READING' ||$status eq 'WRITING' ||
+       $status eq 'WAITING'){
+      if(!$job_submission_ids{$job->submission_id}){
+        $job_submission_ids{$job->submission_id} = [];
       }
-      $lj->set_status('AWOL');
+      push(@{$job_submission_ids{$job->submission_id}}, $job);
     }
-    print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
   }
-  return;
+  my @jobs = @{$batch_q_module->check_existance
+                 (\%job_submission_ids, $verbose)};
+
+  foreach my $job(@jobs){
+    $job->set_status('AWOL');
+  }
+  $job_adaptor->unlock_tables;
 }
+
+#sub job_existance{
+#  my ($batch_q_module, $verbose, $job_adaptor, $id) = @_;
+  
+#  my $job = $job_adaptor->fetch_by_dbID($id);
+#  if(!$job){
+#    return;
+#  }
+ 
+#  my $status = $job->current_status->status;
+#  my $exists;
+#  if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
+#     $status eq 'READING' ||$status eq 'WRITING' ||
+#     $status eq 'WAITING'){
+#    if(!$job->submission_id){
+#      print STDERR "Job ".$job->dbID." status ".$status." doesn't have ".
+#        "a submission_id\n";
+#      return;
+#    }
+   
+#    $exists = $batch_q_module->check_existance
+#      ($job->submission_id, $verbose);
+#    if($exists){
+#      return;
+#    }
+#  }else{
+#    return;
+#  }
+#  if(!$exists){
+#    $job->set_status('AWOL');
+#    my @lost_jobs = $job_adaptor->fetch_by_submission_id
+#      ($job->submission_id);
+#  LOST:foreach my $lj(@lost_jobs){
+#      print STDERR "job ".$lj->dbID." is lost at ".
+#        $status."\n" if($verbose);
+#      if($lj->dbID == $job->dbID){
+#        next LOST;
+#      }
+#      $lj->set_status('AWOL');
+#    }
+#    print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
+#  }
+#  return;
+#}
 
 
 

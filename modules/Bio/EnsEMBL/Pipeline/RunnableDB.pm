@@ -104,7 +104,7 @@ sub new {
 
     $self->throw("No analysis object input") unless defined($analysis);
     $self->analysis($analysis);
-    &verbose('WARNING');
+    &verbose('EXCEPTION');
     return $self;
 }
 
@@ -535,11 +535,13 @@ sub input_is_void {
 
 
 
+
 sub fetch_sequence{
   my ($self, $repeat_masking) = @_;
 
+  #print STDERR "Fetching sequence from ".$self->db->dbname."\n";
   my $sa = $self->db->get_SliceAdaptor;
-
+#print STDERR "Have input_id ".$self->input_id."\n";
   my $slice = $sa->fetch_by_name($self->input_id);
   $repeat_masking = [] unless($repeat_masking);
   if(@$repeat_masking){
@@ -548,7 +550,7 @@ sub fetch_sequence{
   }else{
     $self->query($slice);
   }
-
+  #print STDERR "have sequence ".$self->query."\n";
   return $self->query;
 }
 
