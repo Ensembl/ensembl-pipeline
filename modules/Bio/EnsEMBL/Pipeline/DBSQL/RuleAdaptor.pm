@@ -131,7 +131,7 @@ sub remove {
 
   $sth = $self->prepare( qq {
     DELETE FROM rule_conditions
-     WHERE ruleID = $dbID } );
+    WHERE  rule_id = $dbID } );
   $sth->execute;
 }
 
