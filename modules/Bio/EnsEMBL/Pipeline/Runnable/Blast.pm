@@ -278,11 +278,19 @@ sub run_analysis {
         $db =~ s/.*\///;
 	#print STDERR "\n".$database."\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
+
         my $command = $self->program ;
-        $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
-        $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
+        my $blastype = "";
+        my $filename = $self->filename;
+
+        if (defined($::pipeConf{blast}) && $::pipeconf{blast} eq 'ncbi') {
+            $command .= " -d $database -i $filename ";
+        } else {
+            $command .= " $database $filename ";
+        }
         $command .= ' '.$self->options. ' > '.$self->results . ".$db";
-	print STDERR $command."\n";
+
+	#print STDERR $command."\n";
         $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
   
@@ -323,7 +331,6 @@ sub fetch_databases {
     #
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
-
     if (-f $dbname) {
 	push(@databases,$dbname);
     } else {
@@ -408,7 +415,7 @@ sub parse_results {
     
   }
  
-  #print STDERR "Ids " . keys(%ids) . "\n";
+  print STDERR "Ids " . keys(%ids) . "\n";
 
   @parsers = ();
 
