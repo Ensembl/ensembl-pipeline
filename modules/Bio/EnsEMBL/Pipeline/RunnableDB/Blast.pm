@@ -97,7 +97,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 
     print STDERR "Setting genseq to " . $genseq. "\n";
