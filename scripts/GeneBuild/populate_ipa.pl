@@ -8,10 +8,13 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (GB_DBNAME
 							    );
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (	    
 							   GB_SIZE
-							   GB_GENEBUILD_INPUT_IDS
+							   GB_GENEBUILD_PIPELINE
 							   GB_SUBMIT_GENEBUILD_LOGICNAME
-							   GB_PMATCH_INPUT_IDS
+							   GB_PMATCH_PIPELINE
 							   GB_SUBMIT_PMATCH_LOGICNAME
+							   GB_PMATCH_SIZE
+							   GB_PMATCH_CHUNKS
+							   
 							  );
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
