@@ -192,7 +192,7 @@ sub run_ssaha {
 
     push @args, "-mp " . $self->min_length if $self->min_length;
     my $cmd = join " ", $self->ssaha, $self->filename, $self->database, @args;
-    print STDERR "Running ssaha: $cmd\n";
+#    print STDERR "Running ssaha: $cmd\n";
 
     $self->throw("Error running ssaha on ".$self->filename."\n")
         if (system ($cmd . " > " . $self->results));
@@ -268,7 +268,7 @@ sub parse_results {
             $feat1 {source}= 'ssaha';
             $feat1 {primary}= 'similarity';
 
-            $self->createfeaturepair(\%feat1, \%feat2);
+            $self->create_FeaturePair(\%feat1, \%feat2);
 
         }
     }
