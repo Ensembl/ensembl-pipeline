@@ -222,7 +222,7 @@ sub align_hits_to_contig2 {
   for my $feature ( @features ) {
     print ::LOG join
       ( "\n", 
-	( "Blast result:",
+	( "\n", "Blast result:",
 	  "Start ".$feature->start." End ".$feature->end,
 	  "hstart ".$feature->hstart." hend ".$feature->hend,
 	  "qury: ".$feature->{'qseq'},
@@ -233,17 +233,46 @@ sub align_hits_to_contig2 {
   # for each ungapped piece in it
     for my $ugFeature ( $feature->ungapped_features() ) {
 
-      # ask the $self->peptide to do pep2genomic
-      #   for f->start f->end
-      my @split = $self->peptide->pep2genomic( $ugFeature->start, $ugFeature->end );
+      # ask the $self->peptide to do cdna2genomic
+      #   for f->start*3-2 f->end*3
+      my @split = $self->peptide->cdna2genomic
+	(( $ugFeature->start() * 3 -2 ), 
+	 ( $ugFeature->end() * 3 ));
       
       for my $gcoord ( @split ) {
 	
-	my ( $gstart, $gend, $gstrand, $contig, $exon, $pep_start, $pep_end ) =
+	my ( $gstart, $gend, $gstrand, $contig, $exon, $cdna_start, $cdna_end ) =
 	  @$gcoord;
 
-  # Take the pieces and make a list of features from it
-  # hash them by exon
+	# Take the pieces and make a list of features from it
+	# hash them by exon
+
+	# first, eat away non complete codons from start
+	while(( $cdna_start - 1 ) % 3 != 0 ) {
+	  $cdna_start++;
+	  if( $gstrand == 1 ) {
+	    $gstart++;
+	  } else {
+	    $gend--;
+	  }
+	}
+	  
+	# and from end
+	while( $cdna_end  % 3 != 0 ) {
+	  $cdna_end--;
+	  if( $gstrand == 1 ) {
+	    $gend--;
+	  } else {
+	    $gstart++;
+	  }
+	}
+
+	if( $cdna_end <= $cdna_start ) {
+	  next;
+	}
+
+	my $pep_start = ($cdna_start+2)/3;
+	my $pep_end = ( $cdna_end / 3 );
 
 	my $dna_feat = Bio::EnsEMBL::SeqFeature->new 
 	  ( -seqname    =>  $contig->name,
@@ -253,8 +282,8 @@ sub align_hits_to_contig2 {
 	    -score      =>  $feature->score,
 	    -p_value    =>  $feature->p_value,
 	    -percent_id =>  $feature->percent_id,
-	    -analysis   =>  $feature->analysis,
-	    -phase      =>  $exon->phase() );  
+	    -analysis   =>  $feature->analysis );
+
 	
 	my $pep_feat = Bio::EnsEMBL::SeqFeature->new 
 	  ( -seqname    =>  $feature->hseqname,
