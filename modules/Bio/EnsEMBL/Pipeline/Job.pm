@@ -308,6 +308,7 @@ sub flush_runs {
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
+       -STDERR     => $lastjob->stderr_file,
        -PARAMETERS => $queue->{'sub_args'},
        -PRE_EXEC   => $pre_exec,
        -QUEUE      => $queue->{'queue'},
