@@ -164,7 +164,7 @@ sub compute_translation{
 sub run_translate{
     my ($self,$trans,$met) = @_;
     
-    my $verbose = 0;
+    my $verbose = 1;
 
     my $trans_id = $trans->stable_id || $trans->dbID;
     my $seq = $trans->seq;
@@ -206,6 +206,7 @@ sub run_translate{
 	next ORF unless /\>/;
 	print STDERR "$_\n" if $verbose;
 	my @entries = split;
+	next ORF unless ( $entries[3] && $entries[5] );
 	my $id = $entries[1];
 	my $orf_length = $entries[3];
 	$orf_length =~s/\,//;
