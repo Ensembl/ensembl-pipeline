@@ -472,6 +472,8 @@ foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
 
   my @all_deletions = sort {$a <=> $b} keys %all_deletions;
 
+  $self->{_total_inserted_deletions} = 0; # Initialise this method-less value.
+
   foreach my $deletion_coord (@all_deletions) {
 
     my $length = $all_deletions{$deletion_coord};
@@ -1588,7 +1590,22 @@ sub _fiddly_bits {
 
   my $hstart  = $base_align_feature->hstart;
   my $hend    = $base_align_feature->hend;
+  my $cigar   = $base_align_feature->cigar_string;
   my $hstrand = $base_align_feature->hstrand;
+
+    # Take care of unusual situation where genomic strand gets turned around.
+  if (($self->_strand == -1)&&($base_align_feature->strand == 1)){
+      # Force the hstrand around
+    $hstrand = -1;
+      # Reverse the order of things in the cigar
+    my @cigar_items = $self->_cigar_reader($cigar);
+    @cigar_items = reverse @cigar_items;
+    $cigar = '';
+    foreach my $item (@cigar_items){
+      $cigar .= $item->{'length'} unless $item->{'length'} == 1;
+      $cigar .= $item->{'type'};
+    }
+  }
 
   # Fetch our sequence from the cache.  If the sequence
   # is missing it means that it could not be fetched and
@@ -1642,7 +1659,7 @@ sub _fiddly_bits {
     # if the EST is the reverse strand, it is necessary to chop out our 
     # fragment first, then reverse compliment it.
 
-    if ($base_align_feature->hstrand == -1) {
+    if ($hstrand == -1) {
       my $wrong_way_around_exon = join '', @fetched_seq;
 
       my $backwards_seq = Bio::Seq->new('-seq' => $wrong_way_around_exon);
@@ -1662,7 +1679,7 @@ sub _fiddly_bits {
   # information onto our genomic and exonic sequences - this is
   # done in $self->_align.
 
-  my @cigar_instructions = $self->_cigar_reader($base_align_feature->cigar_string);
+  my @cigar_instructions = $self->_cigar_reader($cigar);
 
   my $hit_position = 1;
 
