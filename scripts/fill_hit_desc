@@ -42,9 +42,14 @@ use Data::Dumper;
         -port   => $dbport,
     );
 
-    my( @ids );
-    if (@ARGV) {
-        @ids = @ARGV;
+    my( $ids );
+    if (! -t STDIN) {
+        while (<>) {
+            push(@$ids, split);
+        }
+    }
+    elsif (@ARGV) {
+        @$ids = @ARGV;
     } else {
         if($left){
             $query = "SELECT DISTINCT(f.hit_name)
@@ -67,14 +72,17 @@ use Data::Dumper;
 
         my $sth = $db->prepare($query);
         $sth->execute();
-        while(my $row = $sth->fetchrow_arrayref){
-            push(@ids, $row->[0]);
+        while (my ($id) = $sth->fetchrow){
+            push(@$ids, $id);
         }
     }
 
     my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
 
-	$seqfetcher->write_descriptions( $db, [@ids] );
+	my $failed = $seqfetcher->write_descriptions($db, $ids);
+    if (@$failed) {
+        warn "Failed to fetch:\n", map("  $_\n", @$failed);
+    }
 }
 
 sub useage{
