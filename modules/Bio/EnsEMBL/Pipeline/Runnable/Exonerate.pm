@@ -477,7 +477,8 @@ sub output {
 
 # TEMPORARY FIXME
 #  return @{$self->{'_output'}};
-  return @{$self->{'_fplist'}};
+#  return @{$self->{'_fplist'}};
+  return $self->{'_fplist'}; # ref to an array
 }
 
 =head2 _create_features
