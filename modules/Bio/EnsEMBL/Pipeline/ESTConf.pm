@@ -173,6 +173,8 @@ use vars qw( %ESTConf );
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
+	    # if you want to use ests together with cdnas in EST_GeneBuilder
+	    # and your cdnas are in a SEPARATE DATABASE, you can specify it here:
 	    USE_cDNA_DB                  => 0,  # set it to a def/undef value if you do/don't want to use it
 	    
 	    cDNA_DBNAME                  => '',
@@ -181,7 +183,37 @@ use vars qw( %ESTConf );
 	    cDNA_DBPASS                  => '',
 	    cDNA_GENETYPE                => '',	  
 
-	   	   
+	    # if you want to map expression data to a set of genes via ESTs, 
+	    # ( see Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression )
+	    # you can specify here the database where those genes are
+	    EST_TARGET_DBNAME            => 'ens_NCBI_30',
+	    EST_TARGET_DBHOST            => 'ecs1e',
+	    EST_TARGET_DBUSER            => 'ensadmin',
+	    EST_TARGET_DBPASS            => 'ensembl',
+	    
+	    # gene type to which we are going to map the ests
+	    EST_TARGET_GENETYPE          => 'ensembl',	   
+	   
+	    # set this to 1 if you want to map genes to ests after the genebuild
+	    # this is only for human
+	    MAP_GENES_TO_ESTS            => '1',
+	    
+	    # you can specify here the database (non ensembl schema)
+	    # where the expression database is.
+	    # So far we have one adaptor only for SANBI's Stack database
+	    EST_EXPRESSION_DBHOST        => 'ecs2a',
+	    EST_EXPRESSION_DBNAME        => 'eae_human_expression2',
+	    EST_EXPRESSION_DBUSER        => 'ensro',
+	    EST_EXPRESSION_DBPASS        => '',
+
+	    # the gene2est analysis is run with this script:
+	    #(put your own path here)
+	    EST_EXPRESSION_RUNNER        => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
+	    
+	    # size of the chunks to run the gene to est map
+	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
+	    EST_EXPRESSION_CHUNKSIZE          => '5000000',		
+
 	   );
 
 sub import {
