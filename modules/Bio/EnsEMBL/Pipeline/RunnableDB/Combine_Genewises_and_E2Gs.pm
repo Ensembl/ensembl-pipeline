@@ -817,6 +817,10 @@ sub _merge_genes {
       $cloned_translation->add_Attributes($attribute);
     }
   }
+  my @support = @{$trans[0]->get_all_supporting_features};
+  if (scalar(@support)) {
+    $merged_transcript->add_supporting_features(@support);
+  }
 
     
     #print STDERR "merged_transcript:\n";
@@ -853,6 +857,11 @@ sub combine_genes{
   my $newtranscript = new Bio::EnsEMBL::Transcript;
   foreach my $exon(@gw_exons){
     $newtranscript->add_Exon($exon);
+  }
+
+  my @support = @{$gw_tran[0]->get_all_supporting_features};
+  if (scalar(@support)) {
+    $newtranscript->add_supporting_features(@support);
   }
 
   my $translation   = new Bio::EnsEMBL::Translation;
@@ -1932,6 +1941,8 @@ sub _recalculate_translation_old {
 
 sub _transfer_evidence {
   my ($self, $combined_transcript, $cdna_transcript) = @_;
+
+  my $first_support_id;
   foreach my $combined_exon(@{$combined_transcript->get_all_Exons}){
     foreach my $cdna_exon(@{$cdna_transcript->get_all_Exons}){
       # exact match or overlap?
@@ -1950,6 +1961,11 @@ sub _transfer_evidence {
 	Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
       }
     }
+  }
+
+  my $cdna_trans = $cdna_transcript->get_all_Transcripts()->[0];
+  foreach my $tsf (@{$cdna_trans->get_all_supporting_features}) {
+    $combined_transcript->add_supporting_features($tsf);
   }
   return $combined_transcript;
 }
@@ -2046,6 +2062,11 @@ sub blessed_genes {
       $newtranslation->add_Attributes($attribute);
     }
   }
+  my @support = @{$transcript->get_all_supporting_features};
+  if (scalar(@support)) {
+    $newtranscript->add_supporting_features(@support);
+  }
+
 	$newtranscript->translation($newtranslation);
 
 	foreach my $exon(@{$transcript->get_all_Exons}){

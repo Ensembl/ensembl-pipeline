@@ -634,6 +634,9 @@ sub process_genes {
 	  }
 	
 	}
+        foreach my $tsf (@{$checked_transcript->get_all_supporting_features}) {
+	  $tsf->analysis($analysis_obj);
+        }
 
 	my $gene = new Bio::EnsEMBL::Gene;
 	$gene->type($genetype);
