@@ -138,53 +138,46 @@ sub construct_command_line{
 
 sub open_command_line{
   my ($self, $verbose)= @_;
-
+  
   my $lsf = '';
-
+  
   if (open(my $pipe, '-|')) {
-      while (<$pipe>) {
-	  if (/Job <(\d+)>/) {
-	      $lsf = $1;
-	  } else {
-	      $self->warn("DEBUG: unexpected from bsub: '$_'");
-	  }	  
-      }
-      if (close $pipe) {
-	  if ( ($? >> 8) == 0 ){
-	      if ($lsf) {
-		  $self->id($lsf);
-	      } else {
-		  $self->warn("Bsub worked but returned no job ID. Weird");
-	      }
-	  } else {
-	      $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
-	  }
+    while (<$pipe>) {
+      if (/Job <(\d+)>/) {
+        $lsf = $1;
       } else {
-	  $self->throw("Could not close bsub pipe : $!\n");
-      }      
-  } 
-  else {      
-      # We want STDERR and STDOUT merged for the bsub process
-      # open STDERR, '>&STDOUT'; 
-      # probably better to do with shell redirection as above can fail
-      exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
+        $self->warn("DEBUG: unexpected from bsub: '$_'");
+      }	  
+    }
+    if (close $pipe) {
+      if ( ($? >> 8) == 0 ){
+        if ($lsf) {
+          $self->id($lsf);
+        } else {
+          $self->warn("Bsub worked but returned no job ID. Weird");
+        }
+      } else {
+        $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
+      }
+    } else {
+      $self->throw("Could not close bsub pipe : $!\n");
+    }      
+  } else {      
+    # We want STDERR and STDOUT merged for the bsub process
+    # open STDERR, '>&STDOUT'; 
+    # probably better to do with shell redirection as above can fail
+    exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
   }  
 }
 
 
 sub get_pending_jobs {
-  my($self, $args) = @_;
-  $args ||= $self;
-  my $user  = $args->{'-user'}  || $args->{'-USER'}  || undef;
-  my $queue = $args->{'-queue'} || $args->{'-QUEUE'} || undef;
-  my $debug = $args->{'-debug'} || $args->{'-DEBUG'} || undef;
+  my($self, $verbose) = @_;
 
   my $cmd = "bjobs";
-  $cmd .= " -q $queue" if $queue;
-  $cmd .= " -u $user"  if $user;
   $cmd .= " | grep -c PEND ";
 
-  print STDERR "$cmd\n" if $debug;
+  print STDERR "$cmd\n" if($verbose);
 
   my $pending_jobs = 0;
   if( my $pid = open (my $fh, '-|') ){
@@ -202,7 +195,7 @@ sub get_pending_jobs {
       exec( $cmd );
       die q{Something went wrong here $!: } . $! . "\n";
   }
-  print STDERR "FOUND $pending_jobs jobs pending\n" if $debug;
+  print STDERR "FOUND $pending_jobs jobs pending\n" if $verbose;
   return $pending_jobs;
 }
 
@@ -396,7 +389,7 @@ sub lsf_user{
 =head2 copy_output
 
 copy_output is used to copy the job's STDOUT and
-STDERR files using B<lsrcp>.  This avoids using NFS.
+STDERR files using B<lsrcp>.  This avoids using NFS'.
 
 =cut
 

@@ -99,7 +99,7 @@ sub accumulator_sanity_check{
  RULE:foreach my $rule(@$rules){
     if($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR'){
       print STDERR "dealing with rule ".$rule->goalAnalysis->logic_name."\n";
-      my @conditions = $rule->list_conditions;
+      my @conditions = @{$rule->list_conditions};
       my %input_id_type;
       foreach my $c(@conditions){
         print STDERR "have condition ".$c."\n";
@@ -144,7 +144,7 @@ sub rule_type_sanity{
     if($type eq 'ACCUMULATOR'){
       next RULE;
     }
-  CONDITION:foreach my $name($rule->list_conditions){
+  CONDITION:foreach my $name(@{$rule->list_conditions}){
       my $condition = $aa->fetch_by_logic_name($name);
       if(!$condition){
         my $msg = "Can't depend on an analysis which doesn't exist $name";

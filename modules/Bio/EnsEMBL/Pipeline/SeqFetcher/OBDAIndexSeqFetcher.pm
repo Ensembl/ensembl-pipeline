@@ -70,7 +70,7 @@ sub new {
   # expect an array of dbs
 
   $self->throw("Sorry, you must specify a database") unless defined($db);
-  print STDERR "You passed a " . ref($db) . "\n";
+  #print STDERR "You passed a " . ref($db) . "\n";
   $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
   
   $self->db($db);
@@ -83,7 +83,7 @@ sub new {
       }
       # we want the form '/path/to/index/dir', so remove the last if there is any '/'
       if ( $database =~/(\S+)\/$/ ){
-	  print STDERR "changing $database to $1\n";
+	  #print STDERR "changing $database to $1\n";
 	  $database = $1;
       }
       
@@ -106,7 +106,7 @@ sub new {
       # we take as default format = 'FASTA';
       $format = 'FASTA' unless ( $format );
       
-      print STDERR "Making an OBDAIndex fetcher with db_name: <$db_name>, index_dir: <".$self->index_name.">, format: <$format>\n"; 
+      #print STDERR "Making an OBDAIndex fetcher with db_name: <$db_name>, index_dir: <".$self->index_name.">, format: <$format>\n"; 
 
       my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $self->index_name,
 						     -dbname    => $db_name,
@@ -230,10 +230,10 @@ sub  get_Seq_by_acc {
   }
 
   if ($seq){
-    #print STDERR "found sequence!\n";
-    #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
-    #print STDERR "display_id: ".$seq->display_id."\n";
-    #print STDERR $seq->seq."\n";
+    ##print STDERR "found sequence!\n";
+    ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+    ##print STDERR "display_id: ".$seq->display_id."\n";
+    ##print STDERR $seq->seq."\n";
   }
   else{
     print STDERR "sequence not found. Returning undef\n";
@@ -297,9 +297,9 @@ sub  get_Seq_by_secondary {
     $self->warn("OBDAIndexSeqFetcher: could not find sequence for $acc");
   }
   
-  #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
-  #print STDERR "display_id: ".$seqs[0]->display_id."\n";
-  #print STDERR $seqs[0]->seq."\n";
+  ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+  ##print STDERR "display_id: ".$seqs[0]->display_id."\n";
+  ##print STDERR $seqs[0]->seq."\n";
   return $seqs[0];
 }
 

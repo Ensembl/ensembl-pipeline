@@ -93,7 +93,7 @@ sub store {
   $sth->execute;
   my $dbID = ($sth->fetchrow_array)[0];
 
-  my @literals = $rule->list_conditions;
+  my @literals = @{$rule->list_conditions};
   for my $literal ( @literals ) {
     $sth = $self->prepare( qq{
       INSERT INTO rule_conditions
