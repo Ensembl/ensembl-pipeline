@@ -61,6 +61,12 @@ use vars qw( %Databases );
               GB_GW_DBUSER  => '',
               GB_GW_DBPASS  => '',
               GB_GW_DBPORT     => '',
+	      # database containing the blessed genes if there are any
+	      GB_BLESSED_DBHOST              => '',
+	      GB_BLESSED_DBNAME              => '',
+	      GB_BLESSED_DBUSER              => '',
+	      GB_BLESSED_DBPASS              => '',
+	      GB_BLESSED_DBPORT              => '',
 	      # database where the combined_gw_e2g genes will be stored
 	      # IMPORTANT: we should have copied the genewise genes to this db before hand:
 	      GB_COMB_DBHOST                  => '',
