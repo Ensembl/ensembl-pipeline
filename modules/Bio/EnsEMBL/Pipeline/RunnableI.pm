@@ -182,7 +182,7 @@ sub workdir {
 		
     if (!defined($self->{_workdir})) {
         if ($directory) {
-            mkdir ($directory, '777') unless (-d $directory);
+            mkdir ($directory, 0777) unless (-d $directory);
             $self->throw ("$directory doesn't exist\n") unless (-d $directory);
             $self->{_workdir} = $directory;
 }	elsif ($PIPELINE_WORK_DIR)	{
