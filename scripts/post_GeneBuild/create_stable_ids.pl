@@ -11,11 +11,13 @@ my $dbhost;
 my $dbuser    = 'ensro';
 my $dbname;
 my $label;
-
+my $dbport = '3306' ;
 &GetOptions(
 	    'dbname:s'    => \$dbname,
 	    'dbhost:s'    => \$dbhost,
+            'dbport:i'    => \$dbport,
 	    'label:s'     => \$label,
+
 	   );
 
 unless ( $dbname && $dbhost && $label ){
@@ -28,9 +30,10 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-host'   => $dbhost,
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
+                                            '-port'   => $dbport,
 					   );
 
-print STDERR "connected to estdb $dbname : $dbhost\n";
+print STDERR "connected to databse  $dbname : $dbhost\n";
 
 my $gene_file        = "gene_stable_id";
 my $transcript_file  = "transcript_stable_id";
@@ -51,7 +54,7 @@ my %seen_exon;
 my %seen_transcript;
 
 my $gene_adaptor = $db->get_GeneAdaptor;
-foreach my $gene_id( @{$gene_adaptor->list_geneIds} ) {
+foreach my $gene_id( @{$gene_adaptor->list_dbIDs} ) {
   
   #print STDERR "gene id $gene_id\n";
   eval {
@@ -105,6 +108,9 @@ close TRANSCRIPT;
 close TRANSLATION;
 close GENE;
 
+
+print STDERR "Files gene_stable_id, transcript_stable_id, translation_stable_id , exon_stable_id written\n"; 
+ 
 sub make_stable_id{
   my ($label,$object) = @_;
   # $label is ENSestG, etc...
