@@ -267,14 +267,14 @@ sub filter_output{
     @{$matches_sorted_by_coverage{$rna_id}} = sort { $b->score <=> $a->score  } @{$matches{$rna_id}};
     
     my $max_score;
-    print STDERR "matches for $rna_id:\n";
+    print STDERR "matches for $rna_id: ".scalar(@{$matches_sorted_by_coverage{$rna_id}} )."\n";
     foreach my $match ( @{$matches_sorted_by_coverage{$rna_id}} ){
       unless ($max_score){
 	$max_score = $match->score;
       }
-      foreach my $sub_feat ( $match->sub_SeqFeature ){
-	  print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
-      }
+      #foreach my $sub_feat ( $match->sub_SeqFeature ){
+#  print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
+      #}
       my $score = $match->score;
       
       my $only_best_score      = 0;
@@ -327,9 +327,9 @@ sub write_output{
     
     #print STDERR "about to store gene ".$gene->type." $gene\n";
    
-    foreach my $tran (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-    }
+    #foreach my $tran (@{$gene->get_all_Transcripts}){
+    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+    #}
     eval{
       $gene_adaptor->store($gene);
     };
@@ -343,8 +343,8 @@ sub write_output{
     else{
       print STDERR "stored gene ".$gene->type." ".$gene->dbID."\n";
       foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence(   $transcript );
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence(   $transcript );
       }
     }
   }
