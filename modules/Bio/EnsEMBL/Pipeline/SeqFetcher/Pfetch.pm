@@ -43,7 +43,7 @@ use Bio::Root::RootI;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 use IO::Socket;
-
+use Carp;
 use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::RootI Bio::DB::RandomAccessI);
@@ -162,7 +162,7 @@ sub get_server {
 sub get_Seq_by_acc {
     my ( $self, @id_list ) = @_;
 
-    #confess "No names provided" unless @id_list;
+    #warn "No names provided" unless @id_list;
     unless (@id_list) {
         $self->throw("No accession input");
     }
@@ -281,6 +281,10 @@ sub write_descriptions {
     my @desc_line = $self->get_descriptions(@ids);
     my @lengths   = $self->get_lengths(@ids);
 
+    foreach my $desc (@desc_line) {
+        print $desc,"\n";
+    }
+    
     if ( scalar(@lengths) != scalar(@ids) ) {
         die qq{scalar(@ids) elements in id_list\t scalar(@lengths) elements in Lengths};
     }
@@ -331,7 +335,7 @@ sub write_descriptions {
         }
 
         # parse description from Swall
-        elsif ( $desc_line[$i] =~ /Desc:\s(.*)/ ) {
+        elsif ( $desc_line[$i] =~ /^\w+\s+\w+\s+(.*)/ ) {
 
             $desc = $1;
 
@@ -345,9 +349,9 @@ sub write_descriptions {
 
             # next decide whether this swall hit is Swissprot or Trembl.
             # logic in operation here is that only swall ids will 
-            # ever have a '_'. So grep fro '_' in ids leading up to 
+            # ever have a '_'. So grep for '_' in ids leading up to 
             # the descripton line.
-            my ($pre_desc) = $desc_line[$i] =~ /(^.*)\sDesc:/;
+            my ($pre_desc) = $desc_line[$i] =~ /^(\w+\s+\w+)\s+.*/;
             my $hit_db_prefix;
             if ( grep /_/, $pre_desc ) {
 
@@ -361,7 +365,7 @@ sub write_descriptions {
             }
 
             my $l = $lengths[$i];
-
+            print qq{$hid, $hit_db_prefix, $l, $desc\n};
             $sth->execute( $hid, $hit_db_prefix, $l, $desc );
             next;
         }
@@ -371,3 +375,6 @@ sub write_descriptions {
 }
 
 1;
+
+
+
