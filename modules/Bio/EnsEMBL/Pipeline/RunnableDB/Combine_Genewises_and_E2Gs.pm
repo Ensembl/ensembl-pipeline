@@ -216,7 +216,8 @@ sub run {
 			    
 			  } @merged_gw_genes;
   
-  		   
+  print STDERR "now have " . scalar(@merged_gw_genes) . " merged genes\n";
+		   
   # keep track of the e2g genes that have been used already
   my %used_e2g;
   
@@ -231,6 +232,7 @@ sub run {
     
     if($gw_exons[$#gw_exons]->strand != $strand){
       $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
+      $self->unmatched_genewise_genes($gw);
       next GENEWISE;
     }
     
@@ -245,7 +247,12 @@ sub run {
     # not yet in use
     ##############################
     
-    next GENEWISE unless( @matching_e2gs );
+    if(!@matching_e2gs){
+      # store non matched genewise
+      print STDERR "no matching cDNA for " . $gw->dbID ."\n";
+      $self->unmatched_genewise_genes($gw);      
+      next GENEWISE;
+  }
     
     # from the matching ones, take the best fit
     
@@ -306,6 +313,8 @@ sub run {
       if ( ($count - 1) == $howmany && $howmany != 0 ){
 	print STDERR "(all matching cdnas were already used)\n";
       }
+
+      $self->unmatched_genewise_genes($gw);
       next GENEWISE;
     }
     
@@ -319,9 +328,12 @@ sub run {
     
     my $combined_transcript = $self->combine_genes($gw, $e2g_match);
     if ( $combined_transcript ){
+      $combined_transcript = $self->_transfer_evidence($combined_transcript, $e2g_match);
       $self->make_gene($combined_transcript);
     }
     else{
+      print STDERR "no combined gene built from " . $gw->dbID ."\n";
+      $self->unmatched_genewise_genes($gw);
       next GENEWISE;
     }
   }
@@ -336,7 +348,7 @@ sub run {
 =head2
 
   Description: This method checks the cdnas.             
-               ( see Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_check_transcript() for more details )
+               ( see Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_check_transcript() and _check_introns for more details )
 ImportantNote: translation is not checked as these cdnas come without translation
    Arg       : a Bio::EnsEMBL::Gene array
    Return    : a Bio::EnsEMBL::Gene array
@@ -354,8 +366,11 @@ sub _filter_cdnas{
   cDNA_TRANSCRIPT:
     foreach my $tran (@{$e2g->get_all_Transcripts}) {
       
-      next cDNA_TRANSCRIPT unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran,$self->query) );
-      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+      # rejecting on basis of intron length may not be valid here - it may not be that simple in the same way as it isn;t that simple in Targetted & Similarity builds
+
+      next cDNA_TRANSCRIPT unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran,$self->query) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($tran,$self->query));
+
+#      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
       push(@newe2g,$e2g);
     }
   }
@@ -722,9 +737,9 @@ sub _merge_gw_genes {
     ### we follow here 5' -> 3' orientation ###
     $trans[0]->sort;
    
-    print STDERR "checking for merge: ".$trans[0]->dbID."\n";
-    print STDERR "translation:\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans[0]);
+    #print STDERR "checking for merge: ".$trans[0]->dbID."\n";
+    #print STDERR "translation:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans[0]);
 
     my $cloned_translation = new Bio::EnsEMBL::Translation;
     
@@ -822,14 +837,17 @@ sub _merge_gw_genes {
     $merged_transcript->sort;
     $merged_transcript->translation($cloned_translation);
     
-    print STDERR "merged_transcript:\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
+    #print STDERR "merged_transcript:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
 
     # and gene
     $gene->add_Transcript($merged_transcript);
     push(@merged, $gene);
     $count++;
-  }
+
+    # store match between merged and original gene so we can easily retrieve the latter if we need to
+    $self->merged_unmerged_pairs($gene,$gwg);
+  } # end GW_GENE
   
   return @merged;
 }
@@ -1773,7 +1791,8 @@ sub remap_genes {
   my $contig = $self->query;
   
   my @genes = $self->combined_genes;
-  
+  push(@genes, $self->unmatched_genewise_genes);
+
   my $genecount = 0;
  GENE:  
   foreach my $gene (@genes) {
@@ -1792,11 +1811,11 @@ sub remap_genes {
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
       $transcount++;
       $transcript->type( $genecount."_".$transcount );
+      $transcript = Bio::EnsEMBL::Tools::TranscriptUtils->set_stop_codon($transcript);
       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
     }
-    #my $newgene;
+
     eval {
-      #$newgene = $gene->transform;
       $gene->transform;	
     };
     
@@ -1962,6 +1981,35 @@ sub _recalculate_translation{
 }
 
 ############################################################
+
+=head2 _transfer_evidence
+
+  
+ Arg[1]: reference to Bio::EnsEMBL::Transcript $combined_transcript
+ Arg[2]: reference to Bio::EnsEMBL::Transcript $cdna_transcript
+ Return: Bio::EnsEMBL::Transcript
+ Description: transfers cdna evidence to combined transcript
+           
+=cut 
+
+sub _transfer_evidence {
+  my ($self, $combined_transcript, $cdna_transcript) = @_;
+  foreach my $combined_exon(@{$combined_transcript->get_all_Exons}){
+    foreach my $cdna_exon(@{$cdna_transcript->get_all_Exons}){
+      # exact match or overlap? Be strict for now; later will need to recalculate feature boundaries etc
+      if($combined_exon->start == $cdna_exon->start &&
+         $combined_exon->end == $cdna_exon->end &&
+         $combined_exon->strand == $cdna_exon->strand){
+         print STDERR "exact match " . $combined_exon->dbID . " with " . $cdna_exon->dbID . "; transferring evidence\n";
+         Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
+      }
+    }
+  }
+  return $combined_transcript;
+}
+
+
+############################################################
 #
 # GET/SET METHODS
 #
@@ -2028,6 +2076,46 @@ sub combined_genes {
   }
   
   return @{$self->{'_combined_genes'}};
+}
+
+############################################################
+
+# Function: get/set for unmatched genewise gene array
+
+sub unmatched_genewise_genes {
+  my ($self, @genes) = @_;
+  
+  if (!defined($self->{'_unmatched_genewise_genes'})) {
+    $self->{'_unmatched_genewise_genes'} = [];
+  }
+
+  # we need to store the unmerged version of the genewise gene  
+  my %pairs = %{$self->merged_unmerged_pairs()};
+  foreach my $merged(@genes){
+    my $unmerged = $pairs{$merged};    
+    push(@{$self->{'_unmatched_genewise_genes'}},$unmerged);
+  }
+  
+  return @{$self->{'_unmatched_genewise_genes'}};
+}
+
+############################################################
+
+# Function: get/set for pairs of merged and unmerged genewise genes
+# key is merged gene, value is unmerged
+sub merged_unmerged_pairs {
+  my ($self, $merged_gene, $unmerged_gene) = @_;
+  
+  if (!defined($self->{'_merged_unmerged_pairs'})) {
+    $self->{'_merged_unmerged_pairs'} = {};
+  }
+  
+  if ($unmerged_gene && $merged_gene) {
+    $self->{'_merged_unmerged_pairs'}{$merged_gene}= $unmerged_gene;
+  }
+  
+  # hash ref
+  return $self->{'_merged_unmerged_pairs'};
 }
 
 ############################################################
