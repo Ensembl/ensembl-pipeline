@@ -7,7 +7,7 @@
 =head1 SYNOPSIS
  
   check_node.pl
-  Checks to make sure the estfile and input_id file (if it does not look like chrname.start-end))
+  Checks to make sure the estfile and input_id file (if it does not look like chr_name.start-end))
   can be found.
   Intended to be run as the -E command in a bsub
 

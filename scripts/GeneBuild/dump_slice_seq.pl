@@ -13,7 +13,7 @@
   Dumps the sequence of a virtual contig to file, masked or unmasked.
   db and dnadb can be the same or different databases - just make sure all the relevant arguments are passed in.
   The user for each db can (and probably should) be read-only.
-  Specify chrname, start and end.
+  Specify chr_name, start and end.
 
 =head1 OPTIONS
 
@@ -24,7 +24,7 @@
   -path
   -start
   -end
-  -chrname
+  -chr_name
   -out
   -path
   -masked
@@ -46,7 +46,7 @@ my $path       = 'briggsae_170602';
 my $start;
 my $end;
 my $outfile    = 'out.fa';
-my $chrname    = '';
+my $chr_name    = '';
 my $masked     = 0;
 
 &GetOptions( 
@@ -55,7 +55,7 @@ my $masked     = 0;
 	    'dnadbname:s'  => \$dnadbname,
 	    'dnadbhost:s'  => \$dnadbhost,
 	    'outfile:s'    => \$outfile,
-	    'chrname:s'    => \$chrname,
+	    'chrname:s'    => \$chr_name,
 	    'path:s'       => \$path,
 	    'start:i'      => \$start,
 	    'end:i'        => \$end,
@@ -67,7 +67,7 @@ if(!defined $dbname    ||
    !defined $dnadbname ||
    !defined $dbhost    ||
    !defined $dnadbhost ||
-   !defined $chrname   ||
+   !defined $chr_name   ||
    !defined $start     ||
    !defined $end       ||
    !defined $path    
@@ -94,15 +94,15 @@ $db->static_golden_path_type($path);
 
 my $sgpa = $db->get_StaticGoldenPathAdaptor;
 
-print STDERR "about to fetch $chrname $start $end\n";
+print STDERR "about to fetch $chr_name $start $end\n";
 
-print "fetching virtual contig for ".$chrname." ".$start." ".$end."\n";
-my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
+print "fetching virtual contig for ".$chr_name." ".$start." ".$end."\n";
+my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chr_name,$start,$end);
 
 
 my $seqout = Bio::SeqIO->new( '-format' => 'fasta',
                               '-file'   => ">>$outfile");
-my $did = $chrname . "." . $start . "-" . $end;
+my $did = $chr_name . "." . $start . "-" . $end;
 if($masked){
   print STDERR "about to get repeatmasked sequence\n";
   my $rmseq = $vc->get_repeatmasked_seq;
@@ -113,7 +113,7 @@ if($masked){
 }
 
 else {
-#  my $did = $chrname . "." . $start . "-" . $end;
+#  my $did = $chr_name . "." . $start . "-" . $end;
   $vc->display_id($did);
   print STDERR "about to write sequence to $outfile\n";
   $seqout->write_seq($vc);

@@ -173,29 +173,29 @@ sub fetch_input{
   my ($self,@args) = @_;
   
   my $entry = $self->input_id;
-  my $chrname;
+  my $chr_name;
   my $start;
   my $end;
   
-  # input format: chrname.start-end
+  # input format: chr_name.start-end
   if(!($entry =~ /(.*)\.(.*)\-(.*)/)) {
     $self->throw("Not a valid input id... $entry");
   }
-  $chrname    = $1;
+  $chr_name    = $1;
   $start   = $2 - 10000;
   $end     = $3 + 10000;
   print STDERR "To compensante for the last run of TargettedGeneWise we add 10000b on either side!\n";
-  print STDERR "Chromosome id : $chrname\n";
+  print STDERR "Chromosome id : $chr_name\n";
   print STDERR "Range         : $start - $end\n";  
   
   # genewises
   my $sliceA = $self->genewise_db->get_SliceAdaptor();
-  my $vc = $sliceA->fetch_by_chr_start_end($chrname,$start,$end);
+  my $vc = $sliceA->fetch_by_chr_start_end($chr_name,$start,$end);
   $self->vcontig($vc);
   
   # cdna
   $sliceA = $self->cdna_db->get_SliceAdaptor();
-  my $cdna_vc = $sliceA->fetch_by_chr_start_end($chrname,$start,$end);
+  my $cdna_vc = $sliceA->fetch_by_chr_start_end($chr_name,$start,$end);
   $self->cdna_vc($cdna_vc);
   
 }

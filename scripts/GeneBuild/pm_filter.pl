@@ -28,7 +28,7 @@ BEGIN {
   with other scripts and should be set in GeneConf.pm
 
   pm_filter.pl should be run once for each chromosome. The results are written out to 
-  chrname.pm.dat in the GB_PM_OUTPUT directory specified in GeneConf.pm
+  chr_name.pm.dat in the GB_PM_OUTPUT directory specified in GeneConf.pm
 
   The script analyses the whole chromosome by running pmatch for the protein data 
   against each fpc contig file in turn, and then combining the results to find 
@@ -92,14 +92,14 @@ my $pmatch   = $GB_PMATCH;
 my $tmpdir   = $GB_TMPDIR;
 my $check    = 0;
 my $outfile;
-my $chrname;
+my $chr_name;
 my $run_pmatch = 1; # 1 to run pmatch, 0 if pmatch already run
 my $pmatchfile; # can provide a pmatch results file - will be sorted by both protein id and chr_start
                 # gets ignored if run_pmatch is set
 
 &GetOptions( 
 	    'check'         => \$check,
-	    'chr:s'         => \$chrname,
+	    'chr:s'         => \$chr_name,
 	    'protfile:s'    => \$protfile,
 	    'run_pmatch'    => \$run_pmatch,
 	    'pmatchfile:s'  => \$pmatchfile,
@@ -116,12 +116,12 @@ if(!defined($protfile) || !defined($fpcdir) || !defined($pmatch) ||
   exit (0);
 } 
 
-if(!defined($chrname)) {
+if(!defined($chr_name)) {
   print "You must specify a chromosome to be pmatched\n";
   exit (0);
 } 
 
-$outfile = "$chrname.pm.out";
+$outfile = "$chr_name.pm.out";
 if (defined ($outdir) && $outdir ne '') {
   $outfile = $outdir . "/" . $outfile;
 }
@@ -129,7 +129,7 @@ if (defined ($outdir) && $outdir ne '') {
 ### MAIN
 
 # get a listing of all the fpc contig files
-$fpcdir = $fpcdir . "/" . $chrname;
+$fpcdir = $fpcdir . "/" . $chr_name;
 my @dir = ($fpcdir);
 my @files;
 find sub { push(@files, $File::Find::name) unless -d  }, @dir;
@@ -148,7 +148,7 @@ foreach my $fpcfile(@files){
 
   if($run_pmatch){
     # generate pmatchfile
-    $pmatchfile = "/tmp/$chrname.pmatch";
+    $pmatchfile = "/tmp/$chr_name.pmatch";
     my $pmatch = $GB_PMATCH;
 
     # run pmatch -D

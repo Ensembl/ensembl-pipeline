@@ -163,7 +163,7 @@ sub make_targetted_runnables {
 
   my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->dbobj );
   
-  # pmatch_feature table was designed to use chrname, start & end but should 
+  # pmatch_feature table was designed to use chr_name, start & end but should 
   # work just as well with contigname, start & end
   my $contigname = $contig->id;
   my $start   = 1;

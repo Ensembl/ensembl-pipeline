@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
 Just runs Exonerate over a  chunk of dbEST and spits the output to STDOUT to be assessed later.
 File1 => all FeaturePairs produced by Exonerate
 
-Can run either over virtual contigs (chrname.start-end) or on a file containing genomic sequence(s)
+Can run either over virtual contigs (chr_name.start-end) or on a file containing genomic sequence(s)
 
 The running of this process is controlled by the scripts in ensembl-pipeline/scripts/EST
 
@@ -201,7 +201,7 @@ sub write_output {
     Title   :   fetch_input
     Usage   :   $self->fetch_input
     Function:   Fetches input data for ExonerateESTs and makes runnable. Input genomic data 
-                can either be a chromosomal range specified as chrname.start-end, or can be 
+                can either be a chromosomal range specified as chr_name.start-end, or can be 
                 the name of a file containing genomic sequence(s)
     Returns :   nothing
     Args    :   none

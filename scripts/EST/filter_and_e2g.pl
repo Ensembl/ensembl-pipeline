@@ -15,7 +15,7 @@
 
 =head1 OPTIONS
 
-  -input_id in form chrname.start-end
+  -input_id in form chr_name.start-end
   all other options set in ESTConf.pm
 
 =cut

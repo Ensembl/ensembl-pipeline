@@ -147,7 +147,7 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my $chrname;
+  my $chr_name;
   my $start;
   my $end;
   my $protein_id; 
@@ -159,7 +159,7 @@ sub fetch_input{
       $self->throw("Not a valid input id... $entry");
   }
   
-  $chrname    = $1;
+  $chr_name    = $1;
   $protein_id = $4;
   $start   = $2;
   $end     = $3;
@@ -188,7 +188,7 @@ sub fetch_input{
   my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
   my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
-  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$new_start,$new_end);
+  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chr_name,$new_start,$new_end);
   
   $self->vcontig($vcontig);
   $self->protein_id($protein_id);

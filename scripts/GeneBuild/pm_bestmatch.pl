@@ -148,13 +148,13 @@ print STDERR "finished reading\n";
 
  foreach my $hit($pmf2->output) {
   if($chromo_coords){
-    my ($chrname, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome(
+    my ($chr_name, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome(
 									 $hit->query, 
 									 $hit->qstart,
 									 $hit->qend
 									);
 
-    print OUT $chrname       . ":" . $chrstart      . "," . $chrend        . ":" . 
+    print OUT $chr_name       . ":" . $chrstart      . "," . $chrend        . ":" . 
 	      $hit->target   . ":" . $hit->coverage . "\n";
   }
   

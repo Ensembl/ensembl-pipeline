@@ -164,16 +164,16 @@ sub make_targetted_runnables {
 
   my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->dbobj );
   my $input_id = $self->input_id;
-  my $msg = "input_id $input_id has invalid format - expecting chrname.start-end";
+  my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
   $self->throw($msg) unless $input_id =~ /(\w+)\.(\d+)-(\d+)/;
   
-  my $chrname = $1;
+  my $chr_name = $1;
   my $start   = $2;
   my $end     = $3;
 
-print STDERR "fetching features for $chrname $start $end\n";
+print STDERR "fetching features for $chr_name $start $end\n";
 
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chrname, $start, $end)){
+  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
     my $input = $feat->chr_name   . ":" . 
                 $feat->start      . "," . 
                 $feat->end        . ":" . 

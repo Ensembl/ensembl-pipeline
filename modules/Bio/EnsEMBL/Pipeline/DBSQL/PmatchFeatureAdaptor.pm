@@ -188,10 +188,10 @@ sub get_PmatchFeatures_by_protein_id {
 =cut
 
 sub get_PmatchFeatures_by_chr_start_end {
-  my ($self, $chrname, $chrstart, $chrend) = @_;
+  my ($self, $chr_name, $chrstart, $chrend) = @_;
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
-              "AND pmf.chr_name = '$chrname' " .
+              "AND pmf.chr_name = '$chr_name' " .
 	      "AND pmf.start >= $chrstart " .
 	      "AND pmf.end <= $chrend ";
 

@@ -151,20 +151,20 @@ sub make_targetted_runnables {
   # take a note of those that fall across the ends of the vc? and do what, precisely?
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
-  #input_id cb25.fpc4118.1-298757 has invalid format - expecting chrname.start-end
+  #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
   my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->db );
   my $input_id = $self->input_id;
-  my $msg = "input_id $input_id has invalid format - expecting chrname.start-end";
+  my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
   $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
   
-  my $chrname = $1;
+  my $chr_name = $1;
   my $start   = $2;
   my $end     = $3;
 
-  #print STDERR "fetching features for $chrname $start $end\n";
-  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chrname, $start, $end);
+  #print STDERR "fetching features for $chr_name $start $end\n";
+  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end);
   #print STDERR "have ".@features." to run with\n";
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chrname, $start, $end)){
+  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
     
     my $input = $feat->chr_name   . ":" . 
                 $feat->start      . "," . 
