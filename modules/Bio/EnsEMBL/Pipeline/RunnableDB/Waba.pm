@@ -155,9 +155,9 @@ sub write_output {
     my $sth = $self->dbobj->prepare ( q{ INSERT INTO waba_feature
                                                   (id, contig, seq_start, seq_end,
                                                    score, strand, analysis, name,
-                                                   hstart, hend, hid, perc_id, state)
-					   VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-				    } );
+                                                   hstart, hend, hid, perc_id, state, cigar)
+					   VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				       } );
 
     my $sth_fset = $self->dbobj->prepare ( q{ INSERT INTO waba_fset
                                                           (id, contig, seq_start, seq_end,
@@ -170,11 +170,6 @@ sub write_output {
                                                                   (feature, fset, rank)
                                                            VALUES (?, ?, ?)
 					            } );
-
-    my $sth_waba = $self->dbobj->prepare ( q{ INSERT INTO gapped_align
-                                                          (id, featureId, coor, hcoor, length)
-                                                   VALUES ('NULL', ?, ?, ?, ?)
-                                            } );
 
     my $sth_last = $self->dbobj->prepare ( q{ SELECT last_insert_id() } );
 
@@ -216,26 +211,29 @@ sub write_output {
             $featurepair->feature1->validate_prot_feature;
             $featurepair->feature2->validate_prot_feature;
   
-            my @state_tags = $featurepair->feature1->each_tag_value ('state');
-            my $state = $state_tags[0];
-
+            my $state;
+            my $cigar;
+            if ($featurepair->feature1->has_tag ('state')) {
+                my @state_tags = $featurepair->feature1->each_tag_value ('state');
+                $state = $state_tags[0];
+	    }
+            else {
+                $self->throw ("Waba feature needs the state info");
+	    }
+            if ($featurepair->feature1->has_tag ('cigar')) {
+                my @cigar_tags = $featurepair->feature1->each_tag_value ('cigar');
+                $cigar = $cigar_tags[0];
+	    }
             $sth->execute ($internalId, $featurepair->start, $featurepair->end,
                            $featurepair->score, $featurepair->strand,
                            $analysisId, $self->analysis->program, 
                            $featurepair->hstart, $featurepair->hend, $featurepair->hseqname,
-                           $featurepair->percent_id, $state);
-        
+                           $featurepair->percent_id, $state, $cigar);
+
             $sth_last->execute;
             my $feature_id = ($sth_last->fetchrow_array)[0];
 
-            $sth_fset_feature->execute ($feature_id, $fset_id, ++$rank);
- 
-            my @waba_tags = $featurepair->feature1->each_tag_value ('align_coor');
-            my @waba_coor = @{$waba_tags[0]};
-
-            foreach my $ref (@waba_coor) {
-                $sth_waba->execute ($feature_id, $ref->[0], $ref->[1], $ref->[2]);
-   	    }
+            $sth_fset_feature->execute ($feature_id, $fset_id, ++$rank); 
         }
     }
     $sth->finish;
@@ -243,7 +241,6 @@ sub write_output {
     $sth_fset->finish;
     $sth_fset_feature->finish;
     $sth_last->finish;
-    $sth_waba->finish;
 }
 
 
