@@ -365,9 +365,11 @@ sub prune_Exons {
 }
 
 
-=head2 _validate_Gene
+=head2 validate_Gene
 
   Arg [1]   : Bio::EnsEMBL::Gene
+  Arg [2]   : Bio::EnsEMBL::Slice
+  Arg [3]   : int $single_transcript
   Function  : checks sanity of Gene coords
   Returntype: 1/0
   Exceptions: warns if things aren't valid and return 0'
@@ -376,8 +378,15 @@ sub prune_Exons {
 
 =cut
 
-sub _validate_gene{
-  my ($self, $gene, $slice) = @_;
+sub validate_Gene{
+  my ($self, $gene, $slice, $single_transcript) = @_;
+
+  if($single_transcript){
+    if(scalar(@{$gene->get_all_Transcripts}) != 1) {
+      $self->warn("Rejecting gene - should have one transcript, not " . scalar(@{$gene->get_all_Transcripts}) . "\n");
+      return 0;
+    }
+  }
 
   foreach my $transcript(@{$gene->get_all_Transcripts}){
     # validate transcript
@@ -386,7 +395,7 @@ sub _validate_gene{
       return 0;
     }    
     foreach my $exon(@{$transcript->get_all_Exons}){
-      if(!Bio::EnsEMBL::Pipeline::Tools::ExonUtils->validate_exon($exon)){
+      if(!Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exon)){
 	$self->warn("Rejecting gene because of invalid exon\n");
 	return 0;
       }
