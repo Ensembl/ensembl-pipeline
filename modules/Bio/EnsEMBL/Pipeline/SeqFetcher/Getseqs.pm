@@ -109,8 +109,7 @@ sub db {
     if (ref($dbs) eq 'ARRAY') {
       foreach my $db(@$dbs){
 	$self->throw("are you sure that $db has been formatted with makeindex?\n") 
-	  unless (-e "$db.jidx");
-	
+	  unless ( -e "$db.jidx");
 	push (@{$self->{'_db'}},$db);
       }
     }
@@ -146,7 +145,7 @@ sub  get_Seq_by_acc {
     my $database = pop(@seqdb);
 
     last SEQDB unless defined $database;
-    my $cmd = "$getseqs $acc $database";
+    my $cmd = "$getseqs '$acc' $database";
     
     open(IN,"$cmd 2>/dev/null |") or $self->throw("Error forking getseqs for accession [$acc]: getseqs");
     my $seqstr;
