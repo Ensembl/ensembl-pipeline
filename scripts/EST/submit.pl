@@ -8,7 +8,7 @@ while( <> ) {
   system("$input");
 #print "$input\n";
 
-    #system("sleep(1)");
+    system("sleep 1");
 }
 
 
