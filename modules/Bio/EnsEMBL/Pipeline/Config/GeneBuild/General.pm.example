@@ -49,7 +49,7 @@ use vars qw( %General );
 
 	    # This is a regexp for parsing input ids - eg
 	    # chrname.start-end would be matched by (\S+)\.(\d+)-(\d+)
-	    GB_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
+	    GB_INPUTID_REGEX => '(^\S+)\.(\d+)-(\d+)',
 
 	    # skip blastminigenewise stage? Only relevant for Contig_BMG
 	    GB_SKIP_BMG   =>  0,

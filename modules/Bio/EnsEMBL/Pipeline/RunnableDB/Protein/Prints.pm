@@ -62,6 +62,15 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 sub runnable {
   my ($self) = @_;
     
+
+  my $program = $self->analysis->program;
+ 
+  if($program !~ /\//){
+    my $name = $program;
+    my $full_path = $PA_IPRSCAN_DIR."/".$^O."/".$name;
+    print STDERR "have full path ".$full_path."\n";
+    $self->analysis->program($full_path);
+  } 
     if (!($self->{'_runnable'})) {
 	
 	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->query,

@@ -286,7 +286,7 @@ while (1) {
 	foreach my $analysis_id(@starts_from){
 	  my %ids;
 	  my $analysis = $ana_adaptor->fetch_by_dbID($analysis_id);
-	  my @ids = @{$sic->list_input_ids_by_analysis};
+	  my @ids = @{$sic->list_input_ids_by_analysis($analysis_id)};
 	  foreach my $id(@ids){
 	    $ids{$analysis->input_id_type}{$id} = 1;
 	  }

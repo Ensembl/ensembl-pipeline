@@ -48,6 +48,7 @@ use vars qw( %General );
 	    PA_PEPTIDE_FILE => '', #path to dumped peptides
 	    PA_CHUNKS_DIR => '', #path to directory chunks to be written
 	    PA_CHUNK_SIZE => 100,
+	    PA_IPRSCAN_DIR => '/acari/analysis/iprscan/bin',	
 	   );
 
 sub import {
