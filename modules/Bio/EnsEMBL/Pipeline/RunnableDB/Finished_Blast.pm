@@ -80,15 +80,13 @@ foreach my $db (@$DB_CONFIG) {
 
 sub fetch_input {
     my($self) = @_;
+    my $genseq;
    
     $self->throw("No input id") unless defined($self->input_id);
-    
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    print STDERR "INPUT ID: " . $self->input_id . "\n";
-    my $genseq;
-    if(@$PIPELINE_REPEAT_MASKING){
-        $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-    }
+    print STDERR "INPUT ID: " . $self->input_id . "\n";    
+
+    my $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING,$SOFT_MASKING) or $self->throw("Unable to fetch contig");
     $self->query($genseq || $contig);
     
     my $seq = $self->query->seq;
