@@ -952,7 +952,6 @@ sub _pair_Transcripts{
 	
 	print STDERR "not using the protein info\n";
 	if ( $canonical_splice_sites == 1 &&
-	if(
 	     ($one_exon_shared == 1 || $one_intron_shared == 1)
 	     #&& $similar_protein == 1
 	     && $exon_in_intron  == 1
