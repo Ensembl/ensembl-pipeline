@@ -1,0 +1,69 @@
+#!/usr/local/bin/perl
+
+$| = 1;
+
+use strict;
+use Getopt::Long;
+
+my $size = 2500000;
+my $dir  = "/nfs/acari/enspipe/out/genebuild/";
+my $infile;
+my $queue = "acari";
+
+&GetOptions('infile=s'   => \$infile,
+	    'queue:s'    => \$queue,
+	    'size=n'     => \$size,
+	    );
+
+
+
+my %chrhash = get_chr_lengths($infile,@ARGV);
+
+foreach my $chr (keys %chrhash) {
+    my $length = $chrhash{$chr};
+
+    my $count = 1;
+
+    while ($count < $length) {
+      my $start = $count;
+      my $end   = $count + $size -1;
+      
+      if ($end > $length) {
+	$end = $length;
+      }
+
+      my $input_id = $chr . "." . $start . "-" .  $end;
+
+      my $outfile  = $dir . $input_id . ".out";
+      my $errfile  = $dir . $input_id . ".err";
+
+
+      my $command  = "bsub -q $queue -o $outfile -e $errfile -E \"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl-pipeline/scripts/test_RunnableDB -check \"";
+      $command .= "  /nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl-pipeline/scripts/test_RunnableDB ";
+      $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder ";
+      $command .= " -input_id $input_id -write";
+
+      print "$command\n";
+
+      $count = $count + $size;
+	
+      print(STDERR "Creating job for $chr [$start-$end]\n");
+    }
+}
+
+sub get_chr_lengths {
+    my ($infile,@input) = @_;
+
+    my %hash;
+    
+    if (defined($infile)) {
+	open(IN,"<$infile");
+	while (<IN>) {
+	  chomp;
+	  my ($chr,$len) = split(' ',$_);
+	  $hash{$chr} = $len;
+	}
+      }
+
+    return %hash;
+}
