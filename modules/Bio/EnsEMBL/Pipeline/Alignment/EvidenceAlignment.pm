@@ -477,20 +477,20 @@ sub _align {
   my %evidence_sequence_hash;
 
   foreach my $evidence_sequence (@$evidence_sequences) {
-    # Note:  Purposely using the memory address for our evidence sequence objects
-    # as they don't necessarily have unique names.
+    # Note:  Purposely using the memory addresses as hash keys for evidence
+    # sequence objects as they don't necessarily have unique names.
 
     $evidence_sequence_hash{$evidence_sequence} = $evidence_sequence;
 
     while (my ($deletion_coord, $length) = each %{$evidence_sequence->deletion_hash}){
       $deletion_sets{$evidence_sequence}->{$deletion_coord} = $length;
 
-      $all_deletions{$deletion_coord} = $length 
+      $all_deletions{$deletion_coord} = $length
 	unless ((defined $all_deletions{$deletion_coord} &&
 		 $all_deletions{$deletion_coord} > $length));
 
-      push @{$deletion_tracking{$deletion_coord}}, 
-	[$length, $evidence_sequence->name]; 
+      push @{$deletion_tracking{$deletion_coord}},
+	[$length, $evidence_sequence->name];
     }
   }
 
@@ -516,6 +516,17 @@ sub _align {
 
       if (! $deletion_sets{$evidence_name}->{$deletion_coord}) {
 	$evidence_sequence_hash{$evidence_name}->insert_gap($deletion_coord, $length)
+      } elsif (defined $deletion_sets{$evidence_name}->{$deletion_coord} && 
+	       $deletion_sets{$evidence_name}->{$deletion_coord} < $length){
+
+	my $insert_coord = 
+	  $deletion_coord + $deletion_sets{$evidence_name}->{$deletion_coord};
+
+	my $deletion_length_difference = 
+	  $length - $deletion_sets{$evidence_name}->{$deletion_coord};
+
+	$evidence_sequence_hash{$evidence_name}->insert_gap($insert_coord,
+							    $deletion_length_difference)
       }
     }
 
@@ -568,10 +579,10 @@ sub _align {
     }
     %deletion_tracking = %new_deletion_tracking;
   }
-
+### Used by Dan for conserved indel finding project.  Please leave.
   # Print the locations of our deletions, handy for finding conserved gaps and
   # frameshifts
-
+#
 #  foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
 #    print STDOUT $tracked_deletion . "\t" . 
 #      scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
@@ -580,7 +591,7 @@ sub _align {
 #    }
 #    print STDOUT "\n";
 #  }
-
+###
   # Put our working alignments somewhere handy
 
   $self->_working_alignment('genomic_sequence', $self->_genomic_sequence);
@@ -1932,6 +1943,7 @@ sub _print_tabulated_coordinates {
   print STDERR 
     "Evidence : total features - " . @$supporting_features . "\n";
   foreach my $feature (@$supporting_features){
+
     print STDERR
     "           Feature : " . $feature->hseqname . "\n" .
     "                     (start)  "  . $feature->start . "\t(end)  " . 
@@ -2072,55 +2084,53 @@ sub _exon_protein_translation {
 
     foreach my $exon (@{$self->_transcript->get_all_Exons}){
 
+      # Worry about parts of the exon that dont translate,
+      # but only if they are in the final exon.
+      my $end_exon = 0;
+      if ($exon == $self->_transcript->end_Exon) {
+	$end_exon = 1;
+      }
+
       # Derive a translation of this exon peptide.
 
-      my $peptide_obj = $exon->peptide($self->_transcript);
-      my $peptide = $peptide_obj->seq;
+      my $seq     = $exon->peptide($self->_transcript);
+      my $peptide = $seq->seq;
 
       $peptide =~ s/(.)/$1\-\-/g;
 
-      # Whack off the first residue if it is only a partial 
-      # codon.  The internal rule applied is :
-      #   - include a whole residue for partial codons at ends
-      #       of exons
-      #   - ignore/remove residues from partial codons at 
-      #       starts of exons)
-      # By doing this, a complete undeleted/unrepeated sequence 
-      # is displayed in the alignment.
 
-      if ($exon->phase == 2){ 
-	$peptide = substr($peptide, 2, length($peptide) - 2);
+      # Worry about exon phases for a bit.  Make sure characters
+      # from different exons are not included in this exon.
+
+        # Remove preceeding characters belonging to the previous exon.
+
+      if ($exon->phase == 2){
+	$peptide = substr($peptide, 1);
+
+      } elsif ($exon->phase == 1){
+	$peptide = substr($peptide, 2);
       }
 
-      if ($exon->phase == 1){
-	$peptide = substr($peptide, 1, length($peptide) - 1);
+        # Remove trailing characters that dont belong in this exon.
+
+      if ($exon->end_phase == 2){
+	$peptide = substr($peptide, 0, length($peptide) - 1);
+
+      } elsif ($exon->end_phase == 1){
+	$peptide = substr($peptide, 0, length($peptide) - 2);
       }
 
-      # Darstardly, hidden in here is the coordinate shuffle
-      # to turn reverse strand genes around (the protein sequence
-      # is of course in the forward direction already, just the 
-      # coordinates need to be reversed).
+      # Determining where to stick our peptide.
 
-      my $exon_start     = $exon->start;
-      my $exon_end       = $exon->end;
-      my $exon_length    = $exon_end - $exon_start;
-      my $exon_phase     = $exon->phase;
-      my $exon_end_phase = $exon->end_phase;
+        # This odd method calculates the starting point of the 
+        # coding portion of the exon.  Need to work from the end
+        # as there is no other easy way to know where translation 
+        # actually begins.
+      my $peptide_genomic_start = $exon->end - length($peptide) + 1;
 
-      # Jiggling the exons about to get frame right
-      my $extra_length = 0;
-
-      $extra_length += 3 if (($exon_end_phase != 0) && ($exon_end_phase != -1));
-      $extra_length -= 2 if $exon_end_phase == 2;
-      $extra_length -= 1 if $exon_end_phase == 1;
-
-      my $peptide_genomic_start;
-
-      if ($exon_end_phase != -1) {
-	$peptide_genomic_start = $exon_end - length($peptide) + $extra_length + 1 - 1;
-
-      } else {
-	$peptide_genomic_start = $exon_start - 1;
+      if ($end_exon) {
+	my $start_offset = $exon->phase ? 3 - $exon->phase : 0;
+	$peptide_genomic_start = $exon->start - $start_offset;
       }
 
       push @exon_list, [$peptide_genomic_start, $peptide];
@@ -2131,23 +2141,20 @@ sub _exon_protein_translation {
     # genomic context.
 
     my $exon_translation_string = '';
-    my $gap_start = 1;
 
     foreach my $exon_item (@exon_list){
       my $genomic_start = $exon_item->[0];
       my $peptide_seq   = $exon_item->[1];
 
-      my $gap_length = $genomic_start - $gap_start + 1;
+      my $gap_length = $genomic_start - 1 - length($exon_translation_string);
 
       $exon_translation_string .= ('-' x $gap_length) . $peptide_seq;
-
-      $gap_start += $gap_length + length($peptide_seq);
     }
 
       # Add last gap.
 
-    my $last_gap_length = $self->_slice->length - $gap_start;
-    $exon_translation_string .= ('-' x ($last_gap_length + 1));
+    my $last_gap_length = $self->_slice->length - length($exon_translation_string);
+    $exon_translation_string .= ('-' x $last_gap_length);
 
     # Convert to three letter AA names, if desired.
 
