@@ -109,10 +109,20 @@ use vars qw( %ESTConf );
 	    EST_REFDBNAME               => '',
 	    EST_REFDBUSER               => '',
 	    EST_REFDBPASS               => '',
+
 	    EST_DBNAME                  => '',
 	    EST_DBHOST                  => '',
 	    EST_DBUSER                  => '',
 	    EST_DBPASS                  => '',
+
+	    # you can also choose to use cdnas for est_genebuilder
+	    # this is to read them from a different database:
+	    USE_cDNA_DB                  => '',  # set it to a def/undef value if you do/don't want to use it
+	    
+	    cDNA_DBNAME                  => '',
+	    cDNA_DBHOST                  => '',
+	    cDNA_DBUSER                  => '',
+	    cDNA_DBPASS                  => '',
 	   );
 
 sub import {
