@@ -47,17 +47,25 @@ use vars qw( %GeneCompConf );
 
 # Hash containing config info
 %GeneCompConf = (
-		 DBHOST1    => "ecs1f",
-	         DBNAME1    => "mouse_Sanger_Nov01_denormalised",
-		 PATH1      => "CHR",    
-		 DBUSER1    => "ensro",
-		 GENETYPES1 => ["ensembl"],
 		 
-		 DBHOST2    => 'ecs1b',                    
-		 DBNAME2    => 'mouse_Sanger_Nov01_est',
-		 PATH2      => 'CHR',
-		 DBUSER2      => 'ensro',
-		 GENETYPES2 => ["genomewise"], 
+		 # database with the annotation/benchmark genes to compare to
+		 DBHOST1    => "",
+	         DBNAME1    => "",
+		 PATH1      => "",    
+		 DBUSER1    => "",
+
+		 # genetypes is an arrayref so that we can include more than one type
+		 GENETYPES1 => [""],
+		 
+
+		 # database with the prediction/test genes to compare with the annotation/benchmark
+		 DBHOST2    => "",                    
+		 DBNAME2    => "",
+		 PATH2      => "",
+		 DBUSER2    => "",
+		 
+		 # genetypes is an arrayref so that we can include more than one type
+		 GENETYPES2 => [""], 
 	     
 );
 

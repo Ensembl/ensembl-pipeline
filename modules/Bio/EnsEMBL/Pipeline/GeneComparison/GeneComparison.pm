@@ -1,4 +1,4 @@
-=head1 NAME - Bio::EnsEMBL::Utils::GeneComparison
+=head1 NAME - Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison
 
 =head1 DESCRIPTION
 
@@ -14,7 +14,7 @@ the gene types present in those both gene arrays.
 
 =head1 SYNOPSIS
 
-  my $gene_comparison = Bio::EnsEMBL::Utils::GeneComparison->new(\@genes1,\@genes2);
+  my $gene_comparison = Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(\@genes1,\@genes2);
 
   my @clusters = $gene_comparison->cluster_Genes;
 
@@ -128,7 +128,7 @@ sub new {
     }
   }
   else{
-    $self->throw( "Can't create a Bio::EnsEMBL::Utils::GeneComparison object without passing in two gene arrayref");
+    $self->throw( "Can't create a Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison object without passing in two gene arrayref");
   }
   if ( scalar( @{ $gene_array1 } ) == 0 || scalar( @{ $gene_array2 } ) == 0 ){
     $self->throw( "At least one of the lists of genes to compare is empty. Cannot create a GeneComparison object");
@@ -224,7 +224,7 @@ sub cluster_Genes {
 #      $cluster_count++;
 #    }
 #    if ($found==0){
-#      my $new_cluster=Bio::EnsEMBL::Utils::GeneCluster->new();   # create a GeneCluser object
+#      my $new_cluster=Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();   # create a GeneCluser object
 #      print STDERR "put in new cluster [".$new_cluster_count."]\n";
 #      $new_cluster_count++;
 #      $new_cluster->gene_Types($self->gene_Types);
@@ -256,7 +256,7 @@ sub cluster_Genes {
   #### only checks the current cluster and sometimes
 
   # create a new cluster 
-  my $cluster=Bio::EnsEMBL::Utils::GeneCluster->new();
+  my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
   my $cluster_count = 1;
   my @clusters;
 
@@ -300,7 +300,7 @@ sub cluster_Genes {
       }
     }
     if ($found==0){  # if not-clustered create a new GeneCluser
-      $cluster = new Bio::EnsEMBL::Utils::GeneCluster; 
+      $cluster = new Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster; 
       $cluster->gene_Types($types1,$types2);
       $cluster->put_Genes( $sorted_genes[$c] );
       $cluster_count++;
@@ -376,7 +376,7 @@ sub pair_Genes {
 
   foreach my $gene (@genes2){
     # create a GeneCluser object
-    my $cluster=Bio::EnsEMBL::Utils::GeneCluster->new();
+    my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
     my ($type1,$type2) = $self->gene_Types;
     $cluster->gene_Types($type1,$type2);
     $cluster->put($gene);
@@ -396,7 +396,7 @@ sub pair_Genes {
     }
     #### an arbitary cluster containing the set of predicted genes that do not overlap with any from the 
     #### benchmark set
-    my $unclustered = new Bio::EnsEMBL::Utils::GeneCluster;
+    my $unclustered = new Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
     $unclustered->gene_Types($self->gene_Types);
     $unclustered->put_Genes($gene);  # NOTE: this holds unclustered predicted genes, but does not
                                      # know about unpaired benchmark genes
@@ -532,8 +532,18 @@ sub cluster_Transcripts {
 	$seqname = $exon->seqname;
       }
       unless ($seqname eq $exon->seqname){
-	$self->warn("transcript ".$transcript->stable_id." (".$transcript->dbID.") is partly".
-		    " outside the contig");
+	my $label;
+	if ($transcript->stable_id){
+	  $label = $transcript->stable_id;
+	}
+	elsif ( $transcript->dbID ){
+	  $label = $transcript->dbID;
+	}
+	else{
+	  $label = "unknown";
+	}
+	
+	$self->warn("transcript (ID: ".$label.") is partly outside the contig");
 	last;
       }
     }
@@ -555,7 +565,7 @@ sub cluster_Transcripts {
   my @clusters;
 
   # create a new cluster 
-  my $cluster=Bio::EnsEMBL::Utils::TranscriptCluster->new();
+  my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
   my $cluster_count = 1;
 
   # put the first transcript into these cluster
@@ -599,7 +609,7 @@ sub cluster_Transcripts {
     }
     # if not-clustered create a new TranscriptCluser
     if ($found==0){  
-      $cluster = new Bio::EnsEMBL::Utils::TranscriptCluster; 
+      $cluster = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster; 
       $cluster->put_Transcripts( $sorted_transcripts[$c] );
       $cluster_count++;
       push( @clusters, $cluster );
@@ -665,9 +675,9 @@ sub compare_CDS{
             Setting the flag 'coding' in the arguments we can compare the CDSs
   
   Example : look in ...ensembl/misc-scripts/utilities/run_GeneComparison for a pipeline-like example
-  Returns : a hash with the arrays of transcript pairs (each pair being a Bio::EnsEMBL::Utils::TranscriptCluster)
+  Returns : a hash with the arrays of transcript pairs (each pair being a Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster)
             as values, and the number of missing exons as keys, useful to make a histogram
-  Args    : an arrayref of Bio::EnsEMBL::Utils::GeneCluster objects 
+  Args    : an arrayref of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster objects 
 
 =cut
   
@@ -700,10 +710,10 @@ sub compare_Exons{
   my $total_specificity        = 0;
 
   if ( !defined( $clusters ) ){
-    $self->throw( "Must pass an arrayref of Bio::EnsEMBL::Utils::GeneCluster objects");
+    $self->throw( "Must pass an arrayref of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster objects");
   } 
-  if ( !$$clusters[0]->isa( 'Bio::EnsEMBL::Utils::GeneCluster' ) ){
-    $self->throw( "Can't process a [$$clusters[0]], you must pass a Bio::EnsEMBL::Utils::GeneCluster" );
+  if ( !$$clusters[0]->isa( 'Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster' ) ){
+    $self->throw( "Can't process a [$$clusters[0]], you must pass a Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster" );
   }
   
   # warn about the comparison that is about to happen
@@ -1656,7 +1666,7 @@ sub get_unmatched_Genes {
   my @unmatched1;
   foreach my $gene1 ( @{ $self->{'_gene_array1'} } ){
     unless ( $found1{$gene1->stable_id} ){
-      my $new_cluster = Bio::EnsEMBL::Utils::GeneCluster->new();
+      my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
       $new_cluster->gene_Types($self->gene_Types);
       $new_cluster->put_Genes($gene1);
       push (@unmatched1, $new_cluster);
@@ -1665,7 +1675,7 @@ sub get_unmatched_Genes {
   my @unmatched2;
   foreach my $gene2 ( @{ $self->{'_gene_array2'} } ){
     unless ( $found2{$gene2->stable_id} ){
-      my $new_cluster = Bio::EnsEMBL::Utils::GeneCluster->new();
+      my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
       $new_cluster->gene_Types($self->gene_Types);
       $new_cluster->put_Genes($gene2);
       push (@unmatched2, $new_cluster);
@@ -1792,8 +1802,8 @@ sub _compare_Transcripts {
 
  Title  : unclustered_Genes()
  Usage  : This function stores and returns an array of GeneClusters with only one gene (unclustered) 
- Args   : a Bio::EnsEMBL::Utils::GeneCluster object
- Returns: an array of Bio::EnsEMBL::Utils::GeneCluster objects
+ Args   : a Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster object
+ Returns: an array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster objects
 
 =cut
 
@@ -1802,8 +1812,8 @@ sub unclustered_Genes{
  
     if (@unclustered)
     {
-       $self->throw("Input @unclustered is not a Bio::EnsEMBL::Utils::GeneCluster\n")
-       unless $unclustered[0]->isa('Bio::EnsEMBL::Utils::GeneCluster');
+       $self->throw("Input @unclustered is not a Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster\n")
+       unless $unclustered[0]->isa('Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster');
 
         push ( @{ $self->{'_unclustered_genes'} }, @unclustered);
     }

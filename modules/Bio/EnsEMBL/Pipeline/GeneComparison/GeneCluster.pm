@@ -214,7 +214,7 @@ sub gene_Types {
             in two different pairs. 
   Example : look for instance in the method find_missing_Exons
   Returns : three arrayrefs =  
-            1.- a list of Bio::EnsEMBL::Utils::Transcripts, each holding a pair of transcripts, 
+            1.- a list of Bio::EnsEMBL::Pipeline::GeneComparison::Transcripts, each holding a pair of transcripts, 
             2.- a list with the unpaired transcripts, and 
             3.- a list those transcripts which have been paired up twice or more
   Args    : nothing
@@ -259,7 +259,7 @@ sub pair_Transcripts {
 
   my %seen1;           # these keep track of those transcript linked and with how much overlap
   my %seen2;           # ditto, for @transcripts2
-  my @pairs;           # list of (Bio::EnsEMBL::Utils::TranscriptCluster) transcript-pairs being created 
+  my @pairs;           # list of (Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster) transcript-pairs being created 
   my @unpaired;        # list of Bio::EnsEMBL::Transcript which are left unpaired
   my @doubled;         # those which have been paired up twice
   my $overlap_matrix;  # matrix holding the number of exon overaps for each pair of transcripts
@@ -359,7 +359,7 @@ sub pair_Transcripts {
     foreach my $tran1 ( @transcripts1 ){
       foreach my $tran2 ( @transcripts2 ){
 	if ( $$link{ $tran1 }{ $tran2} && $$link{ $tran1 }{ $tran2 } == 1 ){
-	  my $pair = Bio::EnsEMBL::Utils::TranscriptCluster->new();
+	  my $pair = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
 	  $pair->put_Transcripts( $tran1, $tran2 );
 	  push( @pairs, $pair );
 	}
