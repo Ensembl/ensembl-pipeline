@@ -40,26 +40,10 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blastz;
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::DnaDnaAlignFeature;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-sub new {
-  my ($class, @args) = @_;
-
-  my $self = $class->SUPER::new(@args);  
-
-  if(!defined $self->seqfetcher) {
-    # will look for pfetch in $PATH - change this once PipeConf up to date
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-    $self->seqfetcher($seqfetcher);
-  }  
-  
-  return $self; 
-}
 
 =head2 fetch_input
 
@@ -87,7 +71,7 @@ sub fetch_input {
     $contig = $self->db->get_RawContigAdaptor->fetch_by_name($input_id);
   }
 
-  $self->slice($contig);
+  $self->query($contig);
 
   # if repeatmasking required, always soft mask for blastz
   my $genseq = (@$PIPELINE_REPEAT_MASKING) 
@@ -97,7 +81,7 @@ sub fetch_input {
   my @db;
 
   my $executable =  $self->analysis->program_file;
-  $executable = "$BINDIR/blastz" if not $executable;
+  $executable = "$BIN_DIR/blastz" if not $executable;
 
   my $database = $self->analysis->db;
   $self->throw("RunnableDB/Blastz error: you must define a database in your analysis") if not $database;
@@ -146,24 +130,7 @@ sub run {
 
 }
 
-=head2 slice
 
-    Title   :   slice
-    Usage   :   $self->slice($slice)
-    Function:   Get/Set the underlying sequence for this analysis
-    Returns :   
-    Args    :   
-
-=cut
-
-sub slice {
-  my ($self,$slice) = @_;
-
-  if (defined($slice)) {
-    $self->{_slice} = $slice;
-  }
-  return $self->{_slice};
-}
 
 =head2 write_output
 
