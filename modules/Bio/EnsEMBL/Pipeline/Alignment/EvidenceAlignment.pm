@@ -15,37 +15,59 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
  
 =head1 SYNOPSIS
 
-# If you just want the alignment of an ensembl transcript with
-# the evidence used to predict it:
+# Quick start - use the following code if you want the 
+# alignment of an ensembl transcript with the evidence 
+# used to predict it:
 
 my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
 			   '-seqfetcher'        => $seqfetcher,
 			   '-transcript'        => $transcript);
 
-my $alignment = $alignment_tool->retrieve_alignment('all');  
-                             # Or just 'nucleotide' or 'protein'
+my $alignment = $alignment_tool->retrieve_alignment('-type' => 'all');  
+                             # Type can be 'all', 'nucleotide' or 'protein'
 
 foreach my $align_seq (@$alignment){
   print $sequence->seq . "\n";
 }
 
-# NEU!  If you want to see the fragments of evidence sequence that
-# havent matched the genomic sequence do this:
 
-my $alignment = $alignment_tool->retrieve_alignment('all', 1);
+# Other alignment presentation options exist.  The intronic
+# regions of the alignment can make it _very_ big.  Introns
+# can be truncated thusly:
 
-# The turns on an portion of code that generates sequences
+my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
+						'-remove_introns' => 1,
+						'-padding'        => 10);
+
+# The '-padding' option specifies the amount of tailing
+# sequence left attached to each 'exon'.  If you set this
+# to zero be careful, as you could be truncating some
+# sequence from the aligned evidence sequences.  If this 
+# happens a warning is issued.
+
+# Importantly, if you need to see non-aligned portions of 
+# the evidence sequences use the following '-show_unaligned'
+# option:
+
+my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
+						'-show_unaligned' => 1);
+
+
+# This turns on an portion of code that generates sequences
 # composed of all the fragments in the evidence sequence that
-# havent been matched.  The final sequence/s in the alignment 
-# subsequently will be all the fragmentary pieces.  Good for 
-# genebuilders worrying about similarity matching algorithms
-# missing things.
+# havent been matched.  This is mainly useful to genebuilders 
+# worrying about things that might be missed by various similarity 
+# matching algorithms.  Note that for layout the fragments are 
+# placed in the intron where they conceivably should go.  If 
+# you are also trimming the intron sequences be careful that 
+# you aren't unwittingly throwing these intronic fragments
+# away.  A warning is raised if this happens.
 
 
-# More fussy (set a few things to non-default, change the
-# amount of padding up- and down-stream of the transcript
-# nucleotide sequence):
+# A few features of the actual alignment can be controled.
+# The fasta line length and the amount of 5-prime and
+# 3-prime padding can be stipulated:
 
 my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
@@ -55,9 +77,28 @@ my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
 			   '-fasta_line_length' => 60);
 
 
-# Erm...
+# Once the alignment is generated it is possible to calculate
+# the identity of the best matching evidence for each exon.
+# Coverage is also determined.
 
 my $exon_identities = $alignment_tool->identity;
+
+my $exon_counter = 1;
+foreach my $exon_identity (@$exon_identities) {
+  print "Exon $exon_counter\t" . 
+    $exon_identity->[0] . "\t" .
+      $exon_identity->[1] . "\t" .
+	$exon_identity->[2] . "\t" .
+	  $exon_identity->[3] ."\n";
+  $exon_counter++;
+}
+
+# The identity scores are returned as a reference to an  array 
+# of array references (I know, bleah - need a mini-object 
+# perhaps).  Each referenced array represents the best identity 
+# and coverage for an individual exon. The reference array has
+# the format (nucleotide_identity, nucleotide_coverage,
+# protein_identity, protein_coverage).  This could be easier...
 
 # NOTE : The definition of identity used by this module ignores all
 # gaps in the sequence.  Given than many of these alignments are
@@ -65,7 +106,9 @@ my $exon_identities = $alignment_tool->identity;
 # dilute it somewhat according to coverage.
 
 
-# You can check the coverage of each item of evidence.
+# Alternatively, you can check the coverage of each item of aligned 
+# evidence.  This provides information about how well the aligned
+# sequences are matched to the genomic sequence.
 
 my $evidence_coverage = $alignment_tool->hit_coverage;
   
@@ -77,18 +120,12 @@ foreach my $hit (@$hit_coverage){
   print "Unmatched 5prime bases   : " . $hit->{'unmatched_5prime'} . "\n";
   print "Unmatched 3prime bases   : " . $hit->{'unmatched_3prime'} . "\n";
   print "Unmatched internal bases : " . $hit->{'unmatched_internal'} . "\n\n";
-  
-
-
-  # Look for missing evidence:
-
-  my $missed_exons = scalar @{$transcript->get_all_Exons} - $hit->{'exons'};
 
 }
 
 
-# Determine the number of exons in our alignment that have 
-# no evidence.
+# It is possible to determine the number of exons in an alignment 
+# that have no evidence.
 
 my $no_evidence_exons = $alignment_tool->rogue_exons;
 
@@ -248,15 +285,27 @@ sub new {
 =cut
 
 sub retrieve_alignment {
-  my ($self, $type, $show_missing_evidence) = @_;
+  my $self = shift @_;
+
+  my ($type, 
+      $remove_introns, 
+      $padding, 
+      $show_missing_evidence) = $self->_rearrange([qw(TYPE
+						      REMOVE_INTRONS
+						      PADDING
+						      SHOW_UNALIGNED
+						     )],@_);
+  
 
   unless ($type) {
     $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
 		 "of \'all\', \'nucleotide\' or \'protein\'.");
   }
 
+  $padding = 100 unless ($padding);
+
   unless ($self->_is_computed($type)){
-    $self->_align($type);
+    $self->_align($type, $show_missing_evidence, $remove_introns, $padding);
   }
 
   return $self->_create_Alignment_object($type, $show_missing_evidence);
@@ -361,7 +410,7 @@ sub rogue_exons {
 =cut
 
 sub _align {
-  my ($self, $type) = @_;
+  my ($self, $type, $show_missing_evidence, $truncate_introns, $padding) = @_;
 
   # Collect all our sequences for aligning
 
@@ -431,6 +480,19 @@ sub _align {
     $self->_working_alignment('evidence', $evidence_sequence);
   }
 
+  # If unaligned fragments are to be shown, find these now.
+
+  if ($show_missing_evidence) {
+    $self->_compute_evidence_coverage;
+    $self->_derive_unmatched_sequences;
+  }
+
+  # If introns are to be truncated, do this now.
+
+  if ($truncate_introns) {
+    $self->_truncate_introns($padding);
+  }
+
   # Set flag to indicate that the alignment has been computed.
 
   $self->_is_computed($type, 1);
@@ -469,9 +531,7 @@ sub _create_Alignment_object {
   }
 
   if ($show_missing_evidence) {
-    $self->_compute_evidence_coverage;
-
-    foreach my $missing_sequence (@{$self->_unmatched_sequence_fragments}){
+    foreach my $missing_sequence (@{$self->_working_alignment('unaligned')}){
       $alignment->add_sequence($missing_sequence);
     }
   }
@@ -709,12 +769,9 @@ sub _compute_evidence_coverage {
       }
     }
 
-print "Should not be 1 :  " . $sorted_matches[0]->[0] . "\n";
-
     if ($sorted_matches[0]->[0] != 1){ 
       $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
 				   'before', $sorted_matches[0]->[2]);
-print "It isnt\n";
     }
 
     if ($sorted_matches[-1]->[1] != $length){
@@ -770,7 +827,7 @@ sub _add_unmatched_region {
 
 }
 
-=head2 _unmatched_sequence_fragments
+=head2 _derive_unmatched_sequences
 
   Arg [1]    :
   Example    : 
@@ -781,7 +838,7 @@ sub _add_unmatched_region {
 
 =cut
 
-sub _unmatched_sequence_fragments {
+sub _derive_unmatched_sequences {
   my ($self) = @_;
 
   my $spacing = 5;
@@ -840,11 +897,97 @@ sub _unmatched_sequence_fragments {
 			      '-type'      => 'nucleotide');
 
 
-    push (@sequences, $align_seq);
+    $self->_working_alignment('unaligned', $align_seq);
 
   }
 
-  return \@sequences;
+  return 1;
+}
+
+
+=head2 _truncate_introns
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _truncate_introns {
+  my ($self, $padding) = @_;
+
+  # Get sequences from the working alignment.
+
+  my @sequences;
+
+  push (@sequences, $self->_working_alignment('genomic_sequence'));
+  push (@sequences, $self->_working_alignment('exon_nucleotide'));
+  push (@sequences, $self->_working_alignment('exon_protein'));
+  
+  foreach my $aligned_seq (@{$self->_working_alignment('evidence')}){
+    push (@sequences, $aligned_seq);
+  }
+
+  if ($self->_working_alignment('unaligned')){
+    foreach my $unaligned_seq (@{$self->_working_alignment('unaligned')}){
+      push (@sequences, $unaligned_seq);
+    }
+  }
+
+  # Determine where the introns are.
+
+  my @coordinates;
+  foreach my $exon (@{$self->_transcript->get_all_Exons}){
+    push(@coordinates, $exon->start);
+    push(@coordinates, $exon->end);
+  }
+
+  @coordinates = sort {$b <=> $a} @coordinates;
+
+  shift @coordinates;
+  pop @coordinates;
+
+
+  # Splice introns from each sequence.
+
+  foreach my $align_seq (@sequences){
+
+    my $seq_array = $align_seq->seq_array;
+
+    my @working_coordinates = @coordinates;
+
+  INTRON:
+    while (@working_coordinates){
+      my $intron_end = (shift @working_coordinates) - 1;
+      my $intron_start = (shift @working_coordinates) + 1;
+
+      next INTRON unless ($intron_start + $padding + 22) < ($intron_end - $padding - 22);
+
+      my @offcut = splice (@$seq_array, $intron_start + $padding, 
+			   ($intron_end - 2*$padding - $intron_start), 
+			   '---intron-truncated---');
+
+      my $offcut;
+      foreach my $discarded_element (@offcut) {
+	$offcut .= $discarded_element;
+      }
+
+      if (($offcut =~ /atgc/i)&&($align_seq->name ne 'genomic_sequence')) {
+	$self->warn("Truncating intron sequences has caused some aligned evidence\n" .
+		    "to be discarded.  Try again with a higher amount of padding\n".
+		    "around the exon sequences.\n");
+      }
+      
+    }
+    
+    
+    $align_seq->store_seq_array($seq_array);
+  }
+  
+  return 1;
 }
 
 
@@ -883,9 +1026,9 @@ sub _is_computed {
   # Check whether an alignment of a specific type
   # has been run.
   if ((!defined $value)&&($self->{'_is_computed'})&&($type ne $self->_type)) { 
-    print "Alignment has been previously computed, but was not\n" .
+    $self->warn("Alignment has been previously computed, but was not\n" .
       "of the same type.  The previously computed alignment\n" . 
-	"type was \'" . $self->_type . "\'.\n";
+	"type was \'" . $self->_type . "\'.\n");
 
     return 0; 
   }
@@ -955,7 +1098,8 @@ sub _working_alignment {
       (($slot eq 'genomic_sequence')
        ||($slot eq 'exon_protein')
        ||($slot eq 'exon_nucleotide')
-       ||($slot eq 'evidence'))){
+       ||($slot eq 'evidence')
+       ||($slot eq 'unaligned'))){
     $self->throw("Was trying to retrieve or write working alignments to "
 		 . "a slot that isnt allowed ($slot)");
   }
