@@ -12,20 +12,20 @@ my $genes = $denorm_genes->fetch_all_by_Slice_and_type($slice);
 =head1 DESCRIPTION
 
 All features written to the exon and dna_align_feature tables are meant to be
-represented by RawContig coordinates.  Hence, when running an analysis like BLAT
+represented by RawContig coordinates.  Hence, when running an analysis like EXONERATE
 which is happiest with large slices or whole chromosomes a lot of coordinate
 transformation needs to be carried out.  This is database intensive and hence
-represents a bottleneck when BLAT jobs are run across many cpus.  When building
-EST genes from BLAT results, all building is conducted on minigenomic sequence
-via Slices - hence the RawContig coordinates stored with BLAT output are not used
-except to map features to Slices.  All of the slow assembly mapping is a fairly 
+represents a bottleneck when EXONERATE jobs are run across many cpus.  When building
+EST genes from EXONERATE results, all building is conducted on genomic sequence
+via Slices - hence the RawContig coordinates stored with EXONERATE output are not used
+except to map exons to Slices.  All of the slow assembly mapping is a fairly 
 BIG waste of time.
 
 Using this module and a set of extra tables in the core database allows features
 to be written in chromosomal coordinates.  When used sensibly this should allow
 for a streamlined EST gene build.  This module basically allows genes to be stored
 and retrieved in the coordinate system of the chromosomes or supercontigs fed 
-into BLAT.
+into EXONERATE.
 
 
 =head1 CONTACT
@@ -200,7 +200,7 @@ sub get_genes_by_Slice_and_type {
   
   # Make an appropriate analysis object
 
-  my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($EST_BLAT_ANALYSIS);
+  my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($EST_EXONERATE_ANALYSIS);
 
  DUMPED_GENE:
   while (my ($dumped_gene_id, $retrieved_gene, $already_mapped) = $sth->fetchrow_array) {
