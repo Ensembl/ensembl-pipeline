@@ -123,6 +123,9 @@ my $prefix='COB';
 	     GB_SIMILARITY_MAX_INTRON         => 150000,
 	     # minimum coverage required to prevent splitting on long introns - keep it high!
 	     GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
+	     # low complexity threshold - transcripts whose translations have low
+	     # complexity % higher than GB_MAX_LOW_COMPLEXITY will be discarded
+	     GB_SIMILARITY_MAX_LOW_COMPLEXITY => 60,
 	     # gene type for FPC_BlastMiniGenewise
 	     GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
 
