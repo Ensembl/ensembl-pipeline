@@ -154,7 +154,7 @@ sub protect {
 sub threshold {
     my ($self, $value) = @_;
         
-    $self->{'_threshold'} = $value if ($value);
+    $self->{'_threshold'} = $value if (defined $value);
     
     return  $self->{'_threshold'};
 }
