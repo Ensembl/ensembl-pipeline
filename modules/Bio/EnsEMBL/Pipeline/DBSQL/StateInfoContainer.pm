@@ -125,8 +125,8 @@ exception if any of the inputs are invalid.
 sub store_inputId_class_analysis {
   my ($self, $inputId, $class, $analysis ) = @_;
 
-  $self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object")
-   unless $arg->isa("Bio::EnsEMBL::Analysis");
+  $self->throw("[$analysis] is not a Bio::EnsEMBL::Analysis object")
+   unless $analysis->isa("Bio::EnsEMBL::Analysis");
 
   $self->throw("Invalid inputId [$inputId]")
    unless $inputId;
@@ -291,20 +291,24 @@ sub delete_inputId {
 =head2 delete_inputId_analysis
 
 Takes an input ID (as a string) and an
-analysis internal ID and removes
+analysis internal ID or Bio::EnsEMBL::Analysis
+and removes
 all matching entries from the pipeline
 database. See also delete_inputId()
 and delete_inputId_class().
 
 =cut
 
-# FIXME: should these delete methods all take
-# Bio::EnsEMBL::Analysis rather than internal ID
-# Need to be consistent
-
 sub delete_inputId_analysis {
-  my $self = shift;
-  my ($inputId, $analysisId) = @_;
+  my ($self, $inputId, $analysis) = @_;
+  my $analysisId;
+
+  if (ref $analysis && $analysis->isa('Bio::EnsEMBL::Analysis')) {
+    $analysisId = $analysis->dbID;
+  }
+  else {
+    $analysisId = $analysis;
+  }
 
   my $sth = $self->prepare( qq{
     DELETE FROM input_id_analysis
