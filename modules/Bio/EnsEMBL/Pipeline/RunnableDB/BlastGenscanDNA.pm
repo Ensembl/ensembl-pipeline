@@ -166,21 +166,59 @@ sub run {
     $self->throw("Input must be fetched before run") unless ($self->genseq);
     print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
 
+    #extract parameters into a hash
+    my ($parameter_string) = $self->analysis->parameters();
+    my %parameters;
+    my ($thresh, $thresh_type, $arguments);
+
+    if ($parameter_string)
+    {
+        $parameter_string =~ s/\s+//g;
+        my @pairs = split (/,/, $parameter_string);
+        foreach my $pair (@pairs)
+        {
+            my ($key, $value) = split (/=>/, $pair);
+            if ($key eq '-threshold_type' && $value) {
+                $thresh_type = $value;
+            }
+            elsif ($key eq '-threshold' && $value) {
+                $thresh = $value;
+            }
+            else
+            # remaining arguments not of '=>' form
+            # are simple flags (like -p1)
+            {
+                $arguments .= " $key ";
+            }
+        }
+    }
+
+    $parameters{'-genomic'} = $self->genseq;
+    $parameters{'-database'} = $self->analysis->db;
+    $parameters{'-program'} = $self->analysis->program;
+    $parameters{'-options'} = $arguments if $arguments;
+    if ($thresh && $thresh_type) {
+        $parameters{'-threshold'} = $thresh;
+        $parameters{'-threshold_type'} = $thresh_type;
+    }
+    else {
+        $parameters{'-threshold'} = 1e-3;
+        $parameters{'-threshold_type'} = 'PVALUE';
+    }
+
     foreach my $transcript ($self->transcripts) {
 
-      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(-genomic   => $self->genseq,
-									    -peptide   => $transcript,
-									    -database  => $self->analysis->db,
-									    -program   => $self->analysis->program,
-									    -threshold => 1e-5,
-									    -threshold_type => 'PVALUE');
+      $parameters{'-peptide'} = $transcript;
+      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
+	%parameters
+      );
 
       $runnable->run();
       $self->runnable($runnable);                                        
 
     }
 
-  }
+}
 
 =head2 output
 
