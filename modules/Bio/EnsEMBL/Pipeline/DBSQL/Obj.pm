@@ -163,28 +163,32 @@ sub get_Job {
 
     my $job;
 
-    if (defined($object)) {
-	print(STDERR "Recreating job object from stored version\n");
-	
-	($job)  = FreezeThaw::thaw($object);
+    if (defined($object)) 
+    {
+	    print(STDERR "Recreating job object from stored version\n");
+	    ($job)  = FreezeThaw::thaw($object);
 
-	if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) {
-	    $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
-	}
+        if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) 
+        {
+	        $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
+        }
+        
+	    $job->_dbobj($self);
+    } 
+    else 
+    {
+        print(STDERR "Creating new job object - no stored version\n");
 
-	$job->_dbobj($self);
-
-    } else {
-	print(STDERR "Creating new job object - no stored version\n");
-	
-	$job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id => $id,
-						      -input_id => $input_id,
-						      -analysis => $analysis,
-						      -LSF_id   => $LSF_id,
-						      -machine  => $machine,
-						      -queue    => $queue,
-						      );
-	$job->_dbobj($self);
+        $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(
+                                  -dbobj    => $self,
+                                  -id       => $id,
+						          -input_id => $input_id,
+						          -analysis => $analysis,
+						          -LSF_id   => $LSF_id,
+						          -machine  => $machine,
+						          -queue    => $queue,
+						          );
+        #$job->_dbobj($self);
     }
     
     return $job;
@@ -607,7 +611,9 @@ sub get_Analysis {
 	my $module          = $rowhash->{'module'};
 	my $module_version  = $rowhash->{'module_version'};
 	my $parameters      = $rowhash->{'parameters'};
-
+    my $gff_source      = $rowhash->{'gff_source'};
+    my $gff_feature     = $rowhash->{'gff_feature'};
+    
 	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id => $id,
 							    -created         => $created,
 							    -program         => $program,
@@ -618,8 +624,10 @@ sub get_Analysis {
 							    -db_file         => $db_file,
 							    -module          => $module,
 							    -module_version  => $module_version,
+                                -gff_source      => $gff_source,
+						        -gff_feature     => $gff_feature,
 							    -parameters      => $parameters,
-							    );
+                                );
 
 
 	return ($analysis);
