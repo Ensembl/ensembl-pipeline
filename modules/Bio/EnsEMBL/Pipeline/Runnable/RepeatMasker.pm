@@ -114,7 +114,7 @@ sub _initialize {
         eval 
         { $self->repeatmasker($self->locate_executable('RepeatMaskerHum')); };
         if ($@)
-        { $self->repeatmasker('~humpub/scripts/RepeatMaskerHum'); }
+        { $self->repeatmasker('/nfs/disk100/humpub/scripts/RepeatMaskerHum'); }
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
