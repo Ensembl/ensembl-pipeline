@@ -93,6 +93,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_MAXSHORTINTRONLEN
 					 GB_MINSHORTINTRONLEN
 					 GB_MAX_TRANSCRIPTS_PER_GENE
+					 GB_USE_ABINITIO
 					);
 
 use vars qw(@ISA);
@@ -173,29 +174,41 @@ sub build_Genes{
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
   #}
 
-  # get all Genscan predictions on this slice
-  $self->get_Predictions;
-  print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
   
-  # get all the dna/protein align features from the pre-computes pipeline on this slice
-  $self->get_Similarities;
-  print STDERR "Number of similarity features ". scalar($self->features) . "\n";
+  if ( $GB_USE_ABINITIO ){
+    # get all Genscan predictions on this slice
+    $self->get_Predictions;
+    print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
+    
+    # get all the dna/protein align features from the pre-computes pipeline on this slice
+    $self->get_Similarities;
+    print STDERR "Number of similarity features ". scalar($self->features) . "\n";
+  }
   
-  # process PredictionTranscripts using the features and the annotations:
-  my @predictions = $self->predictions;
-  my @features    = $self->features;
+  my @supported_predictions;
   my @annotations = $self->genewise_combined_Transcripts;
   
-  my $genecooker = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
-									       -predictions => \@predictions,
-									       -features    => \@features,
-									       -annotations => \@annotations,
-									      );
-  
-  my @supported_predictions = $genecooker->run;
+  if ($GB_USE_ABINITIO ){
+    # process PredictionTranscripts using the features and the annotations:
+    
+    my @predictions = $self->predictions;
+    my @features    = $self->features;
+    my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
+										   -predictions => \@predictions,
+										   -features    => \@features,
+										   -annotations => \@annotations,
+										  );
+    @supported_predictions = $genecooker->run;
+  }
   
   # cluster all the transcripts according to mere genomic overlap
-  my @all_transcripts     = ( @annotations, @supported_predictions );
+  my @all_transcripts;
+  push ( @all_transcripts, @annotations );
+  
+  if (@supported_predictions){
+    push( @all_transcripts, @supported_predictions );
+  }
+  
   unless( @all_transcripts ){
       print STDERR "no transcripts left to cook. Exiting...\n";
       exit(0);
@@ -548,7 +561,7 @@ sub prune_Transcripts {
 	  $intron = abs($exon1->start - $exon2->end - 1);
 	}
 	
-	if ($intron < $GB_MAXSHORTINTRONLEN ) {
+	if ($intron < $GB_MAXSHORTINTRONLEN && $intron > $GB_MINSHORTINTRONLEN ) {
 	  print STDERR "Intron too short: $intron bp. Transcript will be rejected\n";
 	  $foundpair = 1;	# this pair will not be compared with other transcripts
 	} 
