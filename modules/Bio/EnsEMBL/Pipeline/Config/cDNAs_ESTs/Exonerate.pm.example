@@ -105,11 +105,21 @@ use vars qw( %Exonerate );
 	      # 6. Generate ungapped Protein <---> DNA alignments:
 	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
 	      
-	      # EST_EXONERATE              => '/usr/local/ensembl/bin/exonerate-0.7.1',
-	      # EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --forcegtag FALSE --joinrangeext 6 ',
+	      # Exonerate options.  Note that some options are version specific, hence the
+	      # bonding of version with options here.
 
-	      EST_EXONERATE              => '/usr/local/ensembl/bin/exonerate-0.6.7',
-	      EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+#	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.6.7',
+#				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+#			       },
+
+#	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.7.1',
+#				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --forcegtag FALSE --joinrangeext 6',
+#
+
+	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.8.2',
+				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14',
+			       },
+
 
 	      # if set to true, this option rejects unspliced alignments for cdnas that have an spliced
 	      # alignment elsewhere in the genome
