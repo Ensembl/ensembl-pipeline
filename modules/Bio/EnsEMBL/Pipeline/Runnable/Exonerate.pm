@@ -349,7 +349,7 @@ sub run_intron {
   
   eval {
     # better to do this as a pipe?
-    print (STDERR "command is $exonerate_command\n");
+    #print (STDERR "command is $exonerate_command\n");
     $self->throw("Error running exonerate on ".$self->filename."\n") 
       if (system ($exonerate_command)); 
     $self->parse_results($resfile);
@@ -510,7 +510,7 @@ sub run_no_intron {
   }
   my $command = $self->exonerate() . " " . $user_args . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
 
-  print STDERR "command is $command\n";
+  #print STDERR "command is $command\n";
 
   # disable buffering of STDOUT
   STDOUT->autoflush(1);
