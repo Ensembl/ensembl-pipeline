@@ -45,7 +45,8 @@ use vars qw( %Combined );
 
 # Hash containing config info
 %Combined = (
-	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
+
+
 	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_GENEWISE_COMBINED_GENETYPE           => 'UTR',
 
