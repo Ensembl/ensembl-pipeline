@@ -65,10 +65,8 @@ use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::Config::General;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -106,18 +104,13 @@ sub new {
   
   $self->query($sequence) if ($sequence);       
 
-  my $bindir = $::pipeConf{'bindir'} || undef;
-
   $epojar = 'eponine-scan.jar' unless $epojar;
 
   if (defined($java) && -x $java) {
     # passed from RunnableDB (full path assumed)
     $self->java($java);
   }
-  elsif ($::pipeConf{'bin_JAVA'} && -x ($java = "$::pipeConf{'bin_JAVA'}")) {
-    $self->java($java);
-  }
-  elsif ($bindir && -x ($java = "/usr/opt/java130/bin/java")) {
+  elsif ($BIN_DIR && -x ($java = "$BIN_DIR/java")) {
     $self->java($java);
     }
   else {
