@@ -51,7 +51,7 @@ my $analysis = $analysis_adaptor->fetch_by_logic_name($logic_name);
 my @input_ids;
 
 foreach my $chr(keys %chrhash) {
-  print STDERR "making input ids for ".$chr."\n";
+  #print STDERR "making input ids for ".$chr."\n";
   my $length = $chrhash{$chr};
   my $count = 1;
   my $size = $GB_SIZE;
@@ -74,7 +74,7 @@ foreach my $input_id(@input_ids){
 
   my $time = time;
   my $sql = "insert into input_id_analysis(input_id, analysis_id, created) values('$input_id', '".$analysis->dbID."', now())";
-  print STDERR $sql."\n";
+  #print STDERR $sql."\n";
   my $sth = $db->prepare($sql);
   $sth->execute();
 }
@@ -87,12 +87,12 @@ sub get_chrlengths{
            FROM   chromosome c, assembly a
            WHERE  c.chromosome_id = a.chromosome_id
            GROUP BY c.name";
-  print STDERR "trying query ".$q."\n";
+  #print STDERR "trying query ".$q."\n";
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
   my $res = $sth->execute || $db->throw("can't execute: $q");
   
   while( my ($chr, $length) = $sth->fetchrow_array) {
     $chrhash{$chr} = $length;
   }
-  print "have ".keys(%chrhash)." chromosomes\n";
+  #print "have ".keys(%chrhash)." chromosomes\n";
 }
