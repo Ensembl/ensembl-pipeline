@@ -55,9 +55,9 @@ if(!$host || !$dbname){
   $help = 1;
 }
 
-if(!$current || !$current_summary || !$finished || !$analysis || !$rules
-   || !$conditions || !$status_analysis || !$unfin || !$ft_ana_id || 
-   !$assembly_type || !$input_id || !$lock){
+if(!$current && !$current_summary && !$finished && !$analysis && !$rules
+   && !$conditions && !$status_analysis && !$unfin && !$ft_ana_id && 
+   !$assembly_type && !$input_id && !$lock){
   print STDERR "you must provide at least one display option\n";
   $help = 1;
 }
