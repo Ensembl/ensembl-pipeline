@@ -283,7 +283,7 @@ sub fetch_input {
     }
     else {
       print STDERR "type = ",$self->type." threshold ".$self->threshold."\n";
-      @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
+      @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold);
       
       print STDERR "Number of features = " . scalar(@features) . "\n";
       
