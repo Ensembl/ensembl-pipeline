@@ -1441,17 +1441,9 @@ sub _build_sequence_cache {
   }
   
   # Build cache.
-print STDERR "Have " . scalar @$fetched_seqs . " fetched sequences.\n";
-my $countthing = 0;
- BAILOUT:
+
   foreach my $fetched_seq (@$fetched_seqs){
-print STDERR "Count : $countthing\t\tAccession : $array_of_accessions[$countthing]\n";
-$countthing++;
-unless ($fetched_seq) {
-print STDERR "BAILING OUT\n";
-  next BAILOUT;
-}
-#print STDERR "Count : $countthing\tFetched seq : " . $fetched_seq . "\n";
+
     $self->{'_fetched_seq_cache'}->{$fetched_seq->accession_number} = $fetched_seq;
 
   }
