@@ -145,8 +145,13 @@ if ($input_id){
   $slice2 = $sa2->fetch_by_chr_start_end($chr,$chrstart,$chrend);
 }
 elsif ($chr_name ){
+  
   $slice1 = $sa1->fetch_by_chr_name($chr_name);
   $slice2 = $sa2->fetch_by_chr_name($chr_name);
+
+  $input_id = $chr_name.".1-".$slice1->length."\n";
+  print STDERR "fetched region $input_id\n";
+  
 }
 
 
@@ -238,4 +243,69 @@ $gene_comparison->compare_Exons(\@gene_clusters,0,'verbose');
 
 # If you remove the string 'verbose', it'll print out less stuff
 # If you want to look at coding exons only, change the 0 for any defined value
+
+
+
+############################################################
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
