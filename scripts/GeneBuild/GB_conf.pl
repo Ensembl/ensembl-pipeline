@@ -30,6 +30,9 @@ package main;
 #	    'dbuser'      => 'ensembl',
 	    'dbpass'      => '',
 
+#	    'golden_path'      => 'UCSC',
+	    'golden_path'      => '',
+
 #	    'queue'       => 'acarilong',
 	    'queue'       => '',
 
