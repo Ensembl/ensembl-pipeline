@@ -269,7 +269,7 @@ sub fetch_descriptions_by_accession {
         $embl_parser->parse($entry);
 
         my $name_without_version = $full_name;
-        $name_without_version =~ s/\.d+$//;
+        $name_without_version =~ s/\.\d+$//;
 
 		my $found = 0;
 		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
