@@ -168,8 +168,8 @@ sub write_output {
     $sth = $self->dbobj->prepare ( q{ INSERT INTO feature
                                                   (id, contig, seq_start, seq_end,
                                                    score, strand, analysis, name,
-                                                   hstart, hend, hid, evalue, perc_id)
-                                           VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                   hstart, hend, hid, evalue, perc_id, cigar)
+                                           VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                     } );
 
 
@@ -194,6 +194,13 @@ sub write_output {
         $featurepair->feature1->validate_prot_feature;
         $featurepair->feature2->validate_prot_feature;
 
+        my $cigar_string;
+        if ($featurepair->feature1->has_tag ('cigar')) {
+            my @cigar_tags = $featurepair->feature1->each_tag_value ('cigar');
+            $cigar_string = $cigar_tags[0];
+
+        }
+
         ################
         my $target_seqname;
 
@@ -212,28 +219,10 @@ sub write_output {
                        $analysisId, $self->analysis->program, 
 #                       $featurepair->hstart, $featurepair->hend, $featurepair->hseqname,
                       $featurepair->hstart, $featurepair->hend, $target_seqname, 
-                      $featurepair->p_value, $featurepair->percent_id);
+                      $featurepair->p_value, $featurepair->percent_id, $cigar_string);
         
-        my $sth_last = $self->dbobj->prepare ( q{ SELECT last_insert_id() } );
-        $sth_last->execute;
-        my $insert_id = ($sth_last->fetchrow_array)[0];
-
-        my @blast_tags = $featurepair->feature1->each_tag_value ('align_coor');
-        my @blast_coor = @{$blast_tags[0]};
-
-        my $sth_blast = $self->dbobj->prepare ( q{ INSERT INTO gapped_align
-                                                              (id, featureId, coor, hcoor, length)
-                                                       VALUES ('NULL', ?, ?, ?, ?)
-                                                } );
-
-        foreach my $ref (@blast_coor) {
-            $sth_blast->execute ($insert_id, $ref->[0], $ref->[1], $ref->[2]);
-        }
-        $sth_last->finish;
-        $sth_blast->finish;
     }
     $sth->finish;
-    close FH;
 }
 
 
@@ -268,7 +257,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
-        $self->{'_runnable'} = $runnable->new (%parameters);
+        $self->{'_runnable'} = $runnable->new (-analysis => $self->analysis, %parameters);
     }
     return $self->{'_runnable'};
 }
