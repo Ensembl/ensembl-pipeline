@@ -61,6 +61,8 @@ sub _initialize {
     $clone->isa("Bio::EnsEMBL::DB::CloneI") || $self->throw("Clone isn't a Bio::EnsEMBL::DB::CloneI");
 
     $self->clone($clone);
+    $self->{_pairs} = [];
+
     return $make; # success - we hope!
 }
 
@@ -85,11 +87,9 @@ sub run {
 	my @features = $contig->get_all_SimilarityFeatures;
 
 	foreach my $gene (@genes) {
-
 	    foreach my $exon ($gene->each_unique_Exon) {
 		$exon->find_supporting_evidence(\@features);
 	    }
-
 	    $contig->make_ExonPairs($gene->each_unique_Exon);
 	}
 
