@@ -8,71 +8,78 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Data::Dumper;
 
-my $help   = 0;
-my $dbhost = undef;
-my $dbname = undef;
-my $dbuser = 'ensro';
-my $dbpass = undef;
-my $dbport = 3306;
-my $table  = 'dna';
-my $query  = undef;
-my $left   = 0;
-my $rev    = 0;
-my $ana_id = 0;
-GetOptions(
-	   'help|h'   => \$help,
-	   'dbhost=s' => \$dbhost,
-	   'dbname=s' => \$dbname,
-	   'dbuser=s' => \$dbuser,
-	   'dbpass=s' => \$dbpass,
-	   'dbport=s' => \$dbport,
-	   'table=s'  => \$table,
-	   'ana_id=s' => \$ana_id,
-	   'reverse'  => \$rev,
-	   'left'     => \$left,
-	   ) or useage();
-useage() if $help;
+{
+    my $help   = 0;
+    my $dbhost = undef;
+    my $dbname = undef;
+    my $dbuser = 'ensro';
+    my $dbpass = undef;
+    my $dbport = 3306;
+    my $table  = 'dna';
+    my $query  = undef;
+    my $left   = 0;
+    my $rev    = 0;
+    my $ana_id = 0;
+    GetOptions(
+	       'help|h'   => \$help,
+	       'dbhost=s' => \$dbhost,
+	       'dbname=s' => \$dbname,
+	       'dbuser=s' => \$dbuser,
+	       'dbpass=s' => \$dbpass,
+	       'dbport=s' => \$dbport,
+	       'table=s'  => \$table,
+	       'ana_id=s' => \$ana_id,
+	       'reverse'  => \$rev,
+	       'left'     => \$left,
+	       ) or useage();
+    useage() if $help;
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
-    -host   => $dbhost,
-    -dbname => $dbname,
-    -user   => $dbuser,
-    -pass   => $dbpass,
-    -port   => $dbport,
-);
-my @ids;
+    my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+        -host   => $dbhost,
+        -dbname => $dbname,
+        -user   => $dbuser,
+        -pass   => $dbpass,
+        -port   => $dbport,
+    );
 
-if($left){
-    $query = "SELECT DISTINCT(f.hit_name)
-                FROM ${table}_align_feature f LEFT JOIN hit_description h 
-                  ON f.hit_name = h.hit_name
-               WHERE h.hit_name IS NULL 
-            ORDER BY f.hit_name";
-}elsif($ana_id){
-    $query = "SELECT DISTINCT(f.hit_name)
-                FROM ${table}_align_feature f LEFT JOIN hit_description h 
-                  ON f.hit_name = h.hit_name
-               WHERE h.hit_name IS NULL 
-                 AND f.analysis_id = '${ana_id}'
-            ORDER BY f.hit_name";
-}else{
-    $query = "SELECT DISTINCT(f.hit_name) FROM ${table}_align_feature f ORDER BY f.hit_name";
-}
-$query .= " DESC" if $rev;
+    my( @ids );
+    if (@ARGV) {
+        @ids = @ARGV;
+    } else {
+        if($left){
+            $query = "SELECT DISTINCT(f.hit_name)
+                        FROM ${table}_align_feature f LEFT JOIN hit_description h 
+                          ON f.hit_name = h.hit_name
+                       WHERE h.hit_name IS NULL 
+                    ORDER BY f.hit_name";
+        }
+        elsif($ana_id){
+            $query = "SELECT DISTINCT(f.hit_name)
+                        FROM ${table}_align_feature f LEFT JOIN hit_description h 
+                          ON f.hit_name = h.hit_name
+                       WHERE h.hit_name IS NULL 
+                         AND f.analysis_id = '${ana_id}'
+                    ORDER BY f.hit_name";
+        }else{
+            $query = "SELECT DISTINCT(f.hit_name) FROM ${table}_align_feature f ORDER BY f.hit_name";
+        }
+        $query .= " DESC" if $rev;
 
-my $sth = $db->prepare($query);
-$sth->execute();
-while(my $row = $sth->fetchrow_arrayref){
-    push(@ids, $row->[0]);
-}
+        my $sth = $db->prepare($query);
+        $sth->execute();
+        while(my $row = $sth->fetchrow_arrayref){
+            push(@ids, $row->[0]);
+        }
+    }
 
-my $cached = array_as_cache(\@ids, 200);
+    my $cached = array_as_cache(\@ids, 200);
 
-my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
+    my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
 
-while(my @first = first_of_cache($cached)){
-    print join(" : ", @first) . "\n";
-    $seqfetcher->write_descriptions( $db, @first );
+    while(my @first = first_of_cache($cached)){
+        print STDERR map "$_\n", @first;
+        $seqfetcher->write_descriptions( $db, @first );
+    }
 }
 
 sub array_as_cache{
@@ -84,8 +91,9 @@ sub array_as_cache{
 }
 sub first_of_cache{
     my ($cache) = @_;
-    my @first = @{ (shift(@{$cache}) || []) };
-    return @first;
+
+    my $first = shift(@$cache) || [];
+    return @$first;
 }
 
 

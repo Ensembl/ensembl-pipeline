@@ -16,11 +16,12 @@ sub new {
     my ( $class, @args ) = @_;
     my $self = bless {}, $class;
 
-    my ( $server, $port, $options ) = $self->_rearrange(
-        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
+    my ( $server, $port, $options, $archive_port ) = $self->_rearrange(
+        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS', 'ARCHIVE_PORT' ], @args );
 
     $self->server($server || 'cbi2.internal.sanger.ac.uk');
     $self->port($port || 22100);
+    $self->archive_port($archive_port || 23100);
     $self->options($options);
 
     return $self;
@@ -62,6 +63,16 @@ sub port {
     return $self->{'_port'};
 }
 
+sub archive_port {
+    my( $self, $archive_port ) = @_;
+    
+    if ($archive_port) {
+        $self->{'_archive_port'} = $archive_port;
+    }
+    return $self->{'_archive_port'};
+}
+
+
 =head2 options
 
   Title   : options
@@ -85,8 +96,6 @@ sub options {
 sub get_server {
     my ($self) = @_;
 
-    local $^W = 0;
-
     my $host = $self->server;
     my $port = $self->port;
 
@@ -101,7 +110,25 @@ sub get_server {
         $server->autoflush(1);
         return $server;
     }
+}
 
+sub get_archive_server {
+    my ($self) = @_;
+
+    my $host = $self->server;
+    my $port = $self->archive_port;
+
+    my $server = IO::Socket::INET->new(
+        PeerAddr => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Type     => SOCK_STREAM,
+        Timeout  => 10,
+    );
+    if ($server) {
+        $server->autoflush(1);
+        return $server;
+    }
 }
 
 =head2 get_Seq_by_acc
@@ -173,27 +200,91 @@ sub write_descriptions {
         });
 
     my $count = 100;
+    my( @failed_to_fetch );
     while (my @hundred_ids = splice(@ids, @ids > $count ? -$count : 0)) {
     
         printf STDERR "Pfetching %d EMBL sequences\n", scalar(@hundred_ids);
     
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
-	print  $server "-F " . join(" ", @hundred_ids) . "\n";
-	local $/ = "//\n";
-	while (<$server>) {
-            next if $_ =~ /no match/;
-            $embl_parser->parse($_);
-            my $name = $embl_parser->sequence_version || $embl_parser->accession->[0];
-            $sth->execute(
-                $name,
-                $embl_parser->description,
-                $embl_parser->seq_length,
-                $embl_parser->taxon,
-                $embl_parser->which_database
-                );
-	}
-    }	
+	print  $server join(' ', '-F', @hundred_ids) . "\n";
+        my %ids_to_fetch = map {$_, 1} @hundred_ids;
+        {
+	    local $/ = "//\n";  #"
+	    while (<$server>) {
+                s/^no match\n//mg;
+                next unless $_;
+                $embl_parser->parse($_);
+                my $name = $embl_parser->sequence_version || $embl_parser->accession->[0];
+                delete($ids_to_fetch{$name})
+                    or die "Got identifier '$name' from EMBL entry, but it was not in list of sequences to fetch:\n@hundred_ids";
+                $sth->execute(
+                    $name,
+                    $embl_parser->description,
+                    $embl_parser->seq_length,
+                    $embl_parser->taxon,
+                    $embl_parser->which_database
+                    );
+	    }
+        }
+        
+        if (my @missing = keys %ids_to_fetch) {
+            # Get lengths from the archvie server
+            my $server = $self->get_archive_server;
+            print $server join(" ", '-l', @missing), "\n";
+            my( %acc_sv_lengths );
+            my $i = 0;
+            while (<$server>) {
+                chomp;
+                unless ($_ eq 'no match') {
+                    my $acc_sv = $missing[$i];
+                    #warn "Found $_ for $acc_sv\n";
+                    $acc_sv_lengths{$acc_sv} = $_;
+                }
+                $i++;
+            }
+
+            # Make a hash of accessions without the .SV for
+            # everything we got a length for.
+            my( %acc_missing );
+            foreach my $acc_sv (keys %acc_sv_lengths) {
+                my ($acc) = $acc_sv =~ /^(.+)\.\d+$/;
+                unless ($acc) {
+                    warn "Can't make accession from '$acc_sv'";
+                    next;
+                }
+                $acc_missing{$acc} = $acc_sv;
+            }
+            
+            # Now get the rest of the info from the latest version
+            # the sequence from the live server.
+            {
+                my $server = $self->get_server;
+                print $server join(" ", '-F', keys %acc_missing), "\n";
+                local $/ = "//\n";  #"
+                while (<$server>) {
+                    s/^no match\n//mg;
+                    next unless $_;
+                    $embl_parser->parse($_);
+                    my $acc = $embl_parser->accession->[0];
+                    my $acc_sv = $acc_missing{$acc}
+                        or die "Can't see ACCESSION.SV for ACCESSION '$acc'";
+                    my $length = $acc_sv_lengths{$acc_sv};
+                    delete($ids_to_fetch{$acc_sv})
+                        or die "Got identifier '$acc_sv' from EMBL entry, but it was not in list of sequences to fetch:\n@hundred_ids";
+                    $sth->execute(
+                        $acc_sv,
+                        $embl_parser->description,
+                        $embl_parser->seq_length,
+                        $embl_parser->taxon,
+                        $embl_parser->which_database
+                        );
+	        }
+            }
+        }
+        push(@failed_to_fetch, keys %ids_to_fetch);
+    }
+    return @failed_to_fetch;
 }
 
 1;
