@@ -94,6 +94,7 @@ sub run{
   if( !defined $self->workdir ) {
     $self->workdir('/tmp');
   }
+
   my $dir = $self->workdir();
   
   # file with the genomic sequence
@@ -103,7 +104,7 @@ sub run{
   my $evi_file    = "$dir/gowise_evi.$$";
   
   open(F,">$genome_file") || $self->throw("Could not open $genome_file $!");
-  open(E,">$evi_file") || $self->throw("Could not open $evi_file $!");
+  open(E,">$evi_file")    || $self->throw("Could not open $evi_file $!");
   
   my $seqout = Bio::SeqIO->new('-format' => 'fasta','-fh' => \*F);
   $seqout->write_seq($self->seq);
@@ -113,24 +114,24 @@ sub run{
   
   #### collect info from transcripts and put it in evidence file
   my %supp_evidence;
-  foreach my $transcript ( $self->each_Transcript ) {
+  foreach my $transcript ( @{$self->get_all_Transcripts}) {
     
     #print STDERR "In Genomewise, before going through genomewise\n";
     my $excount = 0;
-    foreach my $exon ( $transcript->get_all_Exons ) {
+    foreach my $exon ( @{$transcript->get_all_Exons} ) {
       $excount++;
 
       # store supporting evidence
-      my @evi = $exon->each_Supporting_Feature;
-      #print STDERR "Exon $excount: ".scalar(@evi)." features\n";
+      my @evi = @{$exon->get_all_supporting_features};
+      print STDERR "Exon $excount: ".scalar(@evi)." features\n";
 
       $supp_evidence{ $exon } = \@evi;
 
       ## test
       if (@evi){
-	#foreach my $evi ( @evi ){
-	#  print STDERR $evi." - ".$evi->gffstring."\n";
-	#}
+	foreach my $evi ( @evi ){
+	  print STDERR $evi." - ".$evi->gffstring."\n";
+	}
       }
       else{
 	;#print STDERR "No supporting evidence\n";
@@ -191,7 +192,7 @@ sub run{
 	    if( $seen_utr3 == 0 ) {
 	      #  print STDERR "Seen utr - setting end to prev\n";
 	      # ended on a cds 
-	      $trans->end_exon($prev);
+	      $trans->end_Exon($prev);
 	      $trans->end($prev->length);
 	    }
 	    next GENE;
@@ -235,7 +236,7 @@ sub run{
 	    $exon->phase($phase);
 	    
 	    if( $seen_cds == 0 ) {
-	      $trans->start_exon($exon);
+	      $trans->start_Exon($exon);
 	      $trans->start($cds_start-$start+1);
 	    }
 	    $seen_cds = 1;
@@ -280,7 +281,7 @@ sub run{
 	      if( !defined $orig_end ) {
 		$self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
 	      } else {
-		$trans->end_exon($exon);
+		$trans->end_Exon($exon);
 		
 		# position of the end of translation in exon-local coordinates
 		$trans->end($orig_end - $start + 1);
@@ -306,12 +307,12 @@ sub run{
   ##### need to put back the supporting evidence
   # since exons have been created anew, need to check overlaps
   my @trans_out = $self->output;
-  my @trans_in  = $self->each_Transcript;
+  my @trans_in  = @{$self->get_all_Transcripts};
   
   # let's try to make it fast:
   if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
-    my @exons_in  = $trans_in[0] ->get_all_Exons;
-    my @exons_out = $trans_out[0]->get_all_Exons;
+    my @exons_in  = @{$trans_in[0] ->get_all_Exons};
+    my @exons_out = @{$trans_out[0]->get_all_Exons};
     
     # most of the time the numbers of exons doesn't vary
     if ( scalar( @exons_in ) == scalar ( @exons_out ) ){
@@ -350,10 +351,10 @@ sub run{
     # if we have more than one transcript at one or both sides, we also have to check them all
     print STDERR "passing evi info between more than 2 transcripts\n";
     foreach my $tran_in ( @trans_in){
-      my @exons_in  = $trans_in[0] ->get_all_Exons;
+      my @exons_in  = @{$trans_in[0] ->get_all_Exons};
       
       foreach my $tran_out ( @trans_out ){
-	my @exons_out = $trans_out[0]->get_all_Exons;
+	my @exons_out = @{$trans_out[0]->get_all_Exons};
 	
 	foreach my $exon_in ( @exons_in ){
 	  
@@ -373,9 +374,9 @@ sub run{
   foreach my $tran_out ( @trans_out ){
     #print STDERR "In Genomewise, AFTER going through genomewise\n";
     my $count = 0;
-    foreach my $exon_out ( $tran_out->get_all_Exons ) {
+    foreach my $exon_out ( @{$tran_out->get_all_Exons} ) {
       $count++;
-      my @evi = $exon_out->each_Supporting_Feature;
+      my @evi = @{$exon_out->get_all_supporting_features};
       #print "Exon $count: ".scalar(@evi)." features\n";
       if (@evi){
   	#foreach my $evi ( @evi ){
@@ -392,9 +393,9 @@ sub run{
 #    print STDERR " Translation : ".$t->translation."\n";
 #    print STDERR " translation starts: ".$t->translation->start."\n";
 #    print STDERR " translation end   : ".$t->translation->end."\n";
-#    print STDERR " start exon        : ".$t->translation->start_exon."\n";
-#    print STDERR " end exon          : ".$t->translation->end_exon."\n";
-#    foreach my $exon ($t->get_all_Exons){
+#    print STDERR " start exon        : ".$t->translation->start_Exon."\n";
+#    print STDERR " end exon          : ".$t->translation->end_Exon."\n";
+#    foreach my $exon (@{$t->get_all_Exons}){
 #      print STDERR "     Exon          : " . $exon . " ".$exon->phase  . " " . $exon->end_phase ."\tstarts: ".$exon->start."\tends: ".$exon->end."\n";
 #    }
 #  }
@@ -433,9 +434,9 @@ sub output{
 
 
 
-=head2 each_Transcript
+=head2 get_all_Transcripts
 
- Title   : each_Transcript
+ Title   : get_all_Transcripts
  Usage   :
  Function:
  Example :
@@ -445,10 +446,10 @@ sub output{
 
 =cut
 
-sub each_Transcript{
+sub get_all_Transcripts {
    my ($self) = @_;
 
-   @{$self->{'_transcript_array'}};
+   return $self->{'_transcript_array'};
 }
 
 
@@ -469,12 +470,9 @@ sub add_Transcript{
 
    foreach my $val ( @args ) {
      $self->throw("[$val] is not a Transcript...") unless $val->isa("Bio::EnsEMBL::Transcript");
-#     if (!defined $val || !$val->isa('Bio::EnsEMBL::Transcript') ) {
-#       if( !ref $val || !$val->isa('Bio::EnsEMBL::Transcript') ) {
-
- #      }
        push(@{$self->{'_transcript_array'}},$val);
    }
+   return $self->{_transcript_array};
 }
 
 
