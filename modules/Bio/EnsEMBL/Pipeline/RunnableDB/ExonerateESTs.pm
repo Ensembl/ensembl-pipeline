@@ -17,12 +17,13 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs->new(
-					     -dbobj     => $db,
-					     -input_id  => $id,
-					     -estfile   => $estfile,
-					     -exonerate => $exonerate,
-					     -exonerate_args => $exargs
-                                             );
+								     -dbobj     => $db,
+								     -input_id  => $id,
+								     -estfile   => $estfile,
+								     -exonerate => $exonerate,
+								     -exonerate_args => $exargs
+								     '-golden_path' => $gp,
+								    );
     $obj->fetch_input
     $obj->run
 
@@ -70,19 +71,22 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                            -ANALYSIS    => $analysis,
                            -ESTFILE     => $estfile,
 			   -EXONERATE   => $exonerate,
-			   -EXONERATE_ARGS => $exargs);
+			   -EXONERATE_ARGS => $exargs,
+			   -GOLDEN_PATH => $gp,
+			  );
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
-                -input_id:   Contig input id (required), or filename
-                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional)
-                -estfile:    filename
-                -exonerate:  path to exonerate executable (optional)
+    Args    :   -dbobj:           A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:        Contig input id (required), or filename
+                -analysis:        A Bio::EnsEMBL::Pipeline::Analysis (optional)
+                -estfile:         filename
+                -exonerate:       path to exonerate executable (optional)
                 -exonerate_args : string (optional) 
+                -golden_path:name of golden path; defaults to UCSC if not provided
 =cut
 
 sub new {
@@ -104,6 +108,11 @@ sub new {
     # ought not to hard code
     $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 " unless defined $exargs;
     $self->exonerate_args($exargs) if defined $exargs;
+
+    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+	 
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
 
     return $self;
 }
@@ -220,8 +229,6 @@ sub fetch_input {
     my $chrstart = $1;
     my $chrend   = $2;
     
-    $self->dbobj->static_golden_path_type('UCSC');
-    
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
     
@@ -306,5 +313,3 @@ sub output {
 =cut
 
 1;
-
-
