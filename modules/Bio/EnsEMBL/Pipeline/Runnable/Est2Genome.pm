@@ -25,7 +25,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Est2Genome
     or
     
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new()
-    
+
 =head1 DESCRIPTION
 
 Object to store the details of an est2genome run.
@@ -33,11 +33,11 @@ Stores the est2genome matches as an array of Bio::EnsEMBL::FeaturePair
 
 =head2 Methods:
 
-new,
-genomic_sequence,
-est_sequence,
-run,
-output.
+ new,
+ genomic_sequence,
+ est_sequence,
+ run,
+ output.
 
 =head1 CONTACT
 
@@ -93,7 +93,7 @@ sub _initialize {
     Returns :   Bio::Seq object
     Args    :   Bio::Seq object
 
-=cut 
+=cut
 
 sub genomic_sequence {
     my( $self, $value ) = @_;    
@@ -272,24 +272,14 @@ sub _createfeatures {
                                               -source_tag =>   $f1source,
                                               -primary_tag =>  $f1primary,
                                               -analysis => $analysis_obj );
- 
-<<<<<<< Est2Genome.pm
+                                              
      my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
                                                 -end =>      $f2end,
                                                 -seqname =>  $f2id,
                                                 -strand =>   $f2strand,
-                                                -score =>    undef,
+                                                -score =>    $f1score,
                                                 -source_tag =>   $f2source,
                                                 -primary_tag =>  $f2primary,
-=======
-     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
-                                                -end =>    $f2end,
-                                                -seqname =>$f2id,
-                                                -strand => $f2strand,
-                                                -score =>  $f1score,
-                                                -source => $f2source,
-                                                -primary =>$f2primary,
->>>>>>> 1.11
                                                 -analysis => $analysis_obj );
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
@@ -361,19 +351,10 @@ sub _diskspace {
 
 sub _deletefiles {
     my ($self, $genfile, $estfile, $dirname) = @_;
-<<<<<<< Est2Genome.pm
-    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
-    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
-    chdir ("../");
-    rmdir ($dirname) or $self->throw("Cannot remove $dirname \n");
-}
-
-=======
 #    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
 #    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
 
 }
->>>>>>> 1.9
 
 
 
