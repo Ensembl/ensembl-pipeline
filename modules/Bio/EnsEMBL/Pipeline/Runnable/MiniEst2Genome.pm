@@ -72,7 +72,7 @@ sub new {
   my( $genomic, $features ) = $self->_rearrange(['GENOMIC',
 						 'FEATURES'], @args);
        
-  $self->throw("No genomic sequence input")           unless defined($genomic);
+  $self->throw("No genomic sequence input")            unless defined($genomic);
   $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
   
   $self->genomic_sequence($genomic) if defined($genomic);
@@ -510,7 +510,20 @@ sub run {
     }
 
   }
-  
+
+#  # check the output
+#  print STDERR "MiniE2G:\n";
+#  foreach my $gene($self->output){
+#    print STDERR "Gene: " . $gene->gffstring . "\n";
+#    foreach my $exon($gene->sub_SeqFeature) {
+#      print STDERR "Exon: " . $exon->gffstring . "\n";
+#      foreach my $segment($exon->sub_SeqFeature){
+#	print STDERR "Segment: " . $segment->gffstring . "\n";
+#      }
+#    }
+#    print STDERR "\n";
+#  }
+
 }
 
 =head2 run_blaste2g
@@ -526,7 +539,6 @@ sub run {
 sub run_blaste2g {
   my ($self,$est,$features,$analysis_obj) = @_;
   
-  #?? never did fully understand this.
   my @extras  = $self->find_extras (@$features);
   print STDERR "Number of extra features = " . scalar(@extras) . "\n";
   return unless (scalar(@extras) >= 1);
@@ -543,123 +555,194 @@ sub run_blaste2g {
   
   $eg->run;
   
-  # output is a list of Features, one per predicted gene. Exons are added as 
-  # subseqfeatures of gene features, and supporting evidence featurepairs as 
-  # subseqfeatures of exons.
-  my @genes = $eg->output;
+  # each element of @exons represents an exon, with sub_seqfeatures representing the 
+  # individual ungapped alignments from est_genome
+  my @exons = $self->convert_output($eg, $miniseq);
+
+  # make a SeqFeature representing a gene to hold the exons
+  my $gene = new Bio::EnsEMBL::SeqFeature();
+  foreach my $ex (@exons) {
+    $gene->add_sub_SeqFeature($ex,'EXPAND');
+    $gene->seqname($ex->seqname);
+    $gene->analysis($analysis_obj);
+  }
   
+  push(@{$self->{_output}},$gene);
+  
+}
+
+=head2 convert_output
+
+  Title   : convert_output
+  Usage   : $self->convert_output($runnable, $miniseq)
+  Function: Converts 
+  Returns : none
+  Args    : 
+
+=cut
+
+sub convert_output {
+  my ($self, $runnable, $miniseq) = @_;
+
+  my @genes = $runnable->output;
   print STDERR "number of genes: " . scalar(@genes)  . "\n";
   
-  my @newf;
-  
   if ( scalar(@genes) >1 ) {
-    $self->throw("more than one gene predicted - I'm outta here!\n");
+    $self->throw("more than one gene predicted fropm est_genome - I'm outta here!\n");
   }
   
   my @genomic_exons;
-  my $ec = 0;
+  my $excount = 0;
   my $strand;
+  
+  GENE: foreach my $gene(@genes) {
+      my @converted = $self->_convert_exons($gene, $miniseq);
+      push (@genomic_exons, @converted);
+    }
 
-  foreach my $gene(@genes) {
-    my @exons = $gene->sub_SeqFeature;
-    $strand = $exons[0]->strand;
-  FEAT:    foreach my $ex(@exons){
-      $ec++;
-      $self->throw("mismatched exon strands\n") unless $ex->strand == $strand;
-      
-      # exonerate has no concept of phase, but remapping will fail if this is unset
-      $ex->phase(0);
-      
-      # pretend this beast is a featurepair, not just a feature - for remapping
-      # yuk this not right way.
-      my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $ex,
-					     -feature2 => $ex);
-      
-      # convert back to genomic coords, but leave the EST coordinates alone
-      my @converted = $miniseq->convert_PepFeaturePair($fp);
-      if ($#converted > 0) {
-	# all hell will break loose as the sub alignments will probably not map cheerfully 
-	# for now, ignore this feature.
-	print STDERR "Warning : feature converts into > 1 features " . scalar(@converted) . " ignoring exon $ec\n";
-	next FEAT;
-      }
-      
-      foreach my $nf(@converted) {
-	push(@genomic_exons, $nf->feature1); 
-      }
-      
-      # now sort out sub seqfeatures - details of sub segments making up an exon.
-      foreach my $aln($ex->sub_SeqFeature){
-	# strands 
-	if($aln->strand != $aln->hstrand){
-	  $aln->strand(-1);
-	  $aln->hstrand(1);
-	  $ex->strand(-1);
-	}
-	
-	# convert to genomic coords
-	my @alns = $miniseq->convert_FeaturePair($aln);
-	if ($#alns > 0) {
-	  # we're in for fun
-	  print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
-	}
-	
-	foreach my $a(@alns) {
-	  my $added = 0;
-	  $a->strand($aln->strand); # genomic
-	  $a->hstrand(1);      # protein
-	  
-	  $a->seqname($aln->seqname);
-	  $a->hseqname($aln->hseqname);
-	  # shouldn't need to expand ... as long as we choose the right parent feature to add to!
-	  foreach my $g(@genomic_exons){
-	    if($a->start >= $g->start && $a->end <=$g->end && !$added){
-	      $g->add_sub_SeqFeature($a,'');
-	      $added = 1;
-	    }
-	  }
-	  $self->warn("Sub align feature could not be added ...\n") unless $added;
-	}
+  return (@genomic_exons);
+}
+
+=head2 _convert_exons
+
+  Title   : _convert_exons
+  Usage   : $self->_convert_exons($gene, $miniseq)
+  Function: Converts the exons of a SeqFeature representing a gene from cDNA to genomic coordinates
+  Returns : Array of SeqFeatures representing exons
+  Args    : Bio::SeqFeature, Bio::EnsEMBL::Pipeline::MiniSeq
+
+=cut
+
+sub _convert_exons {
+  my ($self, $gene, $miniseq) = @_;
+  my @exons = $gene->sub_SeqFeature;
+  my $excount = 0;
+  my @genomic_exons;
+
+  # we need to keep track of strand information. Exons should not switch strand!
+  foreach my $sf($exons[0]->sub_SeqFeature){
+    if($sf->strand != $sf->hstrand){
+      $sf->strand(-1);
+      $sf->hstrand(1);
+      $exons[0]->strand(-1);
+    }
+  }
+  my $strand = $exons[0]->strand;
+  
+  # convert each exon and its component ungapped alignments back to VC coordinates
+  EXON :    foreach my $exon(@exons){
+    $excount++;
+    foreach my $sf($exon->sub_SeqFeature){
+      if($sf->strand != $sf->hstrand){
+	$sf->strand(-1);
+	$sf->hstrand(1);
+	$exon->strand(-1);
       }
     }
+    $self->throw("Trying to switch strands mid gene!\n") unless $exon->strand == $strand;
     
+    # est_genome has no concept of phase, but remapping will fail if this is unset
+    $exon->phase(0);
     
-    foreach my $gex (@genomic_exons) {
-      $gex->{_phase} = 0; # e2g doesn;t give us phase
-      $gex->strand($strand);
+    my @converted_exons = $miniseq->pairAlign->convert_cDNA_feature($exon);
+    if ($#converted_exons > 0) {
+      # all hell will break loose as the sub alignments will probably not map cheerfully 
+      # for now, ignore this feature.
+      print STDERR "Warning : feature converts into > 1 features " . scalar(@converted_exons) . " ignoring exon $excount\n";
+      next EXON;
+    }
+  
+    # now deal with sub alignments
+    $self->_convert_segments($exon, $miniseq, $converted_exons[0]);
+  
+    foreach my $ce (@converted_exons) {
+      $ce->{_phase} = $exon->phase; # doesn't give us phase
+      $ce->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-      $gex->seqname($gene->seqname); # urrmmmm?
-      $gex->score   (100); # probably not
-      $gex->analysis($analysis_obj);
+      $ce->seqname($exon->seqname); # urrmmmm?
+      $ce->score($exon->score); # probably not
       #end BUGFIX
     }
-  }   
-  
-  
-  # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
-  # sub_SeqFeatures representing ungapped alignments making up the exon:EST alignment
-  my $fset = new Bio::EnsEMBL::SeqFeature();
-  
-  foreach my $nf (@genomic_exons) {
-    $fset->add_sub_SeqFeature($nf,'EXPAND');
-    $fset->seqname($nf->seqname);
-    $fset->analysis($analysis_obj);
-    #   $nf->strand($nf->hstrand);
-    #    print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
-    #	  $nf->start     . "\t" . 
-    #	  $nf->end       . "\t(" . 
-    #	  $nf->strand    . ")\t" .
-    #	  $nf->hseqname  . "\t" . 
-    #	  $nf->hstart    . "\t" . 
-    #	  $nf->hend      . "\t(" .
-    #	  $nf->hstrand   . ")\t:" .
-    #	  $nf->feature1->{_phase} . ":\t:" . 
-    #	  $nf->feature2->{_phase} . ":\n");
+    
+    
+    push (@genomic_exons, @converted_exons);
+    
   }
-  
-  push(@{$self->{_output}},$fset);
-  
+
+  return (@genomic_exons);
 }
+
+
+=head2 _convert_segments
+
+  Title   : _convert_segment
+  Usage   : $self->_convert_segment($exon, $miniseq, $converted_exon)
+  Function: Converts the subSeqFeatures of a SeqFeature representing an exon from cDNA to genomic coordinates
+  Returns : 
+  Args    : Bio::SeqFeature, Bio::EnsEMBL::Pipeline::MiniSeq
+
+=cut
+
+sub _convert_segments {
+  my ($self, $exon, $miniseq, $converted_exon) = @_;
+
+  my @f = $exon->sub_SeqFeature;
+  print STDERR "***_convert_segments: " . scalar(@f). "\n";
+
+  # each gapped exon has a set of subSeqFeatures representing ungapped component alignments to the est.
+  SEGMENT: foreach my $segment($exon->sub_SeqFeature){
+    # double check strands 
+    if($segment->strand != $segment->hstrand){
+      $segment->strand(-1);
+      $segment->hstrand(1);
+      $self->throw("Segment strands don't match exon strand\n") unless $exon->strand == -1;
+    }
+    
+    # convert to genomic coords
+    my @converted_segments = $miniseq->convert_FeaturePair($segment);
+    if ($#converted_segments > 0) {
+      # we're in for fun
+      print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@converted_segments) . "\n";
+    }
+    
+    foreach my $s(@converted_segments) {
+      if($s->strand != $s->hstrand){
+	$s->strand(-1);
+	$s->hstrand(1);
+      }
+
+      if( ($s->strand != $segment->strand) || ($s->hstrand != $segment->hstrand) ) {
+	$self->print_FeaturePair($s);
+	$self->print_FeaturePair($segment);
+	$self->throw("Converted segment strands don't match unconverted segment strands\n");
+      }
+
+      $s->seqname($segment->seqname);
+      $s->hseqname($segment->hseqname);
+      $s->score($segment->score);
+      
+      # try to add to the appropriate converted_exon
+      # shouldn't need to expand $converted_exon when adding $s ... unless something's gone horribly wrong
+      if($s->start >= $converted_exon->start && $s->end <= $converted_exon->end){
+	  $converted_exon->add_sub_SeqFeature($s,'');
+	}
+      else {
+	$self->warn("Sub align feature could not be added ...\n");
+      }
+      
+    }
+  }
+}
+
+=head2 find_extras
+
+  Title   : find_extras
+  Usage   : $self->find_extras(@features)
+  Function: 
+  Returns : 
+  Args    : 
+
+=cut
 
 sub find_extras {
   my ($self,@features) = @_;
@@ -707,110 +790,6 @@ sub output {
 	$self->{_output} = [];
     }
     return @{$self->{'_output'}};
-}
-
-sub _createfeatures {
-    my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
-    
-    #create analysis object
-    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => 'genewise',
-                                 -db_version      => 1,
-                                 -program         => "genewise",
-                                 -program_version => 1,
-                                 -gff_source      => $f1source,
-                                 -gff_feature     => $f1primary,);
-    
-    #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
-                                              -end =>     $f1end,
-                                              -seqname =>      $f1id,
-                                              -strand =>  $f1strand,
-                                              -score =>   $f1score,
-                                              -source =>  $f1source,
-                                              -primary => $f1primary,
-                                              -analysis => $analysis_obj );
- 
-     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
-                                                -end =>    $f2end,
-                                                -seqname =>$f2id,
-                                                -strand => $f2strand,
-                                                -score =>  undef,
-                                                -source => $f2source,
-                                                -primary =>$f2primary,
-                                                -analysis => $analysis_obj );
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-                                             -feature2 => $feat2) ;
- 
-    $self->_growfplist($fp); 
-}
-
-sub _growfplist {
-    my ($self, $fp) =@_;
-    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
-}
-
-sub _createfiles {
-    my ($self, $genfile, $estfile, $dirname)= @_;
-    
-    #check for diskspace
-    my $spacelimit = 0.1; # 0.1Gb or about 100 MB
-    my $dir ="./";
-    unless ($self->_diskspace($dir, $spacelimit)) 
-    {
-        $self->throw("Not enough disk space ($spacelimit Gb required)");
-    }
-            
-    #if names not provided create unique names based on process ID    
-    $genfile = $self->_getname("genfile") unless ($genfile);
-    $estfile = $self->_getname("estfile") unless ($estfile);    
-    #create tmp directory    
-    mkdir ($dirname, 0777) or $self->throw ("Cannot make directory '$dirname' ($?)");
-    chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
-    return ($genfile, $estfile);
-}
-    
-
-sub _getname {
-    my ($self, $typename) = @_;
-    return  $typename."_".$$.".fn"; 
-}
-
-sub _diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!");
-}
-
-
-sub _deletefiles {
-    my ($self, $genfile, $estfile, $dirname) = @_;
-    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
-    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
-    chdir ("../");
-    rmdir ($dirname) or $self->throw("Cannot remove $dirname \n");
 }
 
 1;
