@@ -82,6 +82,7 @@ sub new{
   }
   $self->db($db);
   $self->is_locked;
+  $self->create_lock;
   if(!$queue_manager){
     $queue_manager = $QUEUE_MANAGER; #found in BatchQueue.pm
   }
@@ -862,20 +863,21 @@ sub qualify_hostname{
 
 sub is_locked{
   my ($self) = @_;
-  
   if(my $lock_str = $self->db->pipeline_lock){
     my($user, $host, $pid, $started) = 
       $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
     $started = scalar localtime $started;
+    my $dbname = $self->db->dbname;
+    my $dbhost = $self->db->host;
     my $error_str = ("Error: this pipeline appears to be running!\n\n".
-                     "\tdb       $self->db->dbname\@$self->db->host".
+                     "\tdb       $dbname\@$dbhost\n".
                      "\tpid      $pid on ".
                      "host $host\n\tstarted  $started\n\n".
                      "The process above must be terminated before this ".
                      "script can be run.\nIf the process does not exist, ".
                      "remove the lock by removing the lock from the ".
-                     "pipeline database:\ndelete from meta where ".
-                     "meta_key = 'pipeline.lock';\n Thank you\n\n");
+                     "pipeline database:\n\ndelete from meta where ".
+                     "meta_key = 'pipeline.lock';\n\n Thank you\n\n");
     print STDERR $error_str;
     throw("Can't run RuleManager there may be another rulemanager ".
           "running look in ".$self->db->dbname." meta table ");
@@ -1128,7 +1130,7 @@ sub check_if_done{
   my ($self) = @_;
   my @jobs = $self->job_adaptor->fetch_all;
   my $continue;
-  foreach my $job(@jobs){
+ JOB:foreach my $job(@jobs){
     my $status = $job->current_status->status;
     if($status eq 'KILLED' || $status eq 'SUCCESSFUL'){
       next JOB;
