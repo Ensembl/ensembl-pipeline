@@ -27,7 +27,10 @@ sub run{
   my $potential = $self->get_input_ids;
   my $existing = $self->get_TaskStatus->get_existing;
   my $id_set = $potential->not($existing);
-  $self->create_Jobs('Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker', $id_set, $parameters);
+  $self->create_Jobs('Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker', 
+		     $id_set, $parameters);
+
+  return 2; #TASK_DONE
 }
 
 sub is_finished{
@@ -41,7 +44,7 @@ sub is_finished{
   }elsif($potential->count == $successful->count){
     return 1;
   }else{
-    return undef;
+    return 0;
   }
 }
 

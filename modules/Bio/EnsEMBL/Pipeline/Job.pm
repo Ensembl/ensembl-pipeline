@@ -63,17 +63,17 @@ sub new{
    my $self = bless {}, $class;
 
    my ($dbID, $taskname, $input_id, $submission_id, $array_index,
-			 $parameters, $module, $stderr_file, $stdout_file, $status,
-			 $adaptor, $job_name, $retry_count) =
-			$self->_rearrange([qw(dbID TASKNAME INPUT_ID
-														SUBMISSION_ID ARRAY_INDEX PARAMETERS
-														MODULE STDERR_FILE STDOUT_FILE STATUS
-														ADAPTOR JOB_NAME RETRY_COUNT)],@args);
+       $parameters, $module, $stderr_file, $stdout_file, $status,
+       $adaptor, $job_name, $retry_count) =
+	 $self->_rearrange([qw(dbID TASKNAME INPUT_ID
+			       SUBMISSION_ID ARRAY_INDEX PARAMETERS
+			       MODULE STDERR_FILE STDOUT_FILE STATUS
+			       ADAPTOR JOB_NAME RETRY_COUNT)],@args);
 
-	 $taskname || $self->throw("Must define a taskname when creating a Job");
-	 $input_id || $self->throw("Must define an input_id when creating a Job");
-	 $module   || $self->throw("Must define a module when creating a Job");
-	
+   $taskname || $self->throw("Must define a taskname when creating a Job");
+   $input_id || $self->throw("Must define an input_id when creating a Job");
+   $module   || $self->throw("Must define a module when creating a Job");
+   
    $self->{'_dbID'}          = $dbID;
    $self->{'_taskname'}      = $taskname;
    $self->{'_input_id'}      = $input_id;
@@ -85,8 +85,8 @@ sub new{
    $self->{'_stderr_out'}    = $stdout_file;
    $self->{'_status'}        = $status;
    $self->{'_adaptor'}       = $adaptor;
-	 $self->{'_job_name'}      = $job_name;
-	 $self->{'_retry_count'}   = $retry_count || 0;
+   $self->{'_job_name'}      = $job_name;
+   $self->{'_retry_count'}   = $retry_count || 0;
 
    return $self;
 }
@@ -131,76 +131,76 @@ sub new{
 
 sub dbID{
   my $self = shift;
-	$self->{'_dbID'} = shift if(@_);
+  $self->{'_dbID'} = shift if(@_);
   return $self->{'_dbID'};
 }
 
 sub taskname{
   my $self = shift;
-	$self->{'_taskname'} = shift if(@_);
+  $self->{'_taskname'} = shift if(@_);
   return $self->{'_taskname'};
 }
 
 sub input_id{
   my $self = shift;
-	$self->{'_input_id'} = shift if(@_);
+  $self->{'_input_id'} = shift if(@_);
   return $self->{'_input_id'};
 }
 
 sub submission_id{
   my $self = shift;
-	$self->{'_submission_id'} = shift if(@_);
+  $self->{'_submission_id'} = shift if(@_);
   return $self->{'_submission_id'};
 }
 
 sub job_name {
-	my $self = shift;
-	$self->{'_job_name'} = shift if(@_);
-	return $self->{'_job_name'};
+  my $self = shift;
+  $self->{'_job_name'} = shift if(@_);
+  return $self->{'_job_name'};
 }
 
 
 sub array_index{
   my $self = shift;
-	$self->{'_array_index'} = shift if(@_);
+  $self->{'_array_index'} = shift if(@_);
   return $self->{'_array_index'};
 }
 
 sub parameters{
   my $self = shift;
-	$self->{'_parameters'} = shift if(@_);
+  $self->{'_parameters'} = shift if(@_);
   return $self->{'_parameters'};
 }
 
 sub module{
   my $self = shift;
-	$self->{'_module'} = shift if(@_);
+  $self->{'_module'} = shift if(@_);
   return $self->{'_module'};
 }
 
 sub stderr_file{
   my $self = shift;
-	$self->{'_stderr_file'} = shift if(@_);
+  $self->{'_stderr_file'} = shift if(@_);
   return $self->{'_stderr_file'};
 }
 
 sub stdout_file{
   my $self = shift;
-	$self->{'_stdout_file'} = shift if(@_);
+  $self->{'_stdout_file'} = shift if(@_);
   return $self->{'_stdout_file'};
 }
 
 sub status{
   my $self = shift;
-	$self->{'_status'} = shift if(@_);
+  $self->{'_status'} = shift if(@_);
   return $self->{'_status'};
 }
 
 
 sub retry_count {
-	my $self = shift;
-	$self->{'_retry_count'} = shift if(@_);
-	return $self->{'_retry_count'};
+  my $self = shift;
+  $self->{'_retry_count'} = shift if(@_);
+  return $self->{'_retry_count'};
 }
 
 
@@ -218,7 +218,7 @@ sub retry_count {
 
 sub adaptor{
   my $self = shift;
-	$self->{'_adaptor'} = shift if(@_);
+  $self->{'_adaptor'} = shift if(@_);
   return $self->{'_adaptor'};
 }
 
@@ -244,8 +244,8 @@ sub set_current_status{
 
   if(!$self->adaptor){
     $self->warn("Can't update the status of a Job if it doesn't have" .
-								"a jobadaptor and a database connection" .
-								$self->dbID . ":" . $self->taskname . ":" . $self->input_id);
+		"a jobadaptor and a database connection" .
+		$self->dbID . ":" . $self->taskname . ":" . $self->input_id);
   }else{
     $self->adaptor->update_status($self, $status);
   }
@@ -277,12 +277,12 @@ sub run{
     $module =~ s/\//::/g;
     $rdb = "${module}"->new
       (-input_id => $self->input_id,
-	     -parameters => $self->parameters,);
+       -parameters => $self->parameters,);
   };
 
   if($@){
-    print STDERR("Job creation for job ".$self->dbID.":".$self->taskname.":".
-								 $self->input_id." failed $@");
+    print STDERR "Job creation for job ".$self->dbID.":".$self->taskname.":".
+      $self->input_id." failed $@";
     $self->set_current_status('FAILED');
   }
 
@@ -292,9 +292,9 @@ sub run{
   };
 
   if($@){
-    print STDERR("call to fetch_input for module ".$rdb." job ".
-								 $self->dbID.":".$self->taskname.":".$self->input_id.
-								 " failed $@");
+    print STDERR "call to fetch_input for module ".$rdb." job ".
+      $self->dbID.":".$self->taskname.":".$self->input_id.
+	" failed $@";
     $self->set_current_status('FAILED');
   }
 
@@ -304,8 +304,8 @@ sub run{
   };
 
   if($@){
-    print STDERR("call to run for module ".$rdb." job ".$self->dbID.":".
-								 $self->taskname.":".$self->input_id." failed $@");
+    print STDERR "call to run for module ".$rdb." job ".$self->dbID.":".
+		 $self->taskname.":".$self->input_id." failed $@";
     $self->set_current_status('FAILED');
   }
 
@@ -317,8 +317,8 @@ sub run{
 
   if($@){
     print STDERR ("call to write output for module ".$rdb." job ".
-									$self->dbID.":".$self->taskname.":".$self->input_id.
-									" failed $@");
+		  $self->dbID.":".$self->taskname.":".$self->input_id.
+		  " failed $@");
     $self->set_current_status('FAILED');
   }
 }

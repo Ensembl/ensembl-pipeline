@@ -77,7 +77,7 @@ Internal methods have an underscore prefix.
 use strict;
 package Bio::EnsEMBL::Pipeline::Task;
 
-use vars qw(@ISA);
+use vars qw(@ISA @EXPORT_OK);
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::TaskStatus;
@@ -103,37 +103,35 @@ use Bio::EnsEMBL::Pipeline::TaskStatus;
 =cut
 
 sub new {
-	my $caller = shift;
+  my $caller = shift;
 
-	my $class = ref($caller) || $caller;
+  my $class = ref($caller) || $caller;
+  
+  my $self = bless({}, $class);
 
-	my $self = bless({}, $class);
-	print STDERR "args: @_\n";
-	my ($taskname, $plm) = $self->_rearrange([qw(TASKNAME PIPELINE_MANAGER)], @_);
+  my ($taskname, $plm)=$self->_rearrange([qw(TASKNAME PIPELINE_MANAGER)], @_);
 	
-	print STDERR "have taskname ".$taskname." plm ".$plm." ".$self->name."\n";
-	#
-	# Verify that the configuration is using the correct name
-	#
-	if($taskname ne $self->name) {
-	  
-		$self->throw("Task name in config [$taskname] != [" . $self->name() .
-								 "] as specified by the module " . ref($self));
-	}
+  #
+  # Verify that the configuration is using the correct name
+  #
+  if($taskname ne $self->name) {
+    $self->throw("Task name in config [$taskname] != [" . $self->name() .
+		 "] as specified by the module " . ref($self));
+  }
 
-	#
-	# verify the pipeline manager argument
-	#
-	unless(ref($plm) && $plm->isa('Bio::EnsEMBL::Pipeline::PipelineManager')) {
-		$self->throw('PipelineManager argument is required');
-	}
+  #
+  # verify the pipeline manager argument
+  #
+  unless(ref($plm) && $plm->isa('Bio::EnsEMBL::Pipeline::PipelineManager')) {
+    $self->throw('PipelineManager argument is required');
+  }
+  
+  $self->{'pipeline_manager'} = $plm;
 
-	$self->{'pipeline_manager'} = $plm;
-
-	#create a new status object for this task
-	$self->{'TaskStatus'} = Bio::EnsEMBL::Pipeline::TaskStatus->new();
-
-	return $self;
+  #create a new status object for this task
+  $self->{'TaskStatus'} = Bio::EnsEMBL::Pipeline::TaskStatus->new();
+  
+  return $self;
 }
 
 
@@ -152,9 +150,9 @@ sub new {
 =cut
 
 sub name {
-	my $self = shift;
+  my $self = shift;
 
-	$self->throw('Abstract method name not implemented by subclass');
+  $self->throw('abstract method name not implemented by subclass');
 }
 
 
@@ -170,9 +168,9 @@ sub name {
 =cut
 
 sub run {
-	my $self = shift;
-
-	$self->throw('run is an Abstract method run not implmented by subclass');
+  my $self = shift;
+  
+  $self->throw('abstract method run not implmented by subclass');
 }
 
 
@@ -181,16 +179,13 @@ sub run {
 sub can_start {
   my $self = shift;
 
-  my $ids = $self->get_TaskStatus('RepeatMasker')->get_successful();
-
-  return $ids->count();
-  $self->throw('can_start an Abstract method run not implmented by subclass');
+  $self->throw('abstract method can_start not implmented by subclass');
 }
 
 
 sub is_finished {
   my ($self) = @_;
-  $self->throw('is_finished is an Abstract method run not implmented by subclass');
+  $self->throw('abstract method is_finished not implmented by subclass');
 }
 
 
@@ -219,7 +214,8 @@ sub create_Job {
   my $id = shift;
   my $parameters = shift;
 
-  return $self->get_PipelineManager->create_Job($self->name(), $module, $id, $parameters); 
+  return $self->get_PipelineManager->create_Job($self->name(), $module, 
+						$id, $parameters); 
 }
 
 
@@ -228,9 +224,9 @@ sub create_Jobs {
   my $module = shift;
   my $id_set = shift;
   my $parameters = shift;
-  print STDERR "module ".$module." idset ".$id_set." parameters ".$parameters."\n"; 
-  return $self->get_PipelineManager->create_Jobs($self->name(), $module, $id_set, $parameters);
 
+  return $self->get_PipelineManager->create_Jobs($self->name(), $module, 
+						 $id_set, $parameters);
 }
 
 1;

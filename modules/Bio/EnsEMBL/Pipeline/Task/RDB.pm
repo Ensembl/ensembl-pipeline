@@ -92,28 +92,28 @@ sub db{
   my ($self) = @_;
 
   if(!$self->{'core_db'}){
-     my $config = $self->get_PipelineManager->get_Config;
+    my $config = $self->get_PipelineManager->get_Config;
+    
+    if(!$config){
+      $self->throw("PipelineManager ".$self->get_PipelineManager.
+		   " seems to be missing its config $!");
+    }
 
-     if(!$config){
-       $self->throw("PipelineManager ".$self->get_PipelineManager.
-                    " seems to be missing its config $!");
-     }
+    my $dbhost = $config->get_parameter('ensembl_database', 'host');
+    my $dbuser = $config->get_parameter('ensembl_database', 'user');
+    my $dbpass = $config->get_parameter('ensembl_database', 'pass');
+    my $dbname = $config->get_parameter('ensembl_database', 'dbname');
+    my $dbport = $config->get_parameter('ensembl_database', 'port');
+    
+    my $dbadaptor = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+							-dbname => $dbname,
+							-host => $dbhost,
+							-user => $dbuser,
+							-pass => $dbpass,
+							-port => $dbport
+						       );
 
-     my $dbhost = $config->get_parameter('ensembl_database', 'host');
-     my $dbuser = $config->get_parameter('ensembl_database', 'user');
-     my $dbpass = $config->get_parameter('ensembl_database', 'pass');
-     my $dbname = $config->get_parameter('ensembl_database', 'dbname');
-     my $dbport = $config->get_parameter('ensembl_database', 'port');
-
-     my $dbadaptor = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-							 -dbname => $dbname,
-							 -host => $dbhost,
-							 -user => $dbuser,
-							 -pass => $dbpass,
-               -port => $dbport
-							);
-
-     $self->{'core_db'} = $dbadaptor;
+    $self->{'core_db'} = $dbadaptor;
   }
 
   return $self->{'core_db'};
