@@ -135,7 +135,7 @@ sub make_exonerate_bsubs {
   my $estfile = $::scripts_conf{'estfile'}; # may be a full path
   my @path = split /\//, $estfile;
   $estfile = $path[$#path];
-  $estfile .= "_chunk_";
+  $estfile .= "_reruns_chunk_";
 
   my $numchunks = $::scripts_conf{'estchunknumber'};
 
@@ -196,7 +196,7 @@ sub make_filter_bsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \" $filter_e2g -input_id $input_id";
+      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G\" $filter_e2g -input_id $input_id";
       print OUT "$command\n";
       
       $count = $count + $size;
