@@ -8,29 +8,43 @@
 #
 # POD documentation - main docs before the code
 
-#=pod 
+=pod
 
-#=head1 NAME
+=head1 NAME
 
-#Bio::EnsEMBL::Pipeline::IDSet
+Bio::EnsEMBL::Pipeline::IDSet
 
-#=head1 SYNOPSIS
+=head1 SYNOPSIS
 
-#=head1 DESCRIPTION
+  my $a = Bio::EnsEMBL::Pipeline::IDSet->new(-ID_LIST => [1, 2, 3, 6, 7]);
+  my $b = Bio::EnsEMBL::Pipeline::IDSet->new(-ID_LIST => [4,5,6,7]);
+  my $c = Bio::EnsEMBL::Pipeline::IDSet->new(-ID_LIST => [1, 3, 10]);
 
-#stores a list of input_ids from a pipeline and will generate unions intersections and differences between the list it holds and a list it is passed
+  $a->add_element(9);
+  $b->add_element(10);
+  my $d = $a->or($b)->not($c);
 
-#=head1 CONTACT
+  #prints out: 2,4,5,6,7,9
+  print join ',', @{$d->ID_list};
 
-#Post general queries to B<ensembl-dev@ebi.ac.uk>
 
-#=head1 APPENDIX
+=head1 DESCRIPTION
 
-#The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+stores a list of input_ids from a pipeline and will generate unions
+intersections and differences between the list it holds and a list it is passed
 
-#=cut
+=head1 CONTACT
 
-#package Bio::EnsEMBL::Pipeline::IDSet;
+Post general queries to B<ensembl-dev@ebi.ac.uk>
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
+
+=cut
+
+package Bio::EnsEMBL::Pipeline::IDSet;
 
 use vars qw(@ISA);
 use strict;
@@ -45,7 +59,7 @@ use Bio::EnsEMBL::Root;
   Function  : instantiate a new Bio::EnsEMBL::Pipeline::IDSet object
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: if the value its passed for ID_LIST isn't a listref'
-  Caller    : 
+  Caller    :
   Example   : Bio::EnsEMBL::Pipeline::IDSet->new();
 
 =cut
@@ -57,7 +71,7 @@ sub new{
   my $self = bless {}, $class;
   my ($list) = $self->_rearrange([qw(ID_LIST)], @args);
 
-  $self->{'_ID_list'} = []; 
+  $self->{'_ID_list'} = [];
 
   if($list){
     if(ref($list) eq 'ARRAY'){
@@ -101,7 +115,7 @@ sub delete_element{
     @ids = @new_ids;
     @new_ids = ();
   }
-  
+
   @{$self->{'_ID_list'}} = @ids;
 }
 
@@ -109,10 +123,10 @@ sub delete_element{
 =head2 ID_list
 
   Arg [1]   : none
-  Function  : 
+  Function  :
   Returntype: returns the listref to the caller
   Exceptions: none
-  Caller    : 
+  Caller    :
   Example   : my @array = @{$idset->ID_list};
 
 =cut
@@ -141,9 +155,12 @@ sub ID_list{
 
 sub _calculate{
   my ($self, $idlist) = @_;
-  
-  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||$self->throw("Need to passs these methods (and/or/not) an Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work you passed in $idlist : $!");
-  
+
+  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
+		$self->throw("Need to passs these methods (and/or/not) an" .
+								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise" .
+								 "won't work you passed in $idlist : $!");
+
   my %count;
   my @own_ids =  @{$self->{'_ID_list'}};
   my @comp_ids = @{$idlist->ID_list};
@@ -159,7 +176,7 @@ sub _calculate{
   on both lists. This is done by using calculate to produce a hash which 
   contains the elements on both lists together with the number of times each
   element appears if an elements appears twice it must live on both lists so
-  is added to the new list
+  is added to the new list (set intersection)
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: none
   Caller    : 
@@ -192,6 +209,7 @@ sub and{
   Function  : to return all the values which appear in at least on of the 
   lists this is done by caling calculate and returning an idlist of all the
   keys of the hash it returns as this all live on at least one of the lists
+  (set union)
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: none
   Caller    : 
@@ -234,7 +252,10 @@ sub or{
 
 sub not{
   my ($self, $idlist) = @_;
-  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||$self->throw("Need to passs these methods (and/or/not) an Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work you passed in $idlist : $!");
+  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
+		$self->throw("Need to passs these methods (and/or/not) an " .
+								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work " .
+								 "you passed in $idlist : $!");
 
   my @own_ids =  @{$self->{'_ID_list'}};
   my @comp_ids = @{$idlist->ID_list};
@@ -254,21 +275,21 @@ sub not{
 }
 
 
-=head2 symmetric_difference
+=head2 xor
 
   Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet
   Function  : produces a IDset which contains all the IDs which exist on only
-  on list or the other and not both
+  one list or the other and not both (symmetric difference)
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: none
   Caller    :
-  Example   : $c = $a->symmetric_difference($b);
+  Example   : $c = $a->xor($b);
 
 =cut
 
 
 
-sub symmetric_difference{
+sub xor {
   my ($self, $idlist) = @_;
 
   my %count = %{$self->_calculate($idlist)};
@@ -290,7 +311,7 @@ sub count{
   if(@{$self->{'_ID_list'}}){
      return scalar(@{$self->{'_ID_list'}});
   }else{
-    return 0;    	
+    return 0;
   }
 }
 
