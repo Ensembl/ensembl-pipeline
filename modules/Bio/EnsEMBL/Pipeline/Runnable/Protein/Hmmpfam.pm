@@ -399,12 +399,10 @@ sub parse_results {
             return;
         }       
         else {
-	    print STDERR "RESFILE: $resfile\n";
-            open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
+	    open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
             $filehandle = \*OUT;
 	
 
-	    print STDERR "FSFILE: $fsfile\n";
 	    open (OUT1, "<$fsfile")  or $self->throw ("Error opening $fsfile");
 	    $fshandle = \*OUT1;
 	}
@@ -419,14 +417,12 @@ sub parse_results {
 
 #First parse what comes from the ls mode matches. Every match in that case is taken
     while (<$filehandle>) {
-        print STDERR "PARSING1...\n";
-        chomp;
+	chomp;
         last if /^Alignments of top-scoring domains/;
         next if (/^Model/ || /^\-/ || /^$/);
         if (/^Query sequence:\s+(\S+)/) {
             $id = $1;
-	    print STDERR "ID : $id\n";
-        }
+	}
 	
         if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
 	
