@@ -62,6 +62,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis::PairAlign;
+use Bio::PrimarySeq;
 
 @ISA = qw(Bio::Root::RootI);
 
