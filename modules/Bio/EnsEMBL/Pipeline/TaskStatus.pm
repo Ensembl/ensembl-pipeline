@@ -18,8 +18,9 @@ Bio::EnsEMBL::Pipeline::TaskStatus
 
 =head1 DESCRIPTION
 
-stores IDSets for a Task for all of the different statuses jobs can have from that task
-these status incule Created, Submitted, Reading, Running, Writing, Successful, Failed, Fatal, Exists, Killed
+Stores IDSets for a Task for all of the different statuses jobs can have from
+that task. These statuses include Created, Submitted, Reading, Running,
+Writing, Successful, Failed, Fatal, Exists, Killed
 
 =head1 CONTACT
 
@@ -27,7 +28,8 @@ Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object methods. 
+Internal methods are usually preceded with a _
 
 =cut
 
@@ -58,14 +60,14 @@ use warnings;
 sub new{
   my ($class, @args) = @_;
   my $self = bless {}, $class;
-  my ($created, $submitted, $reading, $running, $writing, $successful, 
-      $failed, $fatal, $killed, $existing, $retried) = 
+  my ($created, $submitted, $reading, $running, $writing, $successful,
+      $failed, $fatal, $killed, $existing, $retried) =
     $self->_rearrange([qw(CREATED SUBMITTED READING RUNNING WRITING 
-			  SUCCESSFUL FAILED FATAL KILLED EXISTING RETRIED)], 
+			  SUCCESSFUL FAILED FATAL KILLED EXISTING RETRIED)],
 		      @args);
 
   $self->{'_created'} = undef;
-  $self->{'_submitted'} = undef; 
+  $self->{'_submitted'} = undef;
   $self->{'_reading'} = undef;
   $self->{'_running'} = undef;
   $self->{'_writing'} = undef;
@@ -95,17 +97,18 @@ sub new{
 =head2 _check
 
   Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or arrayref
-  Function  : to check what the argument is anc if its a listref create an IDSet
- Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Function  : to check what the argument is anc if its a listref create an 
+              IDSet
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: if the argument isn't of the required type'
-  Caller    : 
+  Caller    :
   Example   : $self->_check
 
 =cut
 
 sub _check{
   my ($self, $arg) = @_;
-    
+
   if($arg){
     if(ref($arg) eq 'ARRAY'){
 	
@@ -114,14 +117,13 @@ sub _check{
 						    );
       return $idset;
     }
-      
+
     if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
       return $arg;
     }
   }
   $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array" .
 	       " refs to TaskStatus add methods not $arg");
-    
 
 }
 
@@ -144,51 +146,35 @@ sub _check{
 
 
 sub add_created{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_created'}){
-      $self->{'_created'} = $idset;
-    }else{
-      $self->{'_created'} = ($self->{'_created'}) ?
-        $self->{'_created'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_created'} = ($self->{'_created'}) ?
+    $self->{'_created'}->or($idset) : $idset;
 }
 
 sub add_submitted{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_submitted'}){
-      $self->{'_submitted'} = $idset;
-    }else{
-      $self->{'_submitted'} = ($self->{'_submitted'}) ?
-        $self->{'_submitted'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_submitted'} = ($self->{'_submitted'}) ?
+    $self->{'_submitted'}->or($idset) : $idset;
 }
 
 sub add_reading{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_reading'}){
-      $self->{'_reading'} = $idset;
-    }else{
-      $self->{'_reading'} = ($self->{'_reading'}) ?
-        $self->{'_reading'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_reading'} = ($self->{'_reading'}) ?
+    $self->{'_reading'}->or($idset) : $idset;
 }
 
 sub add_running{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_running'}){
-      $self->{'_running'} = $idset;
-    }else{
-    $self->{'_running'} = ($self->{'_running'}) ?
-      $self->{'_running'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_running'} = ($self->{'_running'}) ?
+    $self->{'_running'}->or($idset) : $idset;
 }
 
 
@@ -197,84 +183,58 @@ sub add_successful{
   my ($self, $arg) = @_;
 
   my $idset = $self->_check($arg);
-  if(!$self->{'_successful'}){
-    $self->{'_successful'} = $idset;
-  }else{
-    $self->{'_successful'} = ( $self->{'_successful'}) ?
-       $self->{'_successful'}->or($idset) : $idset;
-  }
+  $self->{'_successful'} = ( $self->{'_successful'}) ?
+    $self->{'_successful'}->or($idset) : $idset;
 }
 
 sub add_writing{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_writing'}){
-      $self->{'_writing'} = $idset;
-    }else{
-      $self->{'_writing'} = ($self->{'_writing'}) ?
-        $self->{'_writing'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_writing'} = ($self->{'_writing'}) ?
+    $self->{'_writing'}->or($idset) : $idset;
 }
 
 sub add_failed{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_failed'}){
-      $self->{'_failed'} = $idset;
-    }else{
-      $self->{'_failed'} = ($self->{'_failed'}) ?
-        $self->{'_failed'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_failed'} = ($self->{'_failed'}) ?
+    $self->{'_failed'}->or($idset) : $idset;
 }
 
 
 sub add_fatal{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_fatal'}){
-      $self->{'_fatal'} = $idset;
-    }else{
-      $self->{'_fatal'} = ($self->{'_fatal'}) ?
-        $self->{'_fatal'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_fatal'} = ($self->{'_fatal'}) ?
+    $self->{'_fatal'}->or($idset) : $idset;
 }
 
 sub add_killed{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_killed'}){
-      $self->{'_killed'} = $idset;
-    }else{
-      $self->{'_killed'} = ($self->{'_killed'}) ?
-        $self->{'_killed'}->or($idset) : $idset;
-    }
+  my $idset = $self->_check($arg);
+  $self->{'_killed'} = ($self->{'_killed'}) ?
+    $self->{'_killed'}->or($idset) : $idset;
 }
 
 sub add_existing{
-    my ($self, $arg) = @_;
-    
-    my $idset = $self->_check($arg);
-    if(!$self->{'_existing'}){
-      $self->{'_existing'} = $idset;
-    }else{
-      $self->{'_existing'} = ($self->{'_existing'}) ?
-        $self->{'_existing'}->or($idset) : $idset;
-    }
+  my ($self, $arg) = @_;
+
+  my $idset = $self->_check($arg);
+
+  $self->{'_existing'} = ($self->{'_existing'}) ?
+    $self->{'_existing'}->or($idset) : $idset;
 }
 
 sub add_retried{
-    my ($self, $arg) = @_;
-    my $idset = $self->_check($arg);
-    if(!$self->{'_retried'}){
-      $self->{'_retried'} = $idset;
-    }else{
-      $self->{'_retried'} = ($self->{'_retried'}) ?
-        $self->{'_retried'}->or($idset) : $idset;
-    }
+  my ($self, $arg) = @_;
+  my $idset = $self->_check($arg);
+
+  $self->{'_retried'} = ($self->{'_retried'}) ?
+    $self->{'_retried'}->or($idset) : $idset;
 }
 
 
@@ -366,9 +326,9 @@ sub get_killed{
 sub get_existing{
     my ($self) = @_;
     if(!$self->{'_existing'}){
-      $self->create_existing;
+      $self->{'_existing'} = Bio::EnsEMBL::Pipeline::IDSet->new;
     }
-    
+
     return $self->{'_existing'};
 }
 
@@ -380,94 +340,36 @@ sub get_retried{
     return $self->{'_retried'};
 }
 
-=head2 create_existing
-
-  Arg [1]   : none
-  Function  : this takes all IDSets the object holds and performs unions
-              to produce the total set of IDs
-  Returntype: Bio::EnEMBL::Pipeline::IDSet
-  Exceptions: none
-  Caller    : 
-  Example   : my $total = $self->create_exisiting
-
-=cut
-
-
-
-sub create_existing{
-    my ($self) = @_;
-    
-    my $total_ids = Bio::EnsEMBL::Pipeline::IDSet->new;
-
-    if($self->get_created){
-       my $idset = $total_ids->or($self->get_created);
-       $total_ids = $idset;
-    }
-    if($self->get_submitted){
-       my $idset = $total_ids->or($self->get_submitted);
-       $total_ids = $idset;
-    }
-    if($self->get_reading){
-       my $idset = $total_ids->or($self->get_reading);
-       $total_ids = $idset;
-    }
-    if($self->get_running){
-       my $idset = $total_ids->or($self->get_running);
-       $total_ids = $idset;
-    }
-    if($self->get_writing){
-       my $idset = $total_ids->or($self->get_writing);
-       $total_ids = $idset;
-    }
-    if($self->get_successful){
-       my $idset = $total_ids->or($self->get_successful);
-       $total_ids = $idset;
-    }
-    if($self->get_failed){
-       my $idset = $total_ids->or($self->get_failed);
-       $total_ids = $idset;
-    }
-    if($self->get_fatal){
-       my $idset = $total_ids->or($self->get_fatal);
-       $total_ids = $idset;
-    }
-    if($self->get_fatal){
-       my $idset = $total_ids->or($self->get_fatal);
-       $total_ids = $idset;
-    }
-   
-    $self->add_existing($total_ids);
-     
-}
-
-
 
 =head2 status_report
 
   Arg [1]   : none
-  Function  : prints the number of each status type the object holds
+  Function  : returns a formatted string listing the number of each status
+              type the object holds.  Useful for debugging or displaying
+              status information in a monitor tool.
   Returntype: none
   Exceptions: none
-  Caller    : 
-  Example   : $self->status_report
+  Caller    : general
+  Example   : print STDERR $self->status_report
 
 =cut
 
 
 sub status_report{
     my ($self) = @_;
-    
-    print STDERR "Created tasks\t".$self->get_created->count."\n" if($self->get_created->count);
-    print STDERR "Submitted tasks\t".$self->get_submitted->count."\n" if($self->get_submitted->count);
-    print STDERR "Reading tasks\t".$self->get_reading->count."\n" if($self->get_reading->count);
-    print STDERR "Running tasks\t".$self->get_running->count."\n" if($self->get_running->count);
-    print STDERR "Writing tasks\t".$self->get_writing->count."\n" if($self->get_writing->count);
-    print STDERR "Successful tasks\t".$self->get_successful->count."\n" if($self->get_successful->count);
-    print STDERR "Failed tasks\t".$self->get_failed->count."\n" if ($self->get_failed->count);
-    print STDERR "Fatal tasks\t".$self->get_fatal->count."\n" if($self->get_fatal->count);
-    print STDERR "Killed tasks\t".$self->get_killed->count."\n" if($self->get_killed->count);
-    print STDERR "Retried tasks\t".$self->get_retried->count."\n" if($self->get_retried->count);
-    print STDERR "Exisiting tasks\t".$self->get_existing->count."\n" if($self->get_existing->count);
+
+    return join("\n",
+                "  Created   : ".$self->get_created->count,
+                "  Submitted : ".$self->get_submitted->count,
+                "  Reading   : ".$self->get_reading->count,
+                "  Running   : ".$self->get_running->count,
+                "  Writing   : ".$self->get_writing->count,
+                "  Successful: ".$self->get_successful->count,
+                "  Failed    : ".$self->get_failed->count,
+                "  Fatal     : ".$self->get_fatal->count,
+                "  Killed    : ".$self->get_killed->count,
+                "  Retried   : ".$self->get_retried->count,
+                "  Existing  : ".$self->get_existing->count);
 }
 
 
@@ -492,6 +394,7 @@ sub clean{
   $self->{'_submitted'} = undef;
   $self->{'_reading'} = undef;
   $self->{'_running'} = undef;
+  $self->{'_retried'} = undef;
   $self->{'_writing'} = undef;
   $self->{'_killed'} = undef;
   $self->{'_successful'} = undef;
@@ -501,137 +404,10 @@ sub clean{
 }
 
 
-=head2 clean methods
-
-  Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or array ref (optional);
-  Function  : to empty the variable and replace with an argument if its 
-  passed in
-  Returntype: none
-  Exceptions: none
-  Caller    : 
-  Example   : $self->clean_created($created_ids);
-
-=cut
-
-
-
-sub clean_created{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_created'} = $idset;
-  }else{
-    $self->{'_created'} = undef;
-  }
-}
-
-sub clean_submitted{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_submitted'} = $idset;
-  }else{
-    $self->{'_submitted'} = undef;
-  }
-}
-
-sub clean_reading{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_reading'} = $idset;
-  }else{
-    $self->{'_reading'} = undef;
-  }
-}
-
-sub clean_running{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_running'} = $idset;
-  }else{
-    $self->{'_running'} = undef;
-  }
-}
-
-sub clean_writing{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_writing'} = $idset;
-  }else{
-    $self->{'_writing'} = undef;
-  }
-}
-
-sub clean_successful{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_successful'} = $idset;
-  }else{
-    $self->{'_successful'} = undef;
-  }
-}
-
-sub clean_failed{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_failed'} = $idset;
-  }else{
-    $self->{'_failed'} = undef;
-  }
-}
-
-sub clean_fatal{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_fatal'} = $idset;
-  }else{
-    $self->{'_fatal'} = undef;
-  }
-}
-
-sub clean_killed{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_killed'} = $idset;
-  }else{
-    $self->{'_killed'} = undef;
-  }
-}
-
-sub clean_existing{
-  my ($self, $arg) = @_;
-
-  if($arg){
-    my $idset = $self->_check($arg);
-    $self->{'_existing'} = $idset;
-  }else{
-    $self->{'_existing'} = undef;
-  }
-}
-
-
 
 sub is_finished{
   my ($self) = shift;
-  if(@_){
-    $self->{'is_finished'} = shift;
-  }
+  $self->{'is_finished'} = shift if(@_);
   return $self->{'is_finished'};
 }
 
