@@ -60,7 +60,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_INPUTID_REGEX
 					);
 
-require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

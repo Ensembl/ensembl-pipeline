@@ -17,9 +17,6 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

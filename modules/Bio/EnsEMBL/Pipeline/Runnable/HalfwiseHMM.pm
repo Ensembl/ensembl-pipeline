@@ -62,9 +62,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;
 use DB_File;
 use Fcntl;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

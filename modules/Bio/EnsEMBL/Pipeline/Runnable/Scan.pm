@@ -64,9 +64,6 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::Scan;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 use vars qw(@ISA);
 use strict;
