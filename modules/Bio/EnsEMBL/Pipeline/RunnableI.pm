@@ -178,19 +178,19 @@ sub threshold_type {
 sub workdir {
     my ($self, $directory) = @_;
 		
-		if (!defined($self->{_workdir})) {
-			if ($directory) {
-				mkdir ($directory, '777') unless (-d $directory);
-				$self->throw ("$directory doesn't exist\n") unless (-d $directory);
-				$self->{_workdir} = $directory;
-			}	elsif ($PIPELINE_WORK_DIR)	{
-				$self->{_workdir}= $PIPELINE_WORK_DIR;
-			} else {
-				$self->{_workdir} = '/tmp';
-			}
-		}
+    if (!defined($self->{_workdir})) {
+        if ($directory) {
+            mkdir ($directory, '777') unless (-d $directory);
+            $self->throw ("$directory doesn't exist\n") unless (-d $directory);
+            $self->{_workdir} = $directory;
+}	elsif ($PIPELINE_WORK_DIR)	{
+            $self->{_workdir}= $PIPELINE_WORK_DIR;
+        } else {
+            $self->{_workdir} = '/tmp';
+        }
+    }
     return $self->{_workdir};
-  }
+}
 
 
 sub get_tmp_file {
