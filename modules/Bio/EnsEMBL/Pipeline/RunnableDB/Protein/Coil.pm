@@ -23,6 +23,8 @@
   $ncoils->output;
   $ncoils->write_output; # writes features to to DB
 
+ NB: The input_id can either be a peptide id or the location for a protein file. 
+
 =head1 DESCRIPTION
 
   This object wraps Bio::EnsEMBL::Pipeline::Runnable::Protein::Coil

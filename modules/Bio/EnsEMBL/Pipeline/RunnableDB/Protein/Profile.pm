@@ -17,15 +17,26 @@ Prints.pm - DESCRIPTION of Object
 
 =head1 SYNOPSIS
 
-Give standard usage here
+ $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+                           -ANALYSIS    => $analysis);
+
+Where the analysis id can be either a translation internal id or the location of a file. That\'s feature is used only for the protein annotation. Some of the protein analysis are extremely fast to run (eg: seg) in that cases a full protein dataset will be given to the RunnableDB (running a protein at a time would be to expensive).
+
 
 =head1 DESCRIPTION
 
-Describe the object here
+ This object wraps Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg
+  to add functionality to read and write to databases.
+  A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
+  The query sequence is provided through the input_id.
+  The appropriate Bio::EnsEMBL::Pipeline::Analysis object
+  must be passed for extraction of parameters.
+
 
 =head1 CONTACT
 
-Describe contact details here
+mongin@ebi.ac.uk
 
 =head1 APPENDIX
 
