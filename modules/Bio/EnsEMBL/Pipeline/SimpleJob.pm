@@ -75,7 +75,9 @@ use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+#use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
@@ -162,7 +164,7 @@ sub runnable {
 
 sub run {
     my ($self) = @_;
-    print("Running in simplejob\n");
+    print(STDERR "Running in simplejob\n");
     $self->runnable->run;
     print ("done\n");
 }
@@ -341,7 +343,19 @@ sub machine {
     return $self->jobobj->machine();
 }
 
+sub useDB {
+    my ($self,$arg) = @_;
 
+    return $self->jobobj->useDB($arg);
+
+}
+
+sub runlocally {
+    my ($self,$arg) = @_;
+
+    return $self->jobobj->runlocally($arg);
+
+}
 
 =head2 submit
 
@@ -460,7 +474,10 @@ sub get_all_status {
 
 sub _dbobj {
     my ($self,$arg) = @_;
-
+ 
+    if (defined($arg)) {
+     $self->runnable->dbobj($arg);
+    } 
     return $self->jobobj->_dbobj($arg);
 }
 
