@@ -340,8 +340,8 @@ sub flush_runs {
     
     $batch_job->construct_command_line($cmd);
     eval {
-	#print STDERR "Submitting: ", $batch_job->bsub, "\n";
-	$batch_job->open_command_line();
+      #print STDERR "Submitting: ", $batch_job->command_line, "\n";
+      $batch_job->open_command_line();
     };
     if ($@) {
 	print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
@@ -479,6 +479,9 @@ sub run_module {
   }
   my $runnable_db_path = 
     $BATCH_QUEUES{$hash_key}{runnabledb_path};
+  if(!$runnable_db_path){
+    $runnable_db_path = $DEFAULT_RUNNABLEDB_PATH;
+  }
   my $perl_path;
   #print STDERR "Getting ".$hash_key." batchqueue value\n";
   if($module =~ /::/){
