@@ -16,11 +16,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam
 =head1 SYNOPSIS
 
   # something like this
-  my $query = new Bio::Seq(-file   => $queryfile,
+  my $clone = new Bio::Seq(-file   => $clonefile,
 			   -format => 'Fasta');
 
   my $hmm =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new 
-    ('-query'          => $query,
+    ('-clone'          => $clone,
      '-program'        => 'hmmpfam' or '/usr/local/pubseq/bin/hmmpfam',
      '-database'       => 'Pfam');
 
@@ -89,7 +89,7 @@ sub new {
 
 
     
-    $self->query ($query) if ($query);       
+    $self->clone ($query) if ($query);       
     $self->analysis ($analysis) if ($analysis);
 	
     $self->program ($self->analysis->program_file);
@@ -110,11 +110,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 query
+=head2 clone
 
- Title    : query
- Usage    : $self->query ($query);
- Function : get/set method for the Sequence object; assigns query,
+ Title    : clone
+ Usage    : $self->clone ($clone);
+ Function : get/set method for the Sequence object; assigns clone,
             seq-filename and result-filename
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
@@ -123,7 +123,7 @@ sub new {
 
 =cut
 
-sub query {
+sub clone {
  my ($self, $seq) = @_;
     if ($seq) {
 	eval {
@@ -132,8 +132,8 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->query);
-	    $self->filename ($self->query.".$$.seq");
+	    $self->clonename ($self->clone);
+	    $self->filename ("$$.seq");
 	    $self->lsresults ($self->filename.".lsout");
 	    $self->fsresults ($self->filename.".fsout");
 	}
@@ -257,8 +257,8 @@ sub options {
 sub run {
  my ($self, $dir) = @_;
 
-    # check query
-    my $seq = $self->query || $self->throw("Query required for Program");
+    # check clone
+    my $seq = $self->clone || $self->throw("Clone required for Program");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -294,11 +294,11 @@ sub run {
 	$self->deletefiles;
     }
     else {
-	#The query object is not a seq object but a file.
+	#The clone object is not a seq object but a file.
 	#Perhaps should check here or before if this file is fasta format...if not die
 	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
 
-	$self->filename($self->query);
+	$self->filename($self->clone);
 	
 	
 	# run program
@@ -346,7 +346,7 @@ sub run_program {
         unless ((system ($cmd)) == 0);
     }
     else {
-	die || "ls pfam file has not been provided";
+	die || print STDERR "ls pfam file has not been provided";
     }
 
    if ($dbfiles[1] =~ /fs/) { 

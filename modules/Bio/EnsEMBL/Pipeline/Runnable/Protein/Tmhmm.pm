@@ -97,7 +97,7 @@ sub new {
         $self->throw("Tmhmm needs an analysis");
     }
 
-    $self->program ($self->find_executable ($self->analysis->program_file));
+    $self->program ($self->analysis->program_file);
   
     return $self;
 }

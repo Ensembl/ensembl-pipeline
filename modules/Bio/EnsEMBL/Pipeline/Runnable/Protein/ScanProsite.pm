@@ -244,7 +244,7 @@ sub run_analysis {
 
     my $run = "/usr/local/bin/perl ".$self->analysis->program . 
 	' -pattern ' .$self->analysis->db_file. 
-	    ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
+	    ' -confirm  /acari/analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
 		$self->filename . ' > ' .$self->results;
 
     print STDERR "RUNNING: $run\n";
