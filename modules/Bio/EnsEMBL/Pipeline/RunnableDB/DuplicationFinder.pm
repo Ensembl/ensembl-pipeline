@@ -6,19 +6,21 @@ Bio::EnsEMBL::Pipeline::RunnableDB::DuplicationFinder;
 
 =head1 SYNOPSIS
 
-my $dupl = 
-  Bio::EnsEMBL::Pipeline::RunnableDB::DuplicationFinder->new(
-    -db         => $db,
-    -analysis   => $analysis_obj,
-    );
+  # Almost all config is set in Bio::EnsEMBL::Pipeline:Config::GeneDupl
 
-$dupl->fetch_input();
-$dupl->run();
-$dupl->output();
-$dupl->write_output();
+  my $df = 
+    Bio::EnsEMBL::Pipeline::RunnableDB::DuplicationFinder->new(
+      -input_id   => 'ENSG00000183362',
+      );
+
+  $df->fetch_input();
+  $df->run();
+  $df->write_output();
 
 =head1 DESCRIPTION
 
+RunnableDB used to drive the identification of putative gene paralogues.  The
+matching Runnable module is Bio::EnsEMBL::Pipeline::GeneDuplication::Finder.
 
 =head1 CONTACT
 
@@ -32,7 +34,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::Finder;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
-use Bio::SeqIO;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_BLASTDB_FILE
@@ -41,6 +42,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_BLASTDB_FILE
 						GD_CODEML_EXE
 						GD_INGROUP_REGEX
 						GD_OUTGROUP_REGEXES
+						GD_TRANSL_REGEX
 						GD_HIT_COVERAGE
 						GD_HIT_IDENTITY
 						GD_DISTANCE_CUTOFF
@@ -63,16 +65,21 @@ use vars qw(@ISA);
 sub new {
   my ($class, @args) = @_;
 
-    my $self = {};
-    bless $self, $class;
+  # Object creation is not done via the parent class to 
+  # avoid the need for a database adaptor and analysis
+  # object to be passed at construction.  These are not
+  # needed if the output format is text.
 
-    my ($db,
-        $input_id, 
-        $seqfetcher, 
-        $analysis) = &rearrange([qw(DB
-				    INPUT_ID
-				    SEQFETCHER
-			     	    ANALYSIS )], @args);
+  my $self = {};
+  bless $self, $class;
+
+  my ($db,
+      $input_id, 
+      $seqfetcher, 
+      $analysis) = &rearrange([qw(DB
+				  INPUT_ID
+				  SEQFETCHER
+				  ANALYSIS )], @args);
 
   unless (defined $input_id) {
     throw("Must specify input id.")
@@ -149,13 +156,18 @@ sub new {
 
     # Check user regexes.
 
-  unless (defined $GD_INGROUP_REGEX) {
+  unless (defined $GD_INGROUP_REGEX && $GD_INGROUP_REGEX ne '') {
     throw("No ingroup regular expression specified in config")
   }
 
   if (defined $GD_OUTGROUP_REGEXES && ! scalar @{$GD_OUTGROUP_REGEXES}) {
     throw("Output regular expressions should be specified as " . 
 	  "an anonymous array of strings.")
+  }
+
+  unless (defined $GD_TRANSL_REGEX && $GD_TRANSL_REGEX ne '') {
+    throw("No regular expression for matching translation stable " . 
+	  "ids specified in config")
   }
 
     # Warnings if coverage, identity and genetic distance cutoffs not
@@ -317,22 +329,88 @@ sub _write_output_as_text {
 
     if ($GD_OUTPUT_TYPE eq 'nucleotide') {
 
-    my $pair_align = 
-      $self->_alignment_vitals_nt($alignment{$match->{query_id}}, 
-				  $alignment{$match->{match_id}});
+      my $pair_align = 
+	$self->_alignment_vitals_nt($alignment{$match->{query_id}}, 
+				    $alignment{$match->{match_id}});
 
-    print OUT join("\t",
-		   $match->{dN},
-		   $match->{dS},
-		   $GD_DISTANCE_CUTOFF,
-		   $match->{query_id},
-		   $match->{match_id},
-		   $pair_align->{_query_identity},
-		   $pair_align->{_query_coverage}) .
-		     "\n";
-  } else {
-    throw("Amino acid-based output not yet implemented.")
-  }
+      print OUT join("\t",
+		     $match->{dN},
+		     $match->{dS},
+		     $GD_DISTANCE_CUTOFF,
+		     $match->{query_id},
+		     $match->{match_id},
+		     $pair_align->{_query_identity},
+		     $pair_align->{_query_coverage}) .
+		       "\n";
+    } else {
+
+      my $pair_align = 
+	$self->_alignment_vitals_aa($alignment{$match->{query_id}}, 
+				    $alignment{$match->{match_id}});
+
+
+      ($alignment{$match->{query_id}})->desc =~ /($GD_TRANSL_REGEX.{11})/;
+      my $query_translation_id = $1;
+
+      ($alignment{$match->{match_id}})->desc =~ /($GD_TRANSL_REGEX\d{11})/;
+      my $match_translation_id = $1;
+
+      unless ($query_translation_id ne '' && $match_translation_id ne '') {
+	warning("Unable to determine translation stable ids.\n" . 
+		"Translation stable id regex is [$GD_TRANSL_REGEX]\n" . 
+		"Query seq desc line is [" .($alignment{$match->{query_id}})->desc . "]\n" .
+		"Match seq desc line is [" .($alignment{$match->{match_id}})->desc . "]")
+      }
+
+# dn
+# ds
+# n
+# s
+# lnl
+# threshold_on_ds
+# gene_stable_id
+# translation_stable_id
+# cigar_line
+# cigar_start
+# cigar_end
+# perc_cov
+# perc_id
+# perc_pos
+# gene_stable_id
+# translation_stable_id
+# cigar_line
+# cigar_start
+# cigar_end
+# perc_cov
+# perc_id
+# perc_pos
+
+      print OUT join ("\t",
+		      $match->{dN},
+		      $match->{dS},
+		      $match->{N},
+		      $match->{S},
+		      $match->{lnL},
+		      $GD_DISTANCE_CUTOFF,
+		      $match->{query_id},
+		      $query_translation_id,
+		      $pair_align->{_query_cigar},
+		      $pair_align->{_query_start},
+		      $pair_align->{_query_end},
+		      $pair_align->{_query_coverage},
+		      $pair_align->{_query_identity},
+		      $pair_align->{_query_similarity},
+		      $match->{match_id},
+		      $match_translation_id,
+		      $pair_align->{_match_cigar},
+		      $pair_align->{_match_start},
+		      $pair_align->{_match_end},
+		      $pair_align->{_match_coverage},
+		      $pair_align->{_match_identity},
+		      $pair_align->{_match_similarity})
+	. "\n";
+
+    }
 
   }
 
@@ -344,13 +422,11 @@ sub _write_output_as_text {
 sub _write_output_to_database {
   my $self = shift;
 
-  throw("Output written to database is not yet implemented.");
+  throw("Output to database mode is not yet implemented.");
 }
 
 sub _alignment_vitals_nt {
   my ($self, $query, $match) = @_;
-
-  my %aligned_pair;
 
   my @query = split //, $query->seq;
   my @match = split //, $match->seq;
@@ -375,10 +451,11 @@ sub _alignment_vitals_nt {
     }
   }
 
-  $aligned_pair{_query_identity}   = sprintf "%3.2f", ($identical_nt/$query_length)*100;
-  $aligned_pair{_match_identity}   = sprintf "%3.2f", ($identical_nt/$match_length)*100;
-  $aligned_pair{_query_coverage}   = sprintf "%3.2f", ($covered_nt/$query_length)*100;
-  $aligned_pair{_match_coverage}   = sprintf "%3.2f", ($covered_nt/$match_length)*100;
+  my %aligned_pair = 
+    ('_query_identity' => (sprintf "%3.2f", ($identical_nt/$query_length)*100),
+     '_match_identity' => (sprintf "%3.2f", ($identical_nt/$match_length)*100),
+     '_query_coverage' => (sprintf "%3.2f", ($covered_nt/$query_length)*100),
+     '_match_coverage' => (sprintf "%3.2f", ($covered_nt/$match_length)*100));
 
   return \%aligned_pair;
 }
@@ -386,34 +463,38 @@ sub _alignment_vitals_nt {
 sub _alignment_vitals_aa {
   my ($self, $query, $match) = @_;
 
-  my %similarity_lookup = ('A' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'V' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'F' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'P' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'M' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'I' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'L' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'W' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
-			 'D' => ['D', 'E'],
-			 'E' => ['D', 'E'],
-			 'R' => ['R', 'H', 'K'],
-			 'K' => ['R', 'H', 'K'],
-			 'S' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'T' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'Y' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'H' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q', 'R', 'H', 'K'],
-			 'C' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'N' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'G' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'Q' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
-			 'B' => ['B'],
-			 'Z' => ['Z']);
+  my %similarity_lookup 
+    = ('A' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'V' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'F' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'P' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'M' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'I' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'L' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'W' => ['A', 'V', 'F', 'P', 'M', 'I', 'L', 'W'],
+       'D' => ['D', 'E'],
+       'E' => ['D', 'E'],
+       'R' => ['R', 'H', 'K'],
+       'K' => ['R', 'H', 'K'],
+       'S' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'T' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'Y' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'H' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q', 'R', 'H', 'K'],
+       'C' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'N' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'G' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'Q' => ['S', 'T', 'Y', 'H', 'C', 'N', 'G', 'Q'],
+       'B' => ['B'],
+       'Z' => ['Z']);
 
   $query->alphabet('DNA');
   $match->alphabet('DNA');
 
-  my $query_protein = $query->translate->seq;
-  my $match_protein = $match->translate->seq;
+  my $query_protein 
+    = $query->translate(undef, undef, undef, $GD_GENETIC_CODE)->seq;
+
+  my $match_protein 
+    = $match->translate(undef, undef, undef, $GD_GENETIC_CODE)->seq;
 
   my %aligned_pair;
 
@@ -426,8 +507,9 @@ sub _alignment_vitals_aa {
   my @query = split //, $query_protein;
   my @match = split //, $match_protein;
 
-  die "Aligned sequences are not the same length"
-    if (scalar @query != scalar @match);
+  if (scalar @query != scalar @match) {
+    throw("Aligned sequences are not the same length")
+  }
 
   my $query_length = 0;
   my $match_length = 0;
@@ -465,6 +547,9 @@ sub _alignment_vitals_aa {
 
 sub _build_cigar {
   my ($self, $gapped_seq) = @_;
+
+  throw('The CIGAR building code is producing AA coords ONLY!')
+    if $GD_OUTPUT_TYPE ne 'aminoacid';
 
   my @aas = split //, $gapped_seq->translate->seq;
 
