@@ -14,7 +14,7 @@ my $chr_name;
 my $outfile;
 
 
-my $max_length = 200000;
+my $max_length = 100000;
 my $max_feature_count = 200;
 
 
@@ -60,61 +60,49 @@ my @clusters = sort { $a->start <=> $b->start } @$clusters;
 
 open ( OUTPUT, ">$outfile" ) or die("cannot open $outfile");
 
-my $start = 1;
-my $count = 0;
-my $end;
-my $this_end;
-my $order = 1;
+my $current_start = 1;
+my $current_end   = $clusters[0]->end + int( ( $clusters[1]->start - $clusters[0]->end )/2 );
+
+my $extra_features = $feature_count->{$clusters[0]};
+my $this_start  = $current_start;
+my $this_end    = $current_end;
+my $this_length = $this_end - $this_start + 1;
+my $count = $extra_features;
+
+print OUTPUT "   this range:$chr_name.$this_start-$this_end\tlength:".
+    "$this_length\tfeature_count:$extra_features\n";
 
 CLUSTER:
-for (my $i=0; $i<=$#clusters; $i++ ){
+for (my $i=1; $i<=$#clusters; $i++ ){
+    
+    $extra_features = $feature_count->{$clusters[$i]};
+
+    $this_end = $chr_length;
+    if ( $i<$#clusters ){
+	$this_end = $clusters[$i]->end + int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
+    }
+    $this_start  = $current_end + 1;
+    $this_length = $this_end - $this_start + 1;
+    print OUTPUT "   this range:$chr_name.$this_start-$this_end\tlength:".
+	"$this_length\tfeature_count:$extra_features\n";
   
-  my $extra_features = $feature_count->{$clusters[$i]};
-  
-  my $range_end = $chr_length;
-  if ( $i<$#clusters ){
-    $range_end = $clusters[$i]->end + int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
-  }
-  print OUTPUT "   this range:$chr_name.".($end+1)."-$range_end\tlength:".($range_end - $end)."\tfeature_count:$extra_features\n";
-  
-  if ( $i == 0 ){
-    $end = $clusters[$i]->end + int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
-  }
-  
-  if ( $i==$#clusters ){
-    $this_end = $chr_length;    
-  }
-  else{
-    $this_end = $clusters[$i]->end + int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
-  }
-  
-  if ( ($this_end - $start + 1 ) > $max_length || ( $count + $extra_features ) > $max_feature_count ){
-    if ( $order == 1 ){
-      my $features = $count + $extra_features;
-      print OUTPUT "$chr_name.$start-$this_end\tlength:".($this_end-$start+1)."\tfeature_count:$features (single range)\n";
-      $start = $this_end + 1;
-      $count = 0;
-      $order = 1;
-      next CLUSTER;
+    my $new_length = $this_end - $current_start + 1;
+    my $new_count  = $count + $extra_features;
+    if ( $new_length > $max_length ||  $new_count > $max_feature_count ){
+	print OUTPUT "$chr_name.$current_start-$current_end\tlength:".
+	    ($current_end-$current_start +1)."\tfeature_count:$count\n";
+	
+	$current_start = $current_end + 1;
+	$current_end   = $this_end;
+	$count = $extra_features;
     }
     else{
-      print OUTPUT "$chr_name.$start-$end\tlength:".($end-$start+1)."\tfeature_count:$count\n";
-      $start = $end + 1;
-      $count = $extra_features;
-      $order = 1;
-      next CLUSTER;
+	$count = $new_count;
+	$current_end = $this_end;
     }
-  }
-  else{
-    $order++;
-    $count += $extra_features;
-    $end    = $this_end;
-    next CLUSTER;
-  }
-}
-
-if ( $end != $chr_length ){
-  print OUTPUT "$chr_name.$start-$chr_length\tlength:".( $chr_length - $start + 1 )."\tfeature_count:$count\n";
+    if ( $i==$#clusters ){
+	print OUTPUT "$chr_name.$current_start-$chr_length\tlength:".( $chr_length - $current_start + 1 )."\tfeature_count:$count\n";
+    }
 }
 
 close(OUTPUT);
