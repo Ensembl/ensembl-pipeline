@@ -356,7 +356,7 @@ sub create_peptide_featurepairs {
 						    -phase      =>  $start_phase,  
 						    -end_phase  =>  $end_phase );
       
-      my $pep_feat = Bio::EnsEMBL::Pep_SeqFeature->new (-seqname    =>  $fp->hseqname,
+	my $pep_feat = Bio::EnsEMBL::SeqFeature->new (-seqname    =>  $fp->hseqname,
 							-start      =>  $pep_start,
 							-end        =>  $pep_end,
 							-strand     =>  $ex_align->{'strand'},

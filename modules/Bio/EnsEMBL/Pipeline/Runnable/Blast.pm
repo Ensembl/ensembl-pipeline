@@ -192,21 +192,25 @@ sub run_analysis {
 
     # This routine expands the database name into $db-1 etc for
     # split databases
+
     my @databases = $self->fetch_databases;
 
     foreach my $database (@databases) {
 	$self->throw("Failed during blast run $!\n")
 	    
-	    unless (system ($self->program.' '.$database.' '.$self->filename
-			    .' '.$self->options .' > '.$self->results) == 0) ;
+	    unless (system ($self->program . ' ' . 
+			    $database      . ' ' .
+			    $self->filename. ' ' .
+			    $self->options . ' > ' . 
+			    $self->results) == 0) ;
     }
 }
 
 sub fetch_databases {
     my ($self) = @_;
-
+    
     my @databases;
-
+    
     my $fulldbname;
 
     if ($self->database =~ /\//) {
@@ -273,271 +277,237 @@ sub parse_results {
   my $threshold = $self->threshold;
 
   while(my $sbjct = $parser->nextSbjct)  {
+    HSP: while (my $hsp = $sbjct->nextHSP) {
+	next HSP if ($hsp->P > $self->threshold);
+	
+	$self->split_HSP($sbjct,$hsp);
 
-  HSP: while (my $hsp = $sbjct->nextHSP) {
-
-
-      next HSP if ($hsp->P > $self->threshold);
-      
-      my (%feat1, %feat2);
-
-      if ($self->clone->id) {
-	$feat1{name}     = $self->clone->id;
-      } else {
-	$self->results =~ m!/.+/(.+)|(.+)!; #extract filename
-	$feat1{name} = ($1) ?  $1 :  $2;
-      }
-            
-      $feat1 {score}       = $hsp->score;
-      $feat2 {score}       = $hsp->score;
-      $feat1 {percent}     = $hsp->percent;
-      $feat2 {percent}     = $hsp->percent;
-      $feat1 {p}           = $hsp->P;
-      $feat2 {p}           = $hsp->P;
-            
-      if ($hsp->queryBegin < $hsp->queryEnd) {
-	$feat1 {start}   = $hsp->queryBegin;
-	$feat1 {end}     = $hsp->queryEnd;
-	$feat1 {strand}  = 1;
-      } else {
-	$feat1 {start}   = $hsp->queryEnd;
-	$feat1 {end}     = $hsp->queryBegin;
-	$feat1 {strand}  = -1;
-      }
-      
-      $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
-      $feat2 {name}    = $1;
-      
-      #MC 29/11/00 The new viersion of BPlite deals with strand 
-      # so we won't have to do this.
-      if ($hsp->sbjctBegin < $hsp->sbjctEnd) {
-	$feat2 {start}   = $hsp->sbjctBegin;
-	$feat2 {end}     = $hsp->sbjctEnd;
-	$feat2 {strand}  = 1;
-      } else {
-	$feat2 {start}   = $hsp->sbjctEnd;
-	$feat2 {end}     = $hsp->sbjctBegin;
-	$feat2 {strand}  = -1;
-      }
-
-      # We force the feat1 strand always to be 1.  This is not necessarily correct
-      my $tmpstrand = $feat1{strand};
-      
-      $feat1{strand} = 1;
-      $feat2{strand} = $tmpstrand * $feat2{strand};
-      
-      if ($self->database) {
-	$feat2 {db} = $self->database;
-      } else {
-	$feat2 {db} = 'unknown';
-      }
-                        
-      if ($self->program) {
-	$self->program =~ m!/.+/(.+)|(.+)!; #extract executable name
-	if ($1)  {
-	  $feat2 {program} = $1; 
-	} elsif ($2)  {
-	  $feat2 {program} = $2; 
-	}
-      } else {
-	$feat2 {program} = 'unknown';
-      }
-
-      $feat2 {p_version}   = '1';
-      $feat2 {db_version}  = '1';
-      $feat1 {primary}     = 'similarity';
-      $feat1 {source}      = $feat2{program};
-      $feat2 {primary}     = 'similarity';
-      $feat2 {source}      = $feat2{program};
-      
-      #if alignments contain gaps, the feature needs to be split
-      $feat1 {alignment} = $hsp->queryAlignment;
-      $feat2 {alignment} = $hsp->sbjctAlignment;
-            
-      print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
-      print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
-
-      if ($feat1 {alignment} =~ /-/ or $feat2 {alignment} =~ /-/) {
-	  $self->split_gapped_feature(\%feat1, \%feat2); 
-      } else {                    
-	  $self->createfeaturepair(\%feat1, \%feat2); 
-      }
     }
   } 
   return $self->output;
 }
 
 
-#This function creates mini-features from a gapped feature. 
-#The gaps are discarded and the mini alignments have the attributes of the parent feature. 
-sub split_gapped_feature {
-  my ($self, $feat1, $feat2) = @_;
+sub split_HSP {
+    my ($self,$sbjct,$hsp) = @_;
+
+    my $name = $sbjct->name ;
+    $name =~ s/^>(\S+).*/$1/;
+
+    my $type1;
+    my $type2;
+
+    my $len1 = abs($hsp->queryEnd - $hsp->queryBegin) + 1;
+    my $len2 = abs($hsp->sbjctEnd - $hsp->sbjctBegin) + 1;
+
+
+    # Find the strands first
+
+    my $qstrand;
+    my $hstrand;
+
+    if ($hsp->queryBegin < $hsp->queryEnd) {
+	$qstrand = 1;
+    } else {
+	$qstrand = -1;
+    }
+    if ($hsp->sbjctBegin < $hsp->sbjctEnd) {
+	$hstrand = 1;
+    } else {
+	$hstrand = -1;
+    }
+
+    if ($len1/$len2 > 2) {
+	$type1 = 'dna';
+	$type2 = 'pep';
+    } elsif ($len2/$len1 > 2) {
+	$type1 = 'pep';
+	$type2 = 'dna';
+    } else {
+	$type1 = 'dna';
+	$type2 = 'dna';
+    }
+
+    print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
+    print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
+
+    my @features;
     
-  my $type1;
-  my $type2;
-
-  my $len1 = $feat1->{end} - $feat1->{start} + 1;
-  my $len2 = $feat2->{end} - $feat2->{start} + 1;
-
-  if ($len1/$len2 > 2) {
-    $type1 = 'dna';
-    $type2 = 'pep';
-  } elsif ($len2/$len1 > 2) {
-    $type1 = 'pep';
-    $type2 = 'dna';
-  } else {
-    $type1 = 'dna';
-    $type2 = 'dna';
-  }
-  
-  #print STDERR "Got $type1 - $type2\n";
-
-  #There's a strange bug in wublastn where a gap is inserted at the end of an alignment
-  #The alignment is trimmed of any terminal gaps so that the alignment ends on a valid feature
-  while ($feat1->{'alignment'} =~ /-$/ || $feat2->{'alignment'} =~ /-$/) {
-    $feat1->{'alignment'} =~ s/.$//;
-    $feat2->{'alignment'} =~ s/.$//;
-  }
-
-  #The terminal gap bug is so odd, it's probably worth checking for an initial gap
-  $self->throw("Alignment starts with a gap! F1\n"
-	       .$feat1->{'alignment'}."\nF2\n".$feat2->{'alignment'}."\n")
-    if ($feat1->{'alignment'} =~ /^-/ || $feat2->{'alignment'} =~ /^-/);
+    my $qinc   = 1 * $qstrand;
+    my $sinc   = 1 * $hstrand;
     
-  my (@masked_f1, @masked_f2);
+    if ($type1 eq 'dna' && $type2 eq 'pep') {
+	$qinc = 3 * $qinc;
+    } 
+    if ($type1 eq 'pep' && $type2 eq 'dna') {
+	$sinc = 3 * $sinc;
+    }
 
-  #replace bases and gaps with positions and mask number
-
-  if ($type1 eq 'pep' && $type2 eq 'dna') {
-      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
-      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
-  } elsif ($type1 eq 'dna' && $type2 eq 'pep') {
-      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
-      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
-  } else {
-      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
-      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
-  }
-
-  $self->throw("Can't split feature where alignment lengths don't match: F1 ("
-	       .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
-    if (scalar(@masked_f1) != scalar(@masked_f2)); 
+    print STDERR "types $type1 ($qinc) : $type2 ($sinc)\n";
+    my @gap;
     
-  my $building_feature;
-  my $mask_len = scalar(@masked_f1);
-  
-  
+    my @qchars = split(//,$hsp->queryAlignment);
+    my @schars = split(//,$hsp->sbjctAlignment);
+    
+    my $qstart = $hsp->queryBegin;
+    my $sstart = $hsp->sbjctBegin;
+    
+    my $qend   = $hsp->queryBegin;
+    my $send   = $hsp->sbjctBegin;
+    
+    my $count = 0;
+    my $found = 0;
+    
+    my $source = $self->program;
+    $source =~ s/\/.*\/(.*)/$1/;
 
-  my ($f1_start, $f2_start);
-    for (my $index =0; $index < $mask_len; $index++)
-    {
+    my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
+					      -db_version      => 1,
+					      -program         => $source,
+					      -program_version => $1,
+					      -gff_source      => $source,
+					      -gff_feature     => 'similarity');
+    
+    while ($count <= $#qchars) {
+	if ($qchars[$count] ne '-' &&
+	    $schars[$count] ne '-') {
 
-        if ($masked_f1[$index] == -1 || $masked_f2[$index] == -1 || $index == $mask_len -1)
-        {
-            #One of the alignments contains an insertion.
-            if ($building_feature)
-            {    
+	    $qend += $qinc;
+	    $send += $sinc;
+	    
+	    $found = 1;
+	} else {
+	    if ($found == 1) {
 
-		my $f1_end;
-		my $f2_end;
+		my $tmpqend = $qend; $tmpqend -= $qinc;
+		my $tmpsend = $send; $tmpsend -= $sinc;
 
-                #feature ended at previous position unless alignment end
+		my $tmpqstart = $qstart;
+		my $tmpsstart = $sstart;
 
-		if ($index == $mask_len -1)  {
-		    $f1_end = $masked_f1[$index];
-		} else {
-		    $f1_end = $masked_f1[$index-1];
+		if (abs($qinc) > 1) {
+		    $tmpqend += $qstrand * 2;
+		}
+		if (abs($sinc) > 1) {
+		    $tmpsend += $hstrand * 2;
 		}
 
-		if ($index == $mask_len -1) {
-		    $f2_end =  $masked_f2[$index];
-		} else {
-		    $f2_end = $masked_f2[$index-1];
+		if ($tmpqstart > $tmpqend) {
+		    my $tmp    = $tmpqstart;
+		    $tmpqstart = $tmpqend;
+		    $tmpqend   = $tmp;
 		}
-                
-                if ($feat1->{'strand'} == 1)
-                {
-                    $feat1->{'start'}   = $f1_start;
-                    $feat1->{'end'}     = $f1_end;
-                }
-                else
-                {
-                    $feat1->{'start'}   = $f1_end;
-                    $feat1->{'end'}     = $f1_start;
-                }
-                if ($feat2->{'strand'} == 1)
-                {
-                    $feat2->{'start'}   = $f2_start;
-                    $feat2->{'end'}     = $f2_end;
-                }
-                else
-                {
-                    $feat2->{'start'}   = $f2_end;
-                    $feat2->{'end'}     = $f2_start;
-                }
-                
-                #print STDERR "Subfeat1: ".$feat1->{'start'}." - ".$feat1->{'end'}
-                #             ."\tSubfeat2: ".$feat2->{'start'}." - ".$feat2->{'end'}."\n";
-                
-                my $f1_len = $feat1->{'end'} - $feat1->{'start'} +1;
-                my $f2_len = $feat2->{'end'} - $feat2->{'start'} +1; 
-                
-#                $self->throw("FeaturePair lengths don't match! ".
-#                        "F1 $f1_start - $f1_end ($f1_len) F2 $f2_start - $f2_end ($f2_len)\n") 
-#                        if ( $f1_len != $f2_len );
-                 
-                        
-		$feat1->{strand} = $feat2->{strand}; 
-                $self->createfeaturepair($feat1, $feat2);
-                $building_feature = 0;
-            }
-            
-        }
-        else
-        {
-            #Alignment of two bases found
-            if (!$building_feature)
-            {
-                $f1_start = $masked_f1[$index];
-                $f2_start = $masked_f2[$index];
-                $building_feature =1;
-            }
-        }
+		if ($tmpsstart > $tmpsend) {
+		    my $tmp    = $tmpsstart;
+		    $tmpsstart = $tmpsend;
+		    $tmpsend   = $tmp;
+		}
+
+		print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmpsstart . "\t" . $tmpsend . "\t" . $hstrand . "\n";
+
+		my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->clone->id,
+							    -start       => $tmpqstart,
+							    -end         => $tmpqend,
+							    -strand      => $qstrand * $hstrand,
+							    -source_tag  => $source,
+							    -primary_tag => 'similarity',
+							    -analysis    => $analysis,
+							    -score       => $hsp->score);
+		
+		my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
+							    -start   => $tmpsstart,
+							    -end     => $tmpsend,
+							    -strand  => $hstrand * $qstrand,
+							    -source_tag  => $source,
+							    -primary_tag => 'similarity',
+							    -analysis => $analysis,
+							    -score    => $hsp->score);
+		
+		
+		my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
+						       -feature2 => $feature2);
+		
+		print $fp->source_tag . "\t" . $fp->primary_tag . "\t" . $fp->score . "\n";
+		push(@features,$fp);
+		$self->growfplist($fp);                             
+		
+	    }
+	    if ($qchars[$count] ne '-') {
+		$qstart = $qend   + $qinc;
+	    } else {
+		$qstart = $qend;
+	    }
+	    if ($schars[$count] ne '-') {
+		$sstart = $send   + $sinc;
+	    } else {
+		$sstart = $send;
+	    }
+	    
+	    $qend = $qstart;
+	    $send = $sstart;
+
+	    $found = 0;
+	}
+	$count++;
+    }			     
+
+    # Remember the last feature
+    if ($found == 1) {
+	my $tmpqend = $qend; $tmpqend -= $qinc;
+	my $tmpsend = $send; $tmpsend -= $sinc;
+	
+	my $tmpqstart = $qstart;
+	my $tmpsstart = $sstart;
+	
+	if (abs($qinc) > 1) {
+	    $tmpqend += $qstrand * 2;
+	}
+	if (abs($sinc) > 1) {
+	    $tmpsend += $hstrand * 2;
+	}
+	
+	if ($tmpqstart > $tmpqend) {
+	    my $tmp = $tmpqstart;
+	    $tmpqstart = $tmpqend;
+	    $tmpqend   = $tmp;
+	}
+	if ($tmpsstart > $tmpsend) {
+	    my $tmp = $tmpsstart;
+	    $tmpsstart = $tmpsend;
+	    $tmpsend   = $tmp;
+	}
+	
+	print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmpsstart . "\t" . $tmpsend . "\t" . $hstrand . "\n";
+	
+	my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->clone->id,
+						    -start       => $tmpqstart,
+						    -end         => $tmpqend,
+						    -strand      => $qstrand,
+						    -source_tag  => $source,
+						    -primary_tag => 'similarity',
+						    -analysis    => $analysis,
+						    -score       => $hsp->score,
+						    );
+	
+	my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
+						    -start   => $tmpsstart,
+						    -end     => $tmpsend,
+						    -strand  => $hstrand,
+						    -source_tag  => $source,
+						    -primary_tag => 'similarity',
+						    -analysis => $analysis,
+						    -score    => $hsp->score);
+	
+	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
+					       -feature2 => $feature2);
+	
+	push(@features,$fp);
+	$self->growfplist($fp);                             
+	
     }
-  }
 
-#Fills gapped alignment with base position number or -1 for insertions. 
-sub mask_alignment {
-    my ($self, $start, $strand, $alignment,$inc) =@_;
-
-    my @masked_array;
-    my @array = split (//,$alignment);
-
-    $_ = $alignment;
-    my $valid_bases = tr/A-Za-z//;
-    
-    print STDERR "Start: $start Strand: $strand Len ".scalar(@array)." Valids $valid_bases\n";
-    
-    my $base_count = ($strand == 1) ? $start : $start + ($valid_bases -1);
-    
-    foreach my $base (@array)
-    {
-        if ($base ne '-')
-        {
-            push (@masked_array, $base_count);
-	      $base_count = ($strand == 1) ? $base_count + $inc  : $base_count - $inc; 
-
-        }
-        else
-        {
-            push (@masked_array, -1);
-        }   
-    }
-    
-    print STDERR "Masked array @masked_array\n";
-    
-    return @masked_array;
-  }
+}
+	    
 
 ##############
 # input/output methods
@@ -636,3 +606,4 @@ sub options {
 }
 
 1;
+
