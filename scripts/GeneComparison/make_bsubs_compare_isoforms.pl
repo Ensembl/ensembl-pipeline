@@ -35,20 +35,20 @@ my $compara_dbhost = 'ecs2f';
 my $from_file;
 my $gap_penalty;
 my $tmp_dir;
-my $use_coding_exons;
+my $coding_exons;
 
 # options
 &GetOptions( 
 	    'from_file'     => \$from_file,
 	    'gap_penalty:n' => \$gap_penalty,
 	    'tmp_dir:s'     => \$tmp_dir,
-	    'use_coding_exons' => \$use_coding_exons,
+	    'coding_exons' => \$coding_exons,
 	   );
 
 unless ( $tmp_dir ){
     print STDERR "script to generate bsub lines for the compare_isoforms script\n";
     print STDERR "Usage: $0 -tmp_dir /full/path/output_dir/\n";
-    print STDERR "\t\t\t[ -gap_penalty n -use_coding_exons -from_file < file_with_pairs]\n";
+    print STDERR "\t\t\t[ -gap_penalty n -coding_exons -from_file < file_with_pairs]\n";
     exit(0);
 }
 
@@ -168,18 +168,19 @@ sub make_directories {
 sub make_bsubs {
     my ( $human_id, $mouse_id ) = @_;
         
-    my $lsf_options   = "-q acari -C0";
+    #my $lsf_options   = "-q acari -C0 -m\"rlx_hosts ecs2_hosts ecs1_hosts\" ";
+    my $lsf_options   = "-q acari -C0 ";
     #$lsf_options .= " -R\"select[myecs2f < 440]\" ";
-    $lsf_options .= " -R\"select[myecs2f < 440] rusage[myecs2f=20:duration=2:decay=1]\" ";
+    $lsf_options .= " -R\"select[myecs2f < 440] rusage[myecs2f=20:duration=15]\" ";
     
     my $check  = "/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/GeneComparison/compare_isoforms.pl";
     my $script = "/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/GeneComparison/compare_isoforms.pl";
     my $file_name = "comparison_".$human_id."_".$mouse_id;
     my $outfile   = $bsubout."/".$file_name;
     my $errfile   = $bsuberr."/".$file_name;
-    my $command   = "bsub $lsf_options -o $outfile -e $errfile -E \"$check -check\" $script -human_gene $human_id -mouse_gene $mouse_id";
+    my $command   = "bsub $lsf_options -o $outfile -e $errfile -E \"$check -check\" $script -gene_id1 $human_id -gene_id2 $mouse_id";
     
-    if ( $use_coding_exons ){
+    if ( $coding_exons ){
       $command .= " -coding_exons ";
     }
     print OUT "$command\n";
