@@ -83,7 +83,7 @@ my $help;
 my $rename_on_retry = 1;
 my $kill_jobs = 1;
 my $die_if_broken = 0;
-
+my $rules_check_die = 1;
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -244,8 +244,7 @@ $db->pipeline_lock($lock_str);
 
 my @rules    = $rule_adaptor->fetch_all;
 $accumulators = $sanity->accumulator_sanity_check(\@rules, $accumulators, $die_if_broken) if($accumulators);
-
-
+$sanity->rule_type_sanity(\@rules, $rules_check_die);
 my %accumulator_analyses;
 
 foreach my $rule (@rules) {
@@ -793,13 +792,7 @@ sub db_sanity_check{
 
 
 
-sub accumulator_sanity_check{
-  my ($rules, $sanity, $accumulators, $die) = @_;
 
-  $accumulators = $sanity->accumulator_sanity_check
-    ($rules, $accumulators, $die);
-  return $accumulators;
-}
 
 sub job_time_check{
   my ($batch_q_module, $verbose, $running_jobs, $file, $max_time) = @_;
