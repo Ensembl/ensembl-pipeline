@@ -100,7 +100,15 @@ my $prefix='COB';
 		     # final gene type
 		     FINAL_TYPE               => 'final_ensembl',
 		     
+		     ############################################################
 		     # general variables
+		     ############################################################
+
+		     # the input id should give chr_name . start - end
+		     GENECOMBINER_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
+
+
+
 		     # path to run_GeneBuild_RunnableDB
 		     RUNNER      => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_GeneCombiner.pl',
 		     GENECOMBINER_RUNNABLES    =>  [
