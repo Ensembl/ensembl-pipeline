@@ -94,11 +94,11 @@ sub output {
 #########################
 
 sub locate_executable {
-    my ($self, $runnable) = @_;
-    if ($runnable)
+    my ($self, $binary) = @_;
+    if ($binary)
     {
-        Bio::EnsEMBL::Analysis::Programs->import($runnable);
-        return $Bio::EnsEMBL::Analysis::Programs::Program_Paths { $runnable };
+        Bio::EnsEMBL::Analysis::Programs->import($binary);
+        return $Bio::EnsEMBL::Analysis::Programs::Program_Paths { $binary };
     }
 }
 
@@ -384,7 +384,6 @@ sub find_executable {
   my ($self,$name) = @_;
 
   my $bindir = $::pipeConf{'bindir'}   || undef;
-  my $datadir = $::pipeConf{'datadir'} || undef;
 
   if (-x $name) {
     return $name;
@@ -413,6 +412,25 @@ sub find_file {
   } else {
     $self->throw("Can't find file [$name]");
   }
+}
+
+=head2 options
+
+    Title   :   options
+    Usage   :   $obj->options('M=500');
+    Function:   Get/set method for binary options
+                e.g. M=? for e-PCR, B=? for blast
+    Args    :   option string
+
+=cut
+
+sub options {
+    my ($self, $args) = @_;
+    if ($args)
+    {
+        $self->{'_options'} = $args ;
+    }
+    return $self->{'_options'};
 }
 
 1;
