@@ -107,7 +107,10 @@ sub inclusion_tree{
   if ( @{$self->inclusion_children} ){
     
     foreach my $node (  @{$self->inclusion_children} ){
-      unless( $node->is_extended ){ 
+      if( $node->is_extended ){ 
+	print STDERR "not putting node ".$node->transcript->dbID." in the inclusion tree\n";
+      }
+      else{
 	push( @leaves, $node );
       }
     }
@@ -125,27 +128,38 @@ sub inclusion_tree{
 }
 
 ############################################################
-
-=head2 is_extended
-
- Function: checks whether a node has any extension children. It returns a boolean TRUE or FALSE.
-							  
-=cut
-
-sub is_extended{
-  my ($self ) = @_;
-  if ( $self->extension_children && @{$self->extension_children} ){
-    return 1;
-  }
-  else{
-    return 0;
-  }
-}
-
-############################################################
 #
 # GET/SET METHODS
 #
+############################################################
+
+sub collected{
+  my ($self, $boolean ) = @_;
+  if ( $boolean ){
+    $self->{_collected} = $boolean;
+  }
+  return $self->{_collected};
+}
+
+############################################################
+
+sub is_extended{
+  my ($self, $boolean ) = @_;
+  if ( $boolean ){
+    $self->{_is_extended} = $boolean;
+  }
+  return $self->{_is_extended};
+}
+############################################################
+
+sub is_included{
+  my ($self, $boolean ) = @_;
+  if ( $boolean ){
+    $self->{_is_included} = $boolean;
+  }
+  return $self->{_is_included};
+}
+
 ############################################################
 
 =head2 extension_parents
