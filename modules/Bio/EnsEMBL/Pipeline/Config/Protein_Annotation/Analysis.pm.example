@@ -12,7 +12,7 @@ use vars qw( %Analysis );
 	     PA_CHUNK_DUMMY => 'SubmitTranscriptChunk', # as above but for chunk of peptides
 	     PA_CHUNK_TYPE => 'FILENAME',
 	     PA_PROTEOME_DUMMY => 'SubmitProteome',
-	     PA_PROTEOME_TYPE => 'PROTEOME'
+	     PA_PROTEOME_TYPE => 'PROTEOME',
 	     PA_ANALYSIS_TYPE => [
 
 			   {
