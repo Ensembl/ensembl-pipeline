@@ -46,7 +46,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
+package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate;
 
 use strict;
 use vars qw( %Exonerate );
@@ -62,30 +62,31 @@ use vars qw( %Exonerate );
 	    
 	      # where the result-directories are going to go	
 	      
-	      EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/',
+	      EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/NewExonerate',
 	    
 	      # job-queue in the farm
 	      LSF_OPTIONS       => '-q acari -C0',
 	    
 	      # make_bsubs.pl options
-	      EST_EXONERATE_BSUBS   => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/exonerate.jobs',
+	      EST_EXONERATE_BSUBS   => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/NewExonerate/exonerate.jobs',
 	      
 	      # path to file containing ALL ESTs/cDNAs
-	      EST_FILE                    => '/ecs2/work1/eae/NCBI_31/ests/human_ests',
+	      EST_FILE                    => '/ecs2/scratch5/ensembl/eae/NCBI_31/cdnas/chunks/NCBI_31_cdnas',
 	      
 	      # path to directory where EST chunks live
-	      EST_CHUNKDIR                => '/ecs2/work1/eae/NCBI_31/ests/chunks/',
+	      EST_CHUNKDIR                => '/ecs2/scratch5/ensembl/eae/NCBI_31/cdnas/chunks/',
 	      
 	      # how many chunks?
 	      # for NCBI_28 we have 3690891 ests, at approx. 350 ests per chunk, we estimate
-	      EST_CHUNKNUMBER             => 40000, 	 
+	      EST_CHUNKNUMBER             => 4000, 	 
 	      
 	      #####################
 	      # EXONERATE OPTIONS #
 	      #####################
 	      
 	      # full path fo the dir where we have the masked-dusted chromosomes
-	      EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_31/genome',
+	      #EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_31/genome',
+	      EST_GENOMIC                 => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/NewExonerate/chr22',
 	      
 	      # path to file with repeatmasked dusted genomic sequences
 	      # NB this file is huge - distribute it across the farm or 
@@ -125,9 +126,12 @@ use vars qw( %Exonerate );
 	      # 6. Generate ungapped Protein <---> DNA alignments:
 	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
 	      
-	      EST_EXONERATE_OPTIONS       => ' --score 500 --fsmmemory 300 --softmasktarget',
-	       EST_MIN_COVERAGE            => 90,
+	      #EST_EXONERATE_OPTIONS       => ' --showcigar --score 500 --fsmmemory 300 --softmasktarget',
+	      EST_EXONERATE_OPTIONS       => ' --softmasquery --softmasktarget  --dnawordlen 14  --useworddropoff TRUE --wordthreshold 40 --hspthreshold 60 --score 500 --fsmmemory 800  --hspdropoff 15  --saturatethreshold 100',
+	      
+	      EST_MIN_COVERAGE            => 90,
 	      EST_MIN_PERCENT_ID          => 97,
+
 	      
 	      ############################################################
 	      # each runnable has an analysis
@@ -162,8 +166,7 @@ sub import {
   my ($callpack) = caller(0); # Name of the calling package
   my $pack = shift; # Need to move package off @_
 
-  # Get list of variables supplied, or else
-  # all of ESTConf:
+  # Get list of variables supplied, or else everything
   my @vars = @_ ? @_ : keys( %Exonerate );
   return unless @vars;
   
