@@ -167,8 +167,8 @@ sub db {
     
     if ($value) 
     {
-        $value->isa("Bio::EnsEMBL::DB::ObjI")
-            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
+        $value->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQ::DBAdpator");
         $self->{'_db'} = $value;
     }
     return $self->{'_db'};
