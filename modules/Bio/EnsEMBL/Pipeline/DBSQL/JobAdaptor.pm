@@ -504,6 +504,7 @@ sub update {
                             });
 
   foreach my $job (@jobs) {
+    
     $sth->execute( $job->stdout_file,
                    $job->stderr_file,
                    $job->retry_count,
@@ -662,6 +663,11 @@ sub current_status {
         my $time;
         while (my $rowhash = $sth->fetchrow_arrayref()) {
           $time    = $rowhash->[0];
+        }
+        if(!$status){
+          $self->warn("Have found no status for ".$job->dbID." assuming is ".
+                      "sucessful\n");
+          $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
                                                             '-jobid'   => $id,
