@@ -92,7 +92,7 @@ my $prefix='COB';
 	     # eg TargettedGeneE2G
 	     GB_TARGETTED_RUNNABLES   => [''],
 	     # eg FPC_TargettedGeneE2G
-	     GB_LENGTH_RUNNABLES      => ['FPC_TargettedGeneE2G', 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs.pm', 'Gene_Builder'],
+	     GB_LENGTH_RUNNABLES      => ['FPC_TargettedGeneE2G', 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '5000000',
 
