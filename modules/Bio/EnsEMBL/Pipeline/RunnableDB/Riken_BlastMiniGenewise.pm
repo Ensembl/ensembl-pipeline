@@ -1,8 +1,8 @@
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL and EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -18,9 +18,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise->new
     (
-     '-dbobj'     => $db,
-     '-input_id'  => $id,
-     '-seqfetcher'=> $seqfetcher
+     '-dbobj'       => $db,
+     '-input_id'    => $id,
+     '-seqfetcher'  => $seqfetcher,
+     '-golden_path' => $gp
      );
     $obj->fetch_input
     $obj->run
@@ -54,18 +55,15 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
-					 );
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-
-use Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
 use Data::Dumper;
+
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -91,19 +89,19 @@ sub new {
     # dbobj, input_id, seqfetcher objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-    # override default seqfetcher
-    my ($seqfetcher) = $self->_rearrange([qw(SEQFETCHER)], @args);
-    
-    if(!defined $seqfetcher) {
-	print STDERR "creating new SEQFETCHER\n";
-	$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex
-	    (
-	     '-index'  =>'/data/blastdb/riken_prot.inx', 
-	     '-format' =>'Fasta',
-	     );
-	$self->seqfetcher($seqfetcher);
+    # check seqfetcher
+    if(!defined $self->seqfetcher) {
+
+      my $seqfetcher = $self->make_seqfetcher();
+      $self->seqfetcher($seqfetcher);
     } 
-    # it was already set in superclass constructor
+
+print STDERR "seqfethcre is " . $self->seqfetcher . "\n";
+
+    # check golden_path
+    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
 
     return $self;
 }
@@ -147,101 +145,13 @@ sub write_output {
 
     #$self->throw("exiting bfore write");
 
-    my $db = $self->dbobj;
-  
-    if( !defined $db ) {
-      $self->throw("unable to make write db");
-    }
-    
-    my %contighash;
-    my $gene_obj = $db->gene_Obj;
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
-
-    my @newgenes = $self->output;
-    return unless ($#newgenes >= 0);
-
-    # get new ids
-    eval {
-
-	my $genecount  = 0;
-	my $transcount = 0;
-	my $translcount = 0;
-	my $exoncount  = 0;
-
-	# get counts of each type of ID we need.
-
-	foreach my $gene ( @newgenes ) {
-	    $genecount++;
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$transcount++;
-		$translcount++;
-	    }
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		$exoncount++;
-		foreach my $sf($exon->each_Supporting_Feature) {
-		  print STDERR "***sub_align: " . 
-		               $sf->seqname . "\t" .
-		               $sf->start . "\t" .
-			       $sf->end . "\t" .
-			       $sf->strand . "\t" .
-			       $sf->hseqname . "\t" .
-			       $sf->hstart . "\t" .
-			       $sf->hend . "\n";
-	  }
-
-	    }
-	}
-
-	# get that number of ids. This locks the database
-
-	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	my @translids =  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-	my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-
-	# database locks are over.
-
-	# now assign ids. gene and transcripts are easy. Exons are harder.
-	# the code currently assummes that there is one Exon object per unique
-	# exon id. This might not always be the case.
-
-	foreach my $gene ( @newgenes ) {
-	    $gene->id(shift(@geneids));
-	    my %exonhash;
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		my $tempid = $exon->id;
-		$exon->id(shift(@exonsid));
-		$exonhash{$tempid} = $exon->id;
-	    }
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$trans->id(shift(@transids));
-		$trans->translation->id(shift(@translids));
-		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-	    }
-	    
-	}
-
-	# paranoia!
-	if( scalar(@geneids) != 0 || scalar(@exonsid) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
-	    $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonsid));
-	}
-
-    };
-    if( $@ ) {
-	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-    }
-
-
-    # this now assummes that we are building on a single VC.
-
-#    $self->throw("Bailing before real write\n");
-    
-  GENE: foreach my $gene (@newgenes) {	
+  GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
       eval {
-	  print STDERR $gene->id . "\n";
-	  $gene_obj->write($gene);
+	  $gene_adaptor->store($gene);
+	  print STDERR $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -274,8 +184,6 @@ sub fetch_input {
     my $chrstart = $1;
     my $chrend   = $2;
 
-    $self->dbobj->static_golden_path_type('UCSC');
-
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
@@ -285,7 +193,7 @@ sub fetch_input {
 
     print STDERR "Fetching features \n";
 
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('riken_prot',200);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('riken_prot',200, 0);
 
     
     print STDERR "Number of features = " . scalar(@features) . "\n";
@@ -451,13 +359,9 @@ sub make_genes {
   
   foreach my $tmpf (@tmpf) {
     my $gene       = new Bio::EnsEMBL::Gene;
-    my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $count);
+    my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
 
     $gene->type($genetype);
-    $gene->id($self->input_id . ".$genetype.$count");
-    $gene->created($time);
-    $gene->modified($time);
-    $gene->version(1);
     $gene->analysis($analysis_obj);
 
     $count++;
@@ -500,7 +404,7 @@ sub remap_genes {
       $newgene->analysis($gene->analysis);
 
       foreach my $tran ($newgene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
+	foreach my $exon($tran->get_all_Exons) {
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -528,22 +432,21 @@ sub remap_genes {
 =head2 _make_transcript
 
  Title   : make_transcript
- Usage   : $self->make_transcript($gene, $contig, $genetype, $count)
+ Usage   : $self->make_transcript($gene, $contig, $genetype)
  Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
            with sub_SeqFeatures representing exons.
  Example :
  Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
            data), and a Bio::EnsEMBL::translation
  Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
-           $genetype: string, $count: integer
+  $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis
 
 
 =cut
 
 sub _make_transcript{
-  my ($self, $gene, $contig, $genetype, $count) = @_;
+  my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
   $genetype = 'unspecified' unless defined ($genetype);
-  $count = 1 unless defined ($count);
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
@@ -554,13 +457,7 @@ sub _make_transcript{
   chomp($time);
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
-  $transcript->id($contig->id . ".$genetype.$count");
-  $transcript->version(1);
-
   my $translation  = new Bio::EnsEMBL::Translation;    
-  $translation->id($contig->id . ".$genetype.$count");
-  $translation->version(1);
-
   $transcript->translation($translation);
 
   my $excount = 1;
@@ -570,12 +467,7 @@ sub _make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->id($contig->id . ".$genetype.$count.$excount");
     $exon->contig_id($contig->id);
-    $exon->created($time);
-    $exon->modified($time);
-    $exon->version(1);
-      
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -588,12 +480,12 @@ sub _make_transcript{
       $subf->feature1->source_tag($genetype);
       $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
-      $subf->feature1->analysis($exon_pred->analysis);
+      $subf->feature1->analysis($analysis_obj);
 	
       $subf->feature2->source_tag($genetype);
       $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
-      $subf->feature2->analysis($exon_pred->analysis);
+      $subf->feature2->analysis($analysis_obj);
       
       $exon->add_Supporting_Feature($subf);
     }
@@ -620,8 +512,8 @@ sub _make_transcript{
       $transcript->add_Exon($exon);
     }
     
-    $translation->start_exon_id($exons[0]->id);
-    $translation->end_exon_id  ($exons[$#exons]->id);
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
     
     if ($exons[0]->phase == 0) {
       $translation->start(1);
@@ -636,5 +528,37 @@ sub _make_transcript{
   
   return $transcript;
 }
+
+=head2 make_seqfetcher
+
+ Title   : make_seqfetcher
+ Usage   :
+ Function: get/set
+ Example :
+ Returns : Bio::DB::RandomAccessI
+ Args    :
+
+
+=cut
+
+sub make_seqfetcher{
+  my ( $self ) = @_;
+  my $index = $::riken_conf{'riken_index'};
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+								  '-db' => \@db,
+								 );
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  }
+
+  return $seqfetcher;
+}
+
 
 1;
