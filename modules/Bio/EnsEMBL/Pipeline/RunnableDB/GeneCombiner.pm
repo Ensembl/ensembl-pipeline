@@ -281,7 +281,7 @@ sub fetch_input {
 
   my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-
+  
   $self->ensembl_vc( $ensembl_vc );
   $self->estgene_vc( $estgene_vc );
 
@@ -297,9 +297,11 @@ sub run{
   my ($self,@args) = @_;
 
   # get estgenes ( from EST_GeneBuilder )
+  print STDERR "getting genes of type $ESTGENE_TYPE\n";
   $self->estgenes(@{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE, 'evidence' ) } );
 
   # get ensembl genes (from GeneBuilder)
+  print STDERR "getting genes of type $ENSEMBL_TYPE\n";
   my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE, 'evidence' ) };
 
   # if there are no genes, we finish earlier
@@ -334,6 +336,7 @@ sub run{
     my @transcripts =@{ $gene->get_all_Transcripts};
   TRAN1:
     foreach my $transcript (@transcripts){
+      $transcript->type($gene->type);
       $self->_transcript_Type($transcript,$ENSEMBL_TYPE);
       push (  @original_ens_transcripts, $transcript );
     }
@@ -343,12 +346,8 @@ sub run{
     my @transcripts = @{$gene->get_all_Transcripts};
   TRAN2:
     foreach my $transcript (@transcripts){
+      $transcript->type($gene->type);
       $self->_transcript_Type($transcript,$ESTGENE_TYPE);
-      my $valid = $self->_check_Transcript($transcript);
-      unless ($valid == 1){
-	print STDERR "skipping this transcript\n";
-	next TRAN2;
-      }
       push (  @original_est_transcripts, $transcript );
     }
   }
@@ -361,6 +360,7 @@ sub run{
   # the accepted set of transcripts
   my @transcripts;
  
+  ############################################################
   # at this stage we could separate the clusters into three sorts:
 
   # 1) only ensembl genes --> we leave them as they are
@@ -371,7 +371,8 @@ sub run{
   #                                    not necessarily all the same exon, it should be the
   #                                    largest connected graph where vertices are trnascripts and
   #                                    edges is the relation 'share an exon'
- 
+  ############################################################
+
  CLUSTER:
   foreach my $cluster ( @gene_clusters ){
     
@@ -379,7 +380,9 @@ sub run{
     my @ens_genes = $cluster->get_Genes_of_Type( $ENSEMBL_TYPE );
     my @est_genes = $cluster->get_Genes_of_Type( $ESTGENE_TYPE );
     
+    ############################################################
     # if we have genes of either type, let's try to match them
+    ############################################################
     if ( @ens_genes && @est_genes ){
       print STDERR "Matching ".scalar(@ens_genes)." ensembl genes and ".scalar(@est_genes)." est genes\n"; 
       my @ens_transcripts;
@@ -388,8 +391,9 @@ sub run{
       foreach my $gene ( @ens_genes ){
       TRAN1:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	  my $valid = $self->_check_Transcript($transcript);
-	  unless ($valid == 1){
+	  $transcript->type($gene->type);
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN1;
 	  }
@@ -400,13 +404,13 @@ sub run{
       foreach my $gene ( @est_genes ){
       TRAN2:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	  
+	  $transcript->type($gene->type);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN2;
 	  }
-	  my $valid = $self->_check_Transcript($transcript);
-	  unless ($valid == 1){
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN2;
 	  }
@@ -423,17 +427,20 @@ sub run{
       }
     }
     
+    ############################################################
     # else we could have only ensembl genes
+    ############################################################
     elsif(  @ens_genes && !@est_genes ){
       # we have nothing to modify them, hence we accept them...
       my @ens_transcripts;
       
       # but before we check, just in case, you know
       foreach my $gene ( @ens_genes ){
-	TRAN3:
+      TRAN3:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	  my $valid = $self->_check_Transcript($transcript);
-	  unless ($valid == 1){
+	  $transcript->type($gene->type);
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN3;
 	  }
@@ -444,21 +451,23 @@ sub run{
       push ( @transcripts, @ens_transcripts );
     }
     
+    ############################################################
     # else we could have only est genes
+    ############################################################
     elsif( !@ens_genes && @est_genes ){
       print STDERR "Checking ".scalar(@est_genes)." est genes\n";
       my @est_transcripts;
       
       foreach my $gene ( @est_genes ){
-	TRAN4:
+      TRAN4:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	  
+	  $transcript->type($gene->type);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN4;
 	  }
-	  my $valid = $self->_check_Transcript($transcript);
-	  unless ($valid == 1){
+	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
 	    next TRAN4;
 	  }
@@ -490,7 +499,7 @@ sub run{
     $count++;
     print STDERR "gene $count: ".$gene->type."\n";
     foreach my $transcript (@{$gene->get_all_Transcripts}){
-      $self->_print_Transcript($transcript);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
     }
   }
 
@@ -737,8 +746,8 @@ sub _pair_Transcripts{
       if ($merge == 1 && $overlaps > 0 ){
 	
 	print STDERR "Can merge:\n";
-	$self->_print_Transcript($ens_tran);
-	$self->_print_Transcript($est_tran);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
 	
 	# we prefer those with both UTR ends matched
 	my ($match_5prime, $match_3prime) = $self->_check_UTRMatches( $ens_tran,$est_tran);
@@ -786,7 +795,7 @@ sub _pair_Transcripts{
     # test:
     print STDERR "Candidates:\n";
     foreach my $pair ( @sorted_lists ){
-      $self->_print_Transcript( $pair->[3] );
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $pair->[3] );
     }
     
     # try to merge it, if succeeded, mark the chosen one and leave the rest
@@ -855,8 +864,8 @@ sub _pair_Transcripts{
 	    #$exact_merge     = $self->test_for_semiexact_Merge($est_tran, $ens_tran);
 	    
 	    print "Comparing\n";
-	    $self->_print_Transcript($est_tran);
-	    $self->_print_Transcript($ens_tran);
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
 	    print STDERR "shared_exon    : $one_exon_shared\n";
 	    print STDERR "similar protein: $similar_protein\n";
 	    print STDERR "exon_in_intron : $exon_in_intron\n";
@@ -905,8 +914,8 @@ sub _check_est_Cluster{
       
       next if $j==$i;
       print STDERR "Comparing transcripts:\n";
-      $self->_print_Transcript($est_transcripts[$i]);
-      $self->_print_Transcript($est_transcripts[$j]);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$i]);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$j]);
       if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) &&
 	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])    ){
 	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
@@ -970,7 +979,6 @@ sub _visit{
     push( @{ $potential_gene }, $node);
   }
   $color->{ $node } = 'black';    
-  #$self->_print_Transcript($node);
   return;
 }
 
@@ -1004,32 +1012,6 @@ sub _check_Completeness{
   return 0;
 }
     
-#########################################################################
-  
-sub _print_Transcript{
-  my ($self,$transcript) = @_;
-  my @exons = @{$transcript->get_all_Exons};
-  my $id;
-  if ( $transcript->dbID ){
-    $id = $transcript->dbID;
-  }
-  else{
-    $id = "no id";
-  }
-  print STDERR "transcript id: ".$id." type: ".$self->_transcript_Type($transcript)."\n";
-  foreach my $exon ( @exons){
-    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
-  }
-  print STDERR "\n";
-  #print STDERR "Translation : ".$transcript->translation."\n";
-  print STDERR "translation start exon: ".
-    $transcript->translation->start_exon->start."-".$transcript->translation->start_exon->end.
-      " start: ".$transcript->translation->start."\n";
-  print STDERR "translation end exon: ".
-    $transcript->translation->end_exon->start."-".$transcript->translation->end_exon->end.
-      " end: ".$transcript->translation->end."\n";
-}
-
 #########################################################################
 
 sub _clone_Gene{
@@ -1074,10 +1056,7 @@ sub _clone_Transcript{
   $newtranscript->dbID($transcript->dbID);
   $self->_transcript_Type($newtranscript,$self->_transcript_Type($transcript));
   $newtranscript->translation($newtranslation);
-  
-  #print STDERR "Cloning Result:\n";
-  #$self->_print_Transcript($newtranscript);
-
+ 
   return $newtranscript;
 }
 
@@ -2181,8 +2160,11 @@ sub _make_Genes{
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
     $count++;
-    my $valid = $self->_check_Transcript($transcript);
-    next TRANSCRIPT if $valid != 1;
+    unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript)
+	    && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
+      print STDERR "skipping this transcript\n";
+      next TRANSCRIPT;
+    }
     push(@selected_transcripts,$transcript);
   } 
   my @genes = $self->_cluster_into_Genes(@transcripts);
@@ -2192,85 +2174,6 @@ sub _make_Genes{
   }
 
   return @genes;
-}
-
-###################################################################
-
-sub _check_Transcript{
-  my ($self,$transcript) = @_;
-  
-  # sort the exons 
-  $transcript->sort;
-  my @exons = @{$transcript->get_all_Exons};
-  
-  for (my $i = 1; $i <= $#exons; $i++) {
-    
-    # check phase consistency:
-    if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-      print STDERR "transcript has phase inconsistency\n";
-      $self->_print_Transcript($transcript);
-      return 0;
-    }
-    
-    # check contig consistency
-    if ( !( $exons[$i-1]->seqname eq $exons[$i]->seqname ) ){
-      print STDERR "transcript ".$transcript->dbID." is partly outside the contig\n";
-      return 0;
-    }
-  }
-
-  my $translation = $transcript->translation;
-  #$translation->temporary_id($contig->id . ".$genetype.$count");
-  
-  # store only genes that translate ( to check it, we get the Bio::Seq )
-  my $sequence;
-  eval{
-    $sequence = $transcript->translate;
-  };
-  unless ( $sequence ){
-    my $id;
-    if ( $transcript->dbID ){
-      $id = $transcript->dbID;
-    }
-    else{
-      $id = 'no-dbID';
-    }
-    print STDERR "TRANSCRIPT WITHOUT A TRANSLATION: $id !!\n";
-    return 0;
-  }
-  if ( $sequence ){
-    # length of the translation
-    my $length   = $sequence->length;
-    
-    # total length of the exons in the transcript
-    my $t_length = $transcript-> length;
-    #print STDERR "Translation length : $length\n";
-    #print STDERR "Exons length       : $t_length\n";
-    
-    # 5' UTR is usually shorter than 3' UTR, the latter can be very long compared
-    # with the translation length ( 5000 vs. 500 ) see e.g. gene SCL ( aka TAL1)
-    #my $five_prime  = $transcript->five_prime_utr  or warn "No five prime UTR";
-    #my $three_prime = $transcript->three_prime_utr or warn "No three prime UTR";
-    
-    #     # UTRs above are Bio::Seq
-    #      if ( $five_prime ){
-    #	my $length5    = $five_prime->length;
-    #	print STDERR "5prime UTR length  : $length5\n";
-    #      }
-    #      if ( $three_prime ){
-    #	my $length3    = $three_prime->length;
-    #	print STDERR "3prime UTR length  : $length3\n";
-    #      }
-    
-    # only store the genes whose translation has no stop codons
-    my $peptide = $sequence->seq;
-    if ( $peptide =~ /\*/ ){
-      print STDERR "TRANSLATION HAS STOP CODONS!! skipping this transcript\n";
-      $self->_print_Transcript($transcript);
-      return 0;
-    }
-  }
-  return 1;
 }
 
 ###################################################################
