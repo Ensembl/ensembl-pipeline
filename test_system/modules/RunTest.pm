@@ -273,7 +273,7 @@ sub cleanup{
     $testdb = $self->testdb;
   }
   $testdb->cleanup;
-  $self->environment->return_perl5lib;
+  $self->environment->return_environment;
   return;
 }
 
@@ -539,6 +539,7 @@ sub run_single_analysis{
   $self->cleanup($cleanup_dir) unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
+    $self->environment->return_environment;
   }
 }
 
@@ -569,6 +570,7 @@ sub run_pipeline{
   $self->cleanup($cleanup_dir) unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
+    $self->environment->return_environment;
   }
 }
 

@@ -85,7 +85,7 @@ $test_runner->run_single_analysis($logic_name, $feature_table,
 
 sub table_groups{
   my ($logic_name) = @_;
-  lc($logic_name);
+  $logic_name = lc($logic_name);
   my %tables;
   $tables{'genscan'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus'];

@@ -15,8 +15,8 @@ use vars qw(@ISA);
 
 
 sub new{
-  my ($class, $testdb, $verbose) = @_;
-  my $self = $class->SUPER::new();
+  my ($class) = @_;
+  my $self = bless {}, $class;
   return $self;
 }
 
@@ -50,6 +50,21 @@ sub change_blastdb{
   $self->old_blastdb($ENV{'BLASTDB'});
   $ENV{'BLASTDB'} = $blastdb;
   return $blastdb;
+}
+
+
+
+sub return_environment{
+  my ($self) = @_;
+
+  $ENV{'PERL5LIB'} = $self->old_perl5lib;
+  $ENV{'BLASTDB'} = $self->old_blastdb;
+}
+
+
+sub DESTROY{
+  my ($self) = @_;
+  $self->return_environment;
 }
 
 1;

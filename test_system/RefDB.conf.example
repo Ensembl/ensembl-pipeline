@@ -7,15 +7,24 @@
  'host'   => 'ecs1c',
  'dbname' => '',
   #where the table structure files are
- 'sql_files' => ['../../../ensembl-pipeline/sql/table.sql', 
-                 '../../../ensembl-pipeline/sql/pmatch.sql', 
-                 '../../../ensembl/sql/table.sql']
+ 'sql_files' => ['../../ensembl-pipeline/sql/table.sql', 
+                 '../../ensembl-pipeline/sql/pmatch.sql', 
+                 '../../ensembl/sql/table.sql'],
   #where the zip file containing all the tab files is
- 'data_dir' => 'reference_data'
+ 'data_dir' => 'reference_data',
  #the database already exists and the tables don't need loaded
  'preloaded_tables' => 0,
  #the data doesn't need loaded 
  'preloaded_data' => 0,
  #don't need to unzip the zip file the directory will already exist
  'dont_unzip' => 1,
+ 'job_stats_sleep' => 60,
 }
+
+
+#Note if don't unzip is marked the path still needs to be
+# {CWD}/species_name/*.sql files and this won't be deleted by this
+# TestDB object if cleanup is called
+# If preloaded tables is specified dbname must be specified and
+# the database won't be deleted by TestDB cleanup preloaded_data must 
+# only be true if preloaded_tables is also true
