@@ -45,6 +45,9 @@ use vars qw( %FirstEF );
 
 # Hash containing config info
 %FirstEF = (
+	    # Logic name
+	    FEF_LOGICNAME => 'firstef',
+
 	    # Input Id regular expression (to parse something like chr.start-end)
 	    FEF_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
 
@@ -52,19 +55,19 @@ use vars qw( %FirstEF );
 	    FEF_TMPDIR   => '',
 
 	    # The name of the file that will contain all of the LSF bsub commands.
-	    FEF_BSUB_FILE => '',
+	    FEF_BSUB_FILE => '/nfs/acari/dta/work1/first_ef/firstef_bsubs',
 
 	    # Name of the batch queue to use.
 	    FEF_QUEUE => 'acari',
 
 	    # Stipulate the size of the slices that firstef should run on.
-	    FEF_CHUNKSIZE => '50000',
+	    FEF_CHUNKSIZE => '5000000',
 
 	    # Name of the script that actually runs the analysis for each slice.
 	    FEF_RUN_SCRIPT => '',
 
 	    # Repeatmasked, or not.
-	    FEF_REPEATMASKED => 1,
+	    FEF_REPEATMASKED => 0,
 	    
 	    # Reference database where assembly, chromosome, dna, etc information is stored.
 	    FEF_REFDBHOST => '',
