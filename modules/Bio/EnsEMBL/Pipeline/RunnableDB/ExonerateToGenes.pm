@@ -185,8 +185,7 @@ sub fetch_input {
 	      -query_type  => $self->query_type,
 	     );
       $self->runnables($runnable);
-    }
-    else{
+    }else{
       $self->warn("file $database not found. Skipping");
     }
   }
@@ -235,15 +234,15 @@ sub run{
 
   # need to convert coordinates?
   
-  foreach my $gene(@genes){
-    foreach my $transcript(@{$gene->get_all_Transcripts}){
-      foreach my $exon (@{$transcript->get_all_Exons}){
-        foreach my $sf (@{$exon->get_all_supporting_features}){
-          print STDERR $sf->start." ".$sf->end." ".$sf->strand." ".$sf->hseqname."\n";
-        }
-      }
-    }
-  }
+#  foreach my $gene(@genes){
+#    foreach my $transcript(@{$gene->get_all_Transcripts}){
+#      foreach my $exon (@{$transcript->get_all_Exons}){
+#        foreach my $sf (@{$exon->get_all_supporting_features}){
+#          print STDERR $sf->start." ".$sf->end." ".$sf->strand." ".$sf->hseqname."\n";
+#        }
+#      }
+#    }
+#  }
   $self->output(@genes);
 }
 
@@ -864,7 +863,6 @@ sub change_strand{
 	$evi->hstrand( $evi->hstrand*(-1) );
       }
     }
-    $transcript->sort;
     return $transcript;
 }
 

@@ -116,12 +116,12 @@ sub fetch_input{
   # get genewise genes
   my @similarity_genes = @{$self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE)};
   my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
-  #print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
-  #print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
+  print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
+  print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
 
   $self->gw_genes( @similarity_genes, @targetted_genes );
  
-#print STDERR "Have input_id ".$self->input_id."\n";
+  #print STDERR "Have input_id ".$self->input_id."\n";
   my $cdna_vc= $self->cdna_db->get_SliceAdaptor->fetch_by_name
     ($self->input_id);
   # cdnas db
@@ -129,12 +129,12 @@ sub fetch_input{
   
   # get cdnas 
   my @e2g = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
-  #print STDERR "got " . scalar(@e2g) . " cdnas ($GB_cDNA_GENETYPE)\n";
+  print STDERR "got " . scalar(@e2g) . " cdnas ($GB_cDNA_GENETYPE)\n";
   
   # filter cdnas
   my @newe2g = $self->_filter_cdnas(@e2g);
   $self->e2g_genes(@newe2g);
-  #print STDERR "got " . scalar($self->e2g_genes) . " cdnas after filtering\n";
+  print STDERR "got " . scalar($self->e2g_genes) . " cdnas after filtering\n";
   $self->genewise_db->disconnect_when_inactive(1);
   $self->cdna_db->disconnect_when_inactive(1); 
 }
@@ -147,7 +147,7 @@ sub run {
   
   # merge exons with frameshifts into a big exon
   my @merged_gw_genes = $self->_merge_gw_genes;
-  #print STDERR "got " . scalar(@merged_gw_genes) . " merged genewise genes\n";  
+  print STDERR "got " . scalar(@merged_gw_genes) . " merged genewise genes\n";  
   
   # first of all, sort genewises by exonic length and genomic length  
   @merged_gw_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
@@ -160,7 +160,7 @@ sub run {
 			    
 			  } @merged_gw_genes;
   
-  #print STDERR "now have " . scalar(@merged_gw_genes) . " merged genes\n";
+  print STDERR "now have " . scalar(@merged_gw_genes) . " merged genes\n";
 		   
   # keep track of the e2g genes that have been used already
   my %used_e2g;
@@ -232,12 +232,12 @@ sub run {
     
     #test:
     #print STDERR "matching cdnas:\n";
-    foreach my $overlap ( @list ){
-      print STDERR "cdna: ".$$overlap[2]->dbID.
-	", exon_overlap: ".$$overlap[0].
-	  ", extent_overlap: ".$$overlap[1].
-	    ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
-    }
+    #foreach my $overlap ( @list ){
+      #print STDERR "cdna: ".$$overlap[2]->dbID.
+      #", exon_overlap: ".$$overlap[0].
+      # ", extent_overlap: ".$$overlap[1].
+      #  ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
+    #}
     
     my $count = 0;
     my $howmany = scalar(@list);
@@ -247,7 +247,7 @@ sub run {
       $count++;
       $e2g_match = $$this[2];
       
-    } while( $used_e2g{$e2g_match} ); 	      
+    } while($e2g_match && $used_e2g{$e2g_match} ); 	      
     
     unless ( $e2g_match){
       #print STDERR "No cdna found for gw_gene".$gw->dbID." ";
@@ -255,7 +255,7 @@ sub run {
 	print STDERR "(no cdna matched this gw gene)\n";
       }
       if ( ($count - 1) == $howmany && $howmany != 0 ){
-	print STDERR "(all matching cdnas were already used)\n";
+        print STDERR "(all matching cdnas were already used)\n";
       }
 
       $self->unmatched_genewise_genes($gw);
@@ -284,6 +284,7 @@ sub run {
   
   # remap to raw contig coords
   my @remapped = $self->remap_genes();
+  print STDERR "Have ".@remapped." remapped genes\n";
   $self->output(@remapped);
 }
 
@@ -888,74 +889,74 @@ sub combine_genes{
     
       foreach my $ex (@{$newtranscript->get_all_Exons}){
       
-      if(scalar($ex->sub_SeqFeature) > 1 ){
-	my @sf    = $ex->sub_SeqFeature;
-	my $first = shift(@sf);
-	
-	$ex->end($first->end);
-	
-	# add back the remaining component exons
-	foreach my $s(@sf){
-	    $newtranscript->add_Exon($s);
-	}
-	# flush the sub_SeqFeatures
-	$ex->flush_sub_SeqFeature;
-    }
-  }
-    
-    #unless($self->compare_translations($gw_tran[0], $newtranscript) ){
-    #  print STDERR "translation has been modified\n";
-    #}
-
-
-    # check that the result is fine
-    unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript,$self->query) ){
-	print STDERR "problems with this combined transcript, return undef";
-	return undef;
-    }
-    unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript) ){
-	print STDERR "problems with this combined translation, return undef";
-	return undef;
-    }
-      
-    # check translation is the same as for the genewise gene we built from
-    my $foundtrans = 0;
-    
-    # the genewise translation can be modified due to a disagreement in a
-    # splice site with cdnas. This can happen as neither blast nor genewise can
-    # always find very tiny exons.
-    # we then recalculate the translation using genomewise:
-    
-    my $newtrans;
-    if ( $modified_peptide ){
-      my $strand = $newtranscript->start_Exon->strand;
-      
-      #print STDERR "before genomewise:\n";
-#      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
-      
-      $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
-      
-      #print STDERR "after genomewise:\n";
-#    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
-      
-#      unless($self->compare_translations($gw_tran[0], $newtrans) ){
-#      	print STDERR "translation has been modified\n";
-#      }
-      
-      # if the genomewise results gets stop codons, return the original transcript:
-      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
-	print STDERR "Arrgh, stop codons, returning the original transcript\n";
-	$newtrans = $newtranscript;
+        if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
+          my @sf    = $ex->sub_SeqFeature;
+          my $first = shift(@sf);
+          
+          $ex->end($first->end);
+          
+          # add back the remaining component exons
+          foreach my $s(@sf){
+            $newtranscript->add_Exon($s);
+          }
+          # flush the sub_SeqFeatures
+          $ex->flush_sub_SeqFeature;
+        }
       }
+    
+      #unless($self->compare_translations($gw_tran[0], $newtranscript) ){
+      #  print STDERR "translation has been modified\n";
+      #}
+      
+
+      # check that the result is fine
+      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript,$self->query) ){
+        print STDERR "problems with this combined transcript, return undef";
+        return undef;
+      }
+      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript) ){
+        print STDERR "problems with this combined translation, return undef";
+        return undef;
+      }
+      
+      # check translation is the same as for the genewise gene we built from
+      my $foundtrans = 0;
+      
+      # the genewise translation can be modified due to a disagreement in a
+      # splice site with cdnas. This can happen as neither blast nor genewise can
+      # always find very tiny exons.
+      # we then recalculate the translation using genomewise:
+      
+      my $newtrans;
+      if ( $modified_peptide ){
+        my $strand = $newtranscript->start_Exon->strand;
+        
+        #print STDERR "before genomewise:\n";
+        #      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
+        
+        $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
+        
+        #print STDERR "after genomewise:\n";
+        #    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+        
+        #      unless($self->compare_translations($gw_tran[0], $newtrans) ){
+        #      	print STDERR "translation has been modified\n";
+        #      }
+        
+        # if the genomewise results gets stop codons, return the original transcript:
+        unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
+          print STDERR "Arrgh, stop codons, returning the original transcript\n";
+          $newtrans = $newtranscript;
+        }
+      }
+      else{
+        $newtrans = $newtranscript;
+      }
+      return $newtrans;
     }
-    else{
-      $newtrans = $newtranscript;
-    }
-    return $newtrans;
-  }
   else{
-      $self->warn("No combination could be built\n");
-      return undef;
+    $self->warn("No combination could be built\n");
+    return undef;
   }
 }
 
@@ -2017,7 +2018,6 @@ sub unmatched_genewise_genes {
     my $unmerged = $pairs{$merged};    
     push(@{$self->{'_unmatched_genewise_genes'}},$unmerged);
   }
-  
   return @{$self->{'_unmatched_genewise_genes'}};
 }
 

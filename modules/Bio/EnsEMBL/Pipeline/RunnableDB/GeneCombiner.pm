@@ -1,3 +1,4 @@
+
 #
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
@@ -44,7 +45,6 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::GeneCombiner;
 
-use diagnostics;
 use vars qw(@ISA);
 use strict;
 
@@ -62,42 +62,41 @@ use Bio::EnsEMBL::Pipeline::Runnable::GeneGraphGenerator;
 # config file; parameters searched for here if not passed in as @args
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw(
-						ESTGENE_DBHOST
-						ESTGENE_DBUSER
-						ESTGENE_DBNAME
-						ESTGENE_DBPASS 
-						ESTGENE_TYPE
-						ESTGENE_MAX_INTRON_LENGTH
+							       ESTGENE_DBHOST
+							       ESTGENE_DBUSER
+							       ESTGENE_DBNAME
+							       ESTGENE_DBPASS
+							       ESTGENE_DBPORT
+							       ESTGENE_TYPE
+							       ESTGENE_MAX_INTRON_LENGTH
 						
-						ENSEMBL_DBHOST
-						ENSEMBL_DBUSER
-						ENSEMBL_DBNAME
-						ENSEMBL_DBPASS
-						ENSEMBL_TYPE
+							       ENSEMBL_DBHOST
+							       ENSEMBL_DBUSER
+							       ENSEMBL_DBNAME
+							       ENSEMBL_DBPASS
+							       ENSEMBL_DBPORT
+							       ENSEMBL_TYPE
 						
-						REF_DBHOST
-						REF_DBUSER
-						REF_DBNAME
-						REF_DBPASS
+							       REF_DBHOST
+							       REF_DBUSER
+							       REF_DBNAME
+							       REF_DBPASS
+							       REF_DBPORT
 						
-						FINAL_DBHOST
-						FINAL_DBNAME
-						FINAL_DBUSER
-						FINAL_DBPASS
-						FINAL_TYPE
-					       
-						GENECOMBINER_INPUTID_REGEX
-					       
-					       );
+							       FINAL_DBHOST
+							       FINAL_DBNAME
+							       FINAL_DBUSER
+							       FINAL_DBPASS
+							       FINAL_DBPORT
+							       FINAL_TYPE
+
+							       GENECOMBINER_INPUTID_REGEX
+							      );
 
 
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-######################################################################
-
-
 
 #########################################################################
 #
@@ -117,6 +116,7 @@ sub final_db{
        '-user'   => $FINAL_DBUSER,
        '-dbname' => $FINAL_DBNAME,
        '-pass'   => $FINAL_DBPASS,
+       '-port'   => $FINAL_DBPORT,
        '-dnadb'  => $self->db,
       );
     
@@ -141,6 +141,8 @@ sub ensembl_db{
        '-host'   => $ENSEMBL_DBHOST,
        '-user'   => $ENSEMBL_DBUSER,
        '-dbname' => $ENSEMBL_DBNAME,
+       '-pass'   => $ENSEMBL_DBPASS,
+       '-port'   => $ENSEMBL_DBPORT,
        '-dnadb' => $self->db,
       );
     $self->{'_ensembl_db'} = $ensembl_db;
@@ -162,6 +164,8 @@ sub estgene_db{
        '-host'   => $ESTGENE_DBHOST,
        '-user'   => $ESTGENE_DBUSER,
        '-dbname' => $ESTGENE_DBNAME,
+       '-pass'   => $ESTGENE_DBPASS,
+       '-port'   => $ESTGENE_DBPORT,
        '-dnadb' => $self->db,
       ); 
     $self->{'_estgene_db'} = $estgene_db;
@@ -240,38 +244,19 @@ sub output{
 
 sub fetch_input {
   my( $self) = @_;
-  
+
   # get genomic region 
   my $chrid    = $self->input_id;
-  print STDERR "input_id: $chrid\n";
-   
-  my $chrname;
-  my $chrstart;
-  my $chrend;
-  if ( $chrid =~/$GENECOMBINER_INPUTID_REGEX/ ){
-    $chrname  = $1;
-    $chrstart = $2;
-    $chrend   = $3;
-  }
-  else{
-    $self->throw("Not a valid input_id... $chrid");
-  }
-  print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
-  my $ensembl_gpa = $self->ensembl_db->get_SliceAdaptor();
-  my $estgene_gpa = $self->estgene_db->get_SliceAdaptor();
+  my $ensembl_vc  = $self->fetch_sequence($chrid, $self->ensembl_db);
+  my $estgene_vc  = $self->fetch_sequence($chrid, $self->estgene_db);
 
-  my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-  my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-  
   $self->ensembl_vc( $ensembl_vc );
   $self->estgene_vc( $estgene_vc );
 
   print STDERR $self->ensembl_vc."\t".$self->estgene_vc."\n";
-
-  
 }
-  
+
 ############################################################
 #
 # RUN METHOD
@@ -284,7 +269,7 @@ sub run{
   # get estgenes ( from EST_GeneBuilder )
   print STDERR "getting genes of type $ESTGENE_TYPE\n";
   my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE ) };
-  
+
   # filter the est genes on basis of ORF size
   @est_genes = @{$self->_check_est_genes(\@est_genes)};
 
@@ -304,13 +289,13 @@ sub run{
       push(@transcripts, @{$gene->get_all_Transcripts});
     }
     my @newgenes = $self->_make_Genes(\@transcripts);
-      
-    my @remapped = $self->_remap_Genes(\@newgenes);
+
     
-    $self->output(@remapped);
+
+    $self->output(@newgenes);
     return;
   }
-  
+
   # need to CLONE all genes, as their transcripts may share exon objects
   # which makes it dangerous when modifying exon coordinates
 
@@ -320,7 +305,7 @@ sub run{
     push( @cloned_ensembl_genes, $newgene);
   }
   $self->ensembl_genes( @cloned_ensembl_genes );
-  
+
   my @cloned_est_genes;
   foreach my $gene ( @est_genes){
     my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
@@ -331,6 +316,10 @@ sub run{
   # store the original transcripts, just for the numbers
   my @original_ens_transcripts;
   foreach my $gene ( $self->ensembl_genes ){
+    if(!$gene->get_all_Transcripts){
+      $self->throw("Gene ".$gene->dbID." doesn't seem to have any ".
+                   "transcripts");
+    }
     my @transcripts =@{ $gene->get_all_Transcripts};
   TRAN1:
     foreach my $transcript (@transcripts){
@@ -352,16 +341,16 @@ sub run{
   my @genes             = ( $self->ensembl_genes, $self->estgenes );
   my @gene_clusters     = $self->cluster_Genes( @genes );
   my @unclustered_genes = $self->unclustered_Genes;
-  
+
   # the accepted set of transcripts
   my @transcripts;
- 
+
   ############################################################
   # at this stage we could separate the clusters into three sorts:
 
   # 1) only ensembl genes --> we leave them as they are
   # 2) ensembl+est genes  -->  first: extend UTRs
-  #                           second: include alternative forms (do checks) 
+  #                           second: include alternative forms (do checks)
   # 3) only est genes     --> if only 1 in the cluster, take it if good coverage 
   #                       --> if more: take a set that share exons among themselves (exact matches)
   #                                    not necessarily all the same exon, it should be the
@@ -371,11 +360,11 @@ sub run{
 
  CLUSTER:
   foreach my $cluster ( @gene_clusters ){
-    
+
     # get genes of each type
     my @ens_genes = $cluster->get_Genes_of_Type( $ENSEMBL_TYPE );
     my @est_genes = $cluster->get_Genes_of_Type( $ESTGENE_TYPE );
-    
+
     ############################################################
     # if we have genes of either type, let's try to match them
     ############################################################
@@ -383,14 +372,14 @@ sub run{
       print STDERR "Matching ".scalar(@ens_genes)." ensembl genes and ".scalar(@est_genes)." est genes\n"; 
       my @ens_transcripts;
       my @est_transcripts;
-      
+
       print STDERR "=== ensembl genes ===\n";
       foreach my $gene ( @ens_genes ){	
        TRAN1:
 	 foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-	  # do not reject any transcript on basis of intron size - assume this has been handled in the earlier stages as each stage has different rules
+	  # do not reject any transcript on basis of intron size - assume this has been handled 
+	  # in the earlier stages as each stage has different rules
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -399,18 +388,17 @@ sub run{
 	  push ( @ens_transcripts, $transcript );
 	}
       }
-      
+
       print STDERR "=== est genes ===\n";
       foreach my $gene ( @est_genes ){
       TRAN2:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN2;
 	  }
-	  
+	
 	  # reject unspliced transcripts
 	  unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript ) ){
  	    next TRAN2;
@@ -424,7 +412,7 @@ sub run{
 	  push ( @est_transcripts, $transcript );
 	}
       }
-      
+
       my ( $new_ens, $accepted_est ) = $self->_pair_Transcripts( \@ens_transcripts, \@est_transcripts );
       if ( $new_ens ){
 	push ( @transcripts, @$new_ens );
@@ -433,21 +421,20 @@ sub run{
 	push ( @transcripts, @$accepted_est );
       }
     }
-    
+
     ############################################################
     # else we could have only ensembl genes
     ############################################################
     elsif(  @ens_genes && !@est_genes ){
       # we have nothing to modify them, hence we accept them...
       my @ens_transcripts;
-      
+
       # but before we check, just in case, you know
       print STDERR "=== ensembl genes only ===\n";
       foreach my $gene ( @ens_genes ){
       TRAN3:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -459,20 +446,19 @@ sub run{
       print STDERR "Accepting ".scalar(@ens_transcripts)." ens-transcripts\n";
       push ( @transcripts, @ens_transcripts );
     }
-    
+
     ############################################################
     # else we could have only est genes
     ############################################################
     elsif( !@ens_genes && @est_genes ){
       print STDERR "Checking ".scalar(@est_genes)." est genes\n";
       my @est_transcripts;
-      
+
       print STDERR "=== est genes only ===\n";
       foreach my $gene ( @est_genes ){
       TRAN4:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN4;
@@ -492,7 +478,7 @@ sub run{
 	  push ( @est_transcripts, $transcript );
 	}
       }
-      
+
       # we have to check the est genes to see whether they are ok
       # they must have some common properties in order
       # to form a proper set of alternative forms
@@ -502,13 +488,13 @@ sub run{
 	push ( @transcripts, @accepted_trans );
       }
     }
-    
+
     # else we could have nothing !!?
     elsif( !@ens_genes && !@est_genes ){
       print STDERR "empty cluster, you must be kidding!\n";
     }
   } # end of CLUSTER
-  
+
   unless ( @transcripts ){
     print STDERR "No transcripts created, exiting\n";
     exit;
@@ -524,32 +510,16 @@ sub run{
   foreach my $gene (@newgenes){
     $count++;
     print STDERR "gene $count: ".$gene->type."\n";
-    foreach my $transcript (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    }
   }
-  
+
   print STDERR scalar(@newgenes)." genes 2b remapped\n";
   # remap them to raw contig coordinates
-  my @remapped = $self->_remap_Genes(\@newgenes);
-  print STDERR "==================== REMAPPED GENES =====================\n";
-  foreach my $gene ( @remapped ){
-      #print STDERR "type    : ".$gene->type."\n";
-      #print STDERR "analysis: ".$gene->analysis->dbID." ".$gene->analysis->logic_name."\n";
-      
-      # test:
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      }
-  }
-  print STDERR scalar(@remapped)." genes remapped\n";
   
   # store the genes
-  $self->output(@remapped);
+  $self->output(@newgenes);
   print STDERR scalar($self->output)." stored, to be written on the db\n";
-  
 
-  return @remapped;
+  return @newgenes;
 
 }
 
@@ -568,10 +538,10 @@ sub run{
 sub cluster_Genes {
   my ($self) = @_;
   my @genes = ( $self->ensembl_genes, $self->estgenes );
- 
+
   my @forward_genes;
   my @reverse_genes;
- 
+
  GENE:
   foreach my $gene ( @genes ){
     foreach my $transcript (@{$gene->get_all_Transcripts}){
@@ -616,15 +586,15 @@ sub _cluster_Genes_by_genomic_range{
   foreach my $k ( sort { $start_table{$a} <=> $start_table{$b} } keys %start_table ){
     push (@sorted_genes, $genes[$k]);
   }
-  
+
   # we can start clustering
   print "Clustering ".scalar( @sorted_genes )." genes...\n";
-  
+
   # create a new cluster 
   my $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
   my $cluster_count = 1;
   my @clusters;
-  
+
   # before putting any genes, we must declare the types
   my $ensembl    = [$ENSEMBL_TYPE];
   my $genomewise = [$ESTGENE_TYPE];
@@ -633,17 +603,17 @@ sub _cluster_Genes_by_genomic_range{
   # put the first gene into these cluster
   $cluster->put_Genes( $sorted_genes[0] );
   push (@clusters, $cluster);
-  
+
   # loop over the rest of the genes
  LOOP:
   for (my $c=1; $c<=$#sorted_genes; $c++){
     my $found=0;
-    
+
     # treat the clusters as ranges, so we only need to check if ranges overlap
     # for the moment this is enough
     my $gene_start = $self->_get_start_of_Gene( $sorted_genes[$c] );
     my $gene_end   = $self->_get_end_of_Gene(   $sorted_genes[$c] );
-    
+
     # we need to do this each time, so that start/end get updated
     my $cluster_start = $cluster->start;
     my $cluster_end   = $cluster->end;
@@ -692,7 +662,7 @@ sub unclustered_Genes{
 
 # this gives the left-most exon coordinate in a gene
 
-sub _get_start_of_Gene{  
+sub _get_start_of_Gene{
   my ($self,$gene) = @_;
   my $start;
   foreach my $tran ( @{$gene->get_all_Transcripts}){
@@ -713,7 +683,7 @@ sub _get_start_of_Gene{
 
 # this gives the right-most exon coordinate in a gene
 
-sub _get_end_of_Gene{  
+sub _get_end_of_Gene{
   my ($self,$gene) = @_;
   my $end;
   foreach my $tran ( @{$gene->get_all_Transcripts}){
@@ -770,7 +740,7 @@ sub _pair_Transcripts{
   my @est_transcripts = @$est_transcripts;
   my %used_est_transcript;
   my @accepted_isoforms;
-  
+
   # sort the transcripts by their genomic and exonic length
   @ens_transcripts = sort {  my $result = ( $self->_transcript_length($b) <=>
 					    $self->_transcript_length($a) );
@@ -780,8 +750,8 @@ sub _pair_Transcripts{
 			     }
 			     return $result;
 			   } @ens_transcripts;
-  
-  
+
+
   @est_transcripts = sort {  my $result = ( $self->_transcript_length($b) <=>
 					    $self->_transcript_length($a) );
 			     unless ($result){
@@ -790,17 +760,17 @@ sub _pair_Transcripts{
 			     }
 			     return $result;
 			   } @est_transcripts;
-  
+
 
   ###### LOOK FOR ESTGENES THAT EXTEND UTRs
 
   # matrix holding the number and length of exon overlap for each pair of transcripts
   my $overlap_number_matrix;
   my $overlap_length_matrix;
-  
+
   my %merge_list;
   my %selected; # keeps track of the est-transcripts that have been used
-  
+
   ############################################################
   # we use a loose comparison level to be conservative
   # this hopefully will avoid generating too many alternative splicing artifacts
@@ -809,11 +779,11 @@ sub _pair_Transcripts{
     = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(	
 									  -comparison_level         => 5,
 									 );
-  
+
   # we base everything on the ensembl transcripts
  ENS_TRANSCRIPT:
   foreach my $ens_tran ( @ens_transcripts ){
-    
+
     # we store them according to whether there is a est/cdna matching both UTRs or just one
     my @list_both_ends;
     my @list_one_end;
@@ -821,14 +791,10 @@ sub _pair_Transcripts{
 
   EST_TRANSCRIPT:
     foreach my $est_tran ( @est_transcripts ){
-      
+
       # check with which est_transcripts it can merge
       my ($merge,$overlaps) = $transcript_comparator->compare( $ens_tran, $est_tran );
       if ($merge == 1 && $overlaps > 0 ){
-	
-	print STDERR "Can merge:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($ens_tran);
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($est_tran);
 	
 	# we prefer those with both UTR ends matched
 	my ($match_5prime, $match_3prime) = $self->_check_UTRMatches( $ens_tran,$est_tran);
@@ -853,7 +819,7 @@ sub _pair_Transcripts{
 	print STDERR "dbID: ".$element->[3]->dbID."\n";
     }
     push( @lists, \@list_both_ends, \@list_one_end);
-    
+
     # take the est_transcript which overlap the most
     my @sorted_lists;
     foreach my $list ( @lists ){
@@ -875,10 +841,7 @@ sub _pair_Transcripts{
     }
     # test:
     print STDERR "Candidates:\n";
-    foreach my $pair ( @sorted_lists ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $pair->[3] );
-    }
-    
+
     # try to merge it, if succeeded, mark the chosen one and leave the rest
   MODIFY:
     for (my $i = 0; $i< scalar(@sorted_lists); $i++){
@@ -899,7 +862,7 @@ sub _pair_Transcripts{
 	}
     }
   }  # end of ENS_TRANSCRIPT
-  
+
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
   # those which have not been used for extending UTRs are candidate isoforms
   #
@@ -913,13 +876,16 @@ sub _pair_Transcripts{
   }
   print STDERR "\n".scalar(@candidates)." est transcripts left to be tested as isoforms\n\n";
   if (@candidates){
-      
+
       # at the moment we just check whether there is an ens_transcript
       # that shares one exon, part of the protein product and
       # there is one intron matching one exon or vice versa.
-    
+    # VAC 23.03.04 Extend checks to only allow isoform addition if BOTH transcripts 
+    # have all canonical splice sites.
+
   CANDIDATE:
     foreach my $est_tran ( @candidates ){
+      my $canonical_splice_sites = 0;
       my $one_exon_shared = 0;
       my $one_intron_shared = 0;
       my $similar_protein = 0;
@@ -949,29 +915,30 @@ sub _pair_Transcripts{
 	  next CANDIDATE;
 	}
       }
-      
+
       foreach my $ens_tran ( @ens_transcripts ){
-	$one_exon_shared   = $self->_check_exact_exon_Match(   $est_tran, $ens_tran);
-	$one_intron_shared = $self->_check_exact_intron_Match( $est_tran, $ens_tran);
-	$similar_protein   = $self->_check_protein_Match(      $est_tran, $ens_tran);
-	$exon_in_intron    = $self->_check_exon_Skipping(      $est_tran, $ens_tran);
+	$canonical_splice_sites = $self->_check_splice_sites( $est_tran, $ens_tran );
+	$one_exon_shared        = $self->_check_exact_exon_Match( $est_tran, $ens_tran );
+	$one_intron_shared      = $self->_check_exact_intron_Match( $est_tran, $ens_tran );
+	$similar_protein        = $self->_check_protein_Match( $est_tran, $ens_tran );
+	$exon_in_intron         = $self->_check_exon_Skipping( $est_tran, $ens_tran );
 	
-	print "Comparing\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
+	print "Comparing est transcript " . $est_tran->dbID . " with ensembl transcript " . $ens_tran->dbID . "\n";
+	print STDERR "splice_sites   : $canonical_splice_sites\n";
 	print STDERR "shared_exon    : $one_exon_shared\n";
 	print STDERR "shared_intron  : $one_intron_shared\n";
 	print STDERR "similar protein: $similar_protein\n";
 	print STDERR "exon_in_intron : $exon_in_intron\n";
 	
 	print STDERR "not using the protein info\n";
-	if ( ( $one_exon_shared == 1 || $one_intron_shared == 1 )
+	if ( ($canonical_splice_sites == 1) && (
+	     ($one_exon_shared == 1 || $one_intron_shared == 1)
 	     #&& $similar_protein == 1
 	     && $exon_in_intron  == 1
 	     #&& $exact_merge     == 0 
-	   ){
+	   )){
 	    print STDERR "BINGO, and ISOFORM found !!\n";
-	    
+	
 	    # if they don't have the same start/end translation, try to lock phases:
 	    if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
 		 !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
@@ -985,8 +952,8 @@ sub _pair_Transcripts{
 		print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
 	    }
 	  push ( @accepted_isoforms, $est_tran );
-	  
-	  next CANDIDATE; 
+	
+	  next CANDIDATE;
 	  ############################################################
 	  # NOTE: we accept the est gene if it does not merge with any
 	  # of the ensembl genes and if it is a valid isoform
@@ -1002,13 +969,12 @@ sub _pair_Transcripts{
   else{
       # nothing to do then
   }
-  
+
   # return the ens_transcripts (modified or not)
   return ( \@ens_transcripts, \@accepted_isoforms );
-  
+
 }
 #########################################################################
-
 sub _lock_Phases{
   my ($self,$est_tran,$ens_tran) = @_;
   
@@ -1110,12 +1076,10 @@ sub _lock_Phases{
   unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation( $est_tran )){
       print STDERR "Oh, shit we have to put back the original phases!!!!!!!!!!\n";
       print STDERR "Getting back to the original translation:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($original_transcript);
       return $original_transcript;
   }
   
   print STDERR "Succeeded in setting phases Returning:\n";
- Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
   return $est_tran;
 }
     
@@ -1147,6 +1111,41 @@ sub _check_Completeness{
     print STDERR "cannot retrieve exon sequence\n";
   }
   return 0;
+}
+
+############################################################
+
+sub _check_splice_sites{
+  my ($self, $est_tran, $ens_tran) = @_;
+
+  $self->throw("Problem with est transcript [$est_tran]") 
+    unless defined($est_tran) && $est_tran->isa("Bio::EnsEMBL::Transcript");
+  $self->throw("Problem with ensembl transcript [$ens_tran]") 
+    unless defined($ens_tran) && $ens_tran->isa("Bio::EnsEMBL::Transcript");
+
+  my $canonical_splice_sites = 0;
+  my $est_splice_sites = 0;
+  my $ens_splice_sites = 0;
+
+  # TranscriptUtils function returns 0 if single exon transcripts,
+  # so check it separately
+  if (scalar @{$est_tran->get_all_Exons} == 1){
+    $est_splice_sites = 1;
+  }
+  else{
+    $est_splice_sites = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->check_canonical_splice_sites($est_tran);
+  }
+
+  if (scalar @{$ens_tran->get_all_Exons} == 1){
+    $ens_splice_sites = 1;
+  }
+  else{
+    $ens_splice_sites = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->check_canonical_splice_sites($ens_tran);
+  }
+
+  $canonical_splice_sites = $est_splice_sites && $ens_splice_sites;
+  return $canonical_splice_sites;
+
 }
 
 ############################################################
@@ -1903,60 +1902,18 @@ sub _make_Genes{
 
 ###################################################################
 
-sub _remap_Genes {
-  my ($self,$genes) = @_;
-  my @genes = @$genes;
-  my @new_genes;
 
-  my $final_db  = $self->final_db; 
-  my $final_gpa = $self->final_db->get_SliceAdaptor();
-  my $chrid     = $self->input_id;
-  if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
-    $self->throw("Not a valid input_id... $chrid");
-  }
-  $chrid       =~ s/\.(.*)-(.*)//;
-  my $chrstart = $1;
-  my $chrend   = $2;
-  my $final_vc = $final_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $genetype = $FINAL_TYPE;
-  
- GENE:  
-  foreach my $gene (@genes) {
-    
-    $gene->analysis($self->analysis);
-    $gene->type($genetype);
-    my @trans = @{$gene->get_all_Transcripts};
-    my $new_gene;
-    # convert to raw contig coords
-    eval {
-      # transforming gene to raw contig coordinates.
-      print STDERR "****************about to transform***********************\n";
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-      }
 
-      $new_gene = $gene->transform;
-    };
-    if ($@) {
-      print STDERR "Couldn't reverse map gene [$@]\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	$self->_print_Transcript($t);
-      }
-      next;
-    }
-    $new_gene->type($gene->type);
-    $new_gene->analysis($gene->analysis);  
-    print STDERR "****************transformed gene***********************\n";
-    foreach my $transcript ( @{$new_gene->get_all_Transcripts} ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    }
-    push( @new_genes, $new_gene);
-    
-  }
-  return @new_genes;
+
+sub fetch_sequence{
+  my ($self, $name, $db) = @_;
+
+  my $sa = $db->get_SliceAdaptor; 
+
+  my $slice = $sa->fetch_by_name($name);
+
+  return $slice;
 }
-
-
 
 
 
@@ -2205,7 +2162,18 @@ sub write_output {
   print STDERR "writing to ".$self->final_db->dbname."\n";
  GENE: 
   foreach my $gene (@genes) {	
-    
+    foreach my $transcript(@{$gene->get_all_Transcripts}){
+      $transcript->dbID('');
+      $transcript->adaptor('');
+      foreach my $exon(@{$transcript->get_all_Exons}){
+        $exon->dbID('');
+        $exon->adaptor('');
+        foreach my $sf(@{$exon->get_all_supporting_features}){
+          $sf->dbID('');
+          $sf->adaptor('');
+        }
+      }
+    }
     unless ( $gene->analysis ){
       $gene->analysis( $self->analysis );
     }
@@ -2221,12 +2189,8 @@ sub write_output {
     #}
     
     eval {
-	$gene_adaptor->store($gene);
-	print STDERR "wrote gene dbID " . $gene->dbID . "\n";
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-      }
-      
+      $gene_adaptor->store($gene);
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -2323,15 +2287,15 @@ sub _check_est_genes{
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type($est_gene->type);
     $gene->analysis($est_gene->analysis);
-    
+
     foreach my $transcript(@{$est_gene->get_all_Transcripts}){
-      print STDERR "looking at transcript " . $transcript->dbID . "\n"; 
+#      print STDERR "looking at transcript " . $transcript->dbID . "\n"; 
       next unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_get_ORF_coverage($transcript) >= 50;
-    #  print "keeping transcript " . $transcript->dbID . "\n";
+      print "keeping transcript " . $transcript->dbID . "\n";
       $gene->add_Transcript($transcript);
       $added_trans++;
     }
-    
+
     # don't add the gene unless it has at least one transcript!
     next unless $added_trans;
     push(@checked_genes, $gene);

@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder;
 
-use diagnostics;
+#use diagnostics;
 use vars qw(@ISA);
 use strict;
 
@@ -113,77 +113,83 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf
 sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-  
-  my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-    (
-     -host   => $EST_GENE_DBHOST,
-     -user   => $EST_GENE_DBUSER,
-     -dbname => $EST_GENE_DBNAME,
-     -pass   => $EST_GENE_DBPASS,
-     -port   => $EST_GENE_DBPORT,
-    );
-  
-  my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-    (
-     -host             => $EST_DBHOST,
-     -user             => $EST_DBUSER,
-     -dbname           => $EST_DBNAME,
-     -pass             => $EST_DBPASS,
-     -port             => $EST_DBPORT,
-    );
-  
-  $est_db->dnadb($self->db);
-  $self->est_db($est_db);
-  
-  $self->output_db($output_db);
-  $self->output_db->dnadb($self->db);
-  if ( $USE_cDNA_DB ){
-    my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-      (
-       -host             => $cDNA_DBHOST,
-       -user             => $cDNA_DBUSER,
-       -dbname           => $cDNA_DBNAME,
-       -pass             => $cDNA_DBPASS,
-       -port             => $cDNA_DBPORT,
-       -dnadb            => $self->db,
-      );
-      
-    $self->cdna_db($cdna_db);
-  }
-  
+
   $self->genetype($ESTGENE_TYPE);
-  
   $self->{_reverse_transcripts} = [];
   $self->{_forward_transcripts} = [];
-  
+
   return $self; 
 }
 
 ############################################################
 
-sub est_db{
-    my ($self, $est_db) = @_;
+sub output_db {
+    my( $self, $output_db ) = @_;
+    
+    if ($output_db){
+      $output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$output_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_output_db} = $output_db;
+    }
+    if(!$self->{_output_db}){
+      $self->{_output_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $EST_GENE_DBHOST,
+         '-user'   => $EST_GENE_DBUSER,
+         '-pass'   => $EST_GENE_DBPASS,
+         '-port'   => $EST_GENE_DBPORT,
+         '-dbname' => $EST_GENE_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
+    }
+    return $self->{_output_db};
+}
+
+sub est_db {
+    my( $self, $est_db ) = @_;
+    
     if ($est_db){
-	$self->{_est_db} = $est_db;
+      $est_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$est_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_est_db} = $est_db;
+    }
+    if(!$self->{_est_db}){
+      $self->{_est_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $EST_DBHOST,
+         '-user'   => $EST_DBUSER,
+         '-pass'   => $EST_DBPASS,
+         '-port'   => $EST_DBPORT,
+         '-dbname' => $EST_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
     }
     return $self->{_est_db};
 }
 
-sub output_db{
-    my ($self, $output_db) = @_;
-    if ($output_db){
-	$self->{_output_db} = $output_db;
+sub cdna_db {
+    my( $self, $cdna_db ) = @_;
+    
+    if ($cdna_db){
+      $cdna_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$cdna_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_cdna_db} = $cdna_db;
     }
-    return $self->{_output_db};
-}
-############################################################
-
-sub cdna_db{
- my ($self, $cdna_db);
- if ($cdna_db){
-  $self->{_cdna_db} = $cdna_db;
- }
- return $self->cdna_db;
+    if(!$self->{_cdna_db}){
+      $self->{_cdna_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $cDNA_DBHOST,
+         '-user'   => $cDNA_DBUSER,
+         '-pass'   => $cDNA_DBPASS,
+         '-port'   => $cDNA_DBPORT,
+         '-dbname' => $cDNA_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
+    }
+    return $self->{_cdna_db};
 }
 
 sub revcomp_query{
@@ -275,7 +281,10 @@ sub write_output {
       $gene->modified(1);
       $gene->version(1);
     }
-    
+    #####################################
+    ##NASTY HACK from lec is it has been committed it is a mistake
+    #####################################
+    $gene->{'stable_id'} = undef;
     $gene_adaptor->store($gene);
     #print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
     
@@ -347,7 +356,7 @@ sub fetch_input {
     # print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) 
     #. "\n";
     push (@$genes, @$cdna_genes);
-    
+    $self->cdna_db->disconnect_when_inactive(1); 
   }
   
   my @forward_transcripts;
@@ -420,6 +429,7 @@ sub fetch_input {
   if(scalar(@reverse_transcripts)){
     $self->_reverse_transcripts( @reverse_transcripts );
   }
+  $self->est_db->disconnect_when_inactive(1); 
 }
 
 ############################################################
@@ -457,11 +467,11 @@ sub _reverse_transcripts{
 sub _process_Transcripts {
   my ($self, $alltranscripts, $strand) = @_;
 
-  print STDERR "EST_GeneBuilder: processing input transcripts...\n";
-  print STDERR "Have been passed ".@$alltranscripts." transcripts\n";
+  #print STDERR "EST_GeneBuilder: processing input transcripts...\n";
+  #print STDERR "Have been passed ".@$alltranscripts." transcripts\n";
   # first check transcripts and hold info about est_evidence, etc...
   my @checked_transcripts = $self->_check_Transcripts($alltranscripts,$strand);
-  print STDERR scalar(@checked_transcripts)." transcripts returned from _check_Transcripts\n";
+  #print STDERR scalar(@checked_transcripts)." transcripts returned from _check_Transcripts\n";
   
   # reject ests/cdnas if they have more than one non-standard intron splice site consensus sequence
   # or if the only intron they have is non standard.
@@ -492,7 +502,6 @@ sub _process_Transcripts {
 	       -perc_id  => 99,
 	       -depth    => 5,
 	     );
-      
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
       #print STDERR scalar(@checked_transcripts)." transcripts after tight filtering\n";
     }
@@ -555,14 +564,14 @@ sub _process_Transcripts {
   foreach my $tran (@filtered_transcripts ){
     foreach my $exon ( @{$tran->get_all_Exons} ){
       if ( $strand == 1 ){
-	$exon->slice( $self->query );
+        $exon->slice( $self->query );
       }
       else{
-	$exon->slice( $self->revcomp_query );
+        $exon->slice( $self->revcomp_query );
       }
     }
   }
-	
+	#print STDERR "have ".@filtered_transcripts." filtered\n";
   return @filtered_transcripts;
 }
 
@@ -681,7 +690,7 @@ sub _check_Transcripts {
       ############################################################
       my $size = $exon->end - $exon->start + 1;
       if ( $size  < $EST_MIN_EXON_SIZE ){
-        print STDERR "rejecting transcript with very small exon size = $size\n";
+        #print STDERR "rejecting transcript with very small exon size = $size\n";
         #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
         #$self->warn("rejecting very small exon: size=$size");
         next TRANSCRIPT;
@@ -771,7 +780,7 @@ sub _check_Transcripts {
     if ( $CHECK_SPLICE_SITES ){
       my $check = $self->check_splice_sites($new_transcript,$strand);
       unless ( $check ){
-	      print STDERR "rejecting transcript ".$new_transcript->dbID." for not having all splice sites canonical\n";
+	      #print STDERR "rejecting transcript ".$new_transcript->dbID." for not having all splice sites canonical\n";
 	      next TRANSCRIPT;
       }
     }
@@ -779,7 +788,7 @@ sub _check_Transcripts {
     push (@alltranscripts, $new_transcript);
     
   }    # end of TRANSCRIPT
-  print STDERR "Have ".@alltranscripts." transcripts to return\n";
+  #print STDERR "Have ".@alltranscripts." transcripts to return\n";
   return @alltranscripts;
   
 }
@@ -797,7 +806,7 @@ sub _check_Transcript_Location{
 
     # check that transcripts are not completely outside the slice
     if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	  print STDERR "transcript $id outside the slice\n";
+	  #print STDERR "transcript $id outside the slice\n";
   	$valid = 0;
     }
     ############################################################
@@ -805,7 +814,7 @@ sub _check_Transcript_Location{
     # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
     ############################################################
     elsif ( $strand == 1 && $transcript->start < 1 && $transcript->end > 1 ){
-      print STDERR "transcript $id falls off the slice by its lower end\n";
+      #print STDERR "transcript $id falls off the slice by its lower end\n";
       $valid = 0;
     }
     ############################################################
@@ -814,7 +823,7 @@ sub _check_Transcript_Location{
     # vice versa, so  
     ############################################################
     elsif ( $strand == -1 && $transcript->start <=  $slice->length && $transcript->end >  $slice->length ){
-      print STDERR "transcript $id in reverse strand falls off the revcomp-slice by its higher end\n";
+      #print STDERR "transcript $id in reverse strand falls off the revcomp-slice by its higher end\n";
       $valid = 0;
     }
 
@@ -822,17 +831,19 @@ sub _check_Transcript_Location{
     # check for possible coordinate nonsense in the exons
     ############################################################    
     my @exons = @{$transcript->get_all_Exons};
+    my $apparent_strand = $exons[0]->strand * $exons[0]->slice->strand;
+  
     if ($#exons > 0) {
 	for (my $i = 1; $i <= $#exons; $i++) {
 	    
 	    # check for folded transcripts
-	    if ($exons[0]->strand == 1) {
+	    if ($apparent_strand == 1) {
 		if ($exons[$i]->start < $exons[$i-1]->end) {
 		    print STDERR "transcript $id folds back on itself\n";
 		    $valid = 0;
 		} 
 	    } 
-	    elsif ($exons[0]->strand == -1) {
+	    elsif ($apparent_strand == -1) {
 		if ($exons[$i]->end > $exons[$i-1]->start) {
 		    print STDERR "transcript $id folds back on itself\n";
 		    $valid = 0;
@@ -1441,9 +1452,9 @@ sub run {
  # print STDERR "\n## forward strand ##\n\n";
   
   my @f_transcripts1 = $self->_forward_transcripts;
-  #print STDERR @f_transcripts1." forward transcripts\n";
+  print STDERR @f_transcripts1." forward transcripts\n";
   my @f_transcripts2 = $self->_process_Transcripts(\@f_transcripts1,$strand);
-  #print STDERR @f_transcripts2." forward transcripts after processing\n";
+  print STDERR @f_transcripts2." forward transcripts after processing\n";
   my @forward_transcripts;
   
   
@@ -1489,16 +1500,16 @@ sub run {
       }
     }
   }
-  #print STDERR @forward_transcripts." from translation compute\n";
+  print STDERR @forward_transcripts." from translation compute\n";
   # set slice in exons and place last stop codon in ORF definition
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
-  #print STDERR @checked_forward_transcripts." from translation check\n";
+  print STDERR @checked_forward_transcripts." from translation check\n";
   # cluster them into genes
   my @forward_genes                 = $self->_cluster_into_Genes(@checked_forward_transcripts);
-   #print STDERR @forward_genes." genes from clusters\n";
+  print STDERR @forward_genes." genes from clusters\n";
   # take the best ten transcripts from each gene
   my @selected_forward_transcripts  = $self->_select_best_transcripts(@forward_genes);
-   #print STDERR @selected_forward_transcripts." from transcript selection\n";
+   print STDERR @selected_forward_transcripts." from transcript selection\n";
   # cluster again into genes
   my @selected_forward_genes        = $self->_cluster_into_Genes( @selected_forward_transcripts );
   #print STDERR @selected_forward_genes." genes from clusters\n";
@@ -1507,7 +1518,7 @@ sub run {
   
   # map them to raw contig coordinates
   my @forward_remapped              = $self->remap_genes(\@ready_forward_genes, $strand);
-   #print STDERR @forward_remapped." genes from remapping\n";
+   print STDERR @forward_remapped." genes from remapping\n";
   $self->output(@forward_remapped);
 
 
@@ -1521,9 +1532,9 @@ sub run {
   my @reverse_transcripts;
  
   my @r_transcripts1 = $self->_reverse_transcripts;
-  #print STDERR @r_transcripts1." reverse transcripts\n";
+  print STDERR @r_transcripts1." reverse transcripts\n";
   my @r_transcripts2 = $self->_process_Transcripts(\@r_transcripts1,$strand);  
-  #print STDERR @r_transcripts2." reverse transcripts after processing\n";
+  print STDERR @r_transcripts2." reverse transcripts after processing\n";
   ############################################################
   # use genomewise?
   if ( $USE_GENOMEWISE ){
@@ -1567,14 +1578,15 @@ sub run {
   }
   
   # set slice in exons and place last stop codon in ORF definition
+  print STDERR @reverse_transcripts." from translation compute\n";
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
-  
+  print STDERR @checked_reverse_transcripts." from translation check\n";
   # cluster them into genes
   my @reverse_genes               = $self->_cluster_into_Genes(@checked_reverse_transcripts);
-  
+  print STDERR @reverse_genes." genes from clusters\n";
   # take the best ten transcripts from each gene
   my @selected_reverse_transcripts = $self->_select_best_transcripts(@reverse_genes);
-  
+  print STDERR @selected_reverse_transcripts." from transcript selection\n";
   # cluster them again into genes
   my @selected_reverse_genes       = $self->_cluster_into_Genes( @selected_reverse_transcripts );
   
@@ -1583,7 +1595,7 @@ sub run {
   
   # map them to raw contig coordinates
   my @reverse_remapped             = $self->remap_genes(\@ready_reverse_genes, $strand);
-  
+   print STDERR @reverse_remapped." genes from remapping\n";
   $self->output(@reverse_remapped);
   
 

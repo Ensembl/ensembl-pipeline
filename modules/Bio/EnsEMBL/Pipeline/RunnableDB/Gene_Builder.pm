@@ -59,6 +59,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 							       GB_COMB_DBNAME
 							       GB_COMB_DBUSER
 							       GB_COMB_DBPASS
+							       GB_COMB_DBPORT
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
@@ -78,10 +79,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
-			   -SEQFETCHER  => $sf,
+                           -SEQFETCHER  => $sf,
                            -ANALYSIS    => $analysis,
-			   -VCONTIG     => 1,
-			   );
+                           -VCONTIG     => 1,
+                          );
 
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
@@ -104,7 +105,7 @@ sub new {
     my( $use_vcontig) = $self->_rearrange([qw(VCONTIG)], @args);
        
     if (! defined $use_vcontig) {
-	$use_vcontig = $GB_VCONTIG;
+      $use_vcontig = $GB_VCONTIG;
     }  
     
     $self->use_vcontig($use_vcontig);
@@ -183,33 +184,22 @@ sub write_output {
 	    $gene->analysis($analysis);
 	    $gene->type($genetype);
 	    
-	    # coordinate transformation
-	    if ($self->use_vcontig) {
-		eval {
-		    $gene->transform;
-		};
-		if ($@) {
-		    $self->warn("Cannot convert gene to raw contigs:\n$@");
-		    foreach my $tran (@{$gene->get_all_Transcripts}){
-		      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-		    }
-		}
-	    }
-	    
 	    # store
 	    eval {
-		$gene_adaptor->store($gene);
-		print STDERR "wrote gene " . $gene->dbID . " \n";
+        $gene_adaptor->store($gene);
+        print STDERR "wrote gene " . $gene->dbID . " to database ".
+          $gene->adaptor->db->dbname."\n";
 	    }; 
 	    if( $@ ) {
-		$self->warn("NABLE TO WRITE GENE:\n$@");
-		foreach my $tran (@{$gene->get_all_Trascripts}){
-		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-		}
+        $self->warn("UNABLE TO WRITE GENE:\n$@");
+        foreach my $tran (@{$gene->get_all_Transcripts}){
+          Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript
+              ($tran);
+        }
 	    }
-	}
-	
     }
+        
+      }
     
 }
 
@@ -231,43 +221,29 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
     
-    my $contigid  = $self->input_id;
-    my $slice;
-    
-    if ($self->use_vcontig) {
-	my $slice_adaptor = $self->db->get_SliceAdaptor();
-	
-	$contigid =~/$GB_INPUTID_REGEX/;
-	
-	my $chr   = $1;
-	my $start = $2;
-	my $end   = $3;
-	print STDERR "Chr $chr - $start : $end\n";
-	$slice   = $slice_adaptor->fetch_by_chr_start_end($chr,$start,$end);
-    }
-    else {
-	# not sure this is the correct call:
-	$slice = $self->db->get_Contig($contigid);
-    }
+    $self->fetch_sequence();
     # database where all the genewise and combined genes are:
-    my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						      '-host'   => $GB_COMB_DBHOST,
-						      '-user'   => $GB_COMB_DBUSER,
-						      '-dbname' => $GB_COMB_DBNAME,
-						      '-pass'   => $GB_COMB_DBPASS,
-						      '-dnadb'  => $self->db,
-						      );
-
-    print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
+    my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      (
+       '-host'   => $GB_COMB_DBHOST,
+       '-user'   => $GB_COMB_DBUSER,
+       '-dbname' => $GB_COMB_DBNAME,
+       '-pass'   => $GB_COMB_DBPASS,
+       '-port'   => $GB_COMB_DBPORT,
+       '-dnadb'  => $self->db,
+      );
     
-    my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
-							      '-slice'   => $slice,
-							      '-input_id' => $self->input_id,
-							      );
+    #print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
+    
+    my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder
+      (
+       '-slice'   => $self->query,
+       '-input_id' => $self->input_id,
+      );
     $genebuilder->genes_db($genes_db);
- 
+    
     # store the object and the piece of genomic where it will run
-    $self->addgenebuilder($genebuilder,$slice);
+    $self->addgenebuilder($genebuilder,$self->query);
     
 }
 
@@ -314,13 +290,13 @@ sub run {
     
     my @genes;
     foreach my $contig (keys %{ $genebuilders } ) {
-	my $query = $genebuilders->{$contig}->query;
-	
-	print(STDERR "GeneBuilding for $contig\n");
-	
-	$genebuilders->{$contig}->build_Genes;
-	
-	@genes = $genebuilders->{$contig}->final_genes;
+      my $query = $genebuilders->{$contig}->query;
+      
+      #print(STDERR "GeneBuilding for $contig\n");
+      
+      $genebuilders->{$contig}->build_Genes;
+      
+      @genes = $genebuilders->{$contig}->final_genes;
     }
     
     $self->output( @genes );
