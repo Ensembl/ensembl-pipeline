@@ -29,6 +29,7 @@ use strict;
 
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
