@@ -43,9 +43,9 @@ package Bio::EnsEMBL::Pipeline::Status;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::Root::Object);
+@ISA = qw(Bio::Root::RootI);
 
 
 sub _initialize {

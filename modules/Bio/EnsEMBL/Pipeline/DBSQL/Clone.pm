@@ -42,15 +42,15 @@ package Bio::EnsEMBL::Pipeline::DBSQL::Clone;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::Root::Object
+# Object preamble - inheriets from Bio::Root::RootI
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 #use Bio::EnsEMBL::DB::CloneI;
 #use Bio::EnsEMBL::DBSQL::Clone;
 
-@ISA = qw(Bio::Root::Object Bio::EnsEMBL::DB::CloneI);
+@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::DB::CloneI);
 
-# new() is inherited from Bio::Root::Object
+# new() is inherited from Bio::Root::RootI
 
 # _initialize is where the heavy stuff will happen when new is called
 

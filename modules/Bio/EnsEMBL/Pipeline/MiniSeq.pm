@@ -58,16 +58,16 @@ package Bio::EnsEMBL::Pipeline::MiniSeq;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object
+# Object preamble - inherits from Bio::Root::RootI
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis::PairAlign;
 
 
-@ISA = qw(Bio::Root::Object);
-# new() is inherited from Bio::Root::Object
+@ISA = qw(Bio::Root::RootI);
+# new() is inherited from Bio::Root::RootI
 
 # _initialize is where the heavy stuff will happen when new is called
 

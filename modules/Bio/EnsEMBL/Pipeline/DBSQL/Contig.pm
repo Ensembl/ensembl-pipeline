@@ -39,20 +39,20 @@ package Bio::EnsEMBL::Pipeline::DBSQL::Contig;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object
+# Object preamble - inherits from Bio::Root::RootI
 
 BEGIN {
     print STDERR "Warning - file still using DBSQL::Contig. Should use RawContig!\n";
 };
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBSQL::RawContig;
 
-@ISA = qw(Bio::Root::Object Bio::EnsEMBL::DB::RawContigI);
+@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::DB::RawContigI);
 
-# new() is inherited from Bio::Root::Object
+# new() is inherited from Bio::Root::RootI
 
 # _initialize is where the heavy stuff will happen when new is called
 

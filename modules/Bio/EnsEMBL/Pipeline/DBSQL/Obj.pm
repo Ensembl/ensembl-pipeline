@@ -47,7 +47,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
 # use FreezeThaw qw(freeze thaw);
 
