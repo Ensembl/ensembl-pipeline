@@ -44,13 +44,14 @@ else
 #create blast object    
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
                                                              -BLAST => 'wublastn',
-                                                             -DB    => 'dbSTS',
+                                                             -DB    => 'dbSTS-1',
                                                              -THRESHOLD => 1,
                                                              -ARGS  => '');
  
 
-my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFiler->new( -runnable => $blast,
-							         -coverage => 1 );
+my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -runnable => $blast,
+							         -coverage => 1, 
+								 -minscore => 150);
 
 unless ($search)
 { print "not ok 3\n"; }
@@ -58,11 +59,11 @@ else
 { print "ok 3\n"; }
 
 
-$blast->run();
+$search->run();
 print "ok 4\n"; # 4th test passed
 
 #get and store the output
-my @results = $blast->output();
+my @results = $search->output();
 display (@results);
 
 unless (@results) 

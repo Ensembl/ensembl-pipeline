@@ -71,6 +71,8 @@ sub new {
 									)]
 								   ,@args);
 
+
+
   $minscore  = -100000 if !defined $minscore;
   $maxevalue = 0.1     if !defined $maxevalue;
   $coverage  = 10      if !defined $coverage;
@@ -78,6 +80,8 @@ sub new {
   if( !defined $runnable ) {
       $self->throw("Must have a runnable for search filter");
   }
+
+
 
   $self->runnable($runnable);
   $self->minscore($minscore);
@@ -117,10 +121,13 @@ sub run{
 
    FEATURE :
    foreach my $f ( $self->runnable->output ) {
+
+       #print STDERR "Feature ",$f->score," $minscore ",$f->start," ",$f->end,"\n";
        if( defined $f->score && $f->score < $minscore ) {
 	   next;
        }
-       if( defined $f->evalue && $f->evalue > $maxevalue ) {
+
+       if( $f->can('evalue') && defined $f->evalue && $f->evalue > $maxevalue ) {
 	   next;
        }
        # bugger. Coverage. Assumme @accepted is sorted by
@@ -129,7 +136,6 @@ sub run{
        foreach my $a ( @accepted ) {
 	   if( $a->start > $f->end ) {
 	       # accepted.
-	       push(@accepted,$f);
 	       last;
 	   }
 	   if( $a->end < $f->start ) {
@@ -146,6 +152,8 @@ sub run{
 	       }
 	   }
        }
+       push(@accepted,$f);
+       #print STDERR "Feature accepted\n";
 
        # at this point this means we have accepted this
        # feature. resort the accepted list by start
