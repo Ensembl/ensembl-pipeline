@@ -65,8 +65,8 @@ use Bio::EnsEMBL::Pipeline::Config::Blast;
                This module separates possible repeated genes
                into clusters of exons such that multiple 
                minigenomic sequence fragments can be
-               generated for passing to genewise/est2genome
-               - when this happens this method returns
+               generated for passing to genewise/est2genome.
+               When this happens this method returns
                multiple runnables that examine smaller
                portions of genomic DNA.
   Returntype : A list of Bio::EnsEMBL::Pipeline::Runnable
@@ -95,7 +95,7 @@ sub build_runnables {
   # to the simplest case where we make a single runnable with one 
   # unique gene per minigenomic sequence fragment.  In cases
   # where multiple similar genes are likely to be present in
-  #  the minigenomic sequence we switch to the
+  # the minigenomic sequence we switch to the
   # special case algorithm.  When this happens we cluster the 
   # likely exons into groups of similar exons, which we then
   # use make a set of distinct genes.  For each likely gene
@@ -113,7 +113,7 @@ sub build_runnables {
     # This is just for the clustering process.  The full set of features
     # are still passed to the runnable.
     if($raw_feat->percent_id >= 80){
-      push (@{$partitioned_features{$raw_feat->hseqname}}, $raw_feat);
+	    push (@{$partitioned_features{$raw_feat->hseqname}}, $raw_feat);
     }
   }
 
@@ -192,7 +192,7 @@ sub build_runnables {
 
 	my @sorted_gene_cluster = sort {$a->{_gsf_start} <=> $b->{_gsf_start};} @$gene_cluster;
 
-	my $rough_gene_length = $sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
+	my $rough_gene_length = $_sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
 
 	my $padding_length;
 	if ($rough_gene_length > 10000) {
@@ -203,19 +203,18 @@ sub build_runnables {
 
        	my $cluster_start = $sorted_gene_cluster[0]->{_gsf_start} - $padding_length;
 	my $cluster_end = $sorted_gene_cluster[-1]->{_gsf_end} + $padding_length;
-        unless ($cluster_start > 0) {
+
+	#print "Cluster start: $cluster_start   Cluster end: $cluster_end\n";
+
+        if ($cluster_start < 1) {
 	  if ($sorted_gene_cluster[0]->{_gsf_end} > 0) {
 	    $cluster_start = 1;
-	  } else {
-	    next GENE;
 	  }
 	}
-        unless ($cluster_end <= $self->genomic_sequence->length) {
+        if ($cluster_end > $self->genomic_sequence->length) {
 	  if ($sorted_gene_cluster[0]->{_gsf_start} <= $self->genomic_sequence->length) {
 	    $cluster_end = $self->genomic_sequence->length;
-	  } else {
-	    next GENE;
-	  }
+	  } 
 	}        
 
 	# Here we create our genomic fragment for passing to 
@@ -229,6 +228,8 @@ sub build_runnables {
 	my $string_seq = ('N' x ($cluster_start - 1)) . 
 	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
 		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
+
+	#print "Making runnable with sequence from $cluster_start to $cluster_end\n";
 
 	my $genomic_subseq = Bio::Seq->new(-seq => $string_seq,
 					   -id  => $self->genomic_sequence->id );
@@ -349,8 +350,7 @@ sub cluster_features {
   Example    : $self->for_gene_clusters($exon_clusters);
   Description: Using an array of exons clusters (similar
                blast features) to build genes with a feature
-               from each cluster.  Genes are formed from
-               exons that lie closest together.
+               from each cluster.
   Returntype : A reference to an array of arrays, each sub-
                array containing features that should 
                correspond to exons. 
@@ -365,53 +365,96 @@ sub form_gene_clusters {
 
   my ($self, $exon_clusters) = @_;
 
-  # Choose a cluster with the maximum number of members.
-  # Bump the other clusters onto a new array.
-
+  # Sort clusters according to their location in our
+  # hit sequence.
 
   my @sorted_by_start = sort {$a->[0]->{_hstart} <=> $b->[0]->{_hstart}} @$exon_clusters;  
 
-  my $big_cluster = shift @sorted_by_start;
+  my @final_gene_clusters;
+
+  my $total_clustered_exons = 0;
+  foreach my $cluster (@sorted_by_start){
+      foreach my $exon (@$cluster){
+	  $total_clustered_exons++;
+      }
+  }
+
+  my $remaining_unclustered_exons = $total_clustered_exons;
+
   my @other_clusters = @sorted_by_start;
 
-  my @final_gene_clusters;      
-  while (@$big_cluster){
+  while ($remaining_unclustered_exons > (0.2*$total_clustered_exons)) {
+#print "Remaining exons: " . $remaining_unclustered_exons . "   Total exons: " . $total_clustered_exons . "\n";
 
-    my $seed_exon = shift @$big_cluster;
-	
-    my @gene_cluster;
-    push (@gene_cluster, $seed_exon);
+      my $this_cluster = shift @other_clusters;
+
+      while (@$this_cluster){
+	  
+	  my $seed_exon = shift @$this_cluster;
+	  $remaining_unclustered_exons--;
+
+#print "Seed Exon-  gsfstart:" . $seed_exon->{_gsf_start} . "  gsfend:" . $seed_exon->{_gsf_end} . " hstart:" . $seed_exon->{_hstart} . "  hend:" . $seed_exon->{_hend} . "\n";	
+
+	  my @gene_cluster;
+	  push (@gene_cluster, $seed_exon);
     
-    foreach my $other_cluster (@other_clusters) {
-      if (@$other_cluster){
+	  foreach my $other_cluster (@other_clusters) {
+
+	      #print "     new exon cluster\n";
+
+	      if (@$other_cluster){
 	
-	my @subtracted_other_clusters;
-	my $closest = 1000000;
-	my $closest_feature;
-	foreach my $candidate_exon (@$other_cluster){
+		  my @subtracted_other_cluster;
+		  my $closest = 1000000;
+		  my $closest_feature;
+		  foreach my $candidate_exon (@$other_cluster){
+
+#print "     Candidate Exon-  gsfstart:" . $candidate_exon->{_gsf_start} . "  gsfend:" . $candidate_exon->{_gsf_end} . " hstart:" . $candidate_exon->{_hstart} . "  hend:" . $candidate_exon->{_hend} . "\n";
+
+		      my $distance = abs($candidate_exon->{_gsf_start} 
+					 - $seed_exon->{_gsf_start});
 	  
-	  my $distance = abs($candidate_exon->{_gsf_start} 
-			     - $seed_exon->{_gsf_start});
-	  
-	  if(($distance < $closest)&&($candidate_exon->{_hstart} > $seed_exon->{_hend})){
-	    if (defined $closest_feature){
-	      push (@subtracted_other_clusters, $closest_feature);
-	    }
-	    $closest = $distance;
-	    $closest_feature = $candidate_exon;
-	  } else {
-	    push (@subtracted_other_clusters, $candidate_exon);
+		      # The criteria below allows matches so long as the candidate exon 
+		      # is close enough and that the start of the next exon is greater
+		      # than the start of the previous exon (it is desirable to allow 
+		      # overlapping exons because this clusters features that are fragments
+		      # of one another).
+
+		      if(($distance < $closest)&&
+			 ($candidate_exon->{_hstart} > $seed_exon->{_hstart})&&
+			 ($distance < 20000)){
+			  if (defined $closest_feature){
+			      push (@subtracted_other_cluster, $closest_feature);
+			  }
+			  $closest = $distance;
+			  $closest_feature = $candidate_exon;
+		      } else {
+			  push (@subtracted_other_cluster, $candidate_exon);
+		      }
+		  }
+		  @$other_cluster = @subtracted_other_cluster;
+		  
+		  if (defined $closest_feature) {
+
+#print "  Clustered Exon-  gsfstart:" . $closest_feature->{_gsf_start} . "  gsfend:" . $closest_feature->{_gsf_end} . " hstart:" . $closest_feature->{_hstart} . "  hend:" . $closest_feature->{_hend} . "\n";
+
+		      push (@gene_cluster, $closest_feature);
+		      $remaining_unclustered_exons--;
+		  }
+		  undef $closest_feature;
+		  
+	      }
 	  }
-	}
-	@$other_cluster = @subtracted_other_clusters;
-
-	push (@gene_cluster, $closest_feature) if (defined $closest_feature);
-	undef $closest_feature;
-
+	  push (@final_gene_clusters, \@gene_cluster);
       }
-    }
-    push (@final_gene_clusters, \@gene_cluster);
-  }	
+  }
+  
+#  foreach my $cluster (@final_gene_clusters){
+#    print "CLUSTER: " . scalar @$cluster . " members\n";
+#    foreach my $exon (@$cluster){
+#      print " Start: " . $exon->{_gsf_start} . "   End: " . $exon->{_gsf_end} . "\n";
+#    }
+#  }
 
   return \@final_gene_clusters;
 }
@@ -572,3 +615,4 @@ sub check_repeated {
 
 
 return 1;
+
