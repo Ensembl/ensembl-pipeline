@@ -43,7 +43,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-#use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
@@ -314,7 +314,6 @@ sub flush_runs {
 
     $batch_job->construct_command_line($cmd);
     $batch_job->open_command_line();
-    print STDERR "RUNNING :".$batch_job->bsub."\n";
     if( ! defined $batch_job->id ) {
       print STDERR ( "Couldnt batch submit @job_ids" );
       foreach my $job_id (@job_ids) {
@@ -333,6 +332,8 @@ sub flush_runs {
 	$job->submission_id( $batch_job->id );
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
+	$job->stdout_file($lastjob->stdout_file);
+	$job->stderr_file($lastjob->stderr_file);
       }
       $adaptor->update(@jobs);
     }
