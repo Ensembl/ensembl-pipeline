@@ -166,10 +166,10 @@ sub add_Contig {
 
 
 
-=head2 each_Contig
+=head2 get_all_Contigs
 
  Title   : 
- Usage   : my @contigs = $self->each_Contig;
+ Usage   : my @contigs = $self->get_all_Contigs;
  Function: 
  Example : 
  Returns : 
@@ -179,7 +179,7 @@ sub add_Contig {
 
 =cut
 
-sub each_Contig {
+sub get_all_Contigs {
     my ($self,$contig) = @_;
     
     if (!defined($self->{_contigs})) {
@@ -219,20 +219,7 @@ sub build_Genes {
     my @contigs             = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
 
-    foreach my $gene (@genes) {
-	print(STDERR "\nNew gene - " . $gene->id . "\n");
-
-	foreach my $tran ($gene->each_Transcript) {
-	    print STDERR "\nTranscript - " . $tran->id . "\n";
-	    foreach my $exon ($tran->each_Exon) {
-		$self->print_Exon($exon);
-	    }
-	}
-    }
-
-    # Now we pass these on to Ewan's gene and exon comparison module to find the proper ids
-    # and versions and any deleted exons/genes/transcripts.
-
+    $self->print_Genes(@genes);
 }
 
 =head2 get_Features
@@ -255,7 +242,7 @@ sub get_Features {
     my @features;
     my @genscan;
 
-    foreach my $contig ($self->each_Contig) {
+    foreach my $contig ($self->get_all_Contigs) {
 	# This is just working with all the similarity features here
 	# When EST2genome features are in we need to be more selective
 
@@ -302,6 +289,8 @@ sub make_Exons {
 
 	my $excount    = 1;
 	my $contigid   = $gs->seqname;
+	my $contig     = $self->get_ContigByID($contigid);
+
 	foreach my $f ($gs->sub_SeqFeature) {
 	    my $exon  = new Bio::EnsEMBL::MappedExon;
 	    $exon->id       ($contigid . ".$gscount.$excount");
@@ -310,6 +299,7 @@ sub make_Exons {
 	    $exon->start    ($f->start);
 	    $exon->end      ($f->end  );
 	    $exon->strand   ($f->strand);
+	    $exon->attach_seq($contig->primary_seq);
 	    push(@exons,$exon);
 	    $excount++;
 	    
@@ -614,6 +604,9 @@ sub link_ExonPairs {
 
 	    $self->_recurseTranscript($exon,$transcript);
 	}
+    }
+    foreach my $tran ($self->get_all_Transcripts) {
+	$self->make_Translation($tran);
     }
     return $self->get_all_Transcripts;
 
@@ -937,14 +930,53 @@ sub print_Genes {
 	    foreach my $exon ($tran->each_Exon) {
 		$self->print_Exon($exon);
 	    }
+	    print STDERR "\nTranslation is " . $tran->translate->seq . "\n";
 	}
     }
 }
 
+sub get_ContigByID {
+    my ($self,$id) = @_;
+
+    foreach my $contig ($self->get_all_Contigs) {
+	if ($contig->id eq $id) {
+	    return $contig;
+	}
+    }
+}
 sub make_Translation {
     my ($self,$transcript) = @_;
 
- }   
+    my $translation = new Bio::EnsEMBL::Translation;
+    my @exons = $transcript->each_Exon;
+
+    if ($exons[0]->strand == 1) {
+	@exons = sort {$a->start <=> $b->start} @exons;
+	$translation->start        ($exons[0]->start);
+	$translation->end          ($exons[$#exons]->end);
+	
+    } else {
+	@exons = sort {$b->start <=> $a->start} @exons;
+	$translation->start        ($exons[0]->end);
+	$translation->end          ($exons[$#exons]->start);
+	
+    }
+    
+    $translation->start_exon_id($exons[0]->id);
+    $translation->end_exon_id  ($exons[$#exons]->id);
+    
+    my $endphase = 0;
+    
+    foreach my $exon (@exons) {
+	
+	$exon->phase         ($endphase);
+	$transcript->add_Exon($exon);
+	$endphase = $exon->end_phase;
+	
+    }
+
+    $transcript->translation($translation);
+}   
 1;
 
 
