@@ -386,21 +386,25 @@ sub convert_output {
 	}
 
 	$transl->start_exon_id($exons[0]->id);
-	if( $exons[0]->strand == 1 ) {
-	    $transl->start($exons[0]->start);
+	if( $exons[0]->phase == 0 ) {
+	    $transl->start(1);
+	} elsif( $exons[0]->phase == 1 ) {
+	    $transl->start(3);
 	} else {
-	    $transl->start($exons[0]->end);
-	} 
+	    $transl->start(2);
+	}
 	
-
+	
 	$transl->end_exon_id  ($exons[$#exons]->id);
+	my $endexon = $exons[$#exons];
 
-	if( $exons[$#exons]->strand == 1 ) {
-	    $transl->end($exons[$#exons]->end);
+	if( $endexon->end_phase == 1 ) {
+	    $transl->end($endexon->length -1 );
+	} elsif ( $endexon->end_phase == 2 ) {
+	    $transl->end($endexon->length -2 );
 	} else {
-	    $transl->end($exons[$#exons]->start);
-	} 
-
+	    $transl->end($endexon->length);
+	}
     }
 
     $self->{'_output'} = \@genes;
