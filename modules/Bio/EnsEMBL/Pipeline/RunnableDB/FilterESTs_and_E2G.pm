@@ -481,7 +481,7 @@ sub fetch_input {
 
   #my @time1 = times();
   # use coverage 5 for now.
-  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 5,
+  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
 								    '-minscore' => 500,
 								    '-prune'    => 1,
 								  );
@@ -759,7 +759,7 @@ sub make_transcript{
 
   my $excount = 1;
   my @exons;
-    
+     
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
@@ -841,10 +841,10 @@ sub remap_genes {
   my ($self, @genes) = @_;
   my $contig = $self->vc;
   my @remapped;
-
+  
  GENEMAP:
   foreach my $gene(@genes) {
-#     print STDERR "about to remap " . $gene->temporary_id . "\n";
+    #     print STDERR "about to remap " . $gene->temporary_id . "\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
     eval {
@@ -852,32 +852,32 @@ sub remap_genes {
       # need to explicitly add back genetype and analysis.
       $newgene->type($gene->type);
       $newgene->analysis($gene->analysis);
-
+      
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
-
+      
       my @oldtrans = $gene->each_Transcript;
       my @oldexons  = $oldtrans[0]->get_all_Exons;
-
+      
       my @newtrans = $newgene->each_Transcript;
       my @newexons  = $newtrans[0]->get_all_Exons;
-
+      
       if($#oldexons == $#newexons){
 	# 1:1 mapping; each_Exon gives ordered array of exons
 	foreach( my $i = 0; $i <= $#oldexons; $i++){
 	  $newexons[$i]->score($oldexons[$i]->score);
 	}
       }
-
+      
       else{
 	$self->warn("cannot transfer exon scores for " . $newgene->id . "\n");
       }
-
+      
       push(@remapped,$newgene);
       
     };
-     if ($@) {
-       print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
-     }
+    if ($@) {
+      print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
+    }
    }
 
   return @remapped;
