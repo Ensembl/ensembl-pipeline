@@ -630,7 +630,13 @@ sub filter_hits {
      while (my $sbjct = $parser->nextSbjct) {
        HSP:while (my $hsp = $sbjct->nextHSP) {
       
-           my $name = $hsp->subject->seqname ;
+           my $name;
+           if($hsp->subject->can('seq_id')){
+             $name = $hsp->subject->seq_id;
+           } else {
+             $name = $hsp->subject->seqname;
+           }
+           
            if($self->threshold_type){
              if ($self->threshold_type eq "PID") {
                next HSP if ($hsp->percent < $self->threshold);
