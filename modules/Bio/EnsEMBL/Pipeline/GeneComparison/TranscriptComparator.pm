@@ -45,7 +45,7 @@ intron_mismatch = INT -----------> Maximum number of bases that we consider for 
                                    The reason for this is that we do not expect very very small intron to be
                                    real
 
-restrict_internal_splice_overlap ---> value if we want to restrict how much can exceed
+internal_splice_overlap ---------> value if we want to restrict how much can exceed
                                    an external exon an internal splice site:
     
                                                     |--d--|
@@ -120,12 +120,12 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ( $comparison_level, $exon_match, $splice_mismatch, $intron_mismatch, $restrict_internal_splice_overlap ) = 
+  my ( $comparison_level, $exon_match, $splice_mismatch, $intron_mismatch, $internal_splice_overlap ) = 
     $self->_rearrange([qw(COMPARISON_LEVEL
 			  EXON_MATCH
 			  SPLICE_MISMATCH
 			  INTRON_MISMATCH
-			  RESTRICT_INTERNAL_SPLICE_OVERLAP
+			  INTERNAL_SPLICE_OVERLAP
 			  )],
 		      @args);
   
@@ -149,8 +149,8 @@ sub new{
       $self->intron_mismatch($intron_mismatch);
   }
   
-  if( defined $restrict_internal_splice_overlap ){
-    $self->restrict_internal_splice_overlap($restrict_internal_splice_overlap);
+  if( defined $internal_splice_overlap ){
+    $self->internal_splice_overlap($internal_splice_overlap);
   }
 
   $self->verbose(0);
@@ -196,12 +196,12 @@ sub splice_mismatch{
   return $self->{_splice_mismatch};
 }
 
-sub restrict_internal_splice_overlap{
+sub internal_splice_overlap{
     my ($self, $int) = @_;
     if ( defined $int ){ 
-	$self->{_restrict_internal_splice_overlap} = $int;
+	$self->{_internal_splice_overlap} = $int;
     }
-    return $self->{_restrict_internal_splice_overlap};
+    return $self->{_internal_splice_overlap};
 }
 
 sub intron_mismatch{
@@ -1087,8 +1087,8 @@ sub _check_high_site{
 	# if we restrict external splice sites, 
 	# we simply check that they do not exceed the splice_mismatch
 	############################################################
-	if ( defined $self->restrict_internal_splice_overlap ){
-	  if ($last_exon->end - $middle_exon->end <= $self->restrict_internal_splice_overlap ){
+	if ( defined $self->internal_splice_overlap ){
+	  if ($last_exon->end - $middle_exon->end <= $self->internal_splice_overlap ){
 	    return 1;
 	  }
 	  else{
@@ -1139,8 +1139,8 @@ sub _check_low_site{
 	# if we restrict external splice sites, 
 	# we simply check that they do not exceed the splice_mismatch
 	############################################################
-	if ( defined $self->restrict_internal_splice_overlap ){
-	  if ($middle_exon->start - $first_exon->start <= $self->restrict_internal_splice_overlap ){
+	if ( defined $self->internal_splice_overlap ){
+	  if ($middle_exon->start - $first_exon->start <= $self->internal_splice_overlap ){
 	    return 1;
 	  }
 	  else{
