@@ -63,12 +63,3 @@ CREATE TABLE InputIdAnalysis (
   KEY inputId_class (inputId, class)
 );
 
-CREATE TABLE VoidInputIdAnalysis (
-  inputId           varchar(40) DEFAULT '' NOT NULL,
-  analysisId        int(11) DEFAULT '0' NOT NULL,
-  exception         varchar(40),
-
-  PRIMARY KEY (inputId,analysisId),
-  KEY exc (exception)
-);
-
