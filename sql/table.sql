@@ -1,0 +1,66 @@
+# MySQL dump 5.13
+#
+# Host: localhost    Database: analysis
+#--------------------------------------------------------
+# Server version	3.22.22
+
+#
+# Table structure for table 'analysis'
+#
+CREATE TABLE analysis (
+  id int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  db varchar(40),
+  db_version varchar(40),
+  db_file varchar(80),
+  program varchar(40),
+  program_version varchar(40),
+  program_file varchar(40),
+  parameters varchar(80),
+  module varchar(80),
+  module_version varchar(40),
+  gff_source varchar(40),
+  gff_primary varchar(40),
+  PRIMARY KEY (id)
+);
+
+#
+# Table structure for table 'analysis_list'
+#
+CREATE TABLE analysis_list (
+  set_id int(10) DEFAULT '0' NOT NULL,
+  analysis_id int(10) DEFAULT '0' NOT NULL
+);
+
+#
+# Table structure for table 'analysis_set'
+#
+CREATE TABLE analysis_set (
+  id int(10) DEFAULT '0' NOT NULL auto_increment,
+  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  PRIMARY KEY (id)
+);
+
+#
+# Table structure for table 'job'
+#
+CREATE TABLE job (
+  id int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+  input_id int(10) unsigned DEFAULT '0' NOT NULL,
+  analysis int(10) unsigned DEFAULT '0' NOT NULL,
+  LSF_id int(10) unsigned DEFAULT '0',
+  machine varchar(40) DEFAULT '',
+  object mediumtext,
+  queue varchar(40) DEFAULT '',
+  PRIMARY KEY (id)
+);
+
+#
+# Table structure for table 'jobstatus'
+#
+CREATE TABLE jobstatus (
+  id int(10) unsigned DEFAULT '0' NOT NULL,
+  status varchar(40) DEFAULT 'CREATED' NOT NULL,
+  time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL
+);
+
