@@ -319,8 +319,8 @@ sub _tree{
 =head2 get_libraryId_by_estarray
   
   Arg        : an array of EST Accessions
-  Description: it finds the clone library id for each est
-               this EST was derived. It checks for version numbers and prune them
+  Description: it finds the clone library id for each est. 
+               It checks for version numbers in EST accessions and clip them
                as this information is not stored in the expression database
   Returntype : returns an arrray of arrayrefs, each arrayref holds a pair
                with EST.Accession and EST.ClonelibId
@@ -359,7 +359,6 @@ sub get_libraryId_by_estarray{
   }
   return @pairs;
 }
-
 
 ############################################################
 #
@@ -490,6 +489,28 @@ sub _get_term_by_node_id{
   return $term;
 }
 
+############################################################
+# this method gets the last term in the tree from which the library is hanging:
+
+sub get_last_terms_by_library_Name{
+  my ($self,$lib_name) = @_;
+  
+  my $q = qq ( SELECT Vocabulary.Term
+	       FROM   Vocabulary, Mapping, Clonelib
+	       WHERE  Clonelib.Name  = '$lib_name'
+	       AND    Clonelib.Id    = Mapping.ClonelibId
+	       AND    Mapping.NodeID - Vocabulary.NodeId
+	     );
+  
+  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
+  my $res = $sth->execute      || $self->throw("can't execute: $q");
+  
+  my @terms;
+  while( my $term = $sth->fetchrow_array ){
+      push (@terms,$term);
+  }
+  return @terms;
+}
 ############################################################
 
 sub _get_ontology_from_node_id{
