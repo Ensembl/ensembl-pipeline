@@ -370,7 +370,9 @@ sub list_input_ids_by_analysis {
   my $analysis_id = shift;
   my @ids;
   my @row;
-
+  if(!$analysis_id){
+    $self->throw("need an analysis id list from");
+  }
   my $sth = $self->prepare( qq{
     SELECT distinct input_id FROM input_id_analysis where analysis_id=?
     });
