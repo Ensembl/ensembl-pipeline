@@ -48,6 +48,9 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_INPUTID_REGEX
+					);
 
 require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
@@ -171,7 +174,7 @@ sub run {
     my ($self) = @_;
 
     my @features = $self->run_blast;
-
+    print STDERR "there are ".@features." features from reblast\n";
     unless (@features) {
         print STDERR "Contig has no associated features\n";
         return;
@@ -181,7 +184,7 @@ sub run {
 		foreach my $f( @features) {
 			my $newf = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature2,
 																							-feature2 => $f->feature1);
-			print $newf->gffstring . "\n";
+			#print $newf->gffstring . "\n";
 			push(@newf,$newf);
 		}
 
@@ -193,7 +196,7 @@ sub run {
     $mmg->run;
     
     my @f = $mmg->output;
-
+    #print STDERR "Multi Mini Genewise has ".@f." output\n";
     push(@{$self->{'_output'}},@f);
 
 }
@@ -203,35 +206,48 @@ sub run_blast {
 
     my @seq         = $self->get_Sequences;
     my @valid_seq   = $self->validate_sequence(@seq);
-
+    #print STDERR "there are ".@valid_seq." valid sequences\n";
     my $blastdb     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-sequences => [$self->genomic_sequence],
-																																		-type      => 'DNA');
-
-		$blastdb->run;
-
-		my @features;
-
-		my $dbname = $blastdb->dbname;
-
-    foreach my $seq (@seq) {
-			# First sort out the header parsing. Blergh!
-
-			if ($seq->id =~ /^(.*)\|(.*)\|(.*)/) {
-				$::fasta_header_re{$dbname} = '^.*\|(.*)\|.*';
-			} elsif ($seq->id =~ /^..\:(.*)/) {
-				$::fasta_header_re{$dbname} = '^..\:(.*)';
-			} else {
-				$::fasta_header_re{$dbname} = '^(\w+)\s+';
-			}
-
-			my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
-																														-program  => 'wutblastn',
-																														-database => $blastdb->dbfile,
-																													 );
-			$run->run;
-			push(@features,$run->output);
+								    -type      => 'DNA');
+    print STDERR "\n";
+    $blastdb->run;
+    print STDERR "\n";
+    my @features;
+    my @aligns;
+    my $dbname = $blastdb->dbname;
+    my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
+    foreach my $seq (@sorted_seqs) {
+      # First sort out the header parsing. Blergh! cb25.NA_057.31208-61441 Slice, no descrtipion 
+     
+      #print STDERR "ID ".$self->genomic_sequence->id."\n";
+      if($GB_INPUTID_REGEX && $self->genomic_sequence->id =~ /$GB_INPUTID_REGEX/){
+	$::fasta_header_re{$dbname} = $GB_INPUTID_REGEX;
+      }elsif ($self->genomic_sequence->id =~ /^(.*)\|(.*)\|(.*)/) {
+	$::fasta_header_re{$dbname} = '^.*\|(.*)\|.*';
+      } elsif ($self->genomic_sequence->id =~ /^..\:(.*)/) {
+	$::fasta_header_re{$dbname} = '^..\:(.*)';
+      }else {
+	$::fasta_header_re{$dbname} = '^(\w+)\s+';
+      }
+      
+      my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
+							    -program  => 'wutblastn',
+							    -database => $blastdb->dbfile,
+							    -filter => 0,
+							   );
+      $run->run;
+      print STDERR $run->output." gapped alignments come out of blast\n";
+      push(@aligns,$run->output);
     }
-
+    print STDERR "there are ".@aligns." gapped alignments\n";
+    foreach my $align(@aligns){
+     # my @fps = $align->ungapped_features;
+      push(@features, $align);
+    }
+    #print STDERR @features." ungapped alignments come out of blast\n";
+    $blastdb->remove_index_files;
+    unlink $blastdb->dbfile;
+    #print STDERR "my first feature ".$features[0]."\n";
     return @features;
 }
     
