@@ -200,7 +200,7 @@ sub make_MiniSeq {
   Usage   : $self->run()
   Function: Runs genewise on a MiniSeq
   Returns : none
-  Args    : 
+  Args    :
 
 =cut
 
@@ -209,12 +209,13 @@ sub run {
 
   my $miniseq = $self->make_MiniSeq;
 	my $minigen = $miniseq->get_cDNA_sequence;
-  
-  my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $minigen,
+
+  my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice   => $self->genomic_sequence,
+							    -genomic => $minigen,
 							    -protein => $self->protein_sequence,
 							    -reverse => $self->_is_reversed,
 							    -endbias => $self->endbias);
-  
+
   eval{
     $gw->run;
   };
@@ -225,97 +226,116 @@ sub run {
     return;
   }
 
-  # output is a list of Features (one per exon) with subseqfeatures 
-  # representing the ungapped sub alignments for each exon
-  
+  # output is an array of genes in miniseq coordinates
   my @f = $gw->output;
-  #foreach my $f(@f){
-  #  print STDERR ("start ".$f->start." end ".$f->end."\n");
-  #}
-  my @newf;
-  
   my $strand = 1;
-  
+
   if ($self->_is_reversed == 1) {
     $strand = -1;
   }
-  
-  my $ec = 0;
-  
- FEAT: 
-  foreach my $f (@f) {
-    $ec++;
-    
-    $f->strand($strand); 
-    #print STDERR "Converting ".$f->start." ".$f->end." back into genomic "
-    #      " coordinates\n";
-    # need to convert whole exon back to genomic coordinates
-    my @genomics = $miniseq->convert_SeqFeature($f);         
-    my $gf;
-    if(!@genomics){
-      print STDERR "Don't have anything returned by MiniSeq\n";
-      next FEAT;
-    }
-    if ($#genomics > 0) {
-      
-      # all hell will break loose as the sub alignments will probably not map cheerfully 
-      # and we may start introducing in frame stops ...
-      # for now, ignore this feature.
-      
-      print STDERR ("Warning : feature converts into > 1 features " . scalar(@genomics) . " Ignoring exon $ec\n");
-      
-      next FEAT;
-    }  else {
-      $gf = $genomics[0];
-    }
-    
-    $gf->strand   ($strand);
-    $gf->seqname  ($self->genomic_sequence->seq_region_name);
-    
-    # also need to convert each of the sub alignments back to genomic coordinates
-    
-    foreach my $aln ($f->sub_SeqFeature) {
-      my @alns = $miniseq->convert_PepFeaturePair($aln);
-      
-      if ($#alns > 0) {
-	print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
-      }
-      
-      foreach my $a(@alns) {
-	$a->strand($strand); 
-	$a->hstrand(1);      
-	$a->seqname($self->genomic_sequence->seq_region_name);
-	$a->hseqname($self->protein_sequence->id);
-	
-	# Maybe put a check in that this really is a sub feature
 
-	$gf->add_sub_SeqFeature($a,'');
+  my $ec = 0;
+
+ FEAT:
+  foreach my $gene (@f) {
+    my $converted_gene = new Bio::EnsEMBL::Gene;
+    $converted_gene->type($gene->type);
+
+    foreach my $transcript(@{$gene->get_all_Transcripts}){
+      my @converted_exons;
+
+      # need to convert all the exons and all the supporting features
+      foreach my $exon(@{$transcript->get_all_Exons}){
+	$ec++;
+	$exon->strand($strand);
+
+	# need to convert whole exon back to genomic coordinates
+	my @genomics = $miniseq->convert_SeqFeature($exon);
+
+
+	if(!@genomics){
+	  print STDERR "Don't have anything returned by MiniSeq\n";
+	  next FEAT;
+	}
+	if ($#genomics > 0) {
+	  # all hell will break loose as the sub alignments will probably not map cheerfully
+	  # and we may start introducing in frame stops ...
+	  # for now, ignore this feature.
+	  print STDERR ("Warning : feature converts into > 1 features " . scalar(@genomics) . " Ignoring exon $ec\n");
+	  next FEAT;
+	}  else {
+	  my $genomic_exon = new Bio::EnsEMBL::Exon;
+	  $genomic_exon->start    ($genomics[0]->start);
+	  $genomic_exon->end      ($genomics[0]->end);
+	  $genomic_exon->strand   ($strand);
+	  $genomic_exon->seqname  ($self->genomic_sequence->seq_region_name);
+	  $genomic_exon->phase    ($exon->phase);
+	  $genomic_exon->end_phase($exon->end_phase);
+	  $genomic_exon->slice    ($self->genomic_sequence);
+	
+	  # also need to convert each of the sub alignments back to genomic coordinates
+	  foreach my $aln (@{$exon->get_all_supporting_features}) {
+	    my @alns = $miniseq->convert_PepFeaturePair($aln);
+	    if ($#alns > 0) {
+	      print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
+	    }
+	
+	    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@alns);
+	    $align->seqname($self->genomic_sequence->seq_region_name);
+	    $align->hseqname($self->protein_sequence->id);
+	    $align->slice($self->genomic_sequence);
+	    # needs fix
+	    $align->score(100);
+	    $genomic_exon->add_supporting_features($align);
+
+	  }
+	
+	  push(@converted_exons,$genomic_exon);
+	}
       }
+
+      # make a new transcript from @converted_exons
+      my $converted_transcript  = new Bio::EnsEMBL::Transcript;
+      my $converted_translation = new Bio::EnsEMBL::Translation;
+      $converted_transcript->translation($converted_translation);
+
+      if ($#converted_exons < 0) {
+	print STDERR "Odd.  No exons found\n";
+	return undef;
+      }
+
+      else {
+
+	if ($converted_exons[0]->strand == -1) {
+	  @converted_exons = sort {$b->start <=> $a->start} @converted_exons;
+	} else {
+	  @converted_exons = sort {$a->start <=> $b->start} @converted_exons;
+	}
+	
+	$converted_translation->start_Exon($converted_exons[0]);
+	$converted_translation->end_Exon  ($converted_exons[$#converted_exons]);
+
+	# phase is relative to the 5' end of the transcript (start translation)
+	if ($converted_exons[0]->phase == 0) {
+	  $converted_translation->start(1);
+	} elsif ($converted_exons[0]->phase == 1) {
+	  $converted_translation->start(3);
+	} elsif ($converted_exons[0]->phase == 2) {
+	  $converted_translation->start(2);
+	}
+
+	$converted_translation->end  ($converted_exons[$#converted_exons]->end -
+				      $converted_exons[$#converted_exons]->start + 1);
+	foreach my $exon(@converted_exons){
+	  $converted_transcript->add_Exon($exon);
+	}
+      }
+
+      $converted_transcript->slice($self->genomic_sequence);
+      $converted_gene->add_Transcript($converted_transcript);
+      push(@{$self->{_output}}, $converted_gene);
     }
-    
-    push(@newf,$gf);
-    
   }
-  
-  
-  # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
-  # sub_SeqFeatures representing ungapped alignments making up the exon:protein alignment
-  
-  my $fset = new Bio::EnsEMBL::Feature();
-  
-  foreach my $nf (@newf) {
-    $fset->add_sub_SeqFeature($nf,'EXPAND');
-    $fset->seqname($nf->seqname);
-  }
-  
-  # Hmm - only add to the output if > 1 exon???
-  
-  if(scalar($fset->sub_SeqFeature) > 0){
-    push(@{$self->{'_output'}},$fset);
-  } else { 
-    print STDERR $fset." won't be outputed has ".$fset->sub_SeqFeature." exons\n";
-  }
-  
 }
 
 sub _is_reversed {
