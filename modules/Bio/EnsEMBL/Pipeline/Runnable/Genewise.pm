@@ -203,8 +203,6 @@ sub _align_protein {
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->genomic->id);
       $curr_exon->id        ($self->protein->id);
-      $curr_exon->source_tag('genewise');
-      $curr_exon->primary_tag('similarity');
 
       #print STDERR "setting phase to $f[4]\n";
       my $phase = $f[4];
