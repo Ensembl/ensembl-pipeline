@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder->new(
-								       -db     => $db,
+								       -db        => $db,
 								       -input_id  => $id
 								      );
     $obj->fetch_input
@@ -2414,12 +2414,13 @@ sub make_genes {
 
   my $time  = time; chomp($time);
   my $slice = $self->slice;
-
+  
+  
   # are we working on the reverse strand?
   if( $strand == -1 ){
     $slice = $slice->invert;
   }
-
+  
   # transcripts come with a translation, that's sorted out in MiniGenomewise and Genomewise
   my @trans = $runnable->output;
   
