@@ -28,9 +28,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome
 
 
 =head1 DESCRIPTION
-Just runs Exonerate over a  chunk of dbEST and spits the output to 2 files to be assessed later.
+Just runs Exonerate over a  chunk of dbEST and spits the output to file to be assessed later.
 File1 => all FeaturePairs produced by Exonerate
-File2 => FeaturePairs filtered to a coverage depth of 100.
 
 =head1 CONTACT
 
@@ -53,7 +52,6 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -72,7 +70,6 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
                 object
     Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
-                -seqfetcher: A Sequence Fetcher Object (required),
                 -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
 =cut
 
@@ -83,23 +80,13 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-    my( $estfile, $allresults, $filtered ) = $self->_rearrange([qw(ESTFILE ALLRESULTS FILTERED)], @args);
+    my( $estfile, $allresults ) = $self->_rearrange([qw(ESTFILE ALLRESULTS)], @args);
 
     $self->throw("No est file specified") unless defined($estfile);
     $self->estfile($estfile);
 
     $self->throw("No allresults file specified") unless defined($allresults);
     $self->allresults($allresults);
-
-    $self->throw("No filtered file specified") unless defined($filtered);
-    $self->filtered($filtered);
-
-    if(!defined $self->seqfetcher) {
-      # will look for pfetch in $PATH - change this once PipeConf up to date
-      my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-      $self->seqfetcher($seqfetcher);
-    }
-
 
     return $self;
 }
@@ -120,7 +107,6 @@ sub write_output {
   foreach my $feat(@{$self->output}) {
 
     print STDERR "$feat\n";
-    $self->_print_FeaturePair($feat);
   }
 }
 
@@ -159,8 +145,7 @@ sub fetch_input {
   
   my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs('-genomic'     => $genseq, 
 								      '-ests'        => $self->estfile,
-								      '-resfile'     => $self->allresults,
-								      '-seqfetcher'  => $self->seqfetcher);
+								      '-resfile'     => $self->allresults);
   
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
@@ -191,30 +176,6 @@ sub run {
 
   # something about filtering here?
 
-}
-
-=head2 _print_FeaturePair
-
-    Title   :   print_FeaturePair
-    Usage   :   $self->_print_FeaturePair($pair)
-    Function:   Prints attributes of a Bio::EnsEMBL::FeaturePair
-    Returns :   Nothing
-    Args    :   A Bio::EnsEMBL::FeaturePair
-
-=cut
-
-sub _print_FeaturePair {
-  my ($self,$pair) = @_;
-
-  my $host = 'acari';
-  my $filename = $self->filtered;
-  open OUT, ("| /usr/bin/rsh $host '(cat - >>$filename)'");
-
-  print OUT $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . 
-    $pair->score . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-      $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
-
-  close OUT;
 }
 
 =head2 output
