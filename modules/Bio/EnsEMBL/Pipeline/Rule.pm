@@ -138,7 +138,6 @@ sub check_for_analysis {
 
   # reimplement with proper identity check!
   my $goal = $self->goalAnalysis->dbID;
-
   for my $analysis ( @analist ) {
     $anaHash{$analysis->logic_name} = $analysis;
     if( $goal == $analysis->dbID ) {
@@ -146,8 +145,8 @@ sub check_for_analysis {
       return 0;
     }
   }
-
-  for my $cond ( @{$self->list_conditions} ) {
+  
+  for my $cond ( $self->list_conditions ) {
     if( ! defined $anaHash{$cond} ) {
       return 0;
     }

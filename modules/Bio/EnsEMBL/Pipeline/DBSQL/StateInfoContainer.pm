@@ -3,7 +3,7 @@
 # Creator: Arne Stabenau <stabenau@ebi.ac.uk>
 #
 # Date of creation: 15.09.2000
-# Last modified : 15.09.2000 by Arne Stabenau
+# Last modified : 20.09.2000 by Arne Stabenau
 #
 # Copyright EMBL-EBI 2000
 #
@@ -24,7 +24,7 @@ Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
   
   Module which encapsulates state request for objects in the database. 
   Starts of with a table InputIdAnalysis, providing which analysis was done to
-  inputIds but every state information access shou;d go via this object.
+  inputIds but every state information access should go via this object.
      
   Deliberatly NOT called an adaptor, as it does not serve obejcts.
 
@@ -69,7 +69,7 @@ sub fetch_analysis_by_inputId_class {
   my @result;
   my @row;
 
-  my $anaAd = $self->db->get_AnalysisAdapter;
+  my $anaAd = $self->db->get_AnalysisAdaptor;
 
   my $sth = $self->prepare( q {
     SELECT analysisId
@@ -78,7 +78,7 @@ sub fetch_analysis_by_inputId_class {
        AND class = ? } );
   $sth->execute( $inputId, $class );
  
-  while( @row = $sth->fetchrow_array ) {
+  while( my @row = $sth->fetchrow_array ) {
     my $analysis = $anaAd->fetch_by_dbID( $row[0] );
     if( defined $analysis ) {
       push( @result, $analysis );
@@ -96,7 +96,7 @@ sub store_inputId_class_analysis {
       SET inputId='$inputId',
           class='$class',
           created = now(),
-          analysis = ? } );
+          analysisId = ? } );
   $sth->execute( $analysis->dbID );
 }
 
@@ -125,10 +125,10 @@ sub list_inputId_class_by_start_count {
   my @result;
   my @row;
 
-  my $query = qq({
+  my $query = qq{
     SELECT inputId, class 
       FROM InputIdAnalysis
-     GROUP by inputId, class } );
+     GROUP by inputId, class };
   
   if( defined $start && defined $count ) {
     $query .= "LIMIT $start,$count";

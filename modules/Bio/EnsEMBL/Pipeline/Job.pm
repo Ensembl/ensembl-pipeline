@@ -292,7 +292,7 @@ sub runInLSF {
   my $rdb;
   
 
-#  eval {
+  eval {
     if( $module =~ /::/ ) {
       $module =~ s/::/\//g;
       require "${module}.pm";
@@ -314,7 +314,7 @@ sub runInLSF {
     $self->set_status( "WRITING" );
     $rdb->write_output;
     $self->set_status( "SUCCESSFUL" );
-#  }; 
+  }; 
   if( $@ ) {
     print $@;
 # print STDERR ("Problems with $module\n");
@@ -585,7 +585,7 @@ sub remove {
   
   if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
   if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
-  if( -e $self->object_file ) { unlink( $self->object_file ) };
+  if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
 
   if( defined $self->adaptor ) {
     $self->adaptor->remove( $self );

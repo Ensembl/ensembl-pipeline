@@ -19,21 +19,27 @@ use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-$mailReceiver = "stabenau@ebi.ac.uk";
-$maxMails = 3;
-$currentMail = 0;
+my $mailReceiver = "stabenau\@ebi.ac.uk";
+my $maxMails = 3;
+my $currentMail = 0;
 
-%stats = ( );
+my %stats = ( );
 
 # how many second before job becomes old?
-$oldJob = 60;
+my $oldJob = 90;
 
 # $statusDir = '/tmp/ruleManager';
 
-$chunksize = 500;
-$currentStart = 0;
-$completeRead = 0;
+my $chunksize = 5;
+my $currentStart = 0;
+my $completeRead = 0;
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
+  ( -host => 'ensrv3.sanger.ac.uk',
+    -dbname => 'arne_anaTest',
+    -user => 'ensadmin',
+  );
 
 my $ruleAdaptor = $db->get_RuleAdaptor;
 my @rules = $ruleAdaptor->fetch_all;
@@ -44,15 +50,20 @@ my $sic = $db->get_StateInfoContainer;
 
 my @hotJobs = ();
 my @hotIds = ();
+my %workOn;
 
 my $mailCount = 0;
 
-while( 1 ) {
+&intialize_hotJobs_workon;
 
-  if( !completeRead ) {
+while( 1 ) {
+  
+  if( !$completeRead ) {
+    print ( "Read a chunk\n" );
     my @idList = $sic->list_inputId_class_by_start_count
       ( $currentStart, $chunksize );
     push( @hotIds, @idList );
+    print ("Read ",scalar( @idList )," input ids.\n" );
     $currentStart += scalar( @idList );
     $stats{'sizeHotIds'} = scalar( @hotIds );
     if( scalar( @idList ) < $chunksize ) {
@@ -60,53 +71,60 @@ while( 1 ) {
     }
   }
 
-  print ( "Read a chunk\n" );
 
-  if( ! check_stop_condition ) {
-    while ( @hotIds ) {
-      my $hotId = shift( @hotIds );
+  while ( @hotIds ) {
+    my $hotId = shift( @hotIds );
+    $stats{'sizeHotIds'}--; 
+    my @anals = $sic->fetch_analysis_by_inputId_class
+      ( $hotId->[0], $hotId->[1] );
+    %analHash = undef;
       
-      my @anals = $sic->fetch_analysis_by_inputId_class
-	( $hotId->[0], $hotId->[1] );
-      %analHash = undef;
-      
-      # check all rules, which jobs can be started
-      for my $rule ( @rules ) {
-	$anal = $rule->check_for_analysis( @anals );
-	if( $anal ) {
-	  $analHash{$anal->dbID} = $anal;
-	}
-      }
-      
-      # start all jobs ... put the to hotJobs
-      for my $anal ( values %analHash ) {
-	my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId
-	  ( $anal, $hotId->[0] );
-	$jobAdaptor->store( $job );
-	$queue = resolve_queue( $anal );
-	$job->runRemote( $queue );
-	$stats{'jobsStarted'}++;
-	push( @hotJobs, [ $job, time ]  );
+    # check all rules, which jobs can be started
+    for my $rule ( @rules )  {
+      print( "Checking rule ",$rule->goalAnalysis->logic_name,".\n" );
+      print( " for ",$hotId->[0]," is " );
+      	
+      my $anal = $rule->check_for_analysis( @anals );
+      if( $anal ) {
+        print( "fullfilled.\n" );
+	$analHash{$anal->dbID} = $anal;
+      } else {
+        print( "not fullfilled.\n" );
       }
     }
+      
+    # start all jobs ... put the to hotJobs
+    for my $anal ( values %analHash ) {
+      if( defined $workOn{ $hotId->[0]."-".$anal->dbID } ) {
+      	next;
+      }
+      my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId
+	( $anal, $hotId->[0] ); 
+      $workOn{ $hotId->[0]."-".$anal->dbID } = 1;
+      $jobAdaptor->store( $job );
+      $job->runRemote( resolve_queue( $anal ));
+      $stats{'jobsStarted'}++;
+      push( @hotJobs, [ $job, time ]  );
+    }
   }
+
   if( scalar(@hotJobs) ==0 &&
       scalar(@hotIds) == 0 &&
       $completeRead ) {
     print ( "Nothing left to do. Sleep 5 minutes.\n" );
-    print_stats;
+    &print_stats;
     $completeRead = 0;
     $currentStart = 0;
     sleep( 300 );
     print( "Waking up and run again!\n" );
-
+  }
   # now try to find about the jobs in
   # the hotlist
-  check_jobs_against_success;
-  check_jobs_against_failed;
-  check_jobs_startup_problem;
-  check_jobs_for_old;
-  print_stats;
+  sleep( 3 );
+  &check_jobs_against_success;
+  &check_jobs_against_failed;
+  &check_jobs_for_old;
+  &print_stats;
 }
 
 
@@ -116,17 +134,22 @@ sub check_jobs_against_success {
   my @success = $jobAdaptor->list_jobId_by_status( "SUCCESSFUL" );
   my %successHash = map { ( $_,1) } @success;
   my @newHot;
+  print ( "check ",scalar( @success )," successful jobs\n" );
+  
   while( @hotJobs ) {
-    ( $job, $time ) = @{shift( @hotJobs )};
+    my( $job, $time ) = @{shift( @hotJobs )};
     if( defined $successHash{$job->dbID} ) {
       # yep, successful job
       my $class = resolve_class( $job->analysis );
       $sic->store_inputId_class_analysis
 	( $job->input_id, $class, 
 	  $job->analysis );
+      delete $workOn{$job->input_id."-".$job->analysis->dbID};
       $job->remove;
+
       $stats{'jobsSuccessful'}++;
-      push( @hotId, [ $job->input_id, $class ] );
+      push( @hotIds, [ $job->input_id, $class ] );
+      $stats{'sizeHotIds'}++;
     } else {
       push( @newHot, [ $job, $time ] );
     }
@@ -143,13 +166,13 @@ sub check_jobs_against_failed {
   my @newHot;
 
   while( @hotJobs ) {
-    ( $job, $time ) = @{shift( @hotJobs )};
+    my ( $job, $time ) = @{shift( @hotJobs )};
     if( defined $failedHash{$job->dbID} ) {
       # yep, failed job, get an updated version of it ...
       $job = $jobAdaptor->fetch_by_dbID( $job->dbID );
-      if( $job->retry_count < 1 ) {
-	$queue = resolve_queue( $job->analysis );
-	$job->runRemote( $queue );
+      if( $job->retry_count < 2 ) {
+        print( "Job restart ",$job->dbID,"\n" );
+	$job->runRemote( resolve_queue( $job->analysis ));
 	$stats{'jobRestarts'}++;
 	push( @newHot, [ $job, time ] );
       } else {
@@ -161,7 +184,7 @@ sub check_jobs_against_failed {
       push( @newHot, [ $job, $time ] );
     }
   }
-  @hotJobs = @newJobs;
+  @hotJobs = @newHot;
 }
 
 
@@ -169,7 +192,7 @@ sub check_jobs_against_failed {
 # there whereabouts in the db?
 # works on @hotJobs
 sub check_jobs_for_old {
-  $now = time;
+  my $now = time;
 
   my @newHot;
   for my $jobTime ( @hotJobs ) {
@@ -195,6 +218,7 @@ sub check_jobs_for_old {
 sub mail_job_problem {
   my $job = shift;
 
+  print ( "Problem with job mailed\n" );
   open( PIPE, "| Mail -s \"Pipeline problem\" $mailReceiver" ) or 
     die( "Cant contact babysitter..." );
   print PIPE ( "Tried ",$job->analysis->module," 3 times and faild\n" );
@@ -214,17 +238,23 @@ sub mail_job_problem {
     while( <FILE> ) {
       print PIPE $_;
     }
-    close( FILE )
-      print PIPE "----end stderr----\n";
-  }
+    close( FILE );
+    print PIPE "----end stderr----\n";
+	  }
   close PIPE;
   print ( "Mailed a problem.\n" );
   $mailCount++;
   if( $mailCount >= $maxMails ) {
-    to_many_error_exit;
+    &to_many_error_exit;
   }
 }
 
+sub intialize_hotJobs_workon {
+  # go through existing jobs and make them hotJobs
+  # so they are observed.
+  # as well make them workOn entries so nothing is
+  # started twice.
+}
 
 
 sub to_many_error_exit {
@@ -238,7 +268,7 @@ sub to_many_error_exit {
 
 sub resolve_queue {
   my $anal = shift;
-  return "blastfarm";
+  return "slow_blast_farm";
 }
 
 sub resolve_class {
@@ -250,8 +280,8 @@ sub resolve_class {
 sub print_stats {
   my ( $key, $val );
   print "-- Statistics --\n";
-  for ($key,$val) ( each %stats ) {
-    print "   $key=$val\n";
+  while( ($key,$val) = each %stats ) {
+    print "   $key = $val\n";
   }
   print "--\n";
 }
