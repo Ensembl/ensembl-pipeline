@@ -257,10 +257,13 @@ sub flush_runs {
   my $self = shift;
 
   my $adaptor = shift;
-  my $queue = shift;
   my $LSF_params = shift;
   my @queues;
   
+  my $nodes   = $LSF_params->{'nodes'}   || undef;
+  my $queue   = $LSF_params->{'queue'}   || undef;
+  my $jobname = $LSF_params->{'jobname'} || undef;
+
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
@@ -278,13 +281,7 @@ sub flush_runs {
   my $host     = $db->host;
   my $username = $db->username;
   my $dbname   = $db->dbname;
-
-  my ( $lsfid, $job, $stdout, $stderr );
-  my $nodes = $::pipeConf{'usenodes'} || undef;
-  # $nodes needs to be a space-delimited list
-  $nodes =~ s/,/ /;
-  $nodes =~ s/ +/ /;
-  # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
+  my $lsfid;
 
   # runner.pl: first look in same directory as Job.pm
   # if it's not here use file defined in pipeConf.pl
@@ -313,8 +310,15 @@ sub flush_runs {
     my $cmd;
   
     $cmd = "bsub -o ".$lastjob->stdout_file;
-    $cmd .= " -m '$nodes' " if defined $nodes;
+    if ($nodes) {
+	# $nodes needs to be a space-delimited list
+	$nodes =~ s/,/ /;
+	$nodes =~ s/ +/ /;
+	# undef $nodes unless $nodes =~ m{(\w+\ )*\w};
+        $cmd .= " -m '$nodes' ";
+    }
     $cmd .= " -q $queue " if defined $queue;
+    $cmd .= " -J $jobname " if defined $jobname;
     $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
     $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
@@ -370,15 +374,17 @@ sub flush_runs {
 
 sub batch_runRemote {
   my $self = shift;
-  my $queue = shift;
-  my $batchsize = $::pipeConf{'batchsize'};
+  my $LSF_params = shift;
+
+  my $batchsize = $LSF_params->{'flushsize'} || 1;
+  my $queue     = $LSF_params->{'queue'};
   
   # should check job->analysis->runtime
   # and add it to batched_jobs_runtime
   # but for now just
   push( @{$batched_jobs{$queue}}, $self->dbID );
   if ( scalar( @{$batched_jobs{$queue}} ) >= $batchsize ) {
-    $self->flush_runs( $self->adaptor, $queue );
+    $self->flush_runs( $self->adaptor, $LSF_params );
   }
 }
 
