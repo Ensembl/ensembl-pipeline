@@ -194,9 +194,13 @@ sub write_output {
 						'-dnadb'  => $self->dbobj,
 					       );
     # sort out analysis
-    my $genetype = 'ensembl';
+    my $genetype = 'genebuilder';
     my $anaAdaptor = $db->get_AnalysisAdaptor;
-    my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+	#use logic name from $self->analysis object is possible, else take $genetype;
+	my $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
+
+    my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     
     my $analysis_obj;
     
