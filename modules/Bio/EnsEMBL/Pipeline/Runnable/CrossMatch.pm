@@ -53,6 +53,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::FeatureFactory;
 
 # no need to 'use CrossMatch' as we embed the relevant pacakges here
 
