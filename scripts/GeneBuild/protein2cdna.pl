@@ -93,6 +93,7 @@ sub parse_sptr {
 
 sub identify_rf_embl_pairs {
   my $refseq   = $::scripts_conf{'rf_gnp'};  
+  return unless -e $refseq;
 
   my %proteins;
   $/ = "//\n"; # record separator
@@ -133,6 +134,7 @@ sub identify_rf_embl_pairs {
 
 sub identify_sp_embl_pairs {
   my $swiss   = $::scripts_conf{'sp_swiss'};  
+  return unless -e $swiss;
 
   my %proteins;
   $/ = "//\n"; # record separator
@@ -174,15 +176,17 @@ sub identify_sp_embl_pairs {
 sub check_embl {
   my ($id, $prot) = @_;
   my $efetch  = $::scripts_conf{'efetch'};
+  return unless defined $efetch && $efetch ne '';
 
   my $seq;
 
-  open(EFETCH, "$efetch $id |") or die("Error running $efetch for id [$id]");
+  open(EFETCH, "$efetch $id |") or die("Error opening pipe to $efetch for id [$id]");
   eval {
     my $fh = Bio::SeqIO->new(-fh   => \*EFETCH, "-format"=>'embl');
     $seq = $fh->next_seq();
+
   };
-  close EFETCH;
+  close EFETCH or die ("Error running $efetch for id [$id]");;
 
   return unless defined($seq) && $seq->isa("Bio::Seq");
 
@@ -220,7 +224,10 @@ sub write_output {
     open (OUT, ">>$outfile") or die "Can't open [$outfile]\n";
     print OUT "$prot : ";
     if (defined $cdna && $cdna->isa("Bio::Seq")){
-      print OUT $cdna->accession;
+      $cdna->display_id($cdna->accession_number);
+      $cdna->desc('');
+      print OUT $cdna->accession_number;
+
       my $seqout = new Bio::SeqIO(-file => ">>$seqoutfile", "-format" => "Fasta");
       $seqout->write_seq($cdna);
     }
