@@ -1178,6 +1178,7 @@ sub _merge_same_sequences {
   # Work through each distinct sequence merging all fragments into
   # a single string.
 
+ SEQ_NAME:
   foreach my $sequence_name (keys %same_sequences_hash){
 
     my @component_sequences;
@@ -1191,17 +1192,29 @@ sub _merge_same_sequences {
 
     @component_sequences = sort {$a->[1] <=> $b->[1]} @component_sequences;
 
+#foreach my $cs (@component_sequences) {
+#print STDERR $cs->[0]->name . "\t" . 
+#  $cs->[1] . "\t" . 
+#   $cs->[2] . "\n";
+#}
+
+
     # Check for data problems.  Sequence from the same piece of evidence
     # should not overlap with itself.
 
     for (my $i = 0; $i < scalar @component_sequences - 1; $i++){
+#print STDERR $component_sequences[$i]->[0]->name . "\t" . 
+#  $component_sequences[$i]->[1] . "\t" . 
+#    $component_sequences[$i]->[2] . "\t" . 
+#      "(next start : " . $component_sequences[$i+1]->[1] . ")\n";
+
       if ($component_sequences[$i]->[2] >= $component_sequences[$i+1]->[1]) {
 	warning("Parts of the same evidence sequence [" . 
-		$component_sequences[$i]->[0]->name . "] have " . 
-		"been matched to this gene twice.  Fiddling " . 
-		"alignment coordinates to make things work.");
+		$component_sequences[$i]->[0]->name . "] have " .
+		"been matched to this gene twice.  Skipping.  " .
+		"This is a data error, not a code error.");
 
-	  $component_sequences[$i+1]->[1] = $component_sequences[$i]->[2] + 1;
+	next SEQ_NAME
       }
     }
 
@@ -1393,11 +1406,14 @@ sub _working_alignment {
     # Sort evidence so that nucleotide and protein sequences 
     # are returned in blocks of similar sequence type.
     if ($slot eq 'evidence' && $self->_type eq 'all') {
+
+      throw "All the evidence for this gene has been thrown away or skipped.  Yuck."
+	unless $slot_resident;
+
       @$slot_resident = sort {$a->type cmp $b->type} @$slot_resident;
     }
 
     return $slot_resident;
-
   }
 
   return 0;
@@ -1868,12 +1884,18 @@ sub _build_evidence_seq {
     } else {
       my $start_overshoot = 0;
       if ($base_align_feature->start < 0) {
+	info("Feature [". $base_align_feature->hseqname .
+	     "] extends past the beginning of the slice.  Truncating.\n");
 	$start_overshoot = ($base_align_feature->start * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->end > $self->_slice->length) {
+	info("Feature [". $base_align_feature->hseqname .
+	     "] extends past the end of the slice.  Truncating.\n");
 	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
-	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
+	splice (@fetched_seq, 
+		(scalar @fetched_seq) - $start_overshoot - $end_overshoot - 1, 
+		$end_overshoot + 1);
       }
     }
   }

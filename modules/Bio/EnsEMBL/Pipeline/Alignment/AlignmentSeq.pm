@@ -272,10 +272,16 @@ sub _end_gaps {
   # Calculate both up and down stream gaps at the same
   # time for increased overall speed (assuming that
   # both numbers will ultimately be needed).
-  my @seq = split /[\w]/,$self->seq;
 
-  my $upstream_gaps = length($seq[0]);
-  my $downstream_gaps = length($seq[-1]);
+  my $seq = $self->seq;
+
+  $seq =~ s/^(\-*)/$1/;
+  my $upstream_gaps = length $1;
+
+  $seq = reverse $seq;
+  $seq =~ s/^(\-*)/$1/;
+  my $downstream_gaps = length $1;
+
 
   $self->{'_first_base_coord'} = $upstream_gaps + 1;
   $self->{'_last_base_coord'} = $self->length - $downstream_gaps;
