@@ -271,7 +271,6 @@ sub diskspace {
 # FeaturePair methods:
 sub createfeaturepair {
     my ($self, $feat1, $feat2) = @_;
-
     #create analysis object
     my $analysis_obj = new Bio::EnsEMBL::Analysis
                         (   -db              => $feat2->{db},
@@ -308,6 +307,8 @@ sub createfeaturepair {
     #create featurepair
     my $fp = Bio::EnsEMBL::FeaturePair->new  (  -feature1 => $seqfeature1,
                                                 -feature2 => $seqfeature2 ) ;
+
+    print "Feature pair " . $fp->gffstring . "\n";
 
     $self->growfplist($fp);                             
 }
