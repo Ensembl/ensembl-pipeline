@@ -129,6 +129,7 @@ sub new {
     
     
     $genewise_db->dnadb($self->db);
+    $self->genewise_db($genewise_db);
     $self->output_db($genewise_db);
     
     return $self; 
@@ -190,7 +191,7 @@ sub write_output {
     my $chrend   = $3;
 
     
-    my $sla       = $self->db->get_SliceAdaptor();
+    my $sla       = $self->genewise_db->get_SliceAdaptor();
     my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
     my $seq;
     $self->query($slice);
@@ -1055,6 +1056,30 @@ sub get_length_by_id{
    if ($idlength{$id}) {
        return $idlength{$id};
    }
+}
+
+=head2 genewise_db
+
+ Title   : genewise_db
+ Usage   : retrieves /sets the db pointed at by host GB_GW_HOST -
+           where preliminary genes are being written
+ Function:
+
+ Returns :
+ Args    :
+
+=cut
+
+sub genewise_db {
+    my( $self, $genewise_db ) = @_;
+
+    if ($genewise_db)
+    {
+        $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+            || $self->throw("Input [$genewise_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+        $self->{_genewise_db} = $genewise_db;
+    }
+    return $self->{_genewise_db};
 }
 
 
