@@ -504,13 +504,14 @@ sub get_Sequence {
 #    print(STDERR "Sequence id :  is [$id]\n");
 
     eval {
+      print STDERR "BlastMiniGenewise: getting sequence for $id\n";
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
     if($@) {
       $self->warn("Problem fetching sequence for id [$id] $@\n");
       return undef;
     }
-
+    
     if(!defined($seq)){
       $self->warn("Could not find sequence for [$id]");
     }
