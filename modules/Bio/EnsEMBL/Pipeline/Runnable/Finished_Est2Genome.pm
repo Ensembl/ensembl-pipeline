@@ -111,9 +111,10 @@ sub run {
         $estOutput->write_seq($self->{'_est_sequence'});
 
     }
+    
+             
+    my $est_genome_command = "est2genome -genome $genfile -est $estfile -space 500000 -out stdout |";
         
-    #The -reverse switch ensures correct numbering on EST seq in either orientation
-    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
     #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
       #print (STDERR "Running command $est_genome_command\n");
