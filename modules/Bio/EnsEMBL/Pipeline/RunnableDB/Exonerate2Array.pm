@@ -51,32 +51,13 @@ use strict;
 # Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateArray;
+use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-sub new {
-  my ($class, @args) = @_;
-  my $self = bless {}, $class;
-
-  my ($db,$query_file,$target_file,$exonerate,$options) = $self->_rearrange([qw(
-										DB
-										QUERY_FILE
-										TARGET_FILE
-										EXONERATE
-										OPTIONS
-									       )],@args);
-  
-  $self->db($db);
-  $self->query_file($query_file) if defined $query_file;
-  $self->target_file($target_file) if defined $target_file;
-  $self->exonerate($exonerate) if defined $exonerate;
-  $self->options($options) if defined $options;
-
-  return $self; 
-}
 
 =head2 fetch_input
 
@@ -92,12 +73,14 @@ sub fetch_input {
   my( $self) = @_;
   print STDERR "Fetching input \n";
   
-  $self->throw("No exonerate executable") unless defined($self->exonerate);
+  my $input_id = $self->input_id;
+  my $analysis = $self->analysis;
+  my $exonerate = $analysis->program;
+  my $version = $analysis->program_version;
+  my $options;
+  my $query_file = $MICROARRAY_INPUT_DIR.$input_id;
+  my $target_dir =$MICROARRAY_TARGET_DIR;
   
-  my $query_file = $self->query_file();
-  my $target_file = $self->target_file();
-  my $options = $self->options();
-
   ###Runnable::ExonerateArray take a array of query_seq_obj, so it's need to be generated here###
 
   my @query_seqs;
@@ -111,25 +94,30 @@ sub fetch_input {
     push (@query_seqs, $seq);
   }
 
+  $self->total_query_seq(scalar @query_seqs);
+
   # prepare runnable
   
   $self->throw("Can't run Exonerate without both query and target sequences") 
-    unless (defined($query_file) && defined($target_file));
+    unless (defined($query_file) && defined($target_dir));
   
-  my $executable =  $self->exonerate();
+  print "exonerate is '$exonerate', target_dir is $target_dir, query_file is $ query_file\n";
+  my $executable =  $BIN_DIR."/".$exonerate."-".$version;
   
-  my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateArray(
-								       '-db'           => $self->db,
-								       '-database'     => $target_file,
-								       '-query_seqs'   => \@query_seqs,
-								       '-query_type'   => 'dna',
-								       '-target_type'  => 'dna',
-								       '-exonerate'    => $executable,
-								       '-options'      => $options,
-								       '-analysis'     => $self->analysis,
-								      );
-  $self->runnable($exonerate);
-  
+  $self->throw("No exonerate executable") unless defined($executable);
+
+  my $target_file = $target_dir."*";
+  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateArray(
+								      '-db'           => $self->db,
+								      '-database'  => $target_file,
+								      '-query_seqs'   => \@query_seqs,
+								      '-query_type'   => 'dna',
+								      '-target_type'  => 'dna',
+								      '-exonerate'    => $executable,
+								      '-options'      => $options,
+								      '-analysis'     => $analysis,
+								     );
+  $self->runnables($runnable);
 }
 
 
@@ -148,14 +136,13 @@ sub run {
   
   $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
   
-  my $runnable = $self->runnable;
-  $runnable->run();
-    
-  my @out = $runnable->output();
-  my %match = %{$runnable->output_match_count};
-
-  $self->output(@out);
-  $self->output_match_count(\%match);
+  foreach my $runnable ($self->runnables){
+    $runnable->run();
+    my @out = $runnable->output();
+    my $match = $runnable->output_match_count;
+    $self->output(\@out);
+    $self->output_match_count($match);
+  }
 }
 
 =head2 output
@@ -170,9 +157,9 @@ sub run {
 
 sub output {
 
-  my ($self, @output) = @_;
-  if (@output){
-    push(@{$self->{_output}}, @output);
+  my ($self, $output) = @_;
+  if ($output){
+    push(@{$self->{_output}}, @$output);
   }
   return @{$self->{_output}};
 }
@@ -201,31 +188,33 @@ sub write_output {
   my($self) = @_;
   
   my @misc_features = $self->output(); 
-  my %match = %{$self->output_match_count};
+  my $match = $self->output_match_count;
   
   my $mfa = $self->db->get_MiscFeatureAdaptor();
-  #$mfa->store( @misc_features );
+  $mfa->store( @misc_features );
   
-  my ($count,$only_25,$only_24,$both,%count,%done);
+  my ($tot_pass_ids,$only_25,$only_24,$both,%done);
 
-  foreach my $q_id (keys %match) {
-    if ($match{$q_id}{'full_match_count'} and !$match{$q_id}{'mis_match_count'}) {
-      $only_25++;
+  foreach my $q_id (keys %{$match}) {
+    $tot_pass_ids++;
+    if ($match->{$q_id}->{'full_match_count'} and !$match->{$q_id}->{'mis_match_count'}) {
+      $only_25 += $match->{$q_id}->{'full_match_count'};
     }
-    elsif ($match{$q_id}{'full_match_count'} and $match{$q_id}{'mis_match_count'}) {
-      $both++;
+    elsif ($match->{$q_id}->{'full_match_count'} and $match->{$q_id}->{'mis_match_count'}) {
+      $both +=$match->{$q_id}->{'full_match_count'};
+      $both +=$match->{$q_id}->{'mis_match_count'};
     }
-    elsif ($match{$q_id}{'mis_match_count'} and !$match{$q_id}{'fullmatch_count'}) {
-      $only_24++;
+    elsif ($match->{$q_id}->{'mis_match_count'} and !$match->{$q_id}->{'fullmatch_count'}) {
+      $only_24 += $match->{$q_id}->{'mis_match_count'};
     }
   }
   
-  my $tot_pass_ids = keys %match;
+  
   my $ratio_25 = $only_25/$tot_pass_ids;
   my $ratio_24 = $only_24/$tot_pass_ids;
   my $ratio_both = $both/$tot_pass_ids;
-  
-  printf "total pass ids is $tot_pass_ids, 25 exact match is $only_25 (%.2f), 24 exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
+  my $total_query_seq = $self->total_query_seq;
+  printf "total_query_seq is $total_query_seq, total pass ids is $tot_pass_ids, with 25 bases exact match is $only_25 (%.2f), with 24 bases exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
   
   return 1;
 }
@@ -291,43 +280,36 @@ sub db {
 
 ############################################################
 
-sub analysis {
-
-  my ($self, $analysis) = @_;
-
-  if ($analysis) {
-    $self->{'_analysis'} = $analysis;
+sub input_id {
+  my ($self, $input_id) = @_;
+  if ($input_id) {
+    $self->{_input_id} = $input_id ;
   }
-  else {
-    my ($program, $version) = split /\-/, $self->exonerate;
-    
-    my $analysis = new Bio::EnsEMBL::Analysis (
-					       -db              => 'Affymetrix_array',
-					       -db_version      => '',
-					       -program         => $program,
-					       -program_version => $version,
-					       -gff_source      => $program,
-					       -gff_feature     => 'mapping',
-					       -logic_name      => 'mapping',
-					       -module          => 'ExonerateArray',
-					      );
-    
-    $self->{'_analysis'} = $analysis;
-  }
-  return $self->{'_analysis'};
+  return $self->{_input_id};
 }
 
 ############################################################
+
+sub total_query_seq {
+  my ($self, $total_query_seq) = @_;
+  if ($total_query_seq) {
+    $self->{_total_query_seq} = $total_query_seq ;
+  }
+  return $self->{_total_query_seq};
+}
+
+
+############################################################
     
-sub runnable{
+sub runnables{
   my ($self, $runnable) = @_;
   if($runnable) {
     unless($runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
       $self->throw("$runnable is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
-    $self->{'_runnable'} = $runnable;
+    push @{$self->{_runnable}}, $runnable;
   }
-  return $self->{'_runnable'};
+  return @{$self->{_runnable}};
 }
 
 
