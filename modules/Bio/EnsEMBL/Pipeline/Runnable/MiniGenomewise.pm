@@ -60,11 +60,12 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $transcripts , $switch, $smell) = $self->_rearrange([qw(GENOMIC
-									  TRANSCRIPTS
-									  SWITCH
-									  SMELL
-									 )],
+    my( $genomic, $transcripts , $switch, $smell, $cds) = $self->_rearrange([qw(GENOMIC
+										TRANSCRIPTS
+										SWITCH
+										SMELL
+										CDS
+									       )],
 								      @args);
     
     if ( defined($smell) ){
@@ -72,6 +73,9 @@ sub new {
     }
     if ( defined($switch) ){
       $self->switch($switch);
+    }
+    if ($cds){
+      $self->cds($cds);
     }
 
     $self->throw("No genomic sequence input")                     unless defined($genomic);
@@ -390,6 +394,9 @@ sub run {
   if ( defined($self->smell)  ){
     $genomewise->smell($self->smell);
   }
+  if ( $self->cds ){
+    $genomewise->cds($self->convert_transcript_to_miniseq($self->cds));
+  }
   
   foreach my $t (@{$self->get_all_Transcripts}){
     my $converted = $self->convert_transcript_to_miniseq($t);
@@ -577,6 +584,15 @@ sub smell{
 
 ############################################################
 
+sub cds{
+  my ($self,$cds) = @_;
+  if ( $cds ){
+    $self->{_cds} = $cds;
+  }
+  return $self->{_cds};
+}
+
+############################################################
 
 1;
 
