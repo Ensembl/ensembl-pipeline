@@ -704,6 +704,11 @@ sub output {
 
 sub runnables {
   my ($self, $runnable) = @_;
+  
+  if (!defined($self->{'_runnable'})) {
+      $self->{'_runnable'} = [];
+  }
+  
   if (defined($runnable) ){
     unless( $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") ){
       $self->throw("$runnable is not a Bio::EnsEMBL::Pipeline::RunnableI");
