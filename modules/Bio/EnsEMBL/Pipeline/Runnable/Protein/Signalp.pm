@@ -151,15 +151,6 @@ sub query {
     return $self->{'_sequence'};
 }
 
-sub clone{
-  my ( $self, $clone ) = @_;
-  if ($clone){
-    $self->query($clone);
-  }
-  return $self->query;
-}
-
-
 =head2 analysis
 
  Title    : analysis
@@ -465,5 +456,14 @@ sub output {
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
 }
+
+sub queryname{
+  my ($self,$queryname) = @_;
+  if ($queryname){
+    $self->{_queryname} = $queryname;
+  }
+  return $self->{_queryname};
+}
+
 
 1;

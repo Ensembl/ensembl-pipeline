@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -97,7 +97,7 @@ sub new {
         $self->throw("Tmhmm needs an analysis");
     }
 
-    $self->program ($self->find_executable ($self->analysis->program_file));
+    $self->program ($self->analysis->program_file);
   
     return $self;
 }
@@ -413,5 +413,14 @@ sub output {
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
 }
+
+sub queryname{
+  my ($self,$queryname) = @_;
+  if ($queryname){
+    $self->{_queryname} = $queryname;
+  }
+  return $self->{_queryname};
+}
+
 
 1;
