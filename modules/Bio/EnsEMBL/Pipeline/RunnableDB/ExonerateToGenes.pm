@@ -176,7 +176,7 @@ sub fetch_input {
       #print STDERR "creating runnable for target: $database\n";
       my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
 	->new(
-	      -database    => $database,
+	      -target_file => $database,
 	      -query_seqs  => \@sequences,
 	      -exonerate   => $self->exonerate,
 	      -options     => $self->options,
@@ -209,7 +209,7 @@ sub run{
     # store the results
     my @results_here = $runnable->output;
     push ( @results, @results_here );
-    print STDERR scalar(@results_here)." matches found in ".$runnable->database."\n";
+    print STDERR scalar(@results_here)." matches found in ".$runnable->target_file."\n";
     
   }
 
