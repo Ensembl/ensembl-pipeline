@@ -320,18 +320,6 @@ sub write_output {
 
 	  foreach my $exon ( $gene->each_unique_Exon() ) {
 	    $exoncount++;
-	    foreach my $sf($exon->each_Supporting_Feature) {
-#	      print STDERR "***sub_align: " . 
-#		           $sf->seqname  . "\t" .
-#		           $sf->start    . "\t" .
-#		           $sf->end      . "\t" .
-#		           $sf->strand   . "\t" .
-#			   $sf->score   . "\t" .
-#			   $sf->hseqname . "\t" .
-#			   $sf->hstart   . "\t" .
-#			   $sf->hend     . "\n";
-	    }
-	    
 	    }
 	}
 	
@@ -390,7 +378,7 @@ sub write_output {
   GENE: foreach my $gene (@newgenes) {	
       # do a per gene eval...
       eval {
-	  
+	  print STDERR $gene->id . "\n";
 	  $gene_obj->write($gene);
       }; 
       if( $@ ) {
@@ -496,7 +484,6 @@ sub convert_e2g_output {
   my @results = $self->e2g_runnable->output;
   
   foreach my $gene(@results) {
-#    foreach my $ex($gene->feature1->sub_SeqFeature){
     foreach my $ex($gene->sub_SeqFeature){
       # exonerate has no concept of phase, but remapping will fail if this is unset
 #      $ex->phase(-1);
@@ -515,15 +502,36 @@ sub convert_e2g_output {
   my $count = 1;
   my $time  = time; chomp($time);
   my $genetype = "TGE_e2g";
-  my @genes = $self->make_genes($count, $genetype, \@results);
   
-#  if (!defined($self->{'_e2g_genes'})) {
-#    $self->{'_e2g_genes'} = [];
-#  }
+  # get the appropriate analysis from the AnalysisAdaptor
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'TargettedGeneE2G',
+      );
+  }
+
+  my @genes = $self->make_genes($count, $genetype, $analysis_obj, \@results);
+  
   print STDERR "e2g genes: " . scalar(@genes) . "\n";
 
-#  push(@{$self->{'_e2g_genes'}},@genes);  
   $self->e2g_genes(@genes);  
 }
 
@@ -544,7 +552,33 @@ sub convert_gw_output {
   my $count = 1;
   my $genetype = 'TGE_gw';
   my @results  = $self->runnable->output;
-  my @genes    = $self->make_genes($count, $genetype, \@results);
+
+  # get the appropriate analysis from the AnalysisAdaptor
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'TargettedGeneE2G',
+      );
+  }
+
+  my @genes    = $self->make_genes($count, $genetype, $analysis_obj, \@results);
 
   # check for stops?
   print STDERR "gw genes: " . scalar(@genes) . "\n";
@@ -571,20 +605,54 @@ sub combine_genes{
   # make array of gw_pred_genes -> merge potentially frameshifted exons together; add
   # component exons as sub_SeqFeatures so they can be retrieved later
   my @merged_gw_genes = $self->_merge_gw_genes;
-  
+
+  my $genetype = 'combined_gw_e2g';
+
+  # get the appropriate analysis from the AnalysisAdaptor
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'TargettedGeneE2G',
+      );
+  }
+
   # merge the genewise and est2genome predictions. Only one new transcript per genewise gene ...
-  my @newtrans = $self->_make_newtranscripts(@merged_gw_genes);
+  my @newtrans = $self->_make_newtranscripts($genetype, $analysis_obj, @merged_gw_genes);
+
+  $analysis_obj->gff_feature('gene');
 
   # make some lovely genes
   my @genes;
   my $count=0;
-  my $genetype = 'combined_gw_e2g';
+  my $time = time;
+  chomp($time);
+
   foreach my $trans(@newtrans){
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
     $gene->id($self->input_id . "$genetype.$count"); 
     $gene->version(1);
     $gene->add_Transcript($trans);
+    $gene->analysis($analysis_obj);
+    $gene->created($time);
+    $gene->modified($time);
     push (@genes,$gene);
     $count++;
   }
@@ -703,10 +771,12 @@ sub _merge_gw_genes {
 =cut
 
 sub _make_newtranscripts {
-  my ($self, @merged_gw_genes) = @_;
+  my ($self, $genetype, $analysis_obj, @merged_gw_genes) = @_;
   my @gw_genes  = $self->gw_genes;
   my @e2g_genes = $self->e2g_genes;
   my @newtrans  = ();
+
+
 
  GENE:
   foreach my $gene(@merged_gw_genes) {
@@ -770,7 +840,6 @@ sub _make_newtranscripts {
       
       # check the transcript and expand frameshifts in all but original 3' gw_exon
       # check translation does not change from original genewise prediction
-#      print STDERR "NEWTRANSCRIPT $newtranscript\n";
       if (defined($newtranscript)){
 	foreach my $ex($newtranscript->each_Exon){
 	  if(scalar($ex->sub_SeqFeature) > 1 ){
@@ -792,6 +861,11 @@ sub _make_newtranscripts {
 	foreach my $ex($newtranscript->each_Exon){
 	  $ex->attach_seq($self->vc);
 	  $ex->contig_id($self->vc->id);
+	  # add new analysis object to the supporting features
+	  foreach my $sf($ex->each_Supporting_Feature){
+	    $sf->analysis($analysis_obj);
+	    $sf->source_tag($genetype);
+	  }
 	}
 	
 	# compare UTR-gene translation with genewise translation NB NOT the merged gw gene 
@@ -1074,36 +1148,38 @@ sub transcript_from_multi_exon_genewise {
 =head2 make_genes
 
  Title   : make_genes
- Usage   :
- Function: 
- Example :
- Returns : 
- Args    :
+ Usage   : $self->make_genes($count, $genetype, $analysis_obj, $runnable)
+ Function: converts the output from $runnable into Bio::EnsEMBL::Genes in
+           $contig(VirtualContig) coordinates. The genes have type $genetype, 
+           and have $analysis_obj attached. Each Gene has a single Transcript, 
+           which in turn has Exons(with supporting features) and a Translation
+ Example : 
+ Returns : array of Bio::EnsEMBL::Gene
+ Args    : $count: integer, $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis, 
+           $runnable: Bio::EnsEMBL::Pipeline::RunnableI
 
 
 =cut
 
 sub make_genes {
-  my ($self,$count,$genetype,$results) = @_;
+  my ($self, $count, $genetype, $analysis_obj, $results) = @_;
   my $contig = $self->vc;
   my @genes;
   
+  my $time = time; chomp($time);
+
   foreach my $tmpf (@$results) {
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
     $gene->id($self->input_id . ".$genetype.$count");
     $gene->version(1);
+    $gene->created($time);
+    $gene->modified($time);
 
     my $transcript = $self->_make_transcript($tmpf,$self->vc,$genetype,$count);
-#    if ($tmpf->isa("Bio::EnsEMBL::FeaturePair")) {
-#      $transcript = $self->_make_transcript($tmpf->feature1,$self->vc,$genetype,$count);
-#    }
-#    
-#    else {
-#      $transcript = $self->_make_transcript($tmpf,$self->vc,$genetype,$count);
-#    }
 	
     # add transcript to gene
+    $gene->analysis($analysis_obj);
     $gene->add_Transcript($transcript);
     $count++;
 
@@ -1141,8 +1217,9 @@ sub remap_genes {
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      # need to explicitly add back genetype and analysis.
       $newgene->type($genetype);
-
+      $newgene->analysis($gene->analysis);
       push(@newf,$newgene);
 
       # sort out supporting feature coordinates
@@ -1191,16 +1268,6 @@ sub remap_genes {
 
     # did we throw exceptions?
     if ($@) {
-#      print STDERR "contig: $contig\n";
-#      foreach my $tran ($gene->each_Transcript) {
-#	foreach my $exon($tran->each_Exon) {
-#	  foreach my $sf($exon->each_Supporting_Feature) {
-#	    print STDERR "hid: " . $sf->hseqname . "\n";
-#	  }
-#	}
-#      }
-      
-      
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
   }
@@ -1282,20 +1349,24 @@ sub _check_coverage{
   print STDERR "***Coverage of $protname by " . $gene->id . " is $coverage\n";
   return 1;
 }
+
 =head2 _make_transcript
 
  Title   : make_transcript
- Usage   :
- Function: 
+ Usage   : $self->make_transcript($gene, $contig, $genetype, $count)
+ Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
+           with sub_SeqFeatures representing exons.
  Example :
- Returns : 
- Args    :
+ Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
+           data), and a Bio::EnsEMBL::translation
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+           $genetype: string, $count: integer
 
 
 =cut
 
 sub _make_transcript{
-  my ($self,$gene,$contig,$genetype,$count)=@_;
+  my ($self, $gene, $contig, $genetype, $count)=@_;
   $genetype = 'unspecified' unless defined ($genetype);
   $count = 1 unless defined ($count);
 
