@@ -1,9 +1,13 @@
 package Bio::EnsEMBL::Pipeline::SubmissionSystem::Local;
-
+use vars qw(@ISA);
 use strict;
 use warnings;
 
+use Bio::EnsEMBL::Pipeline::SubmissionSystem;
 use Bio::EnsEMBL::Pipeline::Load;
+use Bio::EnsEMBL::Pipeline::Job;
+
+@ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
 
 my $children = 0;
 my @_queue;
@@ -21,21 +25,13 @@ my @_queue;
 =cut
 
 sub new {
-
   my $caller = shift;
-  my $pm = shift;
 
   my $class = ref($caller) || $caller;
 
-  # if the singleton has already been created, return it,
-  # otherwise create the singleton first
-  my $singleton;
-  unless (defined $singleton){
-    $singleton = bless {}, $class;
-  }
-
-  return $singleton;
-	
+  my $self = bless {}, $class;
+  
+  return $self->SUPER::new(@_);
 }
 
 =head2 submit
@@ -50,14 +46,14 @@ sub new {
 
 =cut
 
-sub submit {
+sub submit{
 
   my $self = shift;
   my $job  = shift;
-
+  print STDERR "have ".$self." and job ".$job."\n";
   # Check params
-  unless(ref($job) && $job->isa('Bio::EnsEMBL::Job')) {
-    $self->throw('expected Bio::EnsEMBL::Job argument');
+  unless(ref($job) && $job->isa('Bio::EnsEMBL::Pipeline::Job')) {
+    $self->throw('expected Bio::EnsEMBL::Pipeline::Job argument');
   }
 
   $SIG{CHLD} = \&sig_chld;
@@ -128,14 +124,18 @@ sub sig_chld {
 
 =cut
 
-sub create_job {
+sub create_Job {
 
   my ($self, $taskname, $module, $input_id, $parameter_string) = @_;
 
   my $config = $self->get_Config();
-  my $job_adaptor = $config->db()->get_JobAdaptor();
-
-  my $job = new Bio::EnsEMBL::Job->new($taskname, $module, $input_id, $parameter_string);
+  my $job_adaptor = $config->get_DBAdaptor()->get_JobAdaptor();
+  
+  my $job = Bio::EnsEMBL::Pipeline::Job->new(
+					     -TASKNAME => $taskname, 
+					     -MODULE => $module, 
+					     -INPUT_ID => $input_id, 
+					     -PARAMETERS => $parameter_string);
 
   $job_adaptor->store($job);
 
