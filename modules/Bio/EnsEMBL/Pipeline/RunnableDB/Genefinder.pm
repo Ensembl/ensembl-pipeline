@@ -51,6 +51,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Genefinder;
+use Bio::EnsEMBL::PredictionTranscript;
 use Data::Dumper;
 
 use vars qw(@ISA);
@@ -84,7 +85,7 @@ sub new {
 
     # anlaysis not mandatory for BlastableDB, so we check here 
     $self->throw("Analysis object required") unless ($self->analysis);
-    $self->init('Bio::EnsEMBL::Pipeline::Runnable::Genefinder');
+    #$self->init('Bio::EnsEMBL::Pipeline::Runnable::Genefinder');
     
     return $self;
 }
@@ -102,41 +103,27 @@ sub new {
 
 sub fetch_input {
     my($self) = @_;
-    
-    $self->throw("No input id") unless defined($self->input_id);
-
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
+    #print STDERR "in genefinder\n";
+    #print STDERR "using db ".$self->db->dbname."\n";
+    $self->throw("No input id") unless ($self->input_id);
+    #print STDERR "input id ".$self->input_id."\n";
+    $self->throw("No input id") unless ($self->input_id);
+    #my $contigid  = $self->input_id;
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    #print STDERR "have ".$contig." contig\n";
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+    
+#    print STDERR "have ".$genseq." repeatmasked seq\n";
     $self->{'contig'} = $contig;
-    $self->genseq($genseq);
+    $self->query($genseq);
+
+    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Genefinder->new('-query'=> $self->query);
+    $self->runnable($runnable);
 
 }
 
 #get/set for runnable and args
-sub init {
-    my ($self, $runnable) = @_;
-    my %parameters;
-    if ($runnable) {
-      #extract parameters into a hash
-    
-      my ($parameter_string) = $self->parameters();
-      if ($parameter_string) {
-	my @pairs = split (/,/, $parameter_string);
-	foreach my $pair (@pairs) {
-	  
-	  my ($key, $value) = split (/=>/, $pair);
-	  $key =~ s/\s+//g;
-	  $parameters{$key} = $value;
-	}
-	
-      }
-   
-      #creates empty Bio::EnsEMBL::Runnable::Genefinder object
-      my $runnable = $runnable->new(%parameters);
-      $self->runnable($runnable);
-    }
-}
+
 
 
 =head2 result_quality_tag
@@ -164,34 +151,48 @@ sub result_quality_tag {
     }
 }
 
+sub create_PredictionTranscripts{
+  my $self = shift;
+
+  my @ptranscripts;
+
+  my $genefinder_runnable = ($self->runnable())[0];
+  my @transcripts = $genefinder_runnable->each_Transcript();
+  if( ! @transcripts ) { return; }
+  
+  for my $trans ( @transcripts ) {
+    my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
+    my @exons = @{$trans->get_all_Exons()};
+    
+    if ($exons[0]->strand == 1) {
+      @exons = sort {$a->start <=> $b->start } @exons;
+    } else {
+      @exons = sort {$b->start <=> $a->start } @exons;
+    }
+    #print "ANALYSIS: ",$self->analysis()->dbID,"\n";
+    
+    $ptrans->analysis( $self->analysis() );
+    for my $exon ( @exons ) {
+      #print STDERR "adding contig ".$self->{'contig'}." to exon\n";
+      $exon->contig( $self->{'contig'} );
+      $ptrans->add_Exon( $exon );
+    }
+    push(@ptranscripts, $ptrans);
+  }
+
+  return @ptranscripts;
+}
 
 sub write_output {
    my $self = shift;
   
-   my $genefinder_runnable = ($self->runnable())[0];
-   my @transcripts = $genefinder_runnable->each_Transcript();
+  
+   my @transcripts = $self->create_PredictionTranscripts;
    if( ! @transcripts ) { return; }
 
    my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
-   print "there are ".@transcripts." transcripts\n";
    for my $trans ( @transcripts ) {
-     my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
-     my @exons = @{$trans->get_all_Exons()};
-
-     if ($exons[0]->strand == 1) {
-       @exons = sort {$a->start <=> $b->start } @exons;
-     } else {
-       @exons = sort {$b->start <=> $a->start } @exons;
-     }
-     #print "ANALYSIS: ",$self->analysis()->dbID,"\n";
-
-     $ptrans->analysis( $self->analysis() );
-     for my $exon ( @exons ) {
-       print STDERR "adding contig ".$self->{'contig'}." to exon\n";
-       $exon->contig( $self->{'contig'} );
-       $ptrans->add_Exon( $exon );
-     }
-     $ptransAdaptor->store( $ptrans );
+     $ptransAdaptor->store( $trans );
    }
   
 }
