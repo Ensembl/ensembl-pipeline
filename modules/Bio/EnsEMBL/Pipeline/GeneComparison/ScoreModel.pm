@@ -193,7 +193,7 @@ sub score_Transcripts{
       
       my $gene_id;
       if ( $self->_label ){
-	my $gene_id = $label."_".$cluster_count;
+	$gene_id = $label."_".$cluster_count;
       }
       else{
 	$gene_id = $cluster_count;
