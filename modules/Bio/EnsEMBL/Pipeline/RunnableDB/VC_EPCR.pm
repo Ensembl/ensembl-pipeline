@@ -136,8 +136,10 @@ sub runnable {
             {
 		my ($key, $value) = split (/=>/, $pair);
 		if ($key && $value) {
-                    $key =~ s/^\s+//g;
-                    $key =~ s/\s+$//g;
+                    $key   =~ s/^\s+//g;
+                    $key   =~ s/\s+$//g;
+                    $value =~ s/^\s+//g;
+                    $value =~ s/\s+$//g;
 		    $parameters{$key} = $value;
 		}
 		else
