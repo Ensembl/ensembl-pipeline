@@ -114,7 +114,7 @@ sub parse_files {
       }
 
       # key=value
-      if (/^(\S+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
+      if (/^([^=\s]+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
 
 	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
 	my $value = $2;
@@ -263,7 +263,7 @@ sub read_db{
       [2]   : arrayref of analysis objects
   Function  : write a config file for the objects given
   Returntype: N/A
-  Exceptions: if file doesn't exist
+  Exceptions: if file doesnt exist
   Caller    : 
   Example   : &write_file($file, $analyses);
 
