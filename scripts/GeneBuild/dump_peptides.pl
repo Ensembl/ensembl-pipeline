@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl
 
 =head1 NAME
 
@@ -23,12 +23,12 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
+use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_FINALDBHOST
 					 GB_FINALDBNAME
 					 GB_DBHOST
 					 GB_DBNAME
-					 GB_GOLDEN_PATH
 					);
 use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
 
@@ -37,12 +37,23 @@ my $dbuser    = 'ensro';
 my $dbname    = $GB_FINALDBNAME;
 my $dbpass    = undef;
 
-my $path      = $GB_GOLDEN_PATH;
-
 my $dnadbhost = $GB_DBHOST;
 my $dnadbuser = 'ensro';
 my $dnadbname = $GB_DBNAME;
 my $dnadbpass = undef;
+
+my $file;
+
+
+&GetOptions(
+	    'peptide_file:s' => \$file,
+	   );
+
+unless( $file){     
+  print STDERR "Usage: dump_peptides -peptide_file file\n";
+  exit(0);
+}
+
 
 
 my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -63,10 +74,16 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print STDERR "connected to $dbname : $dbhost\n";
-$db->static_golden_path_type($path);
+#golden path type is now obtained from the meta table
+#$db->static_golden_path_type($path);
 my $sa = $db->get_StaticGoldenPathAdaptor();
 
-my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*STDOUT ) ;
+
+
+
+open (OUT,">$file") or die("unable to open file $file");
+
+my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*OUT ) ;
 
 foreach my $gene_id($db->get_GeneAdaptor->list_geneIds) {
   print STDERR "gene id $gene_id\n";
@@ -82,7 +99,7 @@ foreach my $gene_id($db->get_GeneAdaptor->list_geneIds) {
       
       my $tseq = $trans->translate();
       if ( $tseq->seq =~ /\*/ ) {
-	print STDERR "translation of ".$trans->id." has stop codons. Skipping! (in clone". $fe->clone_id .")\n";
+	print STDERR "translation of ".$trans->dbID." in chr $chr has stop codons. Skipping! (in clone". $fe->clone_id .")\n";
 	next;
       }
       my $gene_version = $gene->version;
@@ -96,6 +113,8 @@ foreach my $gene_id($db->get_GeneAdaptor->list_geneIds) {
     print STDERR "unable to process $gene_id, due to \n$@\n";
     }
 }
+
+close (OUT);
 
 sub  find_trans_start {
  my ($trans) = @_;
