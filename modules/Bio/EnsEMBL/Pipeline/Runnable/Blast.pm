@@ -300,8 +300,7 @@ sub run_analysis {
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-        #print STDERR "running cmd: <".$command.">\n";
-		$self->throw("Failed during blast run: ". ($?/256) . " ". $!) unless (system ($command) == 0);
+	$self->throw("Failed during blast run: ". ($?/256) . " ". $!) unless (system ($command) == 0);
       }
   
 }
