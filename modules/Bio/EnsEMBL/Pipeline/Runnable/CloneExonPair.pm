@@ -84,14 +84,15 @@ sub run {
     foreach my $contig ($clone->get_all_Contigs) {
 	my @genes    = $contig->get_all_Genes;
 	my @features = $contig->get_all_SimilarityFeatures;
-
+	
 	foreach my $gene (@genes) {
 	    foreach my $exon ($gene->each_unique_Exon) {
 		$exon->find_supporting_evidence(\@features);
 	    }
 	    $contig->make_ExonPairs($gene->each_unique_Exon);
 	}
-    $self->{_clone} = undef;
+    }
+	$self->{_clone} = undef;
 }
 
 
@@ -147,16 +148,16 @@ sub add_ExonPair {
 
 sub clone {
     my ($self,$arg) = @_;
-
+    
     if (defined($arg)) {
 	if ($arg->isa("Bio::EnsEMBL::DB::CloneI")) {
 	    $self->{_clone} = $arg;
 	} else {
-
+	    
 	    $self->throw("[$arg] is not a Bio::EnsEMBL::DB::CloneI");
 	}
     }
-
+    
     return $self->{_clone};
 }
 
