@@ -329,3 +329,29 @@ sub write_output {
     }
     return 1;
 }
+
+
+=head2 result_quality_tag
+
+    Title   :   result_quality_tag
+    Usage   :   $self->result_quality_tag
+    Function:   Returns an indication of whether the data is suitable for 
+                further analyses. Allows distinction between failed run and 
+                no hits on a sequence.
+    Returns :   'VALID' or 'INVALID'
+    Args    :   none
+
+=cut
+#a method of writing back result quality
+sub result_quality_tag {
+    my ($self) = @_;
+    
+    if ($self->output)
+    {
+        return 'VALID';
+    }
+    else
+    {
+        return 'INVALID';
+    }
+}
