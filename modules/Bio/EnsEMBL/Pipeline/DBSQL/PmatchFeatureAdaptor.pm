@@ -306,7 +306,7 @@ sub exists_protein {
 sub create_sql {
   my($self,$dbname) = @_;
 
-  my $create = "create database $dbname";
+  my $create = "create database $dbname;";
 
   my $protein = "create table protein ( protein_internal_id int(10) unsigned NOT NULL auto_increment,
 					  protein_id          varchar(40) NOT NULL,
@@ -317,16 +317,17 @@ sub create_sql {
 					);";
   
   
-  my $feature = "CREATE TABLE pmatch_feature (feature_internal_id int(10) unsigned NOT NULL auto_increment,
-						protein_internal_id int(10) unsigned NOT NULL,
-						chr_name            varchar(40) NOT NULL, 
-						start               int(10) unsigned NOT NULL,
-						end                 int(10) unsigned NOT NULL,
-				 		coverage            double(16,4) NOT NULL,
+  my $feature = "CREATE TABLE pmatch_feature ( feature_internal_id int(10) unsigned NOT NULL auto_increment,
+ 					       protein_internal_id int(10) unsigned NOT NULL,
+					       chr_name            varchar(40) NOT NULL, 
+					       start               int(10) unsigned NOT NULL,
+					       end                 int(10) unsigned NOT NULL,
+				 	       coverage            double(16,4) NOT NULL,
 						 
-						PRIMARY KEY(feature_internal_id),
-                                                UNIQUE(protein_internal_id,chr_name,start,end),
-						KEY(protein_internal_id));   );";
+					       PRIMARY KEY(feature_internal_id),
+                                               UNIQUE(protein_internal_id,chr_name,start,end),
+					       KEY(protein_internal_id)   
+                                             );";
 
   return $create . "\n" . $protein . "\n" . $feature;
 }
