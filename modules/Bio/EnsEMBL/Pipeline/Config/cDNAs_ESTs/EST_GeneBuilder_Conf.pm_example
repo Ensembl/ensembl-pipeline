@@ -181,27 +181,27 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # ref_db - holds the static golden path, contig and dna information
 	    ############################################################
 	    
-	    EST_REFDBNAME               => 'human_NCBI33_raw2',
-	    EST_REFDBHOST               => 'ecs2',
-	    EST_REFDBPORT               => '3363',
-	    EST_REFDBUSER               => 'ensro',
+	    EST_REFDBNAME               => '',
+	    EST_REFDBHOST               => '',
+	    EST_REFDBPORT               => '',
+	    EST_REFDBUSER               => '',
 	    EST_REFDBPASS               => '',
 
 	    # this is in general the database where we read the mapped ests/cdnas
 	    # from, in order to use them for the EST_GeneBuilder
 			 
-			 EST_DBNAME                  => 'human_ests_eae',
-			 EST_DBHOST                  => 'ecs2c',
-			 EST_DBPORT                  => '3353',
-			 EST_DBUSER                  => 'ensadmin',
-			 EST_DBPASS                  => 'ensembl',
+			 EST_DBNAME                  => '',
+			 EST_DBHOST                  => '',
+			 EST_DBPORT                  => '',
+			 EST_DBUSER                  => '',
+			 EST_DBPASS                  => '',
 
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
-	    EST_GENE_DBNAME                  => 'human_estgenes_eae_rerun',
-	    EST_GENE_DBHOST                  => 'ecs2b',
-	    EST_GENE_DBPORT                  => '3353',
-	    EST_GENE_DBUSER                  => 'ensadmin',
-	    EST_GENE_DBPASS                  => 'ensembl',
+	    EST_GENE_DBNAME                  => '',
+	    EST_GENE_DBHOST                  => '',
+	    EST_GENE_DBPORT                  => '',
+	    EST_GENE_DBUSER                  => '',
+	    EST_GENE_DBPASS                  => '',
 	    
 	    # if you want to use ests together with cdnas in EST_GeneBuilder
 	    # and your cdnas are in a SEPARATE DATABASE, you can specify it here:
