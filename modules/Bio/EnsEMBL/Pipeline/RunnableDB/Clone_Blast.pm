@@ -160,8 +160,8 @@ sub fetch_input {
     my $clone       = $self->dbobj->get_Clone($cloneid);
     foreach my $contig  ($clone->get_all_Contigs())
     {       
-        my $genseq
-            = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+        my $genseq = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+	print STDERR "Passing in genseq $genseq\n";
         $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast', $genseq);
     }
 }
@@ -182,11 +182,14 @@ sub runnable {
             my ($key, $value) = split (/=>/, $pair);
             $parameters{$key} = $value;
         }
-        $parameters {'-clone'}  = $genseq;
-        $parameters {'-blast'}  = $self->analysis->program;
-        $parameters {'-db'}     = $self->analysis->db;
-        #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
-        push (@{$self->{'_runnable'}}, $runnable->new(%parameters));
+	#create blast object    
+	my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -query    => $genseq,
+								     -program  => $self->analysis->program,
+								     -database => $self->analysis->db,
+								     -threshold => 1, 
+								     );
+	
+	push (@{$self->{'_runnable'}}, $blast);
     }
     return @{$self->{'_runnable'}};
 }
@@ -202,12 +205,12 @@ sub runnable {
 =cut
 
 sub run {
-    my ($self) = @_;
+    my ($self,$dir) = @_;
     $self->throw("Runnable modules not set") unless ($self->runnable());
     foreach my $runnable ($self->runnable)
     {
 #        $runnable->threshold($self->threshold);
-        $runnable->run();
+        $runnable->run($dir);
     }
 }
 

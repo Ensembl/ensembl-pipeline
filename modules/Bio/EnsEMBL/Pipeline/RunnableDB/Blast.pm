@@ -155,11 +155,11 @@ sub runnable {
 =cut
 
 sub run {
-    my ($self) = @_;
+    my ($self,$dir) = @_;
     $self->throw("Runnable module not set") unless ($self->runnable());
     $self->throw("Input not fetched")       unless ($self->genseq());
 
-    $self->runnable->run();
+    $self->runnable->run($dir);
 }
 
 1;
