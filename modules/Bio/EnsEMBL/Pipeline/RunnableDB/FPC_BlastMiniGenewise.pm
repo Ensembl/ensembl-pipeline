@@ -135,9 +135,9 @@ sub fetch_output {
 sub write_output {
     my($self,@features) = @_;
 
-    my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=bcs121;dbname=simon_oct07;user=ensadmin";
-    
-    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
+    #   my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=bcs121;dbname=simon_oct07;user=ensadmin";
+    #    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
+    my $db = $self->dbobj;
    
     if( !defined $db ) {
       $self->throw("unable to make write db");
@@ -149,6 +149,9 @@ sub write_output {
 
     my @newgenes = $self->output;
     return unless ($#newgenes >= 0);
+
+
+
 
     # get new ids
     eval {
@@ -219,7 +222,7 @@ sub write_output {
   GENE: foreach my $gene (@newgenes) {	
       # do a per gene eval...
       eval {
-	  
+	
 	  $gene_obj->write($gene);
       }; 
       if( $@ ) {
@@ -243,7 +246,7 @@ sub write_output {
 sub fetch_input {
     my( $self) = @_;
     
-    print STDERR "Fetching input \n";
+    print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
     my $chrid  = $self->input_id;
@@ -274,6 +277,8 @@ sub fetch_input {
 
     print STDERR "Length is " . $genseq->length . "\n";
     print STDERR "Fetching features \n";
+
+    print STDERR "contig: " . $contig . " \n";
 
     my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200);
     
@@ -314,7 +319,7 @@ sub fetch_input {
     my %idhash;
     
     foreach my $f (@features) {
-#        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
+        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
       if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	  defined($f->hseqname) &&
 	    $redids{$f->hseqname} != 1) {
@@ -381,6 +386,7 @@ sub convert_output {
   
   # This BAD! Shouldn't be using internal ids.
   # <sigh> no time to change it now
+  # eh? what analysis should this be now? Is it still 7?
   my $analysis = $self->dbobj->get_OldAnalysis(7);
   my $trancount = 1;
   
@@ -429,7 +435,7 @@ sub convert_output {
 	$subf->feature2->primary_tag('similarity');
 	$subf->feature2->score(100);
 	$subf->feature2->analysis($analysis);
-
+	
 	my $exon = new Bio::EnsEMBL::Exon;
 	
 	$exon->id($self->input_id . ".genewise.$count.$excount");
@@ -493,37 +499,37 @@ sub convert_output {
 	$transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
       }
     }
-
-  my @newf;
-  foreach my $gene (@genes) {
-    foreach my $tran ($gene->each_Transcript) {
-      print STDERR " Translation is " . $tran->translate->seq . "\n";
-      foreach my $exon ($tran->each_Exon) {
-	my $strand = "+";
-	if ($exon->strand == -1) {
-	  $strand = "-";
+    
+    my @newf;
+    foreach my $gene (@genes) {
+      foreach my $tran ($gene->each_Transcript) {
+	print STDERR " Translation is " . $tran->translate->seq . "\n";
+	foreach my $exon ($tran->each_Exon) {
+	  my $strand = "+";
+	  if ($exon->strand == -1) {
+	    $strand = "-";
+	  }
+	  print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
 	}
-	print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
+	$trancount++;
       }
-      $trancount++;
+      
+      eval {
+	my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+	$newgene->type('genewise');
+	push(@newf,$newgene);
+      };
+      if ($@) {
+	print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+      }
+      
+      if (!defined($self->{_output})) {
+	$self->{_output} = [];
+      }
     }
-    
-    eval {
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-      $newgene->type('genewise');
-      push(@newf,$newgene);
-    };
-    if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
-    }
-    
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    }
-    
+    # push all the genes we've made onto _output
     push(@{$self->{_output}},@newf);
   }
-}
 }
 
 sub check_splice {
