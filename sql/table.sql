@@ -78,7 +78,7 @@ CREATE TABLE rule_conditions (
 
 CREATE TABLE input_id_analysis (
   input_id          varchar(40) not null,
-  input_id_type     enum("CONTIG" ,"SLICE", "ALL") not null,
+  input_id_type     varchar(40) not null,
   analysis_id       smallint(10) unsigned NOT NULL,
   created           datetime NOT NULL,
   runhost           varchar(20) NOT NULL,
@@ -104,5 +104,5 @@ CREATE TABLE input_id_analysis (
 
 CREATE table input_id_type_analysis (
   analysis_id       smallint(10) unsigned NOT NULL,
-  input_id_type     enum("CONTIG" ,"SLICE", "ALL") NOT NULL
+  input_id_type     varchar(40) NOT NULL
 );
