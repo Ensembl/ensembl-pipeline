@@ -72,8 +72,8 @@ comparison_level = INT ----------> There are currently 4 comparison levels:
    5 ---> loose match. It allows intron mismatches if so desired. There is no limitation on
           the number of mismatches at the splice-sites.
 
-                 ################----#######
-       #####-----######----####------#####
+                #################----#######   OR                 #######------####----#######  
+       #####-----######----####------#####                #####-----######----####------#####
 
 
 =head1 AUTHOR - Eduardo Eyras
@@ -184,17 +184,32 @@ sub compare{
 
   # switch on comparison level
   if (   $self->comparison_level == 3 ){
-    ($merge, $overlaps) = $self->_test_for_fuzzy_semiexact_Merge( $tran1, $tran2 );
+      ($merge, $overlaps) = $self->_test_for_merge( $tran1, $tran2 );
+      #($merge, $overlaps) = $self->_test_for_fuzzy_semiexact_Merge( $tran1, $tran2 );
   }
   elsif( $self->comparison_level == 2 ){
-    ($merge, $overlaps) = $self->_test_for_semiexact_Merge(  $tran1, $tran2 );
+      $self->splice_mismatch(0);
+      ($merge, $overlaps) = $self->_test_for_merge(  $tran1, $tran2 );
+      #($merge, $overlaps) = $self->_test_for_semiexact_Merge(  $tran1, $tran2 );
   }
   elsif( $self->comparison_level == 4 ){
-    ($merge, $overlaps) = $self->_test_for_Merge_allow_small_introns( $tran1, $tran2 );
+      # this calls _test_for_merge but after eliminating small introns
+      ($merge, $overlaps) = $self->_test_for_Merge_allow_small_introns( $tran1, $tran2 );
+      
   }
   elsif( $self->comparison_level == 1 ){
-    ($merge, $overlaps) = $self->_test_for_strict_merge(     $tran1, $tran2 );
+      ($merge, $overlaps) = $self->_test_for_strict_merge(     $tran1, $tran2 );
   }
+  elsif( $self->comparison_level == 5 ){
+      # this will not check any differences in the splice sites
+      if ( defined $self->intron_mismatch ){
+	  ($merge, $overlaps) = $self->_test_for_Merge_allow_small_introns( $tran1, $tran2 );
+      }
+      else{
+	  ($merge, $overlaps) = $self->_test_for_merge(     $tran1, $tran2 );
+      }
+  }
+
   return ($merge,$overlaps);
 }
   
@@ -756,322 +771,6 @@ sub _difuse_small_introns{
 #                        ____________  
 #              exons2 --|____________|------ etc...  $k
 #
-# are considered a match
-
-
-=head2 _test_for_Merge_allow_gaps
- Function: this function is called from link_Transcripts and actually checks whether two transcripts
-           inputs merge.
- Returns : It returns two numbers ($merge,$overlaps), where
-           $merge = 1 (0) when they do (do not) merge,
-           and $overlaps is the number of exon-overlaps.
-
- ############################################################
- NOTE: STILL NOT WORKING PROPERLY. 
- ############################################################
-
-=cut
-
-sub _test_for_Merge_allow_gaps{
-  my ($self,$tran1,$tran2) = @_;
-  
-  my @exons1 = sort{ $a->start <=> $b->start } @{$tran1->get_all_Exons};
-  my @exons2 = sort{ $a->start <=> $b->start } @{$tran2->get_all_Exons};
-  
-  my $foundlink = 0; # flag that gets set when starting to link exons
-  my $start     = 0; # start looking at the first one
-  my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
-  my $merge     = 0; # =1 if they merge
-
-  print STDERR "comparing:\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
-  
-  my $splice_mismatch = 0;
-  if ( defined $self->splice_mismatch ){
-    $splice_mismatch =  $self->splice_mismatch;
-  }
-  my $intron_mismatch = 0;
-  if ( defined $self->intron_mismatch ){
-    $intron_mismatch =  $self->intron_mismatch;
-  }
-
-  # check first single exon genes:
-  if ( scalar(@exons1) == 1 && scalar(@exons2) == 1 ){
-    if ( $exons1[0]->overlaps( $exons2[0] ) ){
-      return (1,1);
-    }
-  }
-
- EXON1:
-  for (my $j=0; $j<=$#exons1; $j++) {
-    
-  EXON2:
-    for (my $k=$start; $k<=$#exons2; $k++){
-      print STDERR "comparing ".($j+1).": ".
-	$exons1[$j]->start."-".$exons1[$j]->end.
-	  " and ".($k+1).": ".
-	    $exons2[$k]->start."-".$exons2[$k]->end."\n";
-      
-      # if exon 1 is not the first, check first whether it matches the previous exon2 as well, i.e.
-      #                        ____     ____        
-      #              exons1 --|____|---|____|------ etc... $j
-      #                        ____________  
-      #              exons2 --|____________|------ etc...  $k
-      #
-      # we allow to go over an intron if it is <= $intron_mismatch
-      # and can have a mismatch at the other end of <= $splice_mismatch
-      if ($foundlink == 1 && $j != 0){
-	if ( $k != 0 && $exons1[$j]->overlaps($exons2[$k-1]) ){
-	  print STDERR "checking 2-to-1 overlap:\n";
-	  if ( $exons1[$j]->start - $exons1[$j-1]->end - 1 <= $intron_mismatch 
-	       && ( $exons2[$k-1]->end - $exons1[$j]->end >=0
-		    ||
-		    $exons1[$j]->end - $exons2[$k-1]->end <= $splice_mismatch  
-		  )
-	     ){
-	    print STDERR ($j+1)." <--> ".($k)."\n";
-	    $overlaps++;
-	    next EXON1;
-	  }
-	  else{
-	    print STDERR "bad overlap, not merging\n";
-	    merge = 0;
-	    last EXON1;
-	  }
-	}
-      }
-      
-      if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
-	next EXON2;
-      }
-      # if there is no overlap and we had found a link, there is no merge
-      elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	print STDERR "foundlink = 1 and no overlap --> leaving\n";
-	$merge = 0;
-	last EXON1;
-      }	
-      
-      if ( $exons1[$j]->overlaps( $exons2[$k] )){
-	
-	if (  ($k == 0 && $k == $#exons2 ) || ( $j ==0 && $j == $#exons1 ) ){
-	  if ( $self->compare_exon( $exons1[$j], $exons2[$k] ) ){
-	    $merge = 1;
-	    $foundlink =1;
-	    print STDERR ($j+1)." <--> ".($k+1)."\n";
-	    print STDERR "merged single exon transcript\n";
-	    $overlaps++;
-	    last EXON1;
-	  }
-	  elsif( ( $j ==0 && $j == $#exons1 ) 
-		 && $exons1[$j]->overlaps( $exons2[$k+1] ) 
-		 && $self->compare_left_exon( $exons1[$j], $exons2[$k] )
-	       ){
-	    $foundlink =1;
-	    print STDERR ($j+1)." <--> ".($k+1)."\n";
-	  }
-	}	
-	elsif ( ($k == 0 || $j == 0) ){    
-	  if ( $self->compare_right_exon( $exons1[$j], $exons2[$k] ) ){
-	    $foundlink = 1;
-	    print STDERR ($j+1)." <--> ".($k+1)."\n";
-	    $overlaps++;
-	  }
-	  elsif( $k < $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] ) ){
-	    $foundlink = 1;
-	    print STDERR ($j+1)." <--> ".($k+1)."\n";
-	    $overlaps++;
-	  }
-	}
-	elsif( ( $k == $#exons2 || $j == $#exons1 ) ){
-	  if ( $self->compare_left_exon( $exons1[$j], $exons2[$k] ) ){
-	    $foundlink = 1;
-	    print STDERR  ($j+1)." <--> ".($k+1)."\n";
-	    $overlaps++;
-	  }
-	  elsif( $k < $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] ) ){
-	    $foundlink = 1;
-	    print STDERR  ($j+1)." <--> ".($k+1)."\n";
-	    $overlaps++;
-	  }
-	}
-	# check whether in exons2 there are further exons overlapping exon1, i.e.
-	#                       ____________        
-	#             exons1 --|____________|------ etc...
-	#                       ____     ___  
-	#             exons2 --|____|---|___|------ etc...
-	# 
-	# we keep on linking until it does not overlap, or exon2 end falls beyond $splice_mismatch bases
-	# from the exon1
-	if ( $foundlink == 1 && $exons1[$j]->overlaps($exons2[$k+1]) ){
-	  my $addition = 0;
-	FORWARD:
-	  while ( $k+1+$addition < scalar(@exons2) ){
-	    if ( $exons1[$j]->overlaps($exons2[$k+1+$addition]) ){
-	      print STDERR "checking 1-to-2 overlap:\n";
-	      if ( $exons2[$k+1+$addition]->start - $exons2[$k+$addition]->end - 1  <= $intron_mismatch
-		   && ( $exons1[$j]->end - $exons2[$k+1+$addition]->end >= 0 
-			|| 
-			$exons2[$k+1+$addition]->end - $exons1[$j] <= $splice_mismatch 
-		      )
-		 ){
-		print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
-		$foundlink = 1;
-		$overlaps++;
-		$addition++;
-		
-	      }
-	      else{
-		print STDERR "Bad overlap found, not merging\n";
-		$merge = 0;
-		last EXON1;
-	      }
-	    }
-	    else{
-	      last FORWARD;
-	    }
-	  }
-	  $start = $k+1+$addition;
-	  if ( $foundlink && ( $j == $#exons1 || $start > $#exons2 ) ){
-	    print STDERR "link completed, merged transcripts\n";
-	    last EXON1;
-	  }    
-	  next EXON1;
-	}
-	elsif( $foundlink == 1 ){
-	  $start = $k+1;
-	  next EXON2;
-	}
-      }
-      # if they don't overlap, try the next one
-      else{
-	next EXON2;
-      }
-    }  # end of EXON2      
-
-    if ($foundlink == 0){
-      $start = 0;
-    }
-
-  }    # end of EXON1
-  return ($merge,$overlaps);
-}
-
-############################################################
-
-sub compare_left_exon{
-  my ($self, $exon1, $exon2 ) = @_;
-  my $splice_mismatch = 0;
-  if ( defined $self->splice_mismatch ){
-    $splice_mismatch =  $self->splice_mismatch;
-  }
-  #my $intron_mismatch = 0;
-  #if ( defined $self->intron_mismatch ){
-  #  $intron_mismatch =  $self->intron_mismatch;
-  #}
-  
-  unless ( $exon1->overlaps( $exon2 ) ){
-    return 0;
-  }
-
-  if ( abs( $exon1->start - $exon2->start ) <= $splice_mismatch ){
-    return 1;
-  }
-  else{
-    return 0;
-  }
-}
-
-############################################################
-
-sub compare_right_exon{
-  my ($self, $exon1, $exon2 ) = @_;
-  my $splice_mismatch = 0;
-  if ( defined $self->splice_mismatch ){
-    $splice_mismatch =  $self->splice_mismatch;
-  }
-  #my $intron_mismatch = 0;
-  #if ( defined $self->intron_mismatch ){
-  #  $intron_mismatch =  $self->intron_mismatch;
-  #}
-
-  unless ( $exon1->overlaps( $exon2 ) ){
-    return 0;
-  }
-
-  if ( abs( $exon1->end - $exon2->end ) <= $splice_mismatch ){
-    return 1;
-  }
-  else{
-    return 0;
-  }
-}
-
-############################################################
-
-sub compare_exon{
-  my ($self, $exon1, $exon2 ) = @_;
-  my $splice_mismatch = 0;
-  if ( defined $self->splice_mismatch ){
-      $splice_mismatch =  $self->splice_mismatch;
-  }
-  #my $intron_mismatch = 0;
-  #if ( defined $self->intron_mismatch ){
-  #  $intron_mismatch =  $self->intron_mismatch;
-  #}
-  
-  unless ( $exon1->overlaps( $exon2 ) ){
-      return 0;
-  }
-  
-  if ( abs( $exon1->start - $exon2->start ) <= $splice_mismatch 
-       &&
-       abs( $exon1->end  -  $exon2->end   ) <= $splice_mismatch
-     ){
-    return 1;
-  }
-  else{
-    return 0;
-  }
-}
- 
-############################################################
-
-sub _max{
-    my ($self,$a,$b) = @_;
-    if ( $a > $b ){
-	return $a;
-    }
-    else{
-	return $b;
-    }
-}
-
-############################################################
-
-sub _min{
-    my ($self,$a,$b) = @_;
-    if ( $a < $b ){
-	return $a;
-    }
-    else{
-	return $b;
-    }
-}
-
-############################################################
-
-
-#########################################################################
-# this function checks whether two transcripts merge
-# according to consecutive exon overlap
-# this time, matches like this:
-#                        ____     ____        
-#              exons1 --|____|---|____|------ etc... $j
-#                        ____________  
-#              exons2 --|____________|------ etc...  $k
-#
 # are checked, it won't be considered a merge, but it will count how many of those occur
 
 sub _test_for_Merge_with_gaps{
@@ -1220,6 +919,8 @@ sub _compare_Transcripts {
 #########################################################################
 
 
+
+
 sub _test_for_merge{
   my ($self,$tran1,$tran2) = @_;
 
@@ -1337,7 +1038,7 @@ sub _test_for_merge{
 		  $object_map->match( $exons1[$j], $exons2[$k] );
 		  $overlaps++;
 		  $foundlink = 1;
-		  $start += $k + 1;
+		  $start = $k + 1;
 		  next EXON1;
 	      }
 	  }
@@ -1355,6 +1056,16 @@ sub _test_for_merge{
       print STDERR "No merge\n" if $verbose;
       return ( 0, $overlaps );
   }
+  ############################################################
+  # if we are in loose mode, we can return already as we have checked
+  # for consecutive exon overlap, regardless of the splice mismatches
+  ############################################################
+  if ( $self->comparison_level == 5 && $merge ){
+      print STDERR "Loose mode merge\n" if $verbose;
+      return (1,$overlaps);
+  }
+
+
   
   my @list1 = $object_map->list1();
   my @list2 = $object_map->list2();
@@ -1566,6 +1277,7 @@ sub discrete_compare{
 	$tran2 = $self->_difuse_small_introns( $tran2 );
     }
 
+    print STDERR "comparing ".$tran1->dbID." and ".$tran2->dbID."\n";
     if ($verbose){
       #print STDERR "comparing ".
       #$tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
@@ -1661,7 +1373,7 @@ sub discrete_compare{
 	    }
 	    
 	    print STDERR "foundlink = $foundlink\n" if $verbose;
-	    print STDERR "comparing ".$exons1[$j]->start."-".$exons1[$j]->end." and ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+	    print STDERR "comparing ".$exons1[$j]->start."-".$exons1[$j]->end." and ".$exons2[$k]->start."-".$exons2[$k]->end."\n" if $verbose;
 
 	    if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k])) ){
 	      print STDERR "go to next exon2\n" if $verbose;
@@ -1699,7 +1411,7 @@ sub discrete_compare{
 		    $object_map->match( $exons1[$j], $exons2[$k] );
 		    $overlaps++;
 		    $foundlink = 1;
-		    $start += $k + 1;
+		    $start = $k + 1;
 		    next EXON1;
 		}
 	    }
