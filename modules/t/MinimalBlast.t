@@ -14,7 +14,7 @@ ok(1);
 my $verbose;
 $verbose = 1 if @ARGV;
 
-my $seqio = Bio::SeqIO->new('-file'   => '/ecs2/work1/dta/recent_duplications/t/relaxins.fa',
+my $seqio = Bio::SeqIO->new('-file'   => 't/data/relaxins.fa',
 			    '-format' => 'fasta');
 
 ok($seqio);
@@ -28,7 +28,7 @@ my $report;
 {
   my $blastdb 
     = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
-        -dbfile     => '/ecs2/work1/dta/recent_duplications/t/relaxins.fa',
+        -dbfile     => 't/data/relaxins.fa',
         -index_type => 'wu_old',
         -type       => 'DNA',
 	-workdir    => '/tmp',
@@ -54,7 +54,7 @@ my $report;
 {
   my $blastdb 
     = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
-        -dbfile     => '/ecs2/work1/dta/recent_duplications/t/relaxins.fa',
+        -dbfile     => 't/data/relaxins.fa',
         -index_type => 'wu_new',
         -type       => 'DNA',
 	-workdir    => '/tmp',
@@ -82,7 +82,7 @@ my $report;
 #{
 #  my $blastdb 
 #    = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
-#        -dbfile     => '/ecs2/work1/dta/recent_duplications/t/relaxins.fa',
+#        -dbfile     => 't/data/relaxins.fa',
 #        -index_type => 'ncbi',
 #        -type       => 'DNA',
 #	-workdir    => '/tmp',
