@@ -317,11 +317,11 @@ sub parse_results {
         #misc
         $feat2 {db} = undef;
         $feat2 {db_version} = undef;
-        $feat2 {program} = 'RepeatMaskerHum';
-        $feat2 {p_version}='unknown';
-        $feat2 {source}= 'ReapeatMaskerHum';
+        $feat2 {program} = 'RepeatMasker';
+        $feat2 {p_version}='1';
+        $feat2 {source}= 'ReapeatMasker';
         $feat2 {primary}= 'repeat';
-        $feat1 {source}= 'RepearMaskerHum';
+        $feat1 {source}= 'RepeatMasker';
         $feat1 {primary}= 'repeat';
         
         $self->create_repeat(\%feat1, \%feat2); #may need to use references
