@@ -109,8 +109,10 @@ my %perc_id;
 
 my @human_cdna_seqs;
 my %human_protein_seqs;
+my %human_cdna_seqs;
 my @mouse_cdna_seqs;
 my %mouse_protein_seqs;
+my %mouse_cdna_seqs;
 
 HUMAN:
 foreach my $humanNM ( @human_cdnas ){
@@ -120,6 +122,7 @@ foreach my $humanNM ( @human_cdnas ){
     next HUMAN;
   }
   push ( @human_cdna_seqs, $humanNM_seq );
+  $human_cdna_seqs{ $humanNM } = $humanNM_seq;
   my $humanNP = $human_cdna2protein{$humanNM};
   my $humanNP_seq = $seqfetcher->get_Seq_by_acc($humanNP);
   unless ( $humanNP_seq ){
@@ -128,6 +131,7 @@ foreach my $humanNM ( @human_cdnas ){
   }
   $human_protein_seqs{$humanNP} = $humanNP_seq;
 }
+
 MOUSE:
 foreach my $mouseNM ( @mouse_cdnas ){
   my $mouseNM_seq = $seqfetcher->get_Seq_by_acc($mouseNM);
@@ -136,6 +140,7 @@ foreach my $mouseNM ( @mouse_cdnas ){
     next MOUSE;
   }
   push ( @mouse_cdna_seqs, $mouseNM_seq );
+  $mouse_cdna_seqs{ $mouseNM } = $mouseNM_seq;
   my $mouseNP = $mouse_cdna2protein{$mouseNM};
   my $mouseNP_seq = $seqfetcher->get_Seq_by_acc($mouseNP);
   unless ( $mouseNP_seq ){
@@ -337,31 +342,32 @@ foreach my $pair ( @selected_pairs ){
 	  "coverage2:$query_coverage\t".
 	    "perc_id:$perc_id\t".
 	      "length_diff:$length_diff\n";
+
+  ############################################################
+  # do cdna alignments agree with the protein ones?
+  my $humanNM_seq = $human_cdna_seqs{ $humanNM }; 
+  my $mouseNM_seq = $mouse_cdna_seqs{ $mouseNM };
+  if ( $best_transcript_pairs_object->score($humanNM_seq,$mouseNM_seq) ){
+    print STDERR "PAIR_MATCH\n";
+  }
+  else{
+    foreach my $actual_mouseNM_seq ( $best_transcript_pairs_object->partners($humanNM_seq) ){
+      my $this_humanNM = $humanNM_seq->display_id;
+      my $this_mouseNM = $actual_mouseNM_seq->display_id;
+      my $this_humanNP = $human_cdna2protein{$this_humanNM};
+      my $this_mouseNP = $mouse_cdna2protein{$this_mouseNM};
+      print STDERR "PAIR_MISMATCH\t".
+	"$this_humanLL\t$this_humanNM ($this_humanNP)\t$humanNP ($humanNM)\t".
+	  "$this_mouseLL\t$this_mouseNM ($this_mouseNP)\tmouseNM\t$mouseNP ($mouseNM)\n";
+    }
+    foreach my $actual_humanNM_seq ( $best_transcript_pairs_object->partners($mouseNM_seq) ){
+      my $this_humanNM = $actual_humanNM_seq->display_id;
+      my $this_mouseNM = $mouseNM_seq->display_id;
+      my $this_humanNP = $human_cdna2protein{$this_humanNM};
+      my $this_mouseNP = $mouse_cdna2protein{$this_mouseNM};
+      print STDERR "PAIR_MISMATCH\t".
+	"$this_humanLL\t$this_humanNM ($this_humanNP)\t$humanNP ($humanNM)\t".
+	  "$this_mouseLL\t$this_mouseNM ($this_mouseNP)\tmouseNM\t$mouseNP ($mouseNM)\n";
+    }
+  }
 }
-
-############################################################
-# do cdna alignments agree with the protein ones?
-
-
-
-    
- #   ############################################################
-#    # do cdna alignments agree with the protein ones?
-#    my $found = 0;
-#  CDS:
-#    foreach my $humanNP_seq ( $best_protein_pairs_object->list1 ){
-#      if ( $protein_id1 eq $humanNP_seq->display_id ){
-#	foreach my $mouseNP_seq ( $best_transcript_pairs_object->partners( $humanNP_seq ) ){
-#	  if ( $protein_id2 eq $humanNP_seq->display_id ){
-#	    $found = 1;
-#	    print STDERR "CDS_PAIR_MATCH\n";
-#	    last CDS;
-#	  }
-#	}
-#      }
-#    }
-#    if ( $found == 0 ){
-#      print STDERR "CDS_MISMATCH\t".
-#	"$this_humanLL\t$id1\t$protein_id1\t".
-#	  "$this_mouseLL\t$id2\t$protein_id2\n";
-#    }
