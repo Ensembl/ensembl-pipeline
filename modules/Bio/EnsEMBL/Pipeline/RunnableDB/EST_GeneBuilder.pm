@@ -527,7 +527,7 @@ sub _check_Transcripts {
   foreach my $transcript (@$ref_transcripts){
       
       # reject the transcripts that fall off the slice at the lower end
-      unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$slice) ){
+      unless ( $self->_check_Transcript_Location($transcript,$slice,$strand) ){
 	  next TRANSCRIPT;
       }
       
@@ -615,6 +615,73 @@ sub _check_Transcripts {
   return @alltranscripts;
   
 }
+
+############################################################
+
+sub _check_Transcript_Location{
+    my ($self,$transcript, $slice, $strand) = @_;
+      
+    my $valid = 1;
+    
+    my $id = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->transcript_id( $transcript );
+    
+    # never ever trus the order in which the exons come out! 
+    $transcript->sort;
+
+    # check that transcripts are not completely outside the slice
+    if ( $transcript->start > $slice->length || $transcript->end < 1 ){
+	print STDERR "transcript $id outside the slice\n";
+	$valid = 0;
+    }
+    # if the transcript is in the forward strand,
+    # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
+    elsif ( $strand == 1 && $transcript->start < 1 && $transcript->end > 1 ){
+      print STDERR "transcript $id falls off the slice by its lower end\n";
+      $valid = 0;
+    }
+    # else, if the transcripts are in the reverse strand, since we revcomp
+    # the slice, the transcript falling off the lower end would be now fallign off the higher end, and
+    # vice versa, so    
+    elsif ( $strand == -1 && $transcript->start <=  $slice->length && $transcript->end >  $slice->length ){
+      print STDERR "transcript $id in reverse strand falls off the revcomp-slice by its higher end\n";
+      $valid = 0;
+    }
+    
+    
+    my @exons = @{$transcript->get_all_Exons};
+    
+    if ($#exons > 0) {
+	for (my $i = 1; $i <= $#exons; $i++) {
+	    
+	    # check phase consistency:
+	    if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+		print STDERR "transcript $id has phase inconsistency\n";
+		$valid = 0;
+		last;
+	    }
+	    
+	    # check for folded transcripts
+	    if ($exons[0]->strand == 1) {
+		if ($exons[$i]->start < $exons[$i-1]->end) {
+		    print STDERR "transcript $id folds back on itself\n";
+		    $valid = 0;
+		} 
+	    } 
+	    elsif ($exons[0]->strand == -1) {
+		if ($exons[$i]->end > $exons[$i-1]->start) {
+		    print STDERR "transcript $id folds back on itself\n";
+		    $valid = 0;
+		} 
+	    }
+	}
+    }
+    if ($valid == 0 ){
+       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+    }
+    return $valid;
+}
+
+
 
 ############################################################
 
