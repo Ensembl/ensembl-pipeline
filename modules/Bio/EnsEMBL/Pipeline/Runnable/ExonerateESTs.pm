@@ -18,16 +18,23 @@ Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs->new('-genomic'    => $genseq,
 								   '-ests'       => $ests,
-								   '-resfile'    => $resfile);
+								   '-exonerate'  => $exonerate,
+								   '-exonerate_args' => $args,
+								  )
 
-    $obj->run
+    $obj->run;
 
     my @features = $obj->output;
 
 
 =head1 DESCRIPTION
-Runs exonerate between a contig sequence and an estfile. Prints out exonerate output. Filters
-output to depth of coverage 10 and returns it.
+Runs exonerate between a contig sequence and an estfile. 
+Exonerate output is printed to STDOUT by Exonerate - this is controlled by a flag to the Exonerate constructor.
+
+Runnable:ExonerateESTs sits between RunnableDB::ExonerateESTs and Runnable::Exonerate
+
+we currently call Runnable::Exonerate::run with a flag for ungapped; this will probably change as Exonerate matures.
+
 
 =head1 CONTACT
 
@@ -59,37 +66,40 @@ use Bio::DB::RandomAccessI;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC    => $genomicseq,
-			   -ESTS       => $ests);
+			   -ESTS       => $ests,
+			   -EXONERATE  => $exonerate,
+			   -EXONERATE_ARGS => $exargs);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs object
     Returns :   A Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs object
-    Args    :   -genomic:    Bio::PrimarySeqI object (genomic sequence)
-                -ests:       Either path to file containing est seqs or reference to aray of Bio::Seq
+    Args    :   -genomic:        Bio::PrimarySeqI object (genomic sequence)
+                -ests:           Either path to file containing est seqs or reference to array of Bio::Seq
+                -exonerate:  path to exonerate executable (optional)
+                -exonerate_args: arguments to be passed to exonerate. memory, word size etc
 =cut
 
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    my( $genomic, $ests, $resfile) = $self->_rearrange([qw(GENOMIC
-									ESTS
-									RESFILE)],
-								    @args);
+    my( $genomic, $ests, $exonerate, $exargs ) = $self->_rearrange([qw(GENOMIC
+								       ESTS
+								       EXONERATE
+								       EXONERATE_ARGS)],
+					      @args);
 							   
     $self->throw("No genomic sequence input")           
       unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeqI") 
-      unless $genomic->isa("Bio::PrimarySeqI");
     $self->genomic_sequence($genomic) if defined($genomic);
 
     $self->throw("No ests specified") 
       unless defined($ests);
     $self->ests($ests) if defined($ests);
 
-    $self->throw("No resfile specified") 
-      unless defined($resfile);
-    $self->resfile($resfile) if defined($resfile);
+    $self->exonerate($exonerate) if defined $exonerate;
+
+    $self->exonerate_args($exargs) if defined($exargs);
 
     return $self; 
 }
@@ -100,37 +110,16 @@ sub new {
     Usage   :   $self->genomic_sequence($seq)
     Function:   Get/set method for genomic sequence
     Returns :   Bio::Seq object
-    Args    :   Bio::Seq object
+    Args    :   Bio::Seq object, or a filename
 
 =cut
 
 sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
-        #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
-        $self->{'_genomic_sequence'} = $value;
+      $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
-}
-
-=head2 resfile
-
-    Title   :   resfile
-    Usage   :   $self->resfile($resfile)
-    Function:   Get/set method for resfile - file to write raw Exonerates
-    Returns :   
-    Args    :   name of a file 
-
-=cut
-
-sub resfile {
-  my ($self, $resfile) = @_;
-  if(defined $resfile) {
-    $self->{'_resfile'} = $resfile;
-  }
-
-  return $self->{'_resfile'};
 }
 
 =head2 ests
@@ -172,6 +161,54 @@ sub ests {
 
   }
 
+=head2 exonerate
+
+ Title   : exonerate
+ Usage   : $obj->exonerate($exonerate)
+ Function: get/set for exonerate
+ Returns : path to exonerate
+ Args    : exonerate (optional)
+
+
+=cut
+
+sub exonerate {
+   my ($self, $exonerate) = @_;
+
+   if (!defined $self->{'_exonerate'}){
+      $self->{'_exonerate'} = "";
+   }
+
+   if( defined $exonerate ) {
+      $self->{'_exonerate'} = $exonerate;
+    }
+    return $self->{'_exonerate'};
+
+}
+
+
+=head2 exonerate_args
+
+    Title   :   exonerate_args
+    Usage   :   $self->exonerate_args($args)
+    Function:   Get/set method for arguments to exonerate
+    Returns :   string
+    Args    :   string (optional)
+
+=cut
+
+sub exonerate_args {
+    my( $self, $exargs ) = @_;    
+    if(!defined $self->{'_exonerate_args'}){
+      $self->{'_exonerate_args'} = "";
+    }
+    if ($exargs) {
+      $self->{'_exonerate_args'} = $exargs;
+    }
+    return $self->{'_exonerate_args'};
+}
+
+
 =head2 estfilename
 
     Title   :   estfilename
@@ -200,39 +237,8 @@ sub estfilename {
 
 sub run {
     my ($self) = @_;
-
     # filter ESTs using exonerate
     my $exonerate_res = $self->run_exonerate(); # ref to an array
-
-    my %exonerate_ests;
-    my @feat;
-
-    my @hosts = ( 'ecs1a',
-		  'ecs1b',
-		  'ecs1c',
-		  'ecs1d',
-		  'ecs1e',
-		  'ecs1f',
-		  'ecs1g',
-		  'ecs1h',
-		);
-
-    my $index = int(rand 8); # number between 0 and 7; might want to use srand to seed ...?
-
-    my $host = $hosts[$index]; # randomize over ecs nodes here
-    my $resfile = $self->resfile;
-    open OUT, ("| /usr/bin/rsh $host '(cat - >>$resfile)'");
-  
-    foreach my $pair(@{$exonerate_res} ) {
-
-      # all hits, for Aaron
-      print OUT $pair->seqname . "\t" . $pair->start  . "\t" . $pair->end      . "\t" . 
-	        $pair->score   . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-                $pair->hstart  . "\t" . $pair->hend   . "\t" . $pair->hstrand  . "\n";
-    }
-
-  close OUT;
-
 }
 
 =head2 run_exonerate
@@ -272,15 +278,19 @@ sub run_exonerate {
   }
 
   my $exr = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
-							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
-							    '-genomic'   => $self->genomic_sequence,
-							    '-est'       => $self->estfilename
+							     '-exonerate' => $self->exonerate,
+							     '-genomic'   => $self->genomic_sequence,
+							     '-est'       => $self->estfilename,
+							     '-args'      => $self->exonerate_args,
+							     '-print'     => 1,
 							   );
   
-  $exr->run;
+  my $ungapped = 1;
+  $exr->run($ungapped);
+
   my $res = $exr->output; # ref to an array
 
-  #clean up temp files
+  # clean up temp files
   if(ref($estseq) eq 'ARRAY'){
     unlink $estfile;
   }
