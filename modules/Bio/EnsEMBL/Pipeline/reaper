@@ -81,6 +81,7 @@ sub check_jobs_against_success {
       }
 	  
       if (defined($job) && !$test) {
+          print "Removing job " . $job->dbID . "\n";
 	  $job->remove;
       }
 
