@@ -41,6 +41,11 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::DnaPepAlignFeature
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -48,9 +53,10 @@ sub new {
   my($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($genomic, $protein, $memory,$reverse,$endbias,$genewise,$gap, 
+  my ($genomic, $protein, $slice, $memory,$reverse,$endbias,$genewise,$gap, 
       $ext, $subs, $options) = $self->_rearrange([qw(GENOMIC 
 						     PROTEIN 
+						     SLICE
 						     MEMORY 
 						     REVERSE 
 						     ENDBIAS 
@@ -66,6 +72,7 @@ sub new {
 
   $self->genomic($genomic) || $self->throw("No genomic sequence entered for blastwise");
   $self->protein($protein) || $self->throw("No protein sequence entered for blastwise");
+  $self->slice($slice)     || $self->throw("No slice sequence entered for blastwise");
 
   $self->reverse($reverse)   if ($reverse);             
   $self->endbias($endbias)   if ($endbias);
@@ -161,6 +168,21 @@ sub align_protein {
   close(GW) or $self->throw("Error running genewise with command line ".$command."\n $!");
   unlink $genfile;
   unlink $pepfile;
+
+  # now make gene and transcript from array of exons
+  my $transcript = $self->make_transcript(\@genesf_exons);
+
+ if(defined $transcript){
+    my $gene = new Bio::EnsEMBL::Gene;
+    $gene->type("genewise");
+    $gene->add_Transcript($transcript);
+
+    $self->addGene($gene);
+
+  }
+  else{
+   print "No valid transcript made, cannot make gene\n"; 
+  }
 }
 
 =head2 parse_genewise_output_line
@@ -208,18 +230,20 @@ sub parse_genewise_output_line{
 
     my $exon_length = $end - $start + 1;
 
-    # end phase is the number of bases at the end of the exon which do not 
+    # end phase is the number of bases at the end of the exon which do not
     # fall in a codon and it coincides with the phase of the following exon.
 
     my $end_phase   = ( $exon_length + $phase ) %3;
 
-    $$curr_exon_ref = new Bio::EnsEMBL::Feature;
-    $$curr_exon_ref->seqname  ($self->genomic->id);
+    $$curr_exon_ref = new Bio::EnsEMBL::Exon;
     $$curr_exon_ref->start    ($start);
     $$curr_exon_ref->end      ($end);
     $$curr_exon_ref->strand   ($strand);
+    $$curr_exon_ref->phase    ($phase);
+    $$curr_exon_ref->end_phase($end_phase);
 
-    $self->addExon($$curr_exon_ref);
+    $$curr_exon_ref->slice($self->slice);
+
     push(@$exons_ref, $$curr_exon_ref);
   }
 
@@ -249,7 +273,7 @@ sub parse_genewise_output_line{
     }
 
     my $fp = new Bio::EnsEMBL::FeaturePair();
-
+    my @features;
     $fp->start   ($gstart);
     $fp->end     ($gend);
     $fp->strand  ($strand);
@@ -258,10 +282,71 @@ sub parse_genewise_output_line{
     $fp->hstart  ($pstart);
     $fp->hend    ($pend);
     $fp->hstrand (1);
-    $$curr_exon_ref->add_sub_SeqFeature($fp,'');
+    push(@features, $fp);
+
+    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@features);
+    $align->seqname($self->slice->seq_region_name);
+    $align->slice($self->slice);
+    $align->score(100);
+
+    $$curr_exon_ref->add_supporting_features($align);
   }
 }
 
+=head2 make_transcript
+
+  Arg [1]   : $exons_ref, reference to array of Bio::EnsEMBL::Feature
+  Function  : Turns array of exons into transcript & validates it.
+  Returntype: Bio::EnsEMBL::Transcript
+  Exceptions: 
+  Caller    :
+  Example   :
+
+=cut
+
+sub make_transcript{
+  my ($self, $exonsref) = @_;
+  my @exons = @$exonsref;
+
+  my $transcript   = Bio::EnsEMBL::Transcript->new;
+  my $translation  = Bio::EnsEMBL::Translation->new;
+  $transcript->translation($translation);
+
+  if ($#exons < 0) {
+    print STDERR "Odd.  No exons found\n";
+    return undef;
+  }
+
+  else {
+
+    if ($exons[0]->strand == -1) {
+      @exons = sort {$b->start <=> $a->start} @exons;
+    } else {
+      @exons = sort {$a->start <=> $b->start} @exons;
+    }
+
+    $translation->start_Exon($exons[0]);
+    $translation->end_Exon  ($exons[$#exons]);
+
+    # phase is relative to the 5' end of the transcript (start translation)
+    if ($exons[0]->phase == 0) {
+      $translation->start(1);
+    } elsif ($exons[0]->phase == 1) {
+      $translation->start(3);
+    } elsif ($exons[0]->phase == 2) {
+      $translation->start(2);
+    }
+
+    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+    foreach my $exon(@exons){
+      $transcript->add_Exon($exon);
+    }
+
+  }
+
+  $transcript->slice($self->slice);
+  return $transcript;
+}
 
 # These all set/get or initializing methods
 
@@ -369,16 +454,29 @@ sub protein {
     return $self->{'_protein'};
 }
 
-sub addExon {
-	my ($self,$arg) = @_;
+sub slice {
+    my ($self,$arg) = @_;
 
-    if (!defined($self->{'_output'})) {
-			$self->{'_output'} = [];
+    if (defined($arg)) {
+			$self->throw("slice sequence input is not a Bio::EnsEMBL::Slice") unless
+				($arg->isa("Bio::EnsEMBL::Slice"));
+			
+			$self->{'_slice'} = $arg;
     }
+    return $self->{'_slice'};
+}
+
+sub addGene {
+  my ($self,$arg) = @_;
+
+  if (!defined($self->{'_output'})) {
+    $self->{'_output'} = [];
+  }
   #print STDERR "Adding ".$arg." ".$arg->start." ".$arg->end."\n";
-    push(@{$self->{'_output'}},$arg);
+  push(@{$self->{'_output'}},$arg);
 
 }
+
 sub genewise {
   my ($self,$arg) = @_;
 
