@@ -151,7 +151,8 @@ sub score_Transcripts{
     }
 
     my @sites = $self->get_alternative_sites( $cluster );
-           
+    my $average_score = 0;
+
     ############################################################
     # now get the sites of alternative splicing
     # contained in each transcript
@@ -162,91 +163,128 @@ sub score_Transcripts{
   TRAN:
     foreach my $tran ( @trans ){
       
-      print STDERR "finding sites in transcript: " if $verbose;
-      if ($verbose ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
-      }
-      ############################################################
-      # which sites does this transcript have?
-      # $site is a SeqFeature with exons as sub_SeqFeatures 
-      my @these_sites;
-      foreach my $site ( @sites ){
-	my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
-	if ( !( $site->start > $end) && !( $site->end < $start ) ){
-	  push( @these_sites, $site );
+	# list of ESTs:
+	my @list = @{ $self->hold_list($tran) };
+	
+       	print STDERR "finding sites in transcript: " if $verbose;
+	if ($verbose ){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
 	}
-      }
-      
-      ############################################################
-      # make all possible pairs of sites 
-      @these_sites = sort { $a->start <=> $b->end } @these_sites;
-      my @site_pairs;
-      if ( scalar( @these_sites ) > 1 ){
-	foreach ( my $i=0; $i<$#these_sites; $i++ ){
-	  foreach (my $j=$i+1; $j<=$#these_sites; $j++ ){
-	    my $pair = [$these_sites[$i], $these_sites[$j] ];
-	    push( @site_pairs, $pair );
-	  }
-	}
-      }
-      else{
-	print STDERR "transcript with ".scalar( @these_sites )." sites\n" if $verbose;
-      }
-      
-      ############################################################
-      # check how many site pairs are covered by the list of ESTs
-      # in this transcript
-      my @list = @{ $self->hold_list($tran) };
-      my @covered_sites;
-      my %pair_coverage;
-
-      foreach my $pair (@site_pairs){
-	my $covered = 0;
-	print STDERR "pair: ".$pair->[0]->start."-".$pair->[0]->end." ".$pair->[1]->start."-".$pair->[1]->end."\n";
-	foreach my $est ( @list ){
-	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
-	  
-	  ############################################################
-	  # a pair is covered if there is at least an est overlapping
-	  # with both features defining the site pair
-	  if ( $est_start <= $pair->[0]->end 
-	       &&
-	       $est_end   >  $pair->[0]->end
-	       &&
-	       $est_end   >= $pair->[1]->start
-	       &&
-	       $est_start <  $pair->[1]->start
-	     ){
-	    $covered = 1;
-	    print STDERR "covered by est: $est_start-$est_end\n";
-	    $pair_coverage{ $pair }++;
-	    unless ( $pair_coverage{ $pair } > 1 ){
-	      push( @covered_sites, $pair );
+	############################################################
+	# which sites does this transcript have?
+	# $site is a SeqFeature with exons as sub_SeqFeatures 
+	my @these_sites;
+	foreach my $site ( @sites ){
+	    my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
+	    if ( !( $site->start > $end) && !( $site->end < $start ) ){
+		push( @these_sites, $site );
 	    }
-	  }
 	}
-      }
-      
-      print STDERR "number of site-pairs: ".scalar(@site_pairs)."\n" if $verbose;
-      print STDERR "number of covered site-pairs: ".scalar( @covered_sites )."\n" if $verbose;
-      
-      my $score = 100;
-      # score of a transcript is calculated as the fraction of 
-      # pairs of sites of alternative splicing which are covered by ests
-      if ( @site_pairs ){
-	print STDERR "score: $score\n" if $verbose;
-	$score = sprintf "%.2f", 100*scalar( @covered_sites )/scalar( @site_pairs );
-      }
-      else{
-	print STDERR "No site-pairs --> score = $score\n" if $verbose;
-      }
-      
-      ############################################################
-      # put the transcript score in the exons:
-      foreach my $exon ( @{$tran->get_all_Exons} ){
-	$exon->score( $score );
-      }
+	
+	############################################################
+	# @these_sites contains now all the sites
+	# present in the transcript.
+	# Now we follow a greedy approach to find out how many
+	# potential 'splits' ( pairs of sites unlinked ) in the evidence there are.
+	
+	my $n = scalar( @these_sites );
+	my $inv_score = 1;
+	
+	# we consider arrays of consecutive sites
+	# from the largest possible (n) to the smallest (2)
+	my $covered_sites = $n;
+      LEVEL:
+	for (my $i=0; $i<$n-1; $i++ ){
+	    
+	  SUBLEVEL:
+	    for (my $diff = 0; $diff<=$i; $diff++){
+		
+		print STDERR "sites: " if $verbose;
+		my @site_combination;             
+		for ( my $j=0; $j<$n-$i; $j++ ){
+		    print STDERR ($j+$diff)." " if $verbose;
+		    push( @site_combination, $these_sites[$j+$diff] );
+		}
+		print STDERR "\n" if $verbose;
+		
+		############################################################
+		# check whether this transcript contains ESTs
+		# covering all the sites in @site_combination
+		my $covered = 0;
+		
+		my @covered_sites;
+		
+	      EST:
+		foreach my $est ( @list ){
+		    my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
+		    
+		    ############################################################
+		    # by construction, it is enough to check that the EST 
+		    # covers both extreme sites to know that it covers all in the middle,
+		    if ( $est_start <= $site_combination[0]->end 
+			 &&
+			 $est_end   >  $site_combination[0]->end
+			 &&
+			 $est_end   >= $site_combination[-1]->start
+			 &&
+			 $est_start <  $site_combination[-1]->start
+			 ){
+			$covered = 1;
+			if ($verbose ){
+			    print STDERR "covered by est: $est_start-$est_end\n";
+			  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+			      ->_print_SimpleTranscript( $est );
+			}
+			last LEVEL;
+		    }
+		    
+		} # end of EST
+	    }     # end of SUBLEVEL
+	    
+	    ############################################################
+	    # everytime we leave a level unsuccessful, we 
+	    # have a certainty loss factor of 1/2 and the
+	    # (maximum) number of covered sites is reduced by one
+	    $inv_score *= 2;
+	    $covered_sites--;
+
+	} # end of LEVEL
+	
+	my $score = sprintf "%.2f", ( 100/$inv_score );
+	$average_score += $score;
+	
+	############################################################
+	# TRAN number_ests number_sites max_num_sites_covered:
+	
+	print STDERR "TRAN\t".
+	    "ests:".scalar(@list)."\t".
+		"sites:".$n."\t".
+		    "covered:".$covered_sites."\t".
+			"score:".$score."\t".
+			    "s-c:".($n - $covered_sites)."\n";
+	
+	############################################################
+	# put the transcript score in the exons:
+	foreach my $exon ( @{$tran->get_all_Exons} ){
+	    $exon->score( $score );
+	}
     } # end of TRAN
+    
+    ############################################################
+    # cluster info:
+    my $cluster_sites = scalar( @sites );
+    my $trans_number  = scalar( @trans );
+    my $max_sites     = 2 ** $cluster_sites;
+    $average_score   /= $trans_number;
+
+    print STDERR "CLUSTER\t".
+	"sites:".$cluster_sites."\t".
+	    "trans:".$trans_number."\t".
+		"2^N:".$max_sites."\t".
+		    "av_score:".$average_score."\n";
+    
+		    
+
   }   # end of CLUSTER
   return @{$self->transcripts};
 }
