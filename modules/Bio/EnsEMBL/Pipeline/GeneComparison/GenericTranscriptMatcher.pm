@@ -217,13 +217,19 @@ sub _map_Transcripts{
   my %expression_map;
   
   # a comparison tool
-  my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
+  my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
+												-comparison_level         => 3,
+												-exon_match               => 0,
+												-splice_mismatch          => 1,
+												-intron_mismatch          => 0,
+											       );
+  my $sublist;new();
   
  EST:
   foreach my $est (@$ests){
       
       # compare this est
-      my $merge = $transcript_comparator->_test_for_semiexact_Merge($transcript,$est);
+      my ($merge, $overlaps) = $transcript_comparator->compare($transcript,$est);
       
       # (this method checks exact exon boundary matches but
       # allows mismatches at outer end of the 5' and 3' exons)
