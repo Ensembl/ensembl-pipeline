@@ -86,16 +86,15 @@ sub new {
                                                              ANALYSIS
                                                              OPTIONS)],        
                                                           @args);
-  
-    if ($analysis) {
-        $self->analysis($analysis);
-    } else {
-        $self->throw("BlastWorm needs an analysis");
-    }
+
+    my ($query, $analysis) = $self->_rearrange([qw(QUERY 
+						   ANALYSIS)], 
+					       @args);
 
     $self->query ($query) if ($query);       
-
-    $self->program ($self->find_executable ($self->analysis->program_file));
+    $self->analysis ($analysis) if ($analysis);
+	
+    $self->program ($self->analysis->program_file);
   
     if ($self->analysis->db_file) {
         $self->database($self->analysis->db_file);
@@ -127,14 +126,26 @@ sub new {
 =cut
 
 sub query {
-    my ($self, $seq) = @_;
+ my ($self, $seq) = @_;
     if ($seq) {
-        ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
-            || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-        $self->{'_sequence'} = $seq ;
-        $self->queryname ($self->query->id);
-        $self->filename ($self->query->id.".$$.seq");
-        $self->results ($self->filename.".out");
+	eval {
+	    $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+
+	if (!$@) {
+	    $self->{'_sequence'} = $seq ;
+	    $self->queryname ($self->query->id);
+	    $self->filename ($self->query->id.".$$.seq");
+	    $self->results ($self->filename.".out");
+	}
+	else {
+	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    $self->{'_sequence'} = $seq ;
+	    $self->filename ("$$.tmp.seq");
+	    
+	    $self->results ("prints.$$.out");
+	    
+	}
     }
     return $self->{'_sequence'};
 }
@@ -245,12 +256,10 @@ sub options {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
-
-    # nothing to be done with $args
+ my ($self, $dir) = @_;
 
     # check query
-    my $seq = $self->query || $self->throw("Query required for ".$self->program."\n");
+    my $seq = $self->query || $self->throw("Query required for Program");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -263,15 +272,38 @@ sub run {
     $tmp .= "/".$self->results;
     $self->results ($tmp);
 
-    # write sequence to file
-    $self->writefile;        
 
-    # run program
-    $self->run_program;
+ eval {
+	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+	
 
-    # parse output
-    $self->parse_results;
-    $self->deletefiles;
+    if (!$@) {
+	#The inputId is a sequence file...got the normal way...
+
+	# write sequence to file
+	$self->writefile;        
+
+	# run program
+	$self->run_programm;
+
+	# parse output
+	$self->parse_results;
+	$self->deletefiles;
+    }
+    else {
+	#The query object is not a seq object but a file.
+	#Perhaps should check here or before if this file is fasta format...if not die
+	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
+
+	$self->filename($self->query);
+
+	# run program
+	$self->run_analysis;
+
+	# parse output
+	$self->parse_results;
+    }
 }
 
 
