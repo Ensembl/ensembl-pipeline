@@ -77,14 +77,20 @@ sub new {
   # temporary hard coding
   my $genedb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						   '-host'   => 'ecs1e',
-						   '-user'   => 'ensadmin',
-						   '-pass'   => 'ensembl',
+						   '-user'   => 'xxxxxxx',
+						   '-pass'   => 'xxxxxxx',
 						   '-dbname' => 'ens_NCBI_26',
 						  );
 
+#  my $dnadb  =   new Bio::EnsEMBL::DBSQL::DBAdaptor(
+#						   '-host'   => 'ecs1e',
+#						   '-user'   => 'xxxxxxx',
+#						   '-dbname' => 'mouse_sanger_Oct01',
+#						  );
+
   my $cdnadb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						   '-host'   => 'ecs1f',
-						   '-user'   => 'ensro',
+						   '-user'   => 'xxxxxxx',
 						   '-dbname' => 'ens_NCBI_26_cdna',
 						   '-dnadb'  => $genedb,
 						  ); 
@@ -200,7 +206,7 @@ sub run {
   foreach my $e2g (@e2g) {
     my $found = 0;
     foreach my $tran ($e2g->each_Transcript) {
-      my @exons = $tran->each_Exon;
+      my @exons = $tran->get_all_Exons;
       @exons = sort {$a->start <=> $b->start} @exons;
       my $i;
       for ($i = 1; $i < $#exons; $i++) {
@@ -217,7 +223,6 @@ sub run {
 
   $self->e2g_genes(@newe2g);
 
- # $self->e2g_genes($self->vc->get_Genes_by_Type('exonerate_e2g','evidence'));
   print STDERR "got " . scalar($self->e2g_genes) . " e2g genes\n";
 
   # find which gw matches which e2gs
@@ -256,20 +261,9 @@ sub run {
     $self->combine_genes($gw, $chosen_e2g);
   }
   
-#  my @genes = $self->combined_genes;
-#  my $count = 1;
-#  foreach my $g (@genes) {
-#    foreach my $tran ($g->each_Transcript) {
-#      foreach my $exon ($tran->get_all_Exons) {
-##	$exon->source_tag('combined');
-#	$exon->score(100);
-#	print $exon->gffstring . "\t" . $count ."\n";
-#      }
-#      $count++;
-#    }
-#  }
   # remap to raw contig coords
   my @remapped = $self->remap_genes();
+
   $self->output(@remapped);
 }
 
@@ -501,10 +495,10 @@ sub match_gw_to_e2g{
     return;
   }
   
-  print STDERR "\nMatching " . $gw_tran[0]->dbID . "\n";
+#  print STDERR "\nMatching " . $gw_tran[0]->dbID . "\n";
  E2G:
   foreach my $e2g($self->e2g_genes){
-    print STDERR "trying " . $gw->dbID . " against " . $e2g->dbID . "\n";
+#    print STDERR "trying " . $gw->dbID . " against " . $e2g->dbID . "\n";
     my @egtran  = $e2g->each_Transcript;
     my @eg_exons = $egtran[0]->get_all_Exons;
 
@@ -524,7 +518,7 @@ sub match_gw_to_e2g{
       foreach my $current_exon (@eg_exons) {
 	
 	if($current_exon->strand != $gw_exons[0]->strand){
-	  print STDERR "can't compare " . $gw->dbID . " to " . $e2g->dbID . " - strand diffs\n";
+#	  print STDERR "can't compare " . $gw->dbID . " to " . $e2g->dbID . " - strand diffs\n";
 	  next E2G;
 	}
 	
@@ -537,7 +531,7 @@ sub match_gw_to_e2g{
 	
       }
       if($fiveprime_match && $threeprime_match){
-	print STDERR "matched " . $gw->dbID . " to " . $e2g->dbID . "\n";
+#	print STDERR "matched " . $gw->dbID . " to " . $e2g->dbID . "\n";
 	push(@matching_e2g, $e2g);
       }
       
@@ -629,6 +623,9 @@ sub _merge_gw_genes {
 	# combine the two
 	$previous_exon->end($exon->end);
 	$previous_exon->add_sub_SeqFeature($exon,'');
+	foreach my $suppfeat($exon->each_Supporting_Feature){
+	  $previous_exon->add_Supporting_Feature($suppfeat);
+	}
 	next EXON;
       }
       
@@ -644,6 +641,10 @@ sub _merge_gw_genes {
 	
 	$cloned_exon->attach_seq($self->vc->primary_seq);
 	$cloned_exon->add_sub_SeqFeature($exon,'');
+
+	foreach my $suppfeat($exon->each_Supporting_Feature){
+	  $cloned_exon->add_Supporting_Feature($suppfeat);
+	}
 	push(@pred_exons, $cloned_exon);
       }
       
@@ -1161,13 +1162,13 @@ GENE:  foreach my $gene (@genes) {
 	next GENE;
       }
   }
+
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
       # need to explicitly add back genetype and analysis.
       $newgene->type($genetype);
       $newgene->analysis($gene->analysis);
-      push(@newf,$newgene);
 
       # sort out supporting feature coordinates
       foreach my $tran ($newgene->each_Transcript) {
@@ -1186,14 +1187,12 @@ GENE:  foreach my $gene (@genes) {
       # is this a special case single coding exon gene with UTRS?
       if($tran->translation->start_exon() eq $tran->translation->end_exon() 
 	 && $gene->type eq 'combined_gw_e2g'){
-#	print STDERR "single coding exon, with UTRs\n";
+	print STDERR "single coding exon, with UTRs\n";
 	
 	# problems come about when we switch from + strand on FPC contig to - strand on raw contig.
 	my $fpc_strand;
-
-# may need to compare exon objects ... with new schema
+	
 	foreach my $exon($tran->get_all_Exons) {
-#	  if ($exon->id eq $tran->translation->start_exon_id()) {
 	  if ($exon eq $tran->translation->start_exon()) {
 	    $fpc_strand = $exon->strand;
 	    last;
@@ -1202,28 +1201,47 @@ GENE:  foreach my $gene (@genes) {
 	
 	foreach my $tran ($newgene->each_Transcript) {
 	  foreach my $exon($tran->get_all_Exons) {
-
-# oh dear oh dear oh dear
-#	    if ($exon->id eq $tran->translation->start_exon_id()) {
+	    
+	    # oh dear oh dear oh dear
+	    # this is still giving some problems
 	    if ($exon eq $tran->translation->start_exon()) {
 	      if($fpc_strand == 1 && $exon->strand == -1){
-#		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
+		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
 		$exon->end($exon->end - ($tran->translation->start -1));
+		
 		$exon->start($exon->end - ($tran->translation->end -1));
 	      }
 	    }
 	  }
 	}
+	
       } # end special case single coding exon
+      
+      # final exon coord sanity check
+      foreach my $exon($newgene->get_all_Exons){
+	
+	# exon start and end must both be within the raw contig!!!
+	if($exon->start < 1){
+	  $self->throw("can't set exon->start < 1 - discarding gene\n");
+	}
+	
+	if($exon->end > $exon->contig->primary_seq->length){
+	  $self->throw("exon extends beyond end of contig - discarding gene\n");
+	}
+      }
+
+      # if we get to here, the gene is fine, so push it onto the array to be returned
+      push(@newf,$newgene);
 
     };
-
+    
     # did we throw exceptions?
     if ($@) {
       print STDERR "Couldn't reverse map gene:  [$@]\n";
     }
-  }
 
+  }
+  
   return @newf;
 }
 
