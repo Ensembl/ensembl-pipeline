@@ -606,18 +606,18 @@ sub  make_ExonPairs {
     my @forward;
     my @reverse;
 
-    foreach my $exon (@exons) {
-      if ($exon->strand == 1) {
-	push(@forward,$exon);
-      } else {
-	push(@reverse,$exon);
-      }
-    }
+  #  foreach my $exon (@exons) {
+  #    if ($exon->strand == 1) {
+#	push(@forward,$exon);
+#      } else {
+#	push(@reverse,$exon);
+#      }
+#    }
     
-    @forward = sort {$a->start <=> $b->start} @forward;
-    @reverse = sort {$b->start <=> $a->start} @reverse;
+ #   @forward = sort {$a->start <=> $b->start} @forward;
+ #   @reverse = sort {$b->start <=> $a->start} @reverse;
 
-    @exons = (@forward,@reverse);
+#    @exons = (@forward,@reverse);
 
     print STDERR "Making exon pairs \n";
 
@@ -628,8 +628,8 @@ sub  make_ExonPairs {
 	my %idhash;
 	my $exon1 = $exons[$i];
 	
-	my $jstart = $i + 1;  if ($jstart < 0) {$jstart = 0;}
-	my $jend   = $i + 1;  if ($jend > scalar(@exons)) {$jend    = scalar(@exons);}
+	my $jstart = $i - 2;  if ($jstart < 0) {$jstart = 0;}
+	my $jend   = $i + 2;  if ($jend >= scalar(@exons)) {$jend    = scalar(@exons) - 1;}
 
 	J: for (my $j = $jstart ; $j <= $jend; $j++) {
 	    print ("Finding link to exon $j\n");
@@ -977,7 +977,7 @@ sub link_ExonPairs {
 	    if ($self->isTail($exon)) {
 		my $found = 0;
 		foreach my $f ($exon->each_Supporting_Feature) {
-		    if ($f->analysis->db eq "swir" && $f->score > 200) {
+		    if ($f->analysis->db eq "sptr" && $f->score > 200) {
 			$found = 1;
 		    } 
 		}
@@ -2116,9 +2116,12 @@ sub get_all_Features {
 	    }
 	}
 
+        my @genscan = $self->contig->get_all_PredictionFeatures;
+
+        push(@tmp,@genscan);
 
         if ($self->genewise_only != 1) {
-	    my @tmp2 = $self->contig->get_all_SimilarityFeatures;
+	    my @tmp2 = $self->contig->get_all_SimilarityFeatures_above_pid(80);
 
 	    my %idhash;
 	    my @sf;
@@ -2451,19 +2454,21 @@ sub print_gff {
 #	}
 
 #    }
-
+    my $ncount = 1;
     foreach my $gen ($self->genscan) {
 	foreach my $ex ($gen->sub_SeqFeature) {
-	    print POG  $ex->id . "\t" . $ex->source_tag . "\texon\t" . 
+	    print POG  $ncount . "\t" . $ex->source_tag . "\texon\t" . 
 		$ex->start . "\t" . $ex->end . "\t100\t";
 	    if ($ex->strand == 1) {
 		print POG "+\t.\t";
 	    } else {
 		print POG ("-\t.\t");
 	    }
-	    print POG $gen->seqname . "\n";
+	    print POG $ncount . "\n";
 	}
+	$ncount++;
     }
+    my $gcount = 1;
     GEN: foreach my $gen ($self->genewise) {
         eval {
 	foreach my $ex ($gen->sub_SeqFeature) {
@@ -2475,15 +2480,16 @@ sub print_gff {
 		print POG ("-\t.\t");
 	    }
 	    if (ref($ex) =~ "FeaturePair") {
-		print (POG $ex->hseqname . "\t" . $ex->hstart . "\t" . $ex->hend . "\n");
+		print (POG $ex->hseqname . "\t" . $ex->hstart . "\t" . $ex->hend . "\tGW$gcount\n");
 	    } else {
-		print POG $gen->seqname . "\n";
+		print POG "GW$gcount" . "\n";
 	    }
 	}
         };
         if ($@) {
             print STDERR "Couldn't parse genewise [$gen] [$@]\n";
         }
+	$gcount++;
     }
 
     close(POG);
