@@ -1,13 +1,17 @@
 #!/usr/local/ensembl/bin/perl
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
+# default pipeline runner script
+# this script is passed as part of the batch submission request
+# and is therefore the first script to be executed on the
+# remote side
+
+# note that you may need to alter the #! line above to suit your
+# local perl installation
 
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::Config::General;
 use Sys::Hostname;
-
 use Getopt::Long;
 
 
@@ -29,23 +33,24 @@ my $job_id;
 print STDERR join( " ", @ARGV ),"\n";
 
 GetOptions(
-    'host=s'    => \$host,
-    'port=n'    => \$port,
-    'dbname=s'  => \$dbname,
-    'dbuser=s'  => \$dbuser,
-    'pass=s'    => \$pass,
-    'check!'    => \$check,
-    'objfile=s' => \$object_file,
-    'module=s'  => \$module
+    'host=s'       => \$host,
+    'port=n'       => \$port,
+    'dbname=s'     => \$dbname,
+    'dbuser=s'     => \$dbuser,
+    'pass=s'       => \$pass,
+    'check!'       => \$check,
+    'objfile=s'    => \$object_file,
+    'module=s'     => \$module,
+    'output_dir=s' => \$output_dir
 )
 or die ("Couldn't get options");
 
 if( defined $check ) {
   my $host = hostname();
-  if ( ! -e $::pipeConf{'nfstmp.dir'} ) {
+  if ( ! -e $output_dir ) {
     die "no nfs connection";
   }
-  my $deadhostfile = $::pipeConf{'nfstmp.dir'}."/deadhosts";
+  my $deadhostfile = "$output_dir/deadhosts";
   open( FILE, $deadhostfile ) or exit 0;
   while( <FILE> ) {
     chomp;
@@ -112,7 +117,10 @@ while( $job_id = shift ) {
   print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
 
   eval {
-    $job->runLocally;
+    # scp - changed to runInLSF to prevent writing output files
+    # over NFS at the start of the job
+    # $job->runLocally;
+    $job->runInLSF;
   };
   $pants = $@;
 

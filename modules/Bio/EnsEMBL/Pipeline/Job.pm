@@ -13,7 +13,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::Job
+Bio::EnsEMBL::Pipeline::Job
 
 =head1 SYNOPSIS
 
@@ -23,7 +23,7 @@ Stores run and status details of an analysis job
 
 =head1 CONTACT
 
-Describe contact details here
+Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -34,30 +34,39 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::Job;
-# use Data::Dumper;
 
-BEGIN {
-  require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 use vars qw(@ISA);
 use strict;
 
-# use FreezeThaw qw(freeze thaw);
-
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-use Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+# use Bio::EnsEMBL::Pipeline::Config::General qw(PIPELINE_OUTPUT_DIR AUTO_JOB_UPDATE);
+use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
-# following vars are static and not meaningful on remote side
-# recreation of Job object. Not stored in db of course.
-# hash with queue keys
 
-my %batched_jobs;
-my %batched_jobs_runtime;
+# dynamically load appropriate queue manager (e.g. LSF)
+
+my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
+
+my $file = "$batch_q_module.pm";
+$file =~ s{::}{/}g;
+require "$file";
+
+# BATCH_QUEUES is a package variable which stores available
+# 'queues'. this allows different analysis types to be sent
+# to different nodes etc. it is keyed on analysis logic_name
+# and has different parameters such as resource (e.g. node set),
+# number of jobs to be batched together etc.
+#
+# this may be better encapsulated as a separate class, but
+# i can't think at the moment how best to do this.
+
+my %BATCH_QUEUES = &set_up_queues;
 
 sub new {
     my ($class, @args) = @_;
@@ -74,11 +83,9 @@ sub new {
 				STDERR
 				RETRY_COUNT
 				)],@args);
-#    print STDERR "creating job with @args\n";
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
     $cls     = 'contig' unless defined($cls);
- #   print STDERR "retry count is passed in as".$retry_count."\n";
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
@@ -124,7 +131,6 @@ sub create_by_analysis_input_id {
 }
 
 
-
 =head2 dbID
 
   Title   : dbID
@@ -134,7 +140,6 @@ sub create_by_analysis_input_id {
   Args    : int
 
 =cut
-
 
 sub dbID {
     my ($self, $arg) = @_;
@@ -146,6 +151,7 @@ sub dbID {
 
 }
 
+
 =head2 adaptor
 
   Title   : adaptor
@@ -156,7 +162,6 @@ sub dbID {
 
 =cut
 
-
 sub adaptor {
     my ($self, $arg) = @_;
 
@@ -165,7 +170,6 @@ sub adaptor {
     }
     return $self->{'_adaptor'};
 }
-
 
 
 =head2 input_id
@@ -178,7 +182,6 @@ sub adaptor {
 
 =cut
 
-
 sub input_id {
     my ($self, $arg) = @_;
 
@@ -187,6 +190,7 @@ sub input_id {
     }
     return $self->{'_input_id'};
 }
+
 
 =head2 class
 
@@ -199,7 +203,6 @@ sub input_id {
 
 =cut
 
-
 sub class {
     my ($self, $arg) = @_;
 
@@ -208,6 +211,7 @@ sub class {
     }
     return $self->{'_class'};
 }
+
 
 =head2 analysis
 
@@ -245,14 +249,14 @@ sub analysis {
 =cut
 
 sub flush_runs {
-  my ($self, $adaptor, $LSF_params) = @_;
+  my ($self, $adaptor, $queue) = @_;
 
-  my @queues;
+  print STDERR "in flush runs: queue = $queue\n";
+
+  # flush_runs is optionally sent a queue to deal with
+  # @analyses is a list of logic_names (strings)
+  my @analyses = ($queue) || (keys %BATCH_QUEUES);
   
-  my $nodes    = $LSF_params->{'nodes'}   || undef;
-  my $queue    = $LSF_params->{'queue'}   || undef;
-  my $jobname  = $LSF_params->{'jobname'} || undef;
-  my $bsub_opt = $LSF_params->{'bsub'}    || undef;
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
@@ -260,51 +264,49 @@ sub flush_runs {
   local *SUB;
   local *FILE;
 
-  if( ! defined $queue ) {
-    @queues = keys %batched_jobs;
-  } else {
-    @queues = ( $queue );
-  }
-  
   my $db       = $adaptor->db;
   my $host     = $db->host;
   my $username = $db->username;
   my $dbname   = $db->dbname;
   my $pass     = $db->password;
-  
 
-  # runner.pl: first look in pipeConf.pl,
+  # runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
   # then in same directory as Job.pm,
   # and fail if not found
 
-  my $runner = $::pipeConf{'runner'} || undef;
+  my $runner = $::RUNNER_SCRIPT || undef;
 
   unless (-x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
-    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+    my $caller = caller(0);
+    $self->throw("runner undefined - needs to be set in $caller\n") unless defined $runner;
   }
 
-  for my $queue ( @queues ) {
+  # $anal is a logic_name
+  for my $anal (@analyses) {
 
-    if (! (defined $batched_jobs{$queue}) || ! scalar (@{$batched_jobs{$queue}})) {
-      next;
-    }
+    my $queue = $BATCH_QUEUES{$anal};
+    my @job_ids = @{$queue->{'jobs'}};
+    next unless @job_ids;
 
-    my $lastjob = $adaptor->fetch_by_dbID( $batched_jobs{$queue}->[$#{$batched_jobs{$queue}}] );
+    my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
 
     if( ! defined $lastjob ) {
       $self->throw( "Last batch job not in db" );
     }
   
-    my $pre_exec = $runner." -check";
-    my $LSF = Bio::EnsEMBL::Pipeline::BatchSubmission::LSF->new(-STDOUT => $lastjob->stdout_file,
-								-STDERR => $lastjob->stderr_file,
-								-PARAMETERS => $bsub_opt,
-								-PRE_EXEC => $pre_exec,
-								-QUEUE => $queue,
-								-JOBNAME => $jobname,
-								-NODES => $nodes);
+    my $pre_exec = $runner." -check -output_dir $::PIPELINE_OUTPUT_DIR";
+    my $batch_job = $batch_q_module->new(
+	-STDOUT     => $lastjob->stdout_file,
+	-STDERR     => $lastjob->stderr_file,
+	-PARAMETERS => $queue->{'sub_args'},
+	-PRE_EXEC   => $pre_exec,
+	-QUEUE      => $queue->{'queue'},
+	-JOBNAME    => $anal,
+	-NODES      => $queue->{'nodes'},
+	-RESOURCE   => $queue->{'resource'}
+    );
     my $cmd;
   
     
@@ -313,38 +315,39 @@ sub flush_runs {
     # "connect" command line accordingly (otherwise -pass gets the
     # first job id as password, instead of remaining undef)
     if ($pass) {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass";
     }
     else {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname";
     }
-    $LSF->construct_command_line($cmd);
-    $LSF->open_command_line();
+    $cmd .= " -output_dir $::PIPELINE_OUTPUT_DIR";
+    $cmd .= " @job_ids";
 
-    if( ! defined $LSF->id ) {
-      print STDERR ( "Couldnt submit ".join( " ",@{$batched_jobs{$queue}} )." to LSF" );
-      foreach my $jobid ( @{$batched_jobs{$queue}} ) {
-        my $job = $adaptor->fetch_by_dbID( $jobid );
+    $batch_job->construct_command_line($cmd);
+    $batch_job->open_command_line();
+
+    if( ! defined $batch_job->id ) {
+      print STDERR ( "Couldnt batch submit @job_ids" );
+      foreach my $job_id (@job_ids) {
+        my $job = $adaptor->fetch_by_dbID($job_id);
         $job->set_status( "FAILED" );
       }
     } else {
     
-      # SCP - fetch/update a collection of jobs all at once
-      my @jobs = $adaptor->fetch_by_dbID_list(@{$batched_jobs{$queue}});
+      my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
       foreach my $job (@jobs) {
         if( $job->retry_count > 0 ) {
           for ( $job->stdout_file, $job->stderr_file ) {
             open( FILE, ">".$_ ); close( FILE );
           }
         }
-	$job->submission_id( $LSF->id );
+	$job->submission_id( $batch_job->id );
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
       }
       $adaptor->update(@jobs);
     }
-    $batched_jobs{$queue} = [];
-    $batched_jobs_runtime{$queue} = 0;
+    $queue->{'jobs'} = [];
   }
 }
 
@@ -353,7 +356,7 @@ sub flush_runs {
 
   Title   : batch_runRemote
   Usage   : $job->batch_runRemote
-  Function: Issue more than one small job in one LSF job because 
+  Function: Issue more than one pipeline Job in one batch job because 
     job submission is very slow
   Returns : 
   Args    : Is static, private function, dont call with arrow notation.
@@ -361,22 +364,25 @@ sub flush_runs {
 =cut
 
 sub batch_runRemote {
-  my ($self, $LSF_params) = @_;
+  my ($self) = @_;
 
-  my $batchsize = $LSF_params->{'flushsize'} || 1;
-  my $queue     = $LSF_params->{'queue'};
+  my $queue;
+
+  if ($BATCH_QUEUES{$self->analysis->logic_name}) {
+      $queue = $self->analysis->logic_name;
+  }
+  else {
+      $queue = 'default';
+  }
   
-  # should check job->analysis->runtime
-  # and add it to batched_jobs_runtime
-  # but for now just
-  push( @{$batched_jobs{$queue}}, $self->dbID );
-  if ( scalar( @{$batched_jobs{$queue}} ) >= $batchsize ) {
-    $self->flush_runs( $self->adaptor, $LSF_params );
+  push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
+
+  if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
+               $BATCH_QUEUES{$queue}{'batch_size'}) {
+
+    $self->flush_runs($self->adaptor, $queue);
   }
 }
-
-
-
 
 
 =head2 runLocally
@@ -423,7 +429,7 @@ sub runInLSF {
   my $module = $self->analysis->module;
   my $rdb;
   my ($err, $res);
-  my $autoupdate = $::pipeConf{'autoupdate'};
+  my $autoupdate = $AUTO_JOB_UPDATE;
   
 
   STATUS:
@@ -525,7 +531,6 @@ sub runInLSF {
 }
 
 
-
 =head2 set_status
 
   Title   : set_status
@@ -571,6 +576,7 @@ sub current_status {
   return $self->adaptor->current_status( $self, $arg );
 }
 
+
 =head2 get_all_status
 
   Title   : get_all_status
@@ -613,22 +619,19 @@ sub get_last_status {
 }
 
 
+=head 2 make_filenames
+
+=cut
+
 sub make_filenames {
   my ($self) = @_;
   
   my $num = int(rand(10));
-  my $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
+
+  my $dir = $::PIPELINE_OUTPUT_DIR . "/$num/";
   if( ! -e $dir ) {
     system( "mkdir $dir" );
   }
-
-# scp - one set of out files per job (even if batching together)
-# this is a bit messy! added '.0' to $stub. This will be the master
-# file containing LSF output. In runner.pl before each job is run
-# replace 0 with the job ID to get one output file per $job.
-# Change also Job::remove to do a glob on all these files. Yep it's
-# nasty but it seems to work...
-
 
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
@@ -638,9 +641,6 @@ sub make_filenames {
   $self->stdout_file($dir.$stub.".out");
   $self->stderr_file($dir.$stub.".err");
 }
-
-
-
 
 
 =head2 stdout_file
@@ -661,6 +661,7 @@ sub stdout_file {
     }
     return $self->{'_stdout_file'};
 }
+
 
 =head2 stderr_file
 
@@ -722,6 +723,11 @@ sub retry_count {
   $self->{'_retry_count'};
 }
 
+
+=head2 remove
+ 
+=cut
+
 sub remove {
   my $self = shift;
   
@@ -732,6 +738,40 @@ sub remove {
    if( defined $self->adaptor ) {
      $self->adaptor->remove( $self );
    }
+}
+
+
+=head2 set_up_queues
+
+=cut
+
+# scp: set up package variable for queue config
+# i'm not sure this is the best way of doing this
+
+sub set_up_queues {
+    my %q;
+
+    foreach my $queue (@$QUEUE_CONFIG) {
+	my $ln = $queue->{'logic_name'};
+	next unless $ln;
+	delete $queue->{'logic_name'};
+	while (my($k, $v) = each %$queue) {
+	    $q{$ln}{$k} = $v;
+	    $q{$ln}{'jobs'} = [];
+	    $q{$ln}{'last_flushed'} = undef;
+	    $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
+	    $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+	}
+
+	# a default queue for everything else
+	unless (defined $q{'default'}) {
+	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
+	    $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
+	    $q{'default'}{'last_flushed'} = undef;
+	    $q{'default'}{'jobs'} = [];
+	}
+    }
+    return %q;
 }
 
 1;

@@ -1,46 +1,25 @@
-
-
-
 # Script for operating the analysis pipeline
-
-#
-# Creator: Arne Stabenau <stabenau@ebi.ac.uk>
-# Date of creation: 05.09.2000
-# Last modified : 15.06.2001 by Simon Potter
-#
-# Copyright EMBL-EBI 2000
 #
 # You may distribute this code under the same terms as perl itself
 
-
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-    # Can we have a way of reading a (local) pipeConf.pl as well?
-    # e.g. if it exists in the current dir, use that one in preference
-}
 
 use strict;
 use Getopt::Long;
 use Sys::Hostname;
 use Socket;
 
-use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
+use Bio::EnsEMBL::Pipeline::Config::Blast;
+use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
 
-# Signals and events
-#
-# Rather than restarting this script all the time when something
-# changes, send a signal (USR1) to the process. It looks in the
-# ~/.ens-pipe.* directory and takes action depending on what's there
-#
-# Recommended way of shutting down the script.
-#   touch ~/.ens-pipe../stop
-#   kill -USR1 <process ID>
-#
+unless (&config_sanity_check) {
+    exit 1;
+}
+
+
 # Also, an alarm is set to go off every (say) 2 minutes (or not at all if
 # $wakeup is false). When the script receives this it looks to see how many
 # jobs are in the queue and, if there too many, goes to sleep for a while.
@@ -51,36 +30,42 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 # signal parameters
 my $gotsig   =  0;
 my $alarm    =  0;
-my $wakeup   =  120;   # period to check LSF queues; set to 0 to disable
-my $EXIT     = \1;
-my $NEWRULES = \2;
-my $NEWINPUT = \3;
-my $SLEEP    = \4;
+my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
 $SIG{USR1} = \&sighandler;
 $SIG{ALRM} = \&alarmhandler;
+$SIG{TERM} = \&shut_down;
 
 
-# defaults: command line options override pipeConf variables,
-# which override anything set in the environment variables.
+# dynamically load appropriate queue manager (e.g. LSF)
 
-my $dbhost    = $::pipeConf{'dbhost'} || $ENV{'ENS_DBHOST'};
-my $dbname    = $::pipeConf{'dbname'} || $ENV{'ENS_DBNAME'};
-my $dbuser    = $::pipeConf{'dbuser'} || $ENV{'ENS_DBUSER'};
-my $dbpass    = $::pipeConf{'dbpass'} || $ENV{'ENS_DBPASS'};
-my $queue     = $::pipeConf{'queue'}  || $ENV{'ENS_QUEUE'};
-my $nodes     = $::pipeConf{'usenodes'};
-my $workdir   = $::pipeConf{'nfstmp.dir'};
-my $flushsize = $::pipeConf{'batchsize'};
-my $retry     = $::pipeConf{'retry'} || 3;
-my $max_jobs  = $::pipeConf{'maxjobs'} || 1000; # max number of (pend) jobs
-my $jobname   = $::pipeConf{'jobname'};
-                            # Meaningful name displayed by bjobs
-                            # aka "bsub -J <name>"
-                            # maybe this should be compulsory, as
-                            # the default jobname really isn't any use
-my $bsub      = $::pipeConf{'bsub_opt'};
+my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
+
+my $file = "$batch_q_module.pm";
+$file =~ s{::}{/}g;
+eval {
+    require "$file";
+};
+if ($@) {
+    print STDERR "Can't find $file\n";
+    exit 1;
+}
+
+my $get_pend_jobs;
+if ($batch_q_module->can("get_pending_jobs")) {
+    my $f = $batch_q_module . "::get_pending_jobs";
+    $get_pend_jobs = \&$f;
+}
+
+
+# command line options override 
+# anything set in the environment variables.
+
+my $dbhost    = $ENV{'ENS_DBHOST'};
+my $dbname    = $ENV{'ENS_DBNAME'};
+my $dbuser    = $ENV{'ENS_DBUSER'};
+my $dbpass    = $ENV{'ENS_DBPASS'};
 
 $| = 1;
 
@@ -93,26 +78,38 @@ my %analysis;
 my $submitted;
 my $idlist;
 my ($done, $once);
+my $runner;
+my $shuffle;
+my $output_dir;
 
 GetOptions(
     'host=s'      => \$dbhost,
     'dbname=s'    => \$dbname,
     'dbuser=s'    => \$dbuser,
     'dbpass=s'    => \$dbpass,
-    'flushsize=i' => \$flushsize,
     'local'       => \$local,
     'idlist=s'    => \$idlist,
-    'queue=s'     => \$queue,
-    'jobname=s'   => \$jobname,
-    'usenodes=s'  => \$nodes,
-    'bsub_opt=s'  => \$bsub,
+    'runner=s'    => \$runner,
+    'output_dir=s' => \$output_dir,
     'once!'       => \$once,
-    'retry=i'     => \$retry,
+    'shuffle!'    => \$shuffle,
     'analysis=s@' => \@analysis
 )
 or die ("Couldn't get options");
 
-%analysis = map{$_, 1} @analysis;
+unless ($dbhost && $dbname && $dbuser) {
+    print STDERR "Must specify database with -dbhost, -dbname and -dbuser\n";
+    exit 1;
+}
+
+$PIPELINE_OUTPUT_DIR ||= $output_dir;
+my $RUNNER_SCRIPT = $PIPELINE_RUNNER_SCRIPT || $runner;
+
+unless (-d $PIPELINE_OUTPUT_DIR) {
+    print STDERR "Must specify an output dir with -output_dir or PIPELINE_OUTPUT_DIR in Config/General.pm\n";
+    exit 1;
+}
+
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
@@ -121,90 +118,76 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -pass   => $dbpass,
 );
 
+my $rule_adaptor = $db->get_RuleAdaptor;
+my $job_adaptor  = $db->get_JobAdaptor;
+my $ana_adaptor  = $db->get_AnalysisAdaptor;
+my $sic          = $db->get_StateInfoContainer;
+
+
+foreach my $ana (@analysis) {
+    if ($ana =~ /^\d+$/) {
+        $analysis{$ana} = 1;
+    }
+    else {
+	$ana_adaptor->fetch_by_logic_name($ana)->dbID;
+	if ($db) {
+            $analysis{$db};
+	}
+	else {
+	    print STDERR "Could not find analysis $ana\n";
+	}
+    }
+}
+
 
 if ($idlist && ! -e $idlist) {
     die "Must be able to read $idlist";
 }
 
-# Lock to prevent two RuleManager's connecting to the same DB.
-# (i.e. same dbname and dbhost)
+
+# Lock to prevent >1 instances of the same pipeline running together
 #
-# Makes directory in $HOME and writes a DBM file in this directory
-# which stores useful things like process id/host and the time it
-# was started.
-#
-# This lock should really be in the form of a table in the database
+# Puts an entry in the meta table keyed on 'pipeline.lock', which
+# gives the host running the script, user, PID and when it was
+# started
 
-$dbhost = &qualify_hostname($dbhost);
-my $lock_dir = $ENV{"HOME"} . "/.ens-pipe.$dbhost.$dbname";
-my $username = scalar getpwuid($<);
-
-
-
-if (-e $lock_dir) {
+if (my $lock_str = $db->pipeline_lock) {
     # Another pipeline is running: describe it
-    my($subhost, $pid, $started) = &running_pipeline($lock_dir);
+    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
     $started = scalar localtime $started;
 
     print STDERR <<EOF;
-Error: a pipeline appears to be running!
+Error: this pipeline appears to be running!
 
     db       $dbname\@$dbhost
-    pid      $pid on host $subhost
+    pid      $pid on host $host
     started  $started
 
-You cannot have two RuleManagers connecting to the same database.
 The process above must be terminated before this script can be run.
-If the process does not exist, remove the lock by executing
+If the process does not exist, remove the lock by removing the lock
+from the pipeline database:
 
-    rm -r $lock_dir
+    delete from meta where meta_key = 'pipeline.lock';
 
-Thankyou
+Thank you
 
 
 EOF
 
-
     exit 1;
 }
 
-
 my $host = &qualify_hostname(hostname());
-&create_lock($lock_dir, $host, $$);
+my $user = scalar getpwuid($<);
+my $lock_str = join ":", "$user\@$host", $$, time();
+$db->pipeline_lock($lock_str);
 
-
-my $ruleAdaptor = $db->get_RuleAdaptor;
-my $jobAdaptor  = $db->get_JobAdaptor;
-my $sic         = $db->get_StateInfoContainer;
-
-
-# $LSF_params - send certain (LSF) parameters to Job. This hash contains
-# things LSF wants to know, i.e. queue name, nodelist, jobname (things that
-# go on the bsub command line), plus the queue flushsize. This hash is
-# passed to batch_runRemote which passes them on to flush_runs.
-#
-# The idea is that you could have more than one of these hashes to suit
-# different types of jobs, with different LSF options. You would then define
-# a queue 'resolver' function. This would take the Job object and return the
-# queue type, based on variables in the Job/underlying Analysis object.
-#
-# For example, you could put slow (e.g., blastx) jobs in a different queue,
-# or on certain nodes, or simply label them with a different jobname.
-# This should probably be defined in a conf file.
-
-my $LSF_params = {};
-
-$LSF_params->{'queue'}     = $queue     if defined $queue;
-$LSF_params->{'nodes'}     = $nodes     if $nodes;
-$LSF_params->{'flushsize'} = $flushsize if defined $flushsize;
-$LSF_params->{'jobname'}   = $jobname   if defined $jobname;
-$LSF_params->{'bsub'}      = $bsub      if defined $bsub;
 
 # Fetch all the analysis rules.  These contain details of all the
 # analyses we want to run and the dependences between them. e.g. the
 # fact that we only want to run blast jobs after we've repeat masked etc.
 
-my @rules       = $ruleAdaptor->fetch_all;
+my @rules       = $rule_adaptor->fetch_all;
 
 # Need here to strip rules which don't need to be run.
 
@@ -257,7 +240,7 @@ while (1) {
         }
     }
 
-    @idList = shuffle(@idList);
+    @idList = &shuffle(@idList) if $shuffle;
 
     # Now we loop over all the input ids. We fetch all the analyses
     # from the database that have already run. We then check all the
@@ -280,32 +263,11 @@ while (1) {
         if ($alarm == 1) {
             $alarm = 0;
 
-            # retry_failed_jobs($jobAdaptor, $retry, $LSF_params);
-            while (&lsf_jobs($LSF_params) >= $max_jobs && $gotsig == 0) {
+            # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
+            while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS && $gotsig == 0) {
                 sleep 300;
             }
             alarm $wakeup;
-        }
-        if ($gotsig == $EXIT) {
-            print STDERR "Shutting down...\n";
-            $done = 1;
-            $gotsig = 0;
-            last JOBID;
-        }
-        if ($gotsig == $NEWRULES) {
-            @rules = $ruleAdaptor->fetch_all;
-            $gotsig = 0;
-        }
-        if ($gotsig == $NEWINPUT) {
-            $completeRead = 1;
-            $gotsig = 0;
-            last JOBID;
-        }
-        if ($gotsig == $SLEEP) {
-            # this should be two signals: suspend and restart
-            system("sleep 300"); # system call so that this sleep is
-                                 # not "woken up" by other signals
-            $gotsig = 0;
         }
 
         my @anals = $sic->fetch_analysis_by_input_id_class($id->[0], $id->[1]);
@@ -314,7 +276,7 @@ while (1) {
 
         # check all rules, which jobs can be started
 
-        my @current_jobs = $jobAdaptor->fetch_by_input_id($id->[0]);
+        my @current_jobs = $job_adaptor->fetch_by_input_id($id->[0]);
 
         RULE: for my $rule (@rules)  {
             if (keys %analysis && ! defined $analysis{$rule->goalAnalysis->dbID}) {
@@ -355,8 +317,8 @@ while (1) {
                            $anal->dbID . "\n";
 
                     if ($cj->analysis->dbID == $anal->dbID) {
-                        if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $retry) {
-                            $cj->batch_runRemote($LSF_params);
+                        if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
+                            $cj->batch_runRemote;
                             # print "Retrying job\n";
                         }
                         else {
@@ -378,7 +340,7 @@ while (1) {
 
             print "Store ", $id->[0], " - ", $anal->logic_name, "\n";
             $submitted++;
-            $jobAdaptor->store($job);
+            $job_adaptor->store($job);
 
             if ($local) {
                 print "Running job locally\n";
@@ -391,7 +353,7 @@ while (1) {
             } else {
               eval {
                 print "\tBatch running job\n";
-                $job->batch_runRemote($LSF_params);
+                $job->batch_runRemote;
               };
               if ($@) {
                 print STDERR "ERROR running job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
@@ -401,8 +363,7 @@ while (1) {
         }
 
     }
-    Bio::EnsEMBL::Pipeline::Job->flush_runs($jobAdaptor, $LSF_params);
-    &close_down($lock_dir) if $done || $once;
+    &shut_down($db) if $done || $once;
     if ($completeRead == 1) {
         sleep(3600) if $submitted == 0;
         $completeRead = 0;
@@ -414,46 +375,23 @@ while (1) {
 }
 
 
+# remove 'lock'
+sub shut_down {
+    my ($db) = @_;
 
-# remove 'lock' file
-sub close_down {
-    my ($dir) = @_;
-
-    unlink "$dir/db.pag";
-    unlink "$dir/db.dir";
-    rmdir $dir;
+    Bio::EnsEMBL::Pipeline::Job->flush_runs($db->get_JobAdaptor);
+    $db->pipeline_unlock;
     exit 0;
 }
 
 
 # handler for SIGUSR1
-sub sighandler {
+# sub sighandler {
 
-    SIG: {
-        if (-e "$lock_dir/stop") {
-            $gotsig = $EXIT;
-            unlink "$lock_dir/stop";
-            last SIG;
-        }
-        if (-e "$lock_dir/newrules") {
-            $gotsig = $NEWRULES;
-            unlink "$lock_dir/newrules";
-            last SIG;
-        }
-        if (-e "$lock_dir/newinput") {
-            $gotsig = $NEWINPUT;
-            unlink "$lock_dir/newinput";
-            last SIG;
-        }
-        if (-e "$lock_dir/sleep") {
-            $gotsig = $SLEEP;
-            unlink "$lock_dir/sleep";
-            last SIG;
-        }
-    }
-    $SIG{USR1} = \&sighandler;
-};
-
+    # SIG: {
+    # }
+    # $SIG{USR1} = \&sighandler;
+# };
 
 
 # handler for SIGALRM
@@ -461,7 +399,6 @@ sub alarmhandler {
     $alarm = 1;
     $SIG{ALRM} = \&alarmhandler;
 }
-
 
 
 # create lock file in home directory
@@ -479,7 +416,6 @@ sub create_lock {
 }
 
 
-
 # running pipelines should have lock files in ~/ens-pipe.*
 sub running_pipeline {
     my ($dir) = @_;
@@ -495,7 +431,6 @@ sub running_pipeline {
 }
 
 
-
 # turn a name of the form 'ecs1a' into 'ecs1a.sanger.ac.uk'
 sub qualify_hostname {
     my ($hostname) = @_;
@@ -508,45 +443,19 @@ sub qualify_hostname {
 }
 
 
-
 sub retry_failed_jobs {
-    my ($ja, $retry, $LSF_params) = @_;
+    my ($ja, $retry) = @_;
 
-    my @failed_jobs = $ja->list_jobId_by_status('FAILED');
-    $LSF_params->{'nodes'} = 'ecs1d';
+    my @failed_jobs = $ja->list_job_id_by_status('FAILED');
 
     foreach my $jobId (@failed_jobs) {
         my $job = $ja->fetch_by_dbID($jobId);
         if ($job->retry_count <= $retry) {
-            $job->batch_runRemote($LSF_params);
+            $job->batch_runRemote;
 
         }
     }
 }
-
-
-
-# Returns number of pending jobs.
-sub lsf_jobs {
-    my ($LSF_params) = @_;
-
-    my $queue = $LSF_params->{'queue'};
-    my $cmd;
-
-    if (defined $queue) {
-        $cmd = "bjobs -p -q $queue | grep PEND";
-    }
-    else {
-        $cmd = "bjobs -p | grep PEND";
-    }
-
-    my $bjobs = `$cmd`;
-    my $njobs = $bjobs =~ tr!\n!\n!; # no of newlines -> no of jobs
-
-    return $njobs;
-
-}
-
 
 
 # NB Incomplete
@@ -562,7 +471,7 @@ sub check_lsf_status {
 
     my $lsf = Bio::EnsEMBL::Pipeline::LSF->new(
         -queue => $queue,
-        -user  => $username,
+        # -user  => $username,
     );
 
     foreach my $job ($lsf->get_all_jobs()) {
@@ -588,20 +497,38 @@ sub check_lsf_status {
 }
 
 
-
 sub shuffle {
     my (@in) = @_;
     my @out;
 
     srand;
 
-    while (@in) {
-        my $idx = int rand scalar @in;
-        next if $idx > $#in;
-        my $elem = splice @in, $idx, 1;
-        push @out, $elem;
-    }
-
+    push @out, splice(@in, rand @in, 1) while @in;
 
     return @out;
+}
+
+
+sub config_sanity_check {
+    my $ok = 1;
+    no strict 'vars';
+
+    unless ($QUEUE_MANAGER) {
+        print "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
+	$ok = 0;
+    }
+    unless ($LIB_DIR) {
+        print "Need to specify LIB_DIR in Config/General.pm\n";
+	$ok = 0;
+    }
+    unless ($DATA_DIR) {
+        print "Need to specify DATA_DIR in Config/General.pm\n";
+	$ok = 0;
+    }
+    unless ($BIN_DIR) {
+        print "Need to specify BIN_DIR in Config/General.pm\n";
+	$ok = 0;
+    }
+
+    return $ok;
 }
