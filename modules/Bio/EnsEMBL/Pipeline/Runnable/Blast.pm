@@ -298,11 +298,9 @@ sub run_analysis {
                     .$self->database.' '.$self->filename.' '
                     .$self->arguments.' > ' .$self->results."\n");
     
-    system ($self->blast.' '.$self->database.' '.$self->filename
-            .' '.$self->arguments.' > '.$self->results);
-    
-    $self->throw("Couldn't create file for Blast results: $!\n") 
-                unless (-e $self->results);
+    $self->throw("Failed during blast run $!\n")
+    unless (system ($self->blast.' '.$self->database.' '.$self->filename
+            .' '.$self->arguments.' > '.$self->results) == 0) ;
 }
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
