@@ -5,7 +5,6 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::ESTConf;
 
 my $dbhost;
 my $dbuser    = 'ensro';
