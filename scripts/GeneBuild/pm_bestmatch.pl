@@ -49,7 +49,9 @@ BEGIN {
 =cut
 
 use strict;
-use pmatch_modules; 
+use Bio::EnsEMBL::Pipeline::Pmatch::Second_PMF;
+use Bio::EnsEMBL::Pipeline::Pmatch::MergedHit;
+use Bio::EnsEMBL::Pipeline::Pmatch::CoordPair;
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
@@ -113,60 +115,60 @@ while(<>){
   my $percent = $7;
   my $strand  = 1;
 
-  if ($qend < $qstart) { $strand = -1; }
+	  if ($qend < $qstart) { $strand = -1; }
+	  
+	  my $cp = new Bio::EnsEMBL::Pipeline::Pmatch::CoordPair(
+							 '-query'   => $query,
+							 '-target'  => $target,
+							 '-qstart'  => $qstart,
+							 '-qend'    => $qend,
+							 '-tstart'  => $tstart,
+							 '-tend'    => $tend,
+							 '-percent' => $percent,
+							 '-strand'  => $strand,
+							);
 
-  my $cp = new CoordPair(
-			 '-query'   => $query,
-			 '-target'  => $target,
-			 '-qstart'  => $qstart,
-			 '-qend'    => $qend,
-			 '-tstart'  => $tstart,
-			 '-tend'    => $tend,
-			 '-percent' => $percent,
-			 '-strand'  => $strand,
-			);
-
-  my $mh = new MergedHit(
-			 '-query'   => $query,
-			 '-target'  => $target,
-			 '-strand'  => $strand,
-			 '-coverage'=> $percent,
-			);
-
-  $mh->add_CoordPair($cp);
-
-  push (@hits, $mh);
+	  my $mh = new Bio::EnsEMBL::Pipeline::Pmatch::MergedHit(
+								 '-query'   => $query,
+								 '-target'  => $target,
+								 '-strand'  => $strand,
+								 '-coverage'=> $percent,
+								);
+	  
+	  $mh->add_CoordPair($cp);
+	  
+	  push (@hits, $mh);
 
 }
 
 print STDERR "finished reading\n";
 
  # find the best hit(s) in the genome for each protein in $protfile
- my $pmf2 = new Second_PMF( 
-			   '-phits' => \@hits
-			  );
+my $pmf2 = new Bio::EnsEMBL::Pipeline::Pmatch::Second_PMF( 
+							  '-phits' => \@hits
+							 );
 
- $pmf2->run;
+$pmf2->run;
 
 # need to get rid of duplicate lines - eg system sort -u on the output file?
  
  # output the results
 
- foreach my $hit($pmf2->output) {
+foreach my $hit($pmf2->output) {
   if($chromo_coords){
     my ($chr_name, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome(
-									 $hit->query, 
-									 $hit->qstart,
-									 $hit->qend
-									);
-
+									  $hit->query, 
+									  $hit->qstart,
+									  $hit->qend
+									 );
+    
     print OUT $chr_name       . ":" . $chrstart      . "," . $chrend        . ":" . 
-	      $hit->target   . ":" . $hit->coverage . "\n";
+      $hit->target   . ":" . $hit->coverage . "\n";
   }
   
   else{
     print OUT $hit->query    . ":" . $hit->qstart   . "," . $hit->qend     . ":" . 
-	      $hit->target   . ":" . $hit->coverage . "\n";
+      $hit->target   . ":" . $hit->coverage . "\n";
   }
 
 }

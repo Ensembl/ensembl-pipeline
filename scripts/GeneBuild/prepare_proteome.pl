@@ -36,9 +36,11 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
                                                            GB_REFSEQ
                                                            GB_SPTR
-                                                           GB_PFASTA
 					                   GB_KILL_LIST
-                                                           GB_PMATCH
+                                                          );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
+                                                           GB_PFASTA
+					                   GB_PMATCH
                                                           );
 
 my $refseq    = $GB_REFSEQ;
@@ -115,8 +117,9 @@ sub parse_refseq {
 
   while(<IN>){
     # eg >gi|4501893|ref|NP_001094.1| actinin, alpha 2 [Homo sapiens]
+    #>AC3.2 CE05132	 UDP-glucuronosyltransferase status:Partially_confirmed
     if(/^>/){
-      if(/^>\w+\|\w+\|\w+\|(\S+)\|/){
+      if(/if(/^>\w+\|\w+\|\w+\|(\S+)\|/){
 	print OUT ">$1\n";
       }
       else {

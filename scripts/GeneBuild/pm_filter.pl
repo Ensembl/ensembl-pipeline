@@ -59,20 +59,24 @@ BEGIN {
 =cut
 
 use strict;
-use pmatch_modules; 
+use Bio::EnsEMBL::Pipeline::Pmatch::First_PMF; 
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
 use FileHandle;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
-					 GB_PFASTA
-					 GB_PMATCH
-                                         GB_PMATCH_MAX_INTRON
 					 GB_PM_OUTPUT
 					 GB_FPCDIR
 					 GB_OUTPUT_DIR  
                                         );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
+                                                           GB_PMATCH_MAX_INTRON
+                                                           GB_PFASTA
+					                   GB_PMATCH
+                                                          );
+
 $| = 1;
 
 # global vars
@@ -126,7 +130,9 @@ if (defined ($outdir) && $outdir ne '') {
 
 # get a listing of all the fpc contig files
 $fpcdir = $fpcdir . "/" . $chr_name;
+print STDERR "using ".$fpcdir."\n";
 my @dir = ($fpcdir);
+
 my @files;
 find sub { push(@files, $File::Find::name) unless -d  }, @dir;
 
@@ -163,7 +169,7 @@ foreach my $fpcfile(@files){
   &process_pmatches($fpcfile);
 
   # tidy up files we have created
-  #unlink $pmatchfile unless !$run_pmatch;
+  unlink $pmatchfile unless !$run_pmatch;
 
 }
 
@@ -173,7 +179,9 @@ foreach my $fpcfile(@files){
 sub process_pmatches{
   my($fpcfile) = @_;
   # sort pmatch results file
-  system("sort -k6,6 -k3,3n $pmatchfile > $pmatchfile.tmp");
+  my $command = "sort -k6,6 -k3,3n $pmatchfile > $pmatchfile.tmp";
+  system($command);
+  print STDERR $command."\n";
   rename "$pmatchfile.tmp", $pmatchfile;
   print STDERR "processing the  results of pmatch\n"; 
   open (OUT, ">>$outfile") or die "Can't open $outfile for output: $!\n";
@@ -181,7 +189,7 @@ sub process_pmatches{
   my $max_intron = $GB_PMATCH_MAX_INTRON;
   open(PMATCHES, "<$pmatchfile") or die "can't open [$pmatchfile]\n";  
   my $prot_id;
-  my $current_pmf = new First_PMF(
+  my $current_pmf = new Bio::EnsEMBL::Pipeline::Pmatch::First_PMF(
 				  -plengths => \%plengths,
 				  -protfile => $protfile,
 				  -pmatch   => $pmatch,
@@ -208,13 +216,13 @@ sub process_pmatches{
 	}
 
       # start a new PMF
-      $current_pmf = new First_PMF(
-				   -plengths => \%plengths,
-				   -protfile => $protfile,
-				   -pmatch   => $pmatch,
-				   -tmpdir   => $tmpdir,
-				   -fpcfile  => $fpcfile,
-				   -maxintronlen => $max_intron,
+      $current_pmf = new Bio::EnsEMBL::Pipeline::Pmatch::First_PMF(
+								   -plengths => \%plengths,
+								   -protfile => $protfile,
+								   -pmatch   => $pmatch,
+								   -tmpdir   => $tmpdir,
+								   -fpcfile  => $fpcfile,
+								   -maxintronlen => $max_intron,
 				  );
       $prot_id = $cols[5];
       $current_pmf->make_coord_pair($_);
