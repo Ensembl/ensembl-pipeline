@@ -59,7 +59,7 @@ $runnables{'ncoils'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Coil";
 $runnables{'Signalp'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp";
 $runnables{'Seg'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Seg";
 $runnables{'Profile'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Profile";
-$runnables{'ParacelHMM'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
+$runnables{'Superfamily'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Superfamily";
 
 my @ids = &get_ids();
 #my @ids = (28816);
