@@ -1,3 +1,38 @@
+Q8BM31 10 Q8BM31 Q8BM31 Similar to L1 repeat.
+Q63304 10 Q63304 Q63304 ORF2 protein.
+Q8BXC1 11 Q8BXC1 Q8BXC1 Weakly similar to PRO-1 protein.
+Q8BI91 32 Q8BI91 Q8BI91 Weakly similar to repetitive protein BKM.
+NP_796194.1 32 gi|28893255|ref|NP_796194.1| (NM_177220) RIKEN cDNA A630031M04 gene [Mus musculus]
+Q8BIN7 37 Q8BIN7 Q8BIN7 Similar to LINE protein.
+Q8K0U5 49 Q8K0U5 Q8K0U5 Similar to RIKEN cDNA 1110004B06 gene.
+Q91YJ9 68 Q91YJ9 Q91YJ9 Similar to RIKEN cDNA C330014O21 gene.
+Q8BUJ3 78 Q8BUJ3 Q8BUJ3 Similar to ORF7 protein.
+Q8BQ61 13 Q8BQ61 Q8BQ61 Hypothetical protein.
+Q63779 13 Q63779 Q63779 Hypothetical 76.2 kDa protein.
+Q63775 13 Q63775 Q63775 Hypothetical 38.7 kDa protein.
+O08698 15 O08698 O08698 Putative RNA binding protein 1 (Fragment).
+Q8C7B1 17 Q8C7B1 Q8C7B1 Hypothetical protein.
+Q8BZN1 17 Q8BZN1 Q8BZN1 Hypothetical tyrosine-rich region containing protein.
+Q8BNS2 19 Q8BNS2 Q8BNS2 Hypothetical protein.
+P97692 24 P97692 P97692 L1 retrotransposon ORF2 (Fragment).
+Q63778 26 Q63778 Q63778 Hypothetical 43.7 kDa protein.
+P10400 27 POL1_MOUSE P10400 Retrovirus-related POL polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease] (Fragment).
+P11369 38 POL2_MOUSE P11369 Retrovirus-related POL polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease].
+O08870 39 O08870 O08870 Putative RNA binding protein 1 (Fragment).
+P11260 40 YO11_MOUSE P11260 Hypothetical protein ORF-1137.
+Q8C1S6 88 Q8C1S6 Q8C1S6 Mouse endogenous murine leukemia virus modified polytropic provirus DNA (Fragment).
+Q63309 109 Q63309 Q63309 ORF7 protein.
+Q8C256 111 Q8C256 Q8C256 Hypothetical protein.
+Q63502 246 Q63502 Q63502 ORF1 protein.
+Q91WW0 284 Q91WW0 Q91WW0 Hypothetical protein (Expressed sequence AI591529).
+Q8CEJ9 311 Q8CEJ9 Q8CEJ9 Weakly similar to Bkm-like sex-determining region hypothetical protein CS319.
+Q8BTF6 327 Q8BTF6 Q8BTF6 Inferred: proteasome subunit alpha type 6 (Fragment).
+NP_598602.1 360 gi|19527058|ref|NP_598602.1| (NM_133841) expressed sequence AI591529 [Mus musculus]
+Q63308 508 Q63308 Q63308 ORF6 protein.
+Q8BNK6 992 Q8BNK6 Q8BNK6 Hypothetical protein (Fragment).
+Q8CAN8 1415 Q8CAN8 Q8CAN8 Hypothetical protein.
+Q9CXB3 1867 Q9CXB3 Q9CXB3 8430416G17Rik protein.
+Q8CBN4 18368 Q8CBN4 Q8CBN4 Similar to spermatid-specific protein T1.
 Q8K080 Hypothetical protein. lec
 Q99LR7 Hypothetical 35.7 kDa protein (Fragment). lec
 Q99KW1 Hypothetical 28.1 kDa protein (Fragment). lec
