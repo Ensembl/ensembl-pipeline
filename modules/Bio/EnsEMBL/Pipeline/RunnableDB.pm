@@ -348,6 +348,7 @@ sub write_output {
 
     my $db=$self->db();
     my @features = $self->output();
+    my $contig;
 
     eval {
       $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
