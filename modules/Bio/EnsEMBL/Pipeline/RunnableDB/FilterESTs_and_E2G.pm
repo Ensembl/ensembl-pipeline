@@ -49,6 +49,10 @@ use POSIX;
 
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
@@ -58,7 +62,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
-use Bio::Tools::BPlite;
+use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 use FileHandle;
 #use diagnostics;
 
@@ -700,7 +704,7 @@ sub make_genes {
   
   foreach my $tmpf(@$results) {
 
-    my $gene   = new Bio::EnsEMBL::Gene;
+    my $gene   = Bio::EnsEMBL::Gene->new;
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
@@ -738,10 +742,10 @@ sub make_transcript{
   unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
     {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
 
-  my $transcript   = new Bio::EnsEMBL::Transcript;
+  my $transcript   = Bio::EnsEMBL::Transcript->new;
   $transcript->temporary_id($contig->id . ".$genetype.$count");
 
-  my $translation  = new Bio::EnsEMBL::Translation;    
+  my $translation  = Bio::EnsEMBL::Translation->new;    
   $translation->temporary_id($contig->id . ".$genetype.$count");
 
   $transcript->translation($translation);
@@ -751,7 +755,7 @@ sub make_transcript{
      
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
-    my $exon = new Bio::EnsEMBL::Exon;
+    my $exon = Bio::EnsEMBL::Exon->new;
     
     $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
     $exon->contig_id($contig->id);
@@ -1123,7 +1127,7 @@ sub run_blast {
   #print STDERR "$command\n";
   my $status = system( $command );
   
-  my $blast_report = new Bio::Tools::BPlite(-file=>$blastout);
+  my $blast_report = Bio::EnsEMBL::Pipeline::Tools::BPlite->new(-file=>$blastout);
 
  HIT:
   while(my $hit = $blast_report->nextSbjct) {
