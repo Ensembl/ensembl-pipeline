@@ -53,17 +53,27 @@ my $exon_identities = $alignment_tool->identity;
 # gappy or fragmentary, including gaps in the identity score will
 # dilute it somewhat according to coverage.
 
-# ---> Everything below is presently unimplemented:
-## Everything - an array of hashes containing match sequence id, coverage and 
-## overall match identity.
-#my $all_matches_stats = $alignment_tool->missing_method('all_evidence');
+
+# You can check the coverage of each item of evidence.
+
+my $evidence_coverage = $alignment_tool->hit_coverage;
   
-#print "Match ID         : " . $all_matches_stats->[0]->{'id'} . "\n" .
-#      "Overall Identity : " . $all_matches_stats->[0]->{'identity'} . "\n" .
-#      "Hit Coverage     : " . $all_matches_stats->[0]->{'coverage'} . "\n";
+foreach my $hit (@$hit_coverage){
+
+  print "Hit sequence   : " . $hit->{'name'} . "\n";
+  print "Coverage       : " . $hit->{'coverage'} . "\n";
+  print "Presumed exons : " . $hit->{'exons'} . "\n";
+
+  # Look for missing evidence:
+
+  my $missed_exons = scalar @{$transcript->get_all_Exons} - $hit->{'exons'};
+
+}
+
 
 # Determine the number of exons in our alignment that have 
 # no evidence.
+
 my $no_evidence_exons = $alignment_tool->rogue_exons;
 
 
@@ -274,7 +284,7 @@ sub identity {
 sub hit_coverage {
   my ($self) = @_;
 
-
+  return $self->_compute_evidence_coverage;
 
 }
 
@@ -620,6 +630,68 @@ sub _compare_to_reference {
 #print STDERR "Identity : $identity\tCoverage : $coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
   
   return ($identity, $coverage);
+}
+
+
+=head2 _compute_evidence_coverage
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _compute_evidence_coverage {
+  my ($self) = @_;
+
+  my %coordinates_hash;
+  my @evidence_coverage_stats;
+
+  foreach my $exon (@{$self->_transcript->get_all_Exons}){
+
+    foreach my $supporting_feature (@{$exon->get_all_supporting_features}){
+      push (@{$coordinates_hash{$supporting_feature->hseqname}}, 
+	    [$supporting_feature->hstart, $supporting_feature->hend]);
+    }
+
+  }  
+
+ SEQUENCE:
+  foreach my $sequence_identifier (keys %coordinates_hash) {
+
+    my $length = $self->_fetch_sequence($sequence_identifier)->length;
+
+    unless ($length){
+      $self->warn("Evidence sequence with zero length found." 
+		  . "  This sequence probably couldnt be retrieved.");
+      next SEQUENCE;
+    }
+
+    my $presumed_exons = scalar @{$coordinates_hash{$sequence_identifier}};
+	
+    my $covered_length = 0;
+			  
+    foreach my $coordinate_pair (@{$coordinates_hash{$sequence_identifier}}) {
+
+                          # Hit end        minus hit start       plus one;
+      $covered_length += $coordinate_pair->[1] - $coordinate_pair->[0] + 1;
+
+    }
+
+    my %these_stats = ('name'     => $sequence_identifier,
+		       'coverage' => (($covered_length / $length) * 100),
+		       'exons'    => $presumed_exons		  
+		      );
+
+    push (@evidence_coverage_stats, \%these_stats);
+
+  }
+
+  return \@evidence_coverage_stats;
+
 }
 
 
