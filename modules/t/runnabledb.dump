@@ -3,6 +3,7 @@
 #
 
 INSERT INTO analysis (db, db_version, program, program_file, module, module_version, gff_source, gff_feature, parameters, logic_name) VALUES ('__NONE__', '__NONE__', 'tRNAscan_SE', '/usr/local/pubseq/bin/tRNAscan-SE', 'Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE', 1, 'tRNAscan_SE', 'tRNA', '', 'tRNAscan');
+INSERT INTO analysis (db, db_version, program, module, module_version, gff_source, gff_feature, parameters, logic_name) VALUES ('__NONE__', '__NONE__', 'RepeatMasker', 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker', 1, 'RepeatMasker', 'repeat', '', 'RepeatMasker');
 
 #
 # Dumping data for table 'clone'
@@ -518,6 +519,30 @@ INSERT INTO meta(meta_id, meta_key, meta_value) VALUES(NULL, 'assembly.default',
 #
 # Dumping data for table 'repeat_feature'
 #
+
+
+#
+# Dumping data for table 'repeat_consensus'
+#
+
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSq/x', 'SINE/Alu', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER2', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1MC5', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1MEd', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSq', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSx', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'HsTC2', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'FLAM_C', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER115', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluJo', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluJb', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MLT1A', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'CT-rich', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSg', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L2', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MIR', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER5B', '', 'N');
+
 
 #
 # Dumping data for table 'species'
