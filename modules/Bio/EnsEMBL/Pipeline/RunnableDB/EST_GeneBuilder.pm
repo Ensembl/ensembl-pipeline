@@ -1,4 +1,4 @@
-#
+
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
 # Copyright GRL & EBI
@@ -57,7 +57,31 @@ use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
 # config file; parameters searched for here if not passed in as @args
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
+#use Bio::EnsEMBL::Pipeline::ESTConf qw (
+#					EST_INPUTID_REGEX
+#					EST_REFDBHOST
+#					EST_REFDBUSER
+#					EST_REFDBNAME
+#					EST_REFDBPASS
+#					EST_E2G_DBNAME
+#					EST_E2G_DBHOST
+#					EST_E2G_DBUSER
+#					EST_E2G_DBPASS     
+#					EST_GENEBUILDER_INPUT_GENETYPE
+#					EST_EVIDENCE_TAG
+#					EST_MIN_EVIDENCE_SIMILARITY
+#					EST_MAX_EVIDENCE_DISCONTINUITY
+#					EST_MAX_INTRON_SIZE
+#					EST_GENOMEWISE_GENETYPE
+#					USE_cDNA_DB
+#					cDNA_DBNAME
+#					cDNA_DBHOST
+#					cDNA_DBUSER
+#					cDNA_DBPASS
+#					cDNA_GENETYPE
+#				       );
+
+use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 					EST_INPUTID_REGEX
 					EST_REFDBHOST
 					EST_REFDBUSER
@@ -80,6 +104,8 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					cDNA_DBPASS
 					cDNA_GENETYPE
 				       );
+
+
 
 # use new Adaptor to get some extra info from the ESTs
 #use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
@@ -176,27 +202,27 @@ sub revcomp_query{
 
 sub write_output {
   my ($self) = @_;
-    
+  
   my $gene_adaptor = $self->db->get_GeneAdaptor;
-    
+  
  GENE: 
   foreach my $gene ($self->output) {	
-    eval {
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene " . $gene->dbID . "\n";
-      
+      eval {
+	  $gene_adaptor->store($gene);
+	  print STDERR "wrote gene " . $gene->dbID . "\n";
+      }; 
+      if( $@ ) {
+	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+	  next;
+      }
       my @transcripts = @{ $gene->get_all_Transcripts};
       foreach my $tran (@transcripts){
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-      }
+      } 
       
-      
-    }; 
-    if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-    }
   }
 }
+
 
 ############################################################
 
@@ -298,6 +324,7 @@ sub fetch_input {
 	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									      -genomic  => $slice,
 									      -analysis => $self->analysis,
+									      -smell    => 2,
 									      );
 	  
 	  $self->add_runnable($runnable,$strand);
@@ -355,9 +382,10 @@ sub fetch_input {
 	foreach my $tran (@transcripts) {
 	    
 	    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic  => $rev_slice,
-										-analysis => $self->analysis,
-										);
+								        -genomic  => $rev_slice,
+									-analysis => $self->analysis,
+                                                                        -smell => 2,
+);
 	    $self->add_runnable($runnable, $strand);
 	    $runnable->add_Transcript($tran);
 	  }
@@ -404,8 +432,12 @@ sub _process_Transcripts {
   # reject ests/cdnas if they have more than one non-standard intron splice site consensus sequence
   # or if the only intron they have is non standard.
   # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
-  my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
   
+  # this is very slow, need to find out why
+  #my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
+ my @checked_transcripts = @transcripts;
+  
+
   if ( scalar(@checked_transcripts) == 0 ){
       print STDERR "No transcripts left from the splice-site check\n";
       return;
@@ -817,15 +849,17 @@ sub check_splice_sites{
     my ($self,$transcripts_ref,$strand) = @_;
     my @checked_transcripts;    
 
+    print STDERR "checking splice sites\n";
+
   TRANSCRIPT:
     foreach my $transcript ( @$transcripts_ref ){
 	
 	# all transcripts are in forward coordinates
 	my @exons  = sort{ $a->start <=> $b->start } @{$transcript->get_all_Exons};
 	
-	#print STDERR "checking splice sites in transcript:\n";
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+	print STDERR "checking splice sites in transcript:\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
 	
 	my $introns  = scalar(@exons) - 1 ; 
 	if ( $introns <= 0 ){
@@ -836,9 +870,6 @@ sub check_splice_sites{
 	my $correct  = 0;
 	my $other    = 0;
 	
-	# in the forward strand, exons are on the original slice
-	my $slice = $self->query;
-	
       INTRON:
 	for (my $i=0; $i<$#exons; $i++ ){
 	    my $upstream_exon   = $exons[$i];
@@ -846,11 +877,12 @@ sub check_splice_sites{
 	    my $upstream_site;
 	    my $downstream_site;
 	    if ($strand == 1){
+		print STDERR "forward strand\n";
 		eval{
-		    $upstream_site = 
-			$self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-		    $downstream_site = 
-			$self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		$upstream_site = 
+		    $self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		$downstream_site = 
+		    $self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
 		};
 		unless ( $upstream_site && $downstream_site ){
 		    print STDERR "problems retrieving sequence for splice sites\n$@";
@@ -858,6 +890,7 @@ sub check_splice_sites{
 		}
 	    }
 	    elsif( $strand == -1 ){
+		print STDERR "reverse strand\n";
 		# in the reverse strand, exon coords are forward in the revcomp_slice
 		#
 		#  example:
@@ -870,10 +903,10 @@ sub check_splice_sites{
 		# make the complementary to get GT..AG (we do not need to apply the reverse)
 		
 		eval{
-		    $upstream_site = 
-			$self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-		    $downstream_site = 
-			$self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		$upstream_site = 
+		    $self->revcomp_query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		$downstream_site = 
+		    $self->revcomp_query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
 		};
 		unless ( $upstream_site && $downstream_site ){
 		    print STDERR "problems retrieving sequence for splice sites\n$@";
@@ -883,7 +916,7 @@ sub check_splice_sites{
 		$downstream_site =~ tr/ACGTacgt/TGCAtgca/;
 	    }
 	    
-	    #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+	    print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
 	    ## good pairs of upstream-downstream intron sites:
 	    ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
 	    if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
@@ -956,10 +989,10 @@ sub _check_splice_Sites{
 	
 	# catch possible exceptions in gettting the sequence (it might not be there!)
 	eval{
-	  $upstream   = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
+	    $upstream   = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
 	};
 	if ($@){
-	  print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
+	    print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
 	  print STDERR $@;
 	  $upstream = 'NN';
 	}
@@ -1058,7 +1091,7 @@ sub _check_splice_Sites{
 	  $downstream_GT++;
 	}
 	elsif ( $count != $#exons && $downstream eq 'GC') {       
-	  $downstream_GC++;
+	    $downstream_GC++;
 	}
 	elsif ( $count != $#exons && $downstream eq 'AT') {       
 	  $downstream_AT++;
@@ -1429,39 +1462,36 @@ sub _check_Translations {
 =cut
 
 sub remap_genes {
-  my ($self, $genes, $strand) = @_;#
-#  my $slice = $self->vcontig;
-#  if ( $strand == -1 ){
-#    $slice = $slice->invert;
-#  }
-  
-  my @newf;
-  my $trancount=1;
-  foreach my $gene (@$genes) {
-    my @trans = @{$gene->get_all_Transcripts};
-    my $newgene;
-
-    # convert to raw contig coords
-    eval {
-
-      # transforming gene to raw contig coordinates.
-      $newgene = $gene->transform;
-      
-      # need to explicitly add back genetype and analysis.
-      $newgene->type($gene->type);
-      $newgene->analysis($gene->analysis);
-
-      push(@newf,$newgene);
-      
-    };
-    if ($@) {
-      print STDERR "Couldn't reverse map gene [$@]\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	$self->_print_Transcript($t);
-      }
+    my ($self, $genes, $strand) = @_;
+    #  my $slice = $self->vcontig;
+    #  if ( $strand == -1 ){
+    #    $slice = $slice->invert;
+    #  }
+    
+    my @newf;
+    my $trancount=1;
+    foreach my $gene (@$genes) {
+	my @trans = @{$gene->get_all_Transcripts};
+	my $newgene;
+	# convert to raw contig coords
+	eval {
+	    # transforming gene to raw contig coordinates.
+	    $newgene = $gene->transform;
+	};
+	if ($@) {
+	    print STDERR "Couldn't reverse map gene [$@]\n";
+	    foreach my $t ( @{$gene->get_all_Transcripts} ){
+		$self->_print_Transcript($t);
+	    }
+	    next;
+	}
+	$newgene->type($gene->type);
+	$newgene->analysis($gene->analysis);
+	push(@newf,$newgene);
+	
+	
     }
-  }
-  return @newf
+    return @newf;
 }
 
 =head2 vcontig
@@ -1631,11 +1661,21 @@ sub _cluster_into_Genes{
   my $num_trans = scalar(@transcripts_unsorted);
   print STDERR "clustering $num_trans transcripts into genes\n";
 
-  
+  #foreach my $t ( @transcripts_unsorted ){
+  #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+  #}
+
   # flusold genes
   #$self->flush_Genes;
   
-  my @transcripts = sort by_transcript_high @transcripts_unsorted;
+  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+			   if ($result){
+			     return $result;
+			   }
+			   else{
+			     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+			   }
+			 } @transcripts_unsorted;
   my @clusters;
   
   # clusters transcripts by whether or not any exon overlaps with an exon in 
@@ -1754,7 +1794,6 @@ sub check_Clusters{
 sub transcript_high{
   my ($self,$tran) = @_;
   my $high;
-  $tran->sort;
   if ( $tran->start_Exon->strand == 1){
     $high = $tran->end_Exon->end;
   }
@@ -1769,7 +1808,6 @@ sub transcript_high{
 sub transcript_low{
   my ($self,$tran) = @_;
   my $low;
-  $tran->sort;
   if ( $tran->start_Exon->strand == 1){
     $low = $tran->start_Exon->start;
   }
@@ -1862,8 +1900,8 @@ sub prune_Exons {
     $tran->flush_Exons;
     foreach my $exon (@newexons) {
       $tran->add_Exon($exon);
-    }
   }
+}
   return $gene;
 }
 
