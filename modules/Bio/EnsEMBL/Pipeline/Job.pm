@@ -38,7 +38,7 @@ sub adaptor {
 }
 
 
-sub intput_id {
+sub input_id {
 
 }
 
@@ -76,8 +76,7 @@ sub module {
 
   Arg [1]    : none
   Example    : $job->run();
-  Description: Runs this job locally.  This is overridden by batch submission
-	             system jobs, such as LSFJob.  This will require the module
+  Description: Runs this job locally. This will require the module
                specified by the module() subroutine and instantiate it with the
                parameters from the parameters() subroutine.  Upon instantiation
                the fetch_input(), run(), and write_output() subroutines will
@@ -183,9 +182,4 @@ sub set_current_status {
 
 
 1;
-
-
-
-
-
 
