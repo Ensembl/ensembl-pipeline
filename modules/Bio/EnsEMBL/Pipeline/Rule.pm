@@ -61,15 +61,15 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ( $goal, $adaptor, $dbID ) =
-    $self->_rearrange( [ qw ( GOAL
+  my ( $goalAnalysis, $adaptor, $dbID ) =
+    $self->_rearrange( [ qw ( GOALANALYSIS
 			      ADAPTOR
 			      DBID
 			     ) ], @args );
   $self->throw( "Wrong parameter" ) unless
-    $goal->isa( "Bio::EnsEMBL::Analysis" );
+    $goalAnalysis->isa( "Bio::EnsEMBL::Analysis" );
   $self->dbID( $dbID );
-  $self->goalAnalysis( $goal );
+  $self->goalAnalysis( $goalAnalysis );
   $self->adaptor( $adaptor );
 				
   return $self;
@@ -169,18 +169,21 @@ sub goalAnalysis {
 sub check_for_analysis {
   my $self = shift;
   my ($analist, $input_id_type, $completed_accumulator_href, $verbose) = @_;
+  
+  $verbose = 0;
   my %anaHash;
   my $return = 0;
   # reimplement with proper identity check!
   my $goal = $self->goalAnalysis->dbID;
 
   my $goal_id_type = $self->goalAnalysis->input_id_type;
-  print STDERR "have goal type ".$goal_id_type." and input id type ".$input_id_type."\n" if($verbose);
+  
+  print "have goal type ".$goal_id_type." and input id type ".$input_id_type."\n" if($verbose);
 #This id isn't of the right type so doesn't satify goal
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
     print STDERR " failed input_id_type check as goal input_id type ".
-      "isn't the same as the input_id type\n" if($verbose);
+      "isn't the same as the input_id type for goal analysis " . $self->goalAnalysis->logic_name. "\n" if($verbose);
     $return += 1;
   }
 

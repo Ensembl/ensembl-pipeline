@@ -47,7 +47,7 @@ use Bio::EnsEMBL::Root;
 use vars qw(@ISA);
 use strict;
 
-
+use Carp;
 @ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 Constructor
@@ -173,12 +173,15 @@ sub fetch_all {
     }
     $dbID = $ruleId;
 
+
     $rule = Bio::EnsEMBL::Pipeline::Rule->new
       ( '-dbid'    => $dbID,
-	'-goal'    => $analysis,
+	'-goalAnalysis'    => $analysis,
         '-adaptor' => $self );
     $rules{$dbID} = $rule;
   }
+
+
 
   $sth= $self->prepare( q{
     SELECT rule_id, condition
@@ -232,7 +235,7 @@ sub fetch_by_dbID {
 
   $rule = Bio::EnsEMBL::Pipeline::Rule->new
     ( '-dbid'    => $dbID,
-      '-goal'    => $analysis,
+      '-goalAnalysis'    => $analysis,
       '-adaptor' => $self );
 
   $sth= $self->prepare( q{

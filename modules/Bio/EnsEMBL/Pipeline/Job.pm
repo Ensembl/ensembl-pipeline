@@ -336,33 +336,44 @@ sub flush_runs {
     $cmd .= " @job_ids";
     
     $batch_job->construct_command_line($cmd);
-    $batch_job->open_command_line();
-    #print STDERR "\n\n".$batch_job->bsub."\n\n";
-    if( ! defined $batch_job->id ) {
-      print STDERR ( "Couldnt batch submit @job_ids\n" );
-      print STDERR ($batch_job->bsub."\n");
-      foreach my $job_id (@job_ids) {
-        my $job = $adaptor->fetch_by_dbID($job_id);
-        $job->set_status( "FAILED" );
-      }
-    } else {
-      #print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
-      #."\n";
-      my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
-      foreach my $job (@jobs) {
-        if( $job->retry_count > 0 ) {
-          for ( $job->stdout_file, $job->stderr_file ) {
-            open( FILE, ">".$_ ); close( FILE );
-          }
-        }
-        #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
-        $job->submission_id( $batch_job->id );
-        $job->retry_count( $job->retry_count + 1 );
-        $job->set_status( "SUBMITTED" );
-        $job->stdout_file($lastjob->stdout_file);
-        $job->stderr_file($lastjob->stderr_file);
-      }
-      $adaptor->update(@jobs);
+    eval {
+	print STDERR "Submitting: ", $batch_job->bsub, "\n";
+	$batch_job->open_command_line();
+    };
+    if ($@) {
+	print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
+	foreach my $job_id (@job_ids) {
+	    my $job = $adaptor->fetch_by_dbID($job_id);
+	    $job->set_status( "FAILED" );
+	}
+    } 
+    else {
+	#print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
+	#."\n";
+	my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
+	foreach my $job (@jobs) {
+	    if( $job->retry_count > 0 ) {
+		for ( $job->stdout_file, $job->stderr_file ) {
+		    open( FILE, ">".$_ ); close( FILE );
+		}
+	    }
+	    #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
+	    if ($batch_job->id) {
+		$job->submission_id( $batch_job->id );
+	    } else {
+		# submission seems to have succeeded, but we didnt
+		# get a job ID. Safest NOT to raise an error here,
+		# (a warning would have already issued) but flag
+		print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
+		$job->submission_id( 0 );		
+	    }
+	    
+	    $job->retry_count( $job->retry_count + 1 );
+	    $job->set_status( "SUBMITTED" );
+	    $job->stdout_file($lastjob->stdout_file);
+	    $job->stderr_file($lastjob->stderr_file);
+	}
+	$adaptor->update(@jobs);
     }
     $queue->{'jobs'} = [];
     $queue->{'last_flushed'} = time;
@@ -404,8 +415,6 @@ sub batch_runRemote {
 
 
 =head2 runLocally
-=head2 runRemote( boolean withDB, queue )
-=head2 run_module
 
   Title   : running
   Usage   : $self->run...;
@@ -449,107 +458,109 @@ sub run_module {
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
 
-  STATUS:
+  STATUS: 
   { 
-    # "SUBMITTED"
-    eval {
-      if( $module =~ /::/ ) {
-          $module =~ s/::/\//g;
-          require "${module}.pm";
-          $module =~ s/\//::/g;
-
-          $rdb = "${module}"->new
-              ( -analysis => $self->analysis,
-                -input_id => $self->input_id,
-                -db => $self->adaptor->db );
-      } else {
-          require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-          $module =~ s/\//::/g;
-          $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-              ( -analysis => $self->analysis,
-                -input_id => $self->input_id,
-                -db => $self->adaptor->db );
+      # "SUBMITTED"
+      eval {
+	  if( $module =~ /::/ ) {
+	      $module =~ s/::/\//g;
+	      require "${module}.pm";
+	      $module =~ s/\//::/g;
+	      
+	      $rdb = "${module}"->new
+		  ( -analysis => $self->analysis,
+		    -input_id => $self->input_id,
+		    -db => $self->adaptor->db );
+	  } else {
+	      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+	      $module =~ s/\//::/g;
+	      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
+		  ( -analysis => $self->analysis,
+		    -input_id => $self->input_id,
+		    -db => $self->adaptor->db );
+	  }
+      };
+      
+      if ($err = $@) {
+	  print (STDERR "CREATE: Lost the will to live Error\n");
+	  $self->set_status( "FAILED" );
+	  $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
       }
-    };
-    
-    if ($err = $@) {
-      print (STDERR "CREATE: Lost the will to live Error\n");
-      $self->set_status( "FAILED" );
-      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
-    }
-
-    # "READING"
-    eval {   
-      $self->set_status( "READING" );
-      $res = $rdb->fetch_input;
-    };
-    if ($err = $@) {
-      $self->set_status( "FAILED" );
-      print (STDERR "READING: Lost the will to live Error\n");
-      $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
-    }
-    if ($res eq "") {
-    }
-    if ($rdb->input_is_void) {
-      $self->set_status( "VOID" );
-      return;
-    }
-
-    # "RUNNING"
-    eval {
-      $self->set_status( "RUNNING" );
-      $rdb->run;
-    };
-    if ($err = $@) {
-      $self->set_status( "FAILED" );
-      print (STDERR "RUNNING: Lost the will to live Error\n");
-      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
-    }
-
-    # "WRITING"
-    eval {
-      $self->set_status( "WRITING" );
-      $rdb->write_output;
-      # -------------------------------------------------------------------
-      if($rdb->can('db_version_searched')){
-      	my $new_db_version = $rdb->db_version_searched();
-      	my $analysis = $self->analysis();
-      	my $old_db_version = $analysis->db_version();
-      	$analysis->db_version($new_db_version);
-      	# where is the analysisAdaptor??
-      	# $self->adaptor->get_AnalysisAdaptor->store($analysis);# if $new_db_version gt $old_db_version;
-      }else{$SAVE_RUNTIME_INFO = 0;}
-      # -------------------------------------------------------------------
-      $self->set_status( "SUCCESSFUL" );
-    }; 
-    if ($err = $@) {
-      $self->set_status( "FAILED" );
-      print (STDERR "WRITING: Lost the will to live Error\n");
-      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
-    }
-  } # STATUS
-
+      
+      # "READING"
+      eval {   
+	  $self->set_status( "READING" );
+	  $res = $rdb->fetch_input;
+      };
+      if ($err = $@) {
+	  $self->set_status( "FAILED" );
+	  print (STDERR "READING: Lost the will to live Error\n");
+	  $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
+      }
+      
+      if ($rdb->input_is_void) {
+	  $self->set_status( "VOID" );
+      }
+      else {
+	  # "RUNNING"
+	  eval {
+	      $self->set_status( "RUNNING" );
+	      $rdb->run;
+	  };
+	  if ($err = $@) {
+	      $self->set_status( "FAILED" );
+	      print (STDERR "RUNNING: Lost the will to live Error\n");
+	      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
+	  }
+	  
+	  # "WRITING"
+	  eval {
+	      $self->set_status( "WRITING" );
+	      $rdb->write_output;
+	      # -------------------------------------------------------------------
+	      if($rdb->can('db_version_searched')){
+		  my $new_db_version = $rdb->db_version_searched();
+		  my $analysis = $self->analysis();
+		  my $old_db_version = $analysis->db_version();
+		  $analysis->db_version($new_db_version);
+		  # where is the analysisAdaptor??
+		  # $self->adaptor->get_AnalysisAdaptor->store($analysis);# if $new_db_version gt $old_db_version;
+	      } else {
+		  $SAVE_RUNTIME_INFO = 0;
+	      }
+	      # -------------------------------------------------------------------
+	      $self->set_status( "SUCCESSFUL" );
+	  }; 
+	  if ($err = $@) {
+	      $self->set_status( "FAILED" );
+	      print (STDERR "WRITING: Lost the will to live Error\n");
+	      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
+	  }
+      }
+      
+  }    
+  
   # update job in StateInfoContainer
   if ($autoupdate) {
-    eval {
-      my $sic = $self->adaptor->db->get_StateInfoContainer;
-      # -------------------------------------------------------------
-      $sic->store_input_id_analysis(
-                                    $self->input_id,
-                                    $self->analysis,
-                                    $self->execution_host,
-                                    $SAVE_RUNTIME_INFO
-                                   );
-      # -------------------------------------------------------------
-    };
-    if ($err = $@) {
-      print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
-      $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
+	eval {
+	    my $sic = $self->adaptor->db->get_StateInfoContainer;
+	    # -------------------------------------------------------------
+	    $sic->store_input_id_analysis(
+					  $self->input_id,
+					  $self->analysis,
+					  $self->execution_host,
+					  $SAVE_RUNTIME_INFO
+					  );
+	    # -------------------------------------------------------------
+	};
+	if ($err = $@) {
+	    print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
+	    $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
+	}
+	else {
+	    print STDERR "Updated successful job ".$self->dbID."\n";
+	}
     }
-    else {
-      print STDERR "Updated successful job ".$self->dbID."\n";
-    }
-  }
 }
 
 

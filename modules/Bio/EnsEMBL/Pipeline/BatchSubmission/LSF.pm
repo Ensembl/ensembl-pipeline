@@ -139,16 +139,38 @@ sub construct_command_line{
 sub open_command_line{
   my ($self, $verbose)= @_;
 
-  open(SUB, $self->bsub." 2>&1 |");
-  my $lsf;
-  while(<SUB>){
-    print STDERR if($verbose);
-    if (/Job <(\d+)>/) {
-      $lsf = $1;
-    }
-  }
-  $self->id($lsf);
-  close(SUB);
+  my $lsf = '';
+  local *PIPE;
+
+  if (open(PIPE, '-|')) {
+      while (<PIPE>) {
+	  if (/Job <(\d+)>/) {
+	      $lsf = $1;
+	  } else {
+	      $self->warn("DEBUG: unexpected from bsub: '$_'");
+	  }	  
+      }
+      if (close(PIPE)) {
+	  if ( ($? >> 8) == 0 ){
+	      if ($lsf) {
+		  $self->id($lsf);
+	      } else {
+		  $self->warn("Bsub worked but returned no job ID. Weird");
+	      }
+	  } else {
+	      $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
+	  }
+      } else {
+	  $self->throw("Could not close bsub pipe : $!\n");
+      }      
+  } 
+  else {      
+      # We want STDERR and STDOUT merged for the bsub process
+      open STDERR, '>&STDOUT';
+      
+      exec($self->bsub);
+      $self->throw("Could not run bsub");
+  }  
 }
 
 
@@ -158,24 +180,33 @@ sub get_pending_jobs {
   my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
   my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
 
-  my $cmd = "bjobs -p";
-  $cmd   .= " -q $queue" if $queue;
-  $cmd   .= " -u $user"  if $user;
-  $cmd   .= " | grep PEND";
+  my $cmd = "bjobs";
+  $cmd .= " -q $queue" if $queue;
+  $cmd .= " -u $user"  if $user;
+  $cmd .= " | grep -c PEND ";
 
-  open CMD, "$cmd 2>&1 |" or do {
-    return undef;
-  };
+  print STDERR "$cmd\n" if $args{'-debug'};
 
-  my @lines = <CMD>;
-
-  close CMD or do {
-    return undef;
-  };
-
-  return 0 if $lines[0] =~ /No pending job found/;
-  return scalar @lines;
+  my $pending_jobs = 0;
+  if( my $pid = open (my $fh, '-|') ){
+      eval{
+	  local $SIG{ALRM} = sub { kill 9, $pid; };
+	  alarm(60);
+	  while(<$fh>){
+	      chomp;
+	      $pending_jobs = $_;
+	  }
+	  close $fh;
+	  alarm 0;
+      }
+  }else{
+      exec( $cmd );
+      die q{Something went wrong here $!: } . $! . "\n";
+  }
+  print STDERR "FOUND $pending_jobs jobs pending\n" if $args{'-debug'};
+  return $pending_jobs;
 }
+
 
 
 sub get_job_time{
@@ -211,7 +242,7 @@ sub check_existance{
   my $flag = 0; 
   open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
   while(<BJOB>){
-    print STDERR if($verbose);
+    # print STDERR if($verbose);
     chomp;
     if ($_ =~ /No unfinished job found/) {
       #print "Set flag\n";
@@ -219,14 +250,11 @@ sub check_existance{
     } 
     my @values = split;
     if($values[0] =~ /\d+/){
-      print STDERR $values[0]." ".$values[2]."\n" if($verbose);
-      if($values[2] eq 'RUN' || $values[2] eq 'PEND' ){
-        return $values[0];
-      }
-      return undef;
+      return $values[0];
     }
   }
   close(BJOB);
+
   print STDERR "Have lost ".$id."\n" if($verbose);
   return undef;
 }
