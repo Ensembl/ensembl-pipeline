@@ -74,11 +74,13 @@ sub new {
   $self->{'_filename'}  = undef; # file to store Bio::Seq object
   $self->{'_results'}   = undef; # file to store results of ssaha
   $self->{'_protected'} = [];    # a list of files protected from deletion ???
+  $self->{'_min_pc'}    = 0;     # minimum %id required for a
+                                 # predicted match to be reported
   $self->{'_min_length'}= 0;     # minimum length required for a
                                  # predicted match to be reported
 
-  my ($seq, $len, $ssaha, $db) = $self->_rearrange([
-    qw(QUERY LENGTH SSAHA DB)
+  my ($seq, $len, $min_pc, $ssaha, $db) = $self->_rearrange([
+    qw(QUERY LENGTH MIN_PC SSAHA DB)
   ], @args);
 
   $ssaha = 'ssaha' unless ($ssaha);
@@ -86,6 +88,7 @@ sub new {
 
   $self->query($seq) if ($seq);
   $self->min_length($len) if ($len);
+  $self->min_pc($min_pc) if ($min_pc);
   $self->database($db) if ($db);
 
   return $self; # success - we hope!
@@ -130,6 +133,15 @@ sub min_length {
       $self->{'_min_length'} = $len ;
     }
     return $self->{'_min_length'};
+}
+
+
+sub min_pc {
+    my ($self, $pc) = @_;
+    if (defined $pc && $pc > 0) {
+      $self->{'_min_pc'} = $pc;
+    }
+    return $self->{'_min_pc'};
 }
 
 
@@ -212,7 +224,7 @@ sub run_ssaha {
 sub parse_results {
     my ($self, $filehandle) = @_;
     my $resfile = $self->results();
-    my $min_len = $self->min_length;
+    my $min_pc = $self->min_pc;
 
     if (-e $resfile) {
         if (-z $self->results) {
@@ -238,6 +250,8 @@ sub parse_results {
 	    ) = split;
 
             my (%feat1, %feat2);
+
+	    next unless $pc >= $min_pc;
 
             $feat1 {name} = $query;
             $feat2 {name} = $sbjct;

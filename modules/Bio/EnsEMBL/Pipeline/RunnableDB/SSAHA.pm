@@ -72,6 +72,7 @@ sub fetch_input {
             -query  => $self->query,
             -ssaha  => $self->analysis->program_file,
             -db     => $self->analysis->db_file,
+            -min_pc => $parameters{'-min_pc'},
             -length => $parameters{'-length'}
     );
 
