@@ -439,11 +439,13 @@ sub calculate_and_set_phases_new {
 #      print STDERR "Gene " . $genes[$i]->seqname . "\n";
 
       my $peptide = $peptides[$i];
+
       if (length $peptide < $min_gene_length) {
           print STDERR "peptide $i too short (", length($peptide), "bp)\n";
           $i++;
           next GENE;
       }
+
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
       my @newtran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_3frame($genes[$i],$self->query);
@@ -468,11 +470,17 @@ sub calculate_and_set_phases_new {
         
         # remove any terminal X's from the translation
         $temp_tran =~ s/x$//i;
-        my $genscan = $peptides[$i];
+
+        # remove any initial X's from the peptide
+        $peptide =~ s/^x//i;
+        
+        # remove any terminal X's from the peptide
+        $peptide =~ s/x$//i;
+
         my $x = 0;
         while (($x = index($temp_tran, 'X', $x)) != -1) {
           #print STDERR "Found an 'X' at ", $i + 1, "\n";
-          substr($genscan, $x, 1) = 'X';
+          substr($peptide, $x, 1) = 'X';
           $x++;
         }
         $x = 0;
@@ -482,8 +490,8 @@ sub calculate_and_set_phases_new {
           $x++;
         }
     
-        #print "\nafter\ngenscan: $genscan\nensembl: $ensembl\n";
-        if (index($genscan ,$temp_tran) >= 0) {
+        #print "\nafter\ngenscan: $peptide\nensembl: $ensembl\n";
+        if (index($peptide ,$temp_tran) >= 0) {
 #         print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
 
           $translation_found = 1;
