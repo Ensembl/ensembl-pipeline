@@ -492,10 +492,11 @@ sub write_Analysis {
 
     my ($id,$created) = $self->exists_Analysis($analysis);
 
-    if (defined($id)) {
-	$analysis->id     ($id);
-	$analysis->created($created);
-	return $analysis;
+    if (defined($id)) 
+    {
+	    $analysis->id     ($id);
+	    $analysis->created($created);
+	    return $analysis;
     }
     my $query = 
 	                     "insert into analysisprocess(id,created,db,db_version,db_file," .
@@ -522,7 +523,7 @@ sub write_Analysis {
     $sth = $self->prepare("select LAST_INSERT_ID()");
     $res = $sth->execute();
 
-    my $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
+    $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
 
     $analysis->id($id);
 
