@@ -87,9 +87,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 		  
 	    EST_GENEBUILDER_INPUT_GENETYPE => 'human_est',
 	    EST_GENOMEWISE_GENETYPE        => 'genomewise',
-	    EST_EVIDENCE_TAG               => 'human_est',
-			 
-			 
+	    			 
 	                 ## you must choose one type of merging for cdnas/ests: 2 and 3 are the common ones
 			 EST_GENEBUILDER_COMPARISON_LEVEL => 4,
 			 
@@ -103,8 +101,13 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # you can alow a mismatch in the splice sites
 			 EST_GENEBUILDER_SPLICE_MISMATCH  => 10,
 			 
-			 # you can alow to bridge over small introns:
-			 EST_GENEBUILDER_INTRON_MISMATCH  => 10,
+			 # you can allow matches over small introns 
+			 EST_GENEBUILDER_INTRON_MISMATCH => 10,
+
+			 # you can bridge over small introns: we difuse the small intron into one exon
+			 # Note that this number correlates with EST_MAX_EVIDENCE_DISCONTINUITY
+			 # If you use this one, you will not need EST_GENEBUILDER_INTRON_MISMATC
+			 EST_MIN_INTRON_SIZE  => 15,
 			 
 			 # you can choose whether you only want tw ests/cdnas to merge if
 			 # they have the same number of exons
