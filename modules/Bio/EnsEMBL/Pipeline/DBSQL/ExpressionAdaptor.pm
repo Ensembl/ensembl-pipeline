@@ -350,6 +350,7 @@ sub get_libraryId_by_estarray{
 	       WHERE  EST.Accession in $est_string
 	     );
   
+  #print $q."\n";
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
   my $res = $sth->execute || $self->throw("can't execute: $q");
   
