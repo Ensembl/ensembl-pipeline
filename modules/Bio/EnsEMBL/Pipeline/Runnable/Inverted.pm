@@ -130,6 +130,7 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
+        $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".inverted.out");
     }
@@ -192,6 +193,17 @@ sub arguments {
     return $self->{_arguments};
 }
 
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
+
+=cut
+
 ###########
 # Analysis methods
 ##########
@@ -227,6 +239,7 @@ sub run {
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses einverted output to give a set of feature pairs
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
 
@@ -241,21 +254,39 @@ sub run_inverted {
 sub parse_results {
     my ($self) = @_;
     my (%feat1, %feat2);
+    my $filehandle;
+    if (ref ($self->results) !~ /GLOB/)
+    {
+        open (INVERTED, "<".$self->results)
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+        $filehandle = \*INVERTED;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    }
     
-    open (INVERTED, "<".$self->results)
-        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    
-    unless (<INVERTED>)
+    unless (<$filehandle>)
     {
         print STDERR "No repeats found with einverted\n";
         return;
     }
-    while (<INVERTED>)
+    while (<$filehandle>)
     {
         if (m|^Score\s+(\d+)\D+(\d+)/(\d+)\D+(\d+)|i)
         {
-            $feat1 {name} = $self->clone->id;
-            $feat2 {name} = $self->clone->id."_inv_repeat";
+            if ($self->clonename)
+            {
+                $feat1 {name} = $self->clonename;
+            }
+            else
+            {
+                $self->results =~ m!/.+/(.+)|(.+)!; #extract filename
+                #($1) ? $feat1{name} = $1 : $feat1{name} = $2;
+                if ($1) { $feat1{name} = $1; }
+                elsif ($2) { $feat1{name} = $2; }
+            }
+            $feat2 {name} = $feat1{name}."_inv_repeat";
             $feat1 {score} = $1; #score as an inverted repeat
             $feat2 {score} = $4; #percentage identity to feature 1
         }
@@ -306,7 +337,7 @@ sub parse_results {
             }
         }
     }
-    close INVERTED;       
+    close $filehandle;       
 }
 
 ##############

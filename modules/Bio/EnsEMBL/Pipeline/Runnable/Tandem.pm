@@ -140,6 +140,7 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
+        $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".tandem.out");
     }
@@ -252,6 +253,17 @@ sub run {
     $self->deletefiles();
 }
 
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
+
+=cut
+
 =head2 parsefile
 
     Title   :  parsefile
@@ -307,18 +319,38 @@ sub run_tandem {
 
 sub parse_results {
     my ($self) = @_;
-    open (TANDEM, "<".$self->results)
-        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    unless (<TANDEM>)
+    my $filehandle;
+    if (ref ($self->results) !~ /GLOB/)
+    { 
+        open (TANDEM, "<".$self->results)
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+        $filehandle = \*TANDEM;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    } 
+    
+    unless (<$filehandle>)
     {
         print "No repeats found with etandem\n";
         return;
     }
-    while (<TANDEM>)
+    while (<$filehandle>)
     {
         my @element = split;
         my (%feat1, %feat2);
-        $feat1 {name} = $self->clone->id;
+        if ($self->clonename)
+            {
+                $feat1{name}     = $self->clonename;
+            }
+            else
+            {
+                $self->results =~ m!/.+/(.+)|(.+)!; #extract filename
+                #($1) ? $feat1{name} = $1 : $feat1{name} = $2;
+                if ($1) { $feat1{name} = $1; }
+                elsif ($2) { $feat1{name} = $2; }
+            }
         $feat1 {score} = $element[0];
         $feat1 {start} = $element[1];
         $feat1 {end} = $element[2];
@@ -339,7 +371,7 @@ sub parse_results {
         
         $self->createfeaturepair(\%feat1, \%feat2);
     }
-    close TANDEM;       
+    close $filehandle;       
 }
 
 ##############

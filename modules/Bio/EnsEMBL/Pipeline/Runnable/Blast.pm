@@ -140,6 +140,8 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
+        
+        $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".blast.out");
     }
@@ -221,6 +223,17 @@ sub arguments {
     return $self->{_arguments};
 }
 
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
+
+=cut
+
 ###########
 # Analysis methods
 ##########
@@ -299,9 +312,9 @@ sub parse_results {
        while (my $hsp = $sbjct->nextHSP)
        {
             my (%feat1, %feat2);
-            if ($self->clone)
+            if ($self->clonename)
             {
-                $feat1{name}     = $self->clone->id;
+                $feat1{name}     = $self->clonename;
             }
             else
             {

@@ -135,6 +135,8 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
+        
+        $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".RepMask.out");
     }
@@ -176,6 +178,17 @@ sub repeatmasker {
     Usage   :   $obj->wordir('~humpub/temp');
     Function:   Get/set method for the location of a directory to contain temp files
     Args    :   File path (optional)
+
+=cut
+
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
 
 =cut
 
@@ -232,6 +245,7 @@ sub run {
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses RepeatMaskerHum output to give a set of feature pairs
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
 
@@ -249,20 +263,31 @@ sub run_repeatmasker {
     close REPOUT;
 }
 
+#New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
     my ($self) = @_;
-    print "Parsing output\n";
-    open (REPOUT, "<".$self->results)
-        or $self->throw("Error opening ".$self->results."\n");
-    #check if no repeats found
-    if (<REPOUT> =~ /no repetitive sequences detected/)
+    my $filehandle;
+    if (ref ($self->results) !~ /GLOB/)
     {
-        print "RepeatMaskerHum didn't find any repetitive sequences\n";
-        close REPOUT;
+        open (REPOUT, "<".$self->results)
+            or $self->throw("Error opening ".$self->results."\n");
+        $filehandle = \*REPOUT;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    } 
+    
+    
+    #check if no repeats found
+    if (<$filehandle> =~ /no repetitive sequences detected/)
+    {
+        print STDERR "RepeatMaskerHum didn't find any repetitive sequences\n";
+        close $filehandle;
         return;
     }
     #extract values
-    my @output = <REPOUT>;
+    my @output = <$filehandle>;
     for (my $index = 2; $index < scalar(@output); $index++) #loop from 3rd line
     {  
         my @element = split (/\s+/, $output[$index]);  
@@ -300,7 +325,7 @@ sub parse_results {
         
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
-    close REPOUT;   
+    close $filehandle;   
 }
 
 ##############

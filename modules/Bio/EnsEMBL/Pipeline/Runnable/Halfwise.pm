@@ -88,7 +88,7 @@ sub _initialize {
     $self->{_results}   =undef;     #file to store results of Halfwise
     $self->{_protected} =[];        #a list of file suffixes protected from deletion
     $self->{_arguments} =undef;     #parameters for halfwise
-    my($clonefile, $halfwise, $parameters) 
+    my($clonefile, $halfwise, $arguments) 
             = $self->_rearrange(['CLONE', 'HALFW', 'ARGS'], @args);
     
     $self->clone($clonefile) if ($clonefile);
@@ -99,10 +99,10 @@ sub _initialize {
         eval 
         { $self->halfwise($self->locate_executable('halfwise')); };
         if ($@)
-        {  $self->halfwise ('/nfs/disk100/humpub/OSFbin/halfwise'); }
+        {  $self->halfwise ('/usr/local/pubseq/scripts/halfwise'); }
     }
-    if ($parameters)    
-    {$self->clone($parameters) ; }
+    if ($arguments)    
+    {$self->arguments($arguments) ; }
     else                
     {$self->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet'); }     
     return $self; # success - we hope!
@@ -122,6 +122,8 @@ sub clone {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
+        
+        $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.'.halfwise');
     }
@@ -175,6 +177,17 @@ sub arguments {
     return $self->{_arguments};
 }
 
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
+
+=cut
+
 =head2 workdir
 
     Title   :   workdir
@@ -206,7 +219,7 @@ sub run {
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
-    $self->writefile(); 
+    $self->writefile();
     #run genscan       
     $self->run_halfwise();
     #parse output and create features
@@ -217,7 +230,7 @@ sub run {
 sub run_halfwise {
     my ($self) = @_;
     print "Running halfwise on ".$self->filename."\n";
-    open (OUTPUT, $self->halfwise.' '.$self->parameters.' '.$self->filename.'|')
+    open (OUTPUT, $self->halfwise.' '.$self->filename.' '.$self->arguments.'|')
             or $self->throw("Couldn't open pipe to halfwise: $!\n");  
     open (RESULTS, ">".$self->results)
             or $self->throw("Couldn't create file for halfwise results: $!\n");
@@ -231,28 +244,40 @@ sub run_halfwise {
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses halfwise ace output to give a set of feature pairs
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
 
 =cut
 
+#New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
     my ($self) = @_;
-    #file is in ace format. 
-    open (HALFWISE, "<".$self->results)
-        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    if (<HALFWISE> =~ /#No hits found in the blast search/ )
+    my $filehandle;
+    if (ref ($self->results) !~ /GLOB/)
+    {
+        #file is in ace format.
+        open (HALFWISE, "<".$self->results)
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+        $filehandle = \*HALFWISE;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    }
+    
+    if (<$filehandle> =~ /#No hits found in the blast search/ )
     {
         print "No hit found with halfwise\n";
         return;
     }
     
-    while (<HALFWISE>)
+    while (<$filehandle>)
     {
         if (/#Complete Analysis/)
         {
             my (%feat1, %feat2);
-            my @halfwise = <HALFWISE>;
+            my @halfwise = <$filehandle>;
             for (my $index=0; $index < scalar(@halfwise); 
                              $index++, $_ = $halfwise[$index])
             {
@@ -347,7 +372,7 @@ sub parse_results {
 
     Title   :   output
     Usage   :   obj->output()
-    Function:   A list of Feature pairs 
+    Function:   returns a list of Feature pairs 
     Returns :   A list of Feature pairs
     Args    :   none
 

@@ -302,32 +302,44 @@ sub run_genscan {
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses Genscan output to give a set of seqfeatures
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
 
 =cut
 
-
+#New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
     my ($self) = @_;
     my %exon_type = ('Sngl', 'Single Exon',
                      'Init', 'Initial Exon',
                      'Intr', 'Internal Exon',
                      'Term', 'Terminal Exon');
-    open (GENSCAN, "<".$self->results)
-        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    if (<GENSCAN> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
+    
+    my $filehandle;
+    if (ref ($self->results) !~ /GLOB/)
+    {
+        open (GENSCAN, "<".$self->results)
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+        $filehandle = \*GENSCAN;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    }
+    
+    if (<$filehandle> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
     {
         print "No genes predicted\n";
         return;
     }
-    while (<GENSCAN>)
+    while (<$filehandle>)
     {
         # Last line before predictions contains nothing
         # but spaces and dashes
         if (/^\s*-[-\s]+$/) 
         { 
-            while (<GENSCAN>) 
+            while (<$filehandle>) 
             {
                 my @element = split;
                 my %feature;
@@ -359,7 +371,7 @@ sub parse_results {
                 #data ends with line 'predicted peptide sequence(s)'
                 elsif ($element[0] && $element[0] =~ /predicted/i)
                 {
-                    close GENSCAN;
+                    close $filehandle;
                     return;
                 }
             }

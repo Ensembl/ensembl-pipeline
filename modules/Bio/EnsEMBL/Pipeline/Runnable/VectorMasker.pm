@@ -151,6 +151,16 @@ sub clone {
     return $self->{_clone};
 }
 
+=head2 clonename
+
+    Title   :   clonename
+    Usage   :   $obj->clonename('AC00074');
+    Function:   Get/set method for clone name. 
+                This must be set manually when a file or pipe is parsed and the clonename is 
+                not present in the executable output
+    Args    :   File suffixes
+
+=cut
 
 =head2 protect
 
@@ -283,6 +293,7 @@ sub run {
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses blastn and MSPcrunch output to give a set of feature pairs
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
 
@@ -303,14 +314,25 @@ sub run_analysis {
 
 sub parse_results {
     my ($self) = @_;
-    open (VECTOR, "<".$self->results)
-        or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    unless (<VECTOR>)
+    my $filehandle;
+    
+    if (ref ($self->results) !~ /GLOB/)
+    { 
+        open (VECTOR, "<".$self->results)
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+        $filehandle = \*VECTOR;
+    }
+    else
+    {
+        $filehandle = $self->results;
+    }
+    
+    unless (<$filehandle>)
     {
         print "No hit found with blastn and MSPcrunch\n";
         return;
     }
-    while (<VECTOR>)
+    while (<$filehandle>)
     {
         my @element = split;
         my (%feat1, %feat2);
@@ -348,7 +370,7 @@ sub parse_results {
         
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
-    close VECTOR;       
+    close $filehandle;       
 }
 
 
