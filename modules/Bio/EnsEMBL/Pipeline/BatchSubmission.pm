@@ -1,8 +1,5 @@
 package Bio::EnsEMBL::Pipeline::BatchSubmission;
 
-BEGIN {
-  require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 use vars qw(@ISA);
 use strict;
@@ -178,3 +175,5 @@ sub open_command_line{
   $self->throw("open_command_line isn't implemented yet\n");
 
 }
+
+1;
