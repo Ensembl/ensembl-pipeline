@@ -73,7 +73,6 @@ sub write_protein {
   if (defined ($tmpcdna)) {
     if ($tmpcdna eq ''){
       my $query = "UPDATE protein SET cdna_id='$cdna_id' WHERE protein_id='$protein_id'";
-      print STDERR "$query\n";
       my $sth = $self->prepare($query);
       my $res = $sth->execute;
     }
@@ -195,7 +194,7 @@ sub get_PmatchFeatures_by_chr_start_end {
 	      "AND pmf.end <= $chrend ";
 
   my $sth = $self->prepare($query);
-  my $res = $self->execute;
+  my $res = $sth->execute;
 
   my @pmatch;
   my %cdnas;
@@ -220,7 +219,9 @@ sub get_PmatchFeatures_by_chr_start_end {
 
     if (!defined($cdnas{$prot_internal_id})) {
 
-      $cdnas{$prot_internal_id}    = $self->get_cdna_id($prot_internal_id);
+      my $cdna_id = $self->get_cdna_id_by_internal_protein_id($prot_internal_id);
+
+      $cdnas{$prot_internal_id}    = $self->get_cdna_id_by_internal_protein_id($prot_internal_id);
       # not every protein has a corresponding cdna
       if (!defined($cdnas{$prot_internal_id})){
 	$cdnas{$prot_internal_id} = "";
