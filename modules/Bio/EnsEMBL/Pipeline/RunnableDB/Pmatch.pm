@@ -9,8 +9,9 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Pipeline::Runnable::Pmatch;
-use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 use Bio::SeqIO;   
 
@@ -32,9 +33,18 @@ sub new {
   $max_intron_length = $GB_PMATCH_MAX_INTRON unless($max_intron_length);
   $self->throw("Can't run pmatch without a directory of max intron length : $!") unless($max_intron_length);
   $self->max_intron($max_intron_length);
-
+  
+  my $pmfa = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
+    (
+     -host             => $GB_PM_DBHOST,
+     -user             => $GB_PM_DBUSER,
+     -dbname           => $GB_PM_DBNAME,
+     -pass             => $GB_PM_DBPASS,
+    );
+  $self->PmatchFeatureAdaptor($pmfa);
   return $self;
 }
+
 
 
 
@@ -90,7 +100,7 @@ sub run{
 
 sub write_output{
   my ($self) = @_;
-  my $pmfa = $self->db->get_PmatchFeatureAdaptor();
+  my $pmfa = $self->PmatchFeatureAdaptor;
   #print STDERR "Writing to ".$self->pipeline_db->dbname." on ".$self->pipeline_db->host."\n";
   $pmfa->write_PmatchFeatures($self->output);
 }
@@ -172,6 +182,16 @@ sub output{
   
   return @{$self->{'_output'}};
 }
+
+sub PmatchFeatureAdaptor{
+  my $self = shift;
+  if(@_){
+    $self->{'_pmatchfeatureadaptor'} = shift;
+  }
+  return $self->{'_pmatchfeatureadaptor'};
+}
+
+
 ###############
 #other methods#
 ###############
@@ -300,7 +320,7 @@ sub uniquify{
 								 -end         => $end,
 								 -chr_name    => $chr,
 								 -coverage    => $coverage,
-								 -analysis => $self->analysis,
+								 -name => $self->analysis->logic_name,
 								);
     push(@output, $pmf);
   }

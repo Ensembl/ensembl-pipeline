@@ -9,10 +9,12 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Pipeline::Runnable::Pmatch;
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::Second_PMF;
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
    
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -22,8 +24,15 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 sub fetch_input{
   my ($self) = @_;
 
-  my @pmatch_features = $self->db->get_PmatchFeatureAdaptor->fetch_by_logic_name($GB_INITIAL_PMATCH_LOGICNAME);
-
+  my $pmfa = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
+    (
+     -host             => $GB_PM_DBHOST,
+     -user             => $GB_PM_DBUSER,
+     -dbname           => $GB_PM_DBNAME,
+     -pass             => $GB_PM_DBPASS,
+    );
+  $self->PmatchFeatureAdaptor($pmfa);
+  my @pmatch_features = $self->PmatchFeatureAdaptor->fetch_by_name($GB_INITIAL_PMATCH_LOGICNAME);
   $self->pmatch_features(@pmatch_features);
 }
 
@@ -49,7 +58,7 @@ sub run{
 
 sub write_output{
   my ($self) = @_;
-  my $pmfa = $self->db->get_PmatchFeatureAdaptor();
+  my $pmfa = $self->PmatchFeatureAdaptor();
   $pmfa->write_PmatchFeatures($self->output);
 }
 
@@ -83,6 +92,16 @@ sub output{
   
   return @{$self->{'_output'}};
 }
+
+
+sub PmatchFeatureAdaptor{
+  my $self = shift;
+  if(@_){
+    $self->{'_pmatchfeatureadaptor'} = shift;
+  }
+  return $self->{'_pmatchfeatureadaptor'};
+}
+
 ###############
 #other methods#
 ###############
@@ -129,14 +148,15 @@ sub uniquify{
 
    
     my $cdna_id = undef;
-    my $pmf = Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature->new(-protein_id  => $protein,
-								 -start       => $start,
-								 -end         => $end,
-								 -chr_name    => $chr,
-								 -cdna_id     => $cdna_id,
-								 -coverage    => $coverage,
-								 -analysis => $self->analysis,
-								);
+    my $pmf = Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature->new
+      (-protein_id  => $protein,
+       -start       => $start,
+       -end         => $end,
+       -chr_name    => $chr,
+       -cdna_id     => $cdna_id,
+       -coverage    => $coverage,
+       -name => $self->analysis->logic_name,
+      );
     push(@output, $pmf);
   }
   unlink $file;

@@ -47,6 +47,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
+							     GB_PM_DBNAME
+							     GB_PM_DBHOST
+							     GB_PM_DBUSER
+							     GB_PM_DBPASS
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
@@ -88,7 +92,15 @@ sub new {
   
   # db, input_id, seqfetcher, and analysis objects are all set in
   # in superclass constructor (RunnableDB.pm)
-
+  
+  my $pmfa = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
+    (
+     -host             => $GB_PM_DBHOST,
+     -user             => $GB_PM_DBUSER,
+     -dbname           => $GB_PM_DBNAME,
+     -pass             => $GB_PM_DBPASS,
+    );
+  $self->PmatchFeatureAdaptor($pmfa);
   return $self;
 }
 
@@ -168,11 +180,8 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-dbname => $self->db->dbname,
-								-user => $self->db->username,
-								-pass => $self->db->password,
-								-host => $self->db->host);
-  my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
+ 
+  my $pmfa = $self->PmatchFeatureAdaptor();
   #print STDERR "have ".$pmfa." adaptor\n";
   my $input_id = $self->input_id;
   my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
@@ -195,9 +204,10 @@ sub make_targetted_runnables {
   
   $genewise_db->dnadb($self->db);
   $self->output_db($genewise_db);
+  
   my %kill_list = %{$self->fill_kill_list};
 
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
+  foreach my $feat(@features){
 
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
@@ -386,6 +396,15 @@ sub fill_kill_list {
   close KILL_LIST or die "error closing $GB_KILL_LIST\n";
 
   return \%kill_list;
+}
+
+
+sub PmatchFeatureAdaptor{
+  my $self = shift;
+  if(@_){
+    $self->{'_pmatchfeatureadaptor'} = shift;
+  }
+  return $self->{'_pmatchfeatureadaptor'};
 }
 
 
