@@ -423,6 +423,7 @@ sub test_genes{
       $gene->type('pseudogene');
       @pseudo_trans = sort {$a->length <=> $b->length} @pseudo_trans;
       my $only_transcript_to_keep = pop  @pseudo_trans;
+      $only_transcript_to_keep->translation(undef);
       foreach my $pseudo_transcript (@pseudo_trans){
 	$self->discarded_transcripts($pseudo_transcript);
 	$pseudo_transcript->translation(undef);
