@@ -281,6 +281,7 @@ sub flush_runs {
   my $host     = $db->host;
   my $username = $db->username;
   my $dbname   = $db->dbname;
+  my $pass     = $db->password;
   my $lsfid;
 
   # runner.pl: first look in same directory as Job.pm
@@ -321,7 +322,7 @@ sub flush_runs {
     $cmd .= " -J $jobname " if defined $jobname;
     $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
     
     print STDERR "$cmd\n";
     open (SUB,"$cmd 2>&1 |");
