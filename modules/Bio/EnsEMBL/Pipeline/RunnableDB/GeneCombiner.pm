@@ -310,7 +310,7 @@ sub run{
       print STDERR "no genes found, leaving...\n";
       exit(0);
     }
-    print STDERR "No estgenes found, writin ensembl genes as they are\n";
+    print STDERR "No estgenes found, writing ensembl genes as they are\n";
     my @transcripts;
     foreach my $gene (@ensembl_genes){
       push(@transcripts, @{$gene->get_all_Transcripts});
@@ -524,15 +524,45 @@ sub run{
 #
 ############################################################
 
+
+
+
 # this method cluster genes only according to genomic extent
 # covered by the genes. The proper clustering of transcripts
 # to give rise to genes occurs in _cluster_into_Genes()
 
-sub cluster_Genes{
+sub cluster_Genes {
   my ($self) = @_;
-
   my @genes = ( $self->ensembl_genes, $self->estgenes );
+ 
+  my @forward_genes;
+  my @reverse_genes;
+ 
+ GENE:
+  foreach my $gene ( @genes ){
+    foreach my $transcript (@{$gene->get_all_Transcripts}){
+      if ( $transcript->start_Exon->strand == 1 ){
+	push( @forward_genes, $gene );
+      }
+      else{
+	push( @reverse_genes, $gene );
+      }
+      next GENE;
+    }
+  }
+
+  my @forward_clusters = $self->_cluster_Genes_by_genomic_range( @forward_genes );
+  my @reverse_clusters = $self->_cluster_Genes_by_genomic_range( @reverse_genes );
+  my @clusters;
+  push( @clusters, @forward_clusters);
+  push( @clusters, @reverse_clusters);
   
+  return @clusters;
+}
+############################################################
+sub cluster_Genes_by_genomic_range{
+  my ($self, @genes) = @_;
+
   # first sort the genes by the left-most position coordinate ####
   my %start_table;
   my $i=0;
@@ -817,14 +847,14 @@ sub _pair_Transcripts{
   }  # end of ENS_TRANSCRIPT
  
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
-  # those which haven't been used for extending UTRs are candidate isoforms
+  # those `which haven't been used for extending UTRs are candidate isoforms
   #
   # This analysis relies on the fact that the set of cdna-genes being used
   # is non redundant, i.e. it forms a putative set of isoforms
   my @candidates;
   foreach my $est_tran ( @est_transcripts ){
     unless (  $used_est_transcript{ $est_tran } && $used_est_transcript{$est_tran} == 1 ){
-      push ( @candidates, $est_tran);
+      push ( @candidates, $est_tran );
     }
   }
   print STDERR "\n".scalar(@candidates)." est transcripts left to be tested as isoforms\n\n";
@@ -833,25 +863,25 @@ sub _pair_Transcripts{
       # at the moment we just check whether there is an ens_transcript
       # that shares one exon, part of the protein product and
       # there is one intron matching one exon or vice versa.
+    
+  CANDIDATE:
+    foreach my $est_tran ( @candidates ){
+      my $one_exon_shared = 0;
+      my $similar_protein = 0;
+      my $exon_in_intron  = 0;
+      my $exact_merge     = 0;
+      my $fuzzy_merge     = 0;
       
-    CANDIDATE:
-      foreach my $est_tran ( @candidates ){
-	  my $one_exon_shared = 0;
-	  my $similar_protein = 0;
-	  my $exon_in_intron  = 0;
-	  my $exact_merge     = 0;
-	  my $fuzzy_merge     = 0;
-
-	  # check first it does not merge with anything in the cluster
-	  foreach my $ens_tran ( @ens_transcripts ){
-	    my $comparator = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-	    $exact_merge     = $comparator->test_for_semiexact_Merge($est_tran, $ens_tran);
-	    $fuzzy_merge     = $comparator->test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
-	    if ($exact_merge == 1){
-	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges exactly with an ensembl transcript, skipping it\n";
-	      next CANDIDATE;
-	    }
-	    if ( $fuzzy_merge == 1){
+      # check first it does not merge with anything in the cluster
+      foreach my $ens_tran ( @ens_transcripts ){
+	my $comparator = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
+	$exact_merge     = $comparator->test_for_semiexact_Merge($est_tran, $ens_tran);
+	$fuzzy_merge     = $comparator->test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
+	if ($exact_merge == 1){
+	  print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges exactly with an ensembl transcript, skipping it\n";
+	  next CANDIDATE;
+	}
+	if ( $fuzzy_merge == 1){
 	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges 'fuzzily' with an ensembl transcript, skipping it\n";
 	      next CANDIDATE;
 	    }
@@ -878,8 +908,20 @@ sub _pair_Transcripts{
 		 #&& $exact_merge     == 0 
 	       ){
 	      print STDERR "BINGO, and ISOFORM found !!\n";
+
+	      # try to lock phases:
+	      $est_tran = $self->_lock_Phases($est_tran, $ens_tran);
 	      push ( @accepted_isoforms, $est_tran );
+	      
 	      next CANDIDATE; 
+	      ############################################################
+	      # NOTE: we accept the est gene if it does not merge with any
+	      # of the ensembl genes and if it is a valid isoform
+	      # with respect to just ONE ensembl gene.
+	      # We could try to extend that to every ensembl gene
+	      # in the cluster.
+	      # This would make it harder to lock phases
+	      ############################################################
 	    }
 	  }
 	} # end of CANDIDATE 
@@ -894,6 +936,118 @@ sub _pair_Transcripts{
 }
 #########################################################################
 
+sub _lock_Phases{
+  my ($self,$est_tran,$ens_tran) = @_;
+  
+  # keep the original est_tran translation
+  my $original_translation = $est_tran->translation;
+
+  # we go first for the easy-peasy case: when the est gene
+  # overlaps the start exon and end exon of the ensembl translation
+  my $ens_start_exon = $ens_tran->translation->start_Exon;
+  my $ens_end_exon   = $ens_tran->translation->end_Exon;
+  my $est_start_exon;
+  my $est_end_exon;
+  my $est_start_translation;
+  my $est_end_translation;
+
+  foreach my $exon (@{$est_tran->get_all_Exons}){
+    if ( $exon->overlaps( $ens_start_Exon ) ){
+      $est_start_exon = $exon;
+      
+      if ( $exon->strand == 1 && $ens_start_exon->strand == 1 ){
+	$est_start_translation = 
+	  $ens_start_exon->start - $exon->start + $ens_tran->translation->start;
+      }
+      elsif( $exon->strand == -1 && $ens_start_exon->strand == -1 ){
+	$est_start_translation = 
+	  $exon->end - $ens_start_exon->end + $ens_tran->translation->start;
+      }
+    }
+    
+    if ( $exon->overlaps( $ens_end_exon ) ){
+      $est_end_exon = $exon;
+      
+      if ( $exon->strand == 1 && $ens_end_exon->strand == 1 ){
+	$est_end_translation = 
+	  $ens_end_exon->start - $exon->start + $ens_tran->translation->end;
+      }
+      elsif( $exon->strand == -1 && $ens_end_exon->strand == -1 ){
+	$est_end_translation =
+	  $exon->end - $ens_end_exon->end + $ens_tran->translation->end;
+      }
+    }
+  }
+
+  # check that we get something useful:
+  unless ( $est_start_exon && $est_end_exon ){
+    print STDERR "could not lock phases. Translation start/end exon not overlapping\n";
+    return $est_tran;
+  }
+  unless ( $est_start_translation > 0 && $est_start_translation <= $est_start_exon->length ){
+    print STDERR "could not lock phases. Bad start translation: $est_start_translation\n";
+    return $est_tran;
+  }
+  unless ( $est_end_translation > 0 && $est_end_translation <= $est_end_exon->length ){
+    print STDERR "could not lock phases. Bad end translation: $est_end_translation\n";
+    return $est_tran;
+  }
+
+  # recompute phases:
+  $est_tran->sort;
+  $seen_start = 0;
+  $seen_end   = 0;
+  my $previous_exon;
+  foreach my $exon (@{$est_tran->get_all_Exons}){
+    if ( $exon == $est_start_exon && $exon == $est_end_exon ){
+      $exon->phase(-1);
+      $exon->end_phase(-1);
+      $seen_start = 1;
+      $seen_end   = 1;
+    }
+    if ( $exon == $est_start_exon ){
+      $exon->phase(-1);
+      $exon->end_phase( ( $exon->length - $est_start_translation )%3 );
+      $seen_start = 1;
+    }
+    elsif( $exon == $est_end_exon ){
+      $exon->end_phase(-1);
+      $exon->phase( $previous_exon->end_phase );
+      $seen_end = 1;
+    }
+    elsif( $seen_start == 1 && $seen_end == 0 ){
+      $exon->phase( $previous_exon->end_phase );
+      $exon->end_phase( ( $exon->phase + $exon->length )%3 );
+    }
+    elsif( ($seen_start == 0 && $seen_end == 0 ) || ( $seen_start == 1 && $seen_end == 1) ){
+      $exon->phase(-1);
+      $exon->end_phase(-1);
+    }
+    $previous_exon = $exon;
+  }
+  
+  my $new_est_translation = Bio::EnsEMBL::Translation->new();
+  $new_est_translation->start_Exon( $est_start_exon );
+  $new_est_translation->end_Exon($est_end_exon);
+  $new_est_translation->start( $est_start_translation );
+  $new_est_translation->end( $est_end_translation );
+  
+  $est_tran->translation( $new_est_translation );
+  unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation( $est_tran )){
+    print STDERR "Getting back to the original translation\n";
+    print STDERR "Oh, shit we have to put back the original phases!!!!!!!!!!";
+    $est_tran->translation( $original_translation );
+  }
+
+  return $est_tran;
+}
+    
+  
+
+
+
+
+############################################################
 # this function takes est_transcripts that have been clustered together
 # but not with any ensembl transcript and tries to figure out whether they
 # make an acceptable set of alt-forms
