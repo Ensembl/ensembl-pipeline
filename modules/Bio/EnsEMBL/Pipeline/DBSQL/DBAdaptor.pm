@@ -263,3 +263,54 @@ sub DESTROY {
        $obj->{'_db_handle'} = undef;
    }
 }
+
+
+sub pipeline_lock {
+    my ($self, $string) = @_;
+
+    my $sth;
+
+    if ($string) {
+	$sth = $self->prepare(qq{
+	    INSERT into meta (meta_key, meta_value)
+	    VALUES ('pipeline.lock', ?)
+	});
+	$sth->execute($string);
+    }
+    else {
+	$sth = $self->prepare(qq{
+	    SELECT meta_value
+	    FROM   meta
+	    WHERE  meta_key = 'pipeline.lock'
+	});
+
+        $sth->execute;
+        my $row = $sth->fetchrow_arrayref;
+
+        if ($row) {
+	    return $row->[0];
+        }
+        else {
+	    return undef;
+        }
+    }
+    $sth->finish;
+}
+
+
+sub pipeline_unlock {
+    my ($self) = @_;
+
+    my $sth;
+
+    $sth = $self->prepare(qq{
+	DELETE
+	FROM   meta
+	WHERE  meta_key = 'pipeline.lock'
+    });
+
+    $sth->execute;
+    $sth->finish;
+}
+
+1;
