@@ -316,6 +316,31 @@ sub split_Transcript{
 #
 ############################################################
 
+sub _print_SimpleTranscript{
+    my ($self,$transcript) = @_;
+    my @exons = @{$transcript->get_all_Exons};
+    my $id;
+    if ($transcript->stable_id){
+	$id = $transcript->stable_id;
+    }
+    elsif ( $transcript->dbID ){
+	$id = $transcript->dbID;
+    }
+    else{
+	$id = "no id";
+    }
+    if ( defined( $transcript->type ) ){
+	$id .= " ".$transcript->type;
+    }
+    print STDERR "transcript: ".$id.": ";
+    foreach my $exon ( @exons){
+	print STDERR $exon->start."-".$exon->end." ";
+    }
+    print STDERR "\n";
+}
+
+############################################################
+
 sub _print_Transcript{
   my ($self,$transcript) = @_;
   my @exons = @{$transcript->get_all_Exons};
