@@ -86,16 +86,22 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of waba run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $program, $database) = $self->_rearrange([qw(CLONE 
-      		                                             PROGRAM
-                                                             DATABASE)],
-					                  @args);
+    my ($clone, $analysis) = $self->_rearrange([qw(CLONE
+                                                   ANALYSIS)],
+					        @args);
   
-    $self->clone ($clone) if ($clone);       
-    $self->program ($self->find_executable ($program));
+    if ($analysis) {
+        $self->analysis($analysis);
+    } else {
+        $self->throw("Waba needs an analysis");
+    }
 
-    if ($database) {
-        $self->database($database);
+    $self->clone ($clone) if ($clone);       
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
+
+    if ($self->analysis->db_file) {
+        $self->database($self->analysis->db_file);
     } else {
         $self->throw("Waba needs a database");
     }
@@ -175,6 +181,29 @@ sub database {
         $self->{'_database'} = shift;
     }
     return $self->{'_database'};
+} 
+
+
+=head2 analysis
+
+ Title    : analysis
+ Usage    : $self->analysis ($analysis);
+ Function : get/set method for the analysis
+ Example  :
+ Returns  : analysis
+ Args     : analysis (optional)
+ Throws   :
+
+=cut
+
+sub analysis {
+    my $self = shift;
+    if (@_) {
+        $self->{'_analysis'} = shift;
+        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))      
+       || $self->throw("Input isn't a Bio::EnsEMBL::AnalysisI or Bio::EnsEMBL::Analysis");
+    }
+    return $self->{'_analysis'};
 } 
 
 ####################
