@@ -135,7 +135,10 @@ sub _align_protein {
   
   my $genio  = new Bio::SeqIO(-file   => ">$genfile",
 			      '-format' => 'fasta');
-  
+  my $verbose = 0;
+  #if($self->protein->id eq 'CE25688'){
+  #  $verbose = 1;
+  #}
   $genio->write_seq($self->genomic);
   $genio = undef;
   
@@ -160,19 +163,18 @@ sub _align_protein {
   #print STDERR "Command is $command\n";
   
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
-
+  #open(GW, "$command | tee -a /tmp/genewise.out |") or $self->throw("error piping to genewise: $!\n");
   # for genesf parsing
   my @genesf_exons;
   my $curr_exon;
   my $curr_gene;
-
   # making assumption of only 1 gene prediction ... this will change once we start using hmms
 
   #print STDERR "################# GENEWISE ####################\n";
  GENESF: 
   while (<GW>) {
     
-    #print STDERR "$_";
+#    print STDERR "$_";
    
     chomp;
     my @f = split;
@@ -185,6 +187,7 @@ sub _align_protein {
     
     #print STDERR $_."\n";
     if($f[0] eq 'Gene'){
+      #print STDERR "$_" if($verbose);
       # flag a frameshift - ultimately we will do something clever here but for now ...
       
       # frameshift is here defined as two or more genes produced by Genewise from a single protein
@@ -199,6 +202,7 @@ sub _align_protein {
     }
     
     elsif($f[0] eq 'Exon'){
+      #print STDERR "$_" if($verbose);
       #      make a new "exon"
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->genomic->id);
@@ -230,11 +234,11 @@ sub _align_protein {
       $self->addExon($curr_exon);
       push(@genesf_exons, $curr_exon);
     
-      #print STDERR "Exon: ".$start."-".$end." phase: ".$phase." end_phase: ".$end_phase." str: ".$strand."\n";
+      #print STDERR "Exon: ".$start."-".$end." phase: ".$phase." end_phase: ".$end_phase." str: ".$strand."\n" if($verbose);
     }
     
     elsif($f[0] eq 'Supporting'){
-      
+      #print STDERR "$_" if($verbose);
       my $gstart = $f[1];
       my $gend   = $f[2];
       my $strand = 1;
@@ -252,24 +256,22 @@ sub _align_protein {
 
       my $pstart = $f[3];
       my $pend   = $f[4];
+      #print STDERR "Supporting start ".$gstart. " end ".$gend." hstart ".$pstart." hend ".$pend."\n" if($verbose); 
       if($pstart > $pend){
 	$self->warn("Protein start greater than end! Skipping this suppfeat\n");
 	next GENESF;
       }
       
       # start a new "alignment"
-      my $pf = new Bio::EnsEMBL::SeqFeature( -start   => $pstart,
-					     -end     => $pend,
-					     -seqname => $self->protein->id,
-					     -strand  => 1
-					   ); 
-      my $gf  = new Bio::EnsEMBL::SeqFeature( -start   => $gstart,
-					      -end     => $gend,
-					      -seqname => 'genomic',
-					      -strand  => $strand,
-					    );
-      my $fp = new Bio::EnsEMBL::FeaturePair( -feature2 => $pf,
-					      -feature1 => $gf);
+      my $fp = new Bio::EnsEMBL::FeaturePair();
+      $fp->start($gstart);
+      $fp->end($gend);
+      $fp->strand($strand);
+      $fp->seqname('genomic');
+      $fp->hseqname($self->protein->id);
+      $fp->hstart($pstart);
+      $fp->hend($pend);
+      $fp->hstrand(1);
       $curr_exon->add_sub_SeqFeature($fp,'');
     }
     
@@ -387,7 +389,13 @@ sub eachExon {
     if (!defined($self->{'_output'})) {
 	$self->{'_output'} = [];
     }
-
+    #   print "there are ".@{$self->{'_output'}}." genes\n";
+    #   foreach my $gene(@{$self->{'_output'}}){
+    #     print "gene has ".$gene->sub_SeqFeature." exon\n";
+    #     foreach my $e($gene->sub_SeqFeature){
+    #	print "exon has ".$e->sub_SeqFeature." supporting features\n";
+    #  }
+    #}
     return @{$self->{'_output'}};
 }
 
