@@ -49,19 +49,19 @@ use Bio::SeqIO;
 sub new {
   my($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-  
+  #print "args = @args\n";
   my ($genomic, $memory,$reverse,$endbias,$genewise,$hmmfile) = 
       $self->_rearrange([qw(GENOMIC MEMORY REVERSE ENDBIAS GENEWISE HMMFILE)], @args);
   
-#  print $genomic . "\n";
-
+  #  print $genomic . "\n";
+ 
   $genewise = 'genewise' unless defined($genewise);
 
   $self->genewise($self->find_executable($genewise));
 
   $self->genomic($genomic) || $self->throw("No genomic sequence entered for blastwise");
   $self->hmmfile($hmmfile) || $self->throw("No Hmm file entered for Hmmgenewise");
-
+  #print $reverse."\n";
   $self->is_reverse($reverse)   if (defined($reverse));             
   $self->endbias($endbias)   if (defined($endbias));             
   $self->memory ($memory)    if (defined($memory));
@@ -141,7 +141,7 @@ sub _align_protein {
   $genio = undef;
 
   
-  my ($hmmname) = $self->hmmfile =~ /\w+.hmm$/g;
+  my ($hmmname) = $self->hmmfile =~ /PF\d+/g;
 
   my $genewise = $self->genewise;
 
@@ -264,7 +264,7 @@ sub _align_protein {
 
 sub is_reverse {
   my ($self,$arg) = @_;
-
+  #print "running is reverse\n";
   if ($arg==1) {
     $self->{'_reverse'} = $arg;
   }else{
