@@ -76,7 +76,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::Object
+use Bio::Root::Object;
 
 #use Data::Dumper;
 
