@@ -645,13 +645,42 @@ sub find_common_ends {
         
     # take the 2 bases right before the exon and after the exon
     if ($cluster->strand == 1){
-      print STDERR "getting subseq in ( ".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
-      $upstream   = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
-      $downstream = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
+      # catch possible exceptions in gettting the sequence (it might not be there!)
+      eval{
+	$upstream   = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
+      };
+      if ($@){
+	print STDERR "Unable to get subsequence (".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
+	#print STDERR $@;
+	$upstream = 'NN';
+      }
+      eval{
+	$downstream = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
+      };
+      if ($@){
+	print STDERR "Unable to get subsequence (".(($cluster->end)+1).",".(($cluster->end)+2).")\n";
+	#print STDERR $@;
+	$downstream = 'NN';
+      }
     }
     if ($cluster->strand == -1){
-      $downstream = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
-      $upstream   = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
+      # catch possible exceptions in gettting the sequence (it might not be there!)
+      eval{
+	$downstream = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
+      };
+      if ($@){
+	print STDERR "Unable to get subsequence (".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
+	#print STDERR $@;
+	$downstream ='NN';
+      }
+      eval{
+	$upstream   = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
+      };
+      if ($@){
+	print STDERR "Unable to get subsequence (".(($cluster->end)+1).",".(($cluster->end)+2).")\n";
+	#print STDERR $@;
+	$upstream = 'NN';
+      }
       # take the reverse complement
       ( $downstream = reverse( $downstream) ) =~ tr/ACGTacgt/TGCAtgca/;
       ( $upstream   = reverse( $upstream )  ) =~ tr/ACGTacgt/TGCAtgca/;
