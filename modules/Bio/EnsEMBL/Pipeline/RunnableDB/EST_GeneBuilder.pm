@@ -233,6 +233,8 @@ sub fetch_input {
 GENE:    
     foreach my $gene (@genes) {
       my @transcripts = $gene->each_Transcript;
+      
+      # skip genes with more than one transcript
       if( scalar(@transcripts) > 1 ){
 	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
 	next GENE;
@@ -240,11 +242,13 @@ GENE:
 
       my @exons = $transcripts[0]->get_all_Exons;
 
+      # skip genes with one exon
       if(scalar(@exons) == 1){
 	$single++;
 	next GENE;
       }
 
+      # keep only genes in the forward strand
       if($exons[0]->strand == 1){
 	push (@plus_transcripts, $transcripts[0]);
 	next GENE;
@@ -428,7 +432,7 @@ sub cluster_transcripts {
   my ($self, $alltranscripts, $reverse) = @_;
 
   # need all the exons - we're going to cluster them; while we're at it, check consistency of hid & strand
-  my %est2transcript; # relate transcript to est id
+  my %est2transcript;  # relate transcript to est id
   my %exon2est;        # relate exon to est id
   my @exons = $self->check_transcripts(\%est2transcript, \%exon2est, @$alltranscripts);
  
@@ -459,7 +463,8 @@ sub cluster_transcripts {
 
     Title   :   check_transcripts
     Usage   :   $self->check_transcripts
-    Function:   checks transcripts for strand consistency, hid consistency & exon content
+    Function:   checks transcripts obtained from EST2Genome for consistency among exons
+                in strand, hid, and also checks for exon content
     Returns :   @Bio::EnsEMBL::Exon
     Args    :   @Bio::EnsEMBL::Transcript, ref to hash for linking hid to transcript, ref to hash for linking exon to hid, 
 
@@ -467,7 +472,7 @@ sub cluster_transcripts {
 
 sub check_transcripts {
   my ($self, $hid_trans, $exon_hid, @transcripts) = @_;
-  my @allexons;
+  my @allexons;  # here we'll put all exons that pass the check
   my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
 
   TRANS: 
@@ -475,37 +480,31 @@ sub check_transcripts {
     my @exons = $transcript->get_all_Exons;
     my $hid;
     my $strand;
-    
     my $num4=0;
+    
     foreach my $exon(@exons){
       my $hstart;
       my $hend;
       $num4++;
+    
       # check strand consistency
       if(!defined $strand) { 
 	$strand = $exon->strand; 
       }
-      
       if($strand ne $exon->strand){
 	$self->warn("strand not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
 	next TRANS;
       }
       
-      my $num3 = 1;
       # check supporting_feature consistency
       $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @sf = $exon->each_Supporting_Feature;      
+
     SF:
-      my $check=0;
       foreach my $feature ( @sf ) {
 	# because we get all the supporting features indiscriminately
 	next SF unless $feature->source_tag eq 'exonerate_e2g';
-	$check=1;
-	#print STDERR "check = ".$check."\n";
-	#print STDERR "Supporting Feature ".$num4."-".$num3." is a ".ref( $feature )
-        #             ."\t".$feature->source_tag."\n";	
-	$num3++;
-
+	
 	if(!defined $hid) { $hid = $feature->hseqname; }
 	
 	if($hid ne $feature->hseqname){
@@ -515,21 +514,16 @@ sub check_transcripts {
       }
 
       if ( defined( @sf ) && scalar( @sf ) != 0 ) {
-	#print STDERR scalar(@sf)."@sf is defined!!?\n";
 	$hstart = $sf[0]->hstart;
 	$hend   = $sf[$#sf]->hend;
-	#print STDERR "hstart:                 ".$hstart.
-	#         "\thend:                 ".$hend."\n";
       }
-      $$exon_hid{$exon}{"hid"} = $hid;
-      $$exon_hid{$exon}{"hstart"} = $hstart;
-      $$exon_hid{$exon}{"hend"} = $hend;
-      #print   STDERR "exon_hid{exon}{hstart}: ".$$exon_hid{$exon}{"hstart"}.
-      #           "\texon_hid{exon}{hend}: ".$$exon_hid{$exon}{"hend"}."\n";
-      # make sure we can get out the hid corresponding to this exon
-    }
 
+      $$exon_hid{$exon}{"hid"}    = $hid;
+      $$exon_hid{$exon}{"hstart"} = $hstart;
+      $$exon_hid{$exon}{"hend"}   = $hend;
+    }
     push(@allexons, @exons);
+    
     if(defined $hid && defined $$hid_trans{$hid}) { 
       $self->warn("$hid is being used by more than one transcript!\n"); 
     }
@@ -537,7 +531,6 @@ sub check_transcripts {
   }
 
   return @allexons;
-
 }
 
 
@@ -563,26 +556,24 @@ sub make_clusters {
   my $count = 0;
 
  EXON:
-  foreach my $e(@exons) {
-#    print STDERR "Clustering " . $e->dbID . "\n";
-
+  foreach my $e (@exons) {
+    
     if ($count > 0) {
       my @overlap = $self->match($e, $subcluster);    
- #     print STDERR "Overlap :@overlap:$#overlap\n";
-
+      
       # Add to cluster if overlap AND if strand matches
       if ( $overlap[0] && ( $e->strand == $subcluster->strand) ) { # strand is not checked in 'match'
 	$subcluster->add_sub_SeqFeature($e,'EXPAND');
       }  
       else {
 	# Start a new cluster
-	  $subcluster = new Bio::EnsEMBL::SeqFeature;
-	  $subcluster->add_sub_SeqFeature($e,'EXPAND');
-	  $subcluster->strand($e->strand);
-	  
-	  # And add to the top cluster feature
-	  $main_cluster->add_sub_SeqFeature($subcluster,'EXPAND');	
-	}
+	$subcluster = new Bio::EnsEMBL::SeqFeature;
+	$subcluster->add_sub_SeqFeature($e,'EXPAND');
+	$subcluster->strand($e->strand);
+	
+	# and add it to the main_cluster feature
+	$main_cluster->add_sub_SeqFeature($subcluster,'EXPAND');	
+      }
     }
     $count++;
   }
@@ -594,20 +585,45 @@ sub make_clusters {
   # If we're building genes from cDNAs, we need to take clusters with 1 exon as well, since
   # we have less hits, but these are of better quality than the ESTs
 
-  print STDERR "Not throwing away clusters with one exon\n";
   my @exon_clusters = $main_cluster->sub_SeqFeature;
-  print STDERR scalar(@exon_clusters)." clusters found\n";
+  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters found\n";
+  
+  # empty out the list of clusters
+  $main_cluster->flush_sub_SeqFeature;
+  print STDERR "Throwing away clusters with one exon if it has EST hits only...\n";
 
-  #$main_cluster->flush_sub_SeqFeature;
-
-  #my $c = 0;
-  #foreach my $ec (@exon_clusters) {
-  #  $c++;
-  #  my @exons    = $ec->sub_SeqFeature;
-  #  $main_cluster->add_sub_SeqFeature($ec,'EXPAND') unless scalar(@exons) <= 1;
-  #}
-  #@exon_clusters = $main_cluster->sub_SeqFeature;
-
+  ################################################################################
+  # NOTE THAT THIS IS A HACK TO MAKE IT WORK IN DROSOPHILA
+  # THE DISTINCTION BETWEEN EST and cDNA SHOULD BE READ FROM analysisId or maybe analysis name 
+  ################################################################################
+ EXON_CLUSTER:
+  foreach my $exon_cluster (@exon_clusters) {
+    my @exons = $exon_cluster->sub_SeqFeature;
+    if ( scalar(@exons) == 0 ){
+      next EXON_CLUSTER;
+    }
+    if ( scalar(@exons) == 1 ){
+      my $found_est  = 0;
+      my $found_cdna = 0;
+      foreach my $feature ( $exons[0]->each_Supporting_Feature ){
+	my $hid = $feature->hseqname;
+	if ( $hid =~ /\./g ){  # ESTs have labels like AT19106.5prime or like LD23056.contig.5_3prime
+	  $found_est = 1;
+	}
+	else{                  # whereas cDNAs have labels like AI944764 (without dots)
+	  $found_cdna = 1;
+	}
+      }
+      if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
+	next EXON_CLUSTER; 
+      }
+    }
+    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
+  }
+  
+  @exon_clusters = $main_cluster->sub_SeqFeature;
+  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters found\n";
+      
   return $main_cluster;
 }
 
@@ -631,6 +647,7 @@ sub find_common_ends {
   my $count    =  0 ;
   my ($upstream_correct, $downstream_correct) = (0,0);
   
+  print STDERR "finding common ends and checking for splice sites...\n";
   foreach my $cluster(@clusters) {
     my %start;
     my %end;
@@ -723,17 +740,16 @@ sub find_common_ends {
 	$downstream = 'NN';
       }
       # print-outs to test it
-      
-      if ( $count ==0 ){
-	print STDERR "FIRST EXON-->".$downstream;
-      }
-      if ( $count != 0 && $count != $#clusters ){
-	print STDERR $upstream."-->EXON-->".$downstream;
-      }
-      if ( $count == $#clusters ){
-	print STDERR $upstream."-->LAST EXON";
-      }
-      print "\n";
+#      if ( $count ==0 ){
+#	print STDERR "FIRST EXON-->".$downstream;
+#      }
+#      if ( $count != 0 && $count != $#clusters ){
+#	print STDERR $upstream."-->EXON-->".$downstream;
+#      }
+#      if ( $count == $#clusters ){
+#	print STDERR $upstream."-->LAST EXON";
+#      }
+#      print "\n";
       
       # the first and last exon are not checked - potential UTR's
       if ( $count != 0 && $upstream eq 'AG') {       
@@ -784,16 +800,16 @@ sub find_common_ends {
       
       # so the conserved sequence should be AC<-EXON<-CT printed as in the reverse strand
 
-      if ( $count ==0 ){
-	print STDERR "LAST EXON<--".$upstream;
-      }
-      if ( $count != 0 && $count != $#clusters ){
-	print STDERR $downstream."<--EXON<--".$upstream;
-      }
-      if ( $count == $#clusters ){
-	print STDERR $downstream."<--FIRST EXON";
-      }
-      print "\n";
+#      if ( $count ==0 ){
+#	print STDERR "LAST EXON<--".$upstream;
+#      }
+#      if ( $count != 0 && $count != $#clusters ){
+#	print STDERR $downstream."<--EXON<--".$upstream;
+#      }
+#      if ( $count == $#clusters ){
+#	print STDERR $downstream."<--FIRST EXON";
+#      }
+#      print "\n";
       
       # the first and last exon are not checked - potential UTR's
       if ( $count != $#clusters && $downstream eq 'AC') {       
@@ -805,10 +821,10 @@ sub find_common_ends {
       $count++;
     }
   }
-  print STDERR "upstream splice-sites correct (AG)  : ".$upstream_correct. 
-               " out of ".($#clusters)." splice-sites\n";
-  print STDERR "downstream splice-sites correct (GT): ".$downstream_correct. 
-               " out of ".($#clusters)." splice-sites\n";
+  print STDERR "upstream splice-sites correct: ".$upstream_correct. 
+               " out of ".($#clusters)." potential splice-sites\n";
+  print STDERR "downstream splice-sites correct: ".$downstream_correct. 
+               " out of ".($#clusters)." potential splice-sites\n";
 
   return $main_cluster;
 }
@@ -858,14 +874,14 @@ sub link_clusters{
   # Loop over all clusters
  CLUSTER1:  
   for (my $c1 = 0; $c1 < $#clusters; $c1++) {
-    print "\nFinding links in cluster number $c1... \n";
+    #print "\nFinding links in cluster number $c1... \n";
     my $cluster1 = $clusters[$c1];             
     my @exons1   = $cluster1->sub_SeqFeature; 
     my $c2       = $c1 + 1;
     my $limit    = 2; # how many exons away we look to find a link, 2 is the limit used by sub make_ExonPairs 
                       # in GeneBuilder.pm
     
-    # Now look in the next $limit clusters to find a link
+    # Now look (in each exon ) in the next $limit clusters to find a link
   CLUSTER2:    
     while ( $c2 <= ( $c1 + $limit ) && $c2 <= $#clusters ) {
       my $cluster2 = $clusters[$c2];      
@@ -893,37 +909,35 @@ sub link_clusters{
 
 	  # If we have the same id in two clusters then...
 	  if ( defined $exon_link ) {
-	    print("  Found ids in two clusters: " . $exon1->dbID . " " . $exon_link->dbID  . "\n");
+	    #print("  Found ids in two clusters: " . $exon1->dbID . " " . $exon_link->dbID  . "\n");
 	    
 	    # Check the strand is the same and only allow a $tol discontinuity in the h-sequence
 	    my $tol1 = abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'});
 	    my $tol2 = abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'});
-	    
+
 	    if ( $exon1->strand == $exon_link->strand && ( $tol1 < $tol || $tol2 < $tol ) ) {
 	      $foundlink = 1;
-	      print STDERR "   tol1: ".$tol1." tol2: ".$tol2."\n";
-	    }
-	    else {
-	      print STDERR "--- not going to be able to link cluster $c1 and $c2\n";
-	      print STDERR "   exon1 : ". $exon1->start . " - " .$exon1->end 
-		." potential link : ". $exon_link->start." - ".$exon_link->end."\n";
-	      print STDERR "   Exonerate hit - start: ".$$exon_hid{$exon1}{'hstart'}." - end: "
-		.$$exon_hid{$exon1}{'hend'}." tol1: ".$tol1." tol2: ".$tol2."\n";
-	    }
-	    if ($foundlink == 1) {
-	      print STDERR "*** linking cluster $c1 to cluster $c2 ***\n";
-	      # We have found a link between $cluster1 and $cluster2
-	      #	print("Creating link from " . $cluster1->start . "\t" . $cluster1->end . "\n");
-	      #	print("to                 " . $cluster2->start . "\t" . $cluster2->end . "\n");
 	      push(@{ $cluster1->{'_forward'} } ,$cluster2);
-	      # we've found a link we can happily move to the next cluster2 (if we have't done so yet)
+	      print STDERR "*** linking cluster $c1 to cluster $c2 ***\n";
+	      # just announcing alternative splicing
+	      if ( $c2 >= $c1+$limit ){
+	       print STDERR " -------------- Alternative Splicing ----------------\n";
+	       print STDERR "hid1 : ".$hid1." hid2 : ".$$exon_hid{$exon_link}{'hid'}."\n";
+	      # print STDERR "exons in cluster $c1: ".scalar( @exons1 )."\n";
+	      # print STDERR "exons in cluster $c2: ".scalar( @exons2 )."\n";
+	      }
 	      $c2++;
 	      next CLUSTER2;
 	    }
-	  } # end of if ( defined $exon_link )
 	
+	  } # end of if ( defined $exon_link )
+	  
 	}   # end of EXON1
-
+	
+	if ($foundlink != 1){
+	  # print STDERR "not going to be able to link cluster $c1 and $c2\n";
+	}
+	
       }     # end of if ($cluster2->start > $cluster1->end)
       $c2++;
     }       # end of CLUSTER2
@@ -1090,17 +1104,16 @@ sub _get_RepresentativeExon {
     $exon_copy->add_Supporting_Feature($sf);
   }
 
-
   # at this point we could add all the EST-supporting-features of the rest of the exons in the cluster
   # to the supporting features of this exon, something like:
-#  shift @exons;
-#  foreach my $ex ( @exons ){
-#    foreach my $sf ($ex->each_Supporting_Feature){
-#      # add only those that relate to EST's
-#      next unless ( $sf->source_tag eq 'bmeg' );
-#      $exon_copy->add_Supporting_Feature($sf);
-#    }
-#  }
+  shift @exons;
+  foreach my $ex ( @exons ){
+    foreach my $sf ($ex->each_Supporting_Feature){
+      # add only those that relate to EST's?
+      #next unless ( $sf->source_tag eq 'exonerate_e2g' );
+      $exon_copy->add_Supporting_Feature($sf);
+    }
+  }
 
   return $exon_copy;
 }
@@ -1110,7 +1123,7 @@ sub _get_RepresentativeExon {
  Title   : _isHead
  Usage   : my $is_first_cluster = $self->_isHead($cluster,\@clusters); 
  Function: checks through all clusters in @clusters to see whether
-           $cluster is linked to a preceding cluster.
+           $cluster is linked to a preceeding cluster.
  Example : 
  Returns : 0 (if the cluster is not the first), 1 (if the cluster is the first, i.e. the head)
  Args    : one exon-cluster and one Array-ref to exon-clusters, these are Bio::EnsEMBL::SeqFeature
@@ -1238,7 +1251,7 @@ sub run {
 
   # sort out analysis & genetype here or we will get into trouble with duplicate analyses
   #  my $genetype = 'genomewise'; 
-  my $genetype = "genomewise";   # genes get written in the database with this type-name
+  my $genetype = "new_genomewise_no1est";   # genes get written in the database with this type-name
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis_obj;
@@ -1569,8 +1582,7 @@ sub match {
   }
 
   # Now check for an overlap
-  if (($end2 > $start1 && $start2 < $end1) ||
-	($start2 < $end1 && $end2 > $start1)) {
+  if (($end2 > $start1 && $start2 < $end1) ) {
 	
 	#  we have an overlap so we now need to return 
 	#  two numbers reflecting how accurate the span 
@@ -1579,7 +1591,7 @@ sub match {
 	# a positive number means an over match to the exon
 	# a negative number means not all the exon bases were matched
 
-	my $left = ($start2 - $start1);
+	my $left  = ($start2 - $start1);
 	my $right = ($end1 - $end2);
 	
 	if ($rev1) {
