@@ -341,11 +341,12 @@ sub run_gapped {
   
   #clean up temp files
   if(ref($estseq) eq 'ARRAY'){
-    $self->_deletefiles($genfile, $estfile, $resfile);
+    $self->_deletefiles($estfile);
   }
-  else {
-    $self->_deletefiles($genfile, $resfile);
+  if(ref($genomicseq) eq 'ARRAY') {
+    $self->_deletefiles($genfile);
   }
+  $self->_deletefiles($resfile);
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
@@ -701,8 +702,8 @@ sub add_genes {
 
 =head2 each_gene
 
-  Title   : each_genes
-  Usage   : $self->each_genes
+  Title   : each_gene
+  Usage   : $self->each_gene
   Function: Returns results of exonerate as an array of FeaturePair, one per gene. Exons
             are added as subSeqfeatures of genes, and supporting evidence as subSeqFeatures 
             of Exons.
