@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 
 # config file; parameters searched for here if not passed in as @args
@@ -333,14 +334,14 @@ sub run{
 
   my @cloned_ensembl_genes;
   foreach my $gene (@ensembl_genes){
-      my $newgene = $self->_clone_Gene($gene);
+      my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
       push( @cloned_ensembl_genes, $newgene);
   }
   $self->ensembl_genes( @cloned_ensembl_genes );
   
   my @cloned_est_genes;
   foreach my $gene ( @est_genes){
-      my $newgene = $self->_clone_Gene($gene);
+      my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
       push( @cloned_est_genes, $newgene );
   }
   $self->estgenes( @cloned_est_genes );
@@ -352,7 +353,6 @@ sub run{
   TRAN1:
     foreach my $transcript (@transcripts){
       $transcript->type($gene->type);
-      $self->_transcript_Type($transcript,$ENSEMBL_TYPE);
       push (  @original_ens_transcripts, $transcript );
     }
   }
@@ -362,7 +362,6 @@ sub run{
   TRAN2:
     foreach my $transcript (@transcripts){
       $transcript->type($gene->type);
-      $self->_transcript_Type($transcript,$ESTGENE_TYPE);
       push (  @original_est_transcripts, $transcript );
     }
   }
@@ -1231,99 +1230,6 @@ sub _check_Completeness{
   return 0;
 }
     
-#########################################################################
-
-sub _clone_Gene{
-  my ($self,$gene) = @_;
-  
-  my $newgene = new Bio::EnsEMBL::Gene;
-  if ($gene->type){
-      $newgene->type( $gene->type);
-  }
-  if ( defined $gene->dbID ){
-      $newgene->dbID($gene->dbID);
-  }
-  if ( defined $gene->analysis ){
-      $newgene->analysis($gene->analysis);
-  }
-  foreach my $transcript (@{$gene->get_all_Transcripts}){
-    my $newtranscript = $self->_clone_Transcript($transcript);
-    $newgene->add_Transcript($newtranscript);
-  }
-  return $newgene;
-}
-
-#########################################################################
-
-sub _clone_Transcript{
-  my ($self,$transcript) = @_;
-  
-  #print STDERR "Cloning:\n";
-  #$self->_print_Transcript($transcript);
-  my $newtranscript  = new Bio::EnsEMBL::Transcript;
-  my $newtranslation = new Bio::EnsEMBL::Translation;
-  
-  my $translation_start_exon = $transcript->translation->start_Exon;
-  my $translation_end_exon   = $transcript->translation->end_Exon; 
-  
-  foreach my $exon ( @{$transcript->get_all_Exons} ){
-    my $newexon = $self->_clone_Exon($exon);
-    if ($exon == $translation_start_exon){
-      $newtranslation->start_Exon($newexon);
-      $newtranslation->start($transcript->translation->start);
-    }
-    if ($exon == $translation_end_exon){
-      $newtranslation->end_Exon($newexon);
-      $newtranslation->end($transcript->translation->end);
-    }
-    $newtranscript->add_Exon($newexon);
-  }
-  #$newtranscript->sort;
-  $newtranscript->dbID($transcript->dbID);
-  if (defined $transcript->type ){
-      $newtranscript->type($transcript->type);
-  }
-  $self->_transcript_Type($newtranscript,$self->_transcript_Type($transcript));
-  $newtranscript->translation($newtranslation);
- 
-  return $newtranscript;
-}
-
-#########################################################################
-
-sub _clone_Exon{
-  my ($self,$exon) = @_;
-  my $newexon = new Bio::EnsEMBL::Exon;
-  $newexon->start      ($exon->start);
-  $newexon->end        ($exon->end);
-  $newexon->phase      ($exon->phase);
-  $newexon->end_phase  ($exon->end_phase);
-  $newexon->strand     ($exon->strand);
-  $newexon->dbID       ($exon->dbID);
-  $newexon->contig     ($exon->contig);
-  $newexon->sticky_rank($exon->sticky_rank);
-  $newexon->seqname    ($exon->seqname);
-  $newexon->attach_seq ($self->ensembl_vc);
-
-  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
-    $newexon->add_supporting_features( $evidence );
-  }
-  return $newexon;
-}
-
-#########################################################################
-
-sub _transcript_Type{
-  my($self,$transcript,$type) = @_;
-  unless (  $self->{type}{$transcript} ){
-    $self->{type}{$transcript} ='none';
-  }
-  if ($type){
-    $self->{type}{$transcript} = $type;
-  }
-  return $self->{type}{$transcript};
-}
-
 #########################################################################
 
 # having a set of est_genes only, we have no reference transcript (ensembl one),
@@ -2203,7 +2109,7 @@ sub _extend_UTRs{
   }   # end of EST_EXON
   
   if ( $modified ){
-    $self->_transcript_Type($ens_tran,'modified');
+    $ens_tran->type('modified');
   }
 
   $ens_tran->translation($ens_translation);
