@@ -29,6 +29,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
                                         EST_E2G_DBPASS
                                         EST_E2G_DBHOST
 					EST_BLAT_GENOMIC
+					EST_BLAT_OPTIONS
 				       );
 
 
@@ -108,6 +109,7 @@ my $runobj = "$runnable"->new(-db         => $db,
 			      -database   => $EST_BLAT_GENOMIC,
 			      -query_type => 'rna',
 			      -target_type=> 'dna',
+			      -options    => "$EST_BLAT_OPTIONS",
 			     );
 
 $runobj->fetch_input;
