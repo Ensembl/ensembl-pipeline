@@ -189,7 +189,7 @@ sub process_pmatches{
   my $max_intron = $GB_PMATCH_MAX_INTRON;
   open(PMATCHES, "<$pmatchfile") or die "can't open [$pmatchfile]\n";  
   my $prot_id;
-  my $current_pmf = new Bio::EnsEMBL::Pipeline::Pmatch::First_PMF(
+  my $current_pmf = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF(
 				  -plengths => \%plengths,
 				  -protfile => $protfile,
 				  -pmatch   => $pmatch,
@@ -216,7 +216,7 @@ sub process_pmatches{
 	}
 
       # start a new PMF
-      $current_pmf = new Bio::EnsEMBL::Pipeline::Pmatch::First_PMF(
+      $current_pmf = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF(
 								   -plengths => \%plengths,
 								   -protfile => $protfile,
 								   -pmatch   => $pmatch,
