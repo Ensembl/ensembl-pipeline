@@ -46,36 +46,39 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::EPCR';
-my $sts_db   = $::pipeConf{'datadir'} . "/UniSTS";
+my $sts_db   = $::pipeConf{'datadir'} . "/mapprimer_maps_110"; #"/UniSTS";
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Analysis->new (   -db_file             => $sts_db,
-                                                    -db_version     => '1',
-                                                    -program        => 'e-PCR',
-                                                    -program_version=> 1,
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'e-PCR',
-                                                    -gff_feature    => 'similarity', 
-                                                    -parameters     => '',
-                                                    -logic_name     => 'e-PCR'
-                                                     );
+my $ana = $ana_adaptor->fetch_by_logic_name('e-PCR');
+$ana->db_file($sts_db);
+
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db_file             => $sts_db,
+#                                                    -db_version     => '1',
+#                                                    -program        => 'e-PCR',
+#                                                    -program_version=> 1,
+#                                                    -module         => $runnable,
+#                                                    -module_version => 1,
+#                                                    -gff_source     => 'e-PCR',
+#                                                    -gff_feature    => 'similarity', 
+#                                                    -parameters     => '',
+#                                                    -logic_name     => 'e-PCR'
+#                                                     );
 
 unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id ='AB000381.00001';
+my $id = 'AB015752.00001';  #'AB000381.00001';
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(  -dbobj      => $db,
-                                -input_id   => $id,
-                                -analysis   => $ana );
+my $runobj = "$runnable"->new(  -db       => $db,
+                                -input_id => $id,
+                                -analysis => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
 else
 { print "ok 4\n"; }
 
-$runobj->fetch_input;;
+$runobj->fetch_input;
 $runobj->run;
 
 my @out = $runobj->output;
@@ -86,7 +89,8 @@ else
 display(@out);
 
 $runobj->write_output();
-my @features = $db->get_Contig($id)->get_all_SimilarityFeatures();
+my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
+my @features = $contig->adaptor->fetch_all_simple_features($contig, 'e-PCR');
 display(@features);
 
 unless (@features)
