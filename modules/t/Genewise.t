@@ -8,7 +8,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::SeqIO;
 
 ok(1);
-
+print STDERR "genewise test is being created\n";
 my $genfile = 't/data/AC099340.fa.masked';
 my $pepfile = 't/data/testpep.fa';
 
@@ -24,7 +24,7 @@ ok(my $pepseqio = new Bio::SeqIO(-fh => \*IN));
 
 while (my $pseq = $pepseqio->next_seq) {
   ok($pseq);
-  
+  print STDERR "have peptide sequence\n";
   my $reverse = 0;
   
   if ($pseq->id eq 'Q91VS1') {
@@ -39,8 +39,8 @@ while (my $pseq = $pepseqio->next_seq) {
   
   
   
-  #ok($genewise->run());
-  #ok(my @results = $genewise->output());
+  ok($genewise->run());
+  ok(my @results = $genewise->output());
   
   my @results;
 
