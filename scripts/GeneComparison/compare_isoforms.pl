@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 use strict;  
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -94,8 +94,8 @@ $mouse_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $mouse_dbhost,
 my $human_adaptor = $human_db->get_GeneAdaptor;
 my $mouse_adaptor = $mouse_db->get_GeneAdaptor;
 
-my $human_gene = $human_adaptor->fetch_by_stable_id( $human_id,1);
-my $mouse_gene = $mouse_adaptor->fetch_by_stable_id( $mouse_id,1);
+my $human_gene = $human_adaptor->fetch_by_stable_id( $human_gene_id,1);
+my $mouse_gene = $mouse_adaptor->fetch_by_stable_id( $mouse_gene_id,1);
 
 ############################################################
 # call the comparison method
