@@ -113,7 +113,7 @@ sub _initialize {
     $self->{_parameters} =undef;    #location of parameters for genscan
     my($clonefile, $genscan, $parameters) = 
         $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM'], @args);
-    
+
     $self->clone($clonefile) if ($clonefile);
     if ($genscan)       
     {$self->genscan($genscan) ;}
@@ -157,6 +157,16 @@ sub clone {
     Usage   :   $obj->protect('.masked', '.p');
     Function:   Protects files with suffix from deletion when execution ends
     Args    :   File suffixes
+
+=cut
+
+=head2 threshold
+
+    Title   :   threshold
+    Usage   :   $obj->threshold($value);
+    Function:   Get/set method for threshold score required for outputting
+                Feature/FeaturePair
+    Args    :   Optional value (theshold score value)
 
 =cut
 
@@ -300,12 +310,12 @@ sub run_genscan {
 
 sub parse_results {
     my ($self) = @_;
-        
+
     my %exon_type = ('Sngl', 'Single Exon',
                      'Init', 'Initial Exon',
                      'Intr', 'Internal Exon',
                      'Term', 'Terminal Exon');
-    
+
     my $filehandle;
     if (ref ($self->results) !~ /GLOB/)
     {
@@ -317,13 +327,13 @@ sub parse_results {
     {
         $filehandle = $self->results;
     }
-    
+
     if (<$filehandle> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
     {
         print "No genes predicted\n";
         return;
     }
-    
+
     #The big parsing loop - parses exons and predicted peptides
     while (<$filehandle>)
     {
@@ -369,7 +379,7 @@ sub parse_results {
             my $peptide_string;
             while (<$filehandle>)
             {
-                
+
                 if (!/(^>|^\n)/)
                 {   
                     $peptide_string .= $_;
@@ -384,15 +394,16 @@ sub parse_results {
             foreach (@peptides)
                 { $self->peptides($_); }
         }
-   }
-   #end of big loop. Now build up genes
-   $self->create_genes();
-   unless ($self->clone)
-   {
-        print STDERR "Can't calculate phases without Bio::Seq Loaded\n";
+    }
+    #end of big loop. Now build up genes
+    $self->create_genes();
+    unless ($self->clone)
+    {
+        print STDERR "Can't calculate phases if Bio::Seq isn't supplied\n";
         return;
-   }
-   $self->calculate_and_set_phases();
+    }
+    $self->calculate_and_set_phases();
+    $self->clear_exons(); #free up unecessary storage 
 }
 
 #uses peptide and translated exons to calculate start and end phase.
@@ -401,11 +412,11 @@ sub calculate_and_set_phases {
     my ($self) = @_;
     my @genes       = $self->genes();
     my @peptides    = $self->peptides();
-    
+
     #check file has been correctly parsed to give equal genes and peptides
     $self->throw("Mismatch in number of genes and peptides parsed from file") 
             unless (scalar(@genes) == scalar (@peptides));
-    
+
     #Genscan phases are just the result of modulo 3 division which is useless.
     #Correct calculation of phases requires the sequence to be translated into
     #all three reading frames and compared against the genscan predicted peptide
@@ -418,14 +429,14 @@ sub calculate_and_set_phases {
     #the second and third base (phase 2)."
     #Sharp, P.A. (1981). Speculations on RNA splicing
     #Cell 23:643-46
-    
+
     for (my $index=0; $index < scalar(@genes); $index++)
     {
         my $peptide = $peptides[$index];
         #$genes[$index]->attach_seq ($self->clone()); 
         foreach my $exon ($genes[$index]->sub_SeqFeature())
         {
-            
+
             my $exon_seq = $self->clone()->subseq($exon->start(), $exon->end());
             #produce reverse complement sequence where necessary
             if ($exon->strand == -1) 
@@ -433,7 +444,7 @@ sub calculate_and_set_phases {
 	            $exon_seq =~ tr/ATCGatcg/TAGCtagc/;
 	            $exon_seq = reverse($exon_seq);
 	        }
-            
+
             my $bioseq = Bio::Seq->new (    -seq     =>  $exon_seq,
                                             -id      =>  $exon->seqname,
                                             -moltype =>  'dna' );
@@ -442,10 +453,10 @@ sub calculate_and_set_phases {
             my @translation = ( $bioseq->translate('*','.',0), 
                                 $bioseq->translate('*','.',1),
                                 $bioseq->translate('*','.',2));
-            
+
             my $modulo = $exon->length() % 3;
             my ($phase_3, $phase_5);
-            
+
             for (my $frame = 0; $frame < scalar (@translation); $frame++)
             {
                 my $trans_seq = $translation[$frame]->seq();
@@ -459,7 +470,7 @@ sub calculate_and_set_phases {
             }
             #if no match found then something odd happened
             $self->throw("Failed to match Exon and Peptide\n") unless (defined ($phase_5));
-            
+
             #print STDERR "EXON: ".$exon->seqname." 5\'-phase is $phase_5 Modulo is $modulo 3\'-phase is $phase_3 Strand is ".$exon->strand."\n"; 
             #Set phases in Bio::EnsEMBL::SeqFeature
             $exon->phase($phase_5);
@@ -471,7 +482,7 @@ sub calculate_and_set_phases {
 sub create_feature {
     my ($self, $feat) = @_;
     #$self->create_gene();
-    
+
     #create analysis object
     my $analysis_obj = Bio::EnsEMBL::Analysis->new
                         (   -db              => undef,
@@ -480,7 +491,7 @@ sub create_feature {
                             -program_version => $feat->{'program_version'},
                             -gff_source      => $feat->{'source'},
                             -gff_feature     => $feat->{'primary'});
-    
+
     #create and fill Bio::EnsEMBL::Seqfeature objects   
     my $exon = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname => $feat->{'name'},
@@ -502,11 +513,11 @@ sub create_genes {
     my ($self) = @_;
     my (%genes, %gene_start, %gene_end, %gene_score, %gene_p,
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
-    
+
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
     #no longer require exons, so can probably delete them to save memory
     #$self->clear_exons();
-    
+
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
     {
@@ -534,7 +545,7 @@ sub create_genes {
         $gene_score {$group_number} += $exon->score();
         $gene_p     {$group_number} += $exon->p_value();
     }
-    
+
     #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
     foreach my $gene_number (keys(%genes))
     {
@@ -551,7 +562,7 @@ sub create_genes {
                             -primary_tag => $gene_primary  {$gene_number},
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
-                            
+
         foreach my $exon (@{$genes {$gene_number}})
         {
             $gene->add_sub_SeqFeature($exon, '');
@@ -593,10 +604,14 @@ my ($self) = @_;
 
 sub output_exons {
     my ($self) = @_;
-    my @exons = $self->exons();
+    my @exons;
+    foreach my $gene ($self->genes)
+    {
+        push (@exons, $gene->sub_SeqFeature);
+    }
     print STDERR "No exons predicted\n" unless (@exons);
-    my @ordered_exons = sort { $a->seqname <=> $b->seqname } @exons;
-    return $self->exons(@ordered_exons);
+    my @exons = sort { $a->seqname <=> $b->seqname } @exons;
+    return @exons;
 }
 
 =head2 output_singlefeature
@@ -612,7 +627,7 @@ sub output_exons {
 sub output_singlefeature {
     my ($self) = @_;
     my ($start, $end, $score, $analysis, $primary, $source, $p_value);
-    
+
     my (@genes) = $self->genes();
     print STDERR "No exons predicted\n" unless (@genes);
     #calculate boundaries and aggregate values
@@ -627,7 +642,7 @@ sub output_singlefeature {
         $source     =  $gene->source_tag();
     }
     $score  = $score/scalar(@genes); #average score
-    
+
     my $single = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname        => 'genscan',
                             -strand         => 1,
@@ -639,7 +654,7 @@ sub output_singlefeature {
                             -p_value        => $p_value,
                             -analysis       => $analysis )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
-        
+
     foreach my $gene (@genes)
     {
         foreach my $exon ($gene->sub_SeqFeature())
