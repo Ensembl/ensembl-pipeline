@@ -14,8 +14,8 @@
 
 CREATE TABLE job (
   job_id            int unsigned NOT NULL auto_increment,
-  taskname          varchar(255) NOT NULL,
-  input_id          varchar(255) NOT NULL,
+  taskname          varchar(150) NOT NULL,
+  input_id          varchar(150) NOT NULL,
   submission_id     int unsigned,
   job_name          varchar(255),
   array_index       mediumint unsigned,
@@ -26,8 +26,7 @@ CREATE TABLE job (
   retry_count       tinyint unsigned NOT NULL,
 
   PRIMARY KEY (job_id),
-  # UNIQUE      (taskname, input_id),
-  # ^ can't key on two 255-char fields - max key length is 500.
+  UNIQUE      (taskname, input_id),
   KEY         (job_name(15), array_index),
   KEY         (input_id(50)),
   KEY         (taskname(15))
@@ -43,7 +42,8 @@ CREATE TABLE job (
 CREATE TABLE job_status (
   job_id            int(10) unsigned NOT NULL,
   status            enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
-                         'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED') NOT NULL,
+                         'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED',
+                         'RETRIED') NOT NULL,
 
   time              datetime NOT NULL,
   sequence_num      int unsigned NOT NULL auto_increment, 
