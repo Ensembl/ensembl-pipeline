@@ -600,6 +600,19 @@ sub _distance_method {
   return $self->{_distance_method};
 }
 
+
+=head2 _codeml
+
+  Args       : [optional] String
+  Example    : $self->_codeml('/path/to/codeml')
+  Description: Holds the path to the codeml executable
+  Returntype : String
+  Exceptions : Throws if a full path is included, but the 
+               file is not executable.
+  Caller     : $self->new, $self->_run_pairwise_paml
+
+=cut
+
 sub _codeml {
   my $self = shift; 
 
