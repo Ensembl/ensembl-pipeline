@@ -123,7 +123,7 @@ sub new {
   }
 
   # can choose which blat to use
-  $self->blat('/usr/local/ensembl/bin/blat');
+  $self->blat($EST_BLAT_BINARY);
   #$self->blat($self->find_executable($blat));
   
   # can add extra options as a string
@@ -191,32 +191,42 @@ sub run{
     
   }
   
+    
   #filter the output
   my @filtered_results = $self->filter_output(@results);
   
-  # make genes out of the features
-  my @genes = $self->make_genes(@filtered_results);
-  
-  # print out the results:
-  foreach my $gene (@genes){
-    foreach my $trans (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
-      foreach my $exon (@{$trans->get_all_Exons}){
-	foreach my $evi (@{$exon->get_all_supporting_features}){
-	  print STDERR $evi->hseqname." ".
-	    $evi->start." ".$evi->end." ".
-	      $evi->hstart." ".$evi->hend." ".
-		$evi->primary_tag." ".$evi->source_tag."\n";
+  if ( @filtered_results ){
+
+    # make genes out of the features
+    my @genes = $self->make_genes(@filtered_results);
+    
+    # print out the results:
+    foreach my $gene (@genes){
+      foreach my $trans (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
+	foreach my $exon (@{$trans->get_all_Exons}){
+	  foreach my $evi (@{$exon->get_all_supporting_features}){
+	    print STDERR $evi->hseqname." ".
+	      $evi->start." ".$evi->end." ".
+		$evi->hstart." ".$evi->hend." ".
+		  $evi->primary_tag." ".$evi->source_tag."\n";
+	  }
 	}
       }
     }
-  }
-  
-  # need to convert coordinates?
-  my @mapped_genes = $self->convert_coordinates( @genes );
-  print STDERR "mapped_gene is a $mapped_genes[0]\n";
+    
+    # need to convert coordinates?
+    my @mapped_genes = $self->convert_coordinates( @genes );
+    print STDERR "mapped_gene is a $mapped_genes[0]\n";
+    
+    $self->output(@mapped_genes);
 
-  $self->output(@mapped_genes);
+  }
+  else{
+    # exit gracefully
+    print STDERR "Bummer, nothing made it through your score filter\n";
+    exit(0);
+  }
 }
 
 ############################################################
@@ -250,18 +260,34 @@ sub filter_output{
       }
       my $score = $match->score;
       
-      # we keep anything which is 
-      # within the 2% fo the best score
-      # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
-      if ( $score >= (0.98*$max_score) && 
-	   $score >= $EST_MIN_COVERAGE && 
-	   $match->percent_id >= $EST_MIN_PERCENT_ID ){
+      my $only_best_score = 1;
+      my $hits_within_2percent = 0;
 
-	print STDERR "Accept!\n";
-	push( @good_matches, $match);
+      # we can select: best in genome matches
+      if ( $only_best_score ){
+	if ( $score == $max_score && 
+	     $score >= $EST_MIN_COVERAGE && 
+	     $match->percent_id >= $EST_MIN_PERCENT_ID ){
+	  print STDERR "Accept!\n";
+	  push( @good_matches, $match);
+	}
+	else{
+	  print STDERR "Reject!\n";
+	}
       }
-      else{
-	print STDERR "Reject!\n";
+      elsif(hits_within_2percent ) {
+	# or we we keep anything within the 2% fo the best score
+	# with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
+	if ( $score >= (0.98*$max_score) && 
+	     $score >= $EST_MIN_COVERAGE && 
+	     $match->percent_id >= $EST_MIN_PERCENT_ID ){
+	  
+	  print STDERR "Accept!\n";
+	  push( @good_matches, $match);
+	}
+	else{
+	  print STDERR "Reject!\n";
+	}
       }
     }
   }
@@ -291,6 +317,11 @@ sub write_output{
     if ($@){
       $self->warn("Unable to store gene!!\n$@");
     }
+    print STDERR "stored gene ".$gene->dbID."\n";
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence(   $transcript );
+    }
   }
 }
 
@@ -304,7 +335,9 @@ sub make_genes{
     my $transcript = Bio::EnsEMBL::Transcript->new();
     my $gene       = Bio::EnsEMBL::Gene->new();
     $gene->analysis($self->analysis);
-    $gene->type($self->analysis->gff_feature);
+
+    # the genetype is the logic name
+    $gene->type($self->analysis->logic_name);
     
     $gene->add_Transcript($transcript);
     
@@ -436,6 +469,10 @@ sub get_chr_names{
 
 sub output {
   my ($self, @output) = @_;
+  unless ( $self->{_output} ){
+    $self->{_output};
+  }
+
   if (@output){
     push( @{$self->{_output} }, @output);
   }

@@ -138,6 +138,10 @@ sub new {
 Usage   :   $obj->run($workdir, $args)
 Function:   Runs blat script and puts the results into the file $self->results
             It calls $self->parse_restuls, and results are stored in $self->output
+            reads the Blat output (in PSL format or psLayout ) which has been written to
+             a local file $self->results. can accept filenames, filehandles or pipes (\*STDIN)
+
+
 =cut
   
 sub run {
@@ -186,59 +190,18 @@ sub run {
   
   #my $parameters = $self->analysis->parameters;
 
-  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
+  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query stdout ";
   #my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
 
   print STDERR "running blat: $command\n";
   
-  # system calls return 0 (true in Unix) if they succeed
-  $self->throw("Error running blat\n") if (system ($command));
-  
-  $self->output( $self->parse_results );
+  open( BLAT, "$command |" );
+    
+  #################### Parse Results ####################
 
-  # remove interim files (but do not remove the database if you are using one)
-  unlink $query;
-  if ( $self->genomic){
-    unlink $target;
-  }
-}
-
-############################################################
-
-=head2 parse_results
-
- Usage   :   $obj->parse_results
- Function:   reads the Blat output (in PSL format or psLayout ) which has been written to
-             a local file $self->results. can accept filenames, filehandles or pipes (\*STDIN)
- Returns :   a list of Features (each alignment), each feature with a list of sub_Seqfeatures (each block of the alignment)
- Args    :   optional filename
-
-=cut
-
-sub parse_results {
-  my ($self,$filehandle) = @_;
-  
   my @features_within_features;
   
-  my $filehandle;
-  my $resfile = $self->results();
-  
-  if (-e $resfile) {
-    if (-z $self->results) {
-      print STDERR "Blat didn't find any matches\n";
-      return; 
-    } 
-    else {
-      open (OUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");
-      $filehandle = \*OUT;
-    }
-  }
-  else { #it'a a filehandle
-    $filehandle = $resfile;
-  }
-  
-  #extract values
-  while (<$filehandle>){
+  while (<BLAT>){
     
     ############################################################
     #  PSL lines represent alignments and are typically taken from files generated 
@@ -286,7 +249,7 @@ sub parse_results {
       next;
     }
     
-    #print $_."n";
+    print $_."n";
 
     # create as many features as blocks there are in each output line
     my (%feat1, %feat2);
@@ -384,12 +347,24 @@ sub parse_results {
     }
     push(@features_within_features, $superfeature);
   }
-  close $filehandle;
+  close BLAT;
   
   #get rid of the results file
   unlink $self->results;
 
-  return @features_within_features;
+  print STDERR "\n";
+  print STDERR "Features created:\n";
+  foreach my $superf ( @features_within_features ){
+    foreach my $subf ( $superf->sub_SeqFeature ){
+      print STDERR $subf->gffstring."\n";
+    }
+  }
+
+  # remove interim files (but do not remove the database if you are using one)
+  unlink $query;
+  
+  $self->output( @features_within_features );
+ 
 }
 
 ############################################################
@@ -475,10 +450,10 @@ sub options {
 
 sub output {
   my ($self, @output) = @_;
+  unless( $self->{_output} ){
+    $self->{_output} = [];
+  }
   if (@output) {
-    unless( $self->{_output} ){
-      $self->{_output} = [];
-    }
     push( @{$self->{_output}}, @output );
   }
   return @{$self->{_output}};
