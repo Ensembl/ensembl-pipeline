@@ -93,9 +93,8 @@ JOB:foreach my $job (@jobs) {
     print(STDERR "Id is " . $job->id . "\t$module\t" . $job->input_id . "\n");
 
 
-    next JOB if  is_processed($job);
-
-
+    next JOB if  is_processed($job);     
+    next JOB if  -z $stdout;              # Need something in stdout to parse
     
     open(OUT,"<$stdout") || next;
     my $failed = 1;

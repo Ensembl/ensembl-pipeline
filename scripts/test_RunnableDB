@@ -35,6 +35,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
 use vars qw(@ISA);
 
