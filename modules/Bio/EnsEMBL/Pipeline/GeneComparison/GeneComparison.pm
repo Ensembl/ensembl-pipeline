@@ -632,24 +632,29 @@ sub compare_CDS{
   my @total_ann_doubled;
   my @total_pred_doubled;
   my $pairs_count = 0;
+  my $same_start = 0;
+  my $same_end   = 0;
+  my %diff_start;
+  my %diff_end;
 
- GENE:
+ CLUSTER:
   foreach my $gene_cluster (@$clusters){
-  my ( $pairs, $ann_unpaired, $pred_unpaired, $ann_doubled, $pred_doubled) = $gene_cluster->pair_Transcripts;
+    my ( $pairs, $ann_unpaired, $pred_unpaired, $ann_doubled, $pred_doubled) = $gene_cluster->pair_Transcripts;
     my @pairs = @{ $pairs };
-    my @ann_unpaired;
-    my @pred_unpaired;
-    my @ann_doubled;
-    my @pred_doubled;
-    push ( @ann_unpaired , @{ $ann_unpaired }  );
-    push ( @pred_unpaired, @{ $pred_unpaired } );
-    push ( @ann_doubled  , @{ $ann_doubled }   );    
-    push ( @pred_doubled , @{ $pred_doubled }  );
     
-    push ( @total_ann_doubled  , @ann_doubled   );
-    push ( @total_pred_doubled , @pred_doubled  );
-    push ( @total_ann_unpaired , @ann_unpaired  ); 
-    push ( @total_pred_unpaired, @pred_unpaired );
+    #my @ann_unpaired;
+    #my @pred_unpaired;
+    #my @ann_doubled;
+    #my @pred_doubled;
+    #push ( @ann_unpaired , @{ $ann_unpaired }  );
+    #push ( @pred_unpaired, @{ $pred_unpaired } );
+    #push ( @ann_doubled  , @{ $ann_doubled }   );    
+    #push ( @pred_doubled , @{ $pred_doubled }  );
+    
+    #push ( @total_ann_doubled  , @ann_doubled   );
+    #push ( @total_pred_doubled , @pred_doubled  );
+    #push ( @total_ann_unpaired , @ann_unpaired  ); 
+    #push ( @total_pred_unpaired, @pred_unpaired );
 
     # for each pair we keep track of the exon comparison
  
@@ -657,8 +662,184 @@ sub compare_CDS{
     foreach my $pair ( @pairs ){
       $pairs_count++;
        my ($prediction,$annotation) = $pair->get_Transcripts;
-    }
+    
+      my $t_prediction = $prediction->translation;
+      my $t_annotation = $annotation->translation;
+      unless ( $t_prediction && $t_annotation ){
+	print STDERR "one of the transcripts has no translation\n";
+	next PAIR;
+      }
+      
+      my $t_start_pred = $t_prediction->start;
+      my $t_end_pred   = $t_prediction->end;
+      
+      my $t_start_ann  = $t_annotation->start;
+      my $t_end_ann    = $t_annotation->end;
+      
+      if ( $t_start_pred == $t_start_ann ){
+	$same_start++;
+      }
+      else{
+	my $diff = int( abs( $t_start_pred - $t_start_ann )/10 );
+	$diff_start{ $diff }++;
+      }
+      
+      if ( $t_end_pred == $t_end_ann ){
+	$same_end++;
+      }
+      else{
+	my $diff = int( abs( $t_end_pred - $t_end_ann )/10 );
+	$diff_end{ $diff }++;
+      }
+    } # end of PAIR
+  }   # end of CLUSTER
+  
+  print STDERR "Number of compared transcript-pairs    : $pairs_count\n";
+  print STDERR "Number of coinciding translation starts: $same_start\n";
+  print STDERR "Number of coinciding translation end   : $same_end\n";
+  print STDERR "distribution of differences for start:\n";
+  foreach my $k ( sort{ $a <=> $b } keys( %diff_start ) ){
+    print STDERR "diff [".($k*10)." - ".(($k+1)*10)."] --> $diff_start{$k} times\n";
   }
+  print STDERR "distribution of differences for end:\n";
+  foreach my $k ( sort{ $a <=> $b } keys( %diff_end   ) ){
+    print STDERR "diff [".($k*10)." - ".(($k+1)*10)."] --> $diff_end{$k} times\n";
+  }
+}
+
+####################################################################################
+
+sub compare_Translations{
+  my ($self,$clusters) = @_;
+  my @total_ann_unpaired;
+  my @total_pred_unpaired;
+  my @total_ann_doubled;
+  my @total_pred_doubled;
+  my $pairs_count = 0;
+  my %diff_relative_to_annotation;
+
+  my $exact_match = 0;
+  my $ann_embedded_in_pred = 0;
+  my $pred_embedded_in_ann = 0;
+
+ CLUSTER:
+  foreach my $gene_cluster (@$clusters){
+    my ( $pairs, $ann_unpaired, $pred_unpaired, $ann_doubled, $pred_doubled) = $gene_cluster->pair_Transcripts;
+    my @pairs = @{ $pairs };
+    
+    if ( $ann_unpaired ){
+       push ( @total_ann_unpaired , @{ $ann_unpaired }  );
+    }
+    if ( $pred_unpaired ){
+       push ( @total_pred_unpaired, @{ $pred_unpaired } );
+    }
+    #push ( @ann_doubled  , @{ $ann_doubled }   );    
+    #push ( @pred_doubled , @{ $pred_doubled }  );
+    
+    #push ( @total_ann_doubled  , @ann_doubled   );
+    #push ( @total_pred_doubled , @pred_doubled  );
+    #push ( @total_ann_unpaired , @ann_unpaired  ); 
+    #push ( @total_pred_unpaired, @pred_unpaired );
+
+    # for each pair we keep track of the exon comparison
+ 
+   PAIR:
+    foreach my $pair ( @pairs ){
+      $pairs_count++;
+       my ($prediction,$annotation) = $pair->get_Transcripts;
+    
+      my $pred_translation_seq;
+      my $ann_translation_seq;
+      my $pred_peptide_length;
+      my $ann_peptide_length;
+      my $pred_peptide_seq;
+      my $ann_peptide_seq;
+
+    #my $pred_translation = $prediction->translation;
+    #my $ann_translation  = $annotation->translation;
+    
+    eval{  
+      $pred_translation_seq = $prediction->translate;
+      $pred_peptide_seq = $pred_translation_seq->seq; 
+      $pred_peptide_length  = $pred_translation_seq->length;
+      print STDERR "prediction translation_length: ".$pred_peptide_length."\n";
+    };       
+    if ($@){
+      print STDERR "problems getting translation for prediction\n";
+    }    
+    eval{
+      $ann_translation_seq  = $annotation->translate;
+      $ann_peptide_seq  = $ann_translation_seq ->seq; 
+      $ann_peptide_length   = $ann_translation_seq->length;
+      print STDERR "annotation translation_length: ".$ann_peptide_length ."\n";
+    };
+    if ($@){
+      print STDERR "problems getting translation for annotation\n";
+    }
+
+    if ( $pred_peptide_length && $ann_peptide_length ){
+       my $difference = int( ($ann_peptide_length - $pred_peptide_length)/10 );
+       $diff_relative_to_annotation{ $difference }++;
+    }
+        
+    my $goback = 0; 
+    unless ( $pred_peptide_seq ){
+      print STDERR "prediction has no translation\n";
+      $goback = 1;
+    }
+    unless ( $ann_peptide_seq ){
+      print STDERR "annotation has no translation\n";
+      $goback = 1;
+    }
+    if ( $goback ){
+      next PAIR;
+    }
+      # only store the genes whose translation has no stop codons
+    
+    if ( $pred_peptide_seq && $ann_peptide_seq){
+     if ( $pred_peptide_seq =~ /\*/ ){
+	 print STDERR "prediction peptide has STOP codon\n";
+     }
+     if ( $ann_peptide_seq  =~ /\*/ ){
+	 print STDERR "annotation peptide has STOP codon\n";
+     }
+     if ( $ann_peptide_seq eq $pred_peptide_seq ){
+         print STDERR "Identical translation\n";
+         #print STDERR "If you don't believe it...\n";
+         #print STDERR "Annotation: $ann_peptide_seq\n";
+         #print STDERR "Prediction: $pred_peptide_seq\n";
+         $exact_match++;
+     }
+     elsif ( $ann_peptide_seq =~ /$pred_peptide_seq/ ){
+         print STDERR "prediction is a truncated peptide of the annotation\n";
+         $pred_embedded_in_ann++;
+     }
+     elsif ( $pred_peptide_seq = ~ /$ann_peptide_seq/ ){
+         print STDERR "annotation is a truncated peptide of the prediction\n";
+         $ann_embedded_in_pred++;
+     }
+     else{
+      
+         # the only thing left to do would be to try to align them and get a similarity score
+     }
+     print STDERR "\n";
+    }  
+    } # end of PAIR
+  }   # end of CLUSTER
+  
+  print STDERR "Number of compared transcript-pairs    : $pairs_count\n";
+  print STDERR "prediction transcripts unpaired        : ".scalar(@total_pred_unpaired)."\n";
+  print STDERR "annotation transcripts unpaired        : ".scalar(@total_ann_unpaired)."\n";
+  print STDERR "Number of exact peptide matches        : ".$exact_match."\n";
+  print STDERR "     annotation embedded in prediction : ".$ann_embedded_in_pred."\n";
+  print STDERR "     prediction embedded in annotation : ".$pred_embedded_in_ann."\n";
+  print STDERR "Difference in translation length relative to annotation:\n";
+  foreach my $key ( sort{ $a <=> $b } keys( %diff_relative_to_annotation ) ){
+    print STDERR "interval (".($key*10).",".(($key+1)*10).") --> ".$diff_relative_to_annotation{ $key }."\n";
+  }
+  
+ 
+  
 }
 
 ####################################################################################
@@ -680,7 +861,7 @@ sub compare_CDS{
 =cut
   
 sub compare_Exons{
-  my ($self,$clusters,$coding) = @_;
+  my ($self,$clusters,$coding,$verbose) = @_;
   
   my @pairs_missing;                # holds the transcript pairs that have one or more exons missing
   my $pairs_count;                  # this will count the total number of pairs compared
@@ -886,25 +1067,31 @@ sub compare_Exons{
   print STDERR "sensitivity = $sensitivity\n";
   print STDERR "specificity = $specificity\n\n";
   
-  # print out the transcripts pairs with at least one exon missing
-  print STDERR "Exons of genes ".$message1." which are missing in genes ".$message2.":\n";
-  foreach my $key ( sort { $a <=> $b } ( keys( %missing ) ) ){
-    my $these_pairs = scalar( @{ $missing{$key} } );
-    my $percentage  = sprintf "%.2f", 100*$these_pairs/$pairs_count;
-    print STDERR "\n$these_pairs transcript pairs with $key exon(s) missed: $percentage percent\n";
-    foreach my $pair ( @{ $missing{ $key } } ){
-      print STDERR $pair->to_String."\n";
+  if ($verbose){
+
+    # print out the transcripts pairs with at least one exon missing
+    print STDERR "Exons of genes ".$message1." which are missing in genes ".$message2.":\n";
+    foreach my $key ( sort { $a <=> $b } ( keys( %missing ) ) ){
+      my $these_pairs = scalar( @{ $missing{$key} } );
+      my $percentage  = sprintf "%.2f", 100*$these_pairs/$pairs_count;
+      print STDERR "\n$these_pairs transcript pairs with $key exon(s) missed: $percentage percent\n";
+      foreach my $pair ( @{ $missing{ $key } } ){
+	print STDERR $pair->to_String."\n";
+      }
     }
   }
 
-  # print out the transcripts pairs with at least one exon overpredicted
-  print STDERR "Exons of genes ".$message2." which are overpredicted with respect to genes ".$message1.":\n";
-  foreach my $key ( sort { $a <=> $b } ( keys( %overpredicted ) ) ){
-    my $these_pairs = scalar( @{ $overpredicted{$key} } );
-    my $percentage  = sprintf "%.2f", 100*$these_pairs/$pairs_count;
-    print STDERR "\n$these_pairs transcript pairs with $key exon(s) overpredicted: $percentage percent\n";
-    foreach my $pair ( @{ $overpredicted{ $key } } ){
-      print STDERR $pair->to_String."\n";
+  if ($verbose){
+
+    # print out the transcripts pairs with at least one exon overpredicted
+    print STDERR "Exons of genes ".$message2." which are overpredicted with respect to genes ".$message1.":\n";
+    foreach my $key ( sort { $a <=> $b } ( keys( %overpredicted ) ) ){
+      my $these_pairs = scalar( @{ $overpredicted{$key} } );
+      my $percentage  = sprintf "%.2f", 100*$these_pairs/$pairs_count;
+      print STDERR "\n$these_pairs transcript pairs with $key exon(s) overpredicted: $percentage percent\n";
+      foreach my $pair ( @{ $overpredicted{ $key } } ){
+	print STDERR $pair->to_String."\n";
+      }
     }
   }
 
@@ -914,9 +1101,13 @@ sub compare_Exons{
     my $these_pairs = scalar( @{ $mismatches{$key} } );
     my $percentage  = sprintf "%.2f", 100*$these_pairs/$pairs_count;
     print STDERR "\n$these_pairs transcript pairs with $key exon(s) mismatch: $percentage percent\n";
-    foreach my $pair ( @{ $mismatches{ $key } } ){
-      print STDERR $pair->to_String."\n";
+    
+    if ($verbose){
+      foreach my $pair ( @{ $mismatches{ $key } } ){
+	print STDERR $pair->to_String."\n";
+      }
     }
+  
   }
   # we return the hash with the arrays of transcript pairs as values, and 
   # the number of missing exons as keys, that can be used to make a histogram
@@ -1002,8 +1193,8 @@ sub _match_Exons{
   }
   
   # now we link the exons, but first, a bit of formatted info
-  print  "\nComparing transcripts:\n";
-  print STDERR $pair->to_String;
+  #print  "\nComparing transcripts:\n";
+  #print STDERR $pair->to_String;
   
   my %link;
   my $start=0;    # start looking at the first one
@@ -1163,7 +1354,7 @@ sub _exon_Overlap{
   my $strand1 = $exon1->strand;
   my $strand2 = $exon2->strand;
   if ( $strand1 =! $strand2 ){
-    print STDERR "Odd - comparing exons in different strands\n";
+    print STDERR "Odd - comparig exons in different strands\n";
     return 0;
   }
   my $s1 = $exon1->start;

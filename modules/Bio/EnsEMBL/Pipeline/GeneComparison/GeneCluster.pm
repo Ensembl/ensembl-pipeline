@@ -377,7 +377,7 @@ sub pair_Transcripts {
 	push( @unpaired, $tran2 );
       }
     }
-    print STDERR scalar(@pairs)." transcript pairs created\n";
+    #print STDERR scalar(@pairs)." transcript pairs created\n";
     #my $count2=1;
     #foreach my $pair ( @pairs ){
     #  print STDERR "pair $count2:\n".$pair->to_String;
