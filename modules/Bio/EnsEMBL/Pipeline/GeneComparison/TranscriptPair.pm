@@ -345,7 +345,7 @@ sub process_target{
       # compute the size of the 'gaps'
       my @gaps;
       $is_spliced = 0;
-      for(my $i=0; $i<$#clusters-; $i++){
+      for(my $i=0; $i<$#clusters; $i++){
 	my $gap = $cluster_starts[$i+1] - $cluster_ends[$i] - 1;
 	print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
 	if ( $gap >= $min_exon_length ){
