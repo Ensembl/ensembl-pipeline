@@ -165,6 +165,7 @@ sub get_all_FeaturesById {
 	    $idhash{$f->hseqname} = [];
 	    push(@{$idhash{$f->hseqname}},$f);
 	}
+
     }
 
     return (\%idhash);
@@ -567,10 +568,11 @@ sub run {
 
 # VAC Need to deal separately with forward and reverse features? There is a problem with mixed 
 # strand features ...
+
 sub minirun {
   my ($self) = @_;
   
-  my $idhash = $self->get_all_FeaturesById;
+  my ($idhash) = $self->get_all_FeaturesById;
   
   my @ids    = keys %$idhash;
   
@@ -579,6 +581,7 @@ sub minirun {
   }
   
   $self->get_all_Sequences(@ids);
+
   my $analysis_obj    = new Bio::EnsEMBL::Analysis
     (-db              => undef,
      -db_version      => undef,

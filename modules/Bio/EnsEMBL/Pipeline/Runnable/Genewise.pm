@@ -86,10 +86,10 @@ sub output {
 sub set_environment {
     my ($self) = @_;
 
-    $ENV{WISECONFIGDIR} = '/nfs/disk100/pubseq/wise/wisecfg/';
+    $ENV{WISECONFIGDIR} = '/usr/local/ensembl/data/wisecfg/';
 
-    if (! -d '/nfs/disk100/pubseq/wise/wisecfg/') {
-	$self->throw("No WISECONFIGDIR /nfs/disk100/pubseq/wise/wisecfg/");
+    if (! -d '/usr/local/ensembl/data/wisecfg/') {
+	$self->throw("No WISECONFIGDIR /usr/local/ensembl/data/wisecfg/");
     }
 }
 

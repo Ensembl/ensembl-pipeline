@@ -19,7 +19,8 @@ Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new(-genomic  => $genseq,
-								  -features => $features)
+								  -features => $features,
+								  -trim     => 0)
 
     $obj->run
 
@@ -67,9 +68,10 @@ sub _initialize {
            
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $ids) = $self->_rearrange(['GENOMIC',
-					     'IDS',
-					     ], @args);
+    my( $genomic, $ids,$trim) = $self->_rearrange(['GENOMIC',
+						   'IDS',
+						   'TRIM',
+						  ], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
@@ -84,6 +86,10 @@ sub _initialize {
 	}
     }
     
+    if (defined($trim)) {
+      $self->trim($trim);
+    }
+
     return $self; # success - we hope!
 }
 
@@ -178,7 +184,6 @@ sub run {
     my @newfeatures;
 
     my %scorehash;
-    my %idhash;
 
     unless (@features) {
         print STDERR "Contig has no associated features\n";
@@ -187,28 +192,24 @@ sub run {
 
     foreach my $f (@features) {
 
-	if (!defined($idhash{$f->hseqname})) { 
-	    push(@newfeatures,$f);
-	    $idhash{$f->hseqname} =1;
-	}
-	if ($f->score > $scorehash{$f->hseqname})  {
-	    $scorehash{$f->hseqname} = $f->score;
-	}
+      if ($f->score > $scorehash{$f->hseqname})  {
+	$scorehash{$f->hseqname} = $f->score;
+      }
     }
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
 
-    my $mg = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(-genomic  => $self->genomic_sequence,
-								-features => \@features,
-								-forder   => \@forder);
+    
+    my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(-genomic  => $self->genomic_sequence,
+								     -features => \@features,
+								     -forder   => \@forder);
 
     $mg->minirun;
-
+    
     my @f = $mg->output;
-
+    
     foreach my $f (@f) {
-	print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
-
+      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
     }
 
     push(@{$self->{_output}},@f);
@@ -312,7 +313,9 @@ sub make_blast_db {
     my $blastfile = $self->get_tmp_file('/tmp/','blast','fa');
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$blastfile");
+
     print STDERR "Blast db file is $blastfile\n";
+
     foreach my $seq (@seq) {
 	print STDERR "Writing seq " . $seq->id ."\n";
 	$seqio->write_seq($seq);
@@ -453,6 +456,16 @@ sub output {
 	$self->{_output} = [];
     }
     return @{$self->{'_output'}};
+}
+
+
+sub trim {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_trim} = $arg;
+  }
+  return $self->{_trim};
 }
 
 1;
