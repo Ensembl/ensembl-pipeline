@@ -309,6 +309,29 @@ sub vcontig {
 
 }
 
+
+=head2 slice
+
+ Title   : slice
+ Usage   : $obj->slice($newval)
+ Function: 
+ Returns : value of slice
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub slice {
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'_slice'} = $value;
+    }
+    return $obj->{'_slice'};
+
+}
+
+
 =head2 write_output
 
     Title   :   write_output
