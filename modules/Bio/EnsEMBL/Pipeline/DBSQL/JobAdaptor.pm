@@ -77,7 +77,7 @@ sub fetch_by_dbID {
   my $id = shift;
   print STDERR "fetching job by ".$id."\n";
   my $sth = $self->prepare(q{
-    SELECT job_id, input_id, class, analysis_id, lsf_id,
+    SELECT job_id, input_id, class, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  job_id = ?
@@ -113,7 +113,7 @@ sub fetch_by_dbID_list {
   local $" = ',';   # are you local?
 
   my $sth = $self->prepare( qq{
-    SELECT job_id, input_id, class, analysis_id, LSF_id,
+    SELECT job_id, input_id, class, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM job
     WHERE job_id in (@id) } );
@@ -149,7 +149,7 @@ sub fetch_by_Status_Analysis {
     my $analysisId = $analysis->dbID;
 
     my $query = q{
-	SELECT   j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id,
+	SELECT   j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id,
 	         j.stdout_file, j.stderr_file, j.retry_count,
                  j.status_file
 	FROM     job j, job_status js
@@ -195,7 +195,7 @@ sub fetch_by_Age {
     #convert age from minutes to seconds
 
     my $sth = $self->prepare(q{
-	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id
+	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id
                j.stdout_file, j.stderr_file,
                j.retry_count
 	FROM   job j, job_status js
@@ -234,7 +234,7 @@ sub fetch_by_inputId {
   my @result;
 
   my $sth = $self->prepare(q{
-    SELECT job_id, input_id, class, analysis_id, LSF_id,
+    SELECT job_id, input_id, class, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  input_id = ?
@@ -269,7 +269,7 @@ sub store {
 
   my $sth = $self->prepare(q{
     INSERT into job (input_id, class, analysis_id,
-                     lsf_id, stdout_file, stderr_file, 
+                     submission_id, stdout_file, stderr_file, 
                      retry_count)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   });
@@ -380,10 +380,10 @@ sub update {
 
   my $sth = $self->prepare(q{
     UPDATE job
-    SET    stdout_file = ?,
-           stderr_file = ?,
-           retry_count = ?,
-           LSF_id = ?
+    SET    stdout_file   = ?,
+           stderr_file   = ?,
+           retry_count   = ?,
+           submission_id = ?
     WHERE  job_id = ?
   });
 
@@ -729,14 +729,14 @@ sub create_tables {
 
   $sth = $self->prepare(qq{
     CREATE TABLE job (
-      job_id       int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
-      input_id     varchar(40) NOT NULL,
-      class        enum("clone", "contig", "vc", "gene") not null,
-      analysis_id  smallint(5) unsigned NOT NULL,
-      lsf_id       mediumint(10) unsigned NOT NULL,
-      stdout_file  varchar(100) NOT NULL,
-      stderr_file  varchar(100) NOT NULL,
-      retry_count  tinyint(2) unsigned default 0,
+      job_id        int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+      input_id      varchar(40) NOT NULL,
+      class         enum("clone", "contig", "vc", "gene") not null,
+      analysis_id   smallint(5) unsigned NOT NULL,
+      submission_id mediumint(10) unsigned NOT NULL,
+      stdout_file   varchar(100) NOT NULL,
+      stderr_file   varchar(100) NOT NULL,
+      retry_count   tinyint(2) unsigned default 0,
 
       PRIMARY KEY (job_id),
       KEY (input_id),

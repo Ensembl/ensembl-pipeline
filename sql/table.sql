@@ -3,7 +3,7 @@ CREATE TABLE job (
   input_id          varchar(40) NOT NULL,
   class             enum("clone", "contig", "slice", "gene") not null,
   analysis_id       smallint(5) unsigned NOT NULL,
-  lsf_id            mediumint(10) unsigned NOT NULL,
+  submission_id     mediumint(10) unsigned NOT NULL,
   stdout_file       varchar(100) NOT NULL,
   stderr_file       varchar(100) NOT NULL,
   retry_count       tinyint(2) unsigned default 0,
@@ -13,13 +13,13 @@ CREATE TABLE job (
   KEY         (analysis_id)
 );
 
-# job_id      - job internal ID
-# input_id    - name (e.g. accession/Ensembl ID) of input
-# class       - distinguish different input types
-# analysis_id - internal ID of analysis (analysis table)
-# lsf_id      - ID of job in LSF
-# *_file      - files created to contain job output/error
-# retry_count - number of times job restarted
+# job_id        - job internal ID
+# input_id      - name (e.g. accession/Ensembl ID) of input
+# class         - distinguish different input types
+# analysis_id   - internal ID of analysis (analysis table)
+# submission_id - ID of job in LSF
+# *_file        - files created to contain job output/error
+# retry_count   - number of times job restarted
 
 # ?? what is job.objectfile - do we need/use it?
 

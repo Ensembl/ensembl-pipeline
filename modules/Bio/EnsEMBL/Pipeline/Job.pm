@@ -692,7 +692,7 @@ sub stderr_file {
 
   Title   : submission_id
   Usage   : 
-  Function: Get/set method for the LSF_id
+  Function: Get/set method for the submission ID
   Returns : 
   Args    : 
 
