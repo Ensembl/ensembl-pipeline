@@ -261,7 +261,7 @@ sub flush_runs {
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
-
+  
   local *FILE;
 
   my $db       = $adaptor->db;
@@ -276,7 +276,7 @@ sub flush_runs {
   # and fail if not found
 
   my $runner = $self->runner;
-  #print STDERR "have runner ".$self->runner."\n";
+ 
   unless (-x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
@@ -285,23 +285,26 @@ sub flush_runs {
   }
 
   # $anal is a logic_name
-  for my $anal (@analyses) {
-
-    my $queue = $BATCH_QUEUES{$anal};
+ 
+ ANAL:for my $anal (@analyses) {
    
+    my $queue = $BATCH_QUEUES{$anal};
+    
     my @job_ids = @{$queue->{'jobs'}};
-    next unless @job_ids;
-
+    if(!@job_ids){
+      next ANAL;
+    }
     my $this_runner = $queue->{'runner'};
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
- 
+   
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
-
-    if( ! defined $lastjob ) {
+    
+    if( ! $lastjob ) {
       $self->throw( "Last batch job not in db" );
     }
-  
+    
     my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
+   
     my $batch_job = $batch_q_module->new(
 	-STDOUT     => $lastjob->stdout_file,
 	-STDERR     => $lastjob->stderr_file,
@@ -327,7 +330,7 @@ sub flush_runs {
     }
     $cmd .= " -output_dir ".$self->output_dir;
     $cmd .= " @job_ids";
-
+    
     $batch_job->construct_command_line($cmd);
     $batch_job->open_command_line();
     #print STDERR $batch_job->bsub."\n";
@@ -592,8 +595,15 @@ sub current_status {
   if( ! defined( $self->adaptor )) {
     return undef;
   }
- 
-  return $self->adaptor->current_status( $self, $arg );
+  my $status;
+  eval{
+    $status = $self->adaptor->current_status( $self, $arg );
+  };
+  if($@){
+    $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
+                 " error $@");
+  }
+  return $status;
 }
 
 
@@ -757,10 +767,34 @@ sub retry_count {
   $self->{'_retry_count'};
 }
 
+sub can_retry{
+  my ($self, $logic_name) = @_;
+
+  $logic_name = $self->analysis->logic_name if($!logic_name);
+  if(!$BATCH_QUEUES{$logic_name}){
+     $logic_name = 'default';
+  }
+
+  my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
+  if($self->retry_count <= $max_retry){
+     return 1;
+  }else{
+     return 0;
+  }
+}
 
 =head2 remove
- 
+
+  Arg [1]   : STRING, analysis logic_name
+  Function  : remove job and delete output
+  Returntype: none
+  Exceptions: none
+  Caller    : $self
+  Example   : $self->remove($self->analysis->logic_name);
+
 =cut
+
+
 
 sub remove {
   my $self = shift;
