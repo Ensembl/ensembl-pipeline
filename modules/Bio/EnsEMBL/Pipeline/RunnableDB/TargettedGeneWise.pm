@@ -64,6 +64,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_MAX_INTRON
 					 GB_TARGETTED_MIN_SPLIT_COVERAGE
 					 GB_TARGETTED_GW_GENETYPE
+					 GB_SIZE
 					 );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -162,15 +163,32 @@ sub fetch_input{
   $protein_id = $4;
   $start   = $2;
   $end     = $3;
-  #print $chrname." ".$protein_id." ".$start." ".$end."\n";
   if ($2 > $3) { # let blast sort it out
       $start  = $3;
       $end    = $2;
   }
 
+  # we want to give genewise a bit more genomic than the one found by pmatch, 
+  # but we don't want to exceed the multiple of $GB_SIZE,
+  # if transcripts cross this boundary, they will get mangled afterwards when we
+  # read them in GeneBuilder and store them again using $GB_SIZE's
+  
+  my $chunk_size = $GB_SIZE;
+  my $new_start  = $start - 10000;
+  my $new_end    = $end   + 10000;
+  
+  my $chunk_start = (int($start/$GB_SIZE)) * $GB_SIZE + 1;
+  my $chunk_end   = $chunk_start + $GB_SIZE - 1;
+  
+  # check that end passed in is not larger than end of chunk
+  if ( $end > $chunk_end ){
+    $self->throw("the end of the protein match passed in ($end) is larger than the genomic chunk we are in ($chunk_end)");
+  }
+  my $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
+  my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
   my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
-  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
+  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$newstart,$newend);
   
   $self->vcontig($vcontig);
   $self->protein_id($protein_id);
@@ -436,14 +454,24 @@ sub validate_transcript {
   my $valid = 1;
   my $split = 0;
   
+  
+  # check exon phases:
+  my @exons = $transcript->get_all_Exons;
+  $transcript->sort;
+  for (my $i=0;$i<(scalar(@exons-1);$i++){
+    my $endphase = $exons[$i]->end_phase;
+    my $phase    = $exons[$i+1]->phase;
+    if ( $phase != $end_phase ){
+      $self->warn("rejecting transcript with inconsistent phases( $phase - $end_phase) ");
+      return undef;
+    }
+  }
+
   # check coverage of parent protein
   my $threshold = $GB_TARGETTED_SINGLE_EXON_COVERAGE;
-  #print STDERR "getting exons\n";
-  my @exons = $transcript->get_all_Exons;
-  #print "have ".@exons." exons\n";
-    if(scalar(@exons) > 1){
-      $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
-    }
+       if(scalar(@exons) > 1){
+	 $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
+       }
 
   if(!defined $threshold){
     print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in GeneConf.pm\n";
@@ -742,18 +770,24 @@ sub make_transcript{
     $exon->strand($exon_pred->strand);
     
     $exon->phase($exon_pred->phase);
+    $exon->end_phase($exon_pred->end_phase);
     $exon->attach_seq($contig);
+    
     $exon->contig($contig);
     $exon->adaptor($self->db->get_ExonAdaptor);
+    
     # sort out supporting evidence for this exon prediction
-    my @subfs = $exon_pred->sub_SeqFeature;
-   # print STDERR "has ".@subfs." supporting features\n";
     foreach my $subf($exon_pred->sub_SeqFeature){
+      $subf->feature1->source_tag($genetype);
+      $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
       $subf->feature1->analysis($analysis_obj);
+	
+      $subf->feature2->source_tag($genetype);
+      $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
-      $subf->feature1->seqname($contig->id);
+      
       $exon->add_Supporting_Feature($subf);
     }
     
@@ -776,10 +810,26 @@ sub make_transcript{
     foreach my $exon (@exons) {
       $transcript->add_Exon($exon);
     }
+     #for forward strand:
     
+    #start_translation: position on the translation->start_exon coordinate system where
+    #the translation starts (counting from the left)
+    
+    #end_translation  : position on the translation->end_exon coordinate system where
+    #the translation ends (counting from the left)
+    
+    #for reverse strand:
+    
+    #start_translation: position on the translation->start_exon coordinate system where
+    #the translation starts (counting from the right, which is the direction of translation now)
+
+    #end_translation  : position on the translation->end_exon coordinate system where
+    #the translation ends (counting from the right)
+  
     $translation->start_exon($exons[0]);
     $translation->end_exon  ($exons[$#exons]);
     
+     # phase is relative to the 5' end of the transcript (start translation)
     if ($exons[0]->phase == 0) {
       $translation->start(1);
     } elsif ($exons[0]->phase == 1) {
