@@ -429,6 +429,7 @@ sub store {
 
   $self->set_status( $job, "CREATED" );
 }
+
 =head2 remove
 
   Title   : remove
@@ -439,7 +440,6 @@ sub store {
   Args    :
 
 =cut
-
 
 sub remove {
   my $self = shift;
@@ -604,24 +604,26 @@ sub set_status {
 
 
     eval {	
-        my ($sth, $res);
+        my ($sth, $sth_upd, $sth_ins, $res);
 
-        $sth = $self->prepare(q{
+        $sth_upd = $self->prepare(q{
                                 UPDATE job_status
                                 SET    is_current = 'n'
                                 WHERE  job_id = ?
+                                  AND  is_current = 'y'
                                });
-        $res = $sth->execute($jobId);
         
-        $sth = $self->prepare(q{
+        $sth_ins = $self->prepare(q{
                                 INSERT into job_status
                                 (job_id, status, time, is_current)
                                 VALUES (?, ?, NOW(), 'y')
                                });
-        $res = $sth->execute($jobId, $stat_str);
+
+        $sth_upd->execute($jobId);
+        $sth_ins->execute($jobId, $stat_str);
         
         $sth = $self->prepare("SELECT NOW()");
-        $res = $sth->execute();
+        $sth->execute();
         
         my $time = ($sth->fetchrow_arrayref())->[0];
         

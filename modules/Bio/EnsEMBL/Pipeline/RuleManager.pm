@@ -610,7 +610,11 @@ sub can_job_run{
     # _status should be private but current_status is not useful to us here as 
     # it will do a new query. Here we don't need the absolutely up-to-the-second
     # status, we can always get the status on the next round of checks. This
-    # will also significantly reduce the number of queries of the job table
+    # will also significantly reduce the number of queries of the job table.
+    #
+    # One problem is jobs which are in the middle of updating their current status.
+    # These can be in a state with no current status, which will mean they don't get 
+    # listed in the current_jobs hash.
     my $status = $cj->{_status}->status;
 
     if (($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry) {

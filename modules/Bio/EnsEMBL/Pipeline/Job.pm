@@ -476,28 +476,35 @@ sub runLocally {
 sub run_module {
   my $self = shift;
   my $module = $self->analysis->module;
+
   #print STDERR "Running ".$module." with ".$self."\n";
+
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
   my $hash_key = $self->analysis->logic_name;
-  if(!$BATCH_QUEUES{$hash_key}){
+
+  if (!$BATCH_QUEUES{$hash_key}) {
     $hash_key = 'default';
   }
-  my $runnable_db_path = 
-    $BATCH_QUEUES{$hash_key}{runnabledb_path};
+
+  my $runnable_db_path = $BATCH_QUEUES{$hash_key}{runnabledb_path};
+
   if(!$runnable_db_path){
     $runnable_db_path = $DEFAULT_RUNNABLEDB_PATH;
   }
+
   my $perl_path;
   #print STDERR "Getting ".$hash_key." batchqueue value\n";
-  if($module =~ /::/){
+
+  if ($module =~ /::/) {
     #print STDERR "Module contains path info already\n";
     $module =~ s/::/\//g;
     $perl_path = $module;
-  }else{
+  } else {
     $perl_path = $runnable_db_path."/".$module;
   }
+
   #print STDERR "have perlpath ".$perl_path."\n";
  STATUS: 
   { 
@@ -530,25 +537,24 @@ sub run_module {
     
     if ($rdb->input_is_void) {
       $self->set_status( "VOID" );
-    }
-    else {
+    } else {
       # "RUNNING"
       eval {
-	      $self->set_status( "RUNNING" );
-	      $rdb->db->dbc->disconnect_when_inactive(1); 
+        $self->set_status( "RUNNING" );
+        $rdb->db->dbc->disconnect_when_inactive(1); 
         $rdb->run;
         $rdb->db->dbc->disconnect_when_inactive(0); 
       };
       if ($err = $@) {
-        
         print STDERR $@ . "\n";
         
-        if(my $err_state = $rdb->failing_job_status){
+        if (my $err_state = $rdb->failing_job_status) {
           $self->set_status( $err_state );
-        }else{
+        } else {
           $self->set_status( "FAILED" ); # default to just failed 
           #these jobs get retried
         }
+
         print (STDERR "RUNNING: Lost the will to live Error\n");
         $self->throw("Problems running $module for " . 
                      $self->input_id . " [$err]\n");
@@ -556,10 +562,10 @@ sub run_module {
       
       # "WRITING"
       eval {
-	      $self->set_status( "WRITING" );
-	      $rdb->write_output;
-	      # ------------------------------------------------------------
-	      if($rdb->can('db_version_searched')){
+        $self->set_status( "WRITING" );
+        $rdb->write_output;
+        # ------------------------------------------------------------
+        if ($rdb->can('db_version_searched')) {
           my $new_db_version = $rdb->db_version_searchd();
           my $analysis = $self->analysis();
           my $old_db_version = $analysis->db_version();
@@ -567,20 +573,19 @@ sub run_module {
           # where is the analysisAdaptor??
           # $self->adaptor->get_AnalysisAdaptor->store($analysis);
           # if $new_db_version gt $old_db_version;
-	      } else {
+        } else {
           $SAVE_RUNTIME_INFO = 0;
-	      }
-	      # -----------------------------------------------------------
+        }
+        # -----------------------------------------------------------
         $self->set_status("SUCCESSFUL");
       }; 
       if ($err = $@) {
-	      $self->set_status( "FAILED" );
-	      print (STDERR "WRITING: Lost the will to live Error\n");
-	      $self->throw("Problems for $module writing output for " . 
-                     $self->input_id . " [$err]" );
+        $self->set_status( "FAILED" );
+        print (STDERR "WRITING: Lost the will to live Error\n");
+        $self->throw("Problems for $module writing output for " . 
+        $self->input_id . " [$err]" );
       }
     }
-    
   }    
   
   # update job in StateInfoContainer
@@ -604,7 +609,7 @@ sub run_module {
       };
       $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
       $self->throw($error_msg);
-    }else {
+    } else {
       print STDERR "Updated successful job ".$self->dbID."\n";
     }
   }
