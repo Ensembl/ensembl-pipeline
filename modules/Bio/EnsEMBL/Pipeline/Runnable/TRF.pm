@@ -163,7 +163,7 @@ sub query {
 	$self->options(join(' ', @arg_list));
         
 	# TRF seems to want to truncate the filename to 13 chars ...
-        $self->filename(substr($self->query->id.".$$", 0, 13));
+        $self->filename($self->query->id.".$$");
 
         # output has (equally annoyingly) parameters in the filename
         $self->results($self->filename . "." . join('.', @arg_list) . '.dat');
@@ -241,57 +241,55 @@ sub run_trf {
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
-    my ($self) = @_;
-    my $filehandle;
-
-    my $results = $self->results;
-    if (ref ($results) !~ /GLOB/)
-    {
-        $filehandle = new FileHandle;
-        $filehandle->open("< $results")
-	 or $self->throw("Error opening $results \n");
+  my ($self) = @_;
+  my $filehandle;
+  
+  my $results = $self->results;
+  #print STDERR "Results file = ".$results."\n";
+  if (ref ($results) !~ /GLOB/){
+    $filehandle = new FileHandle;
+    $filehandle->open("< $results")
+      or $self->throw("Error opening $results \n");
+  }else{
+    $filehandle = $results;
+  } 
+  
+  my $found = 0;
+  my $seqname;
+  while (<$filehandle>){  
+    if (/Sequence: (\w+)/) {
+      $seqname = $1;
     }
-    else
-    {
-        $filehandle = $results;
-    } 
+    next unless (/^\d/); # ignore introductory lines
+    #print STDERR;
+    $found++;
     
-    my $found = 0;
-    my $seqname;
-    while (<$filehandle>)
-    {  
-	if (/Sequence: (\w+)/) {
-	    $seqname = $1;
-	}
-	next unless (/^\d/); # ignore introductory lines
-	$found++;
-
-        my (
-            $start,          $end,            $period_size,
-            $copy_number,    $consensus_size, $percent_matches,
-            $percent_indels, $score,          $A,
-            $T,              $G,              $C,
-            $entropy,        $mer
-        ) = split;
-
-        my $rc = Bio::EnsEMBL::RepeatConsensus->new;
-        $rc->name             ("trf");
-        $rc->repeat_class     ("trf");
-        $rc->repeat_consensus ($mer);
-
-        my $rf = Bio::EnsEMBL::RepeatFeature->new;
-        $rf->score            ($score);
-        $rf->start            ($start);
-        $rf->end              ($end);
-        $rf->strand           (0);
-        $rf->hstart           (1);
-        $rf->hend             ($end - $start + 1);
-        $rf->repeat_consensus ($rc);
-
-        push @{$self->{'_rflist'}}, $rf;
-    }
-    print STDERR "No tandem repeats found\n" unless $found;
-    close $filehandle;   
+    my (
+        $start,          $end,            $period_size,
+        $copy_number,    $consensus_size, $percent_matches,
+        $percent_indels, $score,          $A,
+        $T,              $G,              $C,
+        $entropy,        $mer
+       ) = split;
+    
+    my $rc = Bio::EnsEMBL::RepeatConsensus->new;
+    $rc->name             ("trf");
+    $rc->repeat_class     ("trf");
+    #print STDERR "Consensus ".$mer."\n";
+    $rc->repeat_consensus ($mer);
+    my $rf = Bio::EnsEMBL::RepeatFeature->new;
+    $rf->score            ($score);
+    $rf->start            ($start);
+    $rf->end              ($end);
+    $rf->strand           (0);
+    $rf->hstart           (1);
+    $rf->hend             ($end - $start + 1);
+    $rf->repeat_consensus ($rc);
+    
+    push @{$self->{'_rflist'}}, $rf;
+  }
+  print STDERR "No tandem repeats found\n" unless $found;
+  close $filehandle;   
 }
 
 
