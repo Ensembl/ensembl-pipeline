@@ -81,7 +81,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
 	    # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
 	    GB_KILL_LIST   => '',
 	    
-	    # array of hashes, each hash contains the runnable class name and the analysis logic name
+	    # array of hashes, each hash contains the runnable class name and the analysis logic name, this is used
+	    #when createing analysis objects in ensembl-pipeline/scripts/GeneBuild/populate_analysis.pl script so if you are
+	    # using the pipeline to run parts of the genebuild the Dummy entry is needed in order to start the pipeline properly
 	    GB_LENGTH_RUNNABLES      => [
 					 {
 					  runnable => 'FPC_TargettedGeneWise',
@@ -99,6 +101,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
 					  runnable => 'Gene_Builder',
 					  analysis => $GB_FINAL_GENETYPE,
 					 }
+					 {
+					  runnable => 'Dummy',
+					  analysis => 'SubmitGeneBuild', # should be the same as GB_SUBMIT_GENEBUILD_LOGICNAME
+				         },
 					],
 	    
 	    
