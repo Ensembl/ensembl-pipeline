@@ -523,7 +523,6 @@ sub _check_Transcripts {
       my $previous_exon;
     EXON:
       foreach my $exon (@exons){
-	  $exon_count++;
 	  
 	  my $hstart;
 	  my $hend;
@@ -543,7 +542,7 @@ sub _check_Transcripts {
 	      $self->warn("rejecting very small exon: size=$size");
 	      next EXON;
 	  }
-	  
+
 	  ####### check the gap with the evidence of the next exon
 	  # if the ESTs are of good quality, this should not reject any
 	  if ( $exon_count > 1 ){
@@ -603,7 +602,8 @@ sub _check_Transcripts {
 	  
 	  #my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $exon );
 	  $new_transcript->add_Exon( $previous_exon );
-
+	  $exon_count++;
+	  
       } # end of EXON
       
       # if the transcript made it to this point, keep it
