@@ -60,7 +60,7 @@ sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
     
     # hardcoded stuff, to go in a config file
-    my $MAX_EXON_LENGTH   = 20000;
+   my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
     my $MAX_INTRON_LENGTH = 200000;
     
@@ -1264,7 +1264,6 @@ sub set_stop_codon{
     my $next_exon = $self->get_next_Exon( $transcript, $end_exon );
     
     if ( $next_exon ){
-
       ############################################################
       # homany bases of the next codon sit in $end_exon?
       my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
@@ -1332,7 +1331,7 @@ sub set_stop_codon{
 		my $codon_start = $slice_start + ( $end_exon->start + $end - 1 );
 		my $codon_end   = $codon_start + 2;
 		
-		#print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
+		print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
 		my $codon_slice = $adaptor->fetch_by_region
       ($end_exon->slice->coord_system->name, 
        $end_exon->slice->seq_region_name, $codon_start, $codon_end );
@@ -1371,16 +1370,22 @@ sub set_stop_codon{
 	    }
 	}
 	else{
+    #print STDERR "Slice = ".$end_exon->slice->name."\n";
 	    my $slice_start = $end_exon->slice->start;
-	    
+	    #print STDERR "Slice start = ".$slice_start."\n";
 	    ############################################################
 	    # calculate the next codon start/end in chr coordinates 
-	    #print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n";
+	    #print STDERR "end_exon: ".$end_exon->start."-".
+      #  $end_exon->end." exon strand ".$end_exon->strand."\n";
 	    
 	    my $codon_end   = $slice_start + $end_exon->end - $end - 1;
 	    my $codon_start = $codon_end - 2;
-	    #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
-	    
+    #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
+    if($codon_start <= 0){
+      print STDERR "Can't extend the transcript off the end of a ".
+        $end_exon->slice->coord_system->name."\n";
+      return $transcript;
+    }
 	    my $codon_slice = $adaptor->fetch_by_region
       ($end_exon->slice->coord_system->name, 
        $end_exon->slice->seq_region_name, $codon_start, $codon_end );
