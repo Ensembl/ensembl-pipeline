@@ -190,18 +190,11 @@ sub new {
 
   $self->_slice($transcript);
 
-  # Due to padding, it is necessary to re-construct our transcript
-  # in proper slice coordinates.
+  # To take account of padding and/or possibly a reverse stranded transcript, it 
+  # is necessary to transfer our transcript into the new slice coordinates.
 
-  $self->_transcript($transcript, $self->_slice);
-
-  # Check the orientation of our transcript.  If it is on the reverse
-  # strand invert our slice and re-retrieve our transcript.
-
-  if ($transcript->strand == -1){
-    $self->_slice($self->_slice->invert);
-    $self->_transcript($transcript, $self->_slice);
-  }
+  $transcript = $transcript->transfer($self->_slice);
+  $self->_transcript($transcript);
 
   # Determine if our database contains translations.  If it doesn't
   # we'll have to skip adding a set of translated exons to our 
@@ -211,8 +204,7 @@ sub new {
     $self->_translatable(1);
   } else {
     warning("Database doesn't contain translation.  Subsequently, ".
-	    "wont be able to display translations of each exon ".
-	    "or calculate protein identity scores.");
+	    "wont be able to display translations of each exon.");
     $self->_type('nucleotide');
     $self->_translatable(0);
   }
@@ -514,13 +506,6 @@ sub _create_Alignment_object {
 }
 
 
-
-
-
-
-
-
-
 =head2 _truncate_introns
 
   Arg [1]    :
@@ -632,6 +617,7 @@ sub _truncate_introns {
   return 1;
 }
 
+
 =head2 _is_computed
 
   Arg [1]    :
@@ -656,13 +642,13 @@ sub _is_computed {
   if ((!defined $type)&&($self->_type)) {
     return 1;
   }
-  
+
   # Paranoid initialisation
 
   if (!defined $self->{'_is_computed'}) {
     $self->{'_is_computed'} = 0;
   }
-  
+
   # Check whether an alignment of a specific type
   # has been run.
   if ((!defined $value)&&($self->{'_is_computed'})&&($type ne $self->_type)) { 
@@ -673,7 +659,6 @@ sub _is_computed {
     return 0; 
   }
 
-  
   if (defined $value && $value > 0) {
 
     if ((defined $type)
@@ -806,60 +791,20 @@ sub _working_alignment {
 
 =cut
 
-# This method could be irradicated by adding some options
-# to our object such that they can be instantiated with
-# a slice and a bunch of transcripts from that slice.
-# Something to think about.
-
 sub _transcript {
-  my ($self, $input_transcript, $slice) = @_;
+  my $self = shift;
 
-  if (defined $input_transcript && defined $slice){
-
-  # This is just a little horrible, but it
-  # does make things much neater elsewhere.
-  # We need to retrieve our transcript from
-  # our slice.  We iterate through all genes on
-  # the slice, then search the stable ids of the 
-  # transcripts on this gene.  Yuck, but for 
-  # most genes this is not much fiddling about.
-
-  GENE:
-    foreach my $candidate_gene (@{$slice->get_all_Genes}){
-
-    TRANSCRIPT:
-      foreach my $candidate_transcript (@{$candidate_gene->get_all_Transcripts}) {
-
-	# Check whether the transcripts are the same, first using the stable_id
-	# if it exists, otherwise with the dbID.
-	unless (($candidate_transcript->stable_id 
-		 && $input_transcript->stable_id 
-		 && $candidate_transcript->stable_id eq $input_transcript->stable_id)
-		||($candidate_transcript->dbID 
-		   && $candidate_transcript->dbID == $input_transcript->dbID)){
-	  next TRANSCRIPT;
-	}
-	
-	$self->{'_transcript'} = $candidate_transcript;
-
-	# Get the strand of our gene
-	$self->_strand($candidate_gene->strand);
-
-	last GENE;
-      }
-    }
-
-    unless ($self->{'_transcript'}){
-      throw("Could not find transcript on Slice.  Very bad.");
-    }
+  if (@_){
+    $self->{'_transcript'} = shift;
   }
 
-  if (defined $self->{'_transcript'}){
-    return $self->{'_transcript'}
-  } else {
-    throw("Something has gone wrong.  A Transcript has not yet been" .
-	  " extracted from our new Slice.");
+  unless (defined $self->{_transcript} &&
+	  $self->{_transcript}->isa("Bio::EnsEMBL::Transcript")){
+    throw("Problem with transcript.  It is either unset or is not a " . 
+	  "transcript.  It is a [".$self->{_transcript}."].");
   }
+
+  return $self->{_transcript}
 }
 
 
@@ -881,12 +826,13 @@ sub _slice {
 
   if (defined $object && 
       $object->isa("Bio::EnsEMBL::Slice")){
-    $self->{'_slice'} = $object
-  } elsif (defined $object) {
+    $self->{_slice} = $object
+  } elsif (defined $object && 
+	   $object->isa("Bio::EnsEMBL::Transcript")) {
     $transcript = $object
   }
 
-  if (! defined $self->{'_slice'} && defined $transcript) {
+  if (! defined $self->{_slice} && defined $transcript) {
 
     my $slice_adaptor = $self->_db->get_SliceAdaptor;
 
@@ -896,15 +842,22 @@ sub _slice {
 
     if ($transcript->stable_id){
 
-      $self->{'_slice'} = 
+      $self->{_slice} = 
 	$slice_adaptor->fetch_by_transcript_stable_id($transcript->stable_id, 
 						      $self->_padding);
     } else {
 
-      $self->{'_slice'} = 
+      $self->{_slice} = 
 	$slice_adaptor->fetch_by_transcript_id($transcript->dbID, 
 					       $self->_padding);
 
+    }
+
+    # Check the orientation of our transcript.  If it is on the reverse
+    # strand invert our slice.
+
+    if ($transcript->strand == -1){
+      $self->{_slice} = $self->{_slice}->invert;
     }
   }
 
@@ -924,25 +877,10 @@ sub _slice {
 =cut
 
 sub _strand {
-  my ($self, $value) = @_;
+  my $self = shift;
 
-  # Potential gotcha.  The strand is set when the transcript is
-  # set, almost always from the constructor.  Hence, to minimise 
-  # overhead, the strand is set from the _transcript method and 
-  # this method doesn't actually figure anything out.
-
-  if (defined $value) {
-    $self->{'_strand'} = $value;
-  }
-
-  if (! defined $self->{'_strand'}){
-    warning("No value for strand set.  Disaster awaits.");
-  }
-
-  return $self->{'_strand'};
+  return $self->{_transcript}->strand;
 }
-
-
 
 
 =head2 _seq_fetcher
