@@ -1258,7 +1258,7 @@ sub _archive_exon{
 =cut
 
 sub _create_exon_vseq {
-    my ($exon) = @_;
+    my ($self,$exon) = @_;
 
     my $seq  = Bio::EnsEMBL::Archive::Seq->new(
 					       -name => $exon->id,
@@ -1327,7 +1327,7 @@ sub _archive_gene{
 
    #Add all transcripts and genes associated with this gene at the time
    #it is archived, to preserve a picture of the structure
-   foreach my $trans ($gene->each_Transcript) {
+   foreach my $trans ($dead_gene->each_Transcript) {
        my $trans_vseq = $self->_create_transcript_vseq($trans);
        foreach my $exon ($trans->each_Exon) {
 	   my $exon_vseq = $self->_create_exon_vseq($exon);
@@ -1359,7 +1359,7 @@ sub _archive_gene{
 =cut
 
 sub _create_gene_vseq {
-    my ($gene) = @_;
+    my ($self,$gene) = @_;
 
     my $seq  = Bio::EnsEMBL::Archive::Seq->new(
 					       -name => $gene->id,
@@ -1368,6 +1368,7 @@ sub _create_gene_vseq {
 					       );
 
     
+    my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
     my $start = $gene->start;
     my $end = $gene->end;
     my $start_contig = $gene->contig_id;
@@ -1407,7 +1408,7 @@ sub _archive_transcript{
    
    #Add translation and all exons associated with this transcript at the time
    #it is archived, to preserve a picture of the structure
-   foreach my $exon ($trans->each_Exon) {
+   foreach my $exon ($dead_transcript->each_Exon) {
        my $exon_vseq = $self->_create_exon_vseq($exon);
        $dead_transcript_vseq->add_relative($exon_vseq);
    }
@@ -1435,7 +1436,7 @@ sub _archive_transcript{
 =cut
 
 sub _create_transcript_vseq {
-    my ($transcript) = @_;
+    my ($self,$transcript) = @_;
 
     my $seq  = Bio::EnsEMBL::Archive::Seq->new(
 					       -name => $transcript->id,
@@ -1445,13 +1446,13 @@ sub _create_transcript_vseq {
 
 
     my ($start_contig,$start,$end_contig,$end);
-    
+    my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
     my $start_exon = $transcript->start_exon;
     my $end_exon = $transcript->end_exon;
     
     if ($start_exon->isa('Bio::EnsEMBL::StickyExon')) {
 	$start_exon->_sort_by_sticky_rank;
-	foreach my $ce ($exon->each_component_Exon) {
+	foreach my $ce ($start_exon->each_component_Exon) {
 	    if (!$start) {
 		$start = $ce->start;
 		$start_contig = $ce->contig_id;
@@ -1460,7 +1461,7 @@ sub _create_transcript_vseq {
     }
     if ($end_exon->isa('Bio::EnsEMBL::StickyExon')) {
 	$end_exon->_sort_by_sticky_rank;
-	foreach my $ce ($exon->each_component_Exon) {
+	foreach my $ce ($end_exon->each_component_Exon) {
 	    $end = $ce->end;
 	    $end_contig = $ce->contig_id;
 	}
@@ -1487,7 +1488,7 @@ sub _create_transcript_vseq {
 							-release_number => $old_db->release_number
 							);
 
-    my $translation_vseq = $self->create_translation_vseq($trans->translation);
+    my $translation_vseq = $self->create_translation_vseq($transcript->translation);
     $vseq->add_relative($translation_vseq);
     
     return $vseq;
@@ -1507,7 +1508,7 @@ sub _create_transcript_vseq {
 =cut
 
 sub _create_translation_vseq {
-    my ($translation) = @_;
+    my ($self,$translation) = @_;
 
     my $seq  = Bio::EnsEMBL::Archive::Seq->new(
 					       -name => $translation->id,
@@ -1517,13 +1518,13 @@ sub _create_translation_vseq {
 
     
     my ($start_contig,$start,$end_contig,$end);
-    
+    my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
     my $start_exon = $translation->start_exon;
     my $end_exon = $translation->end_exon;
     
     if ($start_exon->isa('Bio::EnsEMBL::StickyExon')) {
 	$start_exon->_sort_by_sticky_rank;
-	foreach my $ce ($exon->each_component_Exon) {
+	foreach my $ce ($start_exon->each_component_Exon) {
 	    if (!$start) {
 		$start = $ce->start;
 		$start_contig = $ce->contig_id;
@@ -1532,7 +1533,7 @@ sub _create_translation_vseq {
     }
     if ($end_exon->isa('Bio::EnsEMBL::StickyExon')) {
 	$end_exon->_sort_by_sticky_rank;
-	foreach my $ce ($exon->each_component_Exon) {
+	foreach my $ce ($end_exon->each_component_Exon) {
 	    $end = $ce->end;
 	    $end_contig = $ce->contig_id;
 	}
