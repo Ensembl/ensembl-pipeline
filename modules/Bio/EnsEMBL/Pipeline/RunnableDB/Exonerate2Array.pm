@@ -19,7 +19,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Exonerate2Array
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Exonerate2Array->new(
 					     -dbobj     => $db,
 					     -input_id  => $id,
-					     -analysis   => $analysis 		 
+					     -analysis   => $analysis
                                              );
     $obj->fetch_input();
     $obj->run();
@@ -117,6 +117,7 @@ sub fetch_input {
     unless (defined($query_file) && defined($target_file));
   
   my $executable =  $self->exonerate();
+  
   my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateArray(
 								       '-db'           => $self->db,
 								       '-database'     => $target_file,
@@ -147,10 +148,14 @@ sub run {
   
   $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
   
-  $self->runnable->run();
-  
-  my @out = $self->runnable->output();
+  my $runnable = $self->runnable;
+  $runnable->run();
+    
+  my @out = $runnable->output();
+  my %match = %{$runnable->output_match_count};
+
   $self->output(@out);
+  $self->output_match_count(\%match);
 }
 
 =head2 output
@@ -172,6 +177,15 @@ sub output {
   return @{$self->{_output}};
 }
 
+sub output_match_count {
+
+  my ($self, $match) = @_;
+  if ($match){
+    $self->{_match} = $match;
+  }
+  return $self->{_match};
+}
+
 =head2 write_output
 
     Title   :   write_output
@@ -186,49 +200,36 @@ sub write_output {
 
   my($self) = @_;
   
-  my @features = $self->output(); 
-  my $db = $self->db();
-  my $feat_adp = $db->get_DnaAlignFeatureAdaptor;
+  my @misc_features = $self->output(); 
+  my %match = %{$self->output_match_count};
+  
+  my $mfa = $self->db->get_MiscFeatureAdaptor();
+  #$mfa->store( @misc_features );
   
   my ($count,$only_25,$only_24,$both,%count,%done);
 
-  #$feat_adp->store(@features);
-  foreach my $feat (@features) {
-    #print "seq_start is ",$feat->start," seq_end is ",$feat->end, " strand is ",$feat->strand," hseqname is ",$feat->hseqname," percent_id is ",$feat->percent_id,"\n";
-    $count++;
-    $done{$feat->hseqname}=1;
-    if ($feat->percent_id == 100 and ($feat->end - $feat->start +1) ==25) {
-      $count{$feat->hseqname}{'25f'}++;
-    }
-    elsif ($feat->percent_id >=96 and ($feat->end - $feat->start +1) ==25) {
-      $count{$feat->hseqname}{'25p'}++;
-    }
-    elsif (($feat->end - $feat->start +1) ==24) {
-      $count{$feat->hseqname}{'24'}++;
-    }
-  }
-
-  foreach my $q_id (keys %done) {
-    if ($count{$q_id}{'25f'} and !$count{$q_id}{'25p'} and !$count{$q_id}{'24'}) {
+  foreach my $q_id (keys %match) {
+    if ($match{$q_id}{'full_match_count'} and !$match{$q_id}{'mis_match_count'}) {
       $only_25++;
     }
-    elsif ($count{$q_id}{'25f'} and $count{$q_id}{'25p'} or $count{$q_id}{'25f'} and $count{$q_id}{'24'}) {
+    elsif ($match{$q_id}{'full_match_count'} and $match{$q_id}{'mis_match_count'}) {
       $both++;
     }
-    elsif ($count{$q_id}{'24'} or $count{$q_id}{'25p'} or ($count{$q_id}{'25p'} and $count{$q_id}{'24'})) {
+    elsif ($match{$q_id}{'mis_match_count'} and !$match{$q_id}{'fullmatch_count'}) {
       $only_24++;
     }
   }
-
-  my $tot_pass_ids = keys %done;
+  
+  my $tot_pass_ids = keys %match;
   my $ratio_25 = $only_25/$tot_pass_ids;
   my $ratio_24 = $only_24/$tot_pass_ids;
   my $ratio_both = $both/$tot_pass_ids;
-
+  
   printf "total pass ids is $tot_pass_ids, 25 exact match is $only_25 (%.2f), 24 exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
-
+  
   return 1;
 }
+
 
 ############################################################
 #
@@ -319,11 +320,14 @@ sub analysis {
 ############################################################
     
 sub runnable{
-   my ($self, $runnable) = @_;
-   if($runnable  ) {
-     $self->{'_runnable'} = $runnable;
+  my ($self, $runnable) = @_;
+  if($runnable) {
+    unless($runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
+      $self->throw("$runnable is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
-    return $self->{'_runnable'};
+    $self->{'_runnable'} = $runnable;
+  }
+  return $self->{'_runnable'};
 }
 
 
