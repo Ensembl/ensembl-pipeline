@@ -8,6 +8,7 @@
 # note that you may need to alter the #! line above to suit your
 # local perl installation
 
+use strict;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
@@ -23,8 +24,9 @@ my $dbuser;
 
 my $port            = '3306';
 my $pass            = undef;
-my $job_id;
-
+my $jobname;
+my $index;
+my $check;
 
 GetOptions(
     'host=s'       => \$host,
@@ -32,12 +34,14 @@ GetOptions(
     'dbname=s'     => \$dbname,
     'dbuser=s'     => \$dbuser,
     'pass=s'       => \$pass,
+    'index'        => \$array_index,
+    'jobname'      => \$job_name,
     'check!'       => \$check,
     'output_dir=s' => \$output_dir
 )
 or die ("Couldn't get options");
 
-if( defined $check ) {
+if( $check ) {
   my $host = hostname();
   if ( ! -e $output_dir ) {
     die "output dir $output_dir doesn't exist according to host $host";
@@ -54,51 +58,49 @@ if( defined $check ) {
 
 }
 
+
+$jobname or die("jobname not defined");
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $host,
     -user   => $dbuser,
     -dbname => $dbname,
     -pass   => $pass,
-    -port   => $port
-)
-or die ("Failed to create Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor to db $dbname \n");
+    -port   => $port);
+
 
 my $job_adaptor = $db->get_JobAdaptor();
 
-# Print a list of jobs in this 'batch' - this is perhaps useful later
-# to parse these output files for CPU/Mem usage etc.
-print STDOUT "LSF Batch summary\n";
-print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
-print STDOUT "Job ID\tinput ID\tanalysis ID\n";
-foreach my $id (@ARGV) {
-    my $job = $job_adaptor->fetch_by_dbID($id);
-    print STDOUT join ("\t", $id, $job->input_id, $job->analysis->logic_name), "\n";
+$index ||= '';
+print STDERR "Fetching job [$jobname] index [$index]\n";
+my $jobs;
+
+if($index) {
+  $jobs = $job_adaptor->fetch_all_by_job_name($jobname, $index);
+} else {
+  $jobs = $job_adaptor->fetch_all_by_job_name($jobname);
 }
 
-while( $job_id = shift ) {
-
-  print STDERR "Fetching job " . $job_id . "\n";
-
-  my $job         = $job_adaptor->fetch_by_dbID($job_id);
-
-  if( !defined $job) {
-    print STDERR ( "Couldnt recreate job $job_id\n" );
-    next;
-  }
-  print STDERR "Running job $job_id\n";
-  print STDERR "Module is " . $job->analysis->module . "\n";
-  print STDERR "Input id is " . $job->input_id . "\n";
-  print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
-
-  eval {
-    $job->run_module;
-  };
-  $pants = $@;
-
-  if ($pants) {
-    print STDERR "Job $job_id failed: [$pants]";
-  }
-
-  print STDERR "Finished job $job_id\n";
+if(@$jobs > 1) {
+  die "expected single job with [$jobname] index [$index] but got [" .
+    scalar(@$jobs) . "] instead";
 }
 
+my ($job) = @$jobs;
+
+die "Couldn't recreate job [$jobname] index [$index]\n" if(!$job);
+
+print STDERR "Running job [$jobname] index [$index]\n";
+print STDERR "Module is [".$job->module."]\n";
+print STDERR "Input id is [".$job->input_id."]\n";
+print STDERR "Files are [".$job->stdout_file."] [".$job->stderr_file."]\n";
+
+eval {
+  $job->run;
+};
+
+if ($@) {
+  print STDERR "Job [$jobname] index [$index] failed: [$@]\n";
+}
+
+print STDERR "Finished job [$jobname] index [$index]\n";
