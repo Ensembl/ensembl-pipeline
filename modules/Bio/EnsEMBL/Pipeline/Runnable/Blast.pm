@@ -486,10 +486,10 @@ sub split_HSP {
     my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
-    #print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
-    #print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
+    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
+    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
 
-    #print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
+    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
 
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
@@ -514,10 +514,10 @@ sub split_HSP {
     my @hchars = split(//,$hsp->sbjctSeq);  # ditto for hit sequence
     
     my $qstart = $hsp->query->start();                # Start off the feature pair start
-    my $hstart = $hsp->subject->start();                # ditto
+    my $hstart = $hsp->subject->start();              # ditto
     
-    my $qend   = $hsp->query->end();                # Set the feature pair end also
-    my $hend   = $hsp->subject->end();                # ditto
+    my $qend   = $hsp->query->start();                  # Set the feature pair end also
+    my $hend   = $hsp->subject->start();                # ditto
     
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
@@ -541,6 +541,7 @@ sub split_HSP {
 	if ($qchars[$count] ne '-' &&
 	    $hchars[$count] ne '-') {
 
+	  print STDERR "Counting " . $count ." " . $qend . " " . $hend . "\n";
 	    $qend += $qinc;
 	    $hend += $hinc;
 	    
@@ -581,7 +582,9 @@ sub split_HSP {
 
     # Remember the last feature
     if ($found == 1) {
+      print $hstart . " " . $hend . " " . $qstart . " " . $qend . "\n";
 	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
+	print "Feature is " . $fp->gffstring . "\n";
 	$self->growfplist($fp);                             	    
     }
 
