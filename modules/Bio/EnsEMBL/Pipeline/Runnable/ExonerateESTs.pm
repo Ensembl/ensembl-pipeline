@@ -233,39 +233,36 @@ sub run {
     my ($self) = @_;
 
     # filter ESTs using exonerate
-#    my @exonerate_res = $self->run_exonerate();
     my $exonerate_res = $self->run_exonerate(); # ref to an array
-
-#    print STDERR "**got " . scalar(@exonerate_res) . " hits\n";
 
     my %exonerate_ests;
     my @feat;
 
-    foreach my $res(@{$exonerate_res} ) {
-      print STDERR "$res\n";
+    my @hosts = ( 'ecs1a',
+		  'ecs1b',
+		  'ecs1c',
+		  'ecs1d',
+		  'ecs1e',
+		  'ecs1f',
+		  'ecs1g',
+		  'ecs1h',
+		);
+
+    my $index = int(rand 8); # number between 0 and 7; might want to use srand to seed ...?
+
+    my $host = $hosts[$index]; # randomize over ecs nodes here
+    my $resfile = $self->resfile;
+    open OUT, ("| /usr/bin/rsh $host '(cat - >>$resfile)'");
+  
+    foreach my $pair(@{$exonerate_res} ) {
+
       # all hits, for Aaron
-      $self->_print_FeaturePair($res);
-
-      my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
-      $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
-      $res->hseqname($seqname);
-
-      # score cutoff 500 for exonerate ... take all features for a sequence as long as one of them gets over this threshold
-      if($res->score > 500 || defined $exonerate_ests{$seqname}) {
-	push (@feat, $res);
-	push(@{$exonerate_ests{$seqname}}, $res);
-      }
+      print OUT $pair->seqname . "\t" . $pair->start  . "\t" . $pair->end      . "\t" . 
+	        $pair->score   . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
+                $pair->hstart  . "\t" . $pair->hend   . "\t" . $pair->hstrand  . "\n";
     }
 
-    close OUT;
-
-    # filter features
-    my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
-								      '-minscore' => 500);
-    my @filteredfeats = $filter->run(@feat);
-
-#    print STDERR "filteredfeats: ". scalar(@filteredfeats) . "\n";
-    $self->output(\@filteredfeats);
+  close OUT;
 
 }
 
@@ -346,31 +343,6 @@ sub output {
   
   return $self->{'_output'}; #ref to an array
 }
-
-=head2 _print_FeaturePair
-
-    Title   :   print_FeaturePair
-    Usage   :   $self->_print_FeaturePair($pair)
-    Function:   Prints attributes of a Bio::EnsEMBL::FeaturePair
-    Returns :   Nothing
-    Args    :   A Bio::EnsEMBL::FeaturePair
-
-=cut
-
-sub _print_FeaturePair {
-  my ($self,$pair) = @_;
-
-  my $host = 'acari';
-  my $resfile = $self->resfile;
-  open OUT, ("| /usr/bin/rsh $host '(cat - >>$resfile)'");
-  
-  print OUT $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . 
-    $pair->score . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-      $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
-  
-  close OUT;
-}
-
 
 1;
 
