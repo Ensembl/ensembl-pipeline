@@ -42,11 +42,11 @@ use strict;
 use Bio::EnsEMBL::Analysis::Programs;
 use Bio::SeqIO;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw(Bio::Root::RootI);
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
