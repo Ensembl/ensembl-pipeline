@@ -1,10 +1,3 @@
-
-#
-#
-# Cared for by Laura Clarke  <lec@sanger.ac.uk>
-#
-# Copyright Laura Clarke
-
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -20,7 +13,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB:GC
 my $db          = Bio::EnsEMBL::DBLoader->new($locator);
 my $gc     = Bio::EnsEMBL::Pipeline::RunnableDB::GC->new ( 
                                                     -dbobj      => $db,
-			                                        -input_id   => $input_id
+			                            -input_id   => $input_id
                                                     -analysis   => $analysis );
 $gc->fetch_input();
 $gc->run();
@@ -51,38 +44,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::GC;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::GC;
+
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);      
-                          
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::GC object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::GC object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    $self->{'_fplist'}      = []; # ???   
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    &Bio::EnsEMBL::Pipeline::RunnableDB::GC::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::GC');
-    return $self;
-}
-
 
 =head2 fetch_input
 
@@ -102,72 +67,17 @@ sub fetch_input {
     
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-    my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
-    $self->genseq($genseq);
-   
 
-}
+    $self->query($contig);
+    my %parameters = $self->parameter_hash;
 
-=head2 
-
-    Title   : runnable   
-    Usage   : $self->runnable  
-    Function: creates the runnable and runs the gc analysis  
-    Returns : the runnable 
-    Args    : the name of the runnable  
-
-=cut
-
-sub runnable {
-    my ($self, $runnable) = @_;
-    if ($runnable)
-    {                                      
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
-            }
-        }
-        $parameters{'-cg'} = $self->analysis->program_file;
-        #creates empty Bio::EnsEMBL::Runnable::CG object
-        $self->{'_runnable'} = $runnable->new
-	    ( '-clone' => $parameters{'-clone'},
-	      '-window' =>$parameters{'-window'},
-	      );
-    }
-    return $self->{'_runnable'};
-}
-
-
-sub write_output{
-  my ($self) = @_;
-
-  my @features = $self->output();
-  my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
-  my $contig;
-  eval {
-    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  };
-
-  if ($@) {
-      print STDERR "Contig not found, skipping writing output to db: $@\n";
-      return;
-  }
-  foreach my $f(@features){
-    $f->analysis($self->analysis);
-    $f->attach_seq($contig);
-    $simple_f_a->store($f);
-  }
-
-
+    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::GC->new(
+           -query => $self->query,
+           -window => $parameters{'-window'});
+							   
+    $self->runnable($runnable);
+    
+    return 1;
 }
 
 1;
