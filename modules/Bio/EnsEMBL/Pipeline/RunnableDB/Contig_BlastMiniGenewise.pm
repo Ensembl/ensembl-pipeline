@@ -104,7 +104,7 @@ sub new {
       $threshold = $GB_SIMILARITY_THRESHOLD;
     }
 
-    $type = 'swall' unless (defined $type && $type ne '');
+    $type = 'Swall' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
     $self->dbobj->static_golden_path_type($path);
@@ -223,17 +223,17 @@ sub write_output {
 sub fetch_input {
     my( $self) = @_;
     
-    print STDERR "Fetching input: " . $self->input_id. " \n";
+    #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contig    = $self->dbobj->get_Contig($self->input_id);
+    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
 
     my $genseq    = $contig->get_repeatmasked_seq;
 
-    print STDERR "Length is " . $genseq->length . "\n";
-    print STDERR "Fetching features \n";
+    #print STDERR "Length is " . $genseq->length . "\n";
+    #print STDERR "Fetching features \n";
 
-    print STDERR "contig: " . $contig . " \n";
+    #print STDERR "contig: " . $contig . " \n";
 
     my @features;
     if ($BIOPERLDB) {
@@ -301,13 +301,21 @@ sub fetch_input {
       }
     }
     else {
-      @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
+      my $alignadaptor = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+      @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
       
-      print STDERR "Number of features = " . scalar(@features) . "\n";
+      #print STDERR "Number of features = " . scalar(@features) . "\n";
+      my @filtered_features;
       
+      foreach my $f(@features){
+	#print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
+	if($f->score >= $self->threshold){
+	  push(@filtered_features, $f);
+	}
+      }
       my %idhash;
       
-      foreach my $f (@features) {
+      foreach my $f (@filtered_features) {
 	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	    defined($f->hseqname)) {
 	  $idhash{$f->hseqname} = 1;
@@ -316,7 +324,7 @@ sub fetch_input {
     
       my @ids = keys %idhash;
       
-      print STDERR "Feature ids are @ids\n";
+      #print STDERR "Feature ids are @ids\n";
       my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
 									     '-ids'        => \@ids,
 									     '-seqfetcher' => $self->seqfetcher,
@@ -390,7 +398,7 @@ else{
     else{
       $anal_logic_name = $genetype;
     }
-	
+     
     my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     my $analysis_obj;
     if(scalar(@analyses) > 1){
@@ -490,7 +498,7 @@ sub _make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->contig_id($contig->internal_id);
+    $exon->contig_id($contig->dbID);
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -500,14 +508,9 @@ sub _make_transcript{
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->seqname($contig->internal_id);
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
+      $subf->feature1->seqname($contig->dbID);
       $subf->feature1->score(100);
       $subf->feature1->analysis($analysis_obj);
-	
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
       
@@ -524,7 +527,7 @@ sub _make_transcript{
   } 
   else {
     
-    print STDERR "num exons: " . scalar(@exons) . "\n";
+    #print STDERR "num exons: " . scalar(@exons) . "\n";
 
     if ($exons[0]->strand == -1) {
       @exons = sort {$b->start <=> $a->start} @exons;
@@ -593,7 +596,7 @@ sub make_seqfetcher {
 								 );
   }
   else{
-    print STDERR "defaulting to pfetch\n";
+    #print STDERR "defaulting to pfetch\n";
     # default to Pfetch
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   }
