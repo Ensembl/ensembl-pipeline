@@ -19,19 +19,15 @@ Bio::EnsEMBL::Pipeline::Runnable::GenericTranscriptMatcher
 									      -reference_set => \@transcript_set1,
 									      -match_set => \@transcript_set2,
 									      );
-    
-    $obj->run;
-    my %expression_map = %{ $obj->output };
-    where @{ $expression_map{$transcript_id} } is an array of ests mapped to this transcript
-    ests are here Bio::EnsEMBL::Transcript objects   
-    
-    one can do:
-    my @transcript_ids = keys %expression_map;
-    foreach my $transcript_id ( @transcripts_ids ){
-	@mapped_ests = $expression_map{ $transcript_id };
-    }
 
-    
+    $obj->run;
+   
+    # the output is a Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap object
+    my $matching_map = $obj->output;
+
+    # see the documentation in Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap for details
+
+ 
 =head1 DESCRIPTION
 
 Class to map one set of transcripts (match_set) to a second set (reference_set) 
@@ -242,7 +238,7 @@ sub _map_Transcripts{
 
 
 
-#########################################################################
+############################################################
 #
 # METHODS TO CHECK THE UTRs (Not in use yet)
 #
