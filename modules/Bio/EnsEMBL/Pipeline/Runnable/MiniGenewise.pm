@@ -540,8 +540,6 @@ sub minirun {
     @ids = @{$self->{'_forder'}};
   }
  
-# VAC FIXME - this is messed up for the Rikens as the same acc no is given for both
-# NA and protein seqs ... 
   $self->get_all_Sequences(@ids);
 
   my $analysis_obj    = new Bio::EnsEMBL::Analysis
