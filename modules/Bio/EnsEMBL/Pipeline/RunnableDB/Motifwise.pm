@@ -17,12 +17,23 @@
                                     -analysis_motif  => $analysis_motif,
                                     );
 
-$mw->fetch_input;
-$mw->run;
-my @output = $mw->output;
-$mw->write_output;
+  $mw->fetch_input;
+  $mw->run;
+  my @output = $mw->output;
+  $mw->write_output;
 
-The rows needed in the analysis table on the core database are:
+  Alternatively, you can parse and store the results of an already existing 
+  motifwise output file:
+
+  my $mw = Bio::EnsEMBL::Pipeline::RunnableDB::Motifwise->new(
+                                    -analysis_tss    => $analysis_tss, 
+                                    -analysis_motif  => $analysis_motif,
+                                    );
+
+  $mw->parse_file_and_store($filename);
+
+
+  The rows needed in the analysis table on the core database are:
 
 INSERT INTO analysis (logic_name, db, db_file, program, program_version, program_file, parameters, module, gff_source, gff_feature) VALUES ('motifwise_tss','motif','/ecs2/work1/dta/motifwise/motif_dropout.lr','motifwise','beta','motifwise','-tfm_cutoff 11.0','Motifwise','motifwise','TSS');
 INSERT INTO analysis (logic_name, db, db_file, program, program_version, program_file, parameters, module, gff_source, gff_feature) VALUES ('motifwise_motif','motif','/ecs2/work1/dta/motifwise/motif_dropout.lr','motifwise','beta','motifwise','-tfm_cutoff 11.0','Motifwise','motifwise','Motif');
@@ -94,6 +105,15 @@ sub new {
   # that are passed to the parent class constructor.
 
   push @args, ('-analysis', $analysis_tss);
+
+  # Add a dummy input id if one hasnt been specified - assuming that
+  # the object is being constructed to parse an existing file (if this
+  # is not a correct assumption, the code will mostly likely throw
+  # when it tried to parse the dummy input id).
+
+  push @args, ('-input_id', 'dummy') unless $input_id;
+
+  # Make object using parent constructor.
   
   my $self = $class->SUPER::new(@args);
   
@@ -140,10 +160,17 @@ sub fetch_input {
     my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
     $self->query($slice);
 
-    my $repeatmasked = scalar @$PIPELINE_REPEAT_MASKING;
+    my $seq;
+
+    if (scalar @$PIPELINE_REPEAT_MASKING) {
+      $seq = $slice->get_repeatmasked_sequence($PIPELINE_REPEAT_MASKING);
+    } else {
+      $seq = $slice;
+    }
+
 
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Motifwise->new(
-		     -query_seq  => $self->query,
+		     -query_seq  => $seq,
 		     -executable => $BIN_DIR . "/motifwise",
                      -parameters => $self->parameters,
 		     -motif_file => $self->_motif_file,
@@ -191,6 +218,24 @@ sub write_output {
   $sfa->store(@mapped_features) if @mapped_features;
   
   return 1;
+}
+
+sub parse_file_and_store {
+  my ($self, $filename) = @_;
+
+  $self->throw("Cant find file [$filename].  Make sure you include the full path.")
+    unless (-e $filename);
+
+  $mw = Bio::EnsEMBL::Pipeline::Runnable::Motifwise->new(
+              -analysis_tss   => $self->_analysis_tss,
+              -analysis_motif => $self->_analysis_motif);
+
+  $mw->output($filename);
+  $mw->parse_results;
+
+  $self->write_output;
+
+  return 1
 }
 
 
