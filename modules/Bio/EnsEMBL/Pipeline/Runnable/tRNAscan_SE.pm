@@ -87,12 +87,28 @@ sub new {
   
   $self->clone($sequence) if ($sequence);       
   
-  if ($tRNAscan_SE) {   
-      $self->tRNAscan_SE($tRNAscan_SE); 
-  } else {   
-      $self->tRNAscan_SE($self->locate_executable('tRNAscan-SE')); 
+  my $bindir = $::pipeConf{'bindir'} || undef;
+
+  if (-x $tRNAscan_SE) {
+    # passed from RunnableDB (full path assumed)
+    $self->tRNAscan_SE($tRNAscan_SE);
   }
-  
+  elsif ($::pipeConf{'bin_tRNAscan_SE'} && -x ($tRNAscan_SE = "$::pipeConf{'bin_tRNAscan_SE'}")) {
+    $self->tRNAscan_SE($tRNAscan_SE);
+  }
+  elsif ($bindir && -x ($tRNAscan_SE = "$bindir/tRNAscan-SE")) {
+    $self->tRNAscan_SE($tRNAscan_SE);
+  }
+  else {
+    # search shell $PATH
+    eval {
+      $self->tRNAscan_SE($self->locate_executable('tRNAscan-SE'));
+    };
+    if ($@) {
+      $self->throw("Can't find executable tRNAscan-SE");
+    }
+  }
+
   return $self;
 }
 
