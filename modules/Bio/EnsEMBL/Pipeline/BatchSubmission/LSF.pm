@@ -158,23 +158,31 @@ sub get_pending_jobs {
   my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
   my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
 
-  my $cmd = "bjobs -p";
-  $cmd   .= " -q $queue" if $queue;
-  $cmd   .= " -u $user"  if $user;
-  $cmd   .= " | grep PEND";
+  my $cmd = "bjobs";
+  $cmd .= " -q $queue" if $queue;
+  $cmd .= " -u $user"  if $user;
+  $cmd .= " | grep -c PEND ";
 
-  open CMD, "$cmd 2>&1 |" or do {
-    return undef;
-  };
+  print STDERR "$cmd\n" if $args{'-debug'};
 
-  my @lines = <CMD>;
-
-  close CMD or do {
-    return undef;
-  };
-
-  return 0 if $lines[0] =~ /No pending job found/;
-  return scalar @lines;
+  my $pending_jobs = 0;
+  if( my $pid = open (my $fh, '-|') ){
+      eval{
+	  local $SIG{ALRM} = sub { kill 9, $pid; };
+	  alarm(60);
+	  while(<$fh>){
+	      chomp;
+	      $pending_jobs = $_;
+	  }
+	  close $fh;
+	  alarm 0;
+      }
+  }else{
+      exec( $cmd );
+      die q{Something went wrong here $!: } . $! . "\n";
+  }
+  print STDERR "FOUND $pending_jobs jobs pending\n" if $args{'-debug'};
+  return $pending_jobs;
 }
 
 
