@@ -15,6 +15,7 @@ my $pass;
 my $runhost = 0;
 
 my $help = sub{ exec('perldoc', $0) };
+
 GetOptions('dbhost=s'        => \$host,
            'dbport=i'        => \$port,
            'dbname=s'        => \$database,
@@ -70,7 +71,7 @@ $analysisid,     $logicname,        $version,              $noinput,           $
 
 if ($runhost) {
 
-    print "\nAnalysis ID \t Logic Name \t   DB Version \t No. Of Sequences \t    Run Host";
+    print "\nAnalysis ID \t Logic Name \t   DB Version \t No. Of Sequences \t    Run Host\n";
 
 
 }
@@ -84,7 +85,6 @@ else {
 
 while (my $ref = $sth->fetchrow_hashref) {
 
-    print "\n";
     $analysisid = $ref->{'analysisid'};
     $logicname =  $ref->{'logicname'};
     $version=$ref->{'dbversion'};
@@ -109,6 +109,45 @@ __END__
 
 =head1 DESCRIPTION
 
+Displays  the version of each of the analysis program and the number of 
+sequences that went through that particular version of the analysis program.
+
+Also displays the hostname in which the program was run with an extra option -runhost
+
+=head1 SYNOPSIS
+
+  show_searched_blast_versions -dbhost <MYSQL_HOSTNAME> -dbport <MYSQL_PORT> -dbname <DATABASE_NAME> -dbuser <USER_NAME> [ -dbpass <USER_PASSWORD> ] [ -runhost ]
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item -dbhost <MYSQL_HOSTNAME>
+
+Name of the mysql server host eg: B<ecs4>
+
+=item -dbport <MYSQL_PORT>
+
+Port number of the mysql server eg: B<3352>
+
+=item -dbname <DATABASE_NAME> 
+
+Name of the pipeline database which you would like to connect to eg: B<chimp_finished_updated>
+
+=item -dbuser <USER_NAME>
+
+MySQL user name for connection eg: B<ensuser>
+
+=item -dbpass <USER_PASSWORD>
+
+Password of the mysql user if any eg: B<testpass>
+
+=item -runhost 
+
+Optional , and when given displays the host name in the farm on which the particular sequence was run with the particular version
+
+=back
+
 =head1 AUTHOR
 
-Sindhu Pillai email sp1@sanger.ac.uk
+Sindhu Pillai B<email> sp1@sanger.ac.uk
