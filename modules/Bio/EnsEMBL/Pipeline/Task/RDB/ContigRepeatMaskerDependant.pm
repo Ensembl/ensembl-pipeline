@@ -34,10 +34,21 @@ sub can_start{
  
   my $input_ids = $self->get_input_ids;
   my $repeatmask_success = $self->get_TaskStatus('repeatmasker_task')->get_successful;
+ 
+  my $can_start = $input_ids->and($repeatmask_success);
+  $self->input_ids_to_start($can_start);
+  return $self->input_ids_to_start->count;
+}
+
+sub update_input_ids{
+  my $self = shift;
+
+  my $input_ids = $self->get_input_ids;
+  my $repeatmask_success = $self->get_TaskStatus('repeatmasker_task')->get_successful;
+ 
   my $can_start = $input_ids->and($repeatmask_success);
   $self->input_ids_to_start($can_start);
 }
-
 
 
 =head2 input_id_to_start
@@ -69,6 +80,23 @@ sub input_ids_to_start{
 }
 
 
+=head2 run
 
+  Arg [1]   : none
+  Function  : calls to create_Jobs
+  Returntype: TASK_DONE
+  Exceptions: none
+  Caller    : 
+  Example   : $task->run;
+
+=cut
+
+
+
+sub run{
+  my $self = shift;
+  $self->update_input_ids;
+  return $self->start;
+}
 
 1;

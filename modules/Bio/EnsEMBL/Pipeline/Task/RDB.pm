@@ -153,12 +153,12 @@ sub parameter_string{
       $self->throw("PipelineManager ".$self->get_PipelineManager.
                    " seems to be missing its config $!");
     }
-
-    my $dbhost = $config->get_parameter('ensembl_database', 'host');
-    my $dbuser = $config->get_parameter('ensembl_database', 'user');
-    my $dbpass = $config->get_parameter('ensembl_database', 'pass');
-    my $dbname = $config->get_parameter('ensembl_database', 'dbname');
-    my $dbport = $config->get_parameter('ensembl_database', 'port');
+    my $dbheader = $config->get_parameter($self->name, 'ensdb');
+    my $dbhost = $config->get_parameter($dbheader, 'host');
+    my $dbuser = $config->get_parameter($dbheader, 'user');
+    my $dbpass = $config->get_parameter($dbheader, 'pass');
+    my $dbname = $config->get_parameter($dbheader, 'dbname');
+    my $dbport = $config->get_parameter($dbheader, 'port');
     my $logic_name = $self->logic_name;
 
     my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:$logic_name";
@@ -191,12 +191,12 @@ sub db{
       $self->throw("PipelineManager ".$self->get_PipelineManager.
 		   " seems to be missing its config $!");
     }
-
-    my $dbhost = $config->get_parameter('ensembl_database', 'host');
-    my $dbuser = $config->get_parameter('ensembl_database', 'user');
-    my $dbpass = $config->get_parameter('ensembl_database', 'pass');
-    my $dbname = $config->get_parameter('ensembl_database', 'dbname');
-    my $dbport = $config->get_parameter('ensembl_database', 'port');
+    my $dbheader = $config->get_parameter($self->name, 'ensdb');
+    my $dbhost = $config->get_parameter($dbheader, 'host');
+    my $dbuser = $config->get_parameter($dbheader, 'user');
+    my $dbpass = $config->get_parameter($dbheader, 'pass');
+    my $dbname = $config->get_parameter($dbheader, 'dbname');
+    my $dbport = $config->get_parameter($dbheader, 'port');
     
     my $dbadaptor = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 							-dbname => $dbname,
@@ -239,38 +239,7 @@ sub max_create{
 
 
 
-=head2 run
 
-  Arg [1]   : none
-  Function  : calls to create_Jobs
-  Returntype: TASK_DONE
-  Exceptions: none
-  Caller    : 
-  Example   : $task->run;
-
-=cut
-
-
-
-sub run{
-  my $self = shift;
-
-  my $parameters = $self->parameter_string;
-  my $module = $self->module;
-  my $potential = $self->input_ids_to_start;
-  my $existing = $self->get_TaskStatus->get_existing;
-  my $id_set = $potential->not($existing)->subset($self->max_create);
-  eval{
-    $self->create_Jobs($module, 
-		       $id_set, $parameters);
-  };
-
-  if($@){
-    return 'TASK_FAILED';
-  }
-
-  return 'TASK_OK'; 
-}
 
 
 
@@ -313,5 +282,25 @@ sub get_Config{
   return $self->{'config'};
 }
 
+sub start{
+  my $self = shift;
+  my $parameters = $self->parameter_string;
+  my $module = $self->module;
+  my $potential = $self->input_ids_to_start;
+  my $existing = $self->get_TaskStatus->get_existing;
+  my $id_set = $potential->not($existing)->subset($self->max_create);
+  eval{
+    $self->create_Jobs($module, 
+		       $id_set, $parameters);
+  };
+
+  if($@){
+    print STDERR "Creation of jobs for ".$self->name." failed $@\n";
+    return 'TASK_FAILED';
+  }
+
+  return 'TASK_OK'; 
+  
+}
 
 1;

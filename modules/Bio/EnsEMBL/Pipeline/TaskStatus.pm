@@ -429,16 +429,16 @@ sub create_existing{
 sub status_report{
     my ($self) = @_;
     
-    print STDERR "Created tasks\t".$self->get_created->count."\n" if($self->get_created);
-    print STDERR "Submitted tasks\t".$self->get_submitted->count."\n" if($self->get_submitted);
-    print STDERR "Reading tasks\t".$self->get_reading->count."\n" if($self->get_reading);
-    print STDERR "Running tasks\t".$self->get_running->count."\n" if($self->get_running);
-    print STDERR "Writing tasks\t".$self->get_writing->count."\n" if($self->get_writing);
-    print STDERR "Successful tasks\t".$self->get_successful->count."\n" if($self->get_successful);
-    print STDERR "Failed tasks\t".$self->get_failed->count."\n" if ($self->get_failed);
-    print STDERR "Fatal tasks\t".$self->get_fatal->count."\n" if($self->get_fatal);
-    print STDERR "Killed tasks\t".$self->get_killed->count."\n" if($self->get_killed);
-    print STDERR "Exisiting tasks\t".$self->get_existing->count."\n" if($self->get_existing);
+    print STDERR "Created tasks\t".$self->get_created->count."\n" if($self->get_created->count);
+    print STDERR "Submitted tasks\t".$self->get_submitted->count."\n" if($self->get_submitted->count);
+    print STDERR "Reading tasks\t".$self->get_reading->count."\n" if($self->get_reading->count);
+    print STDERR "Running tasks\t".$self->get_running->count."\n" if($self->get_running->count);
+    print STDERR "Writing tasks\t".$self->get_writing->count."\n" if($self->get_writing->count);
+    print STDERR "Successful tasks\t".$self->get_successful->count."\n" if($self->get_successful->count);
+    print STDERR "Failed tasks\t".$self->get_failed->count."\n" if ($self->get_failed->count);
+    print STDERR "Fatal tasks\t".$self->get_fatal->count."\n" if($self->get_fatal->count);
+    print STDERR "Killed tasks\t".$self->get_killed->count."\n" if($self->get_killed->count);
+    print STDERR "Exisiting tasks\t".$self->get_existing->count."\n" if($self->get_existing->count);
 }
 
 

@@ -54,5 +54,22 @@ sub input_ids_to_start{
 }
 
 
+=head2 run
+
+  Arg [1]   : none
+  Function  : calls to create_Jobs
+  Returntype: TASK_DONE
+  Exceptions: none
+  Caller    : 
+  Example   : $task->run;
+
+=cut
+
+
+
+sub run{
+  my $self = shift;
+  return $self->start;
+}
 
 1;
