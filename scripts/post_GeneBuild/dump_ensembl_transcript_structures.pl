@@ -10,6 +10,8 @@ use strict;
 my $dbname;
 my $dbhost;
 my $dbuser = 'ensro';
+my $dnadbname;
+my $dnadbhost;
 
 my $genetype;
 
@@ -17,6 +19,8 @@ my $file = 'ensembl_transcript_structures';
 
 &GetOptions( 'dbhost:s'       => \$dbhost,
 	     'dbname:s'       => \$dbname,
+	     'dnadbname:s'     => \$dnadbname,
+	     'dnadbhost:s'     => \$dnadbhost,
 	     'genetype:s'     => \$genetype,
 	     'file:s'         => \$file,
 	   );
@@ -32,8 +36,17 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dbhost,
 					    -dbname => $dbname,
 					   );
 
+my $dnadb;
+if ($dnadbhost && $dnadbname ){
+  $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dnadbhost,
+						 -user   => $dbuser,
+						 -dbname => $dnadbname,
+						);
+  $db->dnadb($dnadb);
+}
 
-#my $genetype = "ensembl"; # default genetype
+  
+
 
 open (OUT,     ">$file" )     or die ("cannot open $file");
 
@@ -65,13 +78,16 @@ foreach my $gene_id( @ids) {
     my $strand    = $exons[0]->strand;
     my $chr_name  = $slice->chr_name;
     
-    eval{
-      my $tseq = $trans->translate();
-      if ( $tseq->seq =~ /\*/ ) {
-	print STDERR "translation of ".$trans->dbID." has stop codons. Skipping!\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
-	next TRANS;
-      }
+
+    if ( $dnadb ){
+      eval{
+	my $tseq = $trans->translate();
+	if ( $tseq->seq =~ /\*/ ) {
+	  print STDERR "translation of ".$trans->dbID." has stop codons. Skipping!\n";
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+	  next TRANS;
+	}
+      };
     }
     print OUT $geneid."\t".$trans_id."\t".$chr_name."\t".$strand."\t";
 
