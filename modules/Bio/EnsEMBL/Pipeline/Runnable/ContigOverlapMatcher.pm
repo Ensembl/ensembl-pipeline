@@ -179,8 +179,6 @@ sub get_all_ContigOverlaps {
     return @{$self->{'_contig_overlap'}};
 }
 
-h=cut
-
 =head2 sequence_list
 
     my @seq_list = $matcher->sequence_list;
@@ -335,7 +333,8 @@ sub run {
         mkdir($tmp_dir, 0755) or die "Can't mkdir('$tmp_dir') : $!";
         my $seq_file = "$tmp_dir/contig.seq";
         $self->_write_seqs_to_file($seq_file);
-        my $command = "cd $tmp_dir; phrap.longreads -ace -default_qual 90 -minmatch 30 -maxmatch 30 $seq_file >/dev/null 2>&1";
+        #my $command = "cd $tmp_dir; phrap.longreads -ace -default_qual 90 -minmatch 30 -maxmatch 30 $seq_file >/dev/null 2>&1";
+        my $command = "cd $tmp_dir; phrap.longreads -ace -default_qual 90 -maxmatch 30 $seq_file >/dev/null 2>&1";
         system($command) == 0
             or $self->throw("phrap command '$command' failed");
         
