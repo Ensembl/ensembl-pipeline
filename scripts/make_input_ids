@@ -46,7 +46,7 @@ this script allows input_ids to be generated and written to the input_id_analysi
     
     -single if you just want a single dummy input_id ie for genome wide analyses
     
-    -translation_ids if you want your input ids to be translation ids
+    -translation_id if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
     
 
@@ -81,7 +81,7 @@ as input_ids
 
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
-  -dbname my_database -translation_ids
+  -dbname my_database -translation_id
 
 this will use all the translation ids as input_ids
 
