@@ -65,10 +65,6 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
-
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
