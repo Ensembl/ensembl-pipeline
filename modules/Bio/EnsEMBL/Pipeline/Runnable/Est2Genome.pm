@@ -76,7 +76,8 @@ sub _initialize {
     my $make = $self->SUPER::_initialize(@_);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->{'_clone'}  = undef;        #location of Bio::Seq object
+    $self->{'_genomic_sequence'}  = undef; #location of Bio::Seq object
+    $self->{'_est_sequence'}  = undef; #location of Bio::Seq object
     $self->{'_est_genome'} = undef;    #location of est2genome
     $self->{'_workdir'}   = undef;     #location of temp directory
     $self->{'_filename'}  =undef;      #file to store Bio::Seq object
@@ -239,7 +240,8 @@ sub run {
     my ($self, @args) = @_;
     my ($genname, $estname, $dir) = $self->_rearrange(['genomic', 'est', 'dir'], @args);
     #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Genscan\n");
+    my $seq = $self->genomic_sequence() || $self->throw("Clone required for Est2Genome\n");
+    my $est = $self->est_sequence() || $self->throw("Est Clone required for Est2Genome\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
