@@ -2,6 +2,7 @@
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
+# author: mongin@ebi.ac.uk
 
 =pod 
 
@@ -33,7 +34,7 @@ snap is a gene predictor written by Ian Korf (ik1@sanger.ac.uk) part the Zoe sof
 
 =head1 CONTACT
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+For general queries please contact <ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -65,15 +66,10 @@ sub fetch_input {
     
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-
-    my $genseq;
-    if(@$PIPELINE_REPEAT_MASKING){
-      my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-      $self->query($genseq);
-    }else{
-      $self->query($contig);
-    }
-
+    
+    my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
+    $self->query($genseq);
+    
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Snap(
 	      -query   => $self->query,
               -snap => $self->analysis->program_file,
