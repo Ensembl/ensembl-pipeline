@@ -1428,7 +1428,7 @@ sub _make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->contig_id($contig->id);
+    $exon->contig_id($contig->internal_id);
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
