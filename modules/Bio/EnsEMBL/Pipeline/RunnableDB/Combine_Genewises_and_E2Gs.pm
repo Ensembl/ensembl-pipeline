@@ -274,7 +274,7 @@ sub run {
   #  print STDERR "genewise ".$gw->dbID." with ".scalar( $trans[0]->get_all_Exons )." exons\n";
   #}
 
-  # first of all, sort gw genes by exonic length and genomic length  
+  # first of all, sort gw genes by genomic length and exonic_length  
   @merged_gw_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
 					   $self->_transcript_length_in_gene($a) );
 			    unless ($result){
