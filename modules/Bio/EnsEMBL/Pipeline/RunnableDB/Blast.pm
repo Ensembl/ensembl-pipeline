@@ -80,8 +80,8 @@ sub new {
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
         
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
+    my ( $dbobj, $input_id, $analysis, $threshold) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
     
     $self->throw('Need database handle') unless ($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
@@ -97,7 +97,14 @@ sub new {
     $self->analysis($analysis);
     
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast');
-    $self->threshold(1e-6);
+    if ($threshold)
+    {
+        $self->threshold($threshold);
+    }
+    else
+    {
+        $self->threshold(1e-6);
+    }
     
     return $self;
 }

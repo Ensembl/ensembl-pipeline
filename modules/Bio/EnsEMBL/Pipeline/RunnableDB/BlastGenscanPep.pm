@@ -88,8 +88,8 @@ sub new {
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
+    my ( $dbobj, $input_id, $analysis, $threshold) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
     
     $self->throw('Need database handle') unless ($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
@@ -102,8 +102,16 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->set_parameters($analysis);
-    $self->threshold(1e-6);   
+    $self->analysis($analysis);
+    
+    if ($threshold)
+    {
+        $self->threshold($threshold);
+    }
+    else
+    {
+        $self->threshold(1e-6);
+    }   
     return $self;
 }
 
@@ -119,7 +127,7 @@ sub new {
 
 sub threshold {
     my ($self, $value) = @_;
-    $self->{'_threshold'} = $value if ($value);
+    $self->{'_threshold'} = $value if (defined $value);
     return $self->{'_threshold'};
 }
 
@@ -193,6 +201,9 @@ sub formatted_parameters {
             my ($key, $value) = split (/=>/, $pair);
             $parameters{$key} = $value;
         }
+        $parameters {'-blast'}  = $self->analysis->program;
+        $parameters {'-db'}     = $self->analysis->db;
+        
     return %parameters;
 }
 
@@ -314,6 +325,7 @@ sub write_output {
     }
     return 1;
 }
+
 # This function creates a hash which is used to map between the exon genomic position
 # and a position within the genscan predicted peptide. The hash is then matched
 # against blast peptide hits to return a set of featurepairs of exons and blast

@@ -101,8 +101,8 @@ sub _initialize {
     $self->{_protected} =[];         #a list of files protected from deletion
     $self->{_arguments} =undef;      #arguments for blast
       
-    my( $clone, $blast, $database, $arguments) = 
-            $self->_rearrange(['CLONE', 'BLAST', 'DB', 'ARGS'], @args);
+    my( $clone, $blast, $database, $arguments, $threshold) = 
+            $self->_rearrange(['CLONE', 'BLAST', 'DB', 'ARGS', 'THRESHOLD'], @args);
     
     $self->clone($clone) if ($clone);       
     
@@ -124,7 +124,12 @@ sub _initialize {
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments(' ') ;      }
+    { $self->arguments(' ');   }
+    
+    if ($threshold) 
+    {   $self->threshold($threshold) ;}
+    else
+    { $self->threshold(0);     }
     
     return $self; # success - we hope!
 }
@@ -323,6 +328,7 @@ sub parse_results {
     my $parser = new BPlite ($filehandle);
     $parser->query();
     $parser->database();
+    my $threshold = $self->threshold();
     while(my $sbjct = $parser->nextSbjct) 
     {
        while (my $hsp = $sbjct->nextHSP)
@@ -402,13 +408,14 @@ sub parse_results {
             $feat1 {source}  = $feat2{program};
             $feat2 {primary} = 'similarity';
             $feat2 {source}  = $feat2{program};
-            if ($self->threshold() && $feat1{p} >= $self->threshold())
+            
+            if ( defined $threshold && ($feat1{p} >= $threshold))
             { 
                 $self->createfeaturepair(\%feat1, \%feat2); 
             }
             else
             {
-                print STDERR "Discarding ".$feat2{name}." score ".$feat1{score}."\n";
+                print STDERR "Discarding ".$feat2{name}." p ".$feat1{p}." threshold ($threshold)\t";
             }
         }
 
