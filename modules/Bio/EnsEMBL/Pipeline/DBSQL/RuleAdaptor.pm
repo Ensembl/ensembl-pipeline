@@ -160,9 +160,9 @@ sub fetch_all {
     $dbID = $queryResult[0];
 
     $rule = Bio::EnsEMBL::Pipeline::Rule->new
-      ( -dbid => $dbID,
-	-goal => $analysis,
-        -adaptor => $self );
+      ( '-dbid'    => $dbID,
+	'-goal'    => $analysis,
+        '-adaptor' => $self );
     print STDERR "Setting $dbID rule\n";
     $rules{$dbID} = $rule;
   }
@@ -211,9 +211,9 @@ sub fetch_by_dbID {
   $analysis = $anaAdaptor->fetch_by_dbID( $queryResult->{goalAnalysisId} );
       
   $rule = Bio::EnsEMBL::Pipeline::Rule->new
-    ( -dbid => $dbID,
-      -goal => $analysis,
-      -adaptor => $self );
+    ( '-dbid'    => $dbID,
+      '-goal'    => $analysis,
+      '-adaptor' => $self );
 
   $sth= $self->prepare( q{
     SELECT ruleId, conditionLiteral
