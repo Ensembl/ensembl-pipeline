@@ -48,7 +48,6 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::EPCR;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 
