@@ -13,9 +13,9 @@ use Getopt::Long;
 my $file;
 
 # database for the est genes:
-my $dbhost = 'ecs2d';
+my $dbhost = 'ecs2c';
 my $dbuser = 'ensro';
-my $dbname = 'homo_sapiens_estgene_9_30';
+my $dbname = 'ens_NCBI_31_estgene';
 my $dbpass = undef;
 
 
@@ -40,8 +40,6 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
 					   );
-
-
 print "connected to $dbname : $dbhost\n";
 
 open( OUT, ">$file" ) || die("cannot open file $file");
@@ -64,16 +62,21 @@ foreach my $id ( @gene_ids ){
   foreach my $tran ( @{$gene->get_all_Transcripts} ){
     
     my %evidence;
+    
     foreach my $exon ( @{$tran->get_all_Exons} ){
       my @features =  @{$exon->get_all_supporting_features};
-      unless ( @features ){
-	print STDERR "no evidence\n";
-	print STDERR $exon->gffstring."\n";
-      }
+      #unless ( @features ){
+      #	print STDERR "no evidence\n";
+      #	print STDERR $exon->gffstring."\n";
+      #      }
       foreach my $feature ( @{$exon->get_all_supporting_features} ){
 	#print STDERR $feature->gffstring."\n";
-	print STDERR $feature->hseqname."\n";
+	#print STDERR $feature->hseqname."\n";
+	
 	$evidence{ $feature->hseqname }++;
+	
+	
+	
       }
     }
     
@@ -86,8 +89,14 @@ foreach my $id ( @gene_ids ){
     }
 
     my @names = keys %evidence;
+    my $count = 0;
+  OUT1:
     foreach my $name ( @names ){
       print OUT $id."\t".$name."\n";
+      $count++;
+      if ( $count > 9 ){
+	last OUT1;
+      }
     }
   }
 }

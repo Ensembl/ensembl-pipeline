@@ -63,11 +63,13 @@ my $check  = 0;
 my $params;
 my $pepfile;
 my $acc;
+my $analysis;
 
 # can override db options on command line
 &GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
+             'analysis:s'    => \$analysis,
 	     'write'         => \$write,
              'check'         => \$check,
              'parameters:s'  => \$params,
@@ -83,11 +85,14 @@ die "No runnable entered" unless defined ($runnable);
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
 
+
 if ($check) {
    exit(0);
 }
 
 #print STDERR "args: $host : $dbuser : $dbpass : $dbname\n";
+
+
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
@@ -97,7 +102,11 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -perlonlyfeatures => 0,
 );
 
+print STDERR "db: $db, dbname: $dbname, dbhost: $host\n";
+
 die "No input id entered" unless defined ($input_id);
+
+my $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
 
 my %hparams;
 # eg -parameters param1=value1,param2=value2
@@ -110,8 +119,9 @@ if (defined $params){
 }
 
 
-my $runobj = "$runnable"->new(-dbobj    => $db,
+my $runobj = "$runnable"->new(-db       => $db,
 			      -input_id => $input_id,
+                              -analysis => $analysis_obj,
 			      %hparams,
 			     );
 
@@ -119,7 +129,6 @@ my $runobj = "$runnable"->new(-dbobj    => $db,
 $runobj->fetch_input;
 $runobj->run;
 
-my %expression_map = %{ $runobj->output };
 
 
 if ($write) {
