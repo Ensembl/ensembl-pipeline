@@ -54,6 +54,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Fgenesh;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Data::Dumper;
 
+
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -63,7 +64,7 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
     
-    $self->fetch_sequence;
+    $self->fetch_sequence($PIPELINE_REPEAT_MASKING);
     
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Fgenesh
       (-query   => $self->query,
@@ -75,6 +76,9 @@ sub fetch_input {
 
     return 1;
 }
+
+
+
 
 
 1;
