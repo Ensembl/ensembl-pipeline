@@ -244,3 +244,5 @@ O95746 PMS2L16 protein.  - multiple pmatches vac.
 Q86WY7 Similar to Williams Beuren syndrome chromosome region 19.  - multiple pmatches vac.
 Q15157 PMS4 protein (HPMS4 protein) (Fragment).  - multiple pmatches vac.
 O62658 Canis familiaris LINE-1 element ORF2.
+Q9QZ73 Mouse pseudogene - smjs from ms
+O08905 Mouse dysfunctional protein with L1 in - smjs from ms
