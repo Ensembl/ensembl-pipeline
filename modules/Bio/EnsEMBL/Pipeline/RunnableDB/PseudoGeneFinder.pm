@@ -290,14 +290,14 @@ sub filter_output{
   
   ############################################################
   # sort the alignments by coverage - number of exons - percentage identity
-  my %matches_sorted_by_coverage;
+  my %matches_sorted;
   my %selected_matches;
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
     
     my @selected;
     foreach my $tran ( @{$matches{$rna_id}} ){ 
-      my $coverage = $self->_coverage($tran);
+      my $score    = $self->_coverage($tran);
       my $perc_id  = $self->_percent_id($tran);
       
       ############################################################
