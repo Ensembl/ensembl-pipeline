@@ -181,7 +181,7 @@ sub run_translate{
     }
     my $length = $seq->length;
     
-    print STDERR "display_id = ".$seq->display_id."\n";
+    #print STDERR "display_id = ".$seq->display_id."\n";
     ############################################################
     # create file
     my $file = "/tmp/"."cdna_".$$.".fa";
