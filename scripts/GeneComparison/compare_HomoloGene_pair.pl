@@ -105,6 +105,8 @@ my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
 
 my %target_coverage;
 my %query_coverage;
+my %target_gap;
+my %query_gap;
 my %perc_id;
 
 my @human_cdna_seqs;
@@ -159,14 +161,16 @@ foreach my $humanNM_seq ( @human_cdna_seqs ){
 
     ############################################################
     # compare transcripts
-    my ($score,$best_features, $target_coverage, $query_coverage, $perc_id) = 
+    my ($score,$best_features, $target_coverage, $max_target_gap, $query_coverage, $max_query_gap, $perc_id) = 
       Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptPair
 	->blast_unmapped_transcripts( $humanNM_seq, $mouseNM_seq);
     if ( $score && $best_features ){
       $transcript_map->match($humanNM_seq, $mouseNM_seq, $score );
       $perc_id{$humanNM_seq}{$mouseNM_seq} = $perc_id;
       $target_coverage{$humanNM_seq}{$mouseNM_seq} = $target_coverage;
+      $target_gap{$humanNM_seq}{$mouseNM_seq} = $max_target_gap;
       $query_coverage{$humanNM_seq}{$mouseNM_seq} = $query_coverage;
+      $query_gap{$humanNM_seq}{$mouseNM_seq} = $max_query_gap;
     }
     unless ($score){
       $score = 0;
@@ -189,14 +193,16 @@ foreach my $humanNM_seq ( @human_cdna_seqs ){
       print STDERR "Failed to find sequence $mouseNP\n";
       next MOUSE;
     }
-    ($score,$best_features, $target_coverage, $query_coverage, $perc_id) = 
+    ($score,$best_features, $target_coverage, $max_target_gap, $query_coverage, $max_query_gap, $perc_id) = 
       Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptPair
 	->blast_unmapped_proteins( $humanNP_seq, $mouseNP_seq);
     if ( $score && $best_features ){
       $protein_map->match($humanNP_seq, $mouseNP_seq, $score );
       $perc_id{$humanNP_seq}{$mouseNP_seq} = $perc_id;
       $target_coverage{$humanNP_seq}{$mouseNP_seq} = $target_coverage;
+      $target_gap{$humanNP_seq}{$mouseNP_seq} = $max_target_gap;
       $query_coverage{$humanNP_seq}{$mouseNP_seq} = $query_coverage;
+      $query_gap{$humanNP_seq}{$mouseNP_seq} = $max_query_gap;
     }
     unless ($score){
       $score = 0;
@@ -229,13 +235,15 @@ foreach my $element1 ( $best_transcript_pairs_object->list1 ){
     my $length2 = $partner->length;
     my $perc_id         = $perc_id{$element1}{$partner};
     my $target_coverage = $target_coverage{$element1}{$partner};
+    my $target_gap      = $target_gap{$element1}{$partner};
     my $query_coverage  = $query_coverage{$element1}{$partner};
-    my $length_diff      = $length1 - $length2;
+    my $query_gap       = $query_gap{$element1}{$partner};
+    my $length_diff     = $length1 - $length2;
     print STDERR "TRANSCRIPT_PAIR\t".
       "$this_humanLL\t$id1\t$protein_id1\tlength1:$length1\t".
-	"coverage1:$target_coverage\t".
+	"coverage1:$target_coverage\tgap1:$target_gap\t".
 	  "$this_mouseLL\t$id2\t$protein_id2\tlength2:$length2\t".
-	    "coverage2:$query_coverage\t".
+	    "coverage2:$query_coverage\tgap1:$query_gap\t".
 	      "perc_id:$perc_id\t".
 		"length_diff:$length_diff\n";
     
@@ -333,13 +341,15 @@ foreach my $pair ( @selected_pairs ){
   my $length2 = $pair->[1]->length;
   my $perc_id         = $perc_id{$pair->[0]}{$pair->[1]};
   my $target_coverage = $target_coverage{$pair->[0]}{$pair->[1]};
+  my $target_gap      = $target_gap{$pair->[0]}{$pair->[1]};
   my $query_coverage  = $query_coverage{$pair->[0]}{$pair->[1]};
+  my $query_gap       = $query_gap{$pair->[0]}{$pair->[1]};
   my $length_diff      = $length1 - $length2;
   print STDERR "PROTEIN_PAIR\t".
     "$this_humanLL\t$humanNM\t$humanNP\tlength1:$length1\t".
-      "coverage1:$target_coverage\t".
+      "coverage1:$target_coverage\tgap1:$target_gap\t".
 	"$this_mouseLL\t$mouseNM\t$mouseNP\tlength2:$length2\t".
-	  "coverage2:$query_coverage\t".
+	  "coverage2:$query_coverage\tgap2:$query_gap\t".
 	    "perc_id:$perc_id\t".
 	      "length_diff:$length_diff\n";
 
