@@ -159,7 +159,6 @@ sub get_server {
 
 =cut
 
-
 sub get_Seq_by_acc {
     my ( $self, @id_list ) = @_;
 
@@ -195,11 +194,11 @@ sub get_Seq_by_acc {
 
     }
 
-    if ( wantarray ) {
+    if (wantarray) {
 
         # an array was passed - return array of Bio:Seq objects
-        return @seq_list; 
-        
+        return @seq_list;
+
     }
     else {
 
@@ -210,7 +209,7 @@ sub get_Seq_by_acc {
 
 sub get_descriptions {
     my ( $self, @id_list ) = @_;
-    
+
     unless (@id_list) {
         $self->throw("No accession input");
     }
@@ -228,11 +227,11 @@ sub get_descriptions {
         }
     }
 
-   if ( wantarray ) {
+    if (wantarray) {
 
         # an array was passed - return array of Bio:Seq objects
-        return @desc_list; 
-        
+        return @desc_list;
+
     }
     else {
 
@@ -261,11 +260,11 @@ sub get_lengths {
         }
     }
 
-   if ( wantarray ) {
+    if (wantarray) {
 
         # an array was passed - return array of Bio:Seq objects
-        return @length_list; 
-        
+        return @length_list;
+
     }
     else {
 
@@ -275,10 +274,10 @@ sub get_lengths {
 }
 
 sub write_descriptions {
-    my ( $self, $dbobj, @ids,  ) = @_;
+    my ( $self, $dbobj, @ids, ) = @_;
 
     my ( $hid, $desc );
-    
+
     my @desc_line = $self->get_descriptions(@ids);
     my @lengths   = $self->get_lengths(@ids);
 
@@ -289,6 +288,12 @@ sub write_descriptions {
         die qq{scalar(@ids) elements in id_list\t scalar(@desc_line) elements in Descriptions};
     }
 
+    my $sth = $dbobj->prepare( qq{ 
+                                INSERT DELAYED INTO 
+                                hit_descriptions.hit_description
+                                VALUES (?,?,?,?)}
+    );
+
     for ( my $i = 0 ; $i < @ids ; $i++ ) {
 
         # parse description from dbEST
@@ -298,19 +303,11 @@ sub write_descriptions {
                 warn qq{Hid : $hid    does not match    Query_hid : $i};
                 next;
             }
-            $desc =~ s/\n//g;
-            $desc =~ s/"/\\"/g;
-            $desc =~ s/'/\\'/g;
+
             my $hit_db_prefix = 'Em:';
             my $l             = $lengths[$i];
 
-            my $sth = $dbobj->prepare( qq{ 
-                                INSERT DELAYED INTO 
-                                hit_descriptions.hit_description
-                                VALUES ('$hid','$hit_db_prefix','$l','$desc')}
-            );
-
-            $sth->execute;
+            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
             next;
 
         }
@@ -323,20 +320,12 @@ sub write_descriptions {
                 next;
             }
 
-            $desc =~ s/\n//g;
-            $desc =~ s/"/\\"/g;
-            $desc =~ s/'/\\'/g;
+           
             my $hit_db_prefix = 'Em:';
-            
-            my $l             = $lengths[$i];
 
-            my $sth = $dbobj->prepare( qq{ 
-                                INSERT DELAYED INTO 
-                                hit_descriptions.hit_description
-                                VALUES ('$hid','$hit_db_prefix','$l','$desc')}
-            );
+            my $l = $lengths[$i];
 
-            $sth->execute;
+            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
             next;
 
         }
@@ -371,20 +360,9 @@ sub write_descriptions {
                 $hit_db_prefix = 'Tr:';
             }
 
-            $desc =~ s/\n//g;
-            $desc =~ s/"/\\"/g;
-            $desc =~ s/'/\\'/g;
-
             my $l = $lengths[$i];
 
-            my $sth =
-              $dbobj->prepare(qq{ 
-                            INSERT DELAYED INTO 
-                            hit_descriptions.hit_description
-                            VALUES ('$hid','$hit_db_prefix','$l','$desc')}
-            );
-
-            $sth->execute;
+            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
             next;
         }
 
