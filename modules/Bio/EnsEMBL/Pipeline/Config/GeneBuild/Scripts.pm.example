@@ -66,7 +66,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 	     # transposable elements 
 	     # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
 	    
-	    GB_KILL_LIST   => '/ecs2/work1/lec/code/briggsae/ensembl-pipeline/scripts/Genebuild/kill_list.txt',	
+	    GB_KILL_LIST   => '',	
 
 	    # information about the different protein sources used by new_prepare_proteome.pl,
 	    # the header regex should be a regex to pull out the desired id from the fasta header
@@ -99,13 +99,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 	    # LSF queue plus any options you want to use
 	    GB_QUEUE       => 'acari',
 
-	    # path to swissprot "evidence kill list" file - file of
-	    # protein IDs that should not be used for building genes
-	    # but have made it into the protein databases eg
-	    # transposable elements 
-	    # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
-	   
-	    
 	    # array of hashes, each hash contains the runnable class name and the analysis logic name, this is used
 	    #when createing analysis objects in ensembl-pipeline/scripts/GeneBuild/populate_analysis.pl script so if you are
 	    # using the pipeline to run parts of the genebuild the Dummy entry is needed in order to start the pipeline properly
