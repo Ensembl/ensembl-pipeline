@@ -1,13 +1,3 @@
-The variables can also be references to arrays or hashes.
-
-Edit C<%Analysis> to add or alter variables.
-
-All the variables are in capitals, so that they resemble environment
-variables.
-
-=head1 CONTACT
-
-=cut
 
 
 package Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::Analysis;
@@ -21,18 +11,29 @@ use vars qw( %Analysis );
 	     PA_CHUNK_DUMMY => 'SubmitTranscriptChunk', # as above but for chunk of peptides
 	     PA_PROTEOME_DUMMY => 'SubmitProteome',
 
-	     PA_ANALYSIS_TYPE[
+	     PA_ANALYSIS_TYPE => [
 			   {
-			    logic_name => '', # logic name in analysis table
-			    module => '', #module path, the runner script adds this to the start Bio/EnsEMBL/Pipeline/RunnableDB so if module in RunnableDB/Protein will need to have Protein/ on name
+			    logic_name => '', # logic name in 
+			    #analysis table
+			    module => '', #module path, the runner script
+			    #adds this to the start Bio/EnsEMBL/Pipeline
+			    #/RunnableDB so if module in 
+			    #RunnableDB/Protein will need to have 
+			    #Protein/ on name
 			    program_file => '', # location of binary
-			    db_file => '', #location of any db file needed
+			    db_file => '', #location of any db file 
+			    #needed
 			    db => '', # more human name for db
-			    chunk_size => '', # this can be three things, single which means it will run on a single transcript, chunk which means 
-			                       # it will run on a chunk file and genome which means it will run on all the transcripts in the genome
+			    chunk_size => '', # this can be three things,
+			    #single which means it will run on a single 
+			    #transcript, chunk which means it will run 
+			    #on a chunk file and genome which means it 
+			    #will run on all the transcripts in the 
+			    #genome
 			    gff_source => '', # program name
 			    gff_feature => '', # domain or annotation
 			    parameters => '',
+			    input_id_type => '', #input_id_type
 			   }
 			  ]
 	   );
