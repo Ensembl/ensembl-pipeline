@@ -40,7 +40,9 @@ sub _fetch {
   open(CMD, "$command |") or die "Can't execute fetch command";
 
   my %seqs;
+  my %descs;
   my $id_line;
+  my $desc;
 
   while (<CMD>){
 
@@ -49,11 +51,17 @@ sub _fetch {
       $id_line =~ s/^>//;
 
       if ($self->db->index_type =~ /wu/){
-	$id_line =~ s/([\w\_\.]+).*\n/$1/;
+	$id_line =~ s/([\w\_\.]+)\s*(.*)\n/$1/;
+	$desc = $2;
       }
       if ($self->db->index_type eq 'ncbi'){
-	$id_line =~ s/[^\|]+\|([\w\_\.]+).*\n/$1/;
+	$id_line =~ s/[^\|]+\|([\w\_\.]+)\s*(.*)\n/$1/;
+	$desc = $2;
       }
+
+      $desc =~ s/\t/ /g;
+
+      $descs{$id_line} = $desc;
 
       next
     }
@@ -68,11 +76,12 @@ sub _fetch {
   foreach my $seq_id (keys %seqs) {
 
     $seqs{$seq_id} =~ s/\n//g;
-    
+
     my $bioseq = Bio::Seq->new(-display_id => $seq_id,
-			       -seq        => $seqs{$seq_id}
+			       -seq        => $seqs{$seq_id},
+			       -desc       => $descs{$seq_id}
 			      );
-    
+
     push (@bioseqs, $bioseq)
   }
 
