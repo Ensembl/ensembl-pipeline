@@ -172,13 +172,18 @@ sub write_output {
     my %contighash;
     my $gene_obj = $db->gene_Obj;
 
+    # this now assummes that we are building on a single VC.
+    my $genebuilders = $self->get_genebuilders;
+    my ($contig) = keys %$genebuilders;
+    my $vc = $genebuilders->{$contig}->contig;
+
         return unless ($#genes >= 0);
 
 
 	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
 	      $sth->execute;
 
-#    print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
+         print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
 	  foreach my $gene (@genes) {
 	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
 		=~ s/$GENE_ID_SUBSCRIPT//;
@@ -186,6 +191,7 @@ sub write_output {
 		=~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
 	    (my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
 		=~ s/$PROTEIN_ID_SUBSCRIPT//;
+	    print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
 	    (my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
 		=~ s/$EXON_ID_SUBSCRIPT//;
 	    
@@ -231,19 +237,25 @@ sub write_output {
 		
 	    }
 
-	    $gene_obj->write($gene);
 
 	}
 
+    # convert genes here...
+    my $rcgenes;
+    foreach my $g (@genes) {
+	my $newgene = $vc->convert_Gene_to_raw_contig($g);
+	#$self->check_gene($newgene);
+	$gene_obj->write($newgene);
+	#push(@rcgenes,$newgene);
+    }
+    
      $sth = $db->prepare("unlock tables");
      $sth->execute;
 
      # Set attribute tag on all contigs
-     my $genebuilders = $self->get_genebuilders;
      $db->extension_tables(1);
 
      foreach my $contig (keys %$genebuilders) {
-        my $vc = $genebuilders->{$contig}->contig;
         my @contigs = $vc->get_all_RawContigs;
 
         foreach my $contig (@contigs) {
@@ -352,32 +364,33 @@ sub run {
     my ($self) = @_;
 
     my $genebuilders = $self->get_genebuilders;
-    my @gene;
+    #my @gene;
 
     $self->{_output} = [];
     
+    my @vcgenes;
     foreach my $contig (keys %$genebuilders) {
         my $vc = $genebuilders->{$contig}->contig;
 	print(STDERR "Building for $contig\n");
 	$genebuilders->{$contig}->build_Genes;
-	my @vcgenes = @{$genebuilders->{$contig}{_genes}};
+	@vcgenes = @{$genebuilders->{$contig}{_genes}};
         print STDERR "Genes before conversion\n";
         $genebuilders->{$contig}->print_Genes(@vcgenes);
         print STDERR "Converting coordinates";
-        foreach my $g (@vcgenes) {
-           my $newgene = $vc->convert_Gene_to_raw_contig($g);
+        #foreach my $g (@vcgenes) {
+        #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
            #$self->check_gene($newgene);
-	   push(@gene,$newgene);
-        }
+	#   push(@gene,$newgene);
+        #}
     }
     
-    foreach my $gene (@gene) {
+    foreach my $gene (@vcgenes) {
 	foreach my $exon ($gene->each_unique_Exon) {
 	    $exon->{_gsf_seq} = undef;
 	}
     }
 	    
-    push(@{$self->{_output}},@gene);
+    push(@{$self->{_output}},@vcgenes);
 }
 
 sub output {
