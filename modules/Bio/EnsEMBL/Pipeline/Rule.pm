@@ -27,7 +27,8 @@ Bio::EnsEMBL::Pipeline::Rule
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
 
 =cut
 
@@ -36,6 +37,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 
 package Bio::EnsEMBL::Pipeline::Rule;
+
 use vars qw(@ISA);
 use Bio::Root::RootI;
 use strict;
