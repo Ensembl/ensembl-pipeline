@@ -285,6 +285,7 @@ sub run {
     #parse output and create features
     $self->parse_results();
     $self->deletefiles();
+    return 1;
 }
 
 sub run_genscan {
