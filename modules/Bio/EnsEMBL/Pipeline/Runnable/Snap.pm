@@ -84,6 +84,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::PredictionTranscript;
 use Bio::EnsEMBL::TranscriptFactory;
+use Bio::EnsEMBL::PredictionExon;
 use Bio::EnsEMBL::Root;
 
 
@@ -118,6 +119,7 @@ sub new {
     my($query, $snap, $parameters, $matrix) = 
         $self->_rearrange([qw(QUERY SNAP PARAM HMMFILE)], @args);
 
+    $self->workdir('/tmp') unless $self->workdir;
 
     $self->query($query);
 #    $snap = 'snap'       unless ($snap);
@@ -132,10 +134,11 @@ sub new {
     $self->hmmfile($matrix);
 
 
-    if ($parameters)    
-    { $self->parameters($parameters) ; }
-    else                
-    {$self->parameters(''); }     
+    if ($parameters) { 
+      $self->parameters($parameters) ; 
+    } else {
+      $self->parameters(''); 
+    }     
 
     return $self;
 }
@@ -162,7 +165,7 @@ sub query {
 
         $self->{'_query'} = $new_seq ;
 	$self->slice($seq);
-        $self->filename($seq->id.".$$.seq");
+        $self->filename($self->workdir . "/" . $seq->id.".$$.seq");
         $self->results($self->filename.".snap");
 	$self->protfile($self->filename.".snapprot");
 	
@@ -314,7 +317,6 @@ sub run {
     #check seq
     my $seq = $self->query() || $self->throw("Seq required for Snap\n");
     #set directory if provided
-    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 
@@ -329,7 +331,7 @@ sub run {
 
 sub run_snap {
     my ($self) = @_;
-#    print STDERR "Running snap on ".$self->snap.' '.$self->hmmfile.' '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results."\n";
+    print STDERR "Running snap on ".$self->snap.' '.$self->hmmfile.' '.$self->filename.' -gff -aa '. $self->protfile.'> '. $self->results."\n";
     
     system ($self->snap.' '.$self->hmmfile.' '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results);
    

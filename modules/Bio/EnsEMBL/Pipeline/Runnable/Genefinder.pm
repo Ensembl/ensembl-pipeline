@@ -74,6 +74,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::PredictionTranscript;
+use Bio::EnsEMBL::PredictionExon;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -540,7 +541,9 @@ sub parse_results{
     $phase = 0;
     $gene_count++;
   }
+  print "Done parsing\n";
   $self->create_genes;
+  print "Done creating\n";
 }
 
 
