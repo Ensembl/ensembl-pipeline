@@ -114,7 +114,7 @@ sub new{
 
      my($clone, $fgenesh, $parameters, $matrix) = 
           $self->_rearrange([qw(CLONE FGENESH PARAM MATRIX)], @args);
-
+     print "@args\n";
       $self->clone($clone) if ($clone);
 
 
@@ -442,15 +442,15 @@ sub run {
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
-    #print STDERR "have checked directory writing file next\n";
+    print STDERR "have checked directory writing file next\n";
     $self->writefile(); 
-    #print STDERR "about to run Fgenesh\n";
+    print STDERR "about to run Fgenesh\n";
 #run fgenesh       
     $self->run_fgenesh();
-    #print "have run fgenesh\n";
+    print "have run fgenesh\n";
     #parse output and create features
     $self->parse_results();
-    $self->deletefiles();
+    #$self->deletefiles();
 }
 
 =head2 run_fgenesh
@@ -465,10 +465,11 @@ sub run {
 
 sub run_fgenesh {
     my ($self) = @_;
-    #print STDERR "Running fgenesh on ".$self->filename."\n";
+    print STDERR "Running fgenesh on ".$self->filename."\n";
+    print "command = ".$self->fgenesh." ".$self->matrix." ".$self->filename ." > ".$self->results."\n";
     system ($self->fgenesh.' '.$self->matrix.' '.$self->filename .' > '.$self->results);
     $self->throw($self->results." not created by fgenesh\n") unless (-e $self->results);
-    #print "leaving run_fgenesh\n";
+    print "leaving run_fgenesh\n";
 }
 
 =head2 parse_results
@@ -574,8 +575,8 @@ sub parse_results {
                     }
                     elsif($line->[1] eq '-')
                     {
-                        $feature {'start'} = $line->[5];
-                        $feature {'end'} = $line->[3];
+                        $feature {'start'} = $line->[3];
+                        $feature {'end'} = $line->[5];
                         $feature {'strand'} = -1;
                         $feature {'phase'} = (3-($line->[5]-$line->[9]))% 3;
                     }

@@ -1,3 +1,6 @@
+
+
+
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
 # Copyright Michele Clamp
@@ -17,7 +20,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Blast
   # To run a blast job from scratch do the following.
 
   my $query = new Bio::Seq(-file   => 'somefile.fa',
-			   -format => 'fasta');
+                           -format => 'fasta');
 
   my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
     ('-query'     => $query,
@@ -122,22 +125,22 @@ sub new {
 
       
     # Now parse the input options and store them in the object
-
+    #print STDERR "args: ", @args, "\n";
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$options) = 
-	    $self->_rearrange([qw(QUERY 
-				  PROGRAM 
-				  DATABASE 
-				  THRESHOLD
-				  THRESHOLD_TYPE
-				  FILTER 
-				  OPTIONS)], 
-			      @args);
+            $self->_rearrange([qw(QUERY 
+                                  PROGRAM 
+                                  DATABASE 
+                                  THRESHOLD
+                                  THRESHOLD_TYPE
+                                  FILTER 
+                                  OPTIONS)], 
+                              @args);
     if ($query) {
       $self->clone($query);
     } else {
       $self->throw("No query sequence input.");
     }
-
+    #print STDERR "find executable output ".$self->find_executable($program)."\n";
     $self->program($self->find_executable($program));
     if ($database) {
       $self->database($database);
@@ -146,21 +149,22 @@ sub new {
     }
     
     if ($options) {
-	  if ($::pipeConf{'B_factor'}){
-		my $b_factor = $::pipeConf{'B_factor'};
-		my $b_value = int ($query->length / 1000 * $b_factor); 
-		 if ($::pipeConf{'blast'} eq 'ncbi'){
-            $options .= " -b $b_value" unless ($b_value < 250);
-        }
-        else {
-            $options .= " B=$b_value" unless ($b_value < 250);
-        }
-	  } 
+#this option varies the number of HSP displayed proportionally to the query contig length
+          if ($::pipeConf{'B_factor'}){
+                my $b_factor = $::pipeConf{'B_factor'};
+                my $b_value = int ($query->length / 1000 * $b_factor); 
+                if ($::pipeCong{'blast'} eq 'ncbi'){
+                        $options .= " -b $b_value" unless ($b_value < 250);
+                }
+                else {
+                        $options .= " B=$b_value" unless ($b_value < 250); 
+                }
+          } 
       $self->options($options);
     } else {
       $self->options(' -p1 ');  
     }
-    
+    #print "options = ".$self->options."\n";
     if (defined($threshold)) {
       $self->threshold($threshold);
     }
@@ -170,7 +174,7 @@ sub new {
     }
 
     if (defined($filter)) {
-	$self->filter($filter);
+        $self->filter($filter);
     }
     
     return $self; # success - we hope!
@@ -198,13 +202,14 @@ sub run {
 
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
-
+    #print STDERR "checked directories\n";
     #write sequence to file
     $self->writefile(); 
     $self->run_analysis();
-
+    #print STDERR "ran analysis\n";
     #parse output and create features
     $self->parse_results();
+    #print STDERR "parsed results\n";
     $self->deletefiles();
   }
 
@@ -225,19 +230,23 @@ sub run_analysis {
     # split databases
 
     my @databases = $self->fetch_databases;
-
+    
     foreach my $database (@databases) {
-	
-	my $command = $self->program ;
-	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
-	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
-	$command .= ' '.$self->options. ' >> '.$self->results;
+      
+#print STDERR "database ".$database."\n";
 
-	print STDERR ("Running blast and BPlite:$command\n");    
+#allow system call to adapt to using ncbi blastall. defaults to WU blast.       
+        my $command = $self->program ;
+        $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
+        $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
+        $command .= ' '.$self->options. ' >> '.$self->results;
 
-	$self->throw("Failed during blast run $!\n")
-	    
-	    unless (system ($command) == 0) ;
+        print STDERR ("Running blast and BPlite:$command\n");    
+
+
+        $self->throw("Failed during blast run $!\n")
+            
+            unless (system ($command) == 0) ;
     }
 }
 
@@ -265,9 +274,9 @@ sub fetch_databases {
     # environment variable.
 
     if ($self->database =~ /\//) {
-	$fulldbname = $self->database;
+        $fulldbname = $self->database;
     } else {
-	$fulldbname = $ENV{BLASTDB} . "/" .$self->database;
+        $fulldbname = $ENV{BLASTDB} . "/" .$self->database;
     }
 
     # If the expanded database name exists put this in
@@ -277,18 +286,18 @@ sub fetch_databases {
     # and put them in the database array
 
     if (-e $fulldbname) {
-	push(@databases,$self->database);
+        push(@databases,$self->database);
     } else {
-	my $count = 1;
+        my $count = 1;
 
-	while (-e $fulldbname . "-$count") {
-	    push(@databases,$fulldbname . "-$count");
-	    $count++;
-	}
+        while (-e $fulldbname . "-$count") {
+            push(@databases,$fulldbname . "-$count");
+            $count++;
+        }
     }
 
     if (scalar(@databases) == 0) {
-	$self->throw("No databases exist for " . $self->database);
+        $self->throw("No databases exist for " . $self->database);
     }
 
     return @databases;
@@ -319,19 +328,24 @@ sub parse_results {
   # If we have input a filehandle use that. Otherwise use
   # the results file stored in the object
   my $filehandle;
-
+  my $filesize = (-s $self->results);
+    
+  if (!defined $filesize || $filesize == 0)
+    {
+      print STDERR "sequence file ".$self->results." has not been created or is empty\n";
+    }
   if (defined($fh)) {
-      $filehandle = $fh;
+    $filehandle = $fh;
   } elsif (ref ($self->results) !~ /GLOB/) {
-      open (BLAST, "<".$self->results)
-	  or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-      $filehandle = \*BLAST;
+    open (BLAST, "<".$self->results)
+      or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+    $filehandle = \*BLAST;
   } else {
-      $filehandle = $self->results;
+    $filehandle = $self->results;
   }    
-
+      
   unless (<$filehandle>) {
-    print "No hit found with blast \n";
+    print  "No hit found with blast \n";
     return;
   }
 
@@ -353,7 +367,7 @@ sub parse_results {
       $filehandle = $fh;
   } elsif (ref ($self->results) !~ /GLOB/) {
       open (BLAST, "<".$self->results)
-	  or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+          or $self->throw ("Couldn't open file ".$self->results.": $!\n");
       $filehandle = \*BLAST;
   } else {
       $filehandle = $self->results;
@@ -364,42 +378,58 @@ sub parse_results {
  NAME: while(my $sbjct = $parser->nextSbjct)  {
       
       my $name = $sbjct->name ;
+      #print STDERR "name = ".$name."\n";
       if (($self->filter == 1) && !defined($ids{$name})) {
-	  next NAME;
+         next NAME;
       }
-	  
+          
       my ($ug) = $name =~ m{/ug=(.*?)\ };
 
       if ($name =~ /\|UG\|(\S+)/) {
 # scp - unigene ID 'patch'
 # there must be a better way of doing this...
          if (length $ug > 0) { # just in case "/ug=" not in header
-             $name = $ug;
+           $name = $ug;
          }
-         else {
-             $name = $1;
+         else {  
+           $name = $1;
          }
+       }
+      elsif ($name =~ /\S+\|(\S+)\|\S+/) {  
+        $name = $1;
       }
-      elsif ($name =~ /\S+\|(\S+)\|\S+/) {
-	  $name = $1;
-      }
+
       elsif ($name =~ /^(\S+) (\S+)/) {
-	  $name = $1 || $2;
+        my $word = $2;
+        if ($self->database =~ /halfwise/i) {
+         if ($word =~ /^([^;]*)/) {
+           $name = $1;
+         } else {
+           $self->throw("unable to parse name properly for halfwise : $!");
+         }
+       } else {
+         $name = $1 || $2;
+       }
+        
       }
+      
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	if ($self->threshold_type eq "PID") {
-	  next HSP if ($hsp->percent < $self->threshold);
-	} elsif ($self->threshold_type eq "PVALUE") {
-	  next HSP if ($hsp->P > $self->threshold);
-	}
-	# Each HSP is a gapped alignment.
-	# This method splits the gapped alignment into
-	# ungapped pieces
+        if ($self->threshold_type eq "PID") {
+          next HSP if ($hsp->percent < $self->threshold);
+        } elsif ($self->threshold_type eq "PVALUE") {
+          next HSP if ($hsp->P > $self->threshold);
+        }
+        # Each HSP is a gapped alignment.
+        # This method splits the gapped alignment into
+        # ungapped pieces
 
-	$self->split_HSP($hsp,$name);
+        $self->split_HSP($hsp,$name);
 
-    }
+      }
   } 
+
+
+# Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
   if ($::pipeConf{'filter_blast'}){
   # re-filter, with pruning - rewrote to use a local select_feature function instead of FeatureFilter 
@@ -431,43 +461,43 @@ sub filter_hits {
       my $name = $sbjct->name ;
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	if ($self->threshold_type eq "PID") {
-	  next HSP if ($hsp->percent < $self->threshold);
-	} elsif ($self->threshold_type eq "PVALUE") {
-	  next HSP if ($hsp->P > $self->threshold);
-	} 
+        if ($self->threshold_type eq "PID") {
+          next HSP if ($hsp->percent < $self->threshold);
+        } elsif ($self->threshold_type eq "PVALUE") {
+          next HSP if ($hsp->P > $self->threshold);
+        } 
 
-	my $qstart = $hsp->query->start();
-	my $hstart = $hsp->subject->start();
-	
-	my $qend   = $hsp->query->end();
-	my $hend   = $hsp->subject->end();      
+        my $qstart = $hsp->query->start();
+        my $hstart = $hsp->subject->start();
+        
+        my $qend   = $hsp->query->end();
+        my $hend   = $hsp->subject->end();      
 
-	my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
+        my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
 
-	my $score  = $hsp->score;
+        my $score  = $hsp->score;
 
-	my $feature1 = new Bio::EnsEMBL::SeqFeature();
-	$feature1->start($qstart);
-	$feature1->end  ($qend);
-	$feature1->strand($qstrand);
-	$feature1->score($score);
-	$feature1->source_tag('tmp');
-	$feature1->primary_tag('similarity');
+        my $feature1 = new Bio::EnsEMBL::SeqFeature();
+        $feature1->start($qstart);
+        $feature1->end  ($qend);
+        $feature1->strand($qstrand);
+        $feature1->score($score);
+        $feature1->source_tag('tmp');
+        $feature1->primary_tag('similarity');
 
-	my $feature2 = new Bio::EnsEMBL::SeqFeature();
-	$feature2->start  ($hstart);
-	$feature2->end    ($hend);
-	$feature2->strand ($hstrand);
-	$feature2->score  ($score);
-	$feature2->seqname($name);
-	$feature2->source_tag('tmp');
-	$feature2->primary_tag('similarity');
+        my $feature2 = new Bio::EnsEMBL::SeqFeature();
+        $feature2->start  ($hstart);
+        $feature2->end    ($hend);
+        $feature2->strand ($hstrand);
+        $feature2->score  ($score);
+        $feature2->seqname($name);
+        $feature2->source_tag('tmp');
+        $feature2->primary_tag('similarity');
 
-	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
-					       -feature2 => $feature2);
+        my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
+                                               -feature2 => $feature2);
 
-	push(@features,$fp);
+        push(@features,$fp);
     }
   }
 
@@ -476,9 +506,9 @@ sub filter_hits {
     my @newfeatures = $search->run(@features);
 
     foreach my $f (@newfeatures) {
-	my $id = $f->hseqname;
-	
-	$ids{$id} = 1;
+        my $id = $f->hseqname;
+        
+        $ids{$id} = 1;
     }
     
     return %ids;
@@ -568,64 +598,64 @@ sub split_HSP {
     $source =~ s/\/.*\/(.*)/$1/;
 
     my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
-					      -db_version      => 1,
-					      -program         => $source,
-					      -program_version => 1,
-					      -gff_source      => $source,
-					      -gff_feature     => 'similarity',
-					      -logic_name      => 'blast');
+                                              -db_version      => 1,
+                                              -program         => $source,
+                                              -program_version => 1,
+                                              -gff_source      => $source,
+                                              -gff_feature     => 'similarity',
+                                              -logic_name      => 'blast');
     
     # Here goes...
 
     while ($count <= $#qchars) {
-	# We have hit an ungapped region.  Increase the query and hit counters.
-	# and flag that we have a feature pair.
+        # We have hit an ungapped region.  Increase the query and hit counters.
+        # and flag that we have a feature pair.
 
-	if ($qchars[$count] ne '-' &&
-	    $hchars[$count] ne '-') {
+        if ($qchars[$count] ne '-' &&
+            $hchars[$count] ne '-') {
 
-	    $qend += $qinc;
-	    $hend += $hinc;
-	    
-	    $found = 1;
-	} else {
+            $qend += $qinc;
+            $hend += $hinc;
+            
+            $found = 1;
+        } else {
 
-	    # We have hit a gapped region.  If the feature pair flag is set ($found)
-	    # then make a feature pair, store it and reset the start and end variables.
+            # We have hit a gapped region.  If the feature pair flag is set ($found)
+            # then make a feature pair, store it and reset the start and end variables.
 
-	    if ($found == 1) {
-		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-		
-		$self->growfplist($fp);                             	    
-	    }
-	
-	    # We're in a gapped region.  We need to increment the sequence that
-	    # doesn't have the gap in it to keep the coordinates correct.
-	    # We also need to reset the current end coordinates.
+            if ($found == 1) {
+                my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
+                
+                $self->growfplist($fp);                                     
+            }
+        
+            # We're in a gapped region.  We need to increment the sequence that
+            # doesn't have the gap in it to keep the coordinates correct.
+            # We also need to reset the current end coordinates.
 
-	    if ($qchars[$count] ne '-') {
-		$qstart = $qend   + $qinc;
-	    } else {
-		$qstart = $qend;
-	    }
-	    if ($hchars[$count] ne '-') {
-		$hstart = $hend   + $hinc;
-	    } else {
-		$hstart = $hend;
-	    }
-	    
-	    $qend = $qstart;
-	    $hend = $hstart;
+            if ($qchars[$count] ne '-') {
+                $qstart = $qend   + $qinc;
+            } else {
+                $qstart = $qend;
+            }
+            if ($hchars[$count] ne '-') {
+                $hstart = $hend   + $hinc;
+            } else {
+                $hstart = $hend;
+            }
+            
+            $qend = $qstart;
+            $hend = $hstart;
 
-	    $found = 0;
-	}
-	$count++;
-    }			     
+            $found = 0;
+        }
+        $count++;
+    }                        
 
     # Remember the last feature
     if ($found == 1) {
-	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-	$self->growfplist($fp);                             	    
+        my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
+        $self->growfplist($fp);                                     
     }
 
 }
@@ -656,28 +686,28 @@ sub _convert2FeaturePair {
     # This is for dna-pep alignments.  The actual end base
     # will be +- 2 bases further on.
     if (abs($qinc) > 1) {
-	$tmpqend += $qstrand * 2;
+        $tmpqend += $qstrand * 2;
     }
     if (abs($hinc) > 1) {
-	$tmphend += $hstrand * 2;
+        $tmphend += $hstrand * 2;
     }
     
     # Make sure start is always < end
     if ($tmpqstart > $tmpqend) {
-	my $tmp    = $tmpqstart;
-	$tmpqstart = $tmpqend;
-	$tmpqend   = $tmp;
+        my $tmp    = $tmpqstart;
+        $tmpqstart = $tmpqend;
+        $tmpqend   = $tmp;
     }
     if ($tmphstart > $tmphend) {
-	my $tmp    = $tmphstart;
-	$tmphstart = $tmphend;
-	$tmphend   = $tmp;
+        my $tmp    = $tmphstart;
+        $tmphstart = $tmphend;
+        $tmphend   = $tmp;
     }
     
-    #print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
+    #print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
 
     my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
-				     $hsp->percent,$hsp->P,$name,$analysis);
+                                     $hsp->percent,$hsp->P,$name,$analysis);
 
     return $fp;
 }
@@ -700,29 +730,29 @@ sub _makeFeaturePair {
     $source =~ s/\/.*\/(.*)/$1/;
 
     my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->clone->id,
-						-start       => $qstart,
-						-end         => $qend,
-						-strand      => $qstrand * $hstrand,
-						-source_tag  => $source,
-						-primary_tag => 'similarity',
-						-analysis    => $analysis,
-						-score       => $score);
-	
+                                                -start       => $qstart,
+                                                -end         => $qend,
+                                                -strand      => $qstrand * $hstrand,
+                                                -source_tag  => $source,
+                                                -primary_tag => 'similarity',
+                                                -analysis    => $analysis,
+                                                -score       => $score);
+        
     $feature1->percent_id($pid);
     $feature1->p_value($evalue);
 
     my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
-						-start   => $hstart,
-						-end     => $hend,
-						-strand  => $hstrand * $qstrand,
-						-source_tag  => $source,
-						-primary_tag => 'similarity',
-						-analysis => $analysis,
-						-score    => $score);
+                                                -start   => $hstart,
+                                                -end     => $hend,
+                                                -strand  => $hstrand * $qstrand,
+                                                -source_tag  => $source,
+                                                -primary_tag => 'similarity',
+                                                -analysis => $analysis,
+                                                -score    => $score);
     
     
     my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
-					   -feature2 => $feature2);
+                                           -feature2 => $feature2);
    
     $feature2->percent_id($pid);
     $feature2->p_value($evalue);
@@ -737,10 +767,10 @@ sub _findIncrements {
     my $hinc   = 1 * $hstrand;
     
     if ($qtype eq 'dna' && $htype eq 'pep') {
-	$qinc = 3 * $qinc;
+        $qinc = 3 * $qinc;
     } 
     if ($qtype eq 'pep' && $htype eq 'dna') {
-	$hinc = 3 * $hinc;
+        $hinc = 3 * $hinc;
     }
 
     return ($qinc,$hinc);
@@ -750,20 +780,20 @@ sub _findStrands {
     my ($self,$hsp) = @_;
 
     return ( $hsp->query->strand(),
-	     $hsp->subject->strand());
+             $hsp->subject->strand());
 
 #    my $qstrand;
 #    my $hstrand;
 
 #    if ($hsp->query->start() < $hsp->query->end()) {
-#	$qstrand = 1;
+#       $qstrand = 1;
 #    } else {
-#	$qstrand = -1;
+#       $qstrand = -1;
 #    }
 #    if ($hsp->subject->start() < $hsp->subject->end()) {
-#	$hstrand = 1;
+#       $hstrand = 1;
 #    } else {
-#	$hstrand = -1;
+#       $hstrand = -1;
 #    }
 #    return ($qstrand,$hstrand);
 }
@@ -779,14 +809,14 @@ sub _findTypes {
     my $len2 = $hsp->subject->length();
 
     if ($len1/$len2 > 2) {
-	$type1 = 'dna';
-	$type2 = 'pep';
+        $type1 = 'dna';
+        $type2 = 'pep';
     } elsif ($len2/$len1 > 2) {
-	$type1 = 'pep';
-	$type2 = 'dna';
+        $type1 = 'pep';
+        $type2 = 'dna';
     } else {
-	$type1 = 'dna';
-	$type2 = 'dna';
+        $type1 = 'dna';
+        $type2 = 'dna';
     }
 
     return ($type1,$type2);
@@ -794,41 +824,41 @@ sub _findTypes {
 
 sub select_features {
  
-	my ($self,@features) = @_;
+        my ($self,@features) = @_;
  
-	@features= sort {
-		$a->strand<=> $b->strand
-        	       ||
-		$a->start<=> $b->start
-	} @features;
+        @features= sort {
+                $a->strand<=> $b->strand
+                       ||
+                $a->start<=> $b->start
+        } @features;
  
-	my @selected_features;
+        my @selected_features;
  
-	my $best_hit = @features[0];
+        my $best_hit = @features[0];
  
-	foreach my $feat (@features){
-		if ($feat->overlaps($best_hit,'strong')) {
-			if ($feat->score > $best_hit->score) {
-				$best_hit = $feat;
-			}
-			}else {
-				push (@selected_features,$best_hit);
-				$best_hit = $feat;
-			}
-	}
-	 
-	my @newfeatures;	
-	FEAT: foreach my $feat (@features){
- 		foreach my $sf (@selected_features){
-			if (($sf->hseqname eq $feat->hseqname)&&($sf->score == $feat->score)){
-				push (@newfeatures, $feat);
-				next FEAT;	
-			}	
-		}
-	}
-	
+        foreach my $feat (@features){
+                if ($feat->overlaps($best_hit,'strong')) {
+                        if ($feat->score > $best_hit->score) {
+                                $best_hit = $feat;
+                        }
+                        }else {
+                                push (@selected_features,$best_hit);
+                                $best_hit = $feat;
+                        }
+        }
+         
+        my @newfeatures;        
+        FEAT: foreach my $feat (@features){
+                foreach my $sf (@selected_features){
+                        if (($sf->hseqname eq $feat->hseqname)&&($sf->score == $feat->score)){
+                                push (@newfeatures, $feat);
+                                next FEAT;      
+                        }       
+                }
+        }
+        
 
-	return @newfeatures;
+        return @newfeatures;
 }
 
 ##############
@@ -847,7 +877,7 @@ sub select_features {
 
 sub output {
     my ($self, @arg) = @_;
-
+    
     if (@arg) {
       @{$self->{'_fplist'}} = @arg;
     }
@@ -855,6 +885,7 @@ sub output {
     if (!defined($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
     }
+  
     return @{$self->{'_fplist'}};
   }
 
@@ -867,7 +898,7 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq) {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
-	$self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
       }
 
       $self->{'_query'} = $seq ;
@@ -893,7 +924,7 @@ sub program {
   my ($self, $location) = @_;
   
   if ($location) {
-    $self->throw("executable not found at $location: $!\n") 	unless (-e $location && -x $location);
+    $self->throw("executable not found at $location: $!\n")     unless (-e $location && -x $location);
     $self->{'_program'} = $location ;
   }
   return $self->{'_program'};
@@ -939,10 +970,10 @@ sub filter {
     my ($self,$args) = @_;
 
     if (defined($args)) {
-	if ($args != 0 && $args != 1) {
-	    $self->throw("Filter option must be 0 or 1");
-	}
-	$self->{'_filter'} = $args;
+        if ($args != 0 && $args != 1) {
+            $self->throw("Filter option must be 0 or 1");
+        }
+        $self->{'_filter'} = $args;
     }
     return $self->{'_filter'};
 }
@@ -962,7 +993,7 @@ sub threshold_type {
     my $found = 0;
     foreach my $allowed_type ($self->get_threshold_types) {
       if ($type eq $allowed_type) {
-	$found = 1;
+        $found = 1;
       }
     }
     if ($found == 0) {
@@ -975,3 +1006,11 @@ sub threshold_type {
   return $self->{_threshold_type} || $types[0];
 }
 1;
+
+
+
+
+
+
+
+
