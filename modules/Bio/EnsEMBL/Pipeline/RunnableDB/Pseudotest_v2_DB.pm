@@ -14,7 +14,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Pseudotest_v2_DB.pm
 
 =head1 DESCRIPTION
 
-This object wraps Bio::EnsEMBL::Pipeline::Tools::Pseudotest_v2.pm to add
+This object wraps Bio::EnsEMBL::Pipeline::Runnable::Pseudotest_v2.pm to add
 functionality to read from databases (so far).
 
 =head1 CONTACT
@@ -32,7 +32,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Pseudotest_v2_DB;
 use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Tools::Pseudotest_v2;
+use Bio::EnsEMBL::Pipeline::Runnable::Pseudotest_v2;
 use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::Pseudotest_v2_config;
 
 use vars qw(@ISA);
