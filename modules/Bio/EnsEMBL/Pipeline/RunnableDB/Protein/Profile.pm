@@ -116,8 +116,7 @@ sub runnable {
     
     if (!defined($self->{'_runnable'})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile->new(-query     => $self->genseq,
-							      -database  => $self->analysis->db,
-							      -program   => $self->analysis->program);
+									-analysis  => $self->analysis	);
  
            
       $self->{'_runnable'} = $run;
@@ -181,13 +180,5 @@ sub output {
 }
 
 1;
-
-
-
-
-
-
-
-
 
 
