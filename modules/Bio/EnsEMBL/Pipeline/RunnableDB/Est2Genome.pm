@@ -46,12 +46,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
 
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -77,7 +78,8 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    my $seqfetcher = $self->make_seqfetcher();
+    print $seqfetcher."\n"; 
     $self->seqfetcher($seqfetcher);
 	
     return $self;
@@ -408,6 +410,24 @@ sub _make_genes {
 
 }
 
+sub make_seqfetcher {
+  my ( $self ) = @_;
+  my $index   = $ENV{BLASTDB}."/".$self->analysis->db;
+  print "index = ".$index."\n";
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => \@db,);
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  }
+
+  return $seqfetcher;
+
+}
 
 
 1;
