@@ -122,6 +122,10 @@ sub fetch_input {
   my $input_seq = 
     $runnable->_seq_fetcher->fetch($self->input_id);
 
+  unless ($input_seq){
+    throw("Failed to fetch input sequence [". $self->input_id ."].");
+  }
+
   $self->_input_seq($input_seq);
 
   return 1
@@ -197,7 +201,7 @@ sub _set_options {
   my $id_prefix;
 
   foreach my $prefix (keys %$GD_OPTIONS){
-print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
+#print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
     if ($self->input_id =~ /^$prefix/) {
       $id_prefix = $prefix;
       last
@@ -205,7 +209,7 @@ print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
   }
 
   unless (defined $id_prefix) {
-    throw("Input sequence id does not match any " . 
+    throw("Input sequence id [".$self->input_id."] does not match any " . 
 	  "regex/id-prefix in config file.")
   }
 
@@ -262,10 +266,10 @@ sub _verify_options {
 
     # Check BLAST-related options.
 
-  unless (defined $self->_blastdb_file && -e $self->_blastdb_file) {
-    throw("Input BLAST database is either not specified or does " . 
-	  "not exist [" . $self->_blastdb_file . "].")
-  }
+#  unless (defined $self->_blastdb_file && -e $self->_blastdb_file) {
+#    throw("Input BLAST database is either not specified or does " . 
+#	  "not exist [" . $self->_blastdb_file . "].")
+#  }
 
   if (defined $GD_BLAST_EXE && $GD_BLAST_EXE ne '' && 
       ! -x $GD_BLAST_EXE) {
@@ -472,10 +476,10 @@ sub _write_output_as_text {
 
       my $transl_regex = $self->_transl_regex;
 
-      ($alignment{$match->{query_id}})->desc =~ /($transl_regex\d+)/;
+      ($alignment{$match->{query_id}})->desc =~ /($transl_regex)/;
       my $query_translation_id = $1;
 
-      ($alignment{$match->{match_id}})->desc =~ /($transl_regex\d+)/;
+      ($alignment{$match->{match_id}})->desc =~ /($transl_regex)/;
       my $match_translation_id = $1;
 
       unless ($query_translation_id ne '' && $match_translation_id ne '') {
