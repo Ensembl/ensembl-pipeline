@@ -39,10 +39,6 @@ my $genomic_seq	   =  Bio::PrimarySeq->new(	-seq         => $gseq,
 						-accession   => 'Z84721',
 						-moltype     => 'dna');
 
-unless (defined($genomic_seq)) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
 
 my $pred_transcript = Bio::EnsEMBL::PredictionTranscript->new();
 my $exon = Bio::EnsEMBL::Exon->new;
@@ -71,6 +67,7 @@ unless (defined($pred_transcript) &&
 else
 { print "ok 3\n"; }
 
+my $pwd = `pwd`; chomp($pwd);
 
 # Make a BlastGenscanPep object.
 my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new ( 
@@ -78,7 +75,7 @@ my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new (
                                                     -peptide    => $pred_transcript,
 						    -program    => 'wublastp',
                                             # Hardcoded path alert
-                                                    -database   => '/data/blastdb/Ensembl/swall',
+                                                    -database   => "$pwd/t/data/mini_protein.fa",
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
@@ -105,15 +102,15 @@ else
 
 sub display {
   my @results = @_;
-  my @methods = qw( seqname start end strand );
+  my @methods = qw( seqname start end strand hseqname hstart hend score);
 
   foreach my $obj (@results)
     {
-      printf STDERR "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
         printf STDERR ("%10s = $value\n", $method_name);
       }
+      print "\n";
     }
 }
 
