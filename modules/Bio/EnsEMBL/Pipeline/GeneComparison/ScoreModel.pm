@@ -164,12 +164,15 @@ sub score_Transcripts{
       # in this transcript
       my @list = @{ $self->hold_list($tran) };
       my @covered_sites;
-      
+      my %pair_coverage;
+
       foreach my $pair (@site_pairs){
 	my $covered = 0;
 	foreach my $est ( @list ){
 	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
 	  
+	  # a pair is covered if there is at least an est overlapping
+	  # with both features defining the site pair
 	  if ( $est->start <= $pair->[0]->end 
 	       &&
 	       $est->end > $pair->[0]->end
@@ -179,6 +182,7 @@ sub score_Transcripts{
 	       $est->start < $pair->[1]->start
 	     ){
 	    $covered = 1;
+	    $pair_coverage{ $pair }++;
 	    push( @covered_sites, $pair );
 	  }
 	}
@@ -190,6 +194,10 @@ sub score_Transcripts{
       my $score = 100;
       if ( @site_pairs ){
 	$score = sprintf "%.2f", 100*scalar( @covered_sites )/scalar( @site_pairs );
+	print STDERR "score: $score\n";
+      }
+      else{
+	print STDERR "No site-pairs --> score = $score\n";
       }
       
       ############################################################
