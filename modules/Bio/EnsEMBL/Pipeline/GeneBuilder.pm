@@ -173,6 +173,8 @@ sub build_Genes {
     $self->filter_Transcripts;
     $self->make_Genes;
 
+    $self->recluster_Transcripts;
+
 #    $self->print_gff;
 
     print STDERR "Out of build Genes...\n";
@@ -1169,11 +1171,11 @@ sub make_Genes {
   foreach  my $tran (@transcripts) {
     eval{
       if ($tran->translate->seq !~ /\*/) {
-	print STDERR $tran->{'temporary_id'} . " translates!\n";
+#	print STDERR $tran->{'temporary_id'} . " translates!\n";
 	$valid = 1;
       }
       else{
-	print STDERR $tran->{'temporary_id'} . " does not translate!\n";
+#	print STDERR $tran->{'temporary_id'} . " does not translate!\n";
 	$valid = 0;
       }
     };
@@ -1223,7 +1225,7 @@ sub make_Genes {
 	  if ($exon->overlaps($gene_exon)) {
 	    if ($exon->strand == $gene_exon->strand) {
 	      $found = $gene;
-	      print STDERR "exon overlap\n";
+#	      print STDERR "exon overlap\n";
 	      last GENE;
 	    } 
 	    else {
@@ -1264,6 +1266,174 @@ sub make_Genes {
     }
   }
 }
+
+=head2 recluster_Transcripts
+
+    Title   :   recluster_Transcripts
+    Usage   :   $self->recluster_Transcripts
+    Function:   Check the clustering of transcripts 
+                and make sure all the transcripts that really belong to a single 
+                gene have been put into that gene.
+                Ultimately to be made part of main clustering algorithm
+    Returns :   Nothing
+    Args    :   None
+
+=cut
+
+sub recluster_Transcripts{
+  my ($self) = @_;
+  my $num_old_genes = 0;
+  my @transcripts_unsorted;
+  foreach my $gene ($self->each_Gene) {
+    $num_old_genes++;
+    foreach my $tran ($gene->each_Transcript) {
+      push(@transcripts_unsorted, $tran);
+    }
+  }
+
+  # flush old genes
+  $self->flush_Genes;
+  
+  my @transcripts = sort by_transcript_high @transcripts_unsorted;
+  my @clusters;
+
+  # clusters transcripts by whether or not any exon overlaps with an exon in 
+  # another transcript (came from original prune in GeneBuilder)
+  foreach my $tran (@transcripts) {
+    my @matching_clusters;
+  CLUSTER: foreach my $cluster (@clusters) {
+      foreach my $cluster_transcript (@$cluster) {
+        foreach my $exon1 ($tran->get_all_Exons) {
+	  
+          foreach my $cluster_exon ($cluster_transcript->get_all_Exons) {
+            if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+              push (@matching_clusters, $cluster);
+              next CLUSTER;
+            }
+          }
+        }
+      }
+    }
+    
+    if (scalar(@matching_clusters) == 0) {
+      my @newcluster;
+      push(@newcluster,$tran);
+      push(@clusters,\@newcluster);
+    } 
+    elsif (scalar(@matching_clusters) == 1) {
+      push @{$matching_clusters[0]}, $tran;
+      
+    } 
+    else {
+      # Merge the matching clusters into a single cluster
+      my @new_clusters;
+      my @merged_cluster;
+      foreach my $clust (@matching_clusters) {
+        push @merged_cluster, @$clust;
+        foreach my $trans (@$clust) {
+        } 
+      }
+      push @merged_cluster, $tran;
+      foreach my $trans (@merged_cluster) {
+      } 
+      push @new_clusters,\@merged_cluster;
+      # Add back non matching clusters
+      foreach my $clust (@clusters) {
+        my $found = 0;
+      MATCHING: foreach my $m_clust (@matching_clusters) {
+          if ($clust == $m_clust) {
+            $found = 1;
+            last MATCHING;
+          }
+        }
+        if (!$found) {
+          push @new_clusters,$clust;
+        }
+      }
+      @clusters =  @new_clusters;
+    }
+  }
+  
+  # safety and sanity checks
+  $self->check_Clusters(scalar(@transcripts), $num_old_genes, \@clusters);
+
+  # make and store genes
+  
+  foreach my $cluster(@clusters){
+    my $gene = new Bio::EnsEMBL::Gene;
+    foreach my $transcript(@$cluster){
+      $gene->add_Transcript($transcript);
+    }
+
+    # prune out duplicate exons
+    $self->prune_Exons($gene);
+    
+    $self->add_Gene($gene);
+  }
+  
+}
+
+sub check_Clusters{
+  my ($self, $num_transcripts, $num_old_genes, $clusters) = @_;
+  #Safety checks
+  my $ntrans = 0;
+  my %trans_check_hash;
+  foreach my $cluster (@$clusters) {
+    $ntrans += scalar(@$cluster);
+    foreach my $trans (@$cluster) {
+      if (defined($trans_check_hash{"$trans"})) {
+        $self->throw("Transcript " . $trans->dbID . " added twice to clusters\n");
+      }
+      $trans_check_hash{"$trans"} = 1;
+    }
+    if (!scalar(@$cluster)) {
+      $self->throw("Empty cluster");
+    }
+  }
+  if ($ntrans != $num_transcripts) {
+    $self->throw("Not all transcripts have been added into clusters $ntrans and " . $num_transcripts. " \n");
+  } 
+  #end safety checks
+  
+  if (scalar(@$clusters) < $num_old_genes) {
+    $self->warn("Reclustering reduced number of genes from " . 
+		$num_old_genes . " to " . scalar(@$clusters). "\n");
+  } elsif (scalar(@$clusters) > $num_old_genes) {
+    $self->warn("Reclustering increased number of genes from " . 
+		$num_old_genes . " to " . scalar(@$clusters). "\n");
+  }
+
+}
+
+sub by_transcript_high {
+  my $alow;
+  my $blow;
+  my $ahigh;
+  my $bhigh;
+
+  if ($a->start_exon->strand == 1) {
+    $alow = $a->start_exon->start;
+    $ahigh = $a->end_exon->end;
+  } else {
+    $alow = $a->end_exon->start;
+    $ahigh = $a->start_exon->end;
+  }
+
+  if ($b->start_exon->strand == 1) {
+    $blow = $b->start_exon->start;
+    $bhigh = $b->end_exon->end;
+  } else {
+    $blow = $b->end_exon->start;
+    $bhigh = $b->start_exon->end;
+  }
+
+  if ($ahigh != $bhigh) {
+    return $ahigh <=> $bhigh;
+  } else {
+    return $alow <=> $blow;
+  }
+}
+
 
 sub flush_Genes {
   my ($self) = @_;
@@ -2370,237 +2540,237 @@ sub readGFF {
     return @fset;
 }
 
-=head2 prune
+#=head2 prune
 
- Title   : prune
- Usage   : my @newgenes = $self->prune(@genes)
- Function: rejects non translating transcripts
-           rejects duplicate transcripts
- Returns : array of Bio::EnsEMBL::Gene
- Args    : array of Bio::EnsEMBL::Gene
+# Title   : prune
+# Usage   : my @newgenes = $self->prune(@genes)
+# Function: rejects non translating transcripts
+#           rejects duplicate transcripts
+# Returns : array of Bio::EnsEMBL::Gene
+# Args    : array of Bio::EnsEMBL::Gene
 
-=cut
+#=cut
 
-sub prune {
-    my ($self,@genes) = @_;
+#sub prune {
+#    my ($self,@genes) = @_;
 
-    my @clusters;
-    my @transcripts;
-    my %lengths;
+#    my @clusters;
+#    my @transcripts;
+#    my %lengths;
 
 
-# better to do this earlier?
-## reject non-translating transcripts
-#    foreach my $gene (@genes) {
-#      my @tran = $gene->each_Transcript;
-#      
-#      foreach my $tran ($gene->each_Transcript) {
-#	eval {
-#	  if ($tran->translate->seq !~ /\*/) {
-#	    push(@transcripts,$tran);
+## better to do this earlier?
+### reject non-translating transcripts
+##    foreach my $gene (@genes) {
+##      my @tran = $gene->each_Transcript;
+##      
+##      foreach my $tran ($gene->each_Transcript) {
+##	eval {
+##	  if ($tran->translate->seq !~ /\*/) {
+##	    push(@transcripts,$tran);
+##	  }
+##	};
+##	if ($@) {
+##	  print STDERR "ERROR: Can't translate " . $tran->{'temporary_id'} . ". Skipping [$@]\n";
+##	}
+##      }
+##    }
+    
+
+## clusters transcripts by whether or not any exon overlaps with an exon in another transcript
+## haven't we already done this in make_genes? recluster as might have split some genes when rejecting non-translators
+#  TRAN: foreach my $tran (@transcripts) {
+#      my $found = 0;
+#      foreach my $cluster (@clusters) {
+#	foreach my $cluster_transcript (@$cluster) {
+#	  foreach my $exon1 ($tran->get_all_Exons) {
+	    
+#	    foreach my $cluster_exon ($cluster_transcript->get_all_Exons) {
+#	      if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+#		$found = 1;
+#		push(@$cluster,$tran);
+		
+#		next TRAN;
+#	      }
+#	    }
 #	  }
-#	};
-#	if ($@) {
-#	  print STDERR "ERROR: Can't translate " . $tran->{'temporary_id'} . ". Skipping [$@]\n";
 #	}
+#      }
+      
+#      if ($found == 0) {
+#	#	  print STDERR "Found new cluster for " . $tran->{'temporary_id'} . "\n";
+#	my @newcluster;
+#	push(@newcluster,$tran);
+#	push(@clusters,\@newcluster);
 #      }
 #    }
     
+#    my @newgenes;
 
-# clusters transcripts by whether or not any exon overlaps with an exon in another transcript
-# haven't we already done this in make_genes? recluster as might have split some genes when rejecting non-translators
-  TRAN: foreach my $tran (@transcripts) {
-      my $found = 0;
-      foreach my $cluster (@clusters) {
-	foreach my $cluster_transcript (@$cluster) {
-	  foreach my $exon1 ($tran->get_all_Exons) {
+#    CLUS: foreach my $cluster (@clusters) {
+#	my @transcripts = @$cluster;
+
+#	# sizehash holds transcript length - based on sum of exon lengths
+#	my %sizehash;
+
+#	foreach my $tran (@transcripts) {
+#	    my $length = 0;
 	    
-	    foreach my $cluster_exon ($cluster_transcript->get_all_Exons) {
-	      if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
-		$found = 1;
-		push(@$cluster,$tran);
-		
-		next TRAN;
-	      }
-	    }
-	  }
-	}
-      }
-      
-      if ($found == 0) {
-	#	  print STDERR "Found new cluster for " . $tran->{'temporary_id'} . "\n";
-	my @newcluster;
-	push(@newcluster,$tran);
-	push(@clusters,\@newcluster);
-      }
-    }
-    
-    my @newgenes;
-
-    CLUS: foreach my $cluster (@clusters) {
-	my @transcripts = @$cluster;
-
-	# sizehash holds transcript length - based on sum of exon lengths
-	my %sizehash;
-
-	foreach my $tran (@transcripts) {
-	    my $length = 0;
-	    
-	    foreach my $ex ($tran->get_all_Exons) {
-	      $length += $ex->end - $ex->start + 1;
-	    }
-	    
-	    $sizehash{$tran->{'temporary_id'}} = $length;
-	}
-
-
-	# links each exon in the transcripts of this cluster with a hash of other exons it is paired with
-	my %pairhash;
-
-	# allows retrieval of exon objects by exon->id - convenience
-	my %exonhash;
-
-	# sort transcripts based on total exon length - maybe this should be total exon number?
-	@transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
-
-	my @newtran;
-	my @maxexon = $transcripts[0]->get_all_Exons;
-
-# this could cause a problem - if we have a long single exon gene which encompasses a small multi-exon gene, we will throw the multi exon transcript away & just keep the single exon gene - which might in fact be wrong.
-# it's in to catch the single exon UTR genes so leave as is for now
-	if ($#maxexon == 0) {
-	    print STDERR "Single exon gene\n";
-	    my $gene = new Bio::EnsEMBL::Gene;
-	    $gene->type('pruned');
-	    $gene->{'temporary_id'} = ($transcripts[0]->{'temporary_id'});
-	    push(@newgenes,$gene);
-	    
-	    $gene->type('pruned');
-	    $gene->add_Transcript($transcripts[0]);
-
-	    next CLUS;
-	}
-
-#	print STDERR "\nProcessing cluster\n";
-	foreach my $tran (@transcripts) {
-#	  print STDERR "Transcript " . $tran->{'temporary_id'} . "\tsize: " . $sizehash{$tran} . "\n";
-	  my @exons = $tran->get_all_Exons;
-
-	  # sort exons by strand and start
-	  if ($exons[0]->strand == 1) {
-	    @exons = sort {$a->start <=> $b->start} @exons;
-	  } else {
-	    @exons = sort {$b->start <=> $a->start} @exons;
-	  }
-	  
-	  my $i     = 0;
-	  my $found = 1;
-	    
-	  for ($i = 0; $i < $#exons; $i++) {
-	    my $foundpair = 0;
-	    my $exon1 = $exons[$i];
-	    my $exon2 = $exons[$i+1];
-
-	    # Only count introns > 50 bp as real introns
-	    my $intron;
-	    if ($exon1->strand == 1) {
-	      $intron = abs($exon2->start - $exon1->end + 1);
-	    } else {
-	      $intron = abs($exon1->start   - $exon2->end + 1);
-	    }
-
-	    #		print STDERR "Intron size $intron\n";
-	    if ($intron < 50) {
-	      $foundpair = 1; # this pair will not be compared with other transcripts
-	    } 
-	    else {
-	      
-# go through the exon pairs already stored in %pairhash. If there is a pair whose exon1 overlaps this exon1, and whose exon2 overlaps this exon2, then these two transcripts are paired
-	      
-	      foreach my $exon1id (keys %pairhash) {
-		my $exon1a = $exonhash{$exon1id};
-		
-		foreach my $exon2id (keys %{$pairhash{$exon1id}}) {
-		  my $exon2a = $exonhash{$exon2id};
-		  
-		  
-		  if (($exon1->overlaps($exon1a) && 
-		       $exon2->overlaps($exon2a))) {
-		    #			  	print STDERR "HOORAY! Found overlap\n";
-		    $foundpair = 1;
-		  }
-		}
-	      }
-	    }
-	    
-	    if ($foundpair == 0) { # ie this exon pair does not overlap with a pair yet found in another transcript
-	      
-	      #		    	    print STDERR "Found new pair\n";
-	      $found = 0;
-	  
-	      # store the exons so they can be retrieved by id
-	      $exonhash{$exon1->{'temporary_id'}} = $exon1;
-	      $exonhash{$exon2->{'temporary_id'}} = $exon2;
-	      
-	      # store the pairing between these 2 exons
-	      $pairhash{$exon1->{'temporary_id'}}{$exon2->{'temporary_id'}} = 1;
-	    }
-	  } # end of for ($i = 0; $i < $#exons; $i++)
-
-	  # decide whether this is a new transcript or whether it has already been seen
-	  if ($found == 0) {
-#	    print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
-	    push(@newtran,$tran);
-	  } else {
-#	    print STDERR "Transcript already seen " . $tran->{'temporary_id'} . "\n";
-	  }
-	} # end of this transcript
-
-	# make new transcripts into genes
-	if ($#newtran >= 0) {
-	  my $gene = new Bio::EnsEMBL::Gene;
-	  $gene->type('pruned');
-	  
-	  my $count = 0;
-	  foreach my $newtran (@newtran) {
-	    $gene->{'temporary_id'} = ("TMPG_" . $newtran->{'temporary_id'});
-	    # hardcoded limit to prevent mad genes with lots of transcripts
-	    if ($count < 10) {
-	      $gene->add_Transcript($newtran);
-	    }
-	    $count++;
-	  }
-	  eval {
-	    #	      $self->contig->dbobj->get_ExonAdaptor->fetch_evidence_by_Exons($gene->each_unique_Exon);
-	    foreach my $exon($gene->get_all_Exons){
-	      if ($exon->dbID){
-		$self->contig->dbobj->get_ExonAdaptor->fetch_evidence_by_Exon($exon);
-	      }
-	    }
-	  };
-	  if ($@) {
-	    print STDERR "ERROR: Couldn't fetch supporting evidence for " . $gene->{'temporary_id'} . ":\n[$@]\n";
-	  }
-#	  else{
-#	    print STDERR "got evidence for " . $gene->{'temporary_id'} . "\n";
-#	    foreach my $exon($gene->get_all_Exons){
-
-#	      print STDERR "exon coords: " . $exon->contig_id . " " . exon->start . " " . $exon->end . " " . $exon->strand . "\n";
-#	      foreach my $sf($exon->each_Supporting_Feature){
-#		$self->print_FeaturePair($sf);
-#	      }
-#	      
+#	    foreach my $ex ($tran->get_all_Exons) {
+#	      $length += $ex->end - $ex->start + 1;
 #	    }
-#	    
+	    
+#	    $sizehash{$tran->{'temporary_id'}} = $length;
+#	}
+
+
+#	# links each exon in the transcripts of this cluster with a hash of other exons it is paired with
+#	my %pairhash;
+
+#	# allows retrieval of exon objects by exon->id - convenience
+#	my %exonhash;
+
+#	# sort transcripts based on total exon length - maybe this should be total exon number?
+#	@transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
+
+#	my @newtran;
+#	my @maxexon = $transcripts[0]->get_all_Exons;
+
+## this could cause a problem - if we have a long single exon gene which encompasses a small multi-exon gene, we will throw the multi exon transcript away & just keep the single exon gene - which might in fact be wrong.
+## it's in to catch the single exon UTR genes so leave as is for now
+#	if ($#maxexon == 0) {
+#	    print STDERR "Single exon gene\n";
+#	    my $gene = new Bio::EnsEMBL::Gene;
+#	    $gene->type('pruned');
+#	    $gene->{'temporary_id'} = ($transcripts[0]->{'temporary_id'});
+#	    push(@newgenes,$gene);
+	    
+#	    $gene->type('pruned');
+#	    $gene->add_Transcript($transcripts[0]);
+
+#	    next CLUS;
+#	}
+
+##	print STDERR "\nProcessing cluster\n";
+#	foreach my $tran (@transcripts) {
+##	  print STDERR "Transcript " . $tran->{'temporary_id'} . "\tsize: " . $sizehash{$tran} . "\n";
+#	  my @exons = $tran->get_all_Exons;
+
+#	  # sort exons by strand and start
+#	  if ($exons[0]->strand == 1) {
+#	    @exons = sort {$a->start <=> $b->start} @exons;
+#	  } else {
+#	    @exons = sort {$b->start <=> $a->start} @exons;
 #	  }
 	  
-	  push(@newgenes,$gene);
-	}
-    }
+#	  my $i     = 0;
+#	  my $found = 1;
+	    
+#	  for ($i = 0; $i < $#exons; $i++) {
+#	    my $foundpair = 0;
+#	    my $exon1 = $exons[$i];
+#	    my $exon2 = $exons[$i+1];
+
+#	    # Only count introns > 50 bp as real introns
+#	    my $intron;
+#	    if ($exon1->strand == 1) {
+#	      $intron = abs($exon2->start - $exon1->end + 1);
+#	    } else {
+#	      $intron = abs($exon1->start   - $exon2->end + 1);
+#	    }
+
+#	    #		print STDERR "Intron size $intron\n";
+#	    if ($intron < 50) {
+#	      $foundpair = 1; # this pair will not be compared with other transcripts
+#	    } 
+#	    else {
+	      
+## go through the exon pairs already stored in %pairhash. If there is a pair whose exon1 overlaps this exon1, and whose exon2 overlaps this exon2, then these two transcripts are paired
+	      
+#	      foreach my $exon1id (keys %pairhash) {
+#		my $exon1a = $exonhash{$exon1id};
+		
+#		foreach my $exon2id (keys %{$pairhash{$exon1id}}) {
+#		  my $exon2a = $exonhash{$exon2id};
+		  
+		  
+#		  if (($exon1->overlaps($exon1a) && 
+#		       $exon2->overlaps($exon2a))) {
+#		    #			  	print STDERR "HOORAY! Found overlap\n";
+#		    $foundpair = 1;
+#		  }
+#		}
+#	      }
+#	    }
+	    
+#	    if ($foundpair == 0) { # ie this exon pair does not overlap with a pair yet found in another transcript
+	      
+#	      #		    	    print STDERR "Found new pair\n";
+#	      $found = 0;
+	  
+#	      # store the exons so they can be retrieved by id
+#	      $exonhash{$exon1->{'temporary_id'}} = $exon1;
+#	      $exonhash{$exon2->{'temporary_id'}} = $exon2;
+	      
+#	      # store the pairing between these 2 exons
+#	      $pairhash{$exon1->{'temporary_id'}}{$exon2->{'temporary_id'}} = 1;
+#	    }
+#	  } # end of for ($i = 0; $i < $#exons; $i++)
+
+#	  # decide whether this is a new transcript or whether it has already been seen
+#	  if ($found == 0) {
+##	    print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
+#	    push(@newtran,$tran);
+#	  } else {
+##	    print STDERR "Transcript already seen " . $tran->{'temporary_id'} . "\n";
+#	  }
+#	} # end of this transcript
+
+#	# make new transcripts into genes
+#	if ($#newtran >= 0) {
+#	  my $gene = new Bio::EnsEMBL::Gene;
+#	  $gene->type('pruned');
+	  
+#	  my $count = 0;
+#	  foreach my $newtran (@newtran) {
+#	    $gene->{'temporary_id'} = ("TMPG_" . $newtran->{'temporary_id'});
+#	    # hardcoded limit to prevent mad genes with lots of transcripts
+#	    if ($count < 10) {
+#	      $gene->add_Transcript($newtran);
+#	    }
+#	    $count++;
+#	  }
+#	  eval {
+#	    #	      $self->contig->dbobj->get_ExonAdaptor->fetch_evidence_by_Exons($gene->each_unique_Exon);
+#	    foreach my $exon($gene->get_all_Exons){
+#	      if ($exon->dbID){
+#		$self->contig->dbobj->get_ExonAdaptor->fetch_evidence_by_Exon($exon);
+#	      }
+#	    }
+#	  };
+#	  if ($@) {
+#	    print STDERR "ERROR: Couldn't fetch supporting evidence for " . $gene->{'temporary_id'} . ":\n[$@]\n";
+#	  }
+##	  else{
+##	    print STDERR "got evidence for " . $gene->{'temporary_id'} . "\n";
+##	    foreach my $exon($gene->get_all_Exons){
+
+##	      print STDERR "exon coords: " . $exon->contig_id . " " . exon->start . " " . $exon->end . " " . $exon->strand . "\n";
+##	      foreach my $sf($exon->each_Supporting_Feature){
+##		$self->print_FeaturePair($sf);
+##	      }
+##	      
+##	    }
+##	    
+##	  }
+	  
+#	  push(@newgenes,$gene);
+#	}
+#    }
     
 
-    return @newgenes;  
-  }
+#    return @newgenes;  
+#  }
 
 =head2 prune_gene
 
@@ -2621,7 +2791,7 @@ sub prune_gene {
   
   
   my @newgenes;
-  my $maxexons = 0;
+  my $max_num_exons = 0;
   my @transcripts = $gene->each_Transcript;
 
   # sizehash holds transcript length - based on sum of exon lengths
@@ -2631,7 +2801,7 @@ sub prune_gene {
 
     # keep track of number of exons in multiexon transcripts
     my @exons = $tran->get_all_Exons;
-    if(scalar(@exons) > $maxexons){ $maxexons = scalar(@exons); }
+    if(scalar(@exons) > $max_num_exons){ $max_num_exons = scalar(@exons); }
     my $length = 0;
     foreach my $e($tran->get_all_Exons){
       $length += $e->end - $e->start + 1;
@@ -2646,10 +2816,11 @@ sub prune_gene {
   my @maxexon = $transcripts[0]->get_all_Exons;
   # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
   # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
-#  if ($#maxexon == 0) {
+  #  if ($#maxexon == 0) {
 
-# think this should be OK.
-  if ($#maxexon == 0 && $maxexons == 1) {
+  # this may increase problems with the loss of valid single exon genes as mentioned below. 
+  # it's a balance between keeping multi exon transcripts and losing single exon ones
+  if ($#maxexon == 0 && $max_num_exons == 1) {
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('pruned');
     $gene->{'temporary_id'} = ($transcripts[0]->{'temporary_id'});
