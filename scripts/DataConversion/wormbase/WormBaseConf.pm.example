@@ -47,7 +47,7 @@ use vars qw( %WormBaseConf );
 				  chr_name => 'MtDNA',
 				  agp_file => 'CHROMOSOME_MtDNA.agp',
 				  length => '14088',
-				  gff_file => '',
+				  gff_file => '',  #need to be constructed!
 				 }
 			       ],
 
