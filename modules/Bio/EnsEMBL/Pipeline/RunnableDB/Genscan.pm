@@ -77,7 +77,6 @@ sub new {
     $self->{'_fplist'}      = [];
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
-    $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
     
     # dbobj input_id mandatory and read in by BlastableDB
