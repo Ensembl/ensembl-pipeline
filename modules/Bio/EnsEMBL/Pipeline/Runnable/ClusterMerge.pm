@@ -497,9 +497,6 @@ sub link_Transcripts{
 	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
 	#}
 	
-	# leep track of those ESTs/cDNAs used as middle or last elements in a linked list
-	my %is_middle_link;
-	
 	# for each transcript
 	# try to find al the linked lists that start in this transcript
       TRAN1:
@@ -573,11 +570,11 @@ sub link_Transcripts{
 	    push ( @lists, @current_lists );
 	    
 	    #print STDERR "current lists:\n";
-	    #foreach my $list ( @current_lists ){
-	    # foreach my $t (@$list){
-	    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-	    # }
-	    #}
+	    foreach my $list ( @current_lists ){
+		foreach my $t (@$list){
+		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+		}
+	    }
 	    
 	}  
 	
@@ -618,22 +615,18 @@ sub link_Transcripts{
     # each one containing the transcripts that can merge with each other		      
     
     
-  $self->sub_clusters( @final_lists );
-
-  print STDERR "final lists:\n";
-  my $count = 0;
-  foreach my $list (@final_lists){
-    $count++;
-    print STDERR "list $count\n";
-    foreach my $t ( @$list ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
+    $self->sub_clusters( @final_lists );
+    
+    print STDERR "final lists:\n";
+    my $count = 0;
+    foreach my $list (@final_lists){
+	$count++;
+	print STDERR "list $count\n";
+	foreach my $t ( @$list ){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
+	}
     }
-  }
-
-
-
-		       
-  return @final_lists;	      
+    return @final_lists;	      
 }
 
 ############################################################
@@ -649,7 +642,7 @@ description: this method computes the largest proper sublist in $list
      Return: it can return $list, a sub_list, or undef
 
 =cut
-
+    
 sub _test_for_link{
   my ($self, $list, $transcript) = @_;
   
