@@ -1059,14 +1059,11 @@ sub prune {
   @all = sort {$b->coverage <=> $a->coverage} @all;
 
   my $first = shift(@all);
+  push (@chosen,$first);
 
   # don't select any hits that have coverage less than 2% below that of the first hit, be it 100 or 99.9 or ...
   my $curr_pc = $first->coverage() - 2;
 
-  # lower bound threshold - reject anything with < 25% coverage
-  my $lower_threshold = 25;
-
-  push (@chosen,$first) unless $first->coverage < $lower_threshold;
  PRUNE:
   foreach my $hit(@all) {
     last PRUNE if $hit->coverage < $curr_pc;
@@ -1150,11 +1147,14 @@ sub prune_hits {
     @allhits = sort {$b->coverage <=> $a->coverage} @allhits;
 
     my $first = shift(@allhits);
-    push (@chosen,$first);
 
     # don't select any hits that have coverage less than 2% below that of the first hit, be it 100 or 99.9 or ...
     my $curr_pc = $first->coverage() - 2; 
-    
+
+    # lower bound threshold - reject anything with < 25% coverage
+  my $lower_threshold = 25;
+
+  push (@chosen,$first) unless $first->coverage < $lower_threshold;
   PRUNE:
     foreach my $hit(@allhits) {
       
