@@ -159,35 +159,6 @@ sub revcomp_query{
     return $self->{_revcomp_query};
 }
 
-
-############################################################
-=head2 RunnableDB methods
-
-=head2 analysis
-
-    Title   :   analysis
-    Usage   :   $self->analysis($analysis);
-    Function:   Gets or sets the stored Analusis object
-    Returns :   Bio::EnsEMBLAnalysis object
-    Args    :   Bio::EnsEMBL::Analysis object
-
-=head2 db
-
-    Title   :   db
-    Usage   :   $self->db($obj);
-    Function:   Gets or sets the value of db
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DBSQL::)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=head2 input_id
-
-    Title   :   input_id
-    Usage   :   $self->input_id($input_id);
-    Function:   Gets or sets the value of input_id
-    Returns :   valid input id for this analysis (if set) 
-    Args    :   input id for this analysis 
-
 ############################################################
 
 =head2 write_output
@@ -201,49 +172,31 @@ sub revcomp_query{
 =cut
 
 sub write_output {
-    my ($self) = @_;
+  my ($self) = @_;
     
-    #print STDERR "not writting genes yet\n";
-    #return;
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
     
-    my $gene_adaptor = $self->db->get_GeneAdaptor;
-    
-    #print STDERR "EST_GeneBuilder: before writting gene\n";
-  GENE: 
-    foreach my $gene ($self->output) {	
-	
-	# test
-	print STDERR "about to store gene:\n";
-	my @transcripts = @{ $gene->get_all_Transcripts};
-	#my $tran = $transcripts[0];
-    #my $strand = $tran->start_Exon->strand;
-	#print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
-    
-    # test of the supporting evidence. It seems to wrok fine.
-	foreach my $tran (@transcripts){
-    #  print STDERR "\ntranscript: $tran\n";
-    #  print STDERR "exons:\n";
-	  foreach my $exon (@{$tran->get_all_Exons}){
-	    print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
-	    #  print STDERR "evidence:\n";
-    #  foreach my $sf ( $exon->get_all_supporting_features ){
-    #  $self->print_FeaturePair($sf);
-    #  print STDERR "source_tag: ".$sf->source_tag."\n";
-    #  print STDERR "analysis  : ".$sf->analysis->dbID."\n";
-    #  print STDERR "logic_name: ".$sf->analysis->logic_name."\n";
-	    }
-	}
-    
+ GENE: 
+  foreach my $gene ($self->output) {	
+      
+      
       
       
       eval {
 	  $gene_adaptor->store($gene);
 	  print STDERR "wrote gene " . $gene->dbID . "\n";
+	  
+	  my @transcripts = @{ $gene->get_all_Transcripts};
+	  foreach my $tran (@transcripts){
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+	  }
+	  
+	  
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
       }
-    }
+  }
 }
 
 ############################################################
@@ -262,11 +215,11 @@ sub fetch_input {
     my( $self) = @_;
     my $strand;
 
-    # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
+    # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/ESTConf.pm
     my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
 
-    # make an analysis
-    $self->analysis($self->fetch_Analysis);
+    # make sure you have an analysis
+    $self->throw("No analysis") unless defined( $self->analysis );
 
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
@@ -282,15 +235,14 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
- 
-    my $slice_adaptor = $self->db->get_SliceAdaptor();
-    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
     $slice->chr_name($chrname);
     $self->query($slice);
-    print STDERR "got slice\n";
-    print STDERR "length ".$slice->length."\n";
     
+    ############################################################
     # forward strand
+    ############################################################
+
     $strand = 1;
     print STDERR "\n****** forward strand ******\n\n";
 
@@ -301,85 +253,59 @@ sub fetch_input {
     
     my $cdna_slice;
     if ( $USE_cDNA_DB ){
-      my $cdna_db = $self->cdna_db;
-      
-      my $cdna_sa = $cdna_db->get_SliceAdaptor();
-      $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-      my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
-      print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
-      push (@$genes, @$cdna_genes);
-
+	my $cdna_db = $self->cdna_db;
+	
+	$cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+	my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
+	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
+	push (@$genes, @$cdna_genes);
+	
     }
 
-    if(!scalar(@$genes)){
-      $self->warn("No forward strand genes found");
-    }
     my @plus_transcripts;
     my $single = 0;
+    
     # split by strand
-GENE:    
+  GENE:    
     foreach my $gene (@$genes) {
-      my $transcripts = $gene->get_all_Transcripts;
-      
-      # skip genes with more than one transcript
-      if( scalar(@$transcripts) > 1 ){
-	$self->warn("gene with more than one transcript - skipping it\n");
-	next GENE;
-      }
-      
-      # Don't skip genes with one exon, potential info for UTRs
-      my $exons = $transcripts->[0]->get_all_Exons;
-      if(scalar(@$exons) == 1){
-	$single++;
-      }
-
-      # keep only genes in the forward strand
-      if($exons->[0]->strand == 1){
-	push (@plus_transcripts, $transcripts->[0]);
-	next GENE;
-      }
-    }  # end of GENE
-
+	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	    
+	    # Don't skip genes with one exon, potential info for UTRs
+	    my $exons = $transcript->get_all_Exons;
+	    if(scalar(@$exons) == 1){
+		$single++;
+	    }
+	    
+	    # keep only genes in the forward strand
+	    if ($exons->[0]->strand == 1){
+		push (@plus_transcripts, $transcript );
+	    }
+	}
+    }
+    
     print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
     print STDERR "($single single exon genes NOT thrown away)\n";
 
     # process transcripts in the forward strand
-    #my $exon_adaptor = $self->db->get_ExonAdaptor;
+    
     if( scalar(@plus_transcripts) ){
 
       my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
       
       # make a genomewise runnable for each cluster of transcripts
-
-
       foreach my $tran (@transcripts){
-	#print STDERR "In EST_GeneBuilder, creating a Runnable::MiniGenomewise for\n";
-	#my $excount = 0;
-	#foreach my $exon ($tran->get_all_Exons){
-	#  $excount++;
-	#my @evi = $exon->get_all_supporting_features;
-	#  print STDERR "Exon: $excount, ".scalar(@evi)." features\t"
-	#    ."start: ".$exon->start." end: ".$exon->end."\n";
-	#  foreach my $evi (@evi){
-	#    print STDERR $evi." - ".$evi->gffstring."\n";
-	#  }
-	#}
-	
-	
-	# use MiniSeq
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic  => $slice,
-									    -analysis => $self->analysis,
-									   );
-	
-	$self->add_runnable($runnable,$strand);
-      	$runnable->add_Transcript($tran);
-	
-	#my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
-	#$runnable->seq($slice);
-	
+	  
+	  # use MiniSeq
+	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									      -genomic  => $slice,
+									      -analysis => $self->analysis,
+									      );
+	  
+	  $self->add_runnable($runnable,$strand);
+	  # we only have one transcript per runnable
+	  $runnable->add_Transcript($tran);
       }
-    }
+  }
     
     
     # minus strand - flip the vc and hope it copes ...
@@ -395,60 +321,47 @@ GENE:
     my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
     my @minus_transcripts;
     
-    print STDERR "Number of genes from ests  = " . scalar(@$revgenes) . "\n";
-
-    
     if ( $USE_cDNA_DB ){
-      my $cdna_revslice = $cdna_slice->invert;
-      my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
-      print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
-      push ( @$revgenes, @$cdna_revgenes ); 
+	my $cdna_revslice = $cdna_slice->invert;
+	my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
+	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
+	push ( @$revgenes, @$cdna_revgenes ); 
     }
     
-    if(!scalar(@$revgenes)){
-      $self->warn("No reverse strand genes found");
-    }
-
     $single=0;
   REVGENE:    
     foreach my $gene (@$revgenes) {
-      my @transcripts = @{$gene->get_all_Transcripts};
-      
-      # throw away genes with more than one transcript
-      if(scalar(@transcripts) > 1 ){
-	$self->warn(" gene with more than one transcript - skipping it\n");
-	next REVGENE;
-      }
-      
-      my @exons = @{$transcripts[0]->get_all_Exons};
-      
-      # DON'T throw away single-exon genes
-      if(scalar(@exons) == 1){
-	$single++;
-      }
-      
-      # these are really - strand, but the Slice is reversed, so they are relatively + strand
-      elsif($exons[0]->strand == 1){
-	push (@minus_transcripts, $transcripts[0]);
-	next REVGENE;
-      }
+	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	    
+	    my @exons = @{$transcript->get_all_Exons};
+	    
+	    # DON'T throw away single-exon genes
+	    if(scalar(@exons) == 1){
+		$single++;
+	    }
+	    
+	    # these are really - strand, but the Slice is reversed, so they are relatively + strand
+	    if( $exons[0]->strand == 1){
+		push (@minus_transcripts, $transcript);
+	    }
+	}
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
     print STDERR "($single single exon genes NOT thrown away)\n";
     
     if(scalar(@minus_transcripts)){
       
-      my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
-      
-      foreach my $tran (@transcripts) {
+	my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
 	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+	foreach my $tran (@transcripts) {
+	    
+	    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic  => $rev_slice,
-									    -analysis => $self->analysis,
-									   );
-	$self->add_runnable($runnable, $strand);
-	$runnable->add_Transcript($tran);
-      }
+										-analysis => $self->analysis,
+										);
+	    $self->add_runnable($runnable, $strand);
+	    $runnable->add_Transcript($tran);
+	}
     }
 }
 
@@ -555,6 +468,12 @@ sub _check_Transcripts {
       $slice = $self->revcomp_query;
   }
 
+  print STDERR "transcripts:\n";
+  foreach my $t (@$ref_transcripts){
+      print $t->dbID."\n";
+  }
+
+
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
       
@@ -581,7 +500,6 @@ sub _check_Transcripts {
 	  my $hstart;
 	  my $hend;
 	  #print STDERR " --- Exon $exon_count ---\n";
-	  print STDERR "strand = ".$exon->strand."\n";
 	  # get the supporting_evidence for each exon
 	  my @sf = sort { $a->hstart <=> $b->hstart } @{$exon->get_all_supporting_features};
 	  
@@ -1194,31 +1112,13 @@ sub run {
   my $genetype = $EST_GENOMEWISE_GENETYPE;
   
   # sort out analysis here or we will get into trouble with duplicate analyses
-  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
-  my $analysis_obj;
-  if(scalar(@analyses) > 1){
-    $self->throw("panic! > 1 analysis for $genetype\n");
-  }
-  elsif(scalar(@analyses) == 1){
-      $analysis_obj = $analyses[0];
-  }
-  else{
-      # make a new analysis object
-      $analysis_obj = new Bio::EnsEMBL::Analysis
-	(-db              => 'NULL',
-	 -db_version      => 1,
-	 -program         => $genetype,
-	 -program_version => 1,
-	 -gff_source      => $genetype,
-	 -gff_feature     => 'gene',
-	 -logic_name      => $genetype,
-	 -module          => 'EST_GeneBuilder',
-      );
+  my $analysis = $self->analysis;
+
+  unless ( $analysis ){
+      $self->throw("You need an analysis to run this");
   }
 
   $self->genetype($genetype);
-  $self->analysis($analysis_obj);
 
   print STDERR "Analysis is: ".$self->analysis->dbID."\n";
 
@@ -1272,45 +1172,24 @@ sub genetype {
   my ($self, $genetype) = @_;
 
   if(defined $genetype){
-    $self->{'_genetype'} = $genetype;
+    $self->{_genetype} = $genetype;
   }
 
-  return $self->{'_genetype'};
+  return $self->{_genetype};
 }
 
-# override method from RunnableDB.pm
+############################################################
 
 sub analysis {
   my ($self, $analysis) = @_;
 
   if(defined $analysis){
     $self->throw("$analysis is not a Bio::EnsEMBL::Analysis") unless $analysis->isa("Bio::EnsEMBL::Analysis");
-    $self->{'_analysis'} = $analysis;
+    $self->{_analysis} = $analysis;
   }
 
-  return $self->{'_analysis'};
+  return $self->{_analysis};
 }
-
-sub fetch_Analysis{
-  my ($self) = @_;
-  
-  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-  my $genetype = $EST_GENOMEWISE_GENETYPE;
-    
-  # sort out analysis here or we will get into trouble with duplicate analyses
-  my $ana_adaptor = $self->db->get_AnalysisAdaptor;
-print STDERR "Trying to make an analysis object for logic name $genetype\n";
-  my $analysis = $ana_adaptor->fetch_by_logic_name($genetype);
-
-  $self->analysis($analysis);
-
-print STDERR $analysis . "\n";
-  
-#  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
-  
- return $self->analysis;
-}
-
 
 ############################################
 ### convert genomewise output into genes ###
