@@ -1,5 +1,4 @@
-#!/usr/local/bin/perl
-
+#!/usr/local/ensembl/bin/perl -w
 
 =head1 NAME
 
@@ -23,23 +22,27 @@ use strict;
 use Getopt::Long;
 use Bio::SeqIO;
 
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-                                        EST_E2G_DBNAME
-                                        EST_E2G_DBUSER
-                                        EST_E2G_DBPASS
-                                        EST_E2G_DBHOST
-					EST_BLAT_GENOMIC
-					EST_BLAT_OPTIONS
-				       );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat qw (
+							 EST_DBNAME
+							 EST_DBUSER
+							 EST_DBPASS
+							 EST_DBHOST
+							 EST_BLAT_GENOMIC
+							 EST_BLAT_OPTIONS
+							 EST_REFDBNAME  
+							 EST_REFDBHOST
+							 EST_REFDBUSER
+							 EST_REFDBPASS
+							);
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 # this is the db where the resulting genes will be written
-my $dbname = $EST_E2G_DBNAME;
-my $dbuser = $EST_E2G_DBUSER;
-my $dbpass = $EST_E2G_DBPASS;
-my $host   = $EST_E2G_DBHOST;
+my $dbname = $EST_DBNAME;
+my $dbuser = $EST_DBUSER;
+my $dbpass = $EST_DBPASS;
+my $host   = $EST_DBHOST;
 
 
 my $runnable;
@@ -72,12 +75,21 @@ if ($check) {
 
 print STDERR "args: $host : $dbuser : $dbpass : $dbname\n";
 
+my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					       -host             => $EST_REFDBHOST,
+					       -user             => $EST_REFDBUSER,
+					       -dbname           => $EST_REFDBNAME,
+					       );
+
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    -host             => $host,
 					    -user             => $dbuser,
 					    -dbname           => $dbname,
 					    -pass             => $dbpass,
+					    -dnadb            =>  $dnadb,
 					   );
+
+
 
 my $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
 
@@ -107,7 +119,7 @@ my $runobj = "$runnable"->new(-db         => $db,
 			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
 			      -database   => $EST_BLAT_GENOMIC,
-			      -query_type => 'rna',
+			      -query_type => 'dna',
 			      -target_type=> 'dna',
 			      -options    => "$EST_BLAT_OPTIONS",
 			     );
@@ -115,9 +127,7 @@ my $runobj = "$runnable"->new(-db         => $db,
 $runobj->fetch_input;
 $runobj->run;
 
- 
-my @out = $runobj->output;
-
 if ($write) {
+  print STDERR "run_blat.pl : wrtting!\n";
   $runobj->write_output;
 }
