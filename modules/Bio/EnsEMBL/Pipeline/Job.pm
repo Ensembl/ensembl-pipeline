@@ -66,11 +66,12 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$lsfid,$input_id,$analysis,$stdout,$stderr,$input, $retry_count ) 
+    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count ) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				LSF_ID
 				INPUT_ID
+				CLASS
 				ANALYSIS
 				STDOUT
 				STDERR
@@ -80,6 +81,7 @@ sub new {
 
     $dbID    = -1 unless defined($dbID);
     $lsfid = -1 unless defined($lsfid);
+    $cls = 'contig' unless defined($cls);
 
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
@@ -90,6 +92,7 @@ sub new {
     $self->dbID         ($dbID);
     $self->adaptor  ($adaptor);
     $self->input_id   ($input_id);
+    $self->class   ($cls);
     $self->analysis   ($analysis);
     $self->stdout_file($stdout);
     $self->stderr_file($stderr);
@@ -113,14 +116,16 @@ sub new {
 =cut
 
 sub create_by_analysis_inputId {
-  my $class = shift;
+  my $dummy = shift;
   my $analysis = shift;
   my $inputId = shift;
+  my $class = shift;
 
   my $job = Bio::EnsEMBL::Pipeline::Job->new
-    ( -input_id => $inputId,
-      -analysis => $analysis,
-      -retry_count => 0 
+    ( -input_id    => $inputId,
+      -analysis    => $analysis,
+      -retry_count => 0,
+      -class       => $class
     );
   $job->make_filenames;
   return $job;
@@ -177,8 +182,8 @@ sub adaptor {
   Title   : input_id
   Usage   : $self->input_id($id)
   Function: Get/set method for the id of the input to the job
-  Returns : int
-  Args    : int
+  Returns : string
+  Args    : string
 
 =cut
 
@@ -192,13 +197,34 @@ sub input_id {
     return $self->{_input_id};
 }
 
+=head2 class
+
+  Title   : class
+  Usage   : $self->class($class)
+  Function: Get/set method for the class of the input ID
+            typically contig or clone
+  Returns : string
+  Args    : string
+
+=cut
+
+
+sub class {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_class} = $arg;
+    }
+    return $self->{_class};
+}
+
 =head2 analysis
 
   Title   : analysis
   Usage   : $self->analysis($anal);
   Function: Get/set method for the analysis object of the job
   Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : bio::EnsEMBL::Pipeline::Analysis
+  Args    : Bio::EnsEMBL::Pipeline::Analysis
 
 =cut
 
@@ -221,7 +247,7 @@ sub analysis {
   Usage   : $job->flush_runs( jobadaptor, [queue] );
   Function: Issue all jobs in the queue and empty the queue.
     Set LSF id in all jobs. Uses the given adaptor for connecting to
-    db. Uses first job in queue for stdout/stderr. 
+    db. Uses last job in queue for stdout/stderr. 
   Returns : 
   Args    : 
 
@@ -253,6 +279,11 @@ sub flush_runs {
   my $dbname   = $db->dbname;
 
   my ( $lsfid, $job, $stdout, $stderr );
+  my $nodes = $::pipeConf{'usenodes'} || undef;
+  # $nodes needs to be a space-delimited list
+  $nodes =~ s/,/ /;
+  $nodes =~ s/ +/ /;
+  # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
 
   my $runner = __FILE__;
   $runner =~ s:/[^/]*$:/runner.pl:; 	
@@ -273,10 +304,10 @@ sub flush_runs {
 
     my $cmd;
   
-   # $cmd = "bsub -mecsnodes -o ".$lastjob->stdout_file.
-    $cmd = "bsub -q ".$queue."  -o ".$lastjob->stdout_file.
-#    " -R osf1 ".
-    " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
+    $cmd = "bsub -o ".$lastjob->stdout_file;
+    $cmd .= " -m '$nodes' " if defined $nodes;
+    $cmd .= " -q $queue " if defined $queue;
+    $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
     $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
     
@@ -306,6 +337,7 @@ sub flush_runs {
           }
         }
 	$job->LSF_id( $lsfid );
+        # $job->create_lsflogfile;
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
         $adaptor->update( $job );
@@ -331,12 +363,13 @@ sub flush_runs {
 sub batch_runRemote {
   my $self = shift;
   my $queue = shift;
+  my $batchsize = $::pipeConf{'batchsize'};
   
   # should check job->analysis->runtime
   # and add it to batched_jobs_runtime
   # but for now just
   push( @{$batched_jobs{$queue}}, $self->dbID );
-  if ( scalar( @{$batched_jobs{$queue}} ) >= $::pipeConf{'batchsize'} ) {
+  if ( scalar( @{$batched_jobs{$queue}} ) >= $batchsize ) {
     $self->flush_runs( $self->adaptor, $queue );
   }
 }
@@ -403,6 +436,7 @@ sub runRemote {
   my $runner = __FILE__;
   $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
+#    " -q acarichunky " .
 #    " -R osf1 ".
     " -e ".$self->stderr_file." -E \"$runner -check\" ";
 
@@ -455,6 +489,8 @@ sub runInLSF {
   my $self = shift;
   my $module = $self->analysis->module;
   my $rdb;
+  my $err;
+  my $autoupdate = $::pipeConf{'autoupdate'};
   
 
   eval {
@@ -473,42 +509,63 @@ sub runInLSF {
 		-dbobj => $self->adaptor->db );
       }
   };
-  if ($@) {
-      print (STDERR "Lost the will to live Error : [$@]");
+  if ($err = $@) {
+      print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
-      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$@]\n");
-      return;
+      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
   }
   eval {   
       $self->set_status( "READING" );
       $rdb->fetch_input;
   };
-  if ($@) {
+  if ($err = $@) {
       $self->set_status( "FAILED" );
-      print (STDERR "Lost the will to live Error : [$@]");
-      $self->throw ("Problems with $module fetching input for " . $self->input_id . " [$@]\n");
-      return;
+      print (STDERR "READING: Lost the will to live Error\n");
+      die "Problems with $module fetching input for " . $self->input_id . " [$err]\n";
   }
   eval {
       $self->set_status( "RUNNING" );
       $rdb->run;
   };
-  if ($@) {
+  if ($err = $@) {
       $self->set_status( "FAILED" );
-      print (STDERR "Lost the will to live Error : [$@]");
-      $self->throw( "Problems running $module for " . $self->input_id . " [$@]\n");
-      return;
+      print (STDERR "RUNNING: Lost the will to live Error\n");
+      die "Problems running $module for " . $self->input_id . " [$err]\n";
   }
   eval {
       $self->set_status( "WRITING" );
       $rdb->write_output;
       $self->set_status( "SUCCESSFUL" );
   }; 
-  if( $@ ) {
+  if ($err = $@) {
       $self->set_status( "FAILED" );
-      print (STDERR "Lost the will to live Error : [$@]");
-      $self->throw( "Problems for $module writing output for " . $self->input_id . " [$@]") ;
-      return;
+      print (STDERR "WRITING: Lost the will to live Error\n");
+      die "Problems for $module writing output for " . $self->input_id . " [$err]" ;
+  }
+  if ($autoupdate) {
+    eval {
+      my $sic = $self->adaptor->db->get_StateInfoContainer;
+      $sic->store_inputId_class_analysis(
+        $self->input_id,
+        $self->class,
+        $self->analysis
+      );
+    };
+    if ($err = $@) {
+      print STDERR "Error updating successful job $self->dbID [$err]\n";
+    }
+    else {
+      print STDERR "Updated successful job $self->dbID\n";
+      eval {
+        $self->remove;
+      };
+      if ($err = $@) {
+         print STDERR "Error deleting job $self->dbID [$err]\n";
+      }
+      else {
+         print STDERR "Deleted job $self->dbID\n";
+      }
+    }
   }
 }
 
@@ -642,6 +699,7 @@ sub make_filenames {
   if( ! -e $dir ) {
     system( "mkdir $dir" );
   }
+
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
   $stub .= time().".".int(rand(1000));
@@ -654,6 +712,23 @@ sub make_filenames {
   $self->input_object_file($dir.$stub.".obj");
   $self->stdout_file($dir.$stub.".out");
   $self->stderr_file($dir.$stub.".err");
+}
+
+
+sub create_lsflogfile {
+  my ($self) = @_;
+  
+  my $num = int(rand(10));
+  my $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
+  if( ! -e $dir ) {
+    system( "mkdir $dir" );
+  }
+
+  my $stub = $self->LSF_id.".";
+  $stub .= time().".".int(rand(1000));
+
+  $self->LSF_out($dir.$stub.".out");
+  $self->LSF_err($dir.$stub.".err");
 }
 
 
@@ -745,7 +820,6 @@ sub stderr_file {
     return $self->{_stderr_file};
 }
 
-
 =head2 input_object_file
 
   Title   : input_object_file
@@ -780,6 +854,20 @@ sub LSF_id {
   (defined $arg) &&
     ( $self->{_lsfid} = $arg );
   $self->{_lsfid};
+}
+
+sub LSF_out {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{_lsfout} = $arg );
+  $self->{_lsfout};
+}
+
+sub LSF_err {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{_lsferr} = $arg );
+  $self->{_lsferr};
 }
 
 =head2 retry_count
