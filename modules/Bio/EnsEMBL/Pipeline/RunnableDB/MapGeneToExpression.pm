@@ -21,8 +21,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression
     $obj->fetch_input;
     $obj->run;
     my %expression_map = %{ $obj->output };
-    where @{ $expression_map{$transcript} } is an array of ests mapped to this transcript
-    transcript and est are here Bio::EnsEMBL::Transcript objects   
+    where @{ $expression_map{$transcript_id} } is an array of ests mapped to this transcript
+    ests are here Bio::EnsEMBL::Transcript objects   
 
     $obj->write_output;
 
@@ -60,6 +60,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::DBSQL::DBEntryAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 use Bio::EnsEMBL::DBEntry;
 
 
@@ -78,6 +79,10 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw(
 				       EST_TARGET_DBPASS      
 				       EST_TARGET_GENETYPE
 				       EST_GENEBUILDER_INPUT_GENETYPE
+				       EST_EXPRESSION_DBHOST
+				       EST_EXPRESSION_DBNAME
+				       EST_EXPRESSION_DBUSER
+				       EST_EXPRESSION_DBPASS
 				      );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -101,7 +106,8 @@ sub new{
 						      '-host'   => $EST_TARGET_DBHOST,
 						      '-user'   => $EST_TARGET_DBUSER,
 						      '-dbname' => $EST_TARGET_DBNAME,
-						      '-dnadb' => $refdb,
+						      '-pass'   => $EST_TARGET_DBPASS,
+						      '-dnadb'  => $refdb,
 						     );
   
 
@@ -112,7 +118,7 @@ sub new{
 						    '-host'   => $EST_E2G_DBHOST,
 						    '-user'   => $EST_E2G_DBUSER,
 						    '-dbname' => $EST_E2G_DBNAME,
-						    '-dnadb' => $refdb,
+						    '-dnadb'  => $refdb,
 						   ); 
     $self->dbobj($est_db);
   }
@@ -327,14 +333,15 @@ sub run{
       foreach my $est ( @ests ){
 	push ( @est_transcripts, $est->each_Transcript );
       }
-
+      
       foreach my $gene ( @genes ){
 	foreach my $transcript ( $gene->each_Transcript ){
+	 
 	  $self->_map_ESTs( $transcript, \@est_transcripts );
 	}
       }
     }
-     
+    
     # else we could have only ensembl genes
     elsif(  @genes && !@ests ){
       # we have nothing to modify them, hence we accept them...
@@ -352,6 +359,12 @@ sub run{
       next CLUSTER
     }
   } # end of CLUSTER
+
+  # before returning, check that we have written anything
+  unless( $self->expression_Map ){
+    exit(0);
+  }
+  return;
 }
 
 ############################################################
@@ -511,75 +524,252 @@ sub _get_end_of_Gene{
 
 sub _map_ESTs{
   my ($self,$transcript,$ests) = @_;
-  my @ests = @{ $ests };
-  if (  !( $ests[0]->isa('Bio::EnsEMBL::Transcript')) || !( $transcript->isa('Bio::EnsEMBL::Transcript')) ){
-    $self->throw('expecting only transcripts, you have est = $ests[0] and transcript = $transcript');
-  } 
-  
+  #if (  !( $ests[0]->isa('Bio::EnsEMBL::Transcript')) || !( $transcript->isa('Bio::EnsEMBL::Transcript')) ){
+  #  $self->throw('expecting only transcripts, you have est = $ests[0] and transcript = $transcript');
+  #} 
+
+  # get only the ests that are in the SANBI database
+  my @ests = $self->_in_SANBI( @{ $ests } );
+
+  # check this transcript first:
+  my $check = $self->_check_Transcript($transcript);
+  unless ($check){
+    return;
+  }
+
   # a map from gene to est
   my %expression_map;
   
   # a comparison tool
   my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
   
-  # find out everything about the transcript before starting to compare
-  my $translation = $transcript->translation;
-  my $id;
-  if ( $transcript->stable_id ){
-    $id = $transcript->stable_id;
-  }
-  elsif( $transcript->internal_id ){
-    $id = $transcript->internal_id;
-  }
-  unless( $translation ){
-    print STDERR "Need a translation for $transcript ( $id ), skipping it...\n";
-    return;
-  }
-  my $start = $translation->start;
-  my $end   = $translation->end;
-  my $start_exon = $translation->start_exon;
-  my $end_exon   = $translation->end_exon;
-
  EST:
   foreach my $est (@ests){
     
+    # check this transcript first:
+    unless ($self->_check_Transcript($est)){
+      next EST;
+    }
+
     # compare this est
     my $merge = $transcript_comparator->test_for_semiexact_Merge($transcript,$est);
+
     # (this method checks exact exon boundary matches but
     # allows mismatches at outer end of the 5' and 3' exons)
-    
+
+    # check 5' and 3' ends in case ESTs give an alternative transcription 
+    # start or alternative polyA site, respectively
+    if ($merge){
+      my $alt_start = $self->_check_5prime($transcript,$est);
+      my $alt_polyA = $self->_check_3prime($transcript,$est);
+      if ( $alt_start || $alt_polyA ){
+	$self->_print_Transcript($transcript);
+	$self->_print_Transcript($est);
+      }
+    }
+
+
     # if match, put est in $expression_map{ $transcript }
-    $self->expression_Map($transcript,$est);
-  
-    # test results:
-    my $t_id; 
-    if ( $transcript->stable_id ){
-      $t_id = $transcript->stable_id;
-    }
-    elsif( $transcript->internal_id ){
-      $t_id = $transcript->internal_id;
-    }
-    my @e_ids = $self->_find_est_id( $est);
-    foreach my $e_id ( @e_ids ){
-      print STDERR $t_id."\t".$e_id."\n";
+    if ($merge){
+      $self->expression_Map($transcript,$est);
+      
+      # test results:
+      my $t_id; 
+      if ( $transcript->stable_id ){
+	$t_id = $transcript->stable_id;
+      }
+      elsif( $transcript->dbID ){
+	$t_id = $transcript->dbID;
+      }
+      my $e_id = $self->_find_est_id( $est);
+      
+      print STDERR "mapped $t_id to $e_id\n";
+
+      #print STDERR $t_id."\t".$e_id."\n";
+      #$self->_print_Transcript($transcript);
+      #$self->_print_Transcript($est);
+      #print STDERR "\n";
     }
   }
 }
 
   
+
+#########################################################################
+
+sub _in_SANBI{
+  my ($self,@ests) = @_;
+  
+  # @ests are transcript objects
+  my %id_to_transcript;
+
+  my @est_ids;
+ EST:
+  foreach my $est ( @ests ){
+    my $est_id = $self->_find_est_id($est);
+    unless ($est_id){
+      #print STDERR "No accession found for ".$est->dbID."\n";
+      next EST;
+    }
+    #print STDERR "est: $est, est_id: $est_id\n";
+    if ( $est_id =~/(\S+)\.(\d+)/ ){
+      $est_id = $1;
+    }
+    push( @est_ids, $est_id );
+    $id_to_transcript{$est_id} = $est;
+  }
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      '-host'   => $EST_EXPRESSION_DBHOST,
+					      '-user'   => $EST_EXPRESSION_DBUSER,
+					      '-dbname' => $EST_EXPRESSION_DBNAME,
+					      '-pass'   => $EST_EXPRESSION_DBPASS,
+					     );
+
+  my $expression_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor($db);
+  my @pairs = $expression_adaptor->get_libraryId_by_estarray( @est_ids );
+  
+  my @found_ests;
+  foreach my $pair ( @pairs ){
+    if ( $$pair[1] ){
+      push ( @found_ests, $id_to_transcript{ $$pair[0] } );
+    }
+  }
+  return @found_ests;
+}
+
+
 #########################################################################
 
 sub expression_Map{
   my ($self,$transcript,$est) = @_;
   if ( $transcript ){
-    unless ( $self->{_est_map}{$transcript} ){
-      $self->{_est_map}->{$transcript} = [];
+    my $transcript_id;
+      if ($transcript->stable_id){
+	$transcript_id = $transcript->stable_id;
+      }
+      elsif( $transcript->dbID ){
+	$transcript_id = $transcript->dbID;
+      }
+    unless ( $self->{_est_map}{$transcript_id} ){
+      $self->{_est_map}->{$transcript_id} = [];
     }
     if ($est){
-      push ( @{  $self->{_est_map}->{$transcript} }, $est );
+      push ( @{  $self->{_est_map}->{$transcript_id} }, $est );
     }
   }
   return $self->{_est_map};
+}
+
+#########################################################################
+
+sub _check_5prime{
+  my ($self,$transcript,$est) = @_;
+  my $alt_start = 0;
+  
+  # first find out whether the transcript has 5' UTR
+  my $utr5;
+  eval{
+    $utr5 = $transcript->five_prime_utr;
+  };
+  unless( $utr5 ){
+    return 0;
+  }
+  
+  $transcript->sort;
+  $est->sort;
+  
+  my $start_exon = $transcript->start_exon;
+  #my $start_exon = $transcript->translation->start_exon;
+  my $strand     = $start_exon->strand;
+  foreach my $exon ( $transcript->get_all_Exons ){
+    my $est_exon_count = 0;
+    
+    foreach my $est_exon ( $est->get_all_Exons ){
+      $est_exon_count++;
+      if ( $exon == $start_exon ){
+	if ( $exon->overlaps( $est_exon ) ){
+	  if ($strand == 1){
+	    if ( $est_exon->start < $exon->start ){
+	      print STDERR "potential alternative transcription start in forward strand\n";
+	      $alt_start = 1;
+	    }
+	  }
+	  if ($strand == -1){
+	    if ( $est_exon->end > $exon->end ){
+	      print STDERR "potential alternative transcription start in reverse strand\n";
+	      $alt_start = 1;
+	    }
+	  }
+	  if ($est_exon_count > 1){
+	    print STDERR "There are more est exons upstream\n";
+	    if ( $alt_start == 1){
+	      return 1;
+	    }
+	  }
+	}
+      }
+    }
+  }
+  return 0;
+}
+
+
+#########################################################################
+
+sub _check_3prime{
+  my ($self,$transcript,$est) = @_;
+  my $alt_polyA = 0;
+  
+  # first find out whether the transcript has 5' UTR
+  my $utr3;
+  eval{
+    $utr3 = $transcript->three_prime_utr;
+  };
+  unless( $utr3 ){
+    return 0;
+  }
+  
+  $transcript->sort;
+  $est->sort;
+
+  my $end_exon = $transcript->end_exon;
+  #my $end_exon = $transcript->translation->end_exon;
+  my $strand   = $end_exon->strand;
+  
+  foreach my $exon ( $transcript->get_all_Exons ){
+    my $est_exon_count = 0;
+    my @est_exons = $est->get_all_Exons;
+    
+    foreach my $est_exon ( @est_exons ){
+      $est_exon_count++;
+      if ( $exon == $end_exon ){
+	if ( $exon->overlaps( $est_exon ) ){
+	  if ($strand == 1){
+	    if ( $est_exon->end > $exon->end ){
+	      print STDERR "potential alternative polyA site in forward strand\n";
+	      $alt_polyA = 1;
+	    }
+	  }
+	  if ($strand == -1){
+	    if ( $est_exon->start < $exon->start ){
+	      print STDERR "potential alternative polyA site in reverse strand\n";
+	      print STDERR "looking at : exon:".$exon->start."-".$exon->end." and est_exon:".$est_exon->start."-".$est_exon->end."\n";
+	      $alt_polyA = 1;
+	    }
+	  }
+	  if ($est_exon_count != scalar(@est_exons) ){
+	    print STDERR "There are more est exons downstream\n";
+	    print STDERR "est exon count = $est_exon_count, exons = ".scalar(@est_exons)."\n";
+	    
+	    if ( $alt_polyA ==1 ){
+	      return 1;
+	    }
+	  }
+	}
+      }
+    }
+  }
+  return 0;
 }
 
 #########################################################################
@@ -613,32 +803,24 @@ sub _transcript_length{
     return $genomic_extent;
 }
 
-######################################################################### 
+#########################################################################
 
-sub _print_Transcript{
-  my ($self,$transcript) = @_;
-  my @exons = $transcript->get_all_Exons;
-  my $id;
-  if ( $transcript->dbID ){
-    $id = $transcript->dbID;
+sub _check_Transcript{
+  my ($self,$tran) = @_;
+  
+  my @exons = $tran->get_all_Exons;
+  @exons = sort {$a->start <=> $b->start} @exons;
+  
+  for (my $i = 1; $i <= $#exons; $i++) {
+    
+    # check contig consistency
+    if ( !( $exons[$i-1]->seqname eq $exons[$i]->seqname ) ){
+      print STDERR "transcript ".$tran->dbID." (".$self->_find_est_id($tran).") is partly outside the contig, skipping it...\n";
+      return 0;
+    }
   }
-  else{
-    $id = "no id";
-  }
-  print STDERR "transcript id: ".$transcript->dbID." type: ".$self->_transcript_Type($transcript)."\n";
-  foreach my $exon ( @exons){
-    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
-  }
-  print STDERR "\n";
-  #print STDERR "Translation : ".$transcript->translation."\n";
-  print STDERR "translation start exon: ".
-    $transcript->translation->start_exon->start."-".$transcript->translation->start_exon->end.
-      " start: ".$transcript->translation->start."\n";
-  print STDERR "translation end exon: ".
-    $transcript->translation->end_exon->start."-".$transcript->translation->end_exon->end.
-      " end: ".$transcript->translation->end."\n";
+  return 1;
 }
-
 
 #########################################################################
 #
@@ -657,8 +839,6 @@ sub output{
 
 #########################################################################
 # get the est id throught the supporting evidence of the transcript
-# mind you, it is not usually the case, but we allow the bastards to
-# have mroe than one id
 
 sub _find_est_id{
   my ($self, $est) = @_;
@@ -669,9 +849,12 @@ sub _find_est_id{
     }
   }
   my @evidence = keys %is_evidence;
-  return @evidence;
+  unless ( $evidence[0] ){
+    print STDERR "No evidence for ".$est->dbID.", hmm... possible sticky single exon gene\n";
+  }
+  return $evidence[0];
 }
-    
+ 
 #########################################################################
 
 # we write the results in the Xref table in the est_db:
@@ -679,40 +862,44 @@ sub _find_est_id{
 sub write_output {
   my ($self) = @_;
   
-  my $db      = $self->est_db;
+  my $db            = $self->ensembl_db;
+  my $trans_adaptor = $db->get_TranscriptAdaptor;
   my $entry_adaptor = $db->get_DBEntryAdaptor();
-  my $est_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->est_db);
+  #my $est_adaptor   = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->est_db);
   
   # recall we have stored the results in self->expression_Map as push ( @{ $self->{_est_map}{$transcript} }, $est );
   my %expression_map = %{ $self->expression_Map };
+  
+  foreach my $transcript_id ( keys %expression_map ){
+    
+    my $transcript = $trans_adaptor->fetch_by_stable_id($transcript_id);
+    my $trans_dbID = $transcript->dbID;
+    foreach my $est ( @{ $expression_map{$transcript_id} }  ){
+      
+      my $est_id = $self->_find_est_id($est);
+      my $est_id_no_version;
+      if ( $est_id =~/(\S+)\.(\d+)/){
+	$est_id_no_version = $1;
+      }
+      else{
+	$est_id_no_version = $est_id;
+      }
 
-  foreach my $transcript ( keys %expression_map ){
-    foreach my $est ( @{ $expression_map{$transcript} }  ){
+      print STDERR "Storing pair $transcript_id, $est_id\n";
       
-      my $transcript_id;
-      if ($transcript->stable_id){
-	$transcript_id = $transcript->stable_id;
-      }
-      elsif( $transcript->internal_id ){
-	$transcript_id = $transcript->internal_id;
-      }
-      my @est_ids = $self->_find_est_id($est);
+      # need to find the est_id from est table for this est accession
+      #my $est_dbID = $est_adaptor->get_est_dbID_by_hid($est_id);
       
-      foreach my $est_id ( @est_ids ){
-	
-	# need to find the est_id from est table for this est accession
-	my $est_dbID = $est_adaptor->get_est_dbID_by_hid($est_id);
-	
-	my $dbentry = Bio::EnsEMBL::IdentityXref->new( -adaptor    => $entry_adaptor,
-						       -primary_id => $transcript_id,
-						       -display_id => $transcript_id,
-						       -version    => 1,
-						       -release    => 1,
-						       -dbname     => 'ensembl',
-						     );
-	
-	$entry_adaptor->store($dbentry,$est_dbID,"transcript");
-      }
+      my $dbentry = Bio::EnsEMBL::IdentityXref->new( -adaptor    => $entry_adaptor,
+						     -primary_id => $est_id,
+						     -display_id => $est_id_no_version,
+						     -version    => 1,
+						     -release    => 1,
+						     -dbname     => 'dbEST',
+						   );
+      
+      $dbentry->status('XREF');
+      $entry_adaptor->store($dbentry,$trans_dbID,"Transcript");
     }
   }
 }
@@ -720,6 +907,24 @@ sub write_output {
 
 ########################################################################
 
+sub _print_Transcript{
+  my ($self,$transcript) = @_;
+  my @exons = $transcript->get_all_Exons;
+  my $id;
+  if ( $transcript->stable_id ){
+    $id = $transcript->stable_id;
+  }
+  else{
+    $id = $transcript->dbID;
+  }
+  my $evidence = $self->_find_est_id($transcript);
+  print STDERR "$id ($evidence)\n";
+  foreach my $exon ( @exons){
+    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
+  }
+  print STDERR "\n";
+}
 
+#########################################################################
 
 1;
