@@ -303,9 +303,9 @@ GENE:
 
       foreach my $tran (@transcripts){
 	
-	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-	      						    -genomic => $contig->primary_seq,
-      								   );
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									    -genomic => $contig->primary_seq,
+									   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable,$strand);
@@ -485,6 +485,8 @@ sub _check_Transcripts {
     
   EXON:
     foreach my $exon (@exons){
+
+      # we don't really want to neglect any exon at this point
       my $hstart;
       my $hend;
       #print STDERR " --- Exon $exon_count ---\n";
@@ -508,7 +510,6 @@ sub _check_Transcripts {
 	next TRANSCRIPT;
       }
 
-
       # get the supporting_evidence for each exon
       $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
@@ -518,114 +519,91 @@ sub _check_Transcripts {
       if ( scalar( @sf ) == 0 ){
 	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
 		    "exon_id =".$exon->dbID."\n");
-	#next EXON;
       }
 
-## short-cut added ##
-
-    }
-    # if the transcript made it to this point, keep it
-    push (@alltranscripts, $transcript);
-  }
-  return @alltranscripts;
-
-}
+######## some of the checks are commented out, as we didn't need to use them any longer
 
 
-##################### here below follows some previous checks that were not necessary
-
-=head2
-
-      
-#      ## print out all the info ##
-#      print STDERR "exon_id: ".$exon->dbID."\n";
-#      print STDERR "contig: ".$exon->contig->internal_id." start: ".$exon->start." end: ".$exon->end.
-#                   " exon length: ".$exon->length."\n";
-#      print STDERR "supporting evidence:\n";
-#      foreach my $f (@sf){
-#	print STDERR $f->hseqname." score: ".$f->score." hstart: ".$f->hstart." hend: ".$f->hend.
-#	  " seq_start: ".$f->start." seq_end: ".$f->end."\n";
-#      }
-            
-####### check consitency of supporting evidence
-      my $total_length;
-      my $numerator;
-      my $total_evidence_length;
-      my $gap  = 0;
-      my $total_hgap   = 0;
-      my $exon_length  = $exon->length;
-      my $feature_count = 0;
+######## check consitency of supporting evidence
+#      my $total_length;
+#      my $numerator;
+#      my $total_evidence_length;
+#      my $gap  = 0;
+#      my $total_hgap   = 0;
+#      my $exon_length  = $exon->length;
+#      my $feature_count = 0;
     
-    EVIDENCE:
-      foreach my $feature ( @sf ) {
-	$feature_count++;
+#    EVIDENCE:
+#      foreach my $feature ( @sf ) {
+#	$feature_count++;
 
-	# because we get all the supporting features indiscriminately...
-	next EVIDENCE unless $feature->source_tag eq $evidence_tag;
+#	# because we get all the supporting features indiscriminately...
+#	next EVIDENCE unless $feature->source_tag eq $evidence_tag;
 	
-	# this might sound weird, but sometimes features are repeated, don't know yet why
-	if ( $feature_count != $#sf+1 ){
-	  if ( $sf[$feature_count]->hstart == $feature->hstart &&
-	       $sf[$feature_count]->hend   == $feature->hend ){
-	    #print STDERR "feature is repeated!, skipping it\n";
-	    next EVIDENCE;
-	  }
-	}
-	# check that all exons have the same feature
-	if(!defined $hid) { 
-	  $hid = $feature->hseqname; 
-	}
-	if($hid ne $feature->hseqname){
-	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
-	  next TRANSCRIPT;
-	}
+#	# this might sound weird, but sometimes features are repeated, don't know yet why
+#	if ( $feature_count != $#sf+1 ){
+#	  if ( $sf[$feature_count]->hstart == $feature->hstart &&
+#	       $sf[$feature_count]->hend   == $feature->hend ){
+#	    #print STDERR "feature is repeated!, skipping it\n";
+#	    next EVIDENCE;
+#	  }
+#	}
+#	# check that all exons have the same feature
+#	if(!defined $hid) { 
+#	  $hid = $feature->hseqname; 
+#	}
+#	if($hid ne $feature->hseqname){
+#	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
+#	  next TRANSCRIPT;
+#	}
 	
-######### calculate percentage identity with respect to the alignment length
-	#
-	#  ESTs -->   ACGTACGT-ACGT --> 3 EST pieces
-	#  exon -->   ACG-ACGTGACGT
-	#             ^^^ ^^^^ ^^^^--> evidence_length
-	#  alignment length = evidence_length + gaps
-	#
+########## calculate percentage identity with respect to the alignment length
+#	#
+#	#  ESTs -->   ACGTACGT-ACGT --> 3 EST pieces
+#	#  exon -->   ACG-ACGTGACGT
+#	#             ^^^ ^^^^ ^^^^--> evidence_length
+#	#  alignment length = evidence_length + gaps
+#	#
 	
-	my $length              = $feature->end - $feature->start + 1;
-	my $score               = $feature->score;
-	my $hgap                = 0;
-	$numerator             += $length * $score;
-	$total_evidence_length += $length;
+#	my $length              = $feature->end - $feature->start + 1;
+#	my $score               = $feature->score;
+#	my $hgap                = 0;
+#	$numerator             += $length * $score;
+#	$total_evidence_length += $length;
 
-	if ( $feature_count != $#sf+1 ){
-	  if ( $sf[$feature_count]->hstart > $feature->hend ){
-	    $hgap = $sf[$feature_count]->hstart - $feature->hend - 1;
-	  }
-	  elsif 
-	    ( $sf[$feature_count]->hstart <= $feature->hend && !($sf[$feature_count]->overlaps($feature))){
-	    $hgap = $feature->hstart - $sf[$feature_count]->hend-1;
-	  }
-	  else{
-	    $hgap = 0;
-	  }
-	  if ( $sf[$feature_count]->overlaps( $feature )){
-	    print STDERR "features are overlapping!\n";
-	  }
-	  $total_hgap   += $hgap;
-	}
+#	if ( $feature_count != $#sf+1 ){
+#	  if ( $sf[$feature_count]->hstart > $feature->hend ){
+#	    $hgap = $sf[$feature_count]->hstart - $feature->hend - 1;
+#	  }
+#	  elsif 
+#	    ( $sf[$feature_count]->hstart <= $feature->hend && !($sf[$feature_count]->overlaps($feature))){
+#	    $hgap = $feature->hstart - $sf[$feature_count]->hend-1;
+#	  }
+#	  else{
+#	    $hgap = 0;
+#	  }
+#	  if ( $sf[$feature_count]->overlaps( $feature )){
+#	    print STDERR "features are overlapping!\n";
+#	  }
+#	  $total_hgap   += $hgap;
+#	}
 	      
-      } # end of EVIDENCE 
+#      } # end of EVIDENCE 
 
-###### calculate alignment length and the similarity score (exon_score)
+
+####### calculate alignment length and the similarity score (exon_score)
 	
-      $gap           = $exon_length - $total_evidence_length;
-      $total_length  = $total_evidence_length + $gap + $total_hgap;
-      my $exon_score = $numerator / $total_length;
+#      $gap           = $exon_length - $total_evidence_length;
+#      $total_length  = $total_evidence_length + $gap + $total_hgap;
+#      my $exon_score = $numerator / $total_length;
       
-      # round it up
-      my $number   = 100 * $exon_score;
-      my $decimals = $number % 100;
-      my $addition = int( $decimals / 50 );  # gives 1 ( or 0 ) if $decimals > ( or < ) 50
-      $exon_score  = int( $exon_score ) + $addition;
+#      # round it up
+#      my $number   = 100 * $exon_score;
+#      my $decimals = $number % 100;
+#      my $addition = int( $decimals / 50 );  # gives 1 ( or 0 ) if $decimals > ( or < ) 50
+#      $exon_score  = int( $exon_score ) + $addition;
       
-      # reject EXONS with perc_identity below $min_similarity = $EST_MIN_EVIDENCE_SIMILARITY
+#      # reject EXONS with perc_identity below $min_similarity = $EST_MIN_EVIDENCE_SIMILARITY
 #      if ($min_similarity > $exon_score ){
 #	print STDERR "rejecting Exon due to low percentage identity = $exon_score\n";
 #	$rejected++;
@@ -640,9 +618,11 @@ sub _check_Transcripts {
 #	next EXON;
 #      }
 #      else{
-	push (@accepted_exons, $exon);
+#	push (@accepted_exons, $exon);
 #      }
  
+
+
 ####### alternatively we can get the percentage identity from the feature table (VERY SLOW)
 
 #      # get the percentage identity for the est_hit on this exon from the feature table
@@ -665,69 +645,76 @@ sub _check_Transcripts {
 #	}
 #      }
 
-      
+
+
 ####### check the gap with the evidence of the next exon
-      # if the ESTs are of good quality, this should not reject any
-      if ( $exon_count != $#exons ){
-	my $est_gap = 0;
-	my $exon2 = $exons[$exon_count+1];
+#      # if the ESTs are of good quality, this should not reject any
+#      if ( $exon_count != $#exons ){
+#	my $est_gap = 0;
+#	my $exon2 = $exons[$exon_count+1];
 	
-	$exon_adaptor->fetch_evidence_by_Exon( $exon2 );
-	my @nonsorted_sf2 = $exon2->each_Supporting_Feature; 
-	my @sf2 = sort { $a->hstart <=> $b->hend } @nonsorted_sf2;
+#	$exon_adaptor->fetch_evidence_by_Exon( $exon2 );
+#	my @nonsorted_sf2 = $exon2->each_Supporting_Feature; 
+#	my @sf2 = sort { $a->hstart <=> $b->hend } @nonsorted_sf2;
 
-	if ( scalar( @sf2 ) != 0 ){
+#	if ( scalar( @sf2 ) != 0 ){
 
-	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
-	  if ( $sf[0]->hstart < $sf2[0]->hstart ){
-	    $est_gap = abs( $sf2[0]->hstart  - $sf[$#sf]->hend );
-	  }
-	  # if hstart decreases that means that the EST runs in the opposite direction
-	  elsif (  $sf[0]->hstart > $sf2[0]->hstart ){
-	    $est_gap = abs( $sf[0]->hstart - $sf2[$#sf2]->hend);
-	  }
-	  # else, same EST piece is hitting two exons, not good!
-	  else{
-	    $self->warn( "same bit of evidence is hitting two exons!\n");
-	  }
+#	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
+#	  if ( $sf[0]->hstart < $sf2[0]->hstart ){
+#	    $est_gap = abs( $sf2[0]->hstart  - $sf[$#sf]->hend );
+#	  }
+#	  # if hstart decreases that means that the EST runs in the opposite direction
+#	  elsif (  $sf[0]->hstart > $sf2[0]->hstart ){
+#	    $est_gap = abs( $sf[0]->hstart - $sf2[$#sf2]->hend);
+#	  }
+#	  # else, same EST piece is hitting two exons, not good!
+#	  else{
+#	    $self->warn( "same bit of evidence is hitting two exons!\n");
+#	  }
 	  
-	  # skip EXONS that have too large gaps in the EST hit
-	  if ( $est_gap > $max_est_gap ){
-	    print STDERR "EST with too large gaps skipping it\n";
-	    next TRANSCRIPT;
-	  }
-	}
-      }
-      
-    $exon_count++;
-    
-    }  # end of EXON
+#	  # skip EXONS that have too large gaps in the EST hit
+#	  if ( $est_gap > $max_est_gap ){
+#	    print STDERR "EST with too large gaps skipping it\n";
+#	    next TRANSCRIPT;
+#	  }
+#	}
+#      }
+#       $exon_count++;
+     
 
-    # put the accepted exons into this transcript
-    $transcript->flush_Exon;
-    foreach my $exon (@accepted_exons){
-      $transcript->add_Exon($exon);
-    }
+    } # end of EXON
 
-    push(@allexons, @accepted_exons);
+
+#    # put the accepted exons into this transcript
+#    $transcript->flush_Exon;
+#    foreach my $exon (@accepted_exons){
+#      $transcript->add_Exon($exon);
+#    }
+
+#    push(@allexons, @accepted_exons);
     
-    # finally check the one-to-one correspondance between ESTs and input_transcripts
-    if(defined $hid && defined $hid_trans{$hid}) { 
-      $self->warn("$hid is being used by more than one transcript!\n"); 
-    }
-    # we hold which transcript is associated with each hit
-    $hid_trans{$hid} = $transcript;
+#    # finally check the one-to-one correspondance between ESTs and input_transcripts
+#    if(defined $hid && defined $hid_trans{$hid}) { 
+#      $self->warn("$hid is being used by more than one transcript!\n"); 
+#    }
+#    # we hold which transcript is associated with each hit
+#    $hid_trans{$hid} = $transcript;
+
+#    # if the transcript made it to this point, keep it
+#    push (@alltranscripts, $transcript);
+#  }
+#  print STDERR $total_rejected." exons rejected due to low similarity score\n";
+
+
+## short-cut added ##
+
 
     # if the transcript made it to this point, keep it
     push (@alltranscripts, $transcript);
   }
-  print STDERR $total_rejected." exons rejected due to low similarity score\n";
-
   return @alltranscripts;
+
 }
-
-=cut
-
 
 ############################################################
 
@@ -1001,37 +988,102 @@ sub _merge_Transcripts{
  
     # at this point we have $created_transcripts{u=0,1,...,$#transcripts} transcripts
     
-    # now we go through them to check for possible merges
+    # first of all, sort them again
+    my @created_transcripts = values ( %created_transcripts );
+    
+#    # print created transcripts
+#    @created_transcripts  = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
+#				     if ($result){
+#				       return $result;
+#				     }
+#				     else{
+#				       return ( $a->start_exon->start <=> $b->start_exon->start );
+#				     }
+#				   } @created_transcripts; 
 
-    # first of all, sort them again, this is CRUCIAL!!!
-    my @created_transcripts = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
+#    print STDERR "\ntranscripts created:\n";
+#    for (my $u=0; $u<scalar(@transcripts); $u++){
+#      print STDERR "tran ".$created_transcripts{$u}.":";
+#      foreach my $e1 ( $created_transcripts{$u}->get_all_Exons ){
+#	print STDERR $e1->start.":".$e1->end."\t";
+#      }
+#      print STDERR "\nFrom the following ones:\n";
+      
+#      foreach my $tran ( @{ $chosen_list{$u} } ){
+#	print STDERR "   tran ".$tran.":";
+#	foreach my $e1 ( $tran->get_all_Exons ){
+#	  print STDERR $e1->start.":".$e1->end."\t";
+#	}
+#	print STDERR "\n";
+#      }
+#    }
+
+    # we process again the transcripts for possible residual merges
+    my @merged_transcripts = $self->_check_for_residual_Merge(\@created_transcripts,$strand);
+
+    # We put here yet another check, to make sure that we really get rid of redundant things
+    
+    # if we have produce more than one transcript, check again
+    my @merged_transcripts2;
+    if ( scalar( @merged_transcripts ) > 1 ){
+      @merged_transcripts2 = $self->_check_for_residual_Merge(\@merged_transcripts,$strand);
+    } 
+    
+    # check for the single exon transcripts ( dandruff ), they are no good
+    my @final_merged_transcripts;
+    foreach my $tran ( @merged_transcripts2 ){
+      if ( scalar ( $tran->get_all_Exons ) == 1 ){
+	next;
+      }
+      else{
+	push( @final_merged_transcripts, $tran );
+      }
+    }
+    
+    # keep track of everything it is created for every cluster
+    push (@total_merged_transcripts, @final_merged_transcripts);
+    
+    # empty arrays to save memory
+    @merged_transcripts       = ();
+    @merged_transcripts2      = ();
+    @final_merged_transcripts = ();
+    
+  }     # end of CLUSTER		       
+		       
+  return @total_merged_transcripts;
+		      
+}
+
+#########################################################################
+
+=head2
+
+ Title   : _check_for_residual_Merge
+ Function: this function is called from _merge_Transcripts and checks whether after merging the transcript
+           there is any residual merge
+ Returns : It returns two numbers ($merge,$overlaps), where
+           $merge = 1 (0) when they do (do not) merge,
+           and $overlaps is the number of exon-overlaps.
+
+=cut
+
+sub _check_for_residual_Merge{
+
+   my ($self, $created_tran_ref, $strand) = @_;
+   my @created_transcripts = @$created_tran_ref;
+
+   # first of all, sort them again, this is CRUCIAL!!!
+   @created_transcripts = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
 				     if ($result){
 				       return $result;
 				     }
 				     else{
 				       return ( $a->start_exon->start <=> $b->start_exon->start );
 				     }
-				   } values ( %created_transcripts );
+				   } @created_transcripts;
     
-    # print created transcripts
-    print STDERR "\ntranscripts created:\n";
-    for (my $u=0; $u<scalar(@transcripts); $u++){
-      print STDERR "tran ".$created_transcripts{$u}.":";
-      foreach my $e1 ( $created_transcripts{$u}->get_all_Exons ){
-	print STDERR $e1->start.":".$e1->end."\t";
-      }
-      print STDERR "\nFrom the following ones:\n";
-      
-      foreach my $tran ( @{ $chosen_list{$u} } ){
-	print STDERR "   tran ".$tran.":";
-	foreach my $e1 ( $tran->get_all_Exons ){
-	  print STDERR $e1->start.":".$e1->end."\t";
-	}
-	print STDERR "\n";
-      }
-    }
 
-    # we process again the transcripts, the results go in this hash
+    # we process the transcripts, the results go in this hash
     my %new_transcripts;
     my $max_label = 0;
     my @labels;
@@ -1084,7 +1136,7 @@ sub _merge_Transcripts{
       if ($found == 0) {
 	$max_label = $label;
 	push ( @labels, $label);
-	print STDERR "*** LABEL: $label ***\n";
+	#print STDERR "*** LABEL: $label ***\n";
 	$new_transcripts{ $label } = $tran;
       }    
     
@@ -1093,7 +1145,7 @@ sub _merge_Transcripts{
     my @merged_transcripts = values( %new_transcripts );
 
     ### print out the results
-    print STDERR "2nd round, transcripts created:\n";
+    print STDERR "Transcripts created:\n";
     foreach my $tran ( @merged_transcripts ){
       print STDERR "tran ".$tran.":";
       foreach my $e1 ( $tran->get_all_Exons ){
@@ -1102,119 +1154,10 @@ sub _merge_Transcripts{
       print STDERR "\n";
     }
 
-    # Put here yet another check, to make sure that we really get rid of redundant things
-    # it could be just another copy of the previous check above
-
-    # if we have produce more than one transcript, check again
-    if ( scalar( @merged_transcripts ) > 1 ){
-      
-      # first of all, sort them again, this is CRUCIAL!!!
-      my @created_transcripts2 = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
-					if ($result){
-					  return $result;
-					}
-					else{
-					  return ( $a->start_exon->start <=> $b->start_exon->start );
-					}
-				      } @merged_transcripts;
-      
-      # we process again the transcripts, the results go in this hash
-      my %new_transcripts2;
-      my $max_label2 = 0;
-      my @labels2 = ();
-      
-      # for each created transcript
-    TRAN2: 
-      foreach my $tran (@created_transcripts2){
-	my $found = 0;
-	my $label2 = 0;
-	
-	# loop over the existing new_transcripts
-      NEW_TRAN2: 
-	foreach my $k ( @labels2 ){
-	  
-	  # take each new_transcript
-	  my $new_tran2 = $new_transcripts2{ $k };
-	  
-	  # test for merge
-	  print STDERR "comparing\n";
-	  print STDERR $new_tran2.":";
-	  foreach my $e1 ( $new_tran2->get_all_Exons ){
-	    print STDERR $e1->start.":".$e1->end."\t";
-	  }
-	  print STDERR "\n".$tran.":";
-	  foreach my $e1 ( $tran->get_all_Exons ){
-	    print STDERR $e1->start.":".$e1->end."\t";
-	  }
-	  print STDERR "\n";
-	  
-	  my ($merge,$overlaps) = $self->_test_for_Merge( $new_tran2, $tran );
-	  
-	  # if they can merge, merge them and put the new transcript in this place 
-	  if ( $merge == 1 ){
-	    $found = 1;
-	    my @list = ( $new_tran2, $tran );
-	    print STDERR "They MERGE,\n";
-	    print STDERR "adding it to new_transcripts[ $label2 ] = $new_transcripts{ $label2 }\n";
-	    my $new_transcript2 = $self->_produce_Transcript( \@list, $strand );
-	    $new_transcripts2{ $label2 } = $new_transcript2;
-	    print STDERR "producing a new  new_transcripts[ $label2 ] = $new_transcripts2{ $label2 }\n\n";
-	    next TRAN2;
-	  }
-	  else{
-	    # go to the next cluster
-	    $label2++;
-	  }
-	} # end of NEW_TRAN2
-	
-	# if it does not merge to any transcript, create a new new_tran
-	if ($found == 0) {
-	  $max_label2 = $label2;
-	  push ( @labels2, $label2);
-	  print STDERR "*** LABEL: $label2 ***\n";
-	  $new_transcripts2{ $label2 } = $tran;
-	}    
-	
-      }   # end of TRAN
-      
-      @merged_transcripts = ();
-      @merged_transcripts = values( %new_transcripts2 );
-      
-      ### print out the results
-      print STDERR "3rd round, transcripts created:\n";
-      foreach my $tran ( @merged_transcripts ){
-	print STDERR "tran ".$tran.":";
-	foreach my $e1 ( $tran->get_all_Exons ){
-	  print STDERR $e1->start.":".$e1->end."\t";
-	}
-	print STDERR "\n";
-      }
-      
-    } # END OF THE IF SCALAR (@MERGED_TRANSCRIPTS) > 1
-    
-    
-    # check for the single exon transcripts ( dandruff ), they are no good
-    my @final_merged_transcripts;
-    foreach my $tran ( @merged_transcripts ){
-      if ( scalar ( $tran->get_all_Exons ) == 1 ){
-	next;
-      }
-      else{
-	push( @final_merged_transcripts, $tran );
-      }
-    }
-    
-    # empty array to save memory
-    @merged_transcripts = ();
-    
-    # keep track of everything it is created for every cluster
-    push (@total_merged_transcripts, @final_merged_transcripts);
-    
-  }     # end of CLUSTER		       
-		       
-  return @total_merged_transcripts;
-		      
+  return @merged_transcripts;
 }
+
+
 
 #########################################################################
 
@@ -1678,18 +1621,18 @@ CLUSTER:
       $new_end = $cluster->end;  
     }
     
-    print STDERR "new_start: $new_start\n";
-    print STDERR "start array:\n";
-    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
-      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
-    }
-    print STDERR "\n";
-    print STDERR "new_end: $new_end\n";
-    print STDERR "end array:\n";
-    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
-      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
-    }
-    print STDERR "\n";
+#    print STDERR "new_start: $new_start\n";
+#    print STDERR "start array:\n";
+#    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
+#      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
+#    }
+#    print STDERR "\n";
+#    print STDERR "new_end: $new_end\n";
+#    print STDERR "end array:\n";
+#    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
+#      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
+#    }
+#    print STDERR "\n";
 
 
     ######  if new_start> new_end change them in turns until we get start < end ######
@@ -1698,7 +1641,7 @@ CLUSTER:
     my $trouble     = 0;
 
     while ( $other_start >= $other_end ){
-      print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+ #     print STDERR "*** Trouble: $new_start >= $new_end ***\n";
       $trouble = 1;
 
       # take the next one
@@ -1712,11 +1655,11 @@ CLUSTER:
       if ($other_end && $other_start){
 	$new_start = $other_start;
 	$new_end   = $other_end;
-	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+#	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
       }
       else{
 	# ok, you tried to change, but you got nothing, what can we do about it?
-	print STDERR "Could not reset the start and end coordinates\n";
+#	print STDERR "Could not reset the start and end coordinates\n";
       }
     }
 
@@ -1909,7 +1852,7 @@ sub _check_splice_Sites{
   # U12 spliceosome
   print STDERR "upstream   ( of an exon ) U12-splice-sites AC: ".$upstream_AC. 
     " out of ".($site_count)." splice-sites, percentage: $prec_upstream_AC\n";
-  print STDERR "downstream ( of an exon ) U12-splice-sites GT: ".$downstream_AT. 
+  print STDERR "downstream ( of an exon ) U12-splice-sites AT: ".$downstream_AT. 
     " out of ".($site_count)." splice-sites, percentage: $perc_downstream_AT\n\n";
 
   # eventually, we may modify start/end of exons according to these checks
@@ -2095,7 +2038,6 @@ sub run {
   }
   print STDERR $tcount2." transcripts run in genomewise (-smell 8) in the reverse strand\n";
 
-
 }
 
 ###################################################################
@@ -2157,31 +2099,14 @@ sub make_genes {
     $contig = $contig->invert;
   }
 
-  # transcripts come with a translation, that's sorted out in MiniGenomwise and Genomewise
+  # transcripts come with a translation, that's sorted out in MiniGenomewise and Genomewise
   my @trans = $runnable->output;
   
+ TRANSCRIPT:
   foreach my $transcript (@trans) {
-  
-#   ##test
-#    print STDERR "\nIn EST_GeneBuilder.make_genes\n";
-#    print STDERR " Transcript        : ".$transcript." strand ".$transcript->start_exon->strand."\n";
-#    my $ecount=1;
-#    foreach my $exon ( $transcript->get_all_Exons ){
-#      print STDERR "Exon $ecount: ".$exon->start.":".$exon->end."  ";
-#      $ecount++;
-#    }
-#    print STDERR "\n\n";
-
-#    print STDERR " Translation       : ".$transcript->translation."\n";
-#    print STDERR " translation starts: ".$transcript->translation->start."\n";
-#    print STDERR " translation ends  : ".$transcript->translation->end."\n";
-#    print STDERR " start exon: ".$transcript->translation->start_exon
-#      ." starts: ".$transcript->translation->start_exon->start
-#      ." ends: ".$transcript->translation->start_exon->end."\n";
-#    print STDERR " end  exon : ".$transcript->translation->end_exon
-#      ." starts: ".$transcript->translation->end_exon->start
-#      ." ends: ".$transcript->translation->end_exon->end."\n";
     $count++;
+
+    # create a new gene object out of this transcript
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
     $gene->temporary_id($contig->id . ".$genetype.$count");
@@ -2196,8 +2121,17 @@ sub make_genes {
     my $excount = 1;
     my @exons = $transcript->get_all_Exons;
 
+    # at this point, only accepts transcripts with more than one exon
+    # although we have checked this already, genomewise sometimes bridges 
+    # over introns making one exon out of two
+    if ( scalar(@exons) == 1 ){
+      print STDERR "Rejected a single-exon transcript\n";
+      next TRANSCRIPT;
+    }
+    
+  EXON:
     foreach my $exon(@exons){
-
+      
       #print STDERR "  Exon ".$excount." : ".$exon."  start: ".$exon->start." end: ".$exon->end."\n";
       $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
@@ -2213,7 +2147,7 @@ sub make_genes {
     my $translation = $transcript->translation;
     $translation->temporary_id($contig->id . ".$genetype.$count");
   
-    # check that it translates ( get a Bio::Seq ) and how long it is:
+    # store only genes that translate ( to check it, we the Bio::Seq )
     my $sequence = $transcript->translate;
     unless ( $sequence ){
       print STDERR "TRANSCRIPT WITHOUT A TRANSLATION!!\n";
@@ -2253,7 +2187,7 @@ sub make_genes {
       print STDERR "\n";
 
     }
-  }
+  } # end of TRANSCRIPT
 
   return @genes;
   
@@ -2279,34 +2213,11 @@ sub remap_genes {
     $contig = $contig->invert;
   }
 
-  #print STDERR "genes before remap: " . scalar(@$genes) . "\n";
-  
   my @newf;
   my $trancount=1;
   foreach my $gene (@$genes) {
     #test2
     my @trans = $gene->each_Transcript;
-
-# test
-#    
-#foreach my $tran (@trans){
-#      print STDERR "In EST_GeneBuilder.remap_genes: \n";
-#      print STDERR "  transcript        : ".$tran."\n";
-#      print STDERR "  strand            : ".$tran->start_exon->strand."\n";
-#      print STDERR "  translation       : ".$tran->translation."\n";
-#      print STDERR "  translation starts: ".$tran->translation->start."\n";
-#      print STDERR "  translation ends  : ".$tran->translation->end."\n";
-#      print STDERR "  start exon        : ".$tran->translation->start_exon
-#                  ."\tstart: ".$tran->translation->start_exon->start."\tends: "
-#		  .$tran->translation->start_exon->end."\n";
-#      print STDERR "  end  exon         : ".$tran->translation->end_exon
-#	          ."\tstart: ".$tran->translation->end_exon->start."\tends: "
-#		  .$tran->translation->end_exon->end."\n";
-#      print STDERR "  temporary_id      : ".$tran->translation->temporary_id."\n";
-#   }
-
-
-    
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
       # need to explicitly add back genetype and analysis.
@@ -2319,9 +2230,7 @@ sub remap_genes {
     if ($@) {
       print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
     }
-    
-  }
-  
+  } 
   return @newf
 }
 
