@@ -66,7 +66,7 @@ use vars qw(@ISA);
                            -INPUT_ID    => $id,
                            -SEQFETCHER  => $sf,
 			   -ANALYSIS    => $analysis);
-                           
+
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB object
     Args    :   -db:         A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
@@ -77,18 +77,12 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    
+
     my $self = {};
     bless $self, $class;
- 
-    my ($db,$input_id, $seqfetcher, $analysis, $parameters) = $self->_rearrange([qw(DB
-					    INPUT_ID
-					    SEQFETCHER 
-					    ANALYSIS 
-                                            PARAMETERS)], 
-				        @args);
 
-
+    my ($db,$input_id, $seqfetcher, $analysis, $parameters) = 
+    $self->_rearrange([qw(DB INPUT_ID	SEQFETCHER ANALYSIS PARAMETERS)],@args);
 
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
@@ -98,20 +92,22 @@ sub new {
 
     if($parameters && (!$db || !$analysis)){
       $self->job_parameters($parameters);
-      my ($host, $user, $pass, $dbname, $logic_name) = split /:/, $parameters;
+      my ($host, $port, $user, $pass, $dbname, $logic_name) = 
+        split /:/, $parameters;
       $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,
 					       -user => $user,
 					       -pass => $pass,
-					       -dbname => $dbname);
+					       -dbname => $dbname,
+                 -port => $port);
       my $ana_adp = $db->get_AnalysisAdaptor;
       $analysis = $ana_adp->fetch_by_logic_name($logic_name);
-    }	 
+    }
     $self->throw("No database handle input") unless defined($db);
     $self->db($db);
 
     $self->throw("No input id input")        unless defined($input_id);
     $self->input_id($input_id);
-    
+
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
