@@ -55,6 +55,8 @@ use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor;
+
 
 use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     EST_INPUTID_REGEX
@@ -84,6 +86,8 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     );
 
 
+my $EST_BLAT_RUNMODE = 'easy_slow';
+#my $EST_BLAT_RUNMODE = 'fiddly_fast';
 
 # use new Adaptor to get some extra info from the ESTs
 #use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
@@ -215,161 +219,185 @@ sub write_output {
 =cut
 
 sub fetch_input {
-    my( $self) = @_;
-    my $strand;
-
-    # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/ESTConf.pm
-    my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
-
-    # make sure you have an analysis
-    $self->throw("No analysis") unless defined( $self->analysis );
-
-    #print STDERR "Fetching input: " . $self->input_id. " \n";
-    $self->throw("No input id") unless defined($self->input_id);
-    
-    # get genomic region 
-    my $input_id    = $self->input_id;
-    unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
-      $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
-    }
-    my $chrname  = $1;
-    my $chrstart = $2;
-    my $chrend   = $3;
-
-    print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
-
-    my $slice = $self->est_e2g_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
-    $slice->chr_name($chrname);
-    $self->query($slice);
-    
-    ############################################################
-    # forward strand
-    ############################################################
-
-    $strand = 1;
-    print STDERR "\n****** forward strand ******\n\n";
-
-    # get genes
-    my $genes  = $slice->get_all_Genes_by_type($genetype);
-    
-    print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) . "\n";
-
-    
-    my $cdna_slice;
-    if ( $USE_cDNA_DB ){
-	my $cdna_db = $self->cdna_db;
-	
-	$cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-	my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
-	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
-	push (@$genes, @$cdna_genes);
-	
-    }
-
-    my @plus_transcripts;
-    my $single = 0;
-    
-    # split by strand
-  GENE:    
-    foreach my $gene (@$genes) {
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	    
-	    # Don't skip genes with one exon, potential info for UTRs
-	    my $exons = $transcript->get_all_Exons;
-	    if(scalar(@$exons) == 1){
-		$single++;
-	    }
-	    
-	    # keep only genes in the forward strand
-	    if ($exons->[0]->strand == 1){
-		push (@plus_transcripts, $transcript );
-	    }
-	}
-    }
-    
-    print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
-    print STDERR "($single single exon genes NOT thrown away)\n";
-
-    # process transcripts in the forward strand
-    
-    if( scalar(@plus_transcripts) ){
-
-      my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
-      
-      # make a genomewise runnable for each cluster of transcripts
-      foreach my $tran (@transcripts){
-	  
-	  # use MiniSeq
-	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									      -genomic  => $slice,
-									      -analysis => $self->analysis,
-									      -smell    => $GENOMEWISE_SMELL,
-									      );
-	  
-	  $self->add_runnable($runnable,$strand);
-	  # we only have one transcript per runnable
-	  $runnable->add_Transcript($tran);
-      }
+  my( $self) = @_;
+  my $strand;
+  
+  # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/ESTConf.pm
+  my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
+  
+  # make sure you have an analysis
+  $self->throw("No analysis") unless defined( $self->analysis );
+  
+  #print STDERR "Fetching input: " . $self->input_id. " \n";
+  $self->throw("No input id") unless defined($self->input_id);
+  
+  # get genomic region 
+  my $input_id    = $self->input_id;
+  unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
+    $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
   }
-    
-    
-    # minus strand - flip the vc and hope it copes ...
-    # but SLOW - get the same genes twice ...
-    
-    print STDERR "\n****** reverse strand ******\n\n";
+  my $chrname  = $1;
+  my $chrstart = $2;
+  my $chrend   = $3;
+  
+  print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
+  
+  my $slice = $self->est_e2g_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
+  $slice->chr_name($chrname);
+  $self->query($slice);
+  
+  ############################################################
+  # forward strand
+  ############################################################
+  
+  $strand = 1;
+  print STDERR "\n****** forward strand ******\n\n";
+  
+  # get genes
 
-    $strand = -1;
+  my $genes;
+
+  if ($EST_BLAT_RUNMODE eq 'easy_slow'){
+    $genes  = $slice->get_all_Genes_by_type($genetype);
+  } elsif ($EST_BLAT_RUNMODE eq 'fiddly_fast') {
+    my $blat_gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor->new($self->db);
+    $genes = $blat_gene_adaptor->get_genes_by_Slice_and_type($slice, $genetype);
+  } else {
+    $self->warn("$self - EST_BLAT_RUNMODE not set appropriately" . 
+		"in ESTConf.  Defaulting to slow running method."); 
+  }
+  
+  print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) . "\n";
+  
+  my $cdna_slice;
+  if ( $USE_cDNA_DB ){
+    my $cdna_db = $self->cdna_db;
     
-    # this will return a slice which corresponds to the reversed complement of $slice:
-    my $rev_slice = $slice->invert;
-    $self->revcomp_query($rev_slice);
-    my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
-    my @minus_transcripts;
+    $cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+    my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
+    print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
+    push (@$genes, @$cdna_genes);
     
-    if ( $USE_cDNA_DB ){
-	my $cdna_revslice = $cdna_slice->invert;
-	my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
-	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
-	push ( @$revgenes, @$cdna_revgenes ); 
-    }
-    
-    $single=0;
-  REVGENE:    
-    foreach my $gene (@$revgenes) {
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	
-	my @exons = @{$transcript->get_all_Exons};
-	
-	# DON'T throw away single-exon genes
-	if(scalar(@exons) == 1){
-	  $single++;
-	}
-	
-	# these are really - strand, but the Slice is reversed, so they are relatively + strand
-	if( $exons[0]->strand == 1){
-	  push (@minus_transcripts, $transcript);
-	}
+  }
+  
+  my @plus_transcripts;
+  my $single = 0;
+  
+  # split by strand
+ GENE:    
+  foreach my $gene (@$genes) {
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      
+      # Don't skip genes with one exon, potential info for UTRs
+      my $exons = $transcript->get_all_Exons;
+      if(scalar(@$exons) == 1){
+	$single++;
       }
-    }
-    print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
-    print STDERR "($single single exon genes NOT thrown away)\n";
-    
-    if(scalar(@minus_transcripts)){
-      
-      my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
-      
-      foreach my $tran (@transcripts) {
-	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic  => $rev_slice,
-									    -analysis => $self->analysis,
-									    -smell    => $GENOMEWISE_SMELL,
-									    );
-	$self->add_runnable($runnable, $strand);
-	$runnable->add_Transcript($tran);
+     
+      # keep only genes in the forward strand
+      if ($exons->[0]->strand == 1){
+	push (@plus_transcripts, $transcript );
       }
     }
   }
+  
+  print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
+  print STDERR "($single single exon genes NOT thrown away)\n";
+  
+  # process transcripts in the forward strand
+  
+  if( scalar(@plus_transcripts) ){
+    
+    my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
+    
+    # make a genomewise runnable for each cluster of transcripts
+    foreach my $tran (@transcripts){
+      
+      # use MiniSeq
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									  -genomic  => $slice,
+									  -analysis => $self->analysis,
+									  -smell    => $GENOMEWISE_SMELL,
+									 );
+      
+      $self->add_runnable($runnable,$strand);
+      # we only have one transcript per runnable
+      $runnable->add_Transcript($tran);
+    }
+  }
+  
+  
+  # minus strand - flip the vc and hope it copes ...
+  # but SLOW - get the same genes twice ...
+  
+  print STDERR "\n****** reverse strand ******\n\n";
+  
+  $strand = -1;
+  
+  # this will return a slice which corresponds to the reversed complement of $slice:
+  my $rev_slice = $slice->invert;
+  $self->revcomp_query($rev_slice);
+
+  my $revgenes;
+
+  if ($EST_BLAT_RUNMODE eq 'easy_slow'){
+    $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
+  } elsif ($EST_BLAT_RUNMODE eq 'fiddly_fast') {
+    my $blat_gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor->new($self->db);
+    $revgenes = $blat_gene_adaptor->get_genes_by_Slice_and_type($rev_slice, $genetype);
+  } else {
+    $self->warn("$self - EST_BLAT_RUNMODE not set appropriately" .
+		"in ESTConf.  Defaulting to slow running method."); 
+  }
+
+
+
+  my @minus_transcripts;
+  
+  if ( $USE_cDNA_DB ){
+    my $cdna_revslice = $cdna_slice->invert;
+    my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
+    print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
+    push ( @$revgenes, @$cdna_revgenes ); 
+  }
+  
+  $single=0;
+ REVGENE:    
+  foreach my $gene (@$revgenes) {
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      
+      my @exons = @{$transcript->get_all_Exons};
+      
+      # DON'T throw away single-exon genes
+      if(scalar(@exons) == 1){
+	$single++;
+      }
+
+      # these are really - strand, but the Slice is reversed, so they are relatively + strand
+      if( $exons[0]->strand == 1){
+	push (@minus_transcripts, $transcript);
+      }
+    }
+  }
+  print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
+  print STDERR "($single single exon genes NOT thrown away)\n";
+  
+  if(scalar(@minus_transcripts)){
+    
+    my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
+    
+    foreach my $tran (@transcripts) {
+      
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									  -genomic  => $rev_slice,
+									  -analysis => $self->analysis,
+									  -smell    => $GENOMEWISE_SMELL,
+									 );
+      $self->add_runnable($runnable, $strand);
+      $runnable->add_Transcript($tran);
+    }
+  }
+}
 
 ############################################################
 
@@ -1366,7 +1394,7 @@ sub run {
     }
   }
   print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
-  
+
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
   
   my @reverse_genes               = $self->_cluster_into_Genes(@checked_reverse_transcripts);
