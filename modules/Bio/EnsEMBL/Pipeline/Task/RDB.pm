@@ -108,9 +108,9 @@ sub db{
      
      my $dbadaptor = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 							 -dbname => $dbname,
-							 -dbhost => $dbhost,
-							 -dbuser => $dbuser,
-							 -dbpass => $dbpass,
+							 -host => $dbhost,
+							 -user => $dbuser,
+							 -pass => $dbpass,
 							);
 
      $self->{'core_db'} = $dbadaptor;
@@ -122,3 +122,5 @@ sub db{
   return $self->{'core_db'};
   
 }
+
+
