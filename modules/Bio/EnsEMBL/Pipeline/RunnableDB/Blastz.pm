@@ -152,7 +152,7 @@ sub write_output {
     $output->attach_seq($self->query);    
     $output->analysis($self->analysis);
     
-    if ($self->slice->isa("Bio::EnsEMBL::Slice")) {
+    if ($self->query->isa("Bio::EnsEMBL::Slice")) {
       my @mapped = $output->transform;
       
       if (@mapped == 0) {
