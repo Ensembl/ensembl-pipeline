@@ -45,27 +45,14 @@ my @contigs     = $genebuilder->order_Contigs;
 
 =head1 DESCRIPTION
 
-Takes in contigs and returns genes.  The procedure is currently
-reimplementing the TimDB method of building genes where genscan exons
-are confirmed by similarity features which are then joined together
-into exon pairs.  An exon pair is constructed as follows :
-
-  ---------          --------    genscan exons
-    -------          ----->      blast hit which spans an intron
-    1     10        11    22        
-
-For an exon pair to make it into a gene there must be at least 2 blast
-hits (features) that span across an intron.  This is called the
-coverage of the exon pair.
-
-After all exon pairs have been generated for all the genscan exons
-there is a recursive routine (_recurseTranscripts) that looks for all
-exons that are the start of an exon pair with no preceding exons.  The
-exon pairs are followed recursively (including alternative splices) to
-build up full set of transcripts.
-
-To generate the genes the transcripts are grouped together into sets
-with overlapping exons.
+This module reads your favourite annotations (genewise, combined_genes, est2genome, genomewise, ... )
+on the one hand, and ab initio predictions plus features on the other hand. Ab initio predictions and features
+are passed to Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder which generates putative transcripts
+from supported prediction exons (see documentation in that module for details).
+The product of Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder is combined with
+all the other annotations and redundant transcripts are eliminated in the method prune_Transcripts().
+The resulting transcripts are combined into genes. For more details, follow the list of methods called
+by build_Genes() method and the description in each one.
 
 =head1 CONTACT
 
@@ -104,6 +91,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_ABINITIO_SUPPORTED_TYPE
 					 GB_MAXSHORTINTRONLEN
 					 GB_MINSHORTINTRONLEN
+					 GB_MAX_TRANSCRIPTS_PER_GENE
 					);
 
 use vars qw(@ISA);
@@ -123,9 +111,10 @@ sub new {
 					      @args);
 
     $self->throw("Must input a slice to GeneBuilder") unless defined($slice);
+    $self->{_final_genes} = [];
+    $self->{_gene_types}  = [];
+    
     $self->slice($slice);
-    $self->{_final_genes}          = [];
-    $self->{_gene_types}           = [];
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
@@ -178,6 +167,12 @@ sub build_Genes{
   $self->get_Genes;
   print STDERR "Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n";
   
+  #test
+  foreach my $t ( $self->genewise_combined_Transcripts ){
+    $self->_print_Transcript($t);
+  }
+
+
   # get all Genscan predictions on this slice
   $self->get_Predictions;
   print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
@@ -209,6 +204,15 @@ sub build_Genes{
   print STDERR "clustering transcripts...\n";
   my @transcript_clusters = $self->cluster_Transcripts(@all_transcripts);
   print STDERR scalar(@transcript_clusters)." clusters formed\n";
+  my $ccount =0;
+  foreach my $cluster (@transcript_clusters){
+    $ccount++;
+    print STDERR "* cluster $ccount:\n";
+    foreach my $tran ( @{$cluster->get_Transcripts} ){
+      $self->_print_Transcript($tran);
+    }
+  }
+
 
   # prune the redundant transcripts for each cluster
   print STDERR "pruning transcripts...\n";
@@ -263,15 +267,12 @@ sub get_Genes {
   my $slice = $sa->fetch_by_chr_start_end($chr,$start,$end);
   
   my @unchecked_genes;
-  
+
   foreach my $type ($self->gene_types) {
     foreach my $gene ( @{$slice->get_all_Genes_by_type($type, 'evidence')} ){
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
-	
-	# set temporary_id to be dbID
-	$tran->{'temporary_id'} = ($tran->dbID) unless (defined $tran->{'temporary_id'} && $tran->{'temporary_id'} ne '');
 	
 	# my @valid_transcripts = $self->validate_transcript($t);
 	# next TRANSCRIPT unless scalar(@valid_transcripts);
@@ -284,6 +285,7 @@ sub get_Genes {
       }
     }
   }
+  print STDERR "found ".scalar(@transcripts)."\n";
   $self->genewise_combined_Transcripts(@transcripts);
 }
 
@@ -317,8 +319,11 @@ sub cluster_Transcripts {
   
   my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
   my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
+  my @clusters;
+  push( @clusters, @forward_clusters);
+  push( @clusters, @reverse_clusters);
   
-  return ( @forward_clusters, @reverse_clusters );
+  return @clusters;
 }
 
 ############################################################
@@ -334,29 +339,8 @@ sub cluster_Transcripts {
 sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
 
-  # first sort the transcripts by their start position coordinate
-  my %start_table;
-  my $i=0;
-  foreach my $transcript (@mytranscripts){
-    my $start;
-    my $seqname;
-    my @exons = @{$transcript->get_all_Exons};
-    @exons = sort { $a->start <=> $b->start } @exons;
-    if ( $exons[0]->start > $exons[0]->end){
-      $start = $exons[0]->end;
-    }
-    else{
-      $start = $exons[0]->start;
-    }
-    $start = $transcript->start_Exon->start;
-    $start_table{$i} = $start;
-    $i++;
-  }
-  
-  my @transcripts;
-  foreach my $pos ( sort { $start_table{$a} <=> $start_table{$b} } keys %start_table ){
-    push (@transcripts, $mytranscripts[$pos]);
-  }
+  # first sort the transcripts
+  my @transcripts = sort by_transcript_high @mytranscripts;
 
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
@@ -367,8 +351,10 @@ sub _cluster_Transcripts_by_genomic_range{
   
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
-  $cluster_starts[$count] = $transcripts[0]->start;
-  $cluster_ends[$count]   = $transcripts[0]->end;
+  
+
+  $cluster_starts[$count] = $self->transcript_low($transcripts[0]);
+  $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
   
   # store the list of clusters
   push( @clusters, $cluster );
@@ -376,27 +362,31 @@ sub _cluster_Transcripts_by_genomic_range{
   # loop over the rest of the transcripts
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
-    my $found=0;
+    
+    #print STDERR "\nIn cluster ".($count+1)."\n";
+    #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
+    #print STDERR "comparing:\n";
+    #$self->_print_Transcript( $transcripts[$c] );
     
     if ( !( $transcripts[$c]->end < $cluster_starts[$count] ||
 	    $transcripts[$c]->start > $cluster_ends[$count] ) ){
       $cluster->put_Transcripts( $transcripts[$c] );
       
       # re-adjust size of cluster
-      if ($transcripts[$c]->start < $cluster_starts[$count]) {
-	$cluster_starts[$count] = $transcripts[$c]->start;
+      if ($self->transcript_low($transcripts[$c]) < $cluster_starts[$count]) {
+	$cluster_starts[$count] = $self->transcript_low($transcripts[$c]);
       }
-      if ( $transcripts[$c]->end  > $cluster_ends[$count]) {
-	$cluster_ends[$count] =  $transcripts[$c]->end;
+      if ( $self->transcript_high($transcripts[$c]) > $cluster_ends[$count]) {
+	$cluster_ends[$count] =   $self->transcript_high($transcripts[$c]);
       }
     }
     else{
       # else, create a new cluster with this feature
       $count++;
-      my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
+      $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
       $cluster->put_Transcripts( $transcripts[$c] );
-      $cluster_starts[$count] = $transcripts[$c]->start;
-      $cluster_ends[$count]   = $transcripts[$c]->end;
+      $cluster_starts[$count] = $self->transcript_low( $transcripts[$c]);
+      $cluster_ends[$count]   = $self->transcript_high($transcripts[$c]);
       
       # store it in the list of clusters
       push(@clusters,$cluster);
@@ -422,169 +412,61 @@ sub prune_Transcripts {
   my ($self, @transcript_clusters) = @_;
   my @newtran;
   
-
+  my $cluster_count = 0;
  CLUSTER:
   foreach my $transcript_cluster ( @transcript_clusters ){
-    my @transcripts = $transcript_cluster->get_Transcripts;
+    $cluster_count++;
+    print STDERR "Cluster $cluster_count\n";
+    my @mytranscripts = @{$transcript_cluster->get_Transcripts};
     
-    my @clusters;
-    my %lengths;
-    
-    my @newgenes;
-    my $max_num_exons = 0;
-    
-    # sizehash holds transcript length - based on sum of exon lengths
-    my %sizehash;
-    
-    # orfhash holds orf length - based on sum of translateable exon lengths
-    my %orfhash;
-    
-    my %tran2orf;
-    my %tran2length;
-    
-    # keeps track of to which transcript(s) this exon belong
-    my %exon2transcript;
-    
-    foreach my $tran (@transcripts) {
-      
-      # keep track of number of exons in multiexon transcripts
-      my @exons = @{ $tran->get_all_Exons };
-      if(scalar(@exons) > $max_num_exons){ $max_num_exons = scalar(@exons); }
-      
-      # total exon length
-      my $length = 0;
-      foreach my $e ( @{ $tran->get_all_Exons} ){
-	$length += $e->end - $e->start + 1;
-	
-	push ( @{ $exon2transcript{ $e } }, $tran );
-	
-      }
-      $sizehash{$tran->{'temporary_id'}} = $length;
-      $tran2length{ $tran } = $length;
-      
-      # now for ORF length
-      $length = 0;
-      foreach my $e(@{$tran->get_all_translateable_Exons}){
-	$length += $e->end - $e->start + 1;
-      }
-      $tran2orf{ $tran } = $length;
-      push(@{$orfhash{$length}}, $tran);
-   }  
-    
+    ########################
+    #
+    # sort the transcripts
+    #
+    ########################
 
-    # VAC 15/02/2002 sort transcripts based on total exon length - this
-    # introduces a problem - we can (and have) masked good transcripts
-    # with long translations in favour of transcripts with shorter
-    # translations and long UTRs that are overall slightly longer. This
-    # is not good.
-    # better way? hold both total exon length and length of translateable exons. Then sort:
-    # long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
-    
-    
-    # eae: Notice that this sorting:
-    my @sordid_transcripts =  sort { my $result = ( 
-						   $tran2orf{ $b }
-						   <=> 
-						   $tran2orf{ $a }
-						  );
-				     if ($result){
-				       return $result;
-				     }
-				     else{
-				       return ( $tran2length{ $b } <=> $tran2length{ $a } )
-				     }
-				   } @transcripts;
-    
-    # is only equivalent to the one used below when all transcripts have UTRs. 
-    # The one below is actually the desired behaviour.
-    # since we want long UTRs and long ORFs but the sorting must be fuzzy in the sense that we want to give priority 
-    # to a long ORF with UTR over a long ORF without UTR which could only slightly longer.
-    
-    #test
-    #print STDERR "1.- sordid transcripts:\n";
-    #foreach my $tran (@sordid_transcripts){
-    #  print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
-    #}
-    
-    @transcripts = ();
-    
-    # sort first by orfhash{'length'}
-    my @orflengths = sort {$b <=> $a} (keys %orfhash);
-    
-    # strict sort by translation length is just as wrong as strict sort by UTR length
-    # bin translation lengths - 4 bins (based on 25% length diff)? 10 bins (based on 10%)?
-    my %orflength_bin;
-    my $numbins = 4;
-    my $currbin = 1;
-    
-    foreach my $orflength(@orflengths){
-      last if $currbin > $numbins;
-      my $percid = ($orflength*100)/$orflengths[0];
-      if ($percid > 100) { $percid = 100; }
-      my $currthreshold = $currbin * (100/$numbins);
-      $currthreshold = 100 - $currthreshold;
-      
-      if($percid <$currthreshold) { $currbin++; }
-      my @tmp = @{$orfhash{$orflength}};
-      push(@{$orflength_bin{$currbin}}, @{$orfhash{$orflength}});
-    }
-    
-    # now, foreach bin in %orflengthbin, sort by exonlength
-    $currbin = 1;
-  EXONLENGTH_SORT:
-    while( $currbin <= $numbins){
-      if(!defined $orflength_bin{$currbin} ){
-	$currbin++;
-	next EXONLENGTH_SORT;
-      }
-      
-      my @sorted_transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @{$orflength_bin{$currbin}};
-      push(@transcripts, @sorted_transcripts);
-      $currbin++;
-  }
-    
-    #test
-    my $debug = 0;
-    if ($debug == 1 ){
-      
-      print STDERR "2.- sorted transcripts:\n";
-      
-      
-      foreach my $tran (@transcripts){
-	if ( $tran->dbID ){
-	  print STDERR $tran->dbID." ";
-	}
-	print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
-	my @exons = @{$tran->get_all_Exons};
-	if ( $exons[0]->strand == 1 ){
-	  @exons = sort { $a->start <=> $b->start } @exons;
-	}
-	else{
-	  @exons = sort { $b->start <=> $a->start } @exons;
-	}
-	foreach my $exon ( @{$tran->get_all_Exons} ){
-	  print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
-	}
-      }
-   }
-    # old way - sort strictly on exon length
-    #    @transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
-    
-    ########################################
+    print STDERR "sorting transcripts in cluster $cluster_count...\n";
+    my @transcripts = $self->_bin_sort_transcripts( @mytranscripts );
+
+    ##############################
+    #
     # deal with single exon genes
+    #
+    ##############################
     my @maxexon = @{$transcripts[0]->get_all_Exons};
     
     # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
     # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
     # this may increase problems with the loss of valid single exon genes as mentioned below. 
     # it's a balance between keeping multi exon transcripts and losing single exon ones
-    if ($#maxexon == 0 && $max_num_exons == 1) {
-      push(@newtran, $transcripts[0] );
-	
-      # we are done with this cluster
+    #if ($#maxexon == 0 && $max_num_exons == 1) {
+    #  push(@newtran, $transcripts[0] );
+    ## we are done with this cluster
+    #  next CLUSTER;
+    #}
+    
+    my $maxexon_number = 0;
+    foreach my $t (@transcripts){
+      if ( scalar(@{$t->get_all_Exons}) > $maxexon_number ){
+	$maxexon_number = scalar(@{$t->get_all_Exons});
+      }
+    }
+    if ($maxexon_number == 1){
+      # take the longest:
+      @transcripts = map { $_->[1] } sort { $b->[0]->length <=> $a->[0]->length } map{ [ $_->start_Exon, $_ ] } @transcripts;
+      my $tran = shift( @transcripts );
+      push (@newtran, $tran);
+      print STDERR "found single_exon_transcript\n";
+      $self->_print_Transcript($tran);
+      my @es = @{$tran->get_all_Exons};
+      my $e  = $es[0];
+      foreach my $transcript (@transcripts){
+	foreach my $exon ( @{$transcript->get_all_Exons} ){
+	  $self->transfer_supporting_evidence($exon, $e);
+	}
+      }
       next CLUSTER;
     }
-    
     # otherwise we need to deal with multi exon transcripts and reject duplicates.
     
     # links each exon in the transcripts of this cluster with a hash of other exons it is paired with
@@ -593,10 +475,16 @@ sub prune_Transcripts {
     # allows retrieval of exon objects by exon->id - convenience
     my %exonhash;
     
+    ##############################
+    #
+    # prune redundant transcripts
+    #
+    ##############################
+  
     foreach my $tran (@transcripts) {
-      my @exons = @{$tran->get_all_Exons};
       $tran->sort;
-      
+      my @exons = @{$tran->get_all_Exons};
+            
       #print STDERR "\ntranscript: ".$tran->{'temporary_id'}."\n";
       #foreach my $exon ( @exons ){
       #  print STDERR $exon->start."-".$exon->end." ";
@@ -628,19 +516,19 @@ sub prune_Transcripts {
 	my $foundpair = 0;
 	my $exon1 = $exons[$i];
 	my $exon2 = $exons[$i+1];
+	print STDERR "exon1 is a $exon1 and exon2 is a $exon2\n";
 	
 	# Only count introns > 50 bp as real introns
 	my $intron;
 	if ($exon1->strand == 1) {
 	  $intron = abs($exon2->start - $exon1->end - 1);
-	} else {
+	} 
+	else {
 	  $intron = abs($exon1->start - $exon2->end - 1);
 	}
 	
-	#	GB_MINSHORTINTRONLEN
-	# GB_MAXSHORTINTRONLEN 
-	# print STDERR "Intron size $intron\n";
-	if ($intron < $GB_MAXSHORTINTRONLEN && $intron > $GB_MINSHORTINTRONLEN ) {
+	if ($intron < $GB_MAXSHORTINTRONLEN ) {
+	  print STDERR "Intron too short: $intron bp. Transcript will be rejected\n";
 	  $foundpair = 1;	# this pair will not be compared with other transcripts
 	} 
 	else {
@@ -649,22 +537,22 @@ sub prune_Transcripts {
 	  # If there is a pair whose exon1 overlaps this exon1, and 
 	  # whose exon2 overlaps this exon2, then these two transcripts are paired
 	  
-	  foreach my $exon1id (keys %pairhash) {
-	    my $exon1a = $exonhash{$exon1id};
+	  foreach my $first_exon_id (keys %pairhash) {
+	    my $first_exon = $exonhash{$first_exon_id};
 	    
-	    foreach my $exon2id (keys %{$pairhash{$exon1id}}) {
-	      my $exon2a = $exonhash{$exon2id};
+	    foreach my $second_exon_id (keys %{$pairhash{$first_exon}}) {
+	      my $second_exon = $exonhash{$second_exon_id};
 	      
-	      if (($exon1->overlaps($exon1a) && $exon2->overlaps($exon2a))) {
+	      if ( $exon1->overlaps($first_exon) && $exon2->overlaps($second_exon) ) {
 		$foundpair = 1;
 		
 		# eae: this method allows a transcript to be covered by exon pairs
 		# from different transcripts, rejecting possible
-		# splicing variants
+		# splicing variants. Needs rethinking
 		
 		# we put first the exon from the transcript being tested:
-		push( @evidence_pairs, [ $exon1 , $exon1a ] );
-		push( @evidence_pairs, [ $exon2 , $exon2a ] );
+		push( @evidence_pairs, [ $exon1 , $first_exon  ] );
+		push( @evidence_pairs, [ $exon2 , $second_exon ] );
 		
 		# transfer evidence between exons, assuming the suppfeat coordinates are OK.
 		# currently not working as the supporting evidence is not there - 
@@ -679,26 +567,31 @@ sub prune_Transcripts {
 	}
 	
 	if ($foundpair == 0) {	# ie this exon pair does not overlap with a pair yet found in another transcript
-	  
 	  $found = 0;		# ie currently this transcript is not paired with another
 	  
 	  # store the exons so they can be retrieved by id
-	  $exonhash{$exon1->{'temporary_id'}} = $exon1;
-	  $exonhash{$exon2->{'temporary_id'}} = $exon2;
+	  $exonhash{$exon1} = $exon1;
+	  $exonhash{$exon2} = $exon2;
 	  
 	  # store the pairing between these 2 exons
-	  $pairhash{$exon1->{'temporary_id'}}{$exon2->{'temporary_id'}} = 1;
+	  $pairhash{$exon1}{$exon2} = 1;
 	}
       }				# end of EXONS
       
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
-	  #print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
-	  push(@newtran,$tran);
-	  @evidence_pairs = ();
+	print STDERR "found new transcript:\n";
+	$self->_print_Transcript( $tran );
+
+	push(@newtran,$tran);
+	@evidence_pairs = ();
       } 
       else {
-	#print STDERR "\n\nTranscript already seen " . $tran->{'temporary_id'} . "\n";
+	print STDERR "transcript already seen:\n";
+	if ( $tran == $transcripts[0] ){
+	  print STDERR "Strange, this is the first transcript in the cluster!\n";
+	}
+	$self->_print_Transcript( $tran );
 	
 	## transfer supporting feature data. We transfer it to exons
 	foreach my $pair ( @evidence_pairs ){
@@ -718,6 +611,128 @@ sub prune_Transcripts {
   return @newtran;
 }
  
+############################################################
+
+sub _bin_sort_transcripts{
+
+  my ($self,@transcripts) = @_;
+  
+  my %lengths;    
+  my $max_num_exons = 0;
+  
+  # sizehash holds transcript length - based on sum of exon lengths
+  my %sizehash;
+  
+  # orfhash holds orf length - based on sum of translateable exon lengths
+  my %orfhash;
+  
+  my %tran2orf;
+  my %tran2length;
+  
+  # keeps track of to which transcript(s) this exon belong
+  my %exon2transcript;
+  
+  foreach my $tran (@transcripts) {
+    
+    # keep track of number of exons in multiexon transcripts
+    my @exons = @{ $tran->get_all_Exons };
+    if(scalar(@exons) > $max_num_exons){ 
+      $max_num_exons = scalar(@exons); 
+    }
+    
+    # total exon length
+    my $length = 0;
+    foreach my $e ( @exons ){
+      $length += $e->end - $e->start + 1;
+      push ( @{ $exon2transcript{ $e } }, $tran );
+    }
+    $sizehash{$tran} = $length;
+    $tran2length{ $tran } = $length;
+    
+    # now for ORF length
+    $length = 0;
+    foreach my $e(@{$tran->get_all_translateable_Exons}){
+      $length += $e->end - $e->start + 1;
+    }
+    $tran2orf{ $tran } = $length;
+    push(@{$orfhash{$length}}, $tran);
+  }  
+  
+  # VAC 15/02/2002 sort transcripts based on total exon length - this
+  # introduces a problem - we can (and have) masked good transcripts
+  # with long translations in favour of transcripts with shorter
+  # translations and long UTRs that are overall slightly longer. This
+  # is not good.
+  # better way? hold both total exon length and length of translateable exons. Then sort:
+  # long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
+  ##########
+  @transcripts = ();
+  ##########
+  
+  # sort first by orfhash{'length'}
+  my @orflengths = sort {$b <=> $a} (keys %orfhash);
+  
+  # strict sort by translation length is just as wrong as strict sort by UTR length
+  # bin translation lengths - 4 bins (based on 25% length diff)? 10 bins (based on 10%)?
+  my %orflength_bin;
+  my $numbins = 4;
+  my $currbin = 1;
+  
+  foreach my $orflength(@orflengths){
+    last if $currbin > $numbins;
+    my $percid = ($orflength*100)/$orflengths[0];
+    if ($percid > 100) { 
+      $percid = 100; 
+    }
+    my $currthreshold = $currbin * (100/$numbins);
+    $currthreshold    = 100 - $currthreshold;
+    
+    if($percid <$currthreshold) { 
+      $currbin++; 
+    }
+    my @tmp = @{$orfhash{$orflength}};
+    push(@{$orflength_bin{$currbin}}, @{$orfhash{$orflength}});
+  }
+  
+  # now, foreach bin in %orflengthbin, sort by exonlength
+  $currbin = 1;
+ EXONLENGTH_SORT:
+  while( $currbin <= $numbins){
+    if(!defined $orflength_bin{$currbin} ){
+      $currbin++;
+      next EXONLENGTH_SORT;
+    }	
+    my @sorted_transcripts = sort { $sizehash{$b} <=> $sizehash{$a} } @{$orflength_bin{$currbin}};
+    push(@transcripts, @sorted_transcripts);
+    $currbin++;
+  }
+  
+  #test
+  my $debug = 0;
+  if ($debug == 1 ){
+    
+    print STDERR "2.- sorted transcripts:\n";
+    
+    
+    foreach my $tran (@transcripts){
+      if ( $tran->dbID ){
+	print STDERR $tran->dbID." ";
+      }
+      print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+      my @exons = @{$tran->get_all_Exons};
+      if ( $exons[0]->strand == 1 ){
+	@exons = sort { $a->start <=> $b->start } @exons;
+      }
+      else{
+	@exons = sort { $b->start <=> $a->start } @exons;
+      }
+      foreach my $exon ( @{$tran->get_all_Exons} ){
+	print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
+      }
+    }
+  }
+  return @transcripts;
+}
 
 ############################################################
 
@@ -814,7 +829,7 @@ sub cluster_into_Genes{
     # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
     my @sorted_transcripts = $self->_bin_sort_transcripts( @{$cluster} );
     foreach my $transcript( @sorted_transcripts ){
-	if ($count < 10) {
+	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE) {
 	    $gene->add_Transcript($transcript);
 	    print STDERR "accepting:\n";
 	    print STDERR "check this, prune_Transcripts may not be working properly!\n";
@@ -861,31 +876,69 @@ sub check_Clusters{
 
 ############################################################
 
+sub transcript_high{
+  my ($self,$tran) = @_;
+  my $high;
+  $tran->sort;
+  if ( $tran->start_Exon->strand == 1){
+    $high = $tran->end_Exon->end;
+  }
+  else{
+    $high = $tran->start_Exon->end;
+  }
+  return $high;
+}
+
+############################################################
+
+sub transcript_low{
+  my ($self,$tran) = @_;
+  my $low;
+  $tran->sort;
+  if ( $tran->start_Exon->strand == 1){
+    $low = $tran->start_Exon->start;
+  }
+  else{
+    $low = $tran->end_Exon->start;
+  }
+  return $low;
+}
+
+############################################################
+
 sub by_transcript_high {
   my $alow;
   my $blow;
+
   my $ahigh;
   my $bhigh;
-
+  
+  # alow and ahigh are the left most and right most coordinates for transcript $a 
   if ($a->start_Exon->strand == 1) {
-    $alow = $a->start_Exon->start;
+    $alow  = $a->start_Exon->start;
     $ahigh = $a->end_Exon->end;
-  } else {
-    $alow = $a->end_Exon->start;
+  } 
+  else {
+    $alow  = $a->end_Exon->start;
     $ahigh = $a->start_Exon->end;
   }
 
+  # blow and bhigh are the left most and right most coordinates for transcript $b 
   if ($b->start_Exon->strand == 1) {
-    $blow = $b->start_Exon->start;
+    $blow  = $b->start_Exon->start;
     $bhigh = $b->end_Exon->end;
-  } else {
-    $blow = $b->end_Exon->start;
+  } 
+  else {
+    $blow  = $b->end_Exon->start;
     $bhigh = $b->start_Exon->end;
   }
 
+  # return the ascending comparison of the right-most coordinates if they're different
   if ($ahigh != $bhigh) {
     return $ahigh <=> $bhigh;
-  } else {
+  } 
+  # if they'r equal, return the ascending comparison of the left most coordinate
+  else {
     return $alow <=> $blow;
   }
 }
@@ -1154,127 +1207,6 @@ sub prune_features {
 
 ############################################################
 
-sub _bin_sort_transcripts{
-    my ($self,@transcripts) = @_;
-
-    my %lengths;    
-    my @newgenes;
-    my $max_num_exons = 0;
-    
-    # sizehash holds transcript length - based on sum of exon lengths
-    my %sizehash;
-    
-    # orfhash holds orf length - based on sum of translateable exon lengths
-    my %orfhash;
-    
-    my %tran2orf;
-    my %tran2length;
-    
-    # keeps track of to which transcript(s) this exon belong
-    my %exon2transcript;
-    
-    foreach my $tran (@transcripts) {
-      
-      # keep track of number of exons in multiexon transcripts
-      my @exons = @{ $tran->get_all_Exons };
-      if(scalar(@exons) > $max_num_exons){ 
-	  $max_num_exons = scalar(@exons); 
-      }
-      
-      # total exon length
-      my $length = 0;
-      foreach my $e ( @exons ){
-	  $length += $e->end - $e->start + 1;
-	  push ( @{ $exon2transcript{ $e } }, $tran );
-      }
-      $sizehash{$tran} = $length;
-      $tran2length{ $tran } = $length;
-      
-      # now for ORF length
-      $length = 0;
-      foreach my $e(@{$tran->get_all_translateable_Exons}){
-	$length += $e->end - $e->start + 1;
-      }
-      $tran2orf{ $tran } = $length;
-      push(@{$orfhash{$length}}, $tran);
-   }  
-
-    # VAC 15/02/2002 sort transcripts based on total exon length - this
-    # introduces a problem - we can (and have) masked good transcripts
-    # with long translations in favour of transcripts with shorter
-    # translations and long UTRs that are overall slightly longer. This
-    # is not good.
-    # better way? hold both total exon length and length of translateable exons. Then sort:
-    # long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
-    ##########
-    @transcripts = ();
-    ##########
-
-    # sort first by orfhash{'length'}
-    my @orflengths = sort {$b <=> $a} (keys %orfhash);
-    
-    # strict sort by translation length is just as wrong as strict sort by UTR length
-    # bin translation lengths - 4 bins (based on 25% length diff)? 10 bins (based on 10%)?
-    my %orflength_bin;
-    my $numbins = 4;
-    my $currbin = 1;
-    
-    foreach my $orflength(@orflengths){
-      last if $currbin > $numbins;
-      my $percid = ($orflength*100)/$orflengths[0];
-      if ($percid > 100) { 
-	  $percid = 100; 
-      }
-      my $currthreshold = $currbin * (100/$numbins);
-      $currthreshold    = 100 - $currthreshold;
-      
-      if($percid <$currthreshold) { 
-	  $currbin++; 
-      }
-      my @tmp = @{$orfhash{$orflength}};
-      push(@{$orflength_bin{$currbin}}, @{$orfhash{$orflength}});
-    }
-    
-    # now, foreach bin in %orflengthbin, sort by exonlength
-    $currbin = 1;
-  EXONLENGTH_SORT:
-    while( $currbin <= $numbins){
-	if(!defined $orflength_bin{$currbin} ){
-	    $currbin++;
-	    next EXONLENGTH_SORT;
-	}	
-	my @sorted_transcripts = sort { $sizehash{$b} <=> $sizehash{$a} } @{$orflength_bin{$currbin}};
-	push(@transcripts, @sorted_transcripts);
-	$currbin++;
-    }
-    
-    #test
-    my $debug = 0;
-    if ($debug == 1 ){
-      
-      print STDERR "2.- sorted transcripts:\n";
-      
-      
-      foreach my $tran (@transcripts){
-	if ( $tran->dbID ){
-	  print STDERR $tran->dbID." ";
-	}
-	print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
-	my @exons = @{$tran->get_all_Exons};
-	if ( $exons[0]->strand == 1 ){
-	  @exons = sort { $a->start <=> $b->start } @exons;
-	}
-	else{
-	  @exons = sort { $b->start <=> $a->start } @exons;
-	}
-	foreach my $exon ( @{$tran->get_all_Exons} ){
-	  print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
-      }
-    }
-  }
-    return @transcripts;
-}
-
 
 ############################################################
 #
@@ -1342,10 +1274,8 @@ sub my_genes {
 =cut
 
 sub final_genes{
-  my ($self, @genes);
-  unless ( $self->{_final_genes} ){
-      $self->{_final_genes} = [];
-  }
+  my ($self, @genes) = @_;
+  
   if ( @genes ){
     push( @{$self->{_final_genes}}, @genes );
   }
@@ -1601,7 +1531,6 @@ EXON:
     $st->sort;
     my @ex = @{$st->get_all_Exons};
     if(scalar(@ex) > 1){
-      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
       $count++;
       push(@t, $st);
     }
@@ -1655,13 +1584,13 @@ sub validate_transcript{
       }
       
       if ($intron > $GB_GENSCAN_MAX_INTRON) {
-	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
+	print STDERR "Intron too long $intron  for transcript " . $self->transcript_id($transcript) . "\n";
 	$split = 1;
 	$valid = 0;
       }
       
       if ($exon->strand != $previous_exon->strand) {
-	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
+	print STDERR "Mixed strands for gene " . $self->transcript_id($transcript) . "\n";
 	$valid = 0;
 	return;
       }
@@ -1864,6 +1793,9 @@ sub transcript_id {
   }
   else{
     $id = 'no-id';
+  }
+  if ($t->type){
+    $id .= " ".$t->type;
   }
   return $id;
 }
