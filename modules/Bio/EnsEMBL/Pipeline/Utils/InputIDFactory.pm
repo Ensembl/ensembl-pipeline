@@ -78,16 +78,30 @@ sub generate_slice_input_ids {
 }
 
 
+=head2 get_slice_names
+
+  Arg [1]   : coord system name str
+  Arg [2]   : coord system version
+  Arg [3]   : size, int
+  Arg [4]   : overlap, int
+  Function  : produces a set of slice names based on the size and overlap
+  specified in the format chr_name.start-end
+  Returntype:  Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if it has no core db connection
+  Caller    : 
+  Example   : 
+
+=cut
+
 sub get_slice_names{
   my ($self, $cs_name, $cs_version, $size, $overlap) = @_;
 
   $overlap = 0 if (!$overlap);
-  $size = 0 if (!$size);
   $cs_version = '' unless($cs_version);
   my $csa = $self->db->get_CoordSystemAdaptor();
   my $sa = $self->db->get_SliceAdaptor();
 
-  my @slices = @{$sa->fetch_all($cs_name, $cs_version)};
+  my @slices = @{$sa->fetch_all($cs_name, $cs_version, $size, $overlap)};
   my @ids;
   foreach my $slice(@slices){
     push(@ids, $slice->name);
@@ -100,18 +114,7 @@ sub get_slice_names{
 
 
 
-=head2 get_slice_names
 
-  Arg [1]   : size, int
-  Arg [2]   : overlap, int
-  Function  : produces a set of slice names based on the size and overlap
-  specified in the format chr_name.start-end
-  Returntype:  Bio::EnsEMBL::Pipeline::IDSet
-  Exceptions: throws if it has no core db connection
-  Caller    : 
-  Example   : 
-
-=cut
 
 
 sub generate_non_redundant_input_ids{

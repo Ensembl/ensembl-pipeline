@@ -52,7 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose);
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
@@ -104,7 +104,7 @@ sub new {
 
     $self->throw("No analysis object input") unless defined($analysis);
     $self->analysis($analysis);
-
+    &verbose('WARNING');
     return $self;
 }
 
@@ -376,10 +376,10 @@ sub write_output {
     my $gene_adp = $self->db->get_GeneAdaptor;
 
 
-    $self->warn("shouldn't be using the write_output method of runnabledb");
+
 
     eval {
-      $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+      $contig = $db->get_SliceAdaptor->fetch_by_name($self->input_id);
     };
 
     if ($@) {
@@ -393,77 +393,75 @@ sub write_output {
       $f->analysis($self->analysis);
 
       unless ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
-        print $f->gffstring . "\n";
-        $f->attach_seq($contig);
+        $f->slice($contig);
       }
 
       if ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
-	foreach my $exon (@{$f->get_all_Exons}) {
-	  $exon->contig($contig);
-	}
+        foreach my $exon (@{$f->get_all_Exons}) {
+          $exon->slice($contig);
+        }
 
-	if (!defined($features{prediction})) {
-	  $features{prediction} = [];
-	}
-
-	push(@{$features{prediction}},$f);
-
-	print "F " . $features{prediction} . "\n";
-
+        if (!defined($features{prediction})) {
+          $features{prediction} = [];
+        }
+        
+        push(@{$features{prediction}},$f);
+        
+        
       } elsif ($f->isa("Bio::EnsEMBL::SimpleFeature")) {
-
-	if (!defined($features{simple})) {
-	  $features{simple} = [];
-	}
-
-	push(@{$features{simple}},$f);
-
+        
+        if (!defined($features{simple})) {
+          $features{simple} = [];
+        }
+        
+        push(@{$features{simple}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::Map::MarkerFeature")) {
-
-	if (!defined($features{marker})) {
-	  $features{marker} = [];
-	}
-
-	push(@{$features{marker}},$f);
-
+        
+        if (!defined($features{marker})) {
+          $features{marker} = [];
+        }
+        
+        push(@{$features{marker}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+        
+        if (!defined($features{dnapep})) {
+          $features{dnapep} = [];
+        }
 
-	if (!defined($features{dnapep})) {
-	  $features{dnapep} = [];
-	}
-
-	push(@{$features{dnapep}},$f);
-
+        push(@{$features{dnapep}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::DnaDnaAlignFeature")) {
-
-	if (!defined($features{dnadna})) {
-	  $features{dnadna} = [];
-	}
-
-	push(@{$features{dnadna}},$f);
-
+        
+        if (!defined($features{dnadna})) {
+          $features{dnadna} = [];
+        }
+        
+        push(@{$features{dnadna}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
-
-	if (!defined($features{repeat})) {
-	  $features{repeat} = [];
-	}
-
-	push(@{$features{repeat}},$f);
-
+        
+        if (!defined($features{repeat})) {
+          $features{repeat} = [];
+        }
+        
+        push(@{$features{repeat}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL:Gene")) {
-
-	  foreach my $exon (@{$f->get_all_Exons}) {
-	    $exon->contig($contig);
-	  }
-	  if (!defined($features{gene})) {
-	    $features{gene} = [];
-	  }
-	  
-	push(@{$features{gene}},$f);
-	  
+        
+        foreach my $exon (@{$f->get_all_Exons}) {
+          $exon->slice($contig);
+        }
+        if (!defined($features{gene})) {
+          $features{gene} = [];
+        }
+        
+        push(@{$features{gene}},$f);
+        
       }
     }
-
+    
     if ($features{prediction}) {
       $pred_adp->store(@{$features{prediction}});
       print "Storing " . @{$features{prediction}} . "\n";
@@ -533,6 +531,25 @@ sub input_is_void {
     }
     return $self->{'_input_is_void'};
 
+}
+
+
+
+sub fetch_sequence{
+  my ($self, $repeat_masking) = @_;
+
+  my $sa = $self->db->get_SliceAdaptor;
+
+  my $slice = $sa->fetch_by_name($self->input_id);
+  $repeat_masking = [] unless($repeat_masking);
+  if(@$repeat_masking){
+    my $sequence = $slice->get_repeatmasked_seq($repeat_masking);
+    $self->query($sequence);
+  }else{
+    $self->query($slice);
+  }
+
+  return $self->query;
 }
 
 1;

@@ -12,7 +12,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose);
 unless (&config_sanity_check) {
     exit 1;
 }
@@ -129,6 +129,7 @@ if($idlist_file || @analyses || @input_id_types || @starts_from ||
 
   $accumulators = 0;
 }
+&verbose('WARNING');
 my $max_time = $MAX_JOB_TIME unless($max_time);
 my $killed_file = $KILLED_INPUT_IDS unless($killed_file);
 my $queue_manager = $QUEUE_MANAGER unless($queue_manager);

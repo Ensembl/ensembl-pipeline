@@ -35,7 +35,8 @@ variables.
 
 =head1 CONTACT
 
-for more information on how we run out pmatch analysis see running_pmatchs.txt in ensembl-docs
+for more information on how we run out pmatch analysis see 
+running_the_genebuild.txt in the cvs module ensembl-docs
 
 =cut
 
