@@ -172,7 +172,7 @@ sub  get_Seq_by_acc {
 sub  get_Seqs_by_accs {
   my ($self, @acc) = @_;
   
-  if (!defined(@acc) || scalar(@acc < 1)) {
+  if ((! @acc) || scalar(@acc < 1)) {
     $self->throw("No accession input");
   }  
   
