@@ -233,20 +233,21 @@ sub run_transcript_mapping {
     if (@features) {	# Blast may have found none
       my %coverage_by_hits =
         %{$self->_get_coverage($transcript_seq->length, @features)};
-      my %p_value_by_hits = %{$self->_get_min_p(@features)};
-      my $mapped_name;
+      # my %p_value_by_hits = %{$self->_get_min_p(@features)};
+      # my $mapped_name;
+      my @mapped_names;
       my $min_p_for_hit = 9999999;	# arbitrary huge value
       my $coverage = 0;
       foreach my $hit (keys %coverage_by_hits) {
-        if ($coverage_by_hits{$hit} >= $self->transcript_percent_coverage
-          and $p_value_by_hits{$hit} < $min_p_for_hit) {
+        if ($coverage_by_hits{$hit} >= $self->transcript_percent_coverage) {
+          # and $p_value_by_hits{$hit} < $min_p_for_hit) {
   	  $coverage = $coverage_by_hits{$hit};
-          $mapped_name = $hit;
-          $min_p_for_hit = $p_value_by_hits{$hit};
+          push @mapped_names, $hit;
+          # $min_p_for_hit = $p_value_by_hits{$hit};
         }
       }
       if ($coverage >= $self->transcript_percent_coverage) {
-        $mapping{$transcript_seq->display_id} = $mapped_name;
+        $mapping{$transcript_seq->display_id} = \@mapped_names;
       }
     }
   }
