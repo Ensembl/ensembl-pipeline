@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder;
 
-use diagnostics;
+#use diagnostics;
 use vars qw(@ISA);
 use strict;
 
@@ -57,7 +57,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::Tools::TranslationUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;
-
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (EST_ONE_FILE_PER_CHROMOSOME);
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_INPUTID_REGEX
 									 EST_GENE_DBHOST
@@ -1175,7 +1175,7 @@ sub check_splice_sites{
 	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
       
       unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites\n$@";
+	print STDERR "problems retrieving sequence for splice sites: $up_start:$up_end:$down_start:$down_end\n$@";
 	next INTRON;
       }
       $upstream_site   =~ tr/ACGTacgt/TGCAtgca/;
@@ -1225,16 +1225,75 @@ strand is not used.
 sub get_chr_subseq{
   my ( $self, $chr_name, $start, $end, $strand ) = @_;
 
-  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
-  my $command = "chr_subseq $chr_file $start $end |";
-  #print STDERR "command: $command\n";
-  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
-  my $seq = uc <SEQ>;
-  chomp $seq;
-  close( SEQ );
+  my $seq;
+
+  if ($start > $end) {
+      # normal if reverse strand
+      if ($strand == -1) {
+	  my $tmp = $start; $start = $end; $end = $tmp; 
+      }
+      else {
+	  $self->throw("Error: not expecting start ($start) to be > end ($end) in subseq fetch\n");
+      }
+  }
+
+  if ($EST_ONE_FILE_PER_CHROMOSOME) {
+      my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+      my $command = "chr_subseq $chr_file $start $end |";
+      #print STDERR "command: $command\n";
+      open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+      $seq = uc <SEQ>;
+      chomp $seq;
+      close( SEQ );
+  }
+  else {
+      my ($stored_seq, $stored_start, $stored_end) = $self->_cached_seq;
+
+      if (not $stored_seq) {
+	  ($stored_start, $stored_end) = ($self->query->chr_start, $self->query->chr_end);
+      }
+      if (not $stored_seq or 
+	  # need to refetch if being asked for outside original slice
+	  $start < $stored_start or $end > $stored_end) {
+	  
+
+	  $stored_start = $start if $start < $stored_start;
+	  $stored_end = $end if $end > $stored_end;
+										  
+	  my $new_slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name, 
+									      $stored_start,
+									      $stored_end);
+	  $stored_seq = $new_slice->seq;
+	  $self->_cached_seq( $stored_seq, $stored_start, $stored_end );
+      }
+      
+      # can now get dna by substring. 
+      $seq = substr($stored_seq, $start - $stored_start, $end - $start + 1); 
+  }
 
   return $seq;
 }
+
+sub _cached_seq {
+    my ($self, $seq, $start, $end) = @_;
+    
+    if ($seq and $start and $end) {
+	$self->{'_cached_genomic_seq'} = $seq;
+	$self->{'_cached_genomic_seq_start'} = $start;
+	$self->{'_cached_genomic_seq_end'} = $end;
+    }
+
+    if ($self->{'_cached_genomic_seq'}) {
+	return ($self->{'_cached_genomic_seq'},
+		$self->{'_cached_genomic_seq_start'},
+		$self->{'_cached_genomic_seq_end'});
+    }
+    else {
+	return ();
+    }
+}
+
+
 
 ############################################################
 
