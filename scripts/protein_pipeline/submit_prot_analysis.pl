@@ -53,16 +53,20 @@ print STDERR "SCRATCH: ".$scratchdir."\n";
 
 $runnables{'Prints'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints";
 $runnables{'Prosite'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite";
-$runnables{'Pfam'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
+$runnables{'Pfam'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Hmmpfam   ";
 $runnables{'Tmhmm'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm";
 $runnables{'ncoils'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Coil";
 $runnables{'Signalp'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp";
 $runnables{'Seg'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Seg";
 $runnables{'Profile'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Profile";
+$runnables{'ParacelHMM'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
 
 my @ids = &get_ids();
+#my @ids = (28816);
+
 &make_directories();
 &chunk_pepfile();
+
 &run_jobs(@ids);
 
 sub get_ids {
@@ -146,6 +150,9 @@ sub run_jobs {
     
      foreach my $r(@toberun) {
 	 #First get the analysisId of the module which is supposed to run
+
+	 print STDERR "R: $r\n";
+	 
 	 my $q = "select analysisId from analysisprocess where module = '$r'";
     
 	 my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
