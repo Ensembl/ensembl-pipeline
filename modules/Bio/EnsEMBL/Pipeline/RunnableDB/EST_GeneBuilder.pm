@@ -274,7 +274,8 @@ sub fetch_input {
     # get genes
     my $genes  = $slice->get_all_Genes_by_type($genetype);
     
-    print STDERR "Number of genes from ests  = " . scalar(@$genes) . "\n";
+    print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) . "\n";
+
     
     my $cdna_slice;
     if ( $USE_cDNA_DB ){
@@ -357,40 +358,40 @@ sub fetch_input {
     $single=0;
   REVGENE:    
     foreach my $gene (@$revgenes) {
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	    
-	    my @exons = @{$transcript->get_all_Exons};
-	    
-	    # DON'T throw away single-exon genes
-	    if(scalar(@exons) == 1){
-		$single++;
-	    }
-	    
-	    # these are really - strand, but the Slice is reversed, so they are relatively + strand
-	    if( $exons[0]->strand == 1){
-		push (@minus_transcripts, $transcript);
-	    }
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	
+	my @exons = @{$transcript->get_all_Exons};
+	
+	# DON'T throw away single-exon genes
+	if(scalar(@exons) == 1){
+	  $single++;
 	}
+	
+	# these are really - strand, but the Slice is reversed, so they are relatively + strand
+	if( $exons[0]->strand == 1){
+	  push (@minus_transcripts, $transcript);
+	}
+      }
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
     print STDERR "($single single exon genes NOT thrown away)\n";
     
     if(scalar(@minus_transcripts)){
       
-	my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
+      my @transcripts = $self->_process_Transcripts(\@minus_transcripts,$strand);  
+      
+      foreach my $tran (@transcripts) {
 	
-	foreach my $tran (@transcripts) {
-	    
-	    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-								        -genomic  => $rev_slice,
-									-analysis => $self->analysis,
-                                                                        -smell => 2,
-);
-	    $self->add_runnable($runnable, $strand);
-	    $runnable->add_Transcript($tran);
-	  }
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									    -genomic  => $rev_slice,
+									    -analysis => $self->analysis,
+									    -smell => 2,
+									   );
+	$self->add_runnable($runnable, $strand);
+	$runnable->add_Transcript($tran);
+      }
     }
-}
+  }
 
 ############################################################
 
@@ -435,17 +436,17 @@ sub _process_Transcripts {
   
   # this is very slow, need to find out why
   #my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
- my @checked_transcripts = @transcripts;
+  my @checked_transcripts = @transcripts;
   
 
   if ( scalar(@checked_transcripts) == 0 ){
-      print STDERR "No transcripts left from the splice-site check\n";
+      print STDERR "No transcripts left\n";
       return;
   }
   my $merge_object 
-      = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
-							    -transcripts => \@checked_transcripts,
-							    );
+    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
+							  -transcripts => \@checked_transcripts,
+							 );
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
@@ -581,7 +582,7 @@ sub _check_Transcripts {
 		  
                   # check the evidence gap between both exons
 		  if ( $est_gap > $max_est_gap ){
-		      print STDERR "Rejecting transript: EST evidence with gap too large: $est_gap\n";
+		      print STDERR "Rejecting transcript: EST evidence with gap too large: $est_gap\n";
 		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 		      next TRANSCRIPT;
 		  }
@@ -1268,12 +1269,12 @@ sub run {
       print STDERR $@;
       next RUN1;
     }
-
-    push (@forward_transcripts, $gw_runnable->output);
-    # convert_output
-    #$self->convert_output($gw_runnable, $strand);
+    foreach my $transcript ( $gw_runnable->output ){
+      #$self->_set_evidence( $transcript );
+      push (@forward_transcripts, $transcript);
+    }
   }
-  print STDERR $tcount." transcripts run in genomewise (-smell 8) in the forward strand\n";
+  print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
 
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
   
@@ -1300,12 +1301,12 @@ sub run {
       print STDERR $@;
       next RUN2;
     }
-    
-    push (@reverse_transcripts, $gw_runnable->output );
-    # convert_output
-    #$self->convert_output($gw_runnable, $strand);
+    foreach my $transcript ( $gw_runnable->output ){
+      #$self->_set_evidence( $transcript );
+      push (@reverse_transcripts, $transcript);
+    }
   }
-  print STDERR $tcount2." transcripts run in genomewise (-smell 8) in the reverse strand\n";
+  print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
   
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
   
@@ -1338,23 +1339,21 @@ sub analysis {
     $self->throw("$analysis is not a Bio::EnsEMBL::Analysis") unless $analysis->isa("Bio::EnsEMBL::Analysis");
     $self->{_analysis} = $analysis;
   }
-
   return $self->{_analysis};
 }
 
-############################################
-### convert genomewise output into genes ###
-############################################
+############################################################
 
-#sub convert_output {
-#  my ($self, $gwr, $strand) = @_;
-
-#  my @genes    = $self->make_genes($gwr, $strand);
-
-#  my @remapped = $self->remap_genes(\@genes, $strand);
-
-#  # store genes
-#  $self->output(@remapped);
+### change the analysis of the evidence to the one we are using (Genomewise does not know 
+### about analyses so could not change it, Genomewise just transfers it)
+#sub _set_evidence{
+#  my ( $self, $tran ) = @_;
+#  my $analysis = $self->analysis;
+#  foreach my $exon ( @{$tran->get_all_Exons} ){
+#    foreach my $evidence ( @{$exon->get_all_supporting_features} ){
+#      $evidence->analysis($analysis);
+#    }
+#  }
 #}
 
 ############################################################
@@ -1738,7 +1737,7 @@ sub _cluster_into_Genes{
 
   # make and store genes
   
-  print STDERR scalar(@clusters)." created, turning them into genes...\n";
+  print STDERR scalar(@clusters)." clusters created, turning them into genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
     my $count = 0;
@@ -1758,7 +1757,17 @@ sub _cluster_into_Genes{
     push( @genes, $new_gene );
    }
   
-  #$self->final_genes(@genes);
+  # test
+  #foreach my $gene (@genes){
+  #  foreach my $tran ( @{$gene->get_all_Transcripts} ){
+  #    foreach my $exon ( @{$tran->get_all_Exons} ){
+  #	foreach my $evi ( @{$exon->get_all_supporting_features} ){
+  #	  print STDERR "analysis= ".$evi->analysis->logic_name."\n";
+  #	}
+  #    }
+  #  }
+  #}
+
   return @genes;
 }
 
