@@ -100,7 +100,9 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_GW_GENETYPE
 					 GB_SIMILARITY_GENETYPE
 					 GB_COMBINED_GENETYPE
-					 );
+					 GB_MIN_FEATURE_SCORE
+					 GB_MIN_FEATURE_LENGTH
+					);
 use vars qw(@ISA);
 use strict;
 
@@ -111,24 +113,22 @@ sub new {
 
     my $self = $class->SUPER::new(@args);
 
-    my ($contig,$input_id) = $self->_rearrange([qw(CONTIG INPUT_ID)],
-				     @args);
+    my ($slice,$input_id) = $self->_rearrange([qw(SLICE INPUT_ID)],
+					      @args);
 
-    $self->throw("Must input a contig to GeneBuilder") unless defined($contig);
-    
-    $self->contig($contig);
-
-    $self->{'_genes'}          = [];
-    $self->{'_genewise_types'} = [];
-
-    $self->genewise_types($GB_COMBINED_GENETYPE);
-    $self->genewise_types($GB_TARGETTED_GW_GENETYPE);
-    $self->genewise_types($GB_SIMILARITY_GENETYPE);
+    $self->throw("Must input a slice to GeneBuilder") unless defined($slice);
+    $self->slice($slice);
+    $self->{'_final_genes'}          = [];
+    $self->{'_gene_types'}           = [];
+    $self->gene_types($GB_COMBINED_GENETYPE);
+    $self->gene_types($GB_TARGETTED_GW_GENETYPE);
+    $self->gene_types($GB_SIMILARITY_GENETYPE);
 
     $self->input_id($input_id);
 
     return $self;
 }
+
 
 =head2 input_id
 
@@ -151,11 +151,11 @@ sub input_id {
 
 =head2 build_Genes
 
- Title   : buildGenes 
  Usage   : my @genes = $self->build_Genes
  Function: builds genes
  Returns : none
  Args    : none
+ Caller  : Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder
 
 =cut
 
@@ -164,150 +164,222 @@ sub build_Genes {
 
     print STDERR "Building genes\n";
 
-    $self->get_Features;
+    # get all genes of type defined in gene_types() on this slice
+    $self->get_Genes;
+    print STDERR "Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n\n";
+
+    # get all Genscan predictions on this slice
+    $self->get_Predictions;
+    print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
+
+    # get all the dna/protein align features from the pre-computes pipeline on this slice
+    $self->get_Similarities;
+    print STDERR "\nNumber of similarity features ". scalar($self->features) . "\n";
+    
+    # get all exons from the PredictionTranscripts, take only exons with overlapping similarity features, which
+    # are incorporated as supporting evidence
     $self->make_Exons;
     
+    # pair up the exons according to consecutive overlapping supporting evidence
     $self->make_ExonPairs;
     
+    # link exon-pairs recursively according to shared evidence to form transcripts
+    # resulting transcripts are stored as
     $self->link_ExonPairs;
 
+    
     $self->filter_Transcripts;
+    
+    
     $self->make_Genes;
 
+    # this clusters transcripts into genes
     $self->recluster_Transcripts;
-
-#    $self->print_gff;
 
     print STDERR "Out of build Genes...\n";
 
 }
 
-=head2 genewise_types
+############################################################
 
- Title   : genewise_types
- Usage   : $self->genewise_types('similarity_gw');
- Function: get/set for the type(s) of genewise genes to be used in prediction
- Returns : array of strings
- Args    : string
+=head2 gene_types
+
+ Description: get/set for the type(s) of genewise/combined genes to be used in the genebuilder
+              they get set in new()
 
 =cut
 
-sub genewise_types {
+sub gene_types {
   my ($self,$type) = @_;
 
   if (defined($type)) {
-     push(@{$self->{'_genewise_types'}},$type);
+     push(@{$self->{_gene_types}},$type);
   }
 
-  return @{$self->{'_genewise_types'}};
+  return @{$self->{_gene_types}};
 }
+############################################################
 
-=head2 get_Genewises
+=head2 predictions
 
- Title   : get_Genewises
- Usage   : $self->get_Genewises
- Function: retrieves genewise predictions with supporting evidence. Splits transcripts with very long introns, discards transcripts with strand problems etc.
- Returns : none, but $self->genewise is filled
- Args    : none
+ Description: get/set for the PredictionTranscripts
+                         they get set in new()
 
 =cut
 
-sub get_Genewises {
-   my ($self) = @_;
+sub predictions {
+  my ($self,@predictions) = @_;
 
-    my @genewise;
-    
-    my $contig = $self->contig;
-
-    my @gw;
-
-    foreach my $type ($self->genewise_types) {
-      push(@gw,$self->contig->get_Genes_by_Type($type, 'evidence'));
-    }
-    
-    foreach my $g (@gw) {
-
-    TRANSCRIPT:
-      foreach my $t ($g->get_all_Transcripts) {
-        # set temporary_id to be dbID
-	$t->{'temporary_id'} = ($t->dbID) unless (defined $t->{'temporary_id'} && $t->{'temporary_id'} ne '');
-
-#	my @valid_transcripts = $self->validate_transcript($t);
-#	next TRANSCRIPT unless scalar(@valid_transcripts);
-
-        foreach my $exon ($t->get_all_Exons) {
-
-	  $self->warn("no contig id\n") unless defined $exon->contig_id;
-	  if(!defined $exon->contig_id){ $exon->contig_id("sticky"); }
-	  
-	  # set temporary_id to be dbID
-	  $exon->{'temporary_id'} = ($exon->dbID) unless (defined $exon->{'temporary_id'} && $exon->{'temporary_id'} ne '');
-	  
-	  # still faking score
-	  my $ev = new Bio::EnsEMBL::SeqFeature(-start => $exon->start,
-						-end   => $exon->end,
-						-strand => $exon->strand,
-						-score => '100',
-						-analysis => $g->analysis,
-						-primary_tag => $g->type,
-						-source_tag => $g->type);
-# not sure this will get remapped properly ... but it is needed later on for pairing code
-	  $exon->add_supporting_features($ev);
-	}
-
-#	push(@genewise, @valid_transcripts);
-	push(@genewise, $t);
-      } # end TRANSCRIPT
-    }
-
-    $self->genewise(@genewise);
+  if ( @predictions ) {
+     push(@{$self->{_predictions}},@predictions);
+  }
+  return @{$self->{_predictions}};
 }
+
+############################################################
+
+=head2 linked_predictions
+
+ Description: get/set for the transcripts built from linking the exon-pairs
+              taken from the prediction transcripts according to consecutive
+              feature overlap
+=cut
+
+sub linked_predictions {
+  my ($self,@linked_predictions) = @_;
+
+  if ( @linked_predictions ) {
+     push(@{$self->{_linked_predictions}},@linked_predictions);
+  }
+  return @{$self->{_linked_predictions}};
+}
+
+###################################################
+
+# get/set method holding a reference to the db with genewise and combined genes
+# this reference is set in Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder
+
+sub genes_db{
+ my ($self,$genes_db) = @_;
+ if ( $genes_db ){
+   $self->{_genes_db} = $genes_db;
+ }
+ return $self->{_genes_db};
+}
+
+############################################################
+
+sub genewise_combined_Transcripts {
+    my ($self,@genes) = @_;
+
+    if (!defined($self->{_genes})) {
+        $self->{_genes} = [];
+    }
+
+    if (scalar @genes > 0) {
+	push(@{$self->{_genes}},@genes);
+    }
+
+    return @{$self->{_genes}};
+}
+
+############################################################
+
+
+=head2 get_Genes
+
+ Description: retrieves genewise and combined gene annotations with supporting evidence. 
+              Splits transcripts with very long introns, discards transcripts with strand problems etc.
+ ReturnType : none, but $self->genewise_combined_Transcripts is filled
+ Args       : none
+
+=cut
+
+sub get_Genes {
+  my ($self) = @_;
+  my @transcripts;
+  my $db = $self->genes_db;
+  my $sa = $db->get_SliceAdaptor;
+  
+  my $input_id = $self->input_id;
+  $input_id =~/(\S+)\.(\d+)-(\d+)/;
+  my $chr   = $1;
+  my $start = $2;
+  my $end   = $3;
+  print STDERR "Taking 10000 bases extra to compensante for the latest genewise runs:\n";
+  my $slice = $sa->fetch_chr_start_end($chr,$start,$end);
+  
+  my @unchecked_genes;
+  
+  foreach my $type ($self->gene_types) {
+    push(@unchecked_genes, @{$slice->get_Genes_by_type($type, 'evidence')});
+  }
+  
+  foreach my $gene (@unchecked_genes) {
+    
+  TRANSCRIPT:
+    foreach my $tran (@{$gene->get_all_Transcript}) {
+      
+      # set temporary_id to be dbID
+      $tran->{'temporary_id'} = ($tran->dbID) unless (defined $tran->{'temporary_id'} && $tran->{'temporary_id'} ne '');
+      
+      # my @valid_transcripts = $self->validate_transcript($t);
+      # next TRANSCRIPT unless scalar(@valid_transcripts);
+      
+      my $previous_exon;
+    EXON:
+      foreach my $exon (@{$tran->get_all_Exons}) {
+	
+	$self->warn("no contig id\n") unless defined $exon->contig_id;
+	if(!defined $exon->contig_id){ 
+	  $exon->contig_id("sticky"); 
+	}
+	
+	# check contig consistency  
+	if ($previous_exon){
+	  # don't trust StickyExons, they won't necessarily tell you the truth
+	  unless( $previous_exon->isa('Bio::EnsEMBL::StickyExon') || $exon->isa('Bio::EnsEMBL::StickyExon') ){
+	    if ( !( $previous_exon->seqname eq $exon->seqname ) ){
+	      print STDERR "transcript ".$tran->dbID." is partly outside the contig, skipping it...\n";
+	      next TRANSCRIPT;
+	    }
+	  }
+	}
+	$exon->{'temporary_id'} = ($exon->dbID) unless (defined $exon->{'temporary_id'} && $exon->{'temporary_id'} ne '');
+	$previous_exon = $exon;
+	
+      }				# end of EXON
+      
+      push(@transcripts, $tran);
+      
+    }				# end TRANSCRIPT
+  }
+  
+  $self->genewise_combined_Transcripts(@transcripts);
+}
+
 
 =head2 get_Predictions
 
- Title   : get_Predictions
- Usage   : $self->get_Predictions
- Function: gets genscan preditions
- Returns : none, but $self->genscan is filled
- Args    : none
+Description:  gets your favourite ab initio predictions (genscan,genefinder,fgenesh,genecooker...8-)
+Returns : none, but $self->predictions is filled
+Args    : none
 
 =cut
   
 sub get_Predictions {
   my ($self) = @_;
-  
-  my $contig = $self->contig;
-  
-  my @tmp;
-  
-  my @preds;
-  my @more_preds;
-  if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
-    @preds = $self->contig->get_all_PredictionFeatures;
-  } 
-  else {
-    # VAC use StaticContig, not Virtual::Contig - off by ones.
-    
-    print STDERR "getting genscans with a contig\n";
-    @preds = Bio::EnsEMBL::Virtual::Contig::get_all_PredictionFeatures($self->contig);
-    
-    #print STDERR "getting genscans with a static contig\n";
-    #@more_preds = $self->contig->get_all_PredictionFeatures();
-  }
-  
-  print STDERR "get_Predictions(): got ".scalar(@preds)." predictions from contig\n";
-  #print STDERR "get_Predictions(): got ".scalar(@more_preds)." predictions from static contig\n";
-  
-  my @genscan;
-  
-  foreach my $f (@preds) {
-    my $fset = $self->set_phases($f,$contig);
-    if (defined($fset)) {
-      push(@genscan,$fset);
+  my @checked_predictions;
+  foreach my $prediction ( @{ $self->slice->get_all_PredictionTranscripts } ){
+    unless ( $self->_check_Transcript( $prediction ) ){
+      next;
     }
+    push ( @checked_predictions, $prediction );
   }
-  $self->genscan(@genscan);
+  $self->predictions(@checked_predictions);
 }
+
+############################################################
 
 =head2 get_Similarities
 
@@ -322,95 +394,32 @@ sub get_Predictions {
 sub get_Similarities {
   my ($self) = @_;
 
-  my @tmp2;
-   if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
-     @tmp2 = $self->contig->get_all_SimilarityFeatures;
-   } else {
-# source of one class of missing genscan genes?
-     @tmp2 = $self->contig->get_all_SimilarityFeatures_above_pid(50);
-#     @tmp2 = $self->contig->get_all_SimilarityFeatures_above_score('swall',100);
-   }
+  my @features = @{ $self->slice->get_all_SimilarityFeatures('',$GB_MIN_FEATURE_SCORE) };
+  
+  my %idhash;
+  my @other_features;
+  my @base_align_features;
 
-    my %idhash;
-    my @sf;
-	
-    foreach my $f (@tmp2) {
-
-      if ($f->isa("Bio::EnsEMBL::FeaturePair")) {
-	if (!defined($idhash{$f->hseqname})) {
-	  $idhash{$f->hseqname} = [];
-	}
-	push(@{$idhash{$f->hseqname}},$f);
-      } else {
-	push(@sf,$f);
+  foreach my $feature (@features) {
+    if ($feature->length > $GB_MIN_FEATURE_LENGTH) {
+      if ($feature->isa("Bio::EnsEMBL::BaseAlignFeature")) {
+	push ( @base_align_features, $feature );
       }
     }
-	
-    my @tmpfeatures = $self->merge(\%idhash);
-	
-    my @newfeatures;
-
-    foreach my $f (@tmpfeatures) {
-      if ($f->length > 15) {
-	push(@newfeatures,$f);
-      }
+    else {
+      push(@other_features,$feature);
     }
+  }
+  
+  my @merged_features = $self->merge(\%idhash);
 
-    print STDERR "Found " . scalar(@newfeatures) . " similarity features\n";
-    
-    my @tmp;
-
-    push(@tmp,@newfeatures);
-    push(@tmp,@sf);
-
-    @tmp = sort {$a->start <=> $b->start} @tmp;
-
-    my @features;
-
-    foreach my $f (@tmp) {
-
-      if ($f->primary_tag eq "similarity") {
-
-	$f->seqname  ($self->contig->id);
-	  
-	  if ($f->source_tag eq "hmmpfam" && $f->score > 25) {
-	    push(@features,$f);
-	  } elsif ($f->score >= 80) {
-	    push(@features,$f);
-	  }
-      }
-    }
-    $self->feature (@features);
+  my @newfeatures;
+  push(@newfeatures,@merged_features);
+  push(@newfeatures,@other_features);
+  
+  $self->features(@new_features);
 }
    
-=head2 get_Features
-
- Title   : get_Features
- Usage   : my ($features,$genscan) = $self->get_Features;
- Function: Gets all the features from all the contigs and sorts them into
-           similarity features and genscan exons.
- Example : 
- Returns : Array ref of Bio::EnsEMBL::SeqFeature,array ref of 
-           Bio::EnsEMBL::SeqFeature
- Args    : none
-
-=cut
-
-sub get_Features {
-    my ($self) = @_;
-
-
-    $self->get_Genewises;
-    $self->get_Predictions;
-    $self->get_Similarities;
-
-    print STDERR "\nNumber of similarity features " . scalar($self->feature) . "\n";
-    print STDERR "Number of genscans              " . scalar($self->genscan)  . "\n";
-    print STDERR "Number of genewise genes     " . scalar($self->genewise) . "\n\n";
-
-
-  }
-    
 =head2 make_Exons
 
  Title   : make_Exons
@@ -2136,19 +2145,21 @@ sub  genscan {
     return @{$self->{'_genscan'}};
 }
 
-sub  feature {
-    my ($self,@features) = @_;
+############################################################
 
-    if (!defined($self->{'_feature'})) {
-        $self->{'_feature'} = [];
-    }
-
-    if ( scalar @features > 0) {
-	push(@{$self->{'_feature'}},@features);
-    }
-
-    return @{$self->{'_feature'}};
+sub features {
+  my ($self,@features) = @_;
+  
+  if (!defined($self->{_feature})) {
+    $self->{_feature} = [];
+  }
+  if ( scalar @features ) {
+    push(@{$self->{_feature}},@features);
+  }
+  return @{$self->{_feature}};
 }
+
+############################################################
 
 sub  genewise {
     my ($self,@genewise) = @_;
@@ -2190,28 +2201,28 @@ sub genscan_exons {
 
 =cut
 
-sub contig {
-    my ($self,$contig) = @_;
+sub slice {
+    my ($self,$slice) = @_;
     
-    if (defined($contig)) {
-	    $self->{'_contig'} = $contig;
+    if (defined($slice)) {
+	    $self->{'_slice'} = $contig;
     }
-    return $self->{'_contig'};
+    return $self->{'_slice'};
 }
 
 sub _make_Exon { 
     my ($self,$subf,$stub) = @_;
 
-    my $contigid = $self->contig->id;
+    my $sliceid = $self->slice->id;
     my $exon     = new Bio::EnsEMBL::Exon;
 
-    $exon->{'temporary_id'} = ("TMPE_" . $contigid . "." . $subf->id . "." . $stub);
-    $exon->seqname  ($exon->{'temporary_id'});
-    $exon->contig_id($contigid);
-    $exon->start    ($subf->start);
-    $exon->end      ($subf->end  );
-    $exon->strand   ($subf->strand);
-    $exon->phase    ($subf->phase);
+    $exon->{'temporary_id'} = ("TMPE_" . $sliceid . "." . $subf->id . "." . $stub);
+    $exon->seqname   ($exon->{'temporary_id'});
+    $exon->contig    ($slice);
+    $exon->start     ($subf->start);
+    $exon->end       ($subf->end  );
+    $exon->strand    ($subf->strand);
+    $exon->phase     ($subf->phase);
     $exon->attach_seq($self->contig->primary_seq);
     $exon->add_supporting_features($subf);
     
@@ -2467,7 +2478,7 @@ sub print_gff {
 sub readGFF {
     my ($self,$min,$max) = @_;
 
-    my $clone = $self->contig->id;
+    my $clone = $self->slice->id;
     $clone=~ s/\..*//;
 
     my $file = "/nfs/disk100/humpub/birney/ensembl-pipeline/scripts/gff/$clone.gff";
@@ -3137,5 +3148,86 @@ sub print_FeaturePair{
 	    $fp->hstart . " " .
 	      $fp->hend . "\n";
 }
+
+############################################################
+
+sub _check_Transcript{
+  my ($self,$transcript) = @_;
+  
+  my $valid = 1;
+
+  # sort the exons 
+  $transcript->sort;
+  my @exons = @{$transcript->get_all_Exons};
+  
+  for (my $i = 1; $i <= $#exons; $i++) {
+    
+    # check phase consistency:
+    if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+      print STDERR "transcript has phase inconsistency\n";
+      $self->_print_Transcript($transcript);
+      $valid = 0;
+    }
+    
+    # check contig consistency
+    if ( !( $exons[$i-1]->seqname eq $exons[$i]->seqname ) ){
+      print STDERR "transcript ".$transcript->dbID." is partly outside the contig\n";
+      $valid = 0;
+    }
+  }
+
+  # check that they have a translation
+  my $translation = $transcript->translation;
+  my $sequence;
+  eval{
+    $sequence = $transcript->translate;
+  };
+  unless ( $sequence ){
+    print STDERR "TRANSCRIPT WITHOUT A TRANSLATION\n";
+    return 0;
+  }
+  if ( $sequence ){
+    my $peptide = $sequence->seq;
+    if ( $peptide =~ /\*/ ){
+      print STDERR "TRANSLATION HAS STOP CODONS!!\n";
+      $valid = 0;
+    }
+  }
+  if ($valid == 0 ){
+    $self->_print_Transcript($transcript);
+  }
+  return $valid;
+}
+
+
+############################################################
+
+  
+sub _print_Transcript{
+  my ($self,$transcript) = @_;
+  my @exons = @{$transcript->get_all_Exons};
+  my $id;
+  if ( $transcript->dbID ){
+    $id = $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+  print STDERR "transcript id: ".$id."\n";
+  foreach my $exon ( @exons){
+    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
+  }
+  print STDERR "\n";
+  #print STDERR "Translation : ".$transcript->translation."\n";
+  print STDERR "translation start exon: ".
+    $transcript->translation->start_exon->start."-".$transcript->translation->start_exon->end.
+      " start: ".$transcript->translation->start."\n";
+  print STDERR "translation end exon: ".
+    $transcript->translation->end_exon->start."-".$transcript->translation->end_exon->end.
+      " end: ".$transcript->translation->end."\n";
+}
+
+
+############################################################
 
 1;
