@@ -20,7 +20,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 # defaults: command line options override pipeConf variables,
 # which override anything set in the environment variables.
@@ -32,6 +32,7 @@ my $queue     = $::pipeConf{'queue'}  || $ENV{'ENS_QUEUE'};
 my $nodes     = $::pipeConf{'usenodes'};
 my $workdir   = $::pipeConf{'nfstmp.dir'};
 my $flushsize = $::pipeConf{'batchsize'};
+my $jobname   = $::pipeConf{'jobname'};
 
 $| = 1;
 
@@ -61,7 +62,7 @@ GetOptions(
 )
 or die ("Couldn't get options");
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new(
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
     -dbname => $dbname,
     -user   => $dbuser,
