@@ -318,9 +318,7 @@ sub output {
    }
 
    if (defined $self->{'output'}) {
-#     return @{$self->{'output'}};
      return $self->{'output'};
-
    } else {
      return ();
    }
@@ -343,14 +341,13 @@ sub write_output {
       return 1;
   } 
 
-  my @DnaDnaAlignFeatures;
+  my $DnaDnaAlignFeatures;
   if ($self->filter) {
-    print STDERR "filter used: ",$self->filter,"\n";
-    print STDERR "features before filter: ",scalar @{$self->output},"\n";
-    @DnaDnaAlignFeatures = @{$self->filter->filter($self->output)};
-    print STDERR "features after filter: ",scalar @DnaDnaAlignFeatures,"\n";
+    print STDERR "Features before filtering : ",scalar @{$self->output},"\n";
+    $DnaDnaAlignFeatures = $self->filter->filter($self->output);
+    print STDERR "Features after filtering  : ",scalar @{$DnaDnaAlignFeatures},"\n";
   } else {
-    @DnaDnaAlignFeatures = @{$self->output};
+    $DnaDnaAlignFeatures = $self->output;
   }
   my $db = $self->db();
   my $gadb = $db->get_GenomeDBAdaptor();
@@ -393,7 +390,7 @@ sub write_output {
   my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
   my $hseqname;
 
-  foreach my $f (sort {$a->hseqname cmp $b->hseqname} @DnaDnaAlignFeatures) {
+  foreach my $f (sort {$a->hseqname cmp $b->hseqname} @{$DnaDnaAlignFeatures}) {
     $hseqname = $f->hseqname unless (defined $hseqname);
     if ($hseqname ne $f->hseqname) {
       $aln->add_AlignBlockSet($current_align_row_id,$abs);
