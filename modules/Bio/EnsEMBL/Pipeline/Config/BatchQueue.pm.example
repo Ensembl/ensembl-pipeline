@@ -141,6 +141,17 @@ use vars qw(%Config);
 	 queue => 'acarilong',
 	 output_dir => '/acari/work1/lec/out/'
 	},
+
+	{
+	 logic_name => 'Snap',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '-m ecs_nodes',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/scratch1/ensembl/mongin/anopheles_mai/pipeline'
+	},
 			  				  	  
     ]
 );
