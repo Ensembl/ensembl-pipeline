@@ -1389,42 +1389,49 @@ sub transcript_from_multi_exon_genewise {
 	print STDERR "Recalculating protein\n";
 
 	############################################################
-	$transcript = $self->_recalculate_translation($transcript,1); 
+	# NOTE: this is actually not very correct as it is running genomewise and
+	# perhaps the transcrupt may still get modified afterwards
+	# we would need to run genomewise on a transcript which we are not going to modify
+	#
+	my $newtranscript = $self->_recalculate_translation($transcript,1); 
 	############################################################
 	
-	print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
+	if ($newtranscript == $transcript ){
+	  print STDERR "Genomewise failed\n";
+	  print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
 	
-	# $diff is the number of bases we chop from the genewise exon
-	my $diff   = $current_start - $gwstart;
-	my $tstart = $translation->start;
-	$self->warn("this is a case where gw translation starts at $tstart > 1") if ($tstart>1);
-	print STDERR "gw translation start: ".$tstart."\n";
-	print STDERR "start_exon: ".$translation->start_Exon->start.
-	  "-".$translation->start_Exon->end.
-	    " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
-	      " phase: ".$translation->start_Exon->phase.
-		" end_phase: ".$translation->start_Exon->end_phase."\n";
-
-	
-	if($diff % 3 == 0) { 
-	  # we chop exactily N codons from the beginning of translation
-	  $translation->start(1); 
-	}
-	elsif ($diff % 3 == 1) { 
-	  # we chop N codons plus one base 
-	  $translation->start(3); 
-	}
-	elsif ($diff % 3 == 2) { 
-	  # we chop N codons plus 2 bases
-	  $translation->start(2); 
-	}
-	else {
-	  $translation->start(1);
-	  $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
+	  # $diff is the number of bases we chop from the genewise exon
+	  my $diff   = $current_start - $gwstart;
+	  my $tstart = $translation->start;
+	  $self->warn("this is a case where gw translation starts at $tstart > 1") if ($tstart>1);
+	  print STDERR "gw translation start: ".$tstart."\n";
+	  print STDERR "start_exon: ".$translation->start_Exon->start.
+	    "-".$translation->start_Exon->end.
+	      " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
+		" phase: ".$translation->start_Exon->phase.
+		  " end_phase: ".$translation->start_Exon->end_phase."\n";
+	  
+	  
+	  if($diff % 3 == 0) { 
+	    # we chop exactily N codons from the beginning of translation
+	    $translation->start(1); 
+	  }
+	  elsif ($diff % 3 == 1) { 
+	    # we chop N codons plus one base 
+	    $translation->start(3); 
+	  }
+	  elsif ($diff % 3 == 2) { 
+	    # we chop N codons plus 2 bases
+	    $translation->start(2); 
+	  }
+	  else {
+	    $translation->start(1);
+	    $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
+	  }
 	}
       }
       ############################################################
-			  
+      
       else{
 	print STDERR "gw exon starts: $gwstart > new start: $current_start";
 	print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
@@ -1433,37 +1440,46 @@ sub transcript_from_multi_exon_genewise {
       
     } # end 5' exon
     
-      ############### 3_PRIME:
-      elsif (# they have coincident start
-	     $gwexons[$#gwexons]->start == $current_exon->start && 
-	     
-	     # either e2g exon ends after genewise exon
-	     ($current_exon->end >= $gwexons[$#gwexons]->end ||
-	      
-	      # or we allow to end before if there are UTR exons to be added
-	      (abs($current_exon->end - $gwexons[$#gwexons]->end) <= $exon_slop && 
-	       $current_exon != $egexons[$#egexons]))){   
-	  
-	my $end_translation_shift = 0;
-
-	# modify the coordinates of the last exon in $newtranscript
-	# e2g is larger on this end than gw.
-	my $ex = $transcript->end_Exon;
+    ############### 3_PRIME:
+    elsif (# they have coincident start
+	   $gwexons[$#gwexons]->start == $current_exon->start && 
+	   
+	   # either e2g exon ends after genewise exon
+	   ($current_exon->end >= $gwexons[$#gwexons]->end ||
+	    
+	    # or we allow to end before if there are UTR exons to be added
+	    (abs($current_exon->end - $gwexons[$#gwexons]->end) <= $exon_slop && 
+	     $current_exon != $egexons[$#egexons]))){   
+      
+      my $end_translation_shift = 0;
+      
+      # modify the coordinates of the last exon in $newtranscript
+      # e2g is larger on this end than gw.
+      my $ex = $transcript->end_Exon;
+      
+      # this exon is the end of translation, convention: end_phase = -1
+      $ex->end_phase(-1);
+      
+      if ( $current_exon->end > $gwexons[$#gwexons]->end ){
+	$ex->end($current_exon->end);
+      }
+      elsif( $current_exon->end == $gwexons[$#gwexons]->end ){
+	$ex->end($gwexons[$#gwexons]->end);
+	$ex->end_phase($gwexons[$#gwexons]->end_phase);
+      }
+      # if the e2g exon ends before the gw exon, 
+      # modify the end only if this e2g exon is not the last of the transcript
+      elsif ( $current_exon->end < $gwexons[$#gwexons]->end && $exoncount != $#egexons ){
 	
-	# this exon is the end of translation, convention: end_phase = -1
-	$ex->end_phase(-1);
+	############################################################
+	# NOTE: this is actually not very correct as it is running genomewise and
+	# perhaps the transcript may still get modified afterwards
+	# we would need to run genomewise on a transcript which we are not going to modify
+	#
+	my $newtranscript = $self->_recalculate_translation($transcript,1); 
+	############################################################
 	
-	if ( $current_exon->end > $gwexons[$#gwexons]->end ){
-	  $ex->end($current_exon->end);
-	}
-	elsif( $current_exon->end == $gwexons[$#gwexons]->end ){
-	  $ex->end($gwexons[$#gwexons]->end);
-	  $ex->end_phase($gwexons[$#gwexons]->end_phase);
-	}
-	# if the e2g exon ends before the gw exon, 
-	# modify the end only if this e2g exon is not the last of the transcript
-	elsif ( $current_exon->end < $gwexons[$#gwexons]->end && $exoncount != $#egexons ){
-	  
+	if ( $newtranscript == $transcript ){ 
 	  ## fix translation end iff genewise has leaked over - will need truncating
 	  my $diff   = $gwexons[$#gwexons]->end - $current_exon->end;
 	  print STDERR "diff: $diff\n";
@@ -1476,9 +1492,9 @@ sub transcript_from_multi_exon_genewise {
 	  
 	  my $length_diff = $gw_exon_length - $cdna_exon_length;
 	  print STDERR "length diff: ".$length_diff."\n"; # should be == diff
-
+	  
 	  $ex->end($current_exon->end);
-
+	  
 	  if($diff % 3 == 0) { 
 	    # we chop exactily N codons from the end of the translation
 	    # so it can end where the cdna exon ends
@@ -1504,27 +1520,27 @@ sub transcript_from_multi_exon_genewise {
 	    $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
 	  }
 	  print STDERR "Forward: translation end set to : ".$translation->end."\n";
-	  
 	}
-	# need to explicitly set the translation end exon for translation to work out
-	my $end_ex = $transcript->end_Exon;
-	$translation->end_Exon($end_ex);
-
-	# strand = 1
-	my $expanded = $self->expand_3prime_exon($ex, $transcript, 1);
-	
-	if($expanded){
-	  # set translation end to what it originally was in the unmerged genewise gene
-	  # taking into account the diff
-	  print STDERR "Forward: expanded 3' exon, re-setting end of translation from ".$translation->end." to orig_end ($orig_tend)- ( length_diff + shift_due_to_phases ) ($end_translation_shift)".($orig_tend - $end_translation_shift)."\n";
-	  $translation->end($orig_tend - $end_translation_shift);
-	}
-	
-	# finally add any 3 prime e2g exons
-	$self->add_3prime_exons($transcript, $exoncount, @egexons);
-	
-      } # end 3' exon    
+      }
+      # need to explicitly set the translation end exon for translation to work out
+      my $end_ex = $transcript->end_Exon;
+      $translation->end_Exon($end_ex);
       
+      # strand = 1
+      my $expanded = $self->expand_3prime_exon($ex, $transcript, 1);
+      
+      if($expanded){
+	# set translation end to what it originally was in the unmerged genewise gene
+	# taking into account the diff
+	print STDERR "Forward: expanded 3' exon, re-setting end of translation from ".$translation->end." to orig_end ($orig_tend)- ( length_diff + shift_due_to_phases ) ($end_translation_shift)".($orig_tend - $end_translation_shift)."\n";
+	$translation->end($orig_tend - $end_translation_shift);
+      }
+      
+      # finally add any 3 prime e2g exons
+      $self->add_3prime_exons($transcript, $exoncount, @egexons);
+      
+    } # end 3' exon    
+    
   }
   ########################### REVERSE:
   elsif($gwexons[0]->strand == -1){
@@ -1581,7 +1597,7 @@ sub transcript_from_multi_exon_genewise {
       # this exon is the start of translation, convention: phase = -1
       my $ex = $transcript->start_Exon;
       $ex->phase(-1);
-
+      
       # modify the coordinates of the first exon in $newtranscript
       if ( $current_exon->end > $gwexons[0]->end){ 
 	$ex->end($current_exon->end);
@@ -2320,6 +2336,10 @@ sub _recalculate_translation{
   
   # check that everything is sane:
   print STDERR "after genomewise:\n";
+  unless ($self->_check_Translation($newtranscript)){
+    print STDERR "problem with the translation. Returning the original transcript\n!";
+    return $transcript;
+  }
   $self->_print_Transcript($newtranscript);
   return $newtranscript;
   
