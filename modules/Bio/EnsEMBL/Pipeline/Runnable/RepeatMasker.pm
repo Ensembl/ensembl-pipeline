@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -80,7 +78,7 @@ use Bio::Root::RootI;
 
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
@@ -92,20 +90,23 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
-    $self->{_fplist} = [];           #an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_repeatmasker} = undef;  #location of RepeatMasker executable
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of RepeatMasker
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for RepeatMasker
+    $self->{'_fplist'} = [];           #an array of feature pairs
+    $self->{'_clone'}  = undef;        #location of Bio::Seq object
+    $self->{'_repeatmasker'} = undef;  #location of RepeatMasker executable
+    $self->{'_workdir'}   = undef;     #location of temp directory
+    $self->{'_filename'}  =undef;      #file to store Bio::Seq object
+    $self->{'_results'}   =undef;      #file to store results of RepeatMasker
+    $self->{'_protected'} =[];         #a list of files protected from deletion
+    $self->{'_arguments'} =undef;      #arguments for RepeatMasker
     
-    my( $clone, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
+    my( $clone, $arguments, $repmask) = $self->_rearrange([qw(CLONE
+							      ARGS
+							      REPM)], 
+							  @args);
     
     $self->clone($clone) if ($clone);       
     if ($repmask)
@@ -120,7 +121,7 @@ sub _initialize {
     {   $self->arguments($arguments) ;}
     else
     { $self->arguments('-low') ;      }
-    return $self; # success - we hope!
+    return $self;
 }
 
 #################
@@ -135,13 +136,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".out");
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 =head2 protect
@@ -206,9 +207,9 @@ sub arguments {
     my ($self, $args) = @_;
     if ($args)
     {
-        $self->{_arguments} = $args ;
+        $self->{'_arguments'} = $args ;
     }
-    return $self->{_arguments};
+    return $self->{'_arguments'};
 }
 ###########
 # Analysis methods
@@ -351,3 +352,4 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
+1;

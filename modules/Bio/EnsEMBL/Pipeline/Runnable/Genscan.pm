@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -86,7 +84,7 @@ use Bio::SeqIO;
 
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
@@ -99,23 +97,23 @@ use Bio::SeqIO;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
     #$self->{_seqfeature} = undef;   #Bio::SeqFeature container for Subseqfeatures
-    $self->{_exons} = [];           #an array of Bio::Seqfeatures (exons)
-    $self->{_genes} = [];           #an array of arrays of SeqFeatures
-    #$self->{_feature_data} = [];    #an array of data for SeqFeatures
-    $self->{_peptides} = [];        #genscan predicted peptide (used for phase)
-    $self->{_clone} = undef;        #location of Bio::Seq object
-    $self->{_genscan} = undef;      #location of Genscan script
-    $self->{_workdir} = undef;      #location of temp directory
-    $self->{_filename} =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;     #file to store results of genscan
-    $self->{_protected} =[];        #a list of file suffixes protected from deletion
-    $self->{_parameters} =undef;    #location of parameters for genscan
+    $self->{'_exons'}     = [];    # an array of Bio::Seqfeatures (exons)
+    $self->{'_genes'}     = [];    # an array of arrays of SeqFeatures
+    #$self->{_feature_data} = [];  # an array of data for SeqFeatures
+    $self->{'_peptides'}  = [];    # genscan predicted peptide (used for phase)
+    $self->{'_clone'}     = undef; # location of Bio::Seq object
+    $self->{'_genscan'}   = undef; # location of Genscan script
+    $self->{'_workdir'}   = undef; # location of temp directory
+    $self->{'_filename'}  = undef; # file to store Bio::Seq object
+    $self->{'_results'}   = undef; # file to store results of genscan
+    $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
+    $self->{'_parameters'} =undef; #location of parameters for genscan
     my($clonefile, $genscan, $parameters, $matrix) = 
-        $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM', 'MATRIX'], @args);
+        $self->_rearrange([qw(CLONE GENSCAN PARAM MATRIX)], @args);
 
     $self->clone($clonefile) if ($clonefile);
     print STDERR "GENSCAN $genscan\tMATRIX $matrix\n";
@@ -138,7 +136,7 @@ sub _initialize {
     else                
     {$self->parameters(''); }     
     
-    return $self; # success - we hope!
+    return $self;
 }
 
 
@@ -154,11 +152,11 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".genscan");
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 
@@ -177,9 +175,9 @@ sub genscan {
     {
         $self->throw("Genscan not found at $location: $!\n") 
                                                     unless (-e $location);
-        $self->{_genscan} = $location ;
+        $self->{'_genscan'} = $location ;
     }
-    return $self->{_genscan};
+    return $self->{'_genscan'};
 }
 
 =head2 matrix
@@ -197,9 +195,9 @@ sub matrix {
     {
         $self->throw("Genscan matrix not found at $location: $!\n") 
                                                     unless (-e $location);
-        $self->{_matrix} = $location ;
+        $self->{'_matrix'} = $location ;
     }
-    return $self->{_matrix};
+    return $self->{'_matrix'};
 }
 
 
@@ -216,9 +214,9 @@ sub parameters {
     my ($self, $location) = @_;
     if ($location)
     {
-        $self->{_parameters} = $location ;
+        $self->{'_parameters'} = $location ;
     }
-    return $self->{_parameters};
+    return $self->{'_parameters'};
 }
 
 sub exons {
@@ -732,3 +730,5 @@ sub output_singlefeature {
     }
     return $single;
 }
+
+1;

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -71,23 +69,23 @@ use Bio::SeqIO;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $features ) = $self->_rearrange(['GENOMIC',
-						   'FEATURES'], @args);
+    my( $genomic, $features ) = $self->_rearrange([qw(GENOMIC
+						      FEATURES)], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if $genomic; 
 
-    $self->{_features} = [];
+    $self->{'_features'} = [];
 
     if (defined($features)) {
 	if (ref($features) eq "ARRAY") {
@@ -105,7 +103,7 @@ sub _initialize {
 	}
     }
     
-    return $self; # success - we hope!
+    return $self; 
 }
 
 =head2 genomic_sequence
@@ -143,7 +141,7 @@ sub addFeature {
     
     if ($value) {
         $value->isa("Bio::EnsEMBL::FeaturePair") || $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair");
-	push(@{$self->{_features}},$value);
+	push(@{$self->{'_features'}},$value);
     }
 }
 
@@ -197,7 +195,7 @@ sub get_all_FeaturesById {
 sub get_all_Features {
     my( $self, $value ) = @_;
     
-    return (@{$self->{_features}});
+    return (@{$self->{'_features'}});
 }
 
 
@@ -391,10 +389,10 @@ sub minimum_intron {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_minimum_intron} = $arg;
+	$self->{'_minimum_intron'} = $arg;
     }
 
-    return $self->{_minimum_intron} || 1000;
+    return $self->{'_minimum_intron'} || 1000;
 }
 
     
@@ -402,10 +400,10 @@ sub exon_padding {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_padding} = $arg;
+	$self->{'_padding'} = $arg;
     }
 
-    return $self->{_padding} || 20;
+    return $self->{'_padding'} || 20;
 }
 
 sub print_FeaturePair {
@@ -436,8 +434,8 @@ sub get_Sequence {
     my $seq;
     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
-    if (defined($self->{_seq_cache}{$id})) {
-      return $self->{_seq_cache}{$id};
+    if (defined($self->{'_seq_cache'}{$id})) {
+      return $self->{'_seq_cache'}{$id};
     } 
     
     $seq = $seqfetcher->run_pfetch($id);
@@ -459,7 +457,7 @@ sub get_Sequence {
   Title   : get_all_Sequences
   Usage   : my $seq = get_all_Sequences(@id)
   Function: Fetches sequences with ids in @id
-  Returns : nothing, but $self->{_seq_cache}{$id} has a Bio::PrimarySeq for each $id in @id
+  Returns : nothing, but $self->{'_seq_cache'}{$id} has a Bio::PrimarySeq for each $id in @id
   Args    : array of ids
 
 =cut
@@ -470,7 +468,7 @@ sub get_all_Sequences {
  SEQ: foreach my $id (@id) {
     my $seq = $self->get_Sequence($id);
     if(defined $seq) {
-      $self->{_seq_cache}{$id} = $seq;
+      $self->{'_seq_cache'}{$id} = $seq;
     }
   }
 }
@@ -512,7 +510,7 @@ sub run {
 
 	}
 
-	push(@{$self->{_output}},@f);
+	push(@{$self->{'_output'}},@f);
 
     }
 }
@@ -582,7 +580,7 @@ sub minirun {
 		}
 	    }
 	    
-	    push(@{$self->{_output}},@newf);
+	    push(@{$self->{'_output'}},@newf);
 	    foreach my $nf (@newf) {
         #changed $nf->id to $nf->seqname
         print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
@@ -613,46 +611,47 @@ sub minirun {
 
 sub output {
     my ($self) = @_;
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
 
 sub _createfeatures {
     my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
+        $f1source, $f2source, $f1strand, $f2strand, 
+	$f1primary, $f2primary) = @_;
     
     #create analysis object
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => undef,
-                                 -db_version      => undef,
-                                 -program         => "est_genome",
-                                 -program_version => "unknown",
-                                 -gff_source      => $f1source,
-                                 -gff_feature     => $f1primary,);
+	('-db'              => undef,
+	 '-db_version'      => undef,
+	 '-program'         => "est_genome",
+	 '-program_version' => "unknown",
+	 '-gff_source'      => $f1source,
+	 '-gff_feature'     => $f1primary,);
     
     #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
-                                              -end =>     $f1end,
-                                              -seqname =>      $f1id,
-                                              -strand =>  $f1strand,
-                                              -score =>   $f1score,
-                                              -source =>  $f1source,
-                                              -primary => $f1primary,
-                                              -analysis => $analysis_obj );
+    my $feat1 = new Bio::EnsEMBL::SeqFeature ('-start'   => $f1start,
+                                              '-end'     => $f1end,
+                                              '-seqname' => $f1id,
+                                              '-strand'  => $f1strand,
+                                              '-score'   => $f1score,
+                                              '-source'  => $f1source,
+                                              '-primary' => $f1primary,
+                                              '-analysis'=> $analysis_obj );
  
-     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
-                                                -end =>    $f2end,
-                                                -seqname =>$f2id,
-                                                -strand => $f2strand,
-                                                -score =>  undef,
-                                                -source => $f2source,
-                                                -primary =>$f2primary,
-                                                -analysis => $analysis_obj );
+     my $feat2 = new Bio::EnsEMBL::SeqFeature ('-start'   => $f2start,
+                                               '-end'     => $f2end,
+					       '-seqname' => $f2id,
+					       '-strand'  => $f2strand,
+					       '-score'   => undef,
+					       '-source'  => $f2source,
+					       '-primary' => $f2primary,
+					       '-analysis'=> $analysis_obj );
     #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-                                             -feature2 => $feat2) ;
+    my $fp = new Bio::EnsEMBL::FeaturePair  ('-feature1' => $feat1,
+                                             '-feature2' => $feat2) ;
  
     $self->_growfplist($fp); 
 }
@@ -724,5 +723,3 @@ sub _deletefiles {
 }
 
 1;
-
-

@@ -17,14 +17,16 @@ Bio::EnsEMBL::Pipeline::Runnable::TransferClone
 
 =head1 SYNOPSIS
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::TransferClone(-from_locator => $locator1,
-								       -to_locator   => $locator2);
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::TransferClone
+    ('-from_locator' => $locator1,
+     '-to_locator'   => $locator2);
     my $status   = $runnable->run;
     my @pairs    = $runnable->output;
 
 =head1 DESCRIPTION
 
-Transfers a clones genes and exons from the core database to the analysis database
+Transfers a clones genes and exons from the core database to the
+analysis database
 
 =head1 CONTACT
 
@@ -49,7 +51,6 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::DBSQL::Obj;
-use Bio::EnsEMBL::DBSQL::Clone;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
@@ -59,10 +60,10 @@ use Bio::Root::RootI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
+    my $self = $class->SUPER::new(@args);
 
     my ($from_locator,$to_locator,$cloneid) = 
 	$self->_rearrange([qw(FROM_LOCATOR
@@ -78,7 +79,7 @@ sub _initialize {
     $self->to_locator  ($to_locator);
     $self->cloneid     ($cloneid);
 
-    return $make; # success - we hope!
+    return $self;
 }
 
 
@@ -112,7 +113,6 @@ sub run {
 	my $tcontig  = new Bio::EnsEMBL::Pipeline::DBSQL::Contig(-id    => $contig->id,
 								 -dbobj => $tdb);
 
-
 	$tclone->add_Contig($tcontig);
 	
 	foreach my $f (@features) {
@@ -124,15 +124,10 @@ sub run {
 	    foreach my $exon ($gene->each_unique_Exon) {
 		$exon->find_supporting_evidence(\@features);
 	    }
-	    
 	    $tcontig->add_Gene($gene);
-	    
 	}
-	
     }
-
     $self->clone($tclone);
-    
 }
 
 
@@ -152,27 +147,25 @@ sub output {
     my ($self) = @_;
 
     return $self->clone;
-
 }
 
 sub to_locator {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_to_locator} = $arg;
+	$self->{'_to_locator'} = $arg;
     }
-
-    return $self->{_to_locator};
+    return $self->{'_to_locator'};
 }
 
 sub from_locator {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_from_locator} = $arg;
+	$self->{'_from_locator'} = $arg;
     }
 
-    return $self->{_from_locator};
+    return $self->{'_from_locator'};
 }
 
 
@@ -180,18 +173,18 @@ sub cloneid {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_cloneid} = $arg;
+	$self->{'_cloneid'} = $arg;
     }
-    return $self->{_cloneid};
+    return $self->{'_cloneid'};
 }
 
 sub clone {
     my ($self,$arg) = @_;
     
     if (defined($arg)) {
-	$self->{_clone} = $arg;
+	$self->{'_clone'} = $arg;
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 1;

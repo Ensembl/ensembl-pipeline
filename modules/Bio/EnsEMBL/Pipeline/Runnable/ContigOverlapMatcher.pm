@@ -47,27 +47,27 @@ use Bio::EnsEMBL::Analysis::Programs 'phrap.longreads';
 use Bio::EnsEMBL::ContigOverlap;
 use Bio::SeqIO;
 use Bio::Root::RootI;
-use File::Path 'rmtree';
-use vars '@ISA';
+use File::Path qw(rmtree);
+use vars qw(@ISA);
 
-@ISA = ('Bio::EnsEMBL::Pipeline::RunnableI','Bio::Root::RootI');
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
-Returns a new
-Bio::EnsEMBL::Pipeline::Runnable::ContigOverlapMatcher
+Returns a new Bio::EnsEMBL::Pipeline::Runnable::ContigOverlapMatcher
 object.
 
 =cut
 
-sub _initialize {
-    my( $self, @args ) = @_;
-    my $make = $self->SUPER::_initialize(@_);
+sub new {
+    my( $class, @args ) = @_;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_contig_by_id'} = {};
     $self->{'_contig_overlap'} = [];
     
     $self->sequence_list(@args) if @args;
+    return $self;
 }
 
 =head2 add_Contig

@@ -46,26 +46,23 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
+    my $self = $class->SUPER::new(@args);
 
-    my ($clone) = $self->_rearrange([qw(CLONE
-					)],@args);
+    my ($clone) = $self->_rearrange([qw(CLONE)],@args);
 
     $clone                                  || $self->throw("No input clone object");
     $clone->isa("Bio::EnsEMBL::DB::CloneI") || $self->throw("Clone isn't a Bio::EnsEMBL::DB::CloneI");
-
+    
     $self->clone($clone);
-    $self->{_pairs} = [];
-    return $make; # success - we hope!
+    $self->{'_pairs'} = [];
+    return $self;
 }
-
 
 =head2 run
   Title   : run
@@ -93,7 +90,7 @@ sub run {
 	    $contig->make_ExonPairs($gene->each_unique_Exon);
 	}
     }
-	$self->{_clone} = undef;
+	$self->{'_clone'} = undef;
 }
 
 
@@ -112,10 +109,10 @@ sub run {
 sub output {
     my ($self) = @_;
     
-    if (!(defined($self->{_pairs}))) {
-        $self->{_pairs} = [];
+    if (!(defined($self->{'_pairs'}))) {
+        $self->{'_pairs'} = [];
     }
-    return @{$self->{_pairs}};
+    return @{$self->{'_pairs'}};
 
 }
 
@@ -132,7 +129,7 @@ sub output {
 sub add_ExonPair {
     my ($self,$arg) = @_;
 
-    push(@{$self->{_pairs}},$arg);
+    push(@{$self->{'_pairs'}},$arg);
 }
 
 
@@ -152,14 +149,14 @@ sub clone {
     
     if (defined($arg)) {
 	if ($arg->isa("Bio::EnsEMBL::DB::CloneI")) {
-	    $self->{_clone} = $arg;
+	    $self->{'_clone'} = $arg;
 	} else {
 	    
 	    $self->throw("[$arg] is not a Bio::EnsEMBL::DB::CloneI");
 	}
     }
     
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 1;

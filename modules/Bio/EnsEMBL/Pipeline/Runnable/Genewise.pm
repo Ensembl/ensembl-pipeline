@@ -1,4 +1,4 @@
-package Bio::EnsEMBL::Pipeline::Runnable::Genewise;
+
 
 =pod
 
@@ -31,6 +31,8 @@ The rest of the documentation details each of the object methods. Internal metho
 
 =cut
 
+package Bio::EnsEMBL::Pipeline::Runnable::Genewise;
+
 use strict;  
 use vars   qw(@ISA);
 
@@ -42,16 +44,14 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
-
-# _initialize is where the heavy stuff will happen when new is called
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
-  my ($class,@args) = @_;
-  my $self = bless {}, $class;
-
+  my($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);
+  
   my ($genomic, $protein, $memory,$reverse,$endbias) = 
-      $self->_rearrange(['GENOMIC','PROTEIN','MEMORY','REVERSE','ENDBIAS'], @args);
+      $self->_rearrange([qw(GENOMIC PROTEIN MEMORY REVERSE ENDBIAS)], @args);
   
   print $genomic . "\n";
 
@@ -62,7 +62,7 @@ sub new {
   $self->endbias($endbias)   if (defined($endbias));             
   $self->memory ($memory)    if (defined($memory));
 
-  return $self; # success - we hope!
+  return $self;
 }
 
 # RunnableI methods
@@ -216,7 +216,7 @@ sub _align_protein {
 	$phase = 2;
       }
       
-      $curr_gff->{_phase} = $phase;
+      $curr_gff->phase($phase);
       $curr_gff->id ($self->protein->id . ".$count"); 
       
       $count++;
@@ -424,33 +424,33 @@ sub reverse {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_reverse} = $arg;
+	$self->{'_reverse'} = $arg;
     }
-    return $self->{_reverse};
+    return $self->{'_reverse'};
 }
 
 sub endbias {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_endbias} = $arg;
+	$self->{'_endbias'} = $arg;
     }
 
-    if (!defined($self->{_endbias})) {
-      $self->{_endbias} = 0;
+    if (!defined($self->{'_endbias'})) {
+      $self->{'_endbias'} = 0;
     }
 
-    return $self->{_endbias};
+    return $self->{'_endbias'};
 }
 
 sub memory {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_memory} = $arg;
+	$self->{'_memory'} = $arg;
     }
 
-    return $self->{_memory} || 100000;
+    return $self->{'_memory'} || 100000;
 }
 
 sub genomic {
@@ -464,9 +464,9 @@ sub genomic {
 	     $arg->isa("Bio::PrimarySeqI"));
 		
 	
-	$self->{_genomic} = $arg;
+	$self->{'_genomic'} = $arg;
     }
-    return $self->{_genomic};
+    return $self->{'_genomic'};
 }
 
 sub protein {
@@ -478,59 +478,50 @@ sub protein {
 	     $arg->isa("Bio::Seq")  || 
 	     $arg->isa("Bio::PrimarySeqI"));
 
-	$self->{_protein} = $arg;
+	$self->{'_protein'} = $arg;
 
 
     }
-    return $self->{_protein};
+    return $self->{'_protein'};
 }
 
 #sub addGene {
 #    my ($self,$arg) = @_;
 
-#    if (!defined($self->{_output})) {
-#	$self->{_output} = [];
+#    if (!defined($self->{'_output'})) {
+#	$self->{'_output'} = [];
 #    }
-#    push(@{$self->{_output}},$arg);
+#    push(@{$self->{'_output'}},$arg);
 
 #}
 
 #sub eachGene {
 #    my ($self) = @_;
 
-#    if (!defined($self->{_output})) {
-#	$self->{_output} = [];
+#    if (!defined($self->{'_output'})) {
+#	$self->{'_output'} = [];
 #    }
 
-#    return @{$self->{_output}};
+#    return @{$self->{'_output'}};
 #}
 sub addExon {
     my ($self,$arg) = @_;
 
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
-    push(@{$self->{_output}},$arg);
+    push(@{$self->{'_output'}},$arg);
 
 }
 
 sub eachExon {
     my ($self) = @_;
 
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
 
-    return @{$self->{_output}};
+    return @{$self->{'_output'}};
 }
 
-
-
 1;
-
-
-
-
-
-
-

@@ -58,15 +58,13 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 sub new {
   my($class,@args) = @_;
 
-  my $self = {};
-  bless $self,$class;
-  
+  my $self = $class->SUPER::new(@args);  
 
   my($minscore,$maxevalue,$coverage) = $self->_rearrange([qw(MINSCORE
 							     MAXEVALUE
 							     COVERAGE
-							     )]
-							 ,@args);
+							     )],
+							 @args);
 
 
 
@@ -82,7 +80,6 @@ sub new {
 
   return $self;
 }
-
 
 
 =head2 run
@@ -101,8 +98,6 @@ sub run{
    my ($self,@input) = @_;
 
    my ($minscore,$maxevalue,$coverage);
-
-   my (@accepted);
 
    $minscore = $self->minscore;
    $maxevalue= $self->maxevalue;
@@ -172,10 +167,9 @@ sub run{
    # sort the list by highest score
 
    my @inputids = sort { $validhit{$a} <=> $validhit{$b} } keys %validhit; 
-
+   my @accepted;
 
    # we accept all feature pairs which are valid and meet coverage criteria
-
    FEATURE :
    foreach my $hseqname ( @inputids ) {
 
@@ -298,19 +292,3 @@ sub coverage{
 
 }
 1;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -18,11 +18,12 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new(-genomic    => $genseq,
-								       -features   => $features,
-								       -seqfetcher => $seqfetcher,
-								       -trim       => 0)
-
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new
+    ('-genomic'    => $genseq,
+     '-features'   => $features,
+     '-seqfetcher' => $seqfetcher,
+     '-trim'       => 0);
+    
     $obj->run
 
     my @newfeatures = $obj->output;
@@ -48,10 +49,8 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 
-#compile time check for executable
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
@@ -61,20 +60,21 @@ use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
   my ($class,@args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
   
   $self->{'_idlist'} = []; #create key to an array of feature pairs
   
-  my( $genomic, $ids, $seqfetcher, $trim, $endbias) = $self->_rearrange(['GENOMIC',
-									 'IDS',
-									 'SEQFETCHER',
-									 'TRIM',
-									 'ENDBIAS',
-									], @args);
+  my( $genomic, $ids, $seqfetcher, 
+      $trim, $endbias) = $self->_rearrange([qw(GENOMIC
+					       IDS
+					       SEQFETCHER
+					       TRIM
+					       ENDBIAS)],
+					   @args);
   
   $self->throw("No genomic sequence input")           unless defined($genomic);
   $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
@@ -90,7 +90,7 @@ sub new {
   
   if (defined($ids)) {
     if (ref($ids) eq "ARRAY") {
-      push(@{$self->{_idlist}},@$ids);
+      push(@{$self->{'_idlist'}},@$ids);
     } else {
       $self->throw("[$ids] is not an array ref.");
 	}
@@ -137,14 +137,14 @@ sub endbias {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_endbias} = $arg;
+	$self->{'_endbias'} = $arg;
     }
 
-    if (!defined($self->{_endbias})) {
-      $self->{_endbias} = 0;
+    if (!defined($self->{'_endbias'})) {
+      $self->{'_endbias'} = 0;
     }    
 
-    return $self->{_endbias};
+    return $self->{'_endbias'};
 }
 
 =head2 seqfetcher
@@ -181,10 +181,10 @@ sub seqfetcher {
 sub get_Ids {
     my ($self) = @_;
 
-    if (!defined($self->{_idlist})) {
-	$self->{_idlist} = [];
+    if (!defined($self->{'_idlist'})) {
+	$self->{'_idlist'} = [];
     }
-    return @{$self->{_idlist}};
+    return @{$self->{'_idlist'}};
 }
 
 
@@ -201,8 +201,7 @@ sub get_Ids {
 sub parse_Header {
     my ($self,$id) = @_;
 
-    if (!defined($id)) {
-	$self->throw("No id input to parse_Header");
+    if (!defined($id)) {	$self->throw("No id input to parse_Header");
     }
 
     my $newid = $id;
@@ -263,11 +262,11 @@ sub run {
     
     my @f = $mg->output;
 
-    foreach my $f (@f) {
-#      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
-    }
+ #   foreach my $f (@f) {
+ #      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
+ #   }
 
-    push(@{$self->{_output}},@f);
+    push(@{$self->{'_output'}},@f);
 
 }
 
@@ -511,8 +510,8 @@ sub get_Sequence {
 
 sub output {
     my ($self) = @_;
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
@@ -522,9 +521,9 @@ sub trim {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
-    $self->{_trim} = $arg;
+    $self->{'_trim'} = $arg;
   }
-  return $self->{_trim};
+  return $self->{'_trim'};
 }
 
 1;

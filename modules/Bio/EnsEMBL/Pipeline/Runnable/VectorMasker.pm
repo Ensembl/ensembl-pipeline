@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -70,6 +68,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::Root::RootI;
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::Root::RootI;
 
 #use Data::Dumper;
 
@@ -85,52 +84,49 @@ use Bio::SeqIO;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
-    $self->{_fplist} = [];           #an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_blastn} = undef;        #location of Blastn script
-    $self->{_mspcrunch} = undef;     #location of MSPcrunch
-    $self->{_vector} = undef;       #location of vector sequences
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of analysis
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for MSPcrunch
-    
+    $self->{'_fplist'} = [];          # an array of feature pairs
+    $self->{'_clone'}  = undef;       # location of Bio::Seq object
+    $self->{'_blastn'} = undef;       # location of Blastn script
+    $self->{'_mspcrunch'} = undef;    # location of MSPcrunch
+    $self->{'_vector'} = undef;       # location of vector sequences
+    $self->{'_workdir'}   = undef;    # location of temp directory
+    $self->{'_filename'}  = undef;    # file to store Bio::Seq object
+    $self->{'_results'}   = undef;    # file to store results of analysis
+    $self->{'_protected'} = [];       # a list of files protected from deletion
+    $self->{'_arguments'} =undef;     # arguments for MSPcrunch    
     
     my( $clonefile, $arguments, $blastn, $msp, $vector) = 
-            $self->_rearrange(['CLONE', 'ARGS', 'BLAST','MSP', 'VECT'], @args);
+            $self->_rearrange([qw(CLONE ARGS BLAST 
+				  MSP VECT)], @args);
     $self->clone($clonefile) if ($clonefile);       
-    if ($blastn) 
-    {   $self->blastn($blastn) ;}
-    else
-    {   
+    if ($blastn) {   $self->blastn($blastn) ;}
+    else {   
         eval 
         { $self->blastn($self->locate_executable('blastn'));  }; 
         if ($@) 
         { $self->blastn('/usr/local/pubseq/bin/blastn'); }  
     }
-    if ($msp) 
-    {   $self->mspcrunch($msp) ;}
-    else
-    {   
+    
+    if ($msp) {   $self->mspcrunch($msp) ;}
+    else {   
         eval 
         { $self->mspcrunch($self->locate_executable('MSPcrunch')); }; 
         if ($@)
         { $self->mspcrunch('/usr/local/pubseq/bin/MSPcrunch'); }  
     }
-    if ($vector) 
-    {   $self->vector($vector) ;}
+
+    if ($vector) {   $self->vector($vector) ;}
     else
     {   $self->vector('/tmp_mnt/nfs/disk100/humpub/blast/vectors_etc');   }
-    if ($arguments) 
-    {   $self->arguments($arguments) ;}
+
+    if ($arguments) {   $self->arguments($arguments) ;}
     else
     { $self->arguments(' -I 95 -d -') ;      }
-    return $self; # success - we hope!
+    return $self;
 }
 
 #################
@@ -139,17 +135,18 @@ sub _initialize {
 
 sub clone {
     my ($self, $seq) = @_;
+
     if ($seq)
     {
         unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".VectMask.out");
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 =head2 clonename
@@ -186,10 +183,10 @@ sub blastn {
     if ($location)
     {
         $self->throw("blastn not found at $location: $!\n") 
-                                                    unless (-e $location && -x $location);
-        $self->{_blastn} = $location ;
+	    unless (-e $location && -x $location);
+        $self->{'_blastn'} = $location ;
     }
-    return $self->{_blastn};
+    return $self->{'_blastn'};
 }
 
 =head2 mspcrunch
@@ -206,10 +203,10 @@ sub mspcrunch {
     if ($location)
     {
         $self->throw("MSPcrunch not found at $location: $!\n") 
-                                                    unless (-e $location && -x $location);
-        $self->{_mspcrunch} = $location ;
+	    unless (-e $location && -x $location);
+        $self->{'_mspcrunch'} = $location ;
     }
-    return $self->{_mspcrunch};
+    return $self->{'_mspcrunch'};
 }
 
 =head2 vector
@@ -226,20 +223,19 @@ sub vector {
     if ($location)
     {
         $self->throw("vector_etc not found at $location: $!\n") 
-                                                    unless (-e $location);
-        $self->{_vector} = $location ;
+	    unless (-e $location);
+        $self->{'_vector'} = $location ;
     }
-    return $self->{_vector};
+    return $self->{'_vector'};
 }
 
 =head2 workdir
 
     Title   :   workdir
     Usage   :   $obj->wordir('~humpub/temp');
-    Function:   Get/set method for the location of a directory to contain temp files
+    Function:   Get/set method for the location of a 
+                directory to contain temp files
     Args    :   File path (optional)
-
-=cut
 
 =head2 arguments
 
@@ -254,9 +250,9 @@ sub arguments {
     my ($self, $args) = @_;
     if ($args)
     {
-        $self->{_arguments} = $args ;
+        $self->{'_arguments'} = $args ;
     }
-    return $self->{_arguments};
+    return $self->{'_arguments'};
 }
 
 ###########
@@ -337,43 +333,42 @@ sub parse_results {
     {
         my @element = split;
         my (%feat1, %feat2);
-        $feat1 {name} = $element[4];
-        $feat1 {score} = $element[1];
+        $feat1 {'name'} = $element[4];
+        $feat1 {'score'} = $element[1];
         
         if ($element[2] < $element[3])
         {
-            $feat1 {start} = $element[2];
-            $feat1 {end} = $element[3];
-            $feat1 {strand} = 1;
-            $feat2 {strand} = 1;
+            $feat1 {'start'} = $element[2];
+            $feat1 {'end'} = $element[3];
+            $feat1 {'strand'} = 1;
+            $feat2 {'strand'} = 1;
         }
         else
         {
-            $feat1 {start} = $element[3];
-            $feat1 {end} = $element[2];
-            $feat1 {strand} = 1;
-            $feat2 {strand} = -1;
+            $feat1 {'start'} = $element[3];
+            $feat1 {'end'} = $element[2];
+            $feat1 {'strand'} = 1;
+            $feat2 {'strand'} = -1;
         }
         
-        $feat2 {name} = $element[7];
-        $feat2 {score} = $element[1];
-        $feat2 {start} = $element[5];
-        $feat2 {end} = $element[6];
-        $feat1 {primary} = 'similarity';
-        $feat1 {source} = 'VectorMasker';
-        $feat2 {primary} = 'similarity';
-        $feat2 {source} = 'VectorMasker';
+        $feat2 {'name'} = $element[7];
+        $feat2 {'score'} = $element[1];
+        $feat2 {'start'} = $element[5];
+        $feat2 {'end'} = $element[6];
+        $feat1 {'primary'} = 'similarity';
+        $feat1 {'source'} = 'VectorMasker';
+        $feat2 {'primary'} = 'similarity';
+        $feat2 {'source'} = 'VectorMasker';
         
-        $feat2 {db} = 'vector_etc';
-        $feat2 {db_version} = 'unknown';
-        $feat2 {program} = 'VectorMasker';
-        $feat2 {p_version} = 'unknown';
+        $feat2 {'db'} = 'vector_etc';
+        $feat2 {'db_version'} = 'unknown';
+        $feat2 {'program'} = 'VectorMasker';
+        $feat2 {'p_version'} = 'unknown';
         
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
     close $filehandle;       
 }
-
 
 
 ##############
@@ -394,3 +389,4 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
+1;

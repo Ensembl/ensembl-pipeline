@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -31,12 +29,8 @@ Bio::EnsEMBL::Pipeline::Runnable::Tandem
 
 =head1 DESCRIPTION
 
-Tandem takes a Bio::Seq (or Bio::PrimarySeq) object and runs equicktandem and etandem. The run strategy is taken from
-tan_Search in hp.pl. equicktandem is run to get a range of sizes from 2-3. Theses sizes are used as the
-only repeat length searched by etandem. The output is added to the output of etandem run with a repeat
-length of 2 and the uniform switch set to 'yes'. The results are parsed to produce a set
-ofBio::ensEMBL::FeaturePairs. 
-
+Tandem takes a Bio::Seq (or Bio::PrimarySeq) object and runs equicktandem and etandem. The run strategy is taken from tan_Search in hp.pl. equicktandem is run to get a range of sizes from 2-3. Theses sizes are used as the only repeat length searched by etandem. The output is added to the output of etandem run with a repeat length of 2 and the uniform switch set to 'yes'. The results are parsed to produce a set of Bio::ensEMBL::FeaturePairs. 
+    
 =head2 Methods:
 
  new($seq_obj)
@@ -70,7 +64,7 @@ use Bio::EnsEMBL::Analysis::Programs;
 use Bio::Root::RootI;
 use Bio::Seq;
 use Bio::SeqIO;
-
+use Bio::Root::RootI;
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
@@ -85,23 +79,23 @@ use Data::Dumper;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
-    $self->{_fplist} = [];           #an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_etandem} = undef;       #location of etandem
-    $self->{_equicktandem} = undef;  #location of equicktandem
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of analysis
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for etandem
+    $self->{'_fplist'}    = [];       # an array of feature pairs
+    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_etandem'}   = undef;    # location of etandem
+    $self->{'_equicktandem'} = undef; # location of equicktandem
+    $self->{'_workdir'}   = undef;    # location of temp directory
+    $self->{'_filename'}  = undef;    # file to store Bio::Seq object
+    $self->{'_results'}   = undef;    # file to store results of analysis
+    $self->{'_protected'} = [];       # a list of files protected from deletion
+    $self->{'_arguments'} = undef;    # arguments for etandem
     
     
     my( $clonefile, $arguments, $etandem, $equicktandem) = 
-            $self->_rearrange(['CLONE', 'ARGS', 'ETAND', 'EQTAND'], @args);
+            $self->_rearrange([qw(CLONE ARGS ETAND EQTAND)], @args);
     $self->clone($clonefile) if ($clonefile);       
     if ($etandem) 
     {   $self->etandem($etandem) ;}
@@ -172,9 +166,9 @@ sub etandem {
     {
         $self->throw("etandem not found at $location: $!\n") 
                                                     unless (-e $location && -x $location);
-        $self->{_etandem} = $location ;
+        $self->{'_etandem'} = $location ;
     }
-    return $self->{_etandem};
+    return $self->{'_etandem'};
 }
 
 =head2 equicktandem
@@ -394,3 +388,4 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
+1;

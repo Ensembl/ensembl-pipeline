@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -30,12 +28,12 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
 
 =head1 DESCRIPTION
 
-This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed from 
-assembling genscan predicted features to peptide sequence. The resulting blast hits are
-written back as FeaturePairs.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
-extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
-required for databse access.
+This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides
+constructed from assembling genscan predicted features to peptide
+sequence. The resulting blast hits are written back as FeaturePairs.
+The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed
+for extraction of appropriate parameters. A
+Bio::EnsEMBL::Pipeline::DBSQL::Obj is required for databse access.
 
 =head1 CONTACT
 
@@ -83,7 +81,7 @@ use vars qw(@ISA);
 
 sub new {
   my ($class, @args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
   
   $self->{'_featurepairs'}= [];
   
@@ -98,7 +96,12 @@ sub new {
   # Read the input parameters and set them in the object
 
   my ( $genomic,$peptide,$program,$database,$threshold,$options) = 
-    $self->_rearrange (['GENOMIC','PEPTIDE','PROGRAM','DATABASE','THRESHOLD','OPTIONS'], @args);
+    $self->_rearrange ([qw(GENOMIC 
+			   PEPTIDE 
+			   PROGRAM 
+			   DATABASE 
+			   THRESHOLD 
+			   OPTIONS)], @args);
   
   
   if (defined($genomic) && $genomic->isa("Bio::PrimarySeqI")) {
@@ -314,7 +317,7 @@ sub align_hits_to_contig {
 	  $strand = "-";
 	}
 
-        my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
+        my ($expep) = ($exon->translate->seq =~ /[^\*]+/g);
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
 
@@ -634,10 +637,10 @@ sub genomic {
 	$self->throw("[$seq] is not a Bio::PrimarySeqI");
       }
 
-      $self->{_genomic} = $seq;
+      $self->{'_genomic'} = $seq;
     }
 
-    return $self->{_genomic};
+    return $self->{'_genomic'};
 }
 
 =head2 peptide
@@ -657,10 +660,10 @@ sub peptide {
       if (!($seq->isa("Bio::EnsEMBL::Transcript"))) {
 	$self->throw("[$seq] is not a Bio::EnsEMBL::Transcript");
       }
-      $self->{_peptide} = $seq;
+      $self->{'_peptide'} = $seq;
     }
 
-    return $self->{_peptide};
+    return $self->{'_peptide'};
 }
 
 =head2 program
@@ -677,10 +680,10 @@ sub program {
     my($self,$arg) = @_;
     
     if (defined($arg)) {
-      $self->{_program} = $arg;
+      $self->{'_program'} = $arg;
     }
 
-    return $self->{_program};
+    return $self->{'_program'};
 }
 
 =head2 database
@@ -697,10 +700,10 @@ sub database {
     my($self,$arg) = @_;
     
     if (defined($arg)) {
-      $self->{_database} = $arg;
+      $self->{'_database'} = $arg;
     }
 
-    return $self->{_database};
+    return $self->{'_database'};
 }
 
 =head2 threshold
@@ -717,10 +720,10 @@ sub threshold {
     my($self,$arg) = @_;
     
     if (defined($arg)) {
-      $self->{_threshold} = $arg;
+      $self->{'_threshold'} = $arg;
     }
 
-    return $self->{_threshold};
+    return $self->{'_threshold'};
 }
 
 =head2 options
@@ -737,10 +740,10 @@ sub options {
     my($self,$arg) = @_;
     
     if (defined($arg)) {
-      $self->{_options} = $arg;
+      $self->{'_options'} = $arg;
     }
 
-    return $self->{_options};
+    return $self->{'_options'};
 }
 
 

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -55,36 +53,34 @@ use Bio::EnsEMBL::Analysis;
 use Bio::DB::RandomAccessI;
 
 #compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(pfetch efetch); 
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
-
+use Bio::Root::RootI;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 sub new {
-  my ($class,@args) = @_;
-  my $self = bless {}, $class;
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@_);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $features, $seqfetcher, $endbias, $forder) = $self->_rearrange(['GENOMIC',
-						                    'FEATURES',
-								    'SEQFETCHER',
-						                    'ENDBIAS',
-						                    'FORDER'], @args);
-       
-    $self->throw("No genomic sequence input")           unless defined($genomic);
+    my( $genomic, $features, 
+	$seqfetcher, $endbias, $forder) = $self->_rearrange([qw(GENOMIC
+								FEATURES
+								SEQFETCHER
+								ENDBIAS
+								FORDER)],
+							    @args);
+    
+    $self->throw("No genomic sequence input")         unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
     $self->genomic_sequence($genomic) if defined($genomic);
-
+    $self->{'_forder'} = $forder      if defined($forder);
     $self->throw("No seqfetcher provided") unless defined($seqfetcher);
     $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") unless $seqfetcher->isa("Bio::DB::RandomAccessI");
-    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
-
-    $self->{_forder} = $forder        if defined($forder);
-
+    $self->seqfetcher($seqfetcher)    if defined($seqfetcher);
     $self->endbias($endbias)          if defined($endbias);
 
     if (defined($features)) {
@@ -99,7 +95,7 @@ sub new {
 	}
     }
     
-    return $self; # success - we hope!
+    return $self;
 }
 
 =head2 genomic_sequence
@@ -136,12 +132,12 @@ sub endbias {
   my ($self,$arg) = @_;
   
   if (defined($arg)) {
-    $self->{_endbias} = $arg;
+    $self->{'_endbias'} = $arg;
   }
-  if (!defined($self->{_endbias})) {
-    $self->{_endbias} = 0;
+  if (!defined($self->{'_endbias'})) {
+    $self->{'_endbias'} = 0;
   }
-  return $self->{_endbias};
+  return $self->{'_endbias'};
   }
 
 =head2 seqfetcher
@@ -179,13 +175,13 @@ sub seqfetcher {
 sub addFeature {
     my( $self, $value ) = @_;
     
-    if(!defined($self->{_features})) {
-	$self->{_features} = [];
+    if(!defined($self->{'_features'})) {
+	$self->{'_features'} = [];
     }
 
     if ($value) {
         $value->isa("Bio::EnsEMBL::FeaturePair") || $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair");
-	push(@{$self->{_features}},$value);
+	push(@{$self->{'_features'}},$value);
     }
 }
 
@@ -239,7 +235,7 @@ sub get_all_FeaturesById {
 sub get_all_Features {
     my( $self, $value ) = @_;
     
-    return (@{$self->{_features}});
+    return (@{$self->{'_features'}});
 }
 
 
@@ -383,10 +379,9 @@ sub minimum_intron {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_minimum_intron} = $arg;
+	$self->{'_minimum_intron'} = $arg;
     }
-
-    return $self->{_minimum_intron} || 1000;
+    return $self->{'_minimum_intron'} || 1000;
 }
 
     
@@ -394,11 +389,11 @@ sub exon_padding {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_padding} = $arg;
+	$self->{'_padding'} = $arg;
     }
 
-    return $self->{_padding} || 100;
-#    return $self->{_padding} || 1000;
+    return $self->{'_padding'} || 100;
+#    return $self->{'_padding'} || 1000;
 
 }
 
@@ -428,8 +423,8 @@ sub print_FeaturePair {
 sub get_Sequence {
   my ($self,$id) = @_;
   
-  if (defined($self->{_seq_cache}{$id})) {
-    return $self->{_seq_cache}{$id};
+  if (defined($self->{'_seq_cache'}{$id})) {
+    return $self->{'_seq_cache'}{$id};
   } 
   
   my $seqfetcher = $self->seqfetcher;    
@@ -447,10 +442,8 @@ sub get_Sequence {
   }
   
   print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
-  
-  
+    
   return $seq;
-  
 }
 
 =head2 get_all_Sequences
@@ -458,7 +451,8 @@ sub get_Sequence {
   Title   : get_all_Sequences
   Usage   : my $seq = get_all_Sequences(@id)
   Function: Fetches sequences with ids in @id
-  Returns : nothing, but $self->{_seq_cache}{$id} has a Bio::PrimarySeq for each $id in @id
+  Returns : nothing, but $self->{'_seq_cache'}{$id} 
+            has a Bio::PrimarySeq for each $id in @id
   Args    : array of ids
 
 =cut
@@ -469,7 +463,7 @@ sub get_all_Sequences {
  SEQ: foreach my $id (@id) {
     my $seq = $self->get_Sequence($id);
     if(defined $seq) {
-      $self->{_seq_cache}{$id} = $seq;
+      $self->{'_seq_cache'}{$id} = $seq;
     }
   }
 }
@@ -520,7 +514,7 @@ sub run {
 	    print $f;
 	}
 
-	push(@{$self->{_output}},@f);
+	push(@{$self->{'_output'}},@f);
 
     }
 }
@@ -542,8 +536,8 @@ sub minirun {
   
   my @ids    = keys %$idhash;
   
-  if (defined($self->{_forder})) {
-    @ids = @{$self->{_forder}};
+  if (defined($self->{'_forder'})) {
+    @ids = @{$self->{'_forder'}};
   }
  
 # VAC FIXME - this is messed up for the Rikens as the same acc no is given for both
@@ -556,7 +550,7 @@ sub minirun {
      -program         => "genewise",
      -program_version => 1,
      -gff_source      => 'genewise',
-     -gff_feature     => 'similarity',);
+     -gff_feature     => 'similarity');
   
  ID: foreach my $id (@ids) {
     
@@ -661,7 +655,7 @@ sub run_blastwise {
     $f->strand($strand); # genomic
     $f->hstrand(1);      # protein
     
-    my $phase = $f->feature1->{_phase};
+    my $phase = $f->feature1->phase();
     
     # need to convert whole exon back to genomic coordinates
     my @newfeatures = $miniseq->convert_PepFeaturePair($f);         
@@ -709,7 +703,7 @@ sub run_blastwise {
     push(@newf,@genomics);
     
     foreach my $nf (@genomics) {
-      $nf->{_phase} = $phase;
+      $nf->phase($phase);
       $nf->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $nf->seqname($f->seqname);
@@ -737,11 +731,11 @@ sub run_blastwise {
 #	  $nf->hstart    . "\t" . 
 #	  $nf->hend      . "\t(" .
 #	  $nf->hstrand   . ")\t:" .
-#	  $nf->feature1->{_phase} . ":\t:" . 
-#	  $nf->feature2->{_phase} . ":\n");
+#	  $nf->feature1->phase() . ":\t:" . 
+#	  $nf->feature2->phase() . ":\n");
   }
   
-  push(@{$self->{_output}},$fset);
+  push(@{$self->{'_output'}},$fset);
   
 }
 
@@ -812,15 +806,17 @@ sub find_extras {
 
 sub output {
     my ($self) = @_;
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
 
 sub _createfeatures {
-    my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
+    my ($self, $f1score, $f1start, $f1end, $f1id, 
+	$f2start, $f2end, $f2id,
+        $f1source, $f2source, $f1strand, $f2strand, 
+	$f1primary, $f2primary) = @_;
     
     #create analysis object
     my $analysis_obj    = new Bio::EnsEMBL::Analysis

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -67,7 +65,7 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
@@ -79,24 +77,33 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-  my ($self,@args) = @_;
-  my $make = $self->SUPER::_initialize(@_);    
+sub new {
+  my ($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);    
   
-  $self->{_flist} = [];           #an array of Bio::SeqFeatures
-  $self->{_sequence}  = undef;        #location of Bio::Seq object
-  $self->{_cpg} = undef;  #location of cpg executable
-  $self->{_workdir}   = undef;     #location of temp directory
-  $self->{_filename}  =undef;      #file to store Bio::Seq object
-  $self->{_results}   =undef;      #file to store results of cpg
-  $self->{_protected} =[];         #a list of files protected from deletion ???
-  $self->{_min_length} = 0;    # minimum length required for a predicted cpg island to be reported
-  $self->{_min_gc} = 0;        # minimum %GC required for a predicted cpg island to be reported
-  $self->{_min_oe} = 0;        # minimum observed/expected ratio required for a predicted cpg island to be reported
+  $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
+  $self->{'_sequence'}  = undef; # location of Bio::Seq object
+  $self->{'_cpg'}       = undef; # location of cpg executable
+  $self->{'_workdir'}   = undef; # location of temp directory
+  $self->{'_filename'}  = undef; # file to store Bio::Seq object
+  $self->{'_results'}   = undef; # file to store results of cpg
+  $self->{'_protected'} = [];    # a list of files protected from deletion ???
+  $self->{'_min_length'}= 0;     # minimum length required for a
+                                 # predicted cpg island to be reported
+  $self->{'_min_gc'}    = 0;     # minimum %GC required for a predicted 
+                                 # cpg island to be reported
+  $self->{'_min_oe'}    = 0;     # minimum observed/expected ratio 
+                                 # required for a predicted cpg island to
+                                 # be reported
   
   print STDERR "args: ", @args, "\n";
 
-  my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange(['CLONE', 'LENGTH', 'GC', 'OE', 'CPG'], @args);
+  my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange([qw(CLONE 
+							       LENGTH 
+							       GC 
+							       OE 
+							       CPG)],
+							   @args);
   
   $self->clone($sequence) if ($sequence);       
   
@@ -131,17 +138,17 @@ sub _initialize {
 sub clone {
   my ($self, $seq) = @_;
   if ($seq)
-    {
+  {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
-        {
+      {
 	  $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-        }
-      $self->{_sequence} = $seq ;
-      
+      }
+      $self->{'_sequence'} = $seq ;
+
       $self->filename($self->clone->id.".$$.seq");
       $self->results($self->filename.".out");
-    }
-  return $self->{_sequence};
+  }
+  return $self->{'_sequence'};
 }
 
 =head2 cpg
@@ -159,11 +166,11 @@ sub cpg {
     {
       $self->throw("cpg not found at $location: $!\n") 
 	unless (-e $location);
-        $self->{_cpg} = $location ;
+        $self->{'_cpg'} = $location ;
       $self->throw("cpg not executable: $!\n") 
       	unless (-x $location);
     }
-    return $self->{_cpg};
+    return $self->{'_cpg'};
 }
 
 =head2 min_length
@@ -178,9 +185,9 @@ sub cpg {
 sub min_length {
     my ($self, $len) = @_;
     if (defined $len) {
-      $self->{_min_length} = $len ;
+      $self->{'_min_length'} = $len ;
     }
-    return $self->{_min_length};
+    return $self->{'_min_length'};
 }
 
 =head2 min_gc
@@ -195,9 +202,9 @@ sub min_length {
 sub min_gc {
     my ($self, $gc) = @_;
     if (defined $gc) {
-      $self->{_min_gc} = $gc ;
+      $self->{'_min_gc'} = $gc ;
     }
-    return $self->{_min_gc};
+    return $self->{'_min_gc'};
 }
 
 =head2 min_oe
@@ -212,9 +219,9 @@ sub min_gc {
 sub min_oe {
     my ($self, $oe) = @_;
     if (defined $oe) {
-      $self->{_min_oe} = $oe ; 
+      $self->{'_min_oe'} = $oe ; 
     }
-    return $self->{_min_oe};
+    return $self->{'_min_oe'};
 }
 
 ###########

@@ -44,19 +44,16 @@ package Bio::EnsEMBL::Pipeline::Runnable::ProcessList;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
-
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
-
-    return $make; # success - we hope!
+    my $self = $class->SUPER::new(@args);
+    return $self;
 }
 
 

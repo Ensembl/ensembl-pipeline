@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -72,41 +70,41 @@ use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-sub _initialize {
-  my ($self,@args) = @_;
-  my $make = $self->SUPER::_initialize(@_);    
+sub new {
+  my ($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);    
   
-  $self->{'_fplist'} = []; #create key to an array of feature pairs
-  $self->{_clone}  = undef;        #location of Bio::Seq object
-  $self->{_exonerate} = undef;     #location of exonerate
-  $self->{_workdir}   = undef;     #location of temp directory
-  $self->{_filename}  =undef;      #file to store Bio::Seq object
-  $self->{_estfilename} = undef;   #file to store EST Bio::Seq object
-  $self->{_results}   =undef;      #file to store results of analysis
-  $self->{_protected} =[];         #a list of files protected from deletion
-  $self->{_arguments} =undef;      #arguments for exonerate
+  $self->{'_fplist'}    = [];      # create key to an array of feature pairs
+  $self->{'_clone'}     = undef;   # location of Bio::Seq object
+  $self->{'_exonerate'} = undef;   # location of exonerate
+  $self->{'_workdir'}   = undef;   # location of temp directory
+  $self->{'_filename'}  = undef;   # file to store Bio::Seq object
+  $self->{'_estfilename'} = undef; # file to store EST Bio::Seq object
+  $self->{'_results'}     = undef; # file to store results of analysis
+  $self->{'_protected'}   = [];    # a list of files protected from deletion
+  $self->{'_arguments'}   = undef; # arguments for exonerate
   
   my( $genomic, $est, $exonerate, $arguments ) = 
-    $self->_rearrange(['GENOMIC','EST', 'EXONERATE', 'ARGS'], @args);
+    $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS)], @args);
   
   $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
   $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
   if ($exonerate) 
-    {   $self->exonerate($exonerate) ;}
+  {   $self->exonerate($exonerate) ;}
   else
-    {   
+  {   
       eval 
-        { $self->exonerate($self->locate_executable('exonerate')); };
+      { $self->exonerate($self->locate_executable('exonerate')); };
       if ($@)
-	# need a central installation ...
-        { $self->throw("Can't find exonerate!"); }
-    }
+	  # need a central installation ...
+      { $self->throw("Can't find exonerate!"); }
+  }
   if ($arguments) 
-    {   $self->arguments($arguments) ;}
+  {   $self->arguments($arguments) ;}
   
-  return $self; # success - we hope!
+  return $self;
 }
 
 #################
@@ -128,7 +126,8 @@ sub genomic_sequence {
   print STDERR "In this function!!!\n";
 
   if ($value) {
-      $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+      (ref($value) && $value->isa("Bio::PrimarySeqI")) 
+	  || $self->throw("Input [$value] isn't a Bio::PrimarySeqI");
       
       $self->{'_genomic_sequence'} = $value;
       $self->filename($value->id.".$$.seq");
@@ -180,9 +179,9 @@ sub exonerate {
   my ($self,$arg) = @_;
   
   if (defined($arg)) {
-    $self->{_exonerate} = $arg;
+    $self->{'_exonerate'} = $arg;
   }
-  return $self->{_exonerate};
+  return $self->{'_exonerate'};
 }
 
 =head2 arguments
@@ -199,9 +198,9 @@ sub arguments {
   my ($self, $args) = @_;
   if ($args)
     {
-      $self->{_arguments} = $args ;
+      $self->{'_arguments'} = $args ;
     }
-  return $self->{_arguments};
+  return $self->{'_arguments'};
 }
 
 
@@ -217,8 +216,8 @@ sub arguments {
 
 sub estfilename {
   my ($self, $estfilename) = @_;
-  $self->{_estfilename} = $estfilename if ($estfilename);
-  return $self->{_estfilename};
+  $self->{'_estfilename'} = $estfilename if ($estfilename);
+  return $self->{'_estfilename'};
 }
 
 =head2 run
@@ -399,10 +398,11 @@ sub convert_output {
     # otherwise skip it
   }
   
-  if (!defined($self->{_output})) {
-    $self->{_output} = [];
+  if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
   }
-  push(@{$self->{_output}},@genes);
+  print "genes are @genes\n";
+  push(@{$self->{'_output'}},@genes);
 
 }
 
@@ -420,7 +420,6 @@ sub convert_output {
 sub output {
   my ($self) = @_;
 
-
   #  could return a list of featurepairs, one per gene, as with Genewise.
 
   return @{$self->{'_output'}};
@@ -434,7 +433,7 @@ sub output {
 				    $f2source, $f1strand, $f2strand, 
 				    $f1primary, $f2primary)
   Function: Returns results of exonerate as array of FeaturePair
-  Returns : Nothing, but $self->{_fplist} contains a new FeaturePair
+  Returns : Nothing, but $self->{'_fplist'} contains a new FeaturePair
   Args    : 
 
 =cut
@@ -554,5 +553,4 @@ sub _deletefiles {
   }
 }
 
-
-
+1;

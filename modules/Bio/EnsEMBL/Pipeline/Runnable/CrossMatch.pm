@@ -132,7 +132,7 @@ sub run{
    eval {
        $cm = $cmf->crossMatch($file1,$file2);
    };
-   print STDEER "Finished crossmatch in runnable...\n";
+   print STDERR "Finished crossmatch in runnable...\n";
 
    if( $@ ) {
        unlink($file1);

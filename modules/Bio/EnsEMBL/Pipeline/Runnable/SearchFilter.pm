@@ -53,23 +53,20 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
-
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
   my($class,@args) = @_;
 
-  my $self = {};
-  bless $self,$class;
-  
+  my $self = $class->SUPER::new(@args);  
 
-  my($runnable,$minscore,$maxevalue,$coverage) = $self->_rearrange(
-								   [qw( RUNNABLE
-									MINSCORE
-									MAXEVALUE
-									COVERAGE
-									)]
-								   ,@args);
+  my($runnable,$minscore,
+     $maxevalue,$coverage) = $self->_rearrange([qw( RUNNABLE
+						    MINSCORE
+						    MAXEVALUE
+						    COVERAGE
+						    )]
+					       ,@args);
 
 
 
@@ -80,8 +77,6 @@ sub new {
   if( !defined $runnable ) {
       $self->throw("Must have a runnable for search filter");
   }
-
-
 
   $self->runnable($runnable);
   $self->minscore($minscore);
@@ -242,9 +237,6 @@ sub output{
    return @{$self->{'_output'}};
 }
 
-
-
-
 =head2 runnable
 
  Title   : runnable
@@ -329,4 +321,4 @@ sub coverage{
 
 }
 
-
+1;

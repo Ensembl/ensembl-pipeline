@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -70,28 +68,32 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-  my ($self,@args) = @_;
-  my $make = $self->SUPER::_initialize(@_);    
+sub new {
+  my ($class,@args) = @_;
+
+  my $self = $class->SUPER::new(@_);    
   
-  $self->{_flist} = [];           #an array of Bio::SeqFeatures
-  $self->{_sequence}  = undef;        #location of Bio::Seq object
-  $self->{_tRNAscan_SE} = undef;  #location of tRNAscan_SE executable
-  $self->{_workdir}   = undef;     #location of temp directory
-  $self->{_filename}  =undef;      #file to store Bio::Seq object
-  $self->{_results}   =undef;      #file to store results of tRNAscan_SE
-  $self->{_protected} =[];         #a list of files protected from deletion
+  $self->{'_flist'} = [];           #an array of Bio::SeqFeatures
+  $self->{'_sequence'}  = undef;        #location of Bio::Seq object
+  $self->{'_tRNAscan_SE'} = undef;  #location of tRNAscan_SE executable
+  $self->{'_workdir'}   = undef;     #location of temp directory
+  $self->{'_filename'}  = undef;      #file to store Bio::Seq object
+  $self->{'_results'}   = undef;      #file to store results of tRNAscan_SE
+  $self->{'_protected'} = [];         #a list of files protected from deletion
   
-  my( $sequence, $tRNAscan_SE) = $self->_rearrange(['CLONE', 'TRNASCAN_SE'], @args);
+  my( $sequence, $tRNAscan_SE) = $self->_rearrange([qw(CLONE 
+						       TRNASCAN_SE)], 
+						   @args);
   
   $self->clone($sequence) if ($sequence);       
   
   if ($tRNAscan_SE) {   
-    $self->tRNAscan_SE($tRNAscan_SE); }
-  else {   
-    $self->tRNAscan_SE($self->locate_executable('tRNAscan-SE')); }
+      $self->tRNAscan_SE($tRNAscan_SE); 
+  } else {   
+      $self->tRNAscan_SE($self->locate_executable('tRNAscan-SE')); 
+  }
   
-  return $self; # success - we hope!
+  return $self;
 }
 
 #################
@@ -100,20 +102,20 @@ sub _initialize {
 # really ought to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
 # to do!
 sub clone {
-  my ($self, $seq) = @_;
-  if ($seq)
+    my ($self, $seq) = @_;
+    if ($seq)
     {
-      unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
+	unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
         {
-	  $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
+	    $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-      $self->{_sequence} = $seq ;
-      
-      $self->clonename($self->clone->id);
-      $self->filename($self->clone->id.".$$.seq");
-      $self->results($self->filename.".out");
+	$self->{'_sequence'} = $seq ;
+
+	$self->clonename($self->clone->id);
+	$self->filename($self->clone->id.".$$.seq");
+	$self->results($self->filename.".out");
     }
-  return $self->{_sequence};
+    return $self->{'_sequence'};
 }
 
 =head2 tRNAscan_SE
@@ -130,10 +132,10 @@ sub tRNAscan_SE {
     if ($location)
     {
         $self->throw("tRNAscan-SE not found at $location: $!\n") 
-                                                    unless (-e $location);
-        $self->{_tRNAscan_SE} = $location ;
+	    unless (-e $location);
+        $self->{'_tRNAscan_SE'} = $location ;
     }
-    return $self->{_tRNAscan_SE};
+    return $self->{'_tRNAscan_SE'};
 }
 
 ###########
@@ -174,7 +176,6 @@ sub run {
     $self->deletefiles();
 }
 
-
 =head2 run_tRNAscan_SE
 
     Title   :  run_tRNAscan_SE
@@ -184,6 +185,7 @@ sub run {
     Args    :   optional filename
 
 =cut
+
 sub run_tRNAscan_SE {
     my ($self) = @_;
     #run tRNAscan_SE
@@ -202,6 +204,7 @@ sub run_tRNAscan_SE {
     Args    :   optional filename
 
 =cut
+
 sub parse_results {
     my ($self) = @_;
     my $filehandle;
@@ -288,6 +291,7 @@ sub output {
     Args    :   none
 
 =cut
+
 sub create_feature {
     my ($self, $feat) = @_;
 
@@ -319,3 +323,5 @@ sub create_feature {
 	push(@{$self->{'_flist'}}, $tRNA);
       }
 }
+
+1;

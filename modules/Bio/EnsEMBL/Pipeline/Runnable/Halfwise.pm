@@ -78,23 +78,23 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
-    $self->{_seqfeature} = undef;   #Bio::SeqFeature
-    $self->{_clone} = undef;        #location of Bio::Seq object
-    $self->{_halfwise} = undef;     #location of Genscan script
-    $self->{_workdir} = undef;      #location of temp directory
-    $self->{_filename} =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;     #file to store results of Halfwise
-    $self->{_protected} =[];        #a list of file suffixes protected from deletion
-    $self->{_arguments} =undef;     #parameters for halfwise
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
+    $self->{'_seqfeature'} = undef;  # Bio::SeqFeature
+    $self->{'_clone'}      = undef;  # location of Bio::Seq object
+    $self->{'_halfwise'}   = undef;  # location of Genscan script
+    $self->{'_workdir'}    = undef;  # location of temp directory
+    $self->{'_filename'}   = undef;  # file to store Bio::Seq object
+    $self->{'_results'}    = undef;  # file to store results of Halfwise
+    $self->{'_protected'}  = [];     # a list of file suffixes protected 
+                                     # from deletion
+    $self->{'_arguments'}    = undef;     #parameters for halfwise
     my($clonefile, $halfwise, $arguments) 
-            = $self->_rearrange(['CLONE', 'HALFW', 'ARGS'], @args);
+	= $self->_rearrange([qw(CLONE HALFW ARGS)], @args);
     
     $self->clone($clonefile) if ($clonefile);
-    if ($halfwise)      
-    {$self->halfwise($halfwise) ;}
+    if ($halfwise)  {$self->halfwise($halfwise) ;}
     else                
     {   
         eval 
@@ -106,7 +106,7 @@ sub _initialize {
     {$self->arguments($arguments) ; }
     else                
     {$self->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet'); }     
-    return $self; # success - we hope!
+    return $self; 
 }
 
 
@@ -122,13 +122,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.'.halfwise');
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 =head2 protect

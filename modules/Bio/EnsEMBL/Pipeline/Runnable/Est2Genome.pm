@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -70,25 +68,42 @@ use Bio::Root::RootI;
 
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-GENOMIC       => $genomicseq,
+			   -EST           => $estseq,
+                           -E2G           => $executable,
+                           -ARGS          => $args);
+                           
+    Function:   creates a 
+                Bio::EnsEMBL::Pipeline::Runnable::Est2Genome object
+    Returns :   A Bio::EnsEMBL::Pipeline::Runnable::Est2Genome object
+    Args    :   -genomic:    Bio::PrimarySeqI object (genomic sequence)
+                -est:        Bio::PrimarySeqI object (est sequence), 
+                -e2g:        Path to Est2Genome executable
+                -args:       Arguments when running est2genome 
+=cut
 
 sub new {
     my ($class,@args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
            
-    $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_est_genome} = undef;    #location of est2genome
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_estfilename} = undef;    #file to store EST Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of analysis
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for est2genome
+    $self->{'_fplist'}     = [];    # create key to an array of feature pairs
+    $self->{'_clone'}      = undef; # location of Bio::Seq object
+    $self->{'_est_genome'} = undef; # location of est2genome
+    $self->{'_workdir'}    = undef; # location of temp directory
+    $self->{'_filename'}   = undef; # file to store Bio::Seq object
+    $self->{'_estfilename'}= undef; # file to store EST Bio::Seq object
+    $self->{'_results'}    = undef; # file to store results of analysis
+    $self->{'_protected'}  = [];    # a list of files protected from deletion
+    $self->{'_arguments'}  = undef; # arguments for est2genome
     
     my( $genomic, $est, $est_genome, $arguments ) = 
-        $self->_rearrange(['GENOMIC','EST', 'E2G', 'ARGS'], @args);
-       print STDERR "Genomic $genomic\n"; 
+        $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
+    print STDERR "Genomic $genomic\n"; 
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
@@ -105,7 +120,7 @@ sub new {
     else
     { $self->arguments(' -reverse ') ;      }
     
-    return $self; # success - we hope!
+    return $self;
 }
 
 #################
@@ -158,8 +173,8 @@ sub est_sequence {
 
 sub estfilename {
     my ($self, $estfilename) = @_;
-    $self->{_estfilename} = $estfilename if ($estfilename);
-    return $self->{_estfilename};
+    $self->{'_estfilename'} = $estfilename if ($estfilename);
+    return $self->{'_estfilename'};
 }
 
 =head2 protect
@@ -193,9 +208,9 @@ sub arguments {
     my ($self, $args) = @_;
     if ($args)
     {
-        $self->{_arguments} = $args ;
+        $self->{'_arguments'} = $args ;
     }
-    return $self->{_arguments};
+    return $self->{'_arguments'};
 }
 
 ###########
@@ -495,13 +510,13 @@ sub _deletefiles {
     }
 }
 
-
-
 sub est_genome {
    my ($self,$arg) = @_;
 
   if (defined($arg)) {
-     $self->{_est_genome} = $arg;
+     $self->{'_est_genome'} = $arg;
   }
-  return $self->{_est_genome};
+  return $self->{'_est_genome'};
 }
+
+1;

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -79,7 +77,7 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 =head2 new
 
@@ -91,21 +89,20 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
-    $self->{_fplist} = [];           #an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_epcr} = undef;  #location of EPCRHum script
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of EPCRHum
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_db}        =undef;
+    $self->{'_fplist'}    = [];    # an array of feature pairs
+    $self->{'_clone'}     = undef; # location of Bio::Seq object
+    $self->{'_epcr'}      = undef; # location of EPCRHum script
+    $self->{'_workdir'}   = undef; # location of temp directory
+    $self->{'_filename'}  = undef; # file to store Bio::Seq object
+    $self->{'_results'}   = undef; # file to store results of EPCRHum
+    $self->{'_protected'} = [];    # a list of files protected from deletion
+    $self->{'_db'}        = undef;
     
-    my( $clone, $epcr, $db) 
-        = $self->_rearrange(['CLONE', 'PCR', 'DB'], @args);
+    my( $clone, $epcr, $db) = $self->_rearrange([qw(CLONE PCR DB)], @args);
     
     $self->clone($clone) if ($clone);       
     if ($epcr)
@@ -121,7 +118,7 @@ sub _initialize {
     $self->throw("sts or primer Database required ($db)\n") unless ($db);
     $self->db($db);
     
-    return $self; # success - we hope!
+    return $self; 
 }
 
 #################
@@ -136,13 +133,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".PCR.out");
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 =head2 epcr
@@ -160,9 +157,9 @@ sub epcr {
     {
         $self->throw("e-PCR not found at $location: $!\n") 
                                                     unless (-e $location);
-        $self->{_epcr} = $location ;
+        $self->{'_epcr'} = $location ;
     }
-    return $self->{_epcr};
+    return $self->{'_epcr'};
 }
 
 =head2 arguments
@@ -178,9 +175,9 @@ sub arguments {
     my ($self, $args) = @_;
     if ($args)
     {
-        $self->{_arguments} = $args ;
+        $self->{'_arguments'} = $args ;
     }
-    return $self->{_arguments};
+    return $self->{'_arguments'};
 }
 
 sub db {
@@ -322,3 +319,4 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
+1;

@@ -46,14 +46,13 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Transcript;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
     my($class,@args) = @_;
     
-    my $self = {};
+    my $self = $class->SUPER::new(@args);
     
-    bless $self,$class;
     $self->{'_transcript_array'} = [];
     $self->{'_output_array'}     = [];
     return $self;
@@ -212,8 +211,10 @@ sub seq{
 	  $obj->throw("No primary sequence provided...");
       }
 
-      $obj->{'seq'} = $value;
+      $obj->{'_seq'} = $value;
     }
-    return $obj->{'seq'};
+    return $obj->{'_seq'};
 
 }
+
+1;

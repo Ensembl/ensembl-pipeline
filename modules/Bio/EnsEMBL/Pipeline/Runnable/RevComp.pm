@@ -41,23 +41,21 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::Root::RootI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
+    my $self = $class->SUPER::new(@args);
 
-    my ($seq) = $self->_rearrange([qw(SEQ
-				      )],@args);
+    my ($seq) = $self->_rearrange([qw(SEQ)],@args);
 
     $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
-
+    
     $self->seq($seq);
-
-    return $make; # success - we hope!
+    
+    return $self;
 }
 
 sub run {
@@ -69,7 +67,7 @@ sub run {
     $str =~ tr/atgcATGC/tacgTACG/;
     $str = reverse($str);
 
-    $self->{_revseq} = Bio::Seq->new(-seq => $str,
+    $self->{'_revseq'} = Bio::Seq->new(-seq => $str,
 				     -id  => $self->seq->id . ".rc",
 				     );
     
@@ -78,8 +76,7 @@ sub run {
 sub output {
     my ($self) = @_;
 
-    return $self->{_revseq};
-
+    return $self->{'_revseq'};
 }
 
 
@@ -87,8 +84,7 @@ sub seq {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_seq} = $arg;
+	$self->{'_seq'} = $arg;
     }
-
-    return $self->{_seq};
+    return $self->{'_seq'};
 }

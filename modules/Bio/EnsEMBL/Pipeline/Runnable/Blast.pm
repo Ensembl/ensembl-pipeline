@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -23,12 +21,13 @@ Bio::EnsEMBL::Pipeline::Runnable::Blast
   my $query = new Bio::Seq(-file   => 'somefile.fa',
 			   -format => 'fasta');
 
-  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-query    => $query,
-							     -program  => 'blastp',
-							     -database => 'swir',
-							     -threshold => 1e-6,
-							     -filter    => $filter,
-							     -options   => 'V=1000000');
+  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
+    ('-query'     => $query,
+     '-program'   => 'blastp',
+     '-database'  => 'swir',
+     '-threshold' => 1e-6,
+     '-filter'    => $filter,
+     '-options'   => 'V=1000000');
 
   $blast->run();
 
@@ -80,19 +79,21 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
-use BPlite;
+use Bio::Tools::BPlite;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-query    => $seq,
-									-program  => 'blastp',
-								        -database => 'swir',
-								        -threshold => 1e-6,
-									-filter    => $filter,
-								        -options   => 'V=1000000');
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
+    (-query    => $seq,
+     -program  => 'blastp',
+     -database => 'swir',
+     -threshold => 1e-6,
+     -filter    => $filter,
+     -options   => 'V=1000000');
+
     Function:   Initialises Blast object
     Returns :   a Blast Object
     Args    :   A Bio::Seq object
@@ -100,29 +101,32 @@ use BPlite;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize(@_);    
+    my $self = $class->SUPER::new(@args);    
 
-    $self->{_query}     = undef;     # location of Bio::Seq object
-    $self->{_program}   = undef;     # location of Blast
-    $self->{_database}  = undef;     # name of database
-    $self->{_threshold} = undef;     # Threshold for hit filterting
-    $self->{_options}   = undef;     # arguments for blast
-    $self->{_filter}    = 0;         # Do we filter features?
-    $self->{_fplist}    = [];        # an array of feature pairs (the output)
+    $self->{'_query'}     = undef;     # location of Bio::Seq object
+    $self->{'_program'}   = undef;     # location of Blast
+    $self->{'_database'}  = undef;     # name of database
+    $self->{'_threshold'} = undef;     # Threshold for hit filterting
+    $self->{'_options'}   = undef;     # arguments for blast
+    $self->{'_filter'}    = 0;         # Do we filter features?
+    $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
 
-    $self->{_workdir}   = undef;     # location of temp directory
-    $self->{_filename}  = undef;     # file to store Bio::Seq object
-    $self->{_results}   = undef;     # file to store results of analysis
+    $self->{'_workdir'}   = undef;     # location of temp directory
+    $self->{'_filename'}  = undef;     # file to store Bio::Seq object
+    $self->{'_results'}   = undef;     # file to store results of analysis
 
       
     # Now parse the input options and store them in the object
 
-    my( $query, $program, $database, $threshold, $filter,$options) = 
-	$self->_rearrange(['QUERY', 'PROGRAM', 'DATABASE','THRESHOLD','FILTER','OPTIONS'], @args);
-   
+    my( $query, $program, $database, 
+	$threshold, $filter,$options) = 
+	    $self->_rearrange([qw(QUERY PROGRAM 
+				  DATABASE THRESHOLD
+				  FILTER OPTIONS)], 
+			      @args);
     if ($query) {
       $self->clone($query);
     } else {
@@ -156,9 +160,9 @@ sub _initialize {
     if (defined($filter)) {
 	$self->filter($filter);
     }
-
+    
     return $self; # success - we hope!
-  }
+}
 
 
 ###########
@@ -323,7 +327,7 @@ sub parse_results {
 
   # BPlite does most of the work
 
-  my $parser = new BPlite ($filehandle);
+  my $parser = new Bio::Tools::BPlite ('-fh' => $filehandle);
 
   # Loop over each blast hit
 
@@ -345,7 +349,7 @@ sub parse_results {
       $filehandle = $self->results;
   }    
 
-  $parser = new BPlite ($filehandle);
+  $parser = new Bio::Tools::BPlite ('-fh' => $filehandle);
 
  NAME: while(my $sbjct = $parser->nextSbjct)  {
       
@@ -399,11 +403,11 @@ sub filter_hits {
     HSP: while (my $hsp = $sbjct->nextHSP) {
 	next HSP if ($hsp->percent < $self->threshold);
 	
-	my $qstart = $hsp->queryBegin;      
-	my $hstart = $hsp->sbjctBegin;      
+	my $qstart = $hsp->query->start();
+	my $hstart = $hsp->subject->start();
 	
-	my $qend   = $hsp->queryEnd;      
-	my $hend   = $hsp->sbjctEnd;      
+	my $qend   = $hsp->query->end();
+	my $hend   = $hsp->subject->end();      
 
 	my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
 
@@ -492,26 +496,28 @@ sub split_HSP {
     # in either the query sequence or the hit sequence we make 
     # a new feature pair. 
     #
-    # Before making a new feature pair we check whether we have something to make
-    # a feature pair out of - i.e. we aren't just on the 2nd or greater base in a gapped
-    # region.
+
+    # Before making a new feature pair we check whether we have
+    # something to make a feature pair out of - i.e. we aren't just on
+    # the 2nd or greater base in a gapped region.  
     #
-    # As we loop over the array we need to keep track of both the query coordinates
-    # and the hit coordinates.  We track the last start of a feature pair and
-    # also the current end of a feature pair.  The feature pair start is reset every time 
-    # we hit a gapped position and the feature pair end is reset every time we hit 
-    # an aligned region.
+    # As we loop over the array we need to keep track of both the
+    # query coordinates and the hit coordinates.  We track the last
+    # start of a feature pair and also the current end of a feature
+    # pair.  The feature pair start is reset every time we hit a
+    # gapped position and the feature pair end is reset every time we
+    # hit an aligned region.
 
     my @gap;
 
-    my @qchars = split(//,$hsp->queryAlignment);  # split alignment into array of char
-    my @hchars = split(//,$hsp->sbjctAlignment);  # ditto for hit sequence
+    my @qchars = split(//,$hsp->querySeq);  # split alignment into array of char
+    my @hchars = split(//,$hsp->sbjctSeq);  # ditto for hit sequence
     
-    my $qstart = $hsp->queryBegin;                # Start off the feature pair start
-    my $hstart = $hsp->sbjctBegin;                # ditto
+    my $qstart = $hsp->query->start();                # Start off the feature pair start
+    my $hstart = $hsp->subject->start();                # ditto
     
-    my $qend   = $hsp->queryBegin;                # Set the feature pair end also
-    my $hend   = $hsp->sbjctBegin;                # ditto
+    my $qend   = $hsp->query->end();                # Set the feature pair end also
+    my $hend   = $hsp->subject->end();                # ditto
     
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
@@ -700,21 +706,23 @@ sub _findIncrements {
 sub _findStrands {
     my ($self,$hsp) = @_;
 
-    my $qstrand;
-    my $hstrand;
+    return ( $hsp->query->strand(),
+	     $hsp->subject->strand());
 
-    if ($hsp->queryBegin < $hsp->queryEnd) {
-	$qstrand = 1;
-    } else {
-	$qstrand = -1;
-    }
-    if ($hsp->sbjctBegin < $hsp->sbjctEnd) {
-	$hstrand = 1;
-    } else {
-	$hstrand = -1;
-    }
+#    my $qstrand;
+#    my $hstrand;
 
-    return ($qstrand,$hstrand);
+#    if ($hsp->query->start() < $hsp->query->end()) {
+#	$qstrand = 1;
+#    } else {
+#	$qstrand = -1;
+#    }
+#    if ($hsp->subject->start() < $hsp->subject->end()) {
+#	$hstrand = 1;
+#    } else {
+#	$hstrand = -1;
+#    }
+#    return ($qstrand,$hstrand);
 }
 
 sub _findTypes {
@@ -722,10 +730,10 @@ sub _findTypes {
 
     my $type1;
     my $type2;
-
-    my $len1 = abs($hsp->queryEnd - $hsp->queryBegin) + 1;
-    my $len2 = abs($hsp->sbjctEnd - $hsp->sbjctBegin) + 1;
-
+    #abs($hsp->query->end() - $hsp->query->start()) + 1;
+    my $len1 = $hsp->query->length();
+    #abs($hsp->subject->end() - $hsp->subject->start) + 1;
+    my $len2 = $hsp->subject->length();
 
     if ($len1/$len2 > 2) {
 	$type1 = 'dna';
@@ -776,13 +784,13 @@ sub clone {
 	$self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
       }
 
-      $self->{_query} = $seq ;
+      $self->{'_query'} = $seq ;
 
       $self->filename($self->clone->id.".$$.seq");
       $self->results($self->filename.".blast.out");
       
     }
-    return $self->{_query};
+    return $self->{'_query'};
 }
 
 =head2 program
@@ -800,9 +808,9 @@ sub program {
   
   if ($location) {
     $self->throw("executable not found at $location: $!\n") 	unless (-e $location && -x $location);
-    $self->{_program} = $location ;
+    $self->{'_program'} = $location ;
   }
-  return $self->{_program};
+  return $self->{'_program'};
 }
 
 =head2 database
@@ -818,9 +826,9 @@ sub database {
     my ($self, $db) = @_;
 
     if (defined($db)) {
-      $self->{_database} = $db ;
+      $self->{'_database'} = $db ;
     }
-    return $self->{_database};
+    return $self->{'_database'};
   }
 
 =head2 options
@@ -836,9 +844,9 @@ sub options {
   my ($self, $args) = @_;
   
   if (defined($args)) {
-    $self->{_options} = $args ;
+    $self->{'_options'} = $args ;
   }
-  return $self->{_options};
+  return $self->{'_options'};
 }
 
 sub filter {
@@ -848,10 +856,9 @@ sub filter {
 	if ($args != 0 && $args != 1) {
 	    $self->throw("Filter option must be 0 or 1");
 	}
-	$self->{_filter} = $args;
+	$self->{'_filter'} = $args;
     }
-    return $self->{_filter};
+    return $self->{'_filter'};
 }
 
 1;
-

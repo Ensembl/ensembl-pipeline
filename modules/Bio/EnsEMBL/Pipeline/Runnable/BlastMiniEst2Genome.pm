@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -59,17 +57,33 @@ use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-GENOMIC       => $genomicseq,
+			   -BLASTDB       => $blastdbname,
+                           -SEQFETCHER    => $sf);
+                           
+    Function:   creates a 
+                Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome object
+    Returns :   A Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome object
+    Args    :   -genomic:    Bio::PrimarySeqI object (genomic sequence)
+                -blastdb:    Path to Blastable DB
+                -seqfetcher  Bio::DB::RandomAccessI object
+=cut
 
 sub new {
     my ($class,@args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $blastdb, $seqfetcher) = $self->_rearrange(['GENOMIC',
-							      'BLASTDB',
-							      'SEQFETCHER'], @args);
+    my( $genomic, $blastdb, $seqfetcher) = $self->_rearrange([qw(GENOMIC
+								 BLASTDB
+								 SEQFETCHER)],
+							     @args);
        
     $self->throw("No genomic sequence input")           
       unless defined($genomic);
@@ -87,7 +101,7 @@ sub new {
       unless $seqfetcher->isa("Bio::DB::RandomAccessI");
     $self->seqfetcher($seqfetcher) if defined($seqfetcher);
     
-    return $self; # success - we hope!
+    return $self; 
 }
 
 =head2 genomic_sequence
@@ -495,6 +509,14 @@ sub output {
     return @{$self->{'_output'}};
 }
 
+sub trim {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{'_trim'} = $arg;
+  }
+  return $self->{'_trim'};
+}
 
 1;
 

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -71,7 +69,7 @@ use Bio::Root::RootI;
 
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
@@ -83,22 +81,22 @@ use Bio::Root::RootI;
 
 =cut
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
-    $self->{_fplist} = [];           #an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_einverted} = undef;       #location of einverted
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of analysis
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for einverted
-    
+    $self->{'_fplist'}    = [];       # an array of feature pairs
+    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_einverted'} = undef;    # location of einverted
+    $self->{'_workdir'}   = undef;    # location of temp directory
+    $self->{'_filename'}  = undef;    # file to store Bio::Seq object
+    $self->{'_results'}   = undef;    # file to store results of analysis
+    $self->{'_protected'} = [];       # a list of files protected from deletion
+    $self->{'_arguments'} = undef;    # arguments for einverted    
     
     my( $clonefile, $arguments, $einverted, $equickinverted) = 
-            $self->_rearrange(['CLONE', 'ARGS', 'ETAND', 'EQTAND'], @args);
+            $self->_rearrange([qw(CLONE ARGS ETAND EQTAND)], 
+			      @args);
     $self->clone($clonefile) if ($clonefile);       
     if ($einverted) 
     {   $self->einverted($einverted) ;}
@@ -112,7 +110,7 @@ sub _initialize {
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments(' -mismatch -4 -threshold 50 -gap 12 -match 3 ') ;      }
+    { $self->arguments(' -mismatch -4 -threshold 50 -gap 12 -match 3 ') ; }
     return $self; # success - we hope!
 }
 
@@ -128,12 +126,12 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{_clone} = $seq ;
+        $self->{'_clone'} = $seq ;
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".inverted.out");
     }
-    return $self->{_clone};
+    return $self->{'_clone'};
 }
 
 =head2 protect
@@ -160,9 +158,9 @@ sub einverted {
     {
         $self->throw("einverted not found at $location: $!\n") 
                                                     unless (-e $location && -x $location);
-        $self->{_einverted} = $location ;
+        $self->{'_einverted'} = $location ;
     }
-    return $self->{_einverted};
+    return $self->{'_einverted'};
 }
 
 =head2 workdir
@@ -187,9 +185,9 @@ sub arguments {
     my ($self, $args) = @_;
     if ($args)
     {
-        $self->{_arguments} = $args ;
+        $self->{'_arguments'} = $args ;
     }
-    return $self->{_arguments};
+    return $self->{'_arguments'};
 }
 
 =head2 clonename
@@ -360,3 +358,4 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
+1;

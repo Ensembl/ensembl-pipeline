@@ -46,7 +46,6 @@ package Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
@@ -54,23 +53,22 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::DB::RandomAccessI;
 
-#compile time check for executable
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 sub new {
   my ($class,@args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
   
   $self->{'_fplist'} = []; #create key to an array of feature pairs
   
-  my( $genomic, $features, $seqfetcher ) = $self->_rearrange(['GENOMIC',
-							      'FEATURES',
-							      'SEQFETCHER'], @args);
+  my( $genomic, $features, $seqfetcher ) = $self->_rearrange([qw(GENOMIC
+								 FEATURES
+								 SEQFETCHER)], @args);
   
   $self->throw("No genomic sequence input")           
     unless defined($genomic);
@@ -843,5 +841,3 @@ sub _deletefiles {
 }
 
 1;
-
-
