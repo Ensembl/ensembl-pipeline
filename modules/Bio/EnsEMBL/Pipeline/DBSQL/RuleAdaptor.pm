@@ -292,5 +292,6 @@ sub create_tables{
     );
   });
   $sth->execute();
+}
 
 1;
