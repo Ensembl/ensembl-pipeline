@@ -32,9 +32,11 @@ test_RunnableDB
 use strict;
 use Getopt::Long;
 
-use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
 use vars qw(@ISA);
@@ -42,43 +44,56 @@ use vars qw(@ISA);
 @ISA = qw(Bio::Root::Object);
 
 my $dbtype = 'rdb';
-my $host   = 'localhost';
+my $host   = 'ecs1c';
 my $port   = '410000';
-my $dbname = 'ensembl_freeze24';
-my $dbuser = 'root';
+my $dbname = 'arne_freeze05';
+my $dbuser = 'ensadmin';
 my $pass   = undef;
 my $runnable;
 my $input_id;
+my $analysisid;
+my $write  = 0;
 
 &GetOptions( 
-	     'host:s'    => \$host,
-	     'port:n'    => \$port,
-	     'dbname:s'  => \$dbname,
-	     'dbuser:s'  => \$dbuser,
-	     'pass:s'    => \$pass,
+	     'host:s'      => \$host,
+	     'port:n'      => \$port,
+	     'dbname:s'    => \$dbname,
+	     'dbuser:s'    => \$dbuser,
+	     'pass:s'      => \$pass,
 	     'input_id:s'  => \$input_id,
-	     'runnable:s' => \$runnable,
+	     'runnable:s'  => \$runnable,
+	     'analysis:n'  => \$analysisid,
+	     'write'     => \$write,
 	     );
 
 $| = 1;
 
-my $module  = "Bio::EnsEMBL::DBSQL::Obj";
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => $host,
+						-user => $dbuser,
+						-dbname => $dbname
+					       );
 
-my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
 
-my $db      = new Bio::EnsEMBL::DBLoader($locator);
 
 die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
 
-my $runobj = "$runnable"->new(-dbobj => $db,
+my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
+
+my $runobj = "$runnable"->new(-dbobj    => $db,
 			      -input_id => $input_id,
+			      -analysis => $analysis,
 			     );
+
 $runobj->fetch_input;
 $runobj->run;
 
+ 
 my @out = $runobj->output;
 
+if ($write) {
+  $runobj->write_output;
+}
 foreach my $out (@out) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
       print ($out->gffstring . "\n");
