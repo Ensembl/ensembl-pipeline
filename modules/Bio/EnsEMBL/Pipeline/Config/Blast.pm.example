@@ -44,6 +44,11 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
+         UNKNOWN_ERROR_STRING => 'FAILED',  # this is the error blast
+         # will return if an unregconised exit code occurs. This
+         # string gets propagated through to the pipeline if it is running
+         # AS standard this string is failed as this means the job will be
+         # retried by the pipeline    
     DB_CONFIG => [
         { 
             name    => 'embl_vertrna',
