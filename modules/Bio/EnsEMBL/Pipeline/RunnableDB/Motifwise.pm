@@ -96,7 +96,6 @@ sub new {
 
   push @args, ('-analysis', $analysis_tss);
 
-
   # Make object using parent constructor.
   
   my $self = $class->SUPER::new(@args);
@@ -152,7 +151,6 @@ sub fetch_input {
       $seq = $slice;
     }
 
-
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Motifwise->new(
 		     -query_seq  => $seq,
 		     -executable => $BIN_DIR . "/motifwise",
@@ -160,6 +158,7 @@ sub fetch_input {
 		     -motif_file => $self->_motif_file,
 		     );
 
+    $self->_flush_runnable;
     $self->runnable($runnable);
     
     return 1;
@@ -252,6 +251,14 @@ sub _workdir {
   $self->{_workdir} = shift if @_;
 
   return $self->{_workdir}
+}
+
+sub _flush_runnable {
+  my $self = shift;
+
+  $self->{_runnables} = [];
+
+  return 1;
 }
 
 return 1;
