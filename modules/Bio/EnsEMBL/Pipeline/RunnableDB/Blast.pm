@@ -96,7 +96,6 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-
     $self->analysis($analysis);
     
     return $self;
@@ -120,7 +119,7 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
-    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch repmasked contig");
+    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 
     print STDERR "Setting genseq to " . $genseq. "\n";
 
@@ -131,15 +130,12 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self) = @_;
-
-    # VAC this v. bad but parameters dont seem to be passed in ...
+    
     if (!defined($self->{_runnable})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
-							     -options   => "-hspmax  1000 -nogap",
-							     #-threshold => 1);
-							     -threshold => 1e-3);
+							     -threshold => 1);
 
       $self->{'_runnable'} = $run;
     }
