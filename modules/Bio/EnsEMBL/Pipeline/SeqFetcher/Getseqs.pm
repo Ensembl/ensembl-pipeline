@@ -109,7 +109,7 @@ sub db {
     if (ref($dbs) eq 'ARRAY') {
       foreach my $db(@$dbs){
 	$self->throw("are you sure that $db has been formatted with makeindex?\n") 
-	  unless (-e "$db" && -e "$db.jidx");
+	  unless (-e "$db.jidx");
 	
 	push (@{$self->{'_db'}},$db);
       }
