@@ -15,7 +15,7 @@ use Exporter;
 our(@EXPORT,@ISA);
 @ISA = ('Exporter');
 
-@EXPORT =qw(addTranslationObject convert_to_exon_coords setExonPhases);
+@EXPORT =qw(add_TranslationObject convert_to_exon_coords setExonPhases);
 
 $|=1;
 
@@ -24,7 +24,7 @@ $|=1;
 #############################
 
 
-sub addTranslationObject{
+sub add_TranslationObject{
   my ($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand) = @_;
 
   my $seq_start = -1;
@@ -212,13 +212,36 @@ sub setExonPhases{
 
 
 
+#=pod
+
+#=head3 alternative methods
+
+#=head2 add_DBEntry
+
+#  Usage       : adds a DBEntry to the object
+#  Function    :
+#  Return-Value:
+#=cut
+
+#sub add_DBEntry {
+#  my ($self,$obj) = @_;
+
+#  my $dbentry = new Bio::EnsEMBL::DBEntry(
+#                                          -adaptor => $adaptor,
+#                                          -primary_id => $pid,
+#                                          -dbname  => $dbname,
+#                                          -release => $release,
+#                                          -display_id => $did,
+#                                          -description => $description
+#                                         );
+#}
+
+
 
 
 
 
 =pod
-
-=head3 alternative methods
 
 =head2 convert_to_exon_coords
 
@@ -226,6 +249,7 @@ sub setExonPhases{
   Function    : checks if the cds-coordiante (start or end) lies in an exon
   Return-Value: returns the coordiante of the TSS in exon_coordiantes if given coordinate is inside the exon, and  "-1" if cds_coord is not
 =cut
+
 
 sub convert_to_exon_coords{
   my ( $cds_coord, $exon_start, $exon_end, $exon_strand ) = @_;

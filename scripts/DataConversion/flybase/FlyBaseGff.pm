@@ -12,13 +12,13 @@ use Bio::EnsEMBL::SimpleFeature;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
-
-
+use Bio::EnsEMBL::DBEntry;
 
 $|=1;
 
-
 # construct newFlyBaseGff-object (GFF Version 3) of flybase gff
+# desc of gff3: http://song.sourceforge.net/gff3.shtml
+
 
 sub new  {
   my ($class,@args) = @_;
@@ -38,18 +38,19 @@ sub new  {
   $self->{_gene}=[];
   $self->{non_unique_id}={};
   $self->{exons}={};
-
+  $self->{db_entry}={};
   $self->parse_gff();
   print "gff $gff parsed\n";
   return $self;
 }
 
-
-#
-# getters
-#
- ################################################################################
-
+sub db_entry{
+  my ($self, $tr,$db_entry) = @_;
+  if($db_entry){
+    $ {$self->{db_entry}} {$tr}=$db_entry;
+  }
+  return $ { $self->{db_entry}}{$tr};
+}
 
 
 =pod
@@ -69,18 +70,17 @@ sub new  {
 
 sub get_ids_by_type{
   my ($self,$type) = @_;
-  # get hash in which the types of the features are stored as keys
-  # and return array-ref to all feature-identifiers of this TYPE
+  # get hash in which TYPES of the features are stored as keys return array-ref to all feature-identifiers of this TYPE
   return ${$self->type2id}{$type};
 }
 
 
 =pod
 
-=head2 get_attributes_by_id
+=head2 get_all_attributes_by_id
 
-  Title       : get_attributes_by_id
-  Usage       : $obj->get_attributes_by_id('ID')
+  Title       : get_all_attributes_by_id
+  Usage       : $obj->get_all_attributes_by_id('ID')
   Function    :  access all stored attributes of a feature-id
   Arguments   : ID
   Return-Val  : arrayref to arrayrefs of attributes of a given ID
@@ -88,9 +88,34 @@ sub get_ids_by_type{
 =cut
 
 
-sub get_attributes_by_id{
+sub get_all_attributes_by_id{
    my ($self,$id) = @_;
    return ${$self->id2attributes}{$id};
+}
+
+
+
+
+=pod
+
+=head2 get_source_by_id
+
+  Title       : get_source_by_id
+  Usage       : $obj->get_source_by_id('ID')
+  Function    : access the second filed of the gff (source) by feature-id
+  Arguments   : ID
+  Return-Val  : String describing source i.e. "fgenesh" "part_of" "piecegenie" "predicted" ...
+
+=cut
+
+
+sub get_source_by_id{
+   my ($self,$id) = @_;
+   my @atr = @ { $ {$self->id2attributes } {$id} } ;
+   if(scalar(@atr)>1){
+     warn("Id $id appears in more than one gff-line and seems to be not unique\n");
+   }
+   return $ { $atr[0]} [1];
 }
 
 
@@ -166,10 +191,7 @@ sub get_type_of_id{
 
 #
 # Methods used for storing attributes, genes, SimpleFeatures
-#
  ################################################################################
-
-
 
 
 
@@ -188,33 +210,57 @@ sub get_type_of_id{
 =cut
 
 
-sub store_genes{
-  my ($self) = @_;
-  my @gene_ids =@{$self->get_ids_by_type("gene")};
+sub store_as_gene_object{
+  my ($self,$target) = @_;
+  print "target $target\n";
 
   my %all_processed_exons;
-  for my $gene_id (@gene_ids) {
+
+  # test if $target is annotated in gff
+  unless ($self->get_ids_by_type($target)){
+    print "no $target in ".$self->gff()." found\n";
+    return;
+  }
+
+
+
+  for my $gene_id ( @{$self->get_ids_by_type($target)} ) {
+    
+    if($self->get_source_by_id($gene_id) ne "."){
+      print "$gene_id will be skipped because it has unrecognized source:" . $self->get_source_by_id($gene_id) . "\n";
+      next;
+    }
+
+
     my @all_nw_transcripts;
 
+    #---- start processing the mRNA-childs (transcripts) ----
 
-    #---- start process each alternative transcript of gene ("mRNA") ----
-
-    unless ($self->get_spec_child_of_id($gene_id,"mRNA")) {
-      print "gene_id $gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
+    unless ($self->get_spec_child_of_id($gene_id,"mRNA") ) {
+      print "ID=$gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
     }else{
 
-
       for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"mRNA")}) {
+
+
         my $nw_transcript = new Bio::EnsEMBL::Transcript(
                                                        -STABLE_ID => $trans_id,
                                                        -VERSION => 3,
                                                       );
 
+
+       my $db_entry = $self->get_dbxref($trans_id, "mRNA");
+
+        if($db_entry){
+          $self->db_entry($nw_transcript,$db_entry);
+        }
+
+
         #---- start store each exon ----
         my @exons =  @{$self->get_spec_child_of_id($trans_id,"exon")};
 
         for my $exon (@exons) {
-          my @gff_line = @{$self->get_attributes_by_id($exon)};
+          my @gff_line = @{$self->get_all_attributes_by_id($exon)};
           my ($seqid,$source,$type,$ex_start,$ex_end,$score,$ex_strand,$phase,$attrib) = @{$gff_line[0]};
           warn_inconsistency("ID of exon $exon is not unique \n") if (exists $gff_line[1]);
 
@@ -242,18 +288,23 @@ sub store_genes{
 
         if ($cds_id) {
           warn_inconsistency("There is a mRNA with more than one CDS\n") if exists ${$self->get_spec_child_of_id($trans_id,"CDS")}[1];
-          my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_attributes_by_id($cds_id)}[0]}[3,4,6];   # get 3,4 and 6th attribute of gff-line
+          my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_all_attributes_by_id($cds_id)}[0]}[3,4,6];   # get 3,4 and 6th attribute of gff-line
 
           # add Translatio to transcript
-          $nw_transcript = addTranslationObject($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand);
+          $nw_transcript = add_TranslationObject($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand);
 
           # set phases of other exons
           $nw_transcript =  $self->setExonPhases($nw_transcript);
 
       }else{
-         warn("mRNA $trans_id has no CDS\n");
+         warn("mRNA $trans_id has no CDS\n") if ($target eq "gene");
       }
+
+#       add_DBEntry($nw_transcript);
+
        push @all_nw_transcripts, $nw_transcript;
+
+
 
     } #--- end each alternative transcript ---
 
@@ -355,8 +406,9 @@ foreach my $trans ( @all_nw_transcripts ) {
 
 
 
+
   # got all alternative transcripts and make genes
-  my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$self->get_attributes_by_id($gene_id)};
+  my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$self->get_all_attributes_by_id($gene_id)};
 
   my $gene = Bio::EnsEMBL::Gene->new(
                                      -START     => $start,
@@ -368,14 +420,26 @@ foreach my $trans ( @all_nw_transcripts ) {
                                      -VERSION => 3,
                                     );
 
- # getting attributes: ${${$attrib}{'ID'}}[0],
-
    map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
 
-   $self->db->get_GeneAdaptor->store($gene);
+   my $gene_DB_id = $self->db->get_GeneAdaptor->store($gene);
+   my $db_entry = $self->get_dbxref($gene_id, $target);
+   $self->db->get_DBEntryAdaptor->store($db_entry,$gene_DB_id,'Gene');
+
+   # reprocess the db_entry for trs
+
+   for my $tr (@all_nw_transcripts){
+     my $dbe = $self->db_entry($tr);
+     if($dbe){
+       $self->db->get_DBEntryAdaptor->store($dbe , $tr->dbID() ,'Transcript');
+     }
+   }
+
+
   } #end foreach gene
  } #end unless...else
 }
+
 
 
 
@@ -550,9 +614,30 @@ sub create_analysis{
 
 
 
-
-
-
+# 
+# 2R	.	tRNA	1281033	1281105	.	+	.	ID=CR30304;Name=tRNA:R2:42Ad;Dbxref=FlyBase:FBan0030304,FlyBase:FBgn0003757,FlyBase:FBgn0011958,FlyBase:FBgn0050304;cyto_range=42A12-42A12;gbunit=AE003784
+# 2R	.	mRNA	1281033	1281105	.	+	.	ID=CR30304-RA;Name=tRNA:R2:42Ad-RA;Dbxref=FlyBase:FBtr0085979,FlyBase:CR30304-RA,FlyBase:FBgn0003757;Parent=CR30304
+# 2R	trnascan	tRNA	1281033	1281105	.	.	.	ID=NULL:1954652
+# 2R	.	exon	1281240	1281312	.	-	.	ID=NULL:1958261;Parent=NULL:1958260,CR32837-RA
+# 2R	.	tRNA	1281240	1281312	.	-	.	ID=CR32837;Name=tRNA:K2:42Ae;Dbxref=FlyBase:FBan0032837,FlyBase:FBgn0003795,FlyBase:FBgn0011891,FlyBase:FBgn0052837;cyto_range=42A12-42A12;gbunit=AE003784
+# 2R	.	mRNA	1281240	1281312	.	-	.	ID=CR32837-RA;Name=tRNA:K2:42Ae-RA;Dbxref=FlyBase:FBtr0086017,FlyBase:CR32837-RA,FlyBase:FBgn0003795;Parent=CR32837
+# 2R	trnascan	tRNA	1281240	1281312	.	.	.	ID=NULL:1958260
+# 2R	.	exon	1284763	1284885	.	+	.	ID=NULL:1954611;Parent=NULL:1954606
+# 2R	genscan	mRNA	20276539	20291074	.	.	.	ID=NULL:310788
+# 2R	.	exon	20276539	20276718	.	+	.	ID=NULL:310789;Parent=NULL:310788
+# 2R	.	gene	20290099	20291074	.	+	.	ID=CG30429;Dbxref=FlyBase:FBan0030429,FlyBase:FBgn0050429;cyto_range=60F5-60F5;gbunit=AE003466
+# 2R	.	mRNA	20290099	20291074	.	+	.	ID=CG30429-RA;Dbxref=FlyBase:FBtr0072450,FlyBase:CG30429-RA,FlyBase:FBgn0050429;Parent=CG30429
+# 2R	.	exon	20290099	20290576	.	+	.	ID=CG30429:1;Parent=CG30429-RA
+# 2R	.	exon	20290225	20290423	.	+	.	ID=NULL:310790;Parent=NULL:310788
+# 2R	.	exon	20290635	20291074	.	+	.	ID=CG30429:2;Parent=CG30429-RA,NULL:310788
+# 2R	genscan	mRNA	20295508	20298047	.	.	.	ID=NULL:310736
+# 2R	.	exon	20295508	20295539	.	+	.	ID=NULL:310737;Parent=NULL:310736
+# 2R	.	gene	20296884	20298047	.	+	.	ID=CG30428;Dbxref=FlyBase:FBan0030428,FlyBase:FBgn0050428,FlyBase:FBgn0064772;cyto_range=60F5-60F5;gbunit=AE003466
+# 2R	.	mRNA	20296884	20298047	.	+	.	ID=CG30428-RA;Dbxref=FlyBase:FBtr0072451,FlyBase:CG30428-RA,FlyBase:FBgn0050428;Parent=CG30428
+# 2R	.	exon	20296884	20297010	.	+	.	ID=CG30428:1;Parent=CG30428-RA
+# 2R	.	exon	20297151	20297331	.	+	.	ID=CG30428:2;Parent=CG30428-RA,NULL:310736
+# 2R	.	exon	20297390	20297648	.	+	.	ID=CG30428:3;Parent=CG30428-RA,NULL:310736
+# 2R	.	exon	20297698	20298047	.	+	.	ID=CG30428:4;Parent=CG30428-RA,NULL:310736
 
 
 
@@ -575,7 +660,6 @@ sub parse_gff{
     #
     # inconsinstency !! ID=Q9W0V7 appears twotimes in gff dmel_3L_r3.2.1.gff, also id for repeat_region ID=yoyo
     #
-
 
 
   # local (line)
@@ -941,6 +1025,61 @@ sub warn_inconsistency{
   my $error = shift;
   print STDERR "\tWARNING: UNEXPECTED INCONSISTENCY IN GFF-FILE !!\t\t$error";
   return;
+}
+
+
+=pod
+
+=head2 get_dbxref_($id, $xref_type )
+
+  Usage       : $obj->get_field_attributes($id, $descriptor )
+  Function    : returns the Dbxref-Identifier of a given ID like 'FBgn0033692' for type 'gene'
+  Returnvalue : Arrayref. to all DBxrefs of a given type
+=cut
+
+
+
+sub get_dbxref{
+  my ($self,$id, $xref_type) = @_;
+  my ($primary_id,$db_name);
+
+
+  my %fb_id = (
+               'CDS' =>  'FBpp',
+               'exon' => 'FBex',
+               'gene' => 'FBgn',
+               'mRNA' => 'FBtr',
+               'ncRNA' => 'FBgn',
+               'pseudogene' => 'FBgn',
+               'rRNA' => 'FBgn',
+               'tRNA' => 'FBgn',
+               'transposable_element' => 'FBti',
+               'snRNA' => 'FBgn',
+               'snoRNA' => 'FBgn',
+              );
+
+  my @found = grep {/$fb_id{$xref_type}/} @ { $ { pop @{ $ { $self->get_all_attributes_by_id($id) } [0] } } {'Dbxref'} } ;
+
+  map {s/FlyBase://g} @found;
+
+  $primary_id = shift @found;
+
+  if($xref_type eq "mRNA"){
+    $db_name = "flybase_transcript";
+  }else{
+    $db_name = "flybase_gene";
+  }
+
+  if($primary_id){
+    my $db_entry = Bio::EnsEMBL::DBEntry->new(
+                                              -DBNAME  => $db_name,
+                                              -RELEASE => 1,
+                                              -PRIMARY_ID => $primary_id,
+                                              -DISPLAY_ID => $primary_id
+                                           );
+    return $db_entry;
+  }
+  return 0;
 }
 
 
