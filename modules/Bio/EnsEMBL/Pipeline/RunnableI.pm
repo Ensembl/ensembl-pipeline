@@ -282,13 +282,47 @@ sub createfeaturepair {
     $self->growfplist($fp);                             
 }
 
-sub createrepeat {
+sub create_repeat {
     my ($self, $feat1, $feat2) = @_;
-    $self->createfeaturepair(\$feat1, \$feat2);
-    my $fp = shrinkfplist();
-    my $repeat = Bio::EnsEMBL::Repeat->new  (  -feature1 => $fp->feature1,
-                                               -feature2 => $fp->feature2 ) ;
-    growfplist($repeat);
+    
+    #create analysis object
+    my $analysis_obj = new Bio::EnsEMBL::Analysis
+                        (   -db              => $feat2->{db},
+                            -db_version      => $feat2->{db_version},
+                            -program         => $feat2->{program},
+                            -program_version => $feat2->{p_version},
+                            -gff_source      => $feat2->{source},
+                            -gff_feature     => $feat2->{primary});
+    
+    #create and fill Bio::EnsEMBL::Seqfeature objects
+    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
+                        (   -seqname        => $feat1->{name},
+                            -start          => $feat1->{start},
+                            -end            => $feat1->{end},
+                            -strand         => $feat1->{strand},
+                            -score          => $feat1->{score},
+                            -source_tag     => $feat1->{source},
+                            -primary_tag    => $feat1->{primary},
+                            -percent_id     => $feat1->{percent},
+                            -p_value        => $feat1->{p},
+                            -analysis       => $analysis_obj);
+    
+    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
+                        (   -seqname        => $feat2->{name},
+                            -start          => $feat2->{start},
+                            -end            => $feat2->{end},
+                            -strand         => $feat2->{strand},
+                            -score          => $feat2->{score},
+                            -source_tag     => $feat2->{source},
+                            -primary_tag    => $feat2->{primary},
+                            -percent_id     => $feat2->{percent},
+                            -p_value        => $feat2->{p},
+                            -analysis       => $analysis_obj);
+    #create featurepair
+    my $fp = Bio::EnsEMBL::Repeat->new  (  -feature1 => $seqfeature1,
+                                           -feature2 => $seqfeature2 ) ;
+    $self->growfplist($fp);                             
+
 }
 
 sub growfplist {
