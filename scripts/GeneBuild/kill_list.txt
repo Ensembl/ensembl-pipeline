@@ -1,3 +1,16 @@
+Q8K080 Hypothetical protein. lec
+Q99LR7 Hypothetical 35.7 kDa protein (Fragment). lec
+Q99KW1 Hypothetical 28.1 kDa protein (Fragment). lec
+O88262 Mszf59-2 (Fragment). lec
+Q9CRN0 6720475J19Rik protein (Fragment) lec
+P11370 Retrovirus-related ENV polyprotein from Fv-4 locus. lec
+Q9R137 Cyclophilin A (Peptidyl-prolyl cis-trans isomerase) lec
+Q8K081 Hypothetical protein. lec
+Q9CST9 weakly similar to GAG PROTEIN (Fragment). lec
+P11367 Retrovirus-related POL polyprotein (Endonuclease) (Fragment). lec
+Q8R596 Hypothetical 4.4 kDa protein. lec
+Q8BNJ4 Transient receptor protein 7. lec
+Q60713 Reverse transcriptase. lec
 P17013
 Q99784
 AK057787	supports transposable elements - Daniel
@@ -37,3 +50,14 @@ Q9NW99	supports transposable elements - Daniel
 Q9P1J1	supports transposable elements - Daniel
 Q9UN80	supports transposable elements - Daniel
 Q9Y5K0	supports transposable elements - Daniel
+NP_291080.1 large numbers of X's in sequence lec                   
+NP_067457.1 large numbers of X's in sequence lec                   
+NP_536705.1 large numbers of X's in sequence lec                  
+NP_666420.1 large numbers of X's in sequence lec                   
+Q64152 large numbers of X's in sequence lec                      
+P11276 large numbers of X's in sequence lec                      
+O88329 large numbers of X's in sequence lec                      
+Q9Z1L2 large numbers of X's in sequence lec                      
+Q8VEW3 large numbers of X's in sequence lec                      
+Q8JZM8 large numbers of X's in sequence lec 
+
