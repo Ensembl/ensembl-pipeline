@@ -158,7 +158,9 @@ public abstract class AbstractReadDBAction extends AAction{
         rule_condition = resultSet.getString("condition");
         parentElement = (ModelElement)elementsByLogicName.get(rule_condition);
         currentElement = (ExtendedModelElement)elementsByRuleId.get(String.valueOf(rule_id));
-        parentElement.addChildElement(currentElement);
+        if(currentElement != null){
+          parentElement.addChildElement(currentElement);
+        }
       }
 
       //
