@@ -3,6 +3,7 @@
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::SeqIO;
 use Getopt::Long;
 
@@ -21,8 +22,8 @@ my $protein_id;
 my $dna_id;
 
 &GetOptions(
-	    'protein_id:s' => \$protein_id,
-	    'dna_id:s' => \$dna_id,
+	    'protein_id:s'    => \$protein_id,
+	    'dna_id:s'        => \$dna_id,
 	    'dbhost:s'        => \$dbhost,
 	    'dbname:s'        => \$dbname,
 	    'genetype:s'      => \$genetype,
@@ -56,41 +57,20 @@ print STDERR  "path = $path\n";
 if ( $protein_id ){
   print "Transcripts based on $protein_id\n";
   my @transcripts;
+ 
  TRAN:
-  foreach my $t_id ( &get_transcripts_by_protein_evidence($db,$protein_id) ){
-    my $transc = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
-    foreach my $exon (@{$transc->get_all_Exons}){
-      foreach my $evi ( @{$exon->get_all_supporting_features} ){
-	if ( $evi->hseqname eq $protein_id ){
-	  push (@transcripts,$transc);
-	  next TRAN;
-	}
-      }
-    }
-    foreach my $trans ( @transcripts ){
-      &show_transcript($db,$trans->dbID);
-    }
+  foreach my $tran (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_protein_evidence($protein_id,$db) ){
+      &show_transcript($db,$tran->dbID);
   }
 }
 
 if ( $dna_id ){
-  print "Transcripts based on $dna_id\n";
- my @transcripts;
- TRAN:
-  foreach my $t_id ( &get_transcripts_by_protein_evidence($db,$protein_id) ){
-    my $tran = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
-    foreach my $exon (@{$tran->get_all_Exons}){
-      foreach my $evi ( @{$exon->get_all_supporting_features} ){
-	if ( $evi->hseqname eq $dna_id ){
-	  push (@transcripts,$tran);
-	  next TRAN;
-	}
-      }
+    print "Transcripts based on $dna_id\n";
+    my @transcripts;
+  TRAN:
+    foreach my $tran ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_dna_evidence($dna_id,$db) ){
+	&show_transcript($db,$tran->dbID);
     }
-    foreach my $tran ( @transcripts ){
-      &show_transcript($db,$tran->dbID);
-    }
-  }
 }
 
 ############################################################
@@ -105,7 +85,7 @@ sub get_transcripts_by_protein_evidence{
 	      WHERE  sf.exon_id    = e.exon_id                   AND
 	             sf.feature_id = pf.protein_align_feature_id AND
 	             pf.hit_name   = "$id"                       AND
-                     pf.contig_id  = e.contig_id                 AND 
+	             pf.contig_id  = e.contig_id                 AND 
                      et.exon_id    = e.exon_id                   AND
                      et.transcript_id = t.transcript_id
 	    );
