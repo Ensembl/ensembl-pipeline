@@ -110,20 +110,19 @@ sub new {
     my $self = $class->SUPER::new(@args);
 
     #$self->{_seqfeature} = undef;   #Bio::SeqFeature container for Subseqfeatures
-    $self->{'_exons'} = [];    # an array of Bio::Seqfeatures (exons)
-    $self->{'_genes'} = [];    # an array of arrays of SeqFeatures
-         #$self->{_feature_data} = [];  # an array of data for SeqFeatures
-    $self->{'_peptides'}  = [];     # genscan predicted peptide (used for phase)
-    $self->{'_clone'}     = undef;  # location of Bio::Seq object
-    $self->{'_genscan'}   = undef;  # location of Genscan script
-    $self->{'_workdir'}   = undef;  # location of temp directory
-    $self->{'_filename'}  = undef;  # file to store Bio::Seq object
-    $self->{'_results'}   = undef;  # file to store results of genscan
-    $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
+    $self->{'_exons'}      = [];       # an array of Bio::Seqfeatures (exons)
+    $self->{'_genes'}      = [];       # an array of arrays of SeqFeatures
+                                       #$self->{_feature_data} = [];  # an array of data for SeqFeatures
+    $self->{'_peptides'}   = [];       # genscan predicted peptide (used for phase)
+    $self->{'_clone'}      = undef;    # location of Bio::Seq object
+    $self->{'_genscan'}    = undef;    # location of Genscan script
+    $self->{'_workdir'}    = undef;    # location of temp directory
+    $self->{'_filename'}   = undef;    # file to store Bio::Seq object
+    $self->{'_results'}    = undef;    # file to store results of genscan
+    $self->{'_protected'}  = [];       # a list of file suffixes protected from deletion
     $self->{'_parameters'} = undef;    #location of parameters for genscan
 
-    my ( $clone, $genscan, $parameters, $matrix ) =
-      $self->_rearrange( [qw(CLONE GENSCAN PARAM MATRIX)], @args );
+    my ( $clone, $genscan, $parameters, $matrix ) = $self->_rearrange( [qw(CLONE GENSCAN PARAM MATRIX)], @args );
 
     $self->clone($clone);
     $genscan = 'genscan'       unless ($genscan);
@@ -167,8 +166,7 @@ sub clone {
 sub genscan {
     my ( $self, $location ) = @_;
     if ($location) {
-        $self->throw("Genscan not found at $location: $!\n")
-          unless ( -e $location );
+        $self->throw("Genscan not found at $location: $!\n") unless ( -e $location );
         $self->{'_genscan'} = $location;
     }
     return $self->{'_genscan'};
@@ -186,8 +184,7 @@ sub genscan {
 sub matrix {
     my ( $self, $location ) = @_;
     if ($location) {
-        $self->throw("Genscan matrix not found at $location: $!\n")
-          unless ( -e $location );
+        $self->throw("Genscan matrix not found at $location: $!\n") unless ( -e $location );
         $self->{'_matrix'} = $location;
     }
     return $self->{'_matrix'};
@@ -213,8 +210,7 @@ sub parameters {
 sub exons {
     my ( $self, $exon ) = @_;
     if ($exon) {
-        $exon->isa("Bio::EnsEMBL::SeqFeature")
-          || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
+        $exon->isa("Bio::EnsEMBL::SeqFeature") || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
         push ( @{ $self->{'_exons'} }, $exon );
     }
     return @{ $self->{'_exons'} };
@@ -229,11 +225,9 @@ sub clear_exons {
 sub genscan_genes {
     my ( $self, $gene ) = @_;
     if ($gene) {
-        $gene->isa("Bio::EnsEMBL::SeqFeature")
-          || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
+        $gene->isa("Bio::EnsEMBL::SeqFeature") || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
         push ( @{ $self->{'_genes'} }, $gene );
-        @{ $self->{'_genes'} } =
-          sort { $a->seqname <=> $b->seqname } @{ $self->{'_genes'} };
+        @{ $self->{'_genes'} } = sort { $a->seqname <=> $b->seqname } @{ $self->{'_genes'} };
     }
     return @{ $self->{'_genes'} };
 }
@@ -284,10 +278,8 @@ sub run_genscan {
     my ($self) = @_;
 
     #print "Running genscan on ".$self->filename."\n";
-    system( $self->genscan . ' ' . $self->matrix . ' ' . $self->filename . ' > '
-        . $self->results );
-    $self->throw( $self->results . " not created by Genscan\n" )
-      unless ( -e $self->results );
+    system( $self->genscan . ' ' . $self->matrix . ' ' . $self->filename . ' > ' . $self->results );
+    $self->throw( $self->results . " not created by Genscan\n" ) unless ( -e $self->results );
 }
 
 =head2 parsefile
@@ -306,15 +298,11 @@ sub run_genscan {
 sub parse_results {
     my ($self) = @_;
 
-    my %exon_type = (
-        'Sngl', 'Single Exon',   'Init', 'Initial Exon',
-        'Intr', 'Internal Exon', 'Term', 'Terminal Exon'
-    );
+    my %exon_type = ( 'Sngl', 'Single Exon', 'Init', 'Initial Exon', 'Intr', 'Internal Exon', 'Term', 'Terminal Exon' );
 
     my $filehandle;
     if ( ref( $self->results ) !~ /GLOB/ ) {
-        open( GENSCAN, "<" . $self->results )
-          or $self->throw( "Couldn't open file " . $self->results . ": $!\n" );
+        open( GENSCAN, "<" . $self->results ) or $self->throw( "Couldn't open file " . $self->results . ": $!\n" );
         $filehandle = \*GENSCAN;
     }
     else {
@@ -335,17 +323,14 @@ sub parse_results {
                 my %feature;
                 if (/init|term|sngl|intr/i) {
                     my @element = split;
-                    $self->throw(
-                        "Unable to parse Genscan ouput (" . scalar(@element)
-                        . ") Line: $_\n" )
+                    $self->throw( "Unable to parse Genscan ouput (" . scalar(@element) . ") Line: $_\n" )
                       unless ( scalar(@element) == 13 );
 
                     my ( $gene, $exon ) = split ( /\./, $element[0] );
 
-                    $feature{name} =
-                      $gene + ( $exon / 1000 );  #name must be a number
-                                                 #print "name $feature{name}\n";
-                        #arrange numbers so that start is always < end
+                    $feature{name} = $gene + ( $exon / 1000 );    #name must be a number
+                                                                  #print "name $feature{name}\n";
+                                                                  #arrange numbers so that start is always < end
                     if ( $element[2] eq '+' ) {
                         $feature{'start'}  = $element[3];
                         $feature{'end'}    = $element[4];
@@ -411,104 +396,94 @@ sub calculate_and_set_phases_new {
     my @genes    = $self->genscan_genes();
     my @peptides = $self->genscan_peptides();
 
-    $self->throw(
-        "Mismatch in number of genes (" . scalar(@genes) . ") and peptides ("
-        . scalar(@peptides) . ") parsed from file" )
+    $self->throw( "Mismatch in number of genes (" . scalar(@genes) . ") and peptides (" . scalar(@peptides)
+        . ") parsed from file" )
       unless ( scalar(@genes) == scalar(@peptides) );
 
     my $i     = 0;
     my $count = 1;
-    GENE: while ( $i < scalar(@genes) ) {
+    GENE: while ( $i < @genes ) {
 
-        my $genscan = $peptides[$i];
-        
-        
         my @exons   = $genes[$i]->sub_SeqFeature();
-        my @newtran =
-          Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame( $genes[$i],
-            $self->clone );
-        
+        my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame( $genes[$i], $self->clone );
+
         my $translation_found = 0;
 
         foreach my $tran (@newtran) {
 
+            my $genscan   = $peptides[$i];
             my $temp_tran = $tran->translate->seq;
-            
-            
-            # clean the translated sequence
+
+            my $temp_tran_first_x;
+            my $temp_tran_last_x;
+            my $genscan_first_x;
+            my $genscan_last_x;
+
+            #print STDERR "\nGENSCAN-one:    ",$genscan,"\n";
+            #print STDERR "TRANSLATED-one: ",$temp_tran,"\n";
+
+            # Tidy up the translated sequence...
 
             #genscan translated partial genes correctly whilst exon translation begin with M
             #$temp_tran =~ s/^M//i; #remove initial M from exon was removed as it updets the comparision
 
             # remove any initial X's from the translation                       
-            my $temp_tran_first_x = $temp_tran =~ s/^X//i;
-            
-            # remove any terminal X's from the translation
-            my $temp_tran_last_x = $temp_tran  =~ s/X$//i;
-            
+            $temp_tran =~ s/^X//;
+
             # remove any initial X's from the prediction   
-            my $genscan_first_x = $genscan =~ s/^X//i;
-            
-            # remove any terminal X's from the prediction   
-            my $genscan_last_x = $genscan =~ s/X$//i;
-            
-            if ($temp_tran_first_x or $genscan_first_x) {
-            
+            $genscan =~ s/^X//;
+
+            #substr ($temp_tran, 0, 1) = '' if $temp_tran_first_x ;
+            #substr ($genscan, 0, 1) = '' if $genscan_first_x;        
+
+            # check for terminal X's in the translation
+            my ($temp_tran_last_x) = $temp_tran =~ s/(X)$//;
+
+            # check for terminal X's in the prediction   
+            my ($genscan_last_x) = $genscan =~ /(X)$/;
+
+            if ( $temp_tran_last_x or $genscan_last_x ) {
+
                 chop $temp_tran;
                 chop $genscan;
-                
+
             }
-            
-            if ($temp_tran_last_x or $genscan_last_x) {
-            
-                substr ($temp_tran, 0, 1) = '';
-                substr ($temp_tran, 0, 1) = '';
-                
-            }
-            
-            print STDERR "\nGENSCAN:    ",$genscan,"\n";
-            print STDERR "TRANSLATED: ",$temp_tran,"\n";
-                      
-            # wherever there are X's in translation - insert into prediction 
-            # at same position (is this crazy?) 
-            my $x       = 0;
+
+            # if there are X's in prediction - insert into translation 
+            # at same position and vice-versa
+            my $x = 0;
             while ( ( $x = index( $temp_tran, 'X', $x ) ) != -1 ) {
                 substr( $genscan, $x, 1 ) = 'X';
                 $x++;
             }
-            
-            # wherever there are X's in prediction - insert into translation 
-            # at same position (is this crazy?) 
-            my $x       = 0;
+
+            my $x = 0;
             while ( ( $x = index( $genscan, 'X', $x ) ) != -1 ) {
                 substr( $temp_tran, $x, 1 ) = 'X';
                 $x++;
             }
-            
 
             if ( index( $genscan, $temp_tran ) >= 0 ) {
+
 
                 $translation_found = 1;
 
                 $tran->temporary_id( $self->clone->id . "." . $count );
                 $count++;
 
-                if ( $temp_tran =~ /\*/ ) {
-
-                }
-                else {
+                unless ( $temp_tran =~ /\*/ ) {
 
                     $self->add_Transcript($tran);
                 }
                 $i++;
+
                 next GENE;
             }
+
         }
 
         unless ($translation_found) {
-            $self->throw(
-                "[Genscan.pm] Unable to match Genscan peptide " . $peptides[$i]
-                . " in a translation\n" );
+            $self->throw( "[Genscan.pm] Unable to match Genscan peptide " . $peptides[$i] . " in a translation\n" );
         }
 
         $i++;
@@ -573,9 +548,8 @@ sub create_genes {
 
     #print "creating genes \n";
     my (
-        %genes,       %gene_start,   %gene_end,
-        %gene_score,  %gene_p,       %gene_strand,
-        %gene_source, %gene_primary, %gene_analysis
+        %genes,       %gene_start,  %gene_end,     %gene_score,  %gene_p,
+        %gene_strand, %gene_source, %gene_primary, %gene_analysis
     );
 
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
@@ -602,10 +576,8 @@ sub create_genes {
         push ( @{ $genes{$group_number} }, $exon );
 
         #calculate gene boundaries and total score
-        $gene_start{$group_number} = $exon->start()
-          if ( $exon->start() < $gene_start{$group_number} );
-        $gene_end{$group_number} = $exon->end()
-          if ( $exon->end() > $gene_end{$group_number} );
+        $gene_start{$group_number} = $exon->start() if ( $exon->start() < $gene_start{$group_number} );
+        $gene_end{$group_number}   = $exon->end()   if ( $exon->end() > $gene_end{$group_number} );
         $gene_score{$group_number} += $exon->score();
         $gene_p{$group_number}     += $exon->p_value();
     }
@@ -613,12 +585,10 @@ sub create_genes {
     #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
     foreach my $gene_number ( keys(%genes) ) {
         my $gene = Bio::EnsEMBL::SeqFeature->new(
-            -seqname => $gene_number,
-            -strand  => $gene_strand{$gene_number},
-            -score   => $gene_score{$gene_number} /
-            ( scalar @{ $genes{$gene_number} } ),
-            -p_value => $gene_p{$gene_number} /
-            ( scalar @{ $genes{$gene_number} } ),
+            -seqname     => $gene_number,
+            -strand      => $gene_strand{$gene_number},
+            -score       => $gene_score{$gene_number} / ( scalar @{ $genes{$gene_number} } ),
+            -p_value     => $gene_p{$gene_number} / ( scalar @{ $genes{$gene_number} } ),
             -start       => $gene_start{$gene_number},
             -end         => $gene_end{$gene_number},
             -source_tag  => $gene_source{$gene_number},
@@ -690,33 +660,33 @@ sub output {
         foreach my $exon (@exons) {
 
             my $f = new Bio::EnsEMBL::SeqFeature(
-                -seqname    => $transcript->temporary_id . "." . $exon->seqname,
-                -start      => $exon->start,
-                -end        => $exon->end,
-                -strand     => $exon->strand,
-                -phase      => $exon->phase,
-                -end_phase  => $exon->end_phase,
-                -score      => $exon->score,
-                -p_value    => $exon->p_value,
-                -source_tag => 'genscan',
+                -seqname     => $transcript->temporary_id . "." . $exon->seqname,
+                -start       => $exon->start,
+                -end         => $exon->end,
+                -strand      => $exon->strand,
+                -phase       => $exon->phase,
+                -end_phase   => $exon->end_phase,
+                -score       => $exon->score,
+                -p_value     => $exon->p_value,
+                -source_tag  => 'genscan',
                 -primary_tag => 'prediction',
                 -analysis    => $analysis
             );
             my $f2 = new Bio::EnsEMBL::SeqFeature(
-                -seqname    => $transcript->temporary_id . "." . $exon->seqname,
-                -start      => $exon->start,
-                -end        => $exon->end,
-                -strand     => $exon->strand,
-                -phase      => $exon->phase,
-                -end_phase  => $exon->end_phase,
-                -score      => $exon->score,
-                -p_value    => $exon->p_value,
-                -source_tag => 'genscan',
+                -seqname     => $transcript->temporary_id . "." . $exon->seqname,
+                -start       => $exon->start,
+                -end         => $exon->end,
+                -strand      => $exon->strand,
+                -phase       => $exon->phase,
+                -end_phase   => $exon->end_phase,
+                -score       => $exon->score,
+                -p_value     => $exon->p_value,
+                -source_tag  => 'genscan',
                 -primary_tag => 'prediction',
                 -analysis    => $analysis
             );
 
-    #print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
+            #print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
 
             $f->analysis($analysis);
             $f2->analysis($analysis);
@@ -774,9 +744,8 @@ sub output_singlefeature {
 
     #calculate boundaries and aggregate values
     foreach my $gene (@genes) {
-        $start = $gene->start()
-          if ( !defined($start) || $gene->start() < $start );
-        $end = $gene->end() if ( !defined($end) || $gene->end() > $end );
+        $start = $gene->start() if ( !defined($start) || $gene->start() < $start );
+        $end   = $gene->end()   if ( !defined($end)   || $gene->end() > $end );
         $score   += $gene->score();
         $p_value += $gene->p_value();
         $analysis = $gene->analysis();
