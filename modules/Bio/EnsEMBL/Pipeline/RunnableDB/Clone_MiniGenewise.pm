@@ -244,6 +244,7 @@ sub add_ContigRunnable {
 	if (!defined($self->{_contigrunnable})) {
 	    $self->{_contigrunnable} = [];
 	}
+	print STDERR "Adding runnable to " . $self->{_contigrunnable} . "\n";
 	push(@{$self->{_contigrunnable}},$runnable);
     } else {
 	$self->throw("No runnable input to add_ContigRunnable");
@@ -265,7 +266,12 @@ sub output {
     my @output;
 
     foreach my $runnable ($self->each_ContigRunnable) {
-	push(@output,$runnable->output);
+	eval {
+	    push(@output,$runnable->output);
+	};
+	if ($@) {
+	    print STDERR "No output for $runnable [$@]\n";
+	}
     }
     return @output;
 }

@@ -178,6 +178,7 @@ sub write_output {
 	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
 	      $sth->execute;
 
+#    print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
 	  foreach my $gene (@genes) {
 	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
 		=~ s/$GENE_ID_SUBSCRIPT//;
@@ -272,27 +273,6 @@ sub fetch_input {
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_fpc_name($self->input_id);
-
-    #if ($self->vcontig) {
-#	my $focus = int(($contig->golden_start + $contig->golden_end)/2);
-
-#	$self->focuscontig($contig);
-
-#	$contig = new Bio::EnsEMBL::DB::ConvertibleVirtualContig(-focuscontig   => $contig,
-#						      -focusposition => $focus,
-#						      -ori           => 1,
-#						      -left          => 1,
-#						      -right         => 60000);
-
-	#$contig = $contig->extend_maximally;
-
-#	print(STDERR "Contig length is " . $contig->length . "\n");
-
-#	if ($contig->length > 50000000) {
-#	    $self->throw("Aborting - virtual contig loo tong");
-#	}
-
-#    }
 
 
     my $analysis = $self->dbobj->get_OldAnalysis(8);

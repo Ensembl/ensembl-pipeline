@@ -192,6 +192,8 @@ sub build_Genes {
     push(@features,@{$self->{_features}});
     push(@features,@{$self->{_extras}});
 
+    push(@{$genscan},@{$self->{_genewise}});
+
     $self->print_gff  (\@genes,\@features,$genscan);
 
 }
@@ -227,6 +229,7 @@ sub get_Features {
     my @tmp     = $self->get_all_Features;
 
     my @extras;
+    my @genewise;
 
     foreach my $f (@tmp) {
 	print STDERR "Got feature " . $f->seqname . "\t" . $f->start . "\t" . $f->end . "\t" . 
@@ -236,9 +239,7 @@ sub get_Features {
 	    my $newgs = $self->set_genscan_phases($f,$contig);
 
 	    if (defined($newgs) && $f->source_tag eq "genewise") {
-		push(@{$self->{_extras}},$newgs);
-		
-		print STDERR "Found genewise\n";
+		push(@genewise,$newgs);
 	    } elsif (defined $newgs) {
 		push(@genscan,$newgs);
 	    } else {
@@ -248,7 +249,7 @@ sub get_Features {
 	} elsif ($f->primary_tag eq "similarity") {
 	    $f->seqname($contig->id);
 	    if ($f->source_tag eq "est2genome") {
-#		push(@extras,$f);
+		push(@extras,$f);
 	    } elsif ($f->source_tag eq "hmmpfam" && $f->score > 25) {
 		push(@features,$f);
             } elsif ($f->score >= 100) {
@@ -265,11 +266,13 @@ sub get_Features {
 
     push(@{$self->{_features}},@features);
     push(@{$self->{_extras}}  ,@extras);
+    push(@{$self->{_genewise}},@genewise);
     push(@{$self->{_genscan}},@genscan);
     
     print STDERR "Number of similarity features " . scalar(@features) . "\n";
     print STDERR "Number of genscans "            . scalar(@genscan)  . "\n";
     print STDERR "Number of est2genome features " . scalar(@extras)   . "\n";
+    print STDERR "Number of genewisefeatures " . scalar(@genewise)   . "\n";
 
     return ($self->{_features},$self->{_genscan});
 }
@@ -306,19 +309,26 @@ sub make_Exons {
     my @exons;
     my @supported_exons;
 
-    my $gscount = 1;
-    my @extras  = @{$self->{_extras}};
+    my $gscount  = 1;
+    my @extras   = @{$self->{_extras}};
+    my @genewise = @{$self->{_genewise}};
+
     my @extra_exons;
 
-    my @extra_exons = $self->filter_extras(\@extras,90);
+    my @extra_exons    = $self->filter_extras(\@extras,90);
+    my @genewise_exons = $self->filter_genewise(\@genewise);
+
     my $features = $self->{_features};
 
     for my $ex (@extra_exons) {
-	print "Exon is " . $ex->id . "\t" . $ex->start . "\t" . $ex->end . "\t" . $ex->strand  . "\n";
+	print "Extra exon is " . $ex->id . "\t" . $ex->start . "\t" . $ex->end . "\t" . $ex->strand  . "\n";
+    }
+    for my $ex (@genewise_exons) {
+	print "Genewise exon is " . $ex->id . "\t" . $ex->start . "\t" . $ex->end . "\t" . $ex->strand  . "\n";
     }
 
-#    return @extra_exons;
-
+    return @genewise_exons;
+    my $time = time; chomp($time);
     foreach my $gs (@$genscan) {
 	print STDERR "Found fset\n";
 	my $excount    = 1;
@@ -343,16 +353,25 @@ sub make_Exons {
 	    $exon->strand   ($f->strand);
 	    $exon->phase     ($f->{phase});
 	    $exon->attach_seq($contig->primary_seq);
+	    $exon->created($time);
+	    $exon->modified($time);
 
 	    push(@exons,$exon);
-	    print STDERR "Exons @exons\n";
+	#    print STDERR "Exons @exons\n";
 	    $excount++;
 	    
 	}
 	$gscount++;
     }
     
-    foreach my $ex (@exons) {
+    EXON: foreach my $ex (@exons) {
+	foreach my $gex (@genewise_exons) {
+	    if ($ex->overlaps($gex)) {
+		print STDERR "Genscan exon overlaps genewise exon - skipping\n";
+		next EXON;
+	    }
+	}
+
 	$ex->contig_id($self->contig->id);
 	$ex->find_supporting_evidence($features);
 	my @support = $ex->each_Supporting_Feature;
@@ -372,9 +391,89 @@ sub make_Exons {
     }
     
     push(@supported_exons,@extra_exons);
+    push(@supported_exons,@genewise_exons);
     print STDERR "Supported @supported_exons\n";
     return @supported_exons;
 
+}
+
+sub filter_genewise {
+    my ($self,$features) = @_;
+
+    my @features = @$features;
+    my @newexons;
+
+    my $excount = 1;
+    my $time = time; chomp($time);
+
+    my @gwexons;
+    foreach my $f (@features) {
+	SUBF: foreach my $subf ($f->sub_SeqFeature) {
+	    my $found = 0;
+	    my $foundex;
+
+
+	    $found = 0;
+
+	    foreach my $ex (@newexons) {
+		if ($subf->start == $ex->start && $subf->end == $ex->end) {
+		    $found = 1;
+		    $foundex = $ex;
+		}
+	    }
+
+	    foreach my $ex (@gwexons) {
+		if ($subf->start == $ex->start && $subf->end == $ex->end) {
+		    $found = 1;
+		    $foundex = $ex;
+		}
+	    }
+
+	    if ($found == 1) {
+		print STDERR "Found duplicate exon - adding evidence\n";
+		$foundex->add_Supporting_Feature($subf);
+	    } else {
+		print STDERR "Making new exon from " .  $subf->gffstring . "\n";
+		my $contigid = $self->contig->id;
+		my $exon     = new Bio::EnsEMBL::MappedExon;
+		
+		$exon->id       ("TMPE_" . $contigid . "." . $f->id . "extra.$excount");
+		$exon->seqname  ($contigid . ".extra.$excount");
+		$exon->contig_id($contigid);
+		$exon->start    ($subf->start);
+		$exon->end      ($subf->end  );
+		$exon->strand   ($subf->strand);
+		$exon->phase    ($subf->{phase});
+		$exon->created  ($time);
+		$exon->modified ($time);
+		$exon->version  (1);
+		$exon->attach_seq($self->contig->primary_seq);
+		$exon->add_Supporting_Feature($subf);
+		
+		push(@gwexons,$exon);
+		$excount++;
+	    }
+	}
+
+	if ($gwexons[0]->strand == 1) {
+	    @gwexons = sort {$a->start <=> $b->start} @gwexons;
+	} else {
+	    @gwexons = sort {$b->start <=> $a->start} @gwexons;
+	}
+	
+	# This is not necessarily so.
+	my $phase = 0; #$self->find_phase(@egexons);
+	
+	for my $ex (@gwexons) {
+	    $ex->phase($phase);
+	    $phase = $ex->end_phase;
+	}
+	push(@newexons,@gwexons);
+    }
+    foreach my $exon (@newexons) {
+	print STDERR "Final exon list " . $exon . " " . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n";
+    }
+    return @newexons;
 }
 
 sub filter_extras {
@@ -406,7 +505,7 @@ sub filter_extras {
 
 	print STDERR "Average score is $score for $id\n";
 	
-	if ($score > $thresh) {
+	if ($score >= $thresh) {
 	    my @egexons;
 
 	    my @newf = $self->merge_feature_array(@{$idhash->{$id}});
@@ -435,7 +534,7 @@ sub filter_extras {
 		    $exon->end      ($f->end  );
 		    $exon->strand   ($f->strand);
 		    $exon->phase    ($f->{phase});
-
+		    $exon->version  (1);
 		    $exon->attach_seq($self->contig->primary_seq);
 		    $exon->add_Supporting_Feature($f);
 
@@ -1424,7 +1523,7 @@ sub print_gff {
     }
     foreach my $gen (@$genscan) {
 	foreach my $ex ($gen->sub_SeqFeature) {
-	    print POG  $ex->id . "\tgenscan\texon\t" . 
+	    print POG  $ex->id . "\t" . $ex->source_tag . "\texon\t" . 
 		$ex->start . "\t" . $ex->end . "\t100\t";
 	    if ($ex->strand == 1) {
 		print POG "+\t.\t";
@@ -1792,16 +1891,52 @@ sub set_genscan_phases {
     print STDERR "Got contig primary_seq\n";
     my $mrna = "";
 
-    foreach my $f ($gs->sub_SeqFeature) {
-       print STDERR "Fetching seq for " . $f->id . " "  . $f->start  . " " . $f->end . "\n";
+    my @_subf = $gs->sub_SeqFeature;
+    my @subf;
+
+    foreach my $ex (@_subf) {
+	my $found = 0;
+	foreach my $nex (@subf) {
+	    if ($ex->start == $nex->start && $ex->end == $nex->end) {
+		$found = 1;
+	    }
+	}
+	    
+	if ($found == 1) {
+	    print STDERR "Duplicate genewise exon - skipping\n";
+	} else {
+	    push(@subf,$ex);
+	}
+    }
+
+    if ($#subf >= 0) {
+	$strand = $subf[0]->strand;
+
+	if ($strand == 1) {
+	    @subf = sort { $a->start <=> $b->start } @subf;
+	} else {
+	    @subf = sort { $b->start <=> $a->start } @subf;
+	}
+    }
+    my @newf;
+
+
+    foreach my $f (@subf) {
 	$mrna .= $f->seq->seq;
+	print STDERR "Fetching seq for " . $f->id . " "  . $f->start  . " " . $f->end . " " . $f->seq->seq . "\n";
 	$strand = $f->strand;
     }
     
+    print STDERR "Full seq is " . $mrna . "\n";
+
     my $dnaseq = new Bio::PrimarySeq(-id  => "mrna",
 				     -seq => $mrna);
-    
+
+    if ($strand == -1) {
+#	$dnaseq = $dnaseq->revcom;
+    }
     my $phase;
+
     if ($dnaseq->translate('*','X',0)->seq !~ /\*/) {
 	$phase = 0;
     } elsif ($dnaseq->translate('*','X',2)->seq !~ /\*/) {
@@ -1815,6 +1950,7 @@ sub set_genscan_phases {
 
 
     print(STDERR "genscan translation = " . $gs->id . " " . $dnaseq->translate('*','X',(3-$phase)%3)->seq . " " . $phase . "\n");
+
     foreach my $f ($gs->sub_SeqFeature) {
 	print(STDERR "Genscan exon ids " . $f->id . ": $phase ". $f->seq->seq . "\n");
 	$f->{phase} = $phase;
