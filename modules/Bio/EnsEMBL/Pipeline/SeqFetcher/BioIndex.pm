@@ -154,11 +154,13 @@ sub  get_Seq_by_acc {
       print "Entry\n";
       my ($idstr,$seqstr) = split(/\n/,$entry,2);
       my ($id,$desc) = split(/ /,$idstr,2);
+
+      $id =~ s/^>//;
       
       $seqstr =~ s/\n//g;
       
-      my $seq =  new Bio::Seq(-id      => $id,
-			      -desc    => $desc,
+      my $seq =  new Bio::Seq(-id      => $acc,
+			      -display_id => $acc,
 			      -seq    => $seqstr);
       return $seq;
     }
