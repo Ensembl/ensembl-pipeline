@@ -1,4 +1,3 @@
-
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
 # Copyright GRL & EBI
@@ -140,7 +139,8 @@ sub new {
     
     $self->genetype($ESTGENE_TYPE);
 
-
+    $self->{_reverse_transcripts} = [];
+    $self->{_forward_transcripts} = [];
 
     return $self; 
 }
@@ -436,6 +436,19 @@ sub _process_Transcripts {
       ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
   }
   
+
+  # put sequence to the transcripts/exons
+  foreach my $tran (@filtered_transcripts ){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
+      if ( $strand == 1 ){
+	$exon->contig( $self->query );
+      }
+      else{
+	$exon->contig( $self->revcomp_query );
+      }
+    }
+  }
+	
   return @filtered_transcripts;
 }
 
@@ -947,7 +960,7 @@ We want introns of the form:
 sub check_splice_sites{
   my ($self,$transcript,$strand) = @_;
  
-  my $verbose = 1;
+  my $verbose = 0;
   
   my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
   
