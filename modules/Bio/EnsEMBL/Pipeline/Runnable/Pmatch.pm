@@ -82,7 +82,7 @@ sub parse_results{
 sub sort_results{
   my ($self) = @_;
 
-  my $command = "sort -k6,6 -k3,3n ".$self->results ." > pmatch.tmp";
+  my $command = "sort -k6,6 -k3,3n -u ".$self->results ." > pmatch.tmp";
   $self->throw("Error [sorting results] running pmatch on " . $self->filename) if system($command);
   rename "pmatch.tmp", $self->results;
   my $current_pmf;
