@@ -1,13 +1,5 @@
 #!/usr/local/bin/perl -w
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  use lib $script_dir;
-  require "EST_conf.pl";
-}
-
 =head1 NAME
 
   filter_and_e2g.pl
@@ -30,8 +22,7 @@ BEGIN {
 
 use strict;
 use Getopt::Long;
-
-my %conf = %::EST_conf;
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 my $runner;
 my $runnable;
@@ -45,9 +36,7 @@ my $input_id;
 
 &get_variables();
 
-my $command = "$runner -runnable $runnable -dbuser $refdbuser -dbname $refdbname -host $refdbhost -input_id $input_id -parameters estdbname=$estdbname,estdbuser=$estdbuser,estdbhost=$estdbhost,seq_index=" . $conf{'estindex'} . " -write";
-
-my $seqinx = "/data/blastdb/Ensembl/humanest";
+my $command = "$runner -runnable $runnable -input_id $input_id -write";
 
 print STDERR "command is $command\n";
 
@@ -74,14 +63,14 @@ sub get_variables {
 	      'input_id:s'      => \$input_id,
 	     );
 
-  $runner     = $conf{'runner'};
-  $runnable   = $conf{'est_genome_runnable'};
-  $refdbname  = $conf{'refdbname'};
-  $refdbuser  = $conf{'refdbuser'};
-  $refdbhost    = $conf{'refdbhost'};
-  $estdbname  = $conf{'estdbname'};
-  $estdbuser  = $conf{'estdbuser'};
-  $estdbhost    = $conf{'estdbhost'};
+  $runner     = $::scripts_conf{'runner'};
+  $runnable   = $::est_genome_conf{'est_genome_runnable'};
+  $refdbname  = $::db_conf{'refdbname'};
+  $refdbuser  = $::db_conf{'refdbuser'};
+  $refdbhost  = $::db_conf{'refdbhost'};
+  $estdbname  = $::db_conf{'estdbname'};
+  $estdbuser  = $::db_conf{'estdbuser'};
+  $estdbhost  = $::db_conf{'estdbhost'};
 
   if(!(defined $refdbhost && defined $refdbname & defined $refdbuser &&
        defined $estdbhost && defined $estdbname && defined $estdbuser &&

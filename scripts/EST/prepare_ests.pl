@@ -1,12 +1,6 @@
 #!/usr/local/bin/perl -w
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  use lib $script_dir;
-  require "EST_conf.pl";
-}
+
 
 =head1 NAME
 
@@ -33,14 +27,13 @@ BEGIN {
 
 use strict;
 use Getopt::Long;
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
-my %conf = %::EST_conf;
-
-my $estfile   = $conf{'estfile'};
-my $chunkdir  = $conf{'estfiledir'};
-my $chunknum  = $conf{'estchunknumber'};
-my $splitter  = $conf{'filesplitter'};
-my $makeindex = $conf{'makeindex'};
+my $estfile   = $::scripts_conf{'estfile'};
+my $chunkdir  = $::scripts_conf{'estfiledir'};
+my $chunknum  = $::scripts_conf{'estchunknumber'};
+my $splitter  = $::scripts_conf{'filesplitter'};
+my $makeindex = $::scripts_conf{'makeindex'};
 
 print "1 $estfile\n2 $chunkdir\n3 $chunknum\n4 $splitter\n5 $makeindex\n\n";
 

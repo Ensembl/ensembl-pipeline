@@ -1,13 +1,5 @@
 #!/usr/local/bin/perl -w
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  use lib $script_dir;
-  require "EST_conf.pl";
-}
-
 =head1 NAME
 
   make_bsubs.pl
@@ -33,8 +25,8 @@ BEGIN {
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
-my %conf =  %::EST_conf; # from EST_conf.pl
 my %chrhash;
 
 # declare these here so we can refer to them later
@@ -44,7 +36,7 @@ my $filterdir     = "filter_and_e2g";
 
 &get_chrlengths();
 &make_directories();
-#&make_exonerate_bsubs();
+&make_exonerate_bsubs();
 &make_filter_bsubs();
 
 
@@ -59,7 +51,7 @@ my $filterdir     = "filter_and_e2g";
 =cut
 
 sub make_directories {
-  my $scratchdir =  $conf{'tmpdir'};
+  my $scratchdir =  $::scripts_conf{'tmpdir'};
 
   my @resdirs = split /\//, $ex_resultsdir;
   # exonerate_ests
@@ -104,9 +96,9 @@ sub make_directories {
 =cut
 
 sub get_chrlengths{
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $conf{'refdbhost'},
-					      -user   => $conf{'refdbuser'},
-					      -dbname => $conf{'refdbname'},
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $::db_conf{'refdbhost'},
+					      -user   => $::db_conf{'refdbuser'},
+					      -dbname => $::db_conf{'refdbname'},
 					     );
   my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
   
@@ -130,20 +122,22 @@ sub get_chrlengths{
 =cut
 
 sub make_exonerate_bsubs {
-  my $jobfile = $conf{'exonerate_bsubsfile'};
+  my $jobfile = $::scripts_conf{'exonerate_bsubsfile'};
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
-  my $queue   = $conf{'queue'};
-  my $check   = "check_node.pl";
-  my $bsuberr = $conf{'tmpdir'} . "/" . $ex_bsubdir . "/stderr/";
-  my $bsubout = $conf{'tmpdir'} . "/" . $ex_bsubdir . "/stdout/";
-
-  my $estfile = $conf{'estfile'}; # may be a full path
+  my $queue         = $::scripts_conf{'queue'};
+  my $scriptdir     = $::scripts_conf{'scriptdir'};
+  my $check         = $scriptdir . "/check_node.pl";
+  my $exonerate_est = $scriptdir . "/exonerate_est.pl";il
+  my $bsuberr       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stderr/";
+  my $bsubout       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stdout/";
+  
+  my $estfile = $::scripts_conf{'estfile'}; # may be a full path
   my @path = split /\//, $estfile;
   $estfile = $path[$#path];
   $estfile .= "_chunk_";
 
-  my $numchunks = $conf{'estchunknumber'};
+  my $numchunks = $::scripts_conf{'estchunknumber'};
 
   for(my $i = 0; $i < $numchunks; $i++){
     my $num = $i;
@@ -154,9 +148,8 @@ sub make_exonerate_bsubs {
     my $chunk     = $estfile . $num;
     my $outfile   = $bsubout . $chunk;
     my $errfile   = $bsuberr . $chunk;
-    my $chunkfile = $conf{'estfiledir'} . "/" . $chunk;
     
-    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$check $chunk\" exonerate_est.pl -chunkname $chunkfile";
+    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$check $chunk\" $exonerate_est -chunkname $chunk";
     print OUT "$command\n";
   }
   
@@ -174,12 +167,17 @@ sub make_exonerate_bsubs {
 =cut
 
 sub make_filter_bsubs {
-  my $jobfile = $conf{'filter_bsubsfile'};
+  my $jobfile    = $::scripts_conf{'filter_bsubsfile'};
+  my $scratchdir = $::scripts_conf{'tmpdir'};
+  my $queue      = $::scripts_conf{'queue'};
+  my $scriptdir  = $::scripts_conf{'scriptdir'};
+  my $filter_e2g = $scriptdir . "/filter_and_e2g.pl";
+
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
   my $filter = $scratchdir . "/" . $filterdir . "/";
-  my $size = $conf{'filter_chunksize'};
-  my $runner = $conf{'runner'};
+  my $size   = $::scripts_conf{'filter_chunksize'};
+  my $runner = $::scripts_conf{'runner'};
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
@@ -198,7 +196,7 @@ sub make_filter_bsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \" filter_and_e2g.pl -input_id $input_id"
+      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \" $filter_e2g -input_id $input_id";
       print OUT "$command\n";
       
       $count = $count + $size;

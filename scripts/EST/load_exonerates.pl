@@ -38,6 +38,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Analysis;
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 my $esthost   = undef;
 my $refhost   = undef;
@@ -54,7 +55,7 @@ my $estfile   = undef;
 &get_variables();
 die ("$estfile does not exist") unless -e $estfile;
 
-my ($refdb, $estdb) = get_databases($refdbname, $refhost, $refdbuser, $estdbname, $esthost, $estdbuser);
+my ($refdb, $estdb) = get_databases($refdbname, $refhost, $refdbuser, $refpass, $estdbname, $esthost, $estdbuser, $estpass);
 die ("failed to create reference database DBAdaptor") unless defined $refdb;
 die ("failed to create est database DBAdaptor") unless defined $estdb;
 
@@ -167,18 +168,16 @@ sub process_ests {
 =cut
 
 sub get_variables{
-  &GetOptions( 
-	      'esthost:s'      => \$esthost,
-	      'refhost:s'      => \$refhost,
-	      'estport:n'      => \$estport,
-	      'refport:n'      => \$refport,
-	      'estdbname:s'    => \$estdbname,
-	      'refdbname:s'    => \$refdbname,
+  $esthost = $::db_conf{'estdbhost'};
+  $refhost = $::db_conf{'refdbhost'};
+  $estdbname = $::db_conf{'estdbname'};
+  $refdbname = $::db_conf{'refdbname'};
+  $estdbuser = $::db_conf{'estdbuser'};
+  $refdbuser = $::db_conf{'refdbuser'};
+  $estpass = $::db_conf{'estdbpass'};
+  $refpass = $::db_conf{'refdbpass'};
 
-	      'estdbuser:s'    => \$estdbuser,
-	      'refdbuser:s'    => \$refdbuser,
-	      'estpass:s'      => \$estpass,
-	      'refpass:s'      => \$refpass,
+  &GetOptions( 
 	      'estfile:s'      => \$estfile,
 	     );
   
@@ -203,14 +202,16 @@ sub get_variables{
 =cut
 
 sub get_databases{
-  my ($rname, $rhost, $ruser, $ename, $ehost, $euser) = @_;
+  my ($rname, $rhost, $ruser, $rpass, $ename, $ehost, $euser, $epass) = @_;
   my $rdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $rhost,
 					       -user   => $ruser,
 					       -dbname => $rname,
+					       -pass   => $rpass,
 					      );
   my $edb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $ehost,
 					       -user   => $euser,
 					       -dbname => $ename,
+					       -pass   => $epass,
 					      );
   return ($rdb, $edb);
 }
@@ -235,7 +236,8 @@ sub get_analysis{
   my $anaAdaptor = $db->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
-  
+  my $db = $::est_genome_conf{'est_source'};
+
   if(scalar(@analyses) > 1){
     die("panic! > 1 analysis for $logicname\n");
   }
@@ -245,8 +247,7 @@ sub get_analysis{
   else{
 # only need to insert ONCE.
     $analysis = new Bio::EnsEMBL::Analysis(
-#					   -db              => 'dbEST',
-					   -db              => 'MGC',
+					   -db              => $db,
 					   -db_version      => 1,
 					   -program         => 'exonerate',
 					   -program_version => 3,
