@@ -11,7 +11,7 @@ use strict;
 
 my $file            = 'pseudogene_label.out';
 
-unless ( $ARGV[0] ){
+unless ( defined $ARGV[0] ){
   print STDERR "Script to collect the results from the run of label_pseudogenes.pl\n";
   print STDERR "it prints the results into a file pseudogene_label.out\n";
   print STDERR "Usage: $0 /dir/with/results/\n";
