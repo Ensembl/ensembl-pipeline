@@ -142,8 +142,9 @@ sub new {
 
   ############################################################
   # we are using the latest version: exonerate-0.6.7
-  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
-
+  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
+  #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  
   ############################################################
   # options
   my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
@@ -174,8 +175,8 @@ Function:   Runs exonerate script and puts the results into the file $self->resu
 sub run {
   my ($self) = @_;
 
-  my $verbose = 0;
-    
+ my $verbose = 0;
+  
   my $dir         = $self->workdir();
   my $exonerate   = $self->exonerate;
   my @query_seqs  = $self->query_seqs;
@@ -213,9 +214,17 @@ sub run {
   
   # we write each Bio::Seq sequence in the fasta file $query
   my %length;
+  my $max_length;
   foreach my $query_seq ( @query_seqs ){
     ## calculate the length
     #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
+    my $length = $query_seq->length;
+    unless ( $max_length ){
+      $max_length = $length;
+    }
+    if ( $length > $max_length ){
+      $max_length = $length;
+    }
     if ( $query_seq->display_id ){
       $length{ $query_seq->display_id } = $query_seq->length;
     }
@@ -227,12 +236,20 @@ sub run {
   }
   close( QUERY_SEQ );
   
-  my $command ="exonerate-0.6.7 ".
-      $self->options.
-	  " --querytype $query_type --targettype $target_type --query $query --target $target |";
+  my $command =$self->exonerate." ".
+    $self->options.
+      " --querytype $query_type --targettype $target_type --query $query --target $target ";
+  
+  # long cDNA, should use special parameters?
+  if ( $max_length > 60000 ){
+    $command .= " --spanrangeint 12 --spanrangeext 12 --joinrangeext 12 --joinrangeint 12";
+  }
+  
+  $command .= " | ";
 
-  print STDERR "running exonerate: $command\n" if $verbose;
-
+  #print STDERR "running exonerate: $command\n" if $verbose;
+  print STDERR "running exonerate: $command\n";
+  
   open( EXO, $command ) || $self->throw("Error running exonerate $!");
   
   # system calls return 0 (true in Unix) if they succeed
@@ -246,7 +263,7 @@ sub run {
   ############################################################
   # parse results - avoid writing to disk the output
   while (<EXO>){
-      
+    
     print STDERR $_ if $verbose;
       
       ############################################################
@@ -262,13 +279,13 @@ sub run {
       # The vulgar (Verbose Useful Labelled Gapped Alignment Report) blocks are a series 
       # of <label, query_length, target_length> triplets. The label may be one of the following: 
       #
-      # M Match 
-      # G Gap 
-      # C Codon gap 
-      # N Non-equivalenced region 
-      # 5 5' splice site 
-      # 3 3' splice site 
-      # I Intron 
+      # M    Match 
+      # G    Gap 
+      # C    Codon gap 
+      # N    Non-equivalenced region 
+      # 5/F  5' splice site 
+      # 3/T  3' splice site 
+      # I    Intron 
       #
       # example:
       # RESULT: AW793782.1 25 250 + 10_NT_035057.1-141075 104447 126318 + 652 82.88 M 30 30 5 0 2 I 0 21645 3 0 2 M 35 35 G 1 0 M 16 16 G 1 0 M 134 134 G 1 0 M 7 7
@@ -338,8 +355,11 @@ sub run {
     for( my $i=0; $i<=$#blocks; $i+=3){
       
       # do not look at splice sites now
-      if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
-
+      if ( $blocks[$i] eq '5' || $blocks[$i] eq 'F' 
+	   || 
+	   $blocks[$i] eq '3' || $blocks[$i] eq 'T'
+	 ){
+	
 	# the re-set of the coordinates is done in the intron triad
 	next TRIAD;
       }
@@ -464,10 +484,17 @@ sub run {
 	  
 	  # reset the start in the target only
 	  my $intron_length = $blocks[$i+2];
-	  if ( $i>=3 && ( $blocks[$i-3] eq '3' || $blocks[$i-3] eq '5' ) ){
+	  if ( $i>=3 && 
+	       ( $blocks[$i-3] eq '3' || $blocks[$i-3] eq 'T' )
+	       || 
+	       ( $blocks[$i-3] eq '5' || $blocks[$i-3] eq 'F' ) 
+	     ){
 	    $intron_length += 2;
 	  }
-	  if ( $blocks[$i+3] eq '5' || $blocks[$i+3] eq '3' ){
+	  if ( ( $blocks[$i+3] eq '5' || $blocks[$i+3] eq 'F' )
+	       || 
+	       ( $blocks[$i+3] eq '3' || $blocks[$i+3] eq 'T' )
+	     ){
 	    $intron_length += 2;
 	  }
 
@@ -521,13 +548,17 @@ sub run {
 	$evidence->score($coverage);
       }
     }
-        
+    
     push( @transcripts, $transcript );
     
   } # end of while loop
   
-  $self->output( @transcripts );
+  # test #
+#  foreach my $t ( @transcripts ){
+ #   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t);
+  #}
 
+  $self->output( @transcripts );
   close(EXO) or $self->throw("couldn't close pipe ");  
     
   ############################################################
