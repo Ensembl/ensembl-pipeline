@@ -232,10 +232,7 @@ sub run{
     @mapped_genes = $self->convert_coordinates( @genes );
   }
   
-  unless ( @mapped_genes ){
-    print STDERR "No genes stored - exiting\n";
-    exit(0);
-  }
+ 
 
   $self->output(@mapped_genes);
 }
