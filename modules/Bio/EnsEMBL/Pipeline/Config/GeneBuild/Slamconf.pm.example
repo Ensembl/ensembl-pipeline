@@ -49,29 +49,37 @@ use vars qw( %Slamconf );
 
 %Slamconf = (  
 
-# (valid entrys : R.Norvegicus, H.sapiens or M.musulus)
-#######################################################
+              SLAM_ORG1_NAME => 'H.sapiens'  ,           # (valid species : R.Norvegicus, H.sapiens or M.musulus)
+              SLAM_ORG2_NAME => 'M.musculus' ,
+
+
+              # Slam-options
+              
+              SLAM_BIN => '/nfs/acari/jhv/bin/slam',
+              SLAM_PARS_DIR => '/nfs/acari/jhv/lib/slam_pars_dir',
+              SLAM_MINLENGTH => '250',
+              SLAM_MAXLENGTH => '300000',   #slamdef: 100500 max length of comparing regions (>300kb needs >2GB memory)
+
+
+              # DB-configurations for second species
+
+              SLAM_COMP_DB_USER => 'anonymous' ,
+              SLAM_COMP_DB_PASS => '' ,
+              SLAM_COMP_DB_NAME => 'mus_musculus_core_22_32b' ,
+              SLAM_COMP_DB_HOST => 'kaka.sanger.ac.uk' ,
+              SLAM_COMP_DB_PORT => '' ,
+
+              SLAM_ORG2_RESULT_DB_USER  => 'ensadmin' ,
+              SLAM_ORG2_RESULT_DB_PASS  => 'ensembl' ,
+              SLAM_ORG2_RESULT_DB_NAME  => 'zz_test_jhv_slam_results_org2' ,
+              SLAM_ORG2_RESULT_DB_HOST  => 'ecs1.internal.sanger.ac.uk' ,
+              SLAM_ORG2_RESULT_DB_PORT  => '3306'
+           );
 
 
 
-SLAM_COMP_DB_USER        => 'anonymous' ,
-SLAM_COMP_DB_PASS        => '' ,
-SLAM_COMP_DB_NAME        => 'mus_musculus_core_22_32b' ,
-SLAM_COMP_DB_HOST        => 'kaka.sanger.ac.uk' ,
-SLAM_COMP_DB_PORT        => '' ,
 
-
-SLAM_ORG2_RESULT_DB_USER        => 'ensadmin' ,
-SLAM_ORG2_RESULT_DB_PASS        => 'ensembl' ,
-SLAM_ORG2_RESULT_DB_NAME        => 'zz_test_jhv_slam_result_org2' ,
-SLAM_ORG2_RESULT_DB_HOST        => 'ecs1.sanger.ac.uk' ,
-SLAM_ORG2_RESULT_DB_PORT        => '3306'
-                                );
-
-
-
-
-################################################################################
+    ################################################################################
 
 
 sub import {
