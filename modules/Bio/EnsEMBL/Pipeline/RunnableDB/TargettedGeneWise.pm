@@ -718,7 +718,7 @@ sub make_transcript{
 
   my $excount = 1;
   my @exons;
-    
+  
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
@@ -767,9 +767,26 @@ sub make_transcript{
       $transcript->add_Exon($exon);
     }
     
+    #for forward strand:
+    
+    #start_translation: position on the translation->start_exon coordinate system where
+    #the translation starts (counting from the left)
+    
+    #end_translation  : position on the translation->end_exon coordinate system where
+    #the translation ends (counting from the left)
+    
+    #for reverse strand:
+    
+    #start_translation: position on the translation->start_exon coordinate system where
+    #the translation starts (counting from the right, which is the direction of translation now)
+
+    #end_translation  : position on the translation->end_exon coordinate system where
+    #the translation ends (counting from the right)
+  
     $translation->start_exon($exons[0]);
     $translation->end_exon  ($exons[$#exons]);
     
+    # phase is relative to the 5' end of the transcript (start translation)
     if ($exons[0]->phase == 0) {
       $translation->start(1);
     } elsif ($exons[0]->phase == 1) {
@@ -777,7 +794,7 @@ sub make_transcript{
     } elsif ($exons[0]->phase == 2) {
       $translation->start(2);
     }
-    
+        
     $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
   }
   
