@@ -278,8 +278,9 @@ sub blast_ids {
     my ($self,@ids) = @_;
 
     my @seq         = $self->get_Sequences(@ids);
+    #print STDERR "have ".@seq." sequeunces\n";
     my @valid_seq   = $self->validate_sequence(@seq);
-    
+    #print STDERR "jave ".@valid_seq." valid sequences\n";
     my @blastseqs   = ($self->genomic_sequence);
     
     my $blastdb     = $self->make_blast_db(@blastseqs);
@@ -294,7 +295,7 @@ sub blast_ids {
     unlink $blastdb.".csq";
     unlink $blastdb.".nhd";
     unlink $blastdb.".ntb";
-
+    #print STDERR "have ".@newfeatures." to return\n";
     return @newfeatures;
 }
 
@@ -325,13 +326,13 @@ sub run_blast {
    #print (STDERR "Running command $command\n");
     my $status = system($command );
 
-#    print("Exit status of blast is $status\n");
+    #print("Exit status of blast is $status\n");
 
     my $report = new Bio::EnsEMBL::Pipeline::Tools::BPlite('-file'=>$blastout);
-
+    my $hsp_count = 0;
     while(my $sbjct = $report->nextSbjct){
       while(my $hsp = $sbjct->nextHSP){
-
+	$hsp_count++;
 	
         # strands
         my $strand = 1;
@@ -364,7 +365,7 @@ sub run_blast {
         push (@pairs, $featurepair);
       }
     }
-  
+    #print STDERR "there are ".$hsp_count." hsps\n";
 
     unlink $blastout;
     unlink $seqfile;
@@ -382,10 +383,10 @@ sub print_FeaturePair {
 sub make_blast_db {
     my ($self,@seq) = @_;
 
-    my $tmpdir = $::pipeConf{'nfstmp.dir'};
-    if(!defined $tmpdir || $tmpdir eq ''){
-      $tmpdir = '/tmp';
-    }
+    #my $tmpdir = $::pipeConf{'nfstmp.dir'};
+    #if(!defined $tmpdir || $tmpdir eq ''){
+    my $tmpdir = '/tmp';
+    #}
     my $blastfile = $self->get_tmp_file($tmpdir,'blast','fa');
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
                                -file   => ">$blastfile");
