@@ -78,49 +78,41 @@ sub new{
   $self->{'nodes'} = undef; #must by a space delimited line of nodes
   $self->{'resource'} = undef;
 
-  my($stdout, 
-     $stderr, 
-     $parameters, 
-     $pre_exec, 
-     $command, 
-     $queue, 
-     $jobname,
-     $resource,
-     $nodes) = $self->_rearrange([qw(STDOUT 
-				       STDERR 
-				       PARAMETERS 
-				       PRE_EXEC 
-				       COMMAND 
-				       QUEUE 
-				       JOBNAME
-				       RESOURCE
+  my($stdout, $stderr, $parameters, $pre_exec, $command,$queue, $jobname,$resource, $nodes) = $self->_rearrange([qw(STDOUT 
+                                     STDERR 
+                                     PARAMETERS 
+                                     PRE_EXEC 
+                                     COMMAND 
+                                     QUEUE 
+                                     JOBNAME
+                                     RESOURCE
 				       NODES)],@args);
 
-  if(defined($stdout)){
+  if($stdout){
     $self->stdout_file($stdout);
   }
-  if(defined($stderr)){
+  if($stderr){
     $self->stderr_file($stderr);
   }
-  if(defined($parameters)){
+  if($parameters){
     $self->parameters($parameters);
   }
-  if(defined($pre_exec)){
+  if($pre_exec){
     $self->pre_exec($pre_exec);
   }
-  if(defined($command)){
+  if($command){
     $self->command($command);
   }
-  if(defined($queue)){
+  if($queue){
     $self->queue($queue);
   }
-  if(defined($jobname)){
+  if($jobname){
     $self->jobname($jobname);
   }
-  if(defined($resource)){
+  if($resource){
     $self->resource($resource);
   }
-  if(defined($nodes)){
+  if($nodes){
     $self->nodes($nodes);
   }
 
@@ -134,7 +126,7 @@ sub new{
 sub stdout_file{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'stdout'} = $arg;
    }
 
@@ -146,7 +138,7 @@ sub stdout_file{
 sub stderr_file{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'stderr'} = $arg;
    }
 
@@ -157,7 +149,7 @@ sub stderr_file{
 sub id{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'id'} = $arg;
    }
 
@@ -167,7 +159,7 @@ sub id{
 sub parameters{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'parameters'} = $arg;
    }
 
@@ -177,7 +169,7 @@ sub parameters{
 sub pre_exec{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'pre_exec'} = $arg;
    }
 
@@ -187,7 +179,7 @@ sub pre_exec{
 sub command{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'command'} = $arg;
    }
 
@@ -198,7 +190,7 @@ sub command{
 sub queue{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'queue'} = $arg;
    }
 
@@ -208,7 +200,7 @@ sub queue{
 sub jobname{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'jobname'} = $arg;
    }
 
@@ -218,7 +210,7 @@ sub jobname{
 sub nodes{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'nodes'} = $arg;
    }
 
@@ -228,7 +220,7 @@ sub nodes{
 sub resource{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'resource'} = $arg;
    }
 

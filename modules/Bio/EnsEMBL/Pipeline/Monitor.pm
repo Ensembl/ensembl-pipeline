@@ -174,7 +174,7 @@ sub show_current_status_summary {
 
 #show running/failed jobs grouped by status
 sub show_finished_summary {
-  my ($self) = @_;
+  my ($self, $no_submit) = @_;
 
   my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_id from input_id_analysis i, analysis  a where a.analysis_id = i.analysis_id group by a.analysis_id");
   
@@ -192,7 +192,9 @@ sub show_finished_summary {
     my $count  = $ref->{'count(*)'};
     my $name = $ref->{'logic_name'};
     my $id = $ref->{'analysis_id'};
-
+    if ($name =~ /Submit/){
+      next;
+    }
     if (length($count) > $maxcount) {
       $maxcount = length($count);
     }

@@ -115,7 +115,7 @@ if(!$dbhost || !$dbname || !$dbuser){
 }
 
 useage() if $help;
-
+my %created_job_hash;
 if($idlist_file || @analyses || @input_id_types || @starts_from){
   print STDERR " you are running the rulemanager in a fashion which"
   ." will probably break the accumulators so they are being "
@@ -297,7 +297,7 @@ while (1) {
     # until we have all the input ids.
 
     my $id_type_hash = {};
-    print "Reading IDs ... ";
+    print "Reading IDs ...\n ";
     if ($idlist_file) {
       $id_type_hash = \%ids_to_run;
     }else {
@@ -432,12 +432,12 @@ while (1) {
 	# number of jobs created. When $flushsize jobs have been stored
 	# send to LSF.
 	
-  my %current_jobs = $job_adaptor->fetch_hash_by_input_id($id);
+  my $current_jobs = $job_adaptor->fetch_hash_by_input_id($id);
  ANAL: for my $anal (values %analHash) {
     
 	  my $result_flag = run_if_new($id,
                                  $anal,
-                                 \%current_jobs,
+                                 $current_jobs,
                                  $local,
                                  $verbose,
                                  $output_dir,
@@ -464,11 +464,11 @@ while (1) {
             print "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
             if (!exists($incomplete_accumulator_analyses{$accumulator_logic_name}) &&
                 !exists($completed_accumulator_analyses{$accumulator_logic_name})) {
-              my %current_jobs
+              my $current_jobs
  = $job_adaptor->fetch_hash_by_input_id('ACCUMULATOR');
               my $result_flag = run_if_new('ACCUMULATOR',
                                            $accumulator_analyses{$accumulator_logic_name},
-                                           \%current_jobs,
+                                           $current_jobs,
                                            $local,
                                            $verbose,
                                            $output_dir,
@@ -496,24 +496,11 @@ while (1) {
       }
     }
     if($batch_q_module->can('check_existance')){
+      print STDERR "Checking job existance\n";
       my @ids = @{$job_adaptor->list_dbIDs};
-      my %job_hash;
     JOB:foreach my $id(@ids){
-        my $job = $job_adaptor->fetch_by_dbID($id);
-        if(!$job){
-          next JOB;
-        }
-        my $status = $job->current_status;
-        if($status eq 'KILLED' || $status eq 'FAILED' 
-           || $status eq 'AWOL'){
-          next JOB;
-        }elsif(!$job->submission_id){
-          next JOB;
-        }else{
-          $job_hash{$job->submission_id} = $job;
-        }
+        &job_existance($batch_q_module, $verbose, $job_adaptor, $id);
       }
-      &job_existance($batch_q_module, $verbose, \%job_hash);
     }
     if(!$done){
       print STDERR "Checking whether to shut down\n";
@@ -591,7 +578,13 @@ sub run_if_new {
     
     print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
     $job_adaptor->store($job);
-    
+    my $created = $job->input_id.":".$job->analysis->logic_name;
+    if($created_job_hash{$created}){
+      print STDERR "have already created a job with ".
+        $job->input_id." ".$job->analysis->logic_name;
+    }else{
+      $created_job_hash{$created} = 1;
+      }
     if ($local) {
       print "Running job locally\n" if $verbose;
       eval {
@@ -632,10 +625,10 @@ sub shut_down {
 #or not
 sub cleanup_waiting_jobs{
   my ($db) = @_;
-  print STDERR "cleaning up waiting jobs\n";
+  #print STDERR "cleaning up waiting jobs\n";
     my ($a_job) = $db->get_JobAdaptor->fetch_by_Status("CREATED");
     if ($a_job) {
-      print STDERR "have job ".$a_job->dbID."\n";
+      #print STDERR "have job ".$a_job->dbID."\n";
         $a_job->flush_runs($db->get_JobAdaptor);
     }else{
       print STDERR "have no jobs to clean up\n";
@@ -703,7 +696,7 @@ sub check_if_done{
     }
     my $status = $j->current_status->status;
     #print STDERR "Job ".$id." has status ".$status."\n";
-    if($status eq 'KILLED'){
+    if($status eq 'KILLED' || $status eq 'SUCCESSFUL'){
       next JOB;
     }elsif($status eq 'FAILED' || $status eq 'AWOL'){
       if(!$j->can_retry){
@@ -812,31 +805,76 @@ sub job_time_check{
       print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
       print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
       $job->set_status('KILLED');
-    }elsif(!$time_hash->{$id}){
-      $job->set_status('AWOL');
-      print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
     }
   }
 }
 
+
 sub job_existance{
-  my ($batch_q_module, $verbose, $job_hash) = @_;
-  my @ids = keys(%$job_hash);
-  $verbose = 1;
-  print STDERR "Checking for the existance of jobs \n";
-  my $lost_ids = $batch_q_module->check_existance(\@ids, $verbose);
-  ID:foreach my $lost_id(@$lost_ids){
-    my $job = $job_hash->{$lost_id};
-    if(!$job){
-      print STDERR "job with submission id ".$lost_id." isn't ".
-        "defined\n" if($verbose);
-      next ID;
+  my ($batch_q_module, $verbose, $job_adaptor, $id) = @_;
+  
+  my $job = $job_adaptor->fetch_by_dbID;
+  if(!$job){
+    return;
+  }
+  my $status = $job->current_status->status;
+  my $exists;
+  if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
+     $status eq 'READING' ||$status eq 'WRITING' ||
+     $status eq 'WAIT'){
+    $exists = $batch_q_module->check_existance
+      ($job->submission_id, $verbose);
+    if($exists){
+      return;
     }
+  }else{
+    return;
+  }
+  if(!$exists){
     $job->set_status('AWOL');
+    my @lost_jobs = $job_adaptor->fetch_by_submission_id
+      ($job->submission_id);
+  LOST:foreach my $lj(@lost_jobs){
+      print STDERR "job ".$lj->dbID." is lost at ".
+        $lj->current_status->status."\n";
+      if($lj->dbID == $job->dbID){
+        next LOST;
+      }
+      $lj->set_status('AWOL');
+    }
     print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
   }
-  $verbose = 0;
+  return;
 }
+
+#sub job_existance{
+#  my ($batch_q_module, $verbose, $job_hash) = @_;
+#  sleep(15);
+#  my @ids = keys(%$job_hash);
+#  $verbose = 1;
+#  print STDERR "Checking for the existance of jobs \n";
+#  my $lost_ids = $batch_q_module->check_existance(\@ids, $verbose);
+#  ID:foreach my $lost_id(@$lost_ids){
+#    my $job = $job_hash->{$lost_id};
+#    if(!$job){
+#      print STDERR "job with submission id ".$lost_id." isn't ".
+#        "defined\n" if($verbose);
+#      next ID;
+#    }
+#    $job->set_status('AWOL');
+#    my @lost_jobs = $job_adaptor->fetch_by_submission_id($lost_id);
+#  LOST:foreach my $lj(@lost_jobs){
+#      print STDERR "job ".$lj->dbID." is lost at ".
+#        $lj->current_status->status."\n";
+#      if($lj->dbID == $job->dbID){
+#        next LOST;
+#      }
+#      $lj->set_status('AWOL');
+#    }
+#    print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
+#  }
+#  $verbose = 0;
+#}
 
 
 
