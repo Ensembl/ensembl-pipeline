@@ -52,9 +52,6 @@ use vars qw(%Config);
     # temporary working space (e.g. /tmp)
     PIPELINE_WORK_DIR   => '',
 
-    # default runner script 
-    PIPELINE_RUNNER_SCRIPT => '',
-
     # default input_file_directory
     PIPELINE_INPUT_DIR => '',
 

@@ -525,23 +525,30 @@ sub check_output_dir{
 
 sub run_single_analysis{
   my ($self, $logic_name, $table_to_fill, $verbose) = @_;
+
   $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->change_blastdb($self->blastdb);
   $self->setup_database;
+
   my $cmd = $self->job_submission_command($logic_name, $verbose);
+
   print $cmd."\n" if($self->verbosity || $verbose);
+
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
+
   my $run = 1;
- RUNNING:while($run == 1){
+
+ RUNNING: while ($run == 1) {
     my $jobs = $self->queue_manager->job_stats;
-    if(keys(%$jobs) == 0){
+    if (keys(%$jobs) == 0) {
       $self->analysis_stats($logic_name, $table_to_fill);
       $run = 0;
-    }else{
+    } else {
       sleep($self->testdb->conf_hash->{'job_stats_sleep'});
     }
   }
+
  if($self->comparison_conf){
     my $ref_testdb = TestDB->new(
                                  -SPECIES => $self->testdb->species, 

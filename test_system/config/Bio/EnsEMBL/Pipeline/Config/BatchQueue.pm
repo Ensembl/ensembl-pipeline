@@ -44,148 +44,151 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
-	   QUEUE_MANAGER      => 'LSF',
-	   DEFAULT_BATCH_SIZE => 10,
-	   DEFAULT_RETRIES    => 3,
-	   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-	   DEFAULT_OUTPUT_DIR => '',
-	   DEFAULT_CLEANUP => 'yes',	
-	   AUTO_JOB_UPDATE     => 1,
-     JOB_LIMIT => 10000, #at this number of jobs RuleManager will sleep for 
-     #a certain period of time if you effectively want this never to run set 
-     #the value to very high ie 100000 for a certain period of time
-     JOB_STATUSES_TO_COUNT => ['PEND'], #these are the jobs which will be
-     #counted
-     #valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE
-     MARK_AWOL_JOBS => 1,
-     MAX_JOB_SLEEP => 3600,#the maximun time to sleep for when job limit 
-     #reached
-     MIN_JOB_SLEEP => 120,#the minium time to sleep for when job limit reached
-     SLEEP_PER_JOB => 30,#the amount of time to sleep per job when job limit 
-     #reached
-     DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
-	   QUEUE_CONFIG       => [
-                            {
-				    logic_name => 'RepeatMask',
-				    batch_size => 10,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'Genscan',	
-				    batch_size => 10,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'Swall',	
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'long',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'Vertrna',	
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'long',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'Unigene',	
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'long',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'CpG',
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',
-				   },
-				   {
-				    logic_name => 'Dust',
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',
-				   },
-				   {
-				    logic_name => 'tRNAscan',
-				    batch_size => 200,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',
-				   },
-				   {
-				    logic_name => 'TRF',
-				    batch_size => 200,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',
-				   },
-				   {
-				    logic_name => 'Eponine',	
-				    batch_size => 10,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'marker',	
-				    batch_size => 10,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'yes',	
-				   },
-				   {
-				    logic_name => 'FirstEF',	
-				    batch_size => 1,
-				    resource   => 'select[model==IBMBC2800]',
-				    retries    => 1,
-				    sub_args   => '',
-				    runner     => '',
-				    queue      => 'normal',
-				    cleanup    => 'no',	
-				   },
-				 ]
+  QUEUE_MANAGER       => 'LSF',
+  DEFAULT_BATCH_SIZE  => 10,
+  DEFAULT_RETRIES     => 3,
+  DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
+  DEFAULT_OUTPUT_DIR  => '',
+  DEFAULT_CLEANUP     => 'yes',	
+  AUTO_JOB_UPDATE     => 1,
+  JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
+                      # a certain period of time if you effectively want this never to run set 
+                      # the value to very high ie 100000 for a certain period of time
+  JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be
+                                     # counted
+                                     # valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE
+  MARK_AWOL_JOBS      => 1,
+  MAX_JOB_SLEEP       => 3600, # the maximun time to sleep for when job limit 
+                               # reached
+  MIN_JOB_SLEEP      => 120, # the minium time to sleep for when job limit reached
+  SLEEP_PER_JOB      => 30, # the amount of time to sleep per job when job limit 
+                            # reached
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
+
+  DEFAULT_RUNNER => '',
+
+  QUEUE_CONFIG       => [
+    {
+      logic_name => 'RepeatMask',
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'Genscan',        
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'Swall',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'Vertrna',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'Unigene',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'CpG',
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',
+    },
+    {
+      logic_name => 'Dust',
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',
+    },
+    {
+      logic_name => 'tRNAscan',
+      batch_size => 200,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',
+    },
+    {
+      logic_name => 'TRF',
+      batch_size => 200,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',
+    },
+    {
+      logic_name => 'Eponine',        
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'marker',        
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',        
+    },
+    {
+      logic_name => 'FirstEF',        
+      batch_size => 1,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'no',        
+    },
+  ]
 );
 
 sub import {

@@ -58,7 +58,7 @@ marker          EPCR             marker_feature
 
 To run these tests individually you need a commandline like this
 
-./test_single_analysis -logic_name CpG -feature_table simple_feature
+./test_single_analysis.pl -logic_name CpG -feature_table simple_feature
 
 if you want the data compared to the reference data you all need to 
 pass the commandline option -run_comparison
