@@ -443,52 +443,79 @@ sub parse_results {
 sub split_gapped_feature {
     my ($self, $feat1, $feat2) = @_;
     
-    my @f1_align  = split (//,$feat1->{'alignment'});
-    my @f2_align  = split (//,$feat2->{'alignment'});
-    my ($f1_len, $f2_len) = (scalar(@f1_align), scalar(@f2_align));
+    my (@masked_f1, @masked_f2);
+    #replace bases and gaps with positions and mask number
+    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'alignment'});
+    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'alignment'});
+    $self->throw("Can't split feature where alignment lengths don't match: F1 ("
+                 .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
+                if (scalar(@masked_f1) != scalar(@masked_f2)); 
     
-    $self->throw("Can't compare alignments where lengths don't match: F1 ($f1_len) F2 ($f2_len)\n")
-            unless  ($f1_len == $f2_len);
-    
-    #combine gap alignments into a single array
-    my @masked_align;
-    for (my $index = 0; $index < $f1_len; $index++)
-    {
-        push (@masked_align, ($f1_align[$index] eq '-' or $f2_align[$index] eq '-') ? '-' : 'x');
-    }
-    
-    my $start = 0;
-    my $mask_len = scalar(@masked_align);
+    my $building_feature;
+    my $mask_len = scalar(@masked_f1);
+    my ($f1_start, $f2_start);
     for (my $index =0; $index < $mask_len; $index++)
     {
-        if ($masked_align[$index] eq '-' || $index == $mask_len-1)
+        
+        if ($masked_f1[$index] == -1 || $masked_f2[$index] == -1 || $index == $mask_len -1)
         {
-            if (defined($start))
+            #Either alignment contains an insertion.
+            #Either start a new feature or end current one.
+            if ($building_feature)
             {
-                my $end = $index - 1; #the previous base was the end
-                my $f1_start = $feat1->{start};
-                my $f2_start = $feat2->{start};
-                $feat1->{start} = $f1_start + $start;
-                $feat1->{end}   = $f1_start + $end;
-                $feat2->{start} = $f2_start + $start;
-                $feat2->{end}   = $f2_start + $end;
+                #print STDERR "Feat: ".$feat2->{'name'}
+                #             ." F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
+                #             ." S1 ".$f1_start." - ".$masked_f1[$index-1]
+                #             ." F2 ".$feat2->{'start'}." - ".$feat2->{'end'}
+                #             ." S2 ".$f2_start." - ".$masked_f2[$index-1]."\n";             
+                
+                $feat1->{'start'}   = $f1_start; 
+                $feat2->{'start'}   = $f2_start;
+                #feature ended at previous position unless end of alignment reached
+                $feat1->{'end'}     = ($index == $mask_len -1) 
+                                        ? $masked_f1[$index] : $masked_f1[$index-1];
+                $feat2->{'end'}     = ($index == $mask_len -1) 
+                                        ? $masked_f2[$index] :$masked_f2[$index-1];
                 
                 $self->createfeaturepair($feat1, $feat2);
-                #print STDERR "\nINDEX $start- $end \t";
-                #print STDERR "SPLIT: F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
-                #             ." (".($feat1->{'end'} - $feat1->{'start'} +1).")"
-                #             ."\tF2 ".$feat2->{'start'}." - ".$feat2->{'end'}
-                #             ." (".($feat2->{'end'} - $feat2->{'start'} +1).")\n";
-                $start = undef;
-                next if ($index == $mask_len-1);
+                $building_feature = 0;
             }
             
-            if ($masked_align[$index+1] ne '-')
+        }
+        else
+        {
+            #Alignment of two bases found
+            if (!$building_feature)
             {
-                $start = $index +1;
+                $f1_start = $masked_f1[$index];
+                $f2_start = $masked_f2[$index];
+                $building_feature =1;
             }
         }
     }
+}
+
+#Fills gapped alignment with base position number or -1 for insertions. 
+sub mask_alignment {
+    my ($self, $start, $alignment) =@_;
+    
+    my @array = split (//,$alignment);
+    my @masked_array;
+    
+    my $base_count = $start;
+    foreach my $base (@array)
+    {
+        if ($base ne '-')
+        {
+            push (@masked_array, $base_count);
+            $base_count++; 
+        }
+        else
+        {
+            push (@masked_array, -1);
+        }   
+    }
+    return @masked_array;
 }
 
 ##############
