@@ -771,18 +771,16 @@ sub _working_alignment {
 
     my $slot_resident =  $self->{'_working_alignment_array'}->{$slot};
 
-    if (defined $slot_resident && scalar @$slot_resident == 1) {
+    if ((($slot eq 'genomic_sequence')||($slot eq 'exon_protein')||($slot eq 'exon_nucleotide')) 
+	&& defined $slot_resident && scalar @$slot_resident == 1) {
       return $slot_resident->[0];
     }
 
     return $slot_resident;
 
-  } else {
+  } 
 
-    return $self->{'_working_alignment_array'};
-
-  }
-
+  return 0;
 }
 
 ##### Fiddlings with Slices and Transcripts. #####
