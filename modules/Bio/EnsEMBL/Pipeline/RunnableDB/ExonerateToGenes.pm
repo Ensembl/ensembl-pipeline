@@ -490,6 +490,27 @@ sub make_genes{
   my @genes;
   my $slice_adaptor = $self->db->get_SliceAdaptor;
 
+  #############################################################
+  # Sort transcripts by chromosome to make subsequent 
+  # sequence fetching faster.
+
+    # Create a chromosome number lookup 
+  my %transcript_lookup;
+  foreach my $transcript (@transcripts){
+    my $seqname = $transcript->start_Exon->seqname;
+    $seqname =~ /([^\.]+)/;
+
+    if ($1 > 0){ # If the chromosome number is not numeric.
+      $transcript_lookup{$seqname} = $1;
+    } else {
+      $transcript_lookup{$seqname} = 12345; # Some bogus number.
+    }
+  }
+   # Sort by chromosome
+  @transcripts = sort {$transcript_lookup{$a->start_Exon->seqname} <=> 
+			 $transcript_lookup{$b->start_Exon->seqname}} 
+                      @transcripts;
+
   my $gene;
   my $checked_transcript;
   foreach my $tran ( @transcripts ){
