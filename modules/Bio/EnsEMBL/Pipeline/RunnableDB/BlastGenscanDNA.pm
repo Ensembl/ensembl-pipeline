@@ -109,7 +109,7 @@ sub fetch_input {
     #print STDERR "Fetching contig $contigid\n";
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
-    my $genseq    = $contig->primary_seq() 
+    my $genseq    = $contig
         or $self->throw("Unable to fetch contig sequence");
 
     $self->genseq($genseq);
