@@ -52,6 +52,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Pep_SeqFeature;
 #use Data::Dumper;
 
 use vars qw(@ISA);
