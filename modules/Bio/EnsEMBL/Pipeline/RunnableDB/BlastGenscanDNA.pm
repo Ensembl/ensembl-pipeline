@@ -126,8 +126,8 @@ sub transcripts {
     {
         foreach (@transcripts)
         {
-            $self->throw("Input $_ is not a Bio::EnsEMBL::Transcript\n")
-                unless $_->isa("Bio::EnsEMBL::Transcript");
+	  #$self->throw("Input $_ is not a Bio::EnsEMBL::Transcript\n")
+           #     unless $_->isa("Bio::EnsEMBL::Transcript");
         }
         push (@{$self->{'_transcripts'}}, @transcripts);
     }
