@@ -49,6 +49,13 @@ without removing the data files and databases, allowing the re-run of the script
 The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs 
 between 5 and 24 h, depending on farm usage.
 
+Two external programs need to be accessible for the script:
+  splitting a fasta file into a number of chunks:
+    /nfs/acari/searle/progs/fastasplit/fastasplit
+
+  removing poly-A tails from sequences:
+    /nfs/acari/searle/progs/ensembl-trunk/ensembl-pipeline/scripts/EST/clip_polyA.pl
+
 =head1 CONTACT
 
 ensembl-dev@ebi.ac.uk
@@ -395,12 +402,20 @@ sub fastafiles{
     }
 
     if($update){
+      #clip ployA tails
+      my $newfile2 = $newfile.".clipped";
+      $cmd = "/nfs/acari/searle/progs/ensembl-trunk/ensembl-pipeline/scripts/EST/clip_polyA.pl ".
+	     "-mRNA $newfile -out $newfile2 -clip";
+      if(system($cmd)){
+	die("couldn t clip file.$@\n");
+      }
       #split fasta files, store into CHUNKDIR
       print "splitting fasta file.\n";
       my $newfasta = $dataDIR."/".$newfile;
       my $outdir   = $chunkDIR;
       my $chunknum = 1000;   #(<300 sequences / file)
-      if(system("/nfs/acari/searle/progs/fastasplit/fastasplit $newfasta $chunknum $outdir")){
+      $cmd = "/nfs/acari/searle/progs/fastasplit/fastasplit $newfasta $chunknum $outdir";
+      if(system($cmd)){
 	die("couldn t split file.$@\n");
       }
       print "chopped up file.\n";
