@@ -70,21 +70,23 @@ sub new {
 
   #SET UP ANY INSTANCE VARIABLES
 
-  $self->{'_slice'} = undef; #Slice to run over
   $self->{'_max_intron_length'} = 50000; #default value for intron length cutoff
   $self->{'_max_intron_coverage'} = 80   ; #default value for intron length cutoff
   $self->{'_max_exon_coverage'} = 20   ; #default value for exon length cutoff
   $self->{'_modified_genes'} =[] ;# array ref to modified genes to write to new db
   $self->{'_discarded_transcripts'} = [];# array ref to discarded transcripts
+  $self->{'_genes'} = []; #array of genes to test;
+  $self->{'_repeats'} = {}; # hash of repeat features corresponding to each gene;
 
-  my( $slice,$max_intron_length, $max_intron_coverage, $max_exon_coverage) = $self->_rearrange([qw(
-												   QUERY
+  my( $genes,$repeats,$max_intron_length, $max_intron_coverage, $max_exon_coverage) = $self->_rearrange([qw(
+												   GENES
+												   REPEAT_FEATURES
 												   MAX_INTRON_LENGTH
 												   MAX_INTRON_COVERAGE
 												   MAX_EXON_COVERAGE
 												  )], @args);
   
-  $self->_check_slice($slice) if ($slice);
+#  $self->_check_slice($slice) if ($slice);
   if ($max_intron_length){
     $self->max_intron_length($max_intron_length);
   }
@@ -94,7 +96,14 @@ sub new {
   if ($max_exon_coverage){
     $self->max_exon_coverage($max_exon_coverage);
   }
+  if ($genes){
+    $self->genes($genes);
+  }
+  if ($repeats){
+    $self->repeats($repeats);
+  }
 
+#test for same number of repeats and genes?
 
   return $self;
 }
@@ -149,34 +158,39 @@ sub max_intron_coverage {
 
 sub max_exon_coverage {
   my ($self, $max_exon_coverage) = @_;
-
+  
   if ($max_exon_coverage > 0 && $max_exon_coverage < 100 ){
     $self->{'_max_exon_coverage'} = $max_exon_coverage;
-     }
+  }
   return $self->{'_max_exon_coverage'};
 }
 
-=head2 check_slice
 
-  Arg [1]    : Bio::EnsEMBL::Slice $query
-  Description: accessor for query sequence
-  Returntype : Bio::EnsEMBL::Slice
-  Exceptions : query not a Bio::EnsEMBL::Slice
-  Caller     : general
-
-=cut
-
-sub _check_slice {
-  my ($self, $slice) = @_;
-
-  if ($slice) {
-    unless ($slice->isa("Bio::EnsEMBL::Slice")) {
-      $self->throw("Input isn't a Bio::EnsEMBL::Slice");
-    }  
-    $self->{_slice} = $slice ;
+sub genes {
+  my ($self, $genes) = @_;
+  foreach my $gene (@{$genes}){
+    unless  ($gene->isa("Bio::EnsEMBL::Gene")){
+      $self->throw("Input isn't a Bio::EnsEMBL::Gene, it is a $gene");
+    }
   }
-  return $self->{_slice};
+  $self->{'_genes'} = $genes;
+  return $self->{'_genes'};
 }
+
+sub repeats {
+  my ($self, $repeats) = @_;
+  foreach my $repeat_array (values %{$repeats}){
+    foreach my $repeat (@{$repeat_array}){
+      unless ($repeat->isa("Bio::EnsEMBL::RepeatFeature")){
+        $self->throw("Input is not a Bio::EnsEMBL::RepeatFeature, it is a $repeat");
+      }
+    }
+  }
+  $self->{'_repeats'} = $repeats;
+  return $self->{'_repeats'};
+}
+
+
 
 =head2 run
 
@@ -190,8 +204,6 @@ sub _check_slice {
 
 sub run {
   my ($self) = @_;
-  #check sequence
-  my $seq = $self->_check_slice || $self->throw("Clone required for dust\n");
 
   $self->test_genes;
   $self->summary;
@@ -242,7 +254,7 @@ sub test_genes{
   my @evidence;
   my $num=0;
   my $pseudo= undef;
-  my @genes = @{$self->{'_slice'}->get_all_Genes};
+  my @genes = @{$self->{'_genes'}};
 
 
   foreach my $gene(@genes){
@@ -250,7 +262,7 @@ sub test_genes{
     my @real_trans ;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       $num++;
-      my $evidence = $self->transcript_evidence($transcript);
+      my $evidence = $self->transcript_evidence($transcript,$gene);
       $pseudo = undef;
       #transcript tests
 
@@ -270,17 +282,17 @@ sub test_genes{
       #EXONS CONTAMINATED
       
       #    if($evidence->{'covered_exons'} >= $self->{'_max_exon_coverage'}){$pseudo = 1;}
-      
-      
+
+
       if ($pseudo){
 	push (@pseudo_trans,$transcript);	
       }
-      
+
       else{
 	push (@real_trans,$transcript);	
       }
     }
-    
+
     #########################################
     # gene tests
 
@@ -347,8 +359,8 @@ Arg [none] : Bio::EnsEMBL::Transcript
 
 sub transcript_evidence{
 
-  my ($self,$transcript) =@_;
-  my $repeat_blocks = $self->get_all_repeat_blocks($transcript);
+  my ($self,$transcript,$gene) =@_;
+  my $repeat_blocks = $self->get_all_repeat_blocks($transcript,$gene);
   my $results;
   my  @exons =  @{$transcript->get_all_Exons};
   @exons = sort {$a->start <=> $b->start} @exons;
@@ -365,18 +377,18 @@ sub transcript_evidence{
   foreach my $exon (@exons) {
     ###########################################
     #Need to convert exon object to seq feature
-    #in order to use ranage methods
+    #in order to use range methods
 
     my $seq_feature_exon = Bio::EnsEMBL::SeqFeature->new(
-							 -START => $exon->start-$transcript->start ,
-							 -END => $exon->end-$transcript->start,
+							 -START => $exon->start,
+							 -END => $exon->end,
 							 -STRAND => $exon->strand
 							);
     # Do intron
     if (defined($prev_exon)) {
       my $intron = Bio::EnsEMBL::SeqFeature->new(
-						 -START => $prev_exon->end+1-$transcript->start,
-						 -END => $exon->start-1-$transcript->start,
+						 -START => $prev_exon->end+1,
+						 -END => $exon->start-1,
 						 -STRAND => $exon->strand
 						);
       if ($intron->length > 9) {
@@ -419,17 +431,16 @@ sub transcript_evidence{
 =head2 get_all_repeat_blocks
 
   Args       : none
-  Description: gets slice from transcript and fetches all repeats and  
-merges them into blocks
+  Description: Gets repeat array from _repeats hash using gene objects as keys and merges repeats into blocks
   Returntype : array of Seq_Feature blocks;
 
 =cut 
 
 sub get_all_repeat_blocks {
-  my ($self,$transcript) = @_;
+  my ($self,$transcript,$gene) = @_;
   my @repeat_blocks;
-  my $rep_gene_slice = $transcript->feature_Slice;
-  my @repeats = @{$rep_gene_slice->get_all_RepeatFeatures};
+  my %repeat_hash = %{$self->{'_repeats'}};
+  my @repeats = @{$repeat_hash{$gene}};
   @repeats = sort {$a->start <=> $b->start} @repeats;
   my $curblock = undef;
 
@@ -526,5 +537,7 @@ sub output {
 
     return @{$self->{'_modified_genes'}};
 }
+
+
 
 return 1;
