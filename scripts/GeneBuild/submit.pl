@@ -6,7 +6,8 @@ while( <> ) {
   my $input = $_;
   chomp ($input);
   system("$input");
-#print "$input\n";
+  print "$input\n";
 
-    #system("sleep(1)");
+  print "sleeping for 5 seconds\n";
+  system("sleep 15 ");
 }
