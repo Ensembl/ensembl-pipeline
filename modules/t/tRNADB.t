@@ -2,7 +2,7 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN {$| = 1; plan test => 6;}
+BEGIN {$| = 1; plan test => 15;}
 
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE;
