@@ -141,13 +141,13 @@ foreach my $transcript ( @{$gene->get_all_Transcripts} ){
   
   if ($evidence){
     my $evidence_ids = &_get_evidence($transcript);
-    print STDERR "RESULT gene_id:$gene_id\ttranscript_id:$transcript_id\treal_introns:$real_introns\tframeshift:$frameshift\tpolyA:$polyA\tMet:$Met\tspliced_elsewhere:$spliced_elsewhere\tss_correct:$splice_sites_correct\thomology1:$mouse_homology\thomology2:$rat_homology\trepeats:$repeat\tevidence:$evidence_ids\ttrans_count:$trans_count\n";
+    print STDERR "RESULT gene_id:$gene_id\ttranscript_id:$transcript_id\treal_introns:$real_introns\tframeshift:$frameshift\tpolyA:$polyA\tMet:$Met\tspliced_elsewhere:$spliced_elsewhere\tss_correct:$splice_sites_correct\thomology1:$mouse_homology\thomology2:$rat_homology\tintrons_with_repeats:$repeat\tevidence:$evidence_ids\ttrans_count:$trans_count\n";
   }
   else{
     $mouse_homology = 0 unless defined($mouse_homology);
     $rat_homology = 0 unless defined($rat_homology);
     
-    print STDERR "RESULT gene_id:$gene_id\ttranscript_id:$transcript_id\treal_introns:$real_introns\tframeshift:$frameshift\tpolyA:$polyA\tMet:$Met\tspliced_elsewhere:$spliced_elsewhere\tss_correct:$splice_sites_correct\tmouse_homology:$mouse_homology\trat_homology:$rat_homology\trepeats:$repeat\ttrans_count:$trans_count\n";
+    print STDERR "RESULT gene_id:$gene_id\ttranscript_id:$transcript_id\treal_introns:$real_introns\tframeshift:$frameshift\tpolyA:$polyA\tMet:$Met\tspliced_elsewhere:$spliced_elsewhere\tss_correct:$splice_sites_correct\tmouse_homology:$mouse_homology\trat_homology:$rat_homology\tintrons_with_repeats:$repeat\ttrans_count:$trans_count\n";
   }
 }
 
