@@ -520,7 +520,9 @@ sub run_module {
       # "RUNNING"
       eval {
 	      $self->set_status( "RUNNING" );
-	      $rdb->run;
+	      $rdb->db->disconnect_when_inactive(1); 
+        $rdb->run;
+        $rdb->db->disconnect_when_inactive(0); 
       };
       if ($err = $@) {
         
@@ -543,7 +545,7 @@ sub run_module {
 	      $rdb->write_output;
 	      # ------------------------------------------------------------
 	      if($rdb->can('db_version_searched')){
-          my $new_db_version = $rdb->db_version_searched();
+          my $new_db_version = $rdb->db_version_searchd();
           my $analysis = $self->analysis();
           my $old_db_version = $analysis->db_version();
           $analysis->db_version($new_db_version);
