@@ -384,7 +384,6 @@ sub find_executable {
   my ($self,$name) = @_;
 
   my $bindir = $::pipeConf{'bindir'}   || undef;
-  my $datadir = $::pipeConf{'datadir'} || undef;
 
   if (-x $name) {
     return $name;
@@ -404,11 +403,14 @@ sub find_file {
   my ($self,$name) = @_;
 
   my $datadir = $::pipeConf{'datadir'} || undef;
+  my $libdir  = $::pipeConf{'libdir'}  || undef;
 
   if (-e $name) {
     return $name;
     
   } elsif ($datadir && -e ($name = "$datadir/$name")) {
+    return $name;
+  } elsif ($libdir && -e ($name = "$libdir/$name")) {
     return $name;
   } else {
     $self->throw("Can't find file [$name]");
