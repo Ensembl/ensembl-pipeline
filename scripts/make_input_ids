@@ -48,7 +48,9 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -file_regex a regex to impose on the filenames before using them
     
     -single if you just want a single dummy input_id ie for genome wide analyses
-    
+    -single_name , by default this is genome but you can specify something
+    different here, for example for protein annotation jobs which use the 
+    whole proteome this must be proteome
     -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
     -non_redundant fetch all non redundant pieces
@@ -137,18 +139,20 @@ my $name = 'genome';
             'single'       => \$single,
             'single_name:s'=> \$name,
             'verbose'      => \$verbose,
-            'translation_id' => \$translation_id,
+            'translation_ids' => \$translation_id,
             'non_redundant' => \$non_redundant,
             'h|help'            => \$help,
            );
 
-if ($help) {
-    exec('perldoc', $0);
-}
+
 
 if(!$host || !$user || !$dbname){
-  throw("Can't run without -dbhost $host -dbuser $user -dbname $dbname");
-  exec('perldoc', $0);
+  warn("Can't run without -dbhost $host -dbuser $user -dbname $dbname");
+  $help = 1;
+}
+
+if ($help) {
+    exec('perldoc', $0);
 }
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,

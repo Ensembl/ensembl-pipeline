@@ -32,8 +32,8 @@ my $dnadbuser    = '';
 my $dnadbname    = '';
 my $dnadbpass    = undef;
 my $dbport    = 3306;
-my $stable_id;
-my $db_id;
+my $stable_id = 0;
+my $db_id = 0;
 my $file;
 
 GetOptions(
@@ -46,8 +46,8 @@ GetOptions(
 	   'dnadbname=s'    => \$dnadbname,
 	   'dnadbuser=s'    => \$dnadbuser,
 	   'dnadbpass=s'    => \$dnadbpass,
-	   'stable_id=s' => \$stable_id,
-	   'db_id=s' => \$db_id,
+	   'stable_id!' => \$stable_id,
+	   'db_id!' => \$db_id,
 	   'file=s' => \$file,
 )
 or die ("Couldn't get options");
@@ -86,7 +86,8 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					   );
 
 
-print STDERR "connected to $dbname : $dbhost\n";
+print STDERR "connected to $dbname : $dbhost going to write to file ".
+  " $file\n";
 
 my $fh;
 if($file){
@@ -100,7 +101,7 @@ if($file){
 
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => $fh ) ;
 
-foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
+foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
   
   eval {
     my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
@@ -115,7 +116,7 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
         
 
 
-        my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
+       
         my $identifier;
         if($db_id){
           $identifier = $trans->translation->dbID;
@@ -129,14 +130,14 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
         }
         my $tseq = $trans->translate();
         if ( $tseq->seq =~ /\*.+/ ) {
-          print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
+          print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->slice->dbID .")\n";
           next;
         }
 	my $seq = $tseq->seq;
         $seq =~ s/\*$//;
 	$tseq->seq($seq);
         $tseq->display_id($identifier);
-        $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
+        $tseq->desc("Translation id ".$identifier." gene $gene_id");
         $seqio->write_seq($tseq);
       }
     }
@@ -147,57 +148,3 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
   }
 }
 close($fh);
-sub  find_trans_start {
- my ($trans) = @_;
- #print STDERR "finding trans start\n";
- my $start_pos;
- my $trans_pos;
-
- my $contig; 
- foreach my $exon (@{$trans->get_all_Exons}) {
-   if ($exon eq $trans->translation->start_Exon) {
-     $contig = $exon->contig->dbID;
-     if ($exon->strand == 1) {
-       $start_pos = $exon->start;
-       $trans_pos = $exon->start + $trans->translation->start - 1;
-     } else {
-       $start_pos = $exon->end;
-       $trans_pos = $exon->end - $trans->translation->start + 1;
-     }
-    # print STDERR "have start ".$start_pos." trans ".$trans_pos."\n";
-   }
- }
- if (!defined($start_pos)) {
-   print STDERR "Couldn't find start exon for " . $trans->stable_id . "\n";
-   die;
- }
-
- my $query = "select c.name, a.chr_start,a.chr_end,a.contig_start,a.contig_end,a.contig_ori from assembly a, chromosome c where contig_id = $contig and c.chromosome_id = a.chromosome_id";
-
- 
- my $sth  = $db->prepare($query);
- my $res  = $sth->execute;
- 
- my $row = $sth->fetchrow_hashref;
- 
- my $chr = $row->{name};
- my $chr_start = $row->{chr_start};
- my $chr_end   = $row->{chr_end};
- my $raw_start = $row->{contig_start};
- my $raw_end   = $row->{contig_end}; 
- my $raw_ori   = $row->{contig_ori};
- 
- my $gene_start; 
- my $cdna_start;
- 
- if ($raw_ori == 1) {
-   $gene_start = $chr_start + ($trans_pos - $raw_start);
-   $cdna_start = $chr_start + ($start_pos - $raw_start);
- } else {
-   $cdna_start = $chr_end   - ($start_pos - $raw_start);
-   $gene_start = $chr_end   - ($trans_pos - $raw_start);
- } 
- 
- return ($chr,$gene_start,$cdna_start);
-}
-

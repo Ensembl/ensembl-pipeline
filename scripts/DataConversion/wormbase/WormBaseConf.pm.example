@@ -52,8 +52,6 @@ use vars qw( %WormBaseConf );
 		 WB_DBUSER => '',
 		 WB_DBPASS => '',   
      WB_DBPORT => '',      
-		 #path to index based on clone name
-		 WB_CLONE_INDEX => [''],
 		 # logic name of analysis object to be assigned to genes
 		 WB_LOGIC_NAME => 'wormbase',
 		 # if want the debug statements in wormbase to ensembl scripts printed

@@ -263,16 +263,18 @@ sub process_file{
   my %five_prime;
   my %three_prime;
  LOOP: while(<$fh>){
-    #CHROMOSOME_I    UTR     UTR     111036  111054  .       +       .       UTR "5_UTR:F53G12.10"
-    #CHROMOSOME_I    UTR     UTR     112228  112295  .       +       .       UTR "3_UTR:F53G12.10"
-    #CHROMOSOME_I    curated CDS     111055  111065  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111161  111260  .       +       1       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111510  111707  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111755  111971  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     112019  112227  .       +       2       Sequence "F53G12.10"
+#CHROMOSOME_I	Coding_transcript	exon	49919	50016	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	50815	51030	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	52283	52410	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	52466	52572	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53266	53337	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53391	53695	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53944	54360	.	+	.	Transcript "Y48G1C.4"
+
     chomp;
     my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split;
     my $element = $_;
+    #print STDERR $element."\n" if($type eq 'exon');
     if($chr =~ /sequence-region/){
       #print STDERR $_;
       next LOOP;
@@ -301,9 +303,10 @@ sub process_file{
 	die("not sure what to do with this ".$gene." utr info\n");
       }
 	next LOOP;
-    }elsif($line ne 'curated CDS'){
+    }elsif($line ne 'curated coding_exon'){
       next LOOP;
     }
+    print "line ".$line."\n";
     $gene =~ s/\"//g;
     if(!$transcripts{$gene}){
       $transcripts{$gene} = [];
@@ -313,6 +316,8 @@ sub process_file{
     }
     
   }
+  print STDERR "Have ".keys(%transcripts). " transcripts ".
+    keys(%five_prime)." 5' UTRS and ".keys(%three_prime)." 3' UTRS\n";
   return \%transcripts, \%five_prime, \%three_prime;
 }
 
@@ -1179,9 +1184,7 @@ sub parse_pseudo_gff{
   #print "PARSE GFF there are ".keys(%$genes)." genes\n";
   foreach my $gene_id(keys(%$genes)){
     my $transcripts = $genes->{$gene_id};
-    my $unpruned = &create_gene($transcripts, $gene_id);
-    #print STDERR "gene ".$unpruned."\n";
-    my $gene = &prune_Exons($unpruned);
+    my $gene = &create_gene($transcripts, $gene_id);
     push(@genes, $gene);
   }
   close(FH);

@@ -43,7 +43,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
   seek($fh, 0, 0); #resetting the fh to the start of the agp file 
   my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
   
-  my $obda = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(-db => $WB_CLONE_INDEX);
+ 
 
   my %seqs = %{&get_sequences_pfetch($seq_ids, $pfetch)};
   my %chr_hash = %{&agp_parse($fh, 
