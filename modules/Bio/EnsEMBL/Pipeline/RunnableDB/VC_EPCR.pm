@@ -105,11 +105,11 @@ sub fetch_input {
     my $vc_str = $self->input_id;
     my ($chr, $start, $end, $sgp) = $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
-    $self->dbobj->static_golden_path_type($sgp) if $sgp;
+    $self->db->static_golden_path_type($sgp) if $sgp;
 
-    my $vc = $self->dbobj->get_StaticGoldenPathAdaptor->
+    my $vc = $self->db->get_StaticGoldenPathAdaptor->
      fetch_VirtualContig_by_chr_start_end($chr, $start, $end);
-    $self->vcontig($vc);
+    $self->slice($vc);
 
     my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
@@ -164,11 +164,13 @@ sub write_output {
     my ($hit_start, $hit_end);
     my $max_walk = 15;   # max bp to walk until start of raw contig
 
-    my $db=$self->dbobj();
+    my $db=$self->db();
+    my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
+    
     my @features = $self->output();
     my %feat_by_contig;
   
-    my $vc = $self->vc;
+    my $vc = $self->slice;
 
     foreach my $f (@features) {
 	$f->analysis($self->analysis);
@@ -224,15 +226,17 @@ sub write_output {
 
     foreach my $contig_id (keys %feat_by_contig) {
 	eval {
-	    $contig = $db->get_Contig($contig_id);
+	    $contig = $db->get_RawContigAdaptor->fetch_by_name($contig_id);
 	};
 
 	if ($@) {
 	    print STDERR "Contig not found, skipping writing output to db: $@\n";
 	}
 	elsif (@features = @{$feat_by_contig{$contig_id}}) {
-	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	    $feat_adp->store($contig, @features);
+	  foreach my $f(@features){
+	    $f->analysis($self->analysis);
+	    $simple_f_a->store($contig->dbID, $f);
+	  }
 	}
 
     }
