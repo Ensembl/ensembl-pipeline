@@ -103,6 +103,16 @@ sub _check_Transcript{
 
 ############################################################
 
+=head2 _check_Translation
+
+Description : it returns TRUE if a transcript has a translation, and this has 
+              no  stop codons. It returns FALSE otherwise. 
+  IMPORTANT : we want to check translation independently from other
+              properties of the transcripts. Basically because
+              we may have some transcripts whih are valid but
+              for which we haven not assigned a translation yet.
+ReturnType  : a BOOLEAN.
+
 sub _check_Translation{
   my ($self,$transcript) = @_;
   
