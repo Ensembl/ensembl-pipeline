@@ -320,8 +320,12 @@ sub output {
 sub run {
     my ($self) = @_;
 
+    if($self->input_is_void == 1){
+      print STDERR "input sequence doesn't have enough consecutive unmasked bases\n";
+      return 1;
+    }
     foreach my $runnable ($self->runnable) {
-
+      
       $self->throw("Runnable module not set") unless ($runnable);
 
       # Not sure about this

@@ -54,13 +54,15 @@ sub print_header {
 
 sub show_current_status {
   my ($self) = @_;
-  
+  #print STDERR "running current status\n";
   #Show running/failed jobs grouped by status and analysis name.
-  
+  my @times = times;
+  #print STDERR "1, @times\n";
   my $jobadp = $self->db->get_JobAdaptor;
   
   my $results = $jobadp->list_current_status;
-  
+  @times = times;
+  #print STDERR "2, @times\n";
   my %status;
   my %tasks;
  JOB:foreach my $result(@$results){
@@ -81,7 +83,8 @@ sub show_current_status {
     $tasks{$t}{$s}++;
    
   }
-  
+  @times = times;
+  #print STDERR "3, @times\n";
   my $maxcount = 0;
   my $maxstatus = 0;
   my $maxname = 0;
@@ -106,6 +109,8 @@ sub show_current_status {
   $maxcount++;
   $maxstatus++;
   $maxname++;
+  @times = times;
+  #print STDERR "4, @times\n";
   $self->print_header("Pipeline current status");
   printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","Name","Status","Count");
   printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","----","------","-----");
@@ -118,7 +123,8 @@ sub show_current_status {
     }
   }
   print "\n\n";
-		
+  @times = times;
+  #print STDERR "5 @times\n\n";
   
   
 }
@@ -178,41 +184,83 @@ sub show_current_status_summary {
 #
 
 #show running/failed jobs grouped by status
-sub show_finished{
-  my ($self) = @_;
 
-  my @jobs = @{$self->db->get_JobAdaptor->fetch_all_by_status('SUCCESSFUL')};
+sub show_finished {
+  my ($self) = @_;
+  #print STDERR "running current status\n";
+  #Show running/failed jobs grouped by status and analysis name.
+  my @times = times;
+  #print STDERR "1, @times\n";
+  my $jobadp = $self->db->get_JobAdaptor;
+  
+  my $results = $jobadp->list_current_status;
+  @times = times;
+  #print STDERR "2, @times\n";
+  my %status;
   my %tasks;
-  foreach my $job(@jobs){
-    if(!$tasks{$job->taskname}){
-      $tasks{$job->taskname} = 0;
+ JOB:foreach my $result(@$results){
+    my ($job_id, $t, $input_id, $s, $timestamp) = @$result;
+    #print STDERR "status = ".$s."\n";
+    if($s ne 'SUCCESSFUL'){
+      next JOB;
     }
-    $tasks{$job->taskname}++;
+    #print STDERR "have task ".$t." status ".$s."\n";
+    if(!$tasks{$t}){
+      $tasks{$t} = {};
+      
+    }
+    if(!$tasks{$t}{$s}){
+      $tasks{$t}{$s} = 0;
+     
+    }
+    $tasks{$t}{$s}++;
+   
   }
+  @times = times;
+  #print STDERR "3, @times\n";
   my $maxcount = 0;
+  my $maxstatus = 0;
   my $maxname = 0;
   foreach my $s(keys(%tasks)){
-    my $count = $tasks{$s};
-    my $name = $s;
-    if(length($count) > $maxcount){
-      $maxcount = length($count);
-    }
-    if (length($name) > $maxname) {
-      $maxname = length($name);
+    my %hash = %{$tasks{$s}};
+    my @tasks = keys(%hash);
+    foreach my $t(@tasks){
+      my $count = $status{$s}{$t};
+      my $status = $t;
+      my $name = $s;
+      if(length($count) > $maxcount){
+	$maxcount = length($count);
+      }
+      if (length($status) > $maxstatus) {
+	$maxstatus = length($status);
+      }
+      if (length($name) > $maxname) {
+	$maxname = length($name);
+      }
     }
   }
   $maxcount++;
+  $maxstatus++;
   $maxname++;
-  $self->print_header("Pipeline finished jobs");
-  printf("%-${maxcount}s %-${maxname}s\n","Count","Name");
-  printf("%-${maxcount}s %-${maxname}s\n","-----","----");
-  foreach my $t(keys(%tasks)){
-    printf("%-${maxcount}s %-${maxname}s\n", $tasks{$t}, $t);
+  @times = times;
+  #print STDERR "4, @times\n";
+  $self->print_header("Pipeline current status");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","Name","Status","Count");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","----","------","-----");
+
+  foreach my $s(keys(%tasks)){
+    my %hash = %{$tasks{$s}};
+    my @tasks = keys(%hash);
+    foreach my $t(@tasks){
+      printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n",$s,$t,$tasks{$s}{$t});
+    }
   }
   print "\n\n";
-
-}
+  @times = times;
+  #print STDERR "5 @times\n\n";
   
+  
+} 
 # show analysis processes
 sub show_analysis {
   my ($self) = @_;
