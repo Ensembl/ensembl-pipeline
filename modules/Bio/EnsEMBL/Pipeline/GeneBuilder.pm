@@ -86,7 +86,7 @@ package Bio::EnsEMBL::Pipeline::GeneBuilder;
 
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::MappedExon;
+use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Utils::GTF_handler;
@@ -2203,7 +2203,7 @@ sub _make_Exon {
     my ($self,$subf,$stub) = @_;
 
     my $contigid = $self->contig->id;
-    my $exon     = new Bio::EnsEMBL::MappedExon;
+    my $exon     = new Bio::EnsEMBL::Exon;
 
     $exon->{'temporary_id'} = ("TMPE_" . $contigid . "." . $subf->id . "." . $stub);
     $exon->seqname  ($exon->{'temporary_id'});
