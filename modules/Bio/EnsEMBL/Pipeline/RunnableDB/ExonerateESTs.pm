@@ -240,7 +240,7 @@ sub fetch_input {
 								     '-ests'           => $self->estfile,
 								     '-exonerate'      => $self->exonerate,
 								     '-exonerate_args' => $self->exonerate_args);
-    $self->vc($contig);
+    $self->vcontig($contig);
   }
 
   else {
@@ -302,12 +302,12 @@ sub output {
    return $self->{'_output'};# ref to an array
 }
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =cut

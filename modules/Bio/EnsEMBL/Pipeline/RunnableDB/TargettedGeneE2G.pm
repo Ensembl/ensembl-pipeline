@@ -237,7 +237,7 @@ sub fetch_input{
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
-  $self->vc($vc);
+  $self->vcontig($vc);
   $self->cdna_id($cdna_id);
   $self->protein_id($protein_id);
   
@@ -769,7 +769,7 @@ sub _merge_gw_genes {
       else{
 	# make a new Exon - clone $exon
 	my $cloned_exon = dclone($exon);
-	$cloned_exon->attach_seq($self->vc->primary_seq);
+	$cloned_exon->attach_seq($self->vcontig->primary_seq);
 	$cloned_exon->add_sub_SeqFeature($exon,'');
 	push(@pred_exons, $cloned_exon);
       }
@@ -903,8 +903,8 @@ sub _make_newtranscripts {
 	# dclone messes up database handles
 	foreach my $ex($newtranscript->get_all_Exons){
 
-	  $ex->attach_seq($self->vc);
-	  $ex->contig_id($self->vc->id);
+	  $ex->attach_seq($self->vcontig);
+	  $ex->contig_id($self->vcontig->id);
 	  # add new analysis object to the supporting features
 	  foreach my $sf($ex->each_Supporting_Feature){
 	    $sf->analysis($analysis_obj);
@@ -1218,7 +1218,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 
 sub make_genes {
   my ($self, $count, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @genes;
   
 #$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Pipeline::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Pipeline::Analysis");
@@ -1228,7 +1228,7 @@ $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
 
-    my $transcript = $self->_make_transcript($tmpf,$self->vc,$genetype,$count, $analysis_obj);
+    my $transcript = $self->_make_transcript($tmpf,$self->vcontig,$genetype,$count, $analysis_obj);
 	
     # add transcript to gene
     $gene->analysis($analysis_obj);
@@ -1256,7 +1256,7 @@ $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined
 sub remap_genes {
   my ($self) = @_;
   my @newf;  
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
 
   my @genes = $self->gw_genes;
   push(@genes, $self->e2g_genes); # ??? do we want these?

@@ -143,7 +143,7 @@ sub fetch_input{
   print STDERR "$chrname $chrstart $chrend\n";
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   
-  $self->vc($vc);
+  $self->vcontig($vc);
   
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc->primary_seq,
 								    '-ids'        => [ $pid ] ,
@@ -384,7 +384,7 @@ sub convert_gw_output {
 sub make_genes {
 
   my ($self,$count,$time,$runnable) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my $genetype;
   if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
     $genetype = "test_TGD_gw";
@@ -447,7 +447,7 @@ sub make_genes {
       #	$exon->phase($subf->feature1->{_phase});
 
       $exon->phase($exon_pred->phase);
-      $exon->attach_seq($self->vc->primary_seq);
+      $exon->attach_seq($self->vcontig->primary_seq);
 
 
       # sort out supporting evidence for this exon prediction
@@ -518,7 +518,7 @@ sub make_genes {
 sub remap_genes {
   my ($self,$runnable,@genes) = @_;
   
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my $genetype;
   if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
     $genetype = "test_TGD_gw";

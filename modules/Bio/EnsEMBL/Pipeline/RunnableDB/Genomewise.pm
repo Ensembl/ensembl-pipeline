@@ -252,7 +252,7 @@ sub fetch_input {
     $self->gw_runnable($runnable);
 
     # at present, we'll only ever have one ...
-    $self->vc($contig);
+    $self->vcontig($contig);
 }
   
 
@@ -325,7 +325,7 @@ sub convert_e2g_output {
   
   foreach my $t(@results) {
     my $transcript = new Bio::EnsEMBL::Transcript;
-    $transcript->id($self->vc->id . ".$genetype.$count");
+    $transcript->id($self->vcontig->id . ".$genetype.$count");
     $transcript->version(1);
 
     my @exons;
@@ -339,8 +339,8 @@ sub convert_e2g_output {
       # make an exon
       my $exon = new Bio::EnsEMBL::Exon;
       
-      $exon->id($self->vc->id . ".$genetype.$count.$excount");
-      $exon->contig_id($self->vc->id);
+      $exon->id($self->vcontig->id . ".$genetype.$count.$excount");
+      $exon->contig_id($self->vcontig->id);
       $exon->created($time);
       $exon->modified($time);
       $exon->version(1);
@@ -350,7 +350,7 @@ sub convert_e2g_output {
       $exon->strand($exon_pred->strand);
       
       $exon->phase($exon_pred->{_phase});
-      $exon->attach_seq($self->vc->primary_seq);
+      $exon->attach_seq($self->vcontig->primary_seq);
 
       # supporting feature data goes here
 
@@ -449,11 +449,11 @@ sub make_genes {
     $count++;
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($self->vc->id . ".$genetype.$count");
+    $gene->id($self->vcontig->id . ".$genetype.$count");
     $gene->version(1);
     
     # add transcript to gene
-    $transcript->id($self->vc->id . ".$genetype.$count");
+    $transcript->id($self->vcontig->id . ".$genetype.$count");
     $gene->add_Transcript($transcript);
 
 
@@ -466,11 +466,11 @@ sub make_genes {
     my @exons = $transcript->each_Exon;
 
     foreach my $exon(@exons){
-      $exon->id($self->vc->id . ".$genetype.$count.$excount");
-      $exon->contig_id($self->vc->id);
+      $exon->id($self->vcontig->id . ".$genetype.$count.$excount");
+      $exon->contig_id($self->vcontig->id);
       $exon->created($time);
       $exon->modified($time);
-      $exon->attach_seq($self->vc->primary_seq);
+      $exon->attach_seq($self->vcontig->primary_seq);
       $excount++;
       }
     
@@ -478,7 +478,7 @@ sub make_genes {
 
     # sort out translation
     my $translation  = new Bio::EnsEMBL::Translation;    
-    $translation->id($self->vc->id . ".$genetype.$count");
+    $translation->id($self->vcontig->id . ".$genetype.$count");
     $translation->version(1);    
     
     $translation->start_exon_id($exons[0]->id);
@@ -500,7 +500,7 @@ sub make_genes {
 
 sub remap_genes {
   my ($self,$genetype,$genes) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   
   print STDERR "genes before remap: " . scalar(@$genes) . "\n";
   
@@ -570,12 +570,12 @@ sub output {
 }
 
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =cut

@@ -287,24 +287,24 @@ sub runnable {
   return @{$self->{'_runnables'}};  
 }
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 
 =cut
 
-sub vc {
+sub vcontig {
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'_vc'} = $value;
+      $obj->{'_vcontig'} = $value;
     }
-    return $obj->{'_vc'};
+    return $obj->{'_vcontig'};
 
 }
 

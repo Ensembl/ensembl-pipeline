@@ -248,16 +248,6 @@ sub focuscontig {
     return $self->{_contig};
 }
 
-sub vcontig {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_vcontig} = $arg;
-    }
-
-    return $self->{_vcontig};
-}
-
 sub extend {
     my ($self,$arg) = @_;
 

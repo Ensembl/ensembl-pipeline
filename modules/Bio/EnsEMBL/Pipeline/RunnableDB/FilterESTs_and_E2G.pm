@@ -427,7 +427,7 @@ sub fetch_input {
   my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
-  $self->vc($contig);
+  $self->vcontig($contig);
   print STDERR "contig: " . $contig  ."\n";
 
   # find exonerate features amongst all the other features  
@@ -510,7 +510,7 @@ sub fetch_input {
   my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->dbobj);
 
   # only fetch this once for the whole set or it's SLOW!
-  my $genomic  = $self->vc->get_repeatmasked_seq;
+  my $genomic  = $self->vcontig->get_repeatmasked_seq;
 
  ID:    
   foreach my $id(keys %final_ests) {
@@ -630,7 +630,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $count, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my $genetype = 'exonerate_e2g';
   my @genes;
   
@@ -640,7 +640,7 @@ sub make_genes {
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
-    my $transcript = $self->make_transcript($tmpf, $self->vc, $genetype, $count);
+    my $transcript = $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
     $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
     $count++;
@@ -764,7 +764,7 @@ sub make_transcript{
 
 sub remap_genes {
   my ($self, @genes) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @remapped;
 
  GENEMAP:
@@ -851,12 +851,12 @@ sub output {
    return @{$self->{'_output'}};
 }
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =head2 estfile
@@ -1025,7 +1025,7 @@ sub make_blast_db {
 
  Title   : run_blast
  Usage   : $self->run_blast($db, $numests)
- Function: runs blast between $self->vc and $db, allowing a max of $numests alignments. parses output
+ Function: runs blast between $self->vcontig and $db, allowing a max of $numests alignments. parses output
  Example :
  Returns : array of Bio:EnsEMBL::FeaturePair representing blast hits
  Args    : $estdb: name of wublast formatted database; $numests: number of ests in the database
@@ -1042,7 +1042,7 @@ sub run_blast {
   my $blastout = "/tmp/FEE_blastout." . $$ . ".fa";;
   my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			      -file   => ">$seqfile");
-  $seqio->write_seq($self->vc);
+  $seqio->write_seq($self->vcontig);
   close($seqio->_filehandle);
 
   # set B here to make sure we can show an alignment for every EST

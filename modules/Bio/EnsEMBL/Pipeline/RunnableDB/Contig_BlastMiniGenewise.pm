@@ -135,12 +135,12 @@ sub threshold {
     Returns :   valid input id for this analysis (if set) 
     Args    :   input id for this analysis 
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =head1 FPC_BlastMiniGenewise implemented methods
@@ -309,7 +309,7 @@ sub fetch_input {
     }
 
     # at present, we'll only ever have one ...
-    $self->vc($contig);
+    $self->vcontig($contig);
 }     
 
 =head2 run
@@ -410,7 +410,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @tmpf   = @$results;
   my @genes;
 

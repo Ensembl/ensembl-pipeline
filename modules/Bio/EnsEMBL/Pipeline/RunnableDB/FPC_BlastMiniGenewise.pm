@@ -246,7 +246,7 @@ sub write_output {
     
     $self->runnable($runnable);
     # at present, we'll only ever have one ...
-    $self->vc($contig);
+    $self->vcontig($contig);
 }     
 
 
@@ -346,7 +346,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @tmpf   = @$results;
   my @genes;
 
@@ -678,7 +678,7 @@ sub _make_transcript{
 
 sub remap_genes {
   my ($self, @genes) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
 
   my @newf;
   my $trancount=1;

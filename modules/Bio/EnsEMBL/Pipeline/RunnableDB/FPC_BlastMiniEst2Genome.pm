@@ -246,7 +246,7 @@ sub fetch_input {
     
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
-  $self->vc($contig);
+  $self->vcontig($contig);
 }
 
 =head2 run
@@ -322,7 +322,7 @@ sub _convert_output {
 
 sub _make_genes {
   my ($self, $count, $time, $runnable) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my $genetype = 'bmeg';
   
   my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
@@ -373,7 +373,7 @@ sub _make_genes {
       #	$exon->phase($subf->feature1->{_phase});
       
       $exon->phase($exon_pred->phase);
-      $exon->attach_seq($self->vc->primary_seq);
+      $exon->attach_seq($self->vcontig->primary_seq);
       # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
       $exon_pred->source_tag('BME2G');
       $exon_pred->primary_tag('BME2G');
@@ -520,7 +520,7 @@ sub _filter_genes {
 
 sub _remap_genes {
   my ($self, @genes) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @remapped;
 
   foreach my $gene(@genes) {
@@ -564,12 +564,12 @@ sub _print_FeaturePair {
     Returns :   Array of Bio::EnsEMBL::Gene
     Args    :   None
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =head2 blastdb

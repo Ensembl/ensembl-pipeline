@@ -212,7 +212,7 @@ sub fetch_input {
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
     $contig->_chr_name($chrid);
-    $self->vc($contig);
+    $self->vcontig($contig);
 
     print STDERR "got vc\n";
     print STDERR "length ".$contig->length."\n";
@@ -810,7 +810,7 @@ sub find_common_ends {
     }
     
     # check the splice sites for the whole cluster
-    my $contig = $self->vc;
+    my $contig = $self->vcontig;
     my ($upstream, $downstream);
         
     # take the 2 bases right before the exon and after the exon
@@ -1502,7 +1502,7 @@ sub make_genes {
   my @genes;
 
   my $time  = time; chomp($time);
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
 
   # are we working on the reverse strand?
   if(defined $reverse){
@@ -1577,7 +1577,7 @@ sub make_genes {
 
 sub remap_genes {
   my ($self, $genes, $reverse) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   if (defined $reverse){
     $contig = $contig->invert;
   }
@@ -1628,12 +1628,12 @@ sub remap_genes {
 }
 
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 
