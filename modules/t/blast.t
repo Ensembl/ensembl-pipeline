@@ -31,7 +31,6 @@ $loaded = 1;
 print "ok 1\n";    # 1st test passed.
 my ($seq) =  set_seq();
 
-
 my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
                                     -id          => 'AI937824',
                                     -accession   => 'AI937824',
@@ -43,8 +42,10 @@ else
 
 #create blast object    
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
-                                                             -BLAST => 'blastn',
-                                                             -DB    => 'dbSTS');
+                                                             -BLAST => 'wublastn',
+                                                             -DB    => 'dbSTS',
+                                                             -THRESHOLD => 1,
+                                                             -ARGS  => '');
  
 unless ($blast)
 { print "not ok 3\n"; }
