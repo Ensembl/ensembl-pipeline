@@ -93,6 +93,15 @@ sub make_directories {
     makedir($chrdir);
   }
 
+  # EST_GeneBuilder output directories
+  my $estbuilder_path = $scratchdir . "/" . $est_genebuilder_dir . "/";
+  makedir($estbuilder_path);
+  
+  foreach my $chr(keys %chrhash){
+    my $chrdir = $estbuilder_path . $chr . "/";
+    makedir($chrdir);
+  }
+
 }
 
 =head2 get_chrlengths
