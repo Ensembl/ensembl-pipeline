@@ -60,8 +60,9 @@ use vars qw(@ISA);
                 $target_species  -> the species against which we want to compare $transcript
   Description : this method reads a slice and one of the target species 
                 specified in compara and retrieves the syntenic slice in that species
-                if any. It gets all the dna align features and thread them
-                into a bigger slice. The syntenic slice is made to be at least
+                if any, using the dna-dna matches in the compara database. 
+                It gets all the dna align features for the extent of the focus slice and 
+                thread them into a bigger slice. The syntenic slice is made to be at least
                 as big as the original slice.
   Returntype  : an arrayref of slices (the syntenic slices)
   
