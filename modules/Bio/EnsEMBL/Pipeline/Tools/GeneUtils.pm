@@ -77,9 +77,15 @@ sub validate_Transcript {
   my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, $seqfetchers);
 
   if ($exon_count == 1) {
-      return undef unless $coverage >= $single_coverage_threshold;
+      if ($coverage < $single_coverage_threshold) {
+	  print STDERR "check: single-exon transcript, low coverage ($coverage)\n";
+	  return undef;
+      }
   } else {
-      return undef unless $coverage >= $multi_coverage_threshold;
+      if ($coverage <  $multi_coverage_threshold) {
+	  print STDERR "check: multi-exon transcript, low coverage ($coverage)\n";
+	  return undef;
+      }
   }
   
   # Do we really need to do this? Can we just take out the dbID adaptor stuff
