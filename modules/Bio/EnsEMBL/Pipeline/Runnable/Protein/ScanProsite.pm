@@ -243,7 +243,7 @@ sub run_analysis {
     my ($self) = @_;
 
     my $run = "/usr/local/bin/perl ".$self->analysis->program . 
-	' -pattern ' .$self->analysis->db. 
+	' -pattern ' .$self->analysis->db_file. 
 	    ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
 		$self->filename . ' > ' .$self->results;
 
