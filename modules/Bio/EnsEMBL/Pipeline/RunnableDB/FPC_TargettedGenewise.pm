@@ -185,7 +185,7 @@ sub make_targetted_runnables {
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
   
   my $pmfa = $self->db->get_PmatchFeatureAdaptor();
- 
+
   $self->fetch_sequence($GB_TARGETTED_MASKING);
   my @features = $pmfa->get_PmatchFeatures_by_chr_start_end
     ($self->query->seq_region_name, $self->query->start, 
@@ -206,7 +206,7 @@ sub make_targetted_runnables {
   my %kill_list = %{$self->fill_kill_list};
 
   foreach my $feat(@features){
-    #reject any proteins that are in the kill list
+   #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
       #print STDERR "skipping " . $feat->protein_id . "\n";
       next;
@@ -221,7 +221,7 @@ sub make_targetted_runnables {
                  $self->query->coord_system->version.":".
                  $self->query->seq_region_name.":".
                  $start.":".$end.":".
-                 $self->query->strand."|".
+                 $self->query->strand.",".
                  $feat->protein_id);
 
     #print STDERR "TGW input: $input\n";
