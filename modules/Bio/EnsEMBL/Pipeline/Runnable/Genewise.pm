@@ -148,7 +148,10 @@ sub _align_protein {
   $proio = undef;
 
   my $genewise = $self->genewise;
-#  my $command = "/nfs/acari/birney/wise2-bin-snapshot/genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
+  if(!defined $genewise || $genewise eq ''){
+    $self->throw("genewise executable not set!\n");
+  }
+
   my $command = "$genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
   if ($self->endbias == 1) {
