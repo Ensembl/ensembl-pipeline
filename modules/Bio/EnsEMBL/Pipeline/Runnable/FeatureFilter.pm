@@ -224,13 +224,23 @@ sub run{
   
   if ($self->prune) {
     my @new;
-     
-    # prune the features per hid (per hseqname)
-    foreach my $hseqname ( @accepted_hids ) {
-      my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
-      push(@new,@tmp);
-      #push(@{$self->{'_output'}},@tmp);
+
+    my @all_features;
+    
+    # collect all the features
+    foreach my $hseqname ( @eccepted_hids ){
+      push ( @all_features, @{$hitarray{$hseqname}} );
     }
+     
+    # and prune all together taking the first '$self->coverage' according to score 
+    @new = $self->prune_features( @all_features );
+
+    ## prune the features per hid (per hseqname)
+    #foreach my $hseqname ( @accepted_hids ) {
+    #  my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
+    #  push(@new,@tmp);
+    #  #push(@{$self->{'_output'}},@tmp);
+    #}
     @accepted_hids = ();
     return @new;
   
