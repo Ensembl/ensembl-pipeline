@@ -284,11 +284,11 @@ sub make_miniseq {
 	my $start = $f->start;
 	my $end   = $f->end;
 
-	if ($start > $end) {
-	    my $tmp = $end;
-	    $f->end  ($start);
-	    $f->start($tmp);;
-	}
+	#if ($start > $end) {
+	#    my $tmp = $end;
+	#    $f->end  ($start);
+	#    $f->start($tmp);;
+	#}
 	
 	$start = $f->start - $self->exon_padding;
 	$end   = $f->end   + $self->exon_padding;
