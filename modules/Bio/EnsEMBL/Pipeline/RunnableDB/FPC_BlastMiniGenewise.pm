@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_DATABASES
@@ -72,8 +73,7 @@ sub new {
     # make sure at least one protein source database has been defined
     $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
-
-
+    
     # make all seqfetchers
     foreach my $db(@{$GB_SIMILARITY_DATABASES}){
       my $seqfetcher =  $self->make_seqfetcher($db->{'index'});  
@@ -151,9 +151,9 @@ sub write_output {
     print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
 
     foreach my $database(@{$GB_SIMILARITY_DATABASES}){
-
+      
       print STDERR "Fetching features for " . $database->{'type'} . 
-	           " with score above " . $database->{'threshold'}. "\n\n";
+	" with score above " . $database->{'threshold'}. "\n\n";
       
       my @features  = $contig->get_all_SimilarityFeatures_above_score($database->{'type'}, $database->{'threshold'});
 
@@ -472,6 +472,7 @@ sub validate_transcript {
   
   # check for low complexity
   my $low_complexity = $self->check_low_complexity($transcript);
+  print STDERR "complexity computed by seg: $low_complexity, max_low_complexity we allow: $GB_SIMILARITY_MAX_LOW_COMPLEXITY\n";
   if($low_complexity > $GB_SIMILARITY_MAX_LOW_COMPLEXITY){
     $self->warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
     return undef;
@@ -762,6 +763,7 @@ sub check_coverage{
 
  SEQFETCHER:
   foreach my $seqfetcher( $self->each_seqfetcher){
+    print STDERR "FPC_BlastMiniGenewise: getting sequence for $protname\n";
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($protname);
     };
@@ -825,13 +827,21 @@ sub check_low_complexity{
 					       -gff_feature  => 'annot',
 					       -module       => 'Seg',
 					       -logic_name   => 'Seg'
+	
 					      );
-    my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg( -CLONE    => $protseq,
-								   -analysis => $analysis);
+    
+    print STDERR "about to run seg with query $protseq\n";
+    my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
+								  -query    => $protseq,
+								  -analysis => $analysis,
+								 );
+    
+    print STDERR "query = [".$seg->query."]\n";
     $seg->run;
     my $lc_length = 0;
     foreach my $feat($seg->output){
       if($feat->end < $feat->start){
+	print STDERR "inverting feature\n";
 	my $tmp = $feat->start;
 	$feat->start($feat->end);
 	$feat->end($tmp);
@@ -948,9 +958,13 @@ sub make_seqfetcher {
   my ( $self, $index ) = @_;
   my $seqfetcher;
 
+  
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  
+    ## SeqFetcher to be used with 'indicate' indexing:
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
   }
   else{
     $self->throw("Can't make seqfetcher\n");
