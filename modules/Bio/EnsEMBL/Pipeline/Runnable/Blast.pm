@@ -433,6 +433,7 @@ sub parse_results {
   #print STDERR "Ids " . keys(%ids) . "\n";
 
   @parsers = ();
+  seek $fh, 0, 0 if ref $fh;
 
   if (defined($fh)) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
