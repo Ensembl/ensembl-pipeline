@@ -67,8 +67,17 @@ sub new {
     my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
-    $self->{'_pepseq'}      = undef;
-    $self->{'_runnable'}    = undef;            
+    $self->{'_runnable'}    = undef;
+    $self->{'_all'}         = undef;
+
+    my ($all)  = $self->_rearrange([qw(												      ALL																      )],@args);
+    print STDERR "ALL0: $all\n";
+
+    if ($all) {
+	$self->all($all);
+	$self->genseq($all);
+    }
+
     return $self;
 }
 
@@ -85,38 +94,40 @@ sub new {
 
 sub fetch_input {
     my($self) = @_;
+
     
     $self->throw("No input id") unless defined($self->input_id);
-
     
-
     my $translriptid  = $self->input_id;
     my $prot_adapt = $self->dbobj->get_Protein_Adaptor();
     
     my $prot = $prot_adapt->fetch_Protein_by_dbid($self->input_id);
-
+    
     my $pepseq    = $prot->seq;
-
-
+    
     my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
 					   '-id'          => $self->input_id,
 					   '-accession'   => $self->input_id,
 					   '-moltype'     => 'protein');
-
+	
     $self->genseq($peptide);
-
+    
 
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq;
+    
 }
 
 #get/set for runnable and args
 sub runnable {
     my ($self) = @_;
 
+    print STDERR "ALL1: ".$self->all."\n";
+
     if (!defined($self->{'_runnable'})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->new(
 									    -query => $self->genseq,
+									    -all   => $self->all,
 									    -analysis  => $self->analysis,
 									    -parameters => $self->analysis->parameters);
  
@@ -163,6 +174,52 @@ sub output {
 
     return $runnable->output;
 }
+
+=head2 all
+
+ Title   : all
+ Usage   : $obj->all($newval)
+ Function: 
+ Returns : Location of a peptide dataset if defined
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub all{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'all'} = $value;
+    }
+    return $obj->{'all'};
+
+}
+
+
+
+=head2 getseq
+
+ Title   : getseq
+ Usage   : $obj->getseq($newval)
+ Function: 
+ Returns : value of getseq
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub getseq{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'getseq'} = $value;
+    }
+    return $obj->{'getseq'};
+
+}
+
+
 
 1;
 
