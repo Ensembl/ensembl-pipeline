@@ -21,18 +21,19 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-my $mailReceiver = "stabenau\@ebi.ac.uk";
-my $maxMails = 5;
+my $mailReceiver = "ensembl\@ebi.ac.uk";
+my $maxMails = 20;
 my $currentMail = 0;
-
+$| = 1;
 my %stats = ( );
 
 # how many second before job becomes old?
-my $oldJob = 1800;
+#At the moment, 4 days!
+my $oldJob = 345600;
 
 # $statusDir = '/tmp/ruleManager';
 
-my $chunksize = 5;
+my $chunksize = 10000;
 my $currentStart = 0;
 my $completeRead = 0;
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
@@ -77,7 +78,7 @@ while( 1 ) {
     $stats{'sizeHotIds'}--; 
     my @anals = $sic->fetch_analysis_by_inputId_class
       ( $hotId->[0], $hotId->[1] );
-    %analHash = undef;
+    %analHash = ();
       
     # check all rules, which jobs can be started
     for my $rule ( @rules )  {
