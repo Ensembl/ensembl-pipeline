@@ -239,6 +239,7 @@ sub run {
    
     $self->deletefiles();
    
+    return 1;
 }
 
 sub databases {
