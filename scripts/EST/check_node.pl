@@ -19,11 +19,11 @@
 =cut
 
 use strict;
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-                                        EST_CHUNKDIR
-					EST_GENOMIC
-
-                                       );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
+							      EST_CHUNKDIR
+							      EST_GENOMIC
+							      
+							     );
 
 my $chunkname = $ARGV[0];
 
