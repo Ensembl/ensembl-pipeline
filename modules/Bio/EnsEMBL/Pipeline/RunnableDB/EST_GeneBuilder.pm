@@ -191,6 +191,14 @@ sub _label{
   return $self->{_label};
 }
 
+sub _use_score{
+  my ($self,$boolean) = @_;
+  if ( defined $label ){
+    $self->{_use_score} = $boolean;
+  }
+  return $self->{_use_score};
+}
+
 ############################################################
 
 =head2 write_output
@@ -210,12 +218,16 @@ sub write_output {
     my @trans = @{ $gene->get_all_Transcripts};
     my $num = scalar(@trans);
     
-    ############################################################
-    # put fake stable_ids to keep track of the scoring
-    if ( $self->_label ){
-      my $gene_id;
-      my $trans_count = 0;
-      foreach my $tran (@trans){
+    my $gene_id;
+    my $trans_count = 0;
+
+  TRAN:
+    foreach my $tran (@trans){
+      ############################################################
+      # put fake stable_ids to keep track of the scoring
+      if ( $self->_label ){
+	
+	last TRAN unless ( $tran->stable_id );
 	$trans_count++;
 	my $tran_id = $tran->stable_id || $$."_".$trans_count;
 	$tran->version(1);
