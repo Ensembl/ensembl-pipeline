@@ -711,6 +711,73 @@ sub check_upstream_region_of_genes{
   }
 }
 
+############################################################
+
+sub run_genewise{
+  my ($self, $transcript, $slices) =@_;
+  my @slices = @$slices;
+  
+  my $tseq;
+  eval{
+    $tseq = $transcript->translate();
+  };
+  foreach my $slice ( @slices){
+    
+    print STDERR "running genewise on slice ".$slice->name."\n";
+    my $genewise = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $slice,
+								    -protein => $tseq,
+								    -reverse => 1,
+								    -endbias => 1,);
+    
+    $genewise->run;
+    my @features = $genewise->output;
+    
+    foreach my $feature (@features){
+      print STDERR $feature->gffstring."\n";
+    }
+  }
+}
+
+############################################################
+
+sub run_blast{
+  my ($self, $gene, $slices) =@_;
+  my @slices = @$slices;
+  
+  my @transcripts = sort { $b->length <=> $a->length} @{$gene->get_all_Transcripts};
+  my $tseq = $transcripts[0]->translate();
+  
+  
+  foreach my $slice ( @slices){
+    
+    my $blastdb = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
+								 -sequences => [$slice],
+								 -type      => 'DNA',
+								);
+    
+    $blastdb->run;
+    my $dbname = $blastdb->dbname;
+    
+    my $blast   = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (
+								'-query'     => $tseq,
+								'-program'   => 'wublastp',
+								'-database'  => $dbname,
+								'-threshold' => 1e-6,
+								'-filter'    => 1,
+								'-options'   => 'V=1000000',
+							       );
+    
+    $blast->run();
+    
+    my @featurepairs = $blast->output();
+    
+    foreach my $fp (@featurepairs) {
+      print $fp->gffstring . "\n";
+    }
+  }
+}
+
+############################################################
 
 
 1;
