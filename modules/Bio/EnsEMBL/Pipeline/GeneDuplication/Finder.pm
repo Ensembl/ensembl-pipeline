@@ -193,7 +193,6 @@ sub run {
     if $@;
 
   unless (@results) {
-print $@;
     print "Duplications not found for this gene.\n";
     return 0
   }
@@ -345,7 +344,7 @@ sub _process_for_same_species_duplicates {
 
     }
 
-    throw ("Didnt match hit id to any regex [".$sbjct->name."].");
+    warning ("Didnt match hit id to any regex [".$sbjct->name."].");
   }
 
 
