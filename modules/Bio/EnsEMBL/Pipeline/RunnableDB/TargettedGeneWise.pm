@@ -158,9 +158,6 @@ sub fetch_input{
   print STDERR "$fpc $start $end\n";
 
 
-# 500bp flanking seems awfully short. Trouble is, upping it to, say, 250000 creates problems
-# with "extra" blast hits. These should be got by similarity genewises later on?
-#  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-500,$end+500);
   my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
   print STDERR "$chrname $chrstart $chrend\n";
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
@@ -226,209 +223,294 @@ sub output{
 
 =cut
 
-
 sub write_output {
-  my ($self) = @_;
-  my @genes = $self->output();
-  my $db = $self->dbobj();
-  my $gene_obj = $db->gene_Obj;
+  my($self) = @_;
+
+  #$self->throw("exiting bfore write");
   
-  my $vc = $self->vc;
-  my @newgenes;
-  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-  foreach my $gene (@genes) {
-    print STDERR "**** remapping\n";
-    # bug in here ?
-    my $newgene = $vc->convert_Gene_to_raw_contig($gene);
-    push(@newgenes,$newgene);
-
-    # VC phase not reset when remapped to raw contig???
-    #    print STDERR "checking remapped translation\n";
-    #    foreach my $trans ( $newgene->each_Transcript ) {
-    #      $seqio->write_seq($trans->translate);
-    #    }
-      
-    print STDERR "checking non-remapped translation\n";
-    foreach my $trans ( $gene->each_Transcript ) {
-      $seqio->write_seq($trans->translate);
-    }
-
-    foreach my $t ( $newgene->each_Transcript ) {
-      print STDERR "  Trans ", $t->id(), " :\n";
-      foreach my $e ( $t->each_Exon ) {
-	print STDERR " ",$e->id(),"," , $e->start(), "-", $e->end(), "\n";
-      }
-      print STDERR "\n";
-    }
+  my $db = $self->dbobj;
+  
+  if( !defined $db ) {
+    $self->throw("unable to make write db");
   }
   
-#  $self->throw("exiting before real write");
+  my $gene_obj = $db->gene_Obj;
+  my @newgenes = $self->output;
+  return unless ($#newgenes >= 0);
   
+  # get new ids
   eval {
-    foreach my $gene (@newgenes) {	    
-      $gene->type('pruned_TGW');
-      
-      my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
-      
-      $gene->id($geneid);
-      print (STDERR "Writing gene " . $gene->id . "\n");
-      
-      # Convert all exon ids and save in a hash
-      my %namehash;
-      my @exons = $gene->each_unique_Exon();
-      my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
-      my $count = 0;
-      foreach my $ex (@exons) {
-	$namehash{$ex->id} = $exonids[$count];
-	$ex->id($exonids[$count]);
-	print STDERR "Exon id is ".$ex->id."\n";
-	$count++;
+    
+    my $genecount  = 0;
+    my $transcount = 0;
+    my $translcount = 0;
+    my $exoncount  = 0;
+    
+    # get counts of each type of ID we need.
+    
+    foreach my $gene ( @newgenes ) {
+      $genecount++;
+      foreach my $trans ( $gene->each_Transcript ) {
+	$transcount++;
+	$translcount++;
       }
-      
-      my @transcripts = $gene->each_Transcript;
-      my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
-      my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
-      $count = 0;
-      foreach my $tran (@transcripts) {
-	$tran->id             ($transcript_ids[$count]);
-	$tran->translation->id($translation_ids[$count]);
-	$count++;
-	
-	my $translation = $tran->translation;
-	
-	print (STDERR "Transcript  " . $tran->id . "\n");
-	print (STDERR "Translation " . $tran->translation->id . "\n");
-	
-	foreach my $ex ($tran->each_Exon) {
-	  my @sf = $ex->each_Supporting_Feature;
-	  print STDERR "Supporting features are " . scalar(@sf) . "\n";
-	  
-	  if ($namehash{$translation->start_exon_id} ne "") {
-	    $translation->start_exon_id($namehash{$translation->start_exon_id});
-	  }
-	  if ($namehash{$translation->end_exon_id} ne "") {
-	    $translation->end_exon_id  ($namehash{$translation->end_exon_id});
-	  }
-	  print(STDERR "Exon         " . $ex->id . "\n");
+      foreach my $exon ( $gene->each_unique_Exon() ) {
+	$exoncount++;
+	foreach my $sf($exon->each_Supporting_Feature) {
+	  print STDERR "***sub_align: " . 
+                       $sf->seqname     . "\t" .
+		       $sf->start       . "\t" .
+		       $sf->end         . "\t" .
+		       $sf->strand      . "\t" .
+		       $sf->hseqname    . "\t" .
+		       $sf->hstart      . "\t" .
+		       $sf->hend        . "\n";
 	}
 	
       }
-      
-      	$gene_obj->write($gene);
     }
-  };
-  if ($@) {
     
-    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
-  } else {
-    # nothing
+    # get that number of ids. This locks the database
+    
+    my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
+    my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
+    my @translids =  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
+    my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
+    
+    # database locks are over.
+    
+    # now assign ids. gene and transcripts are easy. Exons are harder.
+    # the code currently assummes that there is one Exon object per unique
+    # exon id. This might not always be the case.
+    
+    foreach my $gene ( @newgenes ) {
+      $gene->id(shift(@geneids));
+      my %exonhash;
+      foreach my $exon ( $gene->each_unique_Exon() ) {
+	my $tempid = $exon->id;
+	$exon->id(shift(@exonsid));
+	$exonhash{$tempid} = $exon->id;
+      }
+      foreach my $trans ( $gene->each_Transcript ) {
+	$trans->id(shift(@transids));
+	$trans->translation->id(shift(@translids));
+	$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
+	$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
+      }
+      
+    }
+    
+    # paranoia!
+    if( scalar(@geneids) != 0 || scalar(@exonsid) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
+      $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonsid));
+    }
+    
+  };
+  if( $@ ) {
+    $self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
+  }
+  
+  
+  # this now assummes that we are building on a single VC.
+  
+      $self->throw("Bailing before real write\n");
+  
+ GENE: foreach my $gene (@newgenes) {	
+    # do a per gene eval...
+    eval {
+      
+      $gene_obj->write($gene);
+    }; 
+    if( $@ ) {
+      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+    }
+    
   }
 }
 
 
 sub convert_output {
     my ($self) =@_;
-    my @tmpf = $self->runnable->output;
-    my @genes;
     my $count = 1;
     my $time  = time; chomp($time);
-    my $vc = $self->vc();
-
-    foreach my $tmpf (@tmpf) {
-	my $gene   = new Bio::EnsEMBL::Gene;
-	my $tran   = new Bio::EnsEMBL::Transcript;
-	my $transl = new Bio::EnsEMBL::Translation;
-
-	$gene->id($self->input_id . ".genewise.$count");
-	$gene->created($time);
-	$gene->modified($time);
-	$gene->version(1);
-
-	$tran->id($self->input_id . ".genewise.$count");
-	$tran->created($time);
-	$tran->modified($time);
-	$tran->version(1);
-
-	$transl->id($self->input_id . ".genewise.$count");
-	$transl->version(1);
-
-	$gene->add_Transcript($tran);
-	$tran->translation($transl);
-
-	push(@genes,$gene);
-
-	my $excount = 1;
-	my @exons;
-
-	foreach my $subf ($tmpf->sub_SeqFeature) {
-	    my $exon = new Bio::EnsEMBL::Exon;
-	    $exon->id($self->input_id . ".genewise.$count.$excount");
-	    $exon->created($time);
-	    $exon->modified($time);
-	    $exon->version(1);
-	    $exon->contig_id($vc->id);
-	    $exon->seqname($vc->id);
-	    $exon->start($subf->start);
-	    $exon->end  ($subf->end);
-	    $exon->strand($subf->strand);
-	    
-
-	    $exon->phase($subf->feature1->{_phase});
-	    $exon->attach_seq($self->vc->primary_seq);
-	    
-	    # fix source tag and primary tag for $subf - this isn;t the right place to do this.
-	    $subf->source_tag('TGW');
-	    $subf->hsource_tag('TGW');
-	    $subf->primary_tag('TGW');
-	    $subf->hprimary_tag('TGW');
-	    $subf->score(100);
-	    $subf->hscore(100);
-
-	    $exon->add_Supporting_Feature($subf);
-
-	    push(@exons,$exon);
-
-
-
-	    $excount++;
-	}
-	$count++;
-	if ($exons[0]->strand == -1) {
-	    @exons = sort {$b->start <=> $a->start} @exons;
-	} else {
-	    @exons = sort {$a->start <=> $b->start} @exons;
-	}
-
-
-	foreach my $exon (@exons) {
-	    $tran->add_Exon($exon);
-	}
-
-	$transl->start_exon_id($exons[0]->id);
-	if( $exons[0]->phase == 0 ) {
-	    $transl->start(1);
-	} elsif( $exons[0]->phase == 1 ) {
-	    $transl->start(3);
-	} else {
-	    $transl->start(2);
-	}
-	
-	
-	$transl->end_exon_id  ($exons[$#exons]->id);
-	my $endexon = $exons[$#exons];
-
-	if( $endexon->end_phase == 1 ) {
-	    $transl->end($endexon->length -1 );
-	} elsif ( $endexon->end_phase == 2 ) {
-	    $transl->end($endexon->length -2 );
-	} else {
-	    $transl->end($endexon->length);
-	}
-    }
-
-    $self->{'_output'} = \@genes;
-
+    my @genes = $self->make_genes($count,$time,$self->runnable);
+    my @remapped = $self->remap_genes($self->runnable,@genes);
+    $self->{'_output'} = \@remapped;
 }
+
+sub make_genes {
+
+  my ($self,$count,$time,$runnable) = @_;
+  my $contig = $self->vc;
+  my $genetype;
+  if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
+    $genetype = "TGW";
+  }
+  else{
+    $self->throw("I don't know what to do with $runnable");
+  }
+  my @tmpf   = $runnable->output;
+  
+  my @genes;
+
+  print "***tmpf: " . scalar(@tmpf) ."\n";
+  
+  foreach my $tmpf (@tmpf) {
+    my $gene   = new Bio::EnsEMBL::Gene;
+    my $tran   = new Bio::EnsEMBL::Transcript;
+    my $transl = new Bio::EnsEMBL::Translation;
+    
+    $gene->type($genetype);
+    $gene->id($self->input_id . ".$genetype.$count");
+    $gene->created($time);
+    $gene->modified($time);
+    $gene->version(1);
+    
+    $tran->id($self->input_id . ".$genetype.$count");
+    $tran->created($time);
+    $tran->modified($time);
+    $tran->version(1);
+    
+    $transl->id($self->input_id . ".$genetype.$count");
+    $transl->version(1);
+    
+    $count++;
+    
+    $gene->add_Transcript($tran);
+    $tran->translation($transl);
+    
+    my $excount = 1;
+    my @exons;
+    
+    foreach my $exon_pred ($tmpf->sub_SeqFeature) {
+      # make an exon
+      my $exon = new Bio::EnsEMBL::Exon;
+      
+      $exon->id($self->input_id . ".$genetype.$count.$excount");
+      $exon->contig_id($contig->id);
+      $exon->created($time);
+      $exon->modified($time);
+      $exon->version(1);
+      $exon->seqname($contig->id);
+      $exon->start($exon_pred->start);
+      $exon->end  ($exon_pred->end);
+      $exon->strand($exon_pred->strand);
+      
+#      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
+      
+      #	$exon->phase($subf->feature1->{_phase});
+
+      $exon->phase($exon_pred->phase);
+      $exon->attach_seq($self->vc->primary_seq);
+      # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
+      $exon_pred->source_tag('TGW');
+      $exon_pred->primary_tag('TGW');
+      $exon_pred->score(100);
+
+      # sort out supporting evidence for this exon prediction
+      foreach my $subf($exon_pred->sub_SeqFeature){
+	$subf->feature1->source_tag($genetype);
+	$subf->feature1->primary_tag('similarity');
+	$subf->feature1->score(100);
+	$subf->feature1->analysis($exon_pred->analysis);
+	
+	$subf->feature2->source_tag($genetype);
+	$subf->feature2->primary_tag('similarity');
+	$subf->feature2->score(100);
+	$subf->feature2->analysis($exon_pred->analysis);
+	
+#	print STDERR "*subf " . $subf->gffstring . "\n";
+	$exon->add_Supporting_Feature($subf);
+      }
+      
+      push(@exons,$exon);
+      
+      $excount++;
+    }
+    
+    if ($#exons < 0) {
+      print STDERR "Odd.  No exons found\n";
+    } else {
+      
+      push(@genes,$gene);
+      
+      if ($exons[0]->strand == -1) {
+	@exons = sort {$b->start <=> $a->start} @exons;
+      } else {
+	@exons = sort {$a->start <=> $b->start} @exons;
+      }
+      
+      foreach my $exon (@exons) {
+	$tran->add_Exon($exon);
+      }
+      
+      $transl->start_exon_id($exons[0]->id);
+      $transl->end_exon_id  ($exons[$#exons]->id);
+      
+      if ($exons[0]->phase == 0) {
+	$transl->start(1);
+      } elsif ($exons[0]->phase == 1) {
+	$transl->start(3);
+      } elsif ($exons[0]->phase == 2) {
+	$transl->start(2);
+      }
+      
+      my $endexon = $exons[$#exons];
+      
+      if( $endexon->end_phase == 1 ) {
+	$transl->end($endexon->length -1 );
+      } elsif ( $endexon->end_phase == 2 ) {
+	$transl->end($endexon->length -2 );
+      } else {
+	$transl->end($endexon->length);
+      }
+      #$transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+    }
+  }
+  return @genes;
+}
+
+sub remap_genes {
+  my ($self,$runnable,@genes) = @_;
+  
+  my $contig = $self->vc;
+  my $genetype;
+  if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
+    $genetype = "TGW";
+  }
+  else{
+    $self->throw("I don't know what to do with $runnable");
+  }
+
+  my @newf;
+  my $trancount=1;
+  foreach my $gene (@genes) {
+    eval {
+      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $newgene->type($genetype);
+      foreach my $tran ($newgene->each_Transcript) {
+	foreach my $exon($tran->each_Exon) {
+	  print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
+	  }
+	}
+      push(@newf,$newgene);
+    };
+    if ($@) {
+      print STDERR "contig: $contig\n";
+      foreach my $tran ($gene->each_Transcript) {
+	foreach my $exon($tran->each_Exon) {
+	  foreach my $sf($exon->each_Supporting_Feature) {
+	    print STDERR "hid: " . $sf->hseqname . "\n";
+	  }
+	}
+      }
+      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+    }
+  }
+
+  return @newf;
+}
+
 
 =head2 input_id
 

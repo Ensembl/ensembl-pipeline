@@ -136,9 +136,9 @@ sub fetch_output {
 =cut
 
 sub write_output {
-    my($self,@features) = @_;
+    my($self) = @_;
 
-#$self->throw("exiting bfore write");
+    #$self->throw("exiting bfore write");
 
     my $db = $self->dbobj;
   
@@ -171,6 +171,17 @@ sub write_output {
 	    }
 	    foreach my $exon ( $gene->each_unique_Exon() ) {
 		$exoncount++;
+		foreach my $sf($exon->each_Supporting_Feature) {
+		  print STDERR "***sub_align: " . 
+		    $sf->seqname . "\t" .
+		      $sf->start . "\t" .
+			$sf->end . "\t" .
+			  $sf->strand . "\t" .
+			    $sf->hseqname . "\t" .
+			      $sf->hstart . "\t" .
+				$sf->hend . "\n";
+	  }
+
 	    }
 	}
 
@@ -217,8 +228,8 @@ sub write_output {
 
     # this now assummes that we are building on a single VC.
 
-#$self->throw("Bailing before real write\n");
-
+#    $self->throw("Bailing before real write\n");
+    
   GENE: foreach my $gene (@newgenes) {	
       # do a per gene eval...
       eval {
@@ -255,7 +266,7 @@ sub fetch_input {
     my $chrstart = $1;
     my $chrend   = $2;
 
-    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
+#    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
     $self->dbobj->static_golden_path_type('UCSC');
 
@@ -270,12 +281,12 @@ sub fetch_input {
 	    $strand = "-";
 	}
 	
-	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
+#	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
     }
 
     my $genseq    = $contig->get_repeatmasked_seq;
 
-    print STDERR "Length is " . $genseq->length . "\n";
+#    print STDERR "Length is " . $genseq->length . "\n";
     print STDERR "Fetching features \n";
 
     my @features  = $contig->get_all_SimilarityFeatures_above_score('riken_prot',200);
@@ -359,9 +370,7 @@ sub convert_output {
 
     my @remapped = $self->remap_genes($runnable,@genes);
 
-    # change of plan - store the genes
-    #    # now get out the feature data we want and store THAT in the output array
-    #    $self->generate_outfeat(@remapped);
+    # store the genes
     if (!defined($self->{_output})) {
       $self->{_output} = [];
     }
@@ -402,24 +411,25 @@ sub make_genes {
   my @tmpf   = $runnable->output;
   
   my @genes;
-    
+
+  
   foreach my $tmpf (@tmpf) {
     my $gene   = new Bio::EnsEMBL::Gene;
     my $tran   = new Bio::EnsEMBL::Transcript;
     my $transl = new Bio::EnsEMBL::Translation;
     
-    $gene->type('riken_genewise');
-    $gene->id($self->input_id . ".riken_genewise.$count");
+    $gene->type('test_riken_genewise');
+    $gene->id($self->input_id . ".test_riken_genewise.$count");
     $gene->created($time);
     $gene->modified($time);
     $gene->version(1);
     
-    $tran->id($self->input_id . ".riken_genewise.$count");
+    $tran->id($self->input_id . ".test_riken_genewise.$count");
     $tran->created($time);
     $tran->modified($time);
     $tran->version(1);
     
-    $transl->id($self->input_id . ".riken_genewise.$count");
+    $transl->id($self->input_id . ".test_riken_genewise.$count");
     $transl->version(1);
     
     $count++;
@@ -430,44 +440,52 @@ sub make_genes {
     my $excount = 1;
     my @exons;
     
-    foreach my $subf ($tmpf->sub_SeqFeature) {
-      $subf->feature1->source_tag('riken_genewise');
-      $subf->feature1->primary_tag('similarity');
-      $subf->feature1->score(100);
-      #	$subf->feature1->analysis($analysis);
-      
-      $subf->feature2->source_tag('riken_genewise');
-      $subf->feature2->primary_tag('similarity');
-      $subf->feature2->score(100);
-      #	$subf->feature2->analysis($analysis);
-      
+    foreach my $exon_pred ($tmpf->sub_SeqFeature) {
+      # make an exon
       my $exon = new Bio::EnsEMBL::Exon;
       
-      $exon->id($self->input_id . ".riken_genewise.$count.$excount");
+      $exon->id($self->input_id . ".test_riken_genewise.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->created($time);
       $exon->modified($time);
       $exon->version(1);
       
-      $exon->start($subf->start);
-      $exon->end  ($subf->end);
-      $exon->strand($subf->strand);
+      $exon->start($exon_pred->start);
+      $exon->end  ($exon_pred->end);
+      $exon->strand($exon_pred->strand);
       
-      print STDERR "\tFeaturePair " . $subf->gffstring . "\n";
+#      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
       
-      $exon->phase($subf->feature1->{_phase});
+      #	$exon->phase($subf->feature1->{_phase});
+      $exon->phase($exon_pred->{_phase});
       $exon->attach_seq($self->{$runnable}->primary_seq);
-      $exon->add_Supporting_Feature($subf);
+
+
+      # sort out supporting evidence for this exon prediction
+      foreach my $subf($exon_pred->sub_SeqFeature){
+	$subf->feature1->source_tag('test_riken_genewise');
+	$subf->feature1->primary_tag('similarity');
+	$subf->feature1->score(100);
+	$subf->feature1->analysis($exon_pred->analysis);
+	
+	$subf->feature2->source_tag('test_riken_genewise');
+	$subf->feature2->primary_tag('similarity');
+	$subf->feature2->score(100);
+	$subf->feature2->analysis($exon_pred->analysis);
+	
+#	print STDERR "*subf " . $subf->gffstring . "\n";
+	$exon->add_Supporting_Feature($subf);
+      }
       
       my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
       
-      my $tran0 =  $seq->translate('*','X',0)->seq;
-      my $tran1 =  $seq->translate('*','X',2)->seq;
-      my $tran2 =  $seq->translate('*','X',1)->seq;
+#      my $tran0 =  $seq->translate('*','X',0)->seq;
+#      my $tran1 =  $seq->translate('*','X',2)->seq;
+#      my $tran2 =  $seq->translate('*','X',1)->seq;
       
-      print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
-      print STDERR "\t exon phase 1 : " . $tran1 . "\n";
-      print STDERR "\t exon phase 2 : " . $tran2 . "\n";
+#      print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
+#      print STDERR "\t exon phase 1 : " . $tran1 . "\n";
+#      print STDERR "\t exon phase 2 : " . $tran2 . "\n";
       
       push(@exons,$exon);
       
@@ -511,31 +529,55 @@ sub remap_genes {
   my ($self,$runnable,@genes) = @_;
   
   my $contig = $self->{$runnable};
-  print STDERR "genes: " . scalar(@genes) . "\n";
-  print STDERR "contig: $contig\n";
+#  print STDERR "genes: " . scalar(@genes) . "\n";
 
   my @newf;
   my $trancount=1;
   foreach my $gene (@genes) {
-    foreach my $tran ($gene->each_Transcript) {
-      print STDERR " Translation is " . $tran->translate->seq . "\n";
-      foreach my $exon ($tran->each_Exon) {
-	my $strand = "+";
-	if ($exon->strand == -1) {
-	  $strand = "-";
-	}
-	print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
-      }
-      $trancount++;
-    }
-    
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-      $newgene->type('riken_genewise');
+      $newgene->type('test_riken_genewise');
+      foreach my $tran ($newgene->each_Transcript) {
+	# may well fail ...
+	print STDERR "no more tranlsation!\n";
+#	print STDERR "Newgene Translation is " . $tran->translate->seq . "\n";
+	foreach my $exon($tran->each_Exon) {
+	  print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
+	  foreach my $sf($exon->each_Supporting_Feature) {
+	    # this should be sorted out by the remapping to rawcontig ... strand is fine
+	    if ($sf->start > $sf->end) {
+	      my $tmp = $sf->start;
+	      $sf->start($sf->end);
+	      $sf->end($tmp);
+	    }
+	    
+#	    print STDERR "sub_align: " . 
+#	    $sf->seqname . "\t" .
+#	    $sf->start . "\t" .
+#	    $sf->end . "\t" .
+#	    $sf->strand . "\t" .
+#	    $sf->hseqname . "\t" .
+#	    $sf->hstart . "\t" .
+#	    $sf->hend . "\n";
+	  }
+	}
+      }
       push(@newf,$newgene);
 
     };
     if ($@) {
+
+
+      print STDERR "contig: $contig\n";
+      foreach my $tran ($gene->each_Transcript) {
+	foreach my $exon($tran->each_Exon) {
+	  foreach my $sf($exon->each_Supporting_Feature) {
+	    print STDERR "hid: " . $sf->hseqname . "\n";
+	  }
+	}
+      }
+
+
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
     
