@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::Hmmpfam;
+package Bio::EnsEMBL::Pipeline::Runnable::Hmmpfam;
 use vars qw(@ISA);
 use strict;
 
@@ -46,7 +46,7 @@ use Bio::EnsEMBL::Analysis::Programs qw(hmmpfam);
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::SeqIO;
 use Bio::Tools::HMMER::Results;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -89,16 +89,16 @@ sub run{
    my ($self,@args) = @_;
 
    my $seqfile = "/tmp/hmmpfam.$$.seq";
-   $seqout = Bio::SeqIO->open( -file => ">$seqfile", -format => 'fasta' );
+   my $seqout = Bio::SeqIO->new( -file => ">$seqfile", -format => 'fasta' );
    $seqout->write_seq($self->peptide);
    $seqout = undef;
    my $db = $self->database;
 
-   open(HMMER,"hmmpfam $db $seqfile");
+   open(HMMER,"hmmpfam $db $seqfile |");
    
-   $res = new Bio::Tools::HMMER::Results( -fh => \*HMMER , -type => 'hmmpfam');
+   my $res = new Bio::Tools::HMMER::Results( -fh => \*HMMER , -type => 'hmmpfam');
 
-   close(HMMER) || $self->throw("Error in running hmmpfam $db $seqfile");
+   close(HMMER) || $self->throw("Error in running hmmpfam $db $seqfile $!");
    
    foreach my $domain ( $res->each_Domain ) {
        $self->add_SeqFeature($domain);
