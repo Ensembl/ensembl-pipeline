@@ -107,13 +107,16 @@ sub _initialize {
     $self->clone($clone) if ($clone);       
     
     if ($blast =~ m!/!) #path to blast is provided 
-    {   $self->blast($blast) ;}
+    {   
+        $self->blast($blast) ;
+    }
     elsif ($blast =~ /blastn|blastx|blastp|tblastn|tblastx/)
     {   
-        eval 
-        { $self->blast($self->locate_executable($blast));  }; 
-        if ($@) 
-        { $self->blast('/usr/local/pubseq/bin/'.$blast); }  
+        $self->blast($self->locate_executable($blast));  
+    }
+    else
+    {
+        $self->throw("Path to blast executable required ($blast)\n");
     }
     
     if ($database) 
