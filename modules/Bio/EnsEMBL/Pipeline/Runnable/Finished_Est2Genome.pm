@@ -52,15 +52,17 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome;
 
-use vars qw(@ISA);
+use vars qw(@ISA $verbose);
 use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
+use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Est2Genome);
 
+$verbose = 0;
 
 sub run{
     my ($self, @args) = @_;
@@ -88,22 +90,18 @@ sub run{
         $estOutput->write_seq($self->{'_est_sequence'});
     }
 
-    my $est_genome_command = $BIN_DIR . "/est2genome -reverse -minscore 6 -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
+    my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
         # use -align to get alignment
-    print STDERR "\n\nRunning command $est_genome_command\n";
-
-
+    print STDERR "\nRunning command $est_genome_command\n\n";
 
     eval{
-
 	open (ESTGENOME, $est_genome_command) || $self->throw("Can't open pipe from '$est_genome_command' : $!");
-
 	my $firstline = <ESTGENOME>;
-#	print STDERR "firstline: \t$firstline";
+	print STDERR "firstline: \t$firstline" if $verbose;
 	if ( $firstline =~ m/Align EST and genomic DNA sequences/ ){ 
 	    # Catch 'Align EST and genomic DNA sequences'. This comes from STDERR!! [ 2>&1 ]
 	    $firstline = <ESTGENOME>;
-#	    print STDERR "\$firstline (secondline!): \t$firstline";	    
+	    print STDERR "\$firstline (secondline!): \t$firstline" if $verbose;	    
 	}
 
 	if( $firstline =~ m/reversed\sest/ ){
@@ -119,7 +117,7 @@ sub run{
 	}
 
 	while (<ESTGENOME>) {
-#	    print STDERR $_;
+	    print STDERR $_ if $verbose;
 	    if ($_ =~ /^Segment|^Exon/) {  # We only care about Segments in Exons
 
 		# "gen" = genomic sequence
@@ -149,7 +147,7 @@ sub run{
 		return(0);
 	    }
 	}
-	foreach my $seg_array(keys(%{$self->{'_exons'}})){
+	foreach my $seg_array( keys(%{$self->{'_exons'}}) ){
 	    my $dnafp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => $self->{'_exons'}->{$seg_array});
 	    $self->add_output($dnafp);
 	}
@@ -210,7 +208,7 @@ sub Segment{ # named to match output from est2genome
 					$p->{-primary}
 					);
 
-    $self->add_segment_to_exon($fp,$p);
+    $self->_add_segment_to_exon($fp,$p);
 }
 
 sub Exon{ # named to match output from est2genome
@@ -226,19 +224,80 @@ sub Exon{ # named to match output from est2genome
 	-est_id     => undef,
 	@_
     };
-    push(@{$self->{'__exons'}} , [$p->{-gen_start}, $p->{-gen_end}, $p->{-score}, $p->{-percent_id}]);
+    #push( @{$self->{'_exon_lines'}} , [ $p->{-gen_start}, $p->{-gen_end}, $p->{-score}, $p->{-percent_id} ] );
+    $self->_get_add_exon_lines( [ $p->{-gen_start}, $p->{-gen_end}, $p->{-score}, $p->{-percent_id} ] );
 }
-
-
-sub add_segment_to_exon{
+sub _add_segment_to_exon{
     my ($self,$fp,$p) = @_;
-    for(my $i = 0; $i < scalar(@{$self->{'__exons'}}); $i++){
-        my($start,$end,$score,$pid) = (@{$self->{'__exons'}->[$i]});
+    my $exon_line_count = scalar(@{$self->{'_exon_lines'}});
+    for(my $i = 0; $i < $exon_line_count; $i++){
+	# get current __exon data
+        my ( $start, $end, $score, $pid ) = ( @{$self->{'_exon_lines'}->[$i]} );
+	# check if feature pair belongs to current __exon
         next if ($p->{-gen_start} < $start || $p->{-gen_start} > $end);
-	$fp->score($score); 
-	$fp->percent_id($pid);
-        push (@{$self->{'_exons'}->{$i}}, $fp);
+	# get last feature pair of current __exon for sanity check
+	if( my $prev_fp = $self->_get_last_fp_of_exon($i) ){
+	    # sanity check to cater for Bio::EnsEMBL::BaseAlignFeature->_parsefeatures
+
+	    if( $fp->start eq ($prev_fp->end + $fp->strand) 
+		|| $fp->end eq ($prev_fp->start + $fp->strand)
+		|| $fp->hstart eq ($prev_fp->hend + $fp->hstrand) 
+		|| $fp->hend eq ($prev_fp->hstart + $fp->hstrand) ){
+		$fp->score($score); 
+		$fp->percent_id($pid);
+		$self->_add_fp_to_exon($fp,$i);
+	    }else{
+		print "Splitting the exon\n";
+		$self->_change_exon_line($i,[ $start, $prev_fp->end, $score, $pid ]);
+		my $new_exon_lines = $self->_get_add_exon_lines([ $fp->start - 1, $end, $score, $pid ]);
+ 		$fp->score($score); 
+ 		$fp->percent_id($pid);
+		# this adds fp to new exon
+		$self->_add_fp_to_exon($fp,(scalar(@{$new_exon_lines}) - 1));
+	    }
+	}else{
+	    $fp->score($score); 
+	    $fp->percent_id($pid);
+	    $self->_add_fp_to_exon($fp,$i);
+	}
     }
+}
+sub _get_last_fp_of_exon{
+    my $self = shift;
+    my $exon = shift;
+    my $last = 0;
+    if(defined($exon)){
+	$self->{'_exons'}->{$exon} ||= [];
+	$last = scalar( @{$self->{'_exons'}->{$exon}} );
+	$last = $last - 1 if $last;
+    }   
+    return $self->{'_exons'}->{$exon}->[$last] || undef;
+}
+sub _add_fp_to_exon{
+    my $self = shift;
+    my $fp = shift;
+    my $exon = shift;
+    if(defined($exon) && defined($fp)){
+	$self->{'_exons'}->{$exon} ||= [];
+	push (@{$self->{'_exons'}->{$exon}}, $fp);
+    }
+}
+sub _get_add_exon_lines{
+    my $self = shift;
+    my $exon_line = shift;
+    if(@{$exon_line}){
+	push( @{$self->{'_exon_lines'}}, $exon_line ) if scalar(@{$exon_line}) == 4;
+    }
+    return $self->{'_exon_lines'};
+}
+sub _change_exon_line{
+    my $self = shift;
+    my $index = shift;
+    my $exon_line = shift;
+    if(defined($index) && @{$exon_line}){
+	$self->{'_exon_lines'}->[$index] = $exon_line;
+    }
+    return $self->{'_exon_lines'};
 }
 sub add_output{
     my ($self, $fp) = @_;
@@ -251,7 +310,19 @@ sub output{
 
 
 sub _create_FeaturePair {
-    my ($self, $f1score, $f1percent_id, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id, $f1source, $f1strand, $f2strand, $f1primary) = @_;
+    my ( $self, 
+	 $f1score, 
+	 $f1percent_id, 
+	 $f1start, 
+	 $f1end, 
+	 $f1id, 
+	 $f2start, 
+	 $f2end, 
+	 $f2id, 
+	 $f1source, 
+	 $f1strand, 
+	 $f2strand, 
+	 $f1primary ) = @_;
     
     #print "creating feature pair ".$f1primary." ".$f1source." \n";
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
