@@ -43,10 +43,12 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
+my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'HumanIso',
                                                     -db_version     => '__NONE__',
+                                                    -db_file        => '/nfs/disk100/humpub/OSFbin/HumanIso.smat',
+ 
                                                     -program        => 'Genscan',
-                                                    #program_version
+                                                    -program_file   => '/nfs/disk100/humpub/OSFbin/genscan',
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'genscan',
