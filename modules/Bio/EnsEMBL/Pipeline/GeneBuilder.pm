@@ -137,6 +137,7 @@ sub new {
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
+    $self->gene_types("KnownUTR");
     foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
       $self->gene_types($bgt->{'type'});
     }
@@ -306,7 +307,7 @@ sub _select_best_transcripts{
   TRAN:
     foreach my $transcript( @sorted_transcripts ){
       $count++;
-      unless ($blessed_genetypes{$transcript->type}){
+      unless (exists $blessed_genetypes{$transcript->type}){
 	next GENE if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
       }
       push ( @selected_transcripts, $transcript );
@@ -542,7 +543,7 @@ sub prune_Transcripts {
     # deal with single exon genes
     #
     ##############################
-    my @maxexon = @{$transcripts[0]->get_all_Exons};
+#    my @maxexon = @{$transcripts[0]->get_all_Exons};
 
     # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
     # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
@@ -565,14 +566,15 @@ sub prune_Transcripts {
       @transcripts = map { $_->[1] } sort { $b->[0]->length <=> $a->[0]->length } map{ [ $_->start_Exon, $_ ] } @transcripts;
       my $tran = shift( @transcripts );
       push (@newtran, $tran);
-      #print STDERR "found single_exon_transcript\n";
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+#      print STDERR "found single_exon_transcript\n";
+#      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       my @es = @{$tran->get_all_Exons};
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
 	# make sure we keep it if it's blessed
-	if($blessed_genetypes{$transcript->type}){
-	  push(@newtran, $tran);
+	if(exists $blessed_genetypes{$transcript->type}){
+
+	  push(@newtran, $transcript);
 	}
 	else{
 	  foreach my $exon ( @{$transcript->get_all_Exons} ){
@@ -602,7 +604,7 @@ sub prune_Transcripts {
   TRANSCRIPT:
     foreach my $tran (@transcripts) {
       # if it's blessed, we keep it and there's nothing more to do
-      if($blessed_genetypes{$tran->type}){
+      if(exists $blessed_genetypes{$tran->type}){
 	push (@newtran, $tran);
 	next TRANSCRIPT;
       }
@@ -868,7 +870,7 @@ sub _bin_sort_transcripts{
   my @heathen_transcripts;
   foreach my $transcript(@transcripts){
 
-    if($blessed_genetypes{$transcript->type}){
+    if(exists $blessed_genetypes{$transcript->type}){
       push(@blessed_transcripts, $transcript);
     }
     else{
@@ -928,32 +930,30 @@ sub cluster_into_Genes{
   
   # flusold genes
   #$self->flush_Genes;
-  
-  my @transcripts = sort sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-				 if ($result){
-				     return $result;
-				 }
-				 else{
-				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-				 }
-			     } @transcripts_unsorted;
+
+  my @transcripts = sort { $a->start <=> $b->start ? $a->start <=> $b->start  : $b->end <=> $a->end } @transcripts_unsorted;
   my @clusters;
-  
+
   # clusters transcripts by whether or not any exon overlaps with an exon in 
   # another transcript (came from original prune in GeneBuilder)
   foreach my $tran (@transcripts) {
+
     my @matching_clusters;
   CLUSTER: 
     foreach my $cluster (@clusters) {
       foreach my $cluster_transcript (@$cluster) {
-        
-        foreach my $exon1 (@{$tran->get_all_Exons}) {
-	  foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
-            if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
-              push (@matching_clusters, $cluster);
-              next CLUSTER;
+        if ($tran->end  >= $cluster_transcript->start &&
+            $tran->start <= $cluster_transcript->end) {
+
+          foreach my $exon1 (@{$tran->get_all_Exons}) {
+  	  foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
+              if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+                push (@matching_clusters, $cluster);
+                next CLUSTER;
+              }
             }
           }
+
         }
       }
     }
@@ -1017,12 +1017,18 @@ sub check_Clusters{
   my ($self, $num_transcripts, $clusters) = @_;
   #Safety checks
   my $ntrans = 0;
+
+my $cluster_num = 0;
+
   my %trans_check_hash;
   foreach my $cluster (@$clusters) {
     $ntrans += scalar(@$cluster);
+
     foreach my $trans (@$cluster) {
+
       if (defined($trans_check_hash{$trans})) {
         $self->throw("Transcript " . $trans->dbID . " added twice to clusters\n");
+#        $self->warn("Transcript " . $trans->dbID . " added twice to clusters\n");
       }
       $trans_check_hash{$trans} = 1;
     }
