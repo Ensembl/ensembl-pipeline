@@ -92,13 +92,21 @@ print STDOUT "LSF Batch summary\n";
 print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
 print STDOUT "Job ID\tinput ID\tanalysis ID\n";
 my @jobs;
+my $submission_id_not = 0;
 foreach my $id (@ARGV) {
     my $job = $job_adaptor->fetch_by_dbID($id);
     print STDERR "lost job ".$id." while trying to run\n" if(!$job);
     exit(0) if(!$job);
     print STDOUT join ("\t", $id, $job->input_id, $job->analysis->logic_name), "\n";
+    if(!$job->submission_id){
+      $submission_id_not = 1;
+      $job->submission_id($ENV{'LSB_JOBID'});
+    }
     $job->set_status('WAITING');
     push(@jobs, $job);
+}
+if($submission_id_not){
+  $job_adaptor->update(@jobs);
 }
 
 my $hostname = [ split(/\./, hostname()) ];
