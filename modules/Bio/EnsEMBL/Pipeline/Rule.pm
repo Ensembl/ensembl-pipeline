@@ -154,14 +154,22 @@ sub goalAnalysis {
   $self->{'_goal'};
 }
 
+=head2 check_for_analysis
 
-# return 0 if nothing can be done or $goalAnalysis,
-# if it should be done.
+ -args: [analysis list], 'input id type', {completed accumulators}, verbose
+ -returns: Either bits for status if nothing can be done;
+           1 - Failed Input_Id_Type Check.
+           2 - Failed Already Complete Check [so is complete].
+           4 - Failed Condition Check.
+           Or;
+           $goalAnalysis if it should be done
+=cut
 
 sub check_for_analysis {
   my $self = shift;
   my ($analist, $input_id_type, $completed_accumulator_href, $verbose) = @_;
   my %anaHash;
+  my $return = 0;
   # reimplement with proper identity check!
   my $goal = $self->goalAnalysis->dbID;
 
@@ -171,7 +179,7 @@ sub check_for_analysis {
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
     print STDERR " failed input_id_type check\n" if($verbose);
-    return 0;
+    $return += 1;
   }
 
 
@@ -183,7 +191,7 @@ sub check_for_analysis {
     if( $goal == $analysis->dbID ) {
       # already done
       print STDERR " already done\n" if($verbose);
-      return 0;
+      $return += 2;
     }
   }
 
@@ -191,9 +199,10 @@ sub check_for_analysis {
   for my $cond ( $self->list_conditions ) {
     if ( ! $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
       print STDERR " failed condition check for $cond\n" if($verbose);
-      return 0;
+      $return += 4;
     }
   }
+  return $return if $return;
   return $self->goalAnalysis;
 }
 
