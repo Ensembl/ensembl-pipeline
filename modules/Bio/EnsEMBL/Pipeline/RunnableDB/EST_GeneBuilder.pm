@@ -216,7 +216,9 @@ sub write_output {
 
 sub fetch_input {
     my( $self) = @_;
-    
+
+    my $genetype = 'bmeg';
+
     print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
@@ -243,9 +245,12 @@ sub fetch_input {
     print STDERR "*** forward strand\n";
 
     # get genes
-    my @genes  = $contig->get_Genes_by_Type('fpc_bme2g', 'evidence');
+    my @genes  = $contig->get_Genes_by_Type($genetype, 'evidence');
     
     print STDERR "Number of genes = " . scalar(@genes) . "\n";
+    if(!scalar(@genes)){
+      $self->warn("No forward strand genes found");
+    }
 
     my @plus_transcripts;
 
@@ -274,21 +279,23 @@ GENE:
 
     }
     # cluster each strand
-    my @plus_clusters  = $self->cluster_transcripts(@plus_transcripts);
+    if(scalar(@plus_transcripts)){
+      my @plus_clusters  = $self->cluster_transcripts(@plus_transcripts);
 
-
-    print STDERR scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
-
-    # make a genomewise runnable for each cluster of transcripts
-    foreach my $cluster(@plus_clusters){
-      print STDERR "new genomewise " . scalar(@$cluster) . "\n";
-
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
-      $runnable->seq($contig->primary_seq);
-      #    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
-      $self->add_runnable($runnable);
-      foreach my $t(@$cluster){
-	$runnable->add_Transcript($t);
+      
+      print STDERR scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
+      
+      # make a genomewise runnable for each cluster of transcripts
+      foreach my $cluster(@plus_clusters){
+	print STDERR "new genomewise " . scalar(@$cluster) . "\n";
+	
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
+	$runnable->seq($contig->primary_seq);
+	#    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
+	$self->add_runnable($runnable);
+	foreach my $t(@$cluster){
+	  $runnable->add_Transcript($t);
+	}
       }
     }
 
@@ -297,10 +304,14 @@ GENE:
     print STDERR "*** reverse strand\n";
     my $reverse = 1;
     my $revcontig = $contig->invert;
-    my @revgenes  = $revcontig->get_Genes_by_Type('fpc_bme2g', 'evidence');
+    my @revgenes  = $revcontig->get_Genes_by_Type($genetype, 'evidence');
     my @minus_transcripts;
     
     print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
+    if(!scalar(@genes)){
+      $self->warn("No reverse strand genes found");
+    }
+
     REVGENE:    
     foreach my $gene(@revgenes) {
       my @transcripts = $gene->each_Transcript;
@@ -322,21 +333,24 @@ GENE:
 	next REVGENE;
       }
     }
+    
+    if(scalar(@minus_transcripts)){
 
-    my @minus_clusters = $self->cluster_transcripts(@minus_transcripts);  
-    # minus clusters need some fancy schmancy feature and contig inversion. 
-    foreach my $cluster(@minus_clusters){
-      print STDERR "new genomewise " . scalar(@$cluster) . "\n";
-
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
-      $runnable->seq($revcontig->primary_seq);
-      #    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
-      $self->add_runnable($runnable, $reverse);
-      foreach my $t(@$cluster){
-	$runnable->add_Transcript($t);
+      my @minus_clusters = $self->cluster_transcripts(@minus_transcripts);  
+      # minus clusters need some fancy schmancy feature and contig inversion. 
+      foreach my $cluster(@minus_clusters){
+	print STDERR "new genomewise " . scalar(@$cluster) . "\n";
+	
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
+	$runnable->seq($revcontig->primary_seq);
+	#    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
+	$self->add_runnable($runnable, $reverse);
+	foreach my $t(@$cluster){
+	  $runnable->add_Transcript($t);
+	}
       }
     }
-#    $self->vc($revcontig);
+
 }
  
 =head2 cluster_transcripts
@@ -878,50 +892,70 @@ sub run {
 # convert genomewise output into genes
 sub convert_output {
   my ($self, $gwr, $reverse) = @_;
-  
-  my @genes = $self->make_genes($gwr, $reverse);
+  my $genetype = 'genomewise'; 
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+      $analysis_obj = $analyses[0];
+  }
+  else{
+      # make a new analysis object
+      $analysis_obj = new Bio::EnsEMBL::Analysis
+	(-db              => 'NULL',
+	 -db_version      => 1,
+	 -program         => $genetype,
+	 -program_version => 1,
+	 -gff_source      => $genetype,
+	 -gff_feature     => 'gene',
+	 -logic_name      => $genetype,
+	 -module          => 'EST_GeneBuilder',
+      );
+  }
+ 
+  my @genes = $self->make_genes($gwr, $reverse, $genetype, $analysis_obj);
+
+
 
   # check translations
-  foreach my $gene(@genes){
-    foreach my $trans ( $gene->each_Transcript ) {
-      print STDERR "translation: \n";
-      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-      print STDERR "checktrans: ";
-      $seqio->write_seq($trans->translate); 
-      print STDERR "\n ";	
-    }
-  }
+#  foreach my $gene(@genes){
+#    foreach my $trans ( $gene->each_Transcript ) {
+#      print STDERR "translation: \n";
+#      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+#      print STDERR "checktrans: ";
+#      $seqio->write_seq($trans->translate); 
+#      print STDERR "\n ";	
+#    }
+#  }
   
-  my @remapped = $self->remap_genes('genomewise', \@genes, $reverse);
+  my @remapped = $self->remap_genes(\@genes, $reverse);
   # check translations
-  foreach my $gene(@remapped){
-    foreach my $trans ( $gene->each_Transcript ) {
-      print STDERR "translation: \n";
-      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-      print STDERR "checktrans: ";
-      $seqio->write_seq($trans->translate); 
-      print STDERR "\n ";	
-    }
-  }
+#  foreach my $gene(@remapped){
+#    foreach my $trans ( $gene->each_Transcript ) {
+#      print STDERR "translation: \n";
+#      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+#      print STDERR "checktrans: ";
+#      $seqio->write_seq($trans->translate); 
+#      print STDERR "\n ";	
+#    }
+#  }
   # store genes
-  
-  if (!defined($self->{'_output'})) {
-    $self->{'_output'} = [];
-  }
-
-  print STDERR "remmapped genes: " . scalar(@remapped) . "\n";
-
-  push(@{$self->{'_output'}},@remapped);
+ 
+  $self->output(@remapped);
+ 
 }
 
 
 
 sub make_genes {
 
-  my ($self, $runnable, $reverse) = @_;
+  my ($self, $runnable, $reverse, $genetype, $analysis_obj) = @_;
   my $count = 0;
   my @genes;
-  my $genetype = 'go_est';
+
   my $time  = time; chomp($time);
   my $contig = $self->vc;
 
@@ -938,7 +972,8 @@ sub make_genes {
     $gene->type($genetype);
     $gene->id($contig->id . ".$genetype.$count");
     $gene->version(1);
-    
+    $gene->analysis($analysis_obj);
+
     # add transcript to gene
     $transcript->id($contig->id . ".$genetype.$count");
     $transcript->version(1);
@@ -987,8 +1022,18 @@ sub make_genes {
   return @genes;
 }
 
+=head2 _remap_genes
+
+    Title   :   _remap_genes
+    Usage   :   $self->_remap_genes(@genes)
+    Function:   Remaps predicted genes into genomic coordinates
+    Returns :   array of Bio::EnsEMBL::Gene
+    Args    :   Bio::EnsEMBL::Virtual::Contig, array of Bio::EnsEMBL::Gene
+
+=cut
+
 sub remap_genes {
-  my ($self, $genetype, $genes, $reverse) = @_;
+  my ($self, $genes, $reverse) = @_;
   my $contig = $self->vc;
   if (defined $reverse){
     $contig = $contig->invert;
@@ -1001,64 +1046,21 @@ sub remap_genes {
   foreach my $gene (@$genes) {
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-      $newgene->type($genetype);
-      foreach my $tran ($newgene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
-	  if ($exon->isa('Bio::EnsEMBL::StickyExon')){
-	    # need to deal with component exons
-	    foreach my $ce($exon->each_component_Exon){
-	      print STDERR $ce->contig_id . "\tgenewise\texon\t" . $ce->start . "\t" . $ce->end . "\t100\t" . $ce->phase . "\n";
-	    }
-	  }
-	  else {
-	    print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
-	  }
-	  foreach my $sf($exon->each_Supporting_Feature) {
-	    print STDERR "sub_align: " . 
-	      $sf->seqname . "\t" .
-	      $sf->start . "\t" .
-	      $sf->end . "\t" .
-	      $sf->strand . "\t" .
-	      $sf->hseqname . "\t" .
-	      $sf->hstart . "\t" .
-	      $sf->hend . "\n";
-	  }
-	}
-      }
+      # need to explicitly add back genetype and analysis.
+      $newgene->type($gene->type);
+      $newgene->analysis($gene->analysis);
+
       push(@newf,$newgene);
       
     };
     if ($@) {
-      
-      
-      print STDERR "contig: $contig\n";
-      foreach my $tran ($gene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
-	  foreach my $sf($exon->each_Supporting_Feature) {
-	    print STDERR "hid: " . $sf->hseqname . "\n";
-	  }
-	}
-      }
-      
-      
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
-    
     
   }
   
   return @newf;
   
-}
-
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{'_output'})) {
-      $self->{'_output'} = [];
-    } 
-    return @{$self->{'_output'}};
 }
 
 
@@ -1160,6 +1162,32 @@ sub match {
 	return @overlap;
       }
     
+}
+
+=head2 output
+
+ Title   : output
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub output{
+   my ($self,@genes) = @_;
+
+   if (!defined($self->{'_output'})) {
+     $self->{'_output'} = [];
+   }
+    
+   if(defined @genes){
+     push(@{$self->{'_output'}},@genes);
+   }
+
+   return @{$self->{'_output'}};
 }
 
 
