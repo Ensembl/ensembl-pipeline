@@ -11,13 +11,14 @@
 
 =head1 NAME
   
-Bio::EnsEMBL::Pipeline::Tools::AlignmentTool
-  
+Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
+ 
 =head1 SYNOPSIS
 
-# Low stress (I just want an alignment, damnit):
+# If you just want the alignment of an ensembl transcript with
+# the evidence used to predict it:
 
-my $alignment_tool = Bio::EnsEMBL::Pipeline::Tools::AlignmentTool->new(
+my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
 			   '-seqfetcher'        => $pfetcher,
 			   '-transcript'        => $transcript);
@@ -29,10 +30,11 @@ foreach my $sequence (@$alignment){
   print $sequence . "\n";
 }
 
-# Fussy (set a few things to non-default, get worried about 
-# alignment quality):
+# More fussy (set a few things to non-default, change the
+# amount of padding up- and down-stream of the transcript
+# nucleotide sequence):
 
-my $alignment_tool = Bio::EnsEMBL::Pipeline::Tools::AlignmentTool->new(
+my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
 			   '-seqfetcher'        => $pfetcher,
 			   '-transcript'        => $transcript,
@@ -40,13 +42,16 @@ my $alignment_tool = Bio::EnsEMBL::Pipeline::Tools::AlignmentTool->new(
 			   '-fasta_line_length' => 60);
 
 
-# Scrutinize each exon for the identity of best evidence:
-my $exon_best_identities = $alignment_tool->identity('identity_by_exon');
+# Get identities of best item of evidence for each exon (returns 
+# an arrayref, where each array element is another list that 
+# contains (highest_protein_identity, protein_coverage, 
+# highest_nucleotide_evidence, nucleotide_coverage).
+my $exon_identities = $alignment_tool->identity;
 
-### NOTE : The definition of identity used by this module ignores all
-### gaps in the sequence.  Given than many of these alignments are
-### gappy or fragmentary, including gaps in the identity score will
-### dilute it somewhat according to coverage.
+# NOTE : The definition of identity used by this module ignores all
+# gaps in the sequence.  Given than many of these alignments are
+# gappy or fragmentary, including gaps in the identity score will
+# dilute it somewhat according to coverage.
 
 # ---> Everything below is presently unimplemented:
 ## Everything - an array of hashes containing match sequence id, coverage and 
@@ -57,10 +62,8 @@ my $exon_best_identities = $alignment_tool->identity('identity_by_exon');
 #      "Overall Identity : " . $all_matches_stats->[0]->{'identity'} . "\n" .
 #      "Hit Coverage     : " . $all_matches_stats->[0]->{'coverage'} . "\n";
 
-# Last, but certainly not least - find exons that have no evidence, or
-# calculate the number of coding bases that have no evidence aligned
-# to them.
-
+# Determine the number of exons in our alignment that have 
+# no evidence.
 my $no_evidence_exons = $alignment_tool->rogue_exons;
 
 
@@ -78,10 +81,12 @@ Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Tools::AlignmentTool;
+package Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 
 use vars qw(@ISA);
 use strict;
+use Bio::EnsEMBL::Pipeline::Alignment;
+use Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
 
 # Object preamble - inherits from Bio::Root::Object;
 
@@ -100,7 +105,7 @@ use strict;
   Arg [5]    : (optional)
   Example    :
   Description: 
-  Returntype : Bio::EnsEMBL::Pipeline::Tools::AlignmentTool
+  Returntype : Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
   Exceptions : Will throw if isnt passed 
                DBAdaptor/Transcript/SeqFetcher
   Caller     : General
@@ -171,9 +176,9 @@ sub new {
   # or a user specified value
 
   if ($fasta_line_length) {
-    $self->{'_fasta_line_length'} = $fasta_line_length;
+    $self->_line_length($fasta_line_length);
   } else {
-    $self->{'_fasta_line_length'} = 60;
+    $self->_line_length(60);
   }
 
 
@@ -212,7 +217,7 @@ sub retrieve_alignment {
     $self->_align($type);
   }
 
-  return $self->_alignment;
+  return $self->_create_Alignment_object($type);
 }
 
 
@@ -288,7 +293,7 @@ sub rogue_exons {
   my %seen_exons;
 
   foreach my $sequence (@$evidence_alignments){
-    $seen_exons{$sequence->{'exon'}}++;
+    $seen_exons{$sequence->exon}++;
   }
 
   my $actual_exons = $self->_transcript->get_all_Exons;
@@ -328,39 +333,40 @@ sub _align {
   
   my $evidence_sequences = $self->_corroborating_sequences($type);
 
-  # Insert use information about 'deletions' (originally from the
+  # Use information about 'deletions' (originally from the
   # cigar string and stored in the hashes returned by 
   # $self->_semialigned_sequences) to insert gaps into the genomic 
-  # and exonic sequences, therefore aligning the evidence with
+  # and exonic sequences.  This aligns the evidence with
   # the parent sequence (with a bit of fiddling to place
   # gaps into the evidence sequences that need them).
 
-  for (my $i = 0; $i < $self->_slice->length; $i++) {
+  for (my $i = 1; $i <= $self->_slice->length; $i++) {
     my $is_deletion = 0;
 
   DELETION_HUNT:
     foreach my $unaligned_sequence (@$evidence_sequences){
-      if ((defined $unaligned_sequence->{'deletions'}->[$i])
-	  &&($unaligned_sequence->{'deletions'}->[$i] eq 'D')){
+
+      if ($unaligned_sequence->fetch_deletion_at_position($i) eq 'D'){
 	$is_deletion = 1;
 	last DELETION_HUNT;
       }
     }
     
     if ($is_deletion) {
-      splice (@$genomic_sequence, $i, 0, '-');
-      splice (@$exon_nucleotide_sequence, $i, 0, '-');
 
-        # Rather than adding an if statement, just make the protein 
-        # sequence and choose whether to use it later. 
-      splice (@$exon_protein_sequence, $i, 0, '-');  
-     
+      $genomic_sequence->insert_gap($i, 1);
+      $exon_nucleotide_sequence->insert_gap($i, 1);
+
+      if (($type eq 'protein')||($type eq 'all')){
+	$exon_protein_sequence->insert_gap($i, 1);  
+      }
 
 
       for (my $j = 0; $j < scalar @$evidence_sequences; $j++) {
-	unless ((defined $evidence_sequences->[$j]->{'deletions'}->[$i])
-		&&($evidence_sequences->[$j]->{'deletions'}->[$i] eq 'D')) {
-	  splice(@{$evidence_sequences->[$j]->{'seq'}}, $i, 0, '-');
+	unless ($evidence_sequences->[$j]->fetch_deletion_at_position($i) eq 'D') {
+
+	  $evidence_sequences->[$j]->insert_gap($i, 1);
+
 	}
       }
     }
@@ -375,80 +381,50 @@ sub _align {
   if (($type eq 'protein')||($type eq 'all')) {
     $self->_working_alignment('exon_protein', $exon_protein_sequence);
   }
+
   foreach my $evidence_sequence (@$evidence_sequences) {
     $self->_working_alignment('evidence', $evidence_sequence);
   }
 
-  # Concatenate the sequences from their storage arrays and print
-
-  my $genomic_string = '';
-  my $exon_nucleotide_string = '';
-  my $exon_protein_string = '';
-
-  for (my $j = 0; $j < scalar @$evidence_sequences; $j++) {
-    $evidence_sequences->[$j]->{'string_seq'} .= '';
-  }
-
-  for (my $i = 0; $i < $self->_slice->length; $i++) {
-    my $multiple_of_line_length = 0;
-    
-    if (($i%($self->{'_fasta_line_length'}) == 0)&&($i != 0)){
-      $genomic_string .= "\n";
-      $exon_nucleotide_string .= "\n";
-      $exon_protein_string .= "\n";
-      $multiple_of_line_length = 1;
-    }
-    
-    $genomic_string .= $genomic_sequence->[$i];
-    
-    if (defined $exon_nucleotide_sequence->[$i]){
-      $exon_nucleotide_string .= $exon_nucleotide_sequence->[$i];
-    } else {
-      $exon_nucleotide_string .= '-';
-    }
-    
-    if ((defined $exon_protein_sequence->[$i])
-	&&(($type eq 'all')||($type eq 'protein'))){
-      $exon_protein_string .= $exon_protein_sequence->[$i];
-    } elsif (($type eq 'all')||($type eq 'protein')) {
-      $exon_protein_string .= '-';
-    }
-    
-    for (my $j = 0; $j < scalar @$evidence_sequences; $j++) {
-      if ($multiple_of_line_length){
-	$evidence_sequences->[$j]->{'string_seq'} .= "\n";
-      }
-      $evidence_sequences->[$j]->{'string_seq'} .= $evidence_sequences->[$j]->{'seq'}->[$i];
-    }
-    
-  }
-
-  # Place our aligned sequences in the alignment storage.  An
-  # alignment object would be *so* useful here.
-
-  my $genomic_alignment = '>' . $self->_transcript->stable_id. " genomic_sequence\n$genomic_string";
-  $self->_alignment('add', $genomic_alignment);
-  my $exon_alignment = '>' . $self->_transcript->stable_id. " exon_sequence\n$exon_nucleotide_string";
-  $self->_alignment('add', $exon_alignment);
-
-  if (($type eq 'protein')||($type eq 'all')){
-    my $trans_alignment = '>' . $self->_transcript->stable_id . " translated_exons\n$exon_protein_string";
-    $self->_alignment('add', $trans_alignment);
-  }
-  
-  for (my $k = 0; $k < scalar @$evidence_sequences; $k++) {
-    my $evidence_alignment =  '>' . $evidence_sequences->[$k]->{'name'} . "\n" . 
-      $evidence_sequences->[$k]->{'string_seq'};
-    $self->_alignment('add', $evidence_alignment);
-  }
- 
   # Set flag to indicate that the alignment has been computed.
 
   $self->_is_computed($type, 1);
  
-  return $self->_alignment;
-
+  return 1;
 }
+
+
+=head2 _create_Alignment_object
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _create_Alignment_object {
+my ($self, $type) = @_;
+
+  my $alignment = Bio::EnsEMBL::Pipeline::Alignment->new(
+			      '-name' => 'evidence alignment');
+
+  $alignment->add_sequence($self->_working_alignment('genomic_sequence'));
+  $alignment->add_sequence($self->_working_alignment('exon_nucleotide'));
+
+  if (($type eq 'protein')||($type eq 'all')) {
+    $alignment->add_sequence($self->_working_alignment('exon_protein'));
+  }
+
+  foreach my $evidence_sequence (@{$self->_working_alignment('evidence')}){
+    $alignment->add_sequence($evidence_sequence);
+  }
+
+return $alignment;
+}
+
 
 
 =head2 _compute_identity
@@ -475,7 +451,7 @@ sub _compute_identity {
   my %by_exon;
 
   foreach my $evidence_item (@$evidence) {
-    push (@{$by_exon{$evidence_item->{'exon'}}}, $evidence_item);
+    push (@{$by_exon{$evidence_item->exon}}, $evidence_item);
   }
 
   my $exon_placemarker = 0;
@@ -504,7 +480,7 @@ sub _compute_identity {
       # The top identities are grouped according to whether
       # they are protein or nucleotide sequences.
 
-      if (($evidence_item->{'type'} eq 'protein')
+      if (($evidence_item->type eq 'protein')
 	  &&($self->_type ne 'nucleotide')){
 	($identity, $coverage) = $self->_compare_to_reference($exon, 
 							      $evidence_item, 
@@ -518,7 +494,7 @@ sub _compute_identity {
 	}
       }
 
-      elsif (($evidence_item->{'type'} eq 'nucleotide')
+      elsif (($evidence_item->type eq 'nucleotide')
 	     &&($self->_type ne 'protein')){
 	($identity, $coverage) = $self->_compare_to_reference($exon, 
 							      $evidence_item, 
@@ -567,7 +543,7 @@ sub _compute_identity {
 =cut
 
 sub _compare_to_reference { 
-  my ($self, $exon, $evidence_item, $reference_sequence) = @_;
+  my ($self, $exon, $evidence_align_seq, $reference_align_seq) = @_;
 
   # For nucleotide alignments each mismatch is counted
   # once.
@@ -575,9 +551,10 @@ sub _compare_to_reference {
 
   # If we are dealing this protein alignments we have to
   # multiply this by three.
-  $align_unit *= 3 if ($evidence_item->{'type'} eq 'protein');
+  $align_unit *= 3 if ($evidence_align_seq->type eq 'protein');
 
-  my $match_sequence = $evidence_item->{'seq'};
+  my $match_sequence = $evidence_align_seq->seq_array;
+  my $reference_sequence = $reference_align_seq->seq_array;
   
   my $mismatches = 0;
   my $noncovered = 0;
@@ -712,33 +689,6 @@ sub _type {
 ##### Alignment information handling methods #####
 
 
-=head2 _alignment
-
-  Arg [1]    :
-  Example    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Caller     : 
-
-=cut
-
-sub _alignment {
-
-  my ($self, $action, $sequence) = @_;
-
-  if (defined $action && $action eq 'add' && defined $sequence){
-
-    # It would be nice to check the sequence for the 
-    # correct format before adding it to our alignment
-
-    push (@{$self->{'_alignment_array'}}, $sequence);
-  }
-
-  return $self->{'_alignment_array'};
-}
-
-
 =head2 _working_alignment
 
   Arg [1]    :
@@ -752,7 +702,7 @@ sub _alignment {
 
 sub _working_alignment {
 
-  my ($self, $slot, $seq_hash) = @_;
+  my ($self, $slot, $align_seq) = @_;
 
   unless (defined $slot && 
       (($slot eq 'genomic_sequence')
@@ -763,11 +713,16 @@ sub _working_alignment {
 		 . "a slot that isnt allowed ($slot)");
   }
 
-  if (defined $slot && defined $seq_hash){
+  if (defined $slot && defined $align_seq){
 
-    push (@{$self->{'_working_alignment_array'}->{$slot}}, $seq_hash);
+    unless ($align_seq->isa("Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq")){
+      $self->throw("Sequence passed to _working alignment was not an " . 
+		   "AlignmentSeq, it was a [$align_seq]")
+    }
+    
+    push (@{$self->{'_working_alignment_array'}->{$slot}}, $align_seq);
 
-  } elsif (defined $slot && !defined $seq_hash) {
+  } elsif (defined $slot && !defined $align_seq) {
 
     my $slot_resident =  $self->{'_working_alignment_array'}->{$slot};
 
@@ -783,7 +738,7 @@ sub _working_alignment {
   return 0;
 }
 
-##### Fiddlings with Slices and Transcripts. #####
+##### Fiddlings with Slices and Transcripts #####
 
 
 =head2 _transcript
@@ -923,7 +878,7 @@ sub _seq_fetcher {
 
     $self->{'_seq_fetcher'} = $fetcher;
 
-    return
+    return 1;
   }
 
   return $self->{'_seq_fetcher'};
@@ -966,10 +921,10 @@ sub _corroborating_sequences {
 
   foreach my $exon (@{$exons}){
     # Work through each item of supporting evidence attached to our exon.
-    
+
   FEATURE:
     foreach my $base_align_feature (@{$exon->get_all_supporting_features}){
-
+ 
       if ((($type eq 'nucleotide')
 	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	  ||(($type eq 'protein')
@@ -984,25 +939,24 @@ sub _corroborating_sequences {
 
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
 
-	my $half_aligned = $self->_fiddly_bits($base_align_feature);
-	next FEATURE unless $half_aligned;
+	my $align_seq = $self->_fiddly_bits($base_align_feature);
+	next FEATURE unless $align_seq;
 
-	$half_aligned->{'exon'} = $exon_placemarker;
-	$half_aligned->{'type'} = 'nucleotide';
+	$align_seq->exon($exon_placemarker);
+	$align_seq->type('nucleotide');
 
-	push (@{$self->{'_corroborating_sequences'}}, $half_aligned);
+	push (@{$self->{'_corroborating_sequences'}}, $align_seq);
 	next FEATURE;
       }
       
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 
-	my $half_aligned = $self->_fiddly_bits($base_align_feature);
-	next FEATURE unless $half_aligned;
+	my $align_seq = $self->_fiddly_bits($base_align_feature);
+	next FEATURE unless $align_seq;
 
-	$half_aligned->{'exon'} = $exon_placemarker;
-	$half_aligned->{'type'} = 'protein';
-
-	push (@protein_features, $half_aligned);
+	$align_seq->exon($exon_placemarker);
+	$align_seq->type('protein');
+	push (@protein_features, $align_seq);
       }
     }
 
@@ -1157,14 +1111,37 @@ sub _fiddly_bits {
 
   splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq);
 
-  # Create a hash that has all the information we want to return.
-
-  my %partially_aligned = ('name'      => $base_align_feature->hseqname,
-			   'start'     => $base_align_feature->start,
-			   'seq'       => \@feature_sequence,
-			   'deletions' => \@deletion_sequence);
+  $feature_sequence = '';
   
-  return \%partially_aligned;
+  foreach my $element (@feature_sequence) {
+    $feature_sequence .= $element;
+  }
+
+  # Munch our array of deletion information into a string
+  # This is not pretty, but will work for now.
+
+  my $deletion_sequence = '';
+
+  foreach my $element (@deletion_sequence){
+ 
+    unless ($element){
+      $deletion_sequence .= '-';
+      next;
+    }
+
+    $deletion_sequence .= $element;
+  }
+
+  # Create a AlignmentSeq object with our valuable sequence:
+
+
+  my $partially_aligned = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+                                          '-name'      => $base_align_feature->hseqname,
+					  '-seq'       => $feature_sequence,
+					  '-deletions' => $deletion_sequence,
+					  '-start'      => $base_align_feature->start);
+
+  return $partially_aligned;
 }
 
 
@@ -1194,17 +1171,11 @@ print STDERR "Reverse complimenting genomic sequence.\n";
       $genomic_sequence = $self->_slice->revcom->seq;
     }
 
-    my @genomic_sequence = split //, $genomic_sequence;
-
-    # Fill in the blanks
-
-    for (my $i = 0; $i < $self->_slice->length; $i++) {
-      unless (defined $genomic_sequence[$i]){
-	$genomic_sequence[$i] = '-';
-      } 
-    }
-
-    $self->{'_genomic_sequence'} = \@genomic_sequence;
+    $self->{'_genomic_sequence'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+					     '-seq'  => $genomic_sequence,
+					     '-name' => 'genomic_sequence',
+					     '-type' => 'nucleotide'
+                                             );
 
   }
 
@@ -1254,10 +1225,6 @@ sub _exon_nucleotide_sequence {
 	  die "Overlapping exons \!\?\!\n$@";
 	}
       }
-      
-#      if ($exon_position != ($exon->end)){
-#	$self->throw("Problem with exon length or sequence.\n$@");
-#      }      
     }    
     
     # Fill in the blanks
@@ -1268,7 +1235,19 @@ sub _exon_nucleotide_sequence {
       } 
     }
 
-    $self->{'_exon_nucleotide_sequence'} = \@exon_only_sequence;
+    # Convert back to a string
+
+    my $exon_sequence = '';
+    foreach my $element (@exon_only_sequence) {
+      $exon_sequence .= $element;
+    }
+
+
+    $self->{'_exon_nucleotide_sequence'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+					     '-seq'  => $exon_sequence,
+					     '-name' => 'exon_sequence',
+					     '-type' => 'nucleotide'
+                                             );
   }
 
   return $self->{'_exon_nucleotide_sequence'};
@@ -1314,9 +1293,6 @@ sub _exon_protein_translation {
       # By doing this, a complete undeleted/unrepeated sequence 
       # is displayed in the alignment.
       
-#      unless (($exon->phase == 0)||($exon->phase == -1)) {
-#    }
-
       if ($exon->phase == 2){ 
 	splice (@peptide, 0, 2);
       }
@@ -1391,7 +1367,18 @@ sub _exon_protein_translation {
       } 
     }
 
-    $self->{'_exon_protein_translation'} = \@exon_translation_sequence;
+    # Convert back to a string
+
+    my $translated_exon_sequence = '';
+    foreach my $element (@exon_translation_sequence) {
+      $translated_exon_sequence .= $element;
+    }
+
+    $self->{'_exon_protein_translation'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+					     '-seq'  => $translated_exon_sequence,
+					     '-name' => 'translated_exon_sequence',
+					     '-type' => 'protein'
+                                             );
   }
   
   return $self->{'_exon_protein_translation'};
@@ -1478,6 +1465,30 @@ sub _fetch_sequence {
 }
 
 
+### Miscellaneous utilities ###
+
+
+=head2 _line_length
+
+  Arg [1]    :
+  Example    : 
+  Description: Getter/Setter for the line length in fasta output.
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+
+sub _line_length {
+  my $self = shift;
+
+  if (@_) {
+    $self->{'_fasta_line_length'} = shift;
+  }
+
+  return $self->{'_fasta_line_length'};
+}
 
 
 
