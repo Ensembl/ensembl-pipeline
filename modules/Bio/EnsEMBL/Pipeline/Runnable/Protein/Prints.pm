@@ -86,13 +86,14 @@ sub new {
   
     print STDERR "args: ", @args, "\n";
     
-    my( $query, $program, $database, $threshold, $workdir) = $self->_rearrange([qw(QUERY
-										   PROGRAM
-										   DATABASE
-										   THRESHOLD
-										   WORKDIR
-										   )],
-									       @args);
+    my( $query, $program, $database, $threshold, $workdir, $analysis) = $self->_rearrange([qw(QUERY
+										              PROGRAM
+										              DATABASE
+											      THRESHOLD
+											      WORKDIR
+											      ANALYSIS
+											      )],
+											  @args);
     
     #$self->clone($sequence) if ($sequence);       
   
@@ -101,19 +102,20 @@ sub new {
     } else {
 	$self->throw("No query sequence given");
     }
-    
-    if ($program) {   
-	$self->program($program); }
-    else {   
-	$self->program($self->locate_executable('FingerPRINTScan')); }
+ 
+    if ($analysis) {
+	$self->analysis($analysis);
+    }
+   
+    if (!defined $self->analysis->program) {   
+	$self->program($self->locate_executable('FingerPRINTScan')); 
+    }
     
     if ($threshold) {
 	$self->threshold($threshold);
     }
     
-    if ($database) {
-	$self->database($database);
-    } else {
+    if (!defined $self->analysis->db) {
 	$self->throw("No database given");
     }
     if ($workdir) {
@@ -197,6 +199,27 @@ sub database{
 
 }
 
+=head2 analysis
+
+ Title   : analysis
+ Usage   : $obj->analysis($newval)
+ Function: 
+ Returns : value of analysis
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub analysis{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'analysis'} = $value;
+    }
+    return $obj->{'analysis'};
+
+}
+
 
 ###########
 # Analysis methods
@@ -246,13 +269,13 @@ sub run_analysis {
     # This routine expands the database name into $db-1 etc for
     # split databases
 
-    #print STDERR $self->program." ".$self->database." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
+    print STDERR $self->analysis->program." ".$self->analysis->db." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
 	$self->throw("Failed during prints run $!\n")
 	    
 	    #print STDERR $self->program." ".$self->database." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
 
-	    unless (system ($self->program . ' ' . 
-			    $self->database . ' ' .
+	    unless (system ($self->analysis->program . ' ' . 
+			    $self->analysis->db . ' ' .
 			    $self->filename. ' ' .
 			    '-fjR >'.
 			    #'-fj -a -o 15   > ' . 
@@ -378,13 +401,13 @@ sub create_feature {
     my ($self, $feat, $sequenceId) = @_;
 
     #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => "PRINTS",
-                            -db_version      => 1,
-                            -program         => "FingerPRINTScan",
-                            -program_version => 1,
-                            -gff_source      => "prints",
-                            -gff_feature     => "domain");
+#    my $analysis_obj = Bio::EnsEMBL::Analysis->new
+#                        (   -db              => "PRINTS",
+#                            -db_version      => 1,
+#                            -program         => "FingerPRINTScan",
+#                            -program_version => 1,
+#                            -gff_source      => "prints",
+#                            -gff_feature     => "domain");
 
 #my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
     my @f = split (/,/,$feat);
@@ -393,14 +416,14 @@ sub create_feature {
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
 					       -end => $f[2],        
 					       -score => $f[4],
-					       -analysis => $analysis_obj,
+					       -analysis => $self->analysis,
 					       -seqname => $self->clone->id,
 					       -percent_id => $f[3],
 					       -p_value => $f[5]);
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start =>0,
 					      -end => 0,
-					      -analysis => $analysis_obj,
+					      -analysis => $self->analysis,
 					      -seqname => $f[0]);
     
     
