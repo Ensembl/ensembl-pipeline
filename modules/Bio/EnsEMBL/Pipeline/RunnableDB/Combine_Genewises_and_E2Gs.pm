@@ -955,16 +955,11 @@ sub combine_genes{
 	$ex->flush_sub_SeqFeature;
       }
     }
-    # test
-    #print STDERR "after expanding exons, newtranscript: $newtranscript\n"; 
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
-    #print STDERR "Compare with:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($translation);
     
+    # check that the result is fine
     unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript,$self->query) ){
       $self->throw("problems with this combined transcript");
     }
-
     unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript) ){
       $self->throw("problems with this combined translation");
     }
@@ -981,15 +976,15 @@ sub combine_genes{
     if ( $modified_peptide ){
       my $strand = $newtranscript->start_Exon->strand;
       
-      print STDERR "before genomewise:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
+      #print STDERR "before genomewise:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
       
       $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
       
-      print STDERR "after genomewise:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+      #print STDERR "after genomewise:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
 
-      unless($self->compare_translations($gw_tran[0], $newtranscript) ){
+      unless($self->compare_translations($gw_tran[0], $newtrans) ){
 	print STDERR "translation has been modified\n";
       }
       
@@ -1002,9 +997,7 @@ sub combine_genes{
     else{
       $newtrans = $newtranscript;
     }
-    
     return $newtrans;
-    
   }
   else{
    $self->warn("No combination could be built\n");
@@ -1758,7 +1751,20 @@ sub compare_translations{
     $seqout->write_seq($genewise_translation);
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($genewise_transcripts[0]);
   }
- 
+  # test
+  #my %seen;
+  #foreach my $exon ( @{$genewise_transcript->get_all_Exons} ){
+  #  foreach my $evi ( @{$exon->get_all_supporting_features} ){
+  #    my $hid = $evi->hseqname;
+  #    if ( exists( $seen{$hid} ) && $seen{$hid} != 0 ){
+#	next;
+#      }
+#      system("pfetch $hid");
+#      $seen{$hid} =1;
+#    }
+#  }
+  
+
   $@ = '';
   
   eval{
@@ -2035,6 +2041,7 @@ sub _print_Gene{
 
 sub _recalculate_translation{
   my ($self,$mytranscript,$strand) = @_;
+
   my $transcript;
 
   my $slice = $self->query;
@@ -2083,7 +2090,7 @@ sub _recalculate_translation{
     $self->warn("Something went wrong running Genomewise. Got ".
 		scalar(@trans).
 		" transcripts. returning without modifying the translation\n");
-    return $transcript;
+    return $mytranscript;
   }
   
   my $newtranscript;
