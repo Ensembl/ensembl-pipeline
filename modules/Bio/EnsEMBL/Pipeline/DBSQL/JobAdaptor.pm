@@ -664,8 +664,9 @@ sub current_status {
           $time    = $rowhash->[0];
         }
         if(!$status){
-          $self->warn("Have found no status for ".$job->dbID." assuming is ".
-                      "sucessful\n");
+          $self->warn("Have found no status for ".$job->dbID." ".
+                      $job->input_id." ".$job->analysis->dbID.
+                      " assuming is sucessful\n");
           $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
