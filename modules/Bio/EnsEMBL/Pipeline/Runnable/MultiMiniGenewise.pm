@@ -294,7 +294,7 @@ sub run {
 									     -genomic => $self->genomic_sequence,
 									     -protein => $pepseq,
 									     -features=> \@forward,
-									     -endbiqas => $self->endbias);
+									     -endbias => $self->endbias);
 	  
 	  $runnable->run;
 	  ##print STDERR "MiniGenewise output " . $runnable->output . "\n";
