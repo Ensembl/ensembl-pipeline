@@ -117,7 +117,13 @@ package main;
 
 # FPC_BlastMiniGenewise parameters
 %similarity_conf = (
+#		    type of (protein) similarity features to be got - sptr, swall, whatever
+#		    'type' => 'sptr',
+		    'type' => '',
 
+#		    score threshold for selecting features for MiniGenewise
+#		    'threshold' => 200,
+		    'threshold' => 200,
 );
 
 # Riken_BlastMiniGenewise parameters
