@@ -3,7 +3,6 @@ use Test;
 use strict;
 
 BEGIN { $| = 1; plan test => 19;
-	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
       }
 
 use EnsTestDB;
@@ -46,9 +45,9 @@ ok($runobj->write_output);
 
 ok(my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id));
 
-ok(my $sfa = $db->get_SimpleFeatureAdaptor);
+ok(my $mfa = $db->get_MarkerFeatureAdaptor);
 
-ok(my @features = @{$sfa->fetch_all_by_RawContig($contig, 'e-PCR')});
+ok(my @features = @{$mfa->fetch_all_by_RawContig_and_priority($contig)});
 
 ok(display(@features));
 
