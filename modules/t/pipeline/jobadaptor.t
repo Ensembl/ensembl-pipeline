@@ -11,7 +11,6 @@ use TestUtils qw(debug test_getter_setter);
 use MultiTestDB;
 
 
-
 my $multi_test_db = new MultiTestDB();
 
 my $db_adaptor = $multi_test_db->get_DBAdaptor('pipeline');
@@ -45,6 +44,7 @@ $job = Bio::EnsEMBL::Pipeline::Job->new(
 
 ok($job);
 
+$multi_test_db->save('pipeline', 'job', 'job_status');
 
 ok($job_adaptor->store($job));
 
@@ -62,6 +62,21 @@ ok($status eq 'SUBMITTED');
 my @lists = @{$job_adaptor->list_current_status};
 
 ok(@lists);
+
+#
+# Test that the update method works
+#
+$job->job_name('new_test');
+$job->submission_id('test');
+
+$job_adaptor->update($job);
+
+$job = $job_adaptor->fetch_by_dbID($job->dbID);
+ok($job->job_name eq 'new_test');
+ok($job->submission_id eq 'test');
+
+
+$multi_test_db->restore('pipeline');
 
 #foreach my $l(@lists){
 #  print STDERR join ', ', @$l;
