@@ -3,7 +3,7 @@
 use strict;
 use Getopt::Long;
 
-use Bio::EnsEMBL::Pipeline::DBSQL::Adaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use vars qw(@ISA);
 
@@ -72,7 +72,7 @@ foreach my $cloneid (@clones) {
 							     $raw_start,
 							     $raw_end,
 							     $raw_ori,
-							     \'$type\')";
+							     \'$type\');";
     $statement =~ s/\n//g;
 
     $statement =~ s/\t+//g;
