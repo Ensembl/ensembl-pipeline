@@ -782,7 +782,7 @@ sub retry_count {
   if($arg) {
     $self->{'_retry_count'} = $arg; 
    }
-  $self->{'_retry_count'};
+  $self->{'_retry_count'} ? $self->{'_retry_count'} : 0;
 }
 
 sub can_retry{
