@@ -18,6 +18,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm - Runs Genomewise and makes a se
 my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq    => $primary_seq,
                                                                     -switch => $switch,
                                                                     -smell  => $smell,
+                                                                    -cds    => $cds_transcript
                                                                   );
 
 where 
@@ -25,6 +26,9 @@ where
 -switch is the cost to switch evidence. It is irrelevant if one only passes 1 transcript to Genomewise.
         With more than one transcript, it is the cost of jumping from one to the other to find the CDS.
 -smell  is the space allowed to move off the splice site of the evidence. The minimum is 0.
+-cds    if this option is included, it will feed a cds evidence to genomewise. This is passed in
+        in the form of a transcript with exons and each exon must have phases. This option
+        has not been tested in genomewise itself yet.
 
 add evidence in the form of a transcript:
    $genomewise->add_Transcript($transcript);
@@ -73,10 +77,12 @@ sub new {
     
     my $self = $class->SUPER::new(@args);
     
-    my( $seq, $switch, $smell ) = $self->_rearrange([qw(SEQ
-						  SWITCH
-						  SMELL)],
-					      @args);
+    my( $seq, $switch, $smell, $cds ) = $self->_rearrange([qw(SEQ
+							      SWITCH
+							      SMELL
+							      CDS
+							     )],
+							  @args);
     
     
     unless ( $seq ){
@@ -98,7 +104,12 @@ sub new {
     else{
       $self->switch(10000);
     }
-    
+    # any cds?
+    if ( $cds ){
+      $self->cds($cds);
+    }
+
+
     $self->{'_transcript_array'} = [];
     $self->{'_output_array'}     = [];
     return $self;
@@ -147,6 +158,8 @@ sub run{
   
   #### collect info from transcripts and put it in evidence file
   my %supp_evidence;
+  
+  # can pass multiple transcripts to genomewise
   foreach my $transcript ( @{$self->get_all_Transcripts}) {
     
     #print STDERR "In Genomewise, before going through genomewise\n";
@@ -177,11 +190,19 @@ sub run{
     }
     print E "//\n";
   }
+
+  if ( $self->cds ){
+    foreach my $exon ( @{$self->cds->get_all_Exons} ){
+      print E $exon->start." ".$exon->end." ".$exon->phase."\n";
+    }
+    print E "//\n";
+  }
   close(E);
   
   my $switch = $self->switch;
   my $smell  = $self->smell;
-  print STDERR "running genomewise with smell: $smell and switch: $switch\n";
+
+  print STDERR "running genomewise with smell: 8 and switch: $switch\n";
 
 #### Steve's version (fixed)
 #  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
@@ -189,8 +210,7 @@ sub run{
   ### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
   open(GW,"/usr/local/ensembl/bin/genomewise -switch $switch -silent -nogff -smell $smell -notrans -nogenes -geneutr $genome_file $evi_file |");
   
-  
-  # parse gff output for start, stop, strand, phase
+    # parse gff output for start, stop, strand, phase
   my $genename = '';
 
  GENE:
@@ -528,6 +548,15 @@ sub switch{
 
 ############################################################
 
+sub cds{
+  my ($self,$cds) = @_;
+  if ( $cds ){
+    $self->{_cds} = $cds;
+  }
+  return $self->{_cds};
+}
+
+############################################################
 
 sub smell{
   my ($self,$smell) = @_;
