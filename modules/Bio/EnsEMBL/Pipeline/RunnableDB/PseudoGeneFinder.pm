@@ -20,8 +20,8 @@ my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder->new(
 			      -input_id   => \@sequences,
 			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
-			      -database   => $EST_GENOMIC,
-			      -options    => $EST_EXONERATE_OPTIONS,
+			      -database   => $GENOMIC,
+			      -options    => $EXONERATE_OPTIONS,
 			     );
     
 
@@ -81,15 +81,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
-use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
-use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 
 use vars qw(@ISA);
 
@@ -175,6 +173,10 @@ sub fetch_input {
   my @chr_names = $self->get_chr_names;
 
   foreach my $chr_name ( @chr_names ){
+    
+    next unless $chr_name eq '6';
+    print STDERR "Running only with chr6\n";
+    
     my $database = $target."/".$chr_name.".fa";
     
     # check that the file exists:
@@ -208,7 +210,7 @@ sub run{
   # align the cDNAs with Exonerate
   $self->throw("Can't run - no funnable objects") unless ($self->runnables);
   foreach my $runnable ($self->runnables){
-      
+    
     # run the funnable
     $runnable->run;  
     
@@ -235,26 +237,31 @@ sub run{
     }
   }
   
- 
   ############################################################
   # test for homology
-  my @processed_pseudogenes = $self->test_homology( @genes );
+  my @processed_pseudogenes = $self->_test_homology( @genes );
  
   ############################################################
-  # check that pseudogenes are not overlapping each other
-  my @final_genes = $self->check_for_overlap( @processed_pseudogenes );
+  # map candidates into one-block structures
+  my @candidate_genes = $self->_convert_to_block( @processed_pseudogenes );
 
+  
+  ############################################################
+  # check that the 'block' has in-frame stops
+  my @candidate_genes2 = $self->_check_inframe_stops( @candidate_genes );
+  
   ############################################################
   # need to convert coordinates
-  my @mapped_genes = $self->convert_coordinates( @final_genes );
+  my @mapped_genes = $self->convert_coordinates( @candidate_genes2 );
   
   ############################################################
   # store the results
-  unless ( @mapped_genes ){
+  if( !@mapped_genes ){
     print STDERR "No genes stored - exiting\n";
-    exit(0);
   }
-  $self->output(@mapped_genes);
+  else{
+    $self->output(@mapped_genes);
+  }
 }
 
 ############################################################
@@ -264,13 +271,15 @@ sub run{
 # If there is an alignment for which all the introns are in fact frameshifts
 # (or there is no introns) and there is a equal or better spliced alignment
 # elsewhere in the genome, we consider that a potential processed pseudogene.
+# We also consider a potential processed pseudogene when a real intron
+# contains a repeat over at least 80% of its length.
 
 sub filter_output{
   my ($self,@results) = @_;
   
   # results are Bio::EnsEMBL::Transcripts with exons and supp_features  
   my @potential_processed_pseudogenes;
-
+  
   ############################################################
   # collect the alignments by cDNA identifier
   my %matches;
@@ -281,26 +290,36 @@ sub filter_output{
   
   ############################################################
   # sort the alignments by coverage - number of exons - percentage identity
-  my %matches_sorted_by_coverage;
+  my %matches_sorted;
   my %selected_matches;
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
     
-    @{$matches_sorted_by_coverage{$rna_id}} = 
-      sort { my $result = ( $self->_coverage($b) <=> $self->_coverage($a) );
+    my @selected;
+  TRAN:
+    foreach my $tran ( @{$matches{$rna_id}} ){ 
+      my $score    = $self->_coverage($tran);
+      my $perc_id  = $self->_percent_id($tran);
+      
+      ############################################################
+      # we allow the rna to align with perc_id below threshold if
+      # if the coverage is much better than just above threshold
+      next TRAN unless ( ( $score >= $MIN_COVERAGE && $perc_id >= $MIN_PERCENT_ID )
+			    ||
+			    ( $score >= (1 + 5/100)*$MIN_COVERAGE && $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID )
+			  );
+      push(@selected,$tran);
+    }
+    
+    @{$matches_sorted{$rna_id}} = 
+      sort { my $result = ( $self->_radial_score($b) <=> $self->_radial_score($a) );
 	     if ( $result){
 	       return $result;
 	     }
 	     else{
-	       my $result2 = ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
-	       if ( $result2 ){
-		 return $result2;
-	       }
-	       else{
-		 return ( $self->_percent_id($b) <=> $self->_percent_id($a) );
-	       }
+	       return ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
 	     }
-	   }    @{$matches{$rna_id}} ;
+	   } @selected;
     
     my $count = 0;
     my $is_spliced = 0;
@@ -312,10 +331,10 @@ sub filter_output{
     print STDERR "Matches for $rna_id:\n";
     
   TRANSCRIPT:
-    foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
+    foreach my $transcript ( @{$matches_sorted{$rna_id}} ){
       $count++;
-      unless ($max_score){
-	$max_score = $self->_coverage($transcript);
+      unless ( $max_score ){
+	$max_score = $self->_radial_score($transcript);
       }
       unless ( $perc_id_of_best ){
 	$perc_id_of_best = $self->_percent_id($transcript);
@@ -355,87 +374,376 @@ sub filter_output{
       }
       
       my $accept;
+      
       ############################################################
-      # if we use the option best in genome:
-      if ( $BEST_IN_GENOME ){
-	if ( ( $score  == $max_score && 
-	       $score >= $MIN_COVERAGE && 
-	       $perc_id >= $MIN_PERCENT_ID
-	     )
-	     ||
-	     ( $score == $max_score &&
-	       $score >= (1 + 5/100)*$MIN_COVERAGE &&
-	       $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
-	     )
+      # we keep anything which is 
+      # within the 2% of the best score
+      # with score >= $MIN_COVERAGE and percent_id >= $MIN_PERCENT_ID
+      if ( $score >= (0.98*$max_score) ){
+	
+	# we want to keep the unspliced cases (only frameshifts) where the
+	# best match is spliced 
+	# and the spliced cases with repeats in the introns
+	if ( $count > 1 
+	     && $is_spliced 
+	     && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
 	   ){
-	  ############################################################
-	  # if we have an unspliced alignment which which has similarity with a
-	  # spliced alignment we have a potential processed pseudogene:	  
-	  if ( $count > 1 
-	       && $is_spliced 
-	       && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
-	     ){
-	    $accept = 'YES';
-	    push( @potential_processed_pseudogenes, $transcript);
-	  }
-	  else{
-	    $accept = 'NO';
-	  }
+	  $accept = 'YES';
+	  push( @potential_processed_pseudogenes, $transcript);
 	}
 	############################################################
-	# don't accept if below threshold
+	# if it has real introns, but the intron falls in a repeat
+	# it is also a candidate
+	elsif( $self->_has_repeat_in_intron( $transcript ) ){
+	  $accept = 'YES';
+	  push( @potential_processed_pseudogenes, $transcript);
+	}
 	else{
 	  $accept = 'NO';
 	}
-	print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
-	
-	print STDERR "--------------------\n";
-	
       }
-      ############################################################
-      # we might want to keep more than just the best one
       else{
-	
-	############################################################
-	# we keep anything which is 
-	# within the 2% of the best score
-	# with score >= $MIN_COVERAGE and percent_id >= $MIN_PERCENT_ID
-	if ( ( $score >= (0.98*$max_score) && 
-	       $score >= $MIN_COVERAGE && 
-	       $perc_id >= $MIN_PERCENT_ID )
-	     ||
-	     ( $score >= (0.98*$max_score) &&
-	       $score >= (1 + 5/100)*$MIN_COVERAGE &&
-	       $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
-	     )
-	   ){
-	  
-	  ############################################################
-	  # non-best matches are kept only if they are not unspliced with the
-	  # best match being spliced - otherwise they could be processed pseudogenes
-	  if ( $count > 1 
-	       && $is_spliced 
-	       && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
-	     ){
-	    $accept = 'YES';
-	    push( @potential_processed_pseudogenes, $transcript);
-	  }
-	  else{
-	    $accept = 'NO';
-	  }
-	}
-	else{
-	  $accept = 'NO';
-	}
-	print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
-	
-	print STDERR "--------------------\n";
+	$accept = 'NO';
       }
+      print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
+      print STDERR "--------------------\n";
     }
   }
   
   return @potential_processed_pseudogenes;
 }
+
+############################################################
+# this method check whether the found gene
+# has any homology in a region in another species
+# homologous to the regions it is contained within
+
+sub _test_homology{
+  my ($self,@genes) = @_;
+  my @selected;
+  
+  my $focus_species = $FOCUS_SPECIES;
+  
+  # compara database
+  my $compara_db = Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
+								-user      => 'ensro',
+								-dbname    => $COMPARA_DBNAME,
+								-host      => $COMPARA_DBHOST,
+							       );
+
+  # database where the focus species dna is
+  my $focus_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						   '-host'   => $REF_DBHOST,
+						   '-user'   => 'ensro',
+						   '-dbname' => $REF_DBNAME,
+						  );
+  
+  
+  my ($target_db, $target_db2);
+  my ($target_species, $target_species2);
+
+  if ( @$COMPARATIVE_DBS ){
+    if ( $COMPARATIVE_DBS->[0] ){
+      $target_species = $COMPARATIVE_DBS->[0]->{SPECIES};
+      
+      $target_db = $compara_db->get_db_adaptor($target_species,$COMPARATIVE_DBS->[0]->{PATH});
+      
+      unless ( $target_db ){
+	$target_db =  
+	  Bio::EnsEMBL::DBSQL::DBAdaptor
+	    ->new(
+		  -user      => 'ensro',
+		  -dbname    => $COMPARATIVE_DBS->[0]->{DBNAME},
+		  -host      => $COMPARATIVE_DBS->[0]->{DBHOST},
+		 );
+	$target_db->assembly_type( $COMPARATIVE_DBS->[0]->{PATH} );
+	$compara_db->add_db_adaptor( $target_db );
+      }
+    }
+    if ( $COMPARATIVE_DBS->[1] ){
+      $target_species2 = $COMPARATIVE_DBS->[1]->{SPECIES};
+      $target_db2 = $compara_db->get_db_adaptor($target_species2,$COMPARATIVE_DBS->[1]->{PATH});
+      
+      unless( $target_db2){
+	$target_db2 =  
+	  Bio::EnsEMBL::DBSQL::DBAdaptor
+	    ->new(
+		  -user      => 'ensro',
+		  -dbname    => $COMPARATIVE_DBS->[1]->{DBNAME},
+		  -host      => $COMPARATIVE_DBS->[1]->{DBHOST},
+		 );
+	$target_db2->assembly_type( $COMPARATIVE_DBS->[1]->{PATH} );
+	$compara_db->add_db_adaptor( $target_db2 );
+      }
+    }
+  }
+ 
+  my %gene_ref;
+  my $threshold = 40;
+  foreach my $gene (@genes){
+    
+    my ($homology1,$homology2) = (0,0);
+    my @transcripts = @{$gene->get_all_Transcripts};
+    my $transcript = $transcripts[0];
+
+    $gene_ref{$transcript} = $self->_evidence_id($transcript);
+    
+    ############################################################
+    # has it got homology in the first species?
+    if ( $target_species ){
+      print STDERR "\n--- testing for homology in $target_species ---\n";
+      $homology1 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+	->test_for_orthology_with_tblastx($transcript, $focus_db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, \%gene_ref );
+    }
+    
+    ############################################################
+    # has it got homology in the second species?
+    if ( $target_species2 ){
+      print STDERR "\n--- testing for homology in $target_species2 ---\n";
+      $homology2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+	->test_for_orthology_with_tblastx($transcript, $focus_db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, \%gene_ref );
+    }
+    unless ( $homology1 || $homology2 ){
+      push (@selected, $gene);
+    }
+  }
+  return @selected;
+}
+
+############################################################
+# method to check whether real introns in a transcript
+# ( if intron <=9 it is considered a frameshift )
+# overlap with a repeat at least over 80% of its length.
+# That's another tell-tale sign of a processed pseudogene
+
+sub _has_repeat_in_intron{
+  my ($self, $tran) = @_;
+  
+  # instantiate a db with repeats
+  my $repeat_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						     -host   => $REPEAT_DBHOST,
+						     -dbname => $REPEAT_DBNAME,
+						     -user   => 'ensro',  
+						    );
+  
+  ############################################################
+  # pseudogene is a transcript
+  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
+  my $start  = $exons[0]->start;
+  my $end    = $exons[$#exons]->end;
+  my $strand = $exons[0]->strand;
+  my $length = $end - $start + 1;
+
+  ############################################################
+  # need to get a slice where pseudogene sits:
+  my $chr_name  = $exons[0]->contig->chr_name;
+  my $chr_start = $exons[0]->contig->chr_start;
+  my $chr_end   = $exons[0]->contig->chr_end;
+  
+  my $slice_start = $chr_start + $start - 1 - 1000;
+  my $slice_end   = $chr_start + $end   - 1 + 1000;
+
+  ############################################################
+  # get slice from the same db where our pseudogene is
+  my $slice = $repeat_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
+  my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
+  print STDERR "found ".scalar(@features)." repeats\n";
+  unless ( @features ){
+    return 0;
+  }
+
+  my @clusters = @{$self->_cluster_Features(@features)};
+
+  my $introns_with_repeats = 0;
+ INTRON:
+  for (my $i=0; $i<$#exons; $i++ ){
+    my $intron_start  = $exons[$i]->end + 1;
+    my $intron_end    = $exons[$i+1]->start - 1;
+    my $intron_strand = $exons[$i]->strand;
+    my $intron_length = $intron_end - $intron_start + 1;
+
+    #print STDERR "intron: $intron_start-$intron_end $intron_strand\n";
+    next INTRON unless ( $intron_length > 9 );
+
+    ############################################################
+    # should we skip really long introns?
+
+    my $overlap_length = 0;
+  FEAT:
+    foreach my $cluster ( @clusters ){
+      my $repeat_start  = $cluster->start + $slice_start - 1;
+      my $repeat_end    = $cluster->end   + $slice_start - 1;
+      my $repeat_strand = $cluster->strand;
+      
+      #print STDERR "repeat: $repeat_start-$repeat_end $repeat_strand\n";
+      next FEAT unless ( $repeat_strand == $intron_strand );
+      next FEAT if ( $repeat_start > $intron_end || $repeat_end < $intron_start );
+      
+      my $overlap_end   = $self->_min( $repeat_end  , $intron_end );
+      my $overlap_start = $self->_max( $repeat_start, $intron_start );
+      
+      $overlap_length += $overlap_end - $overlap_start + 1;
+    }
+    
+    my $overlap_proportion = 100.00*$overlap_length/$intron_length;
+    print STDERR "overlap proportion $overlap_proportion\n";
+
+    if ( $overlap_proportion >= 80 ){
+      $introns_with_repeats++;
+    }
+  }
+  return $introns_with_repeats;
+} 
+
+############################################################
+
+sub _cluster_Features{
+  my ($self, @features) = @_;
+
+  # no point if there are no exons!
+  return unless ( scalar( @features) > 0 );   
+
+  # main cluster feature - holds all clusters
+  my $cluster_list = [];
+  
+  # sort exons by start coordinate
+  @features = sort { $a->start <=> $b->start } @features;
+
+  # Create the first exon_cluster
+  my $cluster = new Bio::EnsEMBL::SeqFeature;
+  
+  # Start off the cluster with the first exon
+  $cluster->add_sub_SeqFeature($features[0],'EXPAND');
+
+  $cluster->strand($features[0]->strand);    
+  push( @$cluster_list, $cluster );
+  
+  # Loop over the rest of the exons
+  my $count = 0;
+  
+ EXON:
+  foreach my $feature (@features) {
+    if ($count > 0) {
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( $cluster->overlaps($feature) && ( $feature->strand == $cluster->strand) ) { 
+	$cluster->add_sub_SeqFeature($feature,'EXPAND');
+      }  
+      else {
+	# Start a new cluster
+	$cluster = new Bio::EnsEMBL::SeqFeature;
+	$cluster->add_sub_SeqFeature($feature,'EXPAND');
+	$cluster->strand($feature->strand);
+		
+	# and add it to the main_cluster feature
+	push( @$cluster_list, $cluster );
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
+############################################################
+
+sub _max{
+  my ($self,$max,$other) = @_;
+  if ($other > $max){
+    $max = $other;
+  }
+  return $max;
+}
+
+############################################################
+
+sub _min{
+  my ($self,$min,$other) = @_;
+  if ($other < $min){
+    $min = $other;
+  }
+  return $min;
+}
+
+############################################################
+# method to convert a transcript with exons into
+# a 1-exon transcript. Processed pseudogenes are described
+# as just 1-block
+
+sub _convert_to_block{
+  my ( $self, @genes ) = @_;
+  
+  my @new_genes;
+  foreach my $gene ( @genes ){
+    my $new_gene = Bio::EnsEMBL::Gene->new();
+    $new_gene->analysis($gene->analysis);
+    $new_gene->type($gene->analysis->logic_name);
+    foreach my $tran ( @{$gene->get_all_Transcripts} ){
+      my $new_transcript  = new Bio::EnsEMBL::Transcript;
+      
+      my $newexon = Bio::EnsEMBL::Exon->new();
+      my @exons = sort{ $a->start <=> $b->start } @{$tran->get_all_Exons};
+      my $strand = $exons[0]->strand;
+      
+      ############################################################
+      # make all exons into one
+      $newexon->start    ($exons[0]->start);
+      $newexon->end      ($exons[-1]->end);
+      $newexon->phase    (0);
+      $newexon->end_phase(0);
+      $newexon->strand   ($strand);
+      $newexon->contig   ($exons[0]->contig);
+      $newexon->seqname  ($exons[0]->seqname);
+  
+      ############################################################
+      # transfer supporting evidence
+      my %evidence_hash;
+      foreach my $exon ( @exons ){
+	foreach my $sf ( @{$exon->get_all_supporting_features} ){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  $newexon->add_supporting_features( $sf );
+	}
+      }
+      
+      $new_transcript->add_Exon($newexon);
+      $new_gene->add_Transcript($new_transcript);
+    }
+    push(@new_genes, $new_gene);
+  }
+  return @new_genes;
+}
+
+############################################################
+# method to check the translation of the transcript-block
+# for inframe stops which fall midway in the transcript-block
+
+sub _check_inframe_stops{
+  my ($self,@genes) = @_;
+
+  my @selected;
+  foreach my $gene ( @genes ){
+    my @trans      = @{$gene->get_all_Transcripts};
+    my $tran       = $trans[0];
+    my $mrna       = $tran->seq->seq;
+    my $display_id = $self->_evidence_id($tran);
+    
+    my $peptide    = Bio::Seq->new( -seq      => $mrna,
+				    -moltype  => "dna",
+				    -alphabet => 'dna',
+				    -id       => $display_id );
+    
+    my $pep0 = $peptide->translate(undef,undef,0);
+    my $pep1 = $peptide->translate(undef,undef,1);
+    my $pep2 = $peptide->translate(undef,undef,2);
+  }
+  
+  
+  return @genes;
+
+}
+
 
 ############################################################
 
@@ -449,19 +757,40 @@ sub _evidence_id{
 ############################################################
 
 sub _coverage{
-    my ($self,$tran) = @_;
-    my @exons = @{$tran->get_all_Exons};
-    my @evi = @{$exons[0]->get_all_supporting_features};
-    return $evi[0]->score;
+  my ($self,$tran) = @_;
+  if ( $self->{_coverage}{$tran} ){
+    return  $self->{_coverage}{$tran};
+  }
+  my @exons = @{$tran->get_all_Exons};
+  my @evi = @{$exons[0]->get_all_supporting_features};
+  $self->{_coverage}{$tran} = $evi[0]->score;
+  return  $self->{_coverage}{$tran};
 }
 
 ############################################################
 
 sub _percent_id{
-    my ($self,$tran) = @_;
-    my @exons = @{$tran->get_all_Exons};
-    my @evi = @{$exons[0]->get_all_supporting_features};
-    return $evi[0]->percent_id;
+  my ($self,$tran) = @_;
+  if ( $self->{_percent_id}{$tran} ){
+    return  $self->{_percent_id}{$tran};
+  }
+  my @exons = @{$tran->get_all_Exons};
+  my @evi = @{$exons[0]->get_all_supporting_features};
+  $self->{_percent_id}{$tran} = $evi[0]->percent_id;
+  return  $self->{_percent_id}{$tran};
+}
+
+############################################################
+
+sub _radial_score{
+  my ($self,$tran) = @_;
+  if ( $self->{_radial_score}{$tran} ){
+    return  $self->{_radial_score}{$tran};
+  }
+  my $p  = $self->_percent_id($tran);
+  my $c = $self->_coverage($tran);
+  $self->{_radial_score}{$tran} = sqrt( $p**2 + $c**2 );         
+  return  $self->{_radial_score}{$tran};
 }
 
 ############################################################
@@ -473,41 +802,36 @@ sub write_output{
   # here is the only place where we need to create a db adaptor
   # for the database where we want to write the genes
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					      -host             => $EST_DBHOST,
-					      -user             => $EST_DBUSER,
-					      -dbname           => $EST_DBNAME,
-					      -pass             => $EST_DBPASS,
+					      -host             => $PSEUDO_DBHOST,
+					      -user             => $PSEUDO_DBUSER,
+					      -dbname           => $PSEUDO_DBNAME,
+					      -pass             => $PSEUDO_DBPASS,
 					      );
 
   # Get our gene adaptor, depending on the type of gene tables
   # that we are working with.
   my $gene_adaptor;
 
-  if ($EST_USE_DENORM_GENES) {
-    $gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($db);
-  } else {
-    $gene_adaptor = $db->get_GeneAdaptor;  
-  } 
 
-
-
+  $gene_adaptor = $db->get_GeneAdaptor;  
+  
   unless (@output){
       @output = $self->output;
   }
   foreach my $gene (@output){
-      print STDERR "gene is a $gene\n";
-      print STDERR "about to store gene ".$gene->type." $gene\n";
-      foreach my $tran (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-      }
-      
-      eval{
-	$gene_adaptor->store($gene);
-      };
-
-      if ($@){
-	  $self->warn("Unable to store gene!!\n$@");
-      }
+    print STDERR "gene is a $gene\n";
+    print STDERR "about to store gene ".$gene->type." $gene\n";
+    foreach my $tran (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+    }
+    
+    eval{
+      $gene_adaptor->store($gene);
+    };
+    
+    if ($@){
+      $self->warn("Unable to store gene!!\n$@");
+    }
   }
 }
 
@@ -590,7 +914,7 @@ sub convert_coordinates{
       my $chr_name;
       my $chr_start;
       my $chr_end;
-      if ($slice_id =~/$EST_INPUTID_REGEX/){
+      if ($slice_id =~/$INPUTID_REGEX/){
 	$chr_name  = $1;
 	$chr_start = $2;
 	$chr_end   = $3;
@@ -831,7 +1155,7 @@ sub check_strand{
 sub get_chr_subseq{
   my ( $self, $chr_name, $start, $end, $strand ) = @_;
 
-  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+  my $chr_file = $GENOMIC."/".$chr_name.".fa";
   my $command = "chr_subseq $chr_file $start $end |";
  
   #print STDERR "command: $command\n";
@@ -894,7 +1218,7 @@ sub _get_SubseqFetcher {
   } else {
     
     $self->{'_current_chr_name'} = $slice->chr_name;
-    my $chr_filename = $EST_GENOMIC . "/" . $slice->chr_name . "\.fa";
+    my $chr_filename = $GENOMIC . "/" . $slice->chr_name . "\.fa";
 
     $self->{'_chr_subseqfetcher'} = Bio::EnsEMBL::Pipeline::SubseqFetcher->new($chr_filename);
   }

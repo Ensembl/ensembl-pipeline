@@ -57,6 +57,8 @@ use vars qw( %PseudoGenes );
         # database with the syntenic regions. orthologs, etc
 	COMPARA_DBNAME  => 'ensembl_compara_16_1',
 	COMPARA_DBHOST  => 'ecs2f',
+	REPEAT_DBHOST => 'ecs2f', 
+        REPEAT_DBNAME => 'fake_repeat_db',
 				
 	
 	# Species we compare to:
