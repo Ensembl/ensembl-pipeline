@@ -21,7 +21,7 @@ and reads as input an input_id in the style of other Runnables, i.e. -input_id c
 use strict;  
 use diagnostics;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::GeneComparison::GeneComparison;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Getopt::Long;
 
 ## load all the parameters
@@ -52,8 +52,11 @@ my $pepfile;
 	     'input_id:s'  => \$input_id,
 
 	     );
-	     
-die "No input id entered" unless defined ($input_id);
+	
+unless( $input_id){     
+  print STDERR "Usage: run_GeneComparison.pl -input_id < chrname.chrstart-chrend >\n";
+  exit(0);
+}
     
 # get genomic region 
 my $chr      = $input_id;
@@ -66,19 +69,18 @@ unless ( $chr && $chrstart && $chrend ){
 }
 
 # connect to the databases 
-print STDERR "Connecting to database $dbname1 : $host1 : $user1 \n";
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
 					    -dbname=> $dbname1);
+print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 
 
-print STDERR "Connecting to database $dbname2 : $host2 : $user2 \n";
 my $db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host2,
 					    -user  => $user2,
 					    -dbname=> $dbname2);
+print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
 
 
-print STDERR "Connected to database $dbname2\n";
 
 # use different golden paths
 $db1->static_golden_path_type($path1); 
@@ -112,7 +114,7 @@ foreach my $type ( @{ $type2 } ){
 }
 
 # get a GeneComparison object 
-my $gene_comparison = Bio::EnsEMBL::Utils::GeneComparison->new(\@genes1, \@genes2);
+my $gene_comparison = Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(\@genes1, \@genes2);
 # as convention, we put first the annotated (or benchmark) genes and second the predicted genes
 # and the comparison methods refer to the second list with respect to the first one
 
