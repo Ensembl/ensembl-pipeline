@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Combine_Genewises_and_E2Gs
 =head1 SYNOPSIS
 
 my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::Combine_Genewises_and_E2Gs(
-                                                                      '-db_obj'      => $dbobj,
+                                                                      '-db_obj'      => $db,
                                                                       '-golden_path' => $gp,
                                                                       '-input_id'    => $input_id
                                                                     );
@@ -71,8 +71,8 @@ sub new {
   my $self = $class->SUPER::new(@args);
   
   # IMPORTANT:
-  # SUPER creates dbobj, which is created on run_GeneBuild_runnable
-  # this dbobj is a reference to GB_DBHOST@GB_DBNAME containing
+  # SUPER creates db, which is created on run_GeneBuild_runnable
+  # this db is a reference to GB_DBHOST@GB_DBNAME containing
   # the features and the dna, so here it is used as refdb only
 
   # db with the genewises
@@ -84,7 +84,7 @@ sub new {
 						  );
   
   
-  $genewise_db->dnadb($self->dbobj);
+  $genewise_db->dnadb($self->db);
   $self->genewise_db($genewise_db);
 
   # db with the cdnas
@@ -94,7 +94,7 @@ sub new {
 						    '-dbname' => $GB_cDNA_DBNAME,
 						    ); 
   
-  $cdna_db->dnadb($self->dbobj);
+  $cdna_db->dnadb($self->db);
   $self->cdna_db($cdna_db);
 
 
@@ -106,14 +106,14 @@ sub new {
 						    '-pass'   => $GB_COMB_DBPASS,
                                                     ); 
   
-  $comb_db->dnadb($self->dbobj);
+  $comb_db->dnadb($self->db);
   $self->output_db($comb_db);
 
   
 
 
 
-  #$self->dbobj($genedb);
+  #$self->db($genedb);
  
   return $self;
 }
@@ -189,13 +189,13 @@ sub fetch_input{
   print STDERR "Range         : $start - $end\n";  
   
   # genewises
-  my $sgpa = $self->genewise_db->get_StaticGoldenPathAdaptor();
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
-  $self->vc($vc);
+  my $sliceA = $self->genewise_db->get_SliceAdaptor();
+  my $vc = $sliceA->fetch_Slice_by_chr_start_end($chrname,$start,$end);
+  $self->vcontig($vc);
   
   # cdna
-  $sgpa = $self->cdna_db->get_StaticGoldenPathAdaptor();
-  my $cdna_vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
+  $sliceA = $self->cdna_db->get_SliceAdaptor();
+  my $cdna_vc = $sliceA->fetch_Slice_by_chr_start_end($chrname,$start,$end);
   $self->cdna_vc($cdna_vc);
   
 }
@@ -217,8 +217,8 @@ sub run {
   my ($self,@args) = @_;
   
   # get genewise genes
-  my @similarity_genes = $self->vc->get_Genes_by_Type($GB_SIMILARITY_GENETYPE,'evidence');
-  my @targetted_genes  = $self->vc->get_Genes_by_Type($GB_TARGETTED_GW_GENETYPE,'evidence');
+  my @similarity_genes = $self->vcontig->get_Genes_by_Type($GB_SIMILARITY_GENETYPE,'evidence');
+  my @targetted_genes  = $self->vcontig->get_Genes_by_Type($GB_TARGETTED_GW_GENETYPE,'evidence');
   print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
   print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
   $self->gw_genes( @similarity_genes, @targetted_genes );
@@ -233,7 +233,7 @@ sub run {
   foreach my $e2g (@e2g) {
   
   cDNA_TRANSCRIPT:
-    foreach my $tran ($e2g->each_Transcript) {
+    foreach my $tran ($e2g->get_all_Transcripts) {
       my $found = 0;
       my @exons = $tran->get_all_Exons;
       @exons = sort {$a->start <=> $b->start} @exons;
@@ -270,7 +270,7 @@ sub run {
   # check:
   #print STDERR "after merging:\n";
   #foreach my $gw (@merged_gw_genes){
-  #  my @trans = $gw->each_Transcript;
+  #  my @trans = $gw->get_all_Transcripts;
   #  print STDERR "genewise ".$gw->dbID." with ".scalar( $trans[0]->get_all_Exons )." exons\n";
   #}
 
@@ -292,7 +292,7 @@ sub run {
  GENEWISE:
   foreach my $gw (@merged_gw_genes){
       # should be only 1 transcript
-      my @gw_tran  = $gw->each_Transcript;
+      my @gw_tran  = $gw->get_all_Transcripts;
       my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
       my $strand   = $gw_exons[0]->strand;
       
@@ -378,7 +378,7 @@ sub run {
 #      }
 #    }
 #    # there is one transcript per gene
-#    my @e2g_tran = $chosen_e2g->each_Transcript; 
+#    my @e2g_tran = $chosen_e2g->get_all_Transcripts; 
 #    if ( @gw_tran == 1 &&  @e2g_tran == 1){
 #      print STDERR "combining : " . $gw_tran[0]->dbID . " with " . $e2g_tran[0]->dbID . "\n";
 #    }
@@ -387,7 +387,7 @@ sub run {
       #    }
       
       print STDERR "combining gw gene : " . $gw->dbID.":\n";
-      foreach my $tran ( $gw->each_Transcript){
+      foreach my $tran ( $gw->get_all_Transcripts){
 	  $tran->sort;
 	  foreach my $exon ($tran->get_all_Exons){
 	      print STDERR $exon->start."-".$exon->end." ";
@@ -395,7 +395,7 @@ sub run {
 	  print STDERR "\n";
       }
       print STDERR "with e2g gene " . $e2g_match->dbID . ":\n";
-      foreach my $tran ( $e2g_match->each_Transcript){
+      foreach my $tran ( $e2g_match->get_all_Transcripts){
 	  $tran->sort;
 	  foreach my $exon ($tran->get_all_Exons){
 	      print STDERR $exon->start."-".$exon->end." ";
@@ -419,7 +419,7 @@ sub run {
 
 sub _transcript_exonic_length_in_gene{
     my ($self,$gene) = @_;
-    my @trans = $gene->each_Transcript;
+    my @trans = $gene->get_all_Transcripts;
     my $tran = $trans[0];
     my $exonic_length = 0;
     foreach my $exon ($tran->get_all_Exons){
@@ -433,7 +433,7 @@ sub _transcript_exonic_length_in_gene{
 
 sub _transcript_length_in_gene{
     my ($self,$gene) = @_;
-    my @trans = $gene->each_Transcript;
+    my @trans = $gene->get_all_Transcripts;
     my @exons= $trans[0]->get_all_Exons;
     my $genomic_extent = 0;
     if ( $exons[0]->strand == -1 ){
@@ -451,8 +451,8 @@ sub _transcript_length_in_gene{
 
 sub _check_overlap{
     my ($self, $gw_gene, $e2g_gene) = @_;
-    my @gw_trans  = $gw_gene->each_Transcript;
-    my @e2g_trans = $e2g_gene->each_Transcript;
+    my @gw_trans  = $gw_gene->get_all_Transcripts;
+    my @e2g_trans = $e2g_gene->get_all_Transcripts;
     
     my $exon_overlap = 0;
     my $extent_overlap = 0;
@@ -692,7 +692,7 @@ sub combine_genes{
 
   print STDERR "Produced genes:\n";
   foreach my $gene (@genes){
-      foreach my $tran ( $gene->each_Transcript ){
+      foreach my $tran ( $gene->get_all_Transcripts ){
 	  foreach my $exon ( $tran->get_all_Exons ){
 	      print STDERR "exon: ".$exon->start."-".$exon->end." phase: ".$exon->phase." end_phase ".$exon->end_phase."\n";
 	      #foreach my $sf ($exon->each_Supporting_Feature){
@@ -724,7 +724,7 @@ sub match_gw_to_e2g{
   
   print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
   my @matching_e2g;
-  my @gw_tran = $gw->each_Transcript;
+  my @gw_tran = $gw->get_all_Transcripts;
   
   my @gw_exons = $gw_tran[0]->get_all_Exons;
   my $strand   = $gw_exons[0]->strand;
@@ -756,7 +756,7 @@ sub match_gw_to_e2g{
   
  E2G:
   foreach my $e2g($self->e2g_genes){
-    my @egtran  = $e2g->each_Transcript;
+    my @egtran  = $e2g->get_all_Transcripts;
     my @eg_exons = $egtran[0]->get_all_Exons;
 
     $strand   = $eg_exons[0]->strand; 
@@ -856,7 +856,7 @@ sub match_gw_to_e2g{
 	    push(@matching_e2g, $e2g);
 	    
 	    # test
-	    foreach my $egtran ( $e2g->each_Transcript ){
+	    foreach my $egtran ( $e2g->get_all_Transcripts ){
 	      print STDERR "Found cDNA match trans_dbID:".$egtran->dbID."\n";
 	      #foreach my $exon ($egtran->get_all_Exons){
 	      #  print STDERR $exon->start."-".$exon->end."  ";
@@ -900,7 +900,7 @@ sub _merge_gw_genes {
     my $ecount = 0;
     
     # order is crucial
-    my @trans = $gwg->each_Transcript;
+    my @trans = $gwg->get_all_Transcripts;
     if(scalar(@trans) != 1) { $self->throw("expected one transcript for $gwg\n"); }
     
     ### we follow here 5' -> 3' orientation ###
@@ -980,7 +980,7 @@ sub _merge_gw_genes {
 	$cloned_exon->end_phase($exon->end_phase);
 	$cloned_exon->contig_id($exon->contig_id);
 	
-	$cloned_exon->attach_seq($self->vc->primary_seq);
+	$cloned_exon->attach_seq($self->vcontig->primary_seq);
 	$cloned_exon->add_sub_SeqFeature($exon,'');
 	
 	#print STDERR "in merged gw_gene, adding evidence in cloned exon:\n";
@@ -1040,10 +1040,10 @@ sub _make_newtranscript {
   my @combined_transcripts  = ();
   
   # should be only 1 transcript
-  my @gw_tran  = $gw->each_Transcript;
+  my @gw_tran  = $gw->get_all_Transcripts;
   #  $gw_tran[0]->sort;
   my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
-  my @egtran = $e2g->each_Transcript;
+  my @egtran = $e2g->get_all_Transcripts;
   #  $egtran[0]->sort;
   my @e2g_exons  = $egtran[0]->get_all_Exons; # ordered array of exons
   
@@ -1168,8 +1168,8 @@ sub _make_newtranscript {
 
     # dclone messes up database handles
     foreach my $ex($newtranscript->get_all_Exons){
-      $ex->attach_seq($self->vc);
-      $ex->contig_id($self->vc->id);
+      $ex->attach_seq($self->vcontig);
+      $ex->contig_id($self->vcontig->id);
       # add new analysis object to the supporting features
       foreach my $sf($ex->each_Supporting_Feature){
 	$sf->analysis($analysis_obj);
@@ -1197,7 +1197,7 @@ sub _make_newtranscript {
     foreach my $gwg($self->gw_genes) {
       if($gw->dbID == $gwg->dbID){
 	print STDERR "comparing transcripts\n";
-	my @tran = $gwg->each_Transcript;
+	my @tran = $gwg->get_all_Transcripts;
 	$foundtrans = $self->compare_transcripts($gwg, $newtranscript);
 	
 	if ($foundtrans == 1){
@@ -1221,7 +1221,7 @@ sub _make_newtranscript {
 
 sub compare_transcripts{
   my ($self, $genewise_gene, $combined_transcript) = @_;
-  my @genewise_transcripts = $genewise_gene->each_Transcript;
+  my @genewise_transcripts = $genewise_gene->get_all_Transcripts;
   
   my $seqout = new Bio::SeqIO->new(-fh => \*STDERR);
   
@@ -1406,11 +1406,11 @@ sub transcript_from_multi_exon_genewise {
   # save out current translation->end - we'll need it if we have to expand 3prime exon later
   my $orig_tend = $translation->end;
 
-  my @gwtran  = $gw_gene->each_Transcript;
+  my @gwtran  = $gw_gene->get_all_Transcripts;
   $gwtran[0]->sort;
   my @gwexons = $gwtran[0]->get_all_Exons;
   
-  my @egtran  = $eg_gene->each_Transcript;
+  my @egtran  = $eg_gene->get_all_Transcripts;
   $egtran[0]->sort;
   my @egexons = $egtran[0]->get_all_Exons;
 
@@ -1805,7 +1805,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase(-1);
 	$newexon->end_phase(-1);
 	$newexon->contig_id($oldexon->contig_id);
-	$newexon->attach_seq($self->vc);
+	$newexon->attach_seq($self->vcontig);
 	my %evidence_hash;
 	#print STDERR "adding evidence at 5':\n";
 	foreach my $sf($oldexon->each_Supporting_Feature){
@@ -1904,7 +1904,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase(-1);
 	$newexon->end_phase(-1);
 	$newexon->contig_id($oldexon->contig_id);
-	$newexon->attach_seq($self->vc);
+	$newexon->attach_seq($self->vcontig);
 	#print STDERR "adding evidence in 3':\n";
 	my %evidence_hash;
 	foreach my $sf($oldexon->each_Supporting_Feature){
@@ -1939,13 +1939,13 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 sub remap_genes {
   my ($self) = @_;
   my @newf;  
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   
   my @genes = $self->combined_genes;
 
 GENE:  
   foreach my $gene (@genes) {
-      my @t = $gene->each_Transcript;
+      my @t = $gene->get_all_Transcripts;
       my $tran = $t[0];
       
       # check that it translates - not the est2genome genes
@@ -1963,7 +1963,7 @@ GENE:
 	  $newgene->analysis($gene->analysis);
 	  
 	  # sort out supporting feature coordinates
-	  foreach my $tran ($newgene->each_Transcript) {
+	  foreach my $tran ($newgene->get_all_Transcripts) {
 	      foreach my $exon($tran->get_all_Exons) {
 		  foreach my $sf($exon->each_Supporting_Feature) {
 		      # this should be sorted out by the remapping to rawcontig ... strand is fine
@@ -1991,7 +1991,7 @@ GENE:
 	      }
 	    }
 	      
-	      foreach my $tran ($newgene->each_Transcript) {
+	      foreach my $tran ($newgene->get_all_Transcripts) {
 		  foreach my $exon ($tran->get_all_Exons) {
 		      
 		      # oh dear oh dear oh dear
@@ -2204,7 +2204,7 @@ sub validate_gene{
   my ($self, $gene) = @_;
 
   # should be only a single transcript
-  my @transcripts = $gene->each_Transcript;
+  my @transcripts = $gene->get_all_Transcripts;
   if(scalar(@transcripts) != 1) {
     my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
     $self->warn($msg);
