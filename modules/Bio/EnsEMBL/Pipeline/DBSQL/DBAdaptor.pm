@@ -51,7 +51,7 @@ use DBI;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
