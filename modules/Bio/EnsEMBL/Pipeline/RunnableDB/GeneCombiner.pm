@@ -305,7 +305,7 @@ sub run{
   # get estgenes ( from EST_GeneBuilder )
   print STDERR "getting genes of type $ESTGENE_TYPE\n";
   my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE ) };
-  
+
   # get ensembl genes (from GeneBuilder)
   print STDERR "getting genes of type $ENSEMBL_TYPE\n";
   my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE ) };
@@ -810,7 +810,7 @@ sub _pair_Transcripts{
   # this hopefully will avoid generating too many alternative splicing artifacts
   ############################################################
   my $transcript_comparator 
-    = Bio::EnsEMBL::Pipeline::::GeneComparison::TranscriptComparator->new(	
+    = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(	
 									  -comparison_level         => 5,
 									 );
   
