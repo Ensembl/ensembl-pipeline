@@ -30,17 +30,17 @@ use constant TASK_FATAL => -1;
 sub new {
   my $caller = shift;
   my $config = shift;
-  
+
   my $class = ref($caller) || $caller;
-  
+
   my $self = bless {'config' => $config}, $class;
-  
+
   ref($config) && $config->isa('Bio::EnsEMBL::Pipeline::Config') ||
     $self->throw('Bio::EnsEMBL::PipelineConfig argument is required');
 
   $self->_create_tasks();
   $self->_create_submission_systems();
-  
+
   return $self;
 }
 
@@ -123,7 +123,7 @@ sub get_TaskStatus {
 
 sub _create_tasks {
   my $self = shift;
-  
+
   #get the config and instantiate all tasks
   my $config = $self->get_Config();
   foreach my $taskname ($config->get_keys('TASKS')) {
@@ -161,16 +161,16 @@ sub _create_submission_systems {
 
   #get the config and instantiate all tasks
   my $config = $self->get_Config();
-  
+
   my %submission_systems;
   my %tasks;
-  
+
   #
   # Get a list of unique submission systems
   #
   foreach my $taskname ($config->get_keys('TASKS')) {
     my $where = $config->get_parameter($taskname, 'where');
-    
+
     #the submission system is the 'where' value before the first ':'
     my $idx = index($where, ':');
     my $system;
@@ -233,23 +233,23 @@ sub run {
   my %pending_tasks = %{$self->_tasks() || {}};
   my %running_tasks;
   my %finished_tasks;
-  
+
   my $config = $self->get_Config();
-  
+
   my $CHECK_INTERVAL = $config->get_parameter('Pipeline_Manager',
                                               'check_interval');
   my $last_check = 0;
-  
+
   #
   # MAIN LOOP
   #
  MAIN: while(!$self->stop()) {
-    
+
     if(!keys(%pending_tasks) && !keys(%running_tasks)) {
       print STDERR "\n\nNothing left to do, shutting down\n";
       last MAIN 
     }
-    
+
     if(time() - $last_check > $CHECK_INTERVAL) {	
       #
       # update task status by contacting job adaptor
@@ -257,21 +257,21 @@ sub run {
       $self->_update_task_status();
       $last_check = time();
     }
-    
+
     #
     # check if any pending tasks can start running
     #
     foreach my $taskname (keys %pending_tasks) {
       my $task = $pending_tasks{$taskname};
-      
+
       if($task->can_start()) {
-	delete $pending_tasks{$taskname};
-	$running_tasks{$taskname} = $task;
+        delete $pending_tasks{$taskname};
+        $running_tasks{$taskname} = $task;
       }
-      
+
       last MAIN if($self->stop);
     }
-    
+
 
     #
     # Check if tasks are finished
@@ -280,19 +280,19 @@ sub run {
     foreach my $taskname (keys %running_tasks) {
       my $task = $running_tasks{$taskname};
       my $subsystem = $self->_submission_systems->{$taskname};
-      
+
       if($task->is_finished()) {
-	delete $running_tasks{$taskname};
-	$finished_tasks{$taskname} = $task;
+        delete $running_tasks{$taskname};
+        $finished_tasks{$taskname} = $task;
       } else {
-	my $retcode = $task->run();
+        my $retcode = $task->run();
 	
-	if($retcode < 0) {
-	  #something went wrong!
-	  #TBD
-	} elsif ($retcode == TASK_DONE) {
-	  $subsystem->flush($taskname);
-	}
+        if($retcode < 0) {
+          #something went wrong!
+          #TBD
+        } elsif ($retcode == TASK_DONE) {
+          $subsystem->flush($taskname);
+        }
       }
 
       last MAIN if($self->stop());
@@ -309,7 +309,7 @@ sub run {
       my $ss = $self->_submission_systems()->{$job->taskname()};
       $ss->kill($job);
 		}
-    
+
     #
     # retry failed jobs
     #
@@ -320,14 +320,14 @@ sub run {
       my $taskname = $job->taskname();
       my $retry_count = $config->get_parameter($taskname, 'retries');
       if($job->retry_count() < $retry_count) {
-	my $ss = $self->_submission_systems()->{$taskname};
-	$job->retry_count(++$job->retry_count);
-	$ss->submit($job);
+        my $ss = $self->_submission_systems()->{$taskname};
+        $job->retry_count(++$job->retry_count);
+        $ss->submit($job);
       } else {
-	$job->set_status('FATAL');
+        $job->set_status('FATAL');
       }
     }
-    
+
   } #end of MAIN LOOP
 }
 
@@ -388,7 +388,7 @@ sub _update_task_status {
 
   my $current_status_list = $job_adaptor->list_current_status();
   my $current_time = time();
-  
+
 
   my %task_status;
   my %task_failed;
@@ -409,7 +409,7 @@ sub _update_task_status {
   #
   foreach my $current_status (@$current_status_list) {
     my ($job_id, $taskname, $input_id, $status, $timestamp) = @$current_status;
-    
+
     $task_status{$taskname}->{'EXISTING'} ||= [];
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
 
@@ -419,14 +419,14 @@ sub _update_task_status {
        && $status ne 'FATAL'
        && $current_time - $timestamp > $timeout_values{$taskname})
       {
-	$task_timeout{$taskname} ||= [];
-	push(@{$task_timeout{$taskname}}, $job_id);
+        $task_timeout{$taskname} ||= [];
+        push(@{$task_timeout{$taskname}}, $job_id);
       } elsif($status eq 'FAILED') {
-	$task_failed{$taskname} ||= [];
-	push(@{$task_failed{$taskname}}, $job_id);
+        $task_failed{$taskname} ||= [];
+        push(@{$task_failed{$taskname}}, $job_id);
       } else {
-	$task_status{$taskname}->{$status} ||= [];
-	push(@{$task_status{$taskname}->{$status}}, $input_id);
+        $task_status{$taskname}->{$status} ||= [];
+        push(@{$task_status{$taskname}->{$status}}, $input_id);
       }
   }
 
@@ -494,8 +494,16 @@ sub _update_task_status {
 sub create_Job {
   my ($self, $taskname, $modulename, $input_id, $parms) = @_;
   my $ssystem = $self->_submission_systems()->{$taskname};
-  
+
   my $job = $ssystem->create_Job($taskname, $modulename, $input_id, $parms);
+
+  #add the id to the taskstatus as existing and created...
+  my $ts = $self->get_TaskStatus($taskname);
+
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(-ID_LIST => [$input_id]);
+  $ts->add_existing($idset);
+  $ts->add_created($idset);
+
   $ssystem->submit($job);
 }
 
@@ -531,9 +539,9 @@ sub create_Job {
 
 sub create_Jobs {
   my ($self, $taskname, $modulename, $id_set, $parms) = @_;
-  
+
   my $task = $self->_tasks()->{$taskname};
-  
+
   my $ts = $task->get_TaskStatus();
 
   # discard ids that have already been created
