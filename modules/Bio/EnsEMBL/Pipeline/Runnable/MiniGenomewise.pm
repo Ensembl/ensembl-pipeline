@@ -215,10 +215,10 @@ sub make_miniseq {
 
       my $start = $exon->start;
       my $end   = $exon->end;
-      print STDERR "input exon coords: $start - $end\n";
+
       $start = $exon->start - $self->exon_padding;
       $end   = $exon->end   + $self->exon_padding;
-      print STDERR "padded exon coords: $start - $end\n";
+
       if ($start < 1) { $start = 1;}
       if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
 
@@ -250,7 +250,7 @@ sub make_miniseq {
 
     my $current_coord = 1;
     
-    # make a forward strand sequence - genomewsie can't handle reversed strand
+    # make a forward strand sequence - genomewise can't handle reversed strand
     # strand flipping has to be dealt with outside Genomewise/MiniGenomewise 
     # eg see EST_GeneBuilder
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
@@ -318,9 +318,31 @@ sub exon_padding {
 	$self->{'_padding'} = $arg;
     }
 
-    return $self->{'_padding'} || 100;
-#    return $self->{'_padding'} || 1000;
+    return $self->{'_padding'} || 1000;
 
+}
+
+=head2 run
+
+  Title   : run
+  Usage   : $self->run()
+  Function: Runs genomewise on MiniSeq representation of genomic sequence, plus the array of transcripts
+  Returns : none
+  Args    : 
+
+=cut
+
+sub convert_transcript_to_miniseq{
+  my ($self, $transcript) = @_;
+  foreach my $exon($transcript->get_all_Exons){
+    my $start = $self->miniseq->pairAlign->genomic2cDNA($exon->start);
+    my $end   = $self->miniseq->pairAlign->genomic2cDNA($exon->end);
+
+    $exon->start($start);
+    $exon->end($end);
+  }
+
+  return $transcript;
 }
 
 =head2 run
@@ -342,21 +364,17 @@ sub run {
 
   my $genomewise = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
   $genomewise->seq($self->miniseq->get_cDNA_sequence);
-  print STDERR ">miniseq\n" . $self->miniseq->get_cDNA_sequence->seq . "\n";
+
 #  $genomewise->seq($self->genomic_sequence);
   foreach my $t($self->get_all_Transcripts){
-    $genomewise->add_Transcript($t);
+    my $converted = $self->convert_transcript_to_miniseq($t);
+    $genomewise->add_Transcript($converted);
+  #$genomewise->add_Transcript($t);
   }
   
   $genomewise->run;
 
-  foreach my $transcript($genomewise->output){
-    foreach my $exon($transcript->get_all_Exons){
-      print STDERR "predicted exon coords: " . $exon->start . "-" . $exon->end . "\n";
-    }
-  }
-
-#  $self->convert_output($genomewise->output);
+  $self->convert_output($genomewise->output);
 }
 
 
@@ -391,8 +409,6 @@ sub convert_output{
   EXON:
     foreach my $exon($transcript->get_all_Exons){
 
-      print STDERR "output exon coords: " . $exon->start . "-" . $exon->end . "\n";
-
       $ec++;
 
       my $phase  = $exon->phase;
@@ -405,16 +421,19 @@ sub convert_output{
 	next EXON;
       }
     
-    foreach my $ne (@genomics) {
-      $ne->phase($phase);
-      $ne->strand($strand);
+    foreach my $f (@genomics) {
+      my $new_exon = new Bio::EnsEMBL::Exon;
+      $new_exon->start($f->start);
+      $new_exon->end($f->end);
+      $new_exon->phase($phase);
+      $new_exon->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-      $ne->seqname($exon->seqname);
-      $ne->score   (100);
-      $ne->analysis($analysis_obj);
+      $new_exon->seqname($exon->seqname);
+      $new_exon->analysis($analysis_obj);
       #end BUGFIX
+      push(@newexons, $new_exon);    
     }
-    push(@newexons,@genomics);    
+
   }
  
     # flush out old exons from transcript and replace them with newly remapped exons
