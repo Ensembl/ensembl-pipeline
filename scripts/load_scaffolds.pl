@@ -6,13 +6,22 @@ load_scaffolds.pl
 
 =head1 SYNOPSIS
 
-  load_scaffolds.pl -pipe blabla.fa
+  load_scaffolds.pl 
 
 =head1 DESCRIPTION
 
-This script loads a fasta file into the ensembl clone/contig/dna schema. BEWARE! It is for gunshot sequencing projects like fugu, where one clone = one contig is the rule (and they are usually referred to as scaffolds. It does not deal with multiple contigs per clone.
+this script will load a fasta file into a new schema database. It parses
+the file using Bio::SeqIO and then turns each sequence into a Slice
+before storing it
 
-If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis with each contig id and value 1 (i.e. ready to be analysed)
+as standard this script takes what ever SeqIO parses as the id for the
+slice name, you may need to edit this so it works properly and uses the 
+names you actually want
+
+here is an example commandline
+
+./load_scaffolds.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-seqfile sequence.fa -coord_system_name contig 
 
 =head1 OPTIONS
 
@@ -20,6 +29,17 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
     -dbname    For RDBs, what name to connect to (dbname= in locator)
     -dbuser    For RDBs, what username to connect as (dbuser= in locator)
     -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -seqfile   the fasta file which contains the sequence
+    -coord_system_name the name of the coordinate system being stored
+    -coord_system_version the version of the coordinate system being stored
+    -default_version, reflects this is the default version of this 
+                      coordinate system, this is true by default but can
+                      be switched off qwith nodefault_version
+    -top_level  reflects this is the top level of sequence in the database
+                this is off by default
+    -sequence_level reflects this is a sequence level coordinate system
+                    this is on by default
     -help      displays this documentation with PERLDOC
 
 =cut
@@ -27,39 +47,42 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Bio::EnsEMBL::RawContig;
-use Bio::EnsEMBL::Clone;
+use Bio::EnsEMBL::Slice;
+use Bio::EnsEMBL::CoordSystem;
 use Getopt::Long;
 
-my $dbtype = 'rdb';
 my $host   = '';
 my $port   = '';
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
-my $write  = 0;
-
-my $help = 0;
-my $pipe = 0;
-my $verbose = 0;
+my $seqfile;
+my $help;
+my $cs_name;
+my $cs_version;
+my $default = 1;
+my $top_level = 0;
+my $sequence_level = 1;
 
 &GetOptions(
-	     'dbtype:s'   => \$dbtype,
-	     'dbhost:s'   => \$host,
-	     'dbport:n'   => \$port,
-	     'dbname:s'   => \$dbname,
-	     'dbuser:s'   => \$dbuser,
-	     'dbpass:s'   => \$dbpass,
-             'pipe'       => \$pipe,
-	     'verbose'    => \$verbose,
-	     'write'      => \$write,
-	     'h|help'     => \$help
-	     );
+            'dbhost:s'   => \$host,
+            'dbport:n'   => \$port,
+            'dbname:s'   => \$dbname,
+            'dbuser:s'   => \$dbuser,
+            'dbpass:s'   => \$dbpass,
+            'seqfile:s'  => \$seqfile,
+            'coord_system_name:s' => \$cs_name,
+            'coord_system_version:s' => \$cs_version,
+            'top_level!' => \$top_level,
+            'sequence_level!' => \$sequence_level,
+            'default_version!' => \$default,
+            'h|help'     => \$help,
+           );
 if ($help) {
     exec('perldoc', $0);
 }
 
-$SIG{INT} = sub {my $sig=shift;die "exited after SIG$sig";};
+
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
@@ -69,45 +92,38 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -pass   => $dbpass
 );
 
-my ($seqfile) = @ARGV;
 
-if( !defined $seqfile ) { die 'cannot load because sequence file to load sequences from was not passed in as argument';}
+my $csa = $db->get_CoordSystemAdaptor();
+my $cs = Bio::EnsEMBL::CoordSystem->new
+  (
+   -NAME            => $cs_name,
+   -VERSION         => $cs_version,
+   -DEFAULT         => $default,
+   -SEQUENCE_LEVEL  => $sequence_level,
+   -TOP_LEVEL       => $top_level,
+  );
 
-my $seqio = new Bio::SeqIO(-format=>'Fasta',
-			   -file=>$seqfile);
-my $count = 0;
+$csa->store($cs);
+
+my $sa  = $db->get_SliceAdaptor();
+
+
+my $seqio = new Bio::SeqIO(
+                           -format=>'Fasta',
+                           -file=>$seqfile
+                          );
+
+
 while ( my $seq = $seqio->next_seq ) {
-    my $cloneid= $seq->id;
-    my $clone     = new Bio::EnsEMBL::Clone;
-    my $contig    = new Bio::EnsEMBL::RawContig;
-    $clone->htg_phase(-1);
-    $clone->id($cloneid);
-    $clone->version(1);
-    $clone->embl_id("");
-    $clone->embl_version(0);
-    my $now = time;
-    $clone->created($now);
-    $clone->modified($now);
-    $contig->seq($seq->seq);
-    my $bp = $seq->length;   #
-    $contig->length($bp);  
-    my $contigid = $cloneid.".1.".$bp;
-    $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
-    $contig->name($contigid);
-    $contig->embl_offset(1);
-    $clone->add_Contig($contig);
-    if ($write) {
-       eval {
-          $db->get_CloneAdaptor->store($clone);
-          $verbose && print STDERR "Written ".$clone->id." scaffold into db\n";
-       };
-       if( $@ ) {
-         print STDERR "Could not write clone into database, error was $@\n";
-       }
-       if ($pipe) {
-          my $sth = $db->prepare("insert into input_id_analysis (input_id,class,analysis_id,created) values('".$contigid."','contig',1,now())");
-         $sth->execute;
-         $verbose && print STDERR "Written input_id_analysis entry for ".$clone->id."\n";
-       }
-    }
+  
+  my ($name) = $seq->id;
+  my $slice = Bio::EnsEMBL::Slice->new(
+                                       -seq_region_name  => $name,
+                                       -start            => 1,
+                                       -end              => $seq->length,
+                                       -strand           => 1,
+                                       -coord_system     => $cs,
+                                      );
+
+  $sa->store($slice, \$seq->seq);
 }
