@@ -45,6 +45,7 @@ my ($obj) = FreezeThaw::thaw($object);
 
 print("LSF id " . $obj->LSF_id . "\n");
 print("Job id " . $obj->id . "\n");
+print("Output file ".$obj->output_file."\n";
 print("Object is $obj\n");
 my $job = $LSF->get_job($obj->LSF_id);
 print("Job/obj [$job][$obj]\n");
@@ -53,8 +54,9 @@ if ($job) {
     $obj->queue  ($job->queue);
     $obj->machine($job->exec_machine);
 }
-my $outputfile=$job->output_file;
-my $statusfile=$job->status_file;
+
+my $outputfile=$obj->output_file;
+my $statusfile=$obj->status_file;
 
 print("Running job\n");
 open(STATUS,">$statusfile");
