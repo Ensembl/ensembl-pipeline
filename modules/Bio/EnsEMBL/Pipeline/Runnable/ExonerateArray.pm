@@ -31,8 +31,7 @@ $options   = a string with options ,
  $runnable->run; #create and fill Bio::Seq object
  my @results = $runnable->output;
  
- where @results is an array of SeqFeatures, each one representing an aligment (e.g. a transcript), 
- and each feature contains a list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
+ where @results is an array of DnaDnaAlignFeatures, each one representing an aligment which are
  in fact feature pairs.
  
 =head1 DESCRIPTION
@@ -40,27 +39,6 @@ $options   = a string with options ,
 ExonerateArray takes a Bio::Seq (or Bio::PrimarySeq) object and runs Exonerate
 against a set of sequences.  The resulting output file is parsed
 to produce a set of features.
-
- here are a few examples of what it can do at this stage:
-
-1. Aligning cdnas to genomic sequence:
-   exonerate --exhaustive no --model est2genome cdna.fasta genomic.masked.fasta
-   ( this is the default )
-
-2. Behaving like est2genome:
-   exonerate --exhaustive yes --model est2genome cdna.fasta genomic.masked.fasta
-
-3. Behaving like blastn:
-   exonerate --model affine:local dna.fasta genomic.masked.fasta
-
-4. Smith-Waterman:
-   exonerate --exhaustive --model affine:local query.fasta target.fasta
-
-5. Needleman-Wunsch:
-   exonerate --exhaustive --model affine:global query.fasta target.fasta
-
-6. Generate ungapped Protein <---> DNA alignments:
-   exonerate --gapped no --showhsp yes protein.fasta genome.fasta
 
 
 =head1 CONTACT
@@ -80,11 +58,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
-use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::MiscFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Root;
 
@@ -94,20 +68,26 @@ use Bio::EnsEMBL::Root;
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-
-  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = 
-      $self->_rearrange([qw(
-			    DATABASE
-			    QUERY_SEQS
-			    QUERY_TYPE
-			    TARGET_TYPE
-			    EXONERATE
-			    OPTIONS
-			   )
-			 ], @args);
+  
+  my ($db,$database, $query_seqs, $query_type, $target_type, $exonerate, $options, $analysis) = 
+    $self->_rearrange([qw(
+			  DB
+			  DATABASE
+			  QUERY_SEQS
+			  QUERY_TYPE
+			  TARGET_TYPE
+			  EXONERATE
+			  OPTIONS
+			  ANALYSIS
+			 )
+		      ], @args);
   
   
   $self->{_output} = [];
+  $self->analysis($analysis) if $analysis;
+
+  ###$db is needed to create $slice which is needed to create DnaDnaAlignFeatures
+  $self->db($db) if $db;
   # must have a target and a query sequences
   unless( $query_seqs ){
     $self->throw("Exonerate needs a query_seqs: $query_seqs");
@@ -121,7 +101,7 @@ sub new {
   else{
     $self->throw("Exonerate needs a target - database: $database");
   }
-
+  
   ############################################################
   # Target type: The default is dna
   if ($target_type){
@@ -141,22 +121,17 @@ sub new {
     print STDERR "Defaulting query type to dna\n";
     $self->query_type('dna');
   }
-
-  ############################################################
-  # we are using the latest version: exonerate-0.6.7
-  #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
-  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
   
-  ############################################################
-  # options
-  # can add extra options as a string
-  # --ryo "%pi\n"  show percentage identity
-  my $basic_options = '--showalignment no --showvulgar no --M 500 --bestn 5 --ryo "myoutput: %S %V %pi\n"';
+  $self->exonerate($exonerate);
+  
+  my $basic_options = '--showalignment no --showvulgar no --bestn 5 --ryo "myoutput: %S %V %pi\n"';
+  
   if ($options){
-    $basic_options .= $options;
+    $self->options($options);
   }
-  $self->options( $basic_options);
-
+  else {
+    $self->options($basic_options);
+  }
   return $self;
 }
 
@@ -172,18 +147,18 @@ Usage   :   $obj->run($workdir, $args)
 Function:   Runs exonerate script and generate features which then stored in $self->output
             
 =cut
-  
+
 sub run {
   my ($self) = @_;
-
- my $verbose = 0;
+  
+  my $verbose = 0;
   
   my $dir         = $self->workdir();
   my $exonerate   = $self->exonerate;
   my @query_seqs  = $self->query_seqs;
   my $query_type  = $self->query_type;
   my $target_type = $self->target_type;
-
+  
   # set the working directory (usually /tmp)
   $self->workdir('/tmp') unless ($self->workdir());
   
@@ -193,7 +168,7 @@ sub run {
   if ( $self->database ){
     $target = $self->database;
   }
-
+  
   #elsif( $self->target_seq ){
   #  
   #  # write the target sequence into a temporary file then
@@ -207,9 +182,9 @@ sub run {
   
   ############################################################
   # write the query sequence into a temporary file then
-
+  
   our (%length,%rec_q_id,%done);
-
+  
   my $query = "$dir/query_seqs.$$";
   
   open( QUERY_SEQ,">$query") || $self->throw("Could not open $query $!");
@@ -243,7 +218,7 @@ sub run {
   ############################################################
   # store each alignment as a features
   
-  my @features;
+  my (@pro_features);
   
   ############################################################
   # parse results - avoid writing to disk the output
@@ -251,7 +226,7 @@ sub run {
   while (<EXO>){
     
     print STDERR $_ if $verbose;
-    
+    print $_;
     ############################################################
     # the output is of the format:
     #
@@ -265,46 +240,58 @@ sub run {
     # M    Match 
     #
     # example:
-    # vulgar: probe:HG-U95Av2:1002_f_at:195:583; 0 25 + 10.1-135037215 96244887 96244912 + 125 M 25 25
+    # vulgar: probe:HG-U95Av2:1002_f_at:195:583; 0 25 + 10.1-135037215 96244887 96244912 + 125 M 25 25 100
     # match_length is 25 bs, it may not be exact match, score 125->exact match, score 116 match 24 bs
     # if it is 120 M 24 24, it means exact match for 24 bs.
     
     if (/^myoutput\:/) {
       my $h={};
       chomp;
-      my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $match, $m_length, $null, $pid) = split;
+      my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $match, $matching_length, $null, $pid) = split;
       
       # the VULGAR 'start' coordinates are 1 less than the actual position on the sequence
       $q_start++;
       $t_start++;
       
+      my $strand;
+      if ($q_strand eq $t_strand) {
+	$strand = 1;
+      }
+      else {
+	$strand = -1;
+      }
+      
       $h->{'q_id'} = $q_id;
       $h->{'q_start'} = $q_start;
       $h->{'q_end'} = $q_end;
-      $h->{'q_strand'} = $q_strand;
+      $h->{'q_strand'} = $strand;
       $h->{'t_id'} = $t_id;
       $h->{'t_start'} = $t_start;
       $h->{'t_end'} = $t_end;
-      $h->{'t_strand'} = $t_strand;
+      $h->{'t_strand'} = $strand;
       $h->{'score'} = $score;
-      $h->{'m_length'} = $m_length;
+      $h->{'matching_length'} = $matching_length;
       $h->{'percent_id'} = $pid;
       
-      #if ($h->{'score'} ==120 and $h->{'m_length'} ==24 or $h->{'score'} ==116 and $h->{'m_length'} ==25) {
-      if ($h->{'m_length'} == $length{$h->{'q_id'}}-1 and $h->{'percent_id'}==100) {
-	creat_feature($h);
+      ###for affymetrix probe sequence, they are 25 bs long, we require at least 24 bs exact match###
+      #if ($h->{'matching_length'} ==24 and $h->{'percent_id'} ==100) {
+      if ($h->{'matching_length'} == $length{$h->{'q_id'}}-1 and $h->{'percent_id'}==100) {
+	print "24 $_\n";
+	$self->_create_features($h);
       } 
-      #elsif ($h->{'score'} ==125 and $h->{'m_length'} ==25) {
-      elsif ($h->{'m_length'} == $length{$h->{'q_id'}} and $h->{'percent_id'}>=(($length{$h->{'q_id'}}-1)/$length{$h->{'q_id'}})) {
-	creat_feature($h);
+      #elsif ($h->{'matching_length'} ==25 and $h->{'percent_id'}>=96) {
+      elsif ($h->{'matching_length'} == $length{$h->{'q_id'}} and $h->{'percent_id'}>=(($length{$h->{'q_id'}}-1)/$length{$h->{'q_id'}}*100)) {
+	print "25 $_\n";
+	$self->_create_features($h);
       }
     }
   }
   
-  $self->output(@features);
   
   close(EXO) or $self->throw("couldn't close pipe ");  
   
+  #$self->_create_features(@pro_features);
+
   ############################################################
   # remove interim files (but do not remove the database if you are using one)
   unlink $query;
@@ -313,35 +300,58 @@ sub run {
   }
 }
 
-sub creat_feature {
+sub _create_features {
   
   
-###I am not sure how to create MiscFeature, only using the following temperately####
-
-  my ($h) = @_;
-  $count_f++;
-
-  my $mfeat = Bio::EnsEMBL::FeaturePair->new;
-
-  $feat->start($h->{'q_start'});
-  $feat->end($h->{'q_end'});
-  $feat->strand($h->{'q_strand'});
-  $feat->seqname($h->{'q_id'});
-  $feat->percent_id($h->{'percent_id'});
-  $feat->hstart($h->{'t_start'});
-  $feat->hend($h->{'t_end'});
-  $feat->hstrand($h->{'t_strand'});
-  $feat->hseqname($h->{'t_id'});
-  $feat->hpercent_id($h->{'percent_id'});
-
-  push @features, $feat;
-
+  ###I am not sure how to create MiscFeature, only using the following temperately####
+  
+  my ($self,$h) = @_;
+  
+  ###to make DnaDnaAlignFeature, we need to make Analysis_obj and slice_obj###
+  
+  my @features;
+  
+  my $coord_system_name = "chromosome";
+  my ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
+  my $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name,$h->{'t_start'},$h->{'t_end'});
+  my $feat_pair = Bio::EnsEMBL::FeaturePair->new(
+						 -slice    => $slice,
+						 -start    => $h->{'t_start'},
+						 -end      => $h->{'t_end'},
+						 -strand   => $h->{'t_strand'},
+						 -hseqname => $h->{'q_id'},
+						 -hstart   => $h->{'q_start'},
+						 -hend     => $h->{'q_end'},
+						 -hstrand  => $h->{'q_strand'},
+						 -percent_id => $h->{'percent_id'},
+						 -analysis  => $self->analysis,
+						);
+  
+  my $feat = Bio::EnsEMBL::DnaDnaAlignFeature->new (-features => [$feat_pair]);
+  
+  
+  
+  $self->output($feat);
+  
+  
 }
 
 ############################################################
 #
 # get/set methods
 #
+############################################################
+
+sub analysis{
+  
+  my ($self,$analysis) = @_;
+  if( defined $analysis) {
+    $self->{'_analysis'} = $analysis;
+  }
+  return $self->{'_analysis'};
+  
+}
+
 ############################################################
 
 sub query_seqs {
@@ -391,13 +401,23 @@ sub options {
 
 ############################################################
 
+sub db {
+  my ($self, $db) = @_;
+  if ($db) {
+    $self->{_db} = $db ;
+  }
+  return $self->{_db};
+}
+
+############################################################
+
 sub output {
-    my ($self, @output) = @_;
-  if (@output) {
-      unless( $self->{_output} ){
-	  $self->{_output} = [];
-      }
-      push( @{$self->{_output}}, @output );
+  my ($self, $output) = @_;
+  if ($output) {
+    unless( $self->{_output} ){
+      $self->{_output} = [];
+    }
+    push( @{$self->{_output}}, $output );
   }
   return @{$self->{_output}};
 }
