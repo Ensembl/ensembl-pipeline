@@ -39,12 +39,10 @@ use strict;
 use Bio::EnsEMBL::Analysis::Programs;
 use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 =head1 ABSTRACT METHODS
 
@@ -185,8 +183,8 @@ sub workdir {
 				mkdir ($directory, '777') unless (-d $directory);
 				$self->throw ("$directory doesn't exist\n") unless (-d $directory);
 				$self->{_workdir} = $directory;
-			}	elsif ($::pipeConf{'workdir'})	{
-				$self->{_workdir}= $::pipeConf{'workdir'};
+			}	elsif ($PIPELINE_WORK_DIR)	{
+				$self->{_workdir}= $PIPELINE_WORK_DIR;
 			} else {
 				$self->{_workdir} = '/tmp';
 			}
@@ -405,7 +403,7 @@ sub shrinkfplist {
 sub find_executable {
   my ($self,$name) = @_;
 
-  my $bindir = $::pipeConf{'bindir'}   || undef;
+  my $bindir = $BIN_DIR || undef;
 
   if (-x $name) {
     return $name;
@@ -453,8 +451,8 @@ sub writefile {
 sub find_file {
   my ($self,$name) = @_;
 
-  my $datadir = $::pipeConf{'datadir'} || undef;
-  my $libdir  = $::pipeConf{'libdir'}  || undef;
+  my $datadir = $DATA_DIR || undef;
+  my $libdir  = $LIB_DIR  || undef;
 
   my $full_name;
 
