@@ -3,7 +3,7 @@ require Exporter;
 
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check);
+our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check make_Clone make_Contig insert_agp_line display_exons non_translate);
 
 use strict;
 use Bio::EnsEMBL::Exon;
@@ -15,7 +15,7 @@ sub get_seq_ids{
   my ($fh) = @_;
 
   my @seq_ids;
-  
+  my @non_ids;
   while(<$fh>){
    chomp;
    #I	47490	107680	3	F	AC024796.1	1	60191	+
@@ -30,11 +30,12 @@ sub get_seq_ids{
      next;
    }
    if(!$contig =~ /\S+\.\d+/){
+     push(@non_ids, $contig);
      next;
    }
    push(@seq_ids, $contig)
   }
-  return \@seq_ids;
+  return \@seq_ids, \@non_ids;
 }
 
 
@@ -425,23 +426,7 @@ sub write_genes{
 	next GENE;
       }
     }
-   # my $translating_gene = translation_check($gene);
-   # #print STDERR "gene ".$gene->stable_id." returns this from translation check ".$translating_gene."\n";
-#    if(!$translating_gene){
-#      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
-#      #print STDERR "gene on ".$clone_name." is being put in non_translating hash\n";
-#      if(!$non_translating{$clone_name}){
-#	$non_translating{$clone_name} = [];
-#	push(@{$non_translating{$clone_name}}, $gene);
-#	#print STDERR "there are ".keys(%non_translating)." clones with non translating genes\n";
-#	next GENE;
-#      }else{
-#	#print "there are ".keys(%$non_translating)." clones with non translating genes\n";
-#	push(@{$non_translating{$clone_name}}, $gene);
-#	next GENE;
-#      }
-#      print "clone ".$clone_name." has ".@{$non_translating{$clone_name}}." genes\n";
-#    }
+ 
   
     my $gene_adaptor = $db->get_GeneAdaptor;
     eval{
@@ -452,7 +437,7 @@ sub write_genes{
     }
   }
 
-  #return \%non_translating, \%non_transforming;
+  return \%non_transforming;
 }
 
 sub translation_check{
@@ -470,3 +455,82 @@ sub translation_check{
   return $gene;
   
 }
+
+sub make_Contig{
+  my ($name, $seq, $length) = @_;
+
+  my $contig = Bio::EnsEMBL::RawContig->new();
+
+  $contig->name($name);
+  $contig->seq($seq);
+  $contig->length($length);
+
+  return $contig;
+  
+}
+
+sub make_Clone{
+  my ($name, $version, $embl_acc, $embl_version, $htg_phase, $contig, $created, $modified) = @_;
+
+  my $clone = Bio::EnsEMBL::Clone->new();
+  $clone->id($name);
+  $clone->version($version);
+  $clone->embl_id($embl_acc);
+  $clone->embl_version($embl_version);
+  $clone->htg_phase($htg_phase);
+  $clone->add_Contig($contig);
+  $clone->created($created);
+  $clone->modified($modified);
+
+  return $clone;
+  
+}
+
+sub insert_agp_line{
+  my ($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type, $db) = @_;
+
+  my $sql = "insert into assembly(chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  my $sth = $db->prepare($sql);
+  $sth->execute($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type); 
+}
+
+
+sub display_exons{
+  my (@exons) = @_;
+
+  @exons = sort{$a->start <=> $b->start || $a->end <=> $b->end} @exons if($exons[0]->strand == 1);
+
+  @exons = sort{$b->start <=> $a->start || $b->end <=> $a->end} @exons if($exons[0]->strand == -1);
+  
+  foreach my $e(@exons){
+       print $e->stable_id."\t ".$e->start."\t ".$e->end."\t ".$e->strand."\t ".$e->phase."\t ".$e->end_phase."\n";
+    }
+  
+}
+
+sub non_translate{
+  my (@transcripts) = @_;
+  
+  foreach my $t(@transcripts){
+    
+    my @exons = @{$t->get_all_Exons};
+#    print "transcript sequence :\n".$t->seq."\n";
+    foreach my $e(@exons){
+      my $seq = $e->seq;
+      my $pep0 = $seq->translate('*', 'X', 0);
+      my $pep1 = $seq->translate('*', 'X', 1);
+      my $pep2 = $seq->translate('*', 'X', 2);
+      print "exon sequence :\n".$e->seq->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 0 frame\n ".$pep0->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 1 phase\n ".$pep2->seq."\n\n";
+      print $e->seqname." ".$e->start." : ".$e->end." translation in 2 phase\n ".$pep1->seq."\n\n";
+      print "\n\n";
+      
+    }
+    
+  }
+}
+
+
+
+1;
