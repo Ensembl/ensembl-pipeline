@@ -13,7 +13,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::RunnableI
+Bio::EnsEMBL::Pipeline::RunnableI
 
 =head1 SYNOPSIS
 
@@ -33,7 +33,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::Runnable::RunnableI;
+package Bio::EnsEMBL::Pipeline::RunnableI;
 
 use vars qw(@ISA);
 use strict;
@@ -48,13 +48,12 @@ use Bio::Root::Object;
 sub run {
     my ($self) = @_;
 
-    $self->throw("run not implemented in Bio::EnsEMBL::Pipeline::Runnable::RunnableI");
+    $self->throw("run not implemented in Bio::EnsEMBL::Pipeline::RunnableI");
 }
 
 sub output {
     my ($self) = @_;
 
-    $self->throw("output not implemented in Bio::EnsEMBL::Pipeline::Runnable::RunnableI");
-
+    $self->throw("output not implemented in Bio::EnsEMBL::Pipeline::RunnableI");
 }
 

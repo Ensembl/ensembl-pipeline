@@ -74,11 +74,11 @@ use FreezeThaw qw(freeze thaw);
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
 use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
 
 sub _initialize {
@@ -90,7 +90,7 @@ sub _initialize {
 						   )],@args);
 
     $jobobj  ->isa("Bio::EnsEMBL::Pipeline::DB::JobI")  || $self->throw("No input job object");
-    $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") || $self->throw("No input RunnableI object");
+    $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableDBI") || $self->throw("No input RunnableDBI object");
 
     $self->jobobj  ($jobobj);
     $self->runnable($runnable);
@@ -182,6 +182,38 @@ sub output {
     my ($self) = @_;
 
     return $self->runnable->output;
+}
+
+=head2 dbobj
+
+  Title   : dbobj
+  Usage   : my $db = $self->dbobj
+  Function: The database handle used to fetch input
+  Returns : ref
+  Args    : none
+
+=cut
+
+sub dbobj {
+    my ($self) = @_;
+
+    return $self->runnable->dbobj;
+}
+
+=head2 fetch_input
+
+  Title   : fetch_input
+  Usage   : $self->fetch_input
+  Function: Fetches any input data needed for the job from the database
+  Returns : ref
+  Args    : none
+
+=cut
+
+sub fetch_input {
+    my ($self) = @_;
+
+    return $self->runnable->fetch_input
 }
 
 ### These are all the JobI methods
