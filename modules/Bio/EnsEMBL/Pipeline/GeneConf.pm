@@ -82,6 +82,8 @@ my $prefix='COB';
 	     GB_REFSEQ      => '',
 	     # path to swissprot fasta file
 	     GB_SPTR        => '',
+	     # path to swissprot "evidence kill list" file
+	     GB_KILL_LIST   => '',
 	     # path to file where we'll write cleaned up  proteome data
 	     GB_PFASTA      => '',
 	     # path pmatch executable
