@@ -453,12 +453,15 @@ sub get_Sequence {
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
 
-    if ($@) {
-      $self->throw("Problem fetching sequence for [$id]: [$@]\n");
+    # if we didn't get it by accession, try by id
+    if(!defined $seq){
+      eval{
+	$seq = $seqfetcher->get_Seq_by_id($id) unless defined $seq;
+      };
     }
 
-    if (!defined($seq)) {
-      $self->throw("Couldn't find sequence for [$id]");
+    if ((!defined($seq)) && $@) {
+      $self->warn("Couldn't find sequence for [$id]:\n $@");
     }
     
 #    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
@@ -559,6 +562,7 @@ sub run_blaste2g {
   return unless (scalar(@extras) >= 1);
   
   my $miniseq = $self->make_miniseq(@$features);
+
   my $hseq    = $self->get_Sequence($est);
   
   if (!defined($hseq)) {
