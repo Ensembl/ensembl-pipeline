@@ -32,8 +32,6 @@ package Bio::EnsEMBL::Pipeline::Alignment;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
-
 @ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
