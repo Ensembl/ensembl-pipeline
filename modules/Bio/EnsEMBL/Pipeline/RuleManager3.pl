@@ -624,6 +624,7 @@ sub run_if_new {
               system($cmd);
             }
           }
+          $cj->set_status('CREATED');
           $cj->batch_runRemote;
           
           print "Retrying job\n" if $verbose;
