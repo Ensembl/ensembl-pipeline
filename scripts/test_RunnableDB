@@ -1,150 +1,130 @@
-#!/usr/local/bin/perl
-
-
-=head1 NAME
-
-test_RunnableDB
-
-=head1 SYNOPSIS
-
-test_RunnableDB
-
-=head1 DESCRIPTION
-
-Runs a RunnableDB on an input seq (extracted from a database) and
-optionally writes features or whatever back into the database.
-
-Requires a DB connexion, input ID, name of runnable and analysis ID.
-
-=head1 OPTIONS
-
-    -dbhost    host name for database (gets put as host= in DBAdaptor)
-
-    -dbport    For RDBs, what port to connect to (port= in DBAdaptor)
-
-    -dbname    For RDBs, what name to connect to (dbname= in DBAdaptor)
-
-    -dbuser    For RDBs, what username to connect as (dbuser= in DBAdaptor)
-
-    -dbpass    For RDBs, what password to use (pass= in DBAdaptor)
-
-    -input_id  The input id for the RunnableDB
-
-    -logic_name  The logic name of the analysis we want to run
-    
-    -write       writes to the database (optionnal)
-
-=cut
+#!/usr/local/ensembl/bin/perl
 
 use strict;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::Analysis;
 use Getopt::Long;
 
-use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
-use Bio::EnsEMBL::DBLoader;
-
-my $host   = '';
-my $port   = undef;
-my $dbname = '';
-my $user = 'ensro';
-my $pass = undef;
+my $dbhost;
+my $dbuser;
+my $dbpass;
+my $dbport = 3306;
+my $dbname;
 my $input_id;
-my $analysisid;
-my $write  = 0;
-my $check  = 0;
-my $params;
-my $pepfile;
-my $input_type;
 my $logic_name;
+my $check  = 0;
+my $output_dir;
+my $write = 1;
+my $help = 0; 
+my $verbose = 0;
+my $update = 1;
+my $input_type;
 my $module;
+my $analysis;
 
 &GetOptions( 
-	     'dbhost:s'    => \$host,
-	     'dbport:n'    => \$port,
-	     'dbname:s'    => \$dbname,
-	     'dbuser:s'    => \$user,
-	     'dbpass:s'    => \$pass,
-	     'input_id:s'  => \$input_id,
-	     'logic_name:s'=> \$logic_name,
-             'input_type:s'=> \$input_type,
-	     'write'       => \$write,
-             'check'       => \$check,
-             'parameters:s'=> \$params,
-	     'pepfile:s'   => \$pepfile,
-             'module:s'    => \$module,
-	     );
+	    'dbhost=s'      => \$dbhost,
+	    'dbname=s'      => \$dbname,
+	    'dbuser=s'      => \$dbuser,
+	    'dbpass=s'      => \$dbpass,
+	    'dbport=s'      => \$dbport,
+	    'input_id:s'  => \$input_id,
+	    'logic_name:s'  => \$logic_name,
+	    'check'       => \$check,
+	    'write!' => \$write,
+	    'help!' => \$help,
+	    'verbose!' => \$verbose,
+	    'update_input_id_analysis!' => \$update,
+	    'input_type:s'=> \$input_type,
+	    'module:s'    => \$module,
+	     ) or &useage();
 
 $| = 1;
 
-my $runnable = $module;
-
-$runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::$runnable"
- unless $runnable =~ /Bio::EnsEMBL::Pipeline::RunnableDB/;
-
-(my $file = $runnable) =~ s/::/\//g;
-require "$file.pm";
-
-if ($check) {
-   exit(0);
+if($check ) {
+  print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n";
+  exit 0;
 }
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
-    -host             => $host,
-    -user             => $user,
-    -port             => $port,
-    -dbname           => $dbname,
-    -pass             => $pass,
-    -perlonlyfeatures => 0
-);
 
-my     $sf = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+if(!$dbhost || !$dbuser || !$dbname || !$input_id || !$logic_name){
+  $help = 1;
+}
+
+&useage() if($help);
+
+if(!$write){
+  $update = 0;
+}
+
+print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n" if($verbose);
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+  (
+   -host   => $dbhost,
+   -user   => $dbuser,
+   -dbname => $dbname,
+   -pass   => $dbpass,
+   -port   => $dbport,
+  );
 
 die "No input id entered" unless defined ($input_id);
 
-my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+my $aa = $db->get_AnalysisAdaptor;
+$analysis = $aa->fetch_by_logic_name($logic_name);
 
-if (!defined($analysis)) {
-  if (!defined($module)) {
-     die "Must supply a module name if creating a new analysis";
-  }
-  if (!defined($input_type)) {
-     die "Must supply an input type if creating a new analysis";
-  }
-  $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name => $logic_name,
-                                                   -module     => $module,
-                                                   -input_type => $input_type);
+
+if(!$analysis){
+  die("Can't create an analysis without a module and input type") 
+    unless($module && $input_type);
+  print STDERR "creating analysis object ".$logic_name." ".$module.
+    " ".$input_type."\n" if($verbose);
+  print STDERR "This object will be stored in the database when the ".
+    "features are written\n" if($verbose && $write);
+  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
+    (-logic_name => $logic_name,
+     -module     => $module,
+     -input_type => $input_type
+    );
+  
 }
 
-my %hparams;
-# eg -parameters param1=value1,param2=value2
-foreach my $p(split /,/, $params){
-  my @sp = split /=/, $p;
-  $sp[0] = '-' . $sp[0];
-  $hparams{$sp[0]} =  $sp[1];
-}
+my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
+(my $file = $runnable) =~ s/::/\//g;
+require "$file.pm";
+print STDERR "creating runnable ".$file."\n" if($verbose);
 
-print "DB " . $db->host . "\n";
-my $runobj = "$runnable"->new(-db        => $db,
-			      -input_id  => $input_id,
-			      -analysis  => $analysis,
-			      -seqfetcher => $sf,
-			      %hparams,
+$runnable =~ s/\//::/g;
+my $runobj = "$runnable"->new(-db    => $db,
+			      -input_id => $input_id,
+			      -analysis => $analysis,
 			     );
-
-if ($pepfile) {
-    $runobj->pep_file($pepfile);
-}
-
+print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
 $runobj->fetch_input;
+print STDERR "Fetched input\n" if($verbose);
 $runobj->run;
+print STDERR "Run ".$runobj."\n" if($verbose);
 
- 
-my @out = $runobj->output;
-
-if ($write) {
+if($write){
   $runobj->write_output;
+  print STDERR "written output\n" if($verbose);
 }
-foreach my $out (@out) {
+
+my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, created) values( ?, ?, ?, now())";
+
+if($write){
+my $sth = $db->prepare($sql);
+$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
+}
+
+
+if($verbose){
+  my @output = $runobj->output;
+  if(!@output){
+    print STDERR "either ".$runobj." doesn't put its output in ".
+      $runobj->output." or your analysis hasn't produced any output\n";
+  }
+  print STDERR "have ".@output." results\n";
+  foreach my $out (@output) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
       print ($out->gffstring . "\n");
     } elsif ($out->isa("Bio::EnsEMBL::Gene")) {
@@ -160,5 +140,77 @@ foreach my $out (@out) {
     } else {
       print $out->gffstring . "\n";
     }
+  }
 }
 
+
+sub useage{
+	exec('perldoc', $0);
+	exit;
+}
+
+
+# POD documentation - main docs before the code
+
+=pod
+
+=head1 NAME
+
+  test_RunnableDB
+
+=head1 SYNOPSIS
+ 
+  will run any runnableDB which will run as part of the pipeline
+
+=head1 DESCRIPTION
+
+  takes database arguments along with an input_id and an analysis object
+  and will run the analysis
+
+
+=head1 OPTIONS
+
+    -dbhost      host name for database (gets put as host= in locator)
+    -dbport      For RDBs, what port to connect to (port= in locator)
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+    -input_id  a input id for the analysis
+    -logic_name  the logic_name of the analysis
+    
+     The above are all compulsory options you must provide them 
+     otherwise the script won't work'
+ 
+    -input_type the input id type
+    -module the module to be run, this should either be a module which is
+                present in Bio::Ensembl::Pipeline::RunnableDB or it 
+                should be the full path
+
+    These two options should be passed if your database doesn't already
+    contain the analysis object you want to use, if the write flag is 
+    switched on this analysis object will be stored in the database when
+    the features are stored, note if you are using the pipeline the
+    input id type won't be stored by the core api so it will cause
+    RuleManagers db sanity checks to fail 
+
+    -update_input_id_analysis update the input_id_analysis, this can be
+               switched off with the -noupdate_input_id_analysis flag
+               but if you pass the -nowrite option this will be switched
+               off automatically 
+    -check     a pre exec option if you want to use it on the farm
+    -write     whether to write the results to the database, by default
+               this is true but i can be switched off with -nowrite
+    -verbose   switch on a series of chatty prints giving you info about
+               how its running
+    -help      summary of options
+
+=head1 EXAMPLES
+
+  ./test_RunnableDB -dbhost ecs2b -dbuser ensadmin -dbpass **** -dbname
+  rat_Jun03_mk2 -input_id 11.14000001-15000000 -analysis Marker
+
+  note if -write isn't swtiched off this script requires your database
+  to have pipeline tables in your database as it writes a entry to the
+  input_id_analysis table when the job is complete'
+
+=cut

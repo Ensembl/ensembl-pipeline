@@ -65,6 +65,7 @@ my $host     = 'localhost';
 my $dbname   = 'pipeline';
 my $dbuser   = 'ensadmin';
 my $pass     = '';
+my $port     = '';
 my $help;
 my %rule_goals; # hash to link up goals with rules for speed later
 
@@ -73,6 +74,7 @@ my %rule_goals; # hash to link up goals with rules for speed later
 	    'dbname:s'          => \$dbname,
 	    'dbuser:s'          => \$dbuser,
 	    'dbpass:s'          => \$pass,	    
+	    'dbport:s'          => \$port,	    
 	    'goal=s'            => \$goal, 
 	    'condition=s@'      => \@conditions, 
 	    'insert'            => \$insert, 
@@ -89,11 +91,14 @@ if ($help) {
     exec('perldoc', $0);
 }
 
+print STDERR $host." ".$dbname." ".$pass ." ".$dbuser." ".$port."\n";
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
-  ( -host   => $host,
-    -dbname => $dbname,
-    -user   => $dbuser,
-    -pass   => $pass,
+( -host   => $host,
+  -dbname => $dbname,
+  -user   => $dbuser,
+  -pass   => $pass,
+  -port   => $port
   );
 
 my $anaAdaptor     = $db->get_AnalysisAdaptor();

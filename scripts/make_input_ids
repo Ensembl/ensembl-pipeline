@@ -27,6 +27,9 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -help      Displays script documentation with PERLDOC
 
     -contig    signals to insert contig name input_ids
+
+    -logic_name the logic_name of the analysis object which needs to be 
+                associated with these entries 
     
     -slice     signals to insert slice type input ids using
                the format chrname.start-end
@@ -43,11 +46,41 @@ this script allows input_ids to be generated and written to the input_id_analysi
     
     -single if you just want a single dummy input_id ie for genome wide analyses
     
+    -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
     
 
     -input_type if you want to override the standard input_id types
-    
+
+=head1 EXAMPLES
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -contig
+
+this will use all the contig names are input_ids
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -slice -slice_size 1000000
+
+this will make slice names in the format chr_name.start-end all 1M in size
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -file -dir path/to/dir
+
+this will use all the filenames in the dir specified as input_ids
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -file -dir path/to/dir -regex /chunk/
+
+this will use all the filenames in dir which match the specifed regex
+as input_ids
+
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -translation_ids
+
+this will use all the translation ids as input_ids
+
 =cut
 
 
@@ -77,9 +110,9 @@ my $dir;
 my $regex;
 my $single;
 my $verbose;
-my $help;
-
-
+my $help = 0;
+my $translation_id;
+my $name = 'genome';
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -96,7 +129,9 @@ my $help;
 	    'dir:s'        => \$dir,
 	    'file_regex:s' => \$regex,
 	    'single'       => \$single,
+            'single_name:s'=> \$name,
             'verbose'      => \$verbose,
+            'translation_id' => \$translation_id,
             'h|help'            => \$help,
            );
 
@@ -118,8 +153,9 @@ if (!($type)) {
     die "No assemby type defined";
 }
 
-if (!($contig) && !($slice) && !($single) && !($file)) {
-  die "Must define input as either contig, slice file or single";
+if (!($contig) && !($slice) && !($single) && !($file) && !($translation_id)) {
+  die "Must define input as either contig, slice, file, translation_id ".
+  "or single";
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
@@ -128,9 +164,10 @@ my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
 
 
-if( ($slice + $contig + $single + $file) > 1){
-  die "must only define one of these options on the commandline ".
-    "-slice $slice -contig $contig -single $single -file $file";
+if( ($slice + $contig + $single + $file + $translation_id) > 1){
+  #die "must only define one of these options on the commandline ".
+  #  "-slice $slice -contig $contig -single $single -file $file ".
+  #  " -translation_id $translation_id";
 }
 
 my @ids;
@@ -148,7 +185,7 @@ if ($slice) {
   
 }elsif($single){
   $input_type = 'GENOME' unless $input_type;
-  @ids = ('genome');
+  @ids = ($name);
 }elsif($file){
   $input_type = 'FILENAME' unless $input_type;
   if(!$dir){
@@ -156,6 +193,8 @@ if ($slice) {
       " a directory to get them from"; 
   }
   @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
+}elsif($translation_id){
+  @ids = $inputIDFactory->generate_translation_id_input_ids;
 }else{
     exec('perldoc', $0);
 }
@@ -185,7 +224,7 @@ foreach my $id (@ids) {
     eval {
       print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
 
-      $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis);  
+      $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis, '');  
     };
     if ($@) {
       print "Input id $id already present $@";
