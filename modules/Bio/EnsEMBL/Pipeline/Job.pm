@@ -15,9 +15,13 @@
 
 Bio::EnsEMBL::Pipeline::Job
 
+
+
 =head1 SYNOPSIS
 
+
 =head1 DESCRIPTION
+
 
 Stores run and status details of an analysis job
 
