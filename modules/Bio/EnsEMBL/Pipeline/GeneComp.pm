@@ -320,7 +320,7 @@ sub map_temp_Exons_to_real_Exons{
 
 	       # ok - if we have already moved this - ERROR
 	       if( $moved{$oldexon->id} == 1 ) {
-		   print $log "attempting to move old exon twice ".$oldexon->id." (for ".$tempexon->id.") with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand." Not clever!\n";
+		   print $log "Duplicate! ".$tempexon->id." maps to ".$oldexon->id." with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand."\n";
 		   next IDENTICAL;
 	       }
 

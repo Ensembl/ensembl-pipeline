@@ -106,7 +106,11 @@ sub add_condition {
 sub list_conditions {
   my $self = shift;
 
-  return @{$self->{_conditions}};
+  my @conditions = @{$self->{_conditions}};
+  if (! scalar (@conditions) ) {
+      $self->throw("No conditions found for this Rule");
+  }
+  return @conditions;
 }
 
 =head2 goalAnalysis
