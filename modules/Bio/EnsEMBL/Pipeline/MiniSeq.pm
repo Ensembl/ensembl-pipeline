@@ -173,7 +173,6 @@ sub get_cDNA_sequence {
    foreach my $exon (@exons) {
        $seqstr .= $exon->feature1->seq->seq;
    }
-
    if ($exons[0]->feature2->strand == 1) {
        return new Bio::PrimarySeq(-id => "genomic" ,
 				  -seq => $seqstr);
