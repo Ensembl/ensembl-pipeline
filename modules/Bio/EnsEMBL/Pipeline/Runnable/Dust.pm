@@ -35,6 +35,9 @@ Bio::EnsEMBL::Pipeline::Runnable::Dust
 Dust takes a Bio::Seq (or Bio::PrimarySeq) object and runs dust
 on it. The resulting output file is parsed to produce a set of features.
 
+NB This module (in particular the options and output parser)
+are written to use the Sanger 'tcdust' utility.
+
 =head1 CONTACT
 
 Mail to B<ensembl-dev@ebi.ac.uk>
@@ -85,7 +88,7 @@ sub new {
     )], @args);
 
     $level ||= 20;
-    $dust  ||= 'dust';
+    $dust  ||= 'tcdust';
 
     $self->dust($self->find_executable($dust));
 
@@ -201,15 +204,13 @@ sub run {
 sub run_dust {
     my ($self) = @_;
 
-    # dust takes one compulsory argument (fasta file)
-    # default output (stdout) is a dusted fasta file
-    # optional second argument is dust level (integer)
-    # adding another argument (of any value) returns
-    # results as a list of start/end pairs, rather than fasta
-    # (N.B. you can't get this output without specifying the
-    # dust level as well!)
+    # NB: Usage
+    # tcdust [ -l N ] -x seq.fa
 
-    my $cmd = join(" ", $self->dust, $self->filename, $self->level, "1 >", $self->results);
+    my $cmd = $self->dust;
+    $cmd .= " -l " . $self->level if $self->level;
+    $cmd .= " -x " . $self->filename . " > " . $self->results;
+    print "$cmd\n";
 
     print "Running dust\n";
     $self->throw("Error running dust on " . $self->filename . "\n")
@@ -249,6 +250,7 @@ sub parse_results {
     while (<$fh>)
     {
         chomp;
+	next if /^>/;
         if (/(\d+)\.\.(\d+)/) {
 
             my ($start, $end) = ($1, $2);
