@@ -24,6 +24,8 @@ package main;
     'swall'          => '',
     'dbEST'          => '',
     'embl_vertrna'   => '',
+    'AI053588.fa' =>	'(\w+)', # dbs used by the test modules in modules/t
+    'AP000074.pep' => '(\w+)\|',	
 );
 
 }
