@@ -47,7 +47,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
 
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
@@ -86,8 +86,8 @@ sub new {
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
-    $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis") ||
-	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis");
+    $analysis->isa("Bio::EnsEMBL::Analysis") ||
+	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
 
     $self->dbID         ($dbID);
     $self->adaptor  ($adaptor);
@@ -223,16 +223,16 @@ sub class {
   Title   : analysis
   Usage   : $self->analysis($anal);
   Function: Get/set method for the analysis object of the job
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : Bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
+  Args    : Bio::EnsEMBL::Analysis
 
 =cut
 
 sub analysis {
     my ($self,$arg) = @_;
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) 
-            unless $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
+            unless $arg->isa("Bio::EnsEMBL::Analysis");
 
 	$self->{'_analysis'} = $arg;
     }
@@ -293,7 +293,7 @@ sub flush_runs {
   unless (-x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
-    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
   for my $queue ( @queues ) {
@@ -466,7 +466,7 @@ sub runRemote {
 
   unless (-x $runner) {
     $runner = $::pipeConf{'runner'} || undef;
-    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
