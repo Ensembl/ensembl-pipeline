@@ -163,7 +163,7 @@ sub fetch_base_at_position {
 sub insert_gap {
   my ($self, $insert_position, $gap_length) = @_;
 
-  unless ($insert_position && $gap_length){
+  unless (defined $insert_position && $gap_length > 0){
     throw("Need to specify gap insertion position [$insert_position] " . 
 	  "and length [$gap_length]");
   }
