@@ -45,7 +45,6 @@ sub bsub{
 
 sub construct_command_line{
   my($self, $command, $stdout, $stderr) = @_; 
-  #print STDERR "creating the command line\n";
 #command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
   if(!$command){
     $self->throw("cannot create bsub if nothing to submit to it : $!\n");
@@ -85,8 +84,6 @@ sub construct_command_line{
 sub open_command_line{
   my ($self)= @_;
 
-  print STDERR $self->bsub."\n";
-  print STDERR "opening command line\n";
   open(SUB, $self->bsub." 2>&1 |");
   my $lsf;
   while(<SUB>){
@@ -94,8 +91,6 @@ sub open_command_line{
       $lsf = $1;
     }
   }
-  print STDERR "have opened ".$self->bsub."\n";
-  print STDERR "lsf ".$lsf."\n";
   $self->id($lsf);
   close(SUB);
 }
