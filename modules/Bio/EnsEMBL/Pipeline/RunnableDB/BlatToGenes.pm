@@ -289,7 +289,7 @@ sub filter_output{
 	  push( @good_matches, $match);
 	}
 	else{
-	  print STDERR "Reject!\n";
+	  #print STDERR "Reject!\n";
 	}
       }
       elsif(hits_within_2percent ) {
