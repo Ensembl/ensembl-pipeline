@@ -41,20 +41,28 @@ sub can_start{
    
     return $repeatmask_success->count;
   }else{
-    $self->warn("this task ".$self->name." uses a input_id type which isn't ".
-		 "contig but ".$type." its going to wait till all RepeatMasker jobs are finished");
+    #$self->warn("this task ".$self->name." uses a input_id type 
+    #which isn't "."contig but ".$type." its going to wait till 
+    #all RepeatMasker jobs are finished");
     return $self->get_TaskStatus('repeatmasker_task')->is_finished;
   }
 }
 
 sub update_input_ids{
   my $self = shift;
-
+  
   my $input_ids = $self->get_input_ids;
-  my $repeatmask_success = $self->get_TaskStatus('repeatmasker_task')->get_successful;
- 
-  my $can_start = $input_ids->and($repeatmask_success);
-  $self->input_ids_to_start($can_start);
+  my $type = $self->input_id_type;
+  if($type eq 'contig'){
+    my $repeatmask_success = $self->get_TaskStatus('repeatmasker_task')->get_successful;
+    
+    my $can_start = $input_ids->and($repeatmask_success);
+    $self->input_ids_to_start($can_start);
+  }else{
+    if($self->get_TaskStatus('repeatmasker_task')->is_finished){
+      $self->input_ids_to_start($input_ids);
+    }
+  }
 }
 
 
