@@ -48,7 +48,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-  DEFAULT_OUTPUT_DIR  => '/ecs4/scratch1/lec/test_out',
+  DEFAULT_OUTPUT_DIR  => '',
   DEFAULT_CLEANUP     => 'yes',	
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
@@ -56,8 +56,8 @@ use vars qw(%Config);
                       # the value to very high ie 100000 for a certain period of time
   JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be
                                      # counted
-                                     # valid statuses for this array are RUN, PEND, SSUSP, EXIT, MARK_AWOL_JOBS
-  DONE      => 1,
+                                     # valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE   
+  MARK_AWOL_JOBS      => 1,
   MAX_JOB_SLEEP       => 3600, # the maximun time to sleep for when job limit 
                                # reached
   MIN_JOB_SLEEP      => 120, # the minium time to sleep for when job limit reached
