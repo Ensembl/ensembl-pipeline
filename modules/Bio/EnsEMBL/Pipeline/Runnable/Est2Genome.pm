@@ -166,7 +166,7 @@ sub run {
     }
     
     #run est2genome 
-    #The -reverse switch ensure correct numbering on EST seq in either orientation
+    #The -reverse switch ensures correct numbering on EST seq in either orientation
     my $est_genome_command = "est_genome -reverse -genome $genfile -est $estfile |";
     open (ESTGENOME, $est_genome_command) 
                 or $self->throw("Can't open pipe from '$est_genome_command' : $!");
@@ -225,7 +225,6 @@ sub run {
  
               #load fp onto array
               push(@{$self->{'_fplist'}}, $fp);
-              warn Dumper ($fp);
         }    
     }
     close(ESTGENOME) or $self->throw("Error running '$est_genome_command' ($?)");
