@@ -60,7 +60,8 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_MAX_INTRON
 					 GB_TARGETTED_MIN_SPLIT_COVERAGE
 					 GB_TARGETTED_GW_GENETYPE
-					 );
+					 GB_SIZE
+					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -163,8 +164,28 @@ sub fetch_input{
   }
 
   
+
+  # we want to give genewise a bit more genomic than the one found by pmatch, 
+  # but we don't want to exceed the multiple of $GB_SIZE,
+  # if transcripts cross this boundary, they will get mangled afterwards when we
+  # read them in GeneBuilder and store them again using $GB_SIZE's
+
+  my $chunk_size = $GB_SIZE;
+  my $new_start  = $start - 10000;
+  my $new_end    = $end   + 10000;
+
+  my $chunk_start = (int($start/$GB_SIZE)) * $GB_SIZE + 1;
+  my $chunk_end   = $chunk_start + $GB_SIZE - 1;
+    
+  # check that end passed in is not larger than end of chunk
+  if ( $end > $chunk_end ){
+    $self->throw("the end of the protein match passed in ($end) is larger than the genomic chunk we are in ($chunk_end)");
+  }
+  my $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
+  my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
+  
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$newstart,$newend);
   
   $self->vc($vc);
   $self->protein_id($protein_id);
@@ -421,6 +442,7 @@ sub make_genes {
  Args    : Bio::EnsEMBL::Transcript
 
 =cut
+
 sub validate_transcript {
   my ($self, $transcript) = @_;
   
@@ -429,18 +451,28 @@ sub validate_transcript {
   my $valid = 1;
   my $split = 0;
   
+  # check exon phases:
+  my @exons = $transcript->get_all_Exons;
+  $transcript->sort;
+  for (my $i=0;$i<(scalar(@exons-1);$i++){
+    my $endphase = $exons[$i]->end_phase;
+    my $phase    = $exons[$i+1]->phase;
+    if ( $phase != $end_phase ){
+      return undef;
+    }
+  }
+
   # check coverage of parent protein
   my $threshold = $GB_TARGETTED_SINGLE_EXON_COVERAGE; 
-  my @exons = $transcript->get_all_Exons;
-    if(scalar(@exons) > 1){
-      $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
-    }
-
+  if(scalar(@exons) > 1){
+    $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
+  }
+  
   if(!defined $threshold){
     print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in GeneConf.pm\n";
     return undef;
   }
-
+  
   my $coverage  = $self->check_coverage($transcript);
   if ($coverage < $threshold){
     $self->warn ("Coverage of ". $self->protein_id . " is only $coverage - will be rejected\n");
@@ -448,7 +480,7 @@ sub validate_transcript {
   }
   
   print STDERR "Coverage of ". $self->protein_id . " is $coverage%\n";
-
+  
   my $previous_exon;
   foreach my $exon($transcript->get_all_Exons){
     if(!$self->validate_exon($exon)){
@@ -466,8 +498,6 @@ sub validate_transcript {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-#      if ($intron > 250000 && $coverage < 95) {
-
       if ($intron > $GB_TARGETTED_MAX_INTRON && $coverage < $GB_TARGETTED_MIN_SPLIT_COVERAGE ) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
 	$split = 1;
@@ -552,6 +582,7 @@ GENE:
 	next GENE;
       }
   }
+  
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
