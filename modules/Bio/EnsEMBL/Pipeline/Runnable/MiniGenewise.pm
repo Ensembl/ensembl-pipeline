@@ -45,9 +45,6 @@ use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 
-use Bio::PrimarySeqI;
-use Bio::SeqIO;
-
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 sub new {
@@ -57,11 +54,13 @@ sub new {
            
     $self->{'_features'} = [];
     
-    my( $genomic, $protein, $features,$endbias)
+    my( $genomic, $protein, $features,$endbias, $minimum_intron, $exon_padding)
       = $self->_rearrange([qw(GENOMIC
 			      PROTEIN
 			      FEATURES
 			      ENDBIAS
+			      MINIMUM_INTRON
+			      EXON_PADDING
 			     )],
 			  @args);
     
@@ -73,17 +72,19 @@ sub new {
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     $self->throw("[$protein] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     
-    $self->genomic_sequence($genomic) if defined($genomic);
-    $self->protein_sequence($protein) if defined($protein);
-    $self->endbias($endbias)          if defined($endbias);
-    $self->features($features)        if defined($features);
-    
+    $self->genomic_sequence($genomic)             if defined($genomic);
+    $self->protein_sequence($protein)             if defined($protein);
+    $self->endbias($endbias)                      if defined($endbias);
+    $self->features($features)                    if defined($features);
+    $self->_minimum_intron($minimum_intron)        if defined($minimum_intron); 
+    $self->_exon_padding($exon_padding)            if defined($exon_padding);
+   
     return $self;
   }
 
 
 
-sub make_miniseq {
+sub make_MiniSeq {
     my ($self) = @_;
 
     my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
@@ -92,16 +93,16 @@ sub make_miniseq {
 		
     my $prevend     = 0;
     my $count       = 0;
-    my $mingap      = $self->minimum_intron;
-    my @features    = $self->features;
+    my $mingap      = $self->_minimum_intron;
+    my @features    = @{$self->features};
     my $seqname     = $features[0]->seqname;
 
     @features = sort {$a->start <=> $b->start} @features;
     
   FEAT: foreach my $f (@features) {
 
-      my $start = $f->start - $self->exon_padding;
-      my $end   = $f->end   + $self->exon_padding;
+      my $start = $f->start - $self->_exon_padding;
+      my $end   = $f->end   + $self->_exon_padding;
 
       if ($start < 1) { 
 				$start = 1;
@@ -145,22 +146,27 @@ sub make_miniseq {
     my $current_coord = 1;
     
     # make a forward strand sequence, but tell genewise to run reversed if the 
-    # features are on the reverse strand - handled by is_reversed
+    # features are on the reverse strand - handled by _is_reversed
 
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
 
     foreach my $f (@genomic_features) {
-      
+
       my $cdna_start = $current_coord;
       my $cdna_end   = $current_coord + ($f->end - $f->start);
       
-      my $tmp = new Bio::EnsEMBL::SeqFeature( #-seqname => $f->seqname.'.cDNA',
-					     -start => $cdna_start,
-					     -end   => $cdna_end,
-					     -strand => 1);
-      
-      my $fp  = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-					      -feature2 => $tmp);
+      my $fp  = new Bio::EnsEMBL::FeaturePair();
+      $fp->start($f->start);
+      $fp->end($f->end);
+      $fp->seqname($f->seqname);
+      $fp->strand($f->strand);
+      $fp->score($f->score);
+      $fp->hstart($cdna_start);
+      $fp->hend($cdna_end);
+      $fp->hstrand(1);
+      $fp->hseqname($f->seqname."cdna");
+      $fp->p_value($f->p_value);
+      $fp->percent_id($f->percent_id);
       
       $pairaln->addFeaturePair($fp);
       
@@ -187,12 +193,12 @@ sub make_miniseq {
 sub run {
   my ($self) = @_;
 
-  my $miniseq = $self->make_miniseq;
+  my $miniseq = $self->make_MiniSeq;
 	my $minigen = $miniseq->get_cDNA_sequence;
 
   my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $minigen,
 							    -protein => $self->protein_sequence,
-							    -reverse => $self->is_reversed,
+							    -reverse => $self->_is_reversed,
 							    -endbias => $self->endbias);
   
   
@@ -207,7 +213,7 @@ sub run {
   
   my $strand = 1;
   
-  if ($self->is_reversed == 1) {
+  if ($self->_is_reversed == 1) {
     $strand = -1;
   }
   
@@ -288,7 +294,7 @@ sub run {
   
 }
 
-sub is_reversed {
+sub _is_reversed {
   my ($self) = @_;
   
   if (!defined($self->{_reverse})) {
@@ -297,7 +303,7 @@ sub is_reversed {
     my $fcount = 0;
     my $rcount = 0;
     
-    foreach my $f ($self->features) {
+    foreach my $f (@{$self->features}) {
       if ($f->strand == 1) {
 	$fcount++;
       } elsif ($f->strand == -1) {
@@ -335,27 +341,28 @@ sub features {
       push(@{$self->{'_features'}},$arg);
     }
   }
-  return @{$self->{_features}};
+  return $self->{_features};
 }    
 
 
-sub minimum_intron {
+sub _minimum_intron {
   my ($self,$arg) = @_;
   
   if (defined($arg)) {
     $self->{'_minimum_intron'} = $arg;
   }
+  # does this need to be hardcoded?
   return $self->{'_minimum_intron'} || 1000;
 }
 
 
-sub exon_padding {
+sub _exon_padding {
   my ($self,$arg) = @_;
   
   if (defined($arg)) {
     $self->{'_padding'} = $arg;
   }
-  
+  # does this need to be hardcoded
   return $self->{'_padding'} || 200;
   
 }

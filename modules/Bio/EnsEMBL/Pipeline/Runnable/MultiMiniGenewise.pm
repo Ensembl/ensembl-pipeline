@@ -40,14 +40,6 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
-use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis;
-use Bio::DB::RandomAccessI;
-
-use Bio::PrimarySeqI;
-use Bio::SeqIO;
-use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -98,7 +90,7 @@ sub features {
       $self->throw("[$features] is not an array ref.");
     }
   }
-  return @{$self->{_features}};
+  return $self->{_features};
 }
 
 =head2 genomic_sequence
@@ -111,7 +103,7 @@ Title   :   genomic_sequence
 
 =cut
   
-  sub genomic_sequence {
+sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
       #need to check if passed sequence is Bio::Seq object
@@ -167,10 +159,10 @@ sub seqfetcher {
 
 
 
-=head2 get_all_FeaturesbyId
+=head2 get_all_features_by_id
 
-    Title   :   get_all_FeaturesById
-    Usage   :   $hash = $self->get_all_FeaturesById;
+    Title   :   get_all_features_by_id
+    Usage   :   $hash = $self->get_all_features_by_id;
     Function:   Returns a ref to a hash of features.
                 The keys to the hash are distinct feature ids
     Returns :   ref to hash of Bio::EnsEMBL::FeaturePair
@@ -178,13 +170,13 @@ sub seqfetcher {
 
 =cut
 
-sub get_all_FeaturesById {
+sub get_all_features_by_id {
     my( $self) = @_;
     
     my  %idhash;
     my  %scorehash;
     
-  FEAT: foreach my $f ($self->features) {
+  FEAT: foreach my $f (@{$self->features}) {
       if (!(defined($f->hseqname))) {
 	$self->warn("No hit name for " . $f->seqname . "\n");
 	next FEAT;
@@ -204,25 +196,25 @@ sub get_all_FeaturesById {
       }
     }
     
-    my @ids = keys %idhash;
+    my @sorted_ids = keys %idhash;
     
-    @ids = sort {$scorehash{$a} <=> $scorehash{$b}} @ids;
+    @sorted_ids = sort {$scorehash{$a} <=> $scorehash{$b}} @sorted_ids;
     
-    return (\%idhash,\@ids);
+    return (\%idhash,\@sorted_ids);
   }
 
 
-=head2 get_all_FeatureIds
+=head2 get_all_feature_ids
 
-  Title   : get_all_FeatureIds
-  Usage   : my @ids = get_all_FeatureIds
+  Title   : get_all_feature_ids
+  Usage   : my @ids = get_all_feature_ids
   Function: Returns an array of all distinct feature hids 
   Returns : @string
   Args    : none
 
 =cut
 
-sub get_all_FeatureIds {
+sub get_all_feature_ids {
   my ($self) = @_;
   
   my ($idhash,$idref) = $self->get_all_FeaturesById;
@@ -275,13 +267,13 @@ sub get_Sequence {
 sub run {
   my ($self) = @_;
 
-  my ($fhash,$ids) = $self->get_all_FeaturesById;
+  my ($fhash,$ids) = $self->get_all_features_by_id;
   
   foreach my $id (@$ids) {
     print "Processing $id\n";
     
     my @features = @{$fhash->{$id}};
-    my @extras   = $self->find_extras (@features);
+    my @extras   = $self->_find_extras (@features);
     
     if (scalar(@extras) > 0) {
       my $pepseq = $self->get_Sequence($features[0]->hseqname);
@@ -308,7 +300,7 @@ sub run {
   return 1;
 }
 
-sub find_extras {
+sub _find_extras {
   my ($self,@features) = @_;
   
   my @output = $self->output;
@@ -318,7 +310,9 @@ sub find_extras {
   foreach my $f (@features) {
     
     my $found = 0;
-    
+
+    # does this need to be hardcoded?
+    # smaller for virgin genomes?
     if (($f->end - $f->start) < 50) {
       next FEAT;
     }      
