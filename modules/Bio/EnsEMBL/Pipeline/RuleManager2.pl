@@ -25,20 +25,22 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 my $dbhost = $::pipeConf{'dbhost'};
 my $dbname = $::pipeConf{'dbname'};
 my $dbuser = $::pipeConf{'dbuser'};
+my $queue  = $::pipeConf{'queue'};
 
 $| = 1;
 
-my $chunksize    = 5000;                # How many InputIds to fetch at one time
-my $currentStart = 0;                   # Running total of job ids
+my $chunksize    = 50000;                # How many InputIds to fetch at one time
+my $currentStart = 1;                   # Running total of job ids
 my $completeRead = 0;                   # Have we got all the input ids yet?
 my $flushsize    = 50;                  # How many jobs to store up before we submit to LSF
 my $local        = 0;                   # Run failed jobs locally
-
+my $analysis;                           # Only run this analysis ids
 
 GetOptions(     'host=s'     => \$dbhost,
                 'dbname=s'   => \$dbname,
                 'dbuser=s'   => \$dbuser,
                 'local'      => \$local,
+                'analysis=s' => \$analysis,
                 ) or die ("Couldn't get options");
 
 
@@ -79,7 +81,7 @@ while( 1 ) {
 	$currentStart += scalar( @tmp );
 	
 	if( scalar( @tmp ) < $chunksize ) {
-	    $completeRead = 1;
+	  $completeRead = 1;
 	}
     }
 
@@ -101,7 +103,11 @@ while( 1 ) {
 
 	my @current_jobs = $jobAdaptor->fetch_by_inputId($id->[0]);
 
-	for my $rule ( @rules )  {
+	RULE: for my $rule ( @rules )  {
+            print STDERR $analysis . " " . $rule->goalAnalysis->dbID . "\n";
+            if ($analysis && $analysis != $rule->goalAnalysis->dbID) {
+               next RULE;
+            }
 	    print( "\nChecking rule ",$rule->goalAnalysis->logic_name," for " . $id->[0] . "\n\n" );
 	    
 	    my $anal = $rule->check_for_analysis( @anals );
@@ -164,7 +170,7 @@ while( 1 ) {
                 }
             } else {
 	        print "\tBatch running job\n";
-	        $job->batch_runRemote('ultra_blast_farm');
+	        $job->batch_runRemote($queue);
             }
 
 	}
@@ -180,6 +186,7 @@ while( 1 ) {
     $completeRead = 0;
     $currentStart = 0;
     @idList = ();
+    exit(0);
     print( "Waking up and run again!\n" );
 	
 }

@@ -40,7 +40,6 @@ my $chunksize    = 500;
 my $currentStart = 0;
 my $completeRead = 0;
 
-print "pog\n";
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
     ( -host   => $dbhost,
       -dbname => $dbname,
@@ -52,8 +51,10 @@ my $ruleAdaptor = $db->get_RuleAdaptor;
 my $jobAdaptor  = $db->get_JobAdaptor;
 my $sic         = $db->get_StateInfoContainer;
 
-#check_jobs_against_failed();
-check_jobs_against_success();
+#while (1) {
+#  check_jobs_against_failed();
+  check_jobs_against_success();
+#}
 
 sub check_jobs_against_success {
 
@@ -124,9 +125,14 @@ sub check_jobs_against_failed {
 	  }
 
 	  if (!$test && $resubmit) {
-	      if( $job->retry_count < 5 ) {
+	      if( $job->retry_count < 50 ) {
+		if ($job->analysis->dbID == 2) {
+		  print( "Job restart locally ",$job->dbID,"\n" );
+		  $job->runLocally;
+		} else {
 		  print( "Job restart ",$job->dbID,"\n" );
 		  $job->runRemote($queue);
+		}
 	      } else {
 		  # dont retry, send mail ....
 		  mail_job_problem( $job );

@@ -13,13 +13,13 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '/work1/scp/out',
+    'nfstmp.dir' => '/work1/scp/out_m',
     'DBI.driver' => 'mysql',
     'dbhost'      => 'ecs1a',
-    'dbname'      => 'simon_oct07',
+    'dbname'      => 'simonmouse',
     'dbuser'      => 'ensadmin',
     'queue'       => 'acarichunky',
-    'batchsize'   => 50,
+    'batchsize'   => 1,
 );
 }
 

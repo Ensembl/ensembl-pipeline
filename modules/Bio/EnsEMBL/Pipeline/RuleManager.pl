@@ -21,14 +21,13 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-$| = 1;
 
 my $mailReceiver = "scp\@sanger.ac.uk";
-my $maxMails = 10000;
+my $maxMails = 50000;
 my $currentMail = 0;
 $| = 1;
 my %stats = ( );
-my $stopfile = '/nfs/acari/enspipe/.rmstop';
+my $stopfile = '/nfs/acari/enspipe/.rmstop_m';
 
 # how many second before job becomes old?
 my $oldJob = 36000;
@@ -43,7 +42,7 @@ die( "Cant fork hoover" ) unless defined($pid);
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
   ( -host => 'ecs1a.sanger.ac.uk',
-    -dbname => 'simon_oct07',
+    -dbname => 'simonmouse',
     -user => 'ensadmin',
   );
 
@@ -274,7 +273,7 @@ sub mail_job_problem {
   my $job = shift;
 
   print ( "Problem with job mailed\n" );
-  open( PIPE, "| Mail -s \"Pipeline problem\" $mailReceiver" ) or 
+  open( PIPE, "| Mail -s \"Pipeline problem [mouse]\" $mailReceiver" ) or 
     die( "Cant contact babysitter..." );
   print PIPE ( "Tried ",$job->analysis->module," 3 times and failed\n" );
   print PIPE ( "on input id ", $job->input_id,"\n" );
@@ -313,7 +312,7 @@ sub intialize_hotJobs_workon {
 
 
 sub to_many_error_exit {
-  open( PIPE, "|Mail -s \"PIPELINE STOPPED\" $mailReceiver" ) or
+  open( PIPE, "|Mail -s \"PIPELINE STOPPED [mouse]\" $mailReceiver" ) or
     die( "Cant contact babysitter..." );
   print PIPE ( "RuleManager reached maximum error report number and stopped.\n" );
   close PIPE;

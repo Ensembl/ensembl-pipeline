@@ -273,7 +273,8 @@ sub flush_runs {
 
     my $cmd;
   
-    $cmd = "bsub -q ".$queue." -o ".$lastjob->stdout_file.
+    $cmd = "bsub -mecsnodes -o ".$lastjob->stdout_file.
+    #$cmd = "bsub -q ".$queue." -m ecsnodes -o ".$lastjob->stdout_file.
 #    " -R osf1 ".
     " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
@@ -801,9 +802,9 @@ sub remove {
   if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
   if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
 
-  # if( defined $self->adaptor ) {
-  # $self->adaptor->remove( $self );
-  # }
+   if( defined $self->adaptor ) {
+   $self->adaptor->remove( $self );
+   }
 }
 
 1;

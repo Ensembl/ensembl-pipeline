@@ -55,7 +55,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDBI);
 
 sub analysis {
     my ($self, $analysis) = @_;
