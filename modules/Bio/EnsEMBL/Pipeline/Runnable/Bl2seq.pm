@@ -19,7 +19,8 @@ Bio::EnsEMBL::Pipeline::Runnable::Bl2seq
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(-seq1 => $seq1,
 							    -seq2 => $seq2,
 							    -min_eval => $min_eval,
-							    -min_score => $min_score);
+							    -min_score => $min_score,
+							    -workdir => "/tmp");
     or
     
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new()
@@ -37,8 +38,9 @@ This runs bl2seq (executable from the ncbi) and provides feature pair output
  seq2,
  min_eval,
  min_score,
+ workdir,
  run,
- output.
+ output
 
 =head1 CONTACT
 
@@ -67,9 +69,10 @@ use Bio::Tools::BPlite;
 sub new {
   my ($class,@args) = @_;
   my $self = bless {}, $class;
-  
-  my ($seq1, $seq2, $min_score, $min_eval) = 
-    $self->_rearrange([qw(SEQ1 SEQ2 MIN_SCORE MIN_EVAL)], @args);
+
+  $self->{'_fp_array'} =[];
+  my ($seq1, $seq2, $min_score, $min_eval, $workdir) = 
+    $self->_rearrange([qw(SEQ1 SEQ2 MIN_SCORE MIN_EVAL WORKDIR)], @args);
 
   if (! defined $seq1 || ! defined $seq2) {
     $self->throw("Must pass in both seq1 and seq1 args");
@@ -78,11 +81,18 @@ sub new {
   $self->seq1($seq1);
   $self->seq2($seq2);
 
+  if ($workdir) { 
+    $self->workdir($workdir); 
+  } else {
+    $self->workdir("/tmp");
+  }
+
   if (defined $min_score) {
     $self->min_score($min_score);
   } else {
     $self->min_score(40); 
   }
+  
   if (defined $min_eval) {
     $self->min_eval($min_eval);
   } else {
@@ -191,21 +201,21 @@ sub min_eval {
 =head2 run
 
  Title   : run
- Usage   :
- Function:
+ Usage   : $self->run();
+ Function: run bl2seq program (NCBI) on two previously defined sequences
  Example :
- Returns : 
- Args    :
+ Returns : 1
+ Args    : None
 
 
 =cut
 
 sub run {
-  my ($self,@args) = @_;
-
+  my ($self) = @_;
+  print "self: ",$self,"\n";
   # dump sequences to work directory
-  my $query = "/tmp/query.".$$;
-  my $sbjct = "/tmp/sbjct.".$$;
+  my $query = $self->workdir."/query.".$$;
+  my $sbjct = $self->workdir."/sbjct.".$$;
   
   open(F,">$query") || $self->throw("Cannot make $query $!");
   my $seqout = Bio::SeqIO->new(-fh => \*F,
@@ -229,8 +239,6 @@ sub run {
   
   my $bl2seq_parsing = new Bio::Tools::BPlite (-fh => \*BL2SEQ);
 
-  my @features;
-
   while (my $sbjct = $bl2seq_parsing->nextSbjct) {
     last unless ($sbjct);
     while (my $hsp = $sbjct->nextHSP) {
@@ -239,7 +247,6 @@ sub run {
       next if ($score < $min_score);
       
       my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
-      #print STDERR "Processing FP with $start-$end to $hstart-$hend\n";
       
       $fp->start($start);
       $fp->end($end);
@@ -251,8 +258,6 @@ sub run {
       $fp->hseqname($self->seq2->id);
       $fp->score($score);
       
-      push @features, $fp;
-
       $self->_add_fp($fp);
     }
     last; # should be only one subject anyway,
@@ -262,28 +267,55 @@ sub run {
   
   unlink($query);
   unlink($sbjct);
+  
+  return 1;
 }
 
 =head2 _add_fp
 
  Title   : _add_fp
- Usage   :
+ Usage   : $self->_add_fp($)
  Function:
  Example :
- Returns : 
- Args    :
+ Returns : none
+ Args    : Bio::EnsEMBL::FeaturePairs
 
 
 =cut
 
-sub _add_fp{
-   my ($self,@args) = @_;
-   push(@{$self->{'_fp_array'}},@args);
+sub _add_fp {
+  my ($self,@args) = @_;
+  if (@args) {
+    push(@{$self->{'_fp_array'}},@args);
+  } else {
+    warn "WARN: Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->_add_fp should have an argument\n";
+  }
 }
 
-sub output{
-  my ($self,@args) = @_;
+sub output {
+  my ($self) = @_;
   return @{$self->{'_fp_array'}};
+}
+
+=head2 workdir
+
+ Title   : workdir
+ Usage   : $obj->workdir($newval)
+ Function: 
+ Example : 
+ Returns : value of workdir
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub workdir{
+   my ($self,$value) = @_;
+   if( defined $value) {
+       $self->{'workdir'} = $value;
+   }
+   return $self->{'workdir'};
+
 }
 
 1;
