@@ -471,15 +471,19 @@ sub validate_sequence {
             $_ = $sequence;
             my $len = length ($_);
             my $invalidCharCount = tr/mrwsykvhdbxMRWSYKVHDBX/n/;
+            #extract invalid characters
+            $sequence =~ s/[ACGTN]//ig;
             if ($invalidCharCount / $len > 0.05)
             {
-                $self->warn("Ignoring ".$seq->display_id().
-                    " contains more than 5% odd nucleotide codes (type returns "
+                $self->warn("Ignoring ".$seq->display_id()
+                    ." contains more than 5% ($invalidCharCount) "
+                    ."odd nucleotide codes ($sequence)\n Type returns "
                     .$seq->moltype().")\n");
             }
             else
             {
-                $self->warn ("Cleaned up ".$seq->display_id."\n");
+                $self->warn ("Cleaned up ".$seq->display_id
+                   ." for blast : $invalidCharCount invalid chars ($sequence)\n");
                 $seq->seq($_);
                 push (@validated, $seq);
             }
