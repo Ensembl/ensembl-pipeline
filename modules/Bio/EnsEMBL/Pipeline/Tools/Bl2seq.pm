@@ -1,9 +1,9 @@
-
 package Bio::EnsEMBL::Pipeline::Tools::Bl2seq;
 
 use strict;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::Block;
+use Bio::EnsEMBL::Pipeline::RunnableI;
 use Carp;
 use vars qw(@ISA);
 
@@ -131,7 +131,11 @@ sub nextHSP {
   my $parse_alntype = "parse_".$self->alntype;
 #  print STDERR "parse_alntype: $parse_alntype\n";
   my $DnaDnaAlignFeature = $self->$parse_alntype($fh,$self->qlength,$self->slength);
-  return $DnaDnaAlignFeature
+  if ($DnaDnaAlignFeature) {
+    return $DnaDnaAlignFeature;
+  } else {
+    return undef;
+  }
 }
 
 sub parse_blastp {
@@ -252,11 +256,6 @@ sub parse_blastn {
     my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits,$perc_id) = ($ungapped_block->qstart,$ungapped_block->qend,$ungapped_block->qstrand,$ungapped_block->sstart,$ungapped_block->send,$ungapped_block->sstrand,$ungapped_block->bits,$ungapped_block->identity);
 
     my $fp = new Bio::EnsEMBL::FeaturePair;
-#    my $seqone = new Bio::EnsEMBL::SeqFeature;
-#    my $seqtwo = new Bio::EnsEMBL::SeqFeature;
-     
-#    $fp->feature1($seqone);
-#    $fp->feature2($seqtwo);
 
     $fp->start($qstart);
     $fp->end($qend);
