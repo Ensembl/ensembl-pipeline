@@ -106,7 +106,13 @@ sub fetch_input {
     print STDERR "Set genseq to " . $self->genseq. "\n";
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq->seq;
-    $self->throw("Need at least 3 nucleotides") unless ($seq =~ /[CATG]{3}/);
+    if ($seq =~ /[CATG]{3}/) {
+        $self->input_is_void(0);
+    }
+    else {
+        $self->input_is_void(1);
+        $self->warn("Need at least 3 nucleotides");
+    }
 }
 
 #get/set for runnable and args
@@ -117,7 +123,8 @@ sub runnable {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
-							     -threshold => 75);
+							     -threshold_type => 'PVALUE',
+							     -threshold => 1);
 
       $self->{'_runnable'} = $run;
     }

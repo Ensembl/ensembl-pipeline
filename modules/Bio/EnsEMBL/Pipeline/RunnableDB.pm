@@ -369,6 +369,25 @@ sub seqfetcher {
     return $self->{'_seqfetcher'};
 }
 
+=head2 input_is_void
 
+    Title   :   input_is_void
+    Usage   :   $self->input_is_void(1)
+    Function:   Get/set flag for sanity of input sequence
+                e.g. reject seqs with only two base pairs
+    Returns :   Boolean
+    Args    :   Boolean
+
+=cut
+
+sub input_is_void {
+    my ($self, $value) = @_;
+
+    if ($value) {
+	$self->{'_input_is_void'} = $value;
+    }
+    return $self->{'_input_is_void'};
+
+}
 
 1;

@@ -558,6 +558,10 @@ sub runInLSF {
       print (STDERR "READING: Lost the will to live Error\n");
       die "Problems with $module fetching input for " . $self->input_id . " [$err]\n";
   }
+  if ($rdb->input_is_void) {
+      $self->set_status( "VOID" );
+      return;
+  }
   eval {
       $self->set_status( "RUNNING" );
       $rdb->run;
