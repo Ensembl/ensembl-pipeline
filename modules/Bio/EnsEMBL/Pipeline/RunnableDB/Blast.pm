@@ -197,7 +197,7 @@ sub write_output{
   my $contig;
   eval 
     {
-      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+      $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
 
   if ($@) 
