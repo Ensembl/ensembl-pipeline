@@ -2,7 +2,7 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 27;}
+BEGIN { $| = 1; plan test => 17;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB;
