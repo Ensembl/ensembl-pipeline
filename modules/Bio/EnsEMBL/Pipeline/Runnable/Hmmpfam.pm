@@ -47,6 +47,8 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
+use Bio::Tools::HMMER::Results;
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
@@ -66,7 +68,7 @@ sub new {
   }
 
   $self->database($database);
-
+  $self->{'_sf'} = [];
   return $self;
 }
 
@@ -86,7 +88,23 @@ sub new {
 sub run{
    my ($self,@args) = @_;
 
-   $self->throw("Not implemented yet. Waiting for Ewan to get off his arse");
+   my $seqfile = "/tmp/hmmpfam.$$.seq";
+   $seqout = Bio::SeqIO->open( -file => ">$seqfile", -format => 'fasta' );
+   $seqout->write_seq($self->peptide);
+   $seqout = undef;
+   my $db = $self->database;
+
+   open(HMMER,"hmmpfam $db $seqfile");
+   
+   $res = new Bio::Tools::HMMER::Results( -fh => \*HMMER , -type => 'hmmpfam');
+
+   close(HMMER) || $self->throw("Error in running hmmpfam $db $seqfile");
+   
+   foreach my $domain ( $res->each_Domain ) {
+       $self->add_SeqFeature($domain);
+   }
+
+   unlink($seqfile);
 
 }
 
@@ -104,9 +122,31 @@ sub run{
 
 sub output{
    my ($self,@args) = @_;
+   
+   return @{$self->{'_sf'}};
+}
 
-   $self->throw("Not implemented yet. Waiting for Ewan to get off his arse");
 
+=head2 add_SeqFeature
+
+ Title   : add_SeqFeature
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub add_SeqFeature{
+   my ($self,$sf) = @_;
+
+   if( !defined $sf ) {
+       $self->throw("You have not passed in a sequence feature...");
+   }
+
+   push(@{$self->{'_sf'}},$sf);
 }
 
 
@@ -151,3 +191,5 @@ sub database{
     return $obj->{'database'};
 
 }
+
+1;
