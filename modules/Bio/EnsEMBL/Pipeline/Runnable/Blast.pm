@@ -125,14 +125,18 @@ sub new {
     $self->{'_workdir'}   = undef;     # location of temp directory
     $self->{'_filename'}  = undef;     # file to store Bio::Seq object
     $self->{'_results'}   = undef;     # file to store results of analysis
-    $self->{'_prune'}     = 1;         # Don't allow hits to the same sequence in the same region
-    $self->{'_coverage'}  = 10;        # Only return hits to a depth of 10
-    $self->{'_ungapped'}  = undef;         # Do we create gapped features or not
+    $self->{'_prune'}     = 1;         # Don't allow hits to the same sequence
+                                       # in the same region
+    $self->{'_hardprune'} = 0;         # Don't force a hard limit on depth
+                                       # of coverage of query
+    $self->{'_coverage'}  = 10;        # Control parameter for coverage, prune
+                                       # and hardprune
+    $self->{'_ungapped'}  = undef;     # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
 
     #print STDERR "@args\n";
     # Now parse the input options and store them in the object
-    my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$ungapped,$options) = 
+    my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$hardprune,$ungapped,$options) = 
             $self->_rearrange([qw(QUERY 
                                   PROGRAM 
                                   DATABASE 
@@ -141,6 +145,7 @@ sub new {
                                   FILTER 
                                   COVERAGE
                                   PRUNE
+				  HARDPRUNE
                                   UNGAPPED
                                   OPTIONS)], 
                               @args);
@@ -188,6 +193,9 @@ sub new {
     
     if (defined($prune)) {
       $self->prune($prune);
+    }
+    if (defined($hardprune)) {
+      $self->hardprune($hardprune);
     }
     if (defined($coverage)) {
       $self->coverage($coverage);
@@ -471,8 +479,10 @@ sub parse_results {
       @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
     }
     if ($self->filter) {
-      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune    => $self->prune,
-                                                                       -coverage => $self->coverage);
+      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
+                                         -prune     => $self->prune,
+                                         -hardprune => $self->hardprune,
+                                         -coverage  => $self->coverage);
       my @pruned = $search->run(@allfeatures);
 
 #      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
@@ -493,6 +503,15 @@ sub prune {
     $self->{_prune} = $arg;
   }
   return $self->{_prune};
+}
+
+sub hardprune {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_hardprune} = $arg;
+  }
+  return $self->{_hardprune};
 }
 
 sub coverage {
