@@ -176,7 +176,7 @@ sub write_output {
    print "there are ".@transcripts." transcripts\n";
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
-     my @exons = $trans->get_all_Exons();
+     my @exons = @{$trans->get_all_Exons()};
 
      if ($exons[0]->strand == 1) {
        @exons = sort {$a->start <=> $b->start } @exons;
