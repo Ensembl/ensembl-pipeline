@@ -2251,7 +2251,8 @@ sub blast_unmapped_transcripts{
   # Ian's parameters:
   #my $options = "W=5 M=1 N=-1 Q=3 R=3";
   
-  my $options = "W=5";
+  #my $options = "W=5";
+  my $options = "";
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						  '-program'        => 'wublastn',
