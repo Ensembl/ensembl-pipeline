@@ -71,12 +71,11 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$submission_id,$input_id,$cls,$analysis,$stdout,$stderr,$retry_count) 
+    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				SUBMISSION_ID
 				INPUT_ID
-				CLASS
 				ANALYSIS
 				STDOUT
 				STDERR
@@ -84,7 +83,6 @@ sub new {
 				)],@args);
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
-    $cls     = 'contig' unless defined($cls);
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
