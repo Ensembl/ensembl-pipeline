@@ -109,27 +109,29 @@ use Carp;
 =head2 map_temp_Exons_to_real_Exons
 
  Title   : map_temp_Exons_to_real_Exons
- Usage   : ($mapped,$new,$untransfered) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Exons_to_real_Exons($dbobj,$tim,@tempexons);
+ Usage   : ($mapped,$new,$untransfered) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Exons_to_real_Exons($newvc,$logfile,@tempexons);
  Function:
  Example :
  Returns : exon objects with valid ids 
  Args    : database object to call get_new_ExonID()
-           database object whoes contig have get_old_Exons();
+           database object whoes fpc contig have get_old_Exons();
            a list of temporary exons
 
 
 =cut
 
 sub map_temp_Exons_to_real_Exons{
-   my ($dbobj,$timdb,@tempexons) = @_;
+   my ($newvc,$logfile,@tempexons) = @_;
 
-   if( !ref $dbobj || !$dbobj->isa('Bio::EnsEMBL::Pipeline::DB::ObjI') ) {
-       die "This is **dreadful** I don't even have a database object to throw an exception on!";
+
+   if( !ref $newvc || !$newvc->isa('Bio::EnsEMBL::Virtual::Contig') ) {
+       die("No virtual contig provided - remember you need a virtual contig from the old !");
+   }
+   
+   if( !defined $logfile ) {
+       $newvc->throw("Must pass logfile in for logging");
    }
 
-   if( !ref $timdb || !$timdb->isa('Bio::EnsEMBL::DB::ObjI') ) {
-       $dbobj->throw("No second DB::ObjI provided - remember you need to provide two dbobjects!");
-   }
    
    if( scalar(@tempexons) == 0 ) {
        $dbobj->warn("No temporary exons passed in for mapping. Can't map! - returning an empty list");
@@ -158,22 +160,9 @@ sub map_temp_Exons_to_real_Exons{
        }
 
        $ismapped{$tempexon->id} = 0;
-       my $tempcid = $tempexon->contig_id;
-
-       if( !exists $contig{$tempcid} ) {
-	   # this will throw an exception if it can't find it
-	   $contig{$tempcid} = $timdb->get_Contig($tempcid);
-	   $oldexons{$tempcid} = [];
-	   push(@{$oldexons{$tempcid}},$contig{$tempcid}->get_old_Exons);
-	   
-	   # set moved hash to zero
-	   foreach my $oldexon ( @{$oldexons{$tempcid}} ) {
-	       $moved{$oldexon->id} = 0;
-	       $oldexonhash{$oldexon->id} = $oldexon;
-	   }
-
-       }
    }
+
+   my @oldexons = $newvc->get_old_Exons();
 
    # get out one date for this mapping....
 
@@ -186,7 +175,7 @@ sub map_temp_Exons_to_real_Exons{
 
    foreach my $tempexon ( @tempexons ) {
        
-       foreach my $oldexon ( @{$oldexons{$tempexon->contig_id}} ) {
+       foreach my $oldexon ( @oldexons ) {
        
 	   # if start/end/strand is identical, it is definitely up for moving.
 	   
@@ -197,7 +186,8 @@ sub map_temp_Exons_to_real_Exons{
 	       # ok - if we have already moved this - ERROR
 
 	       if( $moved{$oldexon->id} == 1 ) {
-		   $dbobj->throw("attempting to move old exon twice with identical start/end/strand. Not clever!");
+		   print $logfile "attempting to move old exon twice ".$oldexon->id." with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand." Not clever!";
+		   next;
 	       }
 
 	       # set ismapped to 1 for this tempexon
@@ -206,15 +196,18 @@ sub map_temp_Exons_to_real_Exons{
 
 	       # we move the id. Do we move the version?
 	       $tempexon->id($oldexon->id);
+	       print $logfile "EXON MAP IDENTICAL: ",$tempexon->id," ",$oldexon->id," "; # will add version
 	       push(@mapped,$tempexon);
-
+	       
 	       if( $oldexon->has_identical_sequence == 1) {
 		   # version and id
 		   $tempexon->version($oldexon->version);
+		   print $logfile "Identical\n";
 		   # don't update modified
 	       } else {
 		   $tempexon->version($oldexon->version()+1);
 		   $tempexon->modified($time);
+		   print $logfile "Version increment to ",$oldexon->version()+1,"\n";
 	       }
 	       
 	       $moved{$oldexon->id} = 1;
@@ -255,6 +248,8 @@ sub map_temp_Exons_to_real_Exons{
 	   $ismapped{$tempexon->id} = 1;
 	   
 	   # we move the id. Do we move the version?
+	   print $logfile "EXON MAP BEST FIT: ",$tempexon->id," ",$biggestoverlap->id," ",$biggestoverlap->version()+1,"\n";
+
 	   $tempexon->id($biggestoverlap->id);
 	   $tempexon->version($biggestoverlap->version()+1);
 	   $tempexon->modified($time);
@@ -264,10 +259,13 @@ sub map_temp_Exons_to_real_Exons{
 	   next TEMPEXON;
        } else {
 	   # ok - new Exon
-	   $tempexon->id($dbobj->gene_obj->get_new_ExonID);
+	   my $tempid = $tempexon->id();
+	   $tempexon->id($newvc->dbobj->gene_obj->get_new_ExonID);
 	   $tempexon->created($time);
 	   $tempexon->modified($time);
 	   $tempexon->version(1);
+	   print $logfile "EXON MAP NEW: ",$tempid," ",$tempexon->id," 1\n"; 
+
 	   push(@new,$tempexon);
 	   next TEMPEXON;
        }
@@ -293,7 +291,7 @@ sub map_temp_Exons_to_real_Exons{
 =head2 map_temp_Genes_to_real_Genes
 
  Title   : map_temp_Genes_to_real_Genes
- Usage   : ($deadgeneid,$deadtranscriptid) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Genes_to_real_Genes($dbobj,\@tempgenes,\@oldgenes);
+ Usage   : ($deadgeneid,$deadtranscriptid) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Genes_to_real_Genes($newvc,$logfile,\@tempgenes,\@oldgenes);
  Function:
  Example :
  Returns : 
@@ -304,7 +302,7 @@ sub map_temp_Exons_to_real_Exons{
 =cut
 
 sub map_temp_Genes_to_real_Genes{
-   my ($dbobj,$tempgenes,$oldgenes) = @_;
+   my ($dbobj,$logfile,$tempgenes,$oldgenes) = @_;
 
    print STDERR "Got $dbobj, $tempgenes, $oldgenes\n";
 
@@ -371,7 +369,7 @@ sub map_temp_Genes_to_real_Genes{
        my $currentgeneid = undef;
 
        foreach my $oe ( $og->each_unique_Exon ) {
-	   print STDERR "Looking at ",$oe->id,"which is [",$newe2g{$oe->id},"]\n";
+	   print $logfile "Looking at ",$oe->id,"which is [",$newe2g{$oe->id},"]\n";
 	   if( ! exists $newe2g{$oe->id} ) {
 	       # this exon does not exist in the new transcripts!
 	       next;
@@ -387,7 +385,7 @@ sub map_temp_Genes_to_real_Genes{
 	       next;
 	   }
 
-	   print STDERR "Looking at $tgeneid for ".$og->id."\n";
+	   print $logfile "Looking at $tgeneid for ".$og->id."\n";
 
 	   $currentgeneid = $tgeneid;
 
@@ -472,12 +470,15 @@ sub map_temp_Genes_to_real_Genes{
        my @newtrans = $newg{$newgeneid}->each_Transcript;
        my @oldtrans = $oldg{$oldgeneid}->each_Transcript;
 
-       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($dbobj,\@newtrans,\@oldtrans);
+       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($dbobj,$logfile,\@newtrans,\@oldtrans);
 
        push(@dead_transcript_ids,@$additional_dead_transcript_ids);
 
 
        # deal with the mapping of ids
+
+       print $logfile "GENE MAP: MOVED",$newgeneid," ",$oldgeneid,"\n";
+
        $newg{$newgeneid}->id($oldgeneid);
 
        if( $should_increment ) {
@@ -520,12 +521,14 @@ sub map_temp_Genes_to_real_Genes{
 	   push(@oldtrans,$oldg{$oldgeneid}->each_Transcript);
        }
        
-       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($dbobj,\@newtrans,\@oldtrans);
+       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($dbobj,$logfile,\@newtrans,\@oldtrans);
 
        push(@dead_transcript_ids,@$additional_dead_transcript_ids);
 
 
        # deal with the mapping of ids
+       print $logfile "GENE MAP: MERGED",$newgeneid," ",$oldg{$largest}->id,"\n";
+
        $newg{$newgeneid}->id($oldg{$largest}->id);
 
        # we increment irregardless of anything else
@@ -604,6 +607,7 @@ sub map_temp_Genes_to_real_Genes{
 	   $fitted{$current_fit->id} = 1;
 	   if( $assigned == 0 ) {
 	       # this gene id wins. Hurray!
+	       print $logfile "GENE MAP: SPLIT",$newgeneid," ",$oldgeneid,"\n";
 	       $newg{$newgeneid}->id($oldgeneid);
 	       $newg{$newgeneid}->version($oldg{$oldgeneid}->version+1);
 	   }
@@ -618,7 +622,10 @@ sub map_temp_Genes_to_real_Genes{
 	       if( exists $fitted{$newtrans->id} ) {
 		   next;
 	       }
+	       my $tempid = $newtrans->id; 
 	       $newtrans->id($dbobj->get_new_TranscriptID);
+	       print $logfile "TRANS MAP: SPLIT",$newgeneid," ",$oldgeneid,"\n";
+
 	       $newtrans->version(1);
 	       $newtrans->created($now);
 	       $newtrans->modified($now);
@@ -626,9 +633,12 @@ sub map_temp_Genes_to_real_Genes{
 
 	   if( $newg{$newgeneid}->id ne $oldgeneid ) {
 	       my $newgene = $newg{$newgeneid};
-
+	       my $tempid = $newgene->id();
 	       # it is an unassigned gene...
 	       $newgene->id($dbobj->get_new_GeneID());
+
+	       print $logfile "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id,"\n";
+
 	       $newgene->created($now);
 	       $newgene->modified($now);
 	       $newgene->version(1);
@@ -687,7 +697,7 @@ sub map_temp_Genes_to_real_Genes{
 =cut
 
 sub map_temp_Transcripts_to_real_Transcripts{
-   my ($dbobj,$new,$old) = @_;
+   my ($dbobj,$logfile,$new,$old) = @_;
 
    my @newt = @$new;
    my @oldt = @$old;
@@ -731,11 +741,11 @@ sub map_temp_Transcripts_to_real_Transcripts{
        }
 
        if ( defined $fitted ) {
-	   print STDERR "Fitting transcript",$fitted->id,"\n";
+
+	   print $logfile "TRANSCRIPT MAP: ",$fitted->id," ",$oldt->id,"\n";
 
 	   $fitted->id($oldt->id);
 	   $fitted{$fitted->id} = 1;
-
 	   if( Bio::EnsEMBL::Pipeline::GeneComp::increment_Transcript($oldt,$fitted) == 1 ) {
 	       $fitted->version($oldt->version()+1);
 	       $fitted->modified($now);
@@ -747,6 +757,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
 	   # it is dead ;)
 	   $should_change = 1;
 	   push(@dead,$oldt->id);
+	   print $logfile "TRANSCRIPT MAP: KILLED",$oldt->id,"\n";
        }
    }
 
@@ -754,12 +765,13 @@ sub map_temp_Transcripts_to_real_Transcripts{
        if( exists $fitted{$newt->id} ) {
 	   next;
        }
-
+       my $tempid = $newt->id;
        $should_change = 1;
        $newt->id($dbobj->get_new_TranscriptID);
        $newt->version(1);
        $newt->created($now);
        $newt->modified($now);
+       print $logfile "TRANSCRIPT MAP: NEW",$tempid," ",$newt->id,"\n";
    }
 
    return ($should_change,\@dead);
