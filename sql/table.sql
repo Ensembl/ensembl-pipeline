@@ -8,7 +8,7 @@ CREATE TABLE analysisprocess (
   db varchar(40),
   db_version varchar(40),
   db_file varchar(80),
-  program varchar(40),
+  program varchar(80),
   program_version varchar(40),
   program_file varchar(40),
   parameters varchar(80),
@@ -27,21 +27,6 @@ CREATE TABLE current_status (
   status varchar(40) DEFAULT '' NOT NULL,
   PRIMARY KEY (jobId),
   KEY status_index (status)
-);
-
-#
-# Table structure for table 'exon_pair'
-#
-CREATE TABLE exon_pair (
-  exon1_id varchar(40) DEFAULT '' NOT NULL,
-  exon2_id varchar(40) DEFAULT '' NOT NULL,
-  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  type varchar(40) DEFAULT '' NOT NULL,
-  exon1_version varchar(40) DEFAULT '0' NOT NULL,
-  exon2_version varchar(40) DEFAULT '0' NOT NULL,
-  PRIMARY KEY (exon1_id,exon2_id,exon1_version,exon2_version,type),
-  KEY exon1_index (exon1_id),
-  KEY exon2_index (exon2_id)
 );
 
 #
@@ -74,25 +59,6 @@ CREATE TABLE jobstatus (
   KEY status_index (status)
 );
 
-#
-# Table structure for table 'timclone'
-#
-CREATE TABLE timclone (
-  disk_id varchar(40) DEFAULT '' NOT NULL,
-  clone_group set('SU','EU','SF','EF') DEFAULT '' NOT NULL,
-  chromosome varchar(10) DEFAULT 'unk' NOT NULL,
-  last_check datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  dna_update_state int(10) unsigned DEFAULT '0' NOT NULL,
-  update_state int(10) unsigned DEFAULT '2' NOT NULL,
-  update_label varchar(40) DEFAULT 'dna_read' NOT NULL,
-  update_date datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  modified datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  internal_lock int(10) DEFAULT '1' NOT NULL,
-  external_lock int(10) DEFAULT '1' NOT NULL,
-  PRIMARY KEY (disk_id)
-);
-
 CREATE TABLE RuleGoal (
   ruleId int unsigned default '0' not null auto_increment,
   goalAnalysisId int unsigned,
@@ -113,6 +79,14 @@ CREATE TABLE InputIdAnalysis (
 
   PRIMARY KEY ( analysisId, inputId, class ),
   KEY inputIdx( inputId, created )
+);
+
+CREATE TABLE VoidInputIdAnalysis (
+  inputId varchar(40) DEFAULT '' NOT NULL,
+  analysisId int(11) DEFAULT '0' NOT NULL,
+  exception varchar(40),
+  PRIMARY KEY (inputId,analysisId),
+  KEY exc (exception)
 );
 
 
@@ -145,6 +119,10 @@ CREATE TABLE chromosome (
   name              varchar(40) NOT NULL,
   species_id        int(11) NOT NULL,
   id                int(11) NOT NULL,
+  known_genes       int(11) NULL,
+  unknown_genes     int(11) NULL,
+  snps              int(11) NULL,
+  length            int(11) NULL,
   
   PRIMARY KEY (chromosome_id)
 );
@@ -164,8 +142,8 @@ CREATE TABLE clone (
   stored        datetime NOT NULL,
   
   PRIMARY KEY (internal_id),
-  UNIQUE embl (embl_id,embl_version),
-  UNIQUE id   (id,embl_version)
+  KEY embl (embl_id,embl_version),
+  KEY id   (id,embl_version)
 );
 
 #
@@ -185,37 +163,8 @@ CREATE TABLE contig (
   PRIMARY KEY (internal_id),
   UNIQUE id (id),
   KEY clone (clone),
-  KEY dna (dna),
-  KEY length (length)
+  KEY dna (dna)
 );
-
-#
-# Table structure for table 'contigoverlap'
-#
-CREATE TABLE contigoverlap (
-  dna_a_id              int(10) unsigned NOT NULL,
-  dna_b_id              int(10) unsigned NOT NULL,
-  overlap_source        varchar(40) NOT NULL,
-  contig_a_position     int(10) unsigned,
-  contig_b_position     int(10) unsigned,
-  overlap_size          int(10) unsigned NOT NULL,
-  overlap_type          enum('right2left','left2right','left2left','right2right'),
-  
-  PRIMARY KEY (dna_a_id,dna_b_id,overlap_source),
-  KEY dna_b_dna_a(dna_b_id,dna_a_id),
-  KEY (overlap_size),
-  KEY (overlap_source)
-);
-
-
-CREATE TABLE contig_orientation (
-   dna_id      int(10) unsigned NOT NULL,
-   orientation int(2),
-   orientation_source varchar(40) NOT NULL,
-   PRIMARY KEY (dna_id,orientation_source)
-);
-
-
 
 #
 # Table structure for table 'db_update'
@@ -250,7 +199,7 @@ CREATE TABLE dna (
   created   datetime NOT NULL,
   
   PRIMARY KEY (id)
-);
+) MAX_ROWS = 750000 AVG_ROW_LENGTH = 13000;
 
 #
 # Table structure for table 'exon'
@@ -270,7 +219,6 @@ CREATE TABLE exon (
   sticky_rank   int(10) DEFAULT '1' NOT NULL,
   
   PRIMARY KEY (id,sticky_rank),
-  KEY id_contig (id,contig),
   KEY contig (contig)
 );
 
@@ -301,18 +249,15 @@ CREATE TABLE feature (
   hstart        int(11) NOT NULL,
   hend          int(11) NOT NULL,
   hid           varchar(40) NOT NULL,
-  evalue        varchar(40),
-  perc_id       int(10),
+  evalue        varchar(20),
+  perc_id       tinyint(10),
   phase         tinyint(1),
   end_phase     tinyint(1),
   
   PRIMARY KEY (id),
-  KEY overlap (id,contig,seq_start,seq_end,analysis),
   KEY contig (contig),
   KEY hid (hid)
-# Do we really need tables as big as this... :-|
-# Hopefully not but the default table length is probably too small
-) MAX_ROWS = 1000000000;
+) MAX_ROWS = 300000000 AVG_ROW_LENGTH = 80;
 
 #
 # Table structure for table 'fset'
@@ -345,31 +290,23 @@ CREATE TABLE gene (
   created   datetime NOT NULL,
   modified  datetime NOT NULL,
   stored    datetime NOT NULL,
+  analysisId int,
   
   PRIMARY KEY (id)
 );
 
 
 #
-# Table structure for table 'ghost'
-#
-CREATE TABLE ghost (
-  id        varchar(40) NOT NULL,
-  version   varchar(5) NOT NULL,
-  obj_type  enum('transcript','protein','exon') DEFAULT 'exon' NOT NULL,
-  deleted   datetime NOT NULL,
-  stored    datetime NOT NULL,
-  
-  PRIMARY KEY (id,version,obj_type)
-);
-
-#
 # Table structure for table 'meta'
 #
 CREATE TABLE meta (
-  donor_database_locator    varchar(100) NOT NULL,
-  offset_time               time DEFAULT '00:30:00' NOT NULL,
-  schema_version            varchar(40) NOT NULL
+  meta_id INT not null auto_increment,
+  meta_key varchar( 40 ) not null,
+  meta_value varchar( 255 ) not null,
+
+  PRIMARY KEY( meta_id ),
+  KEY meta_key_index ( meta_key),
+  KEY meta_value_index ( meta_value )
 );
 
 #
@@ -381,27 +318,15 @@ CREATE TABLE repeat_feature (
   seq_start int(10) NOT NULL,
   seq_end   int(10) NOT NULL,
   score     double(16,4) NOT NULL,
-  strand    int(1) DEFAULT '1' NOT NULL,
+  strand    tinyint(1) DEFAULT '1' NOT NULL,
   analysis  int(10) unsigned NOT NULL,
   hstart    int(11) NOT NULL,
   hend      int(11) NOT NULL,
   hid       varchar(40) NOT NULL,
   
   PRIMARY KEY (id),
-  KEY overlap (id,contig,seq_start,seq_end,analysis),
   KEY contig (contig),
   KEY hid (hid)
-);
-
-#
-# Table structure for table 'species'
-#
-CREATE TABLE species (
-  species_id    int(10) NOT NULL auto_increment,
-  nickname      varchar(40) NOT NULL,
-  taxonomy_id   int(10) NOT NULL,
-  
-  PRIMARY KEY (species_id)
 );
 
 #
@@ -425,7 +350,6 @@ CREATE TABLE supporting_feature (
   end_phase     tinyint(1),
   
   PRIMARY KEY (id),
-  KEY overlap (id,seq_start,seq_end,analysis),
   KEY id_exon (id,exon),
   KEY exon (exon),
   KEY analysis (analysis),
@@ -443,7 +367,8 @@ CREATE TABLE transcript (
   translation   varchar(40) NOT NULL,
   
   PRIMARY KEY (id),
-  KEY gene_index (gene)
+  KEY gene_index (gene),
+  KEY translation_index ( translation )
 );
 
 #
@@ -461,36 +386,20 @@ CREATE TABLE translation (
 );
 
 
-CREATE TABLE genedblink (
-   gene_id      varchar(40) NOT NULL,
-   external_db  varchar(40) NOT NULL,
-   external_id  varchar(40) NOT NULL,
-   
-   PRIMARY KEY(gene_id,external_db,external_id)
-);
-
-
-CREATE TABLE transcriptdblink (
-   transcript_id    varchar(40) NOT NULL,
-   external_db      varchar(40) NOT NULL,
-   external_id      varchar(40) NOT NULL,
-   
-   PRIMARY KEY(transcript_id,external_db,external_id)
-);
-
-
 CREATE TABLE genetype (
    gene_id      varchar(40) NOT NULL,
    type  varchar(40) NOT NULL,
       
-   PRIMARY KEY(gene_id,type)
+   PRIMARY KEY(gene_id),
+   KEY(type)
+
 );
 
 # this is a denormalised golden path
 
 CREATE TABLE static_golden_path (
     fpcctg_name    varchar(20) NOT NULL,
-    chr_name       varchar(5)  NOT NULL,
+    chr_name       varchar(20)  NOT NULL,
     raw_id         int(10) NOT NULL,
     chr_start      int(10) NOT NULL,
     chr_end        int(10) NOT NULL,
@@ -498,12 +407,12 @@ CREATE TABLE static_golden_path (
     fpcctg_end     int(10) NOT NULL,
     raw_start      int(10) NOT NULL,
     raw_end        int(10) NOT NULL,
-    raw_ori        int(2)  NOT NULL, 
+    raw_ori        tinyint(2)  NOT NULL, 
     type           varchar(20) NOT NULL,
     
     PRIMARY KEY(raw_id,type),
-    KEY(fpcctg_name),
-    KEY(chr_name) 
+    KEY(fpcctg_name, fpcctg_start),
+    KEY(chr_name,chr_start)
 );
 
 
