@@ -52,6 +52,7 @@ use vars qw(%Config);
 	   DEFAULT_CLEANUP => 'yes',	
 	   MAX_PENDING_JOBS   => 400,
 	   AUTO_JOB_UPDATE     => 1,
+     DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
 	   QUEUE_CONFIG       => [
 				  {
 				   logic_name => 'RepeatMask',
@@ -63,6 +64,7 @@ use vars qw(%Config);
 				   queue => 'normal',
 				   output_dir => '/some_dir/',
 				   cleanup => 'yes',	
+           runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
 				  },
 				  {
 				   logic_name => 'Genscan',	
