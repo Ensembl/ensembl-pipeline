@@ -39,7 +39,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::Root::RootI;
-use FreezeThaw qw(freeze thaw);
+# use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::LSFJob;
 
@@ -143,7 +143,7 @@ sub _parse_line {
     for (my $i = 6; $i < $#f-2; $i++) {
 	$job_name = $job_name . $f[$i] . " ";
     }
-    chomp($job_name);
+    chop($job_name);
     
     my $job = new Bio::EnsEMBL::Pipeline::LSFJob
 	('-id'              => $id,
