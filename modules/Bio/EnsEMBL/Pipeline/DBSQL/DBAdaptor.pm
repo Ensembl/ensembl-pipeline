@@ -50,10 +50,6 @@ use DBI;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
-use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
-use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::Root::RootI;
 
@@ -61,12 +57,6 @@ use Bio::Root::RootI;
 
 @ISA = qw(Bio::EnsEMBL::DBSQL::DBAdaptor);
 
-
-# sub new {
-    # my ($class,@args) = @_;
-    # my $self = $class->SUPER::new(@args);
-    # return $self;
-# }
 
 # new() inherited from Bio::EnsEMBL::DBSQL::BaseAdaptor
 
@@ -87,20 +77,12 @@ sub get_JobAdaptor {
   my ($self) = @_;
 
   if( ! defined $self->{_JobAdaptor} ) {
+    require Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
     $self->{_JobAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
       ( $self );
   }
 
   return $self->{_JobAdaptor};
-}
-
-
-# DECRUFTME - do we need this?
-
-sub get_OldAnalysis {
-        my ($self,$id) = @_;
-
-        return $self->SUPER::get_Analysis($id);
 }
 
 
@@ -143,6 +125,7 @@ sub get_RuleAdaptor {
   my ($self) = @_;
 
   if( ! defined $self->{_RuleAdaptor} ) {
+    require Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
     $self->{_RuleAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
       ( $self );
   }
@@ -166,6 +149,7 @@ sub get_StateInfoContainer {
   my ($self) = @_;
 
   if( ! defined $self->{_StateInfoContainer} ) {
+    require Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
     $self->{_StateInfoContainer} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
       ( $self );
   }
@@ -173,48 +157,6 @@ sub get_StateInfoContainer {
   return $self->{_StateInfoContainer};
 }
 
-
-# CHECKME - this is probably old hat as well...
-
-sub _parseJob {
-    my ($self,$row) = @_;
-
-    $self->throw("No row object input") unless defined($row);
-
-    my $jobid             = $row->{id};
-    my $input_id          = $row->{input_id};
-    my $analysis_id       = $row->{analysis};
-    my $LSF_id            = $row->{LSF_id};
-    my $machine           = $row->{machine};
-    my $object            = $row->{object};
-    my $queue             = $row->{queue};
-    my $stdout            = $row->{stdout_file};
-    my $stderr            = $row->{stderr_file};
-    my $input_object_file = $row->{input_object_file};
-    my $output_file       = $row->{output_file};
-    my $status_file       = $row->{status_file};
-
-    my $analysis          = $self->get_Analysis($analysis_id);
-
-       $analysis->id($analysis_id);
-
-    my $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id       => $jobid,
-						     -input_id => $input_id,
-						     -analysis => $analysis,
-						     -LSF_id   => $LSF_id,
-						     -machine  => $machine,
-						     -object   => $object,
-						     -queue    => $queue,
-						     -dbobj    => $self,
-						     -stdout   => $stdout,
-						     -stderr   => $stderr,
-						     -input_object_file => $input_object_file,
-						     -output_file => $output_file,
-                                                     -status_file => $status_file,
-						     );
-
-    return $job;
-}
 
 
 sub delete_Job {
