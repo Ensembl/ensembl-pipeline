@@ -655,7 +655,7 @@ sub output {
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
 #    print "\ntranscript ".$transcript->temporary_id." translates to ".$transcript->translate->seq."\n\n";
     foreach my $exon (@exons) {
-      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $transcript->temporary_id,
                                            -start   => $exon->start,
                                            -end     => $exon->end,
                                            -strand  => $exon->strand,
@@ -666,7 +666,7 @@ sub output {
                                            -source_tag => 'genscan',
                                            -primary_tag => 'prediction',
                                            -analysis     => $analysis);
-      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $transcript->temporary_id,
                                             -start   => $exon->start,
                                             -end     => $exon->end,
                                             -strand  => $exon->strand,
