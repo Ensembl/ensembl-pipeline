@@ -79,15 +79,15 @@ sub gap_penalty{
 ############################################################
 
 sub compare{
-    my ($self,$human_gene,$mouse_gene) = @_;
+  my ($self,$human_gene,$mouse_gene) = @_;
   
     my @human_transcripts = @{$human_gene->get_all_Transcripts};
-    my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
-    
-    ############################################################
-    # we make a pair only if the transcripts align with gaps 
-    # no longer than the smallest exon
-    
+  my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
+  
+  ############################################################
+  # we make a pair only if the transcripts align with gaps 
+  # no longer than the smallest exon
+  
   my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
   my @transcript_matches;
   foreach my $human_t ( @human_transcripts ){
@@ -95,8 +95,14 @@ sub compare{
 	  print STDERR "blasting isoforms\n";
 	  my ($score,$pair) = $self->blast_isoforms( $human_t, $mouse_t );
 	  if ( $score && $pair ){
-	      $object_map->match($human_t, $mouse_t, $score );
+	    $object_map->match($human_t, $mouse_t, $score );
 	  }
+	  unless ($score){
+	    $score = 0;
+	  }
+	  my $id1 = $human_t->stable_id || $human_t->dbID;
+	  my $id2 = $mouse_t->stable_id || $mouse_t->dbID;
+	  print STDERR "Pair ( $id1 , $id2 ) score = $score\n";
       }
   }
   my $best_pairs_object = $object_map->stable_marriage;
@@ -106,12 +112,14 @@ sub compare{
   my $pair_count = scalar($best_pairs_object->list1);
   print STDERR "pairs created: ".$pair_count."\n";
   foreach my $element1 ( $best_pairs_object->list1 ){
-      foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
-	  # there should be only one
-	  print STDERR "Pair with score: ".$best_pairs_object->score( $element1, $partner )."\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
-      }
+    foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
+      # there should be only one
+      my $id1 = $element1->stable_id || $element1->dbID;
+      my $id2 = $partner->stable_id || $partner->dbID;
+      print STDERR "Pair ( $id1 , $id2 ) with score: ".$best_pairs_object->score( $element1, $partner )."\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
+    }
   }
   
   ############################################################
@@ -120,6 +128,8 @@ sub compare{
   my $conserved_count        = 0;
   my $skipped_exons_count    = 0;
   my $terminal_missing_count = 0;
+  my $all_conserved_count    = 0;
+
   foreach my $element1 ( $best_pairs_object->list1 ){
       foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
 	  
@@ -127,19 +137,22 @@ sub compare{
 	  #print STDERR "Pair with score: ".$best_pairs_object->score( $element1, $partner )."\n";
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
-	  
-	  my ($missing_terminal_exons, $exon_skipping) = 
-	      $self->compare_Exons( $element1, $partner, $self->gap_penalty);
-	  
-	  if ($exon_skipping ){
-	      $skipped_exons_count++;
-	  }
-	  if ($missing_terminal_exons){
-	      $terminal_missing_count++;
-	  }
-	  unless ( $exon_skipping || $missing_terminal_exons ){
-	      $conserved_count++;
-	  }
+	
+	my ($missing_terminal_exons, $exon_skipping, $all_exons_conserved) = 
+	  $self->compare_Exons( $element1, $partner, $self->gap_penalty);
+	
+	if ($exon_skipping ){
+	  $skipped_exons_count++;
+	}
+	if ($missing_terminal_exons){
+	  $terminal_missing_count++;
+	}
+	unless ( $exon_skipping || $missing_terminal_exons ){
+	  $conserved_count++;
+	}
+	if ( $all_exons_conserved ){
+	  $all_conserved_count++;
+	}
 
 	  #$self->print_alignment( $element1, $partner, \@score_matrix);
 	  
@@ -153,7 +166,7 @@ sub compare{
   print STDERR "GENEPAIR\t".
       "$human_id\thuman_trans_count:$human_trans_count\t".
 	  "$mouse_id\tmouse_trans_count:$mouse_trans_count\t".
-	      "pairs:$pair_count\t".
+	    "pairs:$pair_count\t".
 		  "conserved:$conserved_count\t".
 		      "with_skipped_exons:$skipped_exons_count\t".
 			  "with_missing_terminals:$terminal_missing_count\n";
@@ -183,12 +196,12 @@ sub blast_isoforms{
 	$id2 = "no id";
     }
     
-    print STDERR "comparing $id1 and $id2\n";
+    print STDERR "\tcomparing $id1 and $id2\n";
     
     my $seq1    = $tran1->seq;
     my $length1 = $seq1->length;
     unless ( $seq1->display_id ){
-	$seq1->display_id($id1);
+      $seq1->display_id($id1);
     }
     
     my $seq2    = $tran2->seq;
@@ -228,12 +241,12 @@ sub blast_isoforms{
     
     my @featurepairs = $blast->output();
     
-    foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
-	$self->print_Feature($fp);
-	#print $fp->gffstring . "\n";
-    }
-    print STDERR "$id1 length = $length1\n";
-    print STDERR "$id2 length = $length2\n";
+    #foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
+    #	$self->print_Feature($fp);
+    #	#print $fp->gffstring . "\n";
+    #    }
+    print STDERR "\t$id1 length = $length1\n";
+    print STDERR "\t$id2 length = $length2\n";
     
     ############################################################
     # calculate coverage
@@ -266,8 +279,8 @@ sub blast_isoforms{
 	$max_score = $score;
 	$pair = $features[$i];
       }
-      print STDERR "query:$id1 coverage:$query_coverage spliced:$query_spliced\n";
-      print STDERR "target:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+      print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
+      print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
     }
     return ($max_score,$pair);
 }
@@ -446,7 +459,7 @@ sub process_query{
      $feature_length += $cluster_hends[$i] - $cluster_hstarts[$i] + 1;
  }
  my $coverage = sprintf "%.2f", 100*$feature_length/$qtranscript_length;
- print STDERR "coverage = $feature_length / $qtranscript_length = $coverage\n";
+ #print STDERR "coverage = $feature_length / $qtranscript_length = $coverage\n";
 
  #$self->print_exons_in_transcript($qtran);
  
@@ -533,6 +546,8 @@ sub compare_Exons{
   my $exon_skipping = 0;
   my $conserved     = 0;
   my $same_length   = 0;
+  my $same_phases   = 0;
+
   for ( my $i=0 ; $i< scalar(@$human_list); $i++ ){
     if ( $human_list->[$i] eq 'gap' ){
       $human_missing++;
@@ -546,6 +561,11 @@ sub compare_Exons{
       my $mouse_length = $mouse_list->[$i]->end - $mouse_list->[$i]->start + 1;
       if ( $human_length == $mouse_length ){
 	$same_length++;
+      }
+      if ( $human_list->[$i]->phase == $mouse_list->[$i]->phase 
+	   &&
+	   $human_list->[$i]->end_phase == $mouse_list->[$i]->end_phase ){
+	$same_phases++;
       }
     }
     if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
@@ -561,7 +581,7 @@ sub compare_Exons{
 	  $exon_skipping++;
 	  $human_internal_missing++;
 	}
-	elsif( $mouse_list->[$i] eq 'gap'){
+	if( $mouse_list->[$i] eq 'gap'){
 	  $exon_skipping++;
 	  $mouse_internal_missing++;
 	}
@@ -574,10 +594,10 @@ sub compare_Exons{
 
   my $human_id = $human_t->stable_id || $human_t->dbID;
   my $mouse_id = $mouse_t->stable_id || $mouse_t->dbID;
-
+  
   print STDERR "TRANPAIR\t".
     "$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
-      "conserved_exons:$conserved\twith_same_length:$same_length\t".
+      "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
 	"$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
   
   my $print_report = 1;
@@ -602,7 +622,7 @@ sub compare_Exons{
 	      $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
 	  }
 	  unless ($score){
-	      $score = "-";
+	      $score = 0;
 	  }
 	  print STDERR $human_string."\t<---->\t".$mouse_string.
 	      "\t score= ".$score."\n";
@@ -612,7 +632,11 @@ sub compare_Exons{
   if ( $human_terminal_missing || $mouse_terminal_missing ){
       $missing_terminal_exons = 1;
   }
-  return ($missing_terminal_exons, $exon_skipping);
+  my $all_conserved = 0;
+  if ( $same_length == scalar( @$human_list ) ){
+    $all_conserved = 1;
+  }
+  return ($missing_terminal_exons, $exon_skipping, $all_conserved);
 }
 
 ############################################################
@@ -772,10 +796,12 @@ sub blast_Exons{
   system("pressdb $database > /dev/null 2>&1");
   
   ############################################################
-  my $options = 'V=200 B=200 W=5 E=0.01 E2=0.01 -nogap';
+  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=9 E=0.01 E2=0.01 -nogap';
+  #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						  '-program'        => 'wutblastx',
+						  #'-program'        => 'wublastn',
 						  '-database'       => $database,
 						  '-threshold_type' => "PVALUE",
 						  '-threshold'      => 1e-10,
