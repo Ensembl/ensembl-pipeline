@@ -217,10 +217,25 @@ sub run{
       }
     }
     
+    #print STDERR "=== Before converting coordinates ===\n";
+    #foreach my $gene (@genes ){
+    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+#      }
+#    }
+
     # need to convert coordinates?
     my @mapped_genes = $self->convert_coordinates( @genes );
-    print STDERR "mapped_gene is a $mapped_genes[0]\n";
     
+    #print STDERR "=== After converting coordinates ===\n";
+    #foreach my $gene (@genes ){
+    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+#      }
+#    }
+
+
+
     $self->output(@mapped_genes);
 
   }
@@ -252,14 +267,14 @@ sub filter_output{
     @{$matches_sorted_by_coverage{$rna_id}} = sort { $b->score <=> $a->score  } @{$matches{$rna_id}};
     
     my $max_score;
-    print STDERR "matches for $rna_id:\n";
+    #print STDERR "matches for $rna_id:\n";
     foreach my $match ( @{$matches_sorted_by_coverage{$rna_id}} ){
       unless ($max_score){
 	$max_score = $match->score;
       }
-      foreach my $sub_feat ( $match->sub_SeqFeature ){
-	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
-      }
+      #foreach my $sub_feat ( $match->sub_SeqFeature ){
+      #	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
+      #}
       my $score = $match->score;
       
       my $only_best_score = 1;
@@ -270,7 +285,7 @@ sub filter_output{
 	if ( $score == $max_score && 
 	     $score >= $EST_MIN_COVERAGE && 
 	     $match->percent_id >= $EST_MIN_PERCENT_ID ){
-	  print STDERR "Accept!\n";
+	  #print STDERR "Accept!\n";
 	  push( @good_matches, $match);
 	}
 	else{
@@ -284,11 +299,11 @@ sub filter_output{
 	     $score >= $EST_MIN_COVERAGE && 
 	     $match->percent_id >= $EST_MIN_PERCENT_ID ){
 	  
-	  print STDERR "Accept!\n";
+	  #print STDERR "Accept!\n";
 	  push( @good_matches, $match);
 	}
 	else{
-	  print STDERR "Reject!\n";
+	  #print STDERR "Reject!\n";
 	}
       }
     }
@@ -317,12 +332,18 @@ sub write_output{
       $gene_adaptor->store($gene);
     };
     if ($@){
-      $self->warn("Unable to store gene!!\n$@");
+      $self->warn("Unable to store gene!!");
+      foreach my $tran (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
+      }
+      print STDERR "Error message:\n$@";
     }
-    print STDERR "stored gene ".$gene->dbID."\n";
-    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence(   $transcript );
+    else{
+      print STDERR "stored gene ".$gene->dbID."\n";
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence(   $transcript );
+      }
     }
   }
 }
@@ -379,7 +400,7 @@ sub make_genes{
       $supp_feature->analysis   ($self->analysis );
       $exon->add_supporting_features($supp_feature);
       
-      if ( $prev_exon &&  ( $exon->start - $prev_exon->end ) < 3  ){
+      if ( $prev_exon &&  ( $exon->start - $prev_exon->end ) < 10  ){
 	$prev_exon->end( $exon->end );
 	$prev_exon->add_supporting_features( @{$exon->get_all_supporting_features} );
       }
@@ -404,28 +425,13 @@ sub convert_coordinates{
   my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
   my $slice_adaptor     = $self->db->get_SliceAdaptor;
   
-
+  
   my @transformed_genes;
  GENE:
   foreach my $gene (@genes){
   TRANSCRIPT:
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
       
-      # is it a slice or a rawcontig?
-      my $rawcontig = $rawcontig_adaptor->fetch_by_name($transcript->start_Exon->seqname);
-      if ( $rawcontig ){
-	foreach my $exon (@{$transcript->get_all_Exons}){
-	  $exon->contig( $rawcontig);
-	}
-      }
-      
-      my $contig = $transcript->start_Exon->contig;
-      
-      if ( $contig && $contig->isa("Bio::EnsEMBL::RawContig") ){
-	print STDERR "transcript already in raw contig, no need to transform:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	next TRANSCRIPT;
-      }
       my $slice_id      = $transcript->start_Exon->seqname;
       my $chr_name;
       my $chr_start;
@@ -449,8 +455,21 @@ sub convert_coordinates{
       }
     }
     
-
-    my $transformed_gene = $gene->transform;
+    
+    my $transformed_gene;
+    # some exons may fall on gaps!!!
+    eval{
+      $transformed_gene = $gene->transform;
+    };
+    if ($@){
+      $self->warn("could not transform coordinates of gene");
+      foreach my $tran (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
+      }
+      print STDERR "Error message:\n";
+      print STDERR $@."\n";
+      next GENE;
+    }
     push( @transformed_genes, $transformed_gene);
   }
   return @transformed_genes;
