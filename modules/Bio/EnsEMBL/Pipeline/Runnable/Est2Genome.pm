@@ -188,7 +188,7 @@ sub run {
 
         if ($_ =~ /^Exon/)
         {
-	    print STDERR "Found exon $_";
+	    print STDERR "$_";
               #split on whitespace
               my @elements = split;
               #extract values from output line
@@ -294,7 +294,7 @@ sub _createfiles {
     my ($self, $genfile, $estfile, $dirname)= @_;
     
     #check for diskspace
-    my $spacelimit = 0.1; # 0.1Gb or about 100 MB
+    my $spacelimit = 0.01; # 0.01Gb or about 10 MB
     my $dir ="./";
     unless ($self->_diskspace($dir, $spacelimit)) 
     {
