@@ -16,10 +16,10 @@
 
   Options are to be set in GeneBuild config files
   The important ones for this script are:
-     GeneBuild::Databases::GB_GW_DBNAME     
-     GeneBuild::Databases::GB_GW_DBUSER
-     GeneBuild::Databases::GB_GW_DBHOST
-     GeneBuild::Databases::GB_GW_DBPASS          
+     GeneBuild::Databases::GB_DBNAME     
+     GeneBuild::Databases::GB_DBUSER
+     GeneBuild::Databases::GB_DBHOST
+     GeneBuild::Databases::GB_DBPASS          
 
      GeneBuild::Scripts::GB_PM_OUTPUT   directory to write filtered output files
 
@@ -33,20 +33,20 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-							     GB_GW_DBNAME
-							     GB_GW_DBUSER
-							     GB_GW_DBHOST
-							     GB_GW_DBPASS
+							     GB_DBNAME
+							     GB_DBUSER
+							     GB_DBHOST
+							     GB_DBPASS
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
 							   GB_PM_OUTPUT
 							  );
 
-my $dbname = $GB_GW_DBNAME;
-my $dbuser = $GB_GW_DBUSER;
-my $host   = $GB_GW_DBHOST;
-my $pass   = $GB_GW_DBPASS;
+my $dbname = $GB_DBNAME;
+my $dbuser = $GB_DBUSER;
+my $host   = $GB_DBHOST;
+my $pass   = $GB_DBPASS;
 my $pmfile = $GB_PM_OUTPUT;
 if(defined $pmfile && $pmfile ne ''){
   $pmfile .= "/pm_best.out";
@@ -60,10 +60,10 @@ if(!defined $dbname  ||
    !defined $pmfile
   ){
   print  "USAGE: pmatch_feature_loader.pl\nVarious parameters must be set in GeneBuild config files - here are your relevant current settings:\n " .
-    "\tGB_GW_DBNAME      = $GB_GW_DBNAME\n" .
-    "\tGB_GW_DBUSER      = $GB_GW_DBUSER\n" .
-    "\tGB_GW_DBHOST      = $GB_GW_DBHOST\n" .
-    "\tGB_GW_DBPASS      = $GB_GW_DBPASS\n" . 
+    "\tGB_DBNAME      = $GB_DBNAME\n" .
+    "\tGB_DBUSER      = $GB_DBUSER\n" .
+    "\tGB_DBHOST      = $GB_DBHOST\n" .
+    "\tGB_DBPASS      = $GB_DBPASS\n" . 
     "\tGB_PM_OUTPUT   = $GB_PM_OUTPUT\n";
 
   exit(1);
