@@ -34,6 +34,7 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Data::Dumper;
 
 use vars qw(@ISA);
 use strict;
@@ -43,25 +44,32 @@ use FreezeThaw qw(freeze thaw);
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
+use Bio::EnsEMBL::Pipeline::LSFJob;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
-
-
 sub _initialize {
     my ($self,@args) = @_;
 
     my $make = $self->SUPER::_initialize;
-    my ($dbobj,$input_id,$analysis,$queue,$create,$file_output) 
+    my ($dbobj,$id,$lsfid,$input_id,$analysis,$queue,$create,$stdout,$stderr,$input,$output) 
 	= $self->_rearrange([qw(DBOBJ
+				ID
+				LSF_ID
 				INPUT_ID
 				ANALYSIS
 				QUEUE
 				CREATE
-				FILE_OUTPUT
+				STDOUT
+				STDERR
+				INPUT_OBJECT_FILE
+				OUTPUT_FILE
 				)],@args);
+
+    $id    = -1 unless defined($id);
+    $lsfid = -1 unless defined($lsfid);
 
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $dbobj      || $self->throw("Can't create a job object without a database handle");
@@ -73,20 +81,25 @@ sub _initialize {
     $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis");
 
-    $self->{_file_output} = 1;
-
+    $self->id         ($id);
     $self->_dbobj     ($dbobj);
     $self->input_id   ($input_id);
-    $self->queue      ($queue);
     $self->analysis   ($analysis);
-    $self->file_output($file_output);
-    
-    $self->LSF_id(-1);
-    $self->machine("__NONE__");
+    $self->stdout_file($stdout);
+    $self->stderr_file($stderr);
+    $self->input_object_file($input);
+    $self->output_file($output);
+
+    my $job = new Bio::EnsEMBL::Pipeline::LSFJob(-queue     => $queue,
+						 -exec_host => "__NONE__",
+						 -id        => $lsfid);
+
+    $self->_LSFJob($job);
 
     if ($create == 1) {
 	$self->get_id;
     }
+
     return $make; # success - we hope!
 }
 
@@ -136,12 +149,11 @@ sub get_id {
     $self->throw("No analysis object defined") unless $self->analysis;
     $self->throw("No analysis id input")       unless defined($self->analysis->id);
 
-    my $query =   "insert into job (id,input_id,analysis,queue) values (NULL," .
-				     $self->input_id     . ",".
+    my $query =   "insert into job (id,input_id,analysis,queue) values (NULL,\"" .
+				     $self->input_id     . "\",".
 				     $self->analysis->id . ",\"" .
 				     $self->queue        ."\")";
 
-    print("query is $query\n");
     my $sth = $self->_dbobj->prepare($query);
     my $res = $sth->execute();
 
@@ -154,7 +166,8 @@ sub get_id {
     $self->id($id);
 
     my $status  = $self->set_status('CREATED');
-    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
+
+
     return $id;
 }
 
@@ -202,39 +215,18 @@ sub analysis {
 }
 
 
-=head2 file_output
 
-  Title   : file_output
-  Usage   : $self->file_output
-  Function: Get/set method for whether
-            we put output in a file or not
-  Returns : 0,1
-  Args    : none,0 or 1
-
-=cut
-
-
-sub file_output {
+sub write_object_file {
     my ($self,$arg) = @_;
 
-    my $pwd = "/nfs/disk100/humpub/michele/out";
+    $self->throw("No input object file defined") unless defined($self->input_object_file);
 
     if (defined($arg)) {
-	if ($arg == 1) {
-	    $self->{_file_output} = 1;
-
-	    $self->output_file($pwd . "/pog.$$.out");
-	    $self->error_file ($pwd . "/pog.$$.err");
-
-	} elsif ($arg == 0) {
-	    $self->{_file_output} = 0;
-	} else {
-	    $self->throw("Only 0 or 1 valid arguments for file_output [$arg]");
-	}
+	my $str = FreezeThaw::freeze($arg);
+	open(OUT,">" . $self->input_object_file);
+	print(OUT $str);
+	close(OUT);
     }
-
-    return $self->{_file_output};
-
 }
 
 =head2 LSF_id
@@ -251,12 +243,7 @@ sub file_output {
 sub LSF_id {
     my ($self,$arg) = @_;
 
-    if (defined($arg)) {
-	$self->{_LSF_id} = $arg;
-	
-    }
-    return $self->{_LSF_id};
-
+    return $self->_LSFJob->id($arg);
 }
 
 =head2 queue
@@ -271,12 +258,8 @@ sub LSF_id {
 
 sub queue {
     my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_queue} = $arg;
-    }
-    return $self->{_queue};
-
+    
+    return $self->_LSFJob->queue($arg);
 }
 
 
@@ -293,53 +276,9 @@ sub queue {
 sub machine {
     my ($self,$arg) = @_;
 
-    if (defined($arg)) {
-	$self->{_machine} = $arg;
-    }
-    return $self->{_machine};
+    return $self->_LSFJob->exec_host($arg);
+
 }
-
-
-=head2 output_file
-
-  Title   : output_file
-  Usage   : $self->output_file($file);
-  Function: Get/set method for the job output file
-  Returns : string
-  Args    : string
-
-=cut
-
-sub output_file {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_output_file} = $arg;
-    }
-    return $self->{_output_file};
-}
-
-
-=head2 error_file
-
-  Title   : error_file
-  Usage   : $self->error_file($file)
-  Function: Get/set method for the error file 
-  Returns : string
-  Args    : string
-
-=cut
-
-sub error_file {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_error_file} = $arg;
-    }
-    return $self->{_error_file};
-}
-
-
 
 =head2 submit
 
@@ -354,41 +293,23 @@ sub error_file {
 sub submit {
     my ($self,$obj) = @_;
 
-    $self->store($obj);
+    $self->write_object_file($obj);
 
-    my $status = $self->set_status("STORED");
+    my $status = $self->set_status("WRITTEN_OBJECT_FILE");
     
-    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
-
-
     my $cmd = "bsub -q " . $self->queue;
-    my $opt = "";
 
-    if ($self->file_output == 1) {
-	$cmd .= " -o " . $self->output_file . " -e " . $self->error_file;
-	$opt  = "-f";
-    }
-
-    $cmd .= " \"/nfs/disk100/humpub/michele/runner " . $opt . " -o \\\"" . FreezeThaw::freeze($obj) . "\\\"\"";
+    $cmd .= " -o " . $self->stdout_file . " -e " . $self->stderr_file;
+    
+    $cmd .= " \"/nfs/disk100/humpub/michele/runner  -object " . $self->input_object_file . " " . 
+	                                           "-output " . $self->output_file       . "\"";
 
     print STDERR "Command is $cmd\n";
 
-    open (SUB,"$cmd |");
+    $self->_LSFJob->submit($cmd);
 
-    my $lsfid = 0;
-
-    while (<SUB>) {
-	if (/Job <(\d+)>/) {
-	    $lsfid = $1;
-	    $self->LSF_id($lsfid);
-	    $self->store($obj);
-	    print (STDERR $_);
-	}
-    }
-		   
-    close(SUB);
-
-    if ($lsfid != 0) {
+    if ($self->LSF_id != -1) {
+	$self->store($obj);
 	my $status = $self->set_status("SUBMITTED");
 	print STDERR "Submitted job number " . $self->LSF_id . " to queue " . $self->queue . "\n";
 	return $status;
@@ -410,22 +331,40 @@ sub submit {
 sub store {
     my ($self,$obj) = @_;
 
-    $self->throw("Not connected to database") unless defined($self->_dbobj);
+    eval {
+	$self->throw("Not connected to database") unless defined($self->_dbobj);
 
-    my ($jobstr) = FreezeThaw::freeze($obj);
-    
-    my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue) " .
-		 "values( " . $obj->id .   "," .
-		 $obj->input_id        .   "," .
-		 $obj->analysis->id    .   "," .
-		 $obj->LSF_id          .   ",\"" .
-		 $obj->machine         . "\",\"".
-		 $jobstr               . "\",\"".
-		 $obj->queue           . "\")");
+	my $tmpdb = $obj->_dbobj;
 
-    my $sth = $self->_dbobj->prepare($query);
-    my $res = $sth->execute();
+	$obj->{_dbobj} = undef;
+	
+	my ($jobstr) = FreezeThaw::freeze($obj);
+	
+	my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue," .
+		     "input_object_file,stdout_file,stderr_file,output_file) " .
+		     "values( " . $obj->id .   ",\"" .
+		     $obj->input_id        .   "\"," .
+		     $obj->analysis->id    .   "," .
+		     $obj->LSF_id          .   ",\"" .
+		     $obj->machine         .   "\",\"".
+		     $jobstr               .   "\",\"".
+		     $obj->queue           .   "\",\"" .
+		     $obj->input_object_file . "\",\"".
+		     $obj->stdout_file     .   "\",\"".
+		     $obj->stderr_file     .   "\",\"" .
+		     $obj->output_file     .   "\")");
+	
+	my $sth = $tmpdb->prepare($query);
+	my $res = $sth->execute();
 
+	$obj->_dbobj($tmpdb);
+
+
+    };
+
+    if ($@) {
+	$self->warn("No database connection. Can't store object [$@]");
+    }
 }
 
 
@@ -464,29 +403,45 @@ sub set_status {
 
     $self->throw("No status input" ) unless defined($arg);
 
+    my $status;
 
-    my $sth = $self->_dbobj->prepare("insert into jobstatus(id,status,time) values (" .
-				     $self->id . ",\"" .
-				     $arg      . "\"," .
-				     "now())");
-    my $res = $sth->execute();
+    eval {	
+	my $sth = $self->_dbobj->prepare("insert into jobstatus(id,status,time) values (" .
+					 $self->id . ",\"" .
+					 $arg      . "\"," .
+					 "now())");
+	my $res = $sth->execute();
 
+	$sth = $self->_dbobj->prepare("replace into current_status(id,status) values (" .
+				      $self->id . ",\"" .
+				      $arg      . "\")");
 
+	$res = $sth->execute();
+	
+	$sth = $self->_dbobj->prepare("select time from jobstatus where id = " . $self->id . 
+				      " and status = \""                       . $arg      . "\"");
+	
+	$res = $sth->execute();
+	
+	my $rowhash = $sth->fetchrow_hashref();
+	my $time    = $rowhash->{'time'};
+	
+	
+	$status = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+						     -status  => $arg,
+						     -created => $time,
+						     );
+	
+	$self->current_status($status);
+	
+	print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
+    };
 
-    $sth = $self->_dbobj->prepare("select time from jobstatus where id = " . $self->id . 
-				  " and status = \""                       . $arg      . "\"");
-    $res = $sth->execute();
-    
-    my $rowhash = $sth->fetchrow_hashref();
-    my $time    = $rowhash->{'time'};
-
-
-    my $status = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
-						    -status  => $arg,
-						    -created => $time,
-						    );
-
-    $self->current_status($status);
+    if ($@) {
+	$self->warn("No db connection. Can't set status to $arg");
+    } else {
+	return $status;
+    }
 }
 
 
@@ -528,7 +483,30 @@ sub current_status {
 sub get_all_status {
     my ($self) = @_;
 
-    $self->throw("Method get_all_status not implemented");
+    $self->throw("Can't get status if id not defined") unless defined($self->id);
+
+    my $sth = $self->_dbobj->prepare("select id,status,time from  jobstatus " . 
+				     "where id = \"" . $self->id . "\" order by time desc");
+
+    my $res = $sth->execute();
+
+    my @status;
+
+    while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	my $time      = $rowhash->{'time'};
+	my $status    = $rowhash->{'status'};
+	
+	my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+							   -status  => $status,
+							   -created => $time,
+							   );
+	
+	
+	push(@status,$statusobj);
+	
+    }
+
+    return @status;
 }
 
 
@@ -554,6 +532,188 @@ sub _dbobj {
     return $self->{_dbobj};
 }
 
+
+sub make_files {
+    my ($self) = @_;
+
+    my $input_object_file = $self->get_file("job","obj");
+    my $stdout_file       = $self->get_file("job","out");
+    my $stderr_file       = $self->get_file("job","err");
+    my $output_file       = $self->get_file("job","dat");
+
+    $self->input_object_file($input_object_file);
+    $self->stdout_file      ($stdout_file);
+    $self->stderr_file      ($stderr_file);
+    $self->output_file      ($output_file);
+}
+
+
+sub get_file {
+    my ($self,$stub,$ext) = @_;
+
+    my $dir = "/nfs/disk100/humpub/michele/out/";
+
+    # Should check disk space here.
+
+    my $rand  = int(rand(10000));
+    my $file  = $dir . $stub . "." . $rand . "." . $ext;
+    my $count = 0;
+
+    while (-e $file && $count < 10000) {
+	$rand = int(rand(10000));
+	$file = $dir . $stub . "." . $rand . "." . $ext;
+	$count++;
+    }
+
+    if ($count == 10000) {
+	$self->throw("10000 files in directory. Can't make a new file");
+    } else {
+	return $file;
+    }
+}
+
+
+
+=head2 stdout_file
+
+  Title   : stdout_file
+  Usage   : my $file = $self->stdout_file
+  Function: Get/set method for stdout.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stdout_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_stdout_file} = $arg;
+    }
+    return $self->{_stdout_file};
+}
+
+=head2 stderr_file
+
+  Title   : stderr_file
+  Usage   : my $file = $self->stderr_file
+  Function: Get/set method for stderr.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stderr_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_stderr_file} = $arg;
+    }
+    return $self->{_stderr_file};
+}
+
+=head2 output_file
+
+  Title   : output_file
+  Usage   : my $file = $self->output_file
+  Function: Get/set method for output
+  Returns : string
+  Args    : string
+
+=cut
+
+sub output_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_output_file} = $arg;
+    }
+    return $self->{_output_file};
+}
+
+
+=head2 input_object_file
+
+  Title   : intput_object_file
+  Usage   : my $file = $self->input_object_file
+  Function: Get/set method for the input object file
+  Returns : string
+  Args    : string
+
+=cut
+
+sub input_object_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_input_object_file} = $arg;
+    }
+    return $self->{_input_object_file};
+}
+    
+
+=head2 _LSFJob
+
+  Title   : _LSFJob
+  Usage   : my $job = $self->_LSFJob
+  Function: Get/set method for the LSF job object
+  Returns : Bio::EnsEMBL::Pipeline::LSFJob
+  Args    : Bio::EnsEMBL::Pipeline::LSFJob
+
+=cut
+
+sub _LSFJob {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	if ($arg->isa("Bio::EnsEMBL::Pipeline::LSFJob")) {
+	    $self->{_LSFJob} = $arg;
+	} else {
+	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::LSFJob");
+	}
+    }
+
+    return $self->{_LSFJob};
+}
+
+
+sub print {
+    my ($self) = @_;
+    print("\n");
+    $self->print_var("ID"               , $self->id                     );
+    $self->print_var("Input_id"         , $self->input_id               );
+    $self->print_var("Machine"          , $self->machine                );
+    $self->print_var("LSF_id"           , $self->LSF_id                 );
+    $self->print_var("Machine"          , $self->machine                );
+    $self->print_var("Queue"            , $self->queue                  );
+    $self->print_var("Stdout"           , $self->stdout_file            ); 
+    $self->print_var("Stderr"           , $self->stderr_file            ); 
+    $self->print_var("Object"           , $self->input_object_file      ); 
+    $self->print_var("Output"           , $self->output_file            ); 
+    $self->print_var("Analysis_id"      , $self->analysis->id           );
+    $self->print_var("Created"          , $self->analysis->created      );
+    $self->print_var("Program"          , $self->analysis->program      );
+    $self->print_var("Program_version"  , $self->analysis->program_version );
+    $self->print_var("Program_file"     , $self->analysis->program_file ); 
+    $self->print_var("Database"         , $self->analysis->db           );
+    $self->print_var("Database_version" , $self->analysis->db_version   );
+    $self->print_var("Database_file"    , $self->analysis->db_file      ); 
+    $self->print_var("Module"           , $self->analysis->module       );
+    $self->print_var("Module_version"   , $self->analysis->module_version );
+    $self->print_var("Parameters"       , $self->analysis->parameters   );
+    
+    my @status = $self->get_all_status;
+    print("\n");
+    foreach my $status (@status) {
+	$self->print_var("  - Status" ,$status->status . "\t" . $status->created);
+    }
+
+}
+
+sub print_var {
+    my ($self,$str,$var) = @_;
+    printf("%20s %20s\n",$str,$var);
+}
 
 1;
 

@@ -64,7 +64,7 @@ sub _initialize {
 					  )],@args);
 
   $disk_id || $self->throw("Cannot make clone db object without a disk_id");
-  $dbobj || $self->throw("Cannot make clone db object without db object");
+  $dbobj   || $self->throw("Cannot make clone db object without db object");
   $dbobj->isa('Bio::EnsEMBL::Pipeline::DBSQL::Obj') || $self->throw("Cannot make contig db object with a $dbobj object");
 
   $self->disk_id($disk_id);
@@ -350,6 +350,22 @@ sub _dbobj{
 
 }
 
+
+sub add_Contig {
+    my ($self,$contig) = @_;
+
+    if (!(defined($self->{_contigs}))) {
+	$self->{_contigs} = [];
+    }
+    push(@{$self->{_contigs}},$contig);
+
+}
+
+sub get_all_Contigs {
+    my ($self) = @_;
+
+    return @{$self->{_contigs}};
+}
 1;
 
 

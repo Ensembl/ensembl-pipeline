@@ -262,39 +262,108 @@ sub get_Job {
 sub get_JobsByInputId {
     my ($self,$id) = @_;
 
-    $self->throw("No input input_id for get_JobsByInputId") unless defined($id);
 
-    my $sth = $self->prepare("select id,input_id,analysis,LSF_id,machine,object,queue " . 
-			     "from job " . 
-			     "where input_id = $id");
+    $self->throw("No input input_id for get_JobsByInputId") unless defined($id);
+    my $query = "select id,input_id,analysis,LSF_id,machine,object,queue " . 
+	",stdout_file,stderr_file,input_object_file,output_file " .
+        "from job " . 
+	"where input_id = \"$id\"";
+
+    my $sth = $self->prepare($query);
     my $res = $sth->execute();
-    my $row = $sth->fetchrow_hashref;
 
     my @jobs;
 
-    while ($row = $sth->fetchrow_hashref) {
-	my $input_id    = $row->{input_id};
-	my $analysis_id = $row->{analysis};
-	my $LSF_id      = $row->{LSF_id};
-	my $machine     = $row->{machine};
-	my $object      = $row->{object};
-	my $queue       = $row->{queue};
-	
-	my $analysis    = $self->get_Analysis($analysis_id);
-	
-	my $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id => $id,
-							 -input_id => $input_id,
-							 -analysis => $analysis,
-							 -LSF_id   => $LSF_id,
-							 -machine  => $machine,
-							 -object   => $object,
-							 -queue    => $queue,
-							 );
-	
+    while (my $row = $sth->fetchrow_hashref) {
+	my $job = $self->_parseJob($row);
 	push(@jobs,$job);
     }
 
     return @jobs;
+}
+
+sub get_JobsByCurrentStatus {
+    my ($self,$status) = @_;
+
+
+    $self->throw("No input status for get_JobsByCurrentStatus") unless defined($status);
+
+    my $query = "select j.id,j.input_id,j.analysis,j.LSF_id,j.machine,j.queue," .
+   	        " j.stdout_file,j.stderr_file,j.input_object_file,j.output_file,cs.status " . 
+		" from job as j, current_status as cs where cs.id = j.id and cs.status = \"" . 
+		    $status . "\""; 
+    
+    print("query is $query\n");
+
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+
+    my @jobs;
+
+    while (my $row = $sth->fetchrow_hashref) {
+	my $job = $self->_parseJob($row);
+	push(@jobs,$job);
+    }
+
+    return @jobs;
+}
+
+sub _parseJob {
+    my ($self,$row) = @_;
+
+    $self->throw("Now row object input") unless defined($row);
+
+    my $jobid             = $row->{id};
+    my $input_id          = $row->{input_id};
+    my $analysis_id       = $row->{analysis};
+    my $LSF_id            = $row->{LSF_id};
+    my $machine           = $row->{machine};
+    my $object            = $row->{object};
+    my $queue             = $row->{queue};
+    my $stdout            = $row->{stdout_file};
+    my $stderr            = $row->{stderr_file};
+    my $input_object_file = $row->{input_object_file};
+    my $output_file       = $row->{output_file};
+    
+    my $analysis          = $self->get_Analysis($analysis_id);
+    
+       $analysis->id($analysis_id);
+    
+    my $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id       => $jobid,
+						     -input_id => $input_id,
+						     -analysis => $analysis,
+						     -LSF_id   => $LSF_id,
+						     -machine  => $machine,
+						     -object   => $object,
+						     -queue    => $queue,
+						     -dbobj    => $self,
+						     -stdout   => $stdout,
+						     -stderr   => $stderr,
+						     -input_object_file => $input_object_file,
+						     -output_file => $output_file,
+						     );
+    
+    return $job;
+}
+
+sub get_InputIdsByAnalysis {
+    my ($self,$analid) = @_;
+    
+    $self->throw("No input analysis id  for get_InputIdsByAnalysis") unless defined($analid);
+
+    my $sth = $self->prepare("select distinct input_id  from job where analysis = $analid");
+    my $res = $sth->execute();
+    my $row = $sth->fetchrow_hashref;
+
+    my @input_ids;
+
+    while ($row = $sth->fetchrow_hashref) {
+	my $input_id       = $row->{input_id};
+	print("id is $input_id\n");
+	push(@input_ids,$input_id);
+    }
+    
+    return @input_ids;
 }
 
 
@@ -429,7 +498,6 @@ sub get_Analysis {
 
     if ($rv && $sth->rows > 0) {
 	my $rowhash         = $sth->fetchrow_hashref;
-	my $analid          = $rowhash->{'id'}; 
 	my $created         = $rowhash->{'created'};
 	my $program         = $rowhash->{'program'};
 	my $program_version = $rowhash->{'program_version'};
@@ -441,7 +509,7 @@ sub get_Analysis {
 	my $module_version  = $rowhash->{'module_version'};
 	my $parameters      = $rowhash->{'parameters'};
 
-	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id => $analid,
+	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id              => $id,
 							    -created         => $created,
 							    -program         => $program,
 							    -program_version => $program_version,
