@@ -33,12 +33,19 @@ methods. Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools;
 
-use vars qw(@ISA);
-use strict;
-
+use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
+use Bio::SeqIO;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Root;
 
+use strict;
+
+
+use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Root);
+
 
 ############################################################
 
@@ -81,8 +88,9 @@ sub get_all_syntenic_slices{
 							 $target_db->assembly_type,
 							 $focus_slice->chr_name,
 							 $focus_slice->chr_start, 
-							 $focus_slice->chr_end
-							)};
+							 $focus_slice->chr_end,
+							 'WGA'
+                                                         )};
 	
   
   ############################################################
@@ -103,39 +111,59 @@ sub get_all_syntenic_slices{
     my $start = $chr_features[0]->hstart;
     my $end   = $chr_features[0]->hend;
     foreach (my $i=1; $i<scalar(@chr_features); $i++ ){
+      
+      ############################################################
+      # if the distance between features is smaller than the original length, we bridge them over
       if ( $chr_features[$i]->start - $chr_features[$i-1] - 1 < $focus_length ){
 	$end = $chr_features[$i]->hend;
       }
+      ############################################################
+      # else we create a slice with the current (start,end) feature
       else{
+
 	############################################################
-	# if the slice is not as big as the original, we make it as big
-	# it's ok if they overlap
+	# if the slice is not as big as the original, we make it as big it's ok if they overlap
 	my $length = $end - $start + 1;
 	if ( $focus_length > $length ){
 	  $start -= ( $focus_length - $length )/2;
 	  $end   += ( $focus_length - $length )/2;
 	}
-	
-	my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+
+        my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
 	push(@slices, $target_slice);
+
+        # update to the latest feature
 	$start = $chr_features[$i]->hstart;
 	$end   = $chr_features[$i]->hend;
       }
+
+      if ( $i == scalar(@chr_features) - 1 ){
+         my $length = $end - $start + 1;
+        if ( $focus_length > $length ){
+          $start -= int( ( $focus_length - $length )/2 );
+          $end   += int( ( $focus_length - $length )/2 );
+        }
+        my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+	push(@slices, $target_slice);
+      }
     }
-    my $length = $end - $start + 1;
-    if ( $focus_length > $length ){
-      $start -= int( ( $focus_length - $length )/2 );
-      $end   += int( ( $focus_length - $length )/2 );
-    }
-    my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
-    push(@slices, $target_slice);
+    
+    #my $length = $end - $start + 1;
+    #if ( $focus_length > $length ){
+    #  $start -= int( ( $focus_length - $length )/2 );
+    #  $end   += int( ( $focus_length - $length )/2 );
+    #}
+    #my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+    #push(@slices, $target_slice);
   }
+
   if (@slices){
     print STDERR "Produced slices:\n";
     foreach my $slice (@slices){
       print STDERR $slice->chr_name.".".$slice->chr_start."-".$slice->chr_end."\n";
     }
   }
+  #print STDERR "returning ".scalar(@slices)."\n";
   return \@slices;
 }
 
@@ -183,7 +211,7 @@ sub test_for_synteny_breaking{
   my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold ) = @_;
 
   unless ($threshold){
-    $threshold = 60;
+    $threshold = 40;
   }
 
   ############################################################
@@ -311,17 +339,17 @@ sub test_for_synteny_breaking{
 
       # one occurrence of synteny conservation is enough to flag it as preserved
       $synteny_is_broken = 0;
-      if ( $left_orthology_genes[0]->end < $orthology_transcripts[0]->start 
-	   &&
-	   $right_orthology_genes[0]->start > $orthology_transcripts[0]->end 
-	 ){
-	print STDERR "synteny is preserved\n";
-	$synteny_breaking = 0;
-      }
-      else{
-	print STDERR "synteny is reversed\n";
-	$synteny_breaking = 0;
-      }
+      #if ( $left_orthology_genes[0]->end < $orthology_transcripts[0]->start 
+#	   &&
+#	   $right_orthology_genes[0]->start > $orthology_transcripts[0]->end 
+#	 ){
+#	print STDERR "synteny is preserved\n";
+#	$synteny_breaking = 0;
+#      }
+#      else{
+#	print STDERR "synteny is reversed\n";
+#	$synteny_breaking = 0;
+#      }
     }
 
   }
@@ -447,8 +475,9 @@ sub get_flanking_genes{
   
   
 sub test_for_orthology{
-  my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold ) = @_;
+  my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold , $gene_id) = @_;
   
+  # $gene_id is a hashref with transcript objects as keys and gene ids as values, handy for printing reports
   #unless( $threshold ){
   #  $threshold = 60;
   #}
@@ -490,7 +519,7 @@ sub test_for_orthology{
   my @target_slices;
   my $target_slices = 
     $self->get_all_syntenic_slices( $focus_slice, $focus_db, $focus_species, $compara_db, $target_db, $target_species);
-  if ( $target_slices ){
+  if ( $target_slices && @{$target_slices} ){
     @target_slices = @{$target_slices};
   }
   else{
@@ -508,32 +537,39 @@ sub test_for_orthology{
   # run genewise for this gene
   my @orthologues;
   foreach my $target_slice ( @target_slices ){
-    push( @orthologues, $self->align_with_exonerate( $transcript, $target_slice ) );
+    #push( @orthologues, $self->align_with_exonerate( $transcript, $target_slice ) );
+    return $self->align_with_tblastx( $transcript, $target_slice );
   }
+  exit(0);
   print STDERR "Found ".scalar(@orthologues)." orthologues\n";
   
   if ( @orthologues ){
     foreach my $ortho ( @orthologues ){
-      my @exons    = sort { $a->start <=> $b->end } @{$ortho->get_all_Exons};
-      my $start    = $exons[0]->contig->chr_start + $exons[0]->start - 1;
-      my $end      = $exons[0]->contig->chr_start + $exons[$#exons]->end - 1;
-      my $strand   = $exons[0]->strand;
-      my $seqname  = $exons[0]->seqname;
-      $seqname     =~ s/\.\d+-\d+$//;
-      my $coverage = $self->_coverage(   $ortho );
-      my $perc_id  = $self->_percent_id( $ortho );
-      my $id;
-      if ( $transcript->dbID || $transcript->stable_id ){
-	$id = $transcript->stable_id  || $transcript->dbID;
-      }
-      else{
-	$id = "no id";
-      }
       
-      print STDERR "$focus_species $id $target_species coverage:$coverage percent_id:$perc_id extent:$seqname.$start-$end strand:$strand\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ortho, 1);
+      my $coverage = $self->_coverage(   $ortho );
+
+      if ( $threshold && $coverage > $threshold ){
+	my @exons    = sort { $a->start <=> $b->end } @{$ortho->get_all_Exons};
+	my $start    = $exons[0]->contig->chr_start + $exons[0]->start - 1;
+	my $end      = $exons[0]->contig->chr_start + $exons[$#exons]->end - 1;
+	my $strand   = $exons[0]->strand;
+	my $seqname  = $exons[0]->seqname;
+	$seqname     =~ s/\.\d+-\d+$//;
+	my $perc_id  = $self->_percent_id( $ortho );
+	my $id;
+	if ( $transcript->dbID || $transcript->stable_id ){
+	  $id = $transcript->stable_id  || $transcript->dbID;
+	}
+	else{
+	  $id = "no id";
+	}
+	
+	my $g_id = $gene_id->{$transcript};
+	
+	print STDERR "$focus_species $g_id $id $target_species coverage:$coverage percent_id:$perc_id extent:$seqname.$start-$end strand:$strand\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ortho, 1);
+      }
     }
-    
     if ($threshold){
       my @selected;
       @orthologues = sort { $self->_coverage($b) <=> $self->_coverage($a) } @orthologues;
@@ -588,6 +624,20 @@ sub filter_by_coverage{
 sub align_with_exonerate{
   my ($self, $transcript, $slice ) = @_;
   
+  my $id;
+  if ( $transcript->dbID ){
+    $id = $transcript->stable_id || $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+   
+  my $seq = $transcript->seq;
+  unless ( $seq->display_id ){
+    $seq->display_id($id);
+  }
+  #print STDERR "transcript seq siplay_id : ".$seq->display_id."\n";
+
   ############################################################
   # create database
   my $database = "/tmp/db_seqs.$$";
@@ -601,10 +651,11 @@ sub align_with_exonerate{
   
   ############################################################
   # create runnable
-  my $options = " --forcegtag FALSE ";
+  #my $options = " --forcegtag FALSE ";
+  my $options = ""; 
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
 								     -database    => $database,
-								     -query_seqs  => [$transcript->seq],
+								     -query_seqs  => [$seq],
 								     -query_type => 'dna',
 								     -target_type=> 'dna',
 								     -exonerate   => 'exonerate-0.6.7',
@@ -621,6 +672,319 @@ sub align_with_exonerate{
     }
   }
   return @transcripts;
+}
+
+############################################################
+
+sub align_with_tblastx{
+  my ($self, $transcript, $slice) =@_;
+  
+  my $id;
+  if ( $transcript->dbID ){
+    $id = $transcript->stable_id || $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+    
+  my $seq = $transcript->seq;
+  my $transcript_length = $seq->length;
+  unless ( $seq->display_id ){
+    $seq->display_id($id);
+  }
+
+  ############################################################
+  # create database
+  my $file = 'seq_'.$$.'.fa';
+  my $database = "/tmp/".$file;
+  open( DB_SEQ,">$database") || die("Could not open $database $!");
+  
+  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
+			       '-fh'     => \*DB_SEQ);
+  
+  $seqout->write_seq($seq);
+  close( DB_SEQ );
+  
+  system("pressdb $database");#/tmp/db_seqs.$$");
+
+
+   ############################################################
+  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'     => $slice,
+							     '-program'   => 'wutblastx',
+							     '-database'  => $database,
+							     -threshold_type => "PVALUE",
+							     '-threshold' => 1e-10,
+							     #'-filter'    => $filter,
+							     '-options'   => 'V=1000000'
+							    );
+
+    
+  $blast->add_regex($file,'(\S+)');
+  $blast->run();
+    
+  my @featurepairs = $blast->output();
+  my @pos_strand = grep { $_->strand == 1} @featurepairs;  
+  my @neg_strand = grep { $_->strand == -1} @featurepairs;  
+
+  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @pos_strand) {
+   print $fp->gffstring . "\n";
+  }
+  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @neg_strand) {
+   print $fp->gffstring . "\n";
+  }
+
+#  ############################################################
+#  # make the blast features into likely transcript structures:
+  
+#  # cluster the features by genomic:
+#  my @pos_clusters = @{$self->cluster_Features_by_genomic(@pos_strand)};
+#  my @neg_clusters = @{$self->cluster_Features_by_genomic(@neg_strand)};
+    
+#  my @pos_features;
+#  foreach my $cluster ( @pos_clusters ){
+#     my @features = sort { $b->score <=> $a->score } @{$cluster->get_all_sub_SeqFeatures};
+#     push ( @pos_features, $features[0] );
+#  }
+
+#  my @neg_features;
+#  foreach my $cluster ( @neg_clusters ){
+#     my @features = sort { $b->score <=> $a->score } @{$cluster->get_all_sub_SeqFeatures};
+#     push ( @neg_features, $features[0] );
+#  }
+
+  # calculate the coverage
+  my ($pos_trans_pos_genom_clusters, $neg_trans_pos_genom_clusters) = $self->cluster_all_Features_by_transcript(@pos_strand);
+  my ($pos_trans_neg_genom_clusters, $neg_trans_neg_genom_clusters) = $self->cluster_all_Features_by_transcript(@neg_strand);
+
+  print STDERR "length: $transcript_length\n"; 
+  my $length = 0;
+  foreach my $cluster ( @$pos_trans_pos_genom_clusters ){
+     my ($start,$end);
+     foreach my $fp ( @{$cluster} ){
+       unless ( $start ){
+         $start = $fp->hstart;
+       }
+       unless ( $end ){
+         $end = $fp->hend;
+       }
+       if ( $fp->hstart < $start ){
+         $start = $fp->hstart;
+       }
+       if ( $fp->hend > $end ){
+         $end = $fp->hend;
+       }
+     }
+     $length += ( $end - $start + 1 );
+#     print STDERR "cluster: ".$start."-".$end."\t $length\n";
+  }
+  my $pos_pos_coverage = 100*$length/$transcript_length;
+  print STDERR "coverage on forward transcript - positive strand = $pos_pos_coverage\n";
+
+  $length = 0;
+  foreach my $cluster ( @$neg_trans_pos_genom_clusters ){
+     my ($start,$end);
+     foreach my $fp ( @{$cluster} ){
+       unless ( $start ){
+         $start = $fp->hstart;
+       }
+       unless ( $end ){
+         $end = $fp->hend;
+       }
+       if ( $fp->hstart < $start ){
+         $start = $fp->hstart;
+       }
+       if ( $fp->hend > $end ){
+         $end = $fp->hend;
+       }
+     }
+     $length += ( $end - $start + 1 );
+#          print STDERR "cluster: ".$start."-".$end."\t $length\n";
+  }
+  my $neg_pos_coverage = 100*$length/$transcript_length;
+  print STDERR "coverage on reverse transcript - positive strand = $neg_pos_coverage\n";
+
+  $length = 0;
+  foreach my $cluster ( @$pos_trans_neg_genom_clusters ){
+     my ($start,$end);
+     foreach my $fp ( @{$cluster} ){
+       unless ( $start ){
+         $start = $fp->hstart;
+       }
+       unless ( $end ){
+         $end = $fp->hend;
+       }
+       if ( $fp->hstart < $start ){
+         $start = $fp->hstart;
+       }
+       if ( $fp->hend > $end ){
+         $end = $fp->hend;
+       }
+     }
+     $length += ( $end - $start + 1 );
+#     print STDERR "cluster: ".$start."-".$end."\t $length\n";
+  }
+  my $pos_neg_coverage = 100*$length/$transcript_length;
+  print STDERR "coverage on forward transcript - negative strand = $pos_neg_coverage\n";
+
+  $length = 0;
+  foreach my $cluster ( @$neg_trans_neg_genom_clusters ){
+     my ($start,$end);
+     foreach my $fp ( @{$cluster} ){
+       unless ( $start ){
+         $start = $fp->hstart;
+       }
+       unless ( $end ){
+         $end = $fp->hend;
+       }
+       if ( $fp->hstart < $start ){
+         $start = $fp->hstart;
+       }
+       if ( $fp->hend > $end ){
+         $end = $fp->hend;
+       }
+     }
+     $length += ( $end - $start + 1 );
+ #         print STDERR "cluster: ".$start."-".$end."\t $length\n";
+
+  }
+  my $neg_neg_coverage = 100*$length/$transcript_length;
+  print STDERR "coverage on reverse transcript - negative strand = $neg_neg_coverage\n";
+  
+  return @featurepairs;  
+}
+
+############################################################
+
+sub cluster_Features_by_genomic{
+ my ($self,@feat) = @_;
+
+ my @features = sort{ $a->start <=> $b->start} @feat;
+ 
+ # Create the first cluster
+ my $cluster = new Bio::EnsEMBL::SeqFeature;
+  
+ # main cluster feature - holds all clusters
+  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+
+ # Start off the cluster with the first exon
+ $cluster->add_sub_SeqFeature($features[0]);
+
+ $cluster->strand($features[0]->strand);    
+ $cluster_list->add_sub_SeqFeature($cluster);
+  
+ # Loop over the rest of the features
+ my $count = 0;
+  
+ EXON:
+  foreach my $f (@features) {
+    if ($count > 0) {
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( !( $f->start > $cluster->end || $f->end < $cluster->start )
+           && 
+           ( $f->strand == $cluster->strand) ) { 
+	      $cluster->add_sub_SeqFeature($f);
+      }  
+      else {
+	# Start a new cluster
+	$cluster = new Bio::EnsEMBL::SeqFeature;
+	$cluster->add_sub_SeqFeature($f);
+	$cluster->strand($f->strand);
+		
+	# and add it to the main_cluster feature
+	$cluster_list->add_sub_SeqFeature($cluster);
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
+############################################################
+
+sub cluster_all_Features_by_transcript{
+ my ($self,@feat) = @_;
+ 
+ # separate by hstrands
+ my @hpos_features;
+ my @hneg_features;
+ foreach my $feat ( @feat ){
+   if ( $feat->hstrand == 1 ){
+     push( @hpos_features, $feat );
+   }
+   else{
+     push( @hneg_features, $feat );
+   }
+ }
+ 
+ my $pos_cluster_list;
+ if ( @hpos_features ){
+  $pos_cluster_list = $self->cluster_Features_by_Transcript( @hpos_features );
+ }
+ my $neg_cluster_list; 
+ if ( @hneg_features ){
+   $neg_cluster_list = $self->cluster_Features_by_Transcript( @hneg_features );
+ }
+ return ($pos_cluster_list,$neg_cluster_list);
+}
+
+############################################################
+
+sub cluster_Features_by_Transcript{
+ my ($self,@feat) = @_;
+ 
+ my @clusters;
+ my @cluster_hstarts;
+ my @cluster_hends;
+ my @features = sort{ $a->hstart <=> $b->hstart} @feat;
+ 
+ # create the first cluster
+ my $count = 0;
+ my $cluster = [];
+  
+ # start it off with the first feature
+ my $first_feat = shift( @features );
+ push (@$cluster, $first_feat);
+ $cluster_hstarts[$count] = $first_feat->hstart;
+ $cluster_hends[$count]   = $first_feat->hend;
+  
+ # store the list of clusters
+ push(@clusters,$cluster);
+  
+ # loop over the rest of the features
+  
+ FEATURE:
+  foreach my $f ( @features ){
+    #print STDERR "trying to place feature: $f ".$f->start."-".$f->end."\n";    
+    # add $f to the current cluster if overlaps and strand matched
+    #print STDERR "comparing with cluster $count : "
+    #  .$cluster_hstarts[$count]."-".$cluster_hends[$count]."\n";
+    
+    if (!($f->hend < $cluster_hstarts[$count] || $f->hstart > $cluster_hends[$count])) {      
+      push(@$cluster,$f);
+      
+      # re-adjust size of cluster
+      if ($f->hstart < $cluster_hstarts[$count]) {
+	$cluster_hstarts[$count] = $f->hstart;
+      }
+      if ($f->hend  > $cluster_hends[$count]) {
+	$cluster_hends[$count] = $f->hend;
+      }
+      
+    }
+    else{
+      # else, start create a new cluster with this feature
+      $count++;
+      $cluster = [];
+      push (@$cluster, $f);
+      $cluster_hstarts[$count] = $f->hstart;
+      $cluster_hends[$count]   = $f->hend;
+          
+      # store it in the list of clusters
+      push(@clusters,$cluster);
+    }
+  }
+  return \@clusters;
 }
 
 ############################################################
