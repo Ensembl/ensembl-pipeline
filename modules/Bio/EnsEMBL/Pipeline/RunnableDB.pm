@@ -229,7 +229,7 @@ sub output {
     
     my @r = $self->runnable;
 
-    if(defined (@r) && scalar(@r)){
+    if( @r ){
       foreach my $r ($self->runnable){
 	push(@{$self->{'_output'}}, $r->output);
       }
