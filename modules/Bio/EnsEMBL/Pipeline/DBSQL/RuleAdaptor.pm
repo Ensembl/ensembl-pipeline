@@ -194,7 +194,38 @@ sub fetch_by_dbID {
   my $self = shift;
   my $dbID = shift;
   
-  $self->throw( "Not implemented yet" );
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
+  my ( $analysis, $rule );
+  my $queryResult;
+
+  my $sth = $self->prepare( q {
+    SELECT ruleId,goalAnalysisId
+      FROM RuleGoal 
+      WHERE ruleId = ? } );
+  $sth->execute( $dbID  );
+
+  $queryResult = $sth->fetchrow_hashref;
+  if( ! defined $queryResult ) {
+    return undef;
+  }
+  
+  $analysis = $anaAdaptor->fetch_by_dbID( $queryResult->{goalAnalysisId} );
+      
+  $rule = Bio::EnsEMBL::Pipeline::Rule->new
+    ( -dbid => $dbID,
+      -goal => $analysis,
+      -adaptor => $self );
+
+  $sth= $self->prepare( q{
+    SELECT ruleId, conditionLiteral
+      FROM RuleConditions 
+      WHERE ruleId = ?} );
+  $sth->execute( $dbID );
+  
+  while( $queryResult = $sth->fetchrow_hashref ) {
+    $rule->add_condition( $queryResult->{conditionLiteral} );
+  }
+  return $rule;
 }
 
 =head2 db
