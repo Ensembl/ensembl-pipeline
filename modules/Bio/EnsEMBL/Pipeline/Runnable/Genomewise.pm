@@ -300,12 +300,12 @@ sub run{
 	  else {
 	    # make a new Exon
 	    $exon  = Bio::EnsEMBL::Exon->new();
-	    $t->add_Exon($exon);
 	    $exon->phase($phase);
 	    $exon->start($start);
 	    $exon->end  ($end);
 	    $exon->end_phase( ( $end - $start + 1 + $phase ) %3 );
 	    $exon->strand($strand);
+	    $t->add_Exon($exon);
 	  }
 	  if( $seen_cds == 0 ) {
 	    $trans->start_Exon($exon);
@@ -348,12 +348,12 @@ sub run{
 	    
 	    #   not abutting; should be fine.
 	    $exon =  Bio::EnsEMBL::Exon->new();
-	    $t->add_Exon($exon);
 	    $exon->start($start);
 	    $exon->end  ($end);
 	    $exon->strand($strand);	    
 	    $exon->phase(-1);
 	    $exon->end_phase(-1);
+	    $t->add_Exon($exon);
 	  }
 	    
 	  # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
