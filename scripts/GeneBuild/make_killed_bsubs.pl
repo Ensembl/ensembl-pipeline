@@ -35,18 +35,29 @@ if(!$queue){
   $queue = 'acari';
   print STDERR "GB_QUEUE not defined assuming queue is acari\n";
 }
+my $fh;
+if($GB_KILLED_BSUB_FILE){
+  open(KILL, ">".$GB_KILLED_BSUB_FILE) or die "couldn't open ".$GB_KILLED_BSUB_FILE." $!";
+  $fh = \*KILL;
+}else{
+  print STDERR "you haven't specified a file to write the bsub lines to writing to stdout\n";
+  $fh = \*STDERR;
+}
+
 while(<FH>){
   chomp;
   my ($input_id, $logic_name, $runnable) = split;
-  
-  my ($outfile, $errfile) = &make_filename($GB_KILLED_OUTPUT_DIR, $input_id, $logic_name); 
+  #print STDERR "have ".$input_id." analysis ".$logic_name." runnable ".$runnable."\n";
+  my ($outfile, $errfile) = &make_filenames($GB_KILLED_OUTPUT_DIR, $input_id, $logic_name); 
   
   my $runner = $GB_KILLED_RUNNER;
-  my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $logic_name\"";
+  my $command = "bsub -q $queue -R alpha -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $logic_name\"";
   $command .= "  $runner ";
   $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $logic_name -split_size $GB_SPLIT_JOB_SIZE";
   $command .= " -input_id $input_id ";
   $command .= " -write"; 
+  
+  print $fh $command."\n";
   
 }
 

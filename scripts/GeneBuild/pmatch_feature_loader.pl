@@ -42,7 +42,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
 							   GB_PM_OUTPUT
 							  );
-
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
+                                                          GB_FINAL_PMATCH_LOGICNAME
+                                                         );
 my $dbname = $GB_DBNAME;
 my $dbuser = $GB_DBUSER;
 my $host   = $GB_DBHOST;
@@ -79,6 +81,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 #$db->assembly_type($path);
 my $sgpa = $db->get_SliceAdaptor;
+my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($GB_FINAL_PMATCH_LOGICNAME);
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 
 # warn that pm_best.out has chr names in the form: chr_name.chr_start-chr_end
@@ -144,6 +147,7 @@ sub process_proteins {
 							-chr_name    => $chr,
 							-cdna_id     => $cdna_id,
 							-coverage    => $coverage,
+							-analysis => $analysis,
 						       );
     push(@features, $pmf);
 
