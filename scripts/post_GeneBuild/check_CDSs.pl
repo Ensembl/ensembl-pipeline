@@ -191,10 +191,6 @@ print "both correct        : $both_correct\n";
 
 close (OUT);
 
-
-
-=======
->>>>>>> 1.2
 sub get_evidence{
   my ($trans) = @_;
   my %evi;
