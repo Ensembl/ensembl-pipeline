@@ -278,10 +278,10 @@ sub run_pfam {
 	}
 
 	
-	elsif (scalar(@{$new_transcript->get_all_Exons}) >= 3) {
-	    print STDERR "Adding unssuported transcript\n";
-	    push(@newannot,$new_transcript);
-	}
+#	elsif (scalar(@{$new_transcript->get_all_Exons}) >= 3) {
+#	    print STDERR "Adding unssuported transcript\n";
+#	    push(@newannot,$new_transcript);
+#	}
     }
 
     
