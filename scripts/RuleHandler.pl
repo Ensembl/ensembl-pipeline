@@ -265,10 +265,10 @@ sub show_rules {
 sub check_dependencies {
 
   my ($new_rule) = shift;
-  my @new_conditions = @{$new_rule->list_conditions();} 
+  my @new_conditions = @{$new_rule->list_conditions()};
  
   # check for unfulfilled conditions - these do not prevent rule insertion
-  foreach my $cond(@new_conditions) {
+  foreach my $cond (@new_conditions) {
     if(!$rule_goals{$cond})
       {
 	warn "You should also add a rule that has $cond as its goal,\nor this rule will never have its conditions fulfilled.\n";
