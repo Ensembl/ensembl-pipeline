@@ -467,6 +467,7 @@ sub runInLSF {
       }
   };
   if ($@) {
+      print (STDERR "Lost the will to live Error : [$@]");
       $self->set_status( "FAILED" );
       die "Problems creating runnable $module for " . $self->input_id . " [$@]\n";
   }
@@ -476,6 +477,7 @@ sub runInLSF {
   };
   if ($@) {
       $self->set_status( "FAILED" );
+      print (STDERR "Lost the will to live Error : [$@]");
       die "Problems with $module fetching input for " . $self->input_id . " [$@]\n";
   }
   eval {
@@ -484,6 +486,7 @@ sub runInLSF {
   };
   if ($@) {
       $self->set_status( "FAILED" );
+      print (STDERR "Lost the will to live Error : [$@]");
       die "Problems running $module for " . $self->input_id . " [$@]\n";
   }
   eval {
@@ -493,6 +496,7 @@ sub runInLSF {
   }; 
   if( $@ ) {
       $self->set_status( "FAILED" );
+      print (STDERR "Lost the will to live Error : [$@]");
       die "Problems for $module writing output for " . $self->input_id . " [$@]" ;
   }
 }
