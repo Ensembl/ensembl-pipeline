@@ -115,6 +115,7 @@ sub new {
   
   $self->predictions(@{$predictions});
   $self->features(@{$features});
+  $self->{_annotations} = [];
   if ( @$annotations ){
     $self->annotations( @$annotations );
   }
@@ -1249,9 +1250,6 @@ sub features {
 
 sub annotations{
   my ($self,@annotations) = @_;
-  if (!defined($self->{_annotations})){
-    $self->{_annotations};
-  }
   if (@annotations){
     push( @{$self->{_annotations}}, @annotations);
   }
