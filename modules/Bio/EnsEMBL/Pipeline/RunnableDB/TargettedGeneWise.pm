@@ -149,6 +149,7 @@ sub fetch_input{
 
   # chr12:10602496,10603128:Q9UGV6:
   print STDERR $entry."\n";
+ # if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
   if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
       $self->throw("Not a valid input id... $entry");
   }
@@ -165,14 +166,14 @@ sub fetch_input{
 
   
   my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
+  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
-  $self->vc($vc);
+  $self->vcontig($vcontig);
   $self->protein_id($protein_id);
   
   # genewise runnable
   # repmasking?
-  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc,
+  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vcontig,
 								    '-ids'        => [ $protein_id ] ,
 								    '-seqfetcher' => $self->seqfetcher);
  
@@ -387,14 +388,14 @@ sub convert_gw_output {
 
 sub make_genes {
   my ($self, $count, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @genes;
   print STDERR "making genes\n";
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
  MAKE_GENE:  foreach my $tmpf (@$results) {
-    my $transcript = $self->make_transcript($tmpf,$self->vc,$genetype,$count, $analysis_obj);
+    my $transcript = $self->make_transcript($tmpf,$self->vcontig,$genetype,$count, $analysis_obj);
 	
     # validate transcript - validate_transcript returns an array ref
     my $valid_transcripts = $self->validate_transcript($transcript);
@@ -540,13 +541,13 @@ sub validate_transcript {
 sub remap_genes {
   my ($self) = @_;
   my @newf;  
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
 
   my @genes = $self->gw_genes;
 
 GENE:  foreach my $gene (@genes) {
 
-    my @t = $gene->each_Transcript;
+    my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
 
     # check that it translates
@@ -568,7 +569,7 @@ GENE:  foreach my $gene (@genes) {
       push(@newf,$newgene);
 
       # sort out supporting feature coordinates
-      foreach my $tran ($newgene->each_Transcript) {
+      foreach my $tran ($newgene->get_all_Transcripts) {
 	foreach my $exon($tran->get_all_Exons) {
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
@@ -742,21 +743,17 @@ sub make_transcript{
     
     $exon->phase($exon_pred->phase);
     $exon->attach_seq($contig);
-    
+    $exon->contig($contig);
+    $exon->adaptor($self->db->get_ExonAdaptor);
     # sort out supporting evidence for this exon prediction
     my @subfs = $exon_pred->sub_SeqFeature;
     print STDERR "has ".@subfs." supporting features\n";
     foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
       $subf->feature1->analysis($analysis_obj);
-	
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
-      
+      $subf->feature1->seqname($contig->id);
       $exon->add_Supporting_Feature($subf);
     }
     
