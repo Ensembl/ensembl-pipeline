@@ -21,7 +21,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker->new ( 
                                                     -dbobj      => $db,
-			                                        -input_id   => $input_id );
+			                                        -input_id   => $input_id
+                                                    -analysis   => $analysis );
 $repmask->fetch_input();
 $repmask->run();
 $repmask->output();
@@ -31,6 +32,9 @@ $repmask->write_output(); #writes to DB
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker to add
 functionality to read and write to databases.
+The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
+extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
+required for databse access.
 
 =head1 CONTACT
 
@@ -55,11 +59,14 @@ use vars qw(@ISA);
 
     Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id);
+                           -INPUT_ID    => $id
+                           -ANALYSIS    => $analysis);
+                           
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
-    Args    :   A Bio::EnsEMBL::DB::Obj, contig input id and optional args for
-                Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker (RepeatMaskerHum)
+    Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+                input_id:   Contig input id , 
+                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
 
 =cut
 
@@ -72,16 +79,51 @@ sub new {
     $self->{'_runnable'}    = undef;
     $self->{'_input_id'}    = undef;
     
-    my ( $dbobj, $input_id, $args) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ARGS'], @args);
+    my ( $dbobj, $input_id, $analysis) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
+    
     $self->throw('Need database handle') unless ($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
                 unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
     $self->dbobj($dbobj);
+    
     $self->throw("No input id provided") unless ($input_id);
     $self->input_id($input_id);
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker', $args);
+    
+    $self->throw("Analysis object required") unless ($analysis);
+    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
+                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+    $self->set_parameters($analysis);
+    
+    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker');
     return $self;
+}
+
+sub set_parameters {
+    my ($self, $analysis) = @_;
+    
+    if ($analysis)
+    {
+        $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
+            unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+        $self->parameters($analysis->parameters());
+    }
+}
+
+=head2 parameters
+
+    Title   :   parameters
+    Usage   :   $self->parameters($param);
+    Function:   Gets or sets the value of parameters
+    Returns :   A string containing parameters for Bio::EnsEMBL::Runnable run
+    Args    :   A string containing parameters for Bio::EnsEMBL::Runnable run
+
+=cut
+
+sub parameters {
+    my ($self, $parameters) = @_;
+    $self->{'_parameters'} = $parameters if ($parameters);
+    return $self->{'_parameters'};
 }
 
 =head2 dbobj
@@ -147,11 +189,21 @@ sub genseq {
 
 #get/set for runnable and args
 sub runnable {
-    my ($self, $runnable, $args) = @_;
+    my ($self, $runnable) = @_;
     if ($runnable)
     {
+        #extract parameters into a hash
+        my ($parameter_string) = $self->parameters() ;
+        $parameter_string =~ s/\s+//g;
+        my @pairs = split (/,/, $parameter_string);
+        my %parameters;
+        foreach my $pair (@pairs)
+        {
+            my ($key, $value) = split (/=>/, $pair);
+            $parameters{$key} = $value;
+        }
         #creates empty Bio::EneEMBL::Runnable::RepeatMasker object
-        $self->{'_runnable'} = $runnable->new(-ARGS => $args);;
+        $self->{'_runnable'} = $runnable->new(%parameters);;
     }
     return $self->{'_runnable'};
 }
@@ -263,7 +315,11 @@ sub write_output {
     }
     elsif (@repeats) 
     {
-	    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+	    foreach my $repeat (@repeats)
+        {
+            print STDERR ($repeat->hseqname()."\t");
+        }
+        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
 	    $feat_Obj->write($contig, @repeats);
     }
     return 1;
