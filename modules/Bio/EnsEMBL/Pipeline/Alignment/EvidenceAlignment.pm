@@ -237,7 +237,7 @@ sub new {
   # Throw an error if any of the below are undefined or
   # are the wrong thing.
   unless (defined $db && $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
-    throw("No DB adaptor passed to AlignmentTool.  You passed a $db.");
+    throw("No database adaptor passed to AlignmentTool.  You passed a $db.");
   }
   unless (defined $transcript && $transcript->isa("Bio::EnsEMBL::Transcript")){
     throw("No transcript passed to AlignmentTool.  You passed a $transcript.");
@@ -246,7 +246,7 @@ sub new {
     throw("No sequence fetcher passed to AlignmentTool.  You passed a $seqfetcher.");
   }
 
-  $self->{'_db_adaptor'} = $db;
+  $self->_db($db);
 
   # Set the amount of flanking sequence we want to include around
   # our slice.  This is quite important - many supporting features
@@ -269,6 +269,13 @@ sub new {
 
   $self->_transcript($transcript, $self->_slice);
 
+  # Check the orientation of our transcript.  If it is on the reverse
+  # strand invert our slice and re-retrieve our transcript.
+
+  if ($transcript->strand == -1){
+    $self->_slice($self->_slice->invert);
+    $self->_transcript($transcript, $self->_slice);
+  }
 
   # Determine if our database contains translations.  If it doesn't
   # we'll have to skip adding a set of translated exons to our 
@@ -792,18 +799,13 @@ sub _compare_to_reference {
 
   my $match_sequence = $evidence_align_seq->seq_array;
   my $reference_sequence = $reference_align_seq->seq_array;
-  
+
   my $mismatches = 0;
   my $noncovered = 0;
-  
+
   my $exon_start = $exon->start;
   my $exon_end = $exon->end;
   my $exon_length = $exon_end - $exon_start;
-
-  if ($self->_strand == -1){
-    $exon_start = $self->_slice->length - $exon_end + 1;
-    $exon_end = $exon_start + $exon_length - 1;
-  }
 
   for (my $i = $exon_start - 1; $i < $exon_end; $i++) {
 
@@ -815,16 +817,16 @@ sub _compare_to_reference {
 
       $mismatches += $align_unit;
     }
-    
+
     if (($reference_sequence->[$i] ne '-')
 	&&($match_sequence->[$i] eq '-')) {
 
       $noncovered += $align_unit;
     }
   }
-  
+
   my $identity = (1 - ($mismatches/$exon_length))*100;
-  
+
   # The next line gets around the problem of exon length not always
   # being a whole number of codons.  There can be cases where
   # there are more non-covered bases than there are bases in an exon.
@@ -886,20 +888,16 @@ sub _compute_evidence_coverage {
       $covered_length += $coordinate_pair->[1] - $coordinate_pair->[0] + 1;
 
       if ($previous_end && $coordinate_pair->[0] != $previous_end + 1) {
-	if ($self->_strand == 1){
-	  $self->_add_unmatched_region($sequence_identifier, $previous_end, 
-				       $coordinate_pair->[0], 'before', $coordinate_pair->[2]);
-	  
-	} elsif ($self->_strand == -1) {
-	  $self->_add_unmatched_region($sequence_identifier, $previous_end, 
-				       $coordinate_pair->[0], 'after', 
-				       ($self->_slice->length - $coordinate_pair->[3]));
-	}
+	$self->_add_unmatched_region($sequence_identifier, 
+				     $previous_end, 
+				     $coordinate_pair->[0], 
+				     'before', 
+				     $coordinate_pair->[2]);
       }
-      
+
       $previous_end = $coordinate_pair->[1];
     }
-    
+
     if ($sorted_matches[0]->[0] != 1){ 
        $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
 				    'before', $genomic_start);
@@ -1079,10 +1077,6 @@ sub _truncate_introns {
     my $intron_coord_1 = $exon->start - 1;
     my $intron_coord_2 = $exon->end + 1;
 
-    if ($self->_strand == -1) {
-      $intron_coord_1 = $self->_slice->length - ($exon->start - 1) + 1;
-      $intron_coord_2 = $self->_slice->length - ($exon->end + 1) + 1;
-    }
     push(@coordinates, $intron_coord_1, $intron_coord_2);
 
   }
@@ -1465,7 +1459,7 @@ sub _transcript {
 	last GENE;
       }
     }
-    
+
     unless ($self->{'_transcript'}){
       throw("Could not find transcript on Slice.  Very bad.");
     }
@@ -1492,12 +1486,20 @@ sub _transcript {
 =cut
 
 sub _slice {
+  my ($self, $object) = @_;
 
-  my ($self, $transcript) = @_;
+  my $transcript;
+
+  if (defined $object && 
+      $object->isa("Bio::EnsEMBL::Slice")){
+    $self->{'_slice'} = $object
+  } elsif (defined $object) {
+    $transcript = $object
+  }
 
   if (! defined $self->{'_slice'} && defined $transcript) {
 
-    my $slice_adaptor = $self->{'_db_adaptor'}->get_SliceAdaptor;
+    my $slice_adaptor = $self->_db->get_SliceAdaptor;
 
     # Ideally, stable_ids should be used to fetch things - just in 
     # case the transcript comes from a different db to our current
@@ -1535,9 +1537,10 @@ sub _slice {
 sub _strand {
   my ($self, $value) = @_;
 
-  # Potential gotcha.  The strand is most likely determined in
-  # the _transcript method, as it is easiest to derive it then.
-  # This method doesn't actually figure anything out.
+  # Potential gotcha.  The strand is set when the transcript is
+  # set, almost always from the constructor.  Hence, to minimise 
+  # overhead, the strand is set from the _transcript method and 
+  # this method doesn't actually figure anything out.
 
   if (defined $value) {
     $self->{'_strand'} = $value;
@@ -1830,13 +1833,8 @@ sub _build_evidence_seq {
 	next
       }
 
-      if ($self->_strand == 1) {
-	$partially_aligned->add_deletion($slice_position, 
-					 $instruction->{'length'});
-      } elsif ($self->_strand == -1) {
-	$partially_aligned->add_deletion($slice_rev_position, 
-					 $instruction->{'length'});
-      }
+      $partially_aligned->add_deletion($slice_position, 
+				       $instruction->{'length'});
 
       $hit_position   += $instruction->{'length'};
       $slice_position += $instruction->{'length'};
@@ -1867,28 +1865,14 @@ sub _build_evidence_seq {
       info("Feature [" . $base_align_feature->hseqname . 
 	   "] lies completely outside the bounds of Slice.  Chuck.");
       return 0
-    } elsif ($self->_strand == 1) {
+    } else {
       my $start_overshoot = 0;
       if ($base_align_feature->start < 0) {
-#print STDERR "Case 1.\n";
 	$start_overshoot = ($base_align_feature->start * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->end > $self->_slice->length) {
-#print STDERR "Case 2.\n";
 	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
-	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
-      }
-    } elsif ($self->_strand == -1) {
-      my $start_overshoot = 0;
-      if ($base_align_feature->end < 0) {
-#print STDERR "Case 3.\n";
-	$start_overshoot = ($base_align_feature->end * -1) + $deletions_upstream_of_slice;
-	splice (@fetched_seq, 0, $start_overshoot + 1);
-      }
-      if ($base_align_feature->start > $self->_slice->length) {
-#print STDERR "Case 4.\n";
-	my $end_overshoot = $base_align_feature->start - $self->_slice->length - 1;
 	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
       }
     }
@@ -1902,17 +1886,9 @@ sub _build_evidence_seq {
 
   my $genomic_start;
 
-  if ($self->_strand == 1){
-    $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start - 1 : 0;
-  } elsif ($self->_strand == -1) {
-    $genomic_start = $base_align_feature->end > 0 ? $base_align_feature->end - 1 : 0;
-  }
+  $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start - 1 : 0;
 
   if ($genomic_start <= scalar @feature_sequence){
-    if ($self->_strand == -1){
-      $genomic_start = scalar @feature_sequence - $genomic_start - 1;
-    }
-
     splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
   } else {
     info("Feature [". $base_align_feature->hseqname . " start:" . 
@@ -2005,12 +1981,7 @@ sub _genomic_sequence {
 
     my $genomic_sequence;
 
-    if ($self->_strand == 1) {
-      $genomic_sequence = $self->_slice->seq;
-    } elsif ($self->_strand == -1) {
-#print STDERR "Reverse complimenting genomic sequence.\n";
-      $genomic_sequence = $self->_slice->revcom->seq;
-    }
+    $genomic_sequence = $self->_slice->seq;
 
     $self->{'_genomic_sequence'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
 					     '-seq'  => $genomic_sequence,
@@ -2047,11 +2018,7 @@ sub _exon_nucleotide_sequence {
     foreach my $exon (@{$self->_transcript->get_all_Exons}) {
       my $exon_start;
 
-      if ($self->_strand == 1) {
-	$exon_start = $exon->start - 1;
-      }elsif ($self->_strand == -1) {
-	$exon_start = $self->_slice->length - $exon->end;
-      }
+      $exon_start = $exon->start - 1;
 
       push @exon_list, [$exon, $exon_start];
     }
@@ -2158,11 +2125,6 @@ sub _exon_protein_translation {
       my $exon_phase     = $exon->phase;
       my $exon_end_phase = $exon->end_phase;
 
-      if ($self->_strand == -1) {
-	$exon_start = $self->_slice->length - $exon_end;
-	$exon_end   = $exon_start + $exon_length - 1;
-      }
-
       # Jiggling the exons about to get frame right
       my $extra_length = 0;
 
@@ -2177,13 +2139,6 @@ sub _exon_protein_translation {
 
       } else {
 	$peptide_genomic_start = $exon_start - 1;
-      }
-
-      # This HAS to be removed, it is just necessary to make this work.
-      # There is something about reversed sequences that puts them two
-      # base positions upstream.
-      if ($self->_strand == -1) {
-	$peptide_genomic_start += 2;
       }
 
       push @exon_list, [$peptide_genomic_start, $peptide];
@@ -2416,7 +2371,31 @@ sub _fetch_sequence {
 }
 
 
-### Miscellaneous utilities ###
+### Getter-Setters and Miscellaneous utilities ###
+
+
+=head2 _db
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _db {
+  my $self = shift;
+
+
+  if (@_) {
+    $self->{'_db_adaptor'} = shift;
+  }
+
+  return $self->{'_db_adaptor'}
+}
+
 
 =head2 _padding
 
