@@ -14,12 +14,27 @@ my $dbname;
 my $user = 'ensro';
 my $pass = undef;
 
+my $current;
+my $current_summary;
+my $finished;
+my $analysis;
+my $rules;
+my $conditions;
+my $status_analysis;
+
 &GetOptions( 
 	    'host:s'    => \$host,
 	    'port:n'    => \$port,
 	    'user:s'    => \$user,
 	    'pass:s'    => \$pass,
 	    'dbname:s'  => \$dbname,
+	    'current'   => \$current,
+	    'current_summary' => \$current_summary,
+	    'finished'  => \$finished,
+	    'rules'     => \$rules,
+	    'conditions'=> \$conditions,
+	    'status_analysis:s'    => \$status_analysis,
+	    'analysis'  => \$analysis,
 	   );
 
 
@@ -30,10 +45,15 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 
 my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 
-$monitor->show_current_status;
-$monitor->show_current_status_summary;
-$monitor->show_finished_summary;
-$monitor->show_analysisprocess;
-$monitor->show_Rules;
-$monitor->show_Rules_and_Conditions;
-$monitor->show_jobs_by_status_and_analysis('RUNNING','dbEST');
+$monitor->show_current_status                 if ($current);
+$monitor->show_current_status_summary         if ($current_summary);
+$monitor->show_finished_summary               if ($finished);
+$monitor->show_analysisprocess                if ($analysis);
+$monitor->show_Rules                          if ($rules);
+$monitor->show_Rules_and_Conditions           if ($conditions);
+
+if ($status_analysis) {
+  my ($status,$analysis)  = split(/:/,$status_analysis);
+
+  $monitor->show_jobs_by_status_and_analysis($status,$analysis);
+}
