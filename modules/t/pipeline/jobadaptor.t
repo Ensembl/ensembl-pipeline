@@ -4,7 +4,7 @@ use warnings;
 
 BEGIN { $| = 1;
 	use Test ;
-	plan tests => 13;
+	plan tests => 14;
 }
 
 use TestUtils qw(debug test_getter_setter);
@@ -44,6 +44,13 @@ $job = Bio::EnsEMBL::Pipeline::Job->new(
 
 
 ok($job);
+
+
+#
+# test fetch_all_by_dbID_list method
+#
+my $jobs = $job_adaptor->fetch_all_by_dbID_list([1, 2, 3]);
+ok(grep({$_->dbID =~ /[1-3]/} @$jobs) == 3);
 
 $multi_test_db->save('pipeline', 'job', 'job_status');
 
