@@ -25,6 +25,26 @@ GetOptions ('file=s'   => \@files,
 	    'pass=s'   => \$pass,
 	    'dbname=s' => \$dbname);
 
+
+sub usage() {
+  print STDERR <<EOF
+startPipeline (file_options | database_options)
+
+  file_options: -file <file1> [-file <file2> [...]]
+  file1, file2, etc. are the names of configuration files.  One of the
+  configuration files must specify a [PIPELINE_DATABASE] that the configuration
+  and other pipeline control information will be written to.
+
+  database_options: -dbname <dbname> [-host <host>] [-port <port>] [-user user]
+                    [-pass <pass>]
+  Information necessary to connect to a mysql database where an existing 
+  configuration is already stored.
+
+EOF
+;
+
+}
+
 # create config with file or db
 my $config;
 
@@ -33,6 +53,8 @@ if (@files > 0) {
   $config = new Bio::EnsEMBL::Pipeline::Config(-FILES => \@files);
 
 } else {
+
+  die(usage()) if(!$dbname);
 
   # create DBAdaptor, then Config
   my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor('-host'   => $host,
@@ -57,3 +79,7 @@ sub _shut_down {
   $pipeline_manager->{'stop'} = 1;
 
 }
+
+
+
+
