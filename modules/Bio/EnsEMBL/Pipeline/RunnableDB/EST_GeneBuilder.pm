@@ -749,25 +749,19 @@ sub _check_Transcript_Location{
   ############################################################    
   my @exons = @{$transcript->get_all_Exons};
   my $apparent_strand = $exons[0]->strand * $exons[0]->slice->strand;
-  
+
+
   if ($#exons > 0) {
     for (my $i = 1; $i <= $#exons; $i++) {
-      
-      # check for folded transcripts
-      if ($apparent_strand == 1) {
-        if ($exons[$i]->start < $exons[$i-1]->end) {
-          print STDERR "transcript $id folds back on itself\n";
-          $valid = 0;
-        } 
-      } 
-      elsif ($apparent_strand == -1) {
-        if ($exons[$i]->end > $exons[$i-1]->start) {
-          print STDERR "transcript $id folds back on itself\n";
-          $valid = 0;
-        } 
+      if ($exons[$i]->start < $exons[$i-1]->end) {
+        warn("failed Exon-coordiante-check\n");
+        $valid = 0;
       }
     }
   }
+
+
+
   if ($valid == 0 ){
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
   }
