@@ -134,6 +134,7 @@ sub transcripts{
 sub score_Transcripts{
   my ($self) = @_;
 
+  print STDERR "**************** label : ".$self->_label."\n";
   my $verbose = $self->verbose;
   
   ############################################################
@@ -148,7 +149,7 @@ sub score_Transcripts{
   ############################################################
   # get the sites of alt-splicing on each transcript cluster
   my $cluster_count = 0;
- CLUSTER:
+  CLUSTER:
   foreach my $cluster ( @clusters ){
 
     $cluster_count++;
@@ -168,7 +169,8 @@ sub score_Transcripts{
       if ( $self->_label ){
 	$label = $self->_label;
       }
-      my $tran_id = $label."_".$cluster_count."_".1;
+      my $tran_id = $label."_".$cluster_count."_1";
+      print STDERR "transcript: $tran_id (single transcript)\n";
       $trans[0]->stable_id($tran_id);
       
       foreach my $exon ( @{$trans[0]->get_all_Exons} ){
@@ -176,12 +178,14 @@ sub score_Transcripts{
       }
       next CLUSTER;
     }
-        
-    my @sites = $self->get_alternative_sites( $cluster );
+    
+    # my $exon_clusters_count; # counts howmany exon clusters are in this transcript clusters
+
+    my ($sites, $exon_clusters_count ) = $self->get_alternative_sites( $cluster );
     my $average_score = 0;
     my $average_missed_sites;
     my %trans_with_site; # counts how many transcripts have this site
-
+    
     ############################################################
     # now get the sites of alternative splicing
     # contained in each transcript
@@ -201,11 +205,11 @@ sub score_Transcripts{
       }
       my $tran_id = $label."_".$cluster_count."_".$tran_count;
       $tran->stable_id($tran_id);
-
+      print STDERR "transcript: $tran_id\n";
       # list of ESTs:
       my @list = @{ $self->hold_list($tran) };
-	
-       	print STDERR "finding sites in transcript: " if $verbose;
+      
+      print STDERR "finding sites in transcript: " if $verbose;
 	if ($verbose ){
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
 	}
@@ -213,7 +217,7 @@ sub score_Transcripts{
 	# which sites does this transcript have?
 	# $site is a SeqFeature with exons as sub_SeqFeatures 
 	my @these_sites;
-	foreach my $site ( @sites ){
+	foreach my $site ( @$sites ){
 	    my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
 	    if ( !( $site->start > $end) && !( $site->end < $start ) ){
 		push( @these_sites, $site );
@@ -321,7 +325,7 @@ sub score_Transcripts{
     # by the same est in different transcripts
     my %site_coverage;
   SITE:
-    foreach my $site ( @sites ){
+    foreach my $site ( @$sites ){
       my %used_est;
       foreach my $tran ( @trans ){
 	my %seen_est;
@@ -358,7 +362,7 @@ sub score_Transcripts{
 
     ############################################################
     # cluster info:
-    my $cluster_sites = scalar( @sites );
+    my $cluster_sites = scalar( @$sites );
     my $max_sites     = 2 ** $cluster_sites;
     $average_score   /= $trans_number;
     $average_missed_sites /= $trans_number;
@@ -369,9 +373,10 @@ sub score_Transcripts{
       $gene_id."\t".
 	"sites:".$cluster_sites."\t".
 	  "trans:".$trans_number."\t".
-	    "2^N:".$max_sites."\t".
-	      "av_score:".$average_score."\t".
-		"av_missed_sites:".$average_missed_sites."\n";
+	    "exon_clust:".$exon_clusters_count."\t".
+	      "2^N:".$max_sites."\t".
+		"av_score:".$average_score."\t".
+		  "av_missed_sites:".$average_missed_sites."\n";
     
     
   }   # end of CLUSTER
@@ -415,7 +420,8 @@ sub get_alternative_sites{
   # cluster the exons according to overlap
   my $exon_cluster_list = $self->_cluster_Exons( @all_exons );
   my @clusters = sort { $a->start <=> $b->start } $exon_cluster_list->sub_SeqFeature;
-  
+  my $exon_clusters_count = scalar(@clusters);
+
   ############################################################
   # get the sites of alternative splicing:
   my @sites;
@@ -486,7 +492,7 @@ sub get_alternative_sites{
   # sites of alternative splicing are described by a cluster of exons 
   # which has genomic coordinates
   print STDERR scalar(@sites)." sites found\n";
-  return @sites;
+  return (\@sites, $exon_clusters_count);
 }
   
 ############################################################
