@@ -135,7 +135,7 @@ sub seq1 {
     my $selfseq = Bio::PrimarySeq->new(-display_id => $value->id,
 				       -seq => $value->seq);
     if ($selfseq->length == 0) {
-      $obj->throw("attempting to crossmatch seemingly 0 length sequence!");
+      $obj->throw("attempting to bl2seq seemingly 0 length sequence!");
     }
     $obj->{'_seq1'} = $selfseq;
   }
@@ -162,7 +162,7 @@ sub seq2 {
       }
       my $selfseq = Bio::PrimarySeq->new( -display_id => $value->id , -seq => $value->seq);
       if( $selfseq->length == 0 ) {
-	  $obj->throw("attempting to crossmatch seemingly 0 length sequence!");
+	  $obj->throw("attempting to bl2seq seemingly 0 length sequence!");
       }
       $obj->{'_seq2'} = $selfseq;
 
@@ -289,9 +289,15 @@ sub run {
 
 sub run_analysis {
   my ($self,$query,$sbjct) = @_;
+  my ($g,$W,$G,$E,$X) = qw(T 10 -1 0 10);
   print STDERR ("Running bl2seq\n" . $self->program .
 		                     " -i $query" .
 		                     " -j $sbjct" .
+		                     " -g $g" .
+		                     " -W $W" .
+		                     " -G $G" .
+		                     " -E $E" .
+		                     " -X $X" .
 		                     " -p " . $self->alntype .
 		                     " -e " . $self->min_eval . " > " .
 		                     $self->results. "\n");
@@ -299,6 +305,11 @@ sub run_analysis {
   $self->throw("Failed during bl2seq run, $!\n") unless (system ($self->program .
 								 " -i $query" .
 								 " -j $sbjct" .
+								 " -g $g" .
+								 " -W $W" .
+								 " -G $G" .
+								 " -E $E" .
+								 " -X $X" .
 								 " -p " . $self->alntype .
 								 " -e " . $self->min_eval . " > " .
 								 $self->results) == 0);
