@@ -125,6 +125,7 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;
+    
     if ($runnable)
     {
         #extract parameters into a hash
@@ -141,6 +142,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
+        $parameters{'-repm'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
         $self->{'_runnable'} = $runnable->new(%parameters);;
     }
