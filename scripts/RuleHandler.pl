@@ -187,7 +187,7 @@ sub delete_rule {
   # check dependencies
   my $goal = $rule->goalAnalysis()->logic_name();
   foreach my $old_rule(@existing_rules) {
-    foreach my $cond($old_rule->list_conditions()) {
+    foreach my $cond(@{$old_rule->list_conditions()}) {
       die "Sorry, another rule depends on this one\n" unless $cond ne $goal;
     }
   }
@@ -244,7 +244,7 @@ sub show_rules {
   foreach my $rule(@sorted) {
     print "Rule ID:", $rule->dbID(), "\n",
     "    conditions:\t";
-    my @conditions = $rule->list_conditions();
+    my @conditions = @{$rule->list_conditions()};
     foreach my $cond(@conditions) {
       print "$cond ";
     }
@@ -265,7 +265,7 @@ sub show_rules {
 sub check_dependencies {
 
   my ($new_rule) = shift;
-  my @new_conditions = $new_rule->list_conditions(); 
+  my @new_conditions = @{$new_rule->list_conditions();} 
  
   # check for unfulfilled conditions - these do not prevent rule insertion
   foreach my $cond(@new_conditions) {
@@ -307,7 +307,7 @@ sub check_duplications {
     
     # check the conditions lists
     my %count;
-    foreach my $cond($new_rule->list_conditions(), $old_rule->list_conditions()) {
+    foreach my $cond(@{$new_rule->list_conditions()}, @{$old_rule->list_conditions()}) {
       $count{$cond}++;
     }
     
@@ -315,7 +315,7 @@ sub check_duplications {
       next RULE unless $count{$cond} == 2;
     }
     # if we get to here, the two conditions lists are the same
-    my $conditions = join ' ', $old_rule->list_conditions();
+    my $conditions = join ' ', @{$old_rule->list_conditions()};
     die "Sorry, your new rule duplicates an existing rule:\nRule ID: ", 
     $old_rule->dbID, "\n conditions: $conditions\n goal: $goal\n";
   }
@@ -336,7 +336,7 @@ sub check_duplications {
 sub check_circles {
 
   my ($goal, $rule) = @_;
-  my @conditions = $rule->list_conditions();
+  my @conditions = @{$rule->list_conditions()};
   #print STDERR "checking rule ".$rule->dbID." ".$rule->goalAnalysis->logic_name."\n";
 #  die "Sorry, your rule will introduce a circular dependency\n" 
  #   if $rule->goalAnalysis()->logic_name() eq $goal;
