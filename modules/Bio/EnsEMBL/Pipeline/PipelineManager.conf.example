@@ -22,13 +22,13 @@ dbname =
 dbname = 
 
 [LSF]
-ouput_dir = 
+output_dir =
 path = /usr/local/lsfv42/4.2/alpha5/bin/
 max_pending = 1000
 runner =
 
 [LOCAL]
-ouput_dir = 
+output_dir =
 
 [PIPELINE_MANAGER]
 check_interval = 35
