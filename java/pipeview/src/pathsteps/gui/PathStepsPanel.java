@@ -594,6 +594,7 @@ public class PathStepsPanel extends JPanel{
     int cellWidth = 0;
     int cellHeight = 0;
     String boundString = null;
+    DefaultGraphCell cell = null;
     
     Properties graphLayout = 
       (Properties)panelModel
@@ -611,7 +612,8 @@ public class PathStepsPanel extends JPanel{
 
     while(nodes.hasNext()){
       node = (ModelElement)nodes.next();
-      cellAttributes = (Map)getGraphAttributeMap().get(node.getKey());
+      cellAttributes = (Map)((DefaultGraphCell)getCellMap().get(node.getKey())).getAttributes();
+      //cellAttributes = (Map)getGraphAttributeMap().get(node.getKey());
       if(cellAttributes == null){
         throw new FatalAException("Cannot find the attribute map for cell of key "+node.getKey());
       }
