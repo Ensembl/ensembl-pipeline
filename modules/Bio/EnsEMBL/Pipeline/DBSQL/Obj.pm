@@ -87,6 +87,12 @@ sub get_JobAdaptor {
   return $self->{_JobAdaptor};
 }
 
+sub get_OldAnalysis {
+        my ($self,$id) = @_;
+
+        return $self->SUPER::get_Analysis($id);
+}
+
 =head2 get_AnalysisAdaptor
 
  Title   : get_AnalysisAdaptor

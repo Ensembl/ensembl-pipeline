@@ -285,6 +285,7 @@ sub remove {
     DELETE FROM current_status
      WHERE jobId=$dbID } );
   $sth->execute;
+
   $sth = $self->prepare( qq{
     DELETE FROM jobstatus
      WHERE jobId = $dbID } );
