@@ -161,7 +161,13 @@ sub run {
   my $peptide = Bio::PrimarySeq->new(-id         => $transcript->id,
 				     -seq        => $transcript->translate->seq(),
 				     -moltype    => 'protein' );
-  
+
+  print STDERR "Peptide length: ", $peptide->length, "\n";
+  if ($peptide->length < 3) {
+    print "Peptide too short (min length is 3); skipping transcript\n";
+    return;
+  }
+
   my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $peptide,
 							       -program   => $self->program,
 							       -database  => $self->database,
