@@ -34,6 +34,7 @@ my $dnadbpass    = undef;
 my $dbport    = 3306;
 my $stable_id;
 my $db_id;
+my $file;
 
 GetOptions(
 	   'dbhost=s'    => \$dbhost,
@@ -46,7 +47,8 @@ GetOptions(
 	   'dnadbuser=s'    => \$dnadbuser,
 	   'dnadbpass=s'    => \$dnadbpass,
 	   'stable_id=s' => \$stable_id,
-	   'db_id=s' => \$db_id,  
+	   'db_id=s' => \$db_id,
+	   'file=s' => \$file,
 )
 or die ("Couldn't get options");
 
@@ -86,8 +88,17 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 print STDERR "connected to $dbname : $dbhost\n";
 
+my $fh;
+if($file){
+  open (FH, '>'.$file) or die "couldn't open file ".$file." $!";
+  $fh = \*FH;
+}else{
+  $fh = \*STDOUT;
+}
 
-my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*STDOUT ) ;
+
+
+my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => $fh ) ;
 
 foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
   
@@ -133,7 +144,7 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
     print STDERR "unable to process $gene_id, due to \n$@\n";
   }
 }
-
+close($fh);
 sub  find_trans_start {
  my ($trans) = @_;
  #print STDERR "finding trans start\n";
