@@ -185,7 +185,7 @@ close (OUT) or die "Can't close $outfile: $!\n";
 =cut
 
 sub make_protlist{
-  print STDERR "making prot_length list\n";
+  print STDERR "making prot_length list from $protfile\n";
   open (INFILE, "<$protfile") or die "Can't open $protfile\n";
   $/ = '>'; # looks for fields separated by > instead of "\n"
  SEQFETCH:
@@ -194,6 +194,9 @@ sub make_protlist{
     next SEQFETCH unless scalar(@lines) > 1;
     my $description = shift (@lines);
     $description =~ /(\S+)/; # find the first block of non-whitespace
+
+    next SEQFETCH unless defined $description and $description ne '';
+
     my $bs = new Bio::Seq;
     $bs->display_id($1);
     
