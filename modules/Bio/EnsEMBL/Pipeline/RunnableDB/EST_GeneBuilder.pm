@@ -167,47 +167,49 @@ sub new {
 =cut
 
 sub write_output {
-  my ($self) = @_;
-  
-  #print STDERR "not writting genes yet\n";
-  #return;
-
-  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
-  
- GENE: 
-  foreach my $gene ($self->output) {	
+    my ($self) = @_;
     
-    # test
-    my @transcripts = $gene->each_Transcript;
-    #my $tran = $transcripts[0];
+    #print STDERR "not writting genes yet\n";
+    #return;
+    
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+    
+    #print STDERR "EST_GeneBuilder: before writting gene\n";
+  GENE: 
+    foreach my $gene ($self->output) {	
+	
+	# test
+	print STDERR "about to store gene:\n";
+	my @transcripts = $gene->each_Transcript;
+	#my $tran = $transcripts[0];
     #my $strand = $tran->start_exon->strand;
-    #print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
+	#print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
     
     # test of the supporting evidence. It seems to wrok fine.
-    #foreach my $tran (@transcripts){
+	foreach my $tran (@transcripts){
     #  print STDERR "\ntranscript: $tran\n";
     #  print STDERR "exons:\n";
-    #  foreach my $exon ($tran->get_all_Exons){
-    #  print STDERR $exon->start."-".$exon->end."\n";
+	    foreach my $exon ($tran->get_all_Exons){
+		print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
     #  print STDERR "evidence:\n";
     #  foreach my $sf ( $exon->each_Supporting_Feature ){
     #  $self->print_FeaturePair($sf);
     #  print STDERR "source_tag: ".$sf->source_tag."\n";
     #  print STDERR "analysis  : ".$sf->analysis->dbID."\n";
     #  print STDERR "logic_name: ".$sf->analysis->logic_name."\n";
-    #  }
-    # }
-    #}
+	    }
+	}
     
-    
-    eval {
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene " . $gene->dbID . "\n";
-    }; 
-    if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      
+      
+      eval {
+	  $gene_adaptor->store($gene);
+	  print STDERR "wrote gene " . $gene->dbID . "\n";
+      }; 
+      if( $@ ) {
+	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      }
     }
-  }
 }
 
 ############################################################
@@ -1728,7 +1730,7 @@ sub _set_splice_Ends {
 	      # ... and $exon is at the edge of its transcript
 	      if ( $is_first{ $exon } == 1 || $is_last{ $exon } == 1 ){
 	         
-		print STDERR "ditching one exon\n";
+		#print STDERR "ditching one exon\n";
 		# then we ditch it and continue ...
 		next EXONS;
 	      }
@@ -1748,7 +1750,7 @@ sub _set_splice_Ends {
   # if needed, re-cluster
   if ( $need_to_recluster == 1){
     @exon_clusters   = ();
-    print STDERR " *** Reclustering ***\n";
+    #print STDERR " *** Reclustering ***\n";
     $cluster_list  = $self->_cluster_Exons( @exon_list );
     @exon_clusters = $cluster_list->sub_SeqFeature;
   }
@@ -2433,12 +2435,13 @@ sub make_genes {
       next TRANSCRIPT;
     }
     
-    print STDERR "In _make_genes():\n";
+    #print STDERR "In _make_genes() before translate():\n\n";
     my $excount = 1;
   EXON:
     foreach my $exon(@exons){
       
-      #print STDERR "  Exon ".$excount." : ".$exon."  start: ".$exon->start." end: ".$exon->end."\n";
+      #print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
+      
       $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->attach_seq($contig->primary_seq);
@@ -2448,6 +2451,7 @@ sub make_genes {
       # when the gene gets stored, the strand is flipped automatically
 
       ## test the supporting evidence
+      
       #my @evi = $exon->each_Supporting_Feature;
       #print STDERR "Exon: $excount ".scalar(@evi)." features\t"
       #."start: ".$exon->start." end: ".$exon->end."\n";
@@ -2462,14 +2466,22 @@ sub make_genes {
       #print STDERR "No supporting evidence\n";
       #}
       $excount++;
-    }
+  }
 
     #put temporary_id (this hasn't been put in neither Genomewise nor MiniGenomewise
     my $translation = $transcript->translation;
     $translation->temporary_id($contig->id . ".$genetype.$count");
-  
+
     # store only genes that translate ( to check it, we get the Bio::Seq )
     my $sequence = $transcript->translate;
+
+    print STDERR "In _make_genes() after translate():\n\n";
+  EXON:
+    foreach my $exon(@exons){
+      print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
+    }
+  
+
     unless ( $sequence ){
       print STDERR "TRANSCRIPT WITHOUT A TRANSLATION!!\n";
     }
