@@ -6,7 +6,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Config;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PipelineManager;
-# set a sgnal handler 
+# set a signal handler 
 $SIG{INT}  = \&_shut_down;
 $SIG{TERM} = \&_shut_down;
 
@@ -30,7 +30,7 @@ my $config;
 
 if (@files > 0) {
 
-  $config = new Bio::EnsEMBL::Pipeline::Config(-FILES => @files);
+  $config = new Bio::EnsEMBL::Pipeline::Config(-FILES => \@files);
 
 } else {
 
