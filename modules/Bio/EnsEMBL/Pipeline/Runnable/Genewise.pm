@@ -53,7 +53,7 @@ sub new {
   my ($genomic, $protein, $memory,$reverse,$endbias,$genewise) = 
       $self->_rearrange([qw(GENOMIC PROTEIN MEMORY REVERSE ENDBIAS GENEWISE)], @args);
   
-  print $genomic . "\n";
+#  print $genomic . "\n";
 
   $genewise = 'genewise' unless defined($genewise);
 
@@ -107,7 +107,7 @@ sub set_environment {
 sub _wise_init {
   my($self,$genefile) = @_;
 
-  print("Initializing genewise\n");
+#  print("Initializing genewise\n");
 
   $self->set_environment;
 
@@ -148,7 +148,8 @@ sub _align_protein {
   $proio = undef;
 
   my $genewise = $self->genewise;
-  my $command = "$genewise $protfile $genfile -gff -alb -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
+#  my $command = "/nfs/acari/birney/wise2-bin-snapshot/genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
+  my $command = "$genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
@@ -158,269 +159,104 @@ sub _align_protein {
     $command .= " -trev ";
   }
   
-  print STDERR "Command is $command\n";
+#  print STDERR "Command is $command\n";
   
-  open(GW, "$command |");
+  open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 
-  # for gff parsing
-  my @gff_exons;
-  my $curr_gff;
-  my $count = 1;
-
-  # for alb parsing
-  my @alb_exons;
+  # for genesf parsing
+  my @genesf_exons;
   my $curr_exon;
-  my $exon_pos=0; # current position in exon, relative to start=1
-  my $curr_aln = undef; # feature pair
-  my $prev_state = "";  
-  my $albphase = 0;
-  
-  # need to parse both gff and alb output
-  # making assumption of only 1 gene prediction ...
-  # gff o/p always comes before alb o/p
- GW: while (<GW>) {
+  my $curr_gene;
+
+  # making assumption of only 1 gene prediction ... this will change once we start using hmms
+ GENESF: while (<GW>) {
     chomp;
     my @f = split;
-    
-    #      print STDERR "Line is " . $_ . "\n";
-    next GW unless (defined($f[2]) &&( $f[2] eq '"MATCH_STATE"'  || $f[2] eq '"INTRON_STATE"' ||
-				       $f[2] eq '"INSERT_STATE"' || $f[2] eq '"DELETE_STATE"' ||
-				       $f[2] eq "cds"));
-    
-    if($f[2] eq 'cds'){
-      # this is gff
-      # make a new "exon"
-      $curr_gff = new Bio::EnsEMBL::SeqFeature;
-      $curr_gff->seqname   ($f[8]);
-      $curr_gff->id        ($self->protein->id);
-      $curr_gff->source_tag('genewise');
-      $curr_gff->primary_tag('similarity');
-      
-      push(@gff_exons,$curr_gff);
-      
-      $count = 1;
 
-      my $strand = $f[6];
-      
-      if ($strand eq "+") {
-	$curr_gff->strand(1);
-      } else {
-	$curr_gff->strand(-1);
-      }
-      
-      $curr_gff->seqname($f[8]);
-      
-      if ($f[3] < $f[4]) {
-	$curr_gff->start  ($f[3]);
-	$curr_gff->end    ($f[4]);
-      } else {
-	$curr_gff->start  ($f[4]);
-	$curr_gff->end    ($f[3]);
-      }
-      
-      my $phase = $f[7];
-      
-      if ($phase == 2) { 
-	$phase = 1;
-      }	elsif ($phase == 1) { 
-	$phase = 2;
-      }
-      
-      $curr_gff->phase($phase);
-      $curr_gff->id ($self->protein->id . ".$count"); 
-      
-      $count++;
-
-    }
-    else {
-      
-      # this is alb
-      $f[1] =~ /\[\d+:(\d+)/;
-      my $prot_pos = $1 + 1;
-      
-      if ($f[4] eq '"SEQUENCE_INSERTION"' || $f[4] eq '"SEQUENCE_DELETION"') {
-	# start a new "exon"
-	$curr_exon = undef;
-	$exon_pos = 0;
-	$albphase = 0;
-	$prev_state = 'SEQINDEL';
-      } 
-      
-      if ($f[4] =~ /PHASE/) {
-	# adjustment to start position of sub-aligned block
-	$albphase = 0;
-	$albphase = 1 if ($f[4] eq '"3SS_PHASE_2"' || $f[4] eq '"5SS_PHASE_2"' );
-	$albphase = 2 if ($f[4] eq '"3SS_PHASE_1"'|| $f[4] eq '"5SS_PHASE_1"');
-      }
-      
-      if ($f[2] eq '"MATCH_STATE"' && $f[4] eq '"CODON"') {
-	if (!defined($curr_exon)) {
-	  # start a new "exon"
-	  my $ef = new Bio::EnsEMBL::SeqFeature;
-	  $ef->seqname   ($self->protein->id);
-	  $ef->id        ('exon_pred');
-	  $ef->source_tag('genewise');
-	  $ef->primary_tag('similarity');
-	  $ef->start($prot_pos);
-	  $ef->end($prot_pos);
-	  
-	  $curr_exon = $ef;
-	  push(@alb_exons,$curr_exon);
+    next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting'));
+    
+    if($f[0] eq 'Gene'){
+      # flag a frameshift - ultimately we will do something clever here but for now ...
+      if (/^(Gene\s+\d+)$/){
+	if(!defined($curr_gene)){
+	  $curr_gene = $1;
 	}
-	
-	if ($prev_state eq 'INSERT' || $prev_state eq 'DELETE' || $exon_pos == 0) {
-	  if($exon_pos == 0) {
-	    $exon_pos += $albphase;
-	  }
-	  
-	  # start a new "alignment"
-	  my $pf = new Bio::EnsEMBL::SeqFeature( -start   => $prot_pos,
-						 -end     => $prot_pos,
+	elsif($1 ne $curr_gene){
+	  $self->warn("frameshift!\n");
+	}
+      }
+    }
+
+    elsif($f[0] eq 'Exon'){
+      #      make a new "exon"
+      $curr_exon = new Bio::EnsEMBL::SeqFeature;
+      $curr_exon->seqname  ($self->genomic->id);
+      $curr_exon->id        ($self->protein->id);
+      $curr_exon->source_tag('genewise');
+      $curr_exon->primary_tag('similarity');
+
+      $curr_exon->phase($f[4]);
+
+      my $start  = $f[1];
+      my $end    = $f[2];
+      my $strand = 1;
+      if($f[1] > $f[2]){
+	$strand = -1;
+	$start  = $f[2];
+	$end    = $f[1];
+      }
+      
+      $curr_exon->start($start);
+      $curr_exon->end($end);
+      $curr_exon->strand($strand);
+
+      $self->addExon($curr_exon);
+      push(@genesf_exons, $curr_exon);
+    }
+    
+    elsif($f[0] eq 'Supporting'){
+
+      my $gstart = $f[1];
+      my $gend   = $f[2];
+      my $strand = 1;
+      if ($gstart > $gend){
+	$gstart = $f[2];
+	$gend = $f[1];
+	$strand = -1;
+      }
+      
+      # check strand sanity
+      if($strand != $curr_exon->strand){
+	$self->warn("incompatible strands between exon and supporting feature - cannot add suppfeat\n");
+	next GENESF;
+      }
+
+      my $pstart = $f[3];
+      my $pend   = $f[4];
+      if($pstart > $pend){
+	$self->warn("Protein start greater than end! Skipping this suppfeat\n");
+	next GENESF;
+      }
+
+      # start a new "alignment"
+	  my $pf = new Bio::EnsEMBL::SeqFeature( -start   => $pstart,
+						 -end     => $pend,
 						 -seqname => $self->protein->id,
+						 -strand  => 1
 					       ); 
-	  my $gf  = new Bio::EnsEMBL::SeqFeature( -start   => $exon_pos +1,
-						  -end     => $exon_pos +1,
+	  my $gf  = new Bio::EnsEMBL::SeqFeature( -start   => $gstart,
+						  -end     => $gend,
 						  -seqname => 'genomic',
+						  -strand  => $strand,
 						);
-	  my $fp = new Bio::EnsEMBL::FeaturePair( -feature1 => $pf,
-						  -feature2 => $gf);
-	  $curr_aln = $fp;
-	  $curr_exon->add_sub_SeqFeature($fp,'EXPAND');
-	}
-	
-	$exon_pos += 3;
-	$curr_exon->end($prot_pos);
-	$curr_aln->end($prot_pos);      
-	$curr_aln->hend($exon_pos);      
-	$prev_state = 'MATCH';
-      }
-      
-      elsif ( $f[2] eq '"INSERT_STATE"' ) {
-	$exon_pos += 3 unless ($prev_state eq 'INTRON' || $prev_state eq 'SEQINDEL');
-	$exon_pos += $albphase if ($prev_state eq 'INTRON');
-
-	$prev_state = 'INSERT';
-      }
-      
-      elsif ( $f[2] eq '"DELETE_STATE"' ) {
-	$prev_state = 'DELETE';
-      }
-      
-      elsif ( $f[4] eq '"CENTRAL_INTRON"' ) {
-	$exon_pos = 0;
-	$prev_state = 'INTRON';
-	$curr_exon = undef;
-      }   
+	  my $fp = new Bio::EnsEMBL::FeaturePair( -feature2 => $pf,
+						  -feature1 => $gf);
+	  $curr_exon->add_sub_SeqFeature($fp,'');
     }
+
   } 
   
-  close(GW);
-  
-  # Now convert into feature pairs
-  # makes hstart & hend for the feature pair in cDNA coordinates?
-  # Now convert into feature pairs
-  my $dummy_ex;
-  if(scalar(@gff_exons) != scalar(@alb_exons) ){
-    print STDERR "gff: " .scalar(@gff_exons) . "\talb: " . scalar(@alb_exons) .  "\n";
-    # still write the exons, but the supporting feature data is rubbish now.
-    $self->warn("rats; exon numbers don't match - no sensible supporting feature data");
-    $dummy_ex = 1;
-  }
-  
-  my $index=0;
-  my @fp;
-  for ($index=0; $index <= $#gff_exons; $index++){
-    my $feat_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $gff_exons[$index]);
-    if($dummy_ex){
-      my $f = new Bio::EnsEMBL::SeqFeature;
-      $f->seqname   ($self->protein->id);
-      $f->id        ('exon_pred');
-      $f->source_tag('genewise');
-      $f->primary_tag('similarity');
-      $f->start(0);
-      $f->end(0);
-      $feat_pair->feature2($f);
-    }
-    else{
-      $feat_pair->feature2($alb_exons[$index]);
-    }
-    push(@fp,$feat_pair);
-  }     
-  
-  # now sort them
-  if ($#gff_exons >=0) {
-    if ($gff_exons[0]->strand == 1) {
-      @fp = sort {$a->start <=> $b->start} @fp;
-    } else {
-      @fp = sort {$b->start <=> $a->start} @fp;
-    }
-  }
-  
-  # and sort out the sub_seqfeature coordinates
-  # and transfer them to the genomic feature.
-  foreach my $pair(@fp){
-    my $strand = $pair->feature1->strand;
-    foreach my $aln($pair->feature2->sub_SeqFeature) {
-      $aln->strand(1);
-      $aln->hstrand($strand); # genomic is feature 2. hmmm
-      if ($strand == 1) {
-	my $ex_start = $pair->feature1->start;
-	my $ex_end = $pair->feature1->end;
-	my $sp = $aln->hstart - 1;
-	my $ep = $aln->hend - 1;
-	$aln->hstart($sp + $ex_start);
-	$aln->hend($ep + $ex_start);
-      }
-      else {
-	my $ex_start = $pair->feature1->end;
-	my $ex_end = $pair->feature1->start;
-	my $sp = $aln->hstart - 1;
-	my $ep = $aln->hend - 1;
-	$aln->hend($ex_start - $sp);
-	$aln->hstart($ex_start - $ep);
-      }
-      
-      my $nfp = new Bio::EnsEMBL::FeaturePair( -feature1 => $aln->feature2,
-					       -feature2 => $aln->feature1);
-
-      # final screening out of off by one errors
-      if($nfp->feature1->start  >= $pair->feature1->start &&
-	 $nfp->feature1->end    <= $pair->feature1->end    &&
-	 $nfp->feature1->strand == $pair->feature1->strand){
-
-	$pair->feature1->add_sub_SeqFeature($nfp,'');
-      }
-      
-      else{
-	print STDERR "\n***double rats: coordinate mismatch; can't write supporting_features\n"; 
-	print STDERR "\tpair->feature1\n";
-	print STDERR "\t" . $pair->feature1->start . " " . $pair->feature1->end . " " . $pair->feature1->strand. "\n";
-	print STDERR "\tnfp\n";
-	print STDERR "\t" . $nfp->feature1->start . " " . $nfp->feature1->end . " " . $nfp->feature1->strand. "\n";
-      }
-    }
-    
-    # and flush feature2
-    $pair->feature2->flush_sub_SeqFeature;
-    $self->addExon($pair);
-  }
-  
-  # check them
-  foreach my $pair(@fp){
-#    print STDERR $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . 
-      $pair->score . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-	$pair->hstart . "\t" . $pair->hend. "\n";#
-    
-    foreach my $aln($pair->feature2->sub_SeqFeature) {
-#      print "\t" . $aln->seqname  . " " . $aln->start  . "-" . $aln->end  . " " . $aln->strand ."\t" . 
-	$aln->hseqname . " " . $aln->hstart . "-" . $aln->hend . " " . $aln->hstrand ."\n";  
-    }
-    
-    foreach my $aln($pair->feature1->sub_SeqFeature) {
-#      print "\t" . $aln->seqname  . " " . $aln->start  . "-" . $aln->end  . " " . $aln->strand ."\t" . 
-	$aln->hseqname . " " . $aln->hstart . "-" . $aln->hend . " " . $aln->hstrand ."\n";  
-    }
-  }
+  close(GW) or $self->throw("Error running genewise:$!\n");
   
   unlink $genfile;
   unlink $protfile;
@@ -466,7 +302,6 @@ sub memory {
 sub genomic {
     my ($self,$arg) = @_;
 
-#    print ("Gen $arg\n");
     if (defined($arg)) {
 	$self->throw("Genomic sequence input is not a Bio::SeqI or Bio::Seq or Bio::PrimarySeqI") unless
 	    ($arg->isa("Bio::SeqI") || 
@@ -514,6 +349,7 @@ sub protein {
 
 #    return @{$self->{'_output'}};
 #}
+
 sub addExon {
     my ($self,$arg) = @_;
 
