@@ -69,8 +69,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH,
-						      CDNA_SEQFETCHER)], @args);
+  my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH CDNA_SEQFETCHER)], @args);
 
   # golden path
   if(!defined $path){
@@ -81,6 +80,7 @@ sub new {
   $path = 'UCSC' unless (defined $path && $path ne '');
   $self->dbobj->static_golden_path_type($path);
 
+  # broken by test_runnableDB 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
     my $seqfetcher = $self->make_seqfetcher("protein_index");
@@ -96,7 +96,7 @@ sub new {
     my $seqfetcher = $self->make_seqfetcher("cdna_index");
     $self->cdna_seqfetcher($seqfetcher);
   }
- 
+
   return $self;
 }
 
@@ -391,7 +391,7 @@ sub write_output {
       # do a per gene eval...
       eval {
 	  $gene_adaptor->store($gene);
-	  print STDERR "gene dbID " . $gene->dbID . "\n";
+	  print STDERR "wrote gene dbID " . $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -694,7 +694,7 @@ sub combine_genes{
       );
   }
 
-  # merge the genewise and est2genome predictions. Only one new transcript per genewise gene ...
+
   my @newtrans = $self->_make_newtranscripts($genetype, $analysis_obj, @merged_gw_genes);
 
   $analysis_obj->gff_feature('gene');
@@ -954,6 +954,13 @@ sub compare_transcripts{
     return 0;
   }
   $@ = '';
+
+#  print STDERR "translation: \n";
+#  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+#  print STDERR "genewise: \n";	      
+#  $seqio->write_seq($genewise_translation);
+
+
   eval{
     $combined_translation = $combined_transcript->translate;
   };
@@ -964,13 +971,9 @@ sub compare_transcripts{
     return 0;
   }
 	  
-  print STDERR "translation: \n";
-  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-  print STDERR "genewise: \n";	      
-  $seqio->write_seq($genewise_translation);	      
-  print STDERR "combined: \n";
-  $seqio->write_seq($combined_translation); 
-  print STDERR "\n ";
+#  print STDERR "combined: \n";
+#  $seqio->write_seq($combined_translation); 
+#  print STDERR "\n ";
   
   if($genewise_translation->seq eq $combined_translation->seq) {
     return 1;
@@ -983,7 +986,7 @@ sub transcript_from_single_exon_genewise {
   my ($self, $eg_exon, $gw_exon, $transcript, $translation, $exoncount, @e2g_exons) = @_;
 
   if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
-    print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
+#    print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
 
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_exon;
@@ -1021,7 +1024,7 @@ sub transcript_from_single_exon_genewise {
     
     # expand frameshifted exons back from one exon to multiple exons
     if(scalar($ex->sub_SeqFeature) > 1){
-      print STDERR "uh-oh frameshift\n";
+#      print STDERR "uh-oh frameshift\n";
       my @sf = $ex->sub_SeqFeature;
       
       # save current start and end
@@ -1065,7 +1068,7 @@ sub transcript_from_multi_exon_genewise {
   if($gwexons[0]->strand == 1){
   FORWARD:
     if ($gwexons[0]->end == $current_exon->end && $current_exon->start <= $gwexons[0]->start){
-      print STDERR "5' exon match!\n";
+#      print STDERR "5' exon match!\n";
       # modify the coordinates of the first exon in $newtranscript
       my $ex = $transcript->start_exon;
       $ex->start($current_exon->start);
@@ -1082,7 +1085,7 @@ sub transcript_from_multi_exon_genewise {
     } # end 5' exon
     
     elsif ($gwexons[$#gwexons]->start == $current_exon->start && $current_exon->end >= $gwexons[$#gwexons]->end){
-      print STDERR "3' exon match\n";
+#      print STDERR "3' exon match\n";
       
       # modify the coordinates of the last exon in $newtranscript
       my $ex = $transcript->end_exon;
@@ -1103,7 +1106,7 @@ sub transcript_from_multi_exon_genewise {
   elsif($gwexons[0]->strand == -1){
   REVERSE:
     if ($gwexons[0]->start == $current_exon->start && $current_exon->end >= $gwexons[0]->end){
-      print STDERR "5' exon match!\n";
+#      print STDERR "5' exon match!\n";
       
       # modify the coordinates of the first exon in $newtranscript
       my $ex = $transcript->start_exon;
@@ -1122,7 +1125,7 @@ sub transcript_from_multi_exon_genewise {
     } # end 5' exon
     
     elsif ($gwexons[$#gwexons]->end == $current_exon->end && $current_exon->start <= $gwexons[$#gwexons]->start){
-      print STDERR "3' exon match\n";
+#      print STDERR "3' exon match\n";
       
       # modify the coordinates of the last exon in $newtranscript
       my $ex = $transcript->end_exon;
@@ -1158,7 +1161,7 @@ my ($self, $transcript, $exoncount, @e2g_exons);
 sub expand_3prime_exon{
 my ($self, $exon, $transcript) = @_;
       if(scalar($$exon->sub_SeqFeature) > 1){
-	print STDERR "3' exon frameshift\n";
+#	print STDERR "3' exon frameshift\n";
 	my @sf = $$exon->sub_SeqFeature;
 	my $last = pop(@sf);
 
@@ -1299,7 +1302,7 @@ GENE:  foreach my $gene (@genes) {
       # is this a special case single coding exon gene with UTRS?
       if($tran->translation->start_exon() eq $tran->translation->end_exon() 
 	 && $gene->type eq 'combined_gw_e2g'){
-	print STDERR "single coding exon, with UTRs\n";
+#	print STDERR "single coding exon, with UTRs\n";
 	
 	# problems come about when we switch from + strand on FPC contig to - strand on raw contig.
 	my $fpc_strand;
@@ -1320,7 +1323,7 @@ GENE:  foreach my $gene (@genes) {
 #	    if ($exon->id eq $tran->translation->start_exon_id()) {
 	    if ($exon eq $tran->translation->start_exon()) {
 	      if($fpc_strand == 1 && $exon->strand == -1){
-		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
+#		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
 		$exon->end($exon->end - ($tran->translation->start -1));
 		$exon->start($exon->end - ($tran->translation->end -1));
 	      }
