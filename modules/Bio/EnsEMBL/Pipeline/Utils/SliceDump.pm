@@ -113,31 +113,55 @@ sub output_dir{
   into the desired directory
   Returntype: filename
   Exceptions: 
-  Example   : my $filename = $slice_dump->dump_table(
+  Example   : my $filename = $slice_dump->dump_table()
 
 
 =cut
 
+#sub dump_table{
+#  my ($self, $table_name, $filename, $where_clause) = @_;
+#  #print STDERR "Dumping ".$table_name."\n";
+#  #print STDERR "with where clause ".$where_clause."\n" if($where_clause);
+#  if(!$table_name){
+#    throw("Can't dump table without tablename");
+#  }
+#  if(!$filename){
+#    $filename = $self->output_dir."/".$table_name;
+#    #warning("No filename provided so using ".$filename);
+#  }
+#  if(-e $filename){
+#    throw($filename." exists mysql can't dump into an existing file ");
+#  }
+#  my $sql = "select * from ".$table_name;
+#  $sql .= " where ".$where_clause if($where_clause);
+#  $sql .= " into outfile '".$filename."'";
+#  my $sth = $self->db->prepare($sql);
+#  $sth->execute();
+#  return $filename;
+#}
+
 sub dump_table{
-  my ($self, $table_name, $filename, $where_clause) = @_;
-  #print STDERR "Dumping ".$table_name."\n";
-  #print STDERR "with where clause ".$where_clause."\n" if($where_clause);
+  my ($self, $table_name, $filename, $where, $select, $from, $out) = @_;
   if(!$table_name){
     throw("Can't dump table without tablename");
   }
   if(!$filename){
     $filename = $self->output_dir."/".$table_name;
-    #warning("No filename provided so using ".$filename);
   }
   if(-e $filename){
     throw($filename." exists mysql can't dump into an existing file ");
   }
-  my $sql = "select * from ".$table_name;
-  $sql .= " where ".$where_clause if($where_clause);
-  $sql .= " into outfile '".$filename."'";
+  $select = "select * " unless($select);
+  $from = "from ".$table_name." " unless($from);
+  $out = " into outfile '".$filename."'" unless($out);
+  my $sql = $select;
+  $sql .= $from;
+  $sql .= $where if($where);
+  $sql .= $out;
+  print $sql."\n";
   my $sth = $self->db->prepare($sql);
-  $sth->execute();
-  return $filename;
+  $sth->execute;
+  return $out;
 }
 
 
@@ -147,7 +171,7 @@ sub generate_where_clause{
   if(!$id){
     throw("Can't generate a where clause without seq_region_id");
   }
-  my $where_clause = "seq_region_id = ".$id;
+  my $where_clause = "where seq_region_id = ".$id;
   if($overlaps_boundaries){
     $where_clause .= " and seq_region_start <= ".$end if($end);
     $where_clause .= " and seq_region_end >= ".$start if($start);
@@ -175,6 +199,14 @@ sub can_dump{
   $sth->execute;
   my ($count) = $sth->fetchrow;
   return $count;
+}
+
+
+
+sub get_filename{
+  my ($self, $table_name, $slice) = @_;
+  return $self->output_dir."/".$table_name.".".$slice->seq_region_name.".".
+    $slice->start."-".$slice->end;
 }
 
 
@@ -450,7 +482,7 @@ sub dump_assembly_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('assembly', $id, 'asm_seq_region_id')){
     my $filename = $self->get_filename('assembly', $slice);
-    my $where_clause = "asm_seq_region_id = ".$id.
+    my $where_clause = "where asm_seq_region_id = ".$id.
       " and asm_start <= ".$slice->end.
         " and asm_end >= ".$slice->start;
     $self->dump_table('assembly', $filename, $where_clause);
@@ -470,17 +502,15 @@ sub dump_repeat_consensus_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('repeat_feature', $id)){
     my $filename = $self->get_filename('repeat_consensus', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = ("select rc.* from repeat_consensus rc, repeat_feature rf ".
-               "where rf.repeat_consensus_id = rc.repeat_consensus_id ".
-               "and rf.seq_region_id = ".$id." ".
-               "and rf.seq_region_start = ".$slice->start." ".
-               "and rf.seq_region_end = ".$slice->end." ".
-               "into outfile '".$filename."'");
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select rc.* ";
+    my $from = "from repeat_consensus rc, repeat_feature rf ";
+    my $where = "where rf.repeat_consensus_id = rc.repeat_consensus_id ".
+      "and rf.seq_region_id = ".$id." ".
+        "and rf.seq_region_start = ".$slice->start." ".
+          "and rf.seq_region_end = ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('repeat_consensus', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
@@ -498,16 +528,16 @@ sub dump_translation_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('transcript', $id)){
     my $filename = $self->get_filename('translation', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select translation.* from translation, transcript ".
-      "where translation.transcript_id = transcript.transcript_id and ".
-        "seq_region_id = ".$id." and seq_region_start >= ".$slice->start." ".
-          "and seq_region_end <= ".$slice->end.
-            " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select translation.* ";
+    my $from = "from translation, transcript ";
+    my $where = "where ".
+      "translation.transcript_id = transcript.transcript_id and ".
+        "seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('translation', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
@@ -524,16 +554,16 @@ sub dump_exon_transcript_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('transcript', $id)){
     my $filename = $self->get_filename('exon_transcript', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select exon_transcript.* from exon_transcript, transcript ".
-      "where exon_transcript.transcript_id = transcript.transcript_id and ".
-        "seq_region_id = ".$id." and seq_region_start >= ".$slice->start." ".
-          "and seq_region_end <= ".$slice->end.
-            " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select exon_transcript.* ";
+    my $from = "from exon_transcript, transcript ";
+    my $where = "where ".
+      "exon_transcript.transcript_id = transcript.transcript_id and ".
+        "seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('exon_transcript', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
@@ -550,21 +580,22 @@ sub dump_supporting_feature_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('exon', $id)){
     my $filename = $self->get_filename('supporting_feature', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select supporting_feature.* from supporting_feature, ".
-      "exon where supporting_feature.exon_id = ".
-        "exon.exon_id and seq_region_id = ".$id.
-          " and seq_region_start >= ".$slice->start." ".
-            "and seq_region_end <= ".$slice->end.
-              " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select supporting_feature.* ";
+    my $from = "from supporting_feature, exon ";
+    my $where = "where ".
+      "supporting_feature.exon_id = exon.exon_id and ".
+        "seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('supporting_feature', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
 }
+
+
 
 sub dump_transcript_stable_id_table{
   my ($self, $slice) = @_;
@@ -577,22 +608,20 @@ sub dump_transcript_stable_id_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('transcript', $id)){
     my $filename = $self->get_filename('transcript_stable_id', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select transcript_stable_id.* from transcript_stable_id, ".
-      "transcript where transcript_stable_id.transcript_id = ".
-        "transcript.transcript_id and seq_region_id = ".$id.
-          " and seq_region_start >= ".$slice->start." ".
-            "and seq_region_end <= ".$slice->end.
-              " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select transcript_stable_id.* ";
+    my $from = "from transcript_stable_id, transcript ";
+    my $where = "where ".
+      "transcript_stable_id.transcript_id = transcript.transcript_id ".
+        " and seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('transcript_stable_id', $filename, $where, $select,
+                      $from, $out);
     return 1;
   }
   return 0;
 }
-
 
 sub dump_exon_stable_id_table{
   my ($self, $slice) = @_;
@@ -605,17 +634,16 @@ sub dump_exon_stable_id_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('exon', $id)){
     my $filename = $self->get_filename('exon_stable_id', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select exon_stable_id.* from exon_stable_id, ".
-      "exon where exon_stable_id.exon_id = ".
-        "exon.exon_id and seq_region_id = ".$id.
-          " and seq_region_start >= ".$slice->start." ".
-            "and seq_region_end <= ".$slice->end.
-              " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select exon_stable_id.* ";
+    my $from = "from exon_stable_id, exon ";
+    my $where = "where ".
+      "exon_stable_id.exon_id = exon.exon_id and ".
+        "seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('exon_stable_id', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
@@ -632,21 +660,21 @@ sub dump_gene_stable_id_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('gene', $id)){
     my $filename = $self->get_filename('gene_stable_id', $slice);
-    if(-e $filename){
-      throw($filename." exists mysql can't dump into an existing file ");
-    }
-    my $sql = "select gene_stable_id.* from gene_stable_id, ".
-      "gene where gene_stable_id.gene_id = ".
-        "gene.gene_id and seq_region_id = ".$id.
-          " and seq_region_start >= ".$slice->start." ".
-            "and seq_region_end <= ".$slice->end.
-              " into outfile '".$filename."'";
-    my $sth = $self->db->prepare($sql);
-    $sth->execute;
+    my $select = "select gene_stable_id.* ";
+    my $from = "from gene_stable_id, gene ";
+    my $where = "where ".
+      "gene_stable_id.gene_id = gene.gene_id and ".
+        "seq_region_id = ".$id." and ".
+          "seq_region_start >= ".$slice->start." and ".
+            "seq_region_end <= ".$slice->end." ";
+    my $out = "into outfile '".$filename."'";
+    $self->dump_table('gene_stable_id', $filename, $where, $select, 
+                      $from, $out);
     return 1;
   }
   return 0;
 }
+
 
 
 
@@ -678,11 +706,5 @@ sub dump_protein_feature_table{
   return 0;
 }
 
-
-sub get_filename{
-  my ($self, $table_name, $slice) = @_;
-  return $self->output_dir."/".$table_name.".".$slice->seq_region_name.".".
-    $slice->start."-".$slice->end;
-}
 
 1;
