@@ -46,7 +46,7 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
-#use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
+use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools;
 
 use vars qw(@ISA);
@@ -77,7 +77,7 @@ sub pseudogene_test{
      ) = @_;
   
   my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $splice_sites_correct, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
-    #print STDERR "dealing with transcript ".$transcript->type."\n";
+    
   ############################################################
   # is it spliced?
   print STDERR "\n--- testing for splicing ---\n";
@@ -146,7 +146,6 @@ sub pseudogene_test{
   
   ############################################################
   # if is spliced, has it got canonical splice sites?
-  $splice_sites_correct = -1;
   print STDERR "\n--- testing for canonical splice sites ---\n";
 
   # single-exon transcripts get a label '-1'
@@ -208,13 +207,14 @@ sub pseudogene_test{
   
   ############################################################
   # Does it overlap with repeats?
-    print STDERR "\n--- testing for overlap with repeats ---\n";
-  if ( $self->overlap_repeats( $transcript, $focus_db ) ){
-    print STDERR "it overlaps with repeats\n";
-    $repeat = 1;
+  print STDERR "\n--- testing for ( >=80% ) repeats in intron ---\n";
+  my $introns_with_repeats = $self->_has_repeat_in_intron( $transcript );
+  if ( $introns_with_repeats ){
+    $repeat = $introns_with_repeats;
+    print STDERR "$repeat introns overlap(s) with repeats for at least 80%\n";
   }
   else{
-    print STDERR "it does not overlap with repeats\n";
+    print STDERR "no overlap with repeats found\n";
     $repeat = 0;
   }
   $break_synteny_mouse = 0;
@@ -333,6 +333,157 @@ sub starts_with_Methionine{
       return 0;
     }
   }
+}
+
+
+############################################################
+# method to check whether real introns in a transcript
+# ( if intron <=9 it is considered a frameshift )
+# overlap with a repeat at least over 80% of its length.
+# That's another tell-tale sign of a processed pseudogene
+
+sub _has_repeat_in_intron{
+  my ($self, $tran) = @_;
+  
+  # instantiate a db with repeats
+  my $repeat_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						     -host   => $REPEAT_DBHOST,
+						     -dbname => $REPEAT_DBNAME,
+						     -user   => 'ensro',  
+						    );
+  
+  ############################################################
+  # pseudogene is a transcript
+  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
+  my $start  = $exons[0]->start;
+  my $end    = $exons[$#exons]->end;
+  my $strand = $exons[0]->strand;
+  my $length = $end - $start + 1;
+
+  ############################################################
+  # need to get a slice where pseudogene sits:
+  my $chr_name  = $exons[0]->contig->chr_name;
+  my $chr_start = $exons[0]->contig->chr_start;
+  my $chr_end   = $exons[0]->contig->chr_end;
+  
+  my $slice_start = $chr_start + $start - 1 - 1000;
+  my $slice_end   = $chr_start + $end   - 1 + 1000;
+
+  ############################################################
+  # get slice from the same db where our pseudogene is
+  my $slice = $repeat_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
+  my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
+  print STDERR "found ".scalar(@features)." repeats\n";
+  my @clusters = @{$self->_cluster_Features(@features)};
+
+  my $introns_with_repeats = 0;
+ INTRON:
+  for (my $i=0; $i<$#exons; $i++ ){
+    my $intron_start  = $exons[$i]->end + 1;
+    my $intron_end    = $exons[$i+1]->start - 1;
+    my $intron_strand = $exons[$i]->strand;
+    my $intron_length = $intron_end - $intron_start + 1;
+
+    print STDERR "intron: $intron_start-$intron_end $intron_strand\n";
+    next INTRON unless ( $intron_length > 9 );
+
+    ############################################################
+    # should we skip really long introns?
+
+    my $overlap_length = 0;
+  FEAT:
+    foreach my $cluster ( @clusters ){
+      my $repeat_start  = $cluster->start + $slice_start - 1;
+      my $repeat_end    = $cluster->end   + $slice_start - 1;
+      my $repeat_strand = $cluster->strand;
+      
+      print STDERR "repeat: $repeat_start-$repeat_end $repeat_strand\n";
+      next FEAT unless ( $repeat_strand == $intron_strand );
+      next FEAT if ( $repeat_start > $intron_end || $repeat_end < $intron_start );
+      
+      my $overlap_end   = $self->_min( $repeat_end  , $intron_end );
+      my $overlap_start = $self->_max( $repeat_start, $intron_start );
+      
+      $overlap_length += $overlap_end - $overlap_start + 1;
+    }
+    
+    my $overlap_proportion = 100.00*$overlap_length/$intron_length;
+    print STDERR "overlap proportion $overlap_proportion\n";
+
+    if ( $overlap_proportion >= 80 ){
+      $introns_with_repeats++;
+    }
+  }
+  return $introns_with_repeats;
+} 
+
+############################################################
+
+sub _cluster_Features{
+  my ($self, @features) = @_;
+
+  # no point if there are no exons!
+  return unless ( scalar( @features) > 0 );   
+
+  # main cluster feature - holds all clusters
+  my $cluster_list = [];
+  
+  # sort exons by start coordinate
+  @features = sort { $a->start <=> $b->start } @features;
+
+  # Create the first exon_cluster
+  my $cluster = new Bio::EnsEMBL::SeqFeature;
+  
+  # Start off the cluster with the first exon
+  $cluster->add_sub_SeqFeature($features[0],'EXPAND');
+
+  $cluster->strand($features[0]->strand);    
+  push( @$cluster_list, $cluster );
+  
+  # Loop over the rest of the exons
+  my $count = 0;
+  
+ EXON:
+  foreach my $feature (@features) {
+    if ($count > 0) {
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( $cluster->overlaps($feature) && ( $feature->strand == $cluster->strand) ) { 
+	$cluster->add_sub_SeqFeature($feature,'EXPAND');
+      }  
+      else {
+	# Start a new cluster
+	$cluster = new Bio::EnsEMBL::SeqFeature;
+	$cluster->add_sub_SeqFeature($feature,'EXPAND');
+	$cluster->strand($feature->strand);
+		
+	# and add it to the main_cluster feature
+	push( @$cluster_list, $cluster );
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
+############################################################
+
+sub _max{
+  my ($self,$max,$other) = @_;
+  if ($other > $max){
+    $max = $other;
+  }
+  return $max;
+}
+
+############################################################
+
+sub _min{
+  my ($self,$min,$other) = @_;
+  if ($other < $min){
+    $min = $other;
+  }
+  return $min;
 }
 
 ############################################################
