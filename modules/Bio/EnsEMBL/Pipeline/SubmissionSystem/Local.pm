@@ -64,11 +64,9 @@ use warnings;
 use Bio::EnsEMBL::Pipeline::SubmissionSystem;
 use Bio::EnsEMBL::Pipeline::Job;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use POSIX;
+use POSIX qw(sys_wait_h setsid);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
-
-my $children = 0;
 
 =head2 new
 
@@ -91,9 +89,9 @@ sub new {
 
   $self = $self->SUPER::new(@_);
 
-  $self->{'_queue'} = [];
 
-  $SIG{CHLD} = \&sig_chld;
+  $self->{'_queue'} = [];
+  $self->{'_children'} = [];
 
   return $self;
 }
@@ -102,12 +100,12 @@ sub new {
 =head2 submit
 
   Arg [1]    : Bio::EnsEMBL::Pipeline::Job $job
-  Example    : 
+  Example    :
   Description: This is used to submit the job.  For the Local submission
                system this simply means forking and running the job locally.
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Returntype :
+  Exceptions :
+  Caller     :
 
 =cut
 
@@ -126,16 +124,40 @@ sub submit {
   #put the just received job onto the end of the queue
   push @{$self->{'_queue'}}, $job;
 
-  # if there aren't too many jobs executing take as many off the queue as
+  #cleanup any children that have exited
+  $self->_reap_children();
+  my $num_children = scalar(@{$self->{'_children'}});
+
+  # while there aren't too many jobs executing take as many off the queue as
   # possible
-  while(scalar(@{$self->{'_queue'}}) && ($children < $max_jobs)) {
+  while(scalar(@{$self->{'_queue'}}) && ($num_children < $max_jobs)) {
+    $self->_reap_children();
+    $num_children = scalar(@{$self->{'_children'}});
     $self->_start_job(shift @{$self->{'_queue'}});
   }
 }
 
 
-sub sig_chld {
-  $children--;
+#
+# helper function cleans up any exited child prcesses
+#
+sub _reap_children {
+  my $self = shift;
+  my @children = @{$self->{'_children'}};
+
+  my @out;
+  foreach my $child (@children) {
+    my $pid = waitpid($child, &WNOHANG); #non blocking wait on child process
+    if($pid == 0) {
+      push @out, $child; #child still not dead, put back on list
+    } elsif($pid == $child) {
+#      print STDERR "child exited\n";
+    } else {
+      $self->warn("waitpid returned unexpected value: $pid");
+    }
+  }
+
+ $self->{'_children'} = \@out;
 }
 
 
@@ -159,11 +181,11 @@ sub create_Job {
 
   my $config = $self->get_Config();
   my $job_adaptor = $config->get_DBAdaptor()->get_JobAdaptor();
-  
+
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
-					     -TASKNAME => $taskname, 
-					     -MODULE => $module, 
-					     -INPUT_ID => $input_id, 
+					     -TASKNAME => $taskname,
+					     -MODULE => $module,
+					     -INPUT_ID => $input_id,
 					     -PARAMETERS => $parameter_string);
 
   $job_adaptor->store($job);
@@ -221,10 +243,15 @@ sub flush {
   my $config = $self->get_Config();
   my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); #  default???
 
+  $self->_reap_children();
+  my $num_children = scalar(@{$self->{'_children'}});
+
   #
   # Take as many jobs off the queue as we can
   #
-  while(scalar(@{$self->{'_queue'}}) && ($children < $max_jobs)) {
+  while(scalar(@{$self->{'_queue'}}) && ($num_children < $max_jobs)) {
+    $self->_reap_children();
+    $num_children = scalar(@{$self->{'_children'}});
     $self->_start_job(shift @{$self->{'_queue'}});
   }
 
@@ -239,7 +266,7 @@ sub _generate_filename_prefix {
   # get temp dir from config
   my $config = $self->get_Config();
   my $temp_dir = $config->get_parameter('LOCAL', 'output_dir');
-  $temp_dir || $self->throw('Could not determine output dir for job ' . 
+  $temp_dir || $self->throw('Could not determine output dir for job ' .
 			    $job->taskname() . ' ID ' . $job->dbID() . '\n');
 
   # have a subdirectory for each type of task
@@ -265,7 +292,7 @@ sub _generate_filename_prefix {
   my $time = localtime(time());
   $time =~ tr/ :/_./;
 
-  return "$temp_dir/" . "job_" . $job->dbID() . "$time"; 
+  return "$temp_dir/" . "job_" . $job->dbID() . "$time";
 }
 
 
@@ -282,12 +309,15 @@ sub _start_job {
   my $user   = $db->username();
   my $port   = $db->port();
 
-
   if (my $pid = fork) {	 # fork returns PID of child to parent, 0 to child
     # PARENT
-    $children++;
+    push @{$self->{'_children'}}, $pid;
+  } elsif(!defined($pid)) {
+    #fork gives undef on error
+    $self->warn("Fork failed:\n$!");
   } else {
     #CHILD
+
     #The child needs its own connection to the database. We don't want the
     #parent's database handle cleaned up when the child exits or vice-versa
     $db->db_handle()->{'InactiveDestroy'} = 1;
@@ -302,13 +332,15 @@ sub _start_job {
     #point the adaptor of the job to one from the new dbconnection
     $job->adaptor($db->get_JobAdaptor);
 
-    my $file_prefix = $self->_generate_filename_prefix($job);
+#    my $file_prefix = $self->_generate_filename_prefix($job);
 
-    $job->stdout_file("${file_prefix}.out");
-    $job->stderr_file("${file_prefix}.err");
+#    $job->stdout_file("${file_prefix}.out");
+#    $job->stderr_file("${file_prefix}.err");
 
-    POSIX::setsid();  # make session leader, and effectively a daemon
+    $job->stdout_file("/dev/null");
+    $job->stderr_file("/dev/null");
 
+    setsid();  # make session leader, and effectively a daemon
 
     # redirect stdout/stderr to files
     # read stdin from /dev/null
