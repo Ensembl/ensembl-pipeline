@@ -13,13 +13,13 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DB::JobI
+Bio::EnsEMBL::Pipeline::DBSQL::Job
 
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
 
-Interface for storing run and status details of an analysis job
+Stores run and status details of an analysis job
 
 =head1 CONTACT
 
@@ -33,18 +33,52 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::JobI;
+package Bio::EnsEMBL::Pipeline::DBSQL::Job;
 
 use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
 
-use Bio::Root::Object;
+use Bio::EnsEMBL::Pipeline::DB::JobI;
+use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Pipeline::Status;
 
-# Inherits from the base bioperl object
-@ISA = qw(Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI);
 
+
+
+sub _initialize {
+    my ($self,@args) = @_;
+
+    my $make = $self->SUPER::_initialize;
+    my ($dbobj,$input_id,$analysis,$queue,$create) = $self->_rearrange([qw(DBOBJ
+									   INPUT_ID
+									   ANALYSIS
+									   QUEUE
+									   CREATE
+									   )],@args);
+
+    $input_id   || $self->throw("Can't create a job object without an input_id");
+    $dbobj      || $self->throw("Can't create a job object without a database handle");
+    $queue      || $self->throw("Can't create a job object without a queue");
+    $analysis   || $self->throw("Can't create a job object without an analysis object");
+
+    $dbobj->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj") || 
+	$self->throw("Database object [$dbobj] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj");
+    $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis") ||
+	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis");
+
+    $self->_dbobj  ($dbobj);
+    $self->input_id($input_id);
+    $self->queue   ($queue);
+    $self->analysis($analysis);
+
+    if ($create == 1) {
+	$self->get_id;
+    }
+    return $make; # success - we hope!
+}
 
 =head2 id
 
@@ -60,9 +94,46 @@ use Bio::Root::Object;
 
 
 sub id {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_id} = $arg;
+    }
+    return $self->{_id};
+
+}
+
+
+=head2 get_id
+
+  Title   : get_id
+  Usage   : my $newid = $self->get_id
+  Function: Creates a new job entry in the database
+            and returns the new id.
+  Returns : int
+  Args    : 
+
+=cut
+
+
+sub get_id {
     my ($self) = @_;
 
-    $self->throw("Method id not implemented");
+
+    my $sth = $self->_dbobj->prepare("insert into job (input_id,analysis,queue) values (NULL," .
+				     $self->analysis->id . "," .
+				     $self->queue        .")");
+    my $res = $sth->execute();
+
+       $sth = $self->prepare("select last_insert_id()");
+       $sth->execute;
+
+    my $rowhash = $sth->fetchrow_hashref;
+    my $id      = $rowhash->{'last_insert_id()'};
+
+    $self->id($id);
+
+    return $id;
 }
 
 =head2 input_id
@@ -77,9 +148,12 @@ sub id {
 
 
 sub input_id {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
 
-    $self->throw("Method input_id not implemented");
+    if (defined($arg)) {
+	$self->{_input_id} = $arg;
+    }
+    return $self->{_input_id};
 }
 
 =head2 analysis
@@ -94,9 +168,15 @@ sub input_id {
 
 
 sub analysis {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
+    if (defined($arg)) {
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) unless
+	    $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-    $self->throw("Method analysis not implemented");
+	$self->{_analysis} = $arg;
+    }
+    return $self->{_analysis};
+
 }
 
 
@@ -112,9 +192,13 @@ sub analysis {
 
 
 sub LSF_id {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
 
-    $self->throw("Method input_id not implemented");
+    if (defined($arg)) {
+	$self->{_LSF_id} = $arg;
+    }
+    return $self->{_LSF_id};
+
 }
 
 =head2 queue
@@ -128,9 +212,13 @@ sub LSF_id {
 =cut
 
 sub queue {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
 
-    $self->throw("Method queue not implemented");
+    if (defined($arg)) {
+	$self->{_queue} = $arg;
+    }
+    return $self->{_queue};
+
 }
 
 
@@ -145,9 +233,12 @@ sub queue {
 =cut
 
 sub machine {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
 
-    $self->throw("Method machine not implemented");
+    if (defined($arg)) {
+	$self->{_machine} = $arg;
+    }
+    return $self->{_machine};
 }
 
 
@@ -207,4 +298,66 @@ sub submission_checks {
 
 
 
+=head2 current_status
+
+  Title   : current_status
+  Usage   : my $status = $job->current_status
+  Function: Get/set method for the current status
+  Returns : Bio::EnsEMBL::Pipeline::Status
+  Args    : Bio::EnsEMBL::Pipeline::Status
+
+=cut
+
+sub current_status {
+    my ($self) = @_;
+
+    $self->throw("Method current_status not implemented");
+}
+
+=head2 get_all_status
+
+  Title   : get_all_status
+  Usage   : my @status = $job->get_all_status
+  Function: Get all status objects associated with this job
+  Returns : @Bio::EnsEMBL::Pipeline::Status
+  Args    : @Bio::EnsEMBL::Pipeline::Status
+
+=cut
+
+sub get_all_status {
+    my ($self) = @_;
+
+    $self->throw("Method get_all_status not implemented");
+}
+
+
+=head2 _dbobj
+
+  Title   : _dbobj
+  Usage   : my $db = $self->_dbobj
+  Function: Get/set method for the database handle
+  Returns : @Bio::EnsEMBL::Pipeline::DBSQL::Obj
+  Args    : @Bio::EnsEMBL::Pipeline::DBSQL::Obj,none
+
+=cut
+
+sub _dbobj {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj") unless 
+	    $arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj");
+
+	$self->{_dbobj} = $arg;
+    }
+    return $sefl->{_dbobj};
+}
+
+
 1;
+
+
+
+
+
+
