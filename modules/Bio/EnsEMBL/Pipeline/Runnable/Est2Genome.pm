@@ -98,7 +98,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -119,7 +119,7 @@ sub est_sequence {
     
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_est_sequence'} = $value;
     }
     return $self->{'_est_sequence'};
@@ -141,9 +141,9 @@ sub run {
     my ($self, @args) = @_;
     
     # some constant strings
-    my $source_tag = "est2genome";
+    my $source_tag  = "est2genome";
     my $primary_tag = "similarity";
-    my $dirname = "e2gtemp";
+    my $dirname     = "/tmp";
     #flag for est strand orientation
     my $estOrientation; 
     
@@ -182,19 +182,21 @@ sub run {
       
     #read output
     while (<ESTGENOME>)
+
     {
+
         if ($_ =~ /^Exon/)
         {
         
               #split on whitespace
               my @elements = split;
               #extract values from output line
-              my $f1score = $elements[1];
-              my $f1start = $elements[3];
-              my $f1end = $elements[4];
-              my $f1id = $elements[5];
+              my $f1score  = $elements[1];
+              my $f1start  = $elements[3];
+              my $f1end    = $elements[4];
+              my $f1id     = $elements[5];
               my ($f2start, $f2end);
-              my $f2id = $elements[8];
+              my $f2id     = $elements[8];
               my $f1source = $source_tag;
               my $f2source = $source_tag;
               my $f1strand = 1;
@@ -299,8 +301,11 @@ sub _createfiles {
     #if names not provided create unique names based on process ID    
     $genfile = $self->_getname("genfile") unless ($genfile);
     $estfile = $self->_getname("estfile") unless ($estfile);    
-    #create tmp directory    
-    mkdir ($dirname, 0777) or $self->throw ("Cannot make directory '$dirname' ($?)");
+    
+    # Should check we can write to this directory 
+    $self->throw("No directory $dirname") unless -e $dirname;
+
+
     chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
     return ($genfile, $estfile);
 }
@@ -340,8 +345,7 @@ sub _deletefiles {
     my ($self, $genfile, $estfile, $dirname) = @_;
     unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
     unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
-    chdir ("../");
-    rmdir ($dirname) or $self->throw("Cannot remove $dirname \n");
+
 }
 
 1;
