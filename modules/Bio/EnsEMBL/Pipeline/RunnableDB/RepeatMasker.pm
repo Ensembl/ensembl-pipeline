@@ -13,7 +13,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker->new ( 
-                                                    -dbobj      => $db,
+                                                    -db      => $db,
 			                                        -input_id   => $input_id
                                                     -analysis   => $analysis );
 $repmask->fetch_input();
