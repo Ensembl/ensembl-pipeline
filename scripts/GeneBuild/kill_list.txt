@@ -257,3 +257,4 @@ Q63498 Q63498 Pot.ORF (Fragment). (for rat lec)
 Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
 O70449 Putative retrovirus-related gag1 gene (matches rat - dta)
 Q8BLS1 RIKEN sequence very similar to O70449, which is a retrovirus-like gene (matches rat - dta)
+Q9CRM2 172 Q9CRM2_MOUSE Q9CRM2 Mus musculus 12 days embryo male wolffian duct includes surrounding region cDNA, RIKEN full-length enriched library, clone:6720473M11 product:weakly similar to RETROVIRUS-RELATED GAG POLYPROTEIN (Fragment). from rat retroviral protein
