@@ -82,6 +82,20 @@ my $db      = new Bio::EnsEMBL::DBLoader($locator);
 die "No input id entered" unless defined ($input_id);
 
 my $contig  = $db->get_Contig($input_id);
+
+my @f       = $contig->get_all_SimilarityFeatures;
+
+print ("Original genscan features ffor $input_id\n");
+
+foreach my $f (@f) {
+	if ($f->source_tag eq "genscan") {
+           foreach my $sub ($f->sub_SeqFeature) {
+              print ($sub->id . "\t" . $sub->seqname . "\t" . $sub->start . "\t" . $sub->end . "\n");
+           }
+        }
+}
+
+
 my $focus   = int(($contig->golden_end - $contig->golden_start)/2);
 my $ori     = 1;
 
