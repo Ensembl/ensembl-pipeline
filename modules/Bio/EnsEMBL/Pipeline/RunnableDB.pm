@@ -157,7 +157,7 @@ sub arguments {
 
   my $options = "";
 
-  foreach my $key (%parameters) {
+  foreach my $key (keys %parameters) {
     if ($parameters{$key} ne "__NONE__") {
       $options .= " " . $key . " " . $parameters{$key};
     } else {
@@ -390,9 +390,12 @@ sub write_output {
 
     foreach my $f (@features) {
 
-      print $f->gffstring . "\n";
       $f->analysis($self->analysis);
-      $f->attach_seq($contig);
+
+      unless ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
+        print $f->gffstring . "\n";
+        $f->attach_seq($contig);
+      }
 
       if ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
 	foreach my $exon (@{$f->get_all_Exons}) {
@@ -415,35 +418,39 @@ sub write_output {
 
 	push(@{$features{simple}},$f);
 
-	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+      } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
 
 	if (!defined($features{dnapep})) {
 	  $features{dnapep} = [];
 	}
 
 	push(@{$features{dnadna}},$f);
-	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+
+      } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
 
 	if (!defined($features{dnapep})) {
 	  $features{dnapep} = [];
 	}
 
 	push(@{$features{dnapep}},$f);
-	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+
+      } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
 
 	if (!defined($features{dnapep})) {
 	  $features{dnapep} = [];
 	}
 
 	push(@{$features{dnapep}},$f);
-	} elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
+
+      } elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
 
 	if (!defined($features{repeat})) {
 	  $features{repeat} = [];
 	}
 
 	push(@{$features{repeat}},$f);
-	} elsif ($f->isa("Bio::EnsEMBL:Gene")) {
+
+      } elsif ($f->isa("Bio::EnsEMBL:Gene")) {
 
 	  foreach my $exon (@{$f->get_all_Exons}) {
 	    $exon->contig($contig);
@@ -454,7 +461,7 @@ sub write_output {
 	  
 	push(@{$features{gene}},$f);
 	  
-	}
+      }
     }
 
     if ($features{prediction}) {
