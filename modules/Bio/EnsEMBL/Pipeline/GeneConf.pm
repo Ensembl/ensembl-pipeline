@@ -102,8 +102,8 @@ my $prefix='COB';
 	     ############################################################
 
 	     # path to run_GeneBuild_RunnableDB
-	     GB_RUNNER      => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
-	     GB_OUTPUT_DIR      => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
+	     GB_RUNNER      => '/ecs2/work1/lec/code/main_trunk/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
+	     GB_OUTPUT_DIR      => '/ecs2/scratch4/ensembl/lec/briggsae_out',
 
 	     # LSF queue plus any options you want to use
 	     GB_QUEUE       => 'acari',
@@ -114,7 +114,7 @@ my $prefix='COB';
 	     ############################################################
 
 	     # path to refseq fasta file
-	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep88.pep',
+	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep89.pep',
 
 	     # path to swissprot fasta file
 	     GB_SPTR        => '',
@@ -124,17 +124,17 @@ my $prefix='COB';
 	     # path to file where we'll write cleaned up  proteome data
 	     #GB_PFASTA      => '/acari/work4a/lec/cDNAs/prepare_cdnas.fa',
 	     #GB_PFASTA      => '/ecs2/work2/lec/proteome88.fa',
-	     GB_PFASTA => '/data/blastdb/Worms/proteome88.fa',
+	     GB_PFASTA => '/ecs2/scratch4/ensembl/lec/sequence/proteome89.fa',
 
 	     # path pmatch executable
 	     GB_PMATCH      => '/usr/local/ensembl/bin/pmatch',
 	     GB_PMATCH_MAX_INTRON => '50000',
 
 	     # path to directory where fpc/chromosoaml sequences are 
-	     GB_FPCDIR      => '/acari/scratch4/ensembl/lec/super_contigs/',
+	     GB_FPCDIR      => '/ecs2/scratch4/ensembl/lec/super_contigs/',
 
 	     # directory to write pmatch results
-	     GB_PM_OUTPUT   => '/acari/scratch4/ensembl/lec/pmatch_out/',
+	     GB_PM_OUTPUT   => '/ecs2/scratch4/ensembl/lec/pmout/',
 
 	     # eg TargettedGeneE2G
 	     # array of hashes, each has contains the runnable class name and the analysis logic name
@@ -148,11 +148,11 @@ my $prefix='COB';
 	     # array of hashes, each has contains the runnable class name and the analysis logic name
 	     GB_LENGTH_RUNNABLES      => [
 					  {
-					   runnable => 'FPC_BlastMiniGenewise',
+					   runnable => 'FPC_TargettedGeneWise',
 					   analysis => 'TGE_gw',
 					  },
 					  {
-					   runnable => 'FPC_TargettedGeneWise',
+					   runnable => 'FPC_BlastMiniGenewise',
 					   analysis => 'similarity_genewise',
 					  },
 					  {
@@ -174,8 +174,9 @@ my $prefix='COB';
 	     ############################################################
 
 	     # species specific protein index
-	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Worms/proteome88.fa',
+	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Worms/wp_fasta_indicate',
 #	     GB_TARGETTED_PROTEIN_INDEX => '/acari/work5a/lec/briggsae_sequence/proteome87.fa',
+	     GB_TARGETTED_PROTEIN_SEQFETCHER =>  'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher',
 	     GB_TARGETTED_CDNA_INDEX    => '',
 	     # minimum required coverage for multiexon predictions
 	     GB_TARGETTED_MULTI_EXON_COVERAGE      => '25',
@@ -240,7 +241,7 @@ my $prefix='COB';
 	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
 	     GB_cDNA_GENETYPE               => 'exonerate_e2g',
-	     GB_COMBINED_MAX_INTRON         => 100000,
+	     GB_COMBINED_MAX_INTRON         => 10000,
 	    	     
 	     ############################################################
 	     # GeneBuilder parameters
