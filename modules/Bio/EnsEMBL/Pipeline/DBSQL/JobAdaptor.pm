@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::Job;
 
 use vars qw(@ISA);
 use strict;
-
+use Bio::EnsEMBL::Pipeline::Job;
 
 @ISA = qw( Bio::Root::RootI );
 
@@ -381,24 +381,6 @@ sub exists {
 
   $self->throw( "Not implemented yet" );
 }
-
-
-sub prepare {
-  my $self = shift;
-  my $query = shift;
-  
-  $self->db->prepare( $query );
-}
-
-sub db {
-  my $self = shift;
-  my $db = shift;
-  
-  ( defined $db ) && 
-    ( $self->{_db} = $db );
-  $self->{_db};
-}
-
 
 # Code directly from Michele
 
