@@ -40,7 +40,7 @@ my $clip_ends = 0;
 
 ############################################################
 # we don't want any EST which is shorter than 60bp
-my $min_length = 60;
+my $min_length = 100;
 
 
 &GetOptions( 
@@ -63,7 +63,7 @@ if(!defined $estfile    ||
   print STDERR "                         -clip (clips polyA/T) -clip_ends n (clips n bases from both ends)\n";
   print STDERR "                                                             default = 0, 20 seems to be ok\n";
   print STDERR "                         -softmask ( softmask the polyA/T )\n";
-  print STDERR "                         -min_length ( min_est_length )\n";
+  print STDERR "                         -min_length ( min_est_length, default = 60 )\n";
   exit(0);
 }
 
@@ -114,9 +114,11 @@ while( my $cdna = $seqin->next_seq ){
        !( $description =~/synthetase/i
 	  ||
 	  $description =~/protein/i
+	  ||
+	  $description =~/ligase/i
 	)
      ){
-    print STDERR "rejecting potential rRNA: $description\n";
+    print STDERR "rejecting potential non-coding RNA: $description\n";
     next SEQFETCH;
   }
   
@@ -124,22 +126,29 @@ while( my $cdna = $seqin->next_seq ){
   # reject cancer ESTs
   if ( $description =~/similar to/ ){
     
-    next SEQFETCH if ( $description =~/carcinoma.*similar to/i 
-		       ||
-		       $description =~/cancer.*similar to/i
-		       ||
-		       $description =~/tumor.*similar to/i
-		     );
+    if ( $description =~/carcinoma.*similar to/i 
+	 ||
+	 $description =~/cancer.*similar to/i
+	 ||
+	 $description =~/tumor.*similar to/i
+       ){
+      print STDERR "rejecting cancer EST: $description\n";
+      next SEQFETCH;
+    }
   }
   else{
-    next SEQFETCH if ( $description =~/carcinoma/i 
-		       ||
-		       $description =~/cancer/i
-		       ||
-		       $description =~/tumor/i
-		     );
+    if ( $description =~/carcinoma/i 
+	 ||
+	 $description =~/cancer/i
+	 ||
+	 $description =~/tumor/i
+       ){
+      print STDERR "rejecting cancer EST: $description\n";
+      next SEQFETCH;
+    }
+    
   }
-
+  
   #print STDERR "keeping $description\n";
 
   ############################################################
@@ -173,13 +182,17 @@ while( my $cdna = $seqin->next_seq ){
     my $seq_length = length( $seq );
     
     # skip it if you are going to clip more than the actual length of the EST
-    if ( $clip_ends > 2*$seq_length ){
+    if ( 2*$clip_ends >= $seq_length ){
       next SEQFETCH;
     }
+    #print STDERR "$description\n";
+    #print STDERR "seq:$seq\n";
+    #print STDERR "clip_ends:$clip_ends\n";
+    #print STDERR "\n";
     my $new_seq = substr( $seq, $clip_ends, $seq_length - 2*$clip_ends );
     
     # skip it if you are left with an EST of less than 100bp
-    if ( length( $new_seq ) < 100 ){
+    if ( length( $new_seq ) < $min_length ){
       next SEQFETCH;
     }
     $new_cdna = new Bio::Seq;
