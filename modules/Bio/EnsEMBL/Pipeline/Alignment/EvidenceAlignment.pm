@@ -1161,7 +1161,7 @@ sub _merge_same_sequences {
   my %same_sequences_hash;
 
   foreach my $sequence (@sequences) {
-    
+
     push (@{$same_sequences_hash{$sequence->name}}, $sequence);
   }
 
@@ -1348,6 +1348,12 @@ sub _working_alignment {
     if ((($slot eq 'genomic_sequence')||($slot eq 'exon_protein')||($slot eq 'exon_nucleotide')) 
 	&& defined $slot_resident && scalar @$slot_resident == 1) {
       return $slot_resident->[0];
+    }
+
+    # Sort evidence so that nucleotide and protein sequences 
+    # are returned in blocks of similar sequence type.
+    if ($slot eq 'evidence' && $self->_type eq 'all') {
+      @$slot_resident = sort {$a->type cmp $b->type} @$slot_resident;
     }
 
     return $slot_resident;
@@ -1566,47 +1572,33 @@ sub _corroborating_sequences {
       next FEATURE;
     }
 
+    my $align_seq = $self->_build_evidence_seq($base_align_feature);
+    next FEATURE unless $align_seq;
+
+    $align_seq->exon($exon_placemarker);
+
     if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
-      my $align_seq = $self->_build_evidence_seq($base_align_feature);
-      next FEATURE unless $align_seq;
-
-      $align_seq->exon($exon_placemarker);
-      $align_seq->type('nucleotide');
-
-      push (@{$self->{'_corroborating_sequences'}}, $align_seq);
-      next FEATURE;
-    }
-
-    if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
+      $align_seq->type('nucleotide')
+    } elsif ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+      $align_seq->type('protein');
 
       if ($base_align_feature->hstrand == -1) {
-	warning("Zoicks!  Surely we can't have a reverse" .
-		" complimented protein sequence.");
+	warning("It seems we have a reverse complimented " . 
+		"protein sequence.  Surely not.");
       }
-
-      my $align_seq = $self->_build_evidence_seq($base_align_feature);
-      next FEATURE unless $align_seq;
-
-      $align_seq->exon($exon_placemarker);
-      $align_seq->type('protein');
-      push (@protein_features, $align_seq);
     }
 
-    $exon_placemarker++;
+    push (@{$self->{'_corroborating_sequences'}}, $align_seq);
 
+    $exon_placemarker++;
   }
 
-  # The order in which we add things to our array effects the order
-  # in the final alignment.  Here, if they exist, protein features 
-  # are added separately so that they are all together in the final 
-  # alignment.  There could be a better way to do this, of course.
-  push (@{$self->{'_corroborating_sequences'}}, @protein_features);
-
-  warning("There are no displayable supporting features for this transcript [" .
-	  $self->_transcript->stable_id . "].  " .
-	  "Try setting the -type attribute to 'all', instead of just " . 
-	  "'protein' or 'nucleotide'.") 
-    unless scalar @{$self->{'_corroborating_sequences'}} > 0;
+  unless (scalar @{$self->{'_corroborating_sequences'}} > 0) {
+    warning("There are no displayable supporting features for this transcript [" .
+	    $self->_transcript->stable_id . "].  " .
+	    "Try setting the -type attribute to 'all', instead of just " . 
+	    "'protein' or 'nucleotide'.") 
+  }
 
   return $self->{'_corroborating_sequences'};
 }
