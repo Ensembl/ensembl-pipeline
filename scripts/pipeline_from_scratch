@@ -24,17 +24,19 @@
   1049	14:23	vi ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
   1050	14:27	vi ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm
 
-  1218	15:15	make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type SLICE -logic_name SubmitSlice -slice -slice_size 100000
-  1220	15:15	make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type CONTIG -logic_name SubmitContig -contig
+make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type SLICE100K -logic_name SubmitSlice100K -slice -slice_size 100000
+make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type CONTIG -logic_name SubmitContig -contig
 
-  1221	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -module RepeatMasker -database repbase -input_type CONTIG
-  1222	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -module Genscan -database HumanIso.smat -input_type CONTIG
-  1223	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -module BlastGenscanPep -database swall -input_type CONTIG
-  1224	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG -module CPG -input_type CONTIG
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -module RepeatMasker -database repbase -input_type CONTIG
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -module Genscan -database HumanIso.smat -input_type CONTIG
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -module BlastGenscanPep -database swall -input_type CONTIG
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG -module CPG -input_type CONTIG
 
 add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -dependents SubmitContig
 add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -dependents RepeatMask
 add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG -dependents RepeatMask
 add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -dependents Genscan
 
-  1233	15:18	monitor -host ecs2b -user ensro -dbname my_database -rules -conditions
+monitor -host ecs2b -user ensro -dbname my_database -rules -conditions
+
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RawAccumulator -module Accumulator -input_type ACCUMULATOR
