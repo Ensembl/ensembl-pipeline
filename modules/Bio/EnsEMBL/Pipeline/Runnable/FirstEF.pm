@@ -48,26 +48,26 @@ sub new {
   
   my( $query_seq,
       $db,
+      $rm_seq,
+      $analysis,
       $firstef_dir,
       $param_dir,
       $workdir) = $self->_rearrange([qw(QUERY
-					 DB
-					 FIRSTEF_DIR
-					 PARAM_DIR
-					 WORK_DIR)],
+					DB
+					REPEATMASKED_SEQ
+					ANALYSIS
+					FIRSTEF_DIR
+					PARAM_DIR
+					WORK_DIR)],
 				     @args);
-  
+
   $self->_query_seq($query_seq)     if $query_seq;
   $self->_db($db)                   if $db;
+#  $self->_repeatmasked_seq($rm_seq) if $rm_seq;
   $self->_firstef_dir($firstef_dir) if $firstef_dir;
   $self->_param_dir($param_dir)     if $param_dir;
   $self->workdir($workdir)          if $workdir;
-
-  # Derive our analysis
-  
-  my $analysis_adaptor = $self->_db->get_AnalysisAdaptor;
-  my $analysis = $analysis_adaptor->fetch_by_logic_name('firstef');
-  $self->_analysis($analysis);
+  $self->_analysis($analysis)       if $analysis;
 
 
   return $self
@@ -89,9 +89,9 @@ sub _query_seq {
   my $self = shift;
   
   if (@_) {
-    
+   
     $self->{_query_seq} = shift;
-    
+
     return unless $self->{_query_seq}; # Allows us to set to undef.
     
     $self->throw("Input isnt a Bio::SeqI or Bio::PrimarySeqI")
@@ -105,6 +105,24 @@ sub _query_seq {
   
   return $self->{_query_seq}
 }
+
+#sub _repeatmasked_seq {
+#  my $self = shift;
+  
+#  if (@_) {
+   
+#    $self->{_repeatmasked_seq} = shift;
+
+#    return unless $self->{_repeatmasked_seq}; # Allows us to set to undef.
+    
+#    $self->throw("Repeatmasked Input isnt a Bio::SeqI or Bio::PrimarySeqI")
+#      unless ($self->{_repeatmasked_seq}->isa("Bio::PrimarySeqI") || 
+#	      $self->{_repeatmasked_seq}->isa("Bio::SeqI"));
+    
+#  }
+  
+#  return $self->{_repeatmasked_seq}
+#}
 
 sub _db {
   my $self = shift;
@@ -137,8 +155,10 @@ sub _write_seqs_for_firstef {
 
   my $seqio_out = Bio::SeqIO->new(-file   => ">$seqfile",
 				  -format => 'fasta');
-  
-  $seqio_out->write_seq($self->_query_seq);
+
+     # NOTE, this little backwater is where the repeatmasked 
+     # sequence is plonked in.
+  $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
 
   $self->_seqfile($seqfile);
 
@@ -157,6 +177,8 @@ sub _write_seqs_for_firstef {
   $self->_listfile($listfile);
 
   $self->file($listfile); # For final cleanup
+  $self->file($listfile ."_domain");
+  $self->file($listfile ."_domain_comp");
 
   # While we are at it, generate the outfile name.
   # This filename is not something that the user can control.
@@ -209,6 +231,7 @@ sub _parsed_outfile {
 
   if (@_){
     $self->{_parsed_outfile} = shift;
+    $self->file($self->{_parsed_outfile});
   }
 
   return $self->{_parsed_outfile}
@@ -482,7 +505,7 @@ sub create_feature {
 						      -end     =>  $feat->{end},
 						      -strand  =>  $feat->{strand},
 						      -score   =>  $feat->{score},
-						      -analysis => $self->{_analysis});  
+						      -analysis => $self->_analysis);  
     
     $first_exon->display_label($feat->{'display_label'});
 

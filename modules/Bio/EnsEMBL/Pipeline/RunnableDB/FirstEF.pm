@@ -11,8 +11,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB:FirstEF
 
 =head1 SYNOPSIS
 
-my $fef = Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF->new(-dbobj     => $db,
-			                                   -input_id  => $input_id,
+my $fef = Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF->new(-input_id  => $input_id,
                                                            -analysis  => $analysis );
 $fef->fetch_input;
 $fef->run;
@@ -43,10 +42,30 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::FirstEF;
+use Bio::EnsEMBL::Pipeline::Config::FirstEF;
+use Bio::EnsEMBL::Pipeline::Config::FirstEF qw(  );
 
 use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(_things_)
+    Function:   Creates a new RunnableDB/FirstEF object
+    Returns :   Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF
+    Args    :   lots
+
+=cut
+
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);
+    
+    return $self; 
+}
+
 
 =head2 fetch_input
 
@@ -61,40 +80,75 @@ use vars qw(@ISA);
 sub fetch_input {
     my( $self) = @_;    
     
-    $self->throw("No input id") unless defined($self->input_id);
+    # Check analysis exists
+    $self->throw("Analysis object not passed to RunnableDB/FirstEF") 
+      unless $self->analysis->isa("Bio::EnsEMBL::Analysis");
+
+    # Check input id
+    $self->throw("No input id passed to RunnableDB/FirstEF (eg. 1.500000-1000000)") 
+      unless $self->input_id;
     
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
+    # Fetch slice specified by input id
+    unless ($self->input_id =~ /$FEF_INPUTID_REGEX/ ){
+      $self->throw("Input id [".$self->input_id."] not compatible with ".
+		   "FEF_INPUTID_REGEX [$FEF_INPUTID_REGEX]");
+    }
+    my $chr   = $1;
+    my $start = $2;
+    my $end   = $3;
 
-    $self->query($contig);
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+    $self->query($slice);
 
-    # For practical purposes the following information is hard-coded.
-    # If this runnableDB ends up in more widespread use it would
-    # make sense to construct a config file and place it in 
-    # Bio::EnsEMBL::Pipeline::Config
-
-    # Directory where firstef.* binaries and FirstEF_parser.pl 
-    # are located.  At runtime, the runnable determines which
-    # platform specific binary should be used.
-    my $APPLICATION_DIR = '/usr/local/ensembl/firstef/';
-
-    # Usually, this directory is a sub-directory of the firstef
-    # application directory called 'parameters'.  This directory
-    # contains all of the training data that firstef uses for
-    # identifying first exons.
-    my $PARAMETER_DIR   = '/usr/local/ensembl/firstef/parameters';
-
+#print ">thing\n" . $self->query->get_repeatmasked_seq->seq . "\n";
 
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::FirstEF->new(
-		     -query       => $self->query,
-		     -db          => $self->db,
-		     -firstef_dir => $APPLICATION_DIR,
-		     -param_dir   => $PARAMETER_DIR);
+		     -query            => $self->query,
+		     -repeatmasked_seq => $self->query->get_repeatmasked_seq,
+		     -analysis         => $self->analysis,
+		     -firstef_dir      => $FEF_APPLICATION_DIR,
+		     -param_dir        => $FEF_PARAMETER_DIR);
 
 							   
     $self->runnable($runnable);
     
     return 1;
 }
+
+
+sub write_output {
+    my($self) = @_;
+
+    my $db  = $self->db;
+    my $sfa = $self->db->get_SimpleFeatureAdaptor;
+    
+    my @mapped_features;
+  
+    my $slice = $self->query;
+
+    foreach my $f ($self->output) {
+
+	$f->analysis($self->analysis);
+	$f->contig($slice);
+	my @mapped = $f->transform;
+
+        if (@mapped == 0) {
+	    $self->warn("Couldn't map $f - skipping");
+	    next;
+        }
+        if (@mapped == 1 && $mapped[0]->isa("Bio::EnsEMBL::Mapper::Gap")) {
+	    $self->warn("$f seems to be on a gap - something bad has happened ...");
+	    next;
+        }
+
+	push @mapped_features, $mapped[0];
+
+    }
+    $sfa->store(@mapped_features) if @mapped_features;
+
+    return 1;
+}
+
+
 
 1;
