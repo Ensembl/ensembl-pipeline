@@ -295,12 +295,13 @@ sub parse_genewise_output {
   foreach my $entry (@exons_and_sfs) {
     my ($exon, @sfs) = ($entry->{exon}, @{$entry->{sfs}});
           
-    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sfs);
-    $align->seqname($self->slice->seq_region_name);
-    $align->slice($self->slice);
-    $align->score(100);
-
-    $exon->add_supporting_features($align);    
+    if (@sfs) {
+      my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sfs);
+      $align->seqname($self->slice->seq_region_name);
+      $align->slice($self->slice);
+      $align->score(100);
+      $exon->add_supporting_features($align);    
+    }
   }
 
   return map { $_->{exon} } @exons_and_sfs;
@@ -357,19 +358,21 @@ sub make_transcript{
 
       my ($sf) = @{$exon->get_all_supporting_features};
 
-      if (not defined $min_start or $sf->start < $min_start) {
-        $min_start = $sf->start;
+      if (defined $sf) {
+        if (not defined $min_start or $sf->start < $min_start) {
+          $min_start = $sf->start;
+        }
+        if (not defined $max_end or $sf->hend > $max_end) {
+          $max_end = $sf->end;
+        }
+        if (not defined $min_hstart or $sf->hstart < $min_hstart) {
+          $min_hstart = $sf->hstart;
+        }
+        if (not defined $max_hend or $sf->hend > $max_hend) {
+          $max_hend = $sf->hend;
+        }
+        $total_hcoverage += $sf->hend - $sf->hstart + 1;
       }
-      if (not defined $max_end or $sf->hend > $max_end) {
-        $max_end = $sf->end;
-      }
-      if (not defined $min_hstart or $sf->hstart < $min_hstart) {
-        $min_hstart = $sf->hstart;
-      }
-      if (not defined $max_hend or $sf->hend > $max_hend) {
-        $max_hend = $sf->hend;
-      }
-      $total_hcoverage += $sf->hend - $sf->hstart + 1;
 
       $transcript->add_Exon($exon);
     }
