@@ -283,6 +283,7 @@ sub run {
   # delete sequence files
   unlink($query);
   unlink($sbjct);
+  unlink($self->results);
 
   return 1;
 }
