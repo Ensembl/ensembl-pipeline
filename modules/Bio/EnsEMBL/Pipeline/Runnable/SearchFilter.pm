@@ -121,6 +121,7 @@ sub run{
 
 
    my %validhit;
+   my %hitarray;
    my @input = $self->runnable->output;
 
    # first- scan across all features, considering
@@ -130,52 +131,91 @@ sub run{
 
    # all featurepairs have a score. 
    # some may have an evalue.
+
+   # valid hits are stored in a hash of arrays
+   # sort by score to know that the first score for a hseqname is its best
+   
+   @input = sort { $a->score <=> $b->score } @input; 
+
    foreach my $f ( @input ) {
        if( $f->score > $minscore ) {
 	   if( $f->can('evalue') && defined $f->evalue ) {
 	       if( $f->evalue < $maxevalue ) {
-		   $validhit{$f->hseqname} = 1;
+
+		   if( $validhit{$f->hseqname} < $f->score ) {
+		       $validhit{$f->hseqname} = $f->score;
+		   }
 		   if( $f->end > $maxend ) {
 		       $maxend = $f->end;
 		   }
 
+
 	       }
 	   } else {
-	       $validhit{$f->hseqname} = 1;
+	       if( $validhit{$f->hseqname} < $f->score ) {
+		   $validhit{$f->hseqname} = $f->score;
+	       }
 	       if( $f->end > $maxend ) {
 		   $maxend = $f->end;
 	       }
+	       
 	   }
        }
+
+       # irregardless of score, take if this hseqname is valid
+       if( exists $validhit{$f->hseqname} == 1 ) {
+	   if( ! exists $hitarray{$f->hseqname} ) {
+	       $hitarray{$f->hseqname} = [];
+	   }
+	   push(@{$hitarray{$f->hseqname}},$f);
+       }
+
    }
 	    
+   # empty input array - saves on memory!
+
+   @input = ();
+
    # perl will automatically extend this array 
    my @list;
    $list[$maxend] = 0;
 
+   # sort the list by highest score
+
+   my @inputids = sort { $validhit{$a} <=> $validhit{$b} } keys %validhit; 
+
+
+   # we accept all feature pairs which are valid and meet coverage criteria
 
    my @accepted;
    FEATURE :
-   foreach my $f ( @input ) {
-       if( !exists $validhit{$f->hseqname} ) {
-	   next;
-       }
+   foreach my $hseqname ( @inputids ) {
+
        my $hole = 0;
-       for my $i ( $f->start .. $f->end ) {
-	   if( $list[$i] < $coverage ) {
-	       # accept!
-	       $hole = 1;
-	       last;
+
+       foreach my $f ( @{$hitarray{$hseqname}} ) {
+	   # only mark if this feature is valid
+	   if( $f->score > $minscore || ($f->can('evalue') && defined $f->evalue) ) {
+	       for my $i ( $f->start .. $f->end ) {
+		   if( $list[$i] < $coverage ) {
+		       # accept!
+		       $hole = 1;
+		       last;
+		   }
+	       }
 	   }
        }
 
        if( $hole == 0 ) {
+	   # completely covered 
 	   next;
        }
 
-       push(@accepted,$f);
-       for my $i ( $f->start .. $f->end ) {
-	   $list[$i]++; 
+       foreach my $f ( @{$hitarray{$hseqname}} ) {
+	   push(@accepted,$f);
+	   for my $i ( $f->start .. $f->end ) {
+	       $list[$i]++; 
+	   }
        }
 
    }
