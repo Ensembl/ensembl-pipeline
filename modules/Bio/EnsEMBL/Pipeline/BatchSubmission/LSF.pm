@@ -139,22 +139,38 @@ sub construct_command_line{
 sub open_command_line{
   my ($self, $verbose)= @_;
 
-  open(SUB, $self->bsub." 2>&1 |");
-  my $lsf;
+  my $lsf = '';
+  local *PIPE;
 
-  # scp - fix problem of jobs being resubmitted
-  # (same job_id, different submission id)
-  # not sure why this works
-  sleep 1;
-
-  while(<SUB>){
-    print STDERR if($verbose);
-    if (/Job <(\d+)>/) {
-      $lsf = $1;
-    }
-  }
-  $self->id($lsf);
-  close(SUB);
+  if (open(PIPE, '-|')) {
+      while (<PIPE>) {
+	  if (/Job <(\d+)>/) {
+	      $lsf = $1;
+	  } else {
+	      $self->warn("DEBUG: unexpected from bsub: '$_'");
+	  }	  
+      }
+      if (close(PIPE)) {
+	  if ( ($? >> 8) == 0 ){
+	      if ($lsf) {
+		  $self->id($lsf);
+	      } else {
+		  $self->warn("Bsub worked but returned no job ID. Weird");
+	      }
+	  } else {
+	      $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
+	  }
+      } else {
+	  $self->throw("Could not close bsub pipe : $!\n");
+      }      
+  } 
+  else {      
+      # We want STDERR and STDOUT merged for the bsub process
+      open STDERR, '>&STDOUT';
+      
+      exec($self->bsub);
+      $self->throw("Could not run bsub");
+  }  
 }
 
 
@@ -226,7 +242,7 @@ sub check_existance{
   my $flag = 0; 
   open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
   while(<BJOB>){
-    print STDERR if($verbose);
+    # print STDERR if($verbose);
     chomp;
     if ($_ =~ /No unfinished job found/) {
       #print "Set flag\n";
@@ -237,12 +253,9 @@ sub check_existance{
       return $values[0];
     }
   }
-<<<<<<< LSF.pm
-  # print STDERR "CPU time isn't yet reported for job ".$job_id."\n";
-=======
   close(BJOB);
+
   print STDERR "Have lost ".$id."\n" if($verbose);
->>>>>>> 1.16
   return undef;
 }
 
