@@ -52,7 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Fgenesh;
 use Bio::EnsEMBL::Pipeline::Config::General;
-use Data::Dumper;
+
 
 
 use vars qw(@ISA);
