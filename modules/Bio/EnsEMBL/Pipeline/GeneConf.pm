@@ -114,7 +114,7 @@ my $prefix='COB';
 	     ############################################################
 
 	     # path to refseq fasta file
-	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep89.pep',
+	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep91',
 
 	     # path to swissprot fasta file
 	     GB_SPTR        => '',
@@ -168,7 +168,7 @@ my $prefix='COB';
 	     #, 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '1000000',
-
+	     GB_REPEAT_MASKING => ['RepeatMask'], #here specify the repeat analysis logicname you want masked out
 	     ############################################################
 	     # targetted genewise/geneE2G specific parameters
 	     ############################################################
@@ -209,7 +209,7 @@ my $prefix='COB';
 					 {				  
 					  'type'       => 'Swall',
 					  'threshold'  => '200',
-					  'index'      => '/data/blastdb/Ensembl/swall_020919',
+					  'index'      => '/data/blastdb/Ensembl/swall_021116',
 					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
 # example:
