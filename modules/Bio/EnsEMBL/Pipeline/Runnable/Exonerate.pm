@@ -139,7 +139,13 @@ sub genomic_sequence {
     }
     elsif( $value->isa("Bio::PrimarySeqI") ){
       $self->{'_genomic_sequence'} = $value;
-      $self->genfilename("/tmp/genfile_.$$.fn");
+      my $filename = "/tmp/genfile_$$.fn";
+      $self->genfilename($filename);
+      my $genOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => "Fasta")
+      or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
+    
+      $self->throw ("problem writing genomic seqeunce to $filename\n" ) unless $genOutput->write_seq($value);
+      
     }
     else {
       $self->throw("$value is neither a Bio::Seq  nor a filename\n");
@@ -168,7 +174,16 @@ sub est_sequence {
 	$est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
       }
       $self->{'_est_sequences'} = $value;
-      $self->estfilename("/tmp/estfile_.$$.fn");
+      
+      my $filename = "/tmp/estfile_$$.fn";
+      $self->estfilename($filename);
+      my $estOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta')
+	or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
+      
+      foreach my $eseq(@$value) {
+	$self->throw ("problem writing est seqeunce to $filename\n" ) unless $estOutput->write_seq($eseq);
+      }
+      
     }
     else {
       # it's a filename - check the file exists
@@ -310,11 +325,139 @@ sub run {
 
 sub run_gapped {
   my ($self) = @_;
-  $self->warn("presently there is no gapped cigar parser for exonerate");
 
+  # this method needs serious tidying
+  #check inputs
+  my $genomicseq = $self->genomic_sequence ||
+    $self->throw("Genomic sequences not provided");
+  my $estseq = $self->est_sequence ||
+    $self->throw("EST sequences not provided");
+  
+  #extract filenames from args and check/create files and directory
+  my $genfile = $self->genfilename;
+  my $estfile = $self->estfilename;
+  
+  # finally we run the beast.
+  my $resfile = "/tmp/exonerate_resfile_" . $$;
+  my $exonerate_command = $self->exonerate() . " -n true -A false --cdna $estfile --genomic $genfile >" . $resfile;
+  
+  eval {
+    # better to do this as a pipe?
+    print (STDERR "Running command $exonerate_command\n");
+    $self->throw("Error running exonerate on ".$self->filename."\n") 
+      if (system ($exonerate_command)); 
+    $self->parse_results($resfile);
+    $self->convert_output();
+  };  
+  
+  #clean up temp files
+  if(ref($estseq) eq 'ARRAY'){
+#    $self->_deletefiles($genfile, $estfile, $resfile);
+  }
+  else {
+#    $self->_deletefiles($genfile, $resfile);
+  }
+  if ($@) {
+    $self->throw("Error running exonerate :$@ \n");
+  } 
+  else {
+    return (1);
+  }
   # store raw output FeaturePairs in $self->output
   # store "genes" in $self->add_genes via convert_output
   # $self->convert_output;
+}
+
+=head2 parse_results
+  
+    Title   :   parse_results
+    Usage   :   $obj->parse_results($filename)
+    Function:   Parses exonerate output to give a set of features
+                parsefile can accept filenames, filehandles or pipes (\*STDIN)
+    Returns :   none
+    Args    :   optional filename
+
+=cut
+
+sub parse_results {
+  my ($self, $resfile) = @_;
+
+  # some constant strings
+  my $source_tag  = "exonerate";
+  #  my $primary_tag = "similarity";
+  if (-e $resfile) {
+    open (EXONERATE, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
+  }
+  else {
+    $self->throw("Can't open $resfile :$!\n");
+  }
+  
+  #read output
+  my $queryname = "";
+  while (<EXONERATE>) {
+    
+    # VAC temporary-ish changes - we're not using exonerate fully at the moment.
+    # output parsing needs to be rahashed once exonerate is stable
+    
+    #    if ($_ =~ /exonerate/) {
+    if ($_ =~ /cigar/) {
+      next if($_ =~ /^Message/);
+      
+      #split on whitespace
+      my @elements = split;
+
+      #      if( $elements[1] ne 'exonerate' ) { next; }
+      next unless $elements[0] eq 'cigar:';
+      
+      if($_ =~ /query\s+\"(\w+)\"/) {
+	$queryname = $1;
+      }
+      
+      # cigar parsing needs a LOT of looking at
+      # cigar: gi|550092|dbj|D29023.1|D29023 0 311 + static0 1996 2307 + 1555.00 M 311
+      #extract values from output line [0] - [7]
+      
+      #      my $primary_tag = $elements[2];
+      my $primary_tag = 'Gene';
+      
+      my $genomic_start  = $elements[6];
+      my $genomic_end    = $elements[7];
+      my $genomic_id     = $elements[5];
+      # start & end on EST sequence are not currently given by exonerate output ...
+      my $est_id     = $elements[1];
+      my $est_start  = $elements[2];
+      my $est_end    = $elements[3];
+      
+      # est seqname
+      my $genomic_score  = $elements[9];
+      if ($genomic_score eq ".") { $genomic_score = 0; } 
+      my $est_score = $genomic_score;
+      
+      my $genomic_source = $source_tag;
+      my $est_source = $source_tag;
+      
+      my $genomic_strand = 1;
+      if ($elements[4] eq '-') {
+	$genomic_strand = -1;
+      }
+      my $est_strand = 1;
+      if ($elements[8] eq '-') {
+	$est_strand = -1;
+      }
+      
+      # currently doesn't deal well with - strand ... genes
+      my $genomic_primary = $primary_tag;
+      my $est_primary = $primary_tag;
+      
+      my $pair = $self->_create_featurepair ($genomic_score, $genomic_id, $genomic_start, $genomic_end, 
+					     $est_id, $est_start, $est_end,
+					     $genomic_source, $est_source, 
+					     $genomic_strand, $est_strand, 
+					     $genomic_primary, $est_primary);
+      $self->output($pair);
+    }    
+  }
+  close(EXONERATE);
 }
 
 =head2 run_ungapped
@@ -340,24 +483,6 @@ sub run_ungapped {
   #extract filenames from args and check/create files and directory
   my $genfile = $self->genfilename;
   my $estfile = $self->estfilename;
-  
-  # do we need to write out the genomic sequence?
-  if($genomicseq ne $genfile){
-    my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
-      or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
-    
-    $genOutput->write_seq($genomicseq);
-  }
-    
-  # do we need to write out the est sequences?
-  if(ref($estseq) eq 'ARRAY'){
-    my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
-      or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
-    
-    foreach my $eseq(@$estseq) {
-      $estOutput->write_seq($eseq);
-    }
-  }
   
   # output parsing requires that we have both gff and cigar outputs. We don't want to do intron
   # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
@@ -625,7 +750,7 @@ sub output {
 =cut
 
 sub _create_featurepair {
-  my ($self, $f1score, $f1pid, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
+  my ($self, $f1score,  $f1id, $f1start, $f1end, $f2id, $f2start, $f2end,
       $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
 
   #create analysis object
@@ -637,7 +762,8 @@ sub _create_featurepair {
      -gff_source      => $f1source,
      -gff_feature     => $f1primary,);
   
-  
+  my $f1pid = 0;
+
   #create features
   my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
 					     -end         =>   $f1end,
