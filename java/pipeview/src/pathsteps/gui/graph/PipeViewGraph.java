@@ -44,30 +44,33 @@ public class PipeViewGraph extends JGraph{
     
     if (view != null) {
       if(view instanceof VertexView){
+        
 
         property = attributes.get(ModelElement.SHOW_DETAIL);
         showDetail = Boolean.valueOf((String)property).booleanValue();
         if(showDetail){
+          
           attributes = view.getAllAttributes();
+          
           property = attributes.get(ModelElement.FINISHED_COUNT);
+          
           if(property != null){
             finishedString = ((Integer)property).toString();
           }
-
-          property = attributes.get(ModelElement.ANALYSIS_STATUS_COUNT);
+          
+          property = attributes.get(ModelElement.SUBMITTED);
           if(property != null){
-            statusMap = (Map)property;
-            if(statusMap.get(ModelElement.CREATED) != null){
-              createdString = ((Integer)statusMap.get(ModelElement.CREATED)).toString(); 
-            }
+            submittedString = ((Integer)property).toString(); 
+          }
+          
+          property = attributes.get(ModelElement.RUNNING);
+          if(property != null){
+            runningString = ((Integer)property).toString(); 
+          }
 
-            if(statusMap.get(ModelElement.RUNNING) != null){
-              runningString = ((Integer)statusMap.get(ModelElement.RUNNING)).toString(); 
-            }
-
-            if(statusMap.get(ModelElement.FAILED) != null){
-              failedString = ((Integer)statusMap.get(ModelElement.FAILED)).toString(); 
-            }
+          property = attributes.get(ModelElement.FAILED);
+          if(property != null){
+            failedString = ((Integer)property).toString();
           }
         }
       }
@@ -80,7 +83,7 @@ public class PipeViewGraph extends JGraph{
             "<html> "+
             "<strong><em>" +newValue+"</em></strong>"+
             " <br>FIN: "+finishedString+
-            " <br>CRE: "+createdString+
+            " <br>SUB: "+submittedString+
             " <br>RUN: "+runningString+
             " <br>FAI: "+failedString+
             " <html>";

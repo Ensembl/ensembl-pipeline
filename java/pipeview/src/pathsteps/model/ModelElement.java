@@ -23,11 +23,11 @@ public class ModelElement{
   
   public static String ANALYSIS_STATUS_COUNT = "ANALYSIS_STATUS_COUNT";
   public static String FINISHED_COUNT = "FINISHED_COUNT";
-  public static String CREATED = "FINISHED_COUNT";
-  public static String FAILED = "FINISHED_COUNT";
-  public static String READING = "FINISHED_COUNT";
-  public static String RUNNING = "FINISHED_COUNT";
-  public static String SUBMITTED = "FINISHED_COUNT";
+  public static String CREATED = "CREATED";
+  public static String FAILED = "FAILED";
+  public static String READING = "READING";
+  public static String RUNNING = "RUNNING";
+  public static String SUBMITTED = "SUBMITTED";
   public static String SHOW_DETAIL = "SHOW_DETAIL";
   
   public ModelElement(String key){

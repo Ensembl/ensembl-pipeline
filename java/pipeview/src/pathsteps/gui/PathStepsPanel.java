@@ -565,7 +565,7 @@ public class PathStepsPanel extends JPanel{
     
     DefaultPort port;
     HashMap cellToAttributesMap = new HashMap();
-    
+      
     cellToAttributesMap.put(cell, cellMap);
     port = new DefaultPort();
     cell.add(port);

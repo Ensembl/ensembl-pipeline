@@ -235,6 +235,7 @@ public abstract class AbstractReadDBAction extends AAction{
     HashMap finishedCounts = getFinishedCounts(statement);
     ModelElement element;
     String elementName;
+    Map runningStatusMap;
 
     while(elements.hasNext()){
       element = (ModelElement)elements.next();
@@ -244,10 +245,28 @@ public abstract class AbstractReadDBAction extends AAction{
       }
       
       if(currentlyRunningStatuses.get(elementName)!=null){
-        element.addProperty(
-          ModelElement.ANALYSIS_STATUS_COUNT, 
-          currentlyRunningStatuses.get(elementName)
-        );
+        runningStatusMap = (Map)currentlyRunningStatuses.get(elementName);
+
+        if(runningStatusMap.get(ModelElement.SUBMITTED) != null){
+          element.addProperty(
+            ModelElement.SUBMITTED, 
+            runningStatusMap.get(ModelElement.SUBMITTED)
+          );
+        }
+        
+        if(runningStatusMap.get(ModelElement.RUNNING) != null){
+          element.addProperty(
+            ModelElement.RUNNING, 
+            runningStatusMap.get(ModelElement.RUNNING)
+          );
+        }
+        
+        if(runningStatusMap.get(ModelElement.FAILED) != null){
+          element.addProperty(
+            ModelElement.FAILED, 
+            runningStatusMap.get(ModelElement.FAILED)
+          );
+        }
       }
     }
 
@@ -284,13 +303,26 @@ public abstract class AbstractReadDBAction extends AAction{
       analysis_name = resultSet.getString(1);
       job_status = resultSet.getString(2);
       count = resultSet.getInt(3);
-      
-      if(!old_analysis_name.equals(analysis_name)){
-        countsForAnalysis = new HashMap();
-        returnMap.put(analysis_name, countsForAnalysis);
+
+      if(
+        job_status.equals(ModelElement.SUBMITTED) ||
+        job_status.equals(ModelElement.FAILED) ||
+        job_status.equals(ModelElement.RUNNING)
+      ){
+        if(!old_analysis_name.equals(analysis_name)){
+          countsForAnalysis = new HashMap();
+          returnMap.put(analysis_name, countsForAnalysis);
+        }
+        if(job_status.equals(ModelElement.RUNNING)){
+          countsForAnalysis.put(ModelElement.RUNNING, new Integer(count));
+        }else if(job_status.equals(ModelElement.FAILED)){
+          countsForAnalysis.put(ModelElement.FAILED, new Integer(count));
+        }else if(job_status.equals(ModelElement.SUBMITTED)){
+          countsForAnalysis.put(ModelElement.SUBMITTED, new Integer(count));
+        }
       }
       
-      countsForAnalysis.put(job_status, new Integer(count));
+      old_analysis_name = analysis_name;
     }
     return returnMap;
   }
