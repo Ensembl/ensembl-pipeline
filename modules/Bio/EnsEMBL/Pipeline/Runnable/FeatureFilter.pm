@@ -1,6 +1,5 @@
 
 #
-#
 # Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::SearchFilter
 #
 # Cared for by Ewan Birney <birney@ebi.ac.uk>
@@ -18,10 +17,10 @@ Bio::EnsEMBL::Pipeline::Runnable::SearchFilter - Filters a search runnable
 =head1 SYNOPSIS
 
     $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -coverage  => 5,
-                                                                   -minscore  => 100,
-                                                                   -maxevalue => 0.001,
-                                                                   -prune     => 1
-                                                                 );
+								   -minscore  => 100,
+								   -maxevalue => 0.001,
+								   -prune     => 1
+								 );
     
 
    my @filteredfeatures = $search->run(@features);
@@ -67,18 +66,18 @@ sub new {
   my $self = $class->SUPER::new(@args);  
 
   my($minscore,$maxevalue,$coverage,$prune) = $self->_rearrange([qw(MINSCORE
-                                                                    MAXEVALUE
-                                                                    COVERAGE
-                                                                    PRUNE
-                                                             )],
-                                                         @args);
+								    MAXEVALUE
+								    COVERAGE
+								    PRUNE
+							     )],
+							 @args);
 
 
 
-  $minscore  = -100000 if !defined $minscore;
-  $maxevalue = 0.1     if !defined $maxevalue;
-  $coverage  = 10      if !defined $coverage;
-  $prune     = 0       if !defined $prune;
+  $minscore  = -100000 unless $minscore;
+  $maxevalue = 0.1     unless $maxevalue;
+  $coverage  = 10      unless $coverage;
+  $prune     = 0       unless $prune;
 
   $self->minscore($minscore);
   $self->maxevalue($maxevalue);
@@ -131,32 +130,39 @@ sub run{
   foreach my $f ( @input ) {
     
     if( $f->score > $minscore ) {
+      
+      unless ( $validhit{$f->hseqname} ){
+	$validhit{$f->hseqname} = 0;
+      }
+      
       if( $f->can('evalue') && defined $f->evalue ) {
-        if( $f->evalue < $maxevalue ) {
-          
-          if( $validhit{$f->hseqname} < $f->score ) {
-            $validhit{$f->hseqname} = $f->score;
-          }
-          if( $f->end > $maxend ) {
-            $maxend = $f->end;
-          }
-                  
-        }
-      } else {
-        if( $validhit{$f->hseqname} < $f->score ) {
-          $validhit{$f->hseqname} = $f->score;
-        }
-        if( $f->end > $maxend ) {
-          $maxend = $f->end;
-        }
-        
+	if( $f->evalue < $maxevalue ) {
+	  
+	  if( $validhit{$f->hseqname} < $f->score ) {
+	    $validhit{$f->hseqname} = $f->score;
+	  }
+	  if( $f->end > $maxend ) {
+	    $maxend = $f->end;
+	  }
+	  	  
+	}
+      }
+
+      else {
+	if( $validhit{$f->hseqname} < $f->score ) {
+	  $validhit{$f->hseqname} = $f->score;
+	}
+	if( $f->end > $maxend ) {
+	  $maxend = $f->end;
+	}
+	
       }
     }
     
     # irregardless of score, take if this hseqname is valid
     if( exists $validhit{$f->hseqname} == 1 ) {
       if( ! exists $hitarray{$f->hseqname} ) {
-        $hitarray{$f->hseqname} = [];
+	$hitarray{$f->hseqname} = [];
       }
       push(@{$hitarray{$f->hseqname}},$f);
     }
@@ -184,28 +190,32 @@ sub run{
       my $hole = 0;
       
       foreach my $f ( @{$hitarray{$hseqname}} ) {
-        # only mark if this feature is valid
-        if( $f->score > $minscore || ($f->can('evalue') && defined $f->evalue && $f->evalue<$maxevalue ) ) {
-          for my $i ( $f->start .. $f->end ) {
-            if( $list[$i] < $coverage ) {
-              # accept!
-              $hole = 1;
-              last;
-            }
-          }
-        }
+	# only mark if this feature is valid
+	if( $f->score > $minscore || ($f->can('evalue') && defined $f->evalue && $f->evalue<$maxevalue ) ) {
+	  for my $i ( $f->start .. $f->end ) {
+	    unless( $list[$i] ){
+	      $list[$i] = 0;
+	    }
+
+	    if( $list[$i] < $coverage ) {
+	      # accept!
+	      $hole = 1;
+	      last;
+	    }
+	  }
+	}
       }
       
       if( $hole == 0 ) {
-        # completely covered 
-        next;
+	# completely covered 
+	next;
       }
       
       push ( @accepted_hids, $hseqname );
       foreach my $f ( @{$hitarray{$hseqname}} ) {
-        for my $i ( $f->start .. $f->end ) {
-          $list[$i]++; 
-        }
+	for my $i ( $f->start .. $f->end ) {
+	  $list[$i]++; 
+	}
       }
     }
   
@@ -214,13 +224,23 @@ sub run{
   
   if ($self->prune) {
     my @new;
-     
-    # prune the features per hid (per hseqname)
-    foreach my $hseqname ( @accepted_hids ) {
-      my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
-      push(@new,@tmp);
-      #push(@{$self->{'_output'}},@tmp);
+
+    my @all_features;
+    
+    # collect all the features
+    foreach my $hseqname ( @accepted_hids ){
+      push ( @all_features, @{$hitarray{$hseqname}} );
     }
+     
+    # and prune all together taking the first '$self->coverage' according to score 
+    @new = $self->prune_features( @all_features );
+
+    ## prune the features per hid (per hseqname)
+    #foreach my $hseqname ( @accepted_hids ) {
+    #  my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
+    #  push(@new,@tmp);
+    #  #push(@{$self->{'_output'}},@tmp);
+    #}
     @accepted_hids = ();
     return @new;
   
@@ -254,6 +274,7 @@ sub prune_features {
   # define the depth of the coverage
   my $depth = $self->coverage;
 
+  # here we store the created clusters
   my @clusters;
   my @cluster_starts;
   my @cluster_ends;
@@ -262,9 +283,6 @@ sub prune_features {
 
   # sort the features by start coordinates, this is crucial
   @input = sort {$a->start <=> $b->start} @input;
-
-  # here we store the created clusters
-  
 
   ## this is handy to compare the two clustering methods quickly
   #my $old_method = 0;
@@ -301,10 +319,10 @@ sub prune_features {
       
       # re-adjust size of cluster
       if ($f->start < $cluster_starts[$count]) {
-        $cluster_starts[$count] = $f->start;
+	$cluster_starts[$count] = $f->start;
       }
       if ($f->end  > $cluster_ends[$count]) {
-        $cluster_ends[$count] = $f->end;
+	$cluster_ends[$count] = $f->end;
       }
       
     }
@@ -335,44 +353,44 @@ sub prune_features {
       
 #      my $count = 0;
 #    CLUS: foreach my $clus (@clusters) {
-                
-#       #print STDERR "comparing with cluster $count : "
-#       #  .$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
-#       foreach my $f2 ( @$clus) {
-#         print STDERR "       ".$f2->start."-".$f2->end."\n";
-#       }
+		
+#	#print STDERR "comparing with cluster $count : "
+#	#  .$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
+#	foreach my $f2 ( @$clus) {
+#	  print STDERR "       ".$f2->start."-".$f2->end."\n";
+#	}
 
-#       if ($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count]) {
-#         #print STDERR "No, go to next one\n";
-          
-#         #next CLUS;
-#       }
-#       if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {
-          
-#         #print STDERR "Yes, we put it in this one\n";
-#         $found = 1;
-#         push(@$clus,$f);
-          
-#         if ($f->start < $cluster_starts[$count]) {
-#           $cluster_starts[$count] = $f->start;
-#         }
-#         if ($f->end   > $cluster_ends[$count]) {
-#           $cluster_ends[$count] = $f->end;
-#         }
-          
-#         next FEAT;
-#       }
-#       $count++;
+#	if ($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count]) {
+#	  #print STDERR "No, go to next one\n";
+	  
+#	  #next CLUS;
+#	}
+#	if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {
+	  
+#	  #print STDERR "Yes, we put it in this one\n";
+#	  $found = 1;
+#	  push(@$clus,$f);
+	  
+#	  if ($f->start < $cluster_starts[$count]) {
+#	    $cluster_starts[$count] = $f->start;
+#	  }
+#	  if ($f->end   > $cluster_ends[$count]) {
+#	    $cluster_ends[$count] = $f->end;
+#	  }
+	  
+#	  next FEAT;
+#	}
+#	$count++;
 #      }
 #      if ($found == 0) {
-#       #print STDERR "found new cluster\n";
-#       my $newclus = [];
-#       push (@$newclus,$f);
-#       push(@clusters,$newclus);
-        
-#       $cluster_starts[$count] = $f->start;
-#       $cluster_ends[$count]   = $f->end;
-        
+#	#print STDERR "found new cluster\n";
+#	my $newclus = [];
+#	push (@$newclus,$f);
+#	push(@clusters,$newclus);
+	
+#	$cluster_starts[$count] = $f->start;
+#	$cluster_ends[$count]   = $f->end;
+	
 #      }
 #    }
 #  }

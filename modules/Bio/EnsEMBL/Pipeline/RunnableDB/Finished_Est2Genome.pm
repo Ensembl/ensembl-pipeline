@@ -105,7 +105,7 @@ sub fetch_input {
   }
 
   #print $genseq." ".$self->seqfetcher." ".$percent_filter." ".$percent_id." ".$no_blast." \n";
-  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new('-unmasked' => $genseq,
+  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome->new('-unmasked' => $genseq,
 								'-seqfetcher' => $self->seqfetcher,
 								'-percent_filter' => $percent_filter,
 								'-percent_id' => $percent_id,
@@ -205,11 +205,11 @@ sub output {
 
 
 sub make_seqfetcher {
-  my ( $self, $index_name ) = @_;
-  my $index = undef;
-  if(defined $index_name && $index_name ne ''){
-    $index   = $ENV{BLASTDB}."/".$index_name;
-  }
+  my ( $self ) = @_;
+  
+  
+  my $index   = $ENV{BLASTDB}."/".$self->analysis->db;
+  
   my $seqfetcher;
   if(defined $index && $index ne ''){
     my @db = ( $index );

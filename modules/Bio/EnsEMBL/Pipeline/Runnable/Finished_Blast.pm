@@ -210,6 +210,8 @@ sub output {
     
     if (my $o = $self->{'_output'}) {
         return @$o;
+    } else {
+        return;
     }
 }
 

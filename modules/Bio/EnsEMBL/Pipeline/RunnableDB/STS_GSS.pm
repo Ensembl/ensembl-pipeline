@@ -55,24 +55,63 @@ sub fetch_input {
   
   my $genseq   = $contig->primary_seq;
   my $repeatmasked_seq = $contig->get_repeatmasked_seq;
- 
-  my $percent_id = 95;
+
+
+    print STDERR "Set genseq to " . $repeatmasked_seq. "\n";
+    
+    # input sequence needs to contain at least 3 consecutive nucleotides
+    my $seq = $repeatmasked_seq->seq;
+    if ($seq =~ /[CATG]{3}/) {
+        $self->input_is_void(0);
+    }
+    else {
+        $self->input_is_void(1);
+        $self->warn("Need at least 3 nucleotides");
+    }
+
+    #extract parameters into a hash
+    my ( $parameter_string ) = $self->analysis->parameters();
+    my ( $arguments, $thresh_type, $thresh );
+    
+    if ($parameter_string)
+    {
+        $parameter_string =~ s/\s+//g;
+        my @pairs = split ( /,/, $parameter_string );
+        foreach my $pair ( @pairs )
+        {
+            my ($key, $value) = split (/=>/, $pair);
+            if ($key eq '-threshold_type' && $value) {
+                $thresh_type = $value;
+            }
+            elsif ($key eq '-threshold' && $value) {
+                $thresh = $value;
+            }
+            else
+	    # remaining arguments not of '=>' form
+	    # are simple flags (like -p1)
+            {
+                $arguments .= " $key ";
+            }
+        }
+    }
+
 
   
-  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new(-query => $repeatmasked_seq,
-								 -unmasked =>$genseq,
-								 -database =>$self->analysis->db,
-								 -program =>$self->analysis->program,
-								 -options => $self->analysis->parameters,
-								 -seqfetcher => $self->seqfetcher,
-								-percent_id => $percent_id
-								-percent_filter => 1);
+    my $percent_id = 95;
+    
+    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new(-query => $repeatmasked_seq,
+							         -unmasked =>$genseq,
+							         -database =>$self->analysis->db,
+							         -program =>$self->analysis->program,
+							         -options => $arguments,
+							         -seqfetcher => $self->seqfetcher,
+							         -percent_id => $percent_id
+							         -percent_filter => 1);
+
+    $self->runnable($runnable);
   
-  $self->runnable($runnable);
-  
-}    
-      
-  
+
+}
     
     
     

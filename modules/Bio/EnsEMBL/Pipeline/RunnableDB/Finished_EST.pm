@@ -4,9 +4,17 @@
 package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST;
 
 use strict;
+
+use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::Root::RootI;
+
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+use vars qw(@ISA);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
 
 sub new {
     my ($new,@args) = @_;
@@ -28,7 +36,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->primary_seq;
-    my $masked    = $contig->get_repeatmasked_seq->seq;
+    my $masked    = $contig->get_repeatmasked_seq;
 
     # Make seqfetcher
     my $seqfetcher = $self->make_seqfetcher;
@@ -84,8 +92,15 @@ sub make_seqfetcher {
 
     my( $seqfetcher );
     if (my $dbf = $self->analysis->db_file) {
-        my $index = "$ENV{BLASTDB}/$dbf";
-        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => [$index]);
+        
+        my $db ='/data/blastdb/Ensembl/dbEST';
+        my @dbs = $db;
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
+        -db     => \@dbs,
+        );
+     
+        #my $index = "$ENV{BLASTDB}/$dbf";
+        #$seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => [$index]);
     } else {
         $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
     }

@@ -12,7 +12,8 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
-@ISA = ('Bio::EnsEMBL::Pipeline::RunnableI');
+use vars qw(@ISA);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
     my ($class,@args) = @_;
@@ -89,14 +90,22 @@ sub _make_blast_paramters {
     # Set parameters from analysis object, or use defaults
     my $ana = $self->analysis or $self->throw('analysis not set');
     
+    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ecs1b',
+                                            -user => 'ensadmin',
+                                            -pass => 'ensembl',
+                                            -dbname => 'chr_6_13_finished');
+
+    
     my %param = (
         '-query'            => $self->query,
-        '-database'         => $ana->db      || 'dbEST',
-        '-program'          => $ana->program || 'wublastn',
+        '-database'         => $ana->db,
+        '-program'          => $ana->program || 'wublastn.new',
         '-threshold_type'   => 'PVALUE',
         '-threshold'        => 1e-4,
         '-options'          => 'Z=500000000',
+        -dbobj              => $db,
         );
+    
     
     my( $arguments );
     foreach my $ele (split /\s*,\s*/, $ana->parameters) {
@@ -123,14 +132,17 @@ sub run {
     my $seq = $self->query;
     my $blast = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast
         ->new($self->_make_blast_paramters);
+    
     $blast->run;
     my $features = [$blast->output];
     
-    print STDERR "\nPlus strand est_genome\n";
-    $self->run_est_genome_on_strand( 1, $features);
     
-    print STDERR "\nMinus strand est_genome\n";
-    $self->run_est_genome_on_strand(-1, $features);
+        print STDERR "\nPlus strand est_genome\n";
+        $self->run_est_genome_on_strand( 1, $features);
+
+        print STDERR "\nMinus strand est_genome\n";
+        $self->run_est_genome_on_strand(-1, $features);
+    
 }
 
 sub run_est_genome_on_strand {
@@ -161,7 +173,7 @@ sub run_est_genome_on_strand {
     }
     
     while (my ($hid, $flist) = each %$hit_features) {
-        print STDERR "$hid\n";
+        #print STDERR "$hid\n";
         #next unless $hid =~ /BF965645/;
     
         # Sort features by start/end in genomic
@@ -181,7 +193,7 @@ sub run_est_genome_on_strand {
             }
         }
         
-        print STDERR "Made ", scalar(@sets), " sets\n";
+       # print STDERR "Made ", scalar(@sets), " sets\n";
         
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
@@ -199,16 +211,16 @@ sub do_mini_est_genome {
         );
     $e2g->run;
     
-    print STDERR "\n";
-    foreach my $lin (@$linear) {
-        printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
-            $lin->start, $lin->end, $lin->hstart, $lin->hend;
-    }
+    #print STDERR "\n";
+    #foreach my $lin (@$linear) {
+ #       printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
+ #           $lin->start, $lin->end, $lin->hstart, $lin->hend;
+ #   }
 
     foreach my $fp ($e2g->output) {
 
-        printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
-            $fp->start, $fp->end, $fp->hstart, $fp->hend;
+       # printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
+       #     $fp->start, $fp->end, $fp->hstart, $fp->hend;
 
         # source_tag and primary_tag have to be set to
         # something, or validate method in FeaturePair
