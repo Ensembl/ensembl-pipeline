@@ -49,6 +49,7 @@ use strict;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
 
