@@ -200,7 +200,7 @@ sub run{
   $list[$maxend] = 0;
   
   # sort the list by highest score, then alphabetically for ties
-   my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $b cmp $a }
+   my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $a cmp $b }
                     keys %validhit;
   
   # this now holds the accepted hids ( a much smaller array )
