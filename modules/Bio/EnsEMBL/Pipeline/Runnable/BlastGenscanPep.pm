@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
+Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep
 
 =head1 SYNOPSIS
 
@@ -289,6 +289,7 @@ sub align_hits_to_contig2 {
 	  ( -seqname    =>  $feature->hseqname,
 	    -start      =>  $pep_start - $ugFeature->start() + $ugFeature->hstart(),
 	    -end        =>  $pep_end - $ugFeature->start() + $ugFeature->hstart(),
+	    -strand     =>  $feature->hstrand,
 	    -score      =>  $feature->score,
 	    -p_value    =>  $feature->p_value,
 	    -percent_id =>  $feature->percent_id,
