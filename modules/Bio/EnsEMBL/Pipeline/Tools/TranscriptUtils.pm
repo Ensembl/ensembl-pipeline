@@ -774,7 +774,7 @@ sub _clone_Transcript{
 
 =head2 find_transcripts_by_protein_evidence
   
-  Method to get all the transcripts in a given databases that
+  Method to get all the transcripts in a given database that
   have a given protein evidence
 
 =cut
@@ -787,6 +787,56 @@ sub find_transcripts_by_protein_evidence{
 	             exon_transcript et, transcript t
               WHERE  sf.exon_id    = e.exon_id                   AND
 	             sf.feature_id = pf.protein_align_feature_id AND
+	             pf.hit_name   = "$id"                       AND
+	             pf.contig_id  = e.contig_id                 AND
+                     et.exon_id    = e.exon_id                   AND
+	             et.transcript_id = t.transcript_id
+            );
+  
+  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+  my $res = $sth->execute || $db->throw("can't execute: $q");
+  
+  my @tranz;
+  while( my ($t_id) =  $sth->fetchrow_array) {
+    push( @tranz, $t_id );
+  }
+  
+  my $t_adaptor = $db->get_TranscriptAdaptor;
+  my $s_adaptor = $db->get_SliceAdaptor;
+  
+  ############################################################
+  # create transcripts in slice coordinates
+  my @transcripts;
+  foreach my $t_id ( @tranz ){
+    my $tran     = $t_adaptor->fetch_by_dbID($t_id);
+    my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
+    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
+    my $fakegene = Bio::EnsEMBL::Gene->new();
+    $fakegene->add_Transcript( $tran );
+    my $tmp_gene = $fakegene->transform( $big_slice );
+    my @trans = @{$tmp_gene->get_all_Transcripts};
+    push ( @transcripts, $trans[0] );
+  }
+  
+  return @transcripts;
+}
+
+############################################################
+=head2 find_transcripts_by_dna_evidence
+  
+  Method to get all the transcripts in a given database that
+  have a given dna (cdna/est) evidence
+
+=cut
+
+sub find_transcripts_by_protein_evidence{
+  my ($self,$id,$db) = @_;
+  
+  my $q = qq( SELECT distinct(t.transcript_id)
+              FROM   exon e, supporting_feature sf, dna_align_feature pf,
+	             exon_transcript et, transcript t
+              WHERE  sf.exon_id    = e.exon_id                   AND
+	             sf.feature_id = pf.dna_align_feature_id     AND
 	             pf.hit_name   = "$id"                       AND
 	             pf.contig_id  = e.contig_id                 AND
                      et.exon_id    = e.exon_id                   AND
