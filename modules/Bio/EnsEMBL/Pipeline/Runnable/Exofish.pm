@@ -35,7 +35,7 @@ sub new {
   my $self = $class->SUPER::new(@args);    
   
   # Now parse the input options and store them in the object
-  my( $query, $program, $database, $options, $do_not_project) = 
+  my( $query, $program, $database, $do_not_project) = 
       $self->_rearrange([qw(QUERY 
                             PROGRAM 
                             DATABASE 
@@ -217,10 +217,10 @@ sub parse_results {
       }
       else {
         # overlap
-        push @{$projected_hits[-1]->{hseqname}}, $reg->{hseqname};
-        push @{$projected_hits[-1]->{hstart}}, $reg->{hstart};
-        push @{$projected_hits[-1]->{hend}}, $reg->{hend};
-        push @{$projected_hits[-1]->{score}}, $reg->{score};
+        push @{$projected_hits[-1]->{hseqname}}, @{$reg->{hseqname}};
+        push @{$projected_hits[-1]->{hstart}}, @{$reg->{hstart}};
+        push @{$projected_hits[-1]->{hend}}, @{$reg->{hend}};
+        push @{$projected_hits[-1]->{score}}, @{$reg->{score}};
 
         if ($reg->{end} > $projected_hits[-1]->{end}) {
           $projected_hits[-1]->{end} = $reg->{end};
