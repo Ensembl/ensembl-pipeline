@@ -218,37 +218,6 @@ sub get_all_FeatureIds {
 }
 
 
-=head2 parse_Header
-
-  Title   : parse_Header
-  Usage   : my $newid = $self->parse_Header($id);
-  Function: Parses different sequence headers
-  Returns : string
-  Args    : none
-
-=cut
-
-sub parse_Header {
-    my ($self,$id) = @_;
-
-    if (!defined($id)) {
-	$self->throw("No id input to parse_Header");
-    }
-
-    my $newid = $id;
-
-    if ($id =~ /^(.*)\|(.*)\|(.*)/) {
-	$newid = $2;
-	$newid =~ s/(.*)\..*/$1/;
-	
-    } elsif ($id =~ /^..\:(.*)/) {
-	$newid = $1;
-    }
-    $newid =~ s/ //g;
-    return $newid;
-}
-
-
 sub make_miniseq {
     my ($self,@features) = @_;
 
