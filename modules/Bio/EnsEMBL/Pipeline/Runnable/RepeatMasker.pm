@@ -111,10 +111,10 @@ sub _initialize {
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
     eval {
-	$self->repeatmasker($self->locate_executable('RepeatMaskerHum'));
+	$self->repeatmasker($self->locate_executable('RepeatMasker'));
     };
     if ($@) {
-	$self->repeatmasker('/usr/local/ensembl/bin/RepeatMaskerHum');
+	$self->repeatmasker('/usr/local/ensembl/bin/RepeatMasker');
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
@@ -290,29 +290,29 @@ sub parse_results {
     {  
         if (/\d+/) #ignore introductory lines
         {
-            my @element = split (/\s+/, $_); 
+            my @element = split;
             # ignore features with negatives 
-            next if ($element[12-14] =~ /-/); 
+            next if ($element[11-13] =~ /-/); 
             my (%feat1, %feat2);
-            $feat1 {name} = $element[5];
-            $feat1 {score} = $element[1];
-            $feat1 {start} = $element[6];
-            $feat1 {end} = $element[7];
+            $feat1 {name} = $element[4];
+            $feat1 {score} = $element[0];
+            $feat1 {start} = $element[5];
+            $feat1 {end} = $element[6];
             #The start and end values are in different columns depending 
             #on orientation!
-            if ($element[9] eq '+')
+            if ($element[8] eq '+')
             {
                 $feat2 {strand} = 1;
-                $feat2 {start} = $element[12];     
-                $feat2 {end} = $element[13];
+                $feat2 {start} = $element[11];     
+                $feat2 {end} = $element[12];
             }
-            elsif ($element[9] eq 'C')
+            elsif ($element[8] eq 'C')
             {
                 $feat2 {strand} = -1 ;
-                $feat2 {start} = $element[14];     
-                $feat2 {end} = $element[13];
+                $feat2 {start} = $element[13];     
+                $feat2 {end} = $element[12];
             }
-            $feat2 {name} = $element[10];
+            $feat2 {name} = $element[9];
             $feat2 {score} = $feat1 {score};
             $feat1 {strand} = $feat2 {strand};
             #misc
