@@ -16,9 +16,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G->new(
-									  -dbobj     => $db,
-									  -input_id  => $id,
-									  -seq_index => $index,
+									  -dbobj       => $db,
+									  -input_id    => $id,
+									  -seq_index   => $index,
+									  -golden_path => $gp,
 									 );
     $obj->fetch_input
     $obj->run
@@ -128,6 +129,11 @@ sub new {
       $self->estdb($edba);
     }
     else { $self->throw("expecting exonerate data in an external feature factory\n"); };
+
+    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
+
 
     return $self;
 }
@@ -460,7 +466,7 @@ sub fetch_input {
      $chrid     =~ s/\.(.*)-(.*)//;
   my $chrstart  = $1;
   my $chrend    = $2;
-  $self->dbobj->static_golden_path_type('UCSC');
+
   my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);

@@ -18,7 +18,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
 					     -dbobj     => $db,
-					     -input_id  => $id
+					     -input_id  => $id,
+					     -golden_path => $gp
                                              );
     $obj->fetch_input
     $obj->run
@@ -72,6 +73,9 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
+    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
     return $self; 
 }
 
@@ -252,7 +256,7 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
-    $self->dbobj->static_golden_path_type('UCSC');
+#    $self->dbobj->static_golden_path_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);

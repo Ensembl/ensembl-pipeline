@@ -15,9 +15,11 @@ Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
 
 =head1 SYNOPSIS
 
-my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
-(-db_obj => $dbobj,
- -input_id => $input_id);
+my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G(
+                                                                      '-db_obj'      => $dbobj,
+                                                                      '-golden_path' => $gp,
+                                                                      '-input_id'    => $input_id
+                                                                    );
 
 $t_e2g->fetch_input();
 $t_e2g->run();
@@ -74,6 +76,10 @@ sub new {
     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
     $self->seqfetcher($seqfetcher);
   }
+
+  my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+  $path = 'UCSC' unless (defined $path && $path ne '');
+  $self->dbobj->static_golden_path_type($path);
 
   return $self;
 }
