@@ -177,8 +177,9 @@ sub run{
   my @list;
   $list[$maxend] = 0;
   
-  # sort the list by highest score
-  my @inputids = sort { $validhit{$b} <=> $validhit{$a} } keys %validhit; 
+  # sort the list by highest score, then alphabetically for ties
+  my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $b cmp $a }
+                   keys %validhit;
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
