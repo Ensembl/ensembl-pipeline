@@ -872,7 +872,7 @@ sub execution_host {
   if ($arg) {
     $self->{'_execution_host'} = $arg;
   }
-  return $self->{'_execution_host'};
+  return $self->{'_execution_host'} || '';
 }
 
 
@@ -885,7 +885,8 @@ sub temp_dir {
   if(!$self->{'_temp_dir'}){
     $self->{'_temp_dir'} = $self->batch_q_object->temp_filename;
   }
-  return $self->{'_temp_dir'};
+
+  return $self->{'_temp_dir'} || '';
 }
 
 

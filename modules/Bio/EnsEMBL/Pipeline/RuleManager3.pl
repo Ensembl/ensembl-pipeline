@@ -509,11 +509,11 @@ while (1) {
     if($batch_q_module->can('check_existance')){
       print STDERR "Checking job existance\n";
       my @ids = @{$job_adaptor->list_dbIDs};
-      #$job_adaptor->lock_tables;
+      $job_adaptor->lock_tables;
     JOB:foreach my $id(@ids){
         &job_existance($batch_q_module, $verbose, $job_adaptor, $id);
       }
-      #$job_adaptor->unlock_tables;
+      $job_adaptor->unlock_tables;
     }
     if(!$done){
       print STDERR "Checking whether to shut down\n";
@@ -854,7 +854,7 @@ sub job_existance{
       ($job->submission_id);
   LOST:foreach my $lj(@lost_jobs){
       print STDERR "job ".$lj->dbID." is lost at ".
-        $lj->current_status->status."\n";
+        $status."\n" if($verbose);
       if($lj->dbID == $job->dbID){
         next LOST;
       }

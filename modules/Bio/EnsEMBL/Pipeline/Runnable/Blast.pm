@@ -300,7 +300,7 @@ sub run_analysis {
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-	$self->throw("Failed during blast run: ". ($?/256) . " ". $!) unless (system ($command) == 0);
+        $self->throw("Failed during blast run: $command". ($?/256) . " ". $!) unless (system ($command) == 0);
       }
   
 }
@@ -332,7 +332,7 @@ sub fetch_databases {
     # database name is not an absoloute path
 
     unless ($dbname =~ m!^/!) {
-	$dbname = $ENV{BLASTDB} . "/" . $dbname;
+      $dbname = $ENV{BLASTDB} . "/" . $dbname;
     }
 
     # If the expanded database name exists put this in
@@ -341,18 +341,16 @@ sub fetch_databases {
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
     if (-f $dbname) {
-	push(@databases,$dbname);
+      push(@databases,$dbname);
     } else {
-	my $count = 1;
-
-	while (-f $dbname . "-$count") {
-	    push(@databases,$dbname . "-$count");
-	    $count++;
-	}
+      my $count = 1;
+      push(@databases,$dbname . "-$count");
+      $count++;
     }
+    
 
     if (scalar(@databases) == 0) {
-	$self->throw("No databases exist for " . $dbname);
+      $self->throw("No databases exist for " . $dbname);
     }
 
     return @databases;

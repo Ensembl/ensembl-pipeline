@@ -589,7 +589,7 @@ sub set_status {
 	$res = $sth->execute($jobId);
         
         $sth = $self->prepare(q{
-                                INSERT DELAYED into job_status
+                                INSERT into job_status
                                 (job_id, status, time, is_current)
                                 VALUES (?, ?, NOW(), 'y')
                                });
@@ -832,6 +832,26 @@ sub deleteObj {
 }
 
 
+sub lock_tables{
+  my ($self) = @_;
+  
+  my $sql = "LOCK TABLES job WRITE, job_status WRITE";
+
+  my $sth = $self->db->prepare($sql);
+
+  $sth->execute;
+
+}
+
+sub unlock_tables{
+  my ($self) = @_;
+  
+  my $sql = "UNLOCK TABLES";
+
+  my $sth = $self->db->prepare($sql);
+
+  $sth->execute;
+}
 
 
 1;

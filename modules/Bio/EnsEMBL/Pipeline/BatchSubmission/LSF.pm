@@ -208,7 +208,11 @@ sub get_job_time{
 
 sub check_existance{
   my ($self, $id, $verbose) = @_;
-  my $command = "bjobs -l ".$id."\n";
+  if(!$id){
+    die("Can't run without an LSF id");
+  }
+  my $command = "bjobs ".$id."\n";
+  #print STDERR "Running ".$command."\n";
   my $flag = 0; 
   open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
   while(<BJOB>){
@@ -223,7 +227,7 @@ sub check_existance{
       return $values[0];
     }
   }
-  close(BJOB) or $self->throw("couldn't close pipe to bjobs");
+  close(BJOB);
   print STDERR "Have lost ".$id."\n" if($verbose);
   return undef;
 }
