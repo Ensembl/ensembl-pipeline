@@ -77,7 +77,6 @@ sub _check_Transcript{
 	$self->throw;
     }
 
-    $transcript->sort;
     
     ############################################################
     # check that transcripts are not completely outside the slice
@@ -235,7 +234,7 @@ sub _check_introns{
 
     #my $strand =  $transcript->start_Exon->strand;
 
-    $transcript->sort;
+ 
     
     ############################################################
     # check that transcripts are not completely outside the slice
@@ -518,7 +517,7 @@ sub transcript_id {
 sub split_Transcript{
   my ($self, $transcript, $max_intron) = @_;
   
-  $transcript->sort;
+ 
   
   my @split_transcripts   = ();
   
@@ -606,7 +605,7 @@ sub split_Transcript{
     }
     
     foreach my $sf(@{$exon->get_all_supporting_features}){
-      $sf->seqname($exon->contig->name);
+      $sf->seqname($exon->slice->name);
     }
     
     $prev_exon = $exon;
@@ -618,7 +617,7 @@ sub split_Transcript{
   my $count = 1;
   
   foreach my $st (@split_transcripts){
-    $st->sort;
+   
     
     my @ex = @{$st->get_all_Exons};
     
@@ -661,7 +660,7 @@ sub _print_SimpleTranscript{
     
     my $shift = 0;
     if ( $chr_coord ){
-      $shift = $exons[0]->contig->chr_start - 1;
+      $shift = $exons[0]->slice->start - 1;
     }
     foreach my $exon ( @exons){
       print STDERR ($exon->start + $shift)."-".( $exon->end + $shift )." ";
@@ -948,7 +947,7 @@ sub find_transcripts_by_protein_evidence{
   foreach my $t_id ( @tranz ){
     my $tran     = $t_adaptor->fetch_by_dbID($t_id);
     my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
+    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->seq_region_name);
     my $fakegene = Bio::EnsEMBL::Gene->new();
     $fakegene->add_Transcript( $tran );
     my $tmp_gene = $fakegene->transform( $big_slice );
@@ -1021,7 +1020,7 @@ sub find_transcripts_by_dna_evidence{
       #print STDERR "found $t_id\n";
       my $tran     = $t_adaptor->fetch_by_dbID($t_id);
       my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-      my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name );
+      my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->seq_region_name );
       my $fakegene = Bio::EnsEMBL::Gene->new();
       $fakegene->add_Transcript( $tran );
       my $tmp_gene = $fakegene->transform( $big_slice );
@@ -1067,7 +1066,7 @@ sub is_spliced{
 
 sub check_splice_sites{
   my ($self, $transcript) = @_;
-  $transcript->sort;
+
   
   my $strand = $transcript->start_Exon->strand;
   my @exons  = @{$transcript->get_all_Exons};
@@ -1082,7 +1081,7 @@ sub check_splice_sites{
   my $other    = 0;
   
   # all exons in the transcripts are in the same seqname coordinate system:
-  my $slice = $transcript->start_Exon->contig;
+  my $slice = $transcript->start_Exon->slice;
   
   if ($strand == 1 ){
     
@@ -1303,7 +1302,7 @@ sub set_stop_codon{
 	# there is no next exon and the next codon would fall off the end of the exon 
 	
 	# need to get the slice sequence
-	my $adaptor =  $end_exon->contig->adaptor;
+	my $adaptor =  $end_exon->slice->adaptor;
 	if ( $adaptor ){
 	    my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
 	    my $acceptor_bases_count = 3 - $donor_bases_count;
@@ -1321,7 +1320,7 @@ sub set_stop_codon{
 	    ############################################################
 	    # here we distinguish the strands
 	    if ( $end_exon->strand == 1 ){
-		my $slice_start = $end_exon->contig->chr_start;
+		my $slice_start = $end_exon->slice->start;
 		
 		############################################################
 		# calculate the next codon start/end in chr coordinates 
@@ -1332,7 +1331,7 @@ sub set_stop_codon{
 		
 		#print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
 		my $codon_slice = $adaptor
-		    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
+		    ->fetch_by_chr_start_end( $end_exon->slice->seq_region_name, $codon_start, $codon_end );
 		my $codon = $codon_slice->seq;
 		
 		############################################################
@@ -1348,7 +1347,7 @@ sub set_stop_codon{
 		
 		############################################################
 		# update the exon sequence:	    	    
-		my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
+		my $seq_string = $end_exon->slice->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
 		#my $exon_seq = Bio::Seq->new(
 		#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
 		#			     -MOLTYPE    => 'dna',
@@ -1368,7 +1367,7 @@ sub set_stop_codon{
 	    }
 	}
 	else{
-	    my $slice_start = $end_exon->contig->chr_start;
+	    my $slice_start = $end_exon->slice->start;
 	    
 	    ############################################################
 	    # calculate the next codon start/end in chr coordinates 
@@ -1379,7 +1378,7 @@ sub set_stop_codon{
 	    print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
 	    
 	    my $codon_slice = $adaptor
-		->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
+		->fetch_by_chr_start_end( $end_exon->slice->seq_region_name, $codon_start, $codon_end );
 	    my $pre_codon = $codon_slice->seq;
 	    
 	    #print STDERR "sequence: $pre_codon\n";
@@ -1399,7 +1398,7 @@ sub set_stop_codon{
 		    " translation end".$transcript->translation->end."\n";
 		############################################################
 		# update the exon sequence:	    	    
-		my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
+		my $seq_string = $end_exon->slice->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
 		#my $exon_seq = Bio::Seq->new(
 		#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
 		#			     -MOLTYPE    => 'dna',
@@ -1441,7 +1440,7 @@ sub get_next_Exon{
   my ($self, $transcript, $exon ) = @_;
     
   # this order the exons 5' to 3'
-  $transcript->sort;
+
   my @exons = @{$transcript->get_all_Exons};
   for (my $i=0; $i<=$#exons; $i++ ){
     if ( $exons[$i]->start == $exon->start 
@@ -1465,7 +1464,7 @@ sub get_previous_Exon{
   my ($self, $transcript, $exon ) = @_;
     
   # this order the exons 5' to 3'
-  $transcript->sort;
+  
   my @exons = @{$transcript->get_all_Exons};
   
   for (my $i=0; $i<=$#exons; $i++ ){
