@@ -65,7 +65,7 @@ use Bio::EnsEMBL::Analysis;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome pfetch); 
-use Bio::PrimarySeq;
+use Bio::PrimarySeqI;
 use Bio::SeqIO;
 
 use Data::Dumper;
@@ -82,7 +82,7 @@ sub _initialize {
 						   'FEATURES'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeq") unless $genomic->isa("Bio::PrimarySeq");
+    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if $genomic; 
 
@@ -121,7 +121,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
+        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -669,6 +669,9 @@ sub minirun {
 
 sub output {
     my ($self) = @_;
+    if (!defined($self->{_output})) {
+	$self->{_output} = [];
+    }
     return @{$self->{'_output'}};
 }
 
