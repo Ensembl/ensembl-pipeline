@@ -35,7 +35,7 @@ test_RunnableDB
     -runnable  The name of the runnable module we want to run
 
 =cut
-
+$| = 1;
 use strict;
 use Getopt::Long;
 
@@ -93,6 +93,7 @@ my $vc      = new Bio::EnsEMBL::DB::VirtualContig(-focuscontig   => $contig,
 	
 
 $vc->primary_seq;
+
 my @genscan;
 my @exons;
 
@@ -100,7 +101,7 @@ foreach my $f ($vc->get_all_SimilarityFeatures) {
 
   if ($f->source_tag eq "genscan") {
       eval {
-      print ("\n Testing genscan " . $f->id . "\n");
+      print ("\n Testing genscan " . $f->id . "\t" . $f->seqname . "\n");
       my @tmpexons = test_genscan($f,$vc);
 
       push(@exons,@tmpexons);
@@ -121,7 +122,7 @@ my $wvc    = new Bio::EnsEMBL::DB::WriteableVirtualContig(-focuscontig   => $con
 
 
 foreach my $exon (@exons) {
-   print ("\nReverse mapping " . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\n");
+   print ("\nReverse mapping " . $exon->id . "\t" . $exon->seqname . "\t" . $exon->start . "\t" . $exon->end . "\n");
 
    my @newexons  = $wvc->_reverse_map_Exon($exon);
 
@@ -148,6 +149,7 @@ sub test_genscan {
     # make an exon for the writeback test
     my $exon = new Bio::EnsEMBL::Exon;
     $exon->id($gs->id . ".$count");
+    $exon->seqname($gs->seqname);
     $exon->start ($f->start);
     $exon->end   ($f->end);
     $exon->strand($f->strand);
