@@ -295,14 +295,28 @@ GENE:
     print STDERR "($single single exon genes NOT thrown away)\n";
 
     # process transcripts in the forward strand
+    #my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
     if( scalar(@plus_transcripts) ){
-      
+
       my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
       
       # make a genomewise runnable for each cluster of transcripts
 
       foreach my $tran (@transcripts){
-	
+	print STDERR "In EST_GeneBuilder, creating a Runnable::MiniGenomewise for\n";
+	my $excount = 0;
+	foreach my $exon ($tran->get_all_Exons){
+	  $excount++;
+	  #$exon_adaptor->fetch_evidence_by_Exon($exon);
+	  my @evi = $exon->each_Supporting_Feature;
+	  print STDERR "Exon: $excount, ".scalar(@evi)." features\t"
+	    ."start: ".$exon->start." end: ".$exon->end."\n";
+	  foreach my $evi (@evi){
+	    print STDERR $evi." - ".$evi->gffstring."\n";
+	  }
+	}
+
+
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $contig->primary_seq,
 									   );
@@ -511,7 +525,7 @@ sub _check_Transcripts {
       }
 
       # get the supporting_evidence for each exon
-      $exon_adaptor->fetch_evidence_by_Exon($exon);
+      #$exon_adaptor->fetch_evidence_by_Exon($exon);
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
       my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
             
@@ -806,21 +820,21 @@ sub _cluster_Transcripts{
   }
 
   ## print out the clusters
-  my $number  = 1;
-  foreach my $cluster (@clusters){
-    my $count = 1;
-    print STDERR "cluster $number :\n";
-    foreach my $tran ($cluster->get_Transcripts){
-      print STDERR "$count:\n";
-      print STDERR $tran->dbID." >";
-      foreach my $exon ( $tran->get_all_Exons ){
-	print STDERR $exon->start.":".$exon->end." ";
-      }
-      print STDERR "\n";
-      $count++;
-    }
-    $number++;
-  }		
+  #my $number  = 1;
+  #foreach my $cluster (@clusters){
+  #  my $count = 1;
+  #  print STDERR "cluster $number :\n";
+  #  foreach my $tran ($cluster->get_Transcripts){
+  #    print STDERR "$count:\n";
+  #    print STDERR $tran->dbID." >";
+  #    foreach my $exon ( $tran->get_all_Exons ){
+  #	print STDERR $exon->start.":".$exon->end." ";
+  #    }
+  #    print STDERR "\n";
+  #    $count++;
+  #  }
+  #  $number++;
+  #}		
   
   return @clusters;
 }
@@ -1321,18 +1335,24 @@ sub _produce_Transcript{
   # we turn each cluster into an exon and create a new transcript with these exons
   my $transcript    = Bio::EnsEMBL::Transcript->new();
   my @exon_clusters = $cluster_list->sub_SeqFeature;
-  
+  my $exon_adaptor  = $self->dbobj->get_ExonAdaptor;
+
   foreach my $exon_cluster (@exon_clusters){
     my $new_exon = Bio::EnsEMBL::Exon->new();
     $new_exon->start ($exon_cluster->start);
     $new_exon->end   ($exon_cluster->end);
     
     ###  dont't set strand yet, genomewise cannot handle that ###
-    # shall we pout it to 1 anyway, so that minigenomewise does not complain?
+    # we put it to 1 anyway, so that minigenomewise does not complain?
+    # the real strand will be dealt with in the run method
     $new_exon->strand(1);
 
     foreach my $exon ( $exon_cluster->sub_SeqFeature ){
+      #if ( $exon->dbID ){
+      #$exon_adaptor->fetch_evidence_by_Exon($exon);
+      #}
       foreach my $evidence ( $exon->each_Supporting_Feature ){
+	#print STDERR "adding evidence: ".$evidence." - ".$evidence->gffstring."\n";
 	$new_exon->add_Supporting_Feature($evidence);
       }
     }
@@ -1574,6 +1594,13 @@ CLUSTER:
     # take the most common start (note that we do not resolve ambiguities here)
     # at some point we could resolve them by checking for the splice site consensus sequence
 
+    ## test:
+    #print STDERR "starts: ";
+    #foreach my $s (@starts){
+    #  print STDERR $s."\t";
+    #}
+    #print STDERR "\n";
+
     $new_start = shift( @starts );
     $max_start = $start{ $new_start };
 
@@ -1608,11 +1635,20 @@ CLUSTER:
 
     # take the most common end (note that we do not resolve ambiguities here)
 
+    ## test:
+    #print STDERR "ends: ";
+    #foreach my $e (@ends){
+    #  print STDERR $e."\t";
+    #}
+    #print STDERR "\n";
+
+
     $new_end = shift( @ends );
     $max_end = $end{ $new_end };
     
    # if we have too little exons to obtain the end, take the original value
     if ( $max_end == 0 ){
+      print STDERR "In last position, cluster end wins!\n";
       $new_end = $cluster->end;
     }
     
@@ -1641,7 +1677,7 @@ CLUSTER:
     my $trouble     = 0;
 
     while ( $other_start >= $other_end ){
- #     print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+      #print STDERR "*** Trouble: $new_start >= $new_end ***\n";
       $trouble = 1;
 
       # take the next one
@@ -1655,18 +1691,20 @@ CLUSTER:
       if ($other_end && $other_start){
 	$new_start = $other_start;
 	$new_end   = $other_end;
-#	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+	#print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
       }
       else{
-	# ok, you tried to change, but you got nothing, what can we do about it?
-#	print STDERR "Could not reset the start and end coordinates\n";
+	## ok, you tried to change, but you got nothing, what can we do about it?
+	#print STDERR "Could not reset the start and end coordinates\n";
       }
     }
 
     # reset the cluster start (that's the coordinate used in _produce_Transcript() )
+    #print STDERR "reseting cluster start to: $new_start\n";
     $cluster->start($new_start);
 
     # reset the cluster end (that's the coordinate used in _produce_Transcript() )
+    #print STDERR "reseting cluster end to: $new_end\n";
     $cluster->end($new_end);
     
   }
@@ -2118,7 +2156,6 @@ sub make_genes {
 
     # sort the exons 
     $transcript->sort;
-    my $excount = 1;
     my @exons = $transcript->get_all_Exons;
 
     # at this point, only accepts transcripts with more than one exon
@@ -2129,6 +2166,8 @@ sub make_genes {
       next TRANSCRIPT;
     }
     
+    print STDERR "In _make_genes():\n";
+    my $excount = 1;
   EXON:
     foreach my $exon(@exons){
       
@@ -2139,8 +2178,23 @@ sub make_genes {
       
       # if strand = -1 we have inverted the contig, thus
       $exon->strand(1);
-      $excount++;
       # when the gene gets stored, the strand is flipped automatically
+
+      ## test the supporting evidence
+      #my @evi = $exon->each_Supporting_Feature;
+      #print STDERR "Exon: $excount ".scalar(@evi)." features\t"
+      #."start: ".$exon->start." end: ".$exon->end."\n";
+      #if( @evi ){
+      #  foreach my $evi (@evi){
+      #	  print STDERR $evi." - ".$evi->gffstring."\n";
+      #print STDERR $evi
+      #	    ." - start: ".$evi->start. " end: ."$evi->end." hstart: "$evi->hstart." hend: ".$evi->hend."\n";
+      #}
+      #}
+      #else{
+      #print STDERR "No supporting evidence\n";
+      #}
+      $excount++;
     }
 
     #put temporary_id (this hasn't been put in neither Genomewise nor MiniGenomewise
@@ -2212,25 +2266,48 @@ sub remap_genes {
   if ( $strand == -1 ){
     $contig = $contig->invert;
   }
-
+  
   my @newf;
   my $trancount=1;
   foreach my $gene (@$genes) {
-    #test2
     my @trans = $gene->each_Transcript;
+    my $newgene;
+    
+    # convert to raw contig coords
     eval {
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      
       # need to explicitly add back genetype and analysis.
       $newgene->type($gene->type);
       $newgene->analysis($gene->analysis);
-
       push(@newf,$newgene);
       
     };
     if ($@) {
       print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
     }
-  } 
+    
+    ### check that supporting evidence has been preserved:
+    #foreach my $tran ( $newgene->each_Transcript ){
+    #  print STDERR "after convert_to_raw_contig:\n";
+    #  my $excount = 0;
+    #  foreach my $exon ( $tran->get_all_Exons ){
+    #  $excount++;
+    #  my @evi = $exon->each_Supporting_Feature;
+    #  print "Exon $excount: ".scalar(@evi)." features\t"
+    #  ."start: ".$exon->start." end: ".$exon->end."\n";
+    #  if ( @evi ){
+    #   foreach my $evi (@evi){
+    #    print STDERR $evi." - ".$evi->gffstring."\n";
+    #   }
+    #  }
+    #  else{
+    #   print STDERR "No supporting evidence\n";
+    #  }
+    # }
+    #}
+
+  }
   return @newf
 }
 
