@@ -78,7 +78,7 @@ my $accumulators = 1; #these two options are on as default but that can
 my $db_sanity = 1; #be switched off by sticiking no infront of the 
                    #standard command line options (see GetOpts long docs)
 my $help;
-my $delete_on_retry = 0;
+my $rename_on_retry = 0;
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -102,7 +102,7 @@ GetOptions(
     'killed_file=s' => \$killed_file,
     'queue_manager=s' => \$queue_manager,	   
     'h|help'	    => \$help,
-    'delete_on_retry!' => \$delete_on_retry,	   
+    'rename_on_retry!' => \$rename_on_retry,	   
 ) or useage();
 
 if(!$dbhost || !$dbname || !$dbuser){
@@ -495,12 +495,17 @@ sub run_if_new {
 
             if ($cj->analysis->dbID == $anal->dbID) {
                 if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
-		  if($delete_on_retry){
+		  if($rename_on_retry){
 		    if( -e $cj->stdout_file ) { 
-		      unlink( $cj->stdout_file ) 
+		      my $cmd = "mv ".$cj->stdout_file." ".$cj->stdout_file.
+			".retry.".$cj->retry_count;
+		      system($cmd);
+ 
 		    }
 		    if( -e $cj->stderr_file ) {
-		      unlink( $cj->stderr_file ) 
+		      my $cmd = "mv ".$cj->stderr_file." ".$cj->stderr_file.
+			".retry.".$cj->retry_count;
+		      system($cmd);
 		    }
 		  }
                     $cj->batch_runRemote;
