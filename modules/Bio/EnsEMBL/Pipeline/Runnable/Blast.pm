@@ -168,7 +168,7 @@ sub run {
 
     #parse output and create features
     $self->parse_results();
-    #$self->deletefiles();
+    $self->deletefiles();
   }
 
 =head2 run_analysis
