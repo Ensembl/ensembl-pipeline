@@ -174,6 +174,8 @@ sub run {
     #parse output of ssaha
     $self->parse_results();
     $self->deletefiles();
+
+    1;
 }
 
 sub run_ssaha {

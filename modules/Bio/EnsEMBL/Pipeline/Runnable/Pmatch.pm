@@ -57,6 +57,8 @@ sub run{
    $self->run_analysis;
    $self->parse_results;
    $self->deletefiles;
+
+   1;
 }
 
 
