@@ -173,10 +173,10 @@ sub write_output {
 
 	# get that number of ids. This locks the database
 
-	@geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	@transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	@translids =  $gene_obj->get_New_external_id('translation',$TRANSLATION_ID_SUBSCRIPT,$translcount);
-	@exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
+	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
+	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
+	my @translids =  $gene_obj->get_New_external_id('translation',$TRANSLATION_ID_SUBSCRIPT,$translcount);
+	my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
 
 	# database locks are over.
 
