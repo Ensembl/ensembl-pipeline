@@ -249,13 +249,6 @@ sub parse_Header {
 
     if ($id =~ /^(.*)\|(.*)\|(.*)/) {
         if ($2 eq "UG") {
-#
-# scp - to be tested. for correct parsing of unigene IDs
-# the identifier we actually want is towards the end of the header
-# (err?!) prefixed by "/ug="
-# instead of "$name = $3", need something like...
-#        ($newid) = $id =~ m{/ug=(.*?)\ };
-#
           $newid = $3;
         } else {
 	  $newid = $2;
@@ -425,122 +418,55 @@ sub print_FeaturePair {
 =head2 get_Sequence
 
   Title   : get_Sequence
-  Usage   : my @ids = get_Sequence(@id)
-  Function: Fetches all sequences with ids in the array
-  Returns : ref to hash of Bio::PrimarySeq keyed by id
+  Usage   : my $seq = get_Sequence($id)
+  Function: Fetches sequences with id $id
+  Returns : Bio::PrimarySeq
   Args    : none
 
 =cut
 
 sub get_Sequence {
-    my ($self,@id) = @_;
+    my ($self,$id) = @_;
+    my $seq;
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
-
-ID:    foreach my $id (@id) {
-
-	if (defined($self->{_seq_cache}{$id})) {
-	    return $self->{_seq_cache}{$id};
-	} 
-
-	my $newid = $self->parse_Header($id);
-
-	next ID unless defined($newid);
-	print(STDERR "New id :  is $newid [$id]\n");
-
-	open(IN,"pfetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
-
-	my $seq;
-	
-	while (<IN>) {
-	    chomp;
-	    $seq .= $_;
-	}
-	
-	if (!defined($seq) || $seq eq "no match") {
-	    open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
-           
-	   $seq = "";
-	    
-	    while (<IN>) {
-		chomp;
-		$seq .= $_;
-	    }
-	}
-
-	if (!defined($seq)) {
-	    $self->throw("Couldn't find sequence for $newid [$id]");
-	}
+    if (defined($self->{_seq_cache}{$id})) {
+      return $self->{_seq_cache}{$id};
+    } 
     
-	$seq = new Bio::PrimarySeq(-id  => $newid,
-				      -seq => $seq);
-	
-	$self->{_seq_cache}{$id} = $seq;
+    $seq = $seqfetcher->run_pfetch($id);
+    
+    if (!defined($seq)) {
+      # try efetch
+      $seq = $seqfetcher->run_efetch($id);
+    }    
 
-	return $seq;
+    if (!defined($seq)) {
+      $self->throw("Couldn't find sequence for [$id]");
     }
+    
+    return $seq;
 }
+
+=head2 get_all_Sequences
+
+  Title   : get_all_Sequences
+  Usage   : my $seq = get_all_Sequences(@id)
+  Function: Fetches sequences with ids in @id
+  Returns : nothing, but $self->{_seq_cache}{$id} has a Bio::PrimarySeq for each $id in @id
+  Args    : array of ids
+
+=cut
 
 sub get_all_Sequences {
     my ($self,@id) = @_;
 
-    my $seqstr;
-    my @newid;
-
-    foreach my $id (@id) {
-	my $newid = $self->parse_Header($id);
-	push(@newid,$newid);
-
-	print(STDERR "New id is $newid [$id]\n");
-
-	$seqstr .= $newid . " ";
+ SEQ: foreach my $id (@id) {
+    my $seq = $self->get_Sequence($id);
+    if(defined $seq) {
+      $self->{_seq_cache}{$id} = $seq;
     }
-
-    open(IN,"pfetch -q $seqstr |") || $self->throw("Error fetching sequence for id [$seqstr]");
-	
-    my $count = 0;
-    foreach my $id (@id) {
-	my $seq = <IN>;
-	chomp($seq);
-	if ($seq ne "no match") {
-	    $self->{_seq_cache}{$id} = new Bio::PrimarySeq(-seq => $seq,
-							   -id  => $newid[$count]);
-	}
-	$count++;
-    }
-	
-    SEQ: foreach my $id (@id) {
-	my $seq   = $self->{_seq_cache}{$id};
-
-	next SEQ unless !defined($seq);
-	
-
-	my $newid = $self->parse_Header($id);
-
-	next SEQ unless defined($newid);
-	next SEQ if $newid eq "";
-	print(STDERR "New id :$newid:$id\n");
-
-	open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
-	    
-	$seq = "";
-	    
-	while (<IN>) {
-	    chomp;
-	    $seq .= $_;
-	}
-	
-	if (!defined($seq)) {
-	    $self->warn("Couldn't find sequence for $newid [$id]");
-	}
-	
-	$seq = new Bio::PrimarySeq(-id  => $newid,
-				      -seq => $seq);
-
-	print("Found seq for $id  $seq\n");
-
-	$self->{_seq_cache}{$id} = $seq;
-    }
-
+  }
 }
 
 =head2 run
