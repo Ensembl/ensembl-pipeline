@@ -80,26 +80,19 @@ while (<RNA>){
   if ($clip){
     
     my $length = length($seq);
-    print STDERR "seq length: $length\n";
-
+   
     # is it a polyA or polyT?
     my $check_polyT = substr( $seq, 0, 10 );
 
     my $check_polyA = substr( $seq, -10 );
         
     my $t_count = $check_polyT =~ tr/Tt//;
-    print STDERR "$t_count Ts in head\n";
-    print STDERR "head: $check_polyT\n";
-    
     my $a_count = $check_polyA =~ tr/Aa//;
-    print STDERR "$a_count As in tail\n";
-    print STDERR "tail: $check_polyA\n";
-
+    
 
     #### polyA ####
     if ( $a_count >= 7 && $a_count > $t_count ){
            
-      print STDERR "clipping PolyA tail:\n";
       # we calculate the number of bases we want to chop
       my $length_to_chop = 0;
       
@@ -109,14 +102,11 @@ while (<RNA>){
       # take 3 by 3 bases from the end
       while( $length_to_chop < $length ){
 	my $chunk  = substr( $seq, ($length - ($length_to_chop + 3)), $piece);
-	print STDERR "chunk: $chunk\n";
 	$count = $chunk =~ tr/Aa//;
 	if ( $count >= 2*( $piece )/3 ){
 	  $length_to_chop += 3;
-	  print STDERR "continue\n";
 	}
 	else{
-	  print STDERR "last\n";
 	  last;
 	}
       }
@@ -141,14 +131,11 @@ while (<RNA>){
       # take 3 by 3 bases from the beginning
       while ( $length_to_chop < $length ){
 	my $chunk = substr( $seq, $length_to_chop + 3, $piece );
-	print STDERR "chunk ".( $length_to_chop + 3)." : $chunk\n";
 	$count = $chunk =~ tr/Tt//;
 	if ( $count >= 2*( $piece )/3 ){
 	  $length_to_chop +=3;
-	  print STDERR "continue\n";
 	}
 	else{
-	  print STDERR "last\n";
 	  last;
 	  
 	}
