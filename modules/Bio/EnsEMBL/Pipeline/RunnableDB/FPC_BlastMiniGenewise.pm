@@ -154,9 +154,9 @@ sub write_output {
     #print STDERR "Contig        : " . $slice->id . " \n";
     #print STDERR "Length is     : " . $genseq->length . "\n\n";
     
-    my @genes     = @{$slice->get_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+    my @genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
     #print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
-
+    
     foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       
       print STDERR "Fetching features for " . $database->{'type'} . 
@@ -467,6 +467,8 @@ sub validate_transcript {
   my $valid = 1;
   my $split = 0;
 
+  
+
   # check coverage of parent protein
   my $coverage  = $self->check_coverage($transcript);
   if ($coverage < $GB_SIMILARITY_COVERAGE){
@@ -477,8 +479,7 @@ sub validate_transcript {
   #  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
   
   # check for stops in translation
-  my $translates = $self->check_translation($transcript);
-  if(!$translates){
+  unless(Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript)){
     $self->warn("discarding transcript - translation has stop codons\n");
     return undef;
   }
@@ -492,25 +493,38 @@ sub validate_transcript {
   }
 
   my $previous_exon;
-  foreach my $exon(@{$transcript->get_all_Exons}){
+  my @exons = @{$transcript->get_all_Exons};
+  foreach my $exon( @exons ){
     if (defined($previous_exon)) {
-      my $intron;
       
+      # check phase consistency
+      if ( $previous_exon ){
+	my $end_phase = $previous_exon->end_phase;
+	my $phase     = $exon->phase;
+	if (  $end_phase != $phase ){
+	  $self->warn("rejecting transcript with inconsistent phases ($phase - $end_phase) ");
+	  return undef;
+	}
+      }
+      
+      # check intron size
+      my $intron;
       if ($exon->strand == 1) {
 	$intron = abs($exon->start - $previous_exon->end - 1);
-      } else {
+      } 
+      else {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-# this isn't really working - it's letting through too many genes with long introns  - replace 
-# it with a simple split for the moment
-
-#      if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
-#	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
-#	$split = 1;
-#	$valid = 0;
-#      }
- 
+      # this isn't really working - it's letting through too many genes with long introns  - replace 
+      # it with a simple split for the moment
+      
+      #      if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
+      #	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
+      #	$split = 1;
+      #	$valid = 0;
+      #      }
+      
       if ( $intron > $GB_SIMILARITY_MAX_INTRON ) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->dbID . "\n";
 	$split = 1;
@@ -617,6 +631,7 @@ EXON:   foreach my $exon(@{$transcript->get_all_Exons}){
     
     if ($intron > $GB_SIMILARITY_MAX_INTRON) {
       $curr_transcript->translation->end_Exon($prev_exon);
+      
       # need to account for end_phase of $prev_exon when setting translation->end
       $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
       
@@ -638,7 +653,7 @@ EXON:   foreach my $exon(@{$transcript->get_all_Exons}){
       } elsif ($exon->phase == 2) {
 	$t->translation->start(2);
       }
-
+      
       # start exon always has phase 0
       $exon->phase(0);
 
@@ -688,41 +703,6 @@ EXON:   foreach my $exon(@{$transcript->get_all_Exons}){
   return \@final_transcripts;
 
 }
-
-=head2 check_translation
-
- Title   : check_translation
- Usage   :
- Function: 
- Example :
- Returns : 1 if transcript translates with no stops, otherwise 0
- Args    :
-
-
-=cut
-
-sub check_translation {
-  my ($self, $transcript) = @_;
-  my $tseq;
-
-  eval{
-    $tseq = $transcript->translate;
-  };
-
-  if((!defined $tseq) || ($@)){
-    my $msg = "problem translating :\n$@\n";
-    $self->warn($msg);
-    return 0;
-  }
-
-  if ($tseq->seq =~ /\*/ ) {
-    return 0;
-  }
-  else{
-    return 1;
-  }
-}
-
 
 =head2 check_coverage
 
