@@ -273,34 +273,41 @@ sub get_Genewises {
  Args    : none
 
 =cut
-
+  
 sub get_Predictions {
-   my ($self) = @_;
-
-    my $contig = $self->contig;
-
-    my @tmp;
+  my ($self) = @_;
+  
+  my $contig = $self->contig;
+  
+  my @tmp;
+  
+  my @preds;
+  my @more_preds;
+  if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
+    @preds = $self->contig->get_all_PredictionFeatures;
+  } 
+  else {
+    # VAC use StaticContig, not Virtual::Contig - off by ones.
     
-   my @preds;
-   if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
-     @preds = $self->contig->get_all_PredictionFeatures;
-   } else {
-     # VAC use StaticContig, not Virtual::Contig - off by ones.
-     @preds = Bio::EnsEMBL::Virtual::Contig::get_all_PredictionFeatures($self->contig);
-     #@preds = $self->contig->get_all_PredictionFeatures();
-   }
-    my @genscan;
-
-    foreach my $f (@preds) {
-        my $fset = $self->set_phases($f,$contig);
-
-      if (defined($fset)) {
-	push(@genscan,$fset);
-      }
-      
+    print STDERR "getting genscans with a contig\n";
+    @preds = Bio::EnsEMBL::Virtual::Contig::get_all_PredictionFeatures($self->contig);
+    
+    #print STDERR "getting genscans with a static contig\n";
+    #@more_preds = $self->contig->get_all_PredictionFeatures();
+  }
+  
+  print STDERR "get_Predictions(): got ".scalar(@preds)." predictions from contig\n";
+  #print STDERR "get_Predictions(): got ".scalar(@more_preds)." predictions from static contig\n";
+  
+  my @genscan;
+  
+  foreach my $f (@preds) {
+    my $fset = $self->set_phases($f,$contig);
+    if (defined($fset)) {
+      push(@genscan,$fset);
     }
-
-    $self->genscan(@genscan);
+  }
+  $self->genscan(@genscan);
 }
 
 =head2 get_Similarities
@@ -374,8 +381,6 @@ sub get_Similarities {
 	  }
       }
     }
-
-
     $self->feature (@features);
 }
    
@@ -1883,7 +1888,7 @@ sub set_phases {
     eval {
       my $strand;
       my $mrna     = "";
-    
+      
       $fset->attach_seq($self->contig->primary_seq);
 
       my @subf = $fset->sub_SeqFeature;
@@ -1908,7 +1913,8 @@ sub set_phases {
 	  $ex->{'_3splice'} = $splice3;
 	  $ex->{'_5splice'} = $splice5;
 
-	} else {
+	} 
+	else {
 
 	  my $splice3 = $self->contig->primary_seq->subseq($ex->start-2,$ex->start-1);
 	  my $splice5 = $self->contig->primary_seq->subseq($ex->end+1  ,$ex->end+2);
@@ -1920,9 +1926,9 @@ sub set_phases {
 	  $ex->{'_5splice'} = $splice5->revcom->seq;
 
 	}
-#	print STDERR "Splice seq 5'/3' -2 to +2 " . $ex->{'_5splice'} . " " .  $ex->{'_3splice'} . "\n";
-#	print STDERR "Exon ends  5'/3'          " . $self->contig->primary_seq->subseq($ex->start-5,$ex->start) . " " .
-#	  $self->contig->primary_seq->subseq($ex->end,$ex->end + 5) . "\n";
+	#print STDERR "Splice seq 5'/3' -2 to +2 " . $ex->{'_5splice'} . " " .  $ex->{'_3splice'} . "\n";
+	#print STDERR "Exon ends  5'/3'          " . $self->contig->primary_seq->subseq($ex->start-5,$ex->start) . " " .
+	#  $self->contig->primary_seq->subseq($ex->end,$ex->end + 5) . "\n";
 	
 	push(@nrf,$ex);
       
@@ -1965,23 +1971,25 @@ sub set_phases {
       my  $i = 0;
       my  $found = -1;
 
-# does this actually do anything?
-
-      while ($i < 3) {
-	my $pep = new Bio::Seq(-seq => $cdna);
-	my $seq = $pep->translate('*','X',$i)->seq;
-
-	$seq =~ s/\*$//;
-
-	$i++;
-      }
+      ## does this actually do anything?
+      #while ($i < 3) {
+      #	my $pep = new Bio::Seq(-seq => $cdna);
+      #	my $seq = $pep->translate('*','X',$i)->seq;
+      #
+      #	if ( $seq =~ /\*/ ){
+      #	  print STDERR "removing stop codon in frame $i\n";
+      #	}
+      #	$seq =~ s/\*$//;
+      #
+      # $i++;
+      #}
 
       my $transcript = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($fset,$self->contig);
       my $seq        = $transcript->translate->seq;
 
       $seq =~ s/(.{72})/$1\n/g;
 
-#      print "\nFinal translation is \n\n$seq\n\n";
+      #print "\nFinal translation is \n\n$seq\n\n";
 
       
     };
@@ -2604,8 +2612,8 @@ sub prune_gene {
 # better way? hold both total exon length and length of translateable exons. Then sort:
 # long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
 
-
-  # eae: let's try whether this sorting is equivalent:
+  
+  # eae: Notice that this sorting:
   my @sordid_transcripts =  sort { my $result = ( 
 						 $tran2orf{ $b }
 						 <=> 
@@ -2619,8 +2627,13 @@ sub prune_gene {
 				   }
 				 } @transcripts;
 
+  # is only equivalent to the one used below when all transcripts have UTRs. 
+  # The one below is actually the desired behaviour.
+  # since we want long UTRs and long ORFs but the sorting must be fuzzy in the sense that we want to give priority 
+  # to a long ORF with UTR over a long ORF without UTR which is only slightly longer.
+
   #test
-  print STDERR "1.- sorted transcripts:\n";
+  print STDERR "1.- sordid transcripts:\n";
   foreach my $tran (@sordid_transcripts){
     print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
   }
@@ -2705,6 +2718,13 @@ sub prune_gene {
     my @exons = $tran->get_all_Exons;
     $tran->sort;
 
+    #print STDERR "\ntranscript: ".$tran->{'temporary_id'}."\n";
+    #foreach my $exon ( @exons ){
+    #  print STDERR $exon->start."-".$exon->end." ";
+    #}
+    #print STDERR "\n";
+
+    
     my $i     = 0;
     my $found = 1;
     
@@ -2797,7 +2817,8 @@ sub prune_gene {
       #print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
       push(@newtran,$tran);
       @evidence_pairs = ();
-    } else {
+    } 
+    else {
       print STDERR "\n\nTranscript already seen " . $tran->{'temporary_id'} . "\n";
       
       ## transfer supporting feature data. We transfer it to exons
@@ -2808,10 +2829,15 @@ sub prune_gene {
 	my $source_exon = $pair[0];
 	my $target_exon = $pair[1];
 
-	print STDERR "transferring evi from ".
-	  $source_exon->{'temporary_id'}." in transcript @{ $exon2transcript{ $source_exon } } ".
-	    "to ".$target_exon->{'temporary_id'}." in transcript @{ $exon2transcript{ $target_exon } }\n";
-	
+	print STDERR "transferring evi from exon ".$source_exon->{'temporary_id'}." in transcript ";
+	foreach my $tran ( @{ $exon2transcript{ $source_exon } } ){
+	  print STDERR $tran->{'temporary_id'}." ";
+	}
+	print STDERR "to exon ".$target_exon->{'temporary_id'}." in transcript ";
+	foreach my $tran ( @{ $exon2transcript{ $target_exon } } ){
+	  print STDERR $tran->{'temporary_id'}." ";
+	}
+	print STDERR "\n";
 	$self->transfer_supporting_evidence($source_exon, $target_exon)
       }
     }
@@ -3035,7 +3061,6 @@ my @e = $transcript->get_all_Exons;
  Function: Transfers supporting evidence from source_exon to target_exon, 
            after checking the coordinates are sane and that the evidence is not already in place.
  Returns : nothing, but $target_exon has additional supporting evidence
- Args    : Bio::EnsEMBL::Transcript
 
 =cut
 
@@ -3061,7 +3086,7 @@ sub transfer_supporting_evidence{
     
     # skip duplicated evidence 
     if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
-      print STDERR "Skipping duplicated evidence\n";
+      #print STDERR "Skipping duplicated evidence\n";
       next SOURCE_FEAT;
     }
 
@@ -3078,12 +3103,12 @@ sub transfer_supporting_evidence{
 	 $feat->hstart   == $tsf->hstart &&
 	 $feat->hend     == $tsf->hend){
 	
-	print STDERR "feature already in target exon\n";
+	#print STDERR "feature already in target exon\n";
 	next SOURCE_FEAT;
       }
     }
-    print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
-    $self->print_FeaturePair($feat);
+    #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
+    #$self->print_FeaturePair($feat);
     $target_exon->add_Supporting_Feature($feat);
     $unique_evidence{ $feat } = 1;
     $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
