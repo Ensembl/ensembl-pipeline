@@ -149,7 +149,7 @@ sub new{
       $self->restrict_external_splice($restrict_external_splice_site);
   }
 
-  $self->verbose(1);
+  $self->verbose(0);
 
   return $self;  
 }
