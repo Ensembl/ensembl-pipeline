@@ -264,24 +264,17 @@ sub fetch_input {
 	    my $exons = $transcript->get_all_Exons;
 	    if(scalar(@$exons) == 1){
 		$single++;
-		# if you change your mind...
-		#next GENE;
 	    }
 	    
 	    # keep only genes in the forward strand
 	    if ($exons->[0]->strand == 1){
 		push (@forward_transcripts, $transcript );
-		# ...take a chance on this
-		#if ( scalar( @forward_transcripts ) > 50 ){
-		#    last GENE;
-		#}
 	    }
 	}
     }
     
     print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@forward_transcripts) . " forward strand genes\n";
-    print STDERR "($single single exon genes THROWN away)\n";
-
+    
     # process transcripts in the forward strand
     
     if( scalar(@forward_transcripts) ){
@@ -320,26 +313,20 @@ sub fetch_input {
     $single=0;
   REVGENE:    
     foreach my $gene (@$revgenes) {
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	
-	my @exons = @{$transcript->get_all_Exons};
-	
-	# DON'T throw away single-exon genes
-	if(scalar(@exons) == 1){
-	    $single++;
-	    # if you change your mind...
-	    #next REVGENE;
+	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	    
+	    my @exons = @{$transcript->get_all_Exons};
+	    
+	    # DON'T throw away single-exon genes
+	    if(scalar(@exons) == 1){
+		$single++;
+	    }
+	    
+	    # these are really - strand, but the Slice is reversed, so they are relatively + strand
+	    if( $exons[0]->strand == 1){
+		push (@reverse_transcripts, $transcript);
+	    }
 	}
-	
-	# these are really - strand, but the Slice is reversed, so they are relatively + strand
-	if( $exons[0]->strand == 1){
-	  push (@reverse_transcripts, $transcript);
-	  # ...take a chance on this
-	  #if ( scalar( @minus_transcripts ) > 50 ){
-	  #    last REVGENE;
-	  #}
-	}
-      }
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@reverse_transcripts) . " reverse strand genes\n";
     print STDERR "($single single exon genes THROWN away)\n";
@@ -1008,10 +995,12 @@ sub check_splice_sites{
   unless ( $introns == $other + $correct ){
     print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
   }
-  if ( $other > $correct ){
+  if ( $other ){
+      print STDERR "rejecting for having non-canonical splice-sites\n" if $verbose;
       return  0;
   }
   else{
+      #print STDERR "accepting\n" if $verbose;
       return 1;
   }
 }
