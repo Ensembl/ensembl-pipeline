@@ -459,7 +459,7 @@ sub calculate_and_set_phases {
     #Sharp, P.A. (1981). Speculations on RNA splicing
     #Cell 23:643-46
 
-    for (my $index=0; $index < scalar(@genes); $index++)
+    GENE: for (my $index=0; $index < scalar(@genes); $index++)
     {
         my $peptide = $peptides[$index];
         #$genes[$index]->attach_seq ($self->clone()); 
@@ -497,8 +497,10 @@ sub calculate_and_set_phases {
                 last;
             }
         }
-        $self->throw("Translation (".$exons[0]->seqname.") not found in genscan peptide\n$peptide\n")
-                    unless ($translation_found);
+	unless ($translation_found) {
+            $self->warn("Translation (".$exons[0]->seqname.") not found in genscan peptide\n$peptide\n");
+	    next GENE;
+	}
     }
 }
 
