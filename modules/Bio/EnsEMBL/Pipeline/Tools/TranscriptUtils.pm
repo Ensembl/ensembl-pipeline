@@ -56,15 +56,13 @@ use Bio::EnsEMBL::PredictionTranscript;
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
-
-# note - intron lengths now checked separately using _check_introns
-
 sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
     
     # hardcoded stuff, to go in a config file
     my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
+    my $MAX_INTRON_LENGTH = 200000;
     
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
@@ -73,8 +71,8 @@ sub _check_Transcript{
     
     my @exons = @{$transcript->get_all_Exons};
     eval {
-    $strand =  $exons[0]->strand;
-};
+      $strand =  $exons[0]->strand;
+    };
     if ($@) {
 	$self->throw;
     }
@@ -102,7 +100,7 @@ sub _check_Transcript{
     
     if (scalar(@exons) > 1 ) {
 
-      EXON:
+    EXON:
 	for (my $i = 0; $i <= $#exons; $i++) {
 
 	  ##############################
@@ -137,6 +135,28 @@ sub _check_Transcript{
 		    last EXON;
 		}
 	    
+
+	    
+		##############################
+		# check intron length
+		##############################
+		if ( $strand == 1 ){
+		    my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
+		    if ( $intron_length > $MAX_INTRON_LENGTH ){
+			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+			$valid = 0;
+			last EXON;
+		    }
+		}
+		elsif( $strand == -1 ){
+		    my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
+		    if ( $intron_length > $MAX_INTRON_LENGTH ){
+			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+			$valid = 0;
+			last EXON;
+		    }
+		}
+		
 		##############################
 		# check for folded transcripts
 		##############################
@@ -185,6 +205,8 @@ sub _check_Transcript{
     return $valid;
 }
 
+<<<<<<< TranscriptUtils.pm
+=======
 # parameter slice is optional. It makes sense to use it when working on fixed length slices.
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
@@ -272,6 +294,7 @@ sub _check_introns{
   }
 
 
+>>>>>>> 1.40
 ############################################################
 
 # this is a set of checks for transcripts where they are based
@@ -620,7 +643,7 @@ sub split_Transcript{
 
 sub _print_SimpleTranscript{
     my ($self,$transcript,$chr_coord) = @_;
-    my @exons = @{$transcript->get_all_Exons};
+    my @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
     my $id;
     if ($transcript->stable_id){
 	$id = $transcript->stable_id;
@@ -848,13 +871,14 @@ sub _clone_Transcript{
     $newtranscript->add_Exon($newexon);
   }
   #$newtranscript->sort;
-  $newtranscript->dbID($transcript->dbID);
+  #$newtranscript->dbID($transcript->dbID);
   if (defined $transcript->type ){
     $newtranscript->type($transcript->type);
   }
   if ( defined $transcript->stable_id ){
-    $newtranscript->stable_id( $transcript->stable_id );
-  }
+      $newtranscript->stable_id( $transcript->stable_id );
+      $newtranscript->version( $transcript->version );
+  } 
   if ( defined $transcript->translation ){
     $newtranscript->translation($newtranslation);
   }
@@ -1038,7 +1062,10 @@ sub check_splice_sites{
 	next INTRON;
       }
       
-      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
       
@@ -1088,7 +1115,9 @@ sub check_splice_sites{
       ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
       ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
       
-      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+      print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
+	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -1412,24 +1441,12 @@ sub get_previous_Exon{
   }
   return undef;
 }
+
+############################################################
+
+
   
-# calculates and returns ORF length as a percnetage of total transcript length
-sub _get_ORF_coverage {
 
-  my ($self, $transcript) = @_;
-  my $orf_coverage;
-  my $transcript_length = $transcript->length;
-#print STDERR "transcript length: $transcript_length\n";
-
-
-  my $translateable = $transcript->translateable_seq;
-  my $translateable_length = length($translateable);
-#print STDERR "translateable length: $translateable_length\n";
-  $orf_coverage = 100 * ($translateable_length/$transcript_length);
-  print STDERR "orf coverage: $orf_coverage\n";
-  return $orf_coverage;
-
-}
 
 
 1;
