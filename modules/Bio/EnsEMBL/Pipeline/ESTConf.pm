@@ -57,25 +57,28 @@ use vars qw( %ESTConf );
 
 	    # path to run_ESTRunnableDB
 	    EST_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
-	    EST_RUNNER                  => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
-	
+	    EST_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
+	    
 	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
 	    # we use a different on from EST_RUNNER to use different EST_DB's
-	    EST_GENE_RUNNER			=> '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
+	    EST_GENE_RUNNER   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
 	    
 	    # path to ensembl-pipeline/scripts/EST
-	    EST_SCRIPTDIR               => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/EST/', 	    
+	    EST_SCRIPTDIR     => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/EST/',
+
 	    # where the result-directories are going to go
+	    
 	    #EST_TMPDIR                  => '/ecs2/scratch1/ensembl/eae/NCBI_30/cdnas',
-	    EST_TMPDIR => '/acari/scratch4/ensembl/lec/new_out/',
+	    EST_TMPDIR        => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
+	    
 	    # job-queue in the farm
-	    EST_QUEUE                   => 'acari',
+	    EST_QUEUE         => 'acari',
 	    
 	    # make_bsubs.pl options
-	    EST_EXONERATE_BSUBS         => '/acari/work4a/lec/briggsae_sequence/exonerates.dat',
-	    EST_FILTER_BSUBS            => '/acari/work4a/lec/briggsae_sequence/filter_and_e2g.jobs',
-	    EST_GENEBUILDER_BSUBS       => '/acari/work4a/lec/briggsae_sequence/EST_GeneBuilder.jobs',	
-	    
+	    EST_EXONERATE_BSUBS   => '/ecs2/scratch1/ensembl/eae/main_trunk_tests/est_jobs/exonerate.jobs',
+	    EST_FILTER_BSUBS      => '/ecs2/scratch1/ensembl/eae/main_trunk_tests/est_jobs/filter_and_e2g.jobs',
+	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch1/ensembl/eae/main_trunk_tests/est_jobs/EST_GeneBuilder.jobs',
+	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch1/ensembl/eae/main_trunk_tests/est_job/genes2ests.jobs', 
 	    # for prepare_ests.pl
 	    
 	    # path to executable for chunking seqeuncefiles eg fastasplit
@@ -113,11 +116,18 @@ use vars qw( %ESTConf );
 	    # ExonerateESTs options
 	    EST_EXONERATE               => '/usr/local/ensembl/bin/exonerate',      # path to executable
 	    EST_EXONERATE_ARGS          => '',
+	    
+	    # each runnable has an analysis
 	    EST_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs',      
+	    EST_EXONERATE_ANALYSIS     => 'est_exonerate',
 
-	    # FilterESTs_and_E2G options
-	    EST_FILTER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
-	        # Coverage setting for FeatureFilter
+	    EST_FILTER_RUNNABLE        => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
+	    EST_FILTER_ANALYSIS        => 'exonerate_e2g',
+
+	    EST_GENEBUILDER_RUNNABLE   => 'Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder',
+	    EST_GENEBUILDER_ANALYSIS   => 'genomewise',
+
+	    # Coverage setting for FeatureFilter
 	    EST_FEATFILT_COVERAGE       => 10,    
 	        # Minimum score cut-off for FeatureFilter    
 	    EST_FEATFILT_MINSCORE       => 500,                                   
@@ -136,9 +146,8 @@ use vars qw( %ESTConf );
 	    EST_GENEBUILDER_CHUNKSIZE   => 1000000,      #  we use 1000000 (ie 1MB) chunks
 	                                                 # it should be equal to EST_FILTERCHUNKSIZE
 	    EST_GENEBUILDER_INPUT_GENETYPE => 'exonerate_e2g',   
-	    EST_GENOMEWISE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::Genomewise',
-	    EST_GENOMEWISE_GENETYPE     => 'genomewise',
-	    EST_EVIDENCE_TAG            => 'exonerate_e2g',
+	    EST_GENOMEWISE_GENETYPE        => 'genomewise',
+	    EST_EVIDENCE_TAG               => 'exonerate_e2g',
 
 	    EST_MAX_EVIDENCE_DISCONTINUITY => 10,
 	    EST_MAX_INTRON_SIZE => 10000,
@@ -155,30 +164,37 @@ use vars qw( %ESTConf );
             # if you have more than a couple of hundred jobs contacting the same database at the same 
             # time you will need multiple database but ifyou only have a few jobs you will probably be 
 	    # able to get away with only 1 database.
+	    
+	    ############################################################
 	    # ref_db - holds the static golden path, contig and dna information
+	    ############################################################
+	    
 	    EST_REFDBNAME               => 'briggsae_newschema',
 	    EST_REFDBHOST               => 'ecs1b',
 	    EST_REFDBUSER               => 'ensro',
 	    EST_REFDBPASS               => '',
 
 	    EST_GOLDEN_PATH             => 'briggsae_170602',
-
+	    
+	    ############################################################
 	    # est_db = where we load up exonerate results into the feature table
-	    EST_DBNAME                  => 'briggsae_est_newschema',
-	    EST_DBHOST                  => 'ecs1c',
-	    EST_DBUSER                  => 'ensadmin',
-	    EST_DBPASS                  => 'ensembl',
+	    ############################################################
+
+	    EST_DBNAME                  => 'briggsae_cdna_newschema',
+ 	    EST_DBHOST                  => 'ecs1d',
+	    EST_DBUSER                  => 'ensro',
+	    EST_DBPASS                  => '',
 	    
 	    # est_e2g_db = where we write the genes we produce from the exonerate features
 	         # this should be in a different place from the one above
-	    EST_E2G_DBNAME                  => 'briggsae_est_newschema', 
-	    EST_E2G_DBHOST                  => 'ecs1c',
-	    EST_E2G_DBUSER                  => 'ensadmin',
-	    EST_E2G_DBPASS                  => 'ensembl',
+	    EST_E2G_DBNAME                  => 'briggsae_cdna_newschema', 
+	    EST_E2G_DBHOST                  => 'ecs1d',
+	    EST_E2G_DBUSER                  => 'ensro',
+	    EST_E2G_DBPASS                  => '',
 	    
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
-	    EST_GENE_DBNAME                  => 'briggsae_est_newschema',
-	    EST_GENE_DBHOST                  => 'ecs1c',
+	    EST_GENE_DBNAME                  => 'briggsae_cdna_newschema',
+	    EST_GENE_DBHOST                  => 'ecs1d',
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
@@ -203,9 +219,15 @@ use vars qw( %ESTConf );
 	    # gene type to which we are going to map the ests
 	    EST_TARGET_GENETYPE          => 'ensembl',	   
 	   
+
+	    ############################################################
+	    # parameters for the map of expression data. 
+	    # Currently only available for human
+	    ############################################################
+
 	    # set this to 1 if you want to map genes to ests after the genebuild
 	    # this is only for human
-	    MAP_GENES_TO_ESTS            => '1',
+	    MAP_GENES_TO_ESTS            => '0',
 	    
 	    # you can specify here the database (non ensembl schema)
 	    # where the expression database is.
