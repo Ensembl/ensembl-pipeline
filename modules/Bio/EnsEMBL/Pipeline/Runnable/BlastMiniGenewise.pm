@@ -59,7 +59,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_INPUTID_REGEX
 					);
 
-require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -219,7 +218,7 @@ sub run {
 
   my $mg_runnables;
 
-  if ($self->check_repeated){ 
+  if ($self->check_repeated > 0){ 
     $mg_runnables = $self->build_runnables(@features);
   } else {
     my $runnable = $self->make_mmgw($self->genomic_sequence, \@features);
@@ -306,7 +305,7 @@ sub run_blast {
                returns multiple minigenewise runnables that
                examine smaller portions of genomic DNA.
   Returntype : A list of Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise
-  Exceptions : SOME
+  Exceptions : None.
   Caller     : $self->run
 
 =cut
@@ -315,6 +314,12 @@ sub build_runnables {
   my ($self, @features) = @_;
 
   my @mg_runnables;
+
+  my %unfiltered_partitioned_features;
+
+  foreach my $raw_feat (@features){
+      push (@{$unfiltered_partitioned_features{$raw_feat->seqname}}, $raw_feat);
+  }
 
   # We partition the features by protein id such that we can
   # iterate for each protein id.  Most ids  will fall through
@@ -325,25 +330,23 @@ sub build_runnables {
   # likely exons of each individual gene and make small 
   # minigenomic sequences than span just one cluster.
 
-  # Hmm, Im not entirely sure that partitioning the ids is necessary.
-  
   my %partitioned_features;
 
   foreach my $raw_feat (@features){
-    # Imporantly, the features are filtered for low identity matched.
+    # Imporantly, the features are filtered for low identity matches.
     # This is just for the clustering process.  The full set of features
     # are still passed to genewise.
     if($raw_feat->percent_id >= 80){
-      push (@{$partitioned_features{$raw_feat->hseqname}}, $raw_feat);
+      push (@{$partitioned_features{$raw_feat->seqname}}, $raw_feat);
     }
   }
 
-  foreach my $hseqname (keys %partitioned_features){
+  foreach my $seqname (keys %partitioned_features){
 
      # Now, we attempt to cluster our features into groups of
      # similar exons.
 
-     my $clustered_features = $self->cluster_features(\@{$partitioned_features{$hseqname}});
+     my $clustered_features = $self->cluster_features(\@{$partitioned_features{$seqname}});
 
     # We have to do a little test to see if the clusters
     # represent the bulk of the features present in the 
@@ -363,7 +366,7 @@ sub build_runnables {
 	}
       }
 
-      if ($number_of_clustered_features  > (0.9 * (scalar @{$partitioned_features{$hseqname}}))) {
+      if ($number_of_clustered_features  > (0.8 * (scalar @{$partitioned_features{$seqname}}))) {
 	$clusters_seem_real = 1;
       }
     }
@@ -385,10 +388,9 @@ sub build_runnables {
     
     if ((@$clustered_features)&&($clusters_seem_real > 0)) {
 
-      print STDERR "Minigenomic sequence could contain as many as " 
-	. scalar @$clustered_features . " highly similar genes." 
-	  . "  Fragmenting the minigenomic sequence to try to " 
-	    . " resolve these genes individually.\n";
+      print STDERR "Minigenomic sequence could contain a number "
+	. " of highly similar genes.  Fragmenting the minigenomic "
+	  . "sequence to try to resolve these genes individually.\n";
 
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
 
@@ -437,7 +439,7 @@ sub build_runnables {
 	my $genomic_subseq = Bio::Seq->new(-seq => $string_seq,
 					   -id  => $self->genomic_sequence->id );
 
-	my $mmgw = $self->make_mmgw($genomic_subseq, \@features);
+	my $mmgw = $self->make_mmgw($genomic_subseq, $unfiltered_partitioned_features{$seqname});
 
 	push (@mg_runnables, $mmgw);
       }
@@ -446,7 +448,7 @@ sub build_runnables {
       # This is what we do when we dont have multiple genes
       # in our genomic fragment.  This is "Normal mode".
 
-      my $mmgw = $self->make_mmgw($self->genomic_sequence, \@features);
+      my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
 
       push (@mg_runnables, $mmgw);
     }
@@ -486,24 +488,12 @@ sub cluster_features {
   # Sort the list of features according to their percent id.
   my @sorted_features = sort { $b->percent_id <=> $a->percent_id;} @$features;
 
-  # With sorted features, sequentially blast the 
-  # highest scoring hit against the lesser scoring
-  # sequences.  Hits that have high identity are clustered
-  # in an array of features and these hits removed from 
-  # the blast db.  Next, the  remaining highest hit is 
-  # blasted against the remaining lesser scoring hits, and
-  # so on.  If a feature doesn't hit anything it is
-  # discarded.  
-  
-  # NOTE: At the moment each lesser scoring feature is 
-  # separately blasted with the top scoring feature.  If all
-  # features are blasted together at the same time there is
-  # no way to keep track of which feature is which when then
-  # are returned.  This multiple blasting may be slow way of
-  # finding similar features.  An alternative might be to
-  # pad the non-matching nucleotides of a genomic fragment
-  # with Ns - this will still give the right  matches, in a
-  # recognisable coordinate system.  Yuck though.
+  # With the sorted features, we iteratively check each     
+  # highest scoring hit against each lesser scoring
+  # sequence.  Features that correspond to the same part of 
+  # the hit sequence (ie, are overlapping) are clustered
+  # in an array of 'exons' (and removed from the 
+  # sorted_features array). 
   
   my @all_feature_clusters;
   
@@ -515,13 +505,9 @@ sub cluster_features {
     push (@similar_features, $top_feature);
 
     my @subtracted_sorted_features;
-    for(my $i = 0; $i < scalar @sorted_features; $i++) {
-      my $lesser_feature = @sorted_features[$i];
-      
-      my @matched_feature = $self->blast_features($top_feature,
-						  [$lesser_feature]);
-      
-      if ((@matched_feature)&&($matched_feature[0]->percent_id > 95)){
+    foreach my $lesser_feature (@sorted_features) {
+
+      if ($self->check_overlap($top_feature,$lesser_feature)){
 
 	push (@similar_features, $lesser_feature);
 
@@ -536,7 +522,6 @@ sub cluster_features {
   }
 
   return \@all_feature_clusters;
-
 }
 
 =head2 form_gene_clusters
@@ -567,41 +552,19 @@ sub form_gene_clusters {
   # Choose a cluster with the maximum number of members.
   # Bump the other clusters onto a new array.
 
-  # If more than one cluster has the biggest number of 
-  # members, should try to choose the cluster that houses
-  # a central exon (rather than a terminal exon).
-  # Perhaps could add all the start coordinates per cluster and
-  # take the central value...  UNIMPLEMENTED AS YET.
 
-  my $biggest = 0;
-  my $big_cluster;
-  my @other_clusters;
-  foreach my $cluster (@$exon_clusters){
+  my @sorted_by_start = sort {$a->[0]->{_gsf_start} <=> $b->[0]->{_gsf_start}} @$exon_clusters;  
 
-    if ((scalar @$cluster > $biggest)) {
-      if (defined $big_cluster){
-	push (@other_clusters, $big_cluster);
-      }
-      $big_cluster = $cluster;
-      $biggest = scalar @$cluster;
-    } else {
-      push (@other_clusters, $cluster);
-    }
-  }
-  
-  my @final_gene_clusters;
-      
+  my $big_cluster = shift @sorted_by_start;
+  my @other_clusters = @sorted_by_start;
+
+  my @final_gene_clusters;      
   while (@$big_cluster){
 
-    # Choose the centre-most feature (genomic-location speaking).
-    my @sorted_cluster = sort { $a->{_hstart} <=> $b->{_hstart};} @$big_cluster;
-    my $centre_most_element = int(((scalar @$big_cluster)-1)/2);
-    my $centre_most_feature = $big_cluster->[$centre_most_element];
-    
-    splice (@$big_cluster, $centre_most_element, 1);
+    my $seed_exon = shift @$big_cluster;
 	
     my @gene_cluster;
-    push (@gene_cluster, $centre_most_feature);
+    push (@gene_cluster, $seed_exon);
     
     foreach my $other_cluster (@other_clusters) {
       if (@$other_cluster){
@@ -609,25 +572,26 @@ sub form_gene_clusters {
 	my @subtracted_other_clusters;
 	my $closest = 1000000;
 	my $closest_feature;
-	foreach my $other_feature (@$other_cluster){
+	foreach my $candidate_exon (@$other_cluster){
 	  
-	  my $distance = abs($other_feature->{_hstart} 
-			     - $centre_most_feature->{_hstart});
+	  my $distance = abs($candidate_exon->{_hstart} 
+			     - $seed_exon->{_hstart});
 	  
-	  if($distance < $closest){
+	  if(($distance < $closest)&&($candidate_exon->{_gsf_start} > $seed_exon->{_gsf_end})){
 	    if (defined $closest_feature){
 	      push (@subtracted_other_clusters, $closest_feature);
 	    }
 	    $closest = $distance;
-	    $closest_feature = $other_feature;
+	    $closest_feature = $candidate_exon;
 	  } else {
-	    push (@subtracted_other_clusters, $other_feature);
+	    push (@subtracted_other_clusters, $candidate_exon);
 	  }
 	}
 	@$other_cluster = @subtracted_other_clusters;
 
 	push (@gene_cluster, $closest_feature) if (defined $closest_feature);
-	$closest_feature = <UNDEF>;
+	undef $closest_feature;
+
       }
     }
     push (@final_gene_clusters, \@gene_cluster);
@@ -686,89 +650,55 @@ sub make_mmgw {
 
 
 
-=head2 blast_features
+=head2 check_overlap
 
   Args [1]   : query_feature - any kind of align feature.
-  Args [2]   : other features - a reference to a list of 
-               features that will be used as the db sequences.
-  Example    : $self->blast_features($query_feature, $db_features);
-  Description: Runs a blast job of a query blast feature
-               against an array of other blast features.
-               Currently is used to determine they level of
-               identity between blast features.  This is by
-               no means the best way to this, but for now it
-               works well.  This method is sufficiently
-               different to $self->run_blast that it can't be
-               merged in a neat way.
-  Returntype : A list of matched features.              
+  Args [2]   : other feature - another align feature that is
+               to be checked for substantial overlap with the
+               query feature.
+  Example    : $self->check_overlap($query_feature, $other_feature);
+  Description: Checks two features for greater than 90% hit overlap.
+               Features must be blast-generated align features 
+               resultant from a blast run against a common hit
+               sequence.
+  Returntype : 0 or 1
   Exceptions : none
-  Caller     : *ONLY* $self->make_runnables
+  Caller     : $self->cluster_features
 
 =cut
 
 
-sub blast_features {
-  my ($self, $query_feature, $blast_features) = @_;
+sub check_overlap {
+  my ($self, $query_feature, $other_feature) = @_;
 
-  # Obtain a sequence from each blast feature in order to
-  # create a blast-able database.  We are only concerned
-  # with strand so as to hand seq->subseq start and end
-  # coords in the right order.  The database may be made with
-  # sequence from the wrong strand, but this doesn't matter
-  # for our purposes.
+  my $query_start = $query_feature->{_gsf_start};
+  my $query_end   = $query_feature->{_gsf_end};
 
-  my @db_seqs;
-
-  foreach my $blast_feature (@$blast_features){
-
-    my ($feat_start, $feat_end) = sort {$a <=> $b;} $blast_feature->{_hstart}, $blast_feature->{_hend};
-
-    my $feat_seq = Bio::Seq->new(
-                     -seq => $self->genomic_sequence->subseq($feat_start, $feat_end),
-		     -id  => $blast_feature->seqname);
-
-    push (@db_seqs, $feat_seq);
-  }
-
-
-  my $blast_db     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(
-					 -sequences => \@db_seqs,
-					 -type      => 'DNA');
-
-  $blast_db->run;
-
-  my $db_name = $blast_db->dbname;
-
-  # With a database now at hand, bam, make a query sequence object and time for the run.
-  my ($query_start, $query_end) = sort {$a <=> $b;} $query_feature->{_hstart}, $query_feature->{_hend};
-
-  my $query_seq = Bio::Seq->new(
-	           -seq => $self->genomic_sequence->subseq($query_start, $query_end),
-		   -id  => $query_feature->seqname);
-
-  # BlastConf.pl magic that sets the correct regular expression
-  # for parsing the header of the query sequence.
-
-  if ($query_seq->id =~ /\W*\w+/){
-    $::fasta_header_re{$db_name} = '\W*(\w+)';
-  } else {
-    $self->warn('Problem with regex - unlikely to be parsing correct sequence ids.');
-  }
-
-  my $blast = new Bio::EnsEMBL::Pipeline::Runnable::Blast(
-			      -query    => $query_seq,
-			      -program  => 'wublastn',
-			      -database => $blast_db->dbfile,
-			      -filter => 0,
-			      );
-  $blast->run;
+  if ($query_start > $query_end){($query_start, $query_end) = ($query_end, $query_start)}
   
-  $blast_db->remove_index_files;
-  unlink $blast_db->dbfile;
+  my $other_start = $other_feature->{_gsf_start};
+  my $other_end   = $other_feature->{_gsf_end};
   
-  return $blast->output;
+  if ($other_start > $other_end) {($other_start, $other_end) = ($other_end, $other_start)}
+  
+  unless ($query_end < $other_start || $query_start > $other_end){
+    # We have overlapping features
+    
+    my $query_length = $query_end - $query_start;
+    my $other_length = $other_end - $other_start;
+    
+    my ($start1, $start2, $end1, $end2) = sort {$a <=> $b} ($query_start, $other_start, $query_end, $other_end);
+    
+    my $overlap = $end1 - $start2;
+    
+    if (($overlap >= (0.9 * $query_length))&&($overlap >= (0.9 * $other_length))){
+      return 1
+    }
+  }
+    
+return 0;    
 }
-
+  
 
 
 sub get_Sequences {
