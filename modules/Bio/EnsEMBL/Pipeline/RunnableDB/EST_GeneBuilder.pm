@@ -62,6 +62,10 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBUSER
 					EST_REFDBNAME
 					EST_REFDBPASS
+					EST_E2G_DBNAME
+					EST_E2G_DBHOST
+					EST_E2G_DBUSER
+					EST_E2G_DBPASS     
 					EST_GENEBUILDER_INPUT_GENETYPE
 					EST_EVIDENCE_TAG
 					EST_MIN_EVIDENCE_SIMILARITY
@@ -98,9 +102,18 @@ sub new {
 						   -perlonlyfeatures => 0,
 						  );
     
+    my $est_e2g_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							-host             => $EST_E2G_DBHOST,
+							-user             => $EST_E2G_DBUSER,
+							-dbname           => $EST_E2G_DBNAME,
+							-pass             => $EST_E2G_DBPASS,
+						       );
+    
+    $est_e2g_db->dnadb($refdb);
+    $self->est_e2g_db($est_e2g_db);
+    
     $self->db->dnadb($refdb);
-    
-    
+   
    
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
