@@ -140,6 +140,7 @@ sub open_command_line{
 
   open(SUB, $self->bsub." 2>&1 |");
   my $lsf;
+  sleep 1;
   while(<SUB>){
     if (/Job <(\d+)>/) {
       $lsf = $1;
