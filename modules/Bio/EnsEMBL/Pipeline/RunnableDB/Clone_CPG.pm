@@ -220,8 +220,8 @@ sub write_output {
         }
         elsif (@islands) 
 	{
-	    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	    $feat_Obj->write($contig, @islands);
+	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	    $feat_adp->store($contig, @islands);
 	}
     } 
 }

@@ -181,7 +181,7 @@ sub write_output {
     unless ($analysis) {
         $self->throw ("Feature ".$featurepairs[0]->seqname ." doesn't have analysis. Cannot write to database");
     }
-    my $analysisId = $self->dbobj->get_Feature_Obj->write_Analysis ($analysis);
+    my $analysisId = $self->dbobj->get_FeatureAdaptor->store($analysis);
 
     foreach my $featurepair (@featurepairs) {
 #        print "featurepair ".$featurepair->hseqname."\n";
