@@ -37,11 +37,30 @@ my @supported_predictions = $genecooker->run;
 
 =head1 DESCRIPTION
 
-This module reads predictions in the form of transcripts and features.
+This module is a revampped version of a piece of history within 
+Ensembl automatic annotation. Not only brings you back to the days where
+genome annotation was being devised, but also shows how versatile and powerful
+can be the Ensembl code to manipulate biological information.
+
+This module reads features and predictions (genscan, genefinder, etc ).
+Predictions are read as PredictionTranscript objects.
 It will take only exons which are confirmed by the features and it will make Exon pairs
-accordign to consecutive feature overlap. It will then recursively link the
-Exon pairs according to shared features to form transcripts.
-If @annotations is filled, there will be checks to reject prediction exons which overlap annotations.
+accordign to consecutive feature overlap. An exon pair is constructed as follows :
+
+  ---------          --------    prediction exons (genscan, genefinder,... any ab initio prediction )
+    -------          ----->      feature that spans an intron
+    1     10        11    22        
+
+For an exon pair to make it into a gene there must be at least 2 blast
+hits (features) that span across an intron. This is called the
+coverage of the exon pair. After all exon pairs have been generated for 
+all the genscan exons there is a recursive routine (_recurseTranscript)
+that looks for all exons that are the start of an exon pair with no preceding exons
+It will then recursively link the
+Exon pairs into full transcripts. The recursion will also generate alternative splicing.
+The run method returns the generated transcripts.
+
+=head1 CONTACT
 
 
 =head1 CONTACT
