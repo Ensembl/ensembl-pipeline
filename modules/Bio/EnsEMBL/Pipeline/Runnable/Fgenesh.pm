@@ -76,6 +76,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::PredictionTranscript;
+use Bio::EnsEMBL::PredictionExon;
 use Bio::Seq;
 use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
@@ -682,7 +683,7 @@ sub create_genes {
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
 	#print STDERR "seq = ".$self->query."\n";
-	my $tran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_with_seq($gene, $self->query);
+	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
 	#print "have ".$tran."\n";
 	$self->add_Fgenesh_Transcript($tran);
     }
@@ -759,7 +760,9 @@ sub output {
         } else {
             @exons = sort {$b->start <=> $a->start } @{$exons};
         }
-
+        foreach my $e(@exons){
+          bless($e, 'Bio::EnsEMBL::PredictionExon');
+        }
         push @pred, Bio::EnsEMBL::PredictionTranscript->new(-exons => \@exons);
     }
     return @pred;

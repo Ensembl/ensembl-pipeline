@@ -311,7 +311,7 @@ sub parse_results {
             $feature {primary}= 'TSS';
 	    $feature {program} = 'eponine-scan';
 	    $feature {program_version} = '2';
-          
+            
 	    $self->create_feature(\%feature);
 
 	  
@@ -362,6 +362,11 @@ sub create_feature {
                             -gff_feature     => $feat->{'primary'});
 
     #create and fill Bio::EnsEMBL::Seqfeature object
+    if($feat->{'strand'} eq '-'){
+      $feat->{'strand'} = -1;
+    }elsif($feat->{'strand'} eq '+'){
+      $feat->{'strand'} = 1;
+    }
     my $tss = Bio::EnsEMBL::SimpleFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},

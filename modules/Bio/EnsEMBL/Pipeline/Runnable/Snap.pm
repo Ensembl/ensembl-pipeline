@@ -679,7 +679,9 @@ sub output {
         } else {
             @exons = sort {$b->start <=> $a->start } @{$exons};
         }
-
+        foreach my $e(@exons){
+          bless($e, 'Bio::EnsEMBL::PredictionExon');
+        }
         push @pred, Bio::EnsEMBL::PredictionTranscript->new
           (
            -exons => \@exons

@@ -87,6 +87,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::PredictionTranscript;
+use Bio::EnsEMBL::PredictionExon;
 use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Root;
 
@@ -694,7 +695,9 @@ sub output {
         } else {
             @exons = sort {$b->start <=> $a->start } @{$exons};
         }
-
+        foreach my $e(@exons){
+          bless($e, 'Bio::EnsEMBL::PredictionExon');
+        }
         push 
           @pred, 
           Bio::EnsEMBL::PredictionTranscript->new(-EXONS => \@exons);
