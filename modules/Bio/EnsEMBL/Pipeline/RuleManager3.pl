@@ -35,6 +35,7 @@ my $workdir   = $::pipeConf{'nfstmp.dir'};
 my $flushsize = $::pipeConf{'batchsize'};
 my $jobname   = $::pipeConf{'jobname'};
 my $retry     = $::pipeConf{'retry'} || 3;
+my $sleep     = $::pipeConf{'sleep'} || 3600;
 
 $| = 1;
 
@@ -269,7 +270,7 @@ while (1) {
     # and need to flush created jobs.
     Bio::EnsEMBL::Pipeline::Job->flush_runs($jobAdaptor, $LSF_params);
     exit 0 if $done || $once;
-    sleep(3600) if $submitted == 0;
+    sleep($sleep) if $submitted == 0;
     $completeRead = 0;
     $currentStart = 0;
     @idList = ();

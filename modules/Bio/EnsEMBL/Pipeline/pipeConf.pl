@@ -34,7 +34,8 @@ package main;
     'autoupdate' => 1,         # true->update InputIdAnalysis via Job
     'runner'     => '',        # path to runner.pl, needed by Job.pm
     'cpname'     => '', #this is for crosscomparer comparadb name
-    'cpuser'     => '' #and comparadb user
+    'cpuser'     => '', #and comparadb user
+    'sleep'      => 3600 #sleep time in Rulemanager3
     );
 }
 
