@@ -542,6 +542,7 @@ sub current_status {
 	    SELECT status
 	    FROM   job_status
 	    WHERE  job_id = ?
+	    AND    is_current = 'y'
 	});
 	my $res = $sth->execute($id);
 	my $status;
