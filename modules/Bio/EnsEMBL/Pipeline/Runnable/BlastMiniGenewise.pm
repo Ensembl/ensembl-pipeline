@@ -213,7 +213,7 @@ sub check_repeated {
 sub run {
   my ($self) = @_;
 
-print STDERR "About to run blast\n";  
+
   my @blast_features = $self->run_blast;
 
   unless (@blast_features) {
@@ -224,6 +224,10 @@ print STDERR "About to run blast\n";
   foreach my $f (@blast_features){
     $f->invert;
   }
+  
+  my @blast_features = sort{$a->start <=> $b->start  
+                              || $a->end <=> $b->end} @blast_features; 
+
 
   my $mg_runnables;
   if ($self->check_repeated > 0){ 
@@ -254,7 +258,8 @@ sub run_blast {
   my @seq         = $self->get_Sequences;
   # sometimes index goes away so we get no sequences. Check for this
   if (@seq != $self->ids) {
-      $self->warn("Managed to get only " . scalar(@seq) . " for BLAST run; check indices\n");
+    $self->warn("Managed to get only " . scalar(@seq) . "  of ".
+                scalar($self->ids) ."for BLAST run; check indices\n");
   }
 
   my @valid_seq   = $self->validate_sequence(@seq);
