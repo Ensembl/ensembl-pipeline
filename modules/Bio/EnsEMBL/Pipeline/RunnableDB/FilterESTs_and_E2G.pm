@@ -54,17 +54,18 @@ use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::Tools::BPlite;
 use FileHandle;
+#use diagnostics;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_GOLDEN_PATH
 					EST_REFDBHOST
 					EST_REFDBNAME
 					EST_REFDBUSER
-					EST_REFDBPASS
 					EST_DBNAME
 					EST_DBHOST
 					EST_DBUSER 
@@ -72,6 +73,8 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_SOURCE
 					EST_INDEX
 				       );
+
+					#EST_REFDBPASS #not needed, it is a reference db anyway
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -112,25 +115,28 @@ sub new {
 										       GOLDEN_PATH)],
 										   @args);
 
-    	 
+	 # we force it to use BioIndex SeqFetcher
+	 my $seqfetcher = $self->make_seqfetcher();
+	 $self->seqfetcher($seqfetcher);
+
     # check options in EST_conf.pl 
-    if(!defined $self->seqfetcher) {
-      my $seqfetcher = $self->make_seqfetcher();
-      $self->seqfetcher($seqfetcher);
-      
-    }
+    #if(!defined $self->seqfetcher) {
+    #  my $seqfetcher = $self->make_seqfetcher();
+    #  $self->seqfetcher($seqfetcher);
+    #  
+    #}
 
     $path = $EST_GOLDEN_PATH;
     $path = 'UCSC' unless (defined $path && $path ne '');
-#    print STDERR "path: $path\n";
+    #print STDERR "path: $path\n";
     $self->dbobj->static_golden_path_type($path);
 
-#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
+#print STDERR "refdb: $refdbname $refdbhost $refdbuser (refdb pass no needed really)\n";
 
     $refdbname = $EST_REFDBNAME unless (defined $refdbname && $refdbname ne '');
     $refdbuser = $EST_REFDBUSER unless (defined $refdbuser && $refdbuser ne '');
     $refdbhost = $EST_REFDBHOST unless (defined $refdbhost && $refdbhost ne '');
-    $refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
+    #$refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
 
 #print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
@@ -429,6 +435,7 @@ sub get_exon_analysis{
 sub fetch_input {
   my ($self) = @_;
   
+  print STDERR "In fetch_input\n";
   $self->throw("No input id") unless defined($self->input_id);
 
   # get virtual contig of input region
@@ -466,16 +473,21 @@ sub fetch_input {
   # empty out massive arrays
   @allfeatures = ();
 
-  print STDERR "exonerate features left after filter: " . scalar(@exonerate_features) . "\n";
-  print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n";
+  print STDERR "exonerate features left with percent_id > 97 : " . scalar(@exonerate_features) . "\n";
+  print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
   
   # filter features, current depth of coverage 10, and group successful ones by est id
   my %filtered_ests;
 
+  #my @time1 = times();
   # use coverage 5 for now.
   my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 5,
-								    '-minscore' => 500);
+								    '-minscore' => 500,
+								    '-prune'    => 1,
+								  );
   my @filteredfeats = $filter->run(@exonerate_features);
+  #my @time2 = times();
+  #print STDERR "Filter time: user = ".($time2[0] - $time1[0])."\tsystem = ".($time2[1] - $time1[1])."\n";
   
   # empty out massive arrays
   @exonerate_features = ();
@@ -483,7 +495,8 @@ sub fetch_input {
   foreach my $f(@filteredfeats){
     push(@{$filtered_ests{$f->hseqname}}, $f);
   }
-  
+  print STDERR "num filtered features ". scalar( @filteredfeats) . "\n";  
+
   # empty out massive arrays
   @filteredfeats = ();
 
@@ -493,8 +506,9 @@ sub fetch_input {
   my @ids = keys %filtered_ests;
 
   my @blast_features = $self->blast(@ids);
-
   print STDERR "back from blast with " . scalar(@blast_features) . " features\n";
+  
+
 
   # make sure we can go on before we try to dosomething stupid
   if(!defined @blast_features) {
@@ -505,13 +519,13 @@ sub fetch_input {
   my %final_ests;
   foreach my $feat(@blast_features) {
     my $id = $feat->hseqname;
+    # print STDERR "id-$id-\n";
     # very annoying white space nonsense
     $id =~ s/\s//;
     $feat->hseqname($id);
     push(@{$final_ests{$id}}, $feat);
     my @fe = @{$final_ests{$id}};
   }
-
 
   # make one runnable per EST set
   my $rcount = 0;
@@ -522,7 +536,10 @@ sub fetch_input {
 
   # only fetch this once for the whole set or it's SLOW!
   my $genomic  = $self->vc->get_repeatmasked_seq;
-
+  
+  # keep track of those ESTs who make it into a MiniEst2genome
+  my %accepted_ests;
+  
  ID:    
   foreach my $id(keys %final_ests) {
     # length coverage check for every EST
@@ -560,15 +577,62 @@ sub fetch_input {
       next ID;
     }
   
+    # before making a MiniEst2Genome, check that the one we're about to create
+    # is not redundant with any one we have created before
+    my $do_comparison_stuff = 0;
+    if ( $do_comparison_stuff == 1 ){
+    
+      foreach my $id2 ( keys( %accepted_ests ) ){
+	
+	# compare $id with each $id2
+	# if $id is redundant, skip it
+	my @feat1 = sort{ $a->start <=> $b->start } @{$final_ests{$id}};
+	my @feat2 = sort{ $a->start <=> $b->start } @{$accepted_ests{$id2} };
+	#print STDERR "comparing ".$id."(".scalar(@feat1).") with ".$id2." (".scalar(@feat2).")\n";    
+	
+	if ( scalar( @feat1 ) == scalar( @feat2 ) ){
+	  print STDERR "$id and $id2 have the same number of features\n";
+	  
+	  # first, let's make a straightforward check for exac matches:
+	  my $label = 0;
+	  while ( $label < scalar( @feat1 )                      &&
+		  $feat1[$label]->start == $feat2[$label]->start &&
+		  $feat1[$label]->end   == $feat2[$label]->end   ){	        
+	    print STDERR ($label+1)." == ".($label+1)."\n";
+	    $label++;
+	  }
+	  if ( $label == scalar( @feat1 ) ){
+	    print STDERR "EXACT MATCH between $id and $id2 features, skipping $id\n";
+	  }
+	  # make also a test for overlaps
+	  $label = 0;
+	  while ( $label < scalar( @feat1 ) && $feat1[$label]->overlaps( $feat2[$label] )  ){	        
+	    print STDERR ($label+1)." overlaps ".($label+1)."\t";
+	    print STDERR $feat1[$label]->start.":".$feat1[$label]->end."   ".
+	      $feat2[$label]->start.":".$feat2[$label]->end."\n";
+	    $label++;
+	  }
+	  if ( $label == scalar( @feat1 ) ){
+	    print STDERR "approximate MATCH between $id and $id2 features, skipping $id\n";
+	  }		
+	}
+      }
+      
+    }
+
     # make MiniEst2Genome runnables
     # to repmask or not to repmask?    
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
 								   '-genomic'  => $genomic,
 								   '-features' => \@{$final_ests{$id}},
 								   '-seqfetcher' => $self->seqfetcher,
-								   '-analysis' => $self->analysis);
+								   '-analysis' => $self->analysis
+								  );
     $self->runnable($e2g);
     $rcount++;
+  
+    # store in a hash of arrays the features put in a MiniEst2Genome
+    $accepted_ests{$id} = $final_ests{$id};
   }
 
   print STDERR "number of e2gs: $rcount\n";  
@@ -932,7 +996,14 @@ sub output{
 sub blast{
    my ($self, @allids) = @_;
 
+   print STDERR "retrieving ".scalar(@allids)." EST sequences\n";
+   
+   my $time1 = time();
    my @estseq = $self->get_Sequences(\@allids);
+   my $time2 = time();
+   print STDERR "SeqFetcher time: user = ".($time2 - $time1)."\n";
+   #print STDERR "SeqFetcher time: user = ".($time2[0] - $time1[0])."\tsystem = ".($time2[1] - $time1[1])."\n";
+
    if ( !scalar(@estseq) ){
      $self->warn("Odd - no ESTs retrieved\n");
      return ();
@@ -982,6 +1053,7 @@ sub get_Sequences {
 #      next ACC;
 #    }
 
+    #print STDERR "getting sequence for $acc\n";
     eval{
       $seq = $self->seqfetcher->get_Seq_by_acc($acc);
     };
@@ -1058,6 +1130,8 @@ sub run_blast {
 
   # set B here to make sure we can show an alignment for every EST
   my $command   = "wublastn $estdb $seqfile B=" . $numests . " -hspmax 1000  2> /dev/null >  $blastout";
+  #print STDERR "Running BLAST:\n";
+  #print STDERR "$command\n";
   my $status = system( $command );
   
   my $blast_report = new Bio::Tools::BPlite(-file=>$blastout);
@@ -1107,6 +1181,7 @@ sub run_blast {
       #create featurepair
       my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $genomic,
 					       -feature2 => $est) ;
+      #print STDERR $fp->gffstring."\n";
       if ($fp) {
 	push (@results, $fp);
       }
@@ -1136,18 +1211,28 @@ sub run_blast {
 =cut
 
 sub make_seqfetcher {
+  print STDERR "making a seqfetcher\n";
   my ( $self ) = @_;
   my $index   = $EST_INDEX;
 
   my $seqfetcher;
-
   if(defined $index && $index ne ''){
+    #my $index = '/data/blastdb/Ensembl/human.ests';
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    
+    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex('-db' => \@db,);
   }
+  #if(defined $index && $index ne ''){
+  #  my @db = ( $index );
+  #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  #}
+  #else{
+  #  # default to Pfetch
+  #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  #}
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw( "cannot create a seqfetcher BioIndex from $index");
   }
 
   return $seqfetcher;
