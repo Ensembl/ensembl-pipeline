@@ -111,6 +111,7 @@ foreach my $cloneid (@cloneids) {
 							      -queue    => 'blast_farm',
 							      -create   => 1,
 							      );
+
 	#$job->make_files;
 
 	print(STDERR "Created new job object\n");
