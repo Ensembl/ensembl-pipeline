@@ -103,7 +103,7 @@ sub new {
       if(!$BATCH_QUEUES{$analysis->logic_name}{output_dir}){
         $dir =  $DEFAULT_OUTPUT_DIR;
       }else{
-        $dir = $DEFAULT_OUTPUT_DIR;
+        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
       }
       $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
       $self->output_dir($dir);
