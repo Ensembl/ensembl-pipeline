@@ -7,533 +7,320 @@ use strict;
 use Data::Dumper;
 
 use vars qw(@ISA);
+
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
-use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
-use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
-
-use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis;
-use Bio::DB::RandomAccessI;
-
-use Bio::PrimarySeqI;
-use Bio::SeqIO;
-
+use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 @ISA = ('Bio::EnsEMBL::Pipeline::RunnableI');
-
-=head2 new
-
-  Arg [1]   : hash of parameters 
-  Function  : to create a new STS_GSS object
-  Returntype: an STS_GSS object
-  Exceptions: It will throw is it recieves no unmasked sequence, it will throw if it isn''t running a blast an no blast features are passed to it. If it is running a blast it will throw if it receives no blast db location or masked sequence. It will also throw if it gets no seqfetcher 
-  Caller    : 
-  Example   : 
-
-=cut
 
 sub new {
     my ($class,@args) = @_;
 
-    my $self = $class->SUPER::new(@args);    
+    #my $self = $class->SUPER::new(@args);
+    my $self = bless {}, $class;
+    my ($query,
+        $unmasked,
+        $analysis,
+        $seqfetcher,
+        ) = $self->_rearrange([qw{
+            QUERY
+            UNMASKED
+            ANALYSIS
+            SEQFETCHER
+            }], @args);
 
-    $self->{'_query'}     = undef;     # location of Bio::Seq object
-    $self->{'_unmasked'} = undef;
-    $self->{'_blast_program'}   = undef;     # location of Blast
-    $self->{'_est_program'}   = undef;     # location of Blast
-    $self->{'_database'}  = undef;     # name of database
-    $self->{'_threshold'} = undef;     # Threshold for hit filterting
-    $self->{'_options'}   = undef;     # arguments for blast
-    $self->{'_filter'}    = 1;         # Do we filter features?
-    $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
-    $self->{'_no_blast'} = 0;
-    $self->{'_features'} = [];
-    $self->{'_workdir'}   = undef;     # location of temp directory
-    $self->{'_filename'}  = undef;     # file to store Bio::Seq object
-    $self->{'_results'}   = undef;     # file to store results of analysis
-    $self->{'_seqfetcher'} = undef;
-    $self->{'_prune'}     = 1;         # 
-    $self->{'_coverage'}  = 10;
-    $self->{'_merged_features'} =[];
-    $self->{'_percent_id'} = undef;
-    $self->{'_padding'} = undef;
-    $self->{'_percent_filter'} = undef;
-    $self->{'_tandem'} = undef;
-    # Now parse the input options and store them in the object
-    #print "@args\n";
-    my( $query, $unmasked, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$options, $seqfetcher, $features, $no_blast, $percent_id, $padding, $tandem) = 
-	    $self->_rearrange([qw(QUERY
-				  UNMASKED
-				  PROGRAM
-				  DATABASE 
-				  THRESHOLD
-				  THRESHOLD_TYPE
-				  FILTER 
-				  COVERAGE
-				  PRUNE
-				  OPTIONS
-				  SEQFETCHER
-				  FEATURES
-				  NO_BLAST
-				  PERCENT_ID
-				  PADDING
-				  PERCENT_FILTER
-				  TANDEM_CHECK)], 
-			      @args);
+        #$database,
+        #$program,
+        #$options,
+        #$threshold,
+        #$thres_type,
+        #    DATABASE
+        #    PROGRAM
+        #    OPTIONS
+        #    THRESHOLD
+        #    THRESHOLD_TYPE
     
-    if($no_blast == 1){
-      $self->{'_no_blast'} = $no_blast;
-    } 
-    
-    if ($unmasked) {
-      $self->unmasked($unmasked);
-    } else {
-      $self->throw("No unmasked query sequence input.");
-    }
-   
-    if($program){
-      $self->program($self->find_executable($program));
-    }
-    
-      if (defined($features)) {
-	if (ref($features) eq "ARRAY") {
-	  push(@{$self->{'_features'}},@$features);
-	} else {
-	  $self->throw("[$features] is not an array ref.");
-	}
-      }else{
-	$self->throw("should pass in features haven't \n");
-      }
-    
-    
-    if ($options) {
-#this option varies the number of HSP displayed proportionally to the query contig length
-      $self->options($options);
-    } else {
-      $self->options(' -p1 ');  
-    }
-    if ($percent_id) {
+    die "No QUERY (masked genomic sequence) given" unless $query;
+    die "No UNMASKED (genomic sequence) given"     unless $unmasked;
 
-      $self->percent_id($percent_id);
-    } else {
-      $self->percent_id(95);  
-    }
-     if ($percent_id) {
-
-      $self->padding($padding);
-    } else {
-      $self->padding(200);  
-    }
-    #print "options = ".$self->options."\n";
-    if (defined($threshold)) {
-      $self->threshold($threshold);
-    } else {
-          $self->threshold(95);  
-    }
-
-    if (defined($threshold_type)) {
-      $self->threshold_type($threshold_type);
-    }else {
-      $self->threshold_type('PID');
-    }
-
-    if (defined($filter)) {
-        $self->filter($filter);
-    }
+    $self->query            ($query);
+    $self->unmasked         ($unmasked);
+    $self->analysis         ($analysis);
+    $self->seqfetcher       ($seqfetcher);
+    #$self->database         ($database);
+    #$self->program          ($program);
+    #$self->options          ($options);
+    #$self->threshold        ($threshold);
+    #$self->threshold_type   ($thres_type);
     
-    if (defined($prune)) {
-      $self->prune($prune);
-    }
-    if (defined($coverage)) {
-      $self->coverage($coverage);
-    }
-    if (defined($tandem)) {
-      $self->tandem_check($tandem);
-    }
-    $self->throw("No seqfetcher provided")           
-    unless defined($seqfetcher);
-
-    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
-    return $self; # success - we hope!
+    return $self;
 }
 
-#################
-#get/set methods#
-#################
-
-
-=head2 accessor methods
-
-  Arg [1]   : variable to be set 
-  Function  : if passed set the varible to the argument passed the return the argument
-  Returntype: the varible to be set
-  Exceptions: some throw exceptions if not passed the correct varible
-  Caller    : $self
-  Example   : $clone = $self->clone;
-
-=cut
-
-
-sub clone {
+sub query {
     my ($self, $seq) = @_;
+
     if ($seq) {
-      unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
-        $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
-      }
-
-      $self->{'_query'} = $seq ;
-
-      
+        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
+        $self->{'_query'} = $seq ;
     }
     return $self->{'_query'};
 }
 
-
 sub unmasked {
     my ($self, $seq) = @_;
-    if ($seq) {
-      unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
-        $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
-      }
 
-      $self->{'_unmasked'} = $seq ;
-      $self->filename($self->unmasked->id.".$$.seq");
-      $self->results($self->filename.".blast.out");
-     
+    if ($seq) {
+        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
+        $self->{'_unmasked'} = $seq ;
     }
     return $self->{'_unmasked'};
 }
 
-
-sub program {
-  my ($self, $location) = @_;
-  
-  if ($location) {
-    $self->throw("executable not found at $location: $!\n")     unless (-e $location && -x $location);
-    $self->{'_blast_program'} = $location ;
-  }
-  return $self->{'_blast_program'};
-}
-
-
-sub database {
-    my ($self, $db) = @_;
-
-    if (defined($db)) {
-      $self->{'_database'} = $db ;
-    }
-    return $self->{'_database'};
-}
-
-sub no_blast {
-    my ($self) = @_;
-
-    return $self->{'_no_blast'};
-}
-
-sub options {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_options'} = $args ;
-  }
-  return $self->{'_options'};
-}
-
-sub percent_filter {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_percent_filter'} = $args ;
-  }
-  return $self->{'_percent_filter'};
-}
-
-sub percent_id {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_percent_id'} = $args ;
-  }
-  return $self->{'_percent_id'};
-}
-
-sub padding {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_padding'} = $args ;
-  }
-  return $self->{'_padding'};
-}
-
-sub prune {
-  my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_prune} = $arg;
-  }
-  return $self->{_prune};
-}
-
-sub tandem_check {
-  my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_tandem} = $arg;
-  }
-  return $self->{_tandem};
-}
-
-sub coverage {
-  my($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_coverage} = $arg;
-  }
-  return $self->{_coverage};
-}
-
-sub filter {
-    my ($self,$args) = @_;
-
-    if (defined($args)) {
-        if ($args != 0 && $args != 1) {
-            $self->throw("Filter option must be 0 or 1");
-        }
-        $self->{'_filter'} = $args;
-    }
-    return $self->{'_filter'};
-}
-
-sub get_threshold_types {
-  my ($self) = @_;
-
-  return ("PID","PVALUE");
-}
-
-sub threshold_type {
-  my ($self,$type) = @_;
-
-  my @types = $self->get_threshold_types;
-  
-  if (defined($type)) {
-    my $found = 0;
-    foreach my $allowed_type ($self->get_threshold_types) {
-      if ($type eq $allowed_type) {
-        $found = 1;
-      }
-    }
-    if ($found == 0) {
-
-      $self->throw("Type [$type] is not an allowed type.  Allowed types are [@types]");
-    } else {
-      $self->{_threshold_type} = $type;
-    }
-  }
-  return $self->{_threshold_type} || $types[0];
-}
-
-sub get_pars {
-  my ($self) = @_;
-
-  if (!defined($self->{_hits})) {
-     $self->{_hits} = [];
-  }
-	
-  return @{$self->{_hits}};
-
-}
-
 sub seqfetcher {
-  my( $self, $value ) = @_;    
-  if ($value) {
-    #need to check if passed sequence is Bio::DB::RandomAccessI object
-   $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
-    $self->{'_seqfetcher'} = $value;
-  }
-  return $self->{'_seqfetcher'};
+    my( $self, $seqfetcher ) = @_;
+    
+    if ($seqfetcher) {
+        $self->{'_seqfetcher'} = $seqfetcher;
+    }
+    return $self->{'_seqfetcher'};
 }
 
-sub add_merged_feature{
-  my ($self, $feature) = @_;
-  if(!$feature){
-    $self->throw("no feature passed : $!\n");
-  }else{
-    push(@{$self->{'_merged_features'}}, $feature);
-  }
+sub analysis {
+    my( $self, $analysis ) = @_;
+    
+    if ($analysis) {
+        $self->{'_analysis'} = $analysis;
+    }
+    return $self->{'_analysis'};
 }
 
-sub each_merged_feature{
+#sub database {
+#    my( $self, $database ) = @_;
+#    
+#    if ($database) {
+#        $self->{'_database'} = $database;
+#    }
+#    return $self->{'_database'} || 'dbEST';
+#}
+#
+#sub program {
+#    my( $self, $program ) = @_;
+#    
+#    if ($program) {
+#        $self->{'_program'} = $program;
+#    }
+#    return $self->{'_program'} || 'wublastn';
+#}
+#
+#sub options {
+#    my( $self, $options ) = @_;
+#    
+#    if ($options) {
+#        $self->{'_options'} = $options;
+#    }
+#    return $self->{'_options'} || 'Z=500000000';
+#}
+#
+#sub threshold {
+#    my( $self, $threshold ) = @_;
+#    
+#    if ($threshold) {
+#        $self->{'_threshold'} = $threshold;
+#    }
+#    return $self->{'_threshold'} || 1e-4;
+#}
+#
+#sub threshold_type {
+#    my( $self, $threshold_type ) = @_;
+#    
+#    if ($threshold_type) {
+#        $self->{'_threshold_type'} = $threshold_type;
+#    }
+#    return $self->{'_threshold_type'} || 'PVALUE';
+#}
 
-  my ($self) = @_;
- 
-  return@{$self->{'_merged_features'}};
+#sub _make_blast_paramters {
+#    my( $self ) = @_;
+#    
+#    my @param;
+#    foreach my $meth (qw{
+#        query
+#        database
+#        program
+#        options
+#        threshold
+#        threshold_type
+#        })
+#    {
+#        push(@param, "-$meth", $self->$meth());
+#    }
+#    return @param;
+#}
 
-}
+sub _make_blast_paramters {
+    my( $self ) = @_;
+    
+    # Set parameters from analysis object, or use defaults
+    my $ana = $self->analysis or $self->throw('analysis not set');
+    
+    my %param = (
+        '-query'            => $self->query,
+        '-database'         => $ana->db      || 'dbEST',
+        '-program'          => $ana->program || 'wublastn',
+        '-threshold_type'   => 'PVALUE',
+        '-threshold'        => 1e-4,
+        '-options'          => 'Z=500000000',
+        );
+    
+    my( $arguments );
+    foreach my $ele (split /\s*,\s*/, $ana->parameters) {
+        if (my ($key, $value) = split (/\s*=>\s*/, $ele);
+            if (defined $value) {
+                if ($key eq '-threshold_type' or $key eq '-threshold') {
+                    $param{$key} = $value;
+                }
+            } else {
+	        # remaining arguments not of '=>' form
+	        # are simple flags (like -p1)
+                $arguments .= " $key";
+            }
+        }
+    }
+    $param{'-options'} = $arguments if $arguments;
 
-
-sub features{
-  my ($self) = @_;
-  return @{$self->{'_features'}};
+    return %param;
 }
 
 sub run {
     my( $self ) = @_;
     
-    my $seq = $self->clone;
-    my @raw_hits = $self->features;
-    my %blast_ests;
+    my $seq = $self->query;
+    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast
+        ->new($self->_make_blast_paramters);
+    $blast->run;
+    my $features = [$blast->output];
+    
+    $self->run_est_genome_on_strand( 1, $features);
+    $self->run_est_genome_on_strand(-1, $features);
+}
 
-    foreach my $raw_hit ( @raw_hits ) {
-        
-        my $seqname = $raw_hit->hseqname;
-        
-        push(@{$blast_ests{$seqname}}, $raw_hit);
-        
- 
+sub run_est_genome_on_strand {
+    my( $self, $strand, $feat ) = @_;
+    
+    my $hit_features = {};
+    for (my $i = 0; $i < @$feat; $i++) {
+        my $f   = $feat->[$i];
+        my $hid = $f->hseqname or $self->throw("Missing hid");;
+        next unless $f->strand == $strand;
+        $hit_features->{$hid} ||= [];
+        push(@{$hit_features->{$hid}}, $f);
     }
     
-    while (my ($est, $features) = each %blast_ests) {
-      
-      # Is there a match below the P value threshold?
-      my $good_match = 0;
-      my $est_strand = 0;
-      foreach my $res (@$features) {
-        if ($res->p_value <= $self->threshold) {
-            $est_strand = $res->strand;
-            $good_match = 1;
-            last;
-        }
-      }
-      
-      # Skip EST matches that don't have a match below the threshold
-      next unless $good_match;
+    my( $is_linear );
+    if ($strand == 1) {
+        $is_linear = sub {
+            my( $x, $y ) = @_;
+            
+            return $x->hstart < $y->hstart;
+        };
+    } else {
+        $is_linear = sub {
+            my( $x, $y ) = @_;
+            
+            return $x->hstart > $y->hstart;
+        };
+    }
+    
+    my $count = 0;
+    while (my ($hid, $flist) = each %$hit_features) {
+        $count++;
+        # Sort features by start/end in genomic
+        @$flist = sort {$a->start <=> $b->start or $a->end <=> $b->end} @$flist;
         
-      #my $miniseq = $self->make_miniseq(@$features);
-#       
-#      print @$features[0]->hseqname,"\nMiniseq_sequence \n",$miniseq->get_cDNA_sequence->seq,"\n";
-#      
-#      print "EST Sequence\n",$self->seqfetcher->get_Seq_by_acc(@$features[0]->hseqname)->seq,"\n\n";
-      
-       #make MiniEst2Genome runnables            
-      my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->unmasked,
-								     '-features' => $features,
-								     '-seqfetcher' => $self->seqfetcher);
-
-      # run runnable
-      $e2g->run;
-      
-      # sort out output
-      my @e2g_genes = $e2g->output;
-      
-      my @output;
-      
-        foreach my $e2g_gene (@e2g_genes){
-            my @exons = $e2g_gene->sub_SeqFeature;
-            foreach my $exon (@exons){
-                
-                
-                my @supp_evidence = $exon->sub_SeqFeature;
-                    #display(@sub_Feats);                    
-                    foreach my $supp_evidence (@supp_evidence) {
-                        
-                        $supp_evidence->feature2->source_tag('TEST');
-                        $supp_evidence->feature2->primary_tag('TEST');
-                        
-                        $supp_evidence->feature1->strand($est_strand);
-                        $supp_evidence->feature2->strand($est_strand);
-                        
-                        warn $supp_evidence->feature2->source_tag;
-                        #$supp_evidence->source_tag('TEST');
-                        push (@{$self->{'_output'}},$supp_evidence);
-                    }
+        # Group into linear matches
+        my @sets = ([$flist->[0]]);
+        my $curr = $sets[0];
+        for (my $i = 1; $i < @$flist; $i++) {
+            my $prev = $flist->[$i - 1];
+            my $this = $flist->[$i];
+            if (&$is_linear($prev, $this)) {
+                push(@$curr, $this);
+            } else {
+                $curr = [$this];
+                push(@sets, $curr);
             }
-
         }
-      
-      #print Dumper($self->output);
-      
-      
-                    
+        
+        foreach my $lin (@sets) {
+            $self->do_mini_est_genome($lin);
+        }
+        last if $count >= 10;
     }
-                   
 }
 
+sub do_mini_est_genome {
+    my( $self, $linear ) = @_;
+    
+    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
+        '-genomic'    => $self->unmasked,
+        '-features'   => $linear,
+        '-seqfetcher' => $self->seqfetcher,
+        );
+    $e2g->run;
+    
+    # Could possibly get matches out of MiniEst2Genome on
+    # opposite strand to the features fed into it!
+    # Should fix properly in MiniEst2Genome a la Finished_Est2Genome
+    my $est_strand = $linear->[0]->strand;
 
-=head2 make_miniseq
+    foreach my $e2g_gene ($e2g->output) {
+        my @exons = $e2g_gene->sub_SeqFeature;
+        foreach my $exon (@exons){
+            my @supp_evidence = $exon->sub_SeqFeature;
+            #display(@sub_Feats);                    
+            foreach my $sp (@supp_evidence) {
 
-  Title   : make_miniseq
-  Usage   : 
-  Function: makes a mini genomic from the genomic sequence and features list
-  Returns : 
-  Args    : 
+                # Fix strand
+                $sp->strand($est_strand);
 
-=cut
-
-
-
-
-=head2 minimum_introm
-
-  Title   : minimum_intron
-  Usage   : 
-  Function: Defines minimum intron size for miniseq
-  Returns : 
-  Args    : 
-
-=cut
-
-sub minimum_intron {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{'_minimum_intron'} = $arg;
+                # source_tag and primary_tag have to be set to
+                # something, or validate method in FeaturePair
+                # (callled by RunnableDB) throws!
+                $sp->feature2->source_tag ('I_am_valid');
+                $sp->feature2->primary_tag('I_am_valid');
+                
+                $self->add_output($sp);
+            }
+        }
     }
-
-    return $self->{'_minimum_intron'} || 1000;
 }
 
-=head2 exon_padding
-
-  Title   : exon_padding
-  Usage   : 
-  Function: Defines exon padding extent for miniseq
-  Returns : 
-  Args    : 
-
-=cut
-   
-sub exon_padding {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{'_padding'} = $arg;
+sub add_output {
+    my( $self, @feat ) = @_;
+    
+    my $ana = $self->analysis;
+    foreach my $f (@feat) {
+        $f->analysis($ana);
     }
-
-#    return $self->{'_padding'} || 100;
-    return $self->{'_padding'} || 100;
-
-
+    
+    $self->{'_output'} ||= [];
+    push(@{$self->{'_output'}}, @feat);
 }
 
 sub output {
-    my ($self, @arg) = @_;
+    my( $self ) = @_;
     
-    if (@arg) {
-      @{$self->{'_output'}} = @arg;
+    if (my $out = $self->{'_output'}) {
+        return @$out;
+    } else {
+        return;
     }
-
-    if (!defined($self->{'_output'})) {
-       $self->{'_output'} = [];
-    }
-  
-    return @{$self->{'_output'}};
-  }
-
+}
 
 1;
 

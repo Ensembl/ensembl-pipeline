@@ -521,6 +521,7 @@ sub run {
     my $features = $esthash->{$est};
     my @exons;
     
+    # How would you never have an array?
     next ID unless (ref($features) eq "ARRAY");
     
     # why > not >= 1?

@@ -110,7 +110,7 @@ BEGIN {
 sub new {
     my ($class,@args) = @_;
 
-    my $self = $class->SUPER::new(@args);    
+    my $self = $class->SUPER::new(@args);
 
     $self->{'_query'}     = undef;     # location of Bio::Seq object
     $self->{'_program'}   = undef;     # location of Blast
@@ -228,7 +228,7 @@ sub databases {
   if (!defined($self->{_databases})) {
      $self->{_databases} = [];
   }
-  if (defined(@dbs)) {
+  if (@dbs) {
      push(@{$self->{_databases}},@dbs);
   }
   return @{$self->{_databases}};
