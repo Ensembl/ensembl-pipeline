@@ -226,32 +226,43 @@ sub solutions{
   my $verbose = $self->verbose;
 
   print STDERR "solution at node: ".$node->transcript->dbID."\n" if $verbose;
+  if ( $node->is_candidate ){
+      print STDERR "node: ".$node->transcript->dbID." is a candidate\n" if $verbose;
+  }
   
+  ############################################################
   # if node has extension parents
-  if ( @{$node->extension_parents} ){
+  my @extension_parents;
+  if ($node->is_candidate){
+      @extension_parents = @{$node->candidate_extension_parents};
+  }
+  else{
+      @extension_parents = @{$node->extension_parents};
+  }
+  if ( @extension_parents ){
       
-      if ( scalar(@{$node->extension_parents}) > 1 ){
-	  my @paps = map { $_->transcript->dbID } @{$node->extension_parents};
-	  print STDERR "node ".$node->transcript->dbID." has ".scalar( @{$node->extension_parents})." parents: @paps\n" if $verbose;
-      }
-
-  PARENT:
-    foreach my $extension_parent ( @{$node->extension_parents} ){
-	
-      #if  ( $extension_parent->collected ){
-      #	next PARENT;
-      #}
-      my $solutions = $self->solutions( $extension_parent );
-      
-      foreach my $solution ( @$solutions ){
-	# add itself to the list
-	push ( @$solution, $node );
+      if ( scalar(@extension_parents) > 1 ){
+	  my @paps = map { $_->transcript->dbID } @extension_parents;
+	  print STDERR "node ".$node->transcript->dbID." has ".scalar( @extension_parents)." parents: @paps\n" if $verbose;
       }
       
-      # if the node $node has inclusion children
-      if ( @{$node->inclusion_children} ){
-	foreach my $inclusion_child ( @{$node->inclusion_children} ){
+    PARENT:
+      foreach my $extension_parent ( @extension_parents ){
 	  
+	  #if  ( $extension_parent->collected ){
+	  #	next PARENT;
+	  #}
+	  my $solutions = $self->solutions( $extension_parent );
+	  
+	  foreach my $solution ( @$solutions ){
+	      # add itself to the list
+	      push ( @$solution, $node );
+	  }
+	  
+	  # if the node $node has inclusion children
+	  if ( @{$node->inclusion_children} ){
+	      foreach my $inclusion_child ( @{$node->inclusion_children} ){
+		  
 	  ############################################################
 	  # add the inclusion children recursively
 	  # from this child unless this is included as well in the extension parent
@@ -261,10 +272,10 @@ sub solutions{
 	    my $list = [];
 	    $self->collect_inclusion_children( $inclusion_child , $list);
 	    foreach my $solution ( @$solutions ){
-	      push ( @$solution, @$list );
+		push ( @$solution, @$list );
 	    }
-	  }
 	}
+      }
       }
       
       push (@all_solutions, @$solutions);
@@ -352,12 +363,12 @@ sub link_Transcripts{
     ############################################################
     @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 			  if ($result){
-			    return $result;
+			      return $result;
 			  }
 			  else{
-			    return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+			      return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
 			  }
-			} @transcripts;
+		      } @transcripts;
     
     # just to track the sets
     # take 10 in each cluster
@@ -374,6 +385,8 @@ sub link_Transcripts{
     # search all the trees
     ############################################################
     my $all_the_leaves;  
+    my @candidates;
+  
   TRANSCRIPT:
     foreach my $transcript ( @transcripts ){
 	
@@ -403,12 +416,46 @@ sub link_Transcripts{
 	    push( @$all_the_leaves, $newnode);
 	    
 	}
+	############################################################
+	# check whether this node is a candidate for a missing link:
+	#
+	#                 zN <- ...<- z1 <- x
+	#                  |                |
+	#                 \|/              \|/
+	#                 wN <= ...<= w1 <= y   
+	# 
+	# wN is a potential missing link because it is not leaf but
+	# it could generate a new solution
+	if ( $result eq 'placed' ){
+	    if ( $newnode->is_included && @{$newnode->extension_parents} ){
+	
+		############################################################
+		# every extension parent must for a triangle, otherwise we have a candidate
+		unless( $self->check_triangle( $newnode ) ){
+		    
+		    ############################################################
+		    # check that $newnode is not already in the leaves
+		    my $is_leaf = 0;
+		    foreach my $leaf (@{$all_the_leaves}){
+			if ( $leaf == $newnode ){
+			    $is_leaf++;
+			    last;
+			}
+		    }
+		    unless( $is_leaf ){
+			push( @candidates, $newnode );
+		    }
+		}
+	    }	    
+	}
+	############################################################
+	# check the leaves - this is a bit redundant but it is a sanity-check
 	$self->_check_leaves( $all_the_leaves );
     }
     
     # check #   
     #if ($verbose){
-#      foreach my $leaf ( @$all_the_leaves ){
+    #      foreach my $leaf ( @$all_the_leaves ){
     #	print STDERR "leaf:\n";
 #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($leaf->transcript);
 #	foreach my $parent ( @{$leaf->extension_parents} ){
@@ -417,7 +464,15 @@ sub link_Transcripts{
 #	}
 #      }
 #    }
-
+    
+    ############################################################
+    # get rid of the candidates which have been extended:
+    my @final_candidates;
+    foreach my $candidate ( @candidates ){
+	unless ( $candidate->is_extended ){
+	    push( @final_candidates, $candidate );
+	}
+    }
 
     ############################################################
     # recover the lists from the trees in this cluster:
@@ -427,7 +482,9 @@ sub link_Transcripts{
     print STDERR "**** LEAVES: @t\n" if $verbose;
     #print STDERR "******************************************************\n";
     
-    foreach my $leaf ( @$all_the_leaves ){
+    my @final_leaves = ( @$all_the_leaves, @final_candidates );
+    
+    foreach my $leaf ( @final_leaves ){
 	print STDERR "finding solutions from leaf ".$leaf->transcript->dbID."\n" if $verbose;
 	my @sol = @{$self->solutions($leaf)};
 	print STDERR scalar(@sol)." solutions found\n" if $verbose;
@@ -476,6 +533,42 @@ sub _check_leaves{
     $copy_leaves = [];
 }
 
+
+############################################################
+# every extension parent must for a triangle, otherwise we have a candidate
+sub check_triangle{
+    my ($self, $node ) = @_;
+    unless ( @{$node->extension_parents} ){
+	return 1;
+    }
+    my $is_candidate = 0;
+  EXT_PARENT:
+    foreach my $extension_parent ( @{$node->extension_parents} ){
+	my $found_triangle = 0;
+      INCL_PARENT:
+	foreach my $inclusion_parent ( @{$node->inclusion_parents} ){
+	  OTHER_EXT_PARENT:
+	    foreach my $other_parent ( @{$inclusion_parent->extension_parents} ){
+		if ( $other_parent == $extension_parent ){
+		    $found_triangle = 1;
+		    last INCL_PARENT;
+		}
+	    }
+	}
+	if ( $found_triangle == 0 ){
+	    $is_candidate = 1;
+	    $node->is_candidate(1);
+	    $node->add_candidate_extension_parent($extension_parent);
+	}
+    }
+    if ( $is_candidate ){
+	return 0;
+    }
+    else{
+	return 1;
+    }
+}
+
 ############################################################
 
 sub check_tree{
@@ -506,7 +599,7 @@ sub check_tree{
     # keep track whether the new element has been placed at all or not
     my $placed=0;
     
- NODE:
+  NODE:
     while( @nodes_to_check ){
 	my $node = shift @nodes_to_check;
 	
@@ -594,6 +687,7 @@ sub check_tree{
 		if ( $root && $self->compare( $newnode, $root) eq 'inclusion' ){
 		    print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$root->transcript->dbID."\n" if $verbose;
 		    $root->add_inclusion_child( $newnode );
+		    $newnode->add_inclusion_parent( $root);
 		    $newnode->is_included(1);
 		    $self->tag_extension_ancestors($root);
 		    
@@ -866,6 +960,7 @@ sub _recurse_extension_branch{
 		  elsif( $result3 eq 'continue' || $result3 eq 'no-overlap' ){
 		      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
 		      $node->add_inclusion_child($newnode);
+		      $newnode->add_inclusion_parent($node);
 		      $newnode->is_included(1);
 		      $self->tag_extension_ancestors($node);
 		      if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
@@ -885,6 +980,7 @@ sub _recurse_extension_branch{
 	      else{
 		  print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
 		  $node->add_inclusion_child( $newnode );
+		  $newnode->add_inclusion_parent( $node );
 		  $newnode->is_included(1);
 		  $self->tag_extension_ancestors($node);
 		  if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
@@ -932,6 +1028,7 @@ sub _recurse_extension_branch{
       # place here
       print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
       $node->add_inclusion_child( $newnode );
+      $newnode->add_inclusion_parent( $node );
       $newnode->is_included(1);
       $self->tag_extension_ancestors($node);
       return 'placed';
@@ -1027,9 +1124,12 @@ sub run {
   my @transcripts = $self->input_transcripts;
 	 
   # cluster the transcripts
-  my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
-  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
+  my @transcript_clusters1 = $self->_cluster_Transcripts(@transcripts);
+  print STDERR scalar(@transcript_clusters1)." clusters returned from _cluster_Transcripts\n";
 	 
+  # restrict the number of ESTs per cluster, for the time being, to avoid deep recursion 
+  my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1, 900);
+
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
   print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
@@ -1045,7 +1145,34 @@ sub run {
   $self->output(@merged_transcripts);
 }
 
+############################################################
 
+sub _filter_clusters{
+  my ( $self, $clusters, $threshold ) = @_;
+  my @new_clusters;
+ 
+ CLUSTER:
+  foreach my $cluster ( @$clusters ){
+    my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
+    my @transcripts = 
+      sort { scalar( @{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @{$cluster->get_Transcripts};
+    my $count = 0;
+  
+    my @to_be_added =();
+  TRAN:
+    foreach my $t ( @transcripts ){
+      $count++;
+      if ( $count > 400 ){
+	last TRAN;
+      }
+      push( @to_be_added, $t );
+    }
+    $new_cluster->put_Transcripts( @to_be_added );
+    push( @new_clusters, $new_cluster );
+  }
+  return @new_clusters;
+}
+      
 ############################################################
 #
 # CLUSTERING OF TRANSCRIPTS BY GENOMIC EXTENT
