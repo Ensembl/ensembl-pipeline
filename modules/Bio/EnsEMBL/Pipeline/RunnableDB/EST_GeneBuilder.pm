@@ -1092,10 +1092,94 @@ sub _merge_Transcripts{
     # Put here yet another check, to make sure that we really get rid of redundant things
     # it could be just another copy of the previous check above
 
-
-
-
-
+    # if we have produce more than one transcript, check again
+    if ( scalar( @merged_transcripts ) > 1 ){
+      
+      # first of all, sort them again, this is CRUCIAL!!!
+      my @created_transcripts2 = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
+					if ($result){
+					  return $result;
+					}
+					else{
+					  return ( $a->start_exon->start <=> $b->start_exon->start );
+					}
+				      } @merged_transcripts;
+      
+      # we process again the transcripts, the results go in this hash
+      my %new_transcripts2;
+      my $max_label2 = 0;
+      my @labels2 = ();
+      
+      # for each created transcript
+    TRAN2: 
+      foreach my $tran (@created_transcripts2){
+	my $found = 0;
+	my $label2 = 0;
+	
+	# loop over the existing new_transcripts
+      NEW_TRAN2: 
+	foreach my $k ( @labels2 ){
+	  
+	  # take each new_transcript
+	  my $new_tran2 = $new_transcripts2{ $k };
+	  
+	  # test for merge
+	  print STDERR "comparing\n";
+	  print STDERR $new_tran2.":";
+	  foreach my $e1 ( $new_tran2->get_all_Exons ){
+	    print STDERR $e1->start.":".$e1->end."\t";
+	  }
+	  print STDERR "\n".$tran.":";
+	  foreach my $e1 ( $tran->get_all_Exons ){
+	    print STDERR $e1->start.":".$e1->end."\t";
+	  }
+	  print STDERR "\n";
+	  
+	  my ($merge,$overlaps) = $self->_test_for_Merge( $new_tran2, $tran );
+	  
+	  # if they can merge, merge them and put the new transcript in this place 
+	  if ( $merge == 1 ){
+	    $found = 1;
+	    my @list = ( $new_tran2, $tran );
+	    print STDERR "They MERGE,\n";
+	    print STDERR "adding it to new_transcripts[ $label2 ] = $new_transcripts{ $label2 }\n";
+	    my $new_transcript2 = $self->_produce_Transcript( \@list, $strand );
+	    $new_transcripts2{ $label2 } = $new_transcript2;
+	    print STDERR "producing a new  new_transcripts[ $label2 ] = $new_transcripts2{ $label2 }\n\n";
+	    next TRAN2;
+	  }
+	  else{
+	    # go to the next cluster
+	    $label2++;
+	  }
+	} # end of NEW_TRAN2
+	
+	# if it does not merge to any transcript, create a new new_tran
+	if ($found == 0) {
+	  $max_label2 = $label2;
+	  push ( @labels2, $label2);
+	  print STDERR "*** LABEL: $label2 ***\n";
+	  $new_transcripts2{ $label2 } = $tran;
+	}    
+	
+      }   # end of TRAN
+      
+      @merged_transcripts = ();
+      @merged_transcripts = values( %new_transcripts2 );
+      
+      ### print out the results
+      print STDERR "3rd round, transcripts created:\n";
+      foreach my $tran ( @merged_transcripts ){
+	print STDERR "tran ".$tran.":";
+	foreach my $e1 ( $tran->get_all_Exons ){
+	  print STDERR $e1->start.":".$e1->end."\t";
+	}
+	print STDERR "\n";
+      }
+      
+    } # END OF THE IF SCALAR (@MERGED_TRANSCRIPTS) > 1
+    
+    
     # check for the single exon transcripts ( dandruff ), they are no good
     my @final_merged_transcripts;
     foreach my $tran ( @merged_transcripts ){
@@ -1106,7 +1190,7 @@ sub _merge_Transcripts{
 	push( @final_merged_transcripts, $tran );
       }
     }
-
+    
     # empty array to save memory
     @merged_transcripts = ();
     
@@ -1698,7 +1782,7 @@ sub _check_splice_Sites{
 	};
 	if ($@){
 	  print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
-	  print STDERR $@;
+	  #print STDERR $@;
 	  $upstream ='NN';
 	}
 	eval{
@@ -1706,7 +1790,7 @@ sub _check_splice_Sites{
 	};
 	if ($@){
 	  print STDERR "Unable to get subsequence (".(($exon->end)+1).",".(($exon->end)+2).")\n";
-	  print STDERR $@;
+	  #print STDERR $@;
 	  $downstream = 'NN';
 	}
 	#  in the reverse strand we're looking at coordinates in the reversed-complement contig:
@@ -1931,7 +2015,7 @@ sub run {
     # convert_output
     $self->convert_output($gw_runnable, $strand);
   }
-  print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
+  print STDERR $tcount." transcripts run in genomewise (-smell 8) in the forward strand\n";
 
   # minus strand
   $strand = -1;
@@ -1943,7 +2027,7 @@ sub run {
     # convert_output
     $self->convert_output($gw_runnable, $strand);
   }
-  print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
+  print STDERR $tcount2." transcripts run in genomewise (-smell 8) in the reverse strand\n";
 
 
 }
