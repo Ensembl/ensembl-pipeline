@@ -134,23 +134,20 @@ sub construct_command_line{
   
 }
 
-
-
 sub open_command_line{
   my ($self, $verbose)= @_;
 
   my $lsf = '';
-  local *PIPE;
 
-  if (open(PIPE, '-|')) {
-      while (<PIPE>) {
+  if (open(my $pipe, '-|')) {
+      while (<$pipe>) {
 	  if (/Job <(\d+)>/) {
 	      $lsf = $1;
 	  } else {
 	      $self->warn("DEBUG: unexpected from bsub: '$_'");
 	  }	  
       }
-      if (close(PIPE)) {
+      if (close $pipe) {
 	  if ( ($? >> 8) == 0 ){
 	      if ($lsf) {
 		  $self->id($lsf);
@@ -166,12 +163,13 @@ sub open_command_line{
   } 
   else {      
       # We want STDERR and STDOUT merged for the bsub process
-      open STDERR, '>&STDOUT';
-      
-      exec($self->bsub);
-      $self->throw("Could not run bsub");
+      # open STDERR, '>&STDOUT'; 
+      # probably better to do with shell redirection as above can fail
+      exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
   }  
 }
+
+
 
 
 sub get_pending_jobs {
