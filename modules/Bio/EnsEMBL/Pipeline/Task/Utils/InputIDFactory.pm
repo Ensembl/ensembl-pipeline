@@ -323,14 +323,12 @@ sub get_file_names{
     }else{
       my $file;
       if($regex){
-
-	if($f =~ /$regex/){
+	if($f =~ m|$regex|){
 	  $file = $f;
 	}
       }else{
 	$file = $f;
       }
-     
       push(@input_ids, $file) if($file);
     }    
   }
