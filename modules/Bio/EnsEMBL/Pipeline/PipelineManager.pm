@@ -247,13 +247,14 @@ sub run {
 
     if(!keys(%pending_tasks) && !keys(%running_tasks)) {
       print STDERR "\n\nNothing left to do, shutting down\n";
-      last MAIN 
+      last MAIN;
     }
 
-    if(time() - $last_check > $CHECK_INTERVAL) {	
+    if(time() - $last_check >= $CHECK_INTERVAL) {	
       #
       # update task status by contacting job adaptor
       #
+      print STDERR "UPDATING STATUS!\n";
       $self->_update_task_status();
       $last_check = time();
     }
@@ -321,12 +322,14 @@ sub run {
       my $retry_count = $config->get_parameter($taskname, 'retries');
       if($job->retry_count() < $retry_count) {
         my $ss = $self->_submission_systems()->{$taskname};
-        $job->retry_count(++$job->retry_count);
+        $job->retry_count($job->retry_count + 1);
         $ss->submit($job);
       } else {
-        $job->set_status('FATAL');
+        $job->set_current_status('FATAL');
       }
     }
+
+    sleep(2); #save some CPU when endlessly looping
 
   } #end of MAIN LOOP
 }
@@ -391,8 +394,6 @@ sub _update_task_status {
 
 
   my %task_status;
-  my %task_failed;
-  my %task_timeout;
   my %timeout_values;
 
   #
@@ -413,18 +414,19 @@ sub _update_task_status {
     $task_status{$taskname}->{'EXISTING'} ||= [];
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
 
-    #check if this job has timed out
-    if($status ne 'SUCCESSFUL'
-       && $status ne 'FAILED'
-       && $status ne 'FATAL'
+    #check if this is still running but has timed out
+    if($status ne 'SUCCESSFUL' && $status ne 'FAILED' && $status ne 'FATAL'
        && $current_time - $timestamp > $timeout_values{$taskname})
       {
-        $task_timeout{$taskname} ||= [];
-        push(@{$task_timeout{$taskname}}, $job_id);
-      } elsif($status eq 'FAILED') {
-        $task_failed{$taskname} ||= [];
-        push(@{$task_failed{$taskname}}, $job_id);
+        #timed out jobs need to go on list to be killed
+        push @{$self->_timeout_list()}, $job_id;
       } else {
+
+        if($status eq 'FAILED') {
+          #failed jobs need to go on list to be retried
+          push @{$self->_failed_list()}, $job_id;
+        }
+
         $task_status{$taskname}->{$status} ||= [];
         push(@{$task_status{$taskname}->{$status}}, $input_id);
       }
@@ -452,6 +454,9 @@ sub _update_task_status {
     }
     if($task_status{$taskname}->{'SUCCESSFUL'}) {
       $ts->add_successful($task_status{$taskname}->{'SUCCESSFUL'});
+    }
+    if($task_status{$taskname}->{'FAILED'}) {
+      $ts->add_failed($task_status{$taskname}->{'FAILED'});
     }
     if($task_status{$taskname}->{'FATAL'}) {
       $ts->add_fatal($task_status{$taskname}->{'FATAL'});
