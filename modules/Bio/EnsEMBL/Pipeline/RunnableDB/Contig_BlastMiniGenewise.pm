@@ -70,11 +70,47 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
     $path = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
+
+    if(!defined $type || $type eq ''){
+      $type = $::similarity_conf{'type'};
+    }
+    
+    if(!defined $threshold){
+      $threshold = $::similarity_conf{'threshold'};
+    }
+
+    $type = 'sptr' unless (defined $type && $type ne '');
+    $threshold = 200 unless (defined($threshold));
+
+    $self->dbobj->static_golden_path_type($path);
+    $self->type($type);
+    $self->threshold($threshold);
+
+
     return $self; 
 }
+
+sub type {
+  my ($self,$type) = @_;
+
+  if (defined($type)) {
+    $self->{_type} = $type;
+  }
+  return $self->{_type};
+}
+
+sub threshold {
+  my ($self,$threshold) = @_;
+
+  if (defined($threshold)) {
+    $self->{_threshold} = $threshold;
+  }
+  return $self->{_threshold};
+}
+
 
 =head1 RunnableDB implemented methods
 
@@ -177,9 +213,7 @@ sub fetch_input {
 
     print STDERR "contig: " . $contig . " \n";
 
-    # for mouse, use swall and drop cutoff to 100
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('swall',100,0);
-#    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200,0);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
     
     print STDERR "Number of features = " . scalar(@features) . "\n";
 
