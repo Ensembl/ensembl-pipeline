@@ -80,8 +80,8 @@ use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
-use Bio::Tools::BPlite;
+use Bio::EnsEMBL::RootI;
+use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -129,7 +129,6 @@ sub new {
     $self->{'_coverage'}  = 10;        # Only return hits to a depth of 10
     $self->{'_ungapped'}  = undef;         # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
-    $self->{'_ungapped_features'} = [];
 
     #print STDERR "@args\n";
     # Now parse the input options and store them in the object
@@ -231,7 +230,7 @@ sub run {
     $self->parse_results;
     $self->deletefiles();
     
-    return $self->ungapped_features();
+   
 }
 
 sub databases {
@@ -738,7 +737,7 @@ sub split_HSP {
       # Which type of feature do we want?
       my $fp;
       
-      $self->ungapped_features(@tmpf);
+     
       $qinc = abs( $qinc );
       $hinc = abs( $hinc );
 
@@ -1080,15 +1079,7 @@ sub ungapped {
   return $self->{_ungapped};
 }
 
-sub ungapped_features{
-  my ($self, @fp) = @_;
-  print STDERR "have ",scalar(@fp)," to store as ungapped features\n";
-  if(@fp){
-    push(@{$self->{'_ungapped_features'}}, @fp);
-  }
-  
-  return @{$self->{'_ungapped_features'}};
-}
+
 
 sub filter {
     my ($self,$args) = @_;
