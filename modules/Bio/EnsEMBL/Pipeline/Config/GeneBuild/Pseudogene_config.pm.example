@@ -63,24 +63,21 @@ use vars qw( %Pseudogene_config );
 
 		# configs for the spliced elsewhere tests
 
-		# %ID of a tbalstx of the (presumed) retrotransposed query sequence to its 
+		# %ID of a blastp of the (presumed) retrotransposed query sequence to its 
 		# homolog that is spliced elsewhere in the genome. hits falling below 
 		# this cutoff are ignored (80%) is suggested
 		PS_PERCENT_ID_CUTOFF   => 80,
 
 		# ratio of the spans of the retrotransposed gene vs its spliced homologue
 		# spliced / retrotransposed
-		# ie: 1 is the same length genes 
+		# ie: two genes with the same genomic span have a ratio equal to 1
 		# many retrotransposed genes have a ratio > 10
 		# used to make retrotransposition decision
-		PS_SPAN_RATIO          => 1.5,
+		PS_SPAN_RATIO          => 3,
 
 		# mimimum number of exons for the spliced gene to have
 		PS_MIN_EXONS           => 2,
-		# limit the number of hits from the align feature table
-		PS_SQL_LIMIT           => 100,
-		# minimum score of the align feature required
-		PS_FEATURE_SCORE       => 300,
+
 
 	       );	
 
