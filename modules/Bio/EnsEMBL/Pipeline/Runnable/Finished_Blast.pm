@@ -175,21 +175,9 @@ sub _apply_coverage_filter {
                 
                 my($name, @hsps) = @$hit;
                 
-                if ($split_flag) {
-                    #print "\n$name\n";
-
-                    # Don't keep multiple matches to the same sequence
-                    # at the same genomic location.
-                    @hsps = $self->_discard_worst_overlapping(@hsps);
-                    
-                    #foreach my $h (@hsps) {
-                    #    my $q = $h->query;
-                    #    printf "  %6d  %-6d  %3.2f\n",
-                    #        $q->start,
-                    #        $q->end,
-                    #        $h->percent * 3;   # blastx off by factor of 3
-                    #}
-                }
+                # Don't keep multiple matches to the same sequence
+                # at the same genomic location.
+                @hsps = $self->_discard_worst_overlapping(@hsps);
                 
                 #print STDERR "    Looking at $name ";
                 foreach my $hsp (@hsps) {
