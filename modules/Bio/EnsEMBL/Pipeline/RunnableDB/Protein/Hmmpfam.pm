@@ -81,17 +81,10 @@ sub new {
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     
-    # set up seg specific parameters,
-    # my $params = $self->parameters;  # we don't have to read the parameters column from the database
-                                       # in this case; no parameters are passed on to the Runnable
+    # set up program specific parameters,
 
     my $params;
     if ($params ne "") { $params .= ","; }
-    # get the path to the binaries from the Analysis object (analysisprocess table)
-    $params .= "-program=>".$self->analysis->program_file.",";
-    # define the database
-    $params .= "-database=>".$self->analysis->db_file.",";
-    # define the options
     $params .= "-options=>".$self->analysis->parameters;
 
     $self->parameters($params);
@@ -178,7 +171,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
-        $self->{'_runnable'} = $runnable->new (%parameters);
+        $self->{'_runnable'} = $runnable->new (-analysis => $self->analysis, %parameters);
     }
     return $self->{'_runnable'};
 }

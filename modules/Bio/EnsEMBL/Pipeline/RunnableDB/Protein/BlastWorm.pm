@@ -81,10 +81,8 @@ sub new {
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     
-    # get the path to the binaries from the Analysis object (analysisprocess table)
-    my $params .= "-program=>".$self->analysis->program_file.",";
-    # define the database
-    $params .= "-database=>".$self->analysis->db_file.",";
+    my $params;
+    if ($params ne "") { $params .= ","; }
     # set the filter
     if ($self->analysis->db =~ /slim/i) {
         $params .= "-filter=>1,";
@@ -175,7 +173,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
-        $self->{'_runnable'} = $runnable->new (%parameters);
+        $self->{'_runnable'} = $runnable->new (-analysis => $self->analysis, %parameters);
     }
     return $self->{'_runnable'};
 }
