@@ -70,7 +70,7 @@ sub new {
     my $self = bless {},$class;
     #print STDERR "calling Job->new from ".(caller)."\n";
     #print STDERR "@args\n";
-    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir) 
+    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				SUBMISSION_ID
@@ -80,6 +80,7 @@ sub new {
 				STDERR
 				RETRY_COUNT
 				OUTPUT_DIR
+				RUNNER
 				)],@args);
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
@@ -101,11 +102,17 @@ sub new {
     if($self->output_dir){
       $self->make_filenames;
     }else{
-      my $dir = $BATCH_QUEUES{$analysis->logic_name}->{'output_dir'} || $DEFAULT_OUTPUT_DIR;
+      my $dir;
+      if(!$BATCH_QUEUES{$analysis->logic_name}){
+	$dir =  $DEFAULT_OUTPUT_DIR;
+      }else{
+	$dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
+      }
       $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
       $self->output_dir($dir);
       $self->make_filenames;
     }
+    $self->runner($runner);
     return $self;
 }
 
@@ -150,10 +157,20 @@ sub create_by_analysis_input_id {
 sub dbID {
     my ($self, $arg) = @_;
 
-    if (defined($arg)) {
+    if ($arg) {
 	$self->{'_dbID'} = $arg;
     }
     return $self->{'_dbID'};
+
+}
+
+sub runner {
+    my ($self, $arg) = @_;
+
+    if ($arg) {
+	$self->{'_runner'} = $arg;
+    }
+    return $self->{'_runner'};
 
 }
 
@@ -171,7 +188,7 @@ sub dbID {
 sub adaptor {
     my ($self, $arg) = @_;
 
-    if (defined($arg)) {
+    if ($arg) {
 	$self->{'_adaptor'} = $arg;
     }
     return $self->{'_adaptor'};
@@ -257,7 +274,7 @@ sub flush_runs {
   # then in same directory as Job.pm,
   # and fail if not found
 
-  my $runner = $::RUNNER_SCRIPT || undef;
+  my $runner = $self->runner;
 
   unless (-x $runner) {
     $runner = __FILE__;
@@ -312,6 +329,7 @@ sub flush_runs {
 
     $batch_job->construct_command_line($cmd);
     $batch_job->open_command_line();
+    #print STDERR $batch_job->bsub."\n";
     if( ! defined $batch_job->id ) {
       print STDERR ( "Couldnt batch submit @job_ids" );
       foreach my $job_id (@job_ids) {
@@ -356,16 +374,16 @@ sub batch_runRemote {
   my ($self) = @_;
 
   my $queue;
-
-  if ($BATCH_QUEUES{$self->analysis->logic_name}) {
-      $queue = $self->analysis->logic_name;
+  
+  if (!$BATCH_QUEUES{$self->analysis->logic_name}) {
+      $queue = 'default';
   }
   else {
-      $queue = 'default';
+      $queue = $self->analysis->logic_name;
   }
   
   push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
-
+ 
   if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
@@ -771,10 +789,11 @@ sub set_up_queues {
 	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
             $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
 	    $q{'default'}{'last_flushed'} = undef;
-	    $q{'default'}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
             $q{'default'}{'jobs'} = [];
 	}
     }
+  
     return %q;
 }
 
