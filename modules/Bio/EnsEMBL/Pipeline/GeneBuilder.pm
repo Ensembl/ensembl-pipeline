@@ -383,6 +383,11 @@ sub  make_ExonPairs {
 
     my %pairhash;
 
+
+    #  We can cut down the number of searches we do if we
+    #  only search forward exons within one contig - I
+    #  have yet to implement this.
+
     for (my $i = 0; $i < scalar(@exons)-1; $i++) {
 
 	my %idhash;
@@ -935,6 +940,11 @@ sub print_Genes {
 	}
     }
 }
+
+sub make_Translation {
+    my ($self,$transcript) = @_;
+
+    
 1;
 
 
