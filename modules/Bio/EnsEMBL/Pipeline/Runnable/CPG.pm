@@ -321,9 +321,7 @@ sub parse_results {
             $feature {start} = $element[1];
             $feature {end} = $element[2];
             $feature {strand} = 0;
-            $feature {source}= 'cpg';
-            $feature {primary}= 'cpg_island';
-	    $feature {program} = 'cpg';
+            $feature {program} = 'cpg';
 	    $feature {program_version} = '1';
 	    $feature {display_label} = "oe = $oe";
           
@@ -383,8 +381,6 @@ sub create_feature {
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
                             -score   => $feat->{'score'},
-                            -source_tag  => $feat->{'source'},
-                            -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
     $cpg->display_label($feat->{'display_label'});

@@ -1,6 +1,4 @@
 
-
-#
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
@@ -226,6 +224,7 @@ sub exons {
     my ($self, $exon) =@_;
     if ($exon)
     {
+      #print "adding ".$exon->seqname."\n";
         $exon->isa("Bio::EnsEMBL::SeqFeature") 
                 || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
         push(@{$self->{'_exons'}}, $exon);
@@ -350,8 +349,9 @@ sub parse_results {
                                 unless (scalar(@element) == 13); 
                                 
                    my ($gene, $exon) = split (/\./, $element[0]); 
-
+		   #print $gene." ".$exon."\n";
                    $feature {name} = $gene + ($exon/1000); #name must be a number
+		   #print $feature{name}."\n";
                    #arrange numbers so that start is always < end
                    if ($element[2] eq '+')
                    {
@@ -405,9 +405,12 @@ sub parse_results {
             $self->genscan_peptides($peptide_string); #final peptide 
         }
     }
+    #foreach my $exon ($self->exons){
+    # print "exon seqname ". $exon->seqname."\n";
+    #}
     #end of big loop. Now build up genes
     $self->create_genes();
-
+    #print "there are ".scalar($self->genscan_genes)." genes\n";
     unless ($self->query)
     {
         print STDERR "Can't calculate phases if Bio::Seq isn't supplied\n";
@@ -437,9 +440,9 @@ sub calculate_and_set_phases_new {
 
       my $peptide = $peptides[$i];
       if (length $peptide < $min_gene_length) {
-	  print STDERR "peptide $i too short (", length($peptide), "bp)\n";
-	  $i++;
-	  next GENE;
+          print STDERR "peptide $i too short (", length($peptide), "bp)\n";
+          $i++;
+          next GENE;
       }
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
@@ -465,15 +468,15 @@ sub calculate_and_set_phases_new {
         
         # remove any terminal X's from the translation
         $temp_tran =~ s/x$//i;
-	my $genscan = $peptides[$i];
-	my $x = 0;
-	while (($x = index($temp_tran, 'X', $x)) != -1) {
-	  #print STDERR "Found an 'X' at ", $i + 1, "\n";
-	  substr($genscan, $x, 1) = 'X';
-	  $x++;
-	}
+        my $genscan = $peptides[$i];
+        my $x = 0;
+        while (($x = index($temp_tran, 'X', $x)) != -1) {
+          #print STDERR "Found an 'X' at ", $i + 1, "\n";
+          substr($genscan, $x, 1) = 'X';
+          $x++;
+        }
     
-	#print "\nafter\ngenscan: $genscan\nensembl: $ensembl\n";
+        #print "\nafter\ngenscan: $genscan\nensembl: $ensembl\n";
         if (index($genscan ,$temp_tran) >= 0) {
 #         print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
 
@@ -483,15 +486,15 @@ sub calculate_and_set_phases_new {
           }
           $tran->temporary_id($self->query->id . "." . $count);
           $count++;
-	  #print "translation = ".$temp_tran."\n";
-	  if($temp_tran =~/\*/){
-	    print "translation ".$tran->temporary_id." = ".$temp_tran."\n";
-	    print "transcript contains stop codons!";
-	  } else {
-	   #print "adding translation ".$tran->temporary_id." \n";
-	    $self->add_Transcript($tran);
-	  }
-	  $i++;
+          #print "translation = ".$temp_tran."\n";
+          if($temp_tran =~/\*/){
+            print "translation ".$tran->temporary_id." = ".$temp_tran."\n";
+            print "transcript contains stop codons!";
+          } else {
+           #print "adding translation ".$tran->temporary_id." \n";
+            $self->add_Transcript($tran);
+          }
+          $i++;
           next GENE;
         }
       }
@@ -530,7 +533,7 @@ sub each_Transcript {
 sub create_feature {
     my ($self, $feat) = @_;
     #$self->create_gene();
-
+    #print "have exon ".$feat->{name}."\n";
     #create analysis object
     my $analysis_obj = Bio::EnsEMBL::Analysis->new
                         (   -db              => undef,
@@ -540,7 +543,8 @@ sub create_feature {
                             -gff_source      => $feat->{'source'},
                             -gff_feature     => $feat->{'primary'});
 
-    #create and fill Bio::EnsEMBL::Seqfeature objects   
+    #create and fill Bio::EnsEMBL::Seqfeature objects 
+    #print "have exon ".$feat->{name}."\n" 
     my $exon = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},
@@ -549,10 +553,10 @@ sub create_feature {
                             -score   => $feat->{'score'},
                             -frame   => $feat->{'frame'},
                             -p_value => $feat->{'p'},
-                            -source_tag  => $feat->{'source'},
-                            -primary_tag => $feat->{'type'},
-                            -analysis => $analysis_obj);  
+                            -analysis => $analysis_obj);
+    #print "created exon ".$exon->seqname."\n";
     $self->exons($exon);
+    #print "added exon ".$exon->seqname."\n";
 }
 
 #creates groups of exons as subseqfeatures.
@@ -564,12 +568,16 @@ sub create_genes {
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
-
+    #foreach my $exon(@ordered_exons){
+    #  print " seqname ".$exon->seqname."\n";
+    #}
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
-    {
+      {
+	#print "seqname ".$exon->seqname."\n"; 
         my ($group_number) = ($exon->seqname =~ /(\d+)\./);
-	#print "seqname =  ".$exon->seqname."\n";
+	#print "group number".$group_number."\n";
+        #print "seqname =  ".$exon->seqname."\n";
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
@@ -578,8 +586,6 @@ sub create_genes {
             $gene_end       {$group_number} = $exon->end;
             $gene_score     {$group_number} = 0 ;
             $gene_strand    {$group_number} = $exon->strand;
-            $gene_source    {$group_number} = $exon->source_tag ;
-            $gene_primary   {$group_number} = $exon->primary_tag;
             $gene_analysis  {$group_number} = $exon->analysis;
             $gene_p         {$group_number} = 0 ;
         }
@@ -596,7 +602,8 @@ sub create_genes {
 
     #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
     foreach my $gene_number (keys(%genes))
-    {
+      { 
+	#print "gene number ".$gene_number."\n";
         my $gene = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname     => $gene_number,
                             -strand      => $gene_strand   {$gene_number},
@@ -606,8 +613,6 @@ sub create_genes {
                                             /(scalar @{$genes {$gene_number}}),
                             -start       => $gene_start    {$gene_number},
                             -end         => $gene_end      {$gene_number},
-                            -source_tag  => $gene_source   {$gene_number},
-                            -primary_tag => $gene_primary  {$gene_number},
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
 
@@ -669,8 +674,6 @@ sub output {
                                            -end_phase => $exon->end_phase,
                                            -score   => $exon->score,
                                            -p_value   => $exon->p_value,
-                                           -source_tag => 'genscan',
-                                           -primary_tag => 'prediction',
                                            -analysis     => $analysis);
       my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $self->query->id.".".$exon->seqname,
                                             -start   => $exon->start,
@@ -680,8 +683,6 @@ sub output {
                                             -end_phase => $exon->end_phase,
                                             -score   => $exon->score,
                                             -p_value   => $exon->p_value,
-                                            -source_tag => 'genscan',
-                                            -primary_tag => 'prediction',
                                             -analysis     => $analysis);
 
 #      print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
@@ -757,9 +758,7 @@ sub output_singlefeature {
                             -score          => $score,
                             -start          => $start,
                             -end            => $end,
-                            -source_tag     => $source,
-                            -primary_tag    => $primary,
-                            -p_value        => $p_value,
+			    -p_value        => $p_value,
                             -analysis       => $analysis )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
 

@@ -110,7 +110,7 @@ sub new{
      $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
      $self->{'_parameters'} = undef; #location of parameters for fgenesh
      $self->{'_matirx'} = undef; #location of matrix used by fgenesh
-
+     #print "@args\n";
      my($query, $fgenesh, $parameters, $matrix) = 
 	  $self->_rearrange([qw(QUERY FGENESH PARAM MATRIX)], @args);
 
@@ -155,6 +155,7 @@ sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
+      #print "seq = ".$seq."\n";
         unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
@@ -392,21 +393,30 @@ sub each_Fgenesh_Transcript {
 =cut
 
 sub run {
-    my ($self) = @_;
-    #check query
+    my ($self, $dir, $filename) = @_;
+    #print "check query ".$self->query."\n";
     my $seq = $self->query() || $self->throw("Seq required for Fgenesh\n");
-    #set directory if provided
+    #print "set directory if provided\n";
+    if($dir){
+      $self->workdir($dir);
+    }
     $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
-    #print STDERR "have checked directory writing file next\n";
-    $self->writefile(); 
-    #print STDERR "about to run Fgenesh\n";
+    #print "have checked directory writing file next\n";
+    #print "filename to be set to ".$filename."\n";
+    if($filename){
+      $self->filename($filename);
+    }else{
+      $self->writefile();
+    } 
+    #print "about to run Fgenesh\n";
 #run fgenesh       
     $self->run_fgenesh();
     #print "have run fgenesh\n";
     #parse output and create features
     $self->parse_results();
+    #print "have parsed output\n";
     $self->deletefiles();
 }
 
@@ -423,7 +433,9 @@ sub run {
 sub run_fgenesh {
     my ($self) = @_;
     #print STDERR "Running fgenesh on ".$self->filename."\n";
-    system ($self->fgenesh.' '.$self->matrix.' '.$self->filename .' > '.$self->results);
+    my $command = $self->fgenesh.' '.$self->matrix.' '.$self->filename.' > '.$self->results;
+    #print $command."\n";
+    system ($command);
     $self->throw($self->results." not created by fgenesh\n") unless (-e $self->results);
     #print "leaving run_fgenesh\n";
 }
@@ -521,7 +533,7 @@ sub parse_results {
 		    my %feature;
 		    #print "parsing data\n";
 		    my $number = $line->[0]+($exon_num/100);
-		    $feature {'name'} = $self->query->id.".".$number;
+		    $feature {'name'} = $number;
 		    if($line->[1] eq '+')
 		    {
 			$feature {'start'} = $line->[3];
@@ -608,9 +620,10 @@ sub create_genes {
 
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
-    {
+      {
+	#print $exon->seqname."\n";
         my ($group_number) = ($exon->seqname =~ /(\d+)\./);
-                     
+	#print $group_number."\n";
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
@@ -654,8 +667,9 @@ sub create_genes {
 	  $gene->add_sub_SeqFeature($exon, '');
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
-	print STDERR "seq = ".$self->query."\n";
-	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene,$self->query);
+	#print STDERR "seq = ".$self->query."\n";
+	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
+	#print "have ".$tran."\n";
 	$self->add_Fgenesh_Transcript($tran);
     }
     #print "created the genes\n";
@@ -741,7 +755,7 @@ sub output {
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
 
     foreach my $exon (@exons) {
-      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
+      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->query->id.".".$exon->seqname,
 					   -start   => $exon->start,
 					   -end     => $exon->end,
 					   -strand  => $exon->strand,
@@ -749,7 +763,7 @@ sub output {
 					   -end_phase => $exon->end_phase,
 					   -score   => $exon->score,
 					   -analysis     => $analysis);
-      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
+      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname =>  $self->query->id.".".$exon->seqname,
 					    -start   => $exon->start,
 					    -end     => $exon->end,
 					    -strand  => $exon->strand,
