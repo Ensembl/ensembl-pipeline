@@ -1,10 +1,10 @@
-package Clone2Acc.pm
+package Clone2Acc;
 
 use strict;
 use vars qw( %Clone2Acc );
 
 
-%Clone2Acc = ( WB_ACC_2_CLONE =>  = {
+%Clone2Acc = ( WB_ACC_2_CLONE => {
 				       'U50184' => 'W03A3',
 				       'Z54216' => 'T24H10',
 				       'Z54218' => 'F37B12',
@@ -3269,7 +3269,7 @@ use vars qw( %Clone2Acc );
 				       'U58749' => 'B0496',
 				       'U11279' => 'F21H11'
 				      },
-		 WB_CLONE_2_ACC =>  = {
+		 WB_CLONE_2_ACC =>  {
           'K08F11' => 'U70855',
           'M05B5' => 'Z71265',
           'T01G5' => 'Z81111',
@@ -6540,7 +6540,7 @@ sub import {
     my $pack = shift; # Need to move package off @_
 
     # Get list of variables supplied, or else
-    # all of GeneConf:
+    # all of Clone2Acc:
     my @vars = @_ ? @_ : keys( %Clone2Acc );
     return unless @vars;
 
@@ -6551,14 +6551,14 @@ sub import {
 
 
     foreach (@vars) {
-	if ( defined $GeneConf{ $_ } ) {
+	if ( defined $Clone2Acc{ $_ } ) {
             no strict 'refs';
 	    # Exporter does a similar job to the following
 	    # statement, but for function names, not
 	    # scalar variables:
-	    *{"${callpack}::$_"} = \$GeneConf{ $_ };
+	    *{"${callpack}::$_"} = \$Clone2Acc{ $_ };
 	} else {
-	    die "Error: GeneConf: $_ not known\n";
+	    die "Error: Clone2Acc: $_ not known\n";
 	}
     }
 }

@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin -w
+#!/usr/local/ensembl/bin/perl  -w
 
 use strict;
 use WormBase;
@@ -21,13 +21,15 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
 
   my $chromosome = Bio::EnsEMBL::Chromosome->new(-chr_name => $chromosome_info->{'chr_name'},
 						 -length => $chromosome_info->{'length'},
+						 -adaptor =>$db->get_ChromosomeAdaptor, 
 						);
   $db->get_ChromosomeAdaptor->store($chromosome);
   open(FH, $chromosome_info->{'agp_file'});
   my $fh = \*FH;
   my $seq_ids = &get_seq_ids($fh);
   
-  my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(options => '-A');
+  my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
+  $pfetch->options('-a');
   my $obda = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(-db => $WB_CLONE_INDEX);
 
   my %seqs = %{&get_sequences($seq_ids, $pfetch)};
@@ -49,19 +51,19 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
       }
     }
   }
-
+  my %contig_id;
   foreach my $id(keys(%seqs)){
     my $seq = $seqs{$id};
+    my ($acc, $version) = $id =~ /(\S+)\.(\d+)/;
     my $clone     = new Bio::EnsEMBL::Clone;
     my $contig    = new Bio::EnsEMBL::RawContig; 
-    my ($version) = $clone_ids[0] =~ /\S+\.(\d+)/;
     my $clone_name = $WB_ACC_2_CLONE->{$acc};
     $clone->htg_phase(3);
     $clone->id($clone_name); 
     $clone->embl_id($seq->id);
     $clone->version(1);
     $clone->embl_version($version);
-    my $contig_id = $clone_ids[0].".1.".$seq->length;
+    my $contig_id = $id.".1.".$seq->length;
     $contig->name($contig_id);
     $contig->seq($seq->seq);
     $contig->length($seq->length);
@@ -76,5 +78,6 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
     if($@){
       die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
     }
+    $contig_id{$id} = $contig->dbID;
   }
 }
