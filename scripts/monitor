@@ -68,7 +68,7 @@ if($config_obj){
     my $module = $config_obj->get_parameter('TASKS', $taskname); 
     eval "require $module";
     print $module.": ";
-    $module->description;
+    print $module->description;
     print "\n";
   }
   print "\n";

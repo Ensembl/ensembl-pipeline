@@ -24,5 +24,5 @@ sub module{
 
 sub description{
   my $self = @_;
-  print STDERR $self->name." ".$self->logic_name." runs the runnabledb Genscan and is dependant on RepeatMasker being finished\n";
+  return $self->name." ".$self->logic_name." runs the runnabledb Genscan and is dependant on RepeatMasker being finished\n";
 }

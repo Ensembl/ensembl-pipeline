@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "SliceCPG runs the runnable Slice_CPG and has no dependancies\n";
+  return "SliceCPG runs the runnable Slice_CPG and has no dependancies\n";
 }

@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "Slice_dust runs the runnable Slice_Dust and has no dependancies\n";
+  return "Slice_dust runs the runnable Slice_Dust and has no dependancies\n";
 }

@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "CPG runs the runnable CPG and has no dependancies\n";
+  return "CPG runs the runnable CPG and has no dependancies\n";
 }

@@ -27,7 +27,7 @@ sub module{
 
 sub description{
   my $self = @_;
-  print STDERR $self->name." ".$self->logic_name." runs the runnableDB BestPmatch and is dependant on all Pmatch analysis being finished\n";
+  return $self->name." ".$self->logic_name." runs the runnableDB BestPmatch and is dependant on all Pmatch analysis being finished\n";
 }
 
 

@@ -77,7 +77,7 @@ Internal methods have an underscore prefix.
 use strict;
 package Bio::EnsEMBL::Pipeline::Task;
 
-use vars qw(@ISA @EXPORT_OK);
+use vars qw(@ISA);
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::TaskStatus;
@@ -232,9 +232,9 @@ sub create_Jobs {
 
 sub description{
   my $self = @_;
-  print STDERR $self->name." hasn't implemented a description method".
-    " this method is useful so others can see what a Task does and what".
-      "its dependancies are\n";
+ return $self->name." hasn't implemented a description method".
+   " this method is useful so others can see what a Task does and what".
+     "its dependancies are\n";
 }
 
 

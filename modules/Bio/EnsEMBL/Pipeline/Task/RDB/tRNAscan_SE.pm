@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "tRNAscan runs the runnable tRNAscan_SE and has no dependancies\n";
+  return "tRNAscan runs the runnable tRNAscan_SE and has no dependancies\n";
 }

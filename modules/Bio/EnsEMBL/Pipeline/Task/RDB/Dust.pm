@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "Dust runs the runnabledb Dust and has no dependancies\n";
+  return "Dust runs the runnabledb Dust and has no dependancies\n";
 }

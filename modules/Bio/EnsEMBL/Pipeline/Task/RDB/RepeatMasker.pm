@@ -24,5 +24,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "RepeatMasker runs the runnabledb RepeatMasker and has no dependancies\n";
+  return "RepeatMasker runs the runnabledb RepeatMasker and has no dependancies\n";
 }

@@ -22,5 +22,5 @@ sub module{
 }
 
 sub description{
-  print STDERR "TRF runs the runnabledb TRF and has no dependancies\n";
+  return "TRF runs the runnabledb TRF and has no dependancies\n";
 }
