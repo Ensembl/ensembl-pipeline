@@ -186,9 +186,6 @@ sub make_targetted_runnables {
   my $start   = $2;
   my $end     = $3;
 
-  #print STDERR "fetching features for $chr_name $start $end\n";
-  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end);
-  #print STDERR "have ".@features." pmatch features to run with\n";
   my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       '-host'   => $GB_GW_DBHOST,
 						       '-user'   => $GB_GW_DBUSER,
