@@ -35,308 +35,306 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::DnaPepAlignFeature;
+use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
 =head2 validate_transcript
 
 Title   : validate_transcript 
-  Usage   : my @valid = $self->validate_transcript($transcript)
- Function: Validates a transcript - rejects if mixed strands, 
-  rejects if low coverage, 
-  rejects if stops in translation
-  splits if long introns and insufficient coverage of parental protein
-  Returns : Ref to @Bio::EnsEMBL::Transcript
-  Args    : Bio::EnsEMBL::Transcript
+Usage   : my @valid = $self->validate_transcript($transcript)
+Function: Validates a transcript - rejects if mixed strands, rejects if low coverage, rejects if stops in translation splits if long introns and insufficient coverage of parental protein
+Returns : Ref to @Bio::EnsEMBL::Transcript
+Args    : Bio::EnsEMBL::Transcript
 
 =cut
   
-  sub validate_transcript {
-    my ($transcript,$coverage,$low_complexity,$maxintron,$seqfetchers ) = @_;
+sub validate_transcript {
+  my ($transcript,$coverage,$low_complexity,$maxintron,$seqfetchers ) = @_;
+  
+  my @valid_transcripts;
+  
+  my $valid = 1;
+  my $split = 0;
+  
+  Bio::EnsEMBL::Pipeline::GeneUtils::check_coverage      ($transcript,$coverage,$seqfetchers);
+  Bio::EnsEMBL::Pipeline::GeneUtils::check_translation   ($transcript);
+  Bio::EnsEMBL::Pipeline::GeneUtils::check_low_complexity($transcript,$low_complexity);
+  Bio::EnsEMBL::Pipeline::GeneUtils::check_strand       ($transcript);
+  
+  my @tran = Bio::EnsEMBL::Pipeline::GeneUtils::check_introns ($transcript,$maxintron);
+  
+  
+  if ($valid) {
+    # Do we really need to do this? Can we just take out the dbID adaptor stuff
+    # make a new transcript that's a copy of all the important parts of the old one
+    # but without all the db specific gubbins
     
-    my @valid_transcripts;
+    my $newtranscript  = new Bio::EnsEMBL::Transcript;
+    my $newtranslation = new Bio::EnsEMBL::Translation;
     
-    my $valid = 1;
-    my $split = 0;
+    $newtranscript->translation($newtranslation);
+    $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
+    $newtranscript->translation->end_Exon($transcript->translation->end_Exon);
+    $newtranscript->translation->start($transcript->translation->start);
+    $newtranscript->translation->end($transcript->translation->end);
     
-    Bio::EnsEMBL::Pipeline::GeneUtils::check_coverage      ($transcript,$coverage,$seqfetchers);
-    Bio::EnsEMBL::Pipeline::GeneUtils::check_translation   ($transcript);
-    Bio::EnsEMBL::Pipeline::GeneUtils::check_low_complexity($transcript,$low_complexity);
-    Bio::EnsEMBL::Pipeline::GeneUtils::check_strand       ($transcript);
-    
-    my @tran = Bio::EnsEMBL::Pipeline::GeneUtils::check_introns ($transcript,$maxintron);
-    
-    
-    if ($valid) {
-      # Do we really need to do this? Can we just take out the dbID adaptor stuff
-      # make a new transcript that's a copy of all the important parts of the old one
-      # but without all the db specific gubbins
-      
-      my $newtranscript  = new Bio::EnsEMBL::Transcript;
-      my $newtranslation = new Bio::EnsEMBL::Translation;
-      
-      $newtranscript->translation($newtranslation);
-      $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
-      $newtranscript->translation->end_Exon($transcript->translation->end_Exon);
-      $newtranscript->translation->start($transcript->translation->start);
-      $newtranscript->translation->end($transcript->translation->end);
-      
-      foreach my $exon(@{$transcript->get_all_Exons}){
-	$newtranscript->add_Exon($exon);
-	foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig_id);
-	}
+    foreach my $exon(@{$transcript->get_all_Exons}){
+      $newtranscript->add_Exon($exon);
+      foreach my $sf(@{$exon->get_all_supporting_features}){
+	$sf->seqname($exon->contig_id);
       }
-      
-      push(@valid_transcripts,$newtranscript);
     }
     
-    return \@valid_transcripts;
+    push(@valid_transcripts,$newtranscript);
   }
   
-  sub check_introns {
-    my ($transcript,$maxintron) = @_;
+  return \@valid_transcripts;
+}
+
+sub check_introns {
+  my ($transcript,$maxintron) = @_;
+  
+  my $previous_exon;
+  my $split = 0;
+  
+  foreach my $exon (@{$transcript->get_all_Exons}){
     
-    my $previous_exon;
-    my $split = 0;
-    
-    foreach my $exon (@{$transcript->get_all_Exons}){
+    if (defined($previous_exon)) {
+      my $intron;
       
-      if (defined($previous_exon)) {
-	my $intron;
-	
-	if ($exon->strand == 1) {
-	  $intron = abs($exon->start - $previous_exon->end - 1);
-	} else {
-	  $intron = abs($previous_exon->start - $exon->end - 1);
-	}
-	
-	if ( $intron > $maxintron ) {
-	  print STDERR "Intron too long $intron  for transcript " . $transcript->dbID . "\n";
-	  $split = 1;
-	}
-	
+      if ($exon->strand == 1) {
+	$intron = abs($exon->start - $previous_exon->end - 1);
+      } else {
+	$intron = abs($previous_exon->start - $exon->end - 1);
       }
-      $previous_exon = $exon;
+      
+      if ( $intron > $maxintron ) {
+	print STDERR "Intron too long $intron  for transcript " . $transcript->dbID . "\n";
+	$split = 1;
+      }
+      
     }
-    
-    if ($split) {
-      return @{Bio::EnsEMBL::Pipeline::GeneUtils::split_Transcript($transcript,$maxintron)};
-    } else {
-      return ($transcript);
-    }
+    $previous_exon = $exon;
   }
+  
+  if ($split) {
+    return @{Bio::EnsEMBL::Pipeline::GeneUtils::split_Transcript($transcript,$maxintron)};
+  } else {
+    return ($transcript);
+  }
+}
 
 =head2 split_transcript
 
-  Title   : split_transcript 
-    Usage   : my @splits = $self->split_transcript($transcript)
-  Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
-    transcripts that result. 
-    Returns : Ref to @Bio::EnsEMBL::Transcript
-    Args    : Bio::EnsEMBL::Transcript
+Title   : split_transcript 
+Usage   : my @splits = $self->split_transcript($transcript)
+Function: splits a transcript into multiple transcripts at long introns. Rejects single exon transcripts that result. 
+Returns : Ref to @Bio::EnsEMBL::Transcript
+Args    : Bio::EnsEMBL::Transcript
 
 =cut
     
     
-    sub split_Transcript{
-      my ($transcript,$max_intron) = @_;
+sub split_Transcript{
+  my ($transcript,$max_intron) = @_;
+  
+  $transcript->sort;
+  
+  my @split_transcripts   = ();
+  
+  if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+    #$self->throw("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+  }
+  
+  my $prev_exon;
+  my $exon_added = 0;
+  
+  my $curr_transcript = new Bio::EnsEMBL::Transcript;
+  my $translation     = new Bio::EnsEMBL::Translation;
+  
+  $curr_transcript->translation($translation);
+  
+ EXON: foreach my $exon (@{$transcript->get_all_Exons}){
+    
+    $exon_added = 0;
+    
+    # Start a new transcript if we are just starting out
+    
+    if($exon == $transcript->start_Exon){
       
-      $transcript->sort;
+      $prev_exon = $exon;
       
-      my @split_transcripts   = ();
+      $curr_transcript->add_Exon($exon);
+      $exon_added = 1;
+      $curr_transcript->translation->start_Exon($exon);
+      $curr_transcript->translation->start($transcript->translation->start);
       
-      if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
-	#$self->throw("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
-      }
-      
-      my $prev_exon;
-      my $exon_added = 0;
-      
-      my $curr_transcript = new Bio::EnsEMBL::Transcript;
-      my $translation     = new Bio::EnsEMBL::Translation;
-      
-      $curr_transcript->translation($translation);
-      
-    EXON: foreach my $exon (@{$transcript->get_all_Exons}){
-	
-	$exon_added = 0;
-	
-	# Start a new transcript if we are just starting out
-	
-	if($exon == $transcript->start_Exon){
-	  
-	  $prev_exon = $exon;
-	  
-	  $curr_transcript->add_Exon($exon);
-	  $exon_added = 1;
-	  $curr_transcript->translation->start_Exon($exon);
-	  $curr_transcript->translation->start($transcript->translation->start);
-	  
-	  push(@split_transcripts, $curr_transcript);
-	  next EXON;
-	}
-	
-	# We need to start a new transcript if the intron size between $exon and $prev_exon is too large
-	my $intron = 0;
-	
-	if ($exon->strand == 1) {
-	  $intron = abs($exon->start - $prev_exon->end - 1);
-	} else {
-	  $intron = abs($prev_exon->start - $exon->end - 1);
-	}
-	
-	if ($intron > $max_intron) {
-	  $curr_transcript->translation->end_Exon($prev_exon);
-	  $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
-	  
-	  my $t  = new Bio::EnsEMBL::Transcript;
-	  my $tr = new Bio::EnsEMBL::Translation;
-	  
-	  $t->translation($tr);
-	  
-	  # add exon unless already added, and set translation start and start_Exon
-	  # But the exon will nev er have been added ?
-	  
-	  $t->add_Exon($exon) unless $exon_added;
-	  $exon_added = 1;
-	  
-	  $t->translation->start_Exon($exon);
-	  
-	  if ($exon->phase == 0) {
-	    $t->translation->start(1);
-	  } elsif ($exon->phase == 1) {
-	    $t->translation->start(3);
-	  } elsif ($exon->phase == 2) {
-	    $t->translation->start(2);
-	  }
-	  
-	  $exon->phase(0);
-	  
-	  $curr_transcript = $t;
-	  
-	  push(@split_transcripts, $curr_transcript);
-	}
-	
-	if ($exon == $transcript->end_Exon){
-	  $curr_transcript->add_Exon($exon) unless $exon_added;
-	  $exon_added = 1;
-	  
-	  $curr_transcript->translation->end_Exon($exon);
-	  $curr_transcript->translation->end($transcript->translation->end);
-	} else {
-	  $curr_transcript->add_Exon($exon) unless $exon_added;
-	}
-	
-	foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig_id);
-	}
-	
-	$prev_exon = $exon;
-	
-      }
-      
-      # discard any single exon transcripts
-      my @final_transcripts = ();
-      my $count = 1;
-      
-      foreach my $st (@split_transcripts){
-	$st->sort;
-	
-	my @ex = @{$st->get_all_Exons};
-
-	if(scalar(@ex) > 1){
-	  $st->{'temporary_id'} = $transcript->dbID . "." . $count;
-	  $count++;
-	  push(@final_transcripts, $st);
-
-	}
-      }
-
-      return \@final_transcripts;
-      
+      push(@split_transcripts, $curr_transcript);
+      next EXON;
     }
     
-    sub check_strand {
-      my ($transcript) = @_;
-      
-      my $previous_exon;
-      
-      foreach my $exon (@{$transcript->get_all_Exons}){
-	
-	if (defined($previous_exon)) {
-	  my $intron;
-	  
-	  if ($exon->strand == 1) {
-	    $intron = abs($exon->start - $previous_exon->end - 1);
-	  } else {
-	    $intron = abs($previous_exon->start - $exon->end - 1);
-	  }
-	  
-	  if ($exon->strand != $previous_exon->strand) {
-	    print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
-	    return 0;
-	  }
-	}
-	$previous_exon = $exon;
-      }
-      return 1;
+    # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+    my $intron = 0;
+    
+    if ($exon->strand == 1) {
+      $intron = abs($exon->start - $prev_exon->end - 1);
+    } else {
+      $intron = abs($prev_exon->start - $exon->end - 1);
     }
+    
+    if ($intron > $max_intron) {
+      $curr_transcript->translation->end_Exon($prev_exon);
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
+      
+      my $t  = new Bio::EnsEMBL::Transcript;
+      my $tr = new Bio::EnsEMBL::Translation;
+      
+      $t->translation($tr);
+      
+      # add exon unless already added, and set translation start and start_Exon
+      # But the exon will nev er have been added ?
+      
+      $t->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+      
+      $t->translation->start_Exon($exon);
+      
+      if ($exon->phase == 0) {
+	$t->translation->start(1);
+      } elsif ($exon->phase == 1) {
+	$t->translation->start(3);
+      } elsif ($exon->phase == 2) {
+	$t->translation->start(2);
+      }
+      
+      $exon->phase(0);
+      
+      $curr_transcript = $t;
+      
+      push(@split_transcripts, $curr_transcript);
+    }
+    
+    if ($exon == $transcript->end_Exon){
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+      
+      $curr_transcript->translation->end_Exon($exon);
+      $curr_transcript->translation->end($transcript->translation->end);
+    } else {
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+    }
+    
+    foreach my $sf(@{$exon->get_all_supporting_features}){
+      $sf->seqname($exon->contig_id);
+    }
+    
+    $prev_exon = $exon;
+    
+  }
+  
+  # discard any single exon transcripts
+  my @final_transcripts = ();
+  my $count = 1;
+  
+  foreach my $st (@split_transcripts){
+    $st->sort;
+    
+    my @ex = @{$st->get_all_Exons};
+    
+    if(scalar(@ex) > 1){
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
+      $count++;
+      push(@final_transcripts, $st);
+      
+    }
+  }
+  
+  return \@final_transcripts;
+      
+}
+    
+sub check_strand {
+  my ($transcript) = @_;
+  
+  my $previous_exon;
+  
+  foreach my $exon (@{$transcript->get_all_Exons}){
+    
+    if (defined($previous_exon)) {
+      my $intron;
+      
+      if ($exon->strand == 1) {
+	$intron = abs($exon->start - $previous_exon->end - 1);
+      } else {
+	$intron = abs($previous_exon->start - $exon->end - 1);
+      }
+      
+      if ($exon->strand != $previous_exon->strand) {
+	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
+	return 0;
+      }
+    }
+    $previous_exon = $exon;
+  }
+  return 1;
+}
 
 =head2 check_translation
 
-    Title   : check_translation
-      Usage   :
-    Function: 
-    Example :
-      Returns : 1 if transcript translates with no stops, otherwise 0
-      Args    :
-      
+Title   : check_translation
+  Usage   :
+ Function: 
+Example :
+  Returns : 1 if transcript translates with no stops, otherwise 0
+  Args    :
+  
 
 =cut
       
-      sub check_translation {
-	my ($transcript) = @_;
+sub check_translation {
+  my ($transcript) = @_;
 	
-	my $tseq;
-	
-	eval{
-	  $tseq = $transcript->translate;
-	};
-	
-	if((!defined $tseq) || ($@)){
-	  my $msg = "problem translating :\n$@\n";
-	  #    $self->warn($msg);
-	  return 0;
-	}
-	
-	if ($tseq->seq =~ /\*/ ) {
-	  #   $self->warn("discarding transcript - translation has stop codons\n");
-	  return 0;
-	}
-	else{
-	  return 1;
-	}
-      }
-      
+  my $tseq;
+  
+  eval{
+    $tseq = $transcript->translate;
+  };
+  
+  if((!defined $tseq) || ($@)){
+    my $msg = "problem translating :\n$@\n";
+    #    $self->warn($msg);
+    return 0;
+  }
+  
+  if ($tseq->seq =~ /\*/ ) {
+    #   $self->warn("discarding transcript - translation has stop codons\n");
+    return 0;
+  }
+  else{
+    return 1;
+  }
+}
+
 
 =head2 check_coverage
 
-      Title   : check_coverage
-	Usage   :
-      Function: returns how much of the parent protein is covered by the genewise prediction
-	Example :
-	Returns : percentage
-	Args    :
-	
+Title   : check_coverage
+  Usage   :
+ Function: returns how much of the parent protein is covered by the genewise prediction
+  Example :
+  Returns : percentage
+  Args    :
+  
 
 =cut
-	
-	sub check_coverage {
-	  my ( $transcript, $coverage, $seqfetchers) = @_;
-	  
-	  my $matches = 0;
-	  my $pstart  = 0;
+  
+  sub check_coverage {
+    my ( $transcript, $coverage, $seqfetchers) = @_;
+    
+    my $matches = 0;
+    my $pstart  = 0;
 	  my $pend    = 0;
 	  my $protname;
 	  my $plength;
@@ -597,6 +595,122 @@ Title   : validate_transcript
   
   return $transcript;
 
+}
+
+
+=head2 prune_Exons
+
+  Arg [1]   : Bio::EnsEMBL::Gene
+  Function  : removes redundancy from a genes exon set 
+  Returntype: Bio::EnsEMBL::Gene
+  Exceptions: none 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+sub prune_Exons {
+  my ($self,$gene) = @_;
+  
+  my @unique_Exons; 
+  
+  # keep track of all unique exons found so far to avoid making duplicates
+  # need to be very careful about translation->start_Exon and translation->end_Exon
+  
+  foreach my $tran (@{$gene->get_all_Transcripts}) {
+    my @newexons;
+    foreach my $exon (@{$tran->get_all_Exons}) {
+      my $found;
+      #always empty
+    UNI:foreach my $uni (@unique_Exons) {
+	if ($uni->start  == $exon->start  &&
+	    $uni->end    == $exon->end    &&
+	    $uni->strand == $exon->strand &&
+	    $uni->phase  == $exon->phase  &&
+	    $uni->end_phase == $exon->end_phase
+	   ) {
+	  $found = $uni;
+	  last UNI;
+	}
+      }
+      if (defined($found)) {
+	push(@newexons,$found);
+	if ($exon == $tran->translation->start_Exon){
+	  $tran->translation->start_Exon($found);
+	}
+	if ($exon == $tran->translation->end_Exon){
+	  $tran->translation->end_Exon($found);
+	}
+      } else {
+	push(@newexons,$exon);
+	push(@unique_Exons, $exon);
+      }
+    }          
+    $tran->flush_Exons;
+    foreach my $exon (@newexons) {
+      $tran->add_Exon($exon);
+    }
+  }
+  return $gene;
+}
+
+
+=head2 validate_Gene
+
+  Arg [1]   : Bio::EnsEMBL::Gene
+  Function  : checks sanity of Gene coords
+  Returntype: 1/0
+  Exceptions: warns if things aren't valid and return 0'
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
+sub validate_gene{
+  my ($self, $gene) = @_;
+
+  # should be only a single transcript
+  my @transcripts = @{$gene->get_all_Transcripts};
+  if(scalar(@transcripts) != 1) {
+    my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+  
+  foreach my $transcript(@transcripts){
+    foreach my $exon(@{$transcript->get_all_Exons}){
+      if(!Bio::EnsEMBL::Pipeline::Tools::ExonUtils->validate_exon($exon)){
+	my $msg = "Rejecting gene because of invalid exon\n";
+	$self->warn($msg);
+	return 0;
+      }
+    }
+  }
+  
+  return 1;
+}
+
+sub _print_Gene{
+  my ($self,$gene) = @_;
+   my $id;
+  if ($gene->stable_id){
+    $id = $gene->stable_id;
+  }
+  elsif ( $gene->dbID ){
+    $id = $gene->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+  if ( defined( $gene->type ) ){
+    $id .= " ".$gene->type;
+  }
+  foreach my $transcript (@{$gene->get_all_Transcripts} ){
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+  }
 }
 
 1;

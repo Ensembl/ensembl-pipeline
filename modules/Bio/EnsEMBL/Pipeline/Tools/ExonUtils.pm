@@ -100,3 +100,93 @@ sub _transfer_supporting_evidence{
     $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
   }
 }
+
+
+
+=head2 _validate_Exon
+
+  Arg [1]   : Bio::EnsEMBL::Exon
+  Function  : check to make sure the coordinates of the exon are sensible 
+  Returntype: 1 or 0
+  Exceptions: gives warnings if checks are passed
+  Caller    : 
+  Example   : Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exon);
+
+=cut
+
+
+sub _validate_Exon{
+  my ($self, $exon) = @_;
+
+  if($exon->start < 0){
+    my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+  
+  elsif($exon->start > $exon->end){
+    my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+  
+  elsif($exon->start == $exon->end){
+    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - letting it through\n";
+    $self->warn($msg);
+    return 1;
+  }
+  return 1;
+}
+
+
+=head2 print methods
+
+  Arg [1]   : Bio::EnsEMBL::Exon
+  Function  : prints info about the exon or the exon and its evidence
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
+sub _print_Exon{
+  my ($self, $exon) = @_;
+
+  my $id;
+  if($exon->stable_id){
+    $id = $exon->stable_id;
+  }elsif($exon->dbID){
+    $id = $exon->dbID;
+  }else{
+    $id = "no id";
+  }
+  print STDERR "Exon: ".$id."\n";
+  print STDERR $exon->gffstring."\n";
+}
+
+sub _print_Evidence{
+  my ($self, $exon) = @_;
+
+  my $id;
+  if($exon->stable_id){
+    $id = $exon->stable_id;
+  }elsif($exon->dbID){
+    $id = $exon->dbID;
+  }else{
+    $id = "no id";
+  }
+
+  my @evidence = @{$exon->get_all_supporting_features};
+
+  print STDERR "Exon: ".$id."\n"; 
+  print STDERR $exon->gffstring."\n";
+  foreach my $sf(@evidence){
+    print STDERR "\t ".$sf->gffstring."\n";
+  }
+
+}
+
+1;
