@@ -77,43 +77,43 @@ sub new {
 
   
   foreach my $database ( $self->db ){
-  	# Prepend $ENV{BLASTDB} if not given a full path
-  	if ( $database !~ /^\// ){
-    	$database = $ENV{BLASTDB} . "/" . $database;
-    }
-    # we want the form '/path/to/index/dir', so remove the last if there is any '/'
-    if ( $database =~/(\S+)\/$/ ){
-      print STDERR "changing $database to $1\n";
-      $database = $1;
-    }
-    
-    # get the index name and the index directory out of $database
-    my @path = split /\//, $database;
+      # Prepend $ENV{BLASTDB} if not given a full path
+      if ( $database !~ /^\// ){
+	  $database = $ENV{BLASTDB} . "/" . $database;
+      }
+      # we want the form '/path/to/index/dir', so remove the last if there is any '/'
+      if ( $database =~/(\S+)\/$/ ){
+	  print STDERR "changing $database to $1\n";
+	  $database = $1;
+      }
+      
+      # get the index name and the index directory out of $database
+      my @path = split /\//, $database;
 
-    # the db_name is the last name in the path
-    my $db_name = pop( @path );
-    if ( $db_name =~/(\S+)\.fa/ ){
-      $db_name = $1;
-    }
+      # the db_name is the last name in the path
+      my $db_name = pop( @path );
+      if ( $db_name =~/(\S+)\.fa/ ){
+	  $db_name = $1;
+      }
     
-	$self->throw("Cannot define db_name") unless ( $db_name );
+      $self->throw("Cannot define db_name") unless ( $db_name );
     
-    # the index_dir is the directory path where the db sits
-    my $index_dir = join '/', @path;
-    $self->throw("Cannot define index_dir") unless ( $index_dir );
-	$self->index_name( $index_dir );
+      # the index_dir is the directory path where the db sits
+      my $index_dir = join '/', @path;
+      $self->throw("Cannot define index_dir") unless ( $index_dir );
+      $self->index_name( $index_dir );
 	
-    # we take as default format = 'FASTA';
-    $format = 'FASTA' unless ( $format );
+      # we take as default format = 'FASTA';
+      $format = 'FASTA' unless ( $format );
+      
+      print STDERR "Making an OBDAIndex fetcher with db_name: <$db_name>, index_dir: <".$self->index_name.">, format: <$format>\n"; 
 
-    print STDERR "Making an OBDAIndex fetcher with db_name: <$db_name>, index_dir: <".$self->index_name.">, format: <$format>\n"; 
-
-    my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $self->index_name,
-						   						   -dbname    => $db_name,
-						   						   -format    => $format
-						   						   );
+      my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $self->index_name,
+						     -dbname    => $db_name,
+						     -format    => $format
+						     );
 						   						   
-    $self->_seqfetcher($OBDAfetcher);
+      $self->_seqfetcher($OBDAfetcher);
   }
 
   return $self;
