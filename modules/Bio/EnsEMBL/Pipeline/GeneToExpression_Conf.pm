@@ -1,5 +1,5 @@
 #
-# BioPerl module for Bio::EnsEMBL::Analysis::ESTConf;
+# BioPerl module for Bio::EnsEMBL::Pipeline::GeneToExpression_Conf;
 #
 # Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
 #
@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::ESTConf - imports global variables used by EnsEMBL EST analysis
+Bio::EnsEMBL::Pipeline::GeneToExpression_Conf
 
 =head1 SYNOPSIS
 
@@ -20,7 +20,7 @@ Bio::EnsEMBL::Pipeline::ESTConf - imports global variables used by EnsEMBL EST a
 
 =head1 DESCRIPTION
 
-ESTConf is a pure ripoff of humConf written by James Gilbert.
+It is a pure ripoff of humConf written by James Gilbert.
 
 humConf is based upon ideas from the standard perl Env environment
 module.
@@ -32,11 +32,11 @@ so that it can be used when "use strict" is in use in the calling
 script.  Without arguments all the standard variables are set, and
 with a list, only those variables whose names are provided are set.
 The module will die if a variable which doesn\'t appear in its
-C<%ESTConf> hash is asked to be set.
+C<%GeneToExpression_Conf> hash is asked to be set.
 
 The variables can also be references to arrays or hashes.
 
-Edit C<%ESTConf> to add or alter variables.
+Edit C<%GeneToExpression_Conf> to add or alter variables.
 
 All the variables are in capitals, so that they resemble environment
 variables.
@@ -102,12 +102,18 @@ use vars qw( %GeneToExpression_Conf );
 	    # Currently only available for human
 	    ############################################################
 
-	    # if you want to map expression data to a set of genes via ESTs, 
-	    # ( see Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression )
-	    # set this to 1 if you want to map genes to ests after the genebuild
-	    # this is only for human
-	    MAP_GENES_TO_ESTS            => '1',
+	    # these two parameters will reduce the number of 
+            # ensembl <-> ests maps:
 			  
+	    # this will reject all unspliced ests		  
+	    SKIP_SINGLE_EXONS              => '0',
+            
+	    # this will take only the ests that are present in the expression db 
+	    USE_ONLY_ESTS_IN_EXPRESSION_DB => '1',	  
+			  
+	    # this will put a limit to the number of ests linked to a transcript
+            MAX_ESTS_PER_TRANSCRIPT        => 700,
+
 	    ############################################################		  
 	    # you can specify here the database where those genes are
             ############################################################
@@ -143,8 +149,8 @@ sub import {
     my $pack = shift; # Need to move package off @_
 
     # Get list of variables supplied, or else
-    # all of ESTConf:
-    my @vars = @_ ? @_ : keys( %ESTConf );
+    # all of GeneToExpression_Conf
+    my @vars = @_ ? @_ : keys( %GeneToExpression_Conf );
     return unless @vars;
 
     # Predeclare global variables in calling package
@@ -154,14 +160,14 @@ sub import {
 
 
     foreach (@vars) {
-	if ( defined $ESTConf{ $_ } ) {
+	if ( defined $GeneToExpression_Conf{ $_ } ) {
             no strict 'refs';
 	    # Exporter does a similar job to the following
 	    # statement, but for function names, not
 	    # scalar variables:
-	    *{"${callpack}::$_"} = \$ESTConf{ $_ };
+	    *{"${callpack}::$_"} = \$GeneToExpression_Conf{ $_ };
 	} else {
-	    die "Error: ESTConf: $_ not known\n";
+	    die "Error: GeneToExpression_Conf: $_ not known\n";
 	}
     }
 }
