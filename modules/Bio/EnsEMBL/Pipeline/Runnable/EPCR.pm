@@ -70,7 +70,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::SimpleFeature;
+use Bio::EnsEMBL::Map::MarkerFeature;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -90,7 +90,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_sflist'}    = [];    # an array of feature pairs
+    $self->{'_mflist'}    = [];    # an array of feature pairs
     $self->{'_query'}     = undef; # location of Bio::Seq object
     $self->{'_epcr'}      = undef; # location of EPCR binary
     $self->{'_workdir'}   = undef; # location of temp directory
@@ -169,6 +169,7 @@ sub query {
         
         $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".PCR.out");
+        $self->file($self->results);
     }
     return $self->{'_query'};
 }
@@ -293,7 +294,9 @@ sub run {
     }
 
     # clean up
-    $self->deletefiles();
+    # $self->deletefiles();
+
+    return 1;
 }
 
 
@@ -313,7 +316,7 @@ sub run_epcr {
     my $command = $self->epcr.' '.$self->sts.' '.$self->filename.' '.
      $options.' > '.$self->results;
 
-    #print STDERR "Running EPCR ($command)\n";
+    print STDERR "Running EPCR ($command)\n";
     $self->throw("Error running EPCR on ".$self->filename."\n")
      if system($command); 
     #or $self->throw("Error running EPCR: $!\n")
@@ -355,26 +358,22 @@ sub parse_results {
     foreach (@output) #loop from 3rd line
     {  
         my $feat;
-	my ($name, $start, $end, $hit) = $_ =~ m!(\S+)\s+(\d+)\.\.(\d+)\s+(\w+)!;
+	my ($name, $start, $end, $dbID) = $_ =~ m!(\S+)\s+(\d+)\.\.(\d+)\s+(\w+)!;
 
-	# nasty hack - escape the "'" - sql barfs with things
-	# like "3'UTR" - should be fixed in FeatureAdaptor...
-        $hit =~ s{\'}{\\\'};
-	$self->_add_hit($hit);
+	$self->_add_hit($dbID);
 
         $feat->{'name'} = $name;
         $feat->{'start'} = $start;
         $feat->{'end'} = $end;
         $feat->{'strand'} = 0;
         $feat->{'score'} = -1000;
-        $feat->{'hit'} = $hit;
+        $feat->{'dbID'} = $dbID;
         $feat->{'source'} = 'e-PCR';
         $feat->{'primary'} = 'sts';
 
+	print "$name : $start : $end : $dbID\n";
 
-	print "$name : $start : $end : $hit\n";
-
-	$self->create_SimpleFeature($feat);
+	$self->create_MarkerFeature($feat);
     }
     close $filehandle;   
 }
@@ -388,7 +387,7 @@ Returns an array of FeaturePair's (must be called after parse_results()).
 
 sub output {
     my ($self) = @_;
-    return @{$self->{'_sflist'}};
+    return @{$self->{'_mflist'}};
 }
 
 # make a temporary copy of the STS file to run against
@@ -434,6 +433,41 @@ sub _rm_sts_file {
     my ($self, $file) = @_;
 
     unlink $file;
+}
+
+
+sub create_MarkerFeature {
+    my ($self, $feat) = @_;
+
+    my $analysis = Bio::EnsEMBL::Analysis->new(
+        -db              => undef,
+        -db_version      => undef,
+        -program         => $feat->{'program'},
+        -program_version => $feat->{'program_version'},
+        -gff_source      => $feat->{'source'},
+        -gff_feature     => $feat->{'primary'}
+    );
+
+    my $mf = Bio::EnsEMBL::Map::MarkerFeature->new;
+    $mf->analysis($analysis);
+    $mf->score   ($feat->{'score'});
+    $mf->seqname ($feat->{'name'});
+    $mf->start   ($feat->{'start'});
+    $mf->end     ($feat->{'end'});
+    $mf->strand  ($feat->{'strand'});
+    $mf->dbID    ($feat->{'dbID'});
+
+    # display_label must be a null string, and not undef
+    # can't be set above as it is not known to SeqFeature
+    # (SimpleFeature->new uses SeqFeature->new)
+    # $mf->display_label($feat->{'hit'});
+
+    if ($mf) {
+	$mf->validate();
+
+	# add to _mflist
+	push(@{$self->{'_mflist'}}, $mf);
+    }
 }
 
 1;
