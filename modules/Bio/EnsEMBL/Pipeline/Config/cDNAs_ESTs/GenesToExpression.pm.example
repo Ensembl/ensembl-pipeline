@@ -60,12 +60,11 @@ use vars qw( %GenesToExpression );
 	    ############################################################	    
 	    # your slice ids must be recognised by this regex
 	    EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	    	    
+	    
 	    ############################################################
 	    # the gene2est analysis is run with this script:
 	    #(put your own path here)
 	    EST_EXPRESSION_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
-
 	    ############################################################
 	    # size of the chunks to run the gene to est map
 	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
@@ -73,7 +72,7 @@ use vars qw( %GenesToExpression );
 
 	    ############################################################
 	    # where the result-directories are going to go	
-    	    EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/',
+    	    EST_TMPDIR        => '/ecs2/scratch4/ensembl/eae/expression_test',
 	    
 	    ############################################################
 	    # job-queue in the farm
@@ -81,7 +80,7 @@ use vars qw( %GenesToExpression );
 	    
 	    ############################################################
 	    # the file where the bsub lines (to be sent to the farm) will be written
-	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/genes2ests.jobs', 
+	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch4/ensembl/eae/expression_test/Genes2ests.jobs', 
 	    	    
 	    ############################################################
 	    # the RunnableDB doing the work	    
