@@ -171,6 +171,23 @@ sub _apply_coverage_filter {
                 my $keep_hit = 0;
                 
                 my($name, @hsps) = @$hit;
+                
+                if ($split_flag) {
+                    #print "\n$name\n";
+
+                    # Don't keep multiple matches to the same sequence
+                    # at the same genomic location.
+                    @hsps = $self->_discard_worst_overlapping(@hsps);
+                    
+                    #foreach my $h (@hsps) {
+                    #    my $q = $h->query;
+                    #    printf "  %6d  %-6d  %3.2f\n",
+                    #        $q->start,
+                    #        $q->end,
+                    #        $h->percent * 3;   # blastx off by factor of 3
+                    #}
+                }
+                
                 #print STDERR "    Looking at $name ";
                 foreach my $hsp (@hsps) {
                     my $q = $hsp->query;
@@ -213,6 +230,54 @@ sub _apply_coverage_filter {
             }
         }
     }
+}
+
+sub _discard_worst_overlapping {
+    my $self = shift;
+    my @hsps = sort {$a->query->start <=> $b->query->start} @_;
+    
+    # Put all the hsps hits into overlapping bins
+    my $first = shift @hsps;
+    my $start = $first->start;
+    my $end   = $first->end;
+    my $current = [$first]; # The current bin
+    my @bins = ($current);
+    while (my $hsp = shift @hsps) {
+        my $q = $hsp->query;
+        
+        # Does this hsp overlap the current bin?
+        if ($q->start <= $end and $q->end >= $start) {
+            push(@$current, $hsp);
+            if ($q->end > $end) {
+                $end = $q->end;
+            }
+        } else {
+            $current = [$hsp];
+            push(@bins, $current);
+            $start = $hsp->start;
+            $end   = $hsp->end;
+        }
+    }
+    
+    foreach my $bin (@bins) {
+        if (@$bin == 1) {
+            push(@hsps, $bin->[0]);
+        } else {
+            # Remove the hsp with the lowest percent identity
+            my @bin_hsps = sort {$a->percent <=> $b->percent} @$bin;
+            shift(@bin_hsps);
+            
+            if (@bin_hsps == 1) {
+                # We are left with 1 hsp, so add it.
+                push(@hsps, $bin_hsps[0]);
+            } else {
+                # Remaining hsps may not be overlapping
+                push(@hsps, $self->_discard_worst_overlapping(@bin_hsps));
+            }
+        }
+    }
+    
+    return @hsps;
 }
 
 
