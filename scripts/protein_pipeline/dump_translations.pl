@@ -87,7 +87,7 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
           }
         }
         my $tseq = $trans->translate();
-        if ( $tseq->seq =~ /\*/ ) {
+        if ( $tseq->seq =~ /\*.+/ ) {
           print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
           next;
         }
