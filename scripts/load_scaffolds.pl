@@ -17,11 +17,13 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
 =head1 OPTIONS
 
 
-    -host    host name for database (gets put as host= in locator)
+    -host      host name for database (gets put as host= in locator)
     -dbname    For RDBs, what name to connect to (dbname= in locator)
     -dbuser    For RDBs, what username to connect as (dbuser= in locator)
     -dbpass    For RDBs, what password to use (dbpass= in locator)
     -module    Module name to load (Defaults to Bio::EnsEMBL::DBSQL::DBAdaptor)
+    -chunk     Maximum size of sequence to load.  Larger sequences than this
+               are chopped into $chunk size pieces.  Default is no chunking (0)
     -help      displays this documentation with PERLDOC
 =cut
 
@@ -40,6 +42,7 @@ my $dbname = 'main_trunk_pipeline';
 my $dbuser = 'root';
 my $dbpass = undef;
 my $module = 'Bio::EnsEMBL::DBSQL::DBAdaptor';
+my $chunk  = 0;
 
 my $help = 0;
 my $pipe = 0;
@@ -55,6 +58,7 @@ my $verbose = 0;
 	     'module:s'   => \$module,
              'pipe'       => \$pipe,
 	     'verbose'    => \$verbose,
+             'chunk:n'    => \$chunk,
 	     'h|help'     => \$help
 	     );
 if ($help) {
@@ -78,18 +82,46 @@ if( !defined $seqfile ) { die 'cannot load because sequence file to load sequenc
 my $seqio = new Bio::SeqIO(-format=>'Fasta', 
 			   -file=>$seqfile);
 my $count = 0;
+
+my $std      = $db->get_AnalysisAdaptor;
+my @analysis = $std->fetch_by_logic_name('SubmitContig');
+
+if ($#analysis != 0) {
+  die ("More than one or none SubmitContig logic name. Eeek! [@analysis]");
+}
+
 while ( my $seq = $seqio->next_seq ) {
-    my $cloneid= $seq->id;
-    my $contigid = $cloneid.".1";
-    $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
+    my $cloneid  = $seq->id;
     my $clone     = new Bio::EnsEMBL::PerlDB::Clone;
-    my $contig    = new Bio::EnsEMBL::PerlDB::Contig;
+
     $clone->htg_phase(3);
     $clone->id($cloneid);
-    $contig->id($contigid);
-    $contig->internal_id($count++);
-    $contig->seq($seq);    
-    $clone->add_Contig($contig);
+
+    $chunk = $seq->length unless $chunk;
+
+    my $current = 1;
+    my @contigs;
+
+    while ($current <= $seq->length) {
+
+        my $end = $current + $chunk - 1;
+
+        if ($end > $seq->length) {
+           $end = $seq->length;
+        }
+        my $contigid = $cloneid.".$current-$end" ;
+        my $contig    = new Bio::EnsEMBL::PerlDB::Contig;
+
+        $contig->id($contigid);
+        $contig->seq(new Bio::Seq(-id => $contigid, -seq => $seq->subseq($current,$end)));
+
+        $verbose && print STDERR ("Parsed contig $contigid : contig length\n");
+        $clone->add_Contig($contig);
+
+        push(@contigs,$contig);
+
+        $current += $chunk;
+    }
     eval { 
        $db->write_Clone($clone);
        $verbose && print STDERR "Written ".$clone->id." scaffold into db\n";
@@ -97,9 +129,11 @@ while ( my $seq = $seqio->next_seq ) {
     if( $@ ) {
       print STDERR "Could not write clone into database, error was $@\n";
     }
+
     if ($pipe) {
-      my $sth = $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values('".$contigid."','contig',1,now())");
-      $sth->execute;
-      $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
+        foreach my $contig (@contigs) {
+	$std->submitInputId($contig->id,'contig',$analysis[0]);
+        $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
+				      }
     }
 }
