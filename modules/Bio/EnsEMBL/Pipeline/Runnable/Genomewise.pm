@@ -394,67 +394,70 @@ sub run{
   my @trans_out = $self->output;
   my @trans_in  = @{$self->get_all_Transcripts};
   
+  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
+										     -comparison_level => 5,
+										    );  
   # let's try to make it fast:
   if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
-      my ($consecutive_overlap, $overlaps ) = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->_test_for_Simple_Merge($trans_in[0], $trans_out[0]);
-      my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
-      my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
-
-      if ( $consecutive_overlap == 1 && scalar( @exons_in) == scalar( @exons_out ) ){
-	  
-	EXON_2_EXON:
-	  while ( scalar ( @exons_in ) > 0 ){
-	      my $exon_in  = shift( @exons_in  );
-	      my $exon_out = shift( @exons_out );  
-	      
-	      # check just in case
-	      if ( $exon_in->overlaps( $exon_out ) ){
-		  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-		      $exon_out->add_supporting_features( $feature );
-		  }
-	      }
-	  } # end of EXON_2_EXON
-      }
-      else{
-	  print STDERR "passing evi info between 2 transcripts with non-consecutive overlaping exons\n";
-	  foreach my $exon_in ( @exons_in ){
-	      foreach my $exon_out( @exons_out ){
-		  if ( $exon_out->overlaps($exon_in) ){
-		      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-			  $exon_out->add_supporting_features( $feature );
-		      }
-		  }
-	      }
+    my ($consecutive_overlap, $overlaps ) = $comparator->compare($trans_in[0], $trans_out[0]);
+    my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+    my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+    
+    if ( $consecutive_overlap == 1 && scalar( @exons_in) == scalar( @exons_out ) ){
+      
+    EXON_2_EXON:
+      while ( scalar ( @exons_in ) > 0 ){
+	my $exon_in  = shift( @exons_in  );
+	my $exon_out = shift( @exons_out );  
+	
+	# check just in case
+	if ( $exon_in->overlaps( $exon_out ) ){
+	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	    $exon_out->add_supporting_features( $feature );
 	  }
-	  # test:
-	  print STDERR "before genomewise\n:";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_in[0] );
-	  print STDERR "after genomewise\n:";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_out[0] );
+	}
+      } # end of EXON_2_EXON
+    }
+    else{
+      print STDERR "passing evi info between 2 transcripts with non-consecutive overlaping exons\n";
+      foreach my $exon_in ( @exons_in ){
+	foreach my $exon_out( @exons_out ){
+	  if ( $exon_out->overlaps($exon_in) ){
+	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	      $exon_out->add_supporting_features( $feature );
+	    }
+	  }
+	}
       }
-
+      # test:
+      print STDERR "before genomewise\n:";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_in[0] );
+      print STDERR "after genomewise\n:";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_out[0] );
+    }
+    
   }
   else{
-      # if we have more than one transcript at one or both sides, we also have to check them all
-      print STDERR "passing evi info between more than 2 transcripts\n";
-      foreach my $tran_in ( @trans_in){
-	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+    # if we have more than one transcript at one or both sides, we also have to check them all
+    print STDERR "passing evi info between more than 2 transcripts\n";
+    foreach my $tran_in ( @trans_in){
+      my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+      
+      foreach my $tran_out ( @trans_out ){
+	my @exons_out =  sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+	
+	foreach my $exon_in ( @exons_in ){
 	  
-	  foreach my $tran_out ( @trans_out ){
-	      my @exons_out =  sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
-	      
-	      foreach my $exon_in ( @exons_in ){
-		  
-		  foreach my $exon_out( @exons_out ){
-		      if ( $exon_out->overlaps($exon_in) ){
-			  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-			      $exon_out->add_supporting_features( $feature );
-			  }
-		      }
-		  }
+	  foreach my $exon_out( @exons_out ){
+	    if ( $exon_out->overlaps($exon_in) ){
+	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+		$exon_out->add_supporting_features( $feature );
 	      }
+	    }
 	  }
-      }   
+	}
+      }
+    }   
   }
   
 
