@@ -57,35 +57,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                -input_id:  A virtual contig (e.g. chr_name.start.end)
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    $self->{'_parameters'}  = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::EPCR');
-    return $self;
-}
 
 =head2 fetch_input
 
@@ -112,50 +83,22 @@ sub fetch_input {
 
     $self->throw("Unable to fetch contig") unless $slice;
 
-    $self->slice($slice);
-    $self->genseq($slice);
-}
+    $self->query($slice);
 
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
-    my $arguments = "";
+    my %parameters = $self->parameter_hash;
 
-    # $self->analysis->parameters is a comma-delimited list.
-    # Anything of the form a => b is passed to the runnable's new method.
-    # Other text is given to the runnable as "options"
-    
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->analysis->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-		my ($key, $value) = split (/=>/, $pair);
-		if ($key && $value) {
-                    $key   =~ s/^\s+//g;
-                    $key   =~ s/\s+$//g;
-                    $value =~ s/^\s+//g;
-                    $value =~ s/\s+$//g;
-		    $parameters{$key} = $value;
-		}
-		else
-		{
-		    $arguments .= " $key ";
-		}
-            }
-        }
-        $parameters {'-sts'}     = $self->analysis->db_file();  
-        $parameters {'-options'} = $arguments;
-        $parameters {'-pcr'}     = $self->analysis->program_file();  
-        #creates empty Bio::EnsEMBL::Runnable::EPCR object
-        $self->{'_runnable'} = $runnable->new(%parameters);
-    }
-    return $self->{'_runnable'};
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::EPCR(
+        -query => $self->query,
+        -sts   => $self->analysis->db_file,
+        -nmin  => $parameters{'-NMIN'},
+        -nmax  => $parameters{'-NMAX'},
+        -w     => $parameters{'-W'},
+        -m     => $parameters{'-M'}
+    );
+
+    $self->runnable($runnable);
+
+    return 1;
 }
 
 
@@ -167,7 +110,7 @@ sub write_output {
     
     my @mapped_features;
   
-    my $slice = $self->slice;
+    my $slice = $self->query;
 
     foreach my $f ($self->output) {
 
