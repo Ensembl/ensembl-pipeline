@@ -455,7 +455,7 @@ sub validate_transcript {
   
   
   # check exon phases:
-  my @exons = $transcript->get_all_Exons;
+  my @exons = @{$transcript->get_all_Exons};
   #print "there are ".@exons." exons\n";
   $transcript->sort;
   for (my $i=0;$i<(scalar(@exons-1));$i++){
@@ -487,7 +487,7 @@ sub validate_transcript {
   #print STDERR "Coverage of ". $self->protein_id . " is $coverage%\n";
 
   my $previous_exon;
-  foreach my $exon($transcript->get_all_Exons){
+  foreach my $exon (@{$transcript->get_all_Exons}){
     if(!$self->validate_exon($exon)){
       print STDERR "Rejecting gene because of invalid exon\n";
       return undef;
@@ -498,9 +498,9 @@ sub validate_transcript {
       my $intron;
       
       if ($exon->strand == 1) {
-	$intron = abs($exon->start - $previous_exon->end - 1);
+				$intron = abs($exon->start - $previous_exon->end - 1);
       } else {
-	$intron = abs($previous_exon->start - $exon->end - 1);
+				$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
 #      if ($intron > 250000 && $coverage < 95) {
@@ -527,17 +527,18 @@ sub validate_transcript {
     my $newtranslation = Bio::EnsEMBL::Translation->new;
 
     $newtranscript->translation($newtranslation);
-    $newtranscript->translation->start_exon($transcript->translation->start_exon);
-    $newtranscript->translation->end_exon($transcript->translation->end_exon);
-    $newtranscript->translation->start($transcript->translation->start);
-    $newtranscript->translation->end($transcript->translation->end);
-    foreach my $exon($transcript->get_all_Exons){
+    $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
+    $newtranscript->translation->end_Exon  ($transcript->translation->end_Exon);
+    $newtranscript->translation->start     ($transcript->translation->start);
+		$newtranscript->translation->end       ($transcript->translation->end);
+		
+		foreach my $exon (@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
-      foreach my $sf($exon->get_all_supporting_features){
-	  $sf->feature1->seqname($exon->contig_id);
+      foreach my $sf (@{$exon->get_all_supporting_features}){
+				$sf->feature1->seqname($exon->contig_id);
       }
     }
-
+		
     push(@valid_transcripts,$newtranscript);
   }
   elsif ($split){
@@ -575,7 +576,7 @@ sub remap_genes {
  # print STDERR "REMAPPING GENES\n";
 GENE:  foreach my $gene (@genes) {
 
-    my @t = $gene->get_all_Transcripts;
+    my @t = @{$gene->get_all_Transcripts};
     my $tran = $t[0];
     #print STDERR "gene has ".@t." transcripts\n";
     # check that it translates
@@ -597,11 +598,11 @@ GENE:  foreach my $gene (@genes) {
       push(@newf,$gene);
 
       # sort out supporting feature coordinates
-      foreach my $tran ($gene->get_all_Transcripts) {
+      foreach my $tran (@{$gene->get_all_Transcripts}) {
 	#print STDERR "transcript has ".$tran->get_all_Exons." exons\n";
-	foreach my $exon($tran->get_all_Exons) {
+	foreach my $exon (@{$tran->get_all_Exons}) {
 #	  print STDERR "exon has ".$exon->get_all_supporting_features." supporting features\n";
-	  foreach my $sf($exon->get_all_supporting_features) {
+	  foreach my $sf (@{$exon->get_all_supporting_features}) {
 #	   print STDERR "have ".$sf."\n";
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -680,7 +681,7 @@ sub check_coverage{
   #print STDERR "checking coverage\n";
   my $matches = 0;
 
-  foreach my $exon($transcript->get_all_Exons) {
+  foreach my $exon (@{$transcript->get_all_Exons}) {
     $pstart = 0;
     $pend   = 0;
     my $exonadp = $exon->adaptor;
@@ -689,7 +690,7 @@ sub check_coverage{
     #}else{
     #  print "exon adaptor is ".$exonadp."\n";
     #}
-    my @sfs = $exon->get_all_supporting_features;
+    my @sfs = @{$exon->get_all_supporting_features};
     #print STDERR "have ".@sfs." supporting features\n";
     foreach my $f(@sfs){
      #print STDERR "have ".$f." from get_all_supporting_features\n";
@@ -838,8 +839,8 @@ sub make_transcript{
     #end_translation  : position on the translation->end_exon coordinate system where
     #the translation ends (counting from the right)
   
-    $translation->start_exon($exons[0]);
-    $translation->end_exon  ($exons[$#exons]);
+    $translation->start_Exon($exons[0]);
+    $translation->end_Exon  ($exons[$#exons]);
     
      # phase is relative to the 5' end of the transcript (start translation)
     if ($exons[0]->phase == 0) {
@@ -920,19 +921,19 @@ sub split_transcript{
   my $translation     = Bio::EnsEMBL::Translation->new;
   $curr_transcript->translation($translation);
 
-EXON:   foreach my $exon($transcript->get_all_Exons){
+EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
 
 
     $exon_added = 0;
       # is this the very first exon?
-    if($exon == $transcript->start_exon){
+    if($exon == $transcript->start_Exon){
 
       $prev_exon = $exon;
       
       # set $curr_transcript->translation start and start_exon
       $curr_transcript->add_Exon($exon);
       $exon_added = 1;
-      $curr_transcript->translation->start_exon($exon);
+      $curr_transcript->translation->start_Exon($exon);
       $curr_transcript->translation->start($transcript->translation->start);
       push(@split_transcripts, $curr_transcript);
       next EXON;
@@ -965,7 +966,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       $t->add_Exon($exon) unless $exon_added;
       $exon_added = 1;
 
-      $t->translation->start_exon($exon);
+      $t->translation->start_Exon($exon);
      
       if ($exon->phase == 0) {
 	$t->translation->start(1);
@@ -997,7 +998,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       # just add the exon
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
-    foreach my $sf($exon->get_all_supporting_features){
+    foreach my $sf (@{$exon->get_all_supporting_features}){
 	  $sf->feature1->seqname($exon->contig_id);
 
       }
@@ -1012,7 +1013,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
   
   foreach my $st(@split_transcripts){
     $st->sort;
-    my @ex = $st->get_all_Exons;
+    my @ex = @{$st->get_all_Exons};
     if(scalar(@ex) > 1){
       $st->{'temporary_id'} = $transcript->dbID . "." . $count;
       $count++;
