@@ -150,7 +150,9 @@ $max_slice_size = 5000000 if not $max_slice_size;
 
 my $sl_adp = $db->get_SliceAdaptor;
 
-my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
+my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db,
+                                                                       -slice => 1,
+                                                                       -slice_size => $max_slice_size);
 my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
 
@@ -161,17 +163,12 @@ my @iids_to_write;
 $verbose and print STDERR "Generating Initial input ids...\n";
 
 # foreach my $chr (sort {$a->dbID <=> $b->dbID} @{$db->get_ChromosomeAdaptor->fetch_all}) {
-foreach my $slice_id ($inputIDFactory->generate_slice_input_ids($max_slice_size, 0)) {
-    my ($chr_name, $chr_start, $chr_end) = $slice_id =~ /^(\S+)\.(\d+)\-(\d+)$/;
+foreach my $slice_id ($inputIDFactory->generate_input_ids) {
 
-    my $chr_slice = $sl_adp->fetch_by_chr_start_end( $chr_name, 
-						     $chr_start, 
-						     $chr_end );
-    my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, 
-									       $chr_start, 
-									       $chr_end );
+    my $chr_slice = $sl_adp->fetch_by_name( $slice_id );
+    my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name( $slice_id );
 
-    $verbose and print STDERR "Getting hits for $chr_name.$chr_start-$chr_end\n";
+    $verbose and print STDERR "Getting hits for $slice_id\n";
 
     my @mask_exons;
     # remove masked and killed hits as will be done in the build itself
