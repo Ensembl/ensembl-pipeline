@@ -1,0 +1,90 @@
+#!/usr/local/bin/perl
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::DBLoader;
+
+use vars qw(@ISA);
+
+my $host   = 'ecs1a';
+my $dbname = 'mouse';
+my $dbuser = 'ensadmin';
+my $pass   = undef;
+my $chr  = 'chr_unknown';
+my $type = 'CLONE';
+my $fpcstub = 'ctg.';
+
+&GetOptions( 
+	     'host:s'      => \$host,
+	     'dbname:s'    => \$dbname,
+	     'dbuser:s'    => \$dbuser,
+	     'pass:s'      => \$pass,
+	     'chr:s'       => \$chr,
+	     'type:s'      => \$type,
+	     'fpcstub:s'   => \$fpcstub,
+	     );
+
+$| = 1;
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => $host,
+						-user => $dbuser,
+						-dbname => $dbname,
+					       );
+
+
+
+my @clones = $db->get_all_Clone_id;
+
+my $chr_coord = 1;
+
+foreach my $cloneid (@clones) {
+  my $clone   = $db->get_Clone($cloneid);
+  my @contigs = $clone->get_all_Contigs;
+
+  @contigs = sort {$b->length <=> $a->length} @contigs;
+
+  my $coord = 1;
+  my $gap   = 1000;
+  my $fpcctgname = $fpcstub . $clone->id;
+  
+  foreach my $contig (@contigs) {
+
+    my $chr_start = $chr_coord;
+    my $chr_end   = $chr_coord + $contig->length -1;
+    my $fpc_start = $coord;
+    my $fpc_end   = $coord + $contig->length -1;
+    my $raw_start = 1;
+    my $raw_end   = $contig->length;
+    my $raw_ori   = 1;
+
+    $coord     += $contig->length - 1 + $gap;
+    $chr_coord += $contig->length - 1 + $gap;
+ 
+    my $statement = "insert into static_golden_path values(\'$fpcctgname\',
+							     \'$chr\'," .
+							     $contig->internal_id . ",
+							     $chr_start,
+							     $chr_end,
+							     $fpc_start,
+							     $fpc_end,
+							     $raw_start,
+							     $raw_end,
+							     $raw_ori,
+							     \'$type\')";
+    $statement =~ s/\n//g;
+
+    $statement =~ s/\t+//g;
+    print $statement . "\n";
+
+  }
+
+  $chr_coord += 10000;
+
+}
+
+  
+
+
+
