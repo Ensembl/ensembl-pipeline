@@ -314,7 +314,7 @@ sub parse_results {
             }
             $feat2 {name} = $element[10];
             $feat2 {score} = $feat1 {score};
-            $feat1 {strand} = 1;
+            $feat1 {strand} = $feat2 {strand};
             #misc
             $feat2 {db} = undef;
             $feat2 {db_version} = undef;
