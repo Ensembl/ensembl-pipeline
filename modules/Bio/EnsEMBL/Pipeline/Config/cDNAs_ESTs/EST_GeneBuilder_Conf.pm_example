@@ -66,6 +66,11 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # job-queue in the farm
 	    EST_QUEUE         => 'acari',
 	    
+	    # where we have a genome
+	    # It should be a set of fastA files with
+	    # each file as chr_name.fa, all with the same line length
+	    EST_GENOMIC	      => '/data/blastdb/Ensembl/NCBI33/genome/',
+
 	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch3/ensembl/eae/NCBI_31/rerun_estgenes/EST_GeneBuilder.jobs',
 	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/genes2ests.jobs', 
 	    
