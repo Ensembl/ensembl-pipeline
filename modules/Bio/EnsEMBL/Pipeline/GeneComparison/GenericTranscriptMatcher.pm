@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::Runnable::GenericTranscriptMatcher;
+package Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher;
 
 use diagnostics;
 use vars qw(@ISA);
