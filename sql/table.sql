@@ -32,22 +32,21 @@ CREATE TABLE job (
 
 
 
-# TABLE job_status - contains a history of the states of all jobs
-#                    the current status of a job is the one with the most
-#                    recent timestamp
-#
-# job_id     - job internal ID
-# status     - text string (e.g. 'CREATED' , 'RUNNING')
-
+# TABLE job_status  
+# contains a history of the states of all jobs
+# the current status of a job is the one with the 
+# highest sequence_num 
 
 CREATE TABLE job_status (
-  job_id   int(10) unsigned NOT NULL,
-  status   enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
-                'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED') NOT NULL,
-  time     datetime NOT NULL,
+  job_id            int(10) unsigned NOT NULL,
+  status            enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
+                         'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED') NOT NULL,
+
+  time              datetime NOT NULL,
+  sequence_num      int unsigned NOT NULL auto_increment, 
 
   KEY (job_id),
-  KEY (status)
+  KEY (status, sequence_num)
 );
 
 
