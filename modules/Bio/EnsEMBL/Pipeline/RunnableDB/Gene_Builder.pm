@@ -1,8 +1,7 @@
 #
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
+# written by Michele Clamp
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -17,9 +16,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder->new(
-					     -db     => $db,
-					     -input_id  => $id
-                                             );
+								    -db        => $db,
+								    -input_id  => $id,
+								    );
     $obj->fetch_input
     $obj->run
 
@@ -47,12 +46,9 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble
-
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
-use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
-use Bio::EnsEMBL::DBLoader;
-use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_VCONTIG
 					 GB_FINALDBNAME
@@ -66,19 +62,19 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_COMB_DBUSER
 					 GB_COMB_DBPASS
 					);
-use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+############################################################
+
 =head2 new
 
-    Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
                            -ANALYSIS    => $analysis,
 			   -VCONTIG     => 1,
-			   -EXTEND      => 400);
+			   );
 
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
@@ -98,20 +94,18 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_fplist'} = []; #create key to an array of feature pairs
-    
-    my( $use_vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
+    my( $use_vcontig) = $self->_rearrange([qw(VCONTIG)], @args);
        
     if (! defined $use_vcontig) {
-       $use_vcontig = $GB_VCONTIG;
-     }  
+	$use_vcontig = $GB_VCONTIG;
+    }  
     
     $self->use_vcontig($use_vcontig);
     
-    $self->extend($extend);
-
     return $self;
 }
+
+############################################################
 
 sub input_id {
     my ($self,$arg) = @_;
@@ -123,43 +117,7 @@ sub input_id {
     return $self->{_input_id};
 }
 
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
-
-sub fetch_output {
-    my($self,$output) = @_;
-    
-    $output || $self->throw("No frozen object passed for the output");
-    
-    my $object;
-    open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
-    
-    while (<IN>) {
-    $_ =~ s/\[//;
-	$_ =~ s/\]//;
-	$object .= $_;
-    }
-    close(IN);
-    my @out;
-   
-    if (defined($object)) {
-    my (@obj) = FreezeThaw::thaw($object);
-    foreach my $array (@obj) {
-	foreach my $object (@$array) {
-	    push @out, $object;
-	}
-    }
-    }
-    return @out;
-}
+############################################################
 
 =head2 write_output
 
@@ -170,17 +128,17 @@ sub fetch_output {
     Args    :   none
 
 =cut
-
-
+    
+    
 sub write_output {
     my($self,@genes) = @_;
-
+    
     # write genes out to a different database from the one we read genewise genes from.
     my $dbname = $GB_FINALDBNAME;
     my $dbhost = $GB_FINALDBHOST;
     my $dbuser = $GB_DBUSER;
     my $dbpass = $GB_DBPASS;
-
+    
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
 						'-user'   => $dbuser,
@@ -190,89 +148,70 @@ sub write_output {
 					       );
     # sort out analysis
     my $genetype = $GB_FINAL_GENETYPE;
-    if(!defined $genetype || $genetype eq ''){
-      $genetype = 'ensembl';
-      $self->warn("setting genetype to $genetype\n");
+    unless ( $genetype ){
+	$self->throw("Please, define GB_FINAL_GENETYPE in Pipeline::GeneConf");
     }
-    my $anaAdaptor = $db->get_AnalysisAdaptor;
-
-    my $anal_logic_name = $genetype;
-
-    if (defined $self->analysis){
-      #use logic name from $self->analysis object is possible, else take $genetype;
-      $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
-    }
-   
-    my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
-    
-    my $analysis_obj;
-    
-    if(scalar(@analyses) > 1){
-      $self->throw("panic! > 1 analysis for $genetype\n");
-    }
-    elsif(scalar(@analyses) == 1){
-      $analysis_obj = $analyses[0];
-    }
-    else{
-      # make a new analysis object
-      $analysis_obj = new Bio::EnsEMBL::Analysis
-	(-db              => 'NULL',
-	 -db_version      => 1,
-	 -program         => $genetype,
-	 -program_version => 1,
-	 -gff_source      => $genetype,
-	 -gff_feature     => 'gene',
-	 -logic_name      => $genetype,
-	 -module          => 'GeneBuilder',
-	);
+    my $analysis = $self->analysis;
+    unless ($analysis){
+	$self->throw("an analysis logic name must be defined in the command line");
     }
     
     my %contighash;
     my $gene_adaptor = $db->get_GeneAdaptor;
-
+    
     # this now assummes that we are building on a single VC.
     my $genebuilders = $self->get_genebuilders;
-    my ($contig)     = keys %$genebuilders;
-    my $vc = $genebuilders->{$contig}->slice;
-
-    @genes = $genebuilders->{$contig}->each_Gene;
-
-    return unless ($#genes >= 0);
-    my @newgenes;
-
-    foreach my $gene (@genes) { 
-      eval {
-	$gene->analysis($analysis_obj);
-	$gene->type($genetype);
-      
-	if ($self->use_vcontig) {
-	  $gene->transform;
-	}
-	push(@newgenes,$gene);
-      };
-      if ($@) {
-	print STDERR "ERROR: Can't convert gene to raw contigs. Skipping:\n[$@]\n";
-      }
-    }
-
-  GENE: foreach my $gene (@newgenes) {	
-      # do a per gene eval...
-      eval {
-	$gene_adaptor->store($gene);
-	print STDERR "wrote gene " . $gene->dbID . " \n";
-      }; 
-      if( $@ ) {
-	print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-      }
     
+    foreach my $contig ( keys %$genebuilders ){
+        my $vc = $genebuilders->{$contig}->query;
+	
+	@genes = $genebuilders->{$contig}->final_genes;
+	
+	return unless ($#genes >= 0);
+	my @newgenes;
+	
+	foreach my $gene (@genes) { 
+	    $gene->analysis($analysis);
+	    $gene->type($genetype);
+	    
+	    # coordinate transformation
+	    if ($self->use_vcontig) {
+		eval {
+		    $gene->transform;
+		};
+		if ($@) {
+		    $self->warn("Cannot convert gene to raw contigs:\n$@");
+		    foreach my $tran (@{$gene->get_all_Trascripts}){
+		      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+		    }
+		}
+	    }
+	    
+	    # store
+	    eval {
+		$gene_adaptor->store($gene);
+		print STDERR "wrote gene " . $gene->dbID . " \n";
+	    }; 
+	    if( $@ ) {
+		$self->warn("NABLE TO WRITE GENE:\n$@");
+		foreach my $tran (@{$gene->get_all_Trascripts}){
+		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+		}
+	    }
+	}
+	
     }
+    
 }
+
+############################################################
 
 =head2 fetch_input
 
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for est2genome from the database
+    Function:   It fetches the slice or contig according to the input_id, 
+                and it defines the database where the
+                previous annotations are stored and create a Bio::EnsEMBL::Pipeline::GeneBuilder
+                object for that genomic, input_id and db
     Returns :   nothing
     Args    :   none
 
@@ -282,23 +221,24 @@ sub fetch_input {
     my( $self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
-
+    
     my $contigid  = $self->input_id;
     my $slice;
-
+    
     if ($self->use_vcontig) {
-      my $slice_adaptor = $self->db->get_SliceAdaptor();
-      
-      $contigid =~/$GB_INPUTID_REGEX/;
-      
-      my $chr   = $1;
-      my $start = $2;
-      my $end   = $3;
-      print STDERR "Chr $chr - $start : $end\n";
-      $slice   = $slice_adaptor->fetch_by_chr_start_end($chr,$start,$end);
+	my $slice_adaptor = $self->db->get_SliceAdaptor();
+	
+	$contigid =~/$GB_INPUTID_REGEX/;
+	
+	my $chr   = $1;
+	my $start = $2;
+	my $end   = $3;
+	print STDERR "Chr $chr - $start : $end\n";
+	$slice   = $slice_adaptor->fetch_by_chr_start_end($chr,$start,$end);
     }
     else {
-      $slice = $self->db->get_Contig($contigid);
+	# not sure this is the correct call:
+	$slice = $self->db->get_Contig($contigid);
     }
     # database where all the genewise and combined genes are:
     my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -307,34 +247,26 @@ sub fetch_input {
 						      '-dbname' => $GB_COMB_DBNAME,
 						      '-pass'   => $GB_COMB_DBPASS,
 						      '-dnadb'  => $self->db,
-						     );
+						      );
+
     print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
-    
     
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
 							      '-slice'   => $slice,
 							      '-input_id' => $self->input_id,
-							     );
+							      );
     $genebuilder->genes_db($genes_db);
+ 
+    # store the object and the piece of genomic where it will run
     $self->addgenebuilder($genebuilder,$slice);
     
 }
 
 ############################################################
 
-sub focuscontig {
-    my ($self,$arg) = @_;
-    
-    if (defined($arg)) {
-	$self->{_contig} = $arg;
-    }
-
-    return $self->{_contig};
-}
-
 sub use_vcontig {
     my ($self,$arg) = @_;
-
+    
     if (defined($arg)) {
 	$self->{_vcontig} = $arg;
     }
@@ -342,78 +274,66 @@ sub use_vcontig {
     return $self->{_vcontig};
 }
 
-sub extend {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_extend} = $arg;
-    }
-
-    return $self->{_extend} || 400000;
-}
-
+############################################################
 
 sub addgenebuilder {
     my ($self,$arg,$contig) = @_;
-
+    
     if (defined($arg) && defined($contig)) {
 	$self->{_genebuilder}{$contig->id} = $arg;
-    } else {
+    } 
+    else {
 	$self->throw("Wrong number of inputs [$arg,$contig]\n");
     }
 }
 
+############################################################
+
 sub get_genebuilders {
     my ($self) = @_;
-
+    
     return $self->{_genebuilder};
-}
-
-sub check_gene {
-   my ($self,$gene) = @_;
-
-   foreach my $tran (@{$gene->get_all_Transcripts}) {
-      my $seq = $tran->translate->seq;
-
-      if ($seq =~ /\*/) {
-        $self->throw("Stop codons in gene " . $gene->id . " transcript " . $tran->id . " - exiting");
-      }
-   }
 }
 
 ############################################################
 	
 sub run {
-  my ($self) = @_;
-  
-  my $genebuilders = $self->get_genebuilders;
-  
-  #my @gene;
-  
-  $self->{'_output'} = [];
-  
-  my @vcgenes;
-  foreach my $contig (keys %{ $genebuilders } ) {
-    my $vc = $genebuilders->{$contig}->slice;
-    print(STDERR "Building for $contig\n");
+    my ($self) = @_;
     
-    $genebuilders->{$contig}->build_Genes;
-    @vcgenes = @{$genebuilders->{$contig}{_genes}};
+    # get a hash, with keys = contig/slice and value = genebuilder object
+    my $genebuilders = $self->get_genebuilders;
     
-    #       print STDERR "Genes before conversion\n";
-    #	$vc->_dump_map(\*STDERR);
-    #        $genebuilders->{$contig}->print_Genes(@vcgenes);
-    #        print STDERR "Converting coordinates\n";
-    #foreach my $g (@vcgenes) {
-    #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
-    #$self->check_gene($newgene);
-    #   push(@gene,$newgene);
-    #}
-  }
+    my @genes;
+    foreach my $contig (keys %{ $genebuilders } ) {
+	my $query = $genebuilders->{$contig}->query;
+	
+	print(STDERR "GeneBuilding for $contig\n");
+	
+	$genebuilders->{$contig}->build_Genes;
+	
+	@genes = $genebuilders->{$contig}->final_genes;
+    }
     
-  
-  push(@{$self->{'_output'}},@vcgenes);
+    $self->output( @genes );
 }
+
+############################################################
+
+# override the evil RunnableDB output method:
+
+sub output{
+    my ($self, @genes ) = @_;
+    unless ( $self->{_output} ){
+	$self->{_output} = [];
+    }
+    if (@genes){
+	push( @{$self->{_output}}, @genes );
+    }
+    return @{$self->{_output}};
+}
+
+############################################################
+
 
 
 1;
