@@ -89,6 +89,8 @@ sub new {
     my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
 						   ANALYSIS)], 
 					       @args);
+
+    print STDERR "ANALYSIS: $analysis\n";
     
     $self->clone ($clone) if ($clone);       
     $self->analysis ($analysis) if ($analysis);
@@ -299,7 +301,7 @@ sub parse_results {
 
 	if ($line =~ s/^1TBH//) {
 	   my  ($id) = $line =~ /^\s*(\w+)/;
-	   my ($ac) = $line =~ /(\PR\w+)\s*$/;
+	   my ($ac) = $line =~ /(PR\w+)\s*$/;
 	   $printsac{$id} = $ac;
        }
 	
