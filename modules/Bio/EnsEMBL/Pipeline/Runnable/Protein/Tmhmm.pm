@@ -422,4 +422,13 @@ sub output {
     return @{$self->{'_flist'}};
 }
 
+sub queryname{
+  my ($self,$queryname) = @_;
+  if ($queryname){
+    $self->{_queryname} = $queryname;
+  }
+  return $self->{_queryname};
+}
+
+
 1;
