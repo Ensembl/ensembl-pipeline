@@ -18,10 +18,12 @@ sub new {
       $est_db,
       $est_coverage_cutoff,
       $seqfetcher,
+      $distance_twilight,
      ) = rearrange([qw(GENES
                        EST_DB
                        EST_COVERAGE_CUTOFF
 		       SEQUENCE_FETCHER
+		       DISTANCE_TWILIGHT
                       )],@args);
 
   throw("No genes to analyse")
@@ -46,6 +48,17 @@ sub new {
     $self->_est_coverage_cutoff(0.8)
   }
 
+  # Setting a level of allowed error or wobble in the distance
+  # value.  This is used when comparing the equality of distance
+  # values between two sequences and a common match.  This allows
+  # for a small amount of inaccuracy or sequence error to be
+  # acknowledged in the clustering of ESTs to their closest gene/s.
+  if ($distance_twilight) {
+    $self->_distance_twilight($distance_twilight)
+  } else {
+    $self->_distance_twilight(0.02)
+  }
+
   return $self
 }
 
@@ -53,11 +66,37 @@ sub run {
   my $self = shift;
 
   $self->_identify_shared_ESTs;
+  $self->_cluster_ests_with_genes;
 
-  my %hash_of_ests_and_gene_mapping = 
-    %{$self->_cluster_ests_with_genes};
+  return $self->EST_vs_gene_hash
+}
 
-  return \%hash_of_ests_and_gene_mapping
+sub single_match_ESTs {
+  my $self = shift;
+
+  return $self->_matched_ests('single', @_)
+}
+
+sub multiple_match_ESTs {
+  my $self = shift;
+
+  return $self->_matched_ests('multiple', @_)
+}
+
+sub incorrect_match_ESTs {
+  my $self = shift;
+
+  return $self->_matched_ests('incorrect', @_)
+}
+
+sub EST_vs_gene_hash {
+  my $self = shift;
+
+  if (@_){
+    $self->{_est_vs_gene_hash} = shift
+  }
+
+  return $self->{_est_vs_gene_hash}
 }
 
 sub print_shared_ESTs {
@@ -83,6 +122,42 @@ sub print_shared_ESTs {
   }
 
   print STDERR "Had $shared_ests ESTs that mapped to more than one gene.\n";
+
+  return 1
+}
+
+sub _matched_ests {
+  my ($self, $type, $gene_id, $est_id) = @_;
+
+  # Check
+  throw("Need a gene id for storage and access of " .
+	"gene vs EST information.")
+    unless defined $gene_id;
+
+  # Initialisation
+  unless ($self->{_matches_initialised}->{$type}) {
+
+    foreach my $gene (@{$self->_genes}){
+      $self->{_matches}->{$type}->{$gene->stable_id} = {}
+    }
+
+    $self->{_matches_initialised}->{$type} = 1
+  }
+
+  # Data handling
+  if (! defined $est_id) {
+    warning("Trying to access an odd gene id [$gene_id].  " . 
+	    "Data has not been generated for this id")
+      unless (defined $self->{_matches}->{$type}->{$gene_id});
+
+    my @array_of_est_matches = 
+      keys %{$self->{_matches}->{$type}->{$gene_id}};
+
+    return \@array_of_est_matches
+
+  } else {
+    $self->{_matches}->{$type}->{$gene_id}->{$est_id}++
+  }
 
   return 1
 }
@@ -115,93 +190,87 @@ sub _cluster_ests_with_genes {
 
   foreach my $est_id (keys %all_shared_ests){
 
-    # Make an array of simple hashes, containing
-    # both EST vs gene and inter-gene distances
-    # for this particular EST.
+    my @genes_that_share_this_est = @{$self->_find_genes_by_est_id($est_id)};
+    my @possible_gene_pairs;
 
-    my @est_gene_distances;
-
-    my $genes_that_share_this_est = $self->_find_genes_by_est_id($est_id);
-
-      # EST vs gene distances
-
-    foreach my $gene_id (@$genes_that_share_this_est){
-
-      my %pairwise_comparison = 
-	('type'     => 'est_vs_gene',
-	 'gene_ids'  => [$gene_id],
-	 'distance' => $self->_pairwise_distance($gene_id, $est_id, undef, 1));
-      push @est_gene_distances, \%pairwise_comparison;
-    }
-
-      # Inter-gene distances
-
-    for (my $i = 0; $i < scalar @$genes_that_share_this_est; $i++) {
-      for (my $k = $i + 1; $k < scalar @$genes_that_share_this_est; $k++) {
-
-	my %pairwise_comparison = 
-	  ('type'     => 'inter_gene',
-	   'gene_ids' => [$genes_that_share_this_est->[$i], 
-			  $genes_that_share_this_est->[$k]],
-	   'distance' => $self->_pairwise_distance($genes_that_share_this_est->[$i],
-						   $genes_that_share_this_est->[$k],
-						   undef,
-						   1));
-	push @est_gene_distances, \%pairwise_comparison;
+    for (my $i = 0; $i < scalar @genes_that_share_this_est; $i++){
+      for (my $j = $i + 1; $j < scalar @genes_that_share_this_est; $j++){
+	push @possible_gene_pairs, [$genes_that_share_this_est[$i], 
+				    $genes_that_share_this_est[$j]]
       }
     }
 
+    my %not_list;
+    my %possible_list;
 
-    # Sort the array (of hashes) by distance in ascending order.
+    foreach my $gene_pair (@possible_gene_pairs){
+      my $gene1_dist = $self->_pairwise_distance($gene_pair->[0], $est_id, undef, 1);
+      my $gene2_dist = $self->_pairwise_distance($gene_pair->[1], $est_id, undef, 1);
 
-    @est_gene_distances = 
-      sort {$a->{distance} <=> $b->{distance}} @est_gene_distances;
-
-    # Group the EST to specific genes according
-    # to following rules:
-    # * EST maps to one gene if EST vs gene distance
-    #     is smaller than the smallest inter-gene 
-    #     distance.
-    # * Where genes are more closely related than the
-    #     EST vs gene distances, this EST must be mapped
-    #     to either both genes or neither gene.
-    # * The inherant error attached to the distance
-    #     must be considered when saying an EST is more
-    #     closely related to one gene rather than
-    #     another.  THIS IS PRESENTLY NOT IMPLEMENTED.
-
-
-    my %closest_gene_ids;
-    my $last_dist;
-    foreach my $comparison (@est_gene_distances){
-      if ($comparison->{type} eq 'est_vs_gene') {
-	last if (defined $last_dist && 
-		 $comparison->{distance} > $last_dist);
-
-	$last_dist = $comparison->{distance};
-	$closest_gene_ids{$comparison->{gene_ids}->[0]}++;
-
-      } elsif ($comparison->{type} eq 'inter_gene') {
-	last if (defined $last_dist && 
-		 $comparison->{distance} > $last_dist);
-
-	$closest_gene_ids{$comparison->{gene_ids}->[0]}++;
-	$closest_gene_ids{$comparison->{gene_ids}->[1]}++;
+      if (abs($gene1_dist - $gene2_dist) <= $self->_distance_twilight){
+	$possible_list{$gene_pair->[0]}++;
+	$possible_list{$gene_pair->[1]}++;
+	next
       }
+
+      if ($gene1_dist > $gene2_dist + $self->_distance_twilight) {
+	$possible_list{$gene_pair->[1]}++;
+	$not_list{$gene_pair->[0]}++;
+      } elsif ($gene2_dist > $gene1_dist + $self->_distance_twilight) {
+	$possible_list{$gene_pair->[0]}++;
+	$not_list{$gene_pair->[1]}++;
+      }
+    }
+
+    my @possibles = keys %possible_list;
+    my @nots      = keys %not_list;
+
+    my @closest_gene_ids;
+    foreach my $possible_close_gene (keys %possible_list) {
+      push(@closest_gene_ids, $possible_close_gene)
+	unless $not_list{$possible_close_gene};
     }
 
     throw("Failed to find most closely related gene.")
-      unless keys %closest_gene_ids;
+      unless scalar @closest_gene_ids;
 
-    foreach my $close_gene_id (keys %closest_gene_ids){
+    # Clustering over.  Add results to various data structures.
+
+      # Store data in an EST vs gene-centric manner.  This hash is 
+      # currently not used, but it is important to have it around 
+      # just in case.
+    foreach my $close_gene_id (@closest_gene_ids){
       push @{$ests_clustered_to_genes{$est_id}}, $close_gene_id;
     }
 
-    throw("Erroneously didn't map EST to any gene.")
-      unless defined $ests_clustered_to_genes{$est_id};
+      # Store data in a gene_id-centric manner.  Store singly-
+      # matching, multiply-matching and incorrectly-matching
+      # ESTs vs their relevant gene id.
+    my %shared_genes;
+    foreach my $gene_id (@genes_that_share_this_est){
+      $shared_genes{$gene_id}++
+    }
+
+    if (scalar @closest_gene_ids > 1) {
+      foreach my $gene_id (@closest_gene_ids){
+	$self->multiple_match_ESTs($gene_id, $est_id);
+	$shared_genes{$gene_id}--
+      }
+    } else {
+      $self->single_match_ESTs($closest_gene_ids[0], $est_id);
+      $shared_genes{$closest_gene_ids[0]}--
+    }
+
+    foreach my $gene_id (keys %shared_genes){
+      $self->incorrect_match_ESTs($gene_id, $est_id)
+	if $shared_genes{$gene_id}
+    }
+
   }
 
-  return \%ests_clustered_to_genes
+  $self->EST_vs_gene_hash(\%ests_clustered_to_genes);
+
+  return 1
 }
 
 sub _calculate_gene_vs_est_distances {
@@ -362,8 +431,23 @@ sub _calculate_inf_site_gene_vs_est_distances {
 
     foreach my $gene_id (@$gene_pair){
 
+      # Skip any already computed gene pairs
       next if $seen_genes{$gene_id};
       $seen_genes{$gene_id}++;
+
+      # Cope with identical genes by manually setting gene-est 
+      # distances to zero.  These genes will not have an alignment
+      # of informative sites.
+
+      unless (defined $hr_inf_site_aligns->{$gene_id}){
+	foreach my $est_id (@{$self->_find_shared_ests_by_gene_id($gene_id)}) {
+	  $self->_pairwise_distance($gene_id, $est_id, 0, 1);
+	}
+
+	next
+      }
+
+      # Compute gene pair distance
 
       my ($distances, $sequence_order) = 
 	$self->_compute_distances($hr_inf_site_aligns->{$gene_id});
@@ -500,7 +584,7 @@ sub _evidence_alignment {
   my @est_supporting_features;
   foreach my $est_id (keys %{$genes_and_shared_ests->{$gene_id}}){
     push @est_supporting_features, 
-      @{$genes_and_shared_ests->{$gene_id}->{$est_id}};    
+      @{$genes_and_shared_ests->{$gene_id}->{$est_id}};
   }
 
   # Obtain an alignment of our transcript with the shared ESTs
@@ -589,7 +673,10 @@ sub _identify_shared_ESTs {
   foreach my $est_name (keys %est_comap_counts){
     if ($est_comap_counts{$est_name} == 1){
       foreach my $gene_name (keys %genes_with_their_ests){
-        delete $genes_with_their_ests{$gene_name}->{$est_name};
+	if ($genes_with_their_ests{$gene_name}->{$est_name}){
+	  $self->single_match_ESTs($gene_name, $est_name);
+	  delete $genes_with_their_ests{$gene_name}->{$est_name};
+	}
       }
     }
   }
@@ -704,7 +791,7 @@ sub _pairwise_distance {
   my $dist_set = $inf ? 'inf' : 'norm';
 
   if (defined $distance){
-    print "Storing [$dist_set][$id1][$id2][$distance]\n";
+#    print "Storing [$dist_set][$id1][$id2][$distance]\n";
     warning("Trying to store an already stored value [" . $dist_set . 
 	    "][" . $id1 . "][" . $id2 . "][" . $distance . "]")
       if defined $self->{_pairwise_distances}->{$dist_set}->{$id1}->{$id2};
@@ -866,6 +953,19 @@ sub _est_coverage_cutoff {
   }
 
   return $self->{_est_coverage_cutoff}
+}
+
+# _distance_twilight is the allowed error on distance values for assessing
+# if two sequences are equally distant from a common match.  This value should
+# perhaps represent the perceived rate of sequence error.  Default value
+# set in new method.
+
+sub _distance_twilight {
+  my $self = shift;
+
+  if(@_){
+    $self->{_distance_twilight} = shift;
+  }
 }
 
 sub _seqfetcher {
