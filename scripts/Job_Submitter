@@ -1,12 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-
-unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
-unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
-unshift (@INC,"/nfs/disk89/michele/bioperl-live");
-
-}
 
 =head1 NAME
 
@@ -39,27 +32,22 @@ submits a chunk of jobs.
 
 
 use strict;
+
 use Getopt::Long;
 
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
-use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
+use Bio::EnsEMBL::Pipeline::RunnableDBI;
 
 use FreezeThaw;
 
 my $anahost     = 'obi-wan';
 my $anaport     = '410000';
-my $anadbname   = 'analysis';
+my $anadbname   = 'pipeline',
 my $anadbuser   = 'root';
 my $anapass     =  undef;
-my $enshost     = 'obi-wan';
-my $ensport     = '410000';
-my $ensdbname   = 'ensembl';
-my $ensdbuser   = 'ensro';
-my $enspass     =  undef;
-my $chunk    = 20;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -67,11 +55,6 @@ my $chunk    = 20;
 	    'anadbname:s'   => \$anadbname,
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
-	    'enshost:s'     => \$enshost,
-	    'ensport:n'     => \$ensport,
-	    'ensdbname:s'   => \$ensdbname,
-	    'ensdbuser:s'   => \$ensdbuser,
-	    'enspass:s'     => \$enspass,
 	    'chunk:s'    => \$chunk,
 	    );
 
@@ -84,22 +67,14 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -pass   => $anapass);
 
 
-my $ensdb  = new Bio::EnsEMBL::DBSQL::Obj(-host   => $enshost,
-					  -port   => $ensport,
-					  -dbname => $ensdbname,
-					  -user   => $ensdbuser,
-					  -pass   => $enspass);
-
-
 my @jobs = $anadb->get_JobsByCurrentStatus('CREATED');
 
 foreach my $job (@jobs) {
     
-    print("Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
+    print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
 
-    my $input    = make_clone($ensdb,$job->input_id);
-    my $module   = $job     ->analysis->module;
-    my $runnable = "$module"->new(-clone => $input);
+    my $runnable = "$module"->new(-input_id => $job->input_id,
+				  -dbobj    => $anadb);
 
 
     my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
