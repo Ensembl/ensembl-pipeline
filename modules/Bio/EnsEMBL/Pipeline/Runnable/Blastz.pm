@@ -165,7 +165,7 @@ sub run_analysis {
               
   if($self->{'_results_to_tmp_file'}) {
     $cmd .=  " > ". $self->results;
-    print STDERR "Running blastz...\n$cmd\n";
+    #print STDERR "Running blastz...\n$cmd\n";
     $self->throw("Error runing blastz cmd\n$cmd\n." .
                  " Returned error $? BLAST EXIT: '" .
                  ($? >> 8) . "'," ." SIGNAL '" . ($? & 127) .
@@ -175,7 +175,7 @@ sub run_analysis {
     $self->file($self->results);
     $BlastzParser = Bio::EnsEMBL::Pipeline::Tools::Blastz->new('-file' => $self->results);
   } else {
-    print STDERR "Running blastz to pipe...\n$cmd\n";
+    #print STDERR "Running blastz to pipe...\n$cmd\n";
     open($blastz_output_pipe, "$cmd |") ||
       $self->throw("Error opening Blasts cmd <$cmd>." .
                    " Returned error $? BLAST EXIT: '" .
