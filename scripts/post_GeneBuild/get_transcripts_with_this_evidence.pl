@@ -15,7 +15,7 @@ my $dbname = 'homo_sapiens_core_9_30';
 my $dbpass = undef;
 
 my $path;
-my $genetype = 'ensembl';
+my $genetype;
 
 
 my $protein_id;
@@ -33,7 +33,7 @@ my $dna_id;
 unless ( $protein_id || $dna_id ){
   print STDERR "script to print out all the transcripts with a given id as evidence\n";
  
-  print STDERR "Usage: $0 -dbname -dbhost [ -genetype] ( -protein_id OR -dna_id )\n";
+  print STDERR "Usage: $0 -dbname -dbhost ( -protein_id OR -dna_id ) [ -genetype (optional)]\n"; 
   exit(0);
 }
 
@@ -59,7 +59,7 @@ if ( $protein_id ){
   my @transcripts;
  
  TRAN:
-  foreach my $tran (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_protein_evidence($protein_id,$db) ){
+  foreach my $tran (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_protein_evidence($protein_id,$db,$genetype) ){
       &show_transcript($db,$tran->dbID);
   }
 }
@@ -68,7 +68,7 @@ if ( $dna_id ){
     print "Transcripts based on $dna_id\n";
     my @transcripts;
   TRAN:
-    foreach my $tran ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_dna_evidence($dna_id,$db) ){
+    foreach my $tran ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->find_transcripts_by_dna_evidence($dna_id,$db,$genetype) ){
 	&show_transcript($db,$tran->dbID);
     }
 }
