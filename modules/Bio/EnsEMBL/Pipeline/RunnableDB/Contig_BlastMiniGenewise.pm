@@ -64,15 +64,22 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
                                               BP_SUPPORTING_DATABASES
                                              );
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-                                         GB_DBHOST
-                                         GB_SKIP_BMG
-                                         GB_SIMILARITY_DATABASES
-                                         GB_SIMILARITY_GENETYPE
-					 GB_REPEAT_MASKING
-                                        );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
+							       GB_DBHOST
+							      );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
+							       GB_SKIP_BMG
+							      );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
+							       GB_SIMILARITY_DATABASES
+							       GB_SIMILARITY_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
+							       GB_REPEAT_MASKING
+							      );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -85,7 +92,7 @@ sub new {
    
     $self->db->assembly_type($path);
 
-    $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
+    $self->throw("no protein source databases defined in Config:GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
     
     foreach my $db(@{$GB_SIMILARITY_DATABASES}){
