@@ -64,15 +64,15 @@ use vars qw( %GenesToExpression );
 	    ############################################################
 	    # the gene2est analysis is run with this script:
 	    #(put your own path here)
-	    EST_EXPRESSION_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
+	    EST_EXPRESSION_RUNNER        => '/nfs/acari/dkeefe/src/head/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
 	    ############################################################
 	    # size of the chunks to run the gene to est map
 	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
 	    EST_EXPRESSION_CHUNKSIZE          => '5000000',		
 	    
 	    ############################################################
-	    # this will reject all unspliced est			s		  
-	    SKIP_SINGLE_EXONS              => '1',
+	    # this will reject all unspliced ests		  
+	    SKIP_SINGLE_EXONS              => '0',
             
 	    ############################################################
 	    # this will take only the ests that are present in the expression db 
@@ -85,40 +85,42 @@ use vars qw( %GenesToExpression );
 
 	    ############################################################
 	    # where the result-directories are going to go	
-    	    EST_TMPDIR        => '/ecs2/scratch4/ensembl/eae/expression_test',
+    	    EST_TMPDIR        => '/acari/scratch1/ensembl/dkeefe/EST',
 	    
 	    ############################################################
 	    # job-queue in the farm
-	    EST_QUEUE         => 'acari',
+	    EST_QUEUE         => 'normal',
 	    
 	    ############################################################
 	    # the file where the bsub lines (to be sent to the farm) will be written
-	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch4/ensembl/eae/expression_test/Genes2ests.jobs', 
+	    EST_EXPRESSION_BSUBS  => '/acari/scratch1/ensembl/dkeefe/EST/Genes2ests.jobs', 
 	    	    
 	    ############################################################
 	    # the RunnableDB doing the work	    
 	    EST_EXPRESSION_RUNNABLE    => 'Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression',
 	    
 	    ############################################################
-	    # you will need to put in your analsis tables an entry with logic_name equal to this:
+	    # you will need to put in your analysis tables an entry with logic_name equal to this:
 	    EST_EXPRESSION_ANALYSIS    => 'expression',
 				       	    
        	    ############################################################
 	    # est_db = where we the ests are 
 
-	    EST_DBNAME                  => 'ens_NCBI_31_est',
-	    EST_DBHOST                  => 'ecs2f',
+	    EST_DBNAME                  => 'homo_sapiens_est_20_34b',
+	    EST_DBHOST                  => 'ecs2',
+            EST_DBPORT                  => '3363',
 	    EST_DBUSER                  => 'ensadmin',
 	    EST_DBPASS                  => 'ensembl',
    
 	    # gene type for the ests (usually = human_est)
-   	    EST_GENETYPE          => 'human_est',		
+   	    EST_GENETYPE          => 'human_est_exonerate',		
 
 	    ############################################################
 	    # database with the genes we want to map the ests to (usually the ensembl genes)
 
-     	    EST_TARGET_DBNAME            => 'ens_NCBI_31',
-	    EST_TARGET_DBHOST            => 'ecs2b',
+     	    EST_TARGET_DBNAME            => 'homo_sapiens_core_20_34b',
+	    EST_TARGET_DBHOST            => 'ecs2',
+            EST_TARGET_DBPORT            => '3363',
 	    EST_TARGET_DBUSER            => 'ensadmin',
 	    EST_TARGET_DBPASS            => 'ensembl',
 	    
@@ -130,17 +132,19 @@ use vars qw( %GenesToExpression );
 	    # where the expression database is.
 	    # So far we have one adaptor only for SANBI's Stack database
 
-	    EST_EXPRESSION_DBHOST        => 'ecs2a',
-	    EST_EXPRESSION_DBNAME        => 'eae_human_expression2',
-	    EST_EXPRESSION_DBUSER        => 'ensro',
-	    EST_EXPRESSION_DBPASS        => '',
+	    EST_EXPRESSION_DBHOST        => 'ecs2',
+            EST_EXPRESSION_DBPORT        => '3363',
+	    EST_EXPRESSION_DBNAME        => 'homo_sapiens_core_expression_est_20_34b',
+	    EST_EXPRESSION_DBUSER        => 'ensadmin',
+	    EST_EXPRESSION_DBPASS        => 'ensembl',
 
 	    ############################################################
 	    # ref_db - holds the assembly and the sequence (dna)
 	    # this db can be the same one as the target_database
 	    
-	    EST_REFDBNAME               => 'ens_NCBI_31',
-	    EST_REFDBHOST               => 'ecs2b',
+	    EST_REFDBNAME               => 'homo_sapiens_core_20_34b',
+	    EST_REFDBHOST               => 'ecs2',
+            EST_REFDBPORT               => '3363',
 	    EST_REFDBUSER               => 'ensro',
 	    EST_REFDBPASS               => '',
 	   );
