@@ -130,6 +130,7 @@ sub run {
   }
  
   my $command = $self->format_command . " " . $seqfile;
+  print STDERR "Doing $command\n";
   my $exit_status = system($command);
 
   if ($exit_status) {
@@ -403,7 +404,7 @@ sub blastdb_dir {
 
   unless ($self->{_blastdb_dir} && -d $self->{_blastdb_dir}) {
 
-    my $blastdb_dir = $self->work_dir . "\/tempblast." . getppid . '/';
+    my $blastdb_dir = $self->work_dir . "\/tempblast." . $$ . '/';
  
     mkdir $blastdb_dir;
 
