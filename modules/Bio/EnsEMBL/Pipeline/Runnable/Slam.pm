@@ -117,6 +117,7 @@ use diagnostics;
 
 
 
+
 # Inherits from Interface Bio::EnsEMBL::Pipeline::RunnableI
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -160,11 +161,13 @@ sub new {
                            ], @args
                           );
 
-  # setting slices
-  $self->slices($slice1,$slice2);
+
+  # setting defaults
+
   $self->max_memory_size(1572864);
 
-  #setting fasta-filenames
+
+  $self->slices($slice1,$slice2);
   $self->fasta($fasta1,$fasta2);
 
   $self->approx_align($approx_align);
@@ -176,7 +179,9 @@ sub new {
 
   $self->workdir($workdir);
   $self->debug($debug);
+
   $self->verbose($verbose);
+  $self->verbose("1");
 
   $self->printvars if ($self->verbose);
 
@@ -187,7 +192,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-     $self->deletefiles;
+#     $self->deletefiles;
 }
 
 =pod
@@ -259,7 +264,7 @@ sub parse_results {
 sub _parser {
   my ($self,$slice,$gff) = @_;
   my (%transcripts);
-
+  print "gff: $gff\n" if $self->verbose;
   $gff=~s/(\.fasta)/\.gff/;     # subst. .fasta-suffix with .gff-suffix
 
   ## data for error-message if slam-run fails due to out-of-memory-error
@@ -268,19 +273,20 @@ sub _parser {
   my $e_chr = $slice->seq_region_name;
 
 
-  # processing the written gff-file #### or write an errorlog !!! with statistics !!!! like percentage of repeats in sequence etc
-  # open(IN,"$gff") || die ("Slam.pm: OUT OF MEMORY-ERROR !\n Failed to run Slam on region :Chr $e_chr: $e_start-$e_end bp. \n_SLAM-PROCESS BROKE UP BY SIGINT \n Could not read $gff: $0 \n");
-
+  # processing the written gff-file
     open(IN,"$gff") || $self->throw("Slam.pm: OUT OF MEMORY-ERROR !\n XXXX\nCould not read $gff: $0 \n");
     while (<IN>) {
       chomp;
       my $aline = $_;
+
+
+#### NEW REDESIGN WITH START/STOPCODONS
+
       if ($aline =~m/gene_id/) {
-        #if the line contains a CDS
+        # line contains "CDS"
 
         if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
-          # if the line is no start-or stopcodon
-
+         # if the line is no start-or stopcodon
           my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
           my @attributes = split /\s+/,$line[0];
           my @transc_id =  split /\s+/,$line[1];
@@ -290,13 +296,53 @@ sub _parser {
 
           # we concatenate the first and second part of the line
           push (@attributes, @transc_id);
-          my $attr_ref = \@attributes;
+          my $attr_ref = \@attributes;        
 
           # we store the ref of line with attributes of the exon using the unique transcript-key as key
           # an HASH of ARRAYS of ARRAYS
           push (@{ $transcripts{$key}}, $attr_ref );
+
+	  # {gene_id "001"}=[ "chr1 SLAM CDS 19053348 19053557 . - 1 gene_id "M4H1U1D4-28.002" transcript_id bla",
+	  #                   "chr1 SLAM CDS 19053348 19053557 . - 1 gene_id "M4H1U1D4-28.002" transcript_id bla"....
+	  #   	             ....
+	  #		    ]
+
         }
-      }
+	}
+
+
+
+
+
+
+
+
+
+##### OLD PART ######
+
+#      if ($aline =~m/gene_id/) {
+#        #if the line contains a CDS
+#        if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
+#          # if the line is no start-or stopcodon
+#
+#          my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
+#          my @attributes = split /\s+/,$line[0];
+#          my @transc_id =  split /\s+/,$line[1];
+#
+#          # building a unique key for each transcript
+#          my $key = "$attributes[8] $attributes[9]"; # key: -->gene_id "001"<--
+#
+#          # we concatenate the first and second part of the line
+#          push (@attributes, @transc_id);
+#          my $attr_ref = \@attributes;
+#
+#          # we store the ref of line with attributes of the exon using the unique transcript-key as key
+#          # an HASH of ARRAYS of ARRAYS
+#          push (@{ $transcripts{$key}}, $attr_ref );
+#        }
+#      }
+
+
     }
     close(IN);
 
@@ -371,8 +417,8 @@ sub run {
         " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
           " -org1 ".${$self->org}[0] .
             " -org2 ".${$self->org}[1];
-  $command .= " -v " if $self->verbose;
-  $command .= " -debug " if $self->debug;
+#  $command .= " -v " if $self->verbose;
+#  $command .= " -debug " if $self->debug;
 
   print "Slam.pm: Slam-command:\n $command\n" if $self->verbose;
 
@@ -397,16 +443,18 @@ sub run {
     open(GFF, ">$gff2") ||  die "$0: $gff2: $!\n";
     close (GFF);
   } else {
-    print "Slam.pm: try to evalute / run Slam\n";
+    print "Slam.pm: try to evalute / run Slam\n" if $self->verbose;
     my $pstat;
-#    eval {  $pstat = system ("ulimit -v 1572864 -c 0 ; $command")    };
-    eval {  $pstat = system ("ulimit -v   100  -c 0 ; $command")    };
-    unless ($pstat ne "0") {
-      print "WARNING\t SLAM RUN NEEDED LOTS OF MEM\t BROKE UP\n" ;
-      print "Slam.pm: Slam run seems to be buggy\n";
-    }
-    print "pstat $pstat\n";
+    my $max_memory = $self->max_memory_size;
 
+    print "Slam.pm: max-memory-size: $max_memory\n" if $self->verbose;
+
+    eval {  $pstat = system ("ulimit -v  $max_memory  -c 0 ; $command")    };
+
+#    unless ($pstat ne "0") {
+#      print "WARNING\t SLAM RUN NEEDED LOTS OF MEM\t BROKE UP\n" ;
+#      print "Slam.pm: Slam run seems to be buggy\n";
+#    }
   }
     # add cns-file to list of tempfiles
     my $wdir = $self->workdir;
