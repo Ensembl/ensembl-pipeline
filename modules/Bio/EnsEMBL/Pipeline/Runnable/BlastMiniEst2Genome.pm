@@ -256,7 +256,6 @@ sub run {
     foreach my $res(@exonerate_res ) {
       my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
       $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
-      print "exonerate: " . $seqname . "\n";
 
       # score cutoff 500 for exonerate ...
       if($res->score > 500) {
@@ -272,7 +271,6 @@ sub run {
     my %est_seqs;
     foreach my $seq(@seq) {
       $est_seqs{$seq->id} = $seq;
-      print "est_seq entry for *" . $seq->id . "*\n";
     }
 
     my $id_threshold = $self->{'_id_threshold'};
@@ -335,7 +333,7 @@ sub run {
 
       my $cp = ($covered_length/$estlength) * 100;
       next HIT unless $cp >= $length_threshold;
-      print STDERR "keeping $estname\n";
+#      print STDERR "keeping $estname\n";
       push(@{$esthash{$estname}},@hsps);$esthash{$estname};
     } # end of while $hit
     
@@ -345,7 +343,7 @@ sub run {
       my @features = @{$esthash{$id}};
  
       # only use ESTs that have >1 blast hit to cut down on how many e2gs we run.
-      print STDERR "id: $id has "  . scalar(@features) . " blast hits\n";
+#      print STDERR "id: $id has "  . scalar(@features) . " blast hits\n";
       next ID unless scalar(@features) > 1; # ??? too strict?
 
       # make MiniEst2Genome runnables
@@ -433,7 +431,7 @@ sub make_blast_db {
     print STDERR "Blast db file is $blastfile\n";
 
     foreach my $seq (@seq) {
-	print STDERR "Writing seq " . $seq->id ."\n";
+#	print STDERR "Writing seq " . $seq->id ."\n";
 	$seqio->write_seq($seq);
     }
 
@@ -542,20 +540,20 @@ sub get_Sequence {
       $self->warn("No id input to get_Sequence");
     }  
     
-    print(STDERR "Sequence id :  is [$id]\n");
+#    print(STDERR "Sequence id :  is [$id]\n");
 
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
     if ($@){
-      $self->throw("Problem with seqfetcher [$id]: [$@]\n");
+      $self->warn("Problem with seqfetcher [$id]: [$@]\n");
     }
 	
     if(!defined($seq)){
-      $self->throw("Could not find sequence for [$id]");
+      $self->warn("Could not find sequence for [$id]");
     }
 
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+#    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
 }
