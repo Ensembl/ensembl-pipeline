@@ -237,7 +237,7 @@ sub run {
   my ($self, @args) = @_;
   $self->workdir('/tmp');
   
-  
+  # this method needs serious tidying
   #check inputs
   my $genomicseq = $self->genomic_sequence ||
     $self->throw("Genomic sequences not provided");
@@ -263,18 +263,22 @@ sub run {
     }
   }
   
+  # finally we run the beast.
+
   $self->results($self->workdir()."/".$self->results());
   my $exonerate_command = $self->exonerate() . " --cdna $estfile --genomic $genfile >" . $self->results();
   
   eval {
+    # better to do this as a pipe?
     print (STDERR "Running command $exonerate_command\n");
     $self->throw("Error running exonerate on ".$self->filename."\n") 
       if (system ($exonerate_command)); 
     $self->parse_results();
+    $self->convert_output();
   };  
   
   #clean up temp files
-  $self->_deletefiles($genfile, $estfile);
+#  $self->_deletefiles($genfile, $estfile);
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
@@ -299,7 +303,7 @@ sub parse_results {
 
   # some constant strings
   my $source_tag  = "exonerate";
-#  my $primary_tag = "similarity";
+  #  my $primary_tag = "similarity";
   my $resfile = $self->results();
   if (-e $resfile) {
     open (EXONERATE, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
@@ -322,7 +326,7 @@ sub parse_results {
 
       if( $elements[1] ne 'exonerate' ) { next; }
 
-      if($_ =~ /query \"(\w+)\"/) {
+      if($_ =~ /query\s+\"(\w+)\"/) {
 	$queryname = $1;
       }
 
@@ -361,11 +365,53 @@ sub parse_results {
   close($filehandle);
 }
 
+=head2 convert_output
+  
+    Title   :   convert_output
+    Usage   :   $obj->convert_output
+    Function:   Parses exonerate output to make "gene" features with exons as subfeatures
+                At present pretty hopeless supporting data for exons themselves ...
+    Returns :   none
+    Args    :   
+
+=cut
+
+sub convert_output {
+  my($self) = @_;
+
+  my @tmpf = @{$self->{'_fplist'}};
+
+  #ought to be done here but will probably break Exonerate RunnableDB ...
+  my $curr_gene;
+  my @genes;
+  foreach my $fp(@tmpf){
+    # if it's a gene line, make a gene
+    if($fp->primary_tag eq 'gene'){
+      $curr_gene = $fp->feature1;
+      push (@genes,$curr_gene)
+    }
+    # if it's an exon line, make an exon and add it to the current gene
+    elsif($fp->primary_tag eq 'exon'){
+      $self->throw("Can't cope with an exon without having a gene first!") unless defined ($curr_gene);
+      $curr_gene->add_sub_SeqFeature($fp->feature1,'');
+      $fp->feature1->add_sub_SeqFeature($fp,'');
+    }
+    # otherwise skip it
+  }
+  
+  if (!defined($self->{_output})) {
+    $self->{_output} = [];
+  }
+  push(@{$self->{_output}},@genes);
+
+}
+
 =head2 output
 
   Title   : output
   Usage   : $self->output
-  Function: Returns results of exonerate as array of FeaturePair
+  Function: Returns results of exonerate as array of FeaturePair, one per gene, 
+            with exons as sub_seqfeatures
   Returns : An array of Bio::EnsEMBL::FeaturePair
   Args    : none
 
@@ -373,7 +419,11 @@ sub parse_results {
 
 sub output {
   my ($self) = @_;
-  return @{$self->{'_fplist'}};
+
+
+  #  could return a list of featurepairs, one per gene, as with Genewise.
+
+  return @{$self->{'_output'}};
 }
 
 =head2 _create_features
