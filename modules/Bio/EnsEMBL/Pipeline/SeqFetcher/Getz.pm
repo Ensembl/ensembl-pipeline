@@ -148,5 +148,48 @@ sub  get_Seq_by_acc {
 
   return $seq;
 }
+=head2 get_Seq_by_id
+
+  Title   : get_Seq_by_id
+  Usage   : $self->get_Seq_by_id($id);
+  Function: Does the sequence retrieval via getz
+  Returns : Bio::Seq
+  Args    : 
+
+=cut
+
+sub  get_Seq_by_id {
+  my ($self, $id) = @_;
+  my $libs = $self->library;
+
+  if (!defined($id)) {
+    $self->throw("No id input");
+  }  
+
+  if (!defined($libs)) {
+    $self->throw("No search libs specified");
+  }  
+  
+  my $seqstr;
+  my $seq;
+  my $getz     = $self->executable;
+  
+  open(IN, "$getz  -d -sf fasta '[libs={$libs}-ID:$id]' |") 
+    or $self->throw("Error running getz for id [$id]: $getz");
+  
+  my $format = 'fasta';
+  
+  my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>$format);
+  
+  $seq = $fh->next_seq();
+  close IN;
+
+  $self->throw("Could not getz sequence for [$id]\n") unless defined $seq;
+  $seq->display_id($id);
+  $seq->accession_number($id);
+
+  return $seq;
+}
+
 
 1;
