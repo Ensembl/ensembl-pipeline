@@ -45,8 +45,8 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
-							     GB_TARGETTED_PROTEIN_INDEX
-							     GB_TARGETTED_PROTEIN_SEQFETCHER
+							     GB_PROTEIN_INDEX
+							     GB_PROTEIN_SEQFETCHER
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
@@ -152,7 +152,7 @@ sub make_targetted_runnables {
   my ($self) = @_;
 
   # set up seqfetchers
-  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX, $GB_TARGETTED_PROTEIN_SEQFETCHER);
+  my $protein_fetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
 
   # we need to find all the proteins that pmatch into this region
   # take a note of those that fall across the ends of the vc? and do what, precisely?

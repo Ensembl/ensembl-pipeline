@@ -66,7 +66,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
-							     GB_TARGETTED_PROTEIN_INDEX
+							     GB_PROTEIN_INDEX
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
@@ -89,7 +89,7 @@ sub new {
 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
-    my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
+    my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX);
     $self->seqfetcher($seqfetcher);
   }
 
