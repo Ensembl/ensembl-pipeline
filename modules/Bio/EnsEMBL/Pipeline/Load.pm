@@ -1,6 +1,8 @@
 use strict;
 use warnings;
 
+#require 'syscall.ph';
+
 package Bio::EnsEMBL::Pipeline::Load;
 
 =head2 new
@@ -30,7 +32,7 @@ sub new {
   Arg [1]    : None
   Example    : $
   Description: Returns the load of the machine over the last 1, 5 and 15 minutes.
-  Returntype : List of integers
+  Returntype : List of integers first 3 are the load averages.
   Exceptions : 
   Caller     : 
 
@@ -40,14 +42,14 @@ sub get {
 
   my $self = shift;
 
-  my $uptime = `uptime`;
+  # use /proc/loadavg to avoid shelling out to uptime every time
+  open (LOAD, "/proc/loadavg");
+  my @result = split / /, <LOAD>;
+  close (LOAD);
 
-  #print "uptime=" . $uptime . "\n";
+  #print "$result[0] $result[1] $result[2]\n";
 
-  $uptime =~ /^.*load average:\s*(\d+\.\d\d),\s(\d+\.\d\d),\s(\d+\.\d\d)$/;  # why doesn't backreferencing work?
-  #print "bits: " . $1 . " " . $2 . " ". $3 . "\n";
-
-  return ($1, $2, $3);
+  return @result;
 
 }
 
