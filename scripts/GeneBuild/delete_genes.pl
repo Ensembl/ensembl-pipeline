@@ -59,7 +59,8 @@ if(!$host || !$dbuser || !$dbname ){
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,
 					    -user => $dbuser,
 					    -dbname => $dbname,
-					    -pass  => $pass
+					    -pass  => $pass,
+					    -port => $port,
 					   );
 
 while(<>){

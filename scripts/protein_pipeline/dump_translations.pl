@@ -31,6 +31,7 @@ my $dnadbhost    = '';
 my $dnadbuser    = '';
 my $dnadbname    = '';
 my $dnadbpass    = undef;
+my $dnadbport    = undef;
 my $dbport    = 3306;
 my $stable_id;
 my $db_id;
@@ -47,6 +48,7 @@ GetOptions(
 	   'dnadbname=s'    => \$dnadbname,
 	   'dnadbuser=s'    => \$dnadbuser,
 	   'dnadbpass=s'    => \$dnadbpass,
+	   'dnadbport=s'    => \$dnadbport,
 	   'stable_id!' => \$stable_id,
 	   'db_id!' => \$db_id,
 	   'genetype=s' => \$genetype,
@@ -66,6 +68,8 @@ if(!$stable_id && !$db_id){
 }
 
 
+$dnadbuser = $dbuser if(!$dnadbuser);
+$dnadbpass = $dbpass if(!$dnadbpass);
 my $dnadb;
  
 $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -73,8 +77,8 @@ $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dnadbuser,
 					    '-dbname' => $dnadbname,
 					    '-pass'   => $dnadbpass,
-					    '-port'   => $dbport,
-					   ) unless(!$dnadbhost || !$dnadbname || !$dnadbuser);
+					    '-port'   => $dnadbport,
+					   ) unless(!$dnadbhost || !$dnadbname);
 
 
 #print STDERR "have dnadb ".$dnadb."\n";
