@@ -61,8 +61,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 my %chrhash;
 
 # declare these here so we can refer to them later
-my $blat_resultsdir       = "blat_est/results";
-my $blat_bsubdir          = "blat_est/bsub";
+my $blat_bsubdir          = "blat_results/";
 my $est_genebuilder_dir   = "est_genebuilder";
 my $gene2expression_dir   = "gene2ests";
 
@@ -96,19 +95,19 @@ if ( $MAP_GENES_TO_ESTS ){
 sub make_directories {
   my $scratchdir =  $EST_TMPDIR ;
 
-  my @resdirs = split /\//, $blat_resultsdir;
+  #my @resdirs = split /\//, $blat_resultsdir;
   
   # blat_ests
-  my $dir = $scratchdir . "/" . $resdirs[0] . "/";
-  makedir($dir);
+ #my $dir = $scratchdir . "/" . $resdirs[0] . "/";
+  #makedir($dir);
 
   # blat output directories
-  my $blatdir = $dir . $resdirs[1] . "/";  
-  my $blaterr = $blatdir . "stderr/";
-  my $blatout = $blatdir . "stdout/";
-  makedir($blatdir);
-  makedir($blaterr);
-  makedir($blatout);
+  #my $blatdir = $dir . $resdirs[1] . "/";  
+  #my $blaterr = $blatdir . "stderr/";
+  #my $blatout = $blatdir . "stdout/";
+  #makedir($blatdir);
+  #makedir($blaterr);
+  #makedir($blatout);
   
   # bsub output directories
   my $bsubdir = $scratchdir . "/" . $blat_bsubdir . "/";
