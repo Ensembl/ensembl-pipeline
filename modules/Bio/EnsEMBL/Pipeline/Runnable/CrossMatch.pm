@@ -25,7 +25,7 @@ Bio::EnsEMBL::Pipeline::Runnable::CrossMatch - CrossMatch featurepair generator
 
 =head1 DESCRIPTION
 
-This runs cross match (using James Gilberts/Tim Hubbard's system) and provides
+This runs cross match (using James Gilberts/Tim Hubbard system) and provides
 feature pair output
 
 =head1 AUTHOR - Ewan Birney
@@ -80,7 +80,7 @@ sub new {
   } else {
       $self->workdir("/tmp");
   }
-  if( !defined $score) { 
+  if($score) { 
       $self->score($score); 
   } else {
       $self->score(5000);
@@ -139,7 +139,6 @@ sub run{
    }
 
    #process alignments above score
-
    foreach my $fp ( $cm->fp($self->score) ) {
        my ($seq1,$seq2,$score,$start,$end,$hstart,$hend) = split(/:/,$fp);
        my ($strand,$hstrand,$swap);
@@ -460,7 +459,6 @@ sub _save_hit{
 	# alignment is stored in a directional fashion: x->y maps to a->b where y>x
 	my $raw_align;
 	if(@$raalign){
-
 	    # reverse if required
 	    my $st1=$nres[5];
 	    my $en1=$nres[6];
@@ -578,10 +576,9 @@ sub crossMatch {
     open( CROSS_MATCH, $cross_command )
         or croak "Can't open pipe '$cross_command' : $!";
     while (<CROSS_MATCH>) {
-
 	# process alignment lines if requested
 	if($matcher->{'alignments'}){
-	    if(/^(\w)*\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/){
+	    if(/^(\w*)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/){
 		if($2 eq $res[4] && $ialign==1){
 		    $align[0].=$4;
 		    $align[2]=$1;
