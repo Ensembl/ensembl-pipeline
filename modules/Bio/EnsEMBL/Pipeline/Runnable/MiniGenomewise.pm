@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -197,21 +198,23 @@ sub make_miniseq {
     my $strand;
 
     foreach my $transcript(@{$self->get_all_Transcripts}){
+      #print STDERR "making miniseq with:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
     EXON:
       foreach my $exon (@{$transcript->get_all_Exons}){
-				# we expect to be given a set of transcripts that are all on the same 
-				# strand - genomewise can't deal with mixed strand predictions and we 
-				# really dont; want to be doing with it here
-
-				if(!defined $strand){
-					# this is the first exon
-					$strand = $exon->strand;
-				}
+	# we expect to be given a set of transcripts that are all on the same 
+	# strand - genomewise can't deal with mixed strand predictions and we 
+	# really dont; want to be doing with it here
+	
+	if(!defined $strand){
+	  # this is the first exon
+	  $strand = $exon->strand;
+	}
 	
 	if($exon->strand != $strand){
 	  $self->throw("Mixed strands in input exons! I'm outta here!\n");
 	}
-
+	
 	if ( $exon->start > $exon->end){
 	  my $start = $exon->start;
 	  my $end   = $exon->end;
@@ -221,15 +224,13 @@ sub make_miniseq {
       }
     }
 
-
-
-    my $count  = 0;
-    my $mingap = $self->minimum_intron;
-    my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
+    my $count   = 0;
+    my $mingap  = $self->minimum_intron;
+    my $pairaln = new Bio::EnsEMBL::Analysis::PairAlign;
 
     my @genomic_features;
 
-    my $prevend     = 0;
+    my $prevend = 0;
     
   FEAT: foreach my $exon (@exons) {
 
@@ -241,11 +242,9 @@ sub make_miniseq {
       $start = $exon->start - $self->exon_padding;
       $end   = $exon->end   + $self->exon_padding;
       
-      if ($start < 1) { $start = 1;}
       if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
 
-      #print STDERR "In make_miniseq(), feature-> start: $start, end: $end\n";
-
+      
       my $gap = ($start - $prevend);
 
       if ($count > 0 && ($gap < $mingap)) {
@@ -399,6 +398,8 @@ sub run {
   }
   
   foreach my $t (@{$self->get_all_Transcripts}){
+    #print STDERR "running mingenomewise with:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
     my $converted = $self->convert_transcript_to_miniseq($t);
     $genomewise->add_Transcript($converted);
   }
