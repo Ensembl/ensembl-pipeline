@@ -35,11 +35,12 @@ sub new {
   my $self = $class->SUPER::new(@args);    
   
   # Now parse the input options and store them in the object
-  my( $query, $program, $database, $options) = 
+  my( $query, $program, $database, $options, $do_not_project) = 
       $self->_rearrange([qw(QUERY 
                             PROGRAM 
                             DATABASE 
-                            OPTIONS)],
+                            OPTIONS
+                            DONOTPROJECT)],
                         @args);
   
   if ($query) {
@@ -61,6 +62,10 @@ sub new {
   my $core_options = "-cpus 1 -compat1.4 -lcfilter -matrix EXOFISH -sort_by_highscore W=5 X=25 T=75 S=89 S2=89";  
   $core_options .= $options;
   $self->options($core_options);
+
+  if (defined($do_not_project)) {
+    $self->do_not_project($do_not_project);
+  }
 
   return $self; # success - we hope!
 }
@@ -159,6 +164,8 @@ sub parse_results {
     $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-file => $self->results);
   }
 
+  my @features;
+
  NAME: 
   while (my $sbjct = $parser->nextSbjct) {
     
@@ -222,9 +229,70 @@ sub parse_results {
       $fp->percent_id($pid);
       
       my $df = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => [$fp]);
-      $self->output($df);      
+      push @features, $df;
     }
   }
+
+  if (not $self->do_not_project) {
+    my (@projected_hits);
+    
+    foreach my $fp (sort {$a->start <=> $b->start} @features) {
+      my $reg = {  start    => $fp->start, 
+                   end      => $fp->end,
+                   score    => [$fp->score],
+                   hseqname => [$fp->hseqname],
+                   htstart  => [$fp->hstart],
+                   hend     => [$fp->hend],
+
+                 };
+      
+      if (not @projected_hits or $projected_hits[-1]->{end} + 1 < $reg->{start}) {
+        push @projected_hits, $reg;
+      }
+      else {
+        # overlap
+        push @{$projected_hits[-1]->{hseqname}}, $reg->{hseqname};
+        push @{$projected_hits[-1]->{hstart}}, $reg->{hstart};
+        push @{$projected_hits[-1]->{hend}}, $reg->{hend};
+        push @{$projected_hits[-1]->{score}}, $reg->{score};
+
+        if ($reg->{end} > $projected_hits[-1]->{end}) {
+          $projected_hits[-1]->{end} = $reg->{end};
+        }	    
+      }
+    }
+    
+    @features = ();
+    
+    foreach my $reg (@projected_hits) {      
+      my $fp = Bio::EnsEMBL::FeaturePair->new();
+      $fp->seqname($self->query->id);
+      $fp->start($reg->{start});
+      $fp->end($reg->{end});
+      $fp->strand(1);
+
+      my $tot_score = 0.0;
+      foreach my $el (@{$reg->{score}}) {
+        $tot_score += $el;
+      }
+      $fp->score($tot_score);
+
+      if (@{$reg->{hseqname}} > 1) {      
+        $fp->hseqname(sprintf("Many(%d)", scalar(@{$reg->{hseqname}})));
+        $fp->hstart(1);
+        $fp->hend($reg->{end} - $reg->{start} + 1);
+      }
+      else {
+        $fp->hseqname($reg->{hseqname}->[0]);
+        $fp->hstart($reg->{hstart}->[0]);
+        $fp->hend($reg->{hend}->[0]);
+      }
+
+      push @features,  Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => [$fp]);
+    }    
+  }
+  
+  $self->output(@features);
   
   return $self->output; 
 }
@@ -274,17 +342,28 @@ sub query {
 
 sub output {
   my ($self, @arg) = @_;
+
+  if (!defined($self->{'_fplist'})) {
+    $self->{'_fplist'} = [];
+  }
   
   if (@arg) {
     @{$self->{'_fplist'}} = @arg;
   }
- 
-  if (!defined($self->{'_fplist'})) {
-    $self->{'_fplist'} = [];
-  }
+
   return @{$self->{'_fplist'}};
 }
 
+
+sub do_not_project {
+  my ($self, $do_not_project) = @_;
+
+  if (defined($do_not_project)) {
+    $self->{'_do_not_project'} = $do_not_project;
+  }
+  
+  return $self->{'_do_not_project'};
+}
 
 
 1;
