@@ -356,9 +356,18 @@ sub parse_results {
       }
 	  
       $name =~ s/^>(\S+).*/$1/;
+# need to remove this line as well (see below)
 
       if ($name =~ /\|UG\|(\S+)/) {
          $name = $1;
+#
+# scp - to be tested. for correct parsing of unigene IDs
+# the identifier we actually want is towards the end of the header
+# (err?!) prefixed by "/ug="
+#
+# instead of "$name = $1", need something like...
+#        ($name) = $name =~ m{/ug=(.*?)\ };
+#
       } elsif ($name =~ /\S+\|\S+\|(\S+)/) {
          $name = $1;
       }

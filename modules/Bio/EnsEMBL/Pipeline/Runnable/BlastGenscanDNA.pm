@@ -224,6 +224,11 @@ sub get_Sequence {
         # Take unigene id or accession
         if ($id =~ /\|UG\|/) {
            $id =~ s/.*\|.*\|(.*)/$1/;
+#
+# scp - untested - read 'correct' unigene identifier from header line
+# replace line above with:
+#          $id =~ s{/ug=(.*?)\ }{$1};
+#
         } else {
 	   $id =~ s/.*\|(.*)\|.*/$1/;
         }

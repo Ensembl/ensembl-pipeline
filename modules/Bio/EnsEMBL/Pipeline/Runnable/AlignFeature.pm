@@ -249,6 +249,13 @@ sub parse_Header {
 
     if ($id =~ /^(.*)\|(.*)\|(.*)/) {
         if ($2 eq "UG") {
+#
+# scp - to be tested. for correct parsing of unigene IDs
+# the identifier we actually want is towards the end of the header
+# (err?!) prefixed by "/ug="
+# instead of "$name = $3", need something like...
+#        ($newid) = $id =~ m{/ug=(.*?)\ };
+#
           $newid = $3;
         } else {
 	  $newid = $2;
