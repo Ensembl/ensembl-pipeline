@@ -588,7 +588,7 @@ sub filter_hits {
      
       my $fp = $self->create_FeaturePair($qstart, $qend, $qstrand, 
                                          $hstart, $hend, $hstrand, $name, 
-                                         $percent, $score, $p_value,
+                                         $score, $percent, $p_value,
                                          $self->query);
 
       push(@features,$fp);
