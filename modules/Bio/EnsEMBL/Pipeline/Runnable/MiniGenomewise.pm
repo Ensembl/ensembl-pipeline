@@ -60,9 +60,12 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $transcripts ) = $self->_rearrange([qw(GENOMIC
-							 TRANSCRIPTS)],
-						     @args);
+    my( $genomic, $transcripts , $switch, $smell) = $self->_rearrange([qw(GENOMIC
+									  TRANSCRIPTS
+									  SWITCH
+									  SMELL
+									 )],
+								      @args);
     
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
@@ -374,14 +377,19 @@ sub run {
   # make miniseq representation to cover all transcripts
   $self->make_miniseq;
 
-  my $genomewise = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
-  $genomewise->seq($self->miniseq->get_cDNA_sequence);
-
-#  $genomewise->seq($self->genomic_sequence);
+  my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( 
+								     -seq    => $self->miniseq->get_cDNA_sequence,
+								    );
+  if ( $self->switch ){
+    $genomewise->switch($self->switch);
+  }
+  if ( $self->smell  ){
+    $genomewise->smell($self->smell);
+  }
+  
   foreach my $t (@{$self->get_all_Transcripts}){
     my $converted = $self->convert_transcript_to_miniseq($t);
     $genomewise->add_Transcript($converted);
-    #$genomewise->add_Transcript($t);
   }
   
   $genomewise->run;
@@ -477,7 +485,6 @@ sub convert_output{
 
 	# transfer the supporting evidence!!!
 	foreach my $evi ( @evidence ){
-	  print STDERR "MiniGenomewise: passing a ".$self->genomic_sequence." to the evidence\n";
 	  $evi->contig($self->genomic_sequence);
 	  $new_exon->add_supporting_features( $evi );
 	}
@@ -542,6 +549,30 @@ sub output {
 
     return @{$self->{'_output'}};
 }
+
+############################################################
+
+sub switch{
+  my ($self,$switch) = @_;
+  if( $switch ) {
+    $self->{_switch} = $switch;
+  }
+  return $self->{_switch};
+}
+
+############################################################
+
+
+sub smell{
+  my ($self,$smell) = @_;
+  if( $smell ) {
+    $self->{_smell} = $smell;
+  }
+  return $self->{_smell};
+}
+
+############################################################
+
 
 1;
 

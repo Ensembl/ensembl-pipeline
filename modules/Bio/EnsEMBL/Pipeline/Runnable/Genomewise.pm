@@ -1,4 +1,3 @@
-
 #
 # Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm
 #
@@ -16,37 +15,42 @@ Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm - Runs Genomewise and makes a se
 
 =head1 SYNOPSIS
 
-   $run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new();
+my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq    => $primary_seq,
+                                                                    -switch => $switch,
+                                                                    -smell  => $smell,
+                                                                  );
 
-   $trans = Bio::EnsEMBL::Transcript->new();
-   $exon  = Bio::EnsEMBL::Exon->new();
-   $exon->start(123);
-   $exon->end(345);
- 
-   $trans->add_Exon($exon);
-   # add more Exons, and more Transcripts as desired
+where 
+-seq    is the sequence where we are going to run genomewise on
+-switch is the cost to switch evidence
+-smell  is the space allowed to move off the splice site of the evidence
 
-   $run->add_Transcript($trans);
-   $run->seq($genomic_seq);
+add evidence in the form of a transcript:
+   $genomewise->add_Transcript($transcript);
 
-   $run->run;
+   $genomewise->run;
+   my @transcripts = $genomewise->output;
 
 
 =head1 DESCRIPTION
 
-Describe the object here
+This class is a wrapper to around the genomewise binary.
+You pass in a piece of sequence and evidence in the form of exons in a transcript. It is also possible to pass in
+cds and framshifts (see genomewise -help for details). The evidence must be in the coordinate system
+of the PrimarySeq passed in. 
+
+Genomewise then will try to find the most likely ORF across the sequence and it will produce
+a transcript structure with CDS and UTRs. It can even accept multiple transcripts. It will then choose
+the best across the exons. It aims for longest ORF and it tests for start/stop codons and
+splice site consensus sequences.
+
+At the moment you can pass in the options -switch and -smell.
 
 =head1 CONTACT
 
 Ensembl - ensembl-dev@ebi.ac.uk
 
-=head APPENDIX
-
-The rest of the documentation details each of the object
-methods. Internal methods are usually preceded with a _
-
 =cut
-
 
 # Let the code begin...
 
@@ -67,7 +71,33 @@ sub new {
     my($class,@args) = @_;
     
     my $self = $class->SUPER::new(@args);
-
+    
+    my( $seq, $switch, $smell ) = $self->_rearrange([qw(SEQ
+						  SWITCH
+						  SMELL)],
+					      @args);
+    
+    
+    unless ( $seq ){
+      $self->throw->("must provide a PrimarySeq with option -seq");
+    }
+    $self->seq($seq);
+    
+    # read smell argument or default it to 8
+    if ($smell){
+      $self->smell($smell);
+    }
+    else{
+      $self->smell(8);
+    }
+    # read the switch argument or default it to 10000
+    if ($switch){
+      $self->switch($switch);
+    }
+    else{
+      $self->switch(10000);
+    }
+    
     $self->{'_transcript_array'} = [];
     $self->{'_output_array'}     = [];
     return $self;
@@ -148,19 +178,23 @@ sub run{
   }
   close(E);
   
+  my $switch = $self->switch;
+  my $smell  = $self->smell;
+  print STDERR "running genomewise with smell: $smell and switch: $switch\n";
+
 #### Steve's version (fixed)
 #  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
-
-### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
-  open(GW,"/usr/local/ensembl/bin/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
-
+  
+  ### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
+  open(GW,"/usr/local/ensembl/bin/genomewise -switch $switch -silent -nogff -smell $smell -notrans -nogenes -geneutr $genome_file $evi_file |");
+  
   
   # parse gff output for start, stop, strand, phase
   my $genename = '';
 
  GENE:
   while( <GW> ) {
-    print STDERR $_;
+    #print STDERR $_;
 
       /\/\// && last;
       if( /Gene/ ) {
@@ -175,7 +209,7 @@ sub run{
 	my $seen_utr3 = 0;
 	my $prev = undef;
 	while( <GW> ) {
-	  #print STDERR "$_";
+	  print STDERR "$_";
 	  chomp;
 	  #print "Seen $_\n";
 	  if( /End/ ) {
@@ -226,7 +260,7 @@ sub run{
 	      $exon->end  ($end);
 	      $exon->strand($strand);
 	      $exon->phase($prev->phase);
-	      print STDERR "Genomewise: setting end_phase to $end_phase\n";
+	      #print STDERR "Genomewise: setting end_phase to $end_phase\n";
 	      $exon->end_phase($end_phase);
 	    } 
 	    else {
@@ -249,10 +283,6 @@ sub run{
 	    }
 	    $seen_cds = 1;
 	    $prev = $exon;
-###print STDERR "Genomewise - THIS IS THE EXON ADDED " . $exon . "\n";
-#while (my ($k, $v) = each %$exon){
-#print "     $k => $v\n";
-#}
 	    next;
 	  }
 	  
@@ -309,10 +339,6 @@ sub run{
 	      }
 	    }
 	    $seen_utr3 = 1;
-###print STDERR "Genomewise - THIS IS THE EXON ADDED " . $exon . "\n";
-#while (my ($k, $v) = each %$exon){
-#print "     $k => $v\n";
-#}
 	    next;
 	  }
 	  
@@ -397,7 +423,6 @@ sub run{
     
   ## now we check that all the evi info has been correctly passed
   foreach my $tran_out ( @trans_out ){
-    #print STDERR "In Genomewise, AFTER going through genomewise\n";
     my $count = 0;
     foreach my $exon_out ( @{$tran_out->get_all_Exons} ) {
       $count++;
@@ -413,37 +438,11 @@ sub run{
       }
     }
   }
-
-#    print STDERR " Transcript  : ".$t."\n";
-#    print STDERR " Translation : ".$t->translation."\n";
-#    print STDERR " translation starts: ".$t->translation->start."\n";
-#    print STDERR " translation end   : ".$t->translation->end."\n";
-#    print STDERR " start exon        : ".$t->translation->start_Exon."\n";
-#    print STDERR " end exon          : ".$t->translation->end_Exon."\n";
-#    foreach my $exon (@{$t->get_all_Exons}){
-#      print STDERR "     Exon          : " . $exon . " ".$exon->phase  . " " . $exon->end_phase ."\tstarts: ".$exon->start."\tends: ".$exon->end."\n";
-#    }
-#  }
-  # tidy up output files.
-   unlink $genome_file;
-   unlink $evi_file;
-
+  unlink $genome_file;
+  unlink $evi_file;
 }
 
-
-
-
-=head2 output
-
- Title   : output
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
+############################################################
 
 sub output{
   my ($self,@args) = @_;
@@ -500,32 +499,43 @@ sub add_Transcript{
    return $self->{_transcript_array};
 }
 
-
-
-=head2 seq
-
- Title   : seq
- Usage   : $obj->seq($newval)
- Function: 
- Returns : value of seq
- Args    : newvalue (optional)
-
-
-=cut
+############################################################
 
 sub seq{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      if( !ref $value || !$value->isa("Bio::PrimarySeqI") ) {
-	  $obj->throw("No primary sequence provided...");
-      }
-
-      $obj->{'_seq'} = $value;
+  my ($self,$seq) = @_;
+  if( $seq ) {
+    if( !ref $seq || !$seq->isa("Bio::PrimarySeqI") ) {
+      $self->throw("No primary sequence provided...");
     }
-    return $obj->{'_seq'};
+    
+    $self->{_seq} = $seq;
+  }
+  return $self->{_seq};
 
 }
+
+############################################################
+
+sub switch{
+  my ($self,$switch) = @_;
+  if( $switch ) {
+    $self->{_switch} = $switch;
+  }
+  return $self->{_switch};
+}
+
+############################################################
+
+
+sub smell{
+  my ($self,$smell) = @_;
+  if( $smell ) {
+    $self->{_smell} = $smell;
+  }
+  return $self->{_smell};
+}
+
+############################################################
 
 #sub _make_Analysis{
 #  my ($self) = @_;
