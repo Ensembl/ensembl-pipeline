@@ -214,6 +214,12 @@ sub add_deletion {
 	ref($position) . "]") 
     if (ref($position) ne '');
 
+  if ($position > $self->length) {
+    warning("Attempting to insert a deletion past the end of sequence.");
+    return 1
+  }
+
+
   $length = 1 unless $length;
 
   $self->deletion_hash->{$position} = $length
@@ -244,11 +250,23 @@ sub increment_deletions_above {
 sub deletion_hash {
   my $self = shift;
 
+  if (@_){
+    $self->{'_deletions'} = shift
+  }
+
   unless ($self->{'_deletions'}){
     $self->{'_deletions'} = {};
   }
 
   return $self->{'_deletions'}
+}
+
+sub deletion_coords {
+  my $self = shift;
+
+  my @deletion_coords = keys %{$self->deletion_hash};
+
+  return \@deletion_coords
 }
 
 # I'm not sure what this is used for...
@@ -313,7 +331,6 @@ sub last_base_coord {
   }
 
   return $self->{'_last_base_coord'}
-
 }
 
 
@@ -372,5 +389,5 @@ sub fasta_string {
     $self->seq_with_newlines($line_length) . "\n";
 }
 
-1
+1;
 
