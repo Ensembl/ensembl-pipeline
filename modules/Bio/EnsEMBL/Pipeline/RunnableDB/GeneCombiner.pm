@@ -281,7 +281,6 @@ sub fetch_input {
   my $ensembl_gpa = $self->ensembl_db->get_SliceAdaptor();
   my $estgene_gpa = $self->estgene_db->get_SliceAdaptor();
 
-  print STDERR "chr: $chrid, start: $chrstart, end: $chrend\n";
   my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
   my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
   
@@ -959,18 +958,20 @@ sub _pair_Transcripts{
 	     && $exon_in_intron  == 1
 	     #&& $exact_merge     == 0 
 	   ){
-	  print STDERR "BINGO, and ISOFORM found !!\n";
-	  
-	  # if they don't have the same start/end translation, try to lock phases:
-	  if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
-	       !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
-	    $est_tran = $self->_lock_Phases($est_tran, $ens_tran) ;
-	  }
-	  else{
-	    print STDERR "EST-transcript has the same translation start and end:\n";
-	    print STDERR "EST translation start: ".$est_tran->translation->start." end: ".$est_tran->translation->end."\n";
-	    print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
-	  }
+	    print STDERR "BINGO, and ISOFORM found !!\n";
+	    
+	    # if they don't have the same start/end translation, try to lock phases:
+	    if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
+		 !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
+		print STDERR "Transcripts don't have the same start/end translation. We are not trying to lock the start/end of translation:\n";
+		#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
+		#$est_tran = $self->_lock_Phases($est_tran, $ens_tran) ;
+	    }
+	    else{
+		print STDERR "EST-transcript has the same translation start and end:\n";
+		print STDERR "EST translation start: ".$est_tran->translation->start." end: ".$est_tran->translation->end."\n";
+		print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
+	    }
 	  push ( @accepted_isoforms, $est_tran );
 	  
 	  next CANDIDATE; 
@@ -1001,6 +1002,7 @@ sub _lock_Phases{
   
   # keep the original est_tran translation
   my $original_translation = $est_tran->translation;
+  my $original_transcript  = $self->_clone_Transcript($est_tran);
 
   # we go first for the easy-peasy case: when the est gene
   # overlaps the start exon and end exon of the ensembl translation
@@ -1012,31 +1014,31 @@ sub _lock_Phases{
   my $est_end_translation;
   
   foreach my $exon (@{$est_tran->get_all_Exons}){
-    if ( $exon->overlaps( $ens_start_exon ) ){
-      $est_start_exon = $exon;
+      if ( $exon->overlaps( $ens_start_exon ) ){
+	  $est_start_exon = $exon;
+	  
+	  if ( $exon->strand == 1 && $ens_start_exon->strand == 1 ){
+	      $est_start_translation = 
+		  $ens_start_exon->start - $exon->start + $ens_tran->translation->start;
+	  }
+	  elsif( $exon->strand == -1 && $ens_start_exon->strand == -1 ){
+	      $est_start_translation = 
+		  $exon->end - $ens_start_exon->end + $ens_tran->translation->start;
+	  }
+      }
       
-      if ( $exon->strand == 1 && $ens_start_exon->strand == 1 ){
-	$est_start_translation = 
-	  $ens_start_exon->start - $exon->start + $ens_tran->translation->start;
+      if ( $exon->overlaps( $ens_end_exon ) ){
+	  $est_end_exon = $exon;
+	  
+	  if ( $exon->strand == 1 && $ens_end_exon->strand == 1 ){
+	      $est_end_translation = 
+		  $ens_end_exon->start - $exon->start + $ens_tran->translation->end;
+	  }
+	  elsif( $exon->strand == -1 && $ens_end_exon->strand == -1 ){
+	      $est_end_translation =
+		  $exon->end - $ens_end_exon->end + $ens_tran->translation->end;
+	  }
       }
-      elsif( $exon->strand == -1 && $ens_start_exon->strand == -1 ){
-	$est_start_translation = 
-	  $exon->end - $ens_start_exon->end + $ens_tran->translation->start;
-      }
-    }
-    
-    if ( $exon->overlaps( $ens_end_exon ) ){
-      $est_end_exon = $exon;
-      
-      if ( $exon->strand == 1 && $ens_end_exon->strand == 1 ){
-	$est_end_translation = 
-	  $ens_end_exon->start - $exon->start + $ens_tran->translation->end;
-      }
-      elsif( $exon->strand == -1 && $ens_end_exon->strand == -1 ){
-	$est_end_translation =
-	  $exon->end - $ens_end_exon->end + $ens_tran->translation->end;
-      }
-    }
   }
   
   # check that we get something useful:
@@ -1060,15 +1062,15 @@ sub _lock_Phases{
   my $previous_exon;
   foreach my $exon (@{$est_tran->get_all_Exons}){
     if ( $exon == $est_start_exon && $exon == $est_end_exon ){
-      $exon->phase(-1);
-      $exon->end_phase(-1);
-      $seen_start = 1;
-      $seen_end   = 1;
+	$exon->phase(-1);
+	$exon->end_phase(-1);
+	$seen_start = 1;
+	$seen_end   = 1;
     }
-    if ( $exon == $est_start_exon ){
-      $exon->phase(-1);
-      $exon->end_phase( ( $exon->length - $est_start_translation )%3 );
-      $seen_start = 1;
+    elsif ( $exon == $est_start_exon ){
+	$exon->phase(-1);
+	$exon->end_phase( ( $exon->length - $est_start_translation )%3 );
+	$seen_start = 1;
     }
     elsif( $exon == $est_end_exon ){
       $exon->end_phase(-1);
@@ -1094,11 +1096,14 @@ sub _lock_Phases{
   
   $est_tran->translation( $new_est_translation );
   unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation( $est_tran )){
-    print STDERR "Getting back to the original translation\n";
-    print STDERR "Oh, shit we have to put back the original phases!!!!!!!!!!";
-    $est_tran->translation( $original_translation );
+      print STDERR "Oh, shit we have to put back the original phases!!!!!!!!!!\n";
+      print STDERR "Getting back to the original translation:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($original_transcript);
+      return $original_transcript;
   }
-
+  
+  print STDERR "Succeeded in setting phases Returning:\n";
+ Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
   return $est_tran;
 }
     
@@ -1275,6 +1280,9 @@ sub _clone_Transcript{
   }
   #$newtranscript->sort;
   $newtranscript->dbID($transcript->dbID);
+  if (defined $transcript->type ){
+      $newtranscript->type($transcript->type);
+  }
   $self->_transcript_Type($newtranscript,$self->_transcript_Type($transcript));
   $newtranscript->translation($newtranslation);
  
@@ -2348,7 +2356,7 @@ sub _make_Genes{
 
   my @selected_transcripts;
   my $count  = 0;
-
+  
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
       $count++;
@@ -2360,9 +2368,15 @@ sub _make_Genes{
     push(@selected_transcripts,$transcript);
   } 
   my @genes = $self->_cluster_into_Genes(@transcripts);
+  
   foreach my $gene ( @genes ){
-    $gene->type($genetype);
-    $gene->analysis($analysis);
+      $gene->type($genetype);
+      $gene->analysis($analysis);
+      foreach my $t (@{$gene->get_all_Transcripts}){
+	  unless (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($t) ){
+	      $self->warn("transcript with stop codons!");
+	  }
+      }
   }
 
   return @genes;
@@ -2620,10 +2634,10 @@ sub prune_Exons {
       my $found;
     UNI:
       foreach my $uni (@unique_Exons) {
-	if ($uni->start  == $exon->start  &&
-	    $uni->end    == $exon->end    &&
-	    $uni->strand == $exon->strand &&
-	    $uni->phase  == $exon->phase  &&
+	if ($uni->start     == $exon->start  &&
+	    $uni->end       == $exon->end    &&
+	    $uni->strand    == $exon->strand &&
+	    $uni->phase     == $exon->phase  &&
 	    $uni->end_phase == $exon->end_phase
 	   ) {
 	  $found = $uni;
@@ -2632,24 +2646,24 @@ sub prune_Exons {
       }
       
       if (defined($found)) {
-	push(@newexons,$found);
-	if ($exon == $tran->translation->start_Exon){
-	  $tran->translation->start_Exon($found);
-	}
-	if ($exon == $tran->translation->end_Exon){
-	  $tran->translation->end_Exon($found);
-	}
+	  push(@newexons,$found);
+	  if ($exon == $tran->translation->start_Exon){
+	      $tran->translation->start_Exon($found);
+	  }
+	  if ($exon == $tran->translation->end_Exon){
+	      $tran->translation->end_Exon($found);
+	  }
       } 
       else {
-	push(@newexons,$exon);
-	push(@unique_Exons, $exon);
+	  push(@newexons,$exon);
+	  push(@unique_Exons, $exon);
       }
-    }          
+  }          
     $tran->flush_Exons;
     foreach my $exon (@newexons) {
-      $tran->add_Exon($exon);
+	$tran->add_Exon($exon);
     }
-  } # end of TRANSCRIPT
+ } # end of TRANSCRIPT
   return;
 }
 
