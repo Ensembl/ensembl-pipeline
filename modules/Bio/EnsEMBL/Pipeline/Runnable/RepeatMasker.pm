@@ -261,8 +261,8 @@ sub run {
 sub run_repeatmasker {
     my ($self) = @_;
     #run RepeatMasker
-    print "Running RepeatMasker; ";
-    print "cmd: ", $self->repeatmasker.' '.$self->arguments.' '.$self->filename, "\n";
+    print STDERR "Running RepeatMasker; ";
+    print STDERR "cmd: ", $self->repeatmasker.' '.$self->arguments.' '.$self->filename, "\n";
     $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
         if (system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename)); 
 }
