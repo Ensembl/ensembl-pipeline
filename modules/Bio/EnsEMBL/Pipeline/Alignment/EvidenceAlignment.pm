@@ -216,7 +216,7 @@ sub new {
   # Without padding, these sequences are truncated.  The default
   # of 50bp works OK, but you would want to set this manually
   # higher if you are interested in up- or down-stream goings-on.
-  if ($padding) {
+  if (defined $padding) {
     $self->{'_transcript_padding'} = $padding;
   } else { 
     $self->{'_transcript_padding'} = 50;
@@ -290,11 +290,11 @@ sub retrieve_alignment {
 
   my ($type, 
       $remove_introns, 
-      $padding, 
+      $intron_padding, 
       $show_missing_evidence,
       $merge_sequences) = $self->_rearrange([qw(TYPE
 						REMOVE_INTRONS
-						PADDING
+						INTRON_PADDING
 						SHOW_UNALIGNED
 						MERGE_SEQUENCES
 					       )],@_);
@@ -305,11 +305,11 @@ sub retrieve_alignment {
 		 "of \'all\', \'nucleotide\' or \'protein\'.");
   }
 
-  $padding = 100 unless ($padding);
+  $intron_padding = 100 unless (defined $intron_padding);
 
   unless ($self->_is_computed($type)){
     $self->_align($type, $show_missing_evidence, $remove_introns, 
-		  $padding, $merge_sequences);
+		  $intron_padding, $merge_sequences);
   }
 
   return $self->_create_Alignment_object($type, $show_missing_evidence);
@@ -768,25 +768,38 @@ sub _compute_evidence_coverage {
     my $previous_end;
     my @sorted_matches = sort {$a->[0] <=> $b->[0]} @{$coordinates_hash{$sequence_identifier}};
 
-    foreach my $coordinate_pair (@sorted_matches) {
+    my @genomic_starts = sort {$a->[2] <=> $b->[2]} @{$coordinates_hash{$sequence_identifier}};
+    my @genomic_ends   = sort {$a->[3] <=> $b->[3]} @{$coordinates_hash{$sequence_identifier}};
+    my $genomic_start  = $genomic_starts[0]->[2]; 
+    my $genomic_end    = $genomic_ends[-1]->[3];
 
-                          # Hit end        minus hit start       plus one;
+    foreach my $coordinate_pair (@sorted_matches) {
+                          # Hit end                minus hit start    plus one;
       $covered_length += $coordinate_pair->[1] - $coordinate_pair->[0] + 1;
 
       if ($previous_end && $coordinate_pair->[0] != $previous_end + 1) {
-	$self->_add_unmatched_region($sequence_identifier, $coordinate_pair->[0], 
-				     $coordinate_pair->[1], 'before',$coordinate_pair->[1]);
+	if ($self->_strand == 1){
+	  $self->_add_unmatched_region($sequence_identifier, $previous_end, 
+				       $coordinate_pair->[0], 'before', $coordinate_pair->[2]);
+	  
+	} elsif ($self->_strand == -1) {
+	  $self->_add_unmatched_region($sequence_identifier, $previous_end, 
+				       $coordinate_pair->[0], 'after', 
+				       ($self->_slice->length - $coordinate_pair->[3]));
+	}
       }
+      
+      $previous_end = $coordinate_pair->[1];
     }
-
+    
     if ($sorted_matches[0]->[0] != 1){ 
-      $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
-				   'before', $sorted_matches[0]->[2]);
+       $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
+				    'before', $genomic_start);
     }
 
     if ($sorted_matches[-1]->[1] != $length){
-      $self->_add_unmatched_region($sequence_identifier, ($sorted_matches[-1]->[1] + 1), 
-				   $length, 'after', $sorted_matches[-1]->[3]);
+	$self->_add_unmatched_region($sequence_identifier, ($sorted_matches[-1]->[1] + 1), 
+				     $length, 'after', $genomic_end);
     }
 
     my $uncovered_5prime_bases = $sorted_matches[0]->[0] - 1;
@@ -851,7 +864,7 @@ sub _add_unmatched_region {
 sub _derive_unmatched_sequences {
   my ($self) = @_;
 
-  my $spacing = 5;
+  my $spacing = 0;
   my @sequences;
 
   $self->warn("No unmatched sequences have been found")
@@ -873,8 +886,8 @@ sub _derive_unmatched_sequences {
 
       if ($missed_fragment->[2] eq 'before'){
 
-	$insert_start = $missed_fragment->[3] - 
-	  ($missed_fragment->[1] - $missed_fragment->[0]) - $spacing;
+	$insert_start = $missed_fragment->[3] - 1 - 
+	  ($missed_fragment->[1] - $missed_fragment->[0] + 1) - $spacing;
 
       } elsif ($missed_fragment->[2] eq 'after') {
 
@@ -929,6 +942,8 @@ sub _derive_unmatched_sequences {
 sub _truncate_introns {
   my ($self, $padding) = @_;
 
+  my $transcript_padding = $self->{'_transcript_padding'};
+
   # Get sequences from the working alignment.
 
   my @sequences;
@@ -954,15 +969,28 @@ sub _truncate_introns {
 
   my @coordinates;
   foreach my $exon (@{$self->_transcript->get_all_Exons}){
+
+    my $exon_start = $exon->start;
+    my $exon_end = $exon->end;
+
+    if ($self->_strand == -1) {
+      $exon_start = $self->_slice->length - $exon_start - ($exon_end - $exon_start);
+      $exon_end = $self->_slice->length - $exon_start;
+    }
+    
     push(@coordinates, $exon->start);
     push(@coordinates, $exon->end);
   }
+
+  # Sort in reverse, such that we splice out introns from the
+  # 3-prime end first.  This means we dont have to adjust the
+  # coordinates of the unspliced introns each time an upstream
+  # intron is removed.
 
   @coordinates = sort {$b <=> $a} @coordinates;
 
   shift @coordinates;
   pop @coordinates;
-
 
   # Splice introns from each sequence.
 
@@ -975,7 +1003,7 @@ sub _truncate_introns {
   INTRON:
     while (@working_coordinates){
       my $intron_end = (shift @working_coordinates) - 1;
-      my $intron_start = (shift @working_coordinates) + 1;
+      my $intron_start = (shift @working_coordinates);
 
       next INTRON unless ($intron_start + $padding + 22) < ($intron_end - $padding - 22);
 
@@ -1412,12 +1440,37 @@ sub _corroborating_sequences {
 
   my $exon_placemarker = 0;
 
+  # We have to check whether our evidence is on the reverse
+  # strand.  This happens with cDNA and EST evidence.
+
+  my %evidence_hash;
+
+  foreach my $exon (@{$exons}) {
+    foreach my $base_align_feature (@{$exon->get_all_supporting_features}) {
+      push (@{$evidence_hash{$base_align_feature->hseqname}}, 
+	    [$base_align_feature->hstart, $base_align_feature->hend]);
+    }
+  }
+
+  my %strand_lookup;
+
+  foreach my $seq_id (keys %evidence_hash) {
+    # If the order of features is reversed we assume reverse strand.
+    # Soon, it should be possible to just derive this information
+    # from the base_align_feature, and hence avoid this hack.
+    if ($evidence_hash{$seq_id}->[0]->[0] > $evidence_hash{$seq_id}->[-1]->[0]) {
+      $strand_lookup{$seq_id} = -1;
+    } else {
+      $strand_lookup{$seq_id} = 1;
+    }
+  }
+
+
   foreach my $exon (@{$exons}){
     # Work through each item of supporting evidence attached to our exon.
 
   FEATURE:
     foreach my $base_align_feature (@{$exon->get_all_supporting_features}){
- 
       if ((($type eq 'nucleotide')
 	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	  ||(($type eq 'protein')
@@ -1427,12 +1480,12 @@ sub _corroborating_sequences {
 
       if ((defined $base_align_feature->percent_id)
 	  &&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
-	  next FEATURE;
-	}
+	next FEATURE;
+      }
 
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
-
-	my $align_seq = $self->_fiddly_bits($base_align_feature);
+	my $align_seq = $self->_fiddly_bits($base_align_feature, 
+					    $strand_lookup{$base_align_feature->hseqname});
 	next FEATURE unless $align_seq;
 
 	$align_seq->exon($exon_placemarker);
@@ -1443,6 +1496,11 @@ sub _corroborating_sequences {
       }
       
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
+
+	if ($strand_lookup{$base_align_feature->{hseqname}} == -1) {
+	  $self->warn("Zoicks!  Surely we can't have a reverse" .
+		      " complimented protein sequence.");
+	}
 
 	my $align_seq = $self->_fiddly_bits($base_align_feature);
 	next FEATURE unless $align_seq;
@@ -1477,11 +1535,9 @@ sub _corroborating_sequences {
 =cut
 
 sub _fiddly_bits {
-  my ($self, $base_align_feature) = @_;
-  
+  my ($self, $base_align_feature, $orientation) = @_;
   my $hstart = $base_align_feature->hstart;
   my $hend = $base_align_feature->hend;
-
 
   # Fetch our sequence from the cache.  If the sequence
   # is missing it means that it could not be fetched and
@@ -1531,6 +1587,26 @@ sub _fiddly_bits {
     # Splice out the matched region of our feature sequence
     @fetched_seq = splice(@fetched_seq, ($hstart - 1), ($hend -$hstart + 1));
     
+    # This is a pest, but if the evidence is reverse-stranded we have
+    # to reverse complement the exon sequence. We dont seem to be able to
+    # just reverse complement the whole sequence as this screws up the 
+    # internal coordinates.
+
+    if ($orientation == -1) {
+      my $wrong_way_around_exon;
+
+      foreach my $nucleotide (@fetched_seq) {
+	$wrong_way_around_exon .= $nucleotide;
+      }
+
+      my $backwards_seq = Bio::Seq->new('-seq' => $wrong_way_around_exon);
+      
+      my $forwards_seq = $backwards_seq->revcom;
+
+      @fetched_seq = split //, $forwards_seq->seq;
+
+    }
+
   }
 
   # Add the needed insertion gaps to our supporting
