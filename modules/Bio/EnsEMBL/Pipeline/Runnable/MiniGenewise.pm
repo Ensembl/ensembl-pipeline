@@ -250,7 +250,14 @@ sub parse_Header {
 sub make_miniseq {
     my ($self,@features) = @_;
 
-    my $strand = $features[0]->strand;
+    my $strand = 1;
+
+    if ($self->is_reversed(@features)) {
+	$strand = -1;
+    }
+
+    print STDERR "Strand is $strand\n";
+
     my $seqname = $features[0]->seqname;;
     @features = sort {$a->start <=> $b->start} @features;
     
@@ -264,10 +271,11 @@ sub make_miniseq {
     my $prevend     = 0;
     my $prevcdnaend = 0;
     
-    foreach my $f (@features) {
+    FEAT: foreach my $f (@features) {
 	 print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
-	if ($f->strand != $strand) {
-	    $self->throw("Mixed strands in features set");
+	if ($f->hstrand != $strand) {
+	    $self->warn("Mixed strands in features set - skipping feature");
+	    next FEAT;
 	}
 
 	my $start = $f->start;
@@ -360,7 +368,7 @@ sub make_miniseq {
 						      -pairalign => $pairaln);
 
     my $newgenomic = $miniseq->get_cDNA_sequence;
-    print ("New genomic sequence is " . $newgenomic->seq . "\n");
+#    print ("New genomic sequence is " . $newgenomic->seq . "\n");
     return $miniseq;
 
 }
@@ -583,7 +591,7 @@ sub minirun {
     }
 
     $self->get_all_Sequences(@ids);
- my $analysis_obj    = new Bio::EnsEMBL::Analysis
+    my $analysis_obj    = new Bio::EnsEMBL::Analysis
 	(-db              => undef,
 	 -db_version      => undef,
 	 -program         => "genewise",
@@ -614,11 +622,8 @@ sub minirun {
 	    my $miniseq = $self->make_miniseq(@$features);
 	    my $hseq    = $self->get_Sequence($id);
 	    
-	    my $reverse = 0;
+	    my $reverse = $self->is_reversed(@extras);
 
-	    if ($features->[0]->hstrand == -1) {
-		$reverse = 1;
-	    }
 	    print STDERR "Reverse 2 $reverse\n";
 	    print("Hseq $id " . $hseq->seq . "\n");
 	    print("cdna " . $miniseq->get_cDNA_sequence . "\n");
@@ -637,9 +642,13 @@ sub minirun {
 	    my @f = $eg->output;
 	    my @newf;
 	    
+	    my $strand = 1;
+	    if ($reverse == 1) {
+		$strand = -1;
+	    }
 	    foreach my $f (@f) {
-		$f->strand($features->[0]->strand);
-		$f->hstrand($features->[0]->hstrand);
+		$f->strand($strand);
+		$f->hstrand($strand);
 		
 		print(STDERR "Aligned output is " . $f->id    . "\t" . 
 		      $f->start      . "\t" . 
@@ -694,6 +703,29 @@ sub minirun {
 
 }
 
+sub is_reversed {
+    my ($self,@features) = @_;
+
+    my $strand = 0;
+
+    my $fcount = 0;
+    my $rcount = 0;
+
+    foreach my $f (@features) {
+	if ($f->hstrand == 1) {
+	    $fcount++;
+	}
+	if ($f->hstrand == -1) {
+	    $rcount++;
+	}
+
+    }
+    if ($fcount > $rcount) {
+	return 0;
+    } else {
+	return 1;
+    }
+}
 sub find_extras {
     my ($self,@features) = @_;
 
