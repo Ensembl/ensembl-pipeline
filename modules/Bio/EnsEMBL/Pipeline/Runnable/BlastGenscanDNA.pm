@@ -399,10 +399,11 @@ sub align_hits_to_contig {
 	my $fp = Bio::EnsEMBL::FeaturePair->new;
 	$fp->start($gstart);
 	$fp->end($gend);
+	$fp->seqname($feature->seqname);
 	$fp->strand($gstrand);
 	$fp->score($feature->score);
 	$fp->p_value($feature->p_value);
-	$fp->percent_ident($feature->percent_ident);
+	$fp->percent_id($feature->percent_id);
 	$fp->analysis($feature->analysis);
 	$fp->hseqname($feature->hseqname);
 	$fp->hstart($hstart);
