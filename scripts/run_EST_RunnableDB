@@ -43,8 +43,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::DBLoader;
-my $dbtype = 'rdb';
 my $port   = undef;
 my $dbname = $EST_E2G_DBNAME;
 my $dbuser = $EST_E2G_DBUSER;
@@ -106,7 +104,7 @@ if (defined $params){
 }
 
 
-my $runobj = "$runnable"->new(-dbobj    => $db,
+my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      %hparams,
 			     );
