@@ -38,8 +38,8 @@ use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+
 use FreezeThaw;
 
 my $anahost     = 'localhost';
@@ -47,6 +47,7 @@ my $anaport     = '410000';
 my $anadbname   = 'pipeline',
 my $anadbuser   = 'root';
 my $anapass     =  undef;
+my $jobchunk    =  20;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -54,6 +55,7 @@ my $anapass     =  undef;
 	    'anadbname:s'   => \$anadbname,
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
+            'jobchunk:s'    => \$jobchunk,
 	    );
 
 
@@ -64,26 +66,36 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -user   => $anadbuser,
 						    -pass   => $anapass);
 
+my $ensdb  = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'obi-wan',
+                                          -dbname => 'ensembl',
+                                          -user   => 'ensro',
+                                         );
 
 my @jobs = $anadb->get_JobsByCurrentStatus('CREATED');
 my $count = 0;
+
 foreach my $job (@jobs) {
+    eval {
     $job->_dbobj($anadb);
-    exit(0) if $count > 1; 
+    exit(0) if $count >= $jobchunk; 
     $count++;
     print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
     my $module   = $job->analysis->module;
     my $runnable = "$module"->new(-input_id => $job->input_id,
+                                  -db2      => $ensdb,
 				  -dbobj    => $anadb);
 
     $runnable->fetch_input;
+    $job->queue('loadfastfarm');
 
     my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
-							  -runnable => $runnable,
-							  );
-
+							  -runnable => $runnable,);
     $simplejob->submit;
     $simplejob->store;
-    
+   };
+
+   if ($@) {
+	print STDERR "Error submitting job. Error was [$@]\n";
+   } 
 }
 

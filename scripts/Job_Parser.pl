@@ -55,11 +55,12 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 
-my $anahost     = 'ensrv3.sanger.ac.uk';
+my $anahost     = 'localhost';
 my $anaport     = '410000';
 my $anadbname   = 'pipeline';
-my $anadbuser   = 'ensadmin';
+my $anadbuser   = 'root';
 my $anapass     =  undef;
 
 &GetOptions(
@@ -84,30 +85,19 @@ my @jobs = $anadb->get_JobsByCurrentStatus('SUBMITTED');
 JOB:foreach my $job (@jobs) {
     
     $job->_dbobj($anadb);
+
     my $module   = $job->analysis->module;
+    my $status   = $job->status_file;
+    my $stdout   = $job->stdout_file();
+
     print(STDERR "Id is " . $job->id . "\t$module\t" . $job->input_id . "\n");
 
-    my $status=$job->status_file();
-    open(OUT,"<$status") || do {print STDERR "Could not open $status\n"; next;};
-    
-    my $notprocessed=1;
-    while(<OUT>){
-	print $_;
-	if(/PROCESSED/){
-	    print STDERR "Found processed!\n";
-	    $job->set_status('PROCESSED');
-	    $notprocessed=0;
-	}
-    }
-    close OUT;
-    if ($notprocessed) {
-	next JOB;
-    }
 
-    my $stdout=$job->stdout_file();
-    print STDERR "STDOUT file is $stdout\n";
+    next JOB if  is_processed($job);
+
+
     
-    open(OUT,"<$stdout") || do {print STDERR "Could not open $stdout\n"; next;};
+    open(OUT,"<$stdout") || next;
     my $failed = 1;
     while(<OUT>){
 	if(/Successfully/){
@@ -159,3 +149,24 @@ JOB:foreach my $job (@jobs) {
     
 }
 
+
+sub is_processed {
+    my ($job) = @_;
+    
+    open(OUT,"<" . $job->status_file) || return 0;
+    
+    my $processed = 0;
+
+    while(<OUT>){
+	print $_;
+	if(/PROCESSED/){
+	    print STDERR "Found processed!\n";
+	    $job->set_status('PROCESSED');
+	    $processed = 1;
+	}
+    }
+
+    close OUT;
+
+    return $processed;
+}

@@ -86,7 +86,9 @@ foreach my $job (@jobs) {
           "  Status : "      . $status. "</TD><TD>" .
 	  "Analysis : "      .$job->analysis->program."</TD><TD>" .
           "<a href=\"file:" . $job->stdout_file . "\">stdout</a>" . "</TD><TD>" .
-          "<a href=\"file:" . $job->stderr_file . "\">stderr</a></TD><TD></TR>" 
+          "<a href=\"file:" . $job->stderr_file . "\">stderr</a></TD><TD>" .
+          "<a href=\"file:" . $job->status_file . "\">status</a></TD><TD>"  .
+          $job->LSF_id ."</TD><TD></TR>" 
 );    
 } 
 print("</TABLE>\n");
