@@ -110,7 +110,7 @@ sub new {
 
   $epojar = 'eponine-scan.jar' unless $epojar;
 
-  if (-x $java) {
+  if (defined($java) && -x $java) {
     # passed from RunnableDB (full path assumed)
     $self->java($java);
   }
