@@ -108,7 +108,7 @@ sub inclusion_tree{
     
     foreach my $node (  @{$self->inclusion_children} ){
       if( $node->is_extended ){ 
-	print STDERR "not putting node ".$node->transcript->dbID." in the inclusion tree\n";
+	#print STDERR "not putting node ".$node->transcript->dbID." in the inclusion tree\n";
       }
       else{
 	push( @leaves, $node );
