@@ -40,7 +40,7 @@ sub new{
   $self->config($config) if($config);
   $self->db($db) if($db);
   $self->taskname($taskname) if($taskname);
-  $self->throw("you need to pass at least a config object and a taskname to an InputIDFactory $!") unless($self->config && $self->taskname);
+  $self->throw("you need to pass at least a config object and a taskname to an InputIDFactory") unless($self->config && $self->taskname);
 
   return $self;
 }
@@ -159,7 +159,7 @@ sub get_contig_names{
   my ($self) = @_;
 
   if(!$self->db){
-    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db $!");
+    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db");
   }
   my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
 
@@ -192,7 +192,7 @@ sub get_slice_names{
   my ($self, $size, $overlap) = @_;
 
   if(!$self->db){
-    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db $!");
+    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db");
   }
 
   my @input_ids;
@@ -242,7 +242,7 @@ sub get_chromosome_names{
   my ($self) = @_;
 
   if(!$self->db){
-    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db $!");
+    $self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db");
   }
 
   my @input_ids;
@@ -306,7 +306,7 @@ sub get_Chromosomes{
 sub get_file_names{
   my ($self, $dir, $regex) = @_;
   if(!$dir){
-    $self->throw("need a directory inorder to fetch the filenames to be used as input_ids $!");
+    $self->throw("need a directory inorder to fetch the filenames to be used as input_ids");
   }
 
   my @input_ids;
