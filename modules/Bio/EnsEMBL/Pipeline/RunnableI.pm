@@ -170,7 +170,7 @@ sub writefile {
         $seqfilename = 'filename' unless ($seqfilename);
         print "Writing sequence to ".$self->$seqfilename()."\n";
         #create Bio::SeqIO object and save to file
-        my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename, '-format' => 'Fasta')
+        my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
                or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
         $clone_out->write_seq($self->$seqobj()) 
                 or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
