@@ -314,8 +314,8 @@ sub run{
   unless ( @est_genes ){
     unless (@ensembl_genes){
 	print STDERR "no genes found, leaving...\n";
-	  exit(0);
-    }
+	exit(0);
+      }
     print STDERR "No estgenes found, writing ensembl genes as they are\n";
     my @transcripts;
     foreach my $gene (@ensembl_genes){
@@ -334,15 +334,15 @@ sub run{
 
   my @cloned_ensembl_genes;
   foreach my $gene (@ensembl_genes){
-      my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
-      push( @cloned_ensembl_genes, $newgene);
+    my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
+    push( @cloned_ensembl_genes, $newgene);
   }
   $self->ensembl_genes( @cloned_ensembl_genes );
   
   my @cloned_est_genes;
   foreach my $gene ( @est_genes){
-      my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
-      push( @cloned_est_genes, $newgene );
+    my $newgene = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($gene);
+    push( @cloned_est_genes, $newgene );
   }
   $self->estgenes( @cloned_est_genes );
 
@@ -501,7 +501,9 @@ sub run{
       # they must have some common properties in order
       # to form a proper set of alternative forms
       my @accepted_trans = $self->_check_est_Cluster( @est_transcripts );
-      push ( @transcripts, @accepted_trans );
+      if ( @accepted_trans ){
+	push ( @transcripts, @accepted_trans );
+      }
     }
     
     # else we could have nothing !!?
@@ -510,6 +512,10 @@ sub run{
     }
   } # end of CLUSTER
   
+  unless ( @transcripts ){
+    print STDERR "No transcripts created, exiting\n";
+    exit(0);
+  }
   # make the genes 
   my @newgenes = $self->_make_Genes(\@transcripts);
 
@@ -544,7 +550,7 @@ sub run{
   # store the genes
   $self->output(@remapped);
   print STDERR scalar($self->output)." stored, to be written on the db\n";
-
+  
 
   return @remapped;
 
@@ -574,11 +580,12 @@ sub cluster_Genes {
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       if ( $transcript->start_Exon->strand == 1 ){
 	push( @forward_genes, $gene );
+	next GENE;
       }
       else{
 	push( @reverse_genes, $gene );
+	next GENE;
       }
-      next GENE;
     }
   }
   my @clusters;
@@ -1104,10 +1111,6 @@ sub _lock_Phases{
 }
     
   
-
-
-
-
 ############################################################
 # this function takes est_transcripts that have been clustered together
 # but not with any ensembl transcript and tries to figure out whether they
@@ -1123,7 +1126,9 @@ sub _check_est_Cluster{
 
   # adjacency lists:
   my %adj;
-  
+  my %seen;
+  my @linked;
+
   for(my $i=0;$i<scalar(@est_transcripts);$i++){
     for(my $j=0;$j<scalar(@est_transcripts);$j++){
       
@@ -1131,30 +1136,44 @@ sub _check_est_Cluster{
       print STDERR "Comparing transcripts:\n";
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$i]);
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$j]);
-      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) &&
-	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])    ){
+      
+      # we only check on coincident exon:
+      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) 
+	   #&&	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])
+	 ){
+	print STDERR "they are linked\n";
 	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
+	unless ( defined $seen{ $est_transcripts[$i] } &&  $seen{ $est_transcripts[$i] } ){
+	  push ( @linked, $est_transcripts[$i] );
+	  $seen{ $est_transcripts[$i] } =1 ;
+	}
+	unless ( defined $seen{ $est_transcripts[$j] } &&  $seen{ $est_transcripts[$j] } ){
+	  push ( @linked, $est_transcripts[$j] );
+	  $seen{ $est_transcripts[$j] } = 1;
+	}
       }
     }
   }
   
+  print STDERR scalar(@linked). " linked transcripts\n";
+  
   print STDERR "adjacency lists:\n";
-  foreach my $tran (@est_transcripts){
+  foreach my $tran (@linked){
     print STDERR $tran->dbID." -> ";
     foreach my $link ( @{ $adj{ $tran } } ){
-      print STDERR $link.",";
+      print STDERR $link->dbID.",";
     }
     print STDERR "\n";
   }
   
-  foreach my $tran ( @est_transcripts ){
+  foreach my $tran ( @linked ){
     $color{$tran} = "white";
   }
   
   my @potential_genes;
   
   # find the connected components doing a depth-first search
-  foreach my $tran ( @est_transcripts ){
+  foreach my $tran ( @linked ){
     if ( $color{$tran} eq 'white' ){
       my @potential_gene;
       $self->_visit( $tran, \%color, \%adj, \@potential_gene);
@@ -1162,19 +1181,12 @@ sub _check_est_Cluster{
     }
   }
   print STDERR scalar(@potential_genes)." potential genes created\n";
-  
-  # take only the sets with more than one transcript?:
-  #@potential_genes = sort { scalar( @{ $b } ) <=> scalar( @{ $a } ) } @potential_genes;
-  my @accepted;
-  my $first_gene = shift @potential_genes;
-  while ( $first_gene && scalar( @{ $first_gene } ) > 0 ){
-    if ( scalar(@{ $first_gene } ) == 1 ){
-      my $ok = $self->_check_Completeness( $first_gene );
-    }
-    push( @accepted, @{ $first_gene } );
-    $first_gene = shift @potential_genes;
+  my @accepted_transcripts;
+  foreach my $gene (@potential_genes){
+    push ( @accepted_transcripts, @$gene );
   }
-  return @accepted;
+  print STDERR "returning ".scalar( @accepted_transcripts)." transcripts\n";
+  return @accepted_transcripts;
 }
 
 #########################################################################
@@ -1241,9 +1253,9 @@ sub _check_exact_exon_Match{
  
  # how many exact matches we need (maybe 1 is enough)
  foreach my $exon1 (@exons1){
-     foreach my $exon2 (@exons2){
-	 return 1 if  ( $exon1->start == $exon2->start && $exon2->end == $exon2->end );
-     }
+   foreach my $exon2 (@exons2){
+     return 1 if  ( $exon1->start == $exon2->start && $exon1->end == $exon2->end );
+   }
  }
  return 0;
 }
@@ -1262,30 +1274,29 @@ sub _check_protein_Match{
 
  my $compatible_proteins = 0;
  eval{
-     $seq1 = $tran1->translate;
-     $seq2 = $tran2->translate;
+   $seq1 = $tran1->translate;
+   $seq2 = $tran2->translate;
  };
  if ( $seq1 && $seq2 ){
-     
+   
    if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
      print STDERR "On of the peptides has a stop codon\n";
      return 0;
    }
-   if ( $seq1 eq $seq2 ){
+   elsif ( $seq1 eq $seq2 ){
      print STDERR "Identical translation\n";
-     $compatible_proteins = 1;
+     return 1;
    }
    elsif( $seq1 =~/$seq2/ || $seq2 =~/$seq1/ ){
-     $compatible_proteins = 1;
+     return 1;
    }
  }
- if ( $compatible_proteins != 0 ){
-     return 1;
- }
  else{
-     return 0;
+   print STDERR "unable to compare translations\n";
+   return 0;
  }
 }
+
 #########################################################################
 #
 # this function is another check used to find out if two given transcripts
@@ -2711,7 +2722,5 @@ sub _transfer_transcript_supporting_evidence{
 }
 
 ############################################################
-
-
 
 1;
