@@ -49,8 +49,8 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite;
-use Bio::EnsEMBL::DBSQL::Protein_Adaptor;
-use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
+use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
+use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);

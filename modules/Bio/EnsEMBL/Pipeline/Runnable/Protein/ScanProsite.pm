@@ -243,7 +243,7 @@ sub run_analysis {
 
     my $run = "/usr/local/bin/perl ".$self->analysis->program . 
 	' -pattern ' .$self->analysis->db_file. 
-	    ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
+	    ' -confirm  /acari/analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
 		$self->filename . ' > ' .$self->results;
 
     print STDERR "RUNNING: $run\n";
@@ -357,8 +357,8 @@ sub create_feature {
                                                -score => $score,
                                                -analysis => $analysis_obj,
                                                -seqname => $f[4],
-					       -percent_id => 'NULL',
-						-p_value => 'NULL',
+					       -percent_id => 0,
+					       -p_value => 0,
 					       );
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,

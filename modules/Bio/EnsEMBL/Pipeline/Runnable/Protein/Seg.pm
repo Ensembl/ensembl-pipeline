@@ -361,8 +361,8 @@ sub create_feature {
 						-end         => $feat->{end},
 						-score       => $feat->{score},
 						-analysis    => $analysis,
-						-percent_id => 'NULL',
-						-p_value => 'NULL',
+						-percent_id => 0,
+						-p_value => 0,
 						); 
 
 

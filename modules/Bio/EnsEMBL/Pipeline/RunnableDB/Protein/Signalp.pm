@@ -52,7 +52,7 @@ use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp;
-use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
+use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 

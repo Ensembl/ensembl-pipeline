@@ -317,7 +317,6 @@ sub parse_results {
             $id = $1;
 	}
         elsif (/^%pred/) {
-	    print STDERR "HERE\n";
             my ($junk, $values) = split /:/;
             my @tm = split (/,/, $values);
             foreach (@tm) {
@@ -367,10 +366,11 @@ sub create_feature {
     my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
 						-start       => $feat->{start},
 						-end         => $feat->{end},
-						-score       => $feat->{score},
+						#-score       => $feat->{score},
 						-analysis    => $analysis,
-						-percent_id => 'NULL',
-						-p_value => 'NULL',
+						-score => 0,
+						-percent_id => 0,
+						-p_value => 0,
 						); 
 
 

@@ -414,8 +414,9 @@ sub create_feature {
 						-source_tag  => $feat->{source},
 						-primary_tag => $feat->{primary},
 						-analysis    => $analysis,
-						-percent_id => 'NULL',
-						-p_value => 'NULL',
+						-score => 0,
+						-percent_id => 0,
+						-p_value => 0,
                                                  ); 
 
 
