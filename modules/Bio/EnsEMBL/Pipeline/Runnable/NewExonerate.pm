@@ -158,13 +158,13 @@ sub new {
 
   ############################################################
   # options
-  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
+  my $basic_options = "--ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
 
   # can add extra options as a string
   if ($options){
     $basic_options .= " ".$options;
   }
-  $self->options( $basic_options);
+  $self->options($basic_options);
 
   return $self;
 }
