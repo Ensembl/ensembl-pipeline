@@ -15,13 +15,31 @@
 Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise
 
 =head1 SYNOPSIS
-
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise->new(-genomic     => $genseq,
-								    -transcripts => $transcripts)
+    
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise->new(-genomic          => $genseq,
+								    -transcripts      => $transcripts
+								    -switch           => $switch,
+                                                                    -smell            => $smell,
+                                                                    -cds              => $cds_transcript
+								    -skip_small_exons => $min_exon_size,
+								    )
 
     $obj->run
 
     my @newtranscripts = $obj->output;
+
+where 
+-switch is the cost to switch evidence. It is irrelevant if one only passes 1 transcript to Genomewise.
+        With more than one transcript, it is the cost of jumping from one to the other to find the CDS.
+-smell  is the space allowed to move off the splice site of the evidence. The minimum is 0.
+-cds    if this option is included, it will feed a cds evidence to genomewise. This is passed in
+        in the form of a transcript with exons and each exon must have phases. This option
+        has not been tested in genomewise itself yet.
+-skip_small_exons   
+        minimum exon size which is accepted to be run in genomewise, i.e. smaller exons are not
+        passed as evidence for genomewise. This could be useful (maybe with cross-species alignments)
+        as genomewise sometimes shifts around very small exons.
+
 
 
 =head1 DESCRIPTION
@@ -61,13 +79,18 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $transcripts , $switch, $smell, $cds) = $self->_rearrange([qw(GENOMIC
-										TRANSCRIPTS
-										SWITCH
-										SMELL
-										CDS
-									       )],
-								      @args);
+    my( $genomic, $transcripts , $switch, $smell, $cds, $skip_small_exons) = $self->_rearrange([qw(GENOMIC
+												   TRANSCRIPTS
+												   SWITCH
+												   SMELL
+												   CDS
+												   SKIP_SMALL_EXONS
+												   )],
+											       @args);
+    # read 'skip' argument
+    if ( $skip_small_exons ){
+	$self->_skip_small_exons( $skip_small_exons );
+    }
     
     if ( defined($smell) ){
       $self->smell($smell);
@@ -387,16 +410,19 @@ sub run {
   $self->make_miniseq;
 
   my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( 
-								     -seq    => $self->miniseq->get_cDNA_sequence,
-								    );
+								      -seq    => $self->miniseq->get_cDNA_sequence,
+								      );
   if ( defined($self->switch) ){
-    $genomewise->switch($self->switch);
+      $genomewise->switch($self->switch);
   }
   if ( defined($self->smell)  ){
-    $genomewise->smell($self->smell);
+      $genomewise->smell($self->smell);
   }
   if ( $self->cds ){
-    $genomewise->cds($self->convert_transcript_to_miniseq($self->cds));
+      $genomewise->cds($self->convert_transcript_to_miniseq($self->cds));
+  }
+  if ( $self->_skip_small_exons ){
+      $genomewise->_skip_small_exons($self->_skip_small_exons );
   }
   
   foreach my $t (@{$self->get_all_Transcripts}){
@@ -593,6 +619,16 @@ sub cds{
     $self->{_cds} = $cds;
   }
   return $self->{_cds};
+}
+
+############################################################
+
+sub _skip_small_exons{
+    my ($self,$skip_small_exons) =@_;
+    if ( $skip_small_exons ){
+	$self->{_skip_small_exons} = $skip_small_exons;
+    }
+    return $skip_small_exons;
 }
 
 ############################################################
