@@ -70,7 +70,10 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
-        
+      
+ print STDERR "checking: " . $::db_conf{'dbname'} ." : " . $::db_conf{'dbuser'} . " : " . $::db_conf{'dbpass'} . " : " . $::db_conf{'dbhost'} . "\n";
+
+ 
     if(!defined $self->seqfetcher) {
       my $seqfetcher =  $self->make_seqfetcher();
       $self->seqfetcher($seqfetcher);
@@ -189,7 +192,7 @@ sub write_output {
       }
     }
 
-   print STDERR "Number of features = " . scalar(@features) . "\n\n";
+    print STDERR "Number of features = " . scalar(@features) . "\n\n";
 
     my @genes     = $contig->get_Genes_by_Type('TGE_gw');
 
@@ -198,6 +201,7 @@ sub write_output {
     my %redids;
     my $trancount = 1;
 
+    # check which TargettedGenewise exons overlap similarity features
     foreach my $gene (@genes) {
 
 #      print STDERR "Found genewise gene " . $gene->dbID . "\n";
@@ -224,6 +228,7 @@ sub write_output {
 
     my %idhash;
     
+    # collect those features which haven't been used by Targetted GeneWise
     foreach my $f (@features) {
 #      print "Feature : " . $f->gffstring . "\n";
       
@@ -494,9 +499,9 @@ sub validate_transcript {
       my $intron;
       
       if ($exon->strand == 1) {
-	$intron = abs($exon->start - $previous_exon->end + 1);
+	$intron = abs($exon->start - $previous_exon->end - 1);
       } else {
-	$intron = abs($exon->end   - $previous_exon->start + 1);
+	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
       if ($intron > 100000) {
