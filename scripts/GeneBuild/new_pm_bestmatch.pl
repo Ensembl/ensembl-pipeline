@@ -15,13 +15,13 @@ my ($dbhost, $dbname, $dbpass, $dbuser, $id, $logic, $write);
 	    'dbpass:s' => \$dbpass,
 	    'input_id:s' => \$id,
 	    'analysis:s' => \$logic,
-	    'write' => $write,
+	    'write!' => \$write,
 	   );
 							
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host => 'ecs1c',
-						      -user => 'ensadmin',
-						      -pass => 'ensembl',
-						      -dbname => 'pipeline_genebuild_test',
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host => $dbhost,
+						      -user => $dbuser,
+						      -pass => $dbpass,
+						      -dbname => $dbname,
 						     );
 
 if(!$dbname || !$dbhost || !$dbuser || !$dbpass){
@@ -29,13 +29,15 @@ if(!$dbname || !$dbhost || !$dbuser || !$dbpass){
   exit(0)
 }
 
+print STDERR "write = ".$write."\n";
+
 my $analysis_adaptor = $db->get_AnalysisAdaptor;
 
 my $ana = $analysis_adaptor->fetch_by_logic_name('BestPmatch');
 
 ;			     
 if(!$logic){
-  print STDERR "You have provided no logic name assuming it is Pmatch\n";
+  print STDERR "You have provided no logic name assuming it is BestPmatch\n";
   $logic = 'BestPmatch';
 }
 

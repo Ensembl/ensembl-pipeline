@@ -50,7 +50,7 @@ foreach my $file(@file_info){
   while(<IN>){
     #print STDERR "matching ".$_." with ".$file->{header_regex}."\n";
     if(/$file->{header_regex}/){
-      print "have matched ".$_." with ".$file->{header_regex}."\n";
+      #print "have matched ".$_." with ".$file->{header_regex}."\n";
       $killing = 0;
       if($kill_list{$1}){
 	$killing = 1;
