@@ -48,12 +48,15 @@ use Bio::EnsEMBL::DnaPepAlignFeature;
 #
 ###########################################################
 
-sub _check_Transcript{
+sub _check_Transcipt{
     my ($self,$transcript, $slice) = @_;
       
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     
+    # never ever trus the order in which the exons come out! 
+    $transcript->sort;
+
     # check that transcripts are not completely outside the slice
     if ( $transcript->start > $slice->length || $transcript->end < 1 ){
 	print STDERR "transcript $id outside the slice\n";
@@ -65,8 +68,7 @@ sub _check_Transcript{
 	$valid = 0;
     }
     
-    # sort the exons 
-    $transcript->sort;
+    
     my @exons = @{$transcript->get_all_Exons};
     
     if ($#exons > 0) {
@@ -143,7 +145,7 @@ sub _check_Translation{
   }
   if ( $sequence ){
     my $peptide = $sequence->seq;
-    print STDERR "peptide: $peptide\n";
+    #print STDERR "peptide: $peptide\n";
     # check only terminal stops
     if ( $peptide =~ /\*./ ){
       print STDERR "translation of transcript $id has STOP codons\n";
@@ -359,6 +361,40 @@ sub _print_Translation{
 
 ############################################################
 
+sub _print_Evidence{
+  my ($self,$transcript) = @_;
+  my @exons = @{$transcript->get_all_Exons};
+  my $id;
+  if ($transcript->stable_id){
+    $id = $transcript->stable_id;
+  }
+  elsif ( $transcript->dbID ){
+    $id = $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+  if ( defined( $transcript->type ) ){
+    $id .= " ".$transcript->type;
+  }
+  print STDERR "transcript: ".$id."\n";
+  my $count = 0;
+  foreach my $exon ( @exons){
+    $count++;
+    print STDERR "Exon: ".$exon->gffstring."\n";
+    my @evidence = @{$exon->get_all_supporting_features};
+    if (@evidence){
+      foreach my $evi ( @evidence ){
+	print STDERR "Evidence: ".$evi->gffstring."\n";
+      }
+    }	
+    else{
+      print STDERR "no evidence for exon ".$count."\n";
+    }
+  }
+}
+
+############################################################
 
 sub _print_Peptide{
   my ($self, $transcript) = @_;
@@ -368,14 +404,15 @@ sub _print_Peptide{
   
   eval {
     $translation = $transcript->translate;
+    print "translation is a $translation\n";
   };  
   if ($@) {
     print STDERR "Couldn't translate transcript\n";
   }
   else{
-    unless ( $translation->display_id ){
-      $translation->display_id($self->transcript_id($transcript));
-    }
+    #unless ( $translation->display_id ){
+    #  $translation->display_id($self->transcript_id($transcript));
+    #}
     $seqout->write_seq($translation);
   }
 }
