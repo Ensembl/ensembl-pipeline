@@ -271,6 +271,7 @@ sub run{
   print STDERR "have ".$self." object\n";
   my $rdb;
   my $module = $self->module;
+
   eval {
     $module =~ s/::/\//g;
     require "${module}.pm";
@@ -284,6 +285,7 @@ sub run{
     print STDERR "Job creation for job ".$self->dbID.":".$self->taskname.":".
       $self->input_id." failed $@";
     $self->set_current_status('FAILED');
+    return;
   }
 
   eval{
@@ -294,8 +296,9 @@ sub run{
   if($@){
     print STDERR "call to fetch_input for module ".$rdb." job ".
       $self->dbID.":".$self->taskname.":".$self->input_id.
-	" failed $@";
+        " failed $@";
     $self->set_current_status('FAILED');
+    return;
   }
 
   eval{
@@ -307,20 +310,24 @@ sub run{
     print STDERR "call to run for module ".$rdb." job ".$self->dbID.":".
 		 $self->taskname.":".$self->input_id." failed $@";
     $self->set_current_status('FAILED');
+    return;
   }
 
   eval{
     $self->set_current_status('WRITING');
     $rdb->write_output;
-    $self->set_curent_status('SUCCESSFUL');
   };
 
   if($@){
     print STDERR ("call to write output for module ".$rdb." job ".
-		  $self->dbID.":".$self->taskname.":".$self->input_id.
-		  " failed $@");
+                  $self->dbID.":".$self->taskname.":".$self->input_id.
+                  " failed $@");
     $self->set_current_status('FAILED');
+  } else {
+    $self->set_curent_status('SUCCESSFUL');
   }
+
+  return;
 }
 
 
