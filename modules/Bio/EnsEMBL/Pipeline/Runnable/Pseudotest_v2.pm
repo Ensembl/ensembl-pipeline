@@ -36,7 +36,7 @@ Mail to B<ensembl-dev@ebi.ac.uk>
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Tools::Pseudotest_v2;
+package Bio::EnsEMBL::Pipeline::Runnable::Pseudotest_v2;
 
 use strict;
 use Carp;
