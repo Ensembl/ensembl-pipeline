@@ -1,0 +1,75 @@
+#!/usr/local/bin/perl
+
+use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
+
+use strict;
+use Getopt::Long;
+
+my $host;
+my $user = 'ensadmin';
+my $pass = 'ensembl';
+my $port = 3306;
+my $dbname;
+
+my $logic_name;
+my $database;
+my $database_version;
+my $database_file;
+my $program;
+my $program_file;
+my $program_version;
+my $parameters;
+my $module;
+my $module_version;
+my $gff_source;
+my $gff_feature;
+
+&GetOptions(
+            'host:s'    => \$host,
+            'port:n'    => \$port,
+            'user:s'    => \$user,
+            'pass:s'    => \$pass,
+            'dbname:s'  => \$dbname,
+            'logic_name:s' => \$logic_name,
+            'database:s'   => \$database,
+            'database_version:s' => \$database_version,
+            'database_file:s'    => \$database_file,
+            'program:s'          => \$program,
+            'program_version:s'  => \$program_version,
+            'program_file:s'     => \$program_file,
+            'parameters:s'       => \$parameters,
+            'module:s'           => \$module,
+            'module_version:s'   => \$module_version,
+            'gff_sources:s'      => \$gff_source,
+            'gff_feature:s'      => \$gff_feature
+           );
+
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $host,
+                                                      -user   => $user,
+                                                      -pass   => $pass,
+                                                      -port   => $port,
+                                                      -dbname => $dbname);
+
+my $analysis = new Bio::EnsEMBL::Analysis;
+
+if (!defined($logic_name)) {
+   die "Analysis must have a logic_name defined";
+}
+
+if ($logic_name)       {$analysis->logic_name        ($logic_name);}
+if ($database  )       {$analysis->database          ($database);}
+if ($database_file)    {$analysis->database_file     ($database_file);}
+if ($database_version) {$analysis->database_version  ($database_version);}
+if ($program)          {$analysis->program           ($program);}
+if ($program_file)     {$analysis->program_file      ($program_file);}
+if ($module)           {$analysis->module            ($module);}
+if ($module_version)   {$analysis->module_version    ($module_version);}
+if ($parameters)       {$analysis->parameters        ($parameters);}
+if ($program_version)  {$analysis->program_version   ($program_version);}
+if ($gff_source)       {$analysis->gff_source        ($gff_source);}
+if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
+
+$db->get_AnalysisAdaptor->store($analysis);
+
