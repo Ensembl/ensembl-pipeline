@@ -10,7 +10,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Signalp
+Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp
 
 =head1 SYNOPSIS
 
@@ -19,7 +19,7 @@ my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
                                 );
 $seq = $seqstream->next_seq;
 
-my $signalp = Bio::EnsEMBL::Pipeline::Runnable::Signalp->new ( -CLONE => $seq);
+my $signalp = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new ( -CLONE => $seq);
 $signalp->workdir ($workdir);
 $signalp->run;
 my @results = $signalp->output;
@@ -41,7 +41,7 @@ Internal methods are usually preceded with a _.
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Runnable::Signalp;
+package Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp;
 
 use vars qw(@ISA);
 use strict;
@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Analysis;
 =head2 new
 
  Title    : new
- Usage    : my $signalp =  Bio::EnsEMBL::Pipeline::Runnable::Signalp->new
+ Usage    : my $signalp =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new
                            ( -program    => '/usr/local/pubseq/bin/signalp',
                              -clone      => $clone,
                              -analysisid => 4,
