@@ -220,8 +220,10 @@ sub make_lbsubs {
       my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
-      $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
-      $command .= " -input_id $input_id -parameters golden_path=$golden_path -write";      
+#      $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
+      $command .= " -input_id $input_id ";
+#      $command .= " -parameters golden_path=$golden_path ";
+      $command .= " -write";      
       print OUTF "$command\n";
       
       $count = $count + $size;
