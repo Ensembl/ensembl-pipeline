@@ -416,9 +416,16 @@ sub _read_Axt {
         
         push @subreg_list, $fp;
       }
-	    
-      my $df = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@subreg_list);
-      push @out_list, $df;
+	  
+      # Occasionally, Axt tools return an alignment with a characteristic that the
+      # Ensembl core code finds dodgy (e.g. a insert followed immediately by a delete).
+      # Any such weirdness will cause an Exception in the below, so catch it and discard
+      # the alignment
+      my $df;
+      eval {
+        $df = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@subreg_list);
+      };
+      push @out_list, $df unless $@;
     }
   }
   
