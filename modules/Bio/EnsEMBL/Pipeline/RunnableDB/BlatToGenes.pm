@@ -175,7 +175,6 @@ sub run{
   
   # print out the results:
   foreach my $gene (@genes){
-    print STDERR "gene is a $gene\n";
     foreach my $trans (@{$gene->get_all_Transcripts}){
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
       foreach my $exon (@{$trans->get_all_Exons}){
@@ -231,6 +230,7 @@ sub make_genes{
     my $transcript = Bio::EnsEMBL::Transcript->new();
     my $gene       = Bio::EnsEMBL::Gene->new();
     $gene->analysis($self->analysis);
+    $gene->type($self->analysis->gff_feature);
     
     $gene->add_Transcript($transcript);
     
