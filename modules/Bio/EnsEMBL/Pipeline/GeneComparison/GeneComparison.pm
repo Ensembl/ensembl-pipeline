@@ -395,7 +395,7 @@ sub pair_Genes {
   my (@genes1,@genes2);
 
   @genes1 =  $self->annotated_Genes;
-  @genes2 =  $self->predciont_Genes;
+  @genes2 =  $self->prediction_Genes;
 
   #### first sort the genes by the left-most position coordinate ####
   my %start_table;
