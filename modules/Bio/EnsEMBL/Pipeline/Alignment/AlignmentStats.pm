@@ -127,6 +127,65 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
 ##### 'Public' methods #####
 
+=head2 hit_coverage
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub hit_coverage {
+  my ($self) = @_;
+
+  return $self->_compute_evidence_coverage;
+
+}
+
+
+=head2 rogue_exons
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub rogue_exons {
+  my ($self) = @_;
+
+  unless ($self->_is_computed){
+    $self->_align('all');
+  }
+
+  unless ($self->_type eq 'all') {
+    warning("The alignment used to count rogue exons has\n".
+	    "not been created with both nucleotide and protein\n".
+	    "evidence.  Hence, it is quite likely that you\n".
+	    "will see rogue exons.");
+  }
+
+  my $evidence_alignments = $self->_working_alignment('evidence');
+
+  my %seen_exons;
+
+  foreach my $sequence (@$evidence_alignments){
+    $seen_exons{$sequence->exon}++;
+  }
+
+  my $actual_exons = $self->_transcript->get_all_Exons;
+
+  return ((scalar @$actual_exons) - (scalar keys %seen_exons))
+
+}
+
+
 =head2 identity
 
   Arg [1]    :
