@@ -27,7 +27,8 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 my $dbhost    = $::pipeConf{'dbhost'} || $ENV{'ENS_DBHOST'};
 my $dbname    = $::pipeConf{'dbname'} || $ENV{'ENS_DBNAME'};
-my $dbuser    = $::pipeConf{'dbuser'} || $ENV{'ENS_DBNAME'};
+my $dbuser    = $::pipeConf{'dbuser'} || $ENV{'ENS_DBUSER'};
+my $dbpass    = $::pipeConf{'dbpass'} || $ENV{'ENS_DBPASS'};
 my $queue     = $::pipeConf{'queue'}  || $ENV{'ENS_QUEUE'};
 my $nodes     = $::pipeConf{'usenodes'};
 my $workdir   = $::pipeConf{'nfstmp.dir'};
@@ -51,6 +52,7 @@ GetOptions(
     'host=s'      => \$dbhost,
     'dbname=s'    => \$dbname,
     'dbuser=s'    => \$dbuser,
+    'dbpass=s'    => \$dbpass,
     'flushsize=i' => \$flushsize,
     'local'       => \$local,
     'idlist=s'    => \$idlist,
@@ -66,6 +68,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
     -dbname => $dbname,
     -user   => $dbuser,
+    -pass   => $dbpass,
 );
 
 my $ruleAdaptor = $db->get_RuleAdaptor;
@@ -119,12 +122,14 @@ while (1) {
 
 	# This loop reads input ids from the database a chunk at a time
 	# until we have all the input ids.
+	# NB It's almost as much work to get one ID as the whole lot, so setting
+	# the 'chunksize' variable to a small number doesn't really achieve much.
 
 	if (!$completeRead) {
-	    print "Read a chunk\n";
+	    print "Reading input IDs ...\n";
 	    my @tmp = $sic->list_inputId_class_by_start_count($currentStart, $chunksize);
 
-	    print "Read ", scalar(@idList), " input ids.\n";
+	    print "Read ", scalar(@tmp), " input ids.\n";
 
 	    push(@idList,@tmp);
 
@@ -217,7 +222,8 @@ while (1) {
 	    my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId($anal, $id->[0], $id->[1]);
 
 
-	    print "\n\tStoring job\n";
+	    # print "\n\tStoring job\n";
+	    print "\n\tStoring job ", $id->[0], " ", $anal->logic_name, "\n";
             $submitted++;
 	    $jobAdaptor->store($job);
 
