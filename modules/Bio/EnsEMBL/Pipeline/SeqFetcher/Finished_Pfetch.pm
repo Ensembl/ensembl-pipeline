@@ -189,32 +189,62 @@ sub get_Seq_by_acc {
 }
 
 sub write_descriptions {
-    my( $self, $dbobj, $id_list, $count ) = @_;
-    
-    $count ||= 200;
-    $self->prepare_hit_desc_sth($dbobj);
-    
-    my $failed = [];
-    for (my $i = 0; $i < @$id_list; $i += $count) {
-        my $j = $i + $count - 1;
-        if ($j >= @$id_list) {
-            $j = @$id_list - 1;
-        }
-        my $fetch_list = [@$id_list[$i..$j]];
-        $fetch_list = $self->write_descriptions_by_accession_sv($fetch_list);
-        if (@$fetch_list) {
-            $fetch_list = $self->write_descriptions_by_accession($fetch_list);
-        }
-        push(@$failed, @$fetch_list);
-    }
-    return $failed;
+    my( $self, $dbobj, $id_list, $chunk_size ) = @_;
+
+    $chunk_size ||= 200;
+
+	my ($descriptions,$failed) = fetch_descriptions($self, $id_list, $chunk_size);
+
+    my $sth = $self->prepare_hit_desc_sth($dbobj);
+	for my $accession (keys %$descriptions) {
+		$sth->execute(
+			$accession,
+			map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database')
+		);
+	}
 }
 
-sub write_descriptions_by_accession_sv {
-    my( $self, $id_list ) = @_;
+sub min {
+	my ($a,$b) = @_;
+	return ($a<$b) ? $a : $b;
+}
+
+sub fetch_descriptions {
+    my( $self, $id_list, $chunk_size ) = @_;
     
-    my $sth = $self->get_hit_desc_sth
-        or die "hit_desc_sth not initialized";
+	my $descriptions = {};	% results are stored here
+
+		# first pass fails when the sequence version has changed:
+    my $failed_first_pass = [];
+	my $start = 0;
+	do {
+		my $next = min($chunk_size, scalar(@$id_list));
+        my $chunk = [@$id_list[$start..$next-1]];
+
+		push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
+		$start = $next;
+	} while($start<@$id_list);
+
+	my $failed_second_pass = [];
+	$start = 0;
+	do {
+		my $next = min($chunk_size, scalar(@$failed_first_pass));
+        my $chunk = [@$failed_first_pass[$start..$next-1]];
+
+		my ($succeeded_arch_len, $failed_arch_len)
+			= $self->fetch_lengths_from_archive($failed_first_pass, $descriptions);
+
+		my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions);
+
+		push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
+		$start = $next;
+	} while($start<@$failed_first_pass);
+
+    return ($descriptions, $failed_second_pass);
+}
+
+sub fetch_descriptions_by_accession {
+    my( $self, $id_list, $descriptions ) = @_;
     
     my $srv = $self->get_server;
     print $srv join(' ', '-F', @$id_list), "\n";
@@ -225,6 +255,9 @@ sub write_descriptions_by_accession_sv {
                           # syntax highlighting in my editor!
 
     my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new;
+
+	my $failed = [];
+
     for (my $i = 0; $i < @$id_list; $i++) {
         my $entry = <$srv>;
 
@@ -234,18 +267,57 @@ sub write_descriptions_by_accession_sv {
         # The end of the loop
         last unless $entry;
         
-        my $this_id = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
+        my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
         $embl_parser->parse($entry);
-        my $acc_sv = $embl_parser->sequence_version;
-        my $all_acc = $embl_parser->accession;
-        if ($this_id eq $acc_sv) {
-            warn "Found '$acc_sv'";
-            $id_list->[$i] = undef;
-        } else {
-            warn "Expecting '$this_id' but got '$acc_sv'";
+
+		my $name_without_version = (split('.',$full_id))[0];
+
+		my $found = 0;
+		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
+			if ($name_without_version eq $one_of_names) {
+				$found = 1;
+				warn "Found '$name_without_version'";
+
+					# NB: do not redefine any of these if already defined
+				$descriptions->{$full_name}{description}||= $embl_parser->description;
+				$descriptions->{$full_name}{length}		||= $embl_parser->seq_length;
+				$descriptions->{$full_name}{taxonid}	||= $embl_parser->taxon;
+				$descriptions->{$full_name}{database}	||= $embl_parser->which_database;
+
+				last NAMES;
+			}
+		}
+		if(!$found) {
+			my $acc_sv = $embl_parser->sequence_version;
+            warn "Expecting '$full_name' but got '$acc_sv'";
+			push @$failed, $full_name;
         }
     }
-    return [grep defined($_), @$id_list];
+    return $failed;
+}
+
+sub fetch_lengths_from_archive(
+    my( $self, $id_list, $descriptions ) = @_;
+
+	my $server = $self->get_archive_server;
+	print $server join(" ", '-l', @$id_list), "\n";
+
+	my $succeeded = [];
+	my $failed    = [];
+	my $i = 0;
+	while (<$server>) {
+		chomp;
+		my $full_name = $id_list->[$i];
+		if($_ ne 'no match') {
+			$descriptions->{$full_name}{length}	= $_;
+			push @$succeeded, $full_name;
+		} else {
+			warn "${full_name}'s length is not in the archive";
+			push @$failed, $full_name;
+		}
+		$i++;
+	}
+	return ($succeeded,$failed);
 }
 
 sub prepare_hit_desc_sth {
@@ -259,13 +331,13 @@ sub prepare_hit_desc_sth {
               , hit_db)
         VALUES (?,TRIM(?),?,?,?)
         });
-    $self->{'_hit_desc_sth'} = $sth;
+    return $self->{'_hit_desc_sth'} = $sth; # James, do we really need to save it?
 }
 
 sub get_hit_desc_sth {
     my( $self ) = @_;
     
-    reuturn $self->{'_hit_desc_sth'};
+    reuturn $self->{'_hit_desc_sth'};	# ------,,----- and restore it, if it's only used in 1 place?
 }
 
 sub OLD_write_descriptions {
