@@ -279,7 +279,7 @@ sub filter_output{
   
   # results are Bio::EnsEMBL::Transcripts with exons and supp_features  
   my @potential_processed_pseudogenes;
-
+  
   ############################################################
   # collect the alignments by cDNA identifier
   my %matches;
@@ -295,21 +295,30 @@ sub filter_output{
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
     
-    @{$matches_sorted_by_coverage{$rna_id}} = 
-      sort { my $result = ( $self->_coverage($b) <=> $self->_coverage($a) );
+    my @selected;
+    foreach my $tran ( @{$matches{$rna_id}} ){ 
+      my $coverage = $self->_coverage($tran);
+      my $perc_id  = $self->_percent_id($tran);
+      
+      ############################################################
+      # we allow the rna to align with perc_id below threshold if
+      # if the coverage is much better than just above threshold
+      next $rna_id unless ( ( $score >= $MIN_COVERAGE && $perc_id >= $MIN_PERCENT_ID )
+			    ||
+			    ( $score >= (1 + 5/100)*$MIN_COVERAGE && $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID )
+			  );
+      push(@selected,$tran);
+    }
+    
+    @{$matches_sorted{$rna_id}} = 
+      sort { my $result = ( $self->_radial_score($b) <=> $self->_radial_score($a) );
 	     if ( $result){
 	       return $result;
 	     }
 	     else{
-	       my $result2 = ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
-	       if ( $result2 ){
-		 return $result2;
-	       }
-	       else{
-		 return ( $self->_percent_id($b) <=> $self->_percent_id($a) );
-	       }
+	       return ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
 	     }
-	   }    @{$matches{$rna_id}} ;
+	   } @selected;
     
     my $count = 0;
     my $is_spliced = 0;
@@ -321,10 +330,10 @@ sub filter_output{
     print STDERR "Matches for $rna_id:\n";
     
   TRANSCRIPT:
-    foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
+    foreach my $transcript ( @{$matches_sorted{$rna_id}} ){
       $count++;
       unless ( $max_score ){
-	$max_score = $self->_coverage($transcript);
+	$max_score = $self->_radial_score($transcript);
       }
       unless ( $perc_id_of_best ){
 	$perc_id_of_best = $self->_percent_id($transcript);
@@ -369,19 +378,11 @@ sub filter_output{
       # we keep anything which is 
       # within the 2% of the best score
       # with score >= $MIN_COVERAGE and percent_id >= $MIN_PERCENT_ID
-      if ( ( $score >= (0.98*$max_score) && 
-	     $score >= $MIN_COVERAGE && 
-	     $perc_id >= $MIN_PERCENT_ID )
-	   ||
-	   ( $score >= (0.98*$max_score) &&
-	     $score >= (1 + 5/100)*$MIN_COVERAGE &&
-	     $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
-	   )
-	 ){
+      if ( $score >= (0.98*$max_score) ){
 	
-	############################################################
-	# non-best matches are kept only if they are not unspliced with the
-	# best match being spliced - otherwise they could be processed pseudogenes
+	# we want to keep the unspliced cases (only frameshifts) where the
+	# best match is spliced 
+	# and the spliced cases with repeats in the introns
 	if ( $count > 1 
 	     && $is_spliced 
 	     && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
@@ -751,19 +752,40 @@ sub _evidence_id{
 ############################################################
 
 sub _coverage{
-    my ($self,$tran) = @_;
-    my @exons = @{$tran->get_all_Exons};
-    my @evi = @{$exons[0]->get_all_supporting_features};
-    return $evi[0]->score;
+  my ($self,$tran) = @_;
+  if ( $self->{_coverage}{$tran} ){
+    return  $self->{_coverage}{$tran};
+  }
+  my @exons = @{$tran->get_all_Exons};
+  my @evi = @{$exons[0]->get_all_supporting_features};
+  $self->{_coverage}{$tran} = $evi[0]->score;
+  return  $self->{_coverage}{$tran};
 }
 
 ############################################################
 
 sub _percent_id{
-    my ($self,$tran) = @_;
-    my @exons = @{$tran->get_all_Exons};
-    my @evi = @{$exons[0]->get_all_supporting_features};
-    return $evi[0]->percent_id;
+  my ($self,$tran) = @_;
+  if ( $self->{_percent_id}{$tran} ){
+    return  $self->{_percent_id}{$tran};
+  }
+  my @exons = @{$tran->get_all_Exons};
+  my @evi = @{$exons[0]->get_all_supporting_features};
+  $self->{_percent_id}{$tran} = $evi[0]->percent_id;
+  return  $self->{_percent_id}{$tran};
+}
+
+############################################################
+
+sub _radial_score{
+  my ($self,$tran) = @_;
+  if ( $self->{_radial_score}{$tran} ){
+    return  $self->{_radial_score}{$tran};
+  }
+  my $p  = $self->_percent_id($tran);
+  my $c = $self->_coverage($tran);
+  $self->{_radial_score}{$tran} = sqrt( $p**2 + $c**2 );         
+  return  $self->{_radial_score}{$tran};
 }
 
 ############################################################
