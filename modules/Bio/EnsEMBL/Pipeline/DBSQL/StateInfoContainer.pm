@@ -260,25 +260,6 @@ sub list_input_id_class_by_start_count {
 }
 
 
-=head2 delete_input_id
-
-Takes an input ID and class (as strings) and
-removes all matching entries from the pipeline
-database. See also
-delete_input_id() and delete_input_id_analysis().
-
-=cut
-
-sub delete_input_id {
-  my $self = shift;
-  my ($inputId) = @_;
-
-  my $sth = $self->prepare( qq{
-    DELETE FROM input_id_analysis
-    WHERE  input_id = ? } );
-  $sth->execute($inputId);
-}
-
 sub get_all_input_id_analysis_sets {
   my $self = shift;
   my %id_type_hash;
@@ -333,8 +314,8 @@ and delete_input_id_analysis().
 =cut
 
 sub delete_input_id {
-  my $self = shift;
-  my ($inputId) = shift;
+  my $self    = shift;
+  my $inputId = shift;
 
   my $sth = $self->prepare( qq{
     DELETE FROM input_id_analysis
