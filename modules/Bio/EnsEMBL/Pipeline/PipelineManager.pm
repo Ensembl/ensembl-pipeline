@@ -448,7 +448,7 @@ sub _update_task_status {
       $ts->add_writing($task_status{$taskname}->{'WRITING'});
     }
     if($task_status{$taskname}->{'RUNNING'}) {
-      $ts->add_running($task_status{$taskname}->{'RUNNINNG'});
+      $ts->add_running($task_status{$taskname}->{'RUNNING'});
     }
     if($task_status{$taskname}->{'SUCCESSFUL'}) {
       $ts->add_successful($task_status{$taskname}->{'SUCCESSFUL'});
