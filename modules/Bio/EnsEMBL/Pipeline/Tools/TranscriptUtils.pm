@@ -58,7 +58,7 @@ sub _check_Transcript{
     # hardcoded stuff, to go in a config file
     my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
-    my $MAX_INTRON_LENGTH = 2000000;
+    my $MAX_INTRON_LENGTH = 200000;
     
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
@@ -94,7 +94,7 @@ sub _check_Transcript{
 	    ##############################
 	    # check exon length
 	    ##############################
-	    my $length = $exons[i]->end - $exons[i] + 1;
+	    my $length = $exons[$i]->end - $exons[$i] + 1;
 	    if ( $length > $MAX_EXON_LENGTH ){
 		print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 		$valid = 0;
@@ -118,7 +118,7 @@ sub _check_Transcript{
 		# check intron length
 		##############################
 		if ( $strand == 1 ){
-		    my $intron_length = $exons[i]->start - $exons[i-1]->end -1;
+		    my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
 		    if ( $intron_length > $MAX_INTRON_LENGTH ){
 			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
 			$valid = 0;
@@ -126,7 +126,7 @@ sub _check_Transcript{
 		    }
 		}
 		elsif( $strand == -1 ){
-		    my $intron_length = $exons[i-1]->start - $exons[i]->end -1;
+		    my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
 		    if ( $intron_length > $MAX_INTRON_LENGTH ){
 			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
 			$valid = 0;
@@ -155,11 +155,11 @@ sub _check_Transcript{
 	    ############################################################
 	    # we don't want the NG_ entries going through, they are evil
 	    ############################################################
-	    foreach my $evidence (@{$exons[i]->get_all_supporting_features}){
-		if ( $evidence->hseqname=~/$UNWANTED_EVIDENCE/ ){
+	    foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
+		if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
 		    print STDERR "transcript with evil evidence: ".$evidence->hseqname." skippping\n";
 		    $valid = 0;
-		    next EXON;
+		    last EXON;
 		}
 	    }
 	}
@@ -174,6 +174,71 @@ sub _check_Transcript{
     }
     else{
 	print STDERR "transcript with no exons\n";
+	$valid = 0;
+    }
+    if ($valid == 0 ){
+	$self->_print_Transcript($transcript);
+    }
+    return $valid;
+}
+
+############################################################
+
+# this is a set of checks for transcripts where they are based
+# on rawcontig coordinates
+
+sub _check_rawcontig_Transcript{
+    my ($self,$transcript) = @_;
+    
+    # hardcoded stuff, to go in a config file
+    my $MAX_EXON_LENGTH   = 20000;
+    my $UNWANTED_EVIDENCE = "NG_";
+    
+    my $id = $self->transcript_id( $transcript );
+    my $valid = 1;
+    
+    my $strand =  $transcript->start_Exon->strand;
+
+    my @exons = @{$transcript->get_all_Exons};
+    
+    if (scalar(@exons) > 1 ) {
+	
+      EXON:
+	for (my $i = 0; $i <= $#exons; $i++) {
+	    
+	    ##############################
+	    # check exon length
+	    ##############################
+	    my $length = $exons[$i]->end - $exons[$i] + 1;
+	    if ( $length > $MAX_EXON_LENGTH ){
+		print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+		$valid = 0;
+		last EXON;
+	    }
+	    
+	    ############################################################
+	    # we don't want the NG_ entries going through, they are evil
+	    ############################################################
+	    foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
+		if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
+		    print STDERR "transcript with evil evidence: ".$evidence->hseqname." skippping\n";
+		    $valid = 0;
+		    last EXON;
+		}
+	    }
+	    
+	}
+	
+    }
+    elsif( scalar(@exons) == 1 ){
+	my $length =  $exons[0]->end - $exons[0]->start + 1;
+	if ( $length >  $MAX_EXON_LENGTH ){
+	    print STDERR "single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
+	    $valid = 0;
+	}
+    }
+    else{
+	print STDERR "transcript with no exons, skipping\n";
 	$valid = 0;
     }
     if ($valid == 0 ){
