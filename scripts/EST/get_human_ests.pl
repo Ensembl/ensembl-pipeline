@@ -39,15 +39,19 @@ my $softmask;
 	    'outfile:s'     => \$seqoutfile,
 	    'clip'          => \$clip,
 	    'softmask'      => \$softmask,
+	    'min_length'    => \$min_length,
 	   );
 
 # usage
 if(!defined $estfile    ||
    !defined $seqoutfile 
   ){
-  print  "USAGE: get_human_ests.pl -estfile estfile -outfile outfile\n";
+  print  "USAGE: get_human_ests.pl -estfile estfile -outfile outfile".
+    " -min_length <min_est_length> -clip -softmask\n";
   exit(1);
 }
+
+my $min_length = 60 unless $length;
 
 my $seqin  = new Bio::SeqIO(-file   => "<$estfile",
 			    -format => "Fasta",
@@ -59,8 +63,9 @@ my $seqout = new Bio::SeqIO(-file   => ">$seqoutfile",
 
 
 SEQFETCH:
-#while (<EST>){
 while( my $cdna = $seqin->next_seq ){
+
+  next unless $cdna->length > $min_length;
   
   my $display_id  = $cdna->display_id;
   my $description = $cdna->desc;
