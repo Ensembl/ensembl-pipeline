@@ -2134,7 +2134,7 @@ sub _extend_UTRs{
 	  
 	  # add the est evidence to be able to see why we modified this exon
 	  foreach my $evidence ( @{$est_exons[$i]->get_all_supporting_features} ){
-	    $ens_t_end_exon->add_supporting_feature( $evidence );
+	    $ens_t_end_exon->add_supporting_features( $evidence );
 	  }
 	  
 	  # we need to add any possible extra UTR est_exons
