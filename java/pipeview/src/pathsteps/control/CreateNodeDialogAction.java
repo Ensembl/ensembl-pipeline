@@ -23,8 +23,8 @@ public class CreateNodeDialogAction extends AAction{
     ModelElement dialogElement = null;
     
     if(view.isCreateNodeDialogOpen()){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Create node dialog already open - not opening new dialog");
+      if(isLoggingMedium()){
+        logMedium("Create node dialog already open - not opening new dialog");
       }
       view.requestFocusOnCreateNodeDialog();
       return;
@@ -33,8 +33,8 @@ public class CreateNodeDialogAction extends AAction{
     dialogElement = model.getRootElement().getChildElement(PathStepsModel.CREATE_NODE_DIALOG);
     
     if(dialogElement == null){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("NO create node dialog element found - creating one");
+      if(isLoggingMedium()){
+        logMedium("NO create node dialog element found - creating one");
       }
       
       model.getRootElement().createChildElement(PathStepsModel.CREATE_NODE_DIALOG);
@@ -42,21 +42,21 @@ public class CreateNodeDialogAction extends AAction{
       
       application.readHistory(); //picks up the user's last choices from history instead of internal state.
     }else{
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Create node dialog element found!");
+      if(isLoggingMedium()){
+        logMedium("Create node dialog element found!");
       }
     }
 
     createInputIdTypeList(model);
 
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("populated input id list");
+    if(isLoggingMedium()){
+      logMedium("populated input id list");
     }
     
     view.openCreateNodeDialog();
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Finished action");
+    if(isLoggingLow()){
+      logLow("Finished action");
     }
   }
   
@@ -69,8 +69,8 @@ public class CreateNodeDialogAction extends AAction{
     element.addProperty(PathStepsModel.CREATE_NODE_DIALOG_INPUT_ID_TYPE_LIST, inputIdTypeList);
     String name;
     
-    if(getLogger().isLoggingHigh()){
-      getLogger().logHigh("Running query to populate input id types list ");
+    if(isLoggingHigh()){
+      logHigh("Running query to populate input id types list ");
     }
     
     try{
@@ -78,21 +78,21 @@ public class CreateNodeDialogAction extends AAction{
       set = 
         connection.createStatement().executeQuery(sql);
    
-      if(getLogger().isLoggingHigh()){
-        getLogger().logHigh("SQL: "+sql);
+      if(isLoggingHigh()){
+        logHigh("SQL: "+sql);
       }
       
       while(set.next()){
         name = set.getString(1);
         inputIdTypeList.add(name);
-        if(getLogger().isLoggingHigh()){
-          getLogger().logHigh("adding : "+name+" to allowed input id type list");
+        if(isLoggingHigh()){
+          logHigh("adding : "+name+" to allowed input id type list");
         }
       }
       
       Collections.sort(inputIdTypeList);
-      if(getLogger().isLoggingHigh()){
-        getLogger().logHigh("Size of input_id_type_list: "+inputIdTypeList.size());
+      if(isLoggingHigh()){
+        logHigh("Size of input_id_type_list: "+inputIdTypeList.size());
       }
       
     }catch(SQLException exception){

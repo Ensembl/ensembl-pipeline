@@ -163,5 +163,40 @@ public class PathStepsTestView implements AView
   
   public void applyGraphLayout() {
   }
+
+  public boolean isLoggingLow(){
+    return true;
+  }
   
+  public void logLow(String message){
+    
+  }
+  
+  public void logLow(String message, Throwable exception) {
+    
+  }
+  
+  public boolean isLoggingMedium() {
+    return true;
+  }
+  
+  public void logMedium(String message) {
+    
+  }
+  
+  public void logMedium(String message, Throwable exception) {
+    
+  }
+  
+  public boolean isLoggingHigh(){
+    return true;
+  }
+  
+  public void logHigh(String message) {
+    
+  }
+  
+  public void logHigh(String message, Throwable exception) {
+    
+  }  
 }

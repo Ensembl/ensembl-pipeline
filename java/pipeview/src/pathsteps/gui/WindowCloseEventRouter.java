@@ -19,6 +19,9 @@ public class WindowCloseEventRouter extends EventRouter implements WindowListene
   }
   
   public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+    if(getHandler().getView().getLogger().isLoggingLow()){
+      getHandler().getView().getLogger().logLow("WindowCloseEventRouter processing windowClosing(WindowEvent) - passing event with key:"+getKey());
+    }
     getHandler().notifyEventForKey(getKey());
   }
   

@@ -21,8 +21,8 @@ public class ReadSpecifiedDBAction extends AbstractReadDBAction{
     
     view.closeReadPipelineDBDialog();
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logLow("Closed Read Pipeline DB Dialog");
+    if(isLoggingMedium()){
+      logLow("Closed Read Pipeline DB Dialog");
     }
   }
 

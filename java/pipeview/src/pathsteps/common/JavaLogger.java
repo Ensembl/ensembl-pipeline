@@ -27,15 +27,23 @@ public class JavaLogger implements ALogger{
     return logger;
   }
   
+  private void flush(){
+    for(int i=0; i<getLogger().getHandlers().length; i++){
+      getLogger().getHandlers()[i].flush();
+    }
+  }
+  
   public void logLow(String message){
     ALogRecord record = new ALogRecord(ALogLevel.LOW, message, getPrefix());
     getLogger().log(record);
+    flush();
   }
   
   public void logLow(String message, Throwable exception){
     ALogRecord record = new ALogRecord(ALogLevel.LOW, message, getPrefix());
     record.setThrown(exception);
     getLogger().log(record);
+    flush();
   }
   
   public boolean isLoggingLow(){
@@ -45,12 +53,14 @@ public class JavaLogger implements ALogger{
   public void logMedium(String message){
     ALogRecord record = new ALogRecord(ALogLevel.MEDIUM, message, getPrefix());
     getLogger().log(record);
+    flush();
   }
   
   public void logMedium(String message, Throwable exception){
     ALogRecord record = new ALogRecord(ALogLevel.MEDIUM, message, getPrefix());
     record.setThrown(exception);
     getLogger().log(record);
+    flush();
   }
   
   public boolean isLoggingMedium(){
@@ -60,12 +70,14 @@ public class JavaLogger implements ALogger{
   public void logHigh(String message){
     ALogRecord record = new ALogRecord(ALogLevel.HIGH, message, getPrefix());
     getLogger().log(record);
+    flush();
   }
   
   public void logHigh(String message, Throwable exception){
     ALogRecord record = new ALogRecord(ALogLevel.HIGH, message, getPrefix());
     record.setThrown(exception);
     getLogger().log(record);
+    flush();
   }
   
   public boolean isLoggingHigh(){

@@ -13,11 +13,11 @@ public class DatabaseDataChangeAction extends AAction{
   }
   
   protected void doAction(AView view, AModel model){
-    getLogger().logLow("Starting database data changed action");
+    logLow("Starting database data changed action");
     PathStepsModel theModel = (PathStepsModel)model;
     ModelElement dialogModel = theModel.getRootElement().getChildElement(theModel.READ_DB_DIALOG);
     ModelElement child = dialogModel.getChildElement(theModel.READ_DB_DIALOG_PIPELINE_DB_LIST);
     child.addProperty(theModel.READ_DB_DIALOG_PIPELINE_DB_LIST, new ArrayList());
-    getLogger().logLow("Finished database data changed action");
+    logLow("Finished database data changed action");
   }
 }

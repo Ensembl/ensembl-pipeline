@@ -14,6 +14,9 @@ public class GraphSelectionEventRouter extends EventRouter implements GraphSelec
   }
   
   public void valueChanged(org.jgraph.event.GraphSelectionEvent graphSelectionEvent) {
+    if(getHandler().getView().getLogger().isLoggingLow()){
+      getHandler().getView().getLogger().logLow("GraphSelectionEventRouter processing valueChanged(GraphSelectionEvent) - passing event with key:"+getKey());
+    }
     getHandler().notifyEventForKey(getKey());    
   }
 }

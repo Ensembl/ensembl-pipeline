@@ -22,6 +22,9 @@ implements
   
   public void mouseClicked(MouseEvent mouseEvent) {
     if(SwingUtilities.isLeftMouseButton(mouseEvent)){
+      if(getHandler().getView().getLogger().isLoggingLow()){
+        getHandler().getView().getLogger().logLow("MouseLeftClickEventRouter processing mouseClicked(MouseEvent) - passing event with key:"+getKey());
+      }
       getHandler().notifyEventForKey(key);
     }
   }

@@ -49,8 +49,8 @@ public class ConfirmCreateNodeAction extends AAction{
     gffFeature = (String)dialogElement.getProperty(model.CREATE_NODE_DIALOG_GFF_FEATURE);
     type = (String)dialogElement.getProperty(model.CREATE_NODE_DIALOG_INPUT_ID_TYPE);
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("creating a new node with name: "+name+" and type: "+type);
+    if(isLoggingMedium()){
+      logMedium("creating a new node with name: "+name+" and type: "+type);
     }
     
     int analysisId = 
@@ -74,18 +74,18 @@ public class ConfirmCreateNodeAction extends AAction{
     
     //
     //Now forward to the read-db action to recreate the new model with the added element.
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Forwarding - RereadSpecifiedDBAction");
+    if(isLoggingLow()){
+      logLow("Forwarding - RereadSpecifiedDBAction");
     }
     
     getEventHandler().doActionForKey(AView.REFRESH_BUTTON_KEY);
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Returning from forward - RereadSpecifiedDBAction");
+    if(isLoggingLow()){
+      logLow("Returning from forward - RereadSpecifiedDBAction");
     }
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Finished ConfirmCreateNodeAction");
+    if(isLoggingLow()){
+      logLow("Finished ConfirmCreateNodeAction");
     }
   }
   

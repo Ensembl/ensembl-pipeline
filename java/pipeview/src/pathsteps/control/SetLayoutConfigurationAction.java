@@ -89,8 +89,8 @@ public class SetLayoutConfigurationAction extends AAction{
     history.setProperty(model.LAYOUT_DIALOG_FIX_ROOTS, fixRoots);
     history.setProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL, showDetail);
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Added layout dialog paramters to history - writing history "+history);
+    if(isLoggingMedium()){
+      logMedium("Added layout dialog paramters to history - writing history "+history);
     }
 
     view.getApplication().writeHistory(history);

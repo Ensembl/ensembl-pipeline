@@ -349,4 +349,40 @@ public class Application{
     
     runner.run();
   }
+
+  public boolean isLoggingLow(){
+    return getApplicationLogger().isLoggingLow();
+  }
+  
+  public void logLow(String message){
+    getApplicationLogger().logLow(message);
+  }
+  
+  public void logLow(String message, Throwable exception) {
+    getApplicationLogger().logLow(message, exception);
+  }
+  
+  public boolean isLoggingMedium() {
+    return getApplicationLogger().isLoggingMedium();
+  }
+  
+  public void logMedium(String message) {
+    getApplicationLogger().logMedium(message);
+  }
+  
+  public void logMedium(String message, Throwable exception) {
+    getApplicationLogger().logMedium(message, exception);
+  }
+  
+  public boolean isLoggingHigh(){
+    return getApplicationLogger().isLoggingHigh();
+  }
+  
+  public void logHigh(String message) {
+    getApplicationLogger().logHigh(message);
+  }
+  
+  public void logHigh(String message, Throwable exception) {
+    getApplicationLogger().logHigh(message, exception);
+  }  
 }

@@ -15,6 +15,9 @@ implements ActionListener
   }
   
   public void actionPerformed(ActionEvent event){
+    if(getHandler().getView().getLogger().isLoggingLow()){
+      getHandler().getView().getLogger().logLow("ActionEventRouter processing actionPerformed(ActionEvent) - passing event with key:"+getKey());
+    }
     getHandler().notifyEventForKey(getKey());
   }
 }

@@ -6,7 +6,8 @@ import java.text.*;
 
 public class HTMLFormatter extends Formatter{
 
-  public static String INDENT="    ";
+  public static String INDENT="................";
+//  public static String INDENT="";
   public static String SIZE_PREFIX ="<small>";
   public static String SIZE_SUFFIX ="</small>";
   
@@ -45,14 +46,13 @@ public class HTMLFormatter extends Formatter{
     }
     
     buffer
-      .append(sizePrefix)
-      .append("<pre>")
       .append(indent)
+      .append(sizePrefix)
       .append(formatMessage(logRecord))
-      .append("</pre>")
       .append(sizeSuffix)
+      .append("<br>")
       .append('\n');
-      
+    
     return buffer.toString();
   }
   

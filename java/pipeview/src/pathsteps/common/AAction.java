@@ -4,13 +4,11 @@ import pathsteps.model.*;
 public abstract class AAction{
   private AView view;
   private AModel model;
-  private ALogger logger;
   private AEventHandler eventHandler;
   
   public AAction(AEventHandler eventHandler){
     setView(eventHandler.getApplication().getView());
     setModel(eventHandler.getApplication().getModel());
-    setLogger(eventHandler.getLogger());
     setEventHandler(eventHandler);
     
     if(getView()== null){
@@ -54,20 +52,12 @@ public abstract class AAction{
     this.model = model;
   }
   
-  protected ALogger getLogger(){
-    return logger;
-  }
-  
   public AEventHandler getEventHandler(){
     return eventHandler;
   }
   
   public void setEventHandler(AEventHandler newValue){
     eventHandler = newValue;
-  }
-  
-  protected void setLogger(ALogger logger){
-    this.logger = logger;
   }
   
   protected abstract void doAction(AView view, AModel model);
@@ -193,4 +183,44 @@ public abstract class AAction{
     
     return connection;
   }
+
+  public ALogger getLogger(){
+    return getEventHandler().getLogger();
+  }
+  
+  public boolean isLoggingLow(){
+    return getLogger().isLoggingLow();
+  }
+  
+  public void logLow(String message){
+    getLogger().logLow(message);
+  }
+  
+  public void logLow(String message, Throwable exception) {
+    getLogger().logLow(message, exception);
+  }
+  
+  public boolean isLoggingMedium() {
+    return getLogger().isLoggingMedium();
+  }
+  
+  public void logMedium(String message) {
+    getLogger().logMedium(message);
+  }
+  
+  public void logMedium(String message, Throwable exception) {
+    getLogger().logMedium(message, exception);
+  }
+  
+  public boolean isLoggingHigh(){
+    return getLogger().isLoggingHigh();
+  }
+  
+  public void logHigh(String message) {
+    getLogger().logHigh(message);
+  }
+  
+  public void logHigh(String message, Throwable exception) {
+    getLogger().logHigh(message, exception);
+  }  
 }

@@ -10,21 +10,21 @@ public class FindAllDatabasesAction extends AAction{
   }
   
   protected void doAction(AView view, AModel model){
-    if(getLogger().isLoggingMedium()){
-      getLogger().logLow("Started Find All DBases action");
+    if(isLoggingMedium()){
+      logLow("Started Find All DBases action");
     }
     
     createDatabaseList((PathStepsModel)model);
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logLow("Finished Find All DBases action");
+    if(isLoggingMedium()){
+      logLow("Finished Find All DBases action");
     }
   }
   
   private void createDatabaseList(PathStepsModel model){
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Fetching list of databases");
+    if(isLoggingMedium()){
+      logMedium("Fetching list of databases");
     }
     
     ModelElement element = model.getRootElement().getChildElement(PathStepsModel.READ_DB_DIALOG);
@@ -63,24 +63,24 @@ public class FindAllDatabasesAction extends AAction{
       Class.forName(jdbcDriver).newInstance();
     }catch(IllegalAccessException exception){
       
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not access JDBC Driver constructor", exception);
+      if(isLoggingLow()){
+        logLow("Could not access JDBC Driver constructor", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
       return;
     }catch(InstantiationException exception){
 
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not create JDBC Driver", exception);
+      if(isLoggingLow()){
+        logLow("Could not create JDBC Driver", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
       return;
     }catch(ClassNotFoundException exception){
 
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not access JDBC Driver class", exception);
+      if(isLoggingLow()){
+        logLow("Could not access JDBC Driver class", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
@@ -97,32 +97,32 @@ public class FindAllDatabasesAction extends AAction{
       
       while(databases.next()){
         databaseName = databases.getString(1);
-        if(getLogger().isLoggingHigh()){
-          getLogger().logHigh("fetched database name:"+databaseName);
+        if(isLoggingHigh()){
+          logHigh("fetched database name:"+databaseName);
         }
         orderedListOfNames.add(databaseName);
       }//end while
       Collections.sort(orderedListOfNames);
 
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Adding "+orderedListOfNames+" to model");
+      if(isLoggingMedium()){
+        logMedium("Adding "+orderedListOfNames+" to model");
       }
     }catch(SQLException exception){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not access JDBC Driver class", exception);
+      if(isLoggingMedium()){
+        logMedium("Could not access JDBC Driver class", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "SQL Problems reading pipline database");
       return;
     }catch(Throwable exception){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Caught an unexpected exception when trying to connect to db...");
+      if(isLoggingMedium()){
+        logMedium("Caught an unexpected exception when trying to connect to db...");
       }
       throw new NonFatalAException("Caught an unexpected exception when trying to connect to db:"+exception.getMessage(), exception);
     }
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Successfully finished fetching list of databases");
+    if(isLoggingMedium()){
+      logMedium("Successfully finished fetching list of databases");
     }
   }
   

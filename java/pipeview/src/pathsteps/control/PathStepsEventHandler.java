@@ -139,4 +139,40 @@ public class PathStepsEventHandler implements AEventHandler{
   public void setApplication(Application application){
     this.application = application;
   }
+
+  public boolean isLoggingLow(){
+    return getLogger().isLoggingLow();
+  }
+  
+  public void logLow(String message){
+    getLogger().logLow(message);
+  }
+  
+  public void logLow(String message, Throwable exception) {
+    getLogger().logLow(message, exception);
+  }
+  
+  public boolean isLoggingMedium() {
+    return getLogger().isLoggingMedium();
+  }
+  
+  public void logMedium(String message) {
+    getLogger().logMedium(message);
+  }
+  
+  public void logMedium(String message, Throwable exception) {
+    getLogger().logMedium(message, exception);
+  }
+  
+  public boolean isLoggingHigh(){
+    return getLogger().isLoggingHigh();
+  }
+  
+  public void logHigh(String message) {
+    getLogger().logHigh(message);
+  }
+  
+  public void logHigh(String message, Throwable exception) {
+    getLogger().logHigh(message, exception);
+  }  
 }

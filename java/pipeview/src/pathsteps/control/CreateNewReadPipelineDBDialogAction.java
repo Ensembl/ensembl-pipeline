@@ -28,8 +28,8 @@ public class CreateNewReadPipelineDBDialogAction extends AAction{
     String user;
     
     if(view.isReadPipelineDBDialogOpen()){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Dialog already open - not opening new dialog");
+      if(isLoggingMedium()){
+        logMedium("Dialog already open - not opening new dialog");
       }
       view.requestFocusOnPipelineDBDialog();
       return;
@@ -81,33 +81,33 @@ public class CreateNewReadPipelineDBDialogAction extends AAction{
     //If we can find the db's, then populate them. Otherwise leave the list empty.
     createDatabaseList(model);
 
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Opening pipeline db dialog");
+    if(isLoggingMedium()){
+      logMedium("Opening pipeline db dialog");
     }
     
     view.openReadPipelineDBDialog();
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Opened pipeline db dialog");
+    if(isLoggingMedium()){
+      logMedium("Opened pipeline db dialog");
     }
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Finished action");
+    if(isLoggingLow()){
+      logLow("Finished action");
     }
   }
   
   private void createDatabaseList(PathStepsModel model){
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Fetching list of databases");
+    if(isLoggingMedium()){
+      logMedium("Fetching list of databases");
     }
     
     ModelElement element = model.getRootElement().getChildElement(PathStepsModel.READ_DB_DIALOG);
     ModelElement listElement = element.createChildElement(PathStepsModel.READ_DB_DIALOG_PIPELINE_DB_LIST);
     ArrayList orderedListOfNames = new ArrayList();
     listElement.addProperty(PathStepsModel.READ_DB_DIALOG_PIPELINE_DB_LIST, orderedListOfNames);
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Adding "+orderedListOfNames+" to model");
+    if(isLoggingMedium()){
+      logMedium("Adding "+orderedListOfNames+" to model");
     }
 
     String host = (String)element.getProperty(PathStepsModel.READ_DB_DIALOG_HOST);
@@ -141,24 +141,24 @@ public class CreateNewReadPipelineDBDialogAction extends AAction{
       Class.forName(jdbcDriver).newInstance();
     }catch(IllegalAccessException exception){
       
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not access JDBC Driver constructor", exception);
+      if(isLoggingLow()){
+        logLow("Could not access JDBC Driver constructor", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
       return;
     }catch(InstantiationException exception){
 
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not create JDBC Driver", exception);
+      if(isLoggingLow()){
+        logLow("Could not create JDBC Driver", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
       return;
     }catch(ClassNotFoundException exception){
 
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not access JDBC Driver class", exception);
+      if(isLoggingLow()){
+        logLow("Could not access JDBC Driver class", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "Could not access database with prior information");
@@ -175,24 +175,24 @@ public class CreateNewReadPipelineDBDialogAction extends AAction{
       
       while(databases.next()){
         databaseName = databases.getString(1);
-        if(getLogger().isLoggingHigh()){
-          getLogger().logHigh("fetched database name:"+databaseName);
+        if(isLoggingHigh()){
+          logHigh("fetched database name:"+databaseName);
         }
         orderedListOfNames.add(databaseName);
       }//end while
       Collections.sort(orderedListOfNames);
       
     }catch(SQLException exception){
-      if(getLogger().isLoggingLow()){
-        getLogger().logLow("Could not access JDBC Driver class", exception);
+      if(isLoggingLow()){
+        logLow("Could not access JDBC Driver class", exception);
       }
       
       model.getRootElement().addProperty(PathStepsModel.MESSAGE, "SQL Problems reading pipline database");
       //throw new NonFatalAException("Problems reading pipeline database");
     }
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Successfully finished fetching list of databases");
+    if(isLoggingMedium()){
+      logMedium("Successfully finished fetching list of databases");
     }
   }
 }

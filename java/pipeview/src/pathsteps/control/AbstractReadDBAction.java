@@ -36,8 +36,8 @@ public abstract class AbstractReadDBAction extends AAction{
     String user = null;
     String password = null;
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Starting ReadSpecifiedDBAction");
+    if(isLoggingLow()){
+      logLow("Starting ReadSpecifiedDBAction");
     }
     
     if(dialogModel == null){
@@ -88,12 +88,8 @@ public abstract class AbstractReadDBAction extends AAction{
     
     getView().getApplication().writeHistory(history);
     
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Finished ReadSpecifiedDBAction");
-    }
-    
-    if(getLogger().isLoggingLow()){
-      getLogger().logLow("Wrote application history");
+    if(isLoggingLow()){
+      logLow("Wrote application history");
     }
   }
 
@@ -114,8 +110,8 @@ public abstract class AbstractReadDBAction extends AAction{
     String rule_condition;
     ModelElement parentElement;
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Started creating model");
+    if(isLoggingMedium()){
+      logMedium("Started creating model");
     }
 
     try{
@@ -180,8 +176,8 @@ public abstract class AbstractReadDBAction extends AAction{
       //
       //Keep a Collection - as an attribute of the root element - which 
       //contains all the nodes.
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Adding "+elementsByLogicName.size()+" to model with key "+PathStepsModel.PATH_STEPS_PANEL_ALL_NODES);
+      if(isLoggingMedium()){
+        logMedium("Adding "+elementsByLogicName.size()+" to model with key "+PathStepsModel.PATH_STEPS_PANEL_ALL_NODES);
       }
 
       addMonitorInformation(statement, elementsByLogicName.values());
@@ -189,8 +185,8 @@ public abstract class AbstractReadDBAction extends AAction{
       rootElement.addProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES_MAP, elementsByLogicName);
       rootElement.addProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES, elementsByLogicName.values());
 
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Adding graph layout configuration properties object to model");
+      if(isLoggingMedium()){
+        logMedium("Adding graph layout configuration properties object to model");
       }
 
       rootElement.addProperty(
@@ -207,16 +203,16 @@ public abstract class AbstractReadDBAction extends AAction{
       conn.close();
       
     }catch(SQLException exception){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("SQL Problems reading pipline database", exception);
+      if(isLoggingMedium()){
+        logMedium("SQL Problems reading pipline database", exception);
       }
       
       throw new NonFatalAException("SQL Problems reading pipline database", exception);
     }
    
-    if(getLogger().isLoggingHigh()){
-      getLogger().logHigh("Datamodel after db read: ");
-      getLogger().logHigh(rootElement.toString());
+    if(isLoggingHigh()){
+      logHigh("Datamodel after db read: ");
+      logHigh(rootElement.toString());
     }
     return rootElement;
   }

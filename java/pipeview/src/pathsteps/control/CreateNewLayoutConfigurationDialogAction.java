@@ -24,8 +24,8 @@ public class CreateNewLayoutConfigurationDialogAction extends AAction{
     ModelElement layoutDialogElement = null;
 
     if(view.isLayoutConfigurationDialogOpen()){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Layout configuration dialog already open - not opening new dialog");
+      if(isLoggingMedium()){
+        logMedium("Layout configuration dialog already open - not opening new dialog");
       }
       view.requestFocusOnLayoutConfigurationDialog();
       return;
@@ -33,8 +33,8 @@ public class CreateNewLayoutConfigurationDialogAction extends AAction{
           
     layoutDialogElement = model.getRootElement().getChildElement(PathStepsModel.LAYOUT_DIALOG);
     if(layoutDialogElement == null){
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("NO layout dialog element found - creating one");
+      if(isLoggingMedium()){
+        logMedium("NO layout dialog element found - creating one");
       }
       
       model.getRootElement().createChildElement(PathStepsModel.LAYOUT_DIALOG);
@@ -51,20 +51,19 @@ public class CreateNewLayoutConfigurationDialogAction extends AAction{
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL));
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH));
     }else{
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Layout dialog element found!");
+      if(isLoggingMedium()){
+        logMedium("Layout dialog element found!");
       }
     }
 
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Opening pipeline db dialog");
+    if(isLoggingMedium()){
+      logMedium("Opening pipeline db dialog");
     }
     
     view.openLayoutConfigurationDialog();
     
-    if(getLogger().isLoggingMedium()){
-      getLogger().logMedium("Opened pipeline db dialog");
-      getLogger().logLow("Finished action");
+    if(isLoggingMedium()){
+      logMedium("Opened pipeline db dialog");
     }
   }
 }

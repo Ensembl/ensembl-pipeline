@@ -13,6 +13,10 @@ public class KeyEventRouter extends EventRouter implements KeyListener
   }
 
   public void keyPressed(KeyEvent e) {
+    if(getHandler().getView().getLogger().isLoggingLow()){
+      getHandler().getView().getLogger().logLow("KeyEventRouter processing keyPressed(KeyEvent) - passing event with key:"+getKey());
+    }
+    
     handler.notifyEventForKey(getKey());
   }
   
