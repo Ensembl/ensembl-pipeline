@@ -141,6 +141,12 @@ sub open_command_line{
 
   open(SUB, $self->bsub." 2>&1 |");
   my $lsf;
+
+  # scp - fix problem of jobs being resubmitted
+  # (same job_id, different submission id)
+  # not sure why this works
+  sleep 1;
+
   while(<SUB>){
     print STDERR if($verbose);
     if (/Job <(\d+)>/) {
@@ -231,8 +237,12 @@ sub check_existance{
       return $values[0];
     }
   }
+<<<<<<< LSF.pm
+  # print STDERR "CPU time isn't yet reported for job ".$job_id."\n";
+=======
   close(BJOB);
   print STDERR "Have lost ".$id."\n" if($verbose);
+>>>>>>> 1.16
   return undef;
 }
 
