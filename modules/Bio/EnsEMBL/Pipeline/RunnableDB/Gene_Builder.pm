@@ -197,9 +197,12 @@ sub write_output {
     # sort out analysis
     my $genetype = 'ensembl';
     my $anaAdaptor = $db->get_AnalysisAdaptor;
+    my $anal_logic_name = $genetype;
 
-	#use logic name from $self->analysis object is possible, else take $genetype;
-	my $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
+    if(defined $self->analysis){
+      #use logic name from $self->analysis object is possible, else take $genetype;
+      $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
+    }
 
     my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     
