@@ -274,8 +274,8 @@ sub _createfeatures {
                                               -source_tag =>   $f1source,
                                               -primary_tag =>  $f1primary,
                                               -analysis => $analysis_obj );
-
-     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
+     
+   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
                                                 -end =>      $f2end,
                                                 -seqname =>  $f2id,
                                                 -strand =>   $f2strand,
@@ -355,6 +355,7 @@ sub _deletefiles {
     my ($self, @files) = @_;
     
     my $unlinked = unlink(@files);
+
     if ($unlinked == @files) {
         return 1;
     } else {
