@@ -380,4 +380,51 @@ foreach my $pair ( @selected_pairs ){
 	  "$this_mouseLL\t$this_mouseNM ($this_mouseNP)\tmouseNM\t$mouseNP ($mouseNM)\n";
     }
   }
+
+  ############################################################
+  # check the missed transcript pair
+  unless ( $best_transcript_pairs_object->partners($humanNM_seq) 
+	   ||
+	   $best_transcript_pairs_object->partners($mouseNM_seq)
+	 ){
+    my $humanNP = $human_cdna2protein{ $humanNM };
+    my $mouseNP = $mouse_cdna2protein{ $mouseNM };
+    print STDERR "TRANS_PAIR_MISSED\t".
+      "$this_humanLL\t$humanNM ($humanNP)\t".
+	"$this_mouseLL\t$mouseNM ($mouseNP)\n";
+  }
+}
+
+foreach my $humanNM_seq ( $best_transcript_pairs_object->list1 ){
+  foreach my $mouseNM_seq ( $best_transcript_pairs_object->partners( $humanNM_seq ) ){
+    my $humanNM = $humanNM_seq->display_id;
+    my $mouseNM = $mouseNM_seq->display_id;
+    my $humanNP = $human_cdna2protein{ $humanNM };
+    my $mouseNP = $mouse_cdna2protein{ $mouseNM };
+    my $humanNP_seq = $human_protein_seqs{$humanNP};
+    my $mouseNP_seq = $mouse_protein_seqs{$mouseNP};
+    
+    my $found = 0;
+    foreach my $pair ( @selected_pairs ){
+      if ( $pair->[0] == $humanNP_seq && $pair->[1] == $mouseNP_seq ){
+	$found = 1;
+      }
+    }
+    unless ( $found ){
+      print STDERR "PROT_PAIR_MISSED\t".
+	"$this_humanLL\t$humanNP($humanNM)\t".
+	  "$this_mouseLL\t$mouseNP($mouseNM)\n";
+    }
+  }
+}
+
+if ( $protein_pair_count == 0 && $transcript_pair_count == 0 ){
+  print STDERR "check:\n";
+  foreach my $cdna ( @{$human_cdnas{$this_humanLL}} ){
+    foreach my $mouse_cdna ( @{$mouse_cdnas{$this_mouseLL}} ){
+      print STDERR "EMPTY_ORTHOLOGOUS_PAIR\t".
+	"$this_humanLL\t$cdna\t".$human_cdna2protein{$cdna}."\t".
+	  "$this_mouseLL\t$mouse_cdna\t".$mouse_cdna2protein{$mouse_cdna}."\n";
+    }
+  }
 }
