@@ -114,5 +114,24 @@ Q8VIZ0 un-genewiseable - predominantly ACTG vac
 Q8VIZ1 un-genewiseable - predominantly ACTG vac
 P05790 un-genewiseable - predominantly ACTG vac
 AAN10358 crashes blast
-
-
+Q8BHB5 L1 repeat scp
+Q7TP96 Ab1-160 scp
+O08906 Reverse transcriptase (Fragment) scp
+Q9Z155 Reverse transcriptase (Fragment) scp
+Q64477 His2b protein (Histone H2B) (Fragment) scp
+Q9CTS6 9530057J20Rik protein (Fragment) scp
+Q9CRI0 ES cells cDNA, RIKEN full-length enriched library, clone:2410013L13, full insert sequence (Fragment) scp
+Q8C890 Hypothetical protein (Fragment) scp
+Q8BFY5 Hypothetical integrase scp
+Q91YM3 Hypothetical protein scp
+P80349 Fuctinin 3 (Fucosyltransferase inhibitor 3) (Fragment) scp
+P50709 Cryptdin-11 precursor (Fragment) scp
+O89059 QM protein (Fragment) scp
+O70416 Putative pheromone receptor V2R4 (Fragment) scp
+Q8C3Q3 Hypothetical protein (Fragment) scp
+Q7TQ37 Pol protein scp
+Q7TQ38 Gag protein scp
+O54850 Endonuclease/reverse transcriptase scp
+Q61787 ORF 2 scp
+Q61786 ORF 1 scp
+Q60712 ORF 1 protein scp
