@@ -92,7 +92,9 @@ sub store_inputId_class_analysis {
   my ( $self, $inputId, $class, $analysis ) = @_;
 
   my $sth = $self->prepare( qq{
-    INSERT INTO InputIdAnalysis values (
+    INSERT INTO InputIdAnalysis (
+          inputId, class, analysisId, created)
+          values (
           '$inputId',
           '$class',
           ?,
