@@ -203,7 +203,6 @@ sub get_all_FeaturesById {
     my  %idhash;
 
     FEAT: foreach my $f ($self->get_all_Features) {
-	print STDERR ("Feature is $f " . $f->seqname . "\t" . $f->hseqname ."\n");
     if (!(defined($f->hseqname))) {
 	$self->warn("No hit name for " . $f->seqname . "\n");
 	    next FEAT;
@@ -281,7 +280,6 @@ sub make_miniseq {
     my $prevcdnaend = 0;
     
   FEAT: foreach my $f (@features) {
-      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
 
       my $start = $f->start;
       my $end   = $f->end;
@@ -294,20 +292,13 @@ sub make_miniseq {
 
       my $gap     =    ($start - $prevend);
 
-      print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
-      print STDERR "Padding feature - new start end are $start $end\n";
-
-      print STDERR "Count is $count : $mingap " . $gap  . "\n";
-
       if ($count > 0 && ($gap < $mingap)) {
 	# STRANDS!!!!!
 	  if ($end < $prevend) { $end = $prevend;}
-	  print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
 	  $genomic_features[$#genomic_features]->end($end);
 	  $prevend     = $end;
 	  $prevcdnaend = $f->hend;
-	  print STDERR "Merged start end are " . $genomic_features[$#genomic_features]->start . "\t" .  $genomic_features[$#genomic_features]->end . "\n";
       } else {
 	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
@@ -321,14 +312,8 @@ sub make_miniseq {
 
 	    push(@genomic_features,$newfeature);
 	    
-	    print(STDERR "Added feature $count: " . $newfeature->start  . "\t"  . 
-		  $newfeature->end    . "\t " . 
-		  $newfeature->strand . "\n");
-
 	    $prevend = $end;
 	    $prevcdnaend = $f->hend; 
-	    print STDERR "New end is " . $f->hend . "\n";
-
 	}
 	$count++;
     }
@@ -441,8 +426,6 @@ sub get_Sequence {
     $self->throw("Couldn't find sequence for [$id]");
   }
   
-  print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
-    
   return $seq;
 }
 
@@ -555,11 +538,8 @@ sub minirun {
     my $features = $idhash->{$id};
     my @exons;
     
-    print(STDERR "Processing $id\n");
     next ID unless (ref($features) eq "ARRAY");
     
-    print(STDERR "Features = " . scalar(@$features) . "\n");
-
     # why > not >= 1?
     next ID unless (scalar(@$features) >= 1);
     
@@ -618,8 +598,6 @@ sub run_blastwise {
   
   my $endbias = $self->endbias;
      
-  print STDERR "Reverse 2 $reverse\n";
-  
   if (!defined($hseq)) {
     $self->throw("Can't fetch sequence for id [$id]\n");
   }
@@ -720,17 +698,6 @@ sub run_blastwise {
     $fset->add_sub_SeqFeature($nf,'EXPAND');
     $fset->seqname($nf->seqname);
     $fset->analysis($analysis_obj);
- #   $nf->strand($nf->hstrand);
-#    print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
-#	  $nf->start     . "\t" . 
-#	  $nf->end       . "\t(" . 
-#	  $nf->strand    . ")\t" .
-#	  $nf->hseqname  . "\t" . 
-#	  $nf->hstart    . "\t" . 
-#	  $nf->hend      . "\t(" .
-#	  $nf->hstrand   . ")\t:" .
-#	  $nf->feature1->phase() . ":\t:" . 
-#	  $nf->feature2->phase() . ":\n");
   }
   
   push(@{$self->{'_output'}},$fset);
@@ -752,8 +719,6 @@ sub is_reversed {
 	    $rcount++;
 	}
     }
-    print STDERR "Number of features is " . scalar(@features) . "\n";
-    print STDERR "Forward/reverse counts " . $fcount . " " . $rcount . "\n";
 
     if ($fcount > $rcount) {
 	return 0;
