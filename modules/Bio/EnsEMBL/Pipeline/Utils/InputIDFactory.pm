@@ -65,7 +65,7 @@ sub generate_contig_input_ids{
 
   my @ids  = @{$self->get_contig_names};
 
-  print "Ids @ids\n";
+  #print "Ids @ids\n";
   return @ids;
 
 }
