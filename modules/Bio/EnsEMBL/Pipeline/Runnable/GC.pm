@@ -103,7 +103,7 @@ sub new {
 						 WINDOW)],
 					     @args);
   #print "sequence : ".$sequence."\n";
-  $self->query($sequence) if ($sequence);
+  $self->clone($sequence) if ($sequence);
 
   if (defined $window && $window>=0){
       $self->window($window);
@@ -118,10 +118,10 @@ sub new {
 #GET/SET METHODS#
 #################
 
-=head2 query
+=head2 clone
 
-    Title   :   query
-    Usage   :    $GC->query($seq);
+    Title   :   clone
+    Usage   :    $GC->clone($seq);
     Function:   sets the sequence the fgenesh object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -131,7 +131,7 @@ sub new {
 =cut
 
 
-sub query{
+sub clone{
     my ($self, $seq) = @_;
     #print "sequence: ".$seq."\n";
     if(defined $seq){
@@ -186,7 +186,7 @@ sub run {
     my ($self) = @_;
     #set arguments for cpg
     #check seq
-    my $seq = $self->query() || $self->throw("Seq required for cpg\n");
+    my $seq = $self->clone() || $self->throw("Seq required for cpg\n");
    
     
     #running the gc analysis
@@ -211,8 +211,8 @@ sub run_gc {
     #print "running GC content analysis\n";
    
 
-    my $length = $self->query->length;
-    my $seq = $self->query->seq;
+    my $length = $self->clone->length;
+    my $seq = $self->clone->seq;
     my $window = $self->window;
     #my $gccount = $seq =~ tr/GC/GC/;
     #my $Ncount = $seq =~ tr/N/N/;
@@ -245,7 +245,7 @@ sub run_gc {
                             -gff_source      => 'gc',
                             -gff_feature     => 'gc_content');
         my $gc = Bio::EnsEMBL::SeqFeature->new
-	    (   -seqname => $self->query->id,
+	    (   -seqname => $self->clone->id,
 		-start   => $start_point,
 		-end     => $end_point,
 		-strand => 0,

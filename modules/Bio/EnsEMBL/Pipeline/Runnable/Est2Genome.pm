@@ -87,6 +87,7 @@ use Bio::Root::RootI;
                 -args:       Arguments when running est2genome 
 =cut
 
+
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);

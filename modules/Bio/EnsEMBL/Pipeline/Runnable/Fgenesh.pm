@@ -19,12 +19,12 @@ Bio::EnsEMBL::Pipeline::Runnable::Fgenesh
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::Fgenesh object
-  my $fgenesh = Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-QUERY => $seq);
+  my $fgenesh = Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-CLONE => $seq);
   $fgenesh->workdir($workdir);
   $fgenesh->run();
   my @genes = $fgenesh->output();
@@ -86,7 +86,7 @@ use Bio::SeqIO;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-QUERY => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-CLONE => $seq);
     Function:   Initialises Fgeneshobject
     Returns :   a FgeneshObject
     Args    :   A Bio::Seq object 
@@ -99,10 +99,11 @@ sub new{
      my $self = $class->SUPER::new(@args);  
 
      $self->{'_genes'} = []; #an array of arrays of Bio::Seqfeatures
+     $self->{'_transgenes'} = []; #an array of arrays of Bio::Seqfeatures
      $self->{'_exons'} = []; #an array of seqfeatures
      $self->{'_transcripts'} = []; #an array of Bio::Ensembl::Transcript
      $self->{'_proteins'} = []; #fgenesh predicted proteins
-     $self->{'_query'} = undef; #location of Bio::Seq object
+     $self->{'_clone'} = undef; #location of Bio::Seq object
      $self->{'_workdir'} = undef; #location of temp dir
      $self->{'_fgenesh'} = undef; #location of fgenesh binary
      $self->{'_filename'} = undef; #file to store Bio::Seq object
@@ -111,10 +112,10 @@ sub new{
      $self->{'_parameters'} = undef; #location of parameters for fgenesh
      $self->{'_matirx'} = undef; #location of matrix used by fgenesh
 
-     my($query, $fgenesh, $parameters, $matrix) = 
-	  $self->_rearrange([qw(QUERY FGENESH PARAM MATRIX)], @args);
+     my($clone, $fgenesh, $parameters, $matrix) = 
+          $self->_rearrange([qw(CLONE FGENESH PARAM MATRIX)], @args);
 
-      $self->query($query) if ($query);
+      $self->clone($clone) if ($clone);
 
 
      $fgenesh = 'fgenesh' unless ($fgenesh);
@@ -139,10 +140,10 @@ sub new{
 #get/set methods
 ###################
 
-=head2 query
+=head2 clone
 
-    Title   :   query
-    Usage   :    $Fgenesh->query($seq);
+    Title   :   clone
+    Usage   :    $Fgenesh->clone($seq);
     Function:   sets the sequence the fgenesh object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -151,7 +152,7 @@ sub new{
 
 =cut
 
-sub query {
+sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -159,11 +160,11 @@ sub query {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_query'} = $seq ;
-        $self->filename($self->query->id.".$$.seq");
+        $self->{'_clone'} = $seq ;
+        $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".fgenesh");
     }
-    return $self->{'_query'};
+    return $self->{'_clone'};
 }
 
 =head2 fgenesh
@@ -297,11 +298,55 @@ sub each_Fgenesh_Gene {
     my ($self, $gene) =@_;
    
     if (!defined($self->{'_genes'})) {
-	$self->{'_genes'} = [];
+        $self->{'_genes'} = [];
     }
     
     return @{$self->{'_genes'}};
 }
+
+=head2 add_translating_Fgenesh_Gene
+
+  Title : add_Fgenesh_Gene
+  Usage : $obj->add_Fgenesh_Gene($seqfeature);
+  Function : adds to the objects array of genes and returns the array of genes
+  Args   : Seqfeature that is a gene
+  
+
+=cut
+
+sub add_translating_Fgenesh_Gene {
+    my ($self, $gene) =@_;
+    if ($gene)
+    {
+        $gene->isa("Bio::EnsEMBL::SeqFeature") 
+                || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
+        push(@{$self->{'_transgenes'}}, $gene);
+        @{$self->{'_transgenes'}} = sort { $a->seqname <=> $b->seqname } @{$self->{'_transgenes'}};
+    }
+    return @{$self->{'_transgenes'}};
+}
+
+=head2 each_translating_Fgenesh_Gene
+
+  Title : each_Fgenesh_Gene
+  Usage : $obj->each_Fgenesh_Gene();
+  Function : returns an array of fgenesh genes
+  Args   : 
+  
+
+=cut
+
+
+sub each_translating_Fgenesh_Gene {
+    my ($self, $gene) =@_;
+   
+    if (!defined($self->{'_transgenes'})) {
+        $self->{'_transgenes'} = [];
+    }
+    
+    return @{$self->{'_transgenes'}};
+}
+
 =head2 add_Fgenesh_Protein
 
   Title : add_Fgenesh_Protein
@@ -332,7 +377,7 @@ sub each_Fgenesh_Protein {
     my ($self, $protien) =@_;
    
     if (!defined($self->{'_proteins'})) {
-	$self->{'_proteins'} = [];
+        $self->{'_proteins'} = [];
     }
     
     return @{$self->{'_proteins'}};
@@ -390,11 +435,11 @@ sub each_Transcript {
 =cut
 
 sub run {
-    my ($self) = @_;
-    #check query
-    my $seq = $self->query() || $self->throw("Seq required for Fgenesh\n");
+    my ($self, $dir) = @_;
+    #check clone
+    my $seq = $self->clone() || $self->throw("Clone required for Fgenesh\n");
     #set directory if provided
-    $self->workdir('/tmp') unless $self->workdir();
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     #print STDERR "have checked directory writing file next\n";
@@ -469,120 +514,119 @@ sub parse_results {
     while (<$filehandle>)
     {
         # Last line before predictions contains nothing but spaces and dashes
-	
-	 
-	
-	    #print "looking at ".$_."\n";
         
-	my $flag = 0;
-	if (/^\s*-[-\s]+$/)  
+         
+        
+            #print "looking at ".$_."\n";
+        
+        my $flag = 0;
+        if (/^\s*-[-\s]+$/)  
         { 
-	    #print "have found data\n";
-	    GENES : while (<$filehandle>) 
-	    {
-		my @lines;
-		
-		until (/^$/)
-		{
-		    #print "searching for exons\n";
-		    #print "line = " . $_."\n";
-		    if (/CDSl|CDSi|CDSf|CDSo/i)
-		    {
-			#print "parsing data from ". $_ ."\n";
-			my @element = split;
-			push @lines, \@element; 
-			$self->throw("Unable to parse fgenesh ouput (".scalar(@element).") Line: $_\n") 
-			    unless (scalar(@element) == 11); 	    
-			
-		    } elsif (/Predicted protein/i)
-		    {
+            #print "have found data\n";
+            GENES : while (<$filehandle>) 
+            {
+                my @lines;
+                
+                until (/^$/)
+                {
+                    #print "searching for exons\n";
+                    #print "line = " . $_."\n";
+                    if (/CDSl|CDSi|CDSf|CDSo/i)
+                    {
+                        #print "parsing data from ". $_ ."\n";
+                        my @element = split;
+                        push @lines, \@element; 
+                        $self->throw("Unable to parse fgenesh ouput (".scalar(@element).") Line: $_\n") 
+                            unless (scalar(@element) == 11);        
+                        
+                    } elsif (/Predicted protein/i)
+                    {
                         #print "Doing PP elsif\n";
-			$flag = 1;
-			last GENES ;
-		    }
+                        $flag = 1;
+                        last GENES ;
+                    }
                     #print "Getting next line\n";
                     $_ = <$filehandle>;    
-		}
-		
-		#print "this gene has ". scalar @lines." exons\n";
-		if($lines[0]->[1] eq '+')
-		{
-		    @lines = sort {$a->[3] <=> $b->[3]} @lines;
-		}
-		elsif($lines[0]->[1] eq '-')
-		{
-		    @lines = reverse sort {$a->[3] <=> $b->[3]} @lines;
-		}
-		my $exon_num=1;
-		foreach my $line(@lines)
-		{
-		    my %feature;
-		    #print "parsing data\n";
-		    my $number = $line->[0]+($exon_num/100);
-		    $feature {'name'} = $self->query->id.".".$number;
-		    if($line->[1] eq '+')
-		    {
-			$feature {'start'} = $line->[3];
-			$feature {'end'} = $line->[5];
-			$feature {'strand'} = 1;
-			$feature {'phase'} = (3-($line->[7]-$line->[3]))% 3;
-		    }
-		    elsif($line->[1] eq '-')
-		    {
-			$feature {'start'} = $line->[3];
-			$feature {'end'} = $line->[5];
-			$feature {'strand'} = -1;
-			$feature {'phase'} = (3-($line->[5]-$line->[9]))% 3;
-		    }
-		    
-		    $feature {'score'} = $line->[6];
-		    $feature {'type'} = $exon_type{$line->[2]};
-		    $feature {'program'} = 'Fgenesh';
-		    $feature {'program_version'} = '1.0';
-		    $feature {'primary'} = 'prediction';
-		    $feature {'source'} = 'fgenesh';
-		    #print "creating an exon". $feature {'name'}."\n";
-		    $self->create_feature(\%feature);
-		    $exon_num++;
-		}
-		if($flag==1)
-		{
-		    last;
-		}
-	    } 
-	    my $protein_string = undef;
-	    my $reading_protein =0;
-	    while (<$filehandle>)
-	    {
+                }
+                
+                #print "this gene has ". scalar @lines." exons\n";
+                if($lines[0]->[1] eq '+')
+                {
+                    @lines = sort {$a->[3] <=> $b->[3]} @lines;
+                }
+                elsif($lines[0]->[1] eq '-')
+                {
+                    @lines = reverse sort {$a->[3] <=> $b->[3]} @lines;
+                }
+                my $exon_num=1;
+                foreach my $line(@lines)
+                {
+                    my %feature;
+                    #print "parsing data\n";
+                    my $number = $line->[0]+($exon_num/1000);
+                    $feature {'name'} = $number;
+                    if($line->[1] eq '+')
+                    {
+                        $feature {'start'} = $line->[3];
+                        $feature {'end'} = $line->[5];
+                        $feature {'strand'} = 1;
+                        $feature {'phase'} = (3-($line->[7]-$line->[3]))% 3;
+                    }
+                    elsif($line->[1] eq '-')
+                    {
+                        $feature {'start'} = $line->[5];
+                        $feature {'end'} = $line->[3];
+                        $feature {'strand'} = -1;
+                        $feature {'phase'} = (3-($line->[5]-$line->[9]))% 3;
+                    }
+                    
+                    $feature {'score'} = $line->[6];
+                    $feature {'type'} = $exon_type{$line->[2]};
+                    $feature {'program'} = 'Fgenesh';
+                    $feature {'program_version'} = '1.0';
+                    $feature {'primary'} = 'prediction';
+                    $feature {'source'} = 'fgenesh';
+                    #print "creating an exon". $feature {'name'}."\n";
+                    $self->create_feature(\%feature);
+                    $exon_num++;
+                }
+                if($flag==1)
+                {
+                    last;
+                }
+            } 
+            my $protein_string = undef;
+            my $reading_protein =0;
+            while (<$filehandle>)
+            {
 
-#		if (/\A[\W]\Z/)
-#		{
-#		    $self->add_Fgenesh_Protein($protein_string);
-#		    $protein_string = undef;
-#		    $reading_protein = 0;
-#		}
+#               if (/\A[\W]\Z/)
+#               {
+#                   $self->add_Fgenesh_Protein($protein_string);
+#                   $protein_string = undef;
+#                   $reading_protein = 0;
+#               }
 
-		if (/^>/)
-		{
-		    $reading_protein = 1;
+                if (/^>/)
+                {
+                    $reading_protein = 1;
                     if (defined $protein_string) {
                         $self->add_Fgenesh_Protein($protein_string);
                     }
-		}
-		elsif ($reading_protein)
-		{
-		    $_ =~ s/\n//g;
-		    $protein_string .= $_;
-		}
-	    }
+                }
+                elsif ($reading_protein)
+                {
+                    $_ =~ s/\n//g;
+                    $protein_string .= $_;
+                }
+            }
             if (defined $protein_string) {
-	        $self->add_Fgenesh_Protein($protein_string); #final peptide
+                $self->add_Fgenesh_Protein($protein_string); #final peptide
             } 
-	}
+        }
     }
 
-    $self->create_genes();
-    #$self->test_phases();
+    $self->create_genes();#makes sure only the genes which translate are outputted
     $self->clear_exons(); #free up unecessary storage 
     
 }
@@ -602,7 +646,7 @@ sub create_genes {
     my (%genes, %gene_start, %gene_end, %gene_score,
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
-    my @ordered_exons = sort { $a->seqname cmp $b->seqname } $self->exons();
+    my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
 
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
@@ -636,12 +680,12 @@ sub create_genes {
     #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
     foreach my $gene_number (keys(%genes))
     {
-	#print "start = ".$gene_start{$gene_number}." gene number = ".$gene_number." \n";
+        #print "start = ".$gene_start{$gene_number}." gene number = ".$gene_number." \n";
         my $gene = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname     => $gene_number,
                             -strand      => $gene_strand   {$gene_number},
                             -score       => $gene_score    {$gene_number} 
-			                    /(scalar @{$genes {$gene_number}}),
+                                            /(scalar @{$genes {$gene_number}}),
                             -start       => $gene_start    {$gene_number},
                             -end         => $gene_end      {$gene_number},
                             -source_tag  => $gene_source   {$gene_number},
@@ -651,7 +695,7 @@ sub create_genes {
 
         foreach my $exon (@{$genes {$gene_number}})
         {
-	  $gene->add_sub_SeqFeature($exon, '');
+          $gene->add_sub_SeqFeature($exon, '');
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
     }
@@ -720,16 +764,18 @@ sub output {
   my @feat;
 
   my $analysis = Bio::EnsEMBL::Analysis->new(   -db              => undef,
-						-db_version      => undef,
-						-program         => 'fgenesh',
-						-program_version => 1,
-						-gff_source      => 'fgenesh',
-						-gff_feature     => 'prediction',
-						-logic_name      => 'fgenesh',
-						);
+                                                -db_version      => undef,
+                                                -program         => 'fgenesh',
+                                                -program_version => 1,
+                                                -gff_source      => 'fgenesh',
+                                                -gff_feature     => 'prediction',
+                                                -logic_name      => 'fgenesh',
+                                                );
 
   
-  foreach my $gene ($self->each_Fgenesh_Gene) {
+  foreach my $gene ($self->each_Fgenesh_Gene) { 
+    
+     
     my @exons = $gene->sub_SeqFeature;
 
     if ($exons[0]->strand == 1) {
@@ -740,27 +786,27 @@ sub output {
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
 
     foreach my $exon (@exons) {
-      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
-					   -start   => $exon->start,
-					   -end     => $exon->end,
-					   -strand  => $exon->strand,
-					   -phase   => $exon->phase,
-					   -end_phase => $exon->end_phase,
-					   -score   => $exon->score,
-					   -source_tag => 'fgenesh',
-					   -primary_tag => 'prediction',
-					   -analysis     => $analysis);
-      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
-					    -start   => $exon->start,
-					    -end     => $exon->end,
-					    -strand  => $exon->strand,
-					    -phase   => $exon->phase,
-					    -end_phase => $exon->end_phase,
-					    -score   => $exon->score,
-					    -p_value   => $exon->p_value,
-					    -source_tag => 'fgenesh',
-					    -primary_tag => 'prediction',
-					    -analysis     => $analysis);
+      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+                                           -start   => $exon->start,
+                                           -end     => $exon->end,
+                                           -strand  => $exon->strand,
+                                           -phase   => $exon->phase,
+                                           -end_phase => $exon->end_phase,
+                                           -score   => $exon->score,
+                                           -source_tag => 'fgenesh',
+                                           -primary_tag => 'prediction',
+                                           -analysis     => $analysis);
+      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
+                                            -start   => $exon->start,
+                                            -end     => $exon->end,
+                                            -strand  => $exon->strand,
+                                            -phase   => $exon->phase,
+                                            -end_phase => $exon->end_phase,
+                                            -score   => $exon->score,
+                                            -p_value   => $exon->p_value,
+                                            -source_tag => 'fgenesh',
+                                            -primary_tag => 'prediction',
+                                            -analysis     => $analysis);
 
 #      print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
 
@@ -768,7 +814,7 @@ sub output {
       $f2->analysis($analysis);
 
       my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-					     -feature2 => $f2);
+                                             -feature2 => $f2);
 
       push(@feat,$fp);
     }
@@ -780,21 +826,6 @@ sub output {
 
 
 1;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

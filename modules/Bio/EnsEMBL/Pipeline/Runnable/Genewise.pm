@@ -43,7 +43,7 @@ use Bio::EnsEMBL::Analysis::Programs qw(genewise);
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::SeqIO;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
@@ -159,7 +159,7 @@ sub _align_protein {
     $command .= " -trev ";
   }
   
-#  print STDERR "Command is $command\n";
+ #print STDERR "Command is $command\n";
   
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 

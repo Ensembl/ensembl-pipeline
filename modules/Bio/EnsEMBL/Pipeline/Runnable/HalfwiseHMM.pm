@@ -1,4 +1,3 @@
-
 #
 #
 # Cared for by Laura Clarke  <lec@sanger.ac.uk>
@@ -106,7 +105,7 @@ sub new {
 
     my $self = $class->SUPER::new(@args);    
 
-    $self->{'_query'} = undef; #location of Bio::Seq object
+    $self->{'_clone'} = undef; #location of Bio::Seq object
     $self->{'_blastprog'} = undef; #location of blast program
     $self->{'_blastdb'} = undef; #location fo blast database
     $self->{'_blastobj'} = undef; #location of blast object
@@ -125,11 +124,11 @@ sub new {
     $self->{'_hmmfetch'} = undef; #location of hmmfetch program
     $self->{'_hmmdb'} = undef; #location of hmmdb
     
-    print STDERR "args: ", @args, "\n";
-    my ($query, $blastprog, $blastdb, $threshold, $genewise, $options, $hmmfetch, $hmmdb) 
-	= $self->_rearrange([qw (QUERY BLASTPROG BLASTDB THRESHOLD GENEWISE OPTIONS HMMFETCH HMMDB)], @args);
-    
-    $self->query($query) if ($query);
+    #print STDERR "args: ", @args, "\n";
+    my ($clone, $blastprog, $blastdb, $threshold, $genewise, $options, $hmmfetch, $hmmdb) 
+	= $self->_rearrange([qw (CLONE BLASTPROG BLASTDB THRESHOLD GENEWISE OPTIONS HMMFETCH HMMDB)], @args);
+    print "id = ".$clone->id."\n";
+    $self->clone($clone) if ($clone);
     if ($blastprog){
        $self->blast_loc($self->find_executable($blastprog));
     } else {
@@ -138,13 +137,13 @@ sub new {
     if ($blastdb) {
 	$self->blastdb($blastdb);
     } else {#note database name must always contain halfwise
-	$self->blastdb("/usr/local/ensembl/halfwise.db");
+	$self->blastdb("/usr/local/ensembl/data/blastdb/Ensembl/halfwise.db");
 	#$self->blastdb("/nfs/disk100/pubseq/halfwise/halfwise.db");
     }
     if (defined($genewise )){
 	$self->genewise_loc($self->find_executable($genewise));
     } else {
-	$self->genewise_loc($self->find_executable('genewisedb'));
+       $self->genewise_loc($self->find_executable('genewisedb'));
     }
     if (defined($threshold)) {
 	$self->threshold($threshold);
@@ -168,8 +167,8 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/usr/local/ensembl/data/Pfam');
-	#$self->hmmdb('/nfs/disk100/pubseq/Pfam/DB/Pfam');
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensemb/Pfam');
+	
     }
     return $self; # success - we hope!
 }
@@ -181,10 +180,10 @@ sub new {
 #GET/SET METHODS#
 #################
 
-=head2 query
+=head2 clone
 
-    Title   :   query
-    Usage   :    $HalfwiseHMM->query($seq);
+    Title   :   clone
+    Usage   :    $HalfwiseHMM->clone($seq);
     Function:   sets the sequence the halfwisehmm object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -193,7 +192,7 @@ sub new {
 
 =cut
 
-sub query {
+sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -201,13 +200,13 @@ sub query {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_query'} = $seq ;
-        $self->filename($self->query->id.".$$.seq");
+        $self->{'_clone'} = $seq ;
+        $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".hlf");
 	$self->hmmfilename($self->filename."dbhmm.$$");
 	$self->errorfile($self->filename."err.$$");
     }
-    return $self->{'_query'};
+    return $self->{'_clone'};
 }
 
 =head2 blast_loc
@@ -285,6 +284,17 @@ sub genewise_loc {
  Args     : the options
 
 =cut
+
+sub options {
+  my ($self, $args) = @_;
+  
+  if (defined($args)) {
+    $self->{'_options'} = $args ;
+  }
+  return $self->{'_options'};
+}
+
+
 
 
 =head2 hmmfetch 
@@ -391,7 +401,7 @@ sub run {
 
     $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
-
+    print "filename = ".$self->filename."\n";
     #print STDERR "write sequence to file\n";
     #system ('pwd');
     $self->writefile();
@@ -454,12 +464,12 @@ sub create_blast {
     
     my ($self) = @_;
     eval{
-      $self->query;
+      $self->clone;
     };
     if($@){
       $self->throw("cannot create a blast object without a seq object : ".$@."\n");
     }
-    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-QUERY => $self->query,
+    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-QUERY => $self->clone,
 							      -PROGRAM => $self->blast_loc,
 							      -DATABASE => $self->blastdb,
 							      -THRESHOLD => 1e-6,
@@ -701,7 +711,7 @@ sub parse_results{
 	    $count++;
 	    #print "another pfam domain matched setting count to ".$count." \n";
 	  }elsif(/genewise-prediction/i){ 
-	    #print "2 line to be parsed = ".$_."\n"; 
+	    print "2 line to be parsed = ".$_."\n"; 
 	    my @elements = split;
 	    # my $count =0;
 	    # foreach my $element(@elements){
@@ -711,7 +721,7 @@ sub parse_results{
 	    
 	    $self->throw("unable to properly parse genewisedb output there are ".scalar(@elements)." elements : $!\n")
 	      unless(scalar(@elements) == 9);
-	    #print "3 line to be parsed = ".$_."\n";   
+	    print "3 line to be parsed = ".$_."\n";   
 	    
 	    if(/match/i){
 	      
