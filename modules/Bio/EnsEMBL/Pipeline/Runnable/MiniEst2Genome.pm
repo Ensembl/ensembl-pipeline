@@ -597,6 +597,7 @@ sub run_blaste2g {
       
       # exonerate has no concept of phase, but remapping will fail if this is unset
       $ex->phase(0);
+      $ex->end_phase(0);
       $ex->analysis($self->analysis);
 
       # convert back to genomic coords, but leave the EST coordinates alone
@@ -655,6 +656,7 @@ sub run_blaste2g {
     
     foreach my $gex (@genomic_exons) {
       $gex->{_phase} = 0; # e2g doesn;t give us phase
+      $gex->end_phase(0);
       $gex->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $gex->seqname($gene->seqname); # urrmmmm?
