@@ -311,7 +311,7 @@ sub parse_results {
 		$strand = 1;
 	    }
             elsif ($strand eq 'C') {
-	        ($hit_start, $hit_end) = (split)[12, 13];
+	        ($hit_start, $hit_end) = (split)[13, 12];
 		$strand = -1;
 	    }
 
