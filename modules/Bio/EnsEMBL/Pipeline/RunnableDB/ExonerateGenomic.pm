@@ -61,18 +61,20 @@ use Data::Dumper;
 
 sub new {
     my ($class, @args) = @_;
-    
-    my $self = {};
-    bless $self,$class;
-    my ($aligndb,$query,$target,$exonerate,$exargs,$max_query,$max_target) = $self->_rearrange([qw(ALIGNDB QUERYDB TARGETDB EXONERATE EXARGS MAXQUERY MAXTARGET)],@args);
+    my $self = bless {}, $class;
+
+    my ($db,$query,$target,$exonerate,$exargs,$max_query,$max_target) = $self->_rearrange([qw(DBOBJ QUERYDB TARGETDB EXONERATE EXARGS MAXQUERY MAXTARGET)],@args);
     
     $query || $self->throw("Did not specify query EnsEMBL db");
     $target || $self->throw("Did not specify target EnsEMBL db");
 
+    $self->dbobj($db);
     $self->exonerate($exonerate) if defined $exonerate;
     $self->querydb($query);
     $self->targetdb($target);
-    $max_query ||= 500000;
+    #Apparently exonerate likes whole genome on one side, 
+    #500 Kb on the other
+    $max_query ||=  1000000000;
     $max_target ||= 500000;
     $self->max_query($max_query);
     $self->max_target($max_target);
@@ -97,19 +99,20 @@ sub new {
 sub fetch_input {
     my( $self) = @_; 
   
-    my @query_files = &_split_db_to_files('query');
-    my @target_files = &_split_db_to_files('target');
+    my @query_files = $self->_split_db_to_files('query');
+    my @target_files = $self->_split_db_to_files('target');
 
     #Create Exonerate Runnable between all 
     foreach my $qf (@query_files) {
 	foreach my $tf (@target_files) {
 	    $self->throw("Can't run Exonerate without both genomic and EST sequences") 
 		unless (scalar(@query_files) && scalar(@target_files));
-	    my $executable =  $self->analysis->program_file();
+	    #my $executable =  $self->analysis->program_file();
 	    my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate(
 			    '-genomic'  => $qf,
 			    '-est'      => $tf,
-			    '-exonerate' => $executable);
+			    '-args'     => $self->exonerate_args,
+			    );
 	    push(@{$self->{'_runnables'}},$exonerate);
 	}
     }
@@ -131,40 +134,42 @@ sub fetch_input {
 
 =cut
 
-sub _split_db_to_files{
-    my ($self,$db) = @_;
+sub _split_db_to_files {
+    my ($self,$switch) = @_;
 
     my @genseqfiles;
     my $length=0;
     my $c=1;
-    my $seqout = Bio::SeqIO->new(-file => ">/tmp/exonerate_".$db."_$c.fa" , '-format' => 'Fasta');
-    
+    my $filename = "/tmp/exonerate_".$switch."_$c.fa"; 
+    my $seqout = Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta');
     my ($db,$max);
     #Does not need input id, because it has to compare all against all
-    if ($db eq 'query') {
+    if ($switch eq 'query') {
 	$db = $self->querydb;
-	$max = $self->maxquery;
+	$max = $self->max_query;
     }
     else {
 	$db = $self->targetdb;
-	$max = $self->maxtarget
+	$max = $self->max_target
     }
     my @contigids = $db->get_all_Contig_id();
     while (my $cid = shift (@contigids)) {
 	my $contig = $db->get_Contig($cid);
 	$length += $contig->length;
 	if ($length > $max) {
-	    push (@genseqfiles,$seqout);
+	    push (@genseqfiles,$filename);
 	    $c++;
 	    $length = $contig->length;
-	    $seqout = Bio::SeqIO->new(-file => ">/tmp/exonerate_".$db."_$c.fa" , '-format' => 'Fasta');
+	    $filename = "/tmp/exonerate_".$switch."_$c.fa";
+	    $seqout = Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta');
 	    $seqout->write_seq($contig->get_repeatmasked_seq());
+	    last;
 	}
 	else {
 	    $seqout->write_seq($contig->get_repeatmasked_seq());
 	} 
     }
-    push (@genseqfiles,$seqout);
+    push (@genseqfiles,$filename);
 
     return @genseqfiles;
 }
@@ -193,7 +198,7 @@ sub run {
     $self->throw("Can't run - no runnable objects") unless scalar(@{$self->{'_runnables'}});
     my @output;
     foreach my $runnable (@{$self->{'_runnables'}}) {
-	$runnable->run();
+	$runnable->run('ungapped');
 	my @fps = $runnable->output;
 	#push (@output,@fps);
 	$self->write_output(\@fps);
@@ -235,11 +240,54 @@ sub output{
 sub write_output {
     my($self,$out) = @_;
 
+    #foreach my $f (@$out) {
+#	print $f->seqname."\texonerate\tsimilarity\t".$f->start."\t".$f->end."\t".$f->score."\t".$f->strand."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
+#    }
+#    return 1;
+    my @features;
+    my %contig_hash;
     if ($out) {
-	$self->dbobj->store_feature_pairs($self->querydb,$self->targetdb,@$out);
+	@features = @$out;
+	print STDERR "Found out var, with ".scalar(@features)." features\n";
     }
     else {
-	$self->dbobj->store_feature_pairs($self->querydb,$self->targetdb,$self->output);
+	@features = @{$self->output};
+    }
+    my $db = $self->dbobj();
+    print STDERR "Going to write to ".$db->dbname."\n";
+
+    my %c_features;
+    foreach my $f (@features) {
+	my $c = $f->seqname;
+        my $targetid = $f->hseqname;
+	$f->hseqname("mouse_$targetid");
+	my $contig;
+	if (! $contig_hash{$c}) {
+	    eval 
+	    {
+		$contig = $db->get_Contig($c);
+	    };
+	    
+	    if ($@) {
+		print STDERR "Contig not found, skipping writing output to db: $@\n";
+	    }
+	    else {
+		$contig_hash{$c}=$contig;
+		push (@{$c_features{$c}},$f);
+	    }
+	}
+	else {
+	    $contig = $contig_hash{$c};
+	    push (@{$c_features{$c}},$f);
+	}
+    }	    
+    foreach my $c (keys (%c_features)) {
+	my @feats = @{$c_features{$c}};
+	if (@feats) {
+	    my $contig = $contig_hash{$c};
+	    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+	    $feat_Obj->write($contig, @features);
+	}
     }
     return 1;
 }
@@ -336,6 +384,49 @@ sub exonerate_args {
     return $self->{'_exonerate_args'};
 
 }
+
+=head2 max_query
+
+ Title   : max_query
+ Usage   : $obj->max_query($newval)
+ Function: Getset for max_query value
+ Returns : value of max_query
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub max_query{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'max_query'} = $value;
+    }
+    return $obj->{'max_query'};
+
+}
+
+=head2 max_target
+
+ Title   : max_target
+ Usage   : $obj->max_target($newval)
+ Function: Getset for max_target value
+ Returns : value of max_target
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub max_target{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'max_target'} = $value;
+    }
+    return $obj->{'max_target'};
+
+}
+
 
 
 1;
