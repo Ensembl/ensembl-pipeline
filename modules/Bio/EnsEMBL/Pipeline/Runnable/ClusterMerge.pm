@@ -414,7 +414,11 @@ sub transcript_low{
 	  then choose the best in this priority: a complete list >>
 	  the longer proper sublist
 
-
+          Note: it seems that ESTs that have been used as internal previously are bound
+	  to give us lists that are embedded in previous lists and that will get
+	  rejected anyway later one. We could skip such ESTs.
+	  Not sure yet about those that have appeared previously as ast eements,
+	  I'll have to check few test cases. Try to find a formal way of proving this.s
   
 	  for each list(i)(a), a = 0,...,N {
   
@@ -491,6 +495,12 @@ sub link_Transcripts{
   TRAN1:
     for (my $i=0; $i<scalar(@transcripts); $i++){
 
+
+      print STDERR "we should check here whether this est has been used previously as
+      internal element in a previous list. If true, it will be bound to give us lists
+      embedded in previously generated lists, so they wil be rejected in the post
+      processing. So that they can be skipped at this stage and the algorithm will
+      improve in speed.\n";
       # store this one in the first list
       my @first_list = ();
       push (@first_list, $transcripts[$i]);
