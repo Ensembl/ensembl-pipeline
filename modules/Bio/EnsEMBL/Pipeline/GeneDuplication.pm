@@ -298,14 +298,14 @@ sub _run_pairwise_paml {
   my ($self, $aligned_seqs) = @_;
 
   my $paml = Bio::EnsEMBL::Pipeline::GeneDuplication::PAML->new(
-			     '-work_dir'   => $self->_working_dir,
-			     '-executable' => '/nfs/acari/dta/work1/paml_wrapper/paml3.13/src/codeml',
+			     '-work_dir'     => $self->_working_dir,
+			     '-executable'   => $self->_codeml,
 			     '-aligned_seqs' => $aligned_seqs,
-			     '-runmode'    => '-2',
-			     '-seqtype'    => '1',
-			     '-model'      => '0',
-			     '-nssites'    => '0',
-			     '-icode'      => ($self->_genetic_code) - 1
+			     '-runmode'      => '-2',
+			     '-seqtype'      => '1',
+			     '-model'        => '0',
+			     '-nssites'      => '0',
+			     '-icode'        => ($self->_genetic_code) - 1
 			    );
 
   my $parser = $paml->run_codeml;
@@ -610,10 +610,14 @@ sub _codeml {
   $self->{_codeml} = 'codeml'
     unless $self->{_codeml};
 
+  # If it looks like our executable comes with a full 
+  # path, check that it will work.
+
   $self->throw("codeml executable not found or not " .
 	       "executable. Trying to execute path " .
 	       "[". $self->{_codeml} ."]")
-    unless (-x $self->{_codeml});
+    if ($self->{_codeml} =~ /^\//
+	& !-x $self->{_codeml});
 
   return $self->{_codeml};
 }
