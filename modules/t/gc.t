@@ -26,8 +26,6 @@ END { print "not ok 1\n" unless $loaded; }
 
 use Bio::EnsEMBL::Pipeline::Runnable::GC;
 use Bio::PrimarySeq;
-use Bio::Seq;
-use Bio::SeqIO;
 use strict;
 
 $loaded = 1;
@@ -59,7 +57,7 @@ if ($gc) {
 # Fiddle with the window size.
 
 if ($gc->window(1000)) {
-  print "on 4\n";
+  print "ok 4\n";
 } else {
   print "not ok 4\n";
 }
@@ -91,22 +89,6 @@ foreach my $window (@output) {
         printf ("%10s = $value\n", $method_name);
     }
 }
-
-
-#  #create and fill Bio::Seq object
-#  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
-#  my $seq = Bio::Seq->new();
-#  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
-#  $seq = $seqstream->next_seq();
-#  #create Bio::EnsEMBL::Pipeline::Runnable::GC object
-#  my $gc = Bio::EnsEMBL::Pipeline::Runnable::GC->new (-QUERY => $seq);
-#  $gc->workdir($workdir);
-#  $gc->run();
-#  my @genes = $gc->output();
-#  my @exons = $gc->output_exons();
-#  my $seqfeature = $gc->output_singlefeature();
-
-
 
 
 sub set_seq {
