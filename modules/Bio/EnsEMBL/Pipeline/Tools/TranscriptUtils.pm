@@ -911,28 +911,30 @@ sub find_transcripts_by_protein_evidence{
   }
   my $id_list = join(',',@id_array);
   
-  my $transcript_sql;
-  $transcript_sql = "SELECT distinct(t.transcript_id) ". 
-                    "FROM transcript t, exon_transcript et, exon e, ".
-                     "supporting_feature sf ";
-  $transcript_sql .= ", gene g " if($type);
-  $transcript_sql .= "WHERE  sf.feature_id in (".$id_list.") and ".
-    "e.exon_id=et.exon_id and et.transcript_id=t.transcript_id and ".
-      "sf.exon_id=e.exon_id and sf.feature_type= 'protein_align_feature' ";
-  $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
-
-  print STDERR $transcript_sql."\n";
-  my $transcript_sth = $db->prepare($transcript_sql);
-
-  $transcript_sth->execute;
-  
-  my $transcript_id;
-  
-  $transcript_sth->bind_columns(\$transcript_id);
+  if ($id_list){
+    my $transcript_sql;
+    $transcript_sql = "SELECT distinct(t.transcript_id) ". 
+      "FROM transcript t, exon_transcript et, exon e, ".
+	"supporting_feature sf ";
+    $transcript_sql .= ", gene g " if($type);
+    $transcript_sql .= "WHERE  sf.feature_id in (".$id_list.") and ".
+      "e.exon_id=et.exon_id and et.transcript_id=t.transcript_id and ".
+	"sf.exon_id=e.exon_id and sf.feature_type= 'protein_align_feature' ";
+    $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
     
-  while($transcript_sth->fetch){
-    push(@tranz, $transcript_id);
-  } 
+    print STDERR $transcript_sql."\n";
+    my $transcript_sth = $db->prepare($transcript_sql);
+    
+    $transcript_sth->execute;
+    
+    my $transcript_id;
+    
+    $transcript_sth->bind_columns(\$transcript_id);
+    
+    while($transcript_sth->fetch){
+      push(@tranz, $transcript_id);
+    } 
+  }
   
   
   my $t_adaptor = $db->get_TranscriptAdaptor;
@@ -967,51 +969,46 @@ sub find_transcripts_by_protein_evidence{
 
 sub find_transcripts_by_dna_evidence{
   my ($self,$id,$db, $type) = @_;
-  
-  #print STDERR "Using ".$db->dbname."\n";
-    my @tranz;
 
-  if ( $type ){
-    my $q = qq( SELECT distinct(t.transcript_id)
-		FROM   exon e, supporting_feature sf, dna_align_feature pf,
-		exon_transcript et, transcript t, gene g
-		WHERE  sf.exon_id      = e.exon_id                   AND
-		     sf.feature_id   = pf.dna_align_feature_id     AND
-		     sf.feature_type = "dna_align_feature"         AND
-	             pf.hit_name     = "$id"                       AND
-	             pf.contig_id    = e.contig_id                 AND
-                     et.exon_id      = e.exon_id                   AND 
-	             et.transcript_id = t.transcript_id            AND
-		     g.gene_id       = t.gene_id                   AND
-		     g.type          = "$type"
-	      );
-  
-    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-    my $res = $sth->execute || $db->throw("can't execute: $q");
-    
-    while( my ($t_id) =  $sth->fetchrow_array) {
-      push( @tranz, $t_id );
-    }
+  ############################################################
+  # strip down the version number
+  if ( $id =~/(\S+)\.\d+/ || $id =~/(\w+_*\d+)\.\d+/ ){
+    $id = $1;
   }
-  else{
-    my $q = qq( SELECT distinct(t.transcript_id)
-		FROM   exon e, supporting_feature sf, dna_align_feature pf,
-		exon_transcript et, transcript t 
-		WHERE  sf.exon_id      = e.exon_id                   AND
-		sf.feature_id   = pf.dna_align_feature_id     AND
-		sf.feature_type = "dna_align_feature"         AND
-	             pf.hit_name     = "$id"                       AND
-	             pf.contig_id    = e.contig_id                 AND
-                     et.exon_id      = e.exon_id                   AND 
-	             et.transcript_id = t.transcript_id
-            );
+  
+  my @tranz;
+  
+  my $q = qq( SELECT dna_align_feature_id FROM dna_align_feature WHERE hit_name like "$id\%" );
   
     my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-    my $res = $sth->execute || $db->throw("can't execute: $q");
+  my $res = $sth->execute || $db->throw("can't execute: $q");
     
-    while( my ($t_id) =  $sth->fetchrow_array) {
-      push( @tranz, $t_id );
-    }
+  my @id_array;  
+  while( my ($df_id) =  $sth->fetchrow_array) {
+    push(@id_array, $df_id);
+  }
+  my $id_list = join(',',@id_array);
+  
+  if ( $id_list ){
+    my $transcript_sql;
+    $transcript_sql = "SELECT distinct(t.transcript_id) FROM transcript t, exon_transcript et, exon e, supporting_feature sf ";
+    $transcript_sql .= ", gene g " if($type);
+    $transcript_sql .= "WHERE  sf.feature_id in (".$id_list.") and ".
+      "e.exon_id=et.exon_id and et.transcript_id=t.transcript_id and ".
+	"sf.exon_id=e.exon_id and sf.feature_type= 'dna_align_feature' ";
+    $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
+    
+    my $transcript_sth = $db->prepare($transcript_sql);
+    
+    $transcript_sth->execute;
+    
+    my $transcript_id;
+    
+    $transcript_sth->bind_columns(\$transcript_id);
+    
+    while($transcript_sth->fetch){
+      push(@tranz, $transcript_id);
+    } 
   }
   my $t_adaptor = $db->get_TranscriptAdaptor;
   my $s_adaptor = $db->get_SliceAdaptor;
