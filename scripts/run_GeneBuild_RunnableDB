@@ -41,7 +41,8 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_DBNAME
 					 GB_DBUSER
 					 GB_DBPASS
-					 );
+					 GB_LENGTH_RUNNABLES
+                                         );
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
@@ -54,7 +55,7 @@ my $dbpass = $GB_DBPASS;
 
 my $runnable;
 my $input_id;
-my $analysisid;
+my $analysis_logic_name;
 my $write  = 0;
 my $check  = 0;
 my $params;
@@ -63,7 +64,7 @@ my $pepfile;
 &GetOptions( 
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
-	     'analysis:n'  => \$analysisid,
+	     'analysis:n'  => \$analysis_logic_name,
              'write'       => \$write,
              'check'       => \$check,
              'parameters:s'=> \$params,
@@ -91,7 +92,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 die "No input id entered" unless defined ($input_id);
 
-my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
+my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis_logic_name);
 
 my %hparams;
 # eg -parameters param1=value1,param2=value2
