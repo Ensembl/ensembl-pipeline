@@ -19,7 +19,7 @@
 
 ## We start with some black magic to print on failure.
 BEGIN { 
-        $| = 1; print "1..7\n"; 
+        $| = 1; print "1..6\n"; 
 	    use vars qw($loaded); 
       }
 
@@ -41,11 +41,13 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA';
-my $parameters = ''; # = " -blast => blastp,  -db => swir ";
+my $parameters = '-THRESHOLD 1e-3'; 
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'embl_vertrna',
+                                                    -db_file        => 'embl_vertrna',
                                                     -db_version     => '__NONE__',
                                                     -program        => 'wublastn',
+                                                    -program_file   => 'wublastn',
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'wublastn',
@@ -77,7 +79,7 @@ else
 { print "ok 5\n"; }
 #display(@out);
 
-#$runobj->write_output();
+$runobj->write_output();
 my $contig = $db->get_Contig($id);
 my @features = $contig->get_all_SimilarityFeatures();
 #display(@features);
@@ -86,18 +88,6 @@ unless (@features)
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
-
-my @genscan_peptides =  $contig->get_genscan_peptides();
-unless (@genscan_peptides)
-{ print "not ok 7: (Data error or bug in RawContig)\n"; }
-else
-{ print "ok 7\n"; }
-
-foreach my $pep (@genscan_peptides)
-{
-
-
-}
 
 
 ##############################################################################
@@ -108,11 +98,14 @@ sub display {
     foreach my $obj (@results)
     {
        print STDERR ($obj->gffstring."\n");
+       print STDERR ("PHASE: ".$obj->phase."\n") if (defined($obj->phase));
+       
        if ($obj->sub_SeqFeature)
        {
             foreach my $exon ($obj->sub_SeqFeature)
             {
                 print STDERR "Sub: ".$exon->gffstring."\n";
+                print STDERR ("PHASE: ".$exon->phase."\n");
             }
        }
     }

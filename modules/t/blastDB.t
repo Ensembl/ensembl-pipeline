@@ -40,13 +40,14 @@ $ens_test->do_sql_file("t/runnabledb.dump");
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
-my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000';
+my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS',
                                                     -db_file        => 'dbSTS',
                                                     -db_version     => '1',                  
                                                     -program        => 'wublastn',
+                                                    -program_file   => 'wublastn',
                                                     -program_version=> 1,
                                                     -module         => $runnable,
                                                     -module_version => 1,
