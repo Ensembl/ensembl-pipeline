@@ -83,8 +83,6 @@ sub new {
     
     # get the path to the binaries from the Analysis object (analysisprocess table)
     my $params .= "-program=>".$self->analysis->program_file.",";
-    # get the analysisId from the Analysis object (analysisprocess table)
-    $params .= "-analysisid=>".$self->analysis->dbID.",";
     # define the database
     $params .= "-database=>".$self->analysis->db_file.",";
     # set the filter
