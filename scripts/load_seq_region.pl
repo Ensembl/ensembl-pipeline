@@ -24,17 +24,17 @@ this would load the sequence in the given file into the database under
 a coord system called contig. 
 
 ./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name contig  -sequence_level -fasta_file sequence.fa
+-coord_system_name contig -rank 4 -sequence_level -fasta_file sequence.fa
 
 this would just load seq_regions to represent the entries in this file
 
 ./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name clone -fasta_file clone.fa
+-coord_system_name clone -rank 3 -fasta_file clone.fa
 
 this will load the assembled pieces from the agp file into the seq_region
 table. T
 ./load_seq_region -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name chromosome -top_level -agp_file genome.agp
+-coord_system_name chromosome -rank 1 -agp_file genome.agp
 
 
 
@@ -49,9 +49,12 @@ table. T
 
     -coord_system_name the name of the coordinate system being stored
     -coord_system_version the version of the coordinate system being stored
+    -rank the rank of the coordinate system.  The highest coordinate system
+          should have a rank of 1 (e.g. the chromosome coord system).  The nth
+          highest should have a rank of n.  There can only be one coordinate 
+          system for a given rank.
     -default_version shows this version is the default version of the 
                      coordinate system
-    -top_level  reflects this is the top level of sequence in the database
     -sequence_level reflects this is a sequence level coordinate system and
     means sequence will be stored from the fasta file. This option isn't valid
     if an agp_file is being passed in'
@@ -78,10 +81,10 @@ my $help;
 my $cs_name;
 my $cs_version;
 my $default = 0;
-my $top_level = 0;
 my $sequence_level = 0;
 my $agp;
 my $fasta;
+my $rank;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -91,7 +94,7 @@ my $fasta;
             'dbpass:s'   => \$dbpass,
             'coord_system_name:s' => \$cs_name,
             'coord_system_version:s' => \$cs_version,
-            'top_level!' => \$top_level,
+            'rank:i' => \$rank,
             'sequence_level!' => \$sequence_level,
             'default_version!' => \$default,
             'agp_file:s' => \$agp,
@@ -105,17 +108,21 @@ if(!$host || !$dbuser || !$dbname || !$dbpass){
     " -dbpass $dbpass\n";
   $help = 1;
 }
-if(!$cs_name || (!$fasta  && !$agp){
-  print STDERR "Need coord_system_name and seqfile to beable to run\n";
-  print STDERR "-coord_system_name $cs_name -seqfile $seqfile\n";
+if(!$cs_name || (!$fasta  && !$agp)){
+  print STDERR "Need coord_system_name and fasta/agp file to beable to run\n";
+  print STDERR "-coord_system_name $cs_name -fasta_file $fasta -agp_file $agp\n";
   $help = 1;
 }
 if($agp && $sequence_level){
-  print STDERR ("Can't use an agp file ".$seqfile." to store a ".
+  print STDERR ("Can't use an agp file $agp to store a ".
                 "sequence level coordinate system ".$cs_name."\n");
   $help = 1;
 }
-
+if(!$rank) {
+  print STDERR "A rank for the coordinate system must be specified " .
+    "with the -rank argument\n";
+    $help = 1;
+}
 
 if ($help) {
     exec('perldoc', $0);
@@ -145,7 +152,7 @@ if(!$cs){
      -VERSION         => $cs_version,
      -DEFAULT         => $default,
      -SEQUENCE_LEVEL  => $sequence_level,
-     -TOP_LEVEL       => $top_level,
+     -RANK            => $rank
     );
 $csa->store($cs);
 }
@@ -180,7 +187,7 @@ sub parse_fasta{
     #you are getting you may want to comment out the warning about this
     
     my @values = split /\s+/, $seq->desc;
-    my $name = @values[0];
+    my $name = $values[0];
     warning("You are going to store with name ".$name." are you sure ".
             "this is what you wanted");
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
