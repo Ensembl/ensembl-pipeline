@@ -1,38 +1,14 @@
-#!/usr/local/bin/perl
+# Copyright GRL & EBI 2001
+# Author: Emmanuel Mongin
+# Creation: 03.19.2001
 
 
-=head1 NAME
+=head1 Run_protein_RunnableDB
 
-test_RunnableDB
+=head2 Description
 
-=head1 SYNOPSIS
-
-test_RunnableDB
-
-=head1 DESCRIPTION
-
-Runs a RunnableDB on an input seq (extracted from a database) and
-optionally writes features or whatever back into the database.
-
-Requires a DB connexion, input ID, name of runnable and analysis ID.
-
-=head1 OPTIONS
-
-    -host      host name for database (gets put as host= in DBAdaptor)
-
-    -port      For RDBs, what port to connect to (port= in DBAdaptor)
-
-    -dbname    For RDBs, what name to connect to (dbname= in DBAdaptor)
-
-    -dbuser    For RDBs, what username to connect as (dbuser= in DBAdaptor)
-
-    -dbpass    For RDBs, what password to use (pass= in DBAdaptor)
-
-    -input_id  The input id for the RunnableDB
-
-    -runnable  The name of the runnable module we want to run
-
-    -analysis  The number of the analysisprocess we want to run
+The purpose of this perl script is to run the ensembl protein analysis runnables.
+This script is called by submit_prot_analysis.pl
 
 =cut
 
@@ -40,14 +16,15 @@ use strict;
 use Getopt::Long;
 
 BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+    require "Bio/EnsEMBL/Pipeline/Prot_analysis_Conf.pl";
 }
 
 
+
+
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
 use Bio::EnsEMBL::DBLoader;
+
 my $host   = '';
 my $port   = undef;
 my $dbname = '';
@@ -61,6 +38,14 @@ my $check  = 0;
 my $params;
 my $all;
 
+my %db_conf =  %::db_conf;
+
+my %scripts_conf = %::scripts_conf;
+
+#Get DBs variables
+
+
+
 &GetOptions( 
 	     'host:s'      => \$host,
 	     'port:n'      => \$port,
@@ -73,7 +58,6 @@ my $all;
 	     'write'       => \$write,
              'check'       => \$check,
              'parameters:s'=> \$params,
-	     'all:s'   => \$all,
 	     );
 
 $| = 1;
@@ -99,17 +83,9 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
 
 my $sf;
 
-if (defined ($::pipeConf{'seqfetcher'})) {
-    my $sfname = $::pipeConf{'seqfetcher'};
-    $sf = "$sfname"->new;
-} else {
-    $sf = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-}
-
-die "No input id entered" unless defined (($input_id)||($all));
-
 
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
+
 
 my %hparams;
 # eg -parameters param1=value1,param2=value2
@@ -119,49 +95,32 @@ foreach my $p(split /,/, $params){
   $hparams{$sp[0]} =  $sp[1];
 }
 
-my $runobj;
+my $runobj = "$runnable"->new(-dbobj    => $db,
+			      -input_id => $input_id,
+			      -analysis => $analysis,
+			      -seqfetcher => $sf,
+			      %hparams,
+			     );
 
-if (!defined $all) {
-    $runobj = "$runnable"->new(-dbobj    => $db,
-			       -input_id => $input_id,
-			       -analysis => $analysis,
-			       -seqfetcher => $sf,
-			       %hparams,
-			       );
-}
-elsif ($all) {
-    $runobj = "$runnable"->new(-dbobj    => $db,
-			       -analysis => $analysis,
-			       -seqfetcher => $sf,
-			       -input_id => $all,
-			       -all => $all,
-			       %hparams,
-			       );
-}
+$runobj->fetch_input;
+$runobj->run;
+ 
 
-#if ($all) {
-#    $runobj->pep_file($pepfile);
+
+
+$runobj->write_output;
+
+#my @out = $runobj->output;
+
+#foreach my $out (@out) {
+#    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
+#      print ($out->gffstring . "\n");
+#    } else {
+#      print $out->gffstring . "\n";
+#    }
 #}
 
-print STDERR "ALL: $all\n";
 
-if (!$all) {
-    $runobj->fetch_input;
-}
 
-$runobj->run;
 
- 
-my @out = $runobj->output;
-
-if ($write) {
-  $runobj->write_output;
-}
-foreach my $out (@out) {
-    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
-      print ($out->gffstring . "\n");
-    } else {
-      print $out->gffstring . "\n";
-    }
-}
 
