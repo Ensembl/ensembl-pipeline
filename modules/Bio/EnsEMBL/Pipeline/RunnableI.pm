@@ -310,8 +310,6 @@ sub create_FeaturePair {
                             -end            => $feat1->{end},
                             -strand         => $feat1->{strand},
                             -score          => $feat1->{score},
-                            -source_tag     => $feat1->{source},
-                            -primary_tag    => $feat1->{primary},
                             -percent_id     => $feat1->{percent},
                             -p_value        => $feat1->{p},
                             -analysis       => $analysis_obj);
@@ -322,8 +320,6 @@ sub create_FeaturePair {
                             -end            => $feat2->{end},
                             -strand         => $feat2->{strand},
                             -score          => $feat2->{score},
-                            -source_tag     => $feat2->{source},
-                            -primary_tag    => $feat2->{primary},
                             -percent_id     => $feat2->{percent},
                             -p_value        => $feat2->{p},
                             -analysis       => $analysis_obj);
@@ -473,8 +469,6 @@ sub create_SimpleFeature {
         -end         => $feat->{'end'},
         -strand      => $feat->{'strand'},
         -score       => $feat->{'score'},
-        -source_tag  => $feat->{'source'},
-        -primary_tag => $feat->{'primary'},
         -analysis    => $analysis_obj
     );  
 

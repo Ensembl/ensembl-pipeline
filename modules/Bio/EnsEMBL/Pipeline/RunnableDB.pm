@@ -84,7 +84,9 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
+    
+    my $self = {};
+    bless $self, $class;
     my ($dbobj,$input_id, $seqfetcher, 
 	$analysis) = $self->_rearrange([qw(DBOBJ 
 					   INPUT_ID
