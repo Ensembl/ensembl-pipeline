@@ -77,7 +77,19 @@ my $sequence_level = 1;
             'sequence_level!' => \$sequence_level,
             'default_version!' => \$default,
             'h|help'     => \$help,
-           );
+           ) or ($help = 1);
+
+if(!$dbhost || !$dbuser || !$dbname || !$dbpass){
+  print STDERR "Can't store sequence without database details\n";
+  print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
+    " -dbpass $dbpass\n";
+  $help = 1;
+}
+if(!$coord_system_name || !$seqfile){
+  print STDERR "Need coord_system_name and seqfile to beable to run\n";
+  print STDERR "-coord_system_name $coord_system_name -seqfile $seqfile\n";
+}
+
 if ($help) {
     exec('perldoc', $0);
 }
@@ -119,7 +131,6 @@ my $seqio = new Bio::SeqIO(
 
 
 while ( my $seq = $seqio->next_seq ) {
-  
 
   my @values = split /\s+/, $seq->desc;
   my $name = $values[0];
@@ -132,4 +143,5 @@ while ( my $seq = $seqio->next_seq ) {
                                       );
 
   $sa->store($slice, \$seq->seq);
+
 }

@@ -293,32 +293,35 @@ sub output {
 =cut
 
 sub create_feature {
-    my ($self, $feat) = @_;
-
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => $feat->{'program'},
-                            -program_version => $feat->{'program_version'},
-                            -gff_source      => $feat->{'source'},
-                            -gff_feature     => $feat->{'primary'});
-
-    #create and fill Bio::EnsEMBL::Seqfeature object
-    my $tRNA = Bio::EnsEMBL::SimpleFeature->new
-                        (   -seqname => $feat->{'name'},
-                            -start   => $feat->{'start'},
-                            -end     => $feat->{'end'},
-                            -strand  => $feat->{'strand'},
-                            -score   => $feat->{'score'},
-                            -analysis => $analysis_obj);  
-
-
-    $tRNA->display_label($feat->{'display_label'});
-    if ($tRNA){
+  my ($self, $feat) = @_;
+  
+  #create analysis object
+  my $analysis_obj = Bio::EnsEMBL::Analysis->new
+    (   -db              => undef,
+        -db_version      => undef,
+        -program         => $feat->{'program'},
+        -program_version => $feat->{'program_version'},
+        -gff_source      => $feat->{'source'},
+        -gff_feature     => $feat->{'primary'});
+  
+  #create and fill Bio::EnsEMBL::Seqfeature object
+  my $tRNA = Bio::EnsEMBL::SimpleFeature->new
+    (   -seqname => $feat->{'name'},
+        -start   => $feat->{'start'},
+        -end     => $feat->{'end'},
+        -strand  => $feat->{'strand'},
+        -score   => $feat->{'score'},
+        -analysis => $analysis_obj);  
+  
+  
+  $tRNA->display_label($feat->{'display_label'});
+  if ($tRNA)
+    {
+     
+      
       # add to _flist
       push(@{$self->{'_flist'}}, $tRNA);
     }
-  }
+}
 
 1;
