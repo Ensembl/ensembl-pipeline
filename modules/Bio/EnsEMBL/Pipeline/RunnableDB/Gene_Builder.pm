@@ -61,6 +61,14 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_DBUSER
 					 GB_DBPASS
 					 GB_FINAL_GENETYPE
+					 GB_GW_DBHOST
+					 GB_GW_DBNAME
+					 GB_GW_DBUSER
+					 GB_GW_DBPASS
+					 GB_COMB_DBHOST
+					 GB_COMB_DBNAME
+					 GB_COMB_DBUSER
+					 GB_COMB_DBPASS
 					 );
 use Data::Dumper;
 
@@ -264,7 +272,7 @@ sub write_output {
       #	foreach my $exon ($tran->get_all_Exons){
       #	  print STDERR $exon->contig->internal_id." ".$exon->start."-".$exon->end." ".($exon->end-$exon->start+1)."\n";
       #	}
-      }
+      #}
 
       eval {
       	$gene_adaptor->store($gene);
@@ -304,8 +312,8 @@ sub fetch_input {
       my $end   = $3;
     
       #print STDERR "Chr $chr - $start : $end\n";
-      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start-10000,$end+10000);
-      print STDERR "adding 10000 on either side, to compensante the edge effects from targetted_genewise: chr: $chr, start ".($start-10000).", end ".($end+10000)."\n";
+      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
+#      print STDERR "adding 10000 on either side, to compensante the edge effects from targetted_genewise: chr: $chr, start ".($start-10000).", end ".($end+10000)."\n";
       
       $contig->primary_seq;
 
@@ -316,16 +324,16 @@ sub fetch_input {
     }
     my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 							 '-host'   => $GB_GW_DBHOST,
-							 '-user'   => $GB_GW_DBNAME,
-							 '-dbname' => $GB_GW_DBUSER,
+							 '-user'   => $GB_GW_DBUSER,
+							 '-dbname' => $GB_GW_DBNAME,
 							 '-pass'   => $GB_GW_DBPASS,
 							 '-dnadb'  => $self->dbobj,
 							);
     
     my $comb_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     '-host'   => $GB_COMB_DBHOST,
-						     '-user'   => $GB_COMB_DBNAME,
-						     '-dbname' => $GB_COMB_DBUSER,
+						     '-user'   => $GB_COMB_DBUSER,
+						     '-dbname' => $GB_COMB_DBNAME,
 						     '-pass'   => $GB_COMB_DBPASS,
 						     '-dnadb'  => $self->dbobj,
 						    );
