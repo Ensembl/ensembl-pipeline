@@ -1,12 +1,11 @@
 #
 # Written by Jan-Hinnerk Vogel
+#
 # jhv [at] sanger.ac.uk
+#
 # Copyright GRL/EBI 2004
 #
 # You may distribute this module under the same terms as perl itself
-
-## run
-## output
 
 
 package Bio::EnsEMBL::Pipeline::Runnable::Slam;
@@ -24,96 +23,59 @@ use Bio::EnsEMBL::Analysis;
 
 
 # Inherits from Interface Bio::EnsEMBL::Pipeline::RunnableI
- @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 
 sub new {
   my ($class,@args) = @_;
-  my $self={};  #construct empty hash
+  my $self={};
   bless $self,$class;
 
-
   my (
-      $first_slice,
-      $first_slice_name,
-      $second_slice,
-      $second_slice_name,
-      $slam_bin,
-      $options
-      ) = $self->_rearrange([qw(
-				FIRST_SLICE
-				FIRST_SLICE_NAME
-				SECOND_SLICE
-				SECOND_SLICE_NAME				
-				SLAM_BIN
-				OPTIONS
-			       )
-			    ], @args
-			   );
+      $fasta1,                  # filename 1st fasta-seq
+      $fasta2,                  # filename 2nd fasta-seq
+      $approx_align,            # filename modified approximate alignement (.aat-File)
+      $org1,                    # name 1st organism (H.sapiens M.musculus R.norvegicus)
+      $org2,                    # name 2nd organism (H.sapiens M.musculus R.norvegicus)
+      $slam_bin,                # location slam_binary
+      $slam_pars_dir,           # location of Pars-dir
+      $minlength,               # min seq length
+      $workdir,                 # opt. work-directory
+      $debug,                   # opt. debug-option for slam
+      $verbose                  # opt. verbose-option for runnable
+     ) = $self->_rearrange([qw(
+                               FASTA1
+                               FASTA2
+                               APPROX_ALIGN
+                               ORG1
+                               ORG2
+                               SLAM_BIN
+                               SLAM_PARS_DIR
+                               MINLENGTH
+                               WORKDIR
+                               DEBUG
+                               VERBOSE
+                              )
+                           ], @args
+                          );
 
-      $self->{_output} = [];
+  $self->fasta1($fasta1);
+  $self->fasta2($fasta2);
+  $self->approx_align($approx_align);
 
+  $self->org1($org1);
+  $self->org2($org2);
 
-  ################################################################
-  # Setting $first_slice
+  $self->slam_bin($slam_bin);
+  $self->slam_pars_dir($slam_pars_dir);
 
-  if( $first_slice ){
-    unless ($first_slice->isa("Bio::PrimarySeqI") ) {
-      $self->throw("Query seq must be a Bio::SeqI or Bio::PrimarySeqI");
-    }
-    $self->set_first_slice( $first_slice );
-  }
-  else{
-    $self->throw("Slam needs a first  slice-object: $first_slice ");
-  }
+  $self->minlength($minlength);
 
+  $self->workdir($workdir);
+  $self->debug($debug);
+  $self->verbose($verbose);
 
-  ################################################################
-  # Setting $second_slice
-
-  if( $second_slice ){
-    unless ($second_slice->isa("Bio::PrimarySeqI") ) {
-      $self->throw("Query seq must be a Bio::SeqI or Bio::PrimarySeqI");
-    }
-    $self->set_second_slice( $second_slice );
-  }
-  else{
-    $self->throw("Slam needs a second  slice-object: $second_slice ");
-  }
-
-  ################################################################
-  # Name of $first_slice
-
-  if ( $first_slice_name) {
-    $self->setSliceName("first_slice",$first_slice_name);
-  }else {
-    $self->setSliceName("first_slice");
-  }
-
-  ################################################################
-  # Name of $second_slice
-  if ( $second_slice_name) {
-    $self->setSliceName("second_slice",$second_slice_name);
-  }else {
-    $self->setSliceName("second_slice");
-  }
-
-  ################################################################
-  # Path to used slam-binary if not provided by call
-
-  if ($slam_bin) {
-      $self->set_slam_bin($slam_bin);
-  } else {
-      $self->set_slam_bin('/nfs/acari/jhv/slam/prog/slam.pl');
-  }
-
-  #################################################################
-  # Passing additional options to basic options for calling slam.pl
-
-  my $basic_options = " ";
-  if ($options){    $basic_options .= " ".$options; }
-  $self->options( $basic_options);
-
+  $self->printvars;
   return $self;
 }
 
@@ -121,164 +83,252 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-#  unlink $self->_query_file;
+  $self->deletefiles;
 }
 
 
-
-####runn
-####################################################################################runn
-################################################################################ 
 
 sub run {
   my ($self) = @_;
 
-  # name of results file
-  $self->results($self->workdir . "/results.$$");
+  my $gcdir  = $self->getgcdir;
+  my $fasta1 = $self->fasta1;
+  my $fasta2 = $self->fasta2;
 
-  $self->_write_first_seq;
-  $self->_write_second_seq;
+  my $command =  $self->slam_bin .
+    " -a ".$self->approx_align .
+      " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
+        " -org1 ".$self->org1 .
+          " -org2 ".$self->org2 .
+                  " -prefix my_prefix";
 
-    my $command =  $self->{_slam_bin} .
-                    " ".$self->{_first_filename} .
-		      " ".$self->{_second_filename} .
-			" ".$self->options;
+  $command .= " -v " if $self->verbose;
+  $command .= " -debug " if $self->debug;
 
-  print STDERR "Exonerate command : $command\n"     if $self->_verbose;
+  print "slam-command; $command\n" if $self->verbose;
 
+#  open( EXO, "$command |" ) || $self->throw("Error running Slam $!");
+#  close(EXO);
 
-  $command =  $self->{_slam_bin} ." query_first_slice.11548 query_second_slice.11548";
-
-
-  open( EXO, "$command |" ) || $self->throw("Error running Slam $!");
-#  $self->parse_results(\*EXO);
-  close(EXO);
+  # adding written files to array of files to delete
+  $self->files_to_delete($fasta1);
+  $self->files_to_delete($fasta2);
 
 
+  print "workdir;",  $self->workdir;
+  
+  $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
+  $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
 
-
+  $self->file($fasta1."_".$fasta2.".cns");
+print "cnsfile : ".$fasta1."_".$fasta2.".cns\n";
 
   return 1
 }
 
+sub files_to_delete {
+  my ($self,$file) = @_;
 
-
-
-
-
-############################################################
-# get/set methods  setti
-############################################################
-
-sub set_first_slice {
-  my ($self,$fslice) = @_;
-  if ($fslice) {
-    $self->{_first_slice} = $fslice;
+  $file=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
+  my @suffix = qw (.gff .rna .pep );
+  foreach (@suffix){
+    $self->file($file.$_);
   }
+  return;
 }
 
-sub set_second_slice {
-  my ($self,$sslice) = @_;
-  if ($sslice) {
-    $self->{_second_slice} = $sslice;
+#-------------------- START taken from slam.pl --------------------
+sub getgcdir{
+  my $self = shift;
+
+  my $seq1 = $self->fasta1;
+  my $seq2 = $self->fasta2;
+
+  my $org1 = $self->org1;
+  my $org2 = $self->org2;
+
+  my $gcdirs = {
+    'H.sapiens_M.musculus' => [
+      [ 0,  43],
+      [43,  51],
+      [51,  57],
+      [57, 100]
+    ],
+  },
+
+  my $pairName = sprintf("%s_%s",$org1,$org2);
+  my $gcdir;
+
+  if(exists($gcdirs->{$pairName})) {
+    print "We have paramter bins defined for this organism pair.\n";
+
+    my($seqStream,$seqObj);
+
+    open(SEQ1,$seq1) || die "Can't open $seq1 for read: $!.\n";
+    $seqStream = Bio::SeqIO->new(-fh => \*SEQ1, -format => 'Fasta');
+    $seqObj = $seqStream->next_seq();
+    my $gc1 = &gccontent($seqObj);
+    close SEQ1;
+
+    open(SEQ2,$seq2) || die "Can't open $seq2 for read: $!.\n";
+    $seqStream = Bio::SeqIO->new(-fh => \*SEQ2, -format => 'Fasta');
+    $seqObj = $seqStream->next_seq();
+    my $gc2 = &gccontent($seqObj);
+    close SEQ2;
+
+    my $len1 = &seqLen($seq1); ## HERE
+    my $len2 = &seqLen($seq2); ## HERE
+    my $gc = (($gc1 * $len1) + ($gc2 * $len2)) / ($len1 + $len2);
+
+    $gcdir = undef;
+    my $nBins = scalar(@{$gcdirs->{$pairName}});
+    for(my $i=0; $i<$nBins; $i++) {
+      if(($gc > $gcdirs->{$pairName}[$i][0]) && ($gc <= $gcdirs->{$pairName}[$i][1])) {
+        $gcdir = sprintf("bin%d",$i+1);
+        last;
+      }
+    }
+    die "Didn't find a GC dir for GC content $gc.\n" if(!defined($gcdir));
+  } else {
+    # No binning for this organism pair.
+    $gcdir = "bin1";
   }
+  my $pardir = sprintf("%s/%s_%s/%s",$self->slam_pars_dir,$org1,$org2,,$gcdir);
+  return($pardir);
 }
 
-sub set_slam_bin {
+
+sub gccontent{
+  my($seq) = @_;
+
+  my $tempSeq = $seq->seq();
+  my $n = length($tempSeq);
+  my(@nGC) = ($tempSeq =~ /[GC]/gi);
+
+  return(100*scalar(@nGC)/$n);
+}
+
+sub seqLen {
+  my($seqFile) = @_;
+
+  open(SEQFILE,$seqFile) || die "Can't open $seqFile for read\n";
+  my $seqStr = Bio::SeqIO->new(-fh => \*SEQFILE, -format => 'Fasta' );
+  my $seq = $seqStr->next_seq();
+  my $len = length($seq->seq());
+  close SEQFILE;
+
+  return $len;
+}
+
+#-------------------- END taken from slam.pl --------------------
+sub fasta1 {
+  my $self = shift;
+
+  $self->{_fasta1} = shift   if (@_);
+  return $self->{_fasta1}
+}
+
+
+sub fasta2 {
+  my $self = shift;
+
+  $self->{_fasta2} = shift   if (@_);
+  return $self->{_fasta2}
+}
+
+
+sub approx_align {
+  my $self = shift;
+
+  $self->{_approx_align} = shift   if (@_);
+  return $self->{_approx_align}
+}
+
+
+sub org1{
+  my ($self,$org1) = @_;
+
+  $self->{_org1} = 'H.sapiens' if (!defined $org1 && !defined $self->{_org1});
+  $self->{_org1} = $org1 if (defined $org1);
+  return $self->{_org1};
+}
+
+sub org2{
+  my ($self,$org2) = @_;
+
+  $self->{_org2} = 'M.musculus' if (!defined $org2 && !defined $self->{_org2});
+  $self->{_org2} = $org2 if (defined $org2);
+  return $self->{_org2};
+}
+
+
+sub slam_bin {
   my ($self, $location) = @_;
-  if ($location) {
+
+  if (defined $location) {
+    $self->{_slam_bin} = $location;
     $self->throw("Slam not found at $location: $!\n") unless (-e $location);
-    $self->{_slam_bin} = $location ;
   }
+  $self->{_slam_bin} = '/nfs/acari/jhv/bin/slam' if (!defined $location && !defined $self->{_slam_bin});
+
   return $self->{_slam_bin};
 }
 
 
-sub _write_first_seq {
-  my ($self)     = shift;
-  my $name       = $self->{_first_slice_name};
-  my $slice      = $self->{_first_slice};
-  my $filename   = $self->workdir."/query_" . "$name.$$";
-     $self->{_first_filename}=$filename;
-  my $seqout     = Bio::SeqIO->new('-file'   => ">$filename" , '-format' => 'Fasta' );
-     $seqout->write_seq($slice);
-}
+sub slam_pars_dir {
+  my ($self, $pars_dir) = @_;
 
-sub _write_second_seq {
-  my ($self)     = shift;
-  my $name       = $self->{_second_slice_name};
-  my $slice      = $self->{_second_slice};
-  my $filename   = $self->workdir."/query_" . "$name.$$";
-     $self->{_second_filename}=$filename;
-  my $seqout     = Bio::SeqIO->new('-file'   => ">$filename" , '-format' => 'Fasta' );
-     $seqout->write_seq($slice);
-}
-
-sub output {
-  my ($self, @output) = @_;
-
-  if (@output) {
-    unless( $self->{_output} ){
-      $self->{_output} = [];
-    }
-    push( @{$self->{_output}}, @output );
+  if (defined $pars_dir) {
+    $self->{_slam_pars_dir} = $pars_dir;
+    $self->throw("Slam not found at $pars_dir: $!\n") unless (-e $pars_dir);
   }
-  return @{$self->{_output}};
+  $self->{_slam_pars_dir} = '/nfs/acari/jhv/lib/slam_pars_dir' if (!defined $pars_dir && !defined $self->{_slam_pars_dir});
+  return $self->{_slam_pars_dir};
 }
 
 
 
+sub minlength{
+  my ($self,$minlength) =@_;
 
+  $self->{_minlength} = 250 if (!defined $minlength && !defined $self->{_minlength});
+  $self->{_minlength} = $minlength if (defined $minlength);
+  return $self->{_minlength};
+}
 
 
 ############################################################
 
+sub debug{
+  my ($self,$debug) = @_;
 
-
-
-
-sub _verbose {
-  my $self = shift;
-  if (@_){
-    $self->{_verbose} = shift;
-  }
-  return $self->{_verbose}
+  $self->{_debug} = '0' if (!defined $debug && !defined $self->{_debug});
+  $self->{_debug} = $debug if (defined $debug);
+  return $self->{_debug};
 }
 
 
-sub setSliceName {
-  my ($self,$target,$name) = @_;
-  if ($target eq "first_slice"){
-    if (!$name){
-      $self->{_first_slice_name}="first_slice";
-    }else{
-      $self->{_first_slice_name}=$name;
-    }
-  }elsif ($target eq "second_slice") {
-    if (!$name){
-      $self->{_second_slice_name}="second_slice";
-    }else{
-      $self->{_second_slice_name}=$name;
-    }
-  }
+sub verbose{
+  my ($self,$verbose) = @_;
+
+  $self->{_verbose} = '0' if (!defined $verbose && !defined $self->{_verbose});
+  $self->{_verbose} = $verbose if (defined $verbose);
+  return $self->{_verbose};
 }
 
-sub getSliceNames {
-  my $self = shift;
-  my @sliceNames = ($self->_second_slice_name,$self->_first_slice_name);
-  return @sliceNames;
-}
 
-sub pH {
+
+
+sub printvars {
   my $self = shift;
   my %tmp = %{$self};
 
   print "Key:\t\t\tValue:\n";
   print "------------------------------\n";
-  
   foreach (keys %tmp) {
     print "-$_-\t\t\t-$tmp{$_}-\n";
   }
+  print "------------------------------\n";
 }
 
 1;
