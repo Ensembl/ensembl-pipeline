@@ -97,7 +97,7 @@ if(!$cs_name || !$seqfile){
   $help = 1;
 }
 if($agp && $sequence_level){
-  print STDERR ("Can't use an agp file ".$seq_file." to store a ".
+  print STDERR ("Can't use an agp file ".$seqfile." to store a ".
                 "sequence level coordinate system ".$cs_name."\n");
   $help = 1;
 }
