@@ -425,7 +425,7 @@ sub get_Sequence {
   
   my $seq;
   eval {
-    $seq = $seqfetcher->run_pfetch($id);
+    $seq = $seqfetcher->get_Seq_by_acc($id);
   };
   
   if ($@) {
