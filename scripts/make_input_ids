@@ -56,7 +56,10 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -non_redundant fetch all non redundant pieces
 
     -input_type if you want to override the standard input_id types
-
+    -seq_level if you want the ids for the seq_level seq_regions, can
+    work with slice_size but the -slice options isn't required
+    -top_level if you want the ideas for the top_level regions, again can
+    work with slice_size but -slice isn't needed
 =head1 EXAMPLES
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
@@ -120,6 +123,9 @@ my $help = 0;
 my $translation_id;
 my $non_redundant;
 my $name = 'genome';
+my $seq_level;
+my $top_level;
+
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -140,6 +146,8 @@ my $name = 'genome';
             'single_name:s'=> \$name,
             'verbose'      => \$verbose,
             'translation_ids' => \$translation_id,
+            'seq_level' => \$seq_level,
+            'top_level' => \$top_level,
             'non_redundant' => \$non_redundant,
             'h|help'            => \$help,
            );
@@ -160,11 +168,24 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -port   => $port,
                                                       -dbname => $dbname);
 
+if($seq_level && $top_level){
+  print STDERR "YOU can get both the seq_level and top_level ids at the ".
+    "same time\n";
+  exec('perldoc', $0);
+
+}
+if($seq_level){
+  $slice = 1;
+  $coord_system = 'seqlevel';
+}elsif($top_level){
+  $slice = 1;
+  $coord_system = 'toplevel';
+}
 
 if (!($slice) && !($single) && !($file) && !($translation_id) 
     && !($non_redundant)) {
   throw("Must define input as either contig, slice, file, translation_id ".
-  "or single");
+  "single, seq_level or top_level");
   exec('perldoc', $0);
 }
 
