@@ -153,7 +153,7 @@ sub run {
         my $db_basename = basename($db);
         my $tmpdb_check;
         
-        if ( $db_basename =~ /vertrna/ || $db_basename =~ /emew/) {
+        if ( $db_basename =~ /vertrna/ || $db_basename =~ /emnew/) {
             local $/ = "\n>";
             
             # open /data/blastdb/Ensembl/dbname for reading
@@ -174,19 +174,37 @@ sub run {
             close(BLASTDB);
             close(REFORMATTED_BLASTDB);
             
-            #flag reformated blastdb for deletion
+            #flag reformated blastdb for deletion 
             $tmpdb_check = 1;
         }
-    
-    my $command = "$blat $db $gen_query $options " . $self->results;
-    print $command, "\n";
-    $self->throw("$command\nFailed during BLAT run $!") unless ( system($command) == 0 );
-    
-    unlink($db) if $tmpdb_check;
+        
+        my $db_chunks = 3;
+        #split the databases into smaller chunks
+        my $split_command = "/nfs/acari/searle/progs/fastasplit/fastasplit " .$db." ". $db_chunks." ".$self->workdir;
+        
+        $self->throw("$split_command\nFailed during BLAT run $!") unless ( system($split_command) == 0 );
+        
+        for (my $i = 0; $i < $db_chunks; $i++) {
+            my $chunk_suffix = sprintf("_chunk_%07d",$i);
+
+            my $chunk_db = join( '/',$self->workdir, $db_basename.$chunk_suffix );        
+            
+            warn $chunk_db;
+            
+            my $command = "$blat $chunk_db $gen_query $options " . $self->results;
+            print $command, "\n";
+            $self->throw("$command\nFailed during BLAT run $!") unless ( system($command) == 0 );
+
+            $self->parse_results();
+
+            unlink($chunk_db);
+            unlink($db) if $tmpdb_check;
+        
+        }
+        
     
     }
     
-    $self->parse_results();
     #close BLAT or die "Error running blat pipe '$cmd' : exit($?)";
     $self->deletefiles;
 }
