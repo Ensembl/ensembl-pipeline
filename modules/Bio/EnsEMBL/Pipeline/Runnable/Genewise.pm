@@ -1,5 +1,3 @@
-
-
 =pod
 
 =head1 NAME
@@ -148,10 +146,7 @@ sub _align_protein {
   $proio = undef;
 
   my $genewise = $self->genewise;
-  if(!defined $genewise || $genewise eq ''){
-    $self->throw("genewise executable not set!\n");
-  }
-
+#  my $command = "/nfs/acari/birney/wise2-bin-snapshot/genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
   my $command = "$genewise $protfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
   if ($self->endbias == 1) {
@@ -162,7 +157,7 @@ sub _align_protein {
     $command .= " -trev ";
   }
   
- #print STDERR "Command is $command\n";
+  print STDERR "Command is $command\n";
   
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 
@@ -172,14 +167,27 @@ sub _align_protein {
   my $curr_gene;
 
   # making assumption of only 1 gene prediction ... this will change once we start using hmms
- GENESF: while (<GW>) {
+
+  print STDERR "################# GENEWISE ####################\n";
+ GENESF: 
+  while (<GW>) {
+    
+    #print STDERR "$_";
+   
     chomp;
     my @f = split;
-
+   
+    if ( $f[0] =~/Query Protein/ ){
+      print STDERR $_."\n";
+    }
+ 
     next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting'));
     
+    print STDERR $_."\n";
     if($f[0] eq 'Gene'){
       # flag a frameshift - ultimately we will do something clever here but for now ...
+      
+      # frameshift is here defined as two or more genes produced by Genewise from a single protein
       if (/^(Gene\s+\d+)$/){
 	if(!defined($curr_gene)){
 	  $curr_gene = $1;
@@ -189,7 +197,7 @@ sub _align_protein {
 	}
       }
     }
-
+    
     elsif($f[0] eq 'Exon'){
       #      make a new "exon"
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
@@ -198,8 +206,9 @@ sub _align_protein {
       $curr_exon->source_tag('genewise');
       $curr_exon->primary_tag('similarity');
 
+      print STDERR "setting phase to $f[4]\n";
       $curr_exon->phase($f[4]);
-
+      
       my $start  = $f[1];
       my $end    = $f[2];
       my $strand = 1;
@@ -208,7 +217,13 @@ sub _align_protein {
 	$start  = $f[2];
 	$end    = $f[1];
       }
-      
+      # end phase is the number of bases at the end of the exon which do not 
+      # fall in a codon and it coincides with the phase of the following exon.
+      my $exon_length = $end - $start + 1;
+      my $end_phase   = ( $exon_length + $curr_exon->phase ) %3;
+      print STDERR "setting end_phase to $end_phase\n";
+      $curr_exon->end_phase($end_phase);
+
       $curr_exon->start($start);
       $curr_exon->end($end);
       $curr_exon->strand($strand);
@@ -261,6 +276,8 @@ sub _align_protein {
   
   close(GW) or $self->throw("Error running genewise:$!\n");
   
+  
+
   unlink $genfile;
   unlink $protfile;
   unlink $gwfile;
