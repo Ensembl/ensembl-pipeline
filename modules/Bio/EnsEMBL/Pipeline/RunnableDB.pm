@@ -226,8 +226,12 @@ sub output {
       $self->{'_output'} = [];
     } 
 
-    @{$self->{'_output'}}=$self->runnable->output;
-
+    my @r = $self->runnable;
+    if(defined (@r) && scalar(@r)){
+      foreach my $r($self->runnable){
+	push(@{$self->{'_output'}}, $r->output);
+      }
+    }
     return @{$self->{'_output'}};
 }
 
@@ -261,7 +265,7 @@ sub run {
 
 sub runnable {
   my ($self,$arg) = @_;
-  
+
   if (!defined($self->{'_runnables'})) {
       $self->{'_runnables'} = [];
   }
