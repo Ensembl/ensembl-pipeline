@@ -27,8 +27,8 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Bio::EnsEMBL::PerlDB::Contig;
-use Bio::EnsEMBL::PerlDB::Clone;
+use Bio::EnsEMBL::RawContig;
+use Bio::EnsEMBL::Clone;
 use Getopt::Long;
 
 my $dbtype = 'rdb';
@@ -80,16 +80,19 @@ while ( my $seq = $seqio->next_seq ) {
     my $cloneid= $seq->id;
     my $contigid = $cloneid.".1";
     $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
-    my $clone     = new Bio::EnsEMBL::PerlDB::Clone;
-    my $contig    = new Bio::EnsEMBL::PerlDB::Contig;
+    my $clone     = new Bio::EnsEMBL::Clone;
+    my $contig    = new Bio::EnsEMBL::RawContig;
     $clone->htg_phase(-1);
     $clone->id($cloneid);
     $clone->version(1);
     $clone->embl_id("");
     $clone->embl_version(0);
-    $contig->id($contigid);
-    $contig->internal_id($count++);
+    my $now = time;
+    $clone->created($now);
+    $clone->modified($now);
+    $contig->name($contigid);
     $contig->seq($seq);
+    $contig->embl_offset(1);
     $clone->add_Contig($contig);
     if ($write) {
        eval {
@@ -100,9 +103,9 @@ while ( my $seq = $seqio->next_seq ) {
          print STDERR "Could not write clone into database, error was $@\n";
        }
        if ($pipe) {
-          my $sth = $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values('".$contigid."','contig',1,now())");
+          my $sth = $db->prepare("insert into input_id_analysis (input_id,class,analysis_id,created) values('".$contigid."','contig',1,now())");
          $sth->execute;
-         $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
+         $verbose && print STDERR "Written input_id_analysis entry for ".$clone->id."\n";
        }
     }
 }
