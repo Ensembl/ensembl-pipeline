@@ -406,10 +406,19 @@ sub calculate_and_set_phases {
     $self->throw("Mismatch in number of genes and peptides parsed from file") 
             unless (scalar(@genes) == scalar (@peptides));
     
-    #Genscan phases are just the result of modulo 3 division.
+    #Genscan phases are just the result of modulo 3 division which is useless.
     #Correct calculation of phases requires the sequence to be translated into
     #all three reading frames and compared against the genscan predicted peptide
-    #sequence. This is a fairly messy way of doing it. 
+    #sequence. This is a fairly messy but simple way of doing it. 
+    #DEFINITION OF PHASE - bloody hard to find!
+    #"Spliceosomal introns may be classified according to their position
+    #relative to the reading frame of the gene (Sharp, 1981): introns lying
+    #between two codons (phase 0); introns interrupting a codon between the
+    #first and second base (phase 1); and introns interrupting a codon between
+    #the second and third base (phase 2)."
+    #Sharp, P.A. (1981). Speculations on RNA splicing
+    #Cell 23:643-46
+    
     for (my $index=0; $index < scalar(@genes); $index++)
     {
         my $peptide = $peptides[$index];
@@ -444,7 +453,7 @@ sub calculate_and_set_phases {
                 next if (($trans_seq =~ /\*/) && ($trans_seq!~ /\*$/));
                 if ($peptide =~ /$trans_seq/)
                 {
-                    $phase_5 = $frame; 
+                    $phase_5 = (3-$frame)%3; #because phase 1 is frame 2 etc
                     $phase_3 = ($modulo - $frame) % 3;
                 }
             }
