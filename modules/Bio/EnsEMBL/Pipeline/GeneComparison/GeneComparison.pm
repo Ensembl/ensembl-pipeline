@@ -330,7 +330,7 @@ sub cluster_Genes {
 
 =head2 pair_Genes
 
-  This method crates one GeneCluster object per benchmark gene and then PAIR them with predicted genes
+  This method creates one GeneCluster object per benchmark gene and then PAIR them with predicted genes
   according to their exon overlap. As a default it takes the genes stored in the GeneComparison object 
   as data fields (or attributes) '_gene_array1' and '_gene_array2'. It can also accept instead as argument
   an array of genes to be paired, but then information about their gene-type is lost (to be solved). 
@@ -674,9 +674,7 @@ sub compare_CDS{
             in gene_array1 with respect to gene_array2. It also gives a generic exon_mismatch result.
             Setting the flag 'coding' in the arguments we can compare the CDSs
   
-  Example : look in ...ensembl/misc-scripts/utilities/run_GeneComparison for a pipeline-like example
-  Returns : a hash with the arrays of transcript pairs (each pair being a Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster)
-            as values, and the number of missing exons as keys, useful to make a histogram
+  Returns : a hash with the arrays of transcript pairs (each pair being a Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster) as values, and the number of missing exons as keys, useful to make a histogram
   Args    : an arrayref of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster objects 
 
 =cut
@@ -701,13 +699,6 @@ sub compare_Exons{
 
   my $total_prediction_length  = 0; # denominator in the computation of the specificity
                                     #  ( = TruePositive + FalsePositive )
-
-  my $sum_sensitivity          = 0;
-  my $sum_specificity          = 0;
-  my $average_sensitivity      = 0;
-  my $average_specificity      = 0;
-  my $total_sensitivity        = 0;
-  my $total_specificity        = 0;
 
   if ( !defined( $clusters ) ){
     $self->throw( "Must pass an arrayref of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster objects");
@@ -758,9 +749,11 @@ sub compare_Exons{
     my @pred_doubled;
     if ( $ann_unpaired ){
       push ( @ann_unpaired , @{ $ann_unpaired }  );
+      $total_annotation_length  += $self->_get_length_of_Transcripts( $ann_unpaired );
     }
     if ( $pred_unpaired ){
       push ( @pred_unpaired, @{ $pred_unpaired } );
+      $total_prediction_length  += $self->_get_length_of_Transcripts( $pred_unpaired );
     }
     if ( $ann_doubled ){ 
       push ( @ann_doubled  , @{ $ann_doubled }   );    
@@ -780,7 +773,7 @@ sub compare_Exons{
       $pairs_count++;
       
       # we match the exons in the pair
-      my ($printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats) = 
+      my ($printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats, $matchlength_stats) = 
 	$self->_match_Exons($pair, $coding);
   
       # where 
@@ -789,7 +782,7 @@ sub compare_Exons{
       # $over_stats                      = [ $over_exon_count    , \%over_exon_position      ];
       # $mismatch_stats                  = [ $exon_mismatch_count                            ];
       # $match_stats                     = [ $exon_pair_count    , $thispair_exact_matches   ];
-      
+      # $matchlength_stats               = [ $prediction_matched, $annotation_length, $prediction_length ]; 
 
       my $missing_exon_count             = $$missing_stats[0];
       my %thispair_missing_exon_position = %{ $$missing_stats[1] };
@@ -801,6 +794,15 @@ sub compare_Exons{
       
       my $thispair_exon_pair_count       = $$match_stats[0];
       my $thispair_exact_matches         = $$match_stats[1];
+
+      # numerator in the computation of the sensitivity/specificity ( = TruePositive )
+      $total_prediction_matched += $$matchlength_stats[0]; 
+
+      # denominator in the computation of the sensitivity  ( = TruePositive + FalseNegative ) 
+      $total_annotation_length  += $$matchlength_stats[1];
+      
+      # denominator in the computation of the specificity  ( = TruePositive + FalsePositive )
+      $total_prediction_length  += $$matchlength_stats[2];
 
       #$exon_mismatch_count = $missing_exon_count + $over_exon_count;
       push ( @{ $missing{ $missing_exon_count } }    , $pair );
@@ -835,10 +837,24 @@ sub compare_Exons{
   print STDERR "Transcripts unpaired: ".scalar( @total_ann_unpaired )." from annotation, and ". 
     scalar( @total_pred_unpaired )." from prediction\n";
   foreach my $tran ( @total_ann_unpaired ){
-    print STDERR $tran->stable_id."\n";
+    my $id;
+    if ( $tran->stable_id ){
+      $id = $tran->stable_id;
+    }
+    elsif ( $tran->dbID ){
+      $id = $tran->dbID;
+    }
+    print STDERR $id."\n";
   }
   foreach my $tran ( @total_pred_unpaired ){
-    print STDERR $tran->stable_id."\n";
+    my $id;
+    if ( $tran->stable_id ){
+      $id = $tran->stable_id;
+    }
+    elsif ( $tran->dbID ){
+      $id = $tran->dbID;
+    }
+    print STDERR $id."\n";
   }
 
   print STDERR "Transcripts repeated: ".scalar( @total_ann_doubled )." from annotation, and ".
@@ -863,6 +879,13 @@ sub compare_Exons{
   }
   print STDERR "\n";
 
+  # print out sensitivity/specificity of the prediction
+  my $sensitivity = $total_prediction_matched/$total_annotation_length;
+  my $specificity = $total_prediction_matched/$total_prediction_length;
+  print STDERR "According to length of the prediction and benchmark:\n";
+  print STDERR "sensitivity = $sensitivity\n";
+  print STDERR "specificity = $specificity\n\n";
+  
   # print out the transcripts pairs with at least one exon missing
   print STDERR "Exons of genes ".$message1." which are missing in genes ".$message2.":\n";
   foreach my $key ( sort { $a <=> $b } ( keys( %missing ) ) ){
@@ -901,6 +924,7 @@ sub compare_Exons{
 }
 
 ####################################################################################
+
 
 =head2 _match_Exons()
   
@@ -1035,6 +1059,9 @@ sub _match_Exons{
 	
 	# or there is a mismatch in the number of bases
 	else{              
+	  my $overlap = $self->_exon_Overlap($ann_exons[$i],$pred_exons[$j]);
+	  $prediction_matched += $overlap;
+
 	  my $message = '';
 	  if ( $ann_exons[$i]->start != $pred_exons[$j]->start ){
 	    my $mismatch = ($ann_exons[$i]->start - $pred_exons[$j]->start);
@@ -1117,17 +1144,79 @@ sub _match_Exons{
   }       # end of EXONS1 loop
 
   # stats
-  $exon_mismatch_count = $over_exon_count + $missing_exon_count;
-  my $missing_stats  = [ $missing_exon_count , \%missing_exon_position ];
-  my $over_stats     = [ $over_exon_count    , \%over_exon_position    ];
-  my $mismatch_stats = [ $exon_mismatch_count                          ];
-  my $match_stats    = [ $exon_pair_count    , $exact_matches          ];
+  $exon_mismatch_count  = $over_exon_count + $missing_exon_count;
+
+  my $missing_stats     = [ $missing_exon_count , \%missing_exon_position ];
+  my $over_stats        = [ $over_exon_count    , \%over_exon_position    ];
+  my $mismatch_stats    = [ $exon_mismatch_count                          ];
+  my $match_stats       = [ $exon_pair_count    , $exact_matches          ];
+  my $matchlength_stats = [ $prediction_matched, $annotation_length, $prediction_length ];
 
   # we return printout{ pair }{ exon_number } = [ exon/no link, exon/no link, extra comments ]
-  return ( $printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats );
+  return ( $printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats , $matchlength_stats);
 }
 
 ####################################################################################
+
+sub _exon_Overlap{
+  my ($self, $exon1,$exon2) = @_;
+  my $strand1 = $exon1->strand;
+  my $strand2 = $exon2->strand;
+  if ( $strand1 =! $strand2 ){
+    print STDERR "Odd - comparing exons in different strands\n";
+    return 0;
+  }
+  my $s1 = $exon1->start;
+  my $s2 = $exon2->start;
+  my $e1 = $exon1->end;
+  my $e2 = $exon2->end;
+
+  my $overlap = 0;
+  if ( $s1 <= $s2 && $e1 >= $s2 ){
+    if ( $e1 <= $e2 ){
+      $overlap = $e1 - $s2 + 1;
+    }
+    if ( $e1 > $e2 ){
+      $overlap = $e2 - $s2 + 1;
+    }
+  }
+  if ( $s1 >= $s2 && $s1 <= $e2 ){
+    if ( $e1 <= $e2 ){
+      $overlap = $e1 - $s1 + 1;
+    }
+    if ( $e1 > $e2 ){
+      $overlap = $e2 - $s1 + 1;
+    }
+  }
+  
+  return $overlap;
+}
+
+
+####################################################################################
+
+sub _get_length_of_Transcripts {
+  my ($self,$arrayref) = @_;
+  my @transcripts = @$arrayref;
+  if ( @transcripts ){
+   unless ( $transcripts[0]->isa('Bio::EnsEMBL::Transcript') ){
+     $self->warn("you must pass an arrayref of Bio::EnsEMBL::Transcript objects");
+   }
+   my $total_exon_length;
+   foreach my $transcript ( @transcripts){
+     foreach my $exon ( $transcript->get_all_Exons ){
+       $total_exon_length += $exon->length;
+     }
+   }
+   return $total_exon_length;
+  }
+  else{
+   return 0;
+  }
+}
+
+####################################################################################
+
 
 sub input_id {  my $self = shift @_;
   my ($chr,$chrstart,$chrend) = @_;
@@ -1138,6 +1227,9 @@ sub input_id {  my $self = shift @_;
   }
   return ( $self->{'_chr_name'}, $self->{'_chr_start'}, $self->{'_chr_end'} );
 }
+
+
+
 
 ####################################################################################
 
@@ -1884,7 +1976,189 @@ sub flush_gene_Clusters {
 
 #####################################################################################
 
+=head2
+  
+  This method compares the genomic lengths spanned by the prediction and the benchmark exons.
+  It takes all the ranges of genomic sequece as a 1-dimensional projection of the exons from both sides and
+  calculates the overlap relative to each total length.
 
+=cut
 
+sub exon_Coverage{
+  my ($self,$ann_genes,$pred_genes) = @_;
+  
+  # first get all exons
+  my @ann_exons;
+  my @pred_exons;
+  foreach my $tran ( @$ann_genes ){
+    push ( @ann_exons, $tran->get_all_Exons );
+  }
+  foreach my $tran ( @$pred_genes ){
+    push ( @pred_exons, $tran->get_all_Exons );
+  }
+
+  # now cluster the exons for each side
+  my $ann_cluster_list  = $self->_cluster_Exons( @ann_exons  );
+  my $pred_cluster_list = $self->_cluster_Exons( @pred_exons );
+
+  # get the list of ranges in each side:
+  my @ann_ranges  = $ann_cluster_list->sub_SeqFeature;
+  my @pred_ranges = $pred_cluster_list->sub_SeqFeature;
+
+  # calculate the length of genome covered by each set of exons:
+  my $ann_length  = 0;
+  my $pred_length = 0;
+  foreach my $range ( @ann_ranges ){
+    $ann_length += $range->end - $range->start + 1;
+  }
+  foreach my $range ( @pred_ranges ){
+    $pred_length += $range->end - $range->start + 1;
+  }
+  
+  # now calculate the length of overlap between exons
+  my $overlap_length = 0;
+  foreach my $ann_range ( @ann_ranges ){
+    foreach my $pred_range ( @pred_ranges ){
+      unless ( $pred_range->start > $ann_range->end || $pred_range->end < $ann_range->start ){
+	$overlap_length += $self->_exon_Overlap($ann_range, $pred_range);
+      }
+    }
+  }
+  
+  print STDERR "Total length of prediction: $pred_length\n";
+  print STDERR "                annotation: $ann_length\n";
+  print STDERR "                   overlap: $overlap_length\n\n";
+  
+  my $sensitivity = $overlap_length/$ann_length;
+  my $specificity = $overlap_length/$pred_length;
+
+  print STDERR "               Sensitivity: $sensitivity\n";
+  print STDERR "               Specificity: $specificity\n";
+
+}  
+
+############################################################
+
+=head2
+
+ Title   : _cluster_Exons
+ Function: it cluster exons according to exon overlap,
+           it returns a Bio::EnsEMBL::SeqFeature, where the sub_SeqFeatures
+           are exon_clusters, which are at the same time Bio::EnsEMBL::SeqFeatures,
+           whose sub_SeqFeatures are exons
+=cut
+
+sub _cluster_Exons{
+  my ($self, @exons) = @_;
+
+  # no point if there are no exons!
+  return unless ( scalar( @exons) > 0 );   
+
+  # keep track about in which cluster is each exon
+  my %exon2cluster;
+  
+  # main cluster feature - holds all clusters
+  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  
+  # sort exons by start coordinate
+  @exons = sort { $a->start <=> $b->start } @exons;
+
+  # Create the first exon_cluster
+  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  
+  # Start off the cluster with the first exon
+  $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
+  $exon_cluster->strand($exons[0]->strand);    
+  $cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');
+  
+  # Loop over the rest of the exons
+  my $count = 0;
+
+ EXON:
+  foreach my $exon (@exons) {
+    if ($count > 0) {
+      my $overlap = $self->_exon_Overlap($exon, $exon_cluster);
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( $overlap && ( $exon->strand == $exon_cluster->strand) ) { 
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+      }  
+      else {
+	# Start a new cluster
+	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+	$exon_cluster->strand($exon->strand);
+		
+	# and add it to the main_cluster feature
+	$cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
+############################################################
+
+sub match {
+  my ($self, $f1,$f2) = @_;
+  
+  my ($start1,
+      $start2,
+      $end1,
+      $end2,
+      $rev1,
+      $rev2,
+     );
+
+  # Swap the coords round if necessary
+  if ($f1->start > $f1->end) {
+    $start1 = $f1->end;
+    $end1   = $f1->start;
+    $rev1   = 1;
+  } else {
+    $start1 = $f1->start;
+    $end1   = $f1->end;
+  }
+
+  if ($f2->start > $f2->end) {
+    $start2 = $f2->end;
+    $end2   = $f2->start;
+    $rev2   = 1;
+  } else {
+    $start2 = $f2->start;
+    $end2   = $f2->end;
+  }
+
+  # Now check for an overlap
+  if (($end2 > $start1 && $start2 < $end1) ) {
+	
+	#  we have an overlap so we now need to return 
+	#  two numbers reflecting how accurate the span 
+	#  is. 
+	#  0,0 means an exact match with the exon
+	# a positive number means an over match to the exon
+	# a negative number means not all the exon bases were matched
+
+	my $left  = ($start2 - $start1);
+	my $right = ($end1 - $end2);
+	
+	if ($rev1) {
+	    my $tmp = $left;
+	    $left = $right;
+	    $right = $tmp;
+	}
+	
+	my @overlap;
+
+	push (@overlap,1);
+
+	push (@overlap,$left);
+	push (@overlap,$right);
+
+	return @overlap;
+      }
+    
+}
 1;
 
