@@ -43,7 +43,7 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome
+package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
 use vars qw(@ISA);
 use strict;
@@ -60,7 +60,7 @@ sub _initialize {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ'
+    my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
 						 'INPUT_ID'], @args);
        
     $self->throw("No database handle input")           unless defined($dbobj);
@@ -71,6 +71,15 @@ sub _initialize {
     $self->input_id($input_id);
     
     return $self; # success - we hope!
+}
+sub input_id {
+	my ($self,$arg) = @_;
+
+   if (defined($arg)) {
+      $self->{_input_id} = $arg;
+   }
+
+   return $self->{_input_id};
 }
 
 =head2 dbobj
@@ -109,10 +118,10 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $cloneid  = $self->input_id;
-    my $clone    = $self->dbobj->get_Clone($cloneid);
-    my $genseq   = $clone->primary_seq;
-    my @features = $clone->get_all_SimilarityFeatures;
+    my $contigid  = $self->input_id;
+    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $genseq   = $contig->primary_seq;
+    my @features = $contig->get_all_SimilarityFeatures;
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature(-genomic  => $genseq,
 							    -features => \@features);
 
