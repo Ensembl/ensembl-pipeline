@@ -82,12 +82,9 @@ sub fetch_input {
   if ( -d $database) {
     @db = glob("$database/*");
     
-    # if the files have standard names, try to sort them 
-    # for consistency
-    @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 $o cmp $t } @db;
-    
+    # sort the db files for consistency; largest first, so that if 
+    # memory problems are going to occur, they occur early
+    @db = sort { -s $b <=> -s $a } @db;
   }
   else {
     push(@db,$database);
