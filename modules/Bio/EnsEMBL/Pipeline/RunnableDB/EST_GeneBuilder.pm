@@ -57,46 +57,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::Tools::TranslationUtils;
 
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
-									 EST_INPUTID_REGEX
-									 EST_REFDBHOST
-									 EST_REFDBUSER
-									 EST_REFDBNAME
-									 EST_REFDBPASS
-									 EST_DBNAME
-									 EST_DBHOST
-									 EST_DBUSER
-									 EST_DBPASS     
-									 EST_GENOMIC
-									 EST_GENEBUILDER_INPUT_GENETYPE
-									 EST_USE_DENORM_GENES
-									 EST_MIN_INTRON_SIZE
-									 BRIDGE_OVER_SMALL_INTRONS
-									 EST_MAX_INTRON_SIZE
-									 EST_MAX_EVIDENCE_DISCONTINUITY
-									 EST_GENEBUILDER_INTRON_MISMATCH
-									 ESTGENE_TYPE
-									 USE_cDNA_DB
-									 cDNA_DBNAME
-									 cDNA_DBHOST
-									 cDNA_DBUSER
-									 cDNA_DBPASS
-									 cDNA_GENETYPE
-									 REJECT_SINGLE_EXON_TRANSCRIPTS
-									 USE_GENOMEWISE
-									 GENOMEWISE_SMELL
-									 EST_MIN_EXON_SIZE
-									 EST_GENEBUILDER_COMPARISON_LEVEL
-									 EST_GENEBUILDER_SPLICE_MISMATCH
-									 EST_GENEBUILDER_INTRON_MISMATCH
-									 EST_GENEBUILDER_EXON_MATCH
-									 CHECK_SPLICE_SITES
-									 RAISE_SINGLETON_COVERAGE
-									 FILTER_ON_SINGLETON_SIZE
-									 MAX_TRANSCRIPTS_PER_GENE
-									 CLUSTERMERGE_MIN_EVIDENCE_NUMBER
-									 EST_USE_DENORM_GENES
-);
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf;
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -124,7 +85,6 @@ sub new {
     
     $self->output_db($output_db);
     $self->output_db->dnadb($self->db);
-   7
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       -host             => $cDNA_DBHOST,
