@@ -164,21 +164,24 @@ sub get_cDNA_sequence {
    my @exons = $self->pairAlign->eachFeaturePair;
    
    return unless (scalar @exons > 0);
-
+   
+   #print STDERR "exons:\n"; 
    foreach my $exon (@exons) {
-       $seqstr .= $exon->seq->seq;
+   # print STDERR $exon->start."-".$exon->end." ";
+     $seqstr .= $exon->seq->seq;
    }
    if ($exons[0]->hstrand == 1) {
-       return new Bio::PrimarySeq('-id' => "genomic" ,
-				  -seq => $seqstr);
+     return new Bio::PrimarySeq('-id' => "genomic" ,
+				-seq => $seqstr);
    } elsif ($exons[0]->hstrand == -1) {
-       my $tmpseq = new Bio::PrimarySeq('-id'  => 'genomic',
-					-seq => $seqstr);
-       return $tmpseq->revcom;
-   } else {
-       $self->throw("Invalid strand [".$exons[0]."] on first exon");
+     my $tmpseq = new Bio::PrimarySeq('-id' => 'genomic',
+				      -seq  => $seqstr);
+     return $tmpseq->invert;
+   } 
+   else {
+     $self->throw("Invalid strand [".$exons[0]."] on first exon");
    }
-
+   
 }
 
 =head2 convert_FeaturePair
