@@ -183,6 +183,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    
 	    EST_REFDBNAME               => 'human_NCBI33_raw2',
 	    EST_REFDBHOST               => 'ecs2',
+	    EST_REFDBPORT               => '3363',
 	    EST_REFDBUSER               => 'ensro',
 	    EST_REFDBPASS               => '',
 
@@ -191,12 +192,14 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 
 			 EST_DBNAME                  => 'human_ests_eae',
 			 EST_DBHOST                  => 'ecs2c',
+			 EST_DBPORT                  => '3353',
 			 EST_DBUSER                  => 'ensadmin',
 			 EST_DBPASS                  => 'ensembl',
 
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
 	    EST_GENE_DBNAME                  => 'human_estgenes_eae_rerun',
 	    EST_GENE_DBHOST                  => 'ecs2b',
+	    EST_GENE_DBPORT                  => '3353',
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
@@ -206,6 +209,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    
 	    cDNA_DBNAME                  => '',
 	    cDNA_DBHOST                  => '',
+	    cDNA_DBPORT                  => '',
 	    cDNA_DBUSER                  => '',
 	    cDNA_DBPASS                  => '',
 	    cDNA_GENETYPE                => '',	  
