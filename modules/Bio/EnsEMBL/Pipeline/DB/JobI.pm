@@ -207,4 +207,38 @@ sub submission_checks {
 
 
 
+=head2 current_status
+
+  Title   : current_status
+  Usage   : my $status = $job->current_status
+  Function: Get/set method for the current status
+  Returns : Bio::EnsEMBL::Pipeline::Status
+  Args    : Bio::EnsEMBL::Pipeline::Status
+
+=cut
+
+sub current_status {
+    my ($self) = @_;
+
+    $self->throw("Method current_status not implemented");
+}
+
+=head2 get_all_status
+
+  Title   : get_all_status
+  Usage   : my @status = $job->get_all_status
+  Function: Get all status objects associated with this job
+  Returns : @Bio::EnsEMBL::Pipeline::Status
+  Args    : @Bio::EnsEMBL::Pipeline::Status
+
+=cut
+
+sub get_all_status {
+    my ($self) = @_;
+
+    $self->throw("Method get_all_status not implemented");
+}
+
+
+
 1;
