@@ -103,18 +103,32 @@ sub new {
   my $self = {};
   bless($self,$class);
   
-  my ( $annotation_db, $prediction_db, $annotation_genes, $prediction_genes, $input_id ) = 
+  my ( $annotation_db, $prediction_db, $annotation_genes, $prediction_genes, $input_id, $gff_file ) = 
     $self->_rearrange([qw(ANNOTATION_DB
 			  PREDICTION_DB
 			  ANNOTATION_GENES
 			  PREDICTION_GENES
-			  INPUT_ID)],
+			  INPUT_ID
+			  GFF_FILE)],
 		      @args);
+  unless (  $annotation_db && $prediction_db && $annotation_genes && $prediction_genes && $input_id ){
+    $self->throw("need to specify all these values:\n
+     annotation_db: $annotation_db\n
+     prediction_db: $prediction_db\n
+  annotation_genes: $annotation_genes\n
+  prediction_genes: $prediction_genes\n 
+         $input_id: $input_id\n");
+  }
   
   $self->annotation_db($annotation_db);
   $self->prediction_db($prediction_db);
   $self->annotation_Genes(@$annotation_genes);
   $self->prediction_Genes(@$prediction_genes);
+  $self->input_id($input_id);
+
+  if ( $gff_file ){
+    $self->gff_file($gff_file);
+  }
 
   $self->{'_unclustered_genes'}= [];
   $self->{'_gene_clusters'}= [];
@@ -1002,6 +1016,7 @@ sub compare_Exons{
       my ($prediction,$annotation) = $pair->get_Transcripts;
       if ($self->gff_file){
 	#print STDERR "printing to GFF: ".$prediction->dbID.",".$annotation->dbID."\n";
+		      
 	$self->toGFF($prediction,"prediction",$global_count);
 	$self->toGFF($annotation,"annotation",$global_count);
 	$global_count++;
@@ -2553,7 +2568,7 @@ sub toGFF{
   
   my $filename = $self->gff_file;
   
-  open(OUT,">>$filename");
+  open(OUTFILE,">>$filename");
 
   my $genetype;
   if ( $gene_type eq "annotation" ){
@@ -2574,14 +2589,27 @@ sub toGFF{
     $genetype = "undetermined";
   }
  
-  my $id = $transcript->dbID;
-  if ($label){  
-    $id .= "_".$label;
+  
+  my $trans_id;
+  if ( $transcript->stable_id ){
+    $trans_id = $transcript->stable_id;
+  }
+  elsif ( $transcript->dbID ){
+    $trans_id = $transcript->dbID;
+  }
+  elsif( $transcript->temporary_id ){
+    $trans_id = $transcript->temporary_id;
+  }
+  else{
+    $trans_id = "unidentified";
   }
   
-  print STDERR "gene: $gene_type, type: $genetype, transcript_id: $id\n";
-
-
+  if ($label){  
+    $trans_id .= "_".$label;
+  }
+  
+  #print STDERR "gene: $gene_type, type: $genetype, transcript_id: $id\n";
+  
   foreach my $exon ( $transcript->get_all_Exons ){
     my $strand_label;
     if ( $exon->strand == 1 ){
@@ -2594,7 +2622,21 @@ sub toGFF{
       $strand_label = "+";
     }
     
-    print OUT $exon->dbID
+    my $exon_id;
+    if ( $exon->stable_id ){
+      $exon_id = $exon->stable_id;
+    }
+    elsif ( $exon->dbID ){
+      $exon_id = $exon->dbID;
+    }
+    elsif( $exon->temporary_id ){
+      $exon_id = $exon->temporary_id;
+    }
+    else{
+      $exon_id = "unidentified";
+    }
+    
+    print OUTFILE $exon_id
       ."\t".$genetype
 	."\texon" 
 	  ."\t".($chrstart+$exon->start)
@@ -2602,10 +2644,10 @@ sub toGFF{
 	      ."\t100"
 		."\t".$strand_label
 		  ."\t".$exon->phase 
-		    ."\t". $id
+		    ."\t". $trans_id
 		      ."\n";
   }
-  close(OUT);
+  close(OUTFILE);
 }
 
 
