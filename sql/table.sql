@@ -43,58 +43,9 @@ CREATE TABLE job_status (
 # is_current - whether this status is the current status
 
 
-
-# rule tables: rule_goal and rule_conditions
-#
-# an analysis A depends on a number of rules R1 .. RN. it can
-# be run when all rules with rule_goal.analysis = A are satisfied.
-# in order to satisfy a rule R, at least one of the conditions
-# rule_conditions.condition must have been met for that rule.
-#
-# rule_goal.analysis and rule_conditions.contitions relate to
-# entries in table 'analysis'
-# currently, rule_goal.analysis is an analysis internal ID,
-# rule_conditions.condition is an analysis logic_name
-
-CREATE TABLE rule_goal (
-  rule_id           smallint(5) unsigned default '0' not null auto_increment,
-  goal              varchar(40),
-
-  PRIMARY KEY (rule_id)
+CREATE TABLE config (
+  header          varchar(255),
+  key_name        varchar(255),
+  value           varchar(255)
 );
-
-CREATE TABLE rule_conditions (
-  rule_id           smallint(10) unsigned not null,
-  condition         varchar(40)
-);
-
-# rule_id     - rule internal ID
-# goal - internal ID (if +ve integer) or logic_name of analysis
-# condition   - a literal, such as analysis.logic_name
-
-# need also to include rules like 'run job X on all contigs'
-
-
-
-CREATE TABLE input_id_analysis (
-  input_id          varchar(40) not null,
-  analysis_id       smallint(10) unsigned NOT NULL,
-  created           datetime NOT NULL,
-  result            smallint(10) unsigned NOT NULL,
-
-  PRIMARY KEY       (analysis_id, input_id),
-  KEY input_created (input_id, created)
-);
-
-# pipeline 'history' table - records each job performed in the
-# pipeline with the time it was completed
-#
-# input_id/analysis_id       - see table 'job'
-# timestamp                  - when this job was completed
-
-# ?? need an extra column to hold exit status
-# e.g. for repeat masked seq need to know if seq is all repeat
-# (prevent e.g. blast running) - and store failures here that
-# are understood (e.g. genscan producing garbage)
-# and if, say, no genscan predictions, don't bother BlastGenscanXXX
 
