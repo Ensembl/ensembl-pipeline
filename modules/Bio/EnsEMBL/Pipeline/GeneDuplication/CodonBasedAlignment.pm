@@ -1,3 +1,64 @@
+# Cared for by Dan Andrews <dta@sanger.ac.uk>
+#
+# Copyright EnsEMBL
+#
+# You may distribute this module under the same terms as perl itself
+#
+# POD documentation - main docs before the code
+
+=pod
+
+=head1 NAME
+
+  Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment
+
+=head1 SYNOPSIS
+
+use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
+
+# Create our object, specifying the genetic code needed to 
+# translate our sequences.  The commonest codes are: 
+#   universal                => 1 
+#   vertebrate mitochondrial => 2
+# These numbers are the same as those you need to specify to 
+# translate any Bio::Seq object.  Hence if you need a truly 
+# oddball genetic code, check the Bio::Seq module documentation.
+my $cba =
+  Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
+    -genetic_code => 1);
+
+# Add some sequence to our alignment module.  Pass a reference to
+# an array of Bio::Seq objects.  Everything is going to fall apart
+# if you pass amino acid sequences here, some make sure they are
+# nucleotide sequences.
+
+$cba->sequences(\@seqs);
+
+# Run the actual alignment process.  The return value is an 
+# array of Bio::Seq objects, that when dumped to a multiple 
+# fasta file or the like, will display a multiple alignment.
+
+my $align = $cba->run_alignment;
+
+foreach my $seq (@$align){
+  my $string = $seq->seq;
+  $string =~ s/(.{60})/$1\n/g;
+
+  print STDOUT ">" . $seq->display_id . "\n$string";
+}
+
+
+
+=head1 DESCRIPTION
+
+=head1 CONTACT
+
+Post general queries to B<ensembl-dev@ebi.ac.uk>
+
+=cut
+
+
+
 package Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
 use strict;
@@ -5,43 +66,25 @@ use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Tools::Run::Alignment::Clustalw;
-
-use vars qw(@ISA);
-
-@ISA = qw(Bio::EnsEMBL::Root);
-
-
-#Synopsis:
-
-#use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
-
-#my $cba =
-#Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new;
-
-#$cba->sequences(@seqs); #Add array of nt Bio::Seq's to align.
-#my $aligned_seqs = $cba->run_alignment;
-
-#Alignment is and array of Bio::Seq objects. 
-
-#---
-
-# Genetic codes:
-# Universal                : 1
-# Vertebrate mitochondrial : 2
-
-
-
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
+use Bio::EnsEMBL::Utils::Exception qw(warning throw);
 
 sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
 
-  my ($genetic_code) = 
-    $self->_rearrange([qw(GENETIC_CODE)],
-		      @args);
+  my ($genetic_code
+     ) = rearrange([qw(GENETIC_CODE
+		      )], @args);
 
-  $self->genetic_code($genetic_code) if $genetic_code;
+  unless (defined $genetic_code){
+    warning("Genetic code not specified.  Defaulting " . 
+	    "to the so-called universal code.");
+    $genetic_code = 1;
+  }
+
+  $self->genetic_code($genetic_code);
 
   return $self;
 }
@@ -113,16 +156,11 @@ sub run_alignment {
 
   my $longest_seq = 0;
   foreach my $aligned_seq ($alignment->each_seq){
-#print "This seq is " . $aligned_seq->length . " long\n";
     push(@aligned_seqs, $aligned_seq);
     $longest_seq = $aligned_seq->length if $aligned_seq->length > $longest_seq;
-#print "Longest seq : " . $longest_seq . "\n";
   }
 
-print "Have " . scalar @aligned_seqs . " aligned sequences.\n";
-
   foreach my $aligned_seq (@aligned_seqs) {
-#print "This seq is " . scalar $aligned_seq->length . " long.\n";
     my $nt_work_seq = $nt_seqs{$aligned_seq->display_id}->seq;
     $nt_work_seq =~ s/(...)/$1:/g;
     my @nt_seq_array = split /:/, $nt_work_seq;
@@ -133,7 +171,7 @@ print "Have " . scalar @aligned_seqs . " aligned sequences.\n";
       print "Adding gap to make sequences same length.\n";
     }
 
-#    $self->throw("nt and aa sequences are not of corresponding lengths.") 
+#    throw("nt and aa sequences are not of corresponding lengths.") 
 #      if scalar @nt_seq_array != scalar @aa_seq_array;
 
     my $aligned_nt_string = '';
@@ -163,7 +201,7 @@ sub _alignment {
   } elsif (defined $action && $action eq 'clear') {
     $self->{_alignment} = [];
   } elsif (defined $action) {
-    $self->warn("HomologTool::_alignment - unknown action specified ".
+    warning("CodonBasedAlignment::_alignment - unknown action specified ".
 		"[$action].  Must be \'add\' or \'clear\'");
   }
   
@@ -177,7 +215,7 @@ sub genetic_code {
     $self->{_genetic_code} = shift;
   }
  
-  $self->throw("Genetic code not specified.") 
+  throw("Genetic code not specified.") 
     unless $self->{_genetic_code};
 
   return $self->{_genetic_code}
