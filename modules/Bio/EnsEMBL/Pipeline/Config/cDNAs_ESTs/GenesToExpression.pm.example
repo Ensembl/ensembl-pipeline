@@ -69,6 +69,19 @@ use vars qw( %GenesToExpression );
 	    # size of the chunks to run the gene to est map
 	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
 	    EST_EXPRESSION_CHUNKSIZE          => '5000000',		
+	    
+	    ############################################################
+	    # this will reject all unspliced est			s		  
+	    SKIP_SINGLE_EXONS              => '1',
+            
+	    ############################################################
+	    # this will take only the ests that are present in the expression db 
+	    USE_ONLY_ESTS_IN_EXPRESSION_DB => '0',	  
+			  
+	    ############################################################
+	    # this will put a limit to the number of ests linked to a transcript
+            MAX_ESTS_PER_TRANSCRIPT        => 300,
+
 
 	    ############################################################
 	    # where the result-directories are going to go	
