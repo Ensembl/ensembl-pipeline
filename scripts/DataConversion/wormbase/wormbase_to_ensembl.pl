@@ -70,8 +70,8 @@ ensembl-dev@ebi.ac.uk
 my $release       = "CEL140";
 my $workDIR       = "../wormbase140/";
 my $cvsDIR        = "../cvs_checkout/";
-my $analysisConf  = "./analysis.conf";
-my $ruleConf      = "./rule.conf";
+my $analysisConf  = "./analysis.conf"; #to be created
+my $ruleConf      = "./rule.conf";     #to be created
 
 my $WB_DBHOST     = "";
 my $WB_DBPORT     = "";
