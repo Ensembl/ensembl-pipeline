@@ -312,17 +312,12 @@ sub get_file_names{
   my @input_ids;
 
   opendir(DIR, $dir);   
-  my @allfiles = readdir DIR;
+  my @allfiles = grep !/^\.\.?$/, readdir DIR;
   closedir DIR;
 	
   local *FILE;
 
   foreach my $f(@allfiles) {
-    if($f eq '.' || $f eq '..'){
-      next;
-    }elsif(-d $f){
-      next;
-    }else{
       my $file;
       if($regex){
 	if($f =~ m|$regex|){
@@ -341,7 +336,6 @@ sub get_file_names{
 	  push @input_ids, $_;
       }
       close FILE;
-    }    
   }
   my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
 						 -id_list => \@input_ids,
