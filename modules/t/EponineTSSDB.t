@@ -31,7 +31,7 @@ ok(my $runobj = "$runnable"->new(  -db         => $db,
 
 ok($runobj->fetch_input);
 
-ok$runobj->run);
+ok($runobj->run);
 
 ok(my @out = $runobj->output;
 
