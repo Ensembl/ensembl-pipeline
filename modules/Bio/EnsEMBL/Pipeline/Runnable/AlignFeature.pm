@@ -1,8 +1,8 @@
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -17,8 +17,9 @@ Bio::EnsEMBL::Pipeline::Runnable::AlignFeature
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::AlignFeature->new(
-                                             -genomic  => $genseq,
-					     -features => $features,			  
+                                             -genomic    => $genseq,
+					     -features   => $features,			  
+					     -seqfetcher => $seqfetcher,
                                              );
     or
     
@@ -60,10 +61,11 @@ use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
+use Bio::DB::RandomAccessI;
 use Bio::Root::RootI;
 
 #compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(est_genome pfetch); 
+use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 
@@ -77,31 +79,37 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $features ) = $self->_rearrange([qw(GENOMIC
-						      FEATURES)], @args);
-       
-    $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
+    my( $genomic, $features, $seqfetcher ) = $self->_rearrange(['GENOMIC',
+						   'FEATURES',
+						   'SEQFETCHER'], @args);
 
+    $self->throw("No genomic sequence input") unless defined($genomic);
+    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
     $self->genomic_sequence($genomic) if $genomic; 
 
     $self->{'_features'} = [];
 
     if (defined($features)) {
-	if (ref($features) eq "ARRAY") {
-	    my @f = @$features;
-	    
-	    foreach my $f (@f) {
-		if ($f->isa("Bio::EnsEMBL::FeaturePair")) {
-		    $self->addFeature($f);
-		} else {
-		    $self->warn("Can't add feature [$f]. Not a Bio::EnsEMBL::FeaturePair");
-        }
-	    }
-	} else {
-	    $self->throw("[$features] is not an array ref.");
+      if (ref($features) eq "ARRAY") {
+	my @f = @$features;
+	
+	foreach my $f (@f) {
+	  if ($f->isa("Bio::EnsEMBL::FeaturePair")) {
+	    $self->addFeature($f);
+	  } else {
+	    $self->warn("Can't add feature [$f]. Not a Bio::EnsEMBL::FeaturePair");
+	  }
 	}
+      } else {
+	$self->throw("[$features] is not an array ref.");
+      }
     }
+    
+    $self->throw("No seqfetcher provided")           
+      unless defined($seqfetcher);
+    $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
+      unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
     
     return $self; 
 }
@@ -124,6 +132,26 @@ sub genomic_sequence {
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
+}
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
+
+=cut
+
+sub seqfetcher {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        #need to check if passed sequence is Bio::DB::RandomAccessI object
+        $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+        $self->{'_seqfetcher'} = $value;
+    }
+    return $self->{'_seqfetcher'};
 }
 
 =head2 addFeature 
@@ -431,19 +459,18 @@ sub print_FeaturePair {
 
 sub get_Sequence {
     my ($self,$id) = @_;
-    my $seq;
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
     if (defined($self->{'_seq_cache'}{$id})) {
       return $self->{'_seq_cache'}{$id};
     } 
-    
-    $seq = $seqfetcher->run_pfetch($id);
-    
-    if (!defined($seq)) {
-      # try efetch
-      $seq = $seqfetcher->run_efetch($id);
-    }    
+
+    my $seq;
+    eval{
+      $seq = $self->seqfetcher->get_Seq_by_acc($id);
+    };
+    if( $@ ) {
+      $self->throw("Problem fetching sequence for [$id]: [$@]\n");
+    }
 
     if (!defined($seq)) {
       $self->throw("Couldn't find sequence for [$id]");
