@@ -314,7 +314,7 @@ sub parse_results {
         next if /^$/;
         if (/^\>/) {
           #>(110-122) complexity=2.20 (12/2.20/2.50)
-          /^\>(\S?)\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+          /^\>(\S+)?\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
 
 	  my $tid = $1;
           my $start = $2;
