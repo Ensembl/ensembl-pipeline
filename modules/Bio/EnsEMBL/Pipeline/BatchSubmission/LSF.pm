@@ -372,41 +372,51 @@ sub lsf_user{
   return $self->{'_lsf_user'};
 }
 
+=head2 copy_output
 
-sub copy_output{
-  my ($self, $stderr_file, $stdout_file) = @_;
+copy_output is used to copy the job's STDOUT and
+STDERR files using B<lsrcp>.  This avoids using NFS'.
 
-  $stderr_file = $self->stderr_file if(!$stderr_file);
-  $stdout_file = $self->stdout_file if(!$stdout_file);
-  my $err_file = $self->temp_errfile;
-  my $out_file  = $self->temp_outfile;
+=cut
 
-  if(!$self->temp_filename){
-    my ($p, $f, $l) = caller;
-    $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
-                " we can't copy the output files which don't exist $f:$l");
-    return;
-  }
-  my $command = $self->copy_command;
-  if(-e $err_file){
+sub copy_output {
+    my ($self, $dest_err, $dest_out) = @_;
+
+    $dest_err ||= $self->stderr_file;
+    $dest_out ||= $self->stdout_file;
+
+    if (! $self->temp_filename) {
+        my ($p, $f, $l) = caller;
+        $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
+                    " we can't copy the output files which don't exist $f:$l");
+        return;
+    }
     
-    my $err_copy = $command." ".$err_file." ".$self->lsf_user."@".$self->submission_host.":".$stderr_file." 2>&1 ";
-   
+    # Unbuffer STDOUT so that data gets flushed to file
+    # (It is OK to leave it unbuffered because this method
+    # gets called after the job is finished.)
+    my $old_fh = select(STDOUT);
+    $| = 1;
+    select($old_fh);
+    
+    my $temp_err = $self->temp_errfile;
+    my $temp_out = $self->temp_outfile;
 
-    if(system($err_copy)){
-      $self->throw("Couldn't execute ".$err_copy);
+    my $command = $self->copy_command;
+    my $remote = $self->lsf_user . '@' . $self->submission_host;
+    foreach my $set ([$temp_out, $dest_out], [$temp_err, $dest_err]) {
+        my( $temp, $dest ) = @$set;
+        if (-e $temp) {
+            my $err_copy = "$command $temp $remote:$dest";
+            unless (system($err_copy) == 0) {
+                warn "Error: copy '$err_copy' failed exit($?)";
+            }
+        } else {
+            warn "No such file '$temp' to copy\n";
+        }
     }
-  }
-  if(-e $out_file){
-    my $out_copy = $command." ".$out_file." ".$self->lsf_user."@".$self->submission_host.":".$stdout_file." 2>&1";
-   
-    if(system($out_copy)){
-      $self->throw("Couldn't execute ".$out_copy);
-    }
-   
-  }
-
 }
+
 
 
 sub delete_output{
