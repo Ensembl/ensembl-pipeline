@@ -77,7 +77,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
@@ -319,7 +319,7 @@ sub parse_results {
         $feat2 {db_version} = undef;
         $feat2 {program} = 'RepeatMasker';
         $feat2 {p_version}='1';
-        $feat2 {source}= 'ReapeatMasker';
+        $feat2 {source}= 'RepeatMasker';
         $feat2 {primary}= 'repeat';
         $feat1 {source}= 'RepeatMasker';
         $feat1 {primary}= 'repeat';
