@@ -308,6 +308,13 @@ sub _start_job {
   my $pass   = $db->password();
   my $user   = $db->username();
   my $port   = $db->port();
+  my $module = ref($self);
+  my $job_id = $job->dbID;
+
+  my $exec = "perl -e \"";
+  $exec .= "use $module;";
+  $exec .= "${module}::_run_job('$dbname','$host','$user',";
+  $exec .=                     "'$pass',$port,$job_id);\"";
 
   if (my $pid = fork) {	 # fork returns PID of child to parent, 0 to child
     # PARENT
@@ -319,20 +326,42 @@ sub _start_job {
     #CHILD
 
     #The child needs its own connection to the database. We don't want the
-    #parent's database handle cleaned up when the child exits or vice-versa
+    #parent's database handle cleaned up when the child exits
     $db->db_handle()->{'InactiveDestroy'} = 1;
+    $db = undef;
 
-    $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
+    #need to enter process through exec in order to avoid inheriting all
+    #of parent process memory
+    exec $exec;
+  }
+}
+
+
+
+
+#
+# STATIC method called by forked and exec'd process.  Needs to be
+# done as an exec in order to get it's own (small) memory space not shared
+# with the parent (on write pages are copied from shared mem, eating up lots
+# (of space on the child proceses, which should be really small).
+# This method is basically called from command line via the 
+# _start_job method
+
+sub _run_job {
+  my ($dbname, $host, $user, $pass, $port, $job_id) = @_;
+
+  require Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+
+  my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
       (-dbname   => $dbname,
        -host     => $host,
        -user     => $user,
        -pass     => $pass,
        -port     => $port);
 
-    #point the adaptor of the job to one from the new dbconnection
-    $job->adaptor($db->get_JobAdaptor);
+  my $job = $db->get_JobAdaptor->fetch_by_dbID($job_id);
 
-#    my $file_prefix = $self->_generate_filename_prefix($job);
+#    my $file_prefix = &_generate_filename_prefix($job);
 
 #    $job->stdout_file("${file_prefix}.out");
 #    $job->stderr_file("${file_prefix}.err");
@@ -360,9 +389,7 @@ sub _start_job {
     $job->run();
 
     exit(0);			# child process is finished now!
-  }
-
-  return;
 }
+
 
 1;
