@@ -52,10 +52,9 @@ use strict;
 # no idea what this is:
 #use Storable qw(dclone);
 
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble
 
 
-use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;

@@ -91,7 +91,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::SeqFeature;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::DBSQL::Utils;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
@@ -105,7 +105,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 use vars qw(@ISA);
 use strict;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
     my ($class,@args) = @_;

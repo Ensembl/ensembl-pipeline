@@ -66,7 +66,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble
 
 use FileHandle;
 use Bio::EnsEMBL::Pipeline::RunnableI;

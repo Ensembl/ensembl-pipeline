@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					     );
 
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;

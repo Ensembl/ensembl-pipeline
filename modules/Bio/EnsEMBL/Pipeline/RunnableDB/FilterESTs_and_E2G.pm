@@ -47,7 +47,7 @@ use vars qw(@ISA);
 use strict;
 use POSIX;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;

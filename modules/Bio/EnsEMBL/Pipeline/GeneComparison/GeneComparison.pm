@@ -76,10 +76,10 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 ####################################################################################
 
