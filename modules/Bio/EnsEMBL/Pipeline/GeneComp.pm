@@ -125,11 +125,12 @@ use Carp;
 sub new {
   my($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-  my ($vc,$archive,$log,$map) = 
+  my ($vc,$archive,$log,$map,$maphref) = 
       $self->_rearrange([qw(VC
 			    ARCHIVE
 			    LOG
 			    MAP
+			    HASHREF
 			    )],@args);
 
   #REmoved finaldb, now writing....
@@ -157,12 +158,35 @@ sub new {
   #$self->finaldb($finaldb);
   $self->log($log);
   $self->mapfile($map);
+  $self->maphref($maphref);
   $self->{'_fitted_trans_hash'} = ();
 
   # this usually dies if we can't write
   print $log "Built GeneComp object\n";
 
   return $self;
+}
+
+
+=head2 maphref
+
+ Title   : maphref
+ Usage   : $obj->maphref($newval)
+ Function: Getset for maphref value
+ Returns : value of maphref
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub maphref{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'maphref'} = $value;
+    }
+    return $obj->{'maphref'};
+
 }
 
 
@@ -245,9 +269,8 @@ sub map_temp_Exons_to_real_Exons{
        }
        $ismapped{$tempexon->id} = 0;
    }
-   print "\n";
    print $log "Getting all old exons...";
-   my @oldexons=$vc->get_old_Exons($log);
+   my @oldexons=$vc->get_old_Exons($log,$self->maphref);
 
    my $size=scalar(@oldexons);
    print $log " got $size old exons\n";
@@ -259,15 +282,15 @@ sub map_temp_Exons_to_real_Exons{
 
    @oldexons   = sort { $a->end   <=> $b->end } @oldexons;
 
-   if(my $dd==1){
-       my @all = @tempexons;
-       push(@all,@oldexons);
-       @all   = sort { $a->end   <=> $b->end } @all;
-       foreach my $exon (@all){
-	   print"  ". $exon->id." ".$exon->start." ".$exon->end."\n";
-       }
-       exit 0;
-   }
+   #if(my $dd == 1){
+   #    my @all = @tempexons;
+   #    push(@all,@oldexons);
+   #    @all   = sort { $a->end   <=> $b->end } @all;
+       #foreach my $exon (@all){
+	   #print"  ". $exon->id." ".$exon->start." ".$exon->end."\n";
+       #}
+       #exit 0;
+   #}
    my %e_v;
    foreach my $oldexon ( @oldexons ) {
        $e_v{$oldexon->id}=$oldexon->version;
@@ -319,7 +342,7 @@ sub map_temp_Exons_to_real_Exons{
 	       $temp_old{$tempexon->id}=$oldexon->id;
 	       
 	       print $log "EXON MAP IDENTICAL: ",$tempexon->id," ",$oldexon->id," "; 
-	       print $map $tempexon->id,"\t",$oldexon->id."\n";
+	       print $map $tempexon->id,"\t",$oldexon->id."\t";
                
                # will add version
 	       # we move the id. Do we move the version?
@@ -331,11 +354,12 @@ sub map_temp_Exons_to_real_Exons{
 		   # don't update modified
 	       } else {
 		   my $v=$oldexon->version()+1;
-		   $tempexon->version($oldexon->version()+1);
+		   $tempexon->version($v);
 		   $tempexon->modified($time);
 	       }
 	       push (@mapped,$tempexon);
 	       print $log $tempexon->version."\n";
+	       print $map $tempexon->version."\n";
 	       $moved{$oldexon->id} = 1;
 	       next IDENTICAL;
 	   }
@@ -375,9 +399,8 @@ sub map_temp_Exons_to_real_Exons{
 	     last;
 	 }
 	 #print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
-	 if( $oldexon->overlaps($tempexon2) && $moved{$oldexon->id} == 0 ) {
+	 if( (my $intexon = $oldexon->intersection($tempexon2)) && ($moved{$oldexon->id} == 0) ) {
 	     $bf{$oldexon->id}=$tempexon2->id;
-	     my $intexon = $oldexon->intersection($tempexon2);
 	     my $tovsize = ($intexon->end - $intexon->start +1); 
 	     if( !defined $biggestoverlap ) {
 		 $biggestoverlap = $oldexon;
@@ -398,12 +421,14 @@ sub map_temp_Exons_to_real_Exons{
 	 delete $bf{$biggestoverlap->id};
 	 # we move the id. Do we move the version?
 	 print $log "EXON MAP BEST FIT: ",$tempexon2->id," ",$biggestoverlap->id." ";
-	 print $map $tempexon2->id,"\t",$biggestoverlap->id."\n";
+	 print $map $tempexon2->id,"\t",$biggestoverlap->id."\t";
 	 
 	 $temp_old{$tempexon2->id}=$biggestoverlap->id;
 	 $tempexon2->id($biggestoverlap->id);
 	 $tempexon2->version($biggestoverlap->version()+1);
 	 print $log $tempexon2->version."\n";
+	 print $map $tempexon2->version."\n";
+	 
 	 $tempexon2->modified($time);
 	 push(@mapped,$tempexon2);
 	 $moved{$biggestoverlap->id} = 1;
@@ -425,7 +450,7 @@ sub map_temp_Exons_to_real_Exons{
 	 $tempexon2->version(1);
 	 $temp_old{$tempid}=$tempexon2->id;
 	 print $log "EXON MAP NEW: ",$tempid," ",$tempexon2->id," 1\n"; 
-	 print $map $tempid,"\t",$tempexon2->id,"\n"; 
+	 print $map $tempid,"\t",$tempexon2->id,"\t1\n"; 
 	 push(@new,$tempexon2);
 	 next BESTFIT;
      }
@@ -488,7 +513,7 @@ sub map_temp_Genes_to_real_Genes{
 	}
     }
     print $log "Getting all old genes... ";
-    my @oldgenes  = $vc->get_old_Genes();
+    my @oldgenes  = $vc->get_old_Genes($self->maphref);
     my $size=scalar(@oldgenes);
     print $log "got $size old genes\n";
     if (!$temp_size && $size) {
@@ -649,7 +674,7 @@ sub map_temp_Genes_to_real_Genes{
 	
 	# deal with the mapping of ids
 	print $log "GENE MAP: MOVED $newgeneid $oldgeneid ";
-	print $map $newgeneid,"\t",$oldgeneid."\n";
+	print $map $newgeneid,"\t",$oldgeneid."\t";
 	$self->{'_done_gene_hash'}->{$newgeneid}=1;
 	$self->{'_done_gene_hash'}->{$oldgeneid}=1;
 	$newg{$newgeneid}->id($oldgeneid);
@@ -659,6 +684,7 @@ sub map_temp_Genes_to_real_Genes{
 	    $newg{$newgeneid}->modified($now);
 	}
 	print $log $newg{$newgeneid}->version."\n";
+	print $map $newg{$newgeneid}->version."\n";
 	#print $log "About to dump after move!\n";
 	#$newg{$newgeneid}->_dump(\*STDERR);
 	push (@final_genes,$newg{$newgeneid});
@@ -693,7 +719,7 @@ sub map_temp_Genes_to_real_Genes{
 	    $has_done_new{$newgeneid} = 1;
 	    # deal with the mapping of ids
 	    print $log "GENE MAP: MERGED $newgeneid ",$oldg{$largest}->id." ";
-	    print $map $newgeneid,"\t",$oldg{$largest}->id."\n";
+	    print $map $newgeneid,"\t",$oldg{$largest}->id."\t";
 	    $self->{'_done_gene_hash'}->{$newgeneid}=1;
 	    $self->{'_done_gene_hash'}->{$oldg{$largest}->id}=1;
 	    $newg{$newgeneid}->id($oldg{$largest}->id);
@@ -701,6 +727,7 @@ sub map_temp_Genes_to_real_Genes{
 	    # we increment irregardless of anything else
 	    $newg{$newgeneid}->version($oldg{$largest}->version+1);
 	    print $log $newg{$newgeneid}->version()."\n";
+	    print $map $newg{$newgeneid}->version()."\n";
 	    $newg{$newgeneid}->modified($now);
 	    push (@final_genes,$newg{$newgeneid});
 	}
@@ -779,8 +806,8 @@ sub map_temp_Genes_to_real_Genes{
 		$self->warn("Could not archive ".$trans->id." because of $@\n");
 		print $log "TRANSCRIPT MAP: KILLED ",$trans->id,"\n";
 		print $log "TRANSLATION MAP: KILLED ".$trans->translation->id."\n";
-		$self->archive->write_deleted_id('transcript',$trans->id);
-		$self->archive->write_deleted_id('translation',$trans->id);
+		$self->archive->write_deleted_id('transcript',$trans->id,$trans->version);
+		$self->archive->write_deleted_id('translation',$trans->id,$trans->version);
 		next;
 	    }
 	    
@@ -796,7 +823,7 @@ sub map_temp_Genes_to_real_Genes{
 	    }
 	    $current_fit->version($v);
 	    print $log "TRANSCRIPT MAP: SPLIT $tempid ".$current_fit->id." ".$current_fit->version()."\n";
-	    print $map "$tempid\t".$current_fit->id."\n";
+	    print $map "$tempid\t".$current_fit->id."\t".$current_fit->version()."\n";
 	    $self->{'_fitted_trans_hash'}->{$current_fit->id} = 1;
 	    $self->{'_fitted_trans_hash'}->{$tempid} = 1;
 	    #Deal with translation
@@ -806,18 +833,19 @@ sub map_temp_Genes_to_real_Genes{
 	    $current_fit->translation->id($id);
 	    $current_fit->translation->version($v);
 	    print $log "TRANSLATION MAP: ".$tempid." ".$current_fit->translation->id." $v\n";
-	    print $map "$tempid\t".$current_fit->translation->id."\n";
+	    print $map "$tempid\t".$current_fit->translation->id."\t$v\n";
 	    
 	    if($assigned == 0) {
 		# this gene id wins. Hurray!
 		print $log "GENE MAP: SPLIT $lastgeneid $oldgeneid ";
-		print $map $lastgeneid,"\t",$oldgeneid."\n";
+		print $map $lastgeneid,"\t",$oldgeneid."\t";
 		$self->{'_done_gene_hash'}->{$lastgeneid}=1;
 		$newg{$lastgeneid}->id($oldgeneid);
 		$newg{$lastgeneid}->version($oldg{$oldgeneid}->version+1);
 		$newg{$lastgeneid}->modified($now);
 		$assigned=1;
 		print $log $newg{$lastgeneid}->version."\n";
+		print $map $newg{$lastgeneid}->version."\n";
 		push (@final_genes,$newg{$lastgeneid});
 	    }
 	    
@@ -834,7 +862,7 @@ sub map_temp_Genes_to_real_Genes{
 		$newtrans->id($self->archive->get_new_stable_ids('transcript',1));
 		$self->{'_fitted_trans_hash'}->{$newtrans->id}=1;
 		print $log "TRANSCRIPT MAP: SPLIT NEW ",$tempid," ",$newtrans->id," 1\n";
-		print $map $tempid,"\t",$newtrans->id,"\n";
+		print $map $tempid,"\t",$newtrans->id,"\t1\n";
 		$newtrans->version(1);
 		$newtrans->created($now);
 		$newtrans->modified($now);
@@ -847,7 +875,7 @@ sub map_temp_Genes_to_real_Genes{
 		$newtrans->translation->version(1);
 		
 		print $log "TRANSLATION MAP: SPLIT $tempid ".$newtrans->translation->id()." 1\n";
-		print $map "$tempid\t".$newtrans->translation->id()."\n";
+		print $map "$tempid\t".$newtrans->translation->id()."\t1\n";
 	    }
 	    if(($newg{$newgeneid}->id ne $oldgeneid) && ($newgeneid !~ /ENSG/)) {
 		if ($self->{'_done_gene_hash'}->{$newgeneid}) {
@@ -858,7 +886,7 @@ sub map_temp_Genes_to_real_Genes{
 		# it is an unassigned gene...
 		$newgene->id($self->archive->get_new_stable_ids('gene',1));
 		print $log "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id," 1\n";
-		print $map $tempid,"\t",$newgene->id,"\n";
+		print $map $tempid,"\t",$newgene->id,"\t1\n";
 		$self->{'_done_gene_hash'}->{$tempid}=1;
 		$newgene->created($now);
 		$newgene->modified($now);
@@ -897,17 +925,17 @@ sub map_temp_Genes_to_real_Genes{
 	    $t->modified($now);
 	    $t->version(1);
 	    $self->{'_fitted_trans_hash'}->{$t->id}=1;
-	    print $log "TRANSCRIPT MAP: NEW ".$tempid." ".$t->id."\n";
-	    print $map "$tempid\t".$t->id."\n";
+	    print $log "TRANSCRIPT MAP: NEW ".$tempid." ".$t->id." 1\n";
+	    print $map "$tempid\t".$t->id."\t1\n";
 	    my $tempid=$t->translation->id;
 	    my $id=$t->id;
 	    $id =~ s/ENST/ENSP/;
 	    $t->translation->id($id);
 	    print $log "TRANSLATION MAP: NEW ".$tempid." ".$t->translation->id." 1\n";
-	    print $map $tempid."\t".$t->translation->id."\n"; 
+	    print $map $tempid."\t".$t->translation->id."\t1\n"; 
 	}
 	print $log "GENE MAP: NEW ".$newgene_id." ".$newgene->id." 1\n";
-	print $map $newgene_id."\t".$newgene->id."\n";
+	print $map $newgene_id."\t".$newgene->id."\t1\n";
 	$self->{'_done_gene_hash'}->{$newgene_id}=1;
 	push (@final_genes,$newgene);
     }
@@ -994,7 +1022,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
 
        if ( defined $fitted_trans ) {
 	   print $log "TRANSCRIPT MAP: ",$fitted_trans->id," ",$oldt->id." ";
-	   print $map $fitted_trans->id,"\t",$oldt->id."\n";
+	   print $map $fitted_trans->id,"\t",$oldt->id."\t";
 	   
 	   $fitted_trans->id($oldt->id);
 	   $self->{'_fitted_trans_hash'}->{$fitted_trans->id}=1;
@@ -1010,7 +1038,8 @@ sub map_temp_Transcripts_to_real_Transcripts{
 	       $v=$oldt->version();
 	   }
 	   $fitted_trans->version($v);
-	   print $log " $v\n";
+	   print $log "$v\n";
+	   print $map "$v\n";
 	   #Deal with translation
 	   my $tempid=$fitted_trans->translation->id;
 	   my $id=$fitted_trans->id;
@@ -1018,7 +1047,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
 	   $fitted_trans->translation->id($id);
 	   $fitted_trans->translation->version($v);
 	   print $log "TRANSLATION MAP: ".$tempid." ".$fitted_trans->translation->id." $v\n";
-	   print $map $tempid."\t".$fitted_trans->translation->id."\n";
+	   print $map $tempid."\t".$fitted_trans->translation->id."\t$v\n";
        } else {
 	   # it is dead ;)
 	   $should_change = 1;
@@ -1053,14 +1082,14 @@ sub map_temp_Transcripts_to_real_Transcripts{
        $newt->created($now);
        $newt->modified($now);
        print $log "TRANSCRIPT MAP: NEW ",$tempid," ",$newt->id," 1\n";
-       print $map $tempid,"\t",$newt->id,"\n";
+       print $map $tempid,"\t",$newt->id,"\t1\n";
        $self->{'_fitted_trans_hash'}->{$newt->id}=1;
        $tempid = $newt->translation->id;
        my $id=$newt->id;
        $id =~ s/ENST/ENSP/;
        $newt->translation->id($id);
        print $log "TRANSLATION MAP: NEW ".$tempid." ".$newt->translation->id." 1\n";
-       print $map $tempid."\t".$newt->translation->id."\n";
+       print $map $tempid."\t".$newt->translation->id."\t1\n";
        
    }
    return $should_change;
