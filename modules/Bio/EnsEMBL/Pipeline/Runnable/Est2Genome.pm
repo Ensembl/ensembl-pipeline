@@ -144,6 +144,7 @@ sub run {
     my $source_tag  = "est2genome";
     my $primary_tag = "similarity";
     my $dirname     = "/tmp";
+
     #flag for est strand orientation
     my $estOrientation; 
     
@@ -187,7 +188,7 @@ sub run {
 
         if ($_ =~ /^Exon/)
         {
-        
+	    print STDERR "Found exon $_";
               #split on whitespace
               my @elements = split;
               #extract values from output line
@@ -343,8 +344,8 @@ sub _diskspace {
 
 sub _deletefiles {
     my ($self, $genfile, $estfile, $dirname) = @_;
-    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
-    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
+#    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
+#    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
 
 }
 
