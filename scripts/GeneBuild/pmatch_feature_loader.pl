@@ -26,24 +26,26 @@ use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use  Bio::EnsEMBL::Pipeline::GeneConf qw (
+					  GB_DBNAME
+					  GB_DBUSER
+					  GB_DBHOST
+					  GB_DBPASS
+					  GB_PM_OUTPUT
+					  GB_GOLDEN_PATH
+					 );
 
-my $dbname = $::db_conf{'dbname'};
-my $dbuser = $::db_conf{'dbuser'};
-my $host   = $::db_conf{'dbhost'};
-my $pass   = $::db_conf{'dbpass'};
-my $pmfile = $::scripts_conf{'pm_output'};
+my $dbname = $GB_DBNAME;
+my $dbuser = $GB_DBUSER;
+my $host   = $GB_DBHOST;
+my $pass   = $GB_DBPASS;
+my $pmfile = $GB_PM_OUTPUT;
 if(defined $pmfile && $pmfile ne ''){
   $pmfile .= "/pm_best.out";
 }
-my $cdnafile = $::scripts_conf{'cdna_pairs'};
-my $create = 0;
-my $path = $::db_conf{'golden_path'};
-$path = 'UCSC' unless (defined $path && $path ne '');
 
-&GetOptions( 
-	    'create_tables' => \$create,
-	   );
+my $path     = $GB_GOLDEN_PATH;
+$path        = 'UCSC' unless (defined $path && $path ne '');
 
 # usage
 if(!defined $dbname  ||
@@ -52,16 +54,13 @@ if(!defined $dbname  ||
    !defined $pass    ||
    !defined $pmfile
   ){
-  print  "USAGE: pmatch_feature_loader.pl [-create_tables]\nVarious parameters must be set in GB_conf.pl - here are your relevant current settings:\n " .
-    "db_conf:\n" .
-    "\tdbname      = $::db_conf{'dbname'}\n" .
-    "\tdbuser      = $::db_conf{'dbuser'}\n" .
-    "\tdbhost      = $::db_conf{'dbhost'}\n" .
-    "\tdbpass      = $::db_conf{'dbpass'}\n" . 
-    "\tgolden_path = $::db_conf{'golden_path'}\n" . 
-    "scripts_conf:\n" .
-    "\tpm_output   = $::scripts_conf{'pm_output'}\n" .
-    "\tcdna_pairs  = $::scripts_conf{'cdna_pairs'}\n";
+  print  "USAGE: pmatch_feature_loader.pl\nVarious parameters must be set in GeneConf.pm - here are your relevant current settings:\n " .
+    "\tGB_DBNAME      = $GB_DBNAME\n" .
+    "\tGB_DBUSER      = $GB_DBUSER\n" .
+    "\tGB_DBHOST      = $GB_DBHOST\n" .
+    "\tGB_DBPASS      = $GB_DBPASS\n" . 
+    "\tGB_GOLDEN_PATH = $GB_GOLDEN_PATH\n" . 
+    "\tGB_PM_OUTPUT   = $GB_PM_OUTPUT\n";
 
   exit(1);
 }
@@ -78,37 +77,9 @@ $db->static_golden_path_type($path);
 my $sgpa = $db->get_StaticGoldenPathAdaptor;
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 
-if($create) { 
-  &create_tables ;
-}
-
-&process_cdnas;
 &process_proteins;
 
 # SUBROUTINES #
-
-=head2 create_tables
-
- Title   : create_tables
- Usage   :
- Function: 
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub create_tables{
-  my @sql = split /;/, ($pmfa->create_sql);
-  my $create_sql= join "\n", @sql;
-  
-  my $sth = $db->prepare($sql[1]);
-  $sth->execute;
-
-  $sth = $db->prepare($sql[2]);
-  $sth->execute;
-}
 
 =head2 process_proteins
 
@@ -162,34 +133,3 @@ sub process_proteins {
   $pmfa->write_PmatchFeatures(@features);
 }
 
-=head2 process_cdnas
-
- Title   : process_cdnas
- Usage   :
- Function: 
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub process_cdnas {
-  open(CDNA, "<$cdnafile") or die "Cannot open [$cdnafile] to read cdnas\nClean out protein and pmatch_feature tables before rerunning script!\n";
-
-  while(<CDNA>){
-    chomp;
-#    NP_116272.1 : 
-#    NP_115616.1 : AK027172
-    if(!/(\S+) : (\S*)/){
-      die "Cannot parse protein cdna pairs from [$_]\nClean out protein and pmatch_feature tables before rerunning script!\n";
-    }
-
-    my $protein = $1;
-    my $cdna = $2;
-
-    $pmfa->write_protein($protein, $cdna);
-  }
-
-  close CDNA;
-}

@@ -23,38 +23,43 @@ use strict;
 
 =head1 OPTIONS
   
-  Options are to be set in GB_conf.pl
+  Options are to be set in GeneConf.pm
   The important ones for this script are:
-     refseq      location of refseq file in fasta format
-     sptr        location of swissprot file in fasta format
-     pfasta      where to write the clean fasta file
-     pmatch      location of the pmatch executable
+     GB_REFSEQ      location of refseq file in fasta format
+     GB_SPTR        location of swissprot file in fasta format
+     GB_PFASTA      where to write the clean fasta file
+     GB_PMATCH      location of the pmatch executable
 
      eg.
-	    'refseq'      => '/work2/vac/GeneBuild/rf.fa',
-	    'sptr'        => '/work2/vac/GeneBuild/sptr.fa',
-	    'pfasta'      => '/work2/vac/GeneBuild/human_proteome.fa',
-	    'pmatch'      => '/work2/vac/rd-utils/pmatch',
+	    GB_REFSEQ      => '/work2/vac/GeneBuild/rf.fa',
+	    GB_SPTR        => '/work2/vac/GeneBuild/sptr.fa',
+	    GB_PFASTA      => '/work2/vac/GeneBuild/human_proteome.fa',
+	    GB_PMATCH      => '/work2/vac/rd-utils/pmatch',
   
 =cut
 
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+                                         GB_REFSEQ
+                                         GB_SPTR
+                                         GB_PFASTA
+                                         GB_PMATCH
+                                        );
 
 
-my $refseq   = $::scripts_conf{'refseq'};
-my $sptr     = $::scripts_conf{'sptr'};
-my $protfile = $::scripts_conf{'pfasta'};
-my $pmatch   = $::scripts_conf{'pmatch'};
+my $refseq   = $GB_REFSEQ;
+my $sptr     = $GB_SPTR;
+my $protfile = $GB_PFASTA;
+my $pmatch   = $GB_PMATCH;
 
-if( -e $refseq ) { &parse_refseq; }
-if( -e $sptr )   { &parse_sptr; }
+if( defined $refseq && -e $refseq ) { &parse_refseq; }
+if( defined $sptr   && -e $sptr )   { &parse_sptr; }
 
 &test_protfile;
 
 ### END MAIN
 
 sub parse_sptr {
-
+print STDERR "here\n";
   open (IN, "<$sptr") or die "Can't open $sptr\n";
   open (OUT, ">>$protfile") or die "Can't open $protfile\n";
   

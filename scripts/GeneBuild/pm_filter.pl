@@ -25,10 +25,10 @@ BEGIN {
   needs to be given the location of the fasta file contain the human proteome, 
   the directory at the head of the tree containing all the fpc contig fasta 
   files and the chromosome on which to run. The first two options are common 
-  with other scripts and should be set in GB_conf.pl
+  with other scripts and should be set in GeneConf.pm
 
   pm_filter.pl should be run once for each chromosome. The results are written out to 
-  chrname.pm.dat in the pm_output directory specified in GB_conf.pl
+  chrname.pm.dat in the GB_PM_OUTPUT directory specified in GeneConf.pm
 
   The script analyses the whole chromosome by running pmatch for the protein data 
   against each fpc contig file in turn, and then combining the results to find 
@@ -46,20 +46,20 @@ BEGIN {
 
 =head1 OPTIONS
   
-  Options are to be set in GB_conf.pl
+  Options are to be set in GeneConf.pm
   The important ones for this script are:
-     pfasta      clean file of proteins in fasta format
-     pmatch      location of the pmatch executable
-     pm_output   directory to write filtered output files
-     fpcdir      top of the hierarchy where the fpcctg fasta files are
-     tmpdir      scratch area
+     GB_PFASTA      clean file of proteins in fasta format
+     GB_PMATCH      location of the pmatch executable
+     GB_PM_OUTPUT   directory to write filtered output files
+     GB_FPCDIR      top of the hierarchy where the fpcctg fasta files are
+     GB_TMPDIR      scratch area
 
      eg.
-	    'pfasta'      => '/work2/vac/GeneBuild/human_proteome.fa',
-	    'pmatch'      => '/work2/vac/rd-utils/pmatch',
-	    'pm_output'   => '/work2/vac/GeneBuild/',
-	    'fpcdir'      => '/work2/vac/data/humangenome',
-	    'tmpdir'      => '/work5/scratch/vac',
+	    GB_PFASTA      => /work2/vac/GeneBuild/human_proteome.fa,
+	    GB_PMATCH      => /work2/vac/rd-utils/pmatch,
+	    GB_PM_OUTPUT   => /work2/vac/GeneBuild/,
+	    GB_FPCDIR      => /work2/vac/data/humangenome,
+	    GB_TMPDIR      => /work5/scratch/vac,
   
   If pm_output directory is not provided, output file is written to current directory
     
@@ -71,31 +71,31 @@ use pmatch_modules;
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
-my %conf;
-
-{
-  # yes I know I only use it once. It isn't a typo!
-  local $^W = 0;
-  %conf =  %::scripts_conf; # configuration options
-}
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+                                          GB_PFASTA
+	                                  GB_PMATCH
+	                                  GB_PM_OUTPUT
+	                                  GB_FPCDIR
+	                                  GB_TMPDIR  
+                                        );
 
 # global vars
 my %plengths; # stores lengths of all proteins in $protfile 
 my @hits;     # stores the hits from pmatch runs
-my $protfile = $conf{'pfasta'};
-my $outdir   = $conf{'pm_output'};
-my $fpcdir      = $conf{'fpcdir'};
-my $pmatch   = $conf{'pmatch'};
-my $tmpdir   = $conf{'tmpdir'};
+my $protfile = $GB_PFASTA;
+my $outdir   = $GB_PM_OUTPUT;
+my $fpcdir   = $GB_FPCDIR;
+my $pmatch   = $GB_PMATCH;
+my $tmpdir   = $GB_TMPDIR;
 my $check    = 0;
 my $outfile  = '';
 my $chrname;
 
 &GetOptions( 
-	    'check' => \$check,
-	    'chr:s' => \$chrname
+	    'check'      => \$check,
+	    'chr:s'      => \$chrname,
+	    'protfile:s' => \$protfile
 	   );
 
 if ($check) {
@@ -105,7 +105,7 @@ if ($check) {
 # final check to make sure all parameters are set before we go ahead
 if(!defined($protfile) || !defined($fpcdir) || !defined($pmatch) || 
    $protfile eq '' || $fpcdir eq '' || $pmatch eq ''){
-  print "You must set pfasta, fpcdir and pmatch in the config file, GB_conf.pl\n";
+  print "You must set GB_PFASTA, GB_FPCDIR and GB_PMATCH in the config file, GeneConf.pm: $protfile : $fpcdir : $pmatch\n";
   exit (0);
 } 
 
@@ -114,12 +114,16 @@ if(!defined($chrname)) {
   exit (0);
 } 
 
+#$outfile = "$chrname.$protfile.pm.out";
 $outfile = "$chrname.pm.out";
 if (defined ($outdir) && $outdir ne '') {
   $outfile = $outdir . "/" . $outfile;
 }
 
-open (OUT, ">$outfile") or die "Can't open $outfile for output: $!\n";
+# HACK
+#$protfile = '/work2/vac//Mouse/Dec01/mouse_proteome/' . $protfile;
+#open (OUT, ">$outfile") or die "Can't open $outfile for output: $!\n";
+open (OUT, ">>$outfile") or die "Can't open $outfile for output: $!\n";
 
 ### MAIN
 
@@ -196,7 +200,6 @@ sub make_protlist{
     $description =~ /(\S+)/; # find the first block of non-whitespace
 
     next SEQFETCH unless defined $description and $description ne '';
-
     my $bs = new Bio::Seq;
     $bs->display_id($1);
     

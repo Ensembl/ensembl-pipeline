@@ -7,8 +7,6 @@ BEGIN {
   unshift (@INC, $script_dir);
 }
 
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
-
 =head1 NAME
 
   pm_bestmatch.pl
@@ -37,7 +35,7 @@ require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 =head1 OPTIONS
   
-  Options are to be set in GB_conf.pl
+  Options are to be set in GeneConf.pm
   The important ones for this script are:
      pm_output   directory to write filtered output files
 
@@ -55,15 +53,20 @@ use File::Find;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-my %conf    =  %::scripts_conf; # configuration options
-my %db_conf =  %::db_conf; # configuration options
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_PM_OUTPUT
+                                         GB_DBNAME
+					 GB_DBHOST
+					 GB_DBUSER
+                                         GB_GOLDEN_PATH
+					);
 
 # global vars
 my @hits;     # stores the hits from pmatch runs
-my $outdir   = $conf{'pm_output'};
-my $check    = 0;
+my $outdir        = $GB_PM_OUTPUT;
+my $check         = 0;
 my $chromo_coords = 0;
-my $outfile  = "pm_best.out";
+my $outfile       = "pm_best.out";
 
 &GetOptions( 
 	    'check'         => \$check,
@@ -91,7 +94,6 @@ else{
 
 # read pmatch results from STDIN
 while(<>){
-
   #ctg12770:1140298,1146110:Q15486:18,140 75.8
   next unless /\S+/;
   next unless /^(\S+):(\d+),(\d+):(\S+):(\d+),(\d+)\s+(\S+)/;
@@ -171,12 +173,12 @@ close (OUT) or die "Can't close $outfile:$!\n";
 sub get_static_golden_path_adaptor {
   my $dbuser = "ensro";
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-    -host             => $db_conf{'dbhost'},
-    -user             => $dbuser,
-    -dbname           => $db_conf{'dbname'},
+    -host             => $GB_DBHOST,
+    -user             => $GB_DBUSER,
+    -dbname           => $GB_DBNAME,
 );
 
-  $db->static_golden_path_type($::db_conf{'golden_path'});
+  $db->static_golden_path_type($GB_GOLDEN_PATH);
   my $sgpa = $db->get_StaticGoldenPathAdaptor();
   return $sgpa;
 }
