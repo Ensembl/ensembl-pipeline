@@ -66,6 +66,23 @@ tables alone
                  -file analysis.conf -nopipeline_db
 
 
+this is what a conf entry should like like. The header should be the 
+logic_name, the rest of the columns should lie in key value pairs
+
+[RepeatMask]
+db=repbase
+db_version=020713
+db_file=repbase
+program=RepeatMasker
+program_version=1
+program_file=RepeatMasker
+parameters=-low, -lib, /acari/work5a/lec/briggsae.lib 
+module=RepeatMasker
+module_version=1
+gff_source=RepeatMasker
+gff_feature=Repeat
+type=CONTIG
+
 =cut
 
 use strict;
