@@ -202,9 +202,16 @@ sub run {
 							    -reverse => $self->_is_reversed,
 							    -endbias => $self->endbias);
   
-  
-  $gw->run;
-  
+  eval{
+    $gw->run;
+  };
+
+  # if this failed, no point in going on!
+  if($@){
+    $self->warn("Genewise run failed - getting out of here\n");
+    return;
+  }
+
   # output is a list of Features (one per exon) with subseqfeatures 
   # representing the ungapped sub alignments for each exon
   
