@@ -159,7 +159,7 @@ JOB:foreach my $job(@jobs) {
     }
   }
   if ($job->current_status->status eq "SUCCESSFUL"){
-    #$job->adaptor->remove( $job );
+    $job->adaptor->remove( $job );
   }
   print STDERR "Finished job $job_id\n";
 }
