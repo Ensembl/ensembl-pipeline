@@ -121,8 +121,8 @@ sub store {
 						 -assembly_type => $gsf_seq->assembly_type);
 
 	$dna_align_feature->{'_gsf_seq'} = $new_slice;
-	$dna_align_feature->{'_gsf_seq'}->{'adaptor'} = <undef>;
-	$dna_align_feature->{'_analysis'}->{'_adaptor'} = <undef>;
+	$dna_align_feature->{'_gsf_seq'}->{'adaptor'} = undef;
+	$dna_align_feature->{'_analysis'}->{'_adaptor'} = undef;
       }
       my $old_exon_slice = $gene->{'_transcript_array'}[0]{'_trans_exon_array'}[0]{'_gsf_seq'};
 
@@ -135,8 +135,8 @@ sub store {
 
 
       $exon->{'_gsf_seq'} = $new_exon_slice;
-      $exon->{'_gsf_seq'}->{'adaptor'} = <undef>;
-      $exon->{'adaptor'} = <undef>;
+      $exon->{'_gsf_seq'}->{'adaptor'} = undef;
+      $exon->{'adaptor'} = undef;
 
     }
 
@@ -147,10 +147,10 @@ $gene_dump =~ s/[\s\t\n]//g;
 
   my $storable_gene = $gene_dump;
 
-  my $denorm_gene_dump_sql = q{INSERT INTO denorm_gene_dump (denorm_gene_dump_id, dumped_gene)
+  my $denorm_gene_dump_sql = q{INSERT INTO denormalised_gene_dump (denorm_gene_dump_id, dumped_gene)
 			       VALUES ('/N', ?)};
 
-  my $denorm_gene_sql = q{INSERT INTO denorm_gene(denorm_gene_id, denorm_gene_dump_id, 
+  my $denorm_gene_sql = q{INSERT INTO denormalised_gene(denorm_gene_id, denorm_gene_dump_id, 
 			chr_name, gene_start, gene_end, type)
 			VALUES ('/N', ?, ?, ?, ?, ?)};
 
@@ -175,15 +175,15 @@ sub get_genes_by_Slice_and_type {
   my $chr_start = $slice->chr_start;
   my $chr_end = $slice->chr_end;
 
-  my $sql = q{SELECT bg.denorm_gene_dump_id, bgd.dumped_gene, gdg.gene_id
-	      FROM denorm_gene bg, denorm_gene_dump bgd 
+  my $sql = q{SELECT dg.denorm_gene_dump_id, dgd.dumped_gene, gdg.gene_id
+	      FROM denorm_gene dg, denorm_gene_dump dgd 
 	      LEFT JOIN  gene_dumpedgene gdg 
-	      ON bgd.denorm_gene_dump_id = gdg.denorm_gene_dump_id
-	      WHERE bg.chr_name = ?
-	      AND bg.gene_end >= ?
-	      AND bg.gene_start <= ?
-	      AND bg.type = ?
-              AND bg.denorm_gene_dump_id = bgd.denorm_gene_dump_id};
+	      ON dgd.denorm_gene_dump_id = gdg.denorm_gene_dump_id
+	      WHERE dg.chr_name = ?
+	      AND dg.gene_end >= ?
+	      AND dg.gene_start <= ?
+	      AND dg.type = ?
+              AND dg.denorm_gene_dump_id = dgd.denorm_gene_dump_id};
   
   my $sth = $self->prepare($sql);
 
