@@ -58,7 +58,7 @@ use Bio::DB::RandomAccessI;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_INPUTID_REGEX
 					);
-
+use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -85,7 +85,7 @@ sub new {
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
-
+  $check_repeated = 1;
   if (defined $check_repeated){
     $self->check_repeated($check_repeated);
   }else {
@@ -219,7 +219,7 @@ sub run {
   my $mg_runnables;
 
   if ($self->check_repeated > 0){ 
-    print STDERR "Oooh - turning on the new repeat checking code (grepmehere)\n";
+    #print STDERR "Oooh - turning on the new repeat checking code (grepmehere)\n";
     $mg_runnables = $self->build_runnables(@features);
   } else {
     my $runnable = $self->make_mmgw($self->genomic_sequence, \@features);
@@ -258,31 +258,33 @@ sub run_blast {
   my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
   foreach my $seq (@sorted_seqs) {
     # First sort out the header parsing. Blergh! cb25.NA_057.31208-61441 Slice, no descrtipion 
-     
+     my $regex;
     #print STDERR "ID ".$self->genomic_sequence->id."\n";
     if($GB_INPUTID_REGEX && $self->genomic_sequence->id =~ /$GB_INPUTID_REGEX/){
-      $::fasta_header_re{$dbname} = $GB_INPUTID_REGEX;
+      $regex = $GB_INPUTID_REGEX;
     }elsif ($self->genomic_sequence->id =~ /^(.*)\|(.*)\|(.*)/) {
-      $::fasta_header_re{$dbname} = '^.*\|(.*)\|.*';
+      $regex = '^.*\|(.*)\|.*';
     } elsif ($self->genomic_sequence->id =~ /^..\:(.*)/) {
-      $::fasta_header_re{$dbname} = '^..\:(.*)';
+      $regex = '^..\:(.*)';
     }else {
-      $::fasta_header_re{$dbname} = '^(\w+)\s+';
+      $regex = '^(\w+)\s+';
     }
-
-    my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
-							  -program  => 'wutblastn',
-							  -database => $blastdb->dbfile,
-							  -filter => 1,
-							 );
-    $run->run;
-
-    push(@features,$run->output);
-  }
-
+     
+     
+     my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
+							   -program  => 'wutblastn',
+							   -database => $blastdb->dbfile,
+							   -filter => 1,
+							  );
+     $run->add_regex($dbname, $regex);
+     $run->run;
+     
+     push(@features,$run->output);
+   }
+  
   $blastdb->remove_index_files;
   unlink $blastdb->dbfile;
-
+  
   return @features;
 }
 
@@ -392,7 +394,7 @@ sub build_runnables {
       print STDERR "Minigenomic sequence could contain a number "
 	. " of highly similar genes.  Fragmenting the minigenomic "
 	  . "sequence to try to resolve these genes individually.\n";
-
+      print STDERR "COULD BE TWO OR MORE GENES SUPPORTED BY THE SAME PROTEIN HERE\n";
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
 
       # Determine the extreme start and ends of each gene

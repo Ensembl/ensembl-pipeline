@@ -95,8 +95,10 @@ my %FASTA_HEADER;
 
 foreach my $db (@$DB_CONFIG) {
     my ($name, $header) = ($db->{'name'}, $db->{'header'});
+   
     $FASTA_HEADER{$name} = $header if $db && $name;
 }
+
 
 
 =head2 new
@@ -428,7 +430,7 @@ sub parse_results {
     
   }
  
-  print STDERR "Ids " . keys(%ids) . "\n";
+  #print STDERR "Ids " . keys(%ids) . "\n";
 
   @parsers = ();
 
@@ -438,9 +440,13 @@ sub parse_results {
   } else {
     @parsers = $self->get_parsers;
   }
-
-  my $re = $self->blast_re;
-
+  my $db = $self->database;
+  
+  my $re = $self->get_regex($db);
+  if(!$re){
+    $self->throw("no regex defined for ".$db);
+  }
+  #print STDERR "have ".$re." regular expression\n";
   foreach my $parser (@parsers) {
     # print STDERR "New parser\n";
   NAME: while  ( my $sbjct =$parser->nextSbjct) {
@@ -1054,7 +1060,7 @@ sub query {
       $self->results($self->filename.".blast.out");
 
       # Add file to list for later cleanup.
-      $self->file($self->filename);
+      
       
     }
     return $self->{'_query'};
@@ -1090,20 +1096,16 @@ sub program {
 =cut
 
 sub database {
-    my ($self, $db) = @_;
-    my $re_string;
-
-    if (defined($db)) {
-      $self->{'_database'} = $db;
-      $db =~ s!.*/!!;   # strip of leading path components
-
-      unless ($re_string = $FASTA_HEADER{$db}) {
-        $self->throw("Must define an RE for database $db");
-      }
-      $self->blast_re($re_string);
-    }
-
-    return $self->{'_database'};
+  my ($self, $db) = @_;
+  my $re_string;
+    
+  if (defined($db)) {
+    $self->{'_database'} = $db;
+    $db =~ s!.*/!!;       
+    #print STDERR "have ".keys(%$FASTA_HEADER)." blast regexs defined\n";
+  }
+  
+  return $self->{'_database'};
 }
 
 =head2 options
@@ -1186,5 +1188,19 @@ sub blast_re {
   return $self->{'_blast_re'};
 }
 
+
+sub add_regex{
+  my ($self, $name, $re_string) = @_;
+  $FASTA_HEADER{$name} = $re_string;
+  
+}
+
+sub get_regex{
+  my ($self, $name) = @_;
+  if($name =~/\/tmp\//){
+    $name =~ s/\/tmp\///g;
+  }
+  return $FASTA_HEADER{$name};
+}
 1;
 
