@@ -1994,7 +1994,7 @@ sub _extend_UTRs{
 	    $ens_translation->start($tstart);
 	    #print STDERR "setting start of translation $ens_translation to $tstart\n";
 	    $ens_t_start_exon->phase(-1);
-	    $ens_translation->start_exon($ens_t_start_exon);
+	    $ens_translation->start_Exon($ens_t_start_exon);
 	  }
 	  
 	  # modify the start coordinate
@@ -2331,7 +2331,6 @@ sub _remap_Genes {
   my $final_db  = $self->final_db; 
   my $final_gpa = $self->final_db->get_SliceAdaptor();
   my $chrid     = $self->input_id;
-  print STDERR "input_id: $chrid\n";
   if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
     $self->throw("Not a valid input_id... $chrid");
   }
@@ -2340,7 +2339,7 @@ sub _remap_Genes {
   my $chrend   = $2;
   my $final_vc = $final_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   my $genetype = $FINAL_TYPE;
-
+  
  GENE:  
   foreach my $gene (@genes) {
     
