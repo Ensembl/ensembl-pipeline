@@ -1055,8 +1055,7 @@ sub _real_introns{
 ############################################################
 # this method cehcks whether the splice sites are canonical
 # it returns 1 if all splice sites are canonical.
-# It returns zero if the transcrip has only 1 exon, or some of the splice sites
-# are non-canonical
+# It returns zero if the transcrip has only 1 exon
 
 sub check_splice_sites{
   my ($self, $transcript) = @_;
@@ -1102,10 +1101,14 @@ sub check_splice_sites{
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
       }
-      
-print STDERR "check_splice_sites: upstream ".
-	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
-	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+
+      # case
+      $upstream_site = uc($upstream_site);
+      $downstream_site = uc($downstream_site);      
+
+      print STDERR "check_splice_sites: upstream ".
+	($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+	  "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
       print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
@@ -1162,6 +1165,10 @@ print STDERR "check_splice_sites: upstream ".
       ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
       ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
       
+      # case
+      $upstream_site = uc($upstream_site);
+      $downstream_site = uc($downstream_site);
+
       print STDERR "check_splice_sites: upstream ".
 	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
 	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
