@@ -15,10 +15,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Combine_GeneBuilder_ESTGenes.pm
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Combine_GeneBuilder_ESTGenes->new(
-								       -dbobj     => $db,
-								       -input_id  => $id
-								      );
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::GeneCombiner->new(
+								    -input_id  => $id
+								   );
     $obj->fetch_input
     $obj->run
 
@@ -28,7 +27,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Combine_GeneBuilder_ESTGenes.pm
 =head1 DESCRIPTION
 
 It combines the genes produced by GeneBuilder ( from protein information )
-with the genes produced by EST_GeneBuilder (from EST information)
+with the genes produced by EST_GeneBuilder (from EST and cDNA information)
 
 =head1 CONTACT
 
@@ -53,26 +52,36 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
 
 # config file; parameters searched for here if not passed in as @args
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_REFDBHOST
-					EST_REFDBUSER
-					EST_REFDBNAME
-					EST_REFDBPASS
-					EST_GENOMEWISE_GENETYPE
-					EST_DBHOST
-					EST_DBNAME
-				       );
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_DBHOST              
-					 GB_DBNAME
-					 GB_DBNAME
-					 GB_DBUSER
-					 GB_DBPASS
-					 GB_FINAL_GENETYPE
-				       );
+use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw(
+						ESTGENE_DBHOST
+						ESTGENE_DBUSER
+						ESTGENE_DBNAME
+						ESTGENE_DBPASS 
+						ESTGENE_TYPE
+						
+						ENSEMBL_DBHOST
+						ENSEMBL_DBUSER
+						ENSEMBL_DBNAME
+						ENSEMBL_DBPASS
+						ENSEMBL_TYPE
+						
+						REF_DBHOST
+						REF_DBUSER
+						REF_DBNAME
+						REF_DBPASS
+						
+						FINAL_DBHOST
+						FINAL_DBNAME
+						FINAL_DBUSER
+						FINAL_DBPASS
+						FINAL_TYPE
+					       );
+
+
 
 
 @ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -84,31 +93,40 @@ sub new{
   my $self = $class->SUPER::new(@args);
 
   my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  -host             => $EST_REFDBHOST,
-						  -user             => $EST_REFDBUSER,
-						  -dbname           => $EST_REFDBNAME,
-						  -pass             => $EST_REFDBPASS,
+						  -host             => $REF_DBHOST,
+						  -user             => $REF_DBUSER,
+						  -dbname           => $REF_DBNAME,
+						  -pass             => $REF_DBPASS,
 						);
   
   my $ensembl_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						      '-host'   => $GB_DBHOST,
-						      '-user'   => $GB_DBUSER,
-						      '-pass'   => $GB_DBPASS,
-						      '-dbname' => $GB_DBNAME,
+						      '-host'   => $ENSEMBL_DBHOST,
+						      '-user'   => $ENSEMBL_DBUSER,
+						      #'-pass'   => $ENSEMBL_DBPASS,
+						      '-dbname' => $ENSEMBL_DBNAME,
 						     );
   
+
   my $estgene_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						      '-host'   => $EST_DBHOST,
-						      '-user'   => $EST_REFDBUSER,
-						      '-dbname' => $EST_DBNAME,
+						      '-host'   => $ESTGENE_DBHOST,
+						      '-user'   => $ESTGENE_REFDBUSER,
+						      '-dbname' => $ESTGENE_DBNAME,
 						      '-dnadb'  => $refdb,
 						     ); 
-  
+
+  my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						      '-host'   => $FINAL_DBHOST,
+						      '-user'   => $FINAL_REFDBUSER,
+						      '-dbname' => $FINAL_DBNAME,
+						      '-dnadb'  => $refdb,
+						     ); 
+
 
   # needs to read from two databases and write into another one (possibly a third?)
   
   $self->ensembl_db( $ensembl_db );
   $self->estgene_db( $estgene_db );
+  $self->final_db( $final_db );
 
   return $self;
   
@@ -134,6 +152,18 @@ sub estgene_db{
     $self->{'_estgene_db'} = $db;
   }
   return $self->{'_estgene_db'};
+}
+
+
+#############################################################
+
+sub final_db{
+  my ( $self, $db ) = @_;
+  if ( $db ){
+    $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
+    $self->{_final_db} = $db;
+  }
+  return $self->{_final_db};
 }
 
 
@@ -215,18 +245,30 @@ sub run{
   my ($self,@args) = @_;
 
   # get ensembl genes (from GeneBuilder)
-  $self->ensembl_genes( $self->ensembl_vc->get_Genes_by_Type( $GB_FINAL_GENETYPE, 'evidence' ) );
+  $self->ensembl_genes( $self->ensembl_vc->get_Genes_by_Type( $ENSEMBL_TYPE, 'evidence' ) );
   
   # get estgenes ( from EST_GeneBuilder )
-  $self->estgenes( $self->estgene_vc->get_Genes_by_Type( $EST_GENOMEWISE_GENETYPE, 'evidence' ) ); 
+  $self->estgenes( $self->estgene_vc->get_Genes_by_Type( $ESTGENE_TYPE, 'evidence' ) ); 
   
   # cluster estgenes and ensembl genes
   my @genes             = ( $self->ensembl_genes, $self->estgenes );
   my @gene_clusters     = $self->cluster_Genes( @genes );
   my @unclustered_genes = $self->unclustered_Genes;
   
-  # on each cluster, pair the transcripts
+  # the accepted set of transcripts
   my @transcripts;
+ 
+  # at this stage we could separate the clusters into three sorts:
+
+  # 1) only ensembl genes --> we leave them as they are
+  # 2) ensembl+est genes  -->  first: extend UTRs
+  #                           second: include alternative forms (do checks) 
+  # 3) only est genes     --> if only 1 in the cluster, take it if good coverage 
+  #                       --> if more: take a set that share exons among themselves (exact matches)
+  #                                    not necessarily all the same exon, it should be the
+  #                                    largest connected graph where vertices are trnascripts and
+  #                                    edges is the relation 'share an exon'
+ 
  CLUSTER:
   foreach my $cluster ( @gene_clusters ){
     
@@ -255,7 +297,7 @@ sub run{
     
     # else we could have only ensembl genes
     elsif(  @ens_genes && !@est_genes ){
-      # we have nothing to modify them, hence...
+      # we have nothing to modify them, hence we accept them...
       foreach my $gene ( @ens_genes ){
 	push ( @transcripts, $gene->each_Transcript );
       }
@@ -281,9 +323,10 @@ sub run{
   } # end of CLUSTER
   
   # make the genes ( this goes through a clustering as in GeneBuilder )
-  my @new_genes    = $self->_make_Genes(\@transcripts);
+  my @newgenes = $self->_make_Genes(\@transcripts);
+
   
-  my @remapped = $self->_remap_Genes(\@new_genes);
+  my @remapped  = $self->_remap_Genes(\@new_genes);
 
   # store genes
   $self->output(@remapped);
@@ -448,10 +491,30 @@ sub _pair_Transcripts{
   my $overlap_number_matrix;
   my $overlap_length_matrix;
   
+  my %merge_list;
+
   # we base everything on the ensembl transcripts
  ENS_TRANSCRIPT:
   foreach my $ens_tran ( @ens_transcripts ){
     
+    foreach my $est_tran ( @est_transcripts ){
+      
+      # check with which est_transcripts it can merge
+      my ($merge,$overlaps) = $self->_test_for_Merge( $ens_tran, $est_tran );
+      if ($merge == 1 && $overlaps > 0 ){
+	
+	# check with which it can combine UTRs 
+	
+
+	push( @{ $merge_list{$est_tran} }, $est_tran );
+      
+	# calculate then how much they overlap
+	my ($overlap_number,$overlap_length) = _compare_Transcripts( $ens_tran, $est_tran );
+	
+      }
+    }
+  }
+
     # first calculate all possible overlaps with est_transcripts
     my @overlap_pairs;
     foreach my $est_tran ( @est_transcripts ){
@@ -638,7 +701,185 @@ sub _pair_Transcripts{
   return ( @ens_transcripts, @accepted_isoforms );
 
 }
+#########################################################################
 
+# this function just checks whether an ensembl transcript has the first and last exon
+# matching the internal coordinates of one est transcript so that it can be potentially used
+# for extending UTRs
+
+sub _test_for_extendable_UTRs{
+  
+  my ($self,$ens_tran, $est_tran) = @_;
+  
+  my $ens_translation = $ens_tran->translation;
+  my @ens_exons       = $ens_tran->get_all_Exons;
+  my $strand          = $ens_exons[0]->strand;
+
+  # we only look at the start and end of the translations in the ensembl gene
+  my $ens_t_start_exon = $ens_translation->start_exon;
+  my $ens_t_end_exon   = $ens_translation->end_exon;
+  
+  my @est_exons = $est_tran->get_all_Exons;
+  
+  # sorting paranoia
+  if ( $strand == 1 ){
+    @est_exons = sort { $a->start <=> $b->start } @est_exons;
+    @ens_exons = sort { $a->start <=> $b->start } @ens_exons;
+  }
+  if ( $strand == -1 ){
+    @est_exons = sort { $b->start <=> $b->start } @est_exons;
+    @ens_exons = sort { $b->start <=> $b->start } @ens_exons;
+  }
+
+  my $modified = 0;
+  my $accept = 1;
+ EST_EXON:
+  for ( my $i=0; $i< $#est_exons; $i++ ){
+    
+  FORWARD:
+    if ( $strand == 1 ){
+      
+      # check first the 5' UTR
+      
+      # if one est_exon has a coinciding end with the ens_exon where the translation starts
+      if ( $est_exons[$i]->end == $ens_t_start_exon->end &&
+	   $est_exons[$i]->start <= $ens_t_start_exon->start ){
+
+	# check that this est_exon does not start on top of another previous ens_exon
+       	# we accept this situation:               Not this one:    
+	#      __      __                                 __      __
+	#     |__|----|__|--- ...   ens_tran             |__|----|__|--- ...
+	#            ____                                   ________
+	#           |____|--- ...   est_tran               |________|---  ...
+	my $ok = 1;
+	foreach my $prev_exon ( @ens_exons ){
+	  if ( $prev_exon eq $ens_t_start_exon ){
+	    last;
+	  }
+	  if( $prev_exon->end >= $est_exons[$i]->start ){
+	    $ok = 0;
+	  }
+	}
+	if ( $ok == 0 ){
+	  # the est_exon starts on top of another exon, what should we do?
+	  last EST_EXON;
+	}
+      }
+     
+      # now check the 3' UTR
+      if ( $est_exons[$i]->start == $ens_t_end_exon->start &&
+	   $est_exons[$i]->end >= $ens_t_end_exon->end ){
+	
+	# check that this est_exon does not end on top of another of the following ens_exon's
+       	my $ok = 1;
+	# we sort them in the opposite direction
+	@ens_exons = sort {$b->start <=> $a->start} @ens_exons;
+	foreach my $next_exon ( @ens_exons ){
+	  if ( $next_exon eq $ens_t_end_exon ){
+	    last;
+	  }
+	  if( $next_exon->start <= $est_exons[$i]->end ){
+	    $ok = 0;
+	  }
+	}
+	if ( $ok == 0 ){
+	  # the est_exon end on top of another following exon, what should we do?
+	  last EST_EXON;
+	}
+      }
+	
+    } # end of strand == 1
+
+  REVERSE:
+    if ( $strand == -1 ){
+      
+      # check first the 5' UTR
+      # if one est_exon has a coinciding end with the ens_exon where the translation starts
+      if ( $est_exons[$i]->start == $ens_t_start_exon->start &&
+	   $est_exons[$i]->end >= $ens_t_start_exon->end ){
+	
+	# check that this est_exon does not end on top an ens_exon on the right of $ens_t_start_exon, i.e.
+       	# we accept a situation like:               but not like:
+	#           __      __                             __      __
+	#  ...  ---|__|----|__|   ens_tran         ... ---|__|----|__|
+	#           ____                                   ________
+	#       ---|____|         est_tran         ... ---|________|
+	my $ok = 1;
+	foreach my $prev_exon ( @ens_exons ){
+	  if ( $prev_exon eq $ens_t_start_exon ){
+	    last;
+	  }
+	  if( $prev_exon->start <= $est_exons[$i]->end ){
+	    $ok = 0;
+	  }
+	}
+	if ( $ok == 0 ){
+	  # the est_exon ends on top of another ens_exon, what should we do?
+	}
+	if ( $ok ){
+	  # let's merge them
+	  my $tstart = $ens_translation->start;
+	  $tstart += ( $est_exons[$i]->end - $ens_t_start_exon->end );
+	  $ens_t_start_exon->end( $est_exons[$i]->end );
+	  $ens_tran->translation($tstart);
+	  
+	  # add the est evidence to be able to see why we modified this exon
+	  foreach my $evidence ( $est_exons[$i]->each_Supporting_Feature ){
+	    $ens_t_start_exon->add_Supporting_Feature( $evidence );
+	  }
+	  
+	  # we need to add any possible extra UTR est_exons
+	  # but need to check possible incompatibilities with  previous ens_exons
+	  $ens_tran = $self->_add_5prime_exons($ens_tran, $est_tran, $est_exons[$i], $i);
+	  $modified = 1;
+	}
+      }
+            
+      # now check the 3' UTR
+      if ( $est_exons[$i]->end == $ens_t_end_exon->end &&
+	   $est_exons[$i]->start <= $ens_t_end_exon->start ){
+	
+	# check that this est_exon does not start on top of another ens_exon on the left of $ens_t_end_exon
+       	my $ok = 1;
+	# we sort them in the opposite direction
+	@ens_exons = sort {$a->start <=> $b->start} @ens_exons;
+	foreach my $next_exon ( @ens_exons ){
+	  if ( $next_exon eq $ens_t_end_exon ){
+	    last;
+	  }
+	  if( $next_exon->end >= $est_exons[$i]->start ){
+	    $ok = 0;
+	  }
+	}
+	if ( $ok == 0 ){
+	  # the est_exon end on top of another following exon, what should we do?
+	}
+	if ( $ok ){
+	  # let's merge them
+	  $ens_t_end_exon->start( $est_exons[$i]->start );
+	  $ens_translation->end_exon( $ens_t_end_exon );
+	  # no need to change ens of translation as this is counted from the end of the
+	  # translation->end_exon
+
+	  # add the est evidence to be able to see why we modified this exon
+	  foreach my $evidence ( $est_exons[$i]->each_Supporting_Feature ){
+	    $ens_t_end_exon->add_Supporting_Feature( $evidence );
+	  }
+	  
+	  # we need to add any possible extra UTR est_exons
+	  $ens_tran = $self->_add_3prime_exons($ens_tran, $est_tran, $est_exons[$i], $i);
+	  $modified = 1;
+	}
+      }
+	
+    } # end of strand == -1
+    
+    
+  }   # end of EST_EXON
+
+  return ($est_tran,$modified);
+
+}
 #########################################################################
 
 # this function takes est_transcripts that have been clustered together
@@ -647,16 +888,140 @@ sub _pair_Transcripts{
 
 sub _check_est_Cluster{
   my ($self,@est_transcripts) = @_;
+  my %color;
 
-  my $magic_wand;
+  # adjacency lists:
+  my %adj;
+  
+  for(my $i=1;$i<=scalar(@est_transcripts);$i++){
+    for(my $j=1;$j<=scalar(@est_transripts);$j++){
+      
+      next if $j==$i;
+      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j] ) ){
+	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
+      }
+    }
+  }
+  
+  foreach my $tran ( @est_transcripts ){
+    $color{$trans} = "white";
+  }
+  
+  my @potential_genes;
+  
+  # find the connected components doing a depth-first search
+  foreach my $tran ( @est_transcripts ){
+    if ( $color{$trans} eq 'white' ){
+      my $potential_gene = [];
+      $self->_visit( $tran, \%color, \%adj, $potential_gene);
+      push ( @potential_genes, $potential_gene );
+    }
+  }
+  print STDERR scalar(@potential_genes)." genes created\n";
+  
+  # take only the sets with more than one transcript:
+  @potential_genes = sort { scalar( @{ $b } ) <=> scalar( @{ $a } ) } @potential_genes;
+  my @accepted;
+  my $first_gene = shift @potential_genes;
+  while ( scalar( @{ $first_gene } ) > 0 ){
+    push( @accepted, @{ $first_gene } );
+    $first_gene = shift @potential_genes;
+  }
+  return @accepted;
+}
+
+sub _visit{
+  my ($self, $node, $color, $adj, $potential_gene) = @_;
+  
+  # node is a transcript object;
+  $color->{ $node } = 'gray';
+
+  foreach my $trans ( @{ $adj->{$node} } ){
+    if ( $color->{ $trans } eq 'white' ){
+      $self->_visit( $trans, $color, $adj, $potential_gene );
+    }
+  }
+  unless ( $color->{$node} eq 'black'){
+    push( @{ $potential_gene }, $node );
+  }
+  $color->{ $node } = 'black';    
+  #$self->_print_Transcript($node);
+  return;
+}
+  
+sub _print_Transcript{
+  my ($self,$transcript) = @_;
+  print STDERR "transcript: $transcript\n";
+  foreach my $exon ( $transcript->get_all_Exons ){
+    print $exon->start."-".$exon->end." ";
+  }
+  print STDERR "\n";
+}
+
+
+#########################################################################
+
+# having a set of est_genes only, we have no reference transcript (ensembl one),
+# so to determine whether two transcripts are two alternative forms of the same gene
+# we check whether they share an exon and they have a similar protein product
+
+sub _check_exact_exon_Match{
+ my ($self, $tran1, $tran2 ) = @_;
+ my @exons1 = $tran1->get_all_Exons;
+ my @exons2 = $tran2->get_all_Exons;
+ my $exact_match = 0;
  
-  return @est_transcripts;
+ #check whether both translations are related to each other
+ my $seq1;
+ my $seq2;
+
+ my $compatible_protein = 0;
+ eval{
+   $seq1 = $tran1->translate;
+   $seq2 = $tran2->translate;
+ };
+ if ( $seq1 && $seq2 ){
+
+   if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
+     print STDERR "On of the peptides has a stop codon\n";
+     return 0;
+   }
+   if ( $seq1 eq $seq2 ){
+     print STDERR "Identical translation\n";
+     $compatible_proteins = 1;
+   }
+   elsif( $seq1 =~/$seq2/ || $seq2 =~/$seq1/ ){
+     $compatible_proteins = 1;
+   }
+ }
+
+ # how many exact matches we need (maybe 1 is enough)
+ foreach my $exon1 (@exons1){
+   foreach my $exon2 (@exons2){
+     next unless ( $exon1->start == $exon2->start && $exon2->end == $exon2->end );
+     $exact_match++;
+   }
+ }
+ 
+ if ( $exact_match != 0 && $compatible_proteins != 0 ){
+   return 1;
+ }
+ else{
+   return 0;
+ }
 }
 
 #########################################################################
 
 # this function checks whether two transcripts merge
 # according to consecutive exon overlap
+# it only considers 1-to-1 matches, so things like
+#                        ____     ____        
+#              exons1 --|____|---|____|------ etc... $j
+#                        ____________  
+#              exons2 --|____________|------ etc...  $k
+#
+# are considered a mismatch
 
 sub _test_for_Merge{
   my ($self,$tran1,$tran2) = @_;
@@ -668,6 +1033,9 @@ sub _test_for_Merge{
   my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
   my $merge     = 0; # =1 if they merge
 
+  my $one2one_overlap = 0;
+  my $one2two_overlap = 0;
+  my $two2one_overlap = 0;
  EXON1:
   for (my $j=0; $j<=$#exons1; $j++) {
     
@@ -685,7 +1053,8 @@ sub _test_for_Merge{
 	if ( $k != 0 && $exons1[$j]->overlaps($exons2[$k-1]) ){
 	  #print STDERR ($j+1)." <--> ".($k)."\n";
 	  $overlaps++;
-          next EXON1;
+	  $two2one_overlap++;
+	  next EXON1;
 	}
       }
       
@@ -730,23 +1099,30 @@ sub _test_for_Merge{
 	my $addition = 0;
 	while ( $k+1+$addition < scalar(@exons2) && $exons1[$j]->overlaps($exons2[$k+1+$addition]) ){
 	  #print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
+	  $one2two_overlap++;
 	  $overlaps++;
           $addition++;
 	}      
 	$start = $k+1+$addition;
 	next EXON1;
       }    
-    
+      
     } # end of EXON2 
-  
+    
+    # if you haven't found any match for this exon1, start again from the first exon2:
     if ($foundlink == 0){
       $start = 0;
     }
  
   }   # end of EXON1      
 
-  # if we haven't returned at this point, they don't merge, thus
-  return ($merge,$overlaps);
+  # we only make them merge if $merge = 1 and th2 2-to-1 and 1-to-2 overlaps are zero;
+  if ( $merge == 1 && $one2two_overlap == 0 && $two2one_overlap == 0 ){
+    return ( 1, $overlaps );
+  }
+  else{
+    return ( 0, $overlaps);
+  }
 }
   
 #########################################################################
@@ -1168,7 +1544,7 @@ sub _clone_Exon{
 sub _make_Genes{
   my ( $self, @transcripts ) = @_;
 
-  my $genetype = 'est_combined';
+  my $genetype = $FINAL_TYPE;
 
   # sort out analysis here or we will get into trouble with duplicate analyses
   my $ana_Adaptor = $self->dbobj->get_AnalysisAdaptor;
@@ -1190,7 +1566,7 @@ sub _make_Genes{
 					        -gff_source      => $genetype,
 					        -gff_feature     => 'gene',
 					        -logic_name      => $genetype,
-					        -module          => 'Combine_GeneBuilder_EstGenes',
+					        -module          => 'GeneCombiner',
 					      );
   }
 
@@ -1202,7 +1578,7 @@ sub _make_Genes{
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
     $count++;
-
+    
     # create a new gene object out of this transcript
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
@@ -1262,7 +1638,15 @@ sub _make_Genes{
   
   } # end of TRANSCRIPT
 
-  return @genes;
+  my @clusters = $self->_cluster_into_Genes(@genes);
+
+  my @newgenes;
+
+  make genes here....
+
+
+
+  return @newgenes;
 }
 
 ###################################################################
@@ -1373,6 +1757,160 @@ GENE:
   
   return @new_genes;
 }
+
+
+
+
+
+#########################################################################
+
+sub _cluster_into_Genes{
+  my ($self,$genes2cluster) = @_;
+  my $num_old_genes = 0;
+  my @genes2cluster = @$gene2cluster;
+  my @transcripts_unsorted;
+  
+  foreach my $gene ( @$gene2cluster ){
+    $num_old_genes++;
+    foreach my $tran ($gene->each_Transcript) {
+      push(@transcripts_unsorted, $tran);
+    }
+  }
+  
+  my @transcripts = sort by_transcript_high @transcripts_unsorted;
+  my @clusters;
+
+  # clusters transcripts by exon overlap 
+  foreach my $tran (@transcripts) {
+    
+    # store all clusters to which this transcript can match
+    my @matching_clusters;
+  CLUSTER: 
+    foreach my $cluster (@clusters) {
+      foreach my $cluster_transcript (@$cluster) {
+        foreach my $exon1 ($tran->get_all_Exons) {
+	  
+          foreach my $cluster_exon ($cluster_transcript->get_all_Exons) {
+            if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+              push (@matching_clusters, $cluster);
+              next CLUSTER;
+            }
+          }
+        }
+      }
+    }
+    
+    if (scalar(@matching_clusters) == 0) {
+      my @newcluster;
+      push(@newcluster,$tran);
+      push(@clusters,\@newcluster);
+    } 
+    elsif (scalar(@matching_clusters) == 1) {
+      push (@{ $matching_clusters[0] }, $tran);
+    } 
+    else {
+      # Merge the matching clusters into a single cluster
+      my @new_clusters;
+      my @merged_cluster;
+      foreach my $clust (@matching_clusters) {
+        push @merged_cluster, @$clust;
+      }
+      push @merged_cluster, $tran;
+      push @new_clusters,\@merged_cluster;
+      # Add back non matching clusters
+      foreach my $clust (@clusters) {
+        my $found = 0;
+      MATCHING: 
+	foreach my $m_clust (@matching_clusters) {
+          if ($clust == $m_clust) {
+            $found = 1;
+            last MATCHING;
+          }
+        }
+        if (!$found) {
+          push @new_clusters,$clust;
+        }
+      }
+      @clusters =  @new_clusters;
+    }
+  }
+  
+  # safety and sanity checks
+  $self->check_Clusters(scalar(@transcripts), $num_old_genes, \@clusters);
+
+  # @clusters is an array of arrayrefs, and each of those arrayrefs contain
+  # the set of transcripts that have been clustered together
+
+  # check the version by Steve where he uses TranscriptCluster objects, etc...
+
+  return @clusters;
+}
+
+sub check_Clusters{
+  my ($self, $num_transcripts, $num_old_genes, $clusters) = @_;
+  
+  #Safety checks
+  my $ntrans = 0;
+  my %trans_check_hash;
+  foreach my $cluster (@$clusters) {
+    $ntrans += scalar(@$cluster);
+    foreach my $trans (@$cluster) {
+      if (defined($trans_check_hash{"$trans"})) {
+        $self->throw("Transcript " . $trans->dbID . " added twice to clusters\n");
+      }
+      $trans_check_hash{"$trans"} = 1;
+    }
+    if (!scalar(@$cluster)) {
+      $self->throw("Empty cluster");
+    }
+  }
+  if ($ntrans != $num_transcripts) {
+    $self->throw("Not all transcripts have been added into clusters $ntrans and " . $num_transcripts. " \n");
+  } 
+  #end safety checks
+  
+  if (scalar(@$clusters) < $num_old_genes) {
+    $self->warn("Reclustering reduced number of genes from " . 
+		$num_old_genes . " to " . scalar(@$clusters). "\n");
+  } elsif (scalar(@$clusters) > $num_old_genes) {
+    $self->warn("Reclustering increased number of genes from " . 
+		$num_old_genes . " to " . scalar(@$clusters). "\n");
+  }
+
+}
+
+sub by_transcript_high {
+  my $alow;
+  my $blow;
+  my $ahigh;
+  my $bhigh;
+
+  if ($a->start_exon->strand == 1) {
+    $alow = $a->start_exon->start;
+    $ahigh = $a->end_exon->end;
+  } 
+  else {
+    $alow = $a->end_exon->start;
+    $ahigh = $a->start_exon->end;
+  }
+
+  if ($b->start_exon->strand == 1) {
+    $blow = $b->start_exon->start;
+    $bhigh = $b->end_exon->end;
+  } 
+  else {
+    $blow = $b->end_exon->start;
+    $bhigh = $b->start_exon->end;
+  }
+
+  if ($ahigh != $bhigh) {
+    return $ahigh <=> $bhigh;
+  } 
+  else {
+    return $alow <=> $blow;
+  }
+}
+
 
 #########################################################################
 
