@@ -58,14 +58,14 @@ use vars qw( %FirstEF );
 	    FEF_QUEUE => 'acari',
 
 	    # Stipulate the size of the slices that firstef should run on.
-	    FEF_CHUNKSIZE => ''.
+	    FEF_CHUNKSIZE => '500000',
 
 	    # Name of the script that actually runs the analysis for each slice.
 	    FEF_RUN_SCRIPT => '',
 
 	    # Reference database where assemble, chromosome, dna, etc information is stored.
-	    FEF_REFDBHOST => '',
-	    FEF_REFDBUSER => '',
+	    FEF_REFDBHOST => 'kaka',
+	    FEF_REFDBUSER => 'anonymous',
 	    FEF_REFDBNAME => '',
 
 	    # The database where the firstef features will be written
@@ -77,13 +77,13 @@ use vars qw( %FirstEF );
 	    # Directory where firstef.* binaries and FirstEF_parser.pl 
 	    # are located.  At runtime, the runnable determines which
 	    # platform specific binary should be used.
-	    FEF_APPLICATION_DIR => '/usr/local/ensembl/firstef/',
+	    FEF_APPLICATION_DIR => '',
 
 	    # Usually, this directory is a sub-directory of the firstef
 	    # application directory called 'parameters'.  This directory
 	    # contains all of the training data that firstef uses for
 	    # identifying first exons.
-	    FEF_PARAMETER_DIR   => '/usr/local/ensembl/firstef/parameters',
+	    FEF_PARAMETER_DIR   => '',
 	   );
 
 sub import {
@@ -91,8 +91,8 @@ sub import {
   my $pack = shift; # Need to move package off @_
   
   # Get list of variables supplied, or else
-  # all of General:
-  my @vars = @_ ? @_ : keys( %General );
+  # all of FirstEF:
+  my @vars = @_ ? @_ : keys( %FirstEF );
   return unless @vars;
   
   # Predeclare global variables in calling package
@@ -102,14 +102,14 @@ sub import {
 
 
     foreach (@vars) {
-	if ( defined $General{ $_ } ) {
+	if ( defined $FirstEF{ $_ } ) {
             no strict 'refs';
 	    # Exporter does a similar job to the following
 	    # statement, but for function names, not
 	    # scalar variables:
-	    *{"${callpack}::$_"} = \$General{ $_ };
+	    *{"${callpack}::$_"} = \$FirstEF{ $_ };
 	} else {
-	    die "Error: General: $_ not known\n";
+	    die "Error: FirstEF: $_ not known\n";
 	}
     }
 }
