@@ -1,6 +1,12 @@
+package Bio::EnsEMBL::Pipeline::SubmissionSystem::Local;
+
 use strict;
 use warnings;
 
+use Bio::EnsEMBL::Pipeline::Load;
+
+my $children = 0;
+my @_queue;
 
 =head2 new
 
@@ -49,9 +55,64 @@ sub submit {
   my $self = shift;
   my $job  = shift;
 
+  # Check params
+  unless(ref($job) && $job->isa('Bio::EnsEMBL::Job')) {
+    $self->throw('expected Bio::EnsEMBL::Job argument');
+  }
+
+  $SIG{CHLD} = \&sig_chld;
+
+  unshift @_queue, $job;
+
+  while ($#_queue >= 0) {
+
+    if ($children < 2) {
+
+      my $job = shift @_queue;
+
+      if (my $pid = fork) { # fork returns PID of child to parent, 0 to child
+	
+	# PARENT
+	$children++;
+	print "Size of children is now " . $children . "; " . ($#_queue+1) . " jobs left in queue\n";
+	
+      } else {
+	
+	#CHILD
+	print "Executing $job with PID $$\n";
+	$job->submission_id($$);
+	$job->adaptor->update($job);
+	$job->set_current_status('SUBMITTED');
+	$job->run();
+	
+      }
+
+    } else {
+
+      sleep(2);
+
+    }
+
+  }
+
+  # wait for any children to complete
+  while ($children > 0) {
+
+    print "$children children still running, waiting ...\n";
+    sleep(2);
+
+  }
+
+
 }
 
 
+sub sig_chld {
+
+  $children--;
+  print "Child died; children now $children\n"; 
+
+}
 
 =head2 create_job
 
@@ -68,10 +129,49 @@ sub submit {
 =cut
 
 sub create_job {
-	
-  my $self = shift;
+
+  my ($self, $taskname, $module, $input_id, $parameter_string) = @_;
+
+  my $config = $self->get_Config();
+  my $job_adaptor = $config->db()->get_JobAdaptor();
+
+  my $job = new Bio::EnsEMBL::Job->new($taskname, $module, $input_id, $parameter_string);
+
+  $job_adaptor->store($job);
+
+  return $job;
 
 }
+
+
+=head2 kill
+
+  Arg [1]    : Bio::EnsEMBL::Pipeline::Job
+  Example    : $lsf_sub_system->kill($job);
+  Description: kills a job that has been submitted already
+  Returntype : none
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub kill {
+
+  my $self = shift;
+  my $job  = shift;
+
+  my $job_id = $job->dbID;
+
+  my $rc = system('kill', '-3', $job_id);     # is -3 enough?
+
+  if($rc & 0xffff) {
+    $self->warn("kill of job $job_id returned non-zero exit status $!");
+    return;
+  }
+
+  $job->update_status('KILLED');
+}
+
 
 =head2 flush
 
