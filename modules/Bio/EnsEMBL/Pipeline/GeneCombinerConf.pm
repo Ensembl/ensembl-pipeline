@@ -63,6 +63,9 @@ my $prefix='COB';
 		     
 		     # gene type for est-genes
 		     ESTGENE_TYPE                => 'genomewise',
+
+		     # max intron length for genomewise transcripts beyond which the transcript will be rejected
+		     ESTGENE_MAX_INTRON_LENGTH   => 5000000,
 		     
 		     # db from which we get ensembl genes
 		     ENSEMBL_DBHOST              => 'ecs1a',
