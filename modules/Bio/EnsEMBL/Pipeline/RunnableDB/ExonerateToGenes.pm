@@ -74,14 +74,15 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($database, $rna_seqs, $query_type, $target_type, $exonerate, $options) =  $self->_rearrange([qw(
-												      DATABASE 
-												      RNA_SEQS
-												      QUERY_TYPE
-												      TARGET_TYPE
-												      EXONERATE
-												      OPTIONS
-												     )], @args);
+  my ($database, $rna_seqs, $query_type, $target_type, $exonerate, $options) =  
+      $self->_rearrange([qw(
+			    DATABASE 
+			    RNA_SEQS
+			    QUERY_TYPE
+			    TARGET_TYPE
+			    EXONERATE
+			    OPTIONS
+			    )], @args);
   
   # must have a query sequence
   unless( @{$rna_seqs} ){
@@ -184,31 +185,26 @@ sub run{
     
   }
   
+  ############################################################
   #filter the output
   my @filtered_results = $self->filter_output(@results);
   
+  ############################################################
   # make genes out of the features
   my @genes = $self->make_genes(@filtered_results);
   
+  ############################################################
   # print out the results:
   foreach my $gene (@genes){
-    foreach my $trans (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
-      foreach my $exon (@{$trans->get_all_Exons}){
-	foreach my $evi (@{$exon->get_all_supporting_features}){
-	  print STDERR $evi->hseqname." ".
-	    $evi->start." ".$evi->end." ".
-	      $evi->hstart." ".$evi->hend." ".
-		$evi->primary_tag." ".$evi->source_tag."\n";
-	}
+      foreach my $trans (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
       }
-    }
   }
-  
+
+  ############################################################
   # need to convert coordinates?
   my @mapped_genes = $self->convert_coordinates( @genes );
-  print STDERR "mapped_gene is a $mapped_genes[0]\n";
-
+  
   $self->output(@mapped_genes);
 }
 
@@ -216,50 +212,78 @@ sub run{
 
 sub filter_output{
   my ($self,@results) = @_;
-
-  # recall that the results are Bio::EnsEMBL::SeqFeatures
-  # where each one contains a set of sub_SeqFeatures representing the exons
-
+  
+  # results are Bio::EnsEMBL::Transcripts with exons and supp_features
+  
   my @good_matches;
 
   my %matches;
-  foreach my $result (@results ){
-    push ( @{$matches{$result->seqname}}, $result );
+  foreach my $transcript (@results ){
+      my $id = $self->_evidence_id($transcript);
+      push ( @{$matches{$id}}, $transcript );
   }
   
   my %matches_sorted_by_coverage;
   my %selected_matches;
+ RNA:
   foreach my $rna_id ( keys( %matches ) ){
-    @{$matches_sorted_by_coverage{$rna_id}} = sort { $b->score <=> $a->score  } @{$matches{$rna_id}};
-    
-    my $max_score;
-    print STDERR "matches for $rna_id:\n";
-    foreach my $match ( @{$matches_sorted_by_coverage{$rna_id}} ){
-      unless ($max_score){
-	$max_score = $match->score;
-      }
-      foreach my $sub_feat ( $match->sub_SeqFeature ){
-	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
-      }
-      my $score = $match->score;
+      @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->coverage($a) } @{$matches{$rna_id}};
       
-      # we keep anything which is 
-      # within the 2% fo the best score
-      # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
-      if ( $score >= (0.98*$max_score) && 
-	   $score >= $EST_MIN_COVERAGE && 
-	   $match->percent_id >= $EST_MIN_PERCENT_ID ){
-
-	print STDERR "Accept!\n";
-	push( @good_matches, $match);
+      my $max_score;
+      print STDERR "matches for $rna_id:\n";
+    TRANSCRIPT:
+      foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
+	  unless ($max_score){
+	      $max_score = $self->_coverage($transcript);
+	  }
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($transcript);
+	  my $score = $self->_coverage($transcript);
+	  
+	  ############################################################
+	  # we keep anything which is 
+	  # within the 2% fo the best score
+	  # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
+	  if ( $score >= (0.98*$max_score) && 
+	       $score >= $EST_MIN_COVERAGE && 
+	       $self->_percent_id($transcript) >= $EST_MIN_PERCENT_ID ){
+	      
+	      print STDERR "Accept!\n";
+	      push( @good_matches, $transcript);
+	  }
+	  else{
+	      print STDERR "Reject!\n";
+	  }
       }
-      else{
-	print STDERR "Reject!\n";
-      }
-    }
   }
   
   return @good_matches;
+}
+
+############################################################
+
+sub _evidence_id{
+    my ($self,$tran) = @_;
+    my @exons = @{$tran->get_all_Exons};
+    my @evi = @{$exons[0]->get_all_supporting_features};
+    return $evi[0]->hseqname;
+}
+
+############################################################
+
+sub _coverage{
+    my ($self,$tran) = @_;
+    my @exons = @{$tran->get_all_Exons};
+    my @evi = @{$exons[0]->get_all_supporting_features};
+    return $evi[0]->score;
+}
+
+############################################################
+
+sub _percent_id{
+    my ($self,$tran) = @_;
+    my @exons = @{$tran->get_all_Exons};
+    my @evi = @{$exons[0]->get_all_supporting_features};
+    return $evi[0]->percent_id;
 }
 
 ############################################################
@@ -290,50 +314,17 @@ sub write_output{
 ############################################################
 
 sub make_genes{
-  my ($self,@features) = @_;
+    my ($self,@transcripts) = @_;
   
-  my @genes;
-  foreach my $feature ( @features ){
-    my $transcript = Bio::EnsEMBL::Transcript->new();
-    my $gene       = Bio::EnsEMBL::Gene->new();
-    $gene->analysis($self->analysis);
-    $gene->type($self->analysis->gff_feature);
-    
-    $gene->add_Transcript($transcript);
-    
-    foreach my $sub_feature ($feature->sub_SeqFeature){
-      # each sub_feature is a feature pair
-      
-      # make the exon out of the feature1 (the genomic feature)
-      my $exon = Bio::EnsEMBL::Exon->new();
-      $exon->seqname($sub_feature->feature1->seqname);
-      $exon->contig($sub_feature->feature1->contig);
-      $exon->start  ($sub_feature->feature1->start);
-      $exon->end    ($sub_feature->feature1->end);
-      $exon->strand ($sub_feature->feature1->strand);
-      
-      # we haven't set any translations here!!
-      $exon->phase    (0);
-      $exon->end_phase(0);
-      # score is actually the coverage for the entire rna/est transcript
-      $exon->score      ($sub_feature->feature1->score);
-      $exon->adaptor    ($self->db->get_ExonAdaptor);
-      
-      # what about the supporting evidence?
-      my @supp_features = ($sub_feature);
-      my $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
-      $supp_feature->contig     ($exon->contig);
-      $supp_feature->seqname    ($sub_feature->feature1->seqname);
-      $supp_feature->score      ($sub_feature->feature2->score);
-      $supp_feature->percent_id ($sub_feature->feature2->percent_id);
-      $supp_feature->analysis   ($self->analysis );
-      
-      $exon->add_supporting_features($supp_feature);
-      $transcript->add_Exon($exon);
+    my @genes;
+    foreach my $tran ( @transcripts ){
+	my $gene       = Bio::EnsEMBL::Gene->new();
+	$gene->analysis($self->analysis);
+	$gene->type($self->analysis->gff_feature);
+        $gene->add_Transcript($tran);
+	push( @genes, $gene);
     }
-    push( @genes, $gene);
-  }
-  return @genes;
+    return @genes;
 }
 
 ############################################################
@@ -344,7 +335,6 @@ sub convert_coordinates{
   my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
   my $slice_adaptor     = $self->db->get_SliceAdaptor;
   
-
   my @transformed_genes;
  GENE:
   foreach my $gene (@genes){
