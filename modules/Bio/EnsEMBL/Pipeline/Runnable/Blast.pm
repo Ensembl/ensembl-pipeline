@@ -226,7 +226,7 @@ sub run_analysis {
 	    unless (system ($self->program . ' ' . 
 			    $database      . ' ' .
 			    $self->filename. ' ' .
-			    $self->options . ' > ' . 
+			    $self->options . ' >> ' . 
 			    $self->results) == 0) ;
     }
 }
@@ -360,7 +360,6 @@ sub parse_results {
       }
 	  
       my ($ug) = $name =~ m{/ug=(.*?)\ };
-      $name =~ s/^>(\S+).*/$1/;
 
       if ($name =~ /\|UG\|(\S+)/) {
 # scp - unigene ID 'patch'
@@ -371,8 +370,12 @@ sub parse_results {
          else {
              $name = $1;
          }
-      } elsif ($name =~ /\S+\|\S+\|(\S+)/) {
-         $name = $1;
+      }
+      elsif ($name =~ /\|emb\|(\S+)/) {
+	  $name = $1;
+      }
+      elsif ($name =~ /^(\S+) (\S+)/) {
+	  $name = $2 || $1;
       }
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
