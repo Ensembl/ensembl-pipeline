@@ -48,53 +48,133 @@ use Bio::EnsEMBL::DnaPepAlignFeature;
 #
 ###########################################################
 
+# parameter slice is optional. It makes sense to use it when working on fixed length slices.
+# If it is not used, the method can still be used to check consistency of the transcript
+# although always on chromosomal/slice coordinates, never in rawcontig coordinates.
+
 sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
-      
+    
+    # hardcoded stuff, to go in a config file
+    my $MAX_EXON_LENGTH   = 20000;
+    my $UNWANTED_EVIDENCE = "NG_";
+    my $MAX_INTRON_LENGTH = 2000000;
+    
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     
-    # never ever trus the order in which the exons come out! 
-    $transcript->sort;
+    my $strand =  $transcript->start_Exon->strand;
 
+    $transcript->sort;
+    
+    ############################################################
     # check that transcripts are not completely outside the slice
-    if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	print STDERR "transcript $id outside the slice\n";
-	$valid = 0;
-    }
-    # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
-    elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	print STDERR "transcript $id falls off the slice by its lower end\n";
-	$valid = 0;
+    # allow transcripts that fall partially off the slice only at 
+    # one end, the 'higher' end of the slice
+    ############################################################
+    if ( $slice ){
+	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
+	    print STDERR "transcript $id outside the slice\n";
+	    $valid = 0;
+	}
+	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+	    print STDERR "transcript $id falls off the slice by its lower end\n";
+	    $valid = 0;
+	}
     }
     
-    
+
     my @exons = @{$transcript->get_all_Exons};
     
-    if ($#exons > 0) {
-	for (my $i = 1; $i <= $#exons; $i++) {
-	    
-	    # check phase consistency:
-	    if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-		print STDERR "transcript $id has phase inconsistency\n";
+    if (scalar(@exons) > 1 ) {
+
+      EXON:
+	for (my $i = 0; $i <= $#exons; $i++) {
+
+	    ##############################
+	    # check exon length
+	    ##############################
+	    my $length = $exons[i]->end - $exons[i] + 1;
+	    if ( $length > $MAX_EXON_LENGTH ){
+		print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 		$valid = 0;
-		last;
+		last EXON;
 	    }
 	    
-	    # check for folded transcripts
-	    if ($exons[0]->strand == 1) {
-		if ($exons[$i]->start < $exons[$i-1]->end) {
-		    print STDERR "transcript $id folds back on itself\n";
+	    
+	    if ( $i>0 ){
+		##############################
+		# check phase consistency:
+		##############################
+		if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+		    print STDERR "transcript $id has phase inconsistency\n";
 		    $valid = 0;
+		    last EXON;
+		}
+	    
+
+	    
+		##############################
+		# check intron length
+		##############################
+		if ( $strand == 1 ){
+		    my $intron_length = $exons[i]->start - $exons[i-1]->end -1;
+		    if ( $intron_length > $MAX_INTRON_LENGTH ){
+			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+			$valid = 0;
+			last EXON;
+		    }
+		}
+		elsif( $strand = -1 ){
+		    my $intron_length = $exons[i-1]->start - $exons[i]->end -1;
+		    if ( $intron_length > $MAX_INTRON_LENGTH ){
+			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+			$valid = 0;
+			last EXON;
+		    }
+		}
+		
+		##############################
+		# check for folded transcripts
+		##############################
+		if ($exons[0]->strand == 1) {
+		    if ($exons[$i]->start < $exons[$i-1]->end) {
+			print STDERR "transcript $id folds back on itself\n";
+			$valid = 0;
+			last EXON;
+		    } 
 		} 
-	    } 
-	    elsif ($exons[0]->strand == -1) {
-		if ($exons[$i]->end > $exons[$i-1]->start) {
-		    print STDERR "transcript $id folds back on itself\n";
+		elsif ($exons[0]->strand == -1) {
+		    if ($exons[$i]->end > $exons[$i-1]->start) {
+			print STDERR "transcript $id folds back on itself\n";
+			$valid = 0;
+			last EXON;
+		    } 
+		}
+	    }
+	    ############################################################
+	    # we don't want the NG_ entries going through, they are evil
+	    ############################################################
+	    foreach my $evidence (@{$exons[i]->get_all_supporting_features}){
+		if ( $evidence->hseqname=~/$UNWANTED_EVIDENCE/ ){
+		    print STDERR "transcript with evil evidence: ".$evidence->hseqname." skippping\n";
 		    $valid = 0;
-		} 
+		    next EXON;
+		}
 	    }
 	}
+	
+    }
+    elsif( scalar(@exons) == 1 ){
+	my $length =  $exons[0]->end - $exons[0]->start + 1;
+	if ( $length >  $MAX_EXON_LENGTH ){
+	    print STDERR "single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
+	    $valid = 0;
+	}
+    }
+    else{
+	print STDERR "transcript with no exons\n";
+	$valid = 0;
     }
     if ($valid == 0 ){
 	$self->_print_Transcript($transcript);
