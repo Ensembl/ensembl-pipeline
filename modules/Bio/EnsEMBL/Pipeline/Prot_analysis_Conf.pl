@@ -15,7 +15,7 @@ package main;
 %db_conf = (
 #	    'dbhost'      => 'ecs1b',
 	    'dbhost'      => '',
-
+ 
 #	    'dbname'      => 'human_110',
 	    'dbname'      => '',
 
@@ -39,50 +39,49 @@ package main;
 #	    'queue'       => '',
 		  'queue'       => '',
 		  
-#Location of the different databases
-		  'prints'      => '',
-		  
-		  'prosite'     => '',
-		  
-		  'profile'     => '',
-
-		  'pfam'        => '',
-
-		  'scanprosite'  => '',
+#Location of the peptide file (file containing predicted peptides in fasta format)
+		  #'pep_file'     => '/work4/mongin/dros/GeneBuild3/mapping/dros_pep.fa',
 
 		  'pep_file'     => '',
 
 #Put here all of the analysis which should be run, the analysis names are:
-#prints, prosite, profile, pfam, scanprosite, tmhmm, coils, signalp, seg
+#Prints, Prosite, Profile, Pfam, Tmhmm, ncoils, Signalp, Seg
 		  #'2berun' => 'prints,prosite',
 
 		  '2berun' => '',
 
-#Chunk size for each analysis 1 (whole genome but 1 entry at a time), 0 (give a full peptide dataset) and 2 if want to use the chunks...promise I will change it
+#Chunk size for each analysis 1 (whole genome but 1 entry at a time), 3 (give a full peptide dataset) and 2 if want to use the chunks...promise I will change it
 
-		  'prints_chunk' => '',
+		  #'Prints_chunk' => '2',
+		  'Prints_chunk' => '',
 		  
-		  'prosite_chunk' => '',
-		  
-		  'profile_chunk' => '',
+		  #'Prosite_chunk' => '3',
+		  'Prosite_chunk' => '',
 
-		  'pfam_chunk'    => '',
-		  
-		  'scanprosite_chunk' => '',
+		  #'Profile_chunk' => '2',
+		  'Profile_chunk' => '',
 
-		  'tmhmm_chunk'       => '',
-		  
-		  'coils_chunk'       => '',
+		  #'Pfam_chunk'    => '',
+		  'Pfam_chunk'    => '',
 
-		  'signalp_chunk'     => '',
+		  #'Tmhmm_chunk'       => '2',
+		  'Tmhmm_chunk'       => '',
 		  
-		  'seg_chunk'         => '',
+		  #'ncoils_chunk'       => '2',
+		  'ncoils_chunk'       => '',
+
+		  #'Signalp_chunk'     => '2',
+		  'Signalp_chunk'     => '',
+
+		  #'Seg_chunk'         => '3',
+		  'Seg_chunk'         => '',
 
 #paracel use 0 from no, 1 for yes. If nothing is set, suppose that the paracel is not used
 
 		  'paracel'  => '',
 
 #Define the chunk size (how many protein are going to be in each chunks)
+		  #'chunk_size' => '100'
 		  'chunk_size' => ''
 		  )
 }
