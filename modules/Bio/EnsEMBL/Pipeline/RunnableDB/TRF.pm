@@ -63,9 +63,9 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
-    Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis
+    Args    :     -dbobj     A Bio::EnsEMBL::DB::Obj, 
+                  -input_id  Contig input id , 
+                  -analysis  A Bio::EnsEMBL::Analysis
 
 =cut
 
@@ -93,7 +93,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
     
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
+    my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->primary_seq()
      or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
