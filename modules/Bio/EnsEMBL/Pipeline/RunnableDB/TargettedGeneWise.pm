@@ -105,7 +105,7 @@ sub make_seqfetcher{
 								 );
   }
   else{
-    sssself->throw("Can't make seqfetcher\n");
+    $self->throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -185,7 +185,7 @@ sub fetch_input{
   }
   $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
   $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
-  
+  #print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
   my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
   
@@ -194,6 +194,7 @@ sub fetch_input{
   
   # genewise runnable
   # repmasking?
+
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $slice,
 								    '-ids'        => [ $protein_id ] ,
 								    '-seqfetcher' => $self->seqfetcher);
@@ -298,7 +299,7 @@ sub write_output {
   
   my $gene_adaptor = $self->db->get_GeneAdaptor;
   my @genes = $self->output;
-  #print STDERR "have ".@genes." genes\n";
+  print STDERR "have ".@genes." genes\n";
  GENE: foreach my $gene ($self->output) {	
     # do a per gene eval...
     eval {
@@ -357,7 +358,7 @@ sub convert_gw_output {
     $self->warn("Setting genetype to $genetype\n");
   }
   my @results  = $self->runnable->output;
-  #print STDERR "converting ".@results." from runnable\n";
+  #print STDERR "have ".@results." from blastmini genewise\n";
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
@@ -380,7 +381,7 @@ sub convert_gw_output {
 
   #print STDERR "about to make genes\n";
   my @genes = $self->make_genes($count, $genetype, $analysis_obj, \@results);
-
+  
   # check for stops?
   #print STDERR "have made ".@genes." genes\n";
   $self->gw_genes(@genes);
@@ -407,7 +408,7 @@ sub make_genes {
   my ($self, $count, $genetype, $analysis_obj, $results) = @_;
   my $contig = $self->query;
   my @genes;
-  #print STDERR "making genes\n";
+  ##print STDERR "making genes\n";
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
@@ -536,7 +537,7 @@ sub validate_transcript {
 		foreach my $exon (@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
       foreach my $sf (@{$exon->get_all_supporting_features}){
-				$sf->feature1->seqname($exon->contig_id);
+				$sf->feature1->seqname($exon->dbID);
       }
     }
 		
@@ -771,15 +772,13 @@ sub make_transcript{
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
     my $exon = Bio::EnsEMBL::Exon->new;
-    
-    $exon->contig_id($contig->id);
+   
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
     
     $exon->phase($exon_pred->phase);
     $exon->end_phase($exon_pred->end_phase);
-    $exon->attach_seq($contig);
     
     $exon->contig($contig);
     $exon->adaptor($self->db->get_ExonAdaptor);
@@ -1000,7 +999,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
     foreach my $sf (@{$exon->get_all_supporting_features}){
-	  $sf->feature1->seqname($exon->contig_id);
+	  $sf->feature1->seqname($exon->contig->dbID);
 
       }
     # this exon becomes $prev_exon for the next one
