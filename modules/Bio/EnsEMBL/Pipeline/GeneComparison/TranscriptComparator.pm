@@ -500,8 +500,9 @@ sub _test_for_merge{
   my $verbose   = $self->verbose;
 
   if ($verbose){
-      print STDERR "comparing ".
-	  $tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
+      my $id1 = $tran1->dbID || "no-id";
+      my $id2 = $tran2->dbID || "no-id";
+      print STDERR "comparing ".$id1."-".$id2." ( ".$id2."-".$id1." )\n";
     Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
     Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
   }
