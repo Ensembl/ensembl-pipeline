@@ -225,6 +225,36 @@ sub coverage {
     return $self->{_coverage};
 }
 
+=head2 is_Covered
+
+ Title   : is_Covered
+ Usage   : $pair->is_Covered
+ Function: Returns 1 if this pair is validated by enough evidence
+ Example : 
+ Returns : int
+ Args    : none
+
+=cut
+
+sub is_Covered {
+    my ($self) = @_;
+
+    my $est = 0;
+
+    for my $f ($self->get_all_Evidence) {
+	print STDERR "Evidence " . $f->source_tag . "\n";
+	
+	if ($f->source_tag eq "est2genome" || $f->source_tag eq "genewise") {
+	    $est = 1;
+	}
+    }
+    print STDERR "EST " . $est . " " . $self->coverage . "\n";
+    if ($est == 1 || $self->coverage >= 2) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
 
 =head2 compare
 

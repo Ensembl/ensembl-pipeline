@@ -77,6 +77,7 @@ use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 #use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_MiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
@@ -282,6 +283,8 @@ sub input_id {
   Function: Get/set method for the analysis object of the job
   Returns : Bio::EnsEMBL::Pipeline::Analysis
   Args    : bio::EnsEMBL::Pipeline::Analysis
+
+
 
 =cut
 
