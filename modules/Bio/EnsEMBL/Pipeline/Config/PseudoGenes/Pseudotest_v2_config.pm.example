@@ -1,0 +1,96 @@
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::PseudoGenes::Pseudotest_v2_config.pm;
+
+=head1 SYNOPSIS
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
+
+
+=head1 DESCRIPTION
+
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::PseudoGenes::Pseudotest_v2_config;
+
+use strict;
+use vars qw( %Pseudotest_v2_config );
+
+# Hash containing config info
+%Pseudotest_v2_config = (
+		
+		############################################################
+		# parameters common to both types of
+		# pseudogene analysis
+		
+		TMPDIR      => '/acari/scratch1/ensembl/sw4/Pseudo_test/tmp',
+		BSUBS_FILE  => '/acari/scratch1/ensembl/sw4/Pseudo_test/jobs',
+		LSF_OPTIONS => ' -C0 -q normal ',
+		
+		
+		# database where the genes  are
+		DBNAME => 'mus_musculus_core_23_32c',
+		DBHOST => 'ecs2',
+		DBPORT => '3363',
+		DBUSER => 'ensro',	
+		DBPASS => '',
+		
+		# database where we will write the pseudogenes
+		PSEUDO_DBUSER   => '',
+		PSEUDO_DBNAME   => '',
+		PSEUDO_DBHOST   => '',
+		PSEUDO_DBPASS   => '',
+		PSEUDO_DBPORT   => '',
+	
+         	# repeat database
+                REPEAT_DBNAME => 'mus_musculus_core_23_32c',
+		REPEAT_DBHOST => 'ecs2',
+		REPEAT_DBPORT => '3363',	
+		REPEAT_DBPASS => '',
+                REPEAT_DBUSER => 'ensro',
+
+		# default values
+                MAX_INTRON_LENGTH => '5000',
+		MAX_INTRON_COVERAGE => '80',	
+		MAX_EXON_COVERAGE  => '20',	
+		
+
+	       );
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+  
+  # Get list of variables supplied, or else
+  # all of PseudoGenes:
+  my @vars = @_ ? @_ : keys( %Pseudotest_v2_config );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $Pseudotest_v2_config{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Pseudotest_v2_config{ $_ };
+	} else {
+	    die "Error: PseudoGenes: $_ not known\n";
+	}
+    }
+}
+
+1;
+
