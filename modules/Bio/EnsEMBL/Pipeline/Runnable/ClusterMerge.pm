@@ -180,22 +180,20 @@ sub _cluster_Transcripts {
       push( @reverse_transcripts, $transcript );
     }
   }
-  
-  my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
-  my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
-  if ( @forward_clusters){
-      print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
-  }
-  if ( @reverse_clusters){
-      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
-  }
-  
   my @clusters;
-  if ( @forward_clusters ){
-    push( @clusters, @forward_clusters);
+  if ( @forward_transcripts ){
+    my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
+    if ( @forward_clusters){
+      print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
+      push( @clusters, @forward_clusters);
+    }
   }
-  if ( @reverse_clusters ){
-    push( @clusters, @reverse_clusters);
+  if ( @reverse_transcripts ){
+    my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
+    if ( @reverse_clusters ){
+      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
+      push( @clusters, @reverse_clusters);
+    }
   }
   return @clusters;
 }
