@@ -52,7 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
@@ -81,18 +81,31 @@ sub new {
     my $self = {};
     bless $self, $class;
  
-    my ($db,$input_id, $seqfetcher, $analysis) = $self->_rearrange([qw(DB
+    my ($db,$input_id, $seqfetcher, $analysis, $parameters) = $self->_rearrange([qw(DB
 					    INPUT_ID
 					    SEQFETCHER 
-					    ANALYSIS )], 
+					    ANALYSIS 
+                                            PARAMETERS)], 
 				        @args);
+
 
 
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     $self->{'_parameters'}  = undef;
     $self->{'_analysis'}    = undef;
+    $self->{job_parameters} = undef;
 
+    if($parameters && (!$db || !$analysis)){
+      $self->job_parameters($parameters);
+      my ($host, $user, $pass, $dbname, $logic_name) = split /:/, $parameters;
+      $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,
+					       -user => $user,
+					       -pass => $pass,
+					       -dbname => $dbname);
+      my $ana_adp = $db->get_AnalysisAdaptor;
+      $analysis = $ana_adp->fetch_by_logic_name($logic_name);
+    }	 
     $self->throw("No database handle input") unless defined($db);
     $self->db($db);
 
@@ -534,5 +547,21 @@ sub input_is_void {
     return $self->{'_input_is_void'};
 
 }
+
+sub job_parameters{
+  my $self = shift;
+
+  if(@_){
+    $self->{job_parameters} = shift;
+  }
+
+  return $self->{job_parameters};
+  
+}
+
+
+
+
+
 
 1;
