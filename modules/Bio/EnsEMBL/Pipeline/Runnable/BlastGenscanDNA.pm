@@ -90,17 +90,19 @@ sub new {
   $self->{'_program'}     = undef;
   $self->{'_database'}    = undef;
   $self->{'_threshold'}   = undef;
+  $self->{'_threshold_type'}   = undef;
   $self->{'_options'}     = undef;
     
   
   # Read the input parameters and set them in the object
 
-  my ( $genomic,$peptide,$program,$database,$threshold,$options) = 
+  my ( $genomic,$peptide,$program,$database,$threshold,$threshold_type,$options) = 
     $self->_rearrange ([qw(GENOMIC 
 			   PEPTIDE 
 			   PROGRAM 
 			   DATABASE 
 			   THRESHOLD 
+			   THRESHOLD_TYPE
 			   OPTIONS)], @args);
   
   
@@ -136,6 +138,12 @@ sub new {
     $self->threshold($threshold);
   } else {
     $self->threshold(0);
+  }
+
+  if (defined($threshold_type)) {
+    $self->threshold_type($threshold_type);
+  } else {
+    $self->threshold_type('PVALUE');
   }
   
   if (defined($options)) {
@@ -180,6 +188,7 @@ sub run {
 								 -program   => $self->program,
 								 -database  => $self->database,
 								 -threshold => $self->threshold,
+								 -threshold_type => $self->threshold_type,
 								 -options   => $self->options,
                                                                  -filter    => 1);
 
@@ -729,6 +738,16 @@ sub threshold {
     }
 
     return $self->{'_threshold'};
+}
+
+sub threshold_type {
+    my($self,$arg) = @_;
+    
+    if (defined($arg)) {
+      $self->{'_threshold_type'} = $arg;
+    }
+
+    return $self->{'_threshold_type'};
 }
 
 =head2 options
