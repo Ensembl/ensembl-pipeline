@@ -92,7 +92,7 @@ print STDERR "Got features\n";
 display(@features);
 
 foreach my $f (@features) {
-  my $transcript = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($f,$contig);
+  my $transcript = Bio::EnsEMBL::TranscriptFactory::fset2transcript($f,$contig);
   print "Transcrip " . $transcript->translate->seq . "\n";
 }    
 

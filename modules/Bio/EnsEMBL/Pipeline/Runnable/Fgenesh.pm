@@ -74,7 +74,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::DBSQL::Utils;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::Seq;
 use Bio::Root::RootI;
 use Bio::SeqIO;
@@ -655,7 +655,7 @@ sub create_genes {
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
 	print STDERR "seq = ".$self->query."\n";
-	my $tran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_with_seq($gene,$self->query);
+	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene,$self->query);
 	$self->add_Fgenesh_Transcript($tran);
     }
     #print "created the genes\n";

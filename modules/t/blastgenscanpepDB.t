@@ -30,7 +30,7 @@ use EnsTestDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
 use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::DBSQL::Utils;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Exon;
 use Data::Dumper;
 

@@ -89,7 +89,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::DBSQL::Utils;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::Root::RootI;
 
 
@@ -443,7 +443,7 @@ sub calculate_and_set_phases_new {
       }
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
-      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->query);
+      my @newtran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_3frame($genes[$i],$self->query);
 
 #      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 

@@ -92,7 +92,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::Root::RootI;
-use Bio::EnsEMBL::DBSQL::Utils;
+use Bio::EnsEMBL::TranscriptFactory;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
@@ -1813,7 +1813,7 @@ sub set_phases {
 	$i++;
       }
 
-      my $transcript = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($fset,$self->contig);
+      my $transcript = Bio::EnsEMBL::TranscriptFactory::fset2transcript($fset,$self->contig);
       my $seq        = $transcript->translate->seq;
 
       $seq =~ s/(.{72})/$1\n/g;
