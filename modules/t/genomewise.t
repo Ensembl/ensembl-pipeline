@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..3\n"; 
+BEGIN { $| = 1; print "1..4\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -44,7 +44,7 @@ $run->seq($gen);
 my $t = Bio::EnsEMBL::Transcript->new();
 my $exon = Bio::EnsEMBL::Exon->new;
 
-$exon->start(1794);
+$exon->start(1787);
 $exon->end  (1935);
 $exon->strand (1);
 
@@ -71,9 +71,11 @@ foreach $t ( $run->output ) {
    if( !$t->isa('Bio::EnsEMBL::Transcript') ) {
       $error = 1;
    } else {
-     foreach $e ( $t->each_Exon ) {
-        #print "Exon ",$e->start," ",$e->end,"\n";
+     foreach $e ( $t->get_all_Exons ) {
+       #print "Exon ",$e->start," ",$e->end,"\n";
      }
+     #print "Translation ",$t->translation->start," ",$t->translation->start_exon,"\n";
+     #print "Translation ",$t->translation->end," ",$t->translation->end_exon,"\n";
    }
 
    $seen = 1;
@@ -84,4 +86,38 @@ if( $seen == 1 ) {
 } else {
     print "not ok 3\n";
 }
+
+
+$seqin = Bio::SeqIO->new( -file => "t/genomewise2.seq");
+
+$gen = $seqin->next_seq();
+
+$run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new;
+
+$run->seq($gen);
+
+
+$t = Bio::EnsEMBL::Transcript->new();
+$exon = Bio::EnsEMBL::Exon->new;
+
+$exon->start(1001);
+$exon->end  (1422);
+$exon->strand (1);
+
+$t->add_Exon($exon);
+
+$exon = Bio::EnsEMBL::Exon->new;
+
+$exon->start(1482);
+$exon->end  (1869);
+$exon->strand (1);
+
+$t->add_Exon($exon);
+
+
+$run->add_Transcript($t);
+
+$run->run;
+
+print "ok 4\n";
 
