@@ -30,7 +30,7 @@
                                                       -slam_pars_dir => '',
                                                       -minlength     => 250,
                                                       -debug         => 0,
-                                                      -verbose       => 1
+                                                      -verbose       => 0
                                                       );
 
 or
@@ -184,7 +184,7 @@ sub DESTROY {
 
 =pod
 
-=head2 _parse_results (String, String)
+=head2 _parse_results ()
 
   Title    : run
   Usage    : $obj->_parse_ results
@@ -229,17 +229,17 @@ sub DESTROY {
 #  seq2      SLAM     start_codon 23923   23925    .        -       .     gene_id "002" ; transcript_id "002.1";
 
 
-
 sub parse_results {
   my $self = shift;
 
   # parsing results of first organism
-  my $arrayref1 = $self->_parser( ${$self->slices}[0], ${$self->fasta}[0] ) ;
+  # returns ref to array of predicted transcripts
+  # could be empty arrays or arrays full of predicted transcripts (paradise :-)
+  my $arrayref1 = $self->_parser( ${$self->slices}[0], ${$self->fasta}[0] );
   my $arrayref2 = $self->_parser( ${$self->slices}[1], ${$self->fasta}[1] );
-
+  #     [HPT HPT HPT] [HM HM HM] or  [ [][] ]
   $self->predtrans( $arrayref1,$arrayref2 );
 }
-
 
 
 # parsing the results and adding predicted exons to container of PredictionTranscripts
@@ -251,20 +251,20 @@ sub _parser {
   my (%transcripts);
 
   $gff=~s/(\.fasta)/\.gff/;     # subst. .fasta-suffix with .gff-suffix
+  print "Slam.pm: Parsing $gff\n";
 
   # processing the written gff-file
-  open(IN,"$gff") || die "could not read file $gff";
+  open(IN,"$gff") || die "Slam.pm: Out of MEMORY-ERROR !\n BROKE UP BY SIGINT \n Could not read $gff: $0 \n";
   while (<IN>) {
     chomp;
     my $aline = $_;
-    if ($aline =~m/gene_id/) { 
+    if ($aline =~m/gene_id/) {
       #if the line contains a CDS
 
       if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
         # if the line is no start-or stopcodon
 
         my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
-
         my @attributes = split /\s+/,$line[0];
         my @transc_id =  split /\s+/,$line[1];
 
@@ -277,15 +277,14 @@ sub _parser {
 
         # we store the ref of line with attributes of the exon using the unique transcript-key as key
         # an HASH of ARRAYS of ARRAYS
-        push (@{ $transcripts{$key}}, $attr_ref );
+     push (@{ $transcripts{$key}}, $attr_ref );
       }
     }
   }
   close(IN);
 
-
-
-  my @all_predicted_transcripts;
+  # array of length 0
+  my @all_predicted_transcripts=();
   my $pred_trans;
 
   # for every predicted transcript
@@ -298,7 +297,6 @@ sub _parser {
 
     # process every predicted exon which belongs to the transcript
     for my $exons (@exon_refs) {
-
       my  @attributes = @{$exons}; # @attributes contains all items of a gff-fileline (with CDS)
 
       # extracting startbp, endbp strand and phase
@@ -313,18 +311,16 @@ sub _parser {
                                                        -END       => $end,
                                                        -STRAND    => $strand, # valid values (Feature.pm: 1,-1,0)
                                                        -SLICE     => $slice,
-                                                       -P_VALUE   => 0,
+                                                       -P_VALUE   => 0, #try undef here
                                                        -PHASE     => $phase , # same as frame ?
-                                                       -SCORE     => 0
+                                                       -SCORE     => 0 #try undef here
                                                       );
-
-
       # add predicted exon to the transcript-container (Bio::EnsEMBL::Feature)
       $pred_trans->add_Exon( $pred_exon );
     }
-    push @all_predicted_transcripts, $pred_trans;
+    push @all_predicted_transcripts, $pred_trans; # [HPT HPT HPT]
   }
-  return \@all_predicted_transcripts;
+  return \@all_predicted_transcripts; # retrun \[HPT] or \[] emtpy array
 }
 
 
@@ -353,31 +349,56 @@ sub run {
   my $fasta1 = ${$self->fasta}[0];
   my $fasta2 = ${$self->fasta}[1];
 
-  my $t = ${$self->org}[1];
-  my $command =  $self->slam_bin .
-    " -a ".$self->approx_align .
-      " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
-        " -org1 ".${$self->org}[0] .
-          " -org2 ".${$self->org}[1];
-  $command .= " -v " if $self->verbose;
-  $command .= " -debug " if $self->debug;
+    my $t = ${$self->org}[1];
+    my $command =  $self->slam_bin .
+      " -a ".$self->approx_align .
+        " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
+          " -org1 ".${$self->org}[0] .
+            " -org2 ".${$self->org}[1];
+    $command .= " -v " if $self->verbose;
+    $command .= " -debug " if $self->debug;
 
-  print "slam-command; $command\n" if $self->verbose;
+    print "Slam.pm: Slam-command:\n $command\n" if $self->verbose;
 
-  eval ( system (" $command"));
 
-  $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
-  $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
 
-  my $wdir = $self->workdir;
 
-  $fasta1=~s/$wdir\///;         # get rid of workdir-prefix (/tmp/)
-  $fasta2=~s/$wdir\///;         # get rid of workdir-prefix 
+  # kick of fasta suffix for gff-filenames and cns-tempfile
+  (my $base1 = $fasta1) =~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
+  (my $base2 = $fasta2) =~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
 
-  $self->file($fasta1."_".$fasta2.".cns");
+  my $gff1 = $base1.".gff";
+  my $gff2 = $base2.".gff";
 
-  # parses the two resultfiles
-  $self->parse_results;
+
+  my $slength1 = &_seqlen($fasta1);
+  my $slength2 = &_seqlen($fasta2);
+
+
+  print "Slam.pm: Length of Sequence1: $slength1\t Sequenc2: $slength2\tSlam-run follows\n" if $self->verbose;
+
+  # One of the sequences is too short to process, just make empty gff files.
+  if (($slength1<$self->minlength) || ($slength2 < $self->minlength)) {
+
+    $self->warn("Sequencelength (of cutted sequence) is too small.\nSkipping the sequence and not running slam on the small seqs\n");
+    open(GFF, ">$gff1") ||  die "$0: $gff1: $!\n";
+    close (GFF);
+    open(GFF, ">$gff2") ||  die "$0: $gff2: $!\n";
+
+    close (GFF);
+  } else {
+    print "Both seqs have goog length. I will run slam now, bastard \n"  if $self->verbose;
+    eval ( system (" $command"));     # all ok, run slam
+  }
+
+    # add cns-file to list of tempfiles
+    my $wdir = $self->workdir;
+    $base1=~s/$wdir\///;       # get rid of workdir-prefix (/tmp/)
+    $base2=~s/$wdir\///;       # get rid of workdir-prefix 
+    $self->file($base1."_".$base2.".cns");
+
+    # parses the two resultfiles
+    $self->parse_results;
   return 1;
 }
 
@@ -412,7 +433,7 @@ sub _getgcdir{
                                           ],
                },
 
-                 my $pairName = sprintf("%s_%s",$org1,$org2);
+  my $pairName = sprintf("%s_%s",$org1,$org2);
   my $gcdir;
 
   if (exists($gcdirs->{$pairName})) {
@@ -432,8 +453,8 @@ sub _getgcdir{
     my $gc2 = &_gccontent($seqObj);
     close SEQ2;
 
-    my $len1 = &_seqlen($seq1); ## HERE
-    my $len2 = &_seqlen($seq2); ## HERE
+    my $len1 = &_seqlen($seq1); ## CHANGE HERE
+    my $len2 = &_seqlen($seq2); ## CHANGE HERE
     my $gc = (($gc1 * $len1) + ($gc2 * $len2)) / ($len1 + $len2);
 
     $gcdir = undef;
@@ -462,17 +483,17 @@ sub _gccontent{
   my(@nGC) = ($tempSeq =~ /[GC]/gi);
 
   return(100*scalar(@nGC)/$n);
+
 }
 
 sub _seqlen {
   my($seqFile) = @_;
 
-  open(SEQFILE,$seqFile) || die "Can't open $seqFile for read\n";
+  open(SEQFILE,$seqFile) || die "Slam.pm: Can't open $seqFile for read\n";
   my $seqStr = Bio::SeqIO->new(-fh => \*SEQFILE, -format => 'Fasta' );
   my $seq = $seqStr->next_seq();
   my $len = length($seq->seq());
   close SEQFILE;
-
   return $len;
 }
 
@@ -502,7 +523,7 @@ sub fasta {
 
   Title    : predtrans
   Usage    : $obj->predtrans
-  Function : Sets/gets the Predicted transcripts for the first organism
+  Function : Sets/gets the Predicted transcripts for both organisms
   Returns  : Ref. to an Array of Arrayrefs. to Bio::EnsEMBL::PredictionTranscript
   Args     : References to two arrays
 
@@ -512,6 +533,7 @@ sub predtrans{
   my ($self,$ref_predtrans1,$ref_predtrans2) = @_;
 
   if ($ref_predtrans1 && $ref_predtrans2) {
+    print "Slam.pm: Storing the refernces to the array of predicted transcripts in an array of predicted tansc\n";
     $self->{_ref_predtrans} = [$ref_predtrans1,$ref_predtrans2];
   }
   return $self->{_ref_predtrans};
@@ -531,7 +553,7 @@ sub approx_align {
 sub org{
   my ($self,$org1,$org2) = @_;
 
-  if(!defined $self->{_org}){
+  if (!defined $self->{_org}) {
     $org1 = 'H.sapiens'  if (!defined $org1);
     $org2 = 'M.musculus' if (!defined $org2);
     $self->{_org} = [$org1,$org2];
@@ -579,8 +601,8 @@ sub minlength{
 sub slices{
   my ($self,$slice1,$slice2) = @_;
 
-  if (defined $slice2 && defined $slice1){
-  $self->{_slices} = [$slice1,$slice2];
+  if (defined $slice2 && defined $slice1) {
+    $self->{_slices} = [$slice1,$slice2];
   }
 
   return $self->{_slices};
