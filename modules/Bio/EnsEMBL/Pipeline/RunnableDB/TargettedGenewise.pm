@@ -92,14 +92,6 @@ sub new {
   my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
 
   # makes it easier to run standalone if required
-  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-    (
-     '-host'   => $GB_GW_DBHOST,
-     '-user'   => $GB_GW_DBUSER,
-     '-pass'   => $GB_GW_DBPASS,
-     '-dbname' => $GB_GW_DBNAME,
-     '-port' => $GB_GW_DBPORT,
-    ) if(!$output_db);
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
@@ -1129,11 +1121,21 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
 sub output_db {
     my( $self, $output_db ) = @_;
     
-    if ($output_db) 
-    {
-	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-	    || throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
-	$self->{_output_db} = $output_db;
+    if ($output_db) {
+      $output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || throw("Input [$output_db] isn't a Bio::EnsEMBL::".
+                 "DBSQL::DBAdaptor");
+      $self->{_output_db} = $output_db;
+    }
+    if(!$self->{_output_db}){
+      $self->{_output_db}= new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $GB_GW_DBHOST,
+         '-user'   => $GB_GW_DBUSER,
+         '-pass'   => $GB_GW_DBPASS,
+         '-dbname' => $GB_GW_DBNAME,
+         '-port' => $GB_GW_DBPORT,
+        );
     }
     return $self->{_output_db};
 }

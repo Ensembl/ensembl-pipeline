@@ -100,7 +100,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
       
     # make sure at least one protein source database has been defined
-    
+    my ($genewise_db) = $self->_rearrange([qw(GENEWISE_DB)], @args);
     &throw("no protein source databases defined in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
     # make all seqfetchers
@@ -115,23 +115,7 @@ sub new {
     # features and dna
     # Here it is used as refdb only and we need to make a connection to GB_GW_DBNAME@GB_GW_DBHOST
 
-    $GB_GW_DBHOST = $self->db->host     if (!defined($GB_GW_DBHOST) || $GB_GW_DBHOST eq '');
-    $GB_GW_DBUSER = $self->db->username if (!defined($GB_GW_DBUSER) || $GB_GW_DBUSER eq '');
-    $GB_GW_DBPASS = $self->db->password if (!defined($GB_GW_DBPASS) || $GB_GW_DBPASS eq '');
-    $GB_GW_DBNAME = $self->db->dbname   if (!defined($GB_GW_DBNAME) || $GB_GW_DBNAME eq '');
-    $GB_GW_DBPORT = $self->db->dbname   if (!defined($GB_GW_DBPORT) || $GB_GW_DBPORT eq '');
-
-
-    my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-							 '-host'   => $GB_GW_DBHOST,
-							 '-user'   => $GB_GW_DBUSER,
-							 '-pass'   => $GB_GW_DBPASS,
-							 '-port'   => $GB_GW_DBPORT,
-							 '-dbname' => $GB_GW_DBNAME,
-							);
     
-    
-    $genewise_db->dnadb($self->db);
     $self->genewise_db($genewise_db);
     
     
@@ -341,12 +325,12 @@ sub fetch_input {
 
 sub run {
     my ($self) = @_;
-
+    $self->genewise_db->disconnect_when_inactive(1);
     # is there ever going to be more than one?
     foreach my $runnable ($self->runnable) {
       $runnable->run;
     }
-    
+    $self->genewise_db->disconnect_when_inactive(0);
     $self->convert_output;
     # print STDERR "HAVE CONVERTED OUTPUT\n";
 }
@@ -422,58 +406,54 @@ sub make_genes {
 
   &throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
-
+  
   my $count = 0;
   foreach my $tmpf (@{$results}) {
-      $count++;
-
-      my $unchecked_transcript = 
-	  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->SeqFeature_to_Transcript($tmpf, 
-									     $self->query, 
-									     $analysis_obj, 
-									 $self->genewise_db, 
-									     0);
-
-      if (not defined $unchecked_transcript) {
-	  print STDERR "   Transcript $count : REJECTED because could not make from SeqFeatures\n";
-	  next;
-      }
-
-      
-      # validate transcript
-      my @seqfetchers = $self->each_seqfetcher;
-      
-      my $valid_transcripts = 
-        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript
-            ($unchecked_transcript, 
-             $self->query, 
-             $GB_SIMILARITY_COVERAGE, 
-             $GB_SIMILARITY_MAX_INTRON, 
-             $GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
-             \@seqfetchers, 
-             $GB_SIMILARITY_MAX_LOW_COMPLEXITY);
+    $count++;
+    
+    my $unchecked_transcript = 
+      Bio::EnsEMBL::Pipeline::Tools::GeneUtils->SeqFeature_to_Transcript
+          ($tmpf, $self->query, $analysis_obj, $self->genewise_db, 0);
+    
+    if (not defined $unchecked_transcript) {
+      print STDERR "   Transcript $count : REJECTED because could not make from SeqFeatures\n";
+      next;
+    }
+    
+    # validate transcript
+    my @seqfetchers = $self->each_seqfetcher;
+    
+    my $valid_transcripts = 
+      Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript
+          ($unchecked_transcript, 
+           $self->query, 
+           $GB_SIMILARITY_COVERAGE, 
+           $GB_SIMILARITY_MAX_INTRON, 
+           $GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
+           \@seqfetchers, 
+           $GB_SIMILARITY_MAX_LOW_COMPLEXITY);
       if (not defined $valid_transcripts) {
         print STDERR "   Transcript $count : REJECTED because validation failed\n";
         next;
       }
       
-      # make genes from valid transcripts
-      foreach my $checked_transcript(@$valid_transcripts){
-        #print "have ".$checked_transcript." as a transcript\n";
-        
-        # add start codon if appropriate
-        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
-        # add terminal stop codon if appropriate
-        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
-        
-        my $gene = new Bio::EnsEMBL::Gene;
-        $gene->type($genetype);
-        $gene->analysis($analysis_obj);
-        $gene->add_Transcript($checked_transcript);
-        
-        push (@genes, $gene);
-      }
+    # make genes from valid transcripts
+    foreach my $checked_transcript(@$valid_transcripts){
+      #print "have ".$checked_transcript." as a transcript\n";
+      
+      # add start codon if appropriate
+      $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
+      # add terminal stop codon if appropriate
+      $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+      
+      my $gene = new Bio::EnsEMBL::Gene;
+      $gene->type($genetype);
+      $gene->analysis($analysis_obj);
+      $gene->add_Transcript($checked_transcript);
+      
+      push (@genes, $gene);
     }
+  }
   
   return \@genes;
   
@@ -1077,12 +1057,28 @@ sub get_length_by_id{
 sub genewise_db {
     my( $self, $genewise_db ) = @_;
 
-    if ($genewise_db)
-    {
-        $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-            || &throw("Input [$genewise_db] isn't a ".
-                      "Bio::EnsEMBL::DBSQL::DBAdaptor");
-        $self->{_genewise_db} = $genewise_db;
+    if ($genewise_db){
+      $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || &throw("Input [$genewise_db] isn't a ".
+                  "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_genewise_db} = $genewise_db;
+    }
+    if(!$self->{_genewise_db}){
+      $GB_GW_DBHOST = $self->db->host     if (!$GB_GW_DBHOST);
+      $GB_GW_DBUSER = $self->db->username if (!$GB_GW_DBUSER);
+      $GB_GW_DBPASS = $self->db->password if (!$GB_GW_DBPASS);
+      $GB_GW_DBNAME = $self->db->dbname   if (!$GB_GW_DBNAME);
+      $GB_GW_DBPORT = $self->db->dbname   if (!$GB_GW_DBPORT);
+    
+      
+      my $self->{'genewise_db'} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $GB_GW_DBHOST,
+         '-user'   => $GB_GW_DBUSER,
+         '-pass'   => $GB_GW_DBPASS,
+         '-port'   => $GB_GW_DBPORT,
+         '-dbname' => $GB_GW_DBNAME,
+        );
     }
     return $self->{_genewise_db};
 }
