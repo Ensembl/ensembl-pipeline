@@ -1,8 +1,8 @@
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -66,6 +66,12 @@ sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);  
   
+  if(!defined $self->seqfetcher) {
+    # will look for pfetch in $PATH - change this once PipeConf up to date
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    $self->seqfetcher($seqfetcher);
+  }  
+  
   return $self; 
 }
 
@@ -93,14 +99,13 @@ sub fetch_input {
   
   # set up sequence arrays
   my @ests = $self->_get_ests();
-  my @genomic = ( $genseq );
   
   # prepare runnable
-  $self->throw("Can't run Exonerate with both genomic and EST sequences") 
-    unless (scalar(@ests) && scalar(@genomic));
-
+  $self->throw("Can't run Exonerate without both genomic and EST sequences") 
+    unless (scalar(@ests) && defined($genseq));
+  
   my $executable =  $self->analysis->program_file();
-  my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate('-genomic'  => \@genomic,
+  my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate('-genomic'  => $genseq,
 								  '-est'      => \@ests,
 								  '-exonerate' => $executable);
   $self->runnable($exonerate);
@@ -416,10 +421,6 @@ sub _get_ests {
     }
   my @seq = $self->_get_Sequences(@mrnafeatures);
 
-  # validate sequences
-  #  my @valid_seq   = $self->_validate_sequence(@seq);
-  
-  #  return @valid_seq;
   return @seq;
 
 }
@@ -499,16 +500,22 @@ sub _parse_Header {
 sub _get_Sequence {
   my ($self,$id) = @_;
 
+  if (!defined($id)) {
+    $self->warn("No id input to _get_Sequence");
+  } 
+
   if (defined($self->{_seq_cache}{$id})) {
     return $self->{_seq_cache}{$id};
   } 
   
-  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
-  my $seq = $seqfetcher->run_efetch($id);
+  my $seq;
+  eval {
+    $seq = $self->seqfetcher->get_Seq_by_acc($id);
+  };
   
-  if(!defined $seq) {
-    $seq = $seqfetcher->run_getz($id, 'embl');
-  }
+  if($@) {
+    $self->throw("Problem fetching sequence for id [$id]\n");
+  }  
   
   if(!defined $seq) {
     $self->throw("Couldn't find sequence for [$id]");
