@@ -167,7 +167,7 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensemb/Pfam');
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensembl/Pfam');
 	
     }
     return $self; # success - we hope!
