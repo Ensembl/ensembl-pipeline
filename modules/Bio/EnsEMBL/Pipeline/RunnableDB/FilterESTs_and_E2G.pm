@@ -206,7 +206,7 @@ sub write_output {
       $self->throw("unable to make write db");
     }
     
-#    $self->write_genes();
+    $self->write_genes();
     $self->write_exons_as_features();
 }
 
@@ -676,7 +676,7 @@ sub make_transcript{
   } 
   else {
     
-    print STDERR "num exons: " . scalar(@exons) . "\n";
+#    print STDERR "num exons: " . scalar(@exons) . "\n";
 
     if ($exons[0]->strand == -1) {
       @exons = sort {$b->start <=> $a->start} @exons;
@@ -723,7 +723,7 @@ sub remap_genes {
 
  GENEMAP:
   foreach my $gene(@genes) {
-     print STDERR "about to remap " . $gene->temporary_id . "\n";
+#     print STDERR "about to remap " . $gene->temporary_id . "\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
     eval {
