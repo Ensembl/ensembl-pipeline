@@ -54,20 +54,20 @@ use vars qw( %Databases );
 	      GB_DBNAME                  => '',
 	      GB_DBUSER                  => '',
 	      GB_DBPASS                  => '',
-	      
+	      GB_DBPORT => '',
 	      # database containing the genewise genes (TGE_gw,similarity_genewise)
 	      GB_GW_DBHOST                  => '',
 	      GB_GW_DBNAME                  => '',
 	      GB_GW_DBUSER                  => '',
 	      GB_GW_DBPASS                  => '',
-	      
+	      GB_GW_DBPORT => '',
 	      # database where the combined_gw_e2g genes will be stored
 	      # IMPORTANT: we should have copied the genewise genes to this db before hand:
 	      GB_COMB_DBHOST                  => '',
 	      GB_COMB_DBNAME                  => '',
 	      GB_COMB_DBUSER                  => '',
 	      GB_COMB_DBPASS                  => '',
-	      
+	      GB_COMB_DBPORT => '',
 	      # database containing the cdnas mapped, to be combined with the genewises
 	      # by putting this info here, we free up ESTConf.pm so that two analysis can
 	      # be run at the same time
@@ -75,12 +75,13 @@ use vars qw( %Databases );
 	      GB_cDNA_DBNAME                  => '',
 	      GB_cDNA_DBUSER                  => '',
 	      GB_cDNA_DBPASS                  => '',
-	      
+	      GB_cDNA_DBPORT => '',
 	      # this db needs to have clone & contig & static_golden_path tables populated
 	      GB_FINALDBHOST                  => '',
 	      GB_FINALDBNAME                  => '',
 	      GB_FINALDBUSER                  => '',
 	      GB_FINALDBPASS                  => '',
+              GB_FINALDBPORT => '',
 	     );
 
 sub import {
