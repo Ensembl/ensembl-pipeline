@@ -1,10 +1,6 @@
-#!/usr/local/bin/perl
-
 #
 #
-# Cared for by Simon Potter <ensembl-dev@ebi.ac.uk>
-# Based on Michele Clamp's FPC_BlastMiniGenewise,
-# modified to run on RawContig's rather than FPC contigs
+# Cared for by ensembl  <ensembl-dev@ebi.ac.uk>
 #
 # Copyright GRL & EBI
 #
@@ -20,10 +16,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise->new(
-					     -dbobj      => $db,
-					     -input_id   => $id,
-					     -seqfetcher => $seqfetcher
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise->new(
+					     -dbobj     => $db,
+					     -input_id  => $id,
+					     -golden_path => $gp
                                              );
     $obj->fetch_input
     $obj->run
@@ -35,7 +31,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
@@ -51,49 +47,47 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
-use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
-
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
-					 );
+use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-			   -SEQFETCHER  => $sf);
-                           
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
-                -input_id:   Contig input id (required), 
-                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
-=cut
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
-           
-    # dbobj, input_id, seqfetcher, and analysis objects are all set in
-    # in superclass constructor (RunnableDB.pm)               
+        
+    if(!defined $self->seqfetcher) {
+      my $seqfetcher =  $self->make_seqfetcher();
+      $self->seqfetcher($seqfetcher);
+    }
+       
+    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
     return $self; 
 }
 
 =head1 RunnableDB implemented methods
+
+=head2 dbobj
+
+    Title   :   dbobj
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+
+=cut
 
 =head2 input_id
 
@@ -103,16 +97,6 @@ sub new {
     Returns :   valid input id for this analysis (if set) 
     Args    :   input id for this analysis 
 
-=cut
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
-
 =head2 vc
 
  Title   : vc
@@ -121,7 +105,23 @@ sub new {
  Returns : value of vc
  Args    : newvalue (optional)
 
-=head1 Contig_BlastMiniGenewise implemented methods
+=head1 FPC_BlastMiniGenewise implemented methods
+
+=head2 fetch_output
+
+    Title   :   fetch_output
+    Usage   :   $self->fetch_output($file_name);
+    Function:   Fetchs output data from a frozen perl object
+                stored in file $file_name
+    Returns :   array of exons (with start and end)
+    Args    :   none
+
+=cut
+
+sub fetch_output {
+    my($self,$output) = @_;
+    
+}
 
 =head2 write_output
 
@@ -136,95 +136,13 @@ sub new {
 sub write_output {
     my($self,@features) = @_;
 
-    #   my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=bcs121;dbname=simon_oct07;user=ensadmin";
-    #    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
-    my $db = $self->dbobj;
-   
-    if( !defined $db ) {
-      $self->throw("unable to make write db");
-    }
-    
-    my %contighash;
-    my $gene_obj = $db->gene_Obj;
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
-
-    my @newgenes = $self->output;
-    return unless ($#newgenes >= 0);
-
-
-
-
-    # get new ids
-    eval {
-
-	my $genecount  = 0;
-	my $transcount = 0;
-	my $translcount = 0;
-	my $exoncount  = 0;
-
-	# get counts of each type of ID we need.
-
-	foreach my $gene ( @newgenes ) {
-	    $genecount++;
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$transcount++;
-		$translcount++;
-	    }
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		$exoncount++;
-	    }
-	}
-
-	# get that number of ids. This locks the database
-
-	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	my @translids =  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-	my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-
-	# database locks are over.
-
-	# now assign ids. gene and transcripts are easy. Exons are harder.
-	# the code currently assummes that there is one Exon object per unique
-	# exon id. This might not always be the case.
-
-	foreach my $gene ( @newgenes ) {
-	    $gene->id(shift(@geneids));
-	    my %exonhash;
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		my $tempid = $exon->id;
-		$exon->id(shift(@exonsid));
-		$exonhash{$tempid} = $exon->id;
-	    }
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$trans->id(shift(@transids));
-		$trans->translation->id(shift(@translids));
-		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-	    }
-	    
-	}
-
-	# paranoia!
-	if( scalar(@geneids) != 0 || scalar(@exonsid) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
-	    $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonsid));
-	}
-
-    };
-    if( $@ ) {
-	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-    }
-
-
-    # this now assummes that we are building on a single VC.
-
-
-
-  GENE: foreach my $gene (@newgenes) {	
+  GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
       eval {
-	
-	  $gene_obj->write($gene);
+	$gene_adaptor->store($gene);
+	print STDERR "wrote gene " . $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -259,7 +177,9 @@ sub fetch_input {
 
     print STDERR "contig: " . $contig . " \n";
 
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200);
+    # for mouse, use swall and drop cutoff to 100
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('swall',100,0);
+#    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200,0);
     
     print STDERR "Number of features = " . scalar(@features) . "\n";
 
@@ -284,42 +204,26 @@ sub fetch_input {
 									   '-trim'       => 1);
     
     
-    $self->add_Runnable($runnable);
+    $self->runnable($runnable);
     # at present, we'll only ever have one ...
     $self->vc($contig);
-}
-     
-sub add_Runnable {
-    my ($self,$arg) = @_;
+}     
 
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
+=head2 run
 
-    if (defined($arg)) {
-	if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-	    push(@{$self->{_runnables}},$arg);
-	} else {
-	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-	}
-    }
-}
+    Title   :   run
+    Usage   :   $self->run
+    Function:   calls the run method on each runnable, and then calls convert_output
+    Returns :   nothing, but $self->output contains results
+    Args    :   none
 
-sub get_Runnables {
-    my ($self) = @_;
-
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
-    
-    return @{$self->{_runnables}};
-}
+=cut
 
 sub run {
     my ($self) = @_;
 
     # is there ever going to be more than one?
-    foreach my $runnable ($self->get_Runnables) {
+    foreach my $runnable ($self->runnable) {
 	$runnable->run;
     }
     
@@ -327,146 +231,200 @@ sub run {
 
 }
 
+=head2 convert_output
+
+  Title   :   convert_output
+  Usage   :   $self->convert_output
+  Function:   converts output from each runnable into gene predictions
+  Returns :   nothing, but $self->output contains results
+  Args    :   none
+
+=cut
+
 sub convert_output {
   my ($self) =@_;
   
-  my $count = 1;
-  my $time  = time; chomp($time);
-  
-  # This BAD! Shouldn't be using internal ids.
-  # <sigh> no time to change it now
-  # eh? what analysis should this be now? Is it still 7?
-  #my $analysis = $self->dbobj->get_OldAnalysis(7);
   my $trancount = 1;
   my $genetype;
-  foreach my $runnable ($self->get_Runnables) {
+  foreach my $runnable ($self->runnable) {
     if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
-      $genetype = "mus_genewise";
+      $genetype = "similarity_genewise";
     }
     else{
       $self->throw("I don't know what to do with $runnable");
     }
+
+    my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+    my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+    my $analysis_obj;
+    if(scalar(@analyses) > 1){
+      $self->throw("panic! > 1 analysis for $genetype\n");
+    }
+    elsif(scalar(@analyses) == 1){
+      $analysis_obj = $analyses[0];
+    }
+    else{
+      # make a new analysis object
+      $analysis_obj = new Bio::EnsEMBL::Analysis
+	(-db              => 'NULL',
+	 -db_version      => 1,
+	 -program         => $genetype,
+	 -program_version => 1,
+	 -gff_source      => $genetype,
+	 -gff_feature     => 'gene',
+	 -logic_name      => $genetype,
+	 -module          => 'FPC_BlastMiniGenewise',
+      );
+    }
+
     my @results = $runnable->output;
-    my @genes = $self->make_genes($count,$time,$genetype, \@results);
+    my @genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
     $self->output(@genes);
+
   }
 }
 
 
-sub make_genes {
+=head2 make_genes
 
-  my ($self,$count,$time,$genetype,$results) = @_;
+  Title   :   make_genes
+  Usage   :   $self->make_genes
+  Function:   makes Bio::EnsEMBL::Genes out of the output from runnables
+  Returns :   array of Bio::EnsEMBL::Gene  
+  Args    :   $genetype: string
+              $analysis_obj: Bio::EnsEMBL::Analysis
+              $results: reference to an array of FeaturePairs
+
+=cut
+
+sub make_genes {
+  my ($self, $genetype, $analysis_obj, $results) = @_;
   my $contig = $self->vc;
   my @tmpf   = @$results;
   my @genes;
-  
-  foreach my $tmpf (@tmpf) {
-    my $gene   = new Bio::EnsEMBL::Gene;
-    my $tran   = new Bio::EnsEMBL::Transcript;
-    my $transl = new Bio::EnsEMBL::Translation;
-    
-    $gene->type($genetype);
-    $gene->id($self->input_id . ".$genetype.$count");
-    $gene->created($time);
-    $gene->modified($time);
-    $gene->version(1);
-    
-    $tran->id($self->input_id . ".$genetype.$count");
-    $tran->created($time);
-    $tran->modified($time);
-    $tran->version(1);
-    
-    $transl->id($self->input_id . ".$genetype.$count");
-    $transl->version(1);
-    
-    $count++;
-    
-    $gene->add_Transcript($tran);
-    $tran->translation($transl);
-    
-    my $excount = 1;
-    my @exons;
-    
-    foreach my $exon_pred ($tmpf->sub_SeqFeature) {
-      # make an exon
-      my $exon = new Bio::EnsEMBL::Exon;
-      
-      $exon->id($self->input_id . ".$genetype.$count.$excount");
-      $exon->contig_id($contig->id);
-      $exon->created($time);
-      $exon->modified($time);
-      $exon->version(1);
-      
-      $exon->start($exon_pred->start);
-      $exon->end  ($exon_pred->end);
-      $exon->strand($exon_pred->strand);
-      
-      $exon->phase($exon_pred->{_phase});
-      $exon->attach_seq($self->vc->primary_seq);
 
-      # sort out supporting evidence for this exon prediction
-      foreach my $subf($exon_pred->sub_SeqFeature){
-	$subf->feature1->source_tag('MUS_BMG');
-	$subf->feature1->primary_tag('similarity');
-	$subf->feature1->score(100);
-	$subf->feature1->analysis($exon_pred->analysis);
+  foreach my $tmpf (@tmpf) {
+    my $gene       = new Bio::EnsEMBL::Gene;
+    my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
+
+    $gene->type($genetype);
+    $gene->analysis($analysis_obj);
+    $gene->add_Transcript($transcript);
+
+    push (@genes, $gene);
+  }
+
+  return @genes;
+
+}
+
+=head2 _make_transcript
+
+ Title   : make_transcript
+ Usage   : $self->make_transcript($gene, $contig, $genetype)
+ Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
+           with sub_SeqFeatures representing exons.
+ Example :
+ Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
+           data), and a Bio::EnsEMBL::translation
+ Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
+  $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis
+
+
+=cut
+
+sub _make_transcript{
+  my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
+  $genetype = 'unspecified' unless defined ($genetype);
+
+  unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
+    {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
+  unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
+    {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
+
+  my $transcript   = new Bio::EnsEMBL::Transcript;
+  my $translation  = new Bio::EnsEMBL::Translation;    
+  $transcript->translation($translation);
+
+  my $excount = 1;
+  my @exons;
+    
+  foreach my $exon_pred ($gene->sub_SeqFeature) {
+    # make an exon
+    my $exon = new Bio::EnsEMBL::Exon;
+    
+    $exon->contig_id($contig->internal_id);
+    $exon->start($exon_pred->start);
+    $exon->end  ($exon_pred->end);
+    $exon->strand($exon_pred->strand);
+    
+    $exon->phase($exon_pred->phase);
+    $exon->attach_seq($contig);
+    
+    # sort out supporting evidence for this exon prediction
+    foreach my $subf($exon_pred->sub_SeqFeature){
+      $subf->feature1->source_tag($genetype);
+      $subf->feature1->primary_tag('similarity');
+      $subf->feature1->score(100);
+      $subf->feature1->analysis($analysis_obj);
 	
-	$subf->feature2->source_tag('MUS_BMG');
-	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->score(100);
-	$subf->feature2->analysis($exon_pred->analysis);
-	
-	$exon->add_Supporting_Feature($subf);
-      }
+      $subf->feature2->source_tag($genetype);
+      $subf->feature2->primary_tag('similarity');
+      $subf->feature2->score(100);
+      $subf->feature2->analysis($analysis_obj);
       
-      my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
-      
-      push(@exons,$exon);
-      
-      $excount++;
+      $exon->add_Supporting_Feature($subf);
     }
     
-    if ($#exons < 0) {
-      print STDERR "Odd.  No exons found\n";
-    } else {
-      
-      push(@genes,$gene);
-      
-      if ($exons[0]->strand == -1) {
-	@exons = sort {$b->start <=> $a->start} @exons;
-      } else {
-	@exons = sort {$a->start <=> $b->start} @exons;
-      }
-      
-      foreach my $exon (@exons) {
-	$tran->add_Exon($exon);
-      }
-      
-      $transl->start_exon_id($exons[0]->id);
-      $transl->end_exon_id  ($exons[$#exons]->id);
-      
-      if ($exons[0]->phase == 0) {
-	$transl->start(1);
-      } elsif ($exons[0]->phase == 1) {
-	$transl->start(3);
-      } elsif ($exons[0]->phase == 2) {
-	$transl->start(2);
-      }
-      
-      $transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
-    }
+    push(@exons,$exon);
+    
+    $excount++;
   }
-  return @genes;
+  
+  if ($#exons < 0) {
+    print STDERR "Odd.  No exons found\n";
+  } 
+  else {
+    
+    print STDERR "num exons: " . scalar(@exons) . "\n";
+
+    if ($exons[0]->strand == -1) {
+      @exons = sort {$b->start <=> $a->start} @exons;
+    } else {
+      @exons = sort {$a->start <=> $b->start} @exons;
+    }
+    
+    foreach my $exon (@exons) {
+      $transcript->add_Exon($exon);
+    }
+    
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
+    
+    if ($exons[0]->phase == 0) {
+      $translation->start(1);
+    } elsif ($exons[0]->phase == 1) {
+      $translation->start(3);
+    } elsif ($exons[0]->phase == 2) {
+      $translation->start(2);
+    }
+    
+    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+  }
+  
+  return $transcript;
 }
+
+
 
 =head2 output
 
  Title   : output
  Usage   :
- Function:
+ Function: get/set for output array
  Example :
- Returns : 
+ Returns : array of Bio::EnsEMBL::Gene
  Args    :
 
 
@@ -486,7 +444,24 @@ sub output{
    return @{$self->{'_output'}};
 }
 
+sub make_seqfetcher {
+  my ( $self ) = @_;
+  my $index = $::seqfetch_conf{'protein_index'};
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+								  '-db' => \@db,
+								 );
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  }
+
+  return $seqfetcher;
+
+}
 
 1;
-
-
