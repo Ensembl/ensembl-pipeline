@@ -63,7 +63,7 @@ my @out    = $obj->output;
 my $outstr = FreezeThaw::freeze(\@out);
 
 open(OUT,">$outputfile");
-  print(OUT "[$outstr]");
+  print(OUT "$outstr");
 close(OUT);
 
 exit(0);

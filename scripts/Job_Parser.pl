@@ -111,12 +111,13 @@ foreach my $job (@jobs) {
     my $object;
     open (IN,"<$output");
     while (<IN>) {
+	$_ =~ s/\[//;
+	$_ =~ s/\]//;
 	$object .= $_;
     }
     close(IN);
 
     my ($obj) = FreezeThaw::thaw($object);
-    print STDERR "Got an ".$obj->id."\n";
-    
+    print STDERR "Got an ".$obj->id." \n";
 }
 
