@@ -219,8 +219,8 @@ sub _map_Transcripts{
   # a comparison tool
   my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
 												-comparison_level         => 4,
-												-splice_mismatch          => 10,
-												-intron_mismatch          => 10,
+												-splice_mismatch          => 1,
+												-intron_mismatch          => 0,
 											       );
   my $sublist;
   
