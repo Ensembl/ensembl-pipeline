@@ -442,7 +442,7 @@ sub run {
   #print STDERR "ran analysis\n";
   #parse output and create features
   #print "there are ".scalar(@blast_output)." features\n";
-  $self->parse_features(\@blast_output);
+  $self->expand_and_merge_features(\@blast_output);
   my @features = $self->each_merged_feature;
   my @results;
   foreach my $feature(@features){
@@ -497,7 +497,7 @@ sub run_blasts {
 
 
 
-=head2 parse_features
+=head2 expand_and_merge_features
 
   Arg [1]   : ref to array of feature pairs 
   Function  : filter features on percent_id, extend features start and end to cover whole hit plus padding, and merge overlapping features
@@ -510,7 +510,7 @@ sub run_blasts {
 
 
 
-sub parse_features {
+sub expand_and_merge_features {
   my ($self, $features) = @_;
 
  
@@ -544,43 +544,47 @@ sub parse_features {
   }
   
   my @hids = keys(%unique_hids);
-  ## for each sequence hit, all the features which correspond to that sequence have their start and end extended ##
-  ## the start and end are extended so there is enough query sequence to cover the entire hit sequence plus a bit of padding
+  ## For each sequence hit, all the features which correspond to that sequence
+  ## have their start and end extended.  The start and end are extended so
+  ## there is enough query sequence to cover the entire hit sequence plus a bit of padding
   ## which is set to 200 as default    
   my $count = 0;
-  foreach my $hid(@hids){
+  my $padding = $self->padding;
+  my $genomic_length = $self->unmasked->length;
+  foreach my $hid (@hids) {
     #print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
-    my @feature_array = @{$unique_hids{$hid}};
+    my $feature_array = $unique_hids{$hid};
     #print $self->seqfetcher."\n";
     my $hid_seq = $self->seqfetcher->get_Seq_by_acc($hid);
    
     my $hid_len = $hid_seq->length;
     
-    foreach my $feature(@feature_array){
+    foreach my $feature (@$feature_array) {
       #print "before seqname = ".$hid." length = ".$hid_len." start ".$feature->start." end ".$feature->end." strand ".$feature->strand." hstart ".$feature->hstart." hend ".$feature->hend."\n";
       my $genomic_start = $feature->start;
-      my $genomic_end = $feature->end;
-      my $hstart = $feature->hstart;
-      my $hend = $feature->hend;
-     if($feature->strand == -1){
-	$feature->start($genomic_start-($hid_len+$self->padding));
-	if($feature->start <= 0){
+      my $genomic_end   = $feature->end;
+      my $hstart        = $feature->hstart;
+      my $hend          = $feature->hend;
+      if ($feature->strand == 1) {
+	$feature->start($genomic_start - ($hstart + $padding));
+	if ($feature->start < 1) {
 	  $feature->start(1);
 	}
-	$feature->end($genomic_end+($hstart+$self->padding));
+	$feature->end($genomic_end + ($hid_len - $hend) + $padding);
+	if ($feature->end > $genomic_length) {
+	  $feature->end($genomic_length);
+	}
+      }
+      elsif ($feature->strand == -1) {
+	$feature->start($genomic_start - ($hid_len - $hend) - $padding);
+	if ($feature->start < 1) {
+	  $feature->start(1);
+	}
+	$feature->end($genomic_end + $hstart + $padding);
 	#print $count." trying to get unmasked from ".$self."\n";
 	$count++;
-	if($feature->end >= $self->unmasked->length){
-	  $feature->end($self->unmasked->length);
-	}
-      }elsif($feature->strand == 1){
-	$feature->start($genomic_start-($hstart+$self->padding));
-	if($feature->start <= 0){
-	  $feature->start(1);
-	}
-	$feature->end($genomic_end+($hid_len+$self->padding));
-	if($feature->end >= $self->unmasked->length){
-	  $feature->end($self->unmasked->length);
+	if ($feature->end > $genomic_length) {
+	  $feature->end($genomic_length);
 	}
       }else{
 	$self->throw($feature->hseqname." has got ".$feature->strand." as a stand : $!\n");
@@ -591,13 +595,14 @@ sub parse_features {
     ## the features are then sorted into array of features on the forward and reverse strand so overlapping features can be merged##
     my @sorted_forward_features;
     my @sorted_reverse_features;
-    foreach my $feature(@feature_array){
-      if($feature->strand == -1){
+    foreach my $feature (@$feature_array) {
+      my $strand = $feature->strand;
+      if($strand == -1){
 	push(@sorted_reverse_features, $feature)
-      }elsif($feature->strand == 1){
+      }elsif($strand == 1){
 	push(@sorted_forward_features, $feature)
       }else{
-	$self->throw($feature->hid." hasn't got a stand : $!\n");
+	$self->throw($feature->hid." has strand '$strand' : $!\n");
       }
     }
     @sorted_forward_features = sort{$a->start <=> $b->start || $a->end <=> $b->end} @sorted_forward_features;
@@ -615,9 +620,9 @@ sub parse_features {
 =head2 fuse_overlapping_features
 
   Arg [1]   : refence to an array of features 
-  Function  : merge together overapping features abutting features and arrays of features which seem to come from tandemly repeated sequences then adds each merged feature to an array
+  Function  : merge together overapping features abutting features then adds each merged feature to an array
   Returntype: none
-  Exceptions: throws is feature start and end seem to get screwed up
+  Exceptions: throws if feature start becomes greater than end
   Caller    : 
   Example   : 
 
@@ -625,14 +630,11 @@ sub parse_features {
 
 
 sub fuse_overlapping_features {
-    
-  my ($self, $feature_ref) = @_;
-  
-  my @features = @$feature_ref;
-  
-    for (my $i = 1; $i < @features;) {
-        my $f_a = $features[$i - 1];
-        my $f_b = $features[$i];
+    my ($self, $features) = @_;
+
+    for (my $i = 1; $i < @$features;) {
+        my $f_a = $features->[$i - 1];
+        my $f_b = $features->[$i];
         
         # If coordinates overlap or abut
         if ($f_a->end + 1 >= $f_b->start) {
@@ -642,46 +644,22 @@ sub fuse_overlapping_features {
             }
             
             # Remove b from the list
-            splice(@features, $i, 1);
+            splice(@$features, $i, 1);
             
             # Critical error check!
             if ($f_a->start > $f_a->end) {
                 die "Feature start (", $f_a->start,
                     ") greater than end (", $f_a->end, ")";
             }
-        #if the hend of a is greater than the hstart of b these might be tandemly repeated genes so merge hits
-	#possible need some limiting factor for distance between a and b or for the genes to be considered tandemly repeated
-	  }elsif($self->tandem_check == 1){
-	    if( $f_a->hend > $f_b->hstart){
-	      if ($f_a->end < $f_b->end) {
-		$f_a->end($f_b->end);
-	      }
-	   
-	    
-	      # Remove b from the list
-	      splice(@features, $i, 1);
-	    
-	      # Critical error check!
-	      if ($f_a->start > $f_a->end) {
-		die "Feature start (", $f_a->start,
-		") greater than end (", $f_a->end, ")";
-	      }
-	    }
-	  }else{
+	} else {
 	    # Haven't spliced, so move pointer
             $i++;
-	  }
-      }
+        }
+    }
   
-  foreach my $feature (@features){
-
-    $self->add_merged_feature($feature);
-
-  }
-  
-  
-
-
+    foreach my $feat (@$features){
+        $self->add_merged_feature($feat);
+    }
 }
 
 
@@ -697,15 +675,15 @@ sub fuse_overlapping_features {
 =cut
 
 
-sub run_est2genome{
+sub run_est2genome {
 
   my ($self, $feature) = @_;
   
   my $est = $self->seqfetcher->get_Seq_by_acc($feature->hseqname);
   my $seq = $self->unmasked->subseq($feature->start, $feature->end);
-  my $start = $feature->start;
+  my $start  = $feature->start;
   my $strand = $feature->strand;
-  my $end = $feature->end;
+  my $end    = $feature->end;
   my $query_seq = Bio::Seq->new (-seq => $seq,
 				 -id => $self->unmasked->id,
 				 -accession => $self->unmasked->id);
@@ -718,8 +696,7 @@ sub run_est2genome{
   my @features = $est2genome->output;
   #print "est2 genome outputted ".scalar(@features)."\n";
   my @output;
-  foreach my $f(@features){
-    
+  foreach my $f (@features) {
         if($f->score > 6){
 	  $f->start($f->start+$start-1);
 	  $f->end($f->end+$start-1);
