@@ -48,7 +48,7 @@ sub generate_input_ids{
     my $length = $chr->length;
     my $count = 1;
     while ($count < $length) {
-      my $start = $count;
+      my $start = $count;IDs 
       my $end   = $count + $size -1;
       
       if ($end > $length) {

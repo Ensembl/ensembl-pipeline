@@ -36,7 +36,9 @@ sub is_finished{
   my $potential = $self->get_input_ids;
   my $successful = $self->get_TaskStatus->get_successful;
 
-  if($potential->count == $successful->count){
+  if(!$potential || !$successful){
+    return undef;
+  }elsif($potential->count == $successful->count){
     return 1;
   }else{
     return undef;

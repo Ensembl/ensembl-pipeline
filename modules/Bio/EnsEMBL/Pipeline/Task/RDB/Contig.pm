@@ -36,9 +36,9 @@ sub generate_input_ids{
 
   my $names = $rawcontig_adaptor->fetch_all_names;
 
-  my $idset = Bio::EnsEMBL::Pipeline::IDSet(
-					    -id_list => $names,
-					   );
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						 -id_list => $names,
+						);
 
   return $idset;
 
