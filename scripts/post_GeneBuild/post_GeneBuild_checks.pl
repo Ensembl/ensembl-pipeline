@@ -29,6 +29,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
+use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_FINALDBHOST
 					 GB_FINALDBNAME
@@ -42,17 +43,33 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 
 use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
 
-my $dbhost      = $GB_FINALDBHOST;
+my $dbhost;
 my $dbuser    = 'ensro';
-my $dbname    = $GB_FINALDBNAME;
+my $dbname;
 my $dbpass    = undef;
 
-my $path      = 'CHR';
-
-my $dnadbhost = $GB_DBHOST;
+my $dnadbhost;
 my $dnadbuser = 'ensro';
-my $dnadbname = $GB_DBNAME;
+my $dnadbname;
 my $dnadbpass = undef;
+
+my $genetype = "ensembl"; # default genetype
+
+
+$dbuser = "ensro";
+&GetOptions(
+	    'dbname:s'    => \$dbname,
+	    'dbhost:s'    => \$dbhost,
+	    'dnadbname:s' => \$dnadbname,
+	    'dnadbhost:s' => \$dnadbhost,
+	    'genetype:s'  => \$genetype,
+);
+
+unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
+  print STDERR "script to check the sanity of genes and transcripts after a build\n";
+  print STDERR "Usage: $0 --dbname -dbhost -dnadbname -dnadbhost -genetype\n";
+  exit(0);
+}
 
 my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					       '-host'   => $dnadbhost,
@@ -73,13 +90,15 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 print STDERR "connected to $dbname : $dbhost\n";
 #$db->static_golden_path_type($path);
+
 my $sa = $db->get_StaticGoldenPathAdaptor();
 
-my $genetype= $GB_FINAL_GENETYPE;
-
+print STDERR "checking genes of type $genetype\n";
+print STDERR "path: ".$db->static_golden_path_type."\n";
 # get genomic regions
 my $chr_lengths = get_chrlengths($db,$db->static_golden_path_type);
 my %chr_lengths = %$chr_lengths;
+
 
 # take 1MB vc's and check genes for each vc:
 foreach my $chr ( keys( %chr_lengths ) ){
