@@ -357,6 +357,7 @@ sub fetch_databases {
 		$self->db_version_searched($dbname ."-".$count);
 		$count++;
 	    }
+	    $! = undef; # to stop pollution as it will be "No such file or directory" after while loop above.
 	}
     }
     if (scalar(@databases) == 0) {
