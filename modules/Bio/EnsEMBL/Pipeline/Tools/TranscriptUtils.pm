@@ -558,6 +558,8 @@ sub _print_SimpleTranscript{
     }
     print STDERR "transcript ".$id.": ";
     
+
+    
     my $shift = 0;
     if ( $chr_coord ){
       $shift = $exons[0]->contig->chr_start - 1;
@@ -671,34 +673,34 @@ sub _print_Evidence{
 ############################################################
 
 sub _print_TranscriptEvidence{
-    my ($self,$transcript) = @_;
-    my @exons = @{$transcript->get_all_Exons};
-    my %evidence;
-    my %score;
-    my %percent_id;
-    foreach my $exon ( @exons){
-	my @evidences = @{$exon->get_all_supporting_features};
-	if (@evidences){
-	    foreach my $evi ( @evidences ){
-		$evidence{$evi->hseqname} = 1;
-		unless( $score{$evi->hseqname} ){
-		    $score{$evi->hseqname} = $evi->score;
-		}
-		if ( $score{$evi->hseqname} < $evi->score ){
-		    $score{$evi->hseqname} = $evi->score;
-		}
-		unless( $percent_id{$evi->hseqname} ){
-		    $percent_id{$evi->hseqname} = $evi->percent_id;
-		}
-		if ( $percent_id{$evi->hseqname} < $evi->percent_id ){
-		    $percent_id{$evi->hseqname} = $evi->percent_id;
-		}
-	    }
+  my ($self,$transcript) = @_;
+  my @exons = @{$transcript->get_all_Exons};
+  my %evidence;
+  my %score;
+  my %percent_id;
+  foreach my $exon ( @exons){
+    my @evidences = @{$exon->get_all_supporting_features};
+    if (@evidences){
+      foreach my $evi ( @evidences ){
+	$evidence{$evi->hseqname} = 1;
+	unless( $score{$evi->hseqname} ){
+	  $score{$evi->hseqname} = $evi->score;
 	}
+	if ( $score{$evi->hseqname} < $evi->score ){
+	  $score{$evi->hseqname} = $evi->score;
+	}
+	unless( $percent_id{$evi->hseqname} ){
+	  $percent_id{$evi->hseqname} = $evi->percent_id;
+	}
+	if ( $percent_id{$evi->hseqname} < $evi->percent_id ){
+	  $percent_id{$evi->hseqname} = $evi->percent_id;
+	}
+      }
     }
-    foreach my $evidence ( keys %evidence ){
-	print STDERR "hit_name: ".$evidence." score: ".$score{$evidence}." percent_id: ".$percent_id{$evidence}."\n";
-    }
+  }
+  foreach my $evidence ( keys %evidence ){
+    print STDERR "hit_name: ".$evidence." score: ".$score{$evidence}." percent_id: ".$percent_id{$evidence}."\n";
+  }
 }
 
 ############################################################
@@ -786,7 +788,8 @@ sub find_transcripts_by_protein_evidence{
               WHERE  sf.exon_id    = e.exon_id                   AND
 	             sf.feature_id = pf.protein_align_feature_id AND
 	             pf.hit_name   = "$id"                       AND
-	             et.exon_id    = e.exon_id                   AND
+	             pf.contig_id  = e.contig_id                 AND
+                     et.exon_id    = e.exon_id                   AND
 	             et.transcript_id = t.transcript_id
             );
   

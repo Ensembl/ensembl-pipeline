@@ -45,24 +45,51 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 
-print "connected to $dbname : $dbhost\n";
+print STDERR "connected to $dbname : $dbhost\n";
 
 unless ($path){
   $path = $db->assembly_type;
 }
-print  "path = $path\n";
+
+print STDERR  "path = $path\n";
 
 if ( $protein_id ){
-  print STDERR "Transcripts based on $protein_id\n";
-  foreach my $tran ( &get_transcripts_by_protein_evidence($db,$protein_id) ){
-    &show_transcript($db,$tran);
+  print "Transcripts based on $protein_id\n";
+  my @transcripts;
+ TRAN:
+  foreach my $t_id ( &get_transcripts_by_protein_evidence($db,$protein_id) ){
+    my $transc = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
+    foreach my $exon (@{$transc->get_all_Exons}){
+      foreach my $evi ( @{$exon->get_all_supporting_features} ){
+	if ( $evi->hseqname eq $protein_id ){
+	  push (@transcripts,$transc);
+	  next TRAN;
+	}
+      }
+    }
+    foreach my $trans ( @transcripts ){
+      &show_transcript($db,$trans->dbID);
+    }
   }
 }
 
 if ( $dna_id ){
-  print STDERR "Transcripts based on $dna_id\n";
-  foreach my $tran ( &get_transcripts_by_dna_evidence($db,$dna_id) ){
-    &show_transcript($db,$tran);
+  print "Transcripts based on $dna_id\n";
+ my @transcripts;
+ TRAN:
+  foreach my $t_id ( &get_transcripts_by_protein_evidence($db,$protein_id) ){
+    my $tran = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
+    foreach my $exon (@{$tran->get_all_Exons}){
+      foreach my $evi ( @{$exon->get_all_supporting_features} ){
+	if ( $evi->hseqname eq $dna_id ){
+	  push (@transcripts,$tran);
+	  next TRAN;
+	}
+      }
+    }
+    foreach my $tran ( @transcripts ){
+      &show_transcript($db,$tran->dbID);
+    }
   }
 }
 
@@ -74,10 +101,11 @@ sub get_transcripts_by_protein_evidence{
 
   my $q = qq( SELECT t.transcript_id
 	      FROM   exon e, supporting_feature sf, protein_align_feature pf,
-                     exon_transcript et, transcript t
+	             exon_transcript et, transcript t
 	      WHERE  sf.exon_id    = e.exon_id                   AND
 	             sf.feature_id = pf.protein_align_feature_id AND
 	             pf.hit_name   = "$id"                       AND
+                     pf.contig_id  = e.contig_id                 AND 
                      et.exon_id    = e.exon_id                   AND
                      et.transcript_id = t.transcript_id
 	    );
@@ -94,11 +122,7 @@ sub get_transcripts_by_protein_evidence{
     $transcripts{$t}++;
   }
   return keys %transcripts;
-
-
 }
-
-
 
 
 ############################################################
@@ -113,6 +137,7 @@ sub get_transcripts_by_dna_evidence{
 	      WHERE  sf.exon_id    = e.exon_id                   AND
 	             sf.feature_id = pf.dna_align_feature_id     AND
 	             pf.hit_name   = "$id"                       AND
+                     pf.contig_id  = e.contig_id                 AND
                      et.exon_id    = e.exon_id                   AND
                      et.transcript_id = t.transcript_id
 	    );
@@ -191,14 +216,14 @@ sub print_evidence{
     foreach my $evi ( @evidence ){
       my $length = $evi->end - $evi->start + 1;
       my $hlength = $evi->hend - $evi->hstart + 1;
-      print STDERR "Evidence: ".$evi->dbID."\t".$evi->contig->dbID."\t".$evi->contig->name."\t".
+      print "Evidence: ".$evi->dbID."\t".$evi->contig->dbID."\t".$evi->contig->name."\t".
 	$evi->start."-".$evi->end."\t".$evi->phase."\t".
 	  $evi->end_phase."\t".$evi->strand."\t".$length."\t".
 	    $evi->hstart."-".$evi->hend."\t".$hlength."\t".$evi->hseqname."\n";
     }
   }
   else{
-    print STDERR "No evidence\n";
+    print "No evidence\n";
   }
 }
 
@@ -230,8 +255,8 @@ sub get_gene_id{
   
   my $q = qq( SELECT g.gene_id
 	      FROM   transcript t, gene g
-	      WHERE  t.transcript_id = $t_id AND
-	             t.gene_id       = g.gene_id AND
+	      WHERE  t.transcript_id = $t_id     AND
+	             t.gene_id       = g.gene_id
 	    );
   
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
