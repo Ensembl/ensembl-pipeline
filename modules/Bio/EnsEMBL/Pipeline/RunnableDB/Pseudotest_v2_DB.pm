@@ -64,7 +64,7 @@ sub fetch_input {
 
 
 
-    my $runname = "Bio::EnsEMBL::Pipeline::Tools::Pseudotest_v2";
+    my $runname = "Bio::EnsEMBL::Pipeline::Runnable::Pseudotest_v2";
 
   my $rep_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
