@@ -83,7 +83,7 @@ sub new {
 Fetches all analyses
 which have been completed on a specific input ID
 Takes one string - input ID
-and returns a list of Bio::EnsEMBL::Analysis.
+and returns a ref to a list of Bio::EnsEMBL::Analysis.
 
 =cut
 
@@ -108,7 +108,7 @@ sub fetch_analysis_by_input_id {
     }
   }
 
-  return @result;
+  return \@result;
 }
 
 
@@ -141,39 +141,11 @@ sub store_input_id_analysis {
 }
 
 
-=head2 list_input_id_by_analysis
-
-Takes a Bio::EnsEMBL::Analysis object and
-returns a list of input IDs which have had
-that analysis performed on them.
-
-=cut
-
-sub list_input_id_by_analysis {
-  my $self = shift;
-  my $analysis = shift;
-  my @result;
-  my @row;
-
-  my $sth = $self->prepare( q {
-    SELECT input_id
-      FROM input_id_analysis
-     WHERE analysis_id = ? } );
-  $sth->execute( $analysis->dbID );
-
-  while( @row = $sth->fetchrow_array ) {
-    push( @result, $row[0] );
-  }
-
-  return @result;
-}
-
-
 =head2 list_input_id_created_by_analysis
 
 As list_input_id_by_analysis() but
 also returns the time the analysis was
-created. Returns an list of (anonymous)
+created. Returns a ref to a list of (anonymous)
 arrays.
 
   foreach my $id_time ($sic->list_input_id_created_by_analysis) {
@@ -199,14 +171,15 @@ sub list_input_id_created_by_analysis {
     push( @result, [$row[0], $row[1]] );
   }
 
-  return @result;
+  return \@result;
 }
 
 
 =head2 list_input_id_by_Analysis
 
-Returns a list of all input_id and class
-for this analysis type
+Takes a Bio::EnsEMBL::Analysis object and
+returns a ref to a list of input IDs which have had
+that analysis performed on them.
 
   foreach my $idlist ($sic->list_input_id_class_by_Analysis('SubmitSlice')) {
     my $id    = $idlist->[0];
@@ -239,13 +212,13 @@ sub list_input_id_by_Analysis {
     push @result, $row->[0];
   }
 
-  return @result;
+  return \@result;
 }
 
 
 =head2 list_input_id_class_by_start_count
 
-Returns a list of all input_id and class,
+Returns a ref to a list of all input_id and class,
 with an optional start and end limit.
 
   # get 1st 100 entries from list
@@ -279,7 +252,7 @@ sub list_input_id_class_by_start_count {
     push( @result, [ $row[0], $row[1] ] );
   }
 
-  return @result;
+  return \@result;
 }
 
 
