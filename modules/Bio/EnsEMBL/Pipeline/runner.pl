@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w 
 
 # default pipeline runner script
 # this script is passed as part of the batch submission request
@@ -8,25 +8,26 @@
 # note that you may need to alter the #! line above to suit your
 # local perl installation
 
-
+use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Sys::Hostname;
 use Getopt::Long;
 
-
 #parameters for Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
-my $host;
 my $dbname;
+my $host;
 my $dbuser;
-
 my $port            = '3306';
 my $pass            = undef;
 my $job_id;
 my $queue_manager;
 my $cleanup = 0;
+my $check;
+my $output_dir;
+my $pants;
 
 GetOptions(
            'dbhost=s'        => \$host,
@@ -36,8 +37,8 @@ GetOptions(
            'dbpass=s'        => \$pass,
            'check!'          => \$check,
            'output_dir=s'    => \$output_dir,
-           'queue_manager=s' => \$queue_manger,
-           'cleanup!'       => \$cleanup,
+           'queue_manager=s' => \$queue_manager,
+           'cleanup!'        => \$cleanup,
 )
 or die ("Couldn't get options");
 
@@ -57,7 +58,9 @@ if( $check ) {
   exit 0;
 
 }
-my $queue_manager = $QUEUE_MANAGER unless($queue_manager);
+
+$queue_manager = $QUEUE_MANAGER unless($queue_manager);
+
 my $batch_q_module = 
   "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
@@ -110,13 +113,13 @@ if($submission_id_not){
 }
 
 my $hostname = [ split(/\./, hostname()) ];
-my $host = shift(@$hostname);
+$host = shift(@$hostname);
 JOB:foreach my $job(@jobs) {
 
-  #print STDERR "Fetching job " . $job_id . "\n";
-  
-  #my $job = $job_adaptor->fetch_by_dbID($job_id);
+  my $job_id = $job->dbID;
+
   $job->execution_host($host);
+
   eval{
     $job_adaptor->update($job);
   };
@@ -126,7 +129,7 @@ JOB:foreach my $job(@jobs) {
     if($batch_q_object->can('copy_output')){
       $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
     }else{
-      print STDERR "the batch_q_object ".$queue_manger." needs to implement ".
+      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
         " the copy_output method\n";
     }
     #if($batch_q_object->can('delete_output')){
@@ -153,7 +156,7 @@ JOB:foreach my $job(@jobs) {
     if($batch_q_object->can('copy_output')){
       $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
     }else{
-      print STDERR "the batch_q_object ".$queue_manger." needs to implement ".
+      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
         " the copy_output method\n";
     }
     next JOB;
@@ -162,7 +165,7 @@ JOB:foreach my $job(@jobs) {
     if($batch_q_object->can('copy_output')){
       $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
     }else{
-      print STDERR "the batch_q_object ".$queue_manger." needs to implement ".
+      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
         " the copy_output method\n";
     }
   }
