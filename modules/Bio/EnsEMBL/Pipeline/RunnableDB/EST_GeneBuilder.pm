@@ -56,6 +56,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::Tools::TranslationUtils;
 
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_INPUTID_REGEX
@@ -75,7 +76,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_MAX_INTRON_SIZE
 									 EST_MAX_EVIDENCE_DISCONTINUITY
 									 EST_GENEBUILDER_INTRON_MISMATCH
-									 EST_GENOMEWISE_GENETYPE
+									 ESTGENE_TYPE
 									 USE_cDNA_DB
 									 cDNA_DBNAME
 									 cDNA_DBHOST
@@ -83,6 +84,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 cDNA_DBPASS
 									 cDNA_GENETYPE
 									 REJECT_SINGLE_EXON_TRANSCRIPTS
+									 USE_GENOMEWISE
 									 GENOMEWISE_SMELL
 									 EST_MIN_EXON_SIZE
 									 EST_GENEBUILDER_COMPARISON_LEVEL
@@ -136,7 +138,7 @@ sub new {
       $self->cdna_db($cdna_db);
     }
     
-    $self->genetype($EST_GENOMEWISE_GENETYPE);
+    $self->genetype($ESTGENE_TYPE);
 
 
 
@@ -298,20 +300,11 @@ sub fetch_input {
     
     # process transcripts in the forward strand
     
-    if( scalar(@forward_transcripts) ){
-	my @transcripts  = $self->_process_Transcripts(\@forward_transcripts,$strand);
-	foreach my $tran (@transcripts){
-	    my $runnable = 
-		new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-								     -genomic  => $slice,
-								     -analysis => $self->analysis,
-								     -smell    => $GENOMEWISE_SMELL,
-								     );
-	    $self->add_runnable($runnable,$strand);
-	    $runnable->add_Transcript($tran);
-	}
-    }
     
+    if( scalar(@forward_transcripts) ){
+      $self->_forward_transcripts( @forward_transcripts );
+    }
+
     ############################################################
     # reverse strand
     ############################################################    
@@ -342,36 +335,46 @@ sub fetch_input {
     $single=0;
   REVGENE:    
     foreach my $gene (@$revgenes) {
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	    
-	    my @exons = @{$transcript->get_all_Exons};
-	    
-	    # DON'T throw away single-exon genes
-	    if(scalar(@exons) == 1){
-		$single++;
-	    }
-	    
-	    # these are really - strand, but the Slice is reversed, so they are relatively + strand
-	    if( $exons[0]->strand == 1){
-		push (@reverse_transcripts, $transcript);
-	    }
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	
+	my @exons = @{$transcript->get_all_Exons};
+	
+	# DON'T throw away single-exon genes
+	if(scalar(@exons) == 1){
+	  $single++;
 	}
+	
+	# these are really - strand, but the Slice is reversed, so they are relatively + strand
+	if( $exons[0]->strand == 1){
+	  push (@reverse_transcripts, $transcript);
+	}
+      }
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@reverse_transcripts) . " reverse strand genes\n";
-     
+    
     if(scalar(@reverse_transcripts)){
-	my @transcripts = $self->_process_Transcripts(\@reverse_transcripts,$strand);  
-	foreach my $tran (@transcripts) {
-	    my $runnable = 
-		new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-								     -genomic  => $rev_slice,
-								     -analysis => $self->analysis,
-								     -smell    => $GENOMEWISE_SMELL,
-								     );
-	    $self->add_runnable($runnable, $strand);
-	    $runnable->add_Transcript($tran);
-	}
+      $self->_reverse_transcripts(@reverse_transcripts);
     }
+  }
+
+############################################################
+
+sub _forward_transcripts{
+  my ($self, @transcripts) = @_;
+  if ( @transcripts ){
+    $self->{_forward_transcripts} = \@transcripts;
+  }
+  return @{$self->{_forward_transcripts}};
+}
+
+############################################################
+
+sub _reverse_transcripts{
+  my ($self, @transcripts) = @_;
+  if ( @transcripts ){
+    $self->{_reverse_transcripts} = \@transcripts;
+  }
+  return @{$self->{_reverse_transcripts}};
 }
 
 ############################################################
@@ -1244,26 +1247,55 @@ sub run {
   $strand = 1;
   my $tcount=0;
 
+  my @f_transcripts1 = $self->_forward_transcripts;
+  my @f_transcripts2  = $self->_process_Transcripts(\@f_transcripts1,$strand);
   my @forward_transcripts;
- 
- RUN1:
-  foreach my $gw_runnable( $self->each_runnable($strand) ){
-    $tcount++;
-    eval{
-      $gw_runnable->run;
-    };
-    if ($@){
-      print STDERR "Your runnable $gw_runnable didn't succeed!\n";
-      print STDERR $@;
-      next RUN1;
+  
+
+  ############################################################
+  # run genomewise?
+  if ( $USE_GENOMEWISE ){
+    foreach my $tran (@f_transcripts2){
+      my $runnable = 
+	new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+							     -genomic  => $self->query,
+							     -analysis => $self->analysis,
+							     -smell    => $GENOMEWISE_SMELL,
+							    );
+      $self->add_runnable($runnable,$strand);
+      $runnable->add_Transcript($tran);
     }
-    foreach my $transcript ( $gw_runnable->output ){
-      #$self->_set_evidence( $transcript );
-      push (@forward_transcripts, $transcript);
+    
+  RUN1:
+    foreach my $gw_runnable( $self->each_runnable($strand) ){
+      $tcount++;
+      eval{
+	$gw_runnable->run;
+      };
+      if ($@){
+	print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+	print STDERR $@;
+	next RUN1;
+      }
+      foreach my $transcript ( $gw_runnable->output ){
+	#$self->_set_evidence( $transcript );
+	push (@forward_transcripts, $transcript);
+      }
+    }
+    print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
+
+  }
+  ############################################################
+  # else use a simpler method
+  else{
+    foreach my $tran (@f_transcripts2){
+      my $new_tran = Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation( $tran );
+      if ( $new_tran ){
+	push ( @forward_transcripts, $new_tran );
+      }
     }
   }
-  print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
-
+  
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
   
   # cluster them into genes
@@ -1289,25 +1321,54 @@ sub run {
   ############################################################
   $strand = -1;
   my $tcount2=0;
- 
+  
   my @reverse_transcripts;
- RUN2:
-  foreach my $gw_runnable( $self->each_runnable($strand)) {
-    $tcount2++;
-    eval{
-      $gw_runnable->run;
-    };
-    if ($@){
-      print STDERR "Your runnable $gw_runnable didn't succeed!\n";
-      print STDERR $@;
-      next RUN2;
+  my @r_transcripts1 = $self->_reverse_transcripts;
+  my @r_transcripts2 = $self->_process_Transcripts(\@r_transcripts1,$strand);  
+  
+  ############################################################
+  # use genomewise?
+  if ( $USE_GENOMEWISE ){
+    foreach my $tran (@r_transcripts2) {
+      my $runnable = 
+	new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+							     -genomic  => $self->revcomp_query,
+							     -analysis => $self->analysis,
+							     -smell    => $GENOMEWISE_SMELL,
+							    );
+	    $self->add_runnable($runnable, $strand);
+	    $runnable->add_Transcript($tran);
     }
-    foreach my $transcript ( $gw_runnable->output ){
-      #$self->_set_evidence( $transcript );
-      push (@reverse_transcripts, $transcript);
+    
+  RUN2:
+    foreach my $gw_runnable( $self->each_runnable($strand)) {
+      $tcount2++;
+      eval{
+	$gw_runnable->run;
+      };
+      if ($@){
+	print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+	print STDERR $@;
+	next RUN2;
+      }
+      foreach my $transcript ( $gw_runnable->output ){
+	#$self->_set_evidence( $transcript );
+	push (@reverse_transcripts, $transcript);
+      }
+    }
+    print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
+    
+  }
+  ############################################################
+  # else use a simpler method
+  else{
+    foreach my $tran (@r_transcripts2){
+      my $new_tran = Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation( $tran );
+      if ( $new_tran ){
+	push ( @reverse_transcripts, $new_tran );
+      }
     }
   }
-  print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
   
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
   
