@@ -18,6 +18,7 @@ CREATE TABLE job (
   taskname          varchar(40) NOT NULL,
   input_id          varchar(40) NOT NULL,
   submission_id     varchar(40),
+  job_name          varchar(255),
   array_index       varchar(255),
   parameters        varchar(255),
   module            varchar(255),
