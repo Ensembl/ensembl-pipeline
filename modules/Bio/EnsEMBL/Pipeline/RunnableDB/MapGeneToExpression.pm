@@ -900,9 +900,8 @@ sub write_output {
 	push (@est_ids, $est_id_no_version);
       }
     }
-    print STDERR "Storing pair $transcript_stable_id, $est_id\n";
-      
-    $expression_adaptor->store_ensembl_link($transcript_id,\@$est_ids);
+    print STDERR "Storing pairs $transcript_id, @est_ids\n";
+    $expression_adaptor->store_ensembl_link($transcript_id,\@est_ids);
   }
 }
 
