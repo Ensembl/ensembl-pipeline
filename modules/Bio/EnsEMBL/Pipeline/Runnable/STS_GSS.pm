@@ -85,18 +85,22 @@ sub new {
 				  PERCENT_FILTER
 				  TANDEM_CHECK)], 
 			      @args);
-
-    if($no_blast == 1){
-      #print "setting no_blast\n";
-      $self->{'_no_blast'} = $no_blast;
-    }
-    #print "no_blast = ".$self->no_blast."\n";
     
+    if($no_blast == 1){
+      #print "setting no_blast = ".$no_blast."\n";
+      $self->{'_no_blast'} = $no_blast;
+    } 
+    #print "1no_blast = ".$no_blast."\n";
+    
+    #print "2no_blast = ".$self->no_blast."\n";
+    #print "running new\n";
+    #print "1unmasked = ".$unmasked."\n";
     if ($unmasked) {
       $self->unmasked($unmasked);
     } else {
       $self->throw("No unmasked query sequence input.");
     }
+    #print "2unmasked = ".$self->unmasked."\n";
     #print STDERR "find executable output ".$self->find_executable($program)."\n";
     if($program){
       $self->program($self->find_executable($program));
@@ -112,7 +116,7 @@ sub new {
 	$self->throw("should pass in features haven't \n");
       }
     }
-    if($no_blast != 1){
+    if($no_blast == 0){
       #print $no_blast."\n";
       if ($query) {
 	$self->clone($query);
@@ -437,14 +441,14 @@ sub run {
   }
   #print STDERR "ran analysis\n";
   #parse output and create features
-  print "there are ".scalar(@blast_output)." features\n";
+  #print "there are ".scalar(@blast_output)." features\n";
   $self->parse_features(\@blast_output);
   my @features = $self->each_merged_feature;
   my @results;
   foreach my $feature(@features){
-    print "running on ".$feature->hseqname." with score ".$feature->score." and evalue ".$feature->p_value."\n";
+    #print "running on ".$feature->hseqname." with score ".$feature->score." and evalue ".$feature->p_value."\n";
     my @genes = $self->run_est2genome($feature);
-    print "there are ".scalar(@genes)." results\n";
+    #print "there are ".scalar(@genes)." results\n";
     push(@results, @genes);
   }
   $self->deletefiles();
@@ -543,6 +547,7 @@ sub parse_features {
   ## for each sequence hit, all the features which correspond to that sequence have their start and end extended ##
   ## the start and end are extended so there is enough query sequence to cover the entire hit sequence plus a bit of padding
   ## which is set to 200 as default    
+  my $count = 0;
   foreach my $hid(@hids){
     #print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
     my @feature_array = @{$unique_hids{$hid}};
@@ -563,8 +568,10 @@ sub parse_features {
 	  $feature->start(1);
 	}
 	$feature->end($genomic_end+($hstart+$self->padding));
+	#print $count." trying to get unmasked from ".$self."\n";
+	$count++;
 	if($feature->end >= $self->unmasked->length){
-	  $feature->end($self->umasked->length);
+	  $feature->end($self->unmasked->length);
 	}
       }elsif($feature->strand == 1){
 	$feature->start($genomic_start-($hstart+$self->padding));
