@@ -221,6 +221,7 @@ sub _map_Transcripts{
 												-comparison_level         => 4,
 												-splice_mismatch          => 1,
 												-intron_mismatch          => 0,
+												-restrict_external_splice_site => 0,
 											       );
   my $sublist;
   
