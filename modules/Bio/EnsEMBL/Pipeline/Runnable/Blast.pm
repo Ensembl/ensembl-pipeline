@@ -117,7 +117,7 @@ sub new {
     $self->{'_database'}  = undef;     # name of database
     $self->{'_threshold'} = undef;     # Threshold for hit filterting
     $self->{'_options'}   = undef;     # arguments for blast
-    $self->{'_filter'}    = 0;         # Do we filter features?
+    $self->{'_filter'}    = 1;         # Do we filter features?
     $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
 
     $self->{'_workdir'}   = undef;     # location of temp directory
@@ -157,7 +157,7 @@ sub new {
           if ($::pipeConf{'B_factor'}){
                 my $b_factor = $::pipeConf{'B_factor'};
                 my $b_value = int ($query->length / 1000 * $b_factor); 
-                if ($::pipeCong{'blast'} eq 'ncbi'){
+                if ($::pipeConf{'blast'} eq 'ncbi'){
                         $options .= " -b $b_value" unless ($b_value < 250);
                 }
                 else {
@@ -454,7 +454,7 @@ sub parse_results {
     # re-filter, with pruning
     my @allfeatures = $self->output;
     if ($self->threshold_type eq "PID") {
-      @allfeatures = sort {$b->percent-id <=> $a->percent_id} @allfeatures;
+      @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
     } else {
       @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
     }
