@@ -16,9 +16,11 @@
   -dbhost
   -dbuser
   -dbpass
-  -outdir (the directory where the chromosome sequences will 
-	   be written, one file per chromosome).
-  -chr (specify a chromosome name to dump just one chromosome)
+  -outdir  (the directory where the chromosome sequences will 
+	    be written, one file per chromosome).
+  -chr     (specify a chromosome name to dump just one chromosome)
+  -outfile (specify a filename if the genome is to be dumped to a 
+            single file - specify the full path.)
 
 =cut
 
@@ -36,6 +38,7 @@ my $repeatmask;
 my $dust;
 my $outdir;
 my $chr;
+my $outfile;
 
 &GetOptions('dbname:s'   => \$dbname,
 	    'dbport:s'   => \$dbport,
@@ -45,14 +48,16 @@ my $chr;
 	    'repeatmask' => \$repeatmask,
 	    'dust'       => \$dust,
 	    'outdir:s'   => \$outdir,
-	    'chr:s'      => \$chr);
+	    'chr:s'      => \$chr,
+	    'outfile:s'  => \$outfile);
 
 # Whack out some help if lost...
 if(!defined $dbname || !defined $dbhost || !defined $dbuser || !defined $outdir){
 
   print "Usage: dump_chromosomes.pl -dbname [name] -dbhost [host] -dbuser [user]\n" .
-    "-dbport [port] -dbpass [pass] -outdir [directory for chr files] -repeatmask\n" .
-      "-dust -chr [chr name]\n";
+    "-dbport [port] -dbpass [pass] -outdir [directory for chr files]\n" . 
+      " -outfile [filename (if a single file is wanted only)] -repeatmask\n" .
+	"-dust -chr [chr name]\n";
 
   exit(0);
 }
@@ -69,6 +74,11 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(-dbname => $dbname,
 my $slice_adaptor = $db->get_SliceAdaptor;
 my $chromosome_adaptor = $db->get_ChromosomeAdaptor;
 
+# Set a flag if a single outfile is wanted.
+
+my $single_outfile = 1 
+  if defined($outfile);
+
 # Figure out what kind of masking is wanted
 
 my @mask_logicnames = ();
@@ -82,9 +92,10 @@ foreach my $chromosome (@{$chromosome_adaptor->fetch_all}){
 
   print "Dumping chromosome " . $chromosome->chr_name;
 
-  my $outfile = $outdir . '/' . $chromosome->chr_name . '.fa';
+  $outfile = $outdir . '/' . $chromosome->chr_name . '.fa'
+    unless $single_outfile;
 
-  if (-e $outfile){
+  if (-e $outfile && !$single_outfile){
     print " ... output file exists already - skipping\n";
     next
   }
@@ -98,7 +109,7 @@ foreach my $chromosome (@{$chromosome_adaptor->fetch_all}){
 
   # Open a Bio::SeqIO output stream
 
-  my $seqio = Bio::SeqIO->new(-file   => ">$outfile",
+  my $seqio = Bio::SeqIO->new(-file   => ">>$outfile",
 			      -format => 'Fasta');
 
 
