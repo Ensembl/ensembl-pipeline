@@ -279,8 +279,36 @@ sub write_ens_genes {
             if ($ex->start <= $cd->[1] and $ex->end >= $cd->[0]) {
               
               # Add the phase from the CDS
-              $ex->phase($cd->[3]);
-              $ex->end_phase(($ex->length + $ex->phase)%3);
+              if ($strand == -1) {                
+                if ($ex->end == $cd->[1]) {
+                  $ex->phase($cd->[3]);
+                } else {
+                  $ex->phase(-1);
+                }
+
+                if ($ex->start == $cd->[0]) {
+                  my $this_phase = $ex->phase > 0 ? $ex->phase : 0;
+                  $ex->end_phase(($this_phase + ($cd->[1] - $cd->[0] + 1))%3);
+                } else {
+                  $ex->end_phase(-1);
+                }
+
+              } else {
+                if ($ex->start == $cd->[0]) {
+                  $ex->phase($cd->[3]);
+                } else {
+                  $ex->phase(-1);
+                }
+
+                if ($ex->end == $cd->[1]) {
+                  my $this_phase = $ex->phase > 0 ? $ex->phase : 0;
+                  $ex->end_phase( ($this_phase + ($cd->[1] - $cd->[0] + 1))%3);
+                } else {
+                  $ex->end_phase(-1);
+                }
+              }
+              #$ex->phase($cd->[3]);
+              #$ex->end_phase(($ex->length + $ex->phase)%3);
               
               if (not $tsl->start_Exon) {
                 my $pos = $strand == 1 ? $cd->[0] : $cd->[1];
