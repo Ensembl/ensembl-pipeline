@@ -461,6 +461,10 @@ sub parse_results {
                             $tmp_substart = $subend;
                             $tmp_subend = $tmp;
 		        }
+			else {
+			    $tmp_substart = $substart;
+			    $tmp_subend = $subend;
+			}
                         # build the featurepair
                         my %feature;
                         $feature{name} = $self->clone->id;
