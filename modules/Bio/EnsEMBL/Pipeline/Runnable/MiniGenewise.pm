@@ -420,6 +420,9 @@ sub get_Sequence {
   } 
   
   my $seqfetcher = $self->seqfetcher;    
+  
+  print STDERR "MiniGenewise: getting sequence for $id\n";
+  
   my $seq;
   eval {
     $seq = $seqfetcher->get_Seq_by_acc($id);
@@ -746,29 +749,30 @@ sub find_extras {
     my @new;
 
   FEAT: foreach my $f (@features) {
-	my $found = 0;
-	if (($f->end - $f->start) < 50) {
-	    next FEAT;
-	}
-#	print ("New feature\n");
+      my $found = 0;
+      if (($f->end - $f->start) < 50) {
+	next FEAT;
+      }
+      #	print ("New feature\n");
 
-	#$self->print_FeaturePair($f);
-	foreach my $out (@output) {
-	    foreach my $sf ($out->sub_SeqFeature) {
-
-		if (!($f->end < $out->start || $f->start >$out->end)) {
-			"print throwing out". $f->gffstring."\n";
-		    $found = 1;
-		}
-	    }
+      #$self->print_FeaturePair($f);
+      foreach my $out (@output) {
+	foreach my $sf ($out->sub_SeqFeature) {
+	  
+	  if (!($f->end < $out->start || $f->start >$out->end)) {
+	    print STDERR "throwing out". $f->gffstring."\n";
+	    $found = 1;
+	  }
 	}
-	
-	if ($found == 0) {
-	    push(@new,$f);
-	}
+      }
+      
+      if ($found == 0) {
+	push(@new,$f);
+      }
     }
     return @new;
 }
+
 =head2 output
 
   Title   : output
