@@ -83,6 +83,100 @@ sub _initialize {
 
 }
 
+=head2 get_Clone
+
+ Title   : get_Clone
+ Usage   : $db->get_Clone($disk_id)
+ Function: Gets a Clone object with disk_id as its disk_id
+ Example : $db->get_Clone($disk_id)
+ Returns : Bio::EnsEMBL::Pipeline::DBSQL::Clone object 
+ Args    : disk_id
+
+
+=cut
+
+sub get_Clone{
+   my ($self,$disk_id) = @_;
+
+   $disk_id || $self->throw("Trying to delete a clone without a disk id!");
+
+   my $sth = $self->prepare("select disk_id from clone where disk_id = \"$disk_id\";");
+   my $res = $sth ->execute();
+   my $rv  = $sth ->rows;
+
+   if( ! $rv ) {
+       # make sure we deallocate sth - keeps DBI happy!
+       $sth = 0;
+       $self->throw("Clone $disk_id does not seem to occur in the database!");
+   }
+
+   my $clone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone( -disk_id    => $disk_id,
+					       -dbobj => $self );
+
+   return $clone;
+}
+
+=head2 delete_Clone
+
+ Title   : delete_Clone
+ Usage   : $db->delete_Clone($disk_id)
+ Function: Deletes a clone with a specific disk_id
+ Example : $db->delete_Clone($disk_id)
+ Returns : nothing
+ Args    : disk_id
+
+
+=cut
+
+sub delete_Clone{
+   my ($self,$disk_id) = @_;
+
+   $disk_id || $self->throw("Trying to delete a clone without a disk id!");
+
+   my $sth = $self->prepare("delete from clone where disk_id = \"$disk_id\";");
+   my $res = $sth ->execute();
+   my $rv  = $sth ->rows;
+
+   if( ! $rv ) {
+       # make sure we deallocate sth - keeps DBI happy!
+       $sth = 0;
+       $self->throw("Clone $disk_id does not seem to occur in the database!");
+   }
+   return 1;
+}
+
+=head2 create_Clone
+
+ Title   : create_Clone
+ Usage   : $db->create_Clone($disk_id,$clone_group,$chromosome)
+ Function: writes a new clone in the database
+ Example : $db->create_Clone('dummy','SU','22')
+ Returns : nothing
+ Args    : disk_id,clone group,chromosome
+
+
+=cut
+
+sub create_Clone{
+   my ($self,$disk_id,$clone_group,$chromosome) = @_;
+
+   $disk_id || $self->throw("Trying to create a clone without a disk id!\n");
+   $clone_group || $self->throw("Trying to create a clone without a clone group!");
+   $chromosome || $self->throw("Trying to create a clone without a chromosome id!");
+   
+   my @sql;
+
+   push(@sql,"lock tables clone write");
+   push(@sql,"insert into clone(disk_id,clone_group,chromosome,last_check,created,modified) values('$disk_id','$clone_group','$chromosome',now(),now(),now())");
+   push(@sql,"unlock tables");   
+
+   foreach my $sql (@sql) {
+     my $sth =  $self->prepare($sql);
+     #print STDERR "Executing $sql\n";
+     my $rv  =  $sth->execute();
+     $self->throw("Failed to insert clone $disk_id") unless $rv;
+   }
+}
 
 
 =head2 get_Job {
@@ -382,9 +476,6 @@ sub prepare{
    return $self->_db_handle->prepare($string);
 }
 
-
-
-
 =head2 _db_handle
 
  Title   : _db_handle
@@ -406,9 +497,79 @@ sub _db_handle {
     return $self->{_db_handle};
 }
 
+=head2 _lock_tables
+
+ Title   : _lock_tables
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
 
 
+=cut
+
+sub _lock_tables{
+   my ($self,@tables) = @_;
+   
+   my $state;
+   foreach my $table ( @tables ) {
+       if( $self->{'_lock_table_hash'}->{$table} == 1 ) {
+	   $self->warn("$table already locked. Relock request ignored");
+       } else {
+	   if( $state ) { $state .= ","; } 
+	   $state .= "$table write";
+	   $self->{'_lock_table_hash'}->{$table} = 1;
+       }
+   }
+
+   my $sth = $self->prepare("lock tables $state");
+   my $rv = $sth->execute();
+   $self->throw("Failed to lock tables $state") unless $rv;
+
+}
+
+=head2 _unlock_tables
+
+ Title   : _unlock_tables
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
 
 
+=cut
+
+sub _unlock_tables{
+   my ($self,@tables) = @_;
+
+   my $sth = $self->prepare("unlock tables");
+   my $rv  = $sth->execute();
+   $self->throw("Failed to unlock tables") unless $rv;
+   %{$self->{'_lock_table_hash'}} = ();
+}
 
 
+=head2 DESTROY
+
+ Title   : DESTROY
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub DESTROY{
+   my ($obj) = @_;
+
+   $obj->_unlock_tables();
+
+   if( $obj->{'_db_handle'} ) {
+       $obj->{'_db_handle'}->disconnect;
+       $obj->{'_db_handle'} = undef;
+   }
+}
