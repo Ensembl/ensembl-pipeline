@@ -324,9 +324,7 @@ sub parse_results {
             else
             {
                 $self->results =~ m!/.+/(.+)|(.+)!; #extract filename
-                #($1) ? $feat1{name} = $1 : $feat1{name} = $2;
-                if ($1) { $feat1{name} = $1; }
-                elsif ($2) { $feat1{name} = $2; }
+                $feat1{name} = ($1) ?  $1 :  $2;
             }
             
             $feat1 {score}       = $hsp->score;
@@ -349,7 +347,7 @@ sub parse_results {
                 $feat1 {strand}  = -1;
             }
             
-            $sbjct->name =~ /\|(.+)\|/; #extract subjectname
+            $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
             $feat2 {name}    = $1;
             
             unless ($hsp->sbjctBegin > $hsp->sbjctEnd)
