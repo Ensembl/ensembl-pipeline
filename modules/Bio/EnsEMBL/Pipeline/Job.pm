@@ -312,7 +312,7 @@ sub flush_runs {
 	-PARAMETERS => $queue->{'sub_args'},
 	-PRE_EXEC   => $pre_exec,
 	-QUEUE      => $queue->{'queue'},
-	-JOBNAME    => $dbname . '/' . $anal,
+	-JOBNAME    => $dbname . ':' . $anal,
 	-NODES      => $queue->{'nodes'},
 	-RESOURCE   => $queue->{'resource'}
     );
