@@ -197,6 +197,11 @@ sub make_miniseq {
 	  $self->throw("Mixed strands in input exons! I'm outta here!\n");
 	}
 
+	if ( $exon->start > $exon->end){
+	  my $start = $exon->start;
+	  my $end   = $exon->end;
+	  $self->throw("Exon $exon has start $start larger than end $end");
+	}
 	push(@exons, $exon);
       }
     }
@@ -216,11 +221,15 @@ sub make_miniseq {
       my $start = $exon->start;
       my $end   = $exon->end;
 
+      #print STDERR "In make_miniseq(), exon -> start: $start, end: $end\n";
+
       $start = $exon->start - $self->exon_padding;
       $end   = $exon->end   + $self->exon_padding;
-
+      
       if ($start < 1) { $start = 1;}
       if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
+
+      #print STDERR "In make_miniseq(), feature-> start: $start, end: $end\n";
 
       my $gap = ($start - $prevend);
 
@@ -369,7 +378,7 @@ sub run {
   foreach my $t($self->get_all_Transcripts){
     my $converted = $self->convert_transcript_to_miniseq($t);
     $genomewise->add_Transcript($converted);
-  #$genomewise->add_Transcript($t);
+    #$genomewise->add_Transcript($t);
   }
   
   $genomewise->run;
@@ -398,7 +407,7 @@ sub convert_output{
      -gff_source      => 'genomewise',
      -gff_feature     => 'similarity');
 
-  print STDERR "number of transcripts: " . scalar(@transcripts)  . "\n";
+  #print STDERR "number of transcripts: " . scalar(@transcripts)  . "\n";
   
  TRANSCRIPT: 
   foreach my $transcript (@transcripts) {
