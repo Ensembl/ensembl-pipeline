@@ -189,7 +189,6 @@ sub new {
 sub write_output {
   my ($self) = @_;
   
-
   my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
   
  GENE: 
@@ -200,6 +199,20 @@ sub write_output {
     #my $strand = $tran->start_exon->strand;
     #print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
       
+
+# VAC - setting the analysis type of supporting features. We may 
+# end up changing it back but at least we can then see what has 
+# come from where - makes it possible
+# to distinguish supp feat from e2g genes from supp feat from genomewise genes
+
+    foreach my $exon($gene->get_all_Exons){
+      foreach my $sf($exon->each_Supporting_Feature){
+
+	$sf->analysis($gene->analysis);
+	$sf->source_tag($gene->analysis->logic_name);
+      }
+    }
+
     eval {
      $gene_adaptor->store($gene);
       print STDERR "wrote gene " . $gene->dbID . "\n";
@@ -254,7 +267,9 @@ sub fetch_input {
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    my @genes  = $contig->get_Genes_by_Type($genetype);
+    # VAC - this won't get supporting evidence out
+    #    my @genes  = $contig->get_Genes_by_Type($genetype);
+    my @genes  = $contig->get_Genes_by_Type($genetype,'evidence');
     
     print STDERR "Number of genes = " . scalar(@genes) . "\n";
     if(!scalar(@genes)){
@@ -333,7 +348,9 @@ GENE:
 
     $strand = -1;
     my $revcontig = $contig->invert;
-    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
+    # VAC - this won't get evidence
+    #    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
+    my @revgenes  = $revcontig->get_Genes_by_Type($genetype, 'evidence');
     my @minus_transcripts;
     
     print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
@@ -551,7 +568,6 @@ sub _check_Transcripts {
 	
       # get the supporting_evidence for each exon
       # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
-
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
       my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
             
