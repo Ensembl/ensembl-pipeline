@@ -352,8 +352,6 @@ sub write_output {
     }
     elsif (@features) 
     {
-	print STDERR "Writing features to database\n";
-
         my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
 	$feat_adp->store($contig, @features);
     }

@@ -39,6 +39,7 @@ package Bio::EnsEMBL::Pipeline::RunnableI;
 
 use vars qw(@ISA);
 use strict;
+use Bio::SeqIO;
 use Bio::EnsEMBL::Analysis::Programs;
 
 # Object preamble - inherits from Bio::Root::RootI;
@@ -201,7 +202,6 @@ sub writefile {
   
   if (defined($seqobj)) {
     $seqfilename = 'filename' unless ($seqfilename);
-    print "Writing sequence to ".$self->$seqfilename()."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
       
@@ -212,7 +212,6 @@ sub writefile {
 
 
   } else {
-    print "Writing sequence to ".$self->filename."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
@@ -250,7 +249,6 @@ sub checkdir {
     my $dir = $self->workdir();
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
     open (PWD, 'pwd|');
-    print STDERR "Working directory set to: ".<PWD>;
 }
 
 sub diskspace {
@@ -317,8 +315,6 @@ sub createfeaturepair {
     #create featurepair
     my $fp = Bio::EnsEMBL::FeaturePair->new  (  -feature1 => $seqfeature1,
                                                 -feature2 => $seqfeature2 ) ;
-
-    print "Feature pair " . $fp->gffstring . "\n";
 
     $self->growfplist($fp);                             
 }
