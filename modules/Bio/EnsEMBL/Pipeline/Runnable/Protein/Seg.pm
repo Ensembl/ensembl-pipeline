@@ -106,6 +106,9 @@ sub new {
 # get/set methods 
 ###################
 
+
+
+
 =head2 query
 
  Title    : query
@@ -142,6 +145,17 @@ sub query {
     }
     return $self->{'_sequence'};
 }
+# for some strange reason, RunnableI calls a method which should be in here but it is not inherited.
+# I'm really angry on this one.
+
+sub clone{
+  my ( $self, $clone ) = @_;
+  if ($clone){
+    $self->query($clone);
+  }
+  return $self->query;
+}
+
 
 
 =head2 analysis
@@ -222,23 +236,23 @@ sub run {
     $self->results ($tmp);
 
 
- eval {
-	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
-	};
-	
-
+    eval {
+      $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+    };
+    
+    
     if (!$@) {
-	#The inputId is a sequence file...got the normal way...
-
-	# write sequence to file
-	$self->writefile;        
-
-	# run program
-	$self->run_program;
-
-	# parse output
-	$self->parse_results;
-	$self->deletefiles;
+      #The inputId is a sequence file...got the normal way...
+      
+      # write sequence to file
+      $self->writefile;        
+      
+      # run program
+      $self->run_program;
+      
+      # parse output
+      $self->parse_results;
+      $self->deletefiles;
     }
     else {
 	#The query object is not a seq object but a file.
@@ -403,6 +417,14 @@ sub output {
     my ($self) = @_;
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
+}
+
+sub queryname{
+  my ($self,$queryname) = @_;
+  if ($queryname){
+    $self->{_queryname} = $queryname;
+  }
+  return $self->{_queryname};
 }
 
 1;
