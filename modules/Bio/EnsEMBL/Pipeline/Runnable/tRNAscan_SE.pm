@@ -49,16 +49,16 @@ package Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
 
 =head2 new
 
