@@ -86,7 +86,7 @@ sub run {
     $command = 'blastall -p ' . $self->program . ' -d ' 
       . $self->blastdb->dbfile . ' -i ' . $input_file . ' ' 
 	. $self->options . ' > ' . $output_file;
-    
+
   }
   print $command . "\n";
 
@@ -157,7 +157,11 @@ sub blastdb {
 
   if (@_) {
     $self->{_blastdb} = shift;
+    return
   }
+
+  $self->throw("Unable to return unset BlastDB object.")
+    unless $self->{_blastdb};
 
   return $self->{_blastdb}
 }
@@ -215,14 +219,22 @@ sub workdir {
     my $tag = time;
     my $dir = $self->{_workdir} . "\/tempblast." . $tag . '/';
 
-    mkdir $self->{_workdir};
-    mkdir $dir;
+    unless (-d $self->{_workdir}){
+      my $return_status = mkdir $self->{_workdir};
 
-    $self->throw("Failed to create a temporary working directory.") 
-      unless (-d $dir);
-    
+      $self->throw("Encountered trouble making working directory [" 
+		 . $self->{_workdir} . "].")
+	unless $return_status;
+    }
+
+    unless (-d $dir){
+      my $return_status = mkdir $dir;
+
+      $self->throw("Failed to create temporary blast working directory [$dir].")
+	unless $return_status;
+    }
+
     $self->{_workdir} = $dir;
-
   }
 
   return $self->{_workdir}
