@@ -15,6 +15,7 @@ CREATE TABLE current_status (
 CREATE TABLE job (
   jobId             int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
   input_id          varchar(40) DEFAULT '' NOT NULL,
+  class             enum ("clone","contig","vc","gene") not null,
   analysisId        int(10) unsigned DEFAULT '0' NOT NULL,
   LSF_id            int(10) unsigned DEFAULT '0',
   stdout_file       varchar(100) DEFAULT '' NOT NULL,
