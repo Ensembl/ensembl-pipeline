@@ -126,4 +126,28 @@ sub fetch_input {
     return 1;
 }
 
+
+sub run {
+    my ($self) = @_;
+    
+    my @runnables = $self->runnable;
+    #print STDERR "Have ".$runnable."\n";
+    #$runnable || $self->throw("Can't run - no runnable object");
+    if(!@runnables){
+      $self->throw("can't run no runnable objects\n");
+    }
+    foreach my $runnable(@runnables){
+      eval{
+        $runnable->run;
+      };
+      if(my $err = $@){
+        chomp $err;
+        $self->failing_job_status($1) 
+          if $err =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
+        $self->throw("$@");
+      }
+      push (@{$self->{'_output'}}, $runnable->output);
+    }
+}
+
 1;
