@@ -8,10 +8,13 @@ use vars qw( %Analysis );
 # Hash containing config info
 %Analysis = (
 	     PA_SINGLE_DUMMY => 'SubmitTranscript', # this is the logic name for the dummy analysis type required in order to start those analyses
+	     PA_SINGLE_TYPE => 'TRANSLATIONID',
 	     PA_CHUNK_DUMMY => 'SubmitTranscriptChunk', # as above but for chunk of peptides
+	     PA_CHUNK_TYPE => 'FILENAME',
 	     PA_PROTEOME_DUMMY => 'SubmitProteome',
-
+	     PA_PROTEOME_TYPE => 'PROTEOME'
 	     PA_ANALYSIS_TYPE => [
+
 			   {
 			    logic_name => '', # logic name in 
 			    #analysis table
