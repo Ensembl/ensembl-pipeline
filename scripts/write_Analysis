@@ -105,6 +105,8 @@ if ($help) {
 
 $| = 1;
 
+print STDERR "Writing to $host:$dbuser:$dbname\n";
+
 my $locator  = make_locator_string($dbmodule,$host,$port,$dbname,$dbuser,$pass);
 my $anadb    = new Bio::EnsEMBL::DBLoader($locator);
 
@@ -120,11 +122,9 @@ my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => $db,
 						      -gff_feature     => $gff_feature,
 						      -parameters      => $parameters);
 
-eval {
 $anadb->write_Analysis($analysis);
 
 print(STDERR "Analysis written to database\n");
-};
 
 print($@);
 

@@ -14,9 +14,9 @@ my $vcontig = 0;
             'vcontig'  => \$vcontig,
 	    );
 
-my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'ensrv3',
+my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'ensrv4',
 				      -user   => 'ensro',
-				      -dbname => 'ensembl07',
+				      -dbname => 'ensembl_freeze17_michele',
                                       -perlonlyfeatures => 1,
  				      );
 

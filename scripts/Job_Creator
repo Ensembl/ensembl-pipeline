@@ -1,4 +1,5 @@
 #!/usr/local/bin/perl
+$| = 1;
 
 =head1 NAME
 
@@ -38,10 +39,10 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 
-my $host     = 'localhost';
+my $host     = 'ensrv4';
 my $port     = '410000';
-my $dbname   = 'ensembl_freeze24';
-my $dbuser   = 'root';
+my $dbname   = 'ensembl_freeze17_michele';
+my $dbuser   = 'ensadmin';
 my $pass     =  undef;
 my $queue    = 'ultra_blast_farm';
 

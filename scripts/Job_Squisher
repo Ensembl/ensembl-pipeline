@@ -1,11 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-06");
-}
-
 use strict;
 
 use Getopt::Long;
@@ -15,10 +9,10 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 
-my $anahost     = 'localhost';
+my $anahost     = 'ensrv4';
 my $anaport     = '410000';
-my $anadbname   = 'ensembl_freeze24';
-my $anadbuser   = 'root';
+my $anadbname   = 'ensembl_freeze17_michele';
+my $anadbuser   = 'ensadmin';
 my $anapass     =  undef;
 my $infile;     
 my $status;

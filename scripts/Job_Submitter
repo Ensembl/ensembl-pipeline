@@ -44,21 +44,25 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BigGene_Builder;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_MiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Pruner;
 
 use FreezeThaw;
 
 $| = 1;
 
-my $anahost     = 'localhost';
+my $anahost     = 'ensrv4';
 my $anaport     = '410000';
-my $anadbname   = 'ensembl_freeze15',
-my $anadbuser   = 'root';
+my $anadbname   = 'ensembl_freeze17_michele',
+my $anadbuser   = 'ensadmin';
 my $anapass     =  undef;
 my $jobchunk    =  20;
 my $infile;
 my $analysis;
-my $useDB = 0;
+my $useDB = 1;
 my $runlocal;
 
 &GetOptions(

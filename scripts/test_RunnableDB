@@ -34,20 +34,26 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
+use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_MiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BigGene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Pruner;
 
 use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::Object);
 
 my $dbtype = 'rdb';
-my $host   = 'localhost';
+my $host   = 'ensrv4';
 my $port   = '410000';
-my $dbname = 'ensembl_freeze15_tim';
-my $dbuser = 'root';
+my $dbname = 'ensembl_freeze17_michele';
+my $dbuser = 'ensadmin';
 my $pass   = undef;
 my $runnable;
 my $input_id;
@@ -90,16 +96,28 @@ if ($write) {
 
 foreach my $out (@out) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
-      print ($out->gffstring . "\n");
+	print ($out->gffstring . "\n");
+    } elsif ($out->isa("Bio::EnsEMBL::Gene")) {
+	my $gene = $out;
+	print(STDERR "\nGene - " . $gene->id . "\n");#
+
+	foreach my $tran ($gene->each_Transcript) {
+	    print STDERR "\nTranscript - " . $tran->id . "\n";
+	    
+	    foreach my $exon ($tran->each_Exon) {
+		print STDERR "\tExon " . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->contig_id ."\n";
+
+	    }
+	}
     } else {
-      print $out . "\n";
+	print $out . "\n";
     }
 }
 
 sub make_locator_string {
     my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
 
-    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass;perlonlyfeatures=1";
+    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass;perlonlyfeatures=0";
 
 }
 
