@@ -236,6 +236,8 @@ sub run {
                                               'check_interval');
   my $last_check = 0;
 
+  my $just_started = 1;
+
   #
   # MAIN LOOP
   #
@@ -251,7 +253,8 @@ sub run {
       # update task status by contacting job adaptor
       #
       #print STDERR "UPDATING STATUS!\n";
-      $self->_update_task_status();
+      $self->_update_task_status($just_started);
+      $just_started = 0;
       $last_check = time();
     }
 
@@ -357,6 +360,7 @@ sub _failed_list {
   return $self->{'_failed_list'};
 }
 
+
 sub _submission_systems {
   my $self = shift;
 
@@ -368,7 +372,10 @@ sub _submission_systems {
 
 =head2 _update_task_status
 
-  Arg [1]    : none
+  Arg [1]    : (optional) $just_started
+               Should be set to true if the pipeline manager just restarted.
+               If true this will delete all of the jobs of CREATED status
+               from the databsae so that they may be recreated by the tasks
   Example    : none
   Description: Private method. Refreshes the status of running tasks by
                querying the pipeline database.  This method is also
@@ -382,6 +389,7 @@ sub _submission_systems {
 
 sub _update_task_status {
   my $self = shift;
+  my $flush_created = shift;
 
   my $config = $self->get_Config;
 
@@ -410,6 +418,12 @@ sub _update_task_status {
     my ($job_id, $taskname, $input_id, $status, $timestamp) = @$current_status;
 
     $task_status{$taskname}->{'EXISTING'} ||= [];
+    if($flush_created && $status eq 'CREATED') {
+      #delete the job from the database, don't and add it to the status
+      $job_adaptor->remove($job_adaptor->fetch_by_dbID($job_id));
+      next;
+    }
+
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
 
     #check if this is still running but has timed out
