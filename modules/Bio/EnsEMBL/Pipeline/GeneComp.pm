@@ -633,10 +633,12 @@ sub map_temp_Genes_to_real_Genes{
    # Now - handle all the cases which have not been handled already, and assign
    # new everything to them!
 
-   foreach my $newgene ( @tempgenes ) {
-       if( $has_done_new{$newgene->id} ) {
+   foreach my $newgene_id ( keys %newg ) {
+       if( $has_done_new{$newgene_id} ) {
 	   next;
        }
+
+       my $newgene = $newg{$newgene_id};
 
        $newgene->id($dbobj->get_new_GeneID());
        $newgene->created($now);
