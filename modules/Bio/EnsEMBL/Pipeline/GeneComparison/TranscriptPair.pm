@@ -71,6 +71,8 @@ sub new {
 sub blast_isoforms{
     my ( $self,$tran1,$tran2, $coding_exons ) = @_;
     
+    my $verbose = 1;
+
     # query
     my $id1;
     if ( $tran1->dbID ){
@@ -157,25 +159,12 @@ sub blast_isoforms{
 
     my @featurepairs = $blast->output();
     
-    ############################################################
-    # compute the average score
-    my $ave_score = 0;
-    foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
-      $ave_score += $fp->score;
-      #print $fp->gffstring . "\n";
-    }
-    if ( @featurepairs ){
-      $ave_score = $ave_score/scalar( @featurepairs );
-    }
-    else{
-      $ave_score = 0;
-    }
-
     #print STDERR "\t$id1 length = $length1\n";
     #print STDERR "\t$id2 length = $length2\n";
     
     ############################################################
-    # calculate coverage
+    # separate by strands
+
     my @pos_features = grep { $_->strand == 1 } @featurepairs;  
     my @neg_features = grep { $_->strand == -1} @featurepairs; 
     my @features;
@@ -188,45 +177,56 @@ sub blast_isoforms{
     # hneg - hneg
     @{$features[3]} = grep { $_->hstrand == -1} @neg_features;
     
-    my $max_score = 0;
-    my $pair;
-    my %coverage;
-    my $spliced = 0;
+    my $best_score = 0;
+    my $best_features;
     for (my $i=0; $i<4; $i++ ){
       unless ( $features[$i] && @{$features[$i]} ){
 	next;
       }
+
+      ############################################################
+      # compute the score
+      my $score = 0;
+      foreach my $fp (sort {$a->hstart <=> $b->hstart} @{$features[$i]}) {
+        $score += $fp->score;
+        #print $fp->gffstring . "\n";
+      }
+      if ( $score > $best_score ){
+        $best_score    = $score;
+        $best_features = $features[$i];
+      }
+     }
+    
+     my $coverage = 0;
+     my $spliced = 0;
+
+  
+     if ( $best_features ){
+
+      ############################################################
+      # calculate coverage
       # we use query/target as in feature pairs the target=seqname and query=hseqname
       my ($query_coverage,  $query_spliced)  = 
-	$self->process_query( $features[$i], $tran2 , $coding_exons);
+        $self->process_query( $best_features, $tran2 , $coding_exons);
       my ($target_coverage, $target_spliced) = 
-	$self->process_target( $features[$i], $tran1, $coding_exons);
-      my $score = ( $query_coverage + $target_coverage )/2;
+ 	$self->process_target( $best_features, $tran1, $coding_exons);
+      $coverage = ( $query_coverage + $target_coverage )/2;
+       
+       if ($verbose){
+         foreach my $f ( @{$best_features} ){
+       	    $self->print_Feature($f);
+       }
+       }
+       if ( $query_spliced || $target_spliced ){
+ 	$spliced = 1;
+       }
       
-      #foreach my $f ( @{$features[$i]} ){
-      #	$self->print_Feature($f);
-      #}
-
-      ### this is going to let through also spliced cases - it is just a test
-      if ( $score > $max_score ){
-      	$max_score = $score;
-      	$pair = $features[$i];
-      }
-  
-      if ( $query_spliced || $target_spliced ){
-	$spliced = 1;
-	#print STDERR "one of them is spliced\n";
-      }
-      #if ( $score > $max_score && $query_spliced == 0 && $target_spliced == 0 ){
-      #	$max_score = $score;
-      #	$pair = $features[$i];
-      #}
-      #print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
-      #print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
-    }
-    #return ($max_score,$pair);
-    $ave_score = 0 if $spliced;
-    return ( $ave_score, $pair );
+       #print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
+       #print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+     }
+    
+     $best_score = 0 if $spliced;
+     return ( $best_score, $best_features );
   }
 
 

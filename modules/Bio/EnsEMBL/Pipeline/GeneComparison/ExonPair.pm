@@ -125,8 +125,11 @@ sub blast_Exons{
   
   ############################################################
   # Ian's parameters:
-  my $options = "W=5 M=1 N=-1 Q=3 R=3";
+  #my $options = "W=5 M=1 N=-1 Q=3 R=3";
   
+  my $options = "W=5";
+
+  # tblastx options:
   #my $options = 'altscore="* any na" altscore="any * na" S2=13';
   #$options .= " V=200 B=200 ";
   #$options .= " -nogap ";
@@ -136,8 +139,8 @@ sub blast_Exons{
   #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
-						  '-program'        => 'wutblastx',
-						  #'-program'        => 'wublastn',
+						  #'-program'        => 'wutblastx',
+						  '-program'        => 'wublastn',
 						  '-database'       => $database,
 						  '-threshold_type' => "PVALUE",
 						  #'-threshold'      => 1e-10,
@@ -180,3 +183,15 @@ sub blast_Exons{
 }
   
 ############################################################
+
+sub gap_penalty{
+    my ($self,$value) = @_;
+    if ( $value ){
+	$self->{_gap_penalty} = $value;
+    }
+    return $self->{_gap_penalty};
+}
+
+############################################################
+
+1;
