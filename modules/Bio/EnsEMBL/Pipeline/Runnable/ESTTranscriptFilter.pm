@@ -255,37 +255,63 @@ sub filter_by_length{
     
     my $verbose = $self->verbose();
     my %lengths;
-    my $length_for_max = 0;
-    my $max_count = 0;
+    my @length_list;
+
+    # the genomic distances of ESTs in a small genomic region ( ~1Mb )
+    # do not seem to be normally distributed ( unlike the estlengths, which
+    # is normally distributed )
+    # there is a approximate normal distribution for shorter genomic lengths
+    # and then there is a low long tail, i.e. ests are distributed
+    # homogeneously for long genomic extents - which also means there are fewer
+    # of them.
+    # The mean value usually falls outside the normal distribution, but the
+    # median seems to correlate quite well with the peak of the normal part.
+    # We therefore take the median as threshold. This will still keep some
+    # short ESTs, as it is less restrictive than the mean, but it will be more representative.
+    my $mean = 0;
+    my $median = 0;
+    my $strand = 1;
     foreach my $est ( @$ests ){
 	#print STDERR "est is a $est\n";
 	#print STDERR "exons: ".scalar( @{$est->get_all_Exons} )."\n";
       my @exons = sort { $a->start <=> $b->start } @{$est->get_all_Exons};
-
+      $strand = -1 if $exons[0]->strand == -1;
       # we consider the genomic extension of the transcripts
       # this will not favour big unspliced ESTs over spliced ones with small exons
       my $length = $exons[-1]->end - $exons[0]->start + 1 ;  
-	#print STDERR "length: $length\n";
-      $length = 10*int( $length/10 + 1 );
-      push ( @{ $lengths{ $length } }, $est );
-	
-	if ( scalar( @{ $lengths{ $length } } ) > $max_count ){
-	    $max_count      = scalar( @{ $lengths{ $length } } );
-	    $length_for_max = $length;
-	}
+      push( @length_list, $length );
+      push( @{ $lengths{ 10*int($length/10 + 1) } }, $est );
+      $mean += $length;
     }
-  
+    $mean /= scalar( @$ests );
+    print STDERR "mean length = $mean\n" if $verbose;
+    if ( scalar(@length_list)>2 ){
+      if ( scalar(@length_list)%2 == 0 ){
+	my $i1 = scalar(@length_list)/2;
+	my $i2 = $i1 - 1;
+	$median = ($length_list[$i1] + $length_list[$i2])/2;
+      }
+      else{
+	my $i = ( scalar(@length_list) -1 )/2;
+	$median = $length_list[$i];
+      }
+    }
+    else{
+      $median = $mean;
+    }
+    print STDERR "median length = $median\n" if $verbose;
+
     #test
-    if ($verbose){
+    if ($verbose && $strand == 1){
       foreach my $key ( sort { $a <=> $b } keys %lengths ){
-	print STDERR "$key\t".scalar(@{ $lengths{$key} })."\n";
+	print STDERR "$key\t".scalar( @{ $lengths{$key} })."\n";
       }
     }
   
     my @selected;
     foreach my $key ( keys %lengths ){
-	next unless $key >= $length_for_max;
-	push( @selected, @{ $lengths{$key} });
+      next unless $key >= int($median);
+      push( @selected, @{ $lengths{$key} });
     }
     return @selected;
 }
