@@ -80,22 +80,21 @@ foreach my $db (@$DB_CONFIG) {
 
 sub fetch_input {
     my($self) = @_;
+    my $genseq;
    
     $self->throw("No input id") unless defined($self->input_id);
-    
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    print STDERR "INPUT ID: " . $self->input_id . "\n";
-    my $genseq;
-    if(@$PIPELINE_REPEAT_MASKING){
-        $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-    }
+    print STDERR "INPUT ID: " . $self->input_id . "\n";    
+
+    my $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING,$SOFT_MASKING) or $self->throw("Unable to fetch contig");
     $self->query($genseq || $contig);
     
     my $seq = $self->query->seq;
     
     if ($seq =~ /[CATG]{3}/) {
         $self->input_is_void(0);
-        } else {
+        #$self->check_with_seg($self->query);
+    } else {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
@@ -119,6 +118,68 @@ sub fetch_input {
 
     return 1;
 }
+
+sub check_with_seg{
+    my ($self, $seqObj_to_test) = @_;
+
+    warn "need a Bio::Seq Obj" unless $seqObj_to_test;
+
+    my ($filename) = $self->_createfiles('/tmp',[qw(seg_checking)]);
+    my $file = Bio::SeqIO->new(-file   => ">$filename", 
+                               -format => 'Fasta') 
+        or $self->throw("Can't create Bio::SeqIO $filename $!");
+    my $translated = $seqObj_to_test->translate;
+    #warn "************************************************************";
+    #warn $translated->seq;
+    #warn "************************************************************";
+    $file->write_seq($translated);
+    
+    my $seg_cmd = "nseg $filename -x";
+    my $seg = Bio::SeqIO->new(-file   => "$seg_cmd |",
+                              -format => 'Fasta')
+        or $self->throw("Can't create Bio::SeqIO $seg_cmd $!");
+    my $seq;
+    eval{
+        $seq = $seg->next_seq->seq;
+    };
+    unlink($filename);
+    if($@){
+        $self->throw("There was a problem with SEG masking.\nI tried to '$seg_cmd'");
+    }
+    #warn "************************************************************";
+    #warn $seq;
+    #warn "************************************************************";
+    if($seq =~ /[CATG]{3}/i){
+        $self->input_is_void(0);
+    }else{
+        $self->input_is_void(1);
+        $self->warn("Need at least 3 nucleotides after SEG filtering");
+    }
+    
+}
+sub _createfiles {
+    my ($self, $dirname, $filenames) = @_;
+    
+    my $unique = {};
+    $unique    = { map { $_, $unique->{$_}++ } @$filenames };
+    my @files  = ();
+
+    $dirname ||= '/tmp';
+    $dirname   =~ s!(\S+)/$!$1!;
+
+    foreach my $file(@$filenames){
+        if($unique->{$file}){
+            #name not unique add random
+            $file .= ".$$.".int(rand(200));
+            push(@files, "$dirname/$file");
+        }else{
+            #name was unique just add it
+            push(@files, "$dirname/$file.$$");
+        }
+    }
+
+    return @files;
+}
 =head2 run
 
     Title   :   run
@@ -138,10 +199,17 @@ sub run {
         
         # Not sure about this
         $self->throw("Input not fetched")       unless ($self->query);
-        
-        $runnable->run();
-        my $db_version = $runnable->db_version_searched if $runnable->can('db_version_searched');
-        $self->db_version_searched($db_version);
+        eval{
+            $runnable->run();
+        };
+        if($@){
+            chomp $@;
+            $self->failing_job_status($1) 
+                if $@ =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
+            $self->throw("$@");
+        }
+        my $db_version = $runnable->get_db_version if $runnable->can('get_db_version');
+        $self->db_version_searched($db_version); # make sure we set this here
         if ( my @output = $runnable->output ) {
             my $dbobj      = $self->db;
             my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
@@ -151,9 +219,29 @@ sub run {
     }
     return 1;
 }
+
+=head2 db_version_searched
+
+    Title   :  db_version_searched
+               [ distinguished from Runnable::*::get_db_version() ]
+    Useage  :  $self->db_version_searched('version string')
+               $obj->db_version_searched()
+    Function:  Get/Set a blast database version that was searched
+               The actual look up is done in Runnable::Finished_Blast
+               This is just a holding place for the string in this
+               module
+    Returns :  String or undef
+    Args    :  String
+    Caller  :  $self::run()
+               Job::run_module()
+
+=cut
+
 sub db_version_searched{
-    my $self = shift;
-    $self->{'_db_version_searched'} = shift if @_;
+    my ($self, $arg) = @_;
+    
+    $self->{'_db_version_searched'} = $arg if $arg;
+
     return $self->{'_db_version_searched'};
 }
 
