@@ -1,0 +1,25 @@
+#!/usr/local/bin/perl
+
+BEGIN {
+
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
+unshift (@INC,"/nfs/disk89/michele/bioperl-live");
+
+}
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-dbname => 'analysis',
+ -host => 'croc',
+ -user => 'root');
+
+print("Connected to analysis database\n");
+
+my @jobs = $db->get_JobsByInputId($ARGV[0]);
+print("Got jobs\n");
+foreach my $job (@jobs) {
+  $job->print;
+}
+

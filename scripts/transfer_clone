@@ -1,0 +1,170 @@
+#!/usr/local/bin/perl
+
+BEGIN {
+  unshift (@INC,"/nfs/disk89/michele/bioperl-live");
+  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
+  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+}
+
+=head1 NAME
+
+transfer_clone
+
+=head1 SYNOPSIS
+ 
+  update.pl
+
+=head1 DESCRIPTION
+
+Transfers a clone\'s genes and exons with supporting features
+from the core database to the analysis database
+
+=head1 OPTIONS
+
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
+use Bio::EnsEMBL::Pipeline::SimpleJob;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $fdbtype = 'rdb';
+my $fhost   = 'obi-wan';
+my $fport   = '410000';
+my $fdbname = 'ensembl';
+my $fdbuser = 'ensro';
+my $fpass   = undef;
+my $tdbtype = 'rdb';
+my $thost   = 'croc';
+my $tport   = '410000';
+my $tdbname = 'analysis';
+my $tdbuser = 'root';
+my $tpass   = undef;
+
+my $fmodule  = "Bio::EnsEMBL::DBSQL::Obj";
+my $tmodule  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+
+my $help;
+my $usefile;
+
+&GetOptions( 
+	     'fdbtype:s'  => \$fdbtype,
+	     'fhost:s'    => \$fhost,
+	     'fport:n'    => \$fport,
+	     'fdbname:s'  => \$fdbname,
+	     'fdbuser:s'  => \$fdbuser,
+	     'fpass:s'    => \$fpass,
+	     'tdbtype:s'  => \$tdbtype,
+	     'thost:s'    => \$thost,
+	     'tport:n'    => \$tport,
+	     'tdbname:s'  => \$tdbname,
+	     'tdbuser:s'  => \$tdbuser,
+	     'tpass:s'    => \$tpass,
+	     'usefile=s'  => \$usefile,
+	     'h|help'    => \$help,
+	     );
+
+
+if ($help) {
+    exec('perldoc', $0);
+}
+
+
+$| = 1;
+
+my $from_locator     = make_locator_string($fdbtype,$fmodule,$fhost,$fport,$fdbname,$fdbuser,$fpass);
+my $to_locator       = make_locator_string($tdbtype,$tmodule,$thost,$tport,$tdbname,$tdbuser,$tpass);
+
+my @cloneids         = read_clones($usefile,@ARGV);
+
+my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => '__NONE__',
+						      -db_version      => '__NONE__',
+						      -db_file         => '__NONE__',
+						      -program         => 'transfer_clone',
+						      -program_version => -1,
+						      -program_file    => '__NONE__',
+						      -module          => 'Bio::EnsEMBL::Pipeline::Runnable::TransferClone',
+						      -module_version  => 1,
+						      -gff_source      => 'clone_transfer',
+						      -gff_feature     => 'data_load',
+						      -parameters      => "");
+
+my $tdb = new Bio::EnsEMBL::DBLoader($to_locator);
+
+$tdb->write_Analysis($analysis);
+
+foreach my $cloneid (@cloneids) {
+    eval {
+
+	my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $tdb,
+							      -input_id => $cloneid,
+							      -analysis => $analysis,
+							      -queue    => 'blast_farm',
+							      -create   => 1,
+							      );
+	$job->make_files;
+
+	print(STDERR "Created new job object\n");
+
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::TransferClone(-from_locator => $from_locator,
+									   -to_locator   => $to_locator,
+									   -cloneid      => $cloneid);
+
+	my $simjob  = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
+							    -runnable => $runnable);
+
+	my $id      = $simjob->id;         
+	
+	$simjob->store;
+	$simjob->submit;
+	
+    };
+
+    if ($@) {
+	print("ERROR processing clone $cloneid [$@]\n");
+    }
+}
+
+	   
+sub read_clones {
+    my ($file,@clones) = @_;
+
+    my @out;
+
+    if (defined($file)) {
+	open(IN,"<$file") || die "Can't open $file";
+    }
+
+    while (<IN>) {
+	chomp;
+	push(@out,$_);
+    }
+
+    push(@out,@clones);
+
+    return @out;
+}
+
+sub make_locator_string {
+    my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
+
+    if ($type eq "rdb") {
+	return 	"$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+    } elsif ($type eq "timdb") {
+	return "Bio::EnsEMBL::TimDB::Obj";
+    } else {
+	die "Database type [$type] not recognised\n";
+    }
+}
+
+
+

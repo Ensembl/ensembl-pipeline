@@ -1,0 +1,206 @@
+#!/usr/local/bin/perl
+
+BEGIN {
+
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
+unshift (@INC,"/nfs/disk89/michele/bioperl-live");
+
+}
+
+=head1 NAME
+
+Job_creator - takes a list of input_ids and an analysis id
+and creates a job in the analysis database.
+
+=head1 SYNOPSIS
+
+    Job_creator
+
+=head1 DESCRIPTION
+
+
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -analysis  The analysis id
+
+    -infile    A file containing a list of input ids
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
+use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
+use Bio::EnsEMBL::Pipeline::SimpleJob;
+use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
+
+use Bio::EnsEMBL::DBSQL::Clone;
+use Bio::EnsEMBL::DBSQL::Contig;
+
+
+
+my $host     = 'obi-wan';
+my $port     = '410000';
+my $dbname   = 'analysis';
+my $dbuser   = 'ensro';
+my $pass     =  undef;
+my $queue    = 'blast_farm';
+
+my $analysis_id;
+my @input_ids;
+my $infile;
+
+&GetOptions(
+	    'host:s'     => \$host,
+	    'port:n'     => \$port,
+	    'dbname:s'   => \$dbname,
+	    'dbuser:s'   => \$dbuser,
+	    'pass:s'     => \$pass,
+	    'infile=s'  => \$infile,
+	    'analysis=n' => \$analysis_id,
+	    );
+
+
+
+my @input_ids = get_input_ids($infile,@ARGV);
+
+$analysis_id     || die "No analysis id input";
+$#input_ids >= 0 || die "No input ids";
+
+my $db  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $host,
+						 -port   => $port,
+						 -dbname => $dbname,
+						 -user   => $dbuser,
+						 -pass   => $pass);
+
+
+my $fdb = new Bio::EnsEMBL::DBSQL::Obj          (-host   => $host,
+						 -port    => $port,
+						 -dbname  => 'ensembl',
+						 -user    => $dbuser,
+						 -pass    => $pass);
+
+
+my $analysis = $db->get_Analysis          ($analysis_id);
+my @done_ids = $db->get_InputIdsByAnalysis($analysis_id);
+
+my $donehash = make_done_hash(@done_ids);
+
+foreach my $key (keys %$donehash) {
+    print("key $key\n");
+}
+
+foreach my $id (@input_ids) {
+    print("hash " . $donehash->{$id} . "\n");
+    if ($donehash->{$id} != 1) {
+	print(STDERR "Creating job for $id\n");
+
+	my ($clone) = get_clone($id,$fdb,$db);
+
+	my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $db,
+							      -input_id => $id,
+							      -analysis => $analysis,
+							      -queue    => $queue,
+							      -create   => 1,
+							      );
+
+	$job->make_files;
+
+	print(STDERR "Created new job object for $id\n");
+
+	# Need a get_input routine for all the Runnables
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair(-clone => $clone);
+	my $simjob   = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
+							     -runnable => $runnable);
+
+		     
+	$simjob->store;
+
+	print(STDERR "Stored job object for $id\n");
+    }
+}
+
+sub make_done_hash {
+    my (@done_ids) = @_;
+
+    my %donehash;
+
+    foreach my $did (@done_ids) {
+	$donehash{$did} = 1;
+    }
+    return \%donehash;
+}
+
+sub get_clone {
+    my ($cloneid,$fdb,$tdb) = @_;
+
+    my $fclone = $fdb   ->get_Clone($cloneid);
+    my $tclone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone(-disk_id => "none",
+							  -dbobj   => $tdb);
+
+    print("made clones\n");
+    my @contig;
+
+    foreach my $contig ($fclone->get_all_Contigs) {
+	
+	my @features = $contig->get_all_SeqFeatures;
+	my @genes    = $contig->get_all_Genes;
+	
+	my $tcontig  = new Bio::EnsEMBL::Pipeline::DBSQL::Contig(-id    => $contig->id,
+								 -dbobj => $tdb);
+
+	
+	$tclone->add_Contig($tcontig);
+	
+	foreach my $f (@features) {
+	    $tcontig->add_SimilarityFeature($f);
+	}
+	
+	foreach my $gene (@genes) {
+	    
+	    foreach my $exon ($gene->each_unique_Exon) {
+		$tdb ->write_Exon($exon);
+		$exon->find_supporting_evidence(\@features);
+	    }
+	    
+	    $tcontig->add_Gene($gene);
+	    
+	}
+	
+    }
+    return ($tclone);
+}
+
+sub get_input_ids {
+    my ($infile,@input) = @_;
+
+    my @input_ids;
+
+    if (defined($infile)) {
+	open(IN,"<$infile");
+	while (<IN>) {
+	    chomp;
+	    push(@input_ids,$_);
+	}
+    }
+
+    push(@input_ids,@input);
+
+    return @input_ids;
+}

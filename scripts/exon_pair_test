@@ -1,5 +1,11 @@
 #!/usr/local/bin/perl
 
+BEGIN {
+  unshift (@INC,"/nfs/disk89/michele/bioperl-live");
+  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
+  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+}
+
 =head1 NAME
 
 retransfer_Features  - transfers features for a list of input clones
@@ -36,8 +42,13 @@ database and deletes any existing features
 use strict;
 use Getopt::Long;
 
+use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
+use Bio::EnsEMBL::Pipeline::SimpleJob;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 
@@ -97,45 +108,78 @@ my @cloneids         = read_clones($usefile,@ARGV);
 my $tdb              = new Bio::EnsEMBL::DBLoader($to_locator);
 my $fdb              = new Bio::EnsEMBL::DBLoader($from_locator);
 
+my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => '__NONE__',
+						      -db_version      => '__NONE__',
+						      -db_file         => '__NONE__',
+						      -program         => 'exon_pair_test',
+						      -program_version => -1,
+						      -program_file    => '__NONE__',
+						      -module          => 'Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair.pm',
+						      -module_version  => 1,
+						      -gff_source      => 'exon_pair',
+						      -gff_feature     => 'prediction',
+						      -parameters      => "");
+
+$tdb->write_Analysis($analysis);
+
 foreach my $cloneid (@cloneids) {
     eval {
 
 	my $fclone = $fdb   ->get_Clone($cloneid);
+	my $tclone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone(-disk_id => "none",
+							      -dbobj   => $tdb);
 	my @contig;
 
 	foreach my $contig ($fclone->get_all_Contigs) {
-	    push(@contig,$contig);
+
+	    my @features = $contig->get_all_SeqFeatures;
+	    my @genes    = $contig->get_all_Genes;
+
 
 	    my $tcontig  = new Bio::EnsEMBL::Pipeline::DBSQL::Contig(-id    => $contig->id,
 								     -dbobj => $tdb);
 
-	    my @features = $contig->get_all_SeqFeatures;
+
+	    $tclone->add_Contig($tcontig);
 
 	    foreach my $f (@features) {
 		$tcontig->add_SimilarityFeature($f);
 	    }
 
-	    my @genes    = $contig->get_all_Genes;
-
 	    foreach my $gene (@genes) {
+		
 		foreach my $exon ($gene->each_unique_Exon) {
 		    $tdb ->write_Exon($exon);
 		    $exon->find_supporting_evidence(\@features);
 		}
-		$tcontig->make_ExonPairs($gene);
+
+		$tcontig->add_Gene($gene);
+
 	    }
 
+         }
+	    my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $tdb,
+						      -input_id => $fclone->id,
+						      -analysis => $analysis,
+						      -queue    => 'blast_farm',
+						      -create   => 1,
+                                                      -file_output => 1,
+						      );
+            $job->make_files;
 
+	    print(STDERR "Created new job object\n");
 
-	    $tdb->write_ExonPairs($tcontig->get_all_ExonPairs);
+	    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair(-clone => $tclone);
 
-	}
+	    my $simjob  = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
+								-runnable => $runnable);
+
+	    my $id      = $simjob->id;         
+
+            $simjob->store;
+	    $simjob->submit;
+
 	
-	my @pairs = $tdb->get_all_ExonPairs(@contig);
-	
-	foreach my $p (@pairs) {
-	    print ($p->exon1->id . "\t" . $p->exon2->id . "\n");
-	}
     };
 
     if ($@) {
