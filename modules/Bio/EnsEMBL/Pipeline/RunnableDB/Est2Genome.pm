@@ -57,10 +57,10 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_EST_DATABASES
-					 GB_EST_GENETYPE
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
+							    GB_EST_DATABASES
+							    GB_EST_GENETYPE
+							   );
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -88,7 +88,7 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
     my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->throw("no protein source databases defined in GeneConf::GB_EST_DATABASES\n") 
+    $self->throw("no protein source databases defined in Config::GeneBuild::Combined::GB_EST_DATABASES\n") 
     unless scalar(@{$GB_EST_DATABASES});
 	 
     foreach my $db(@{$GB_EST_DATABASES}){

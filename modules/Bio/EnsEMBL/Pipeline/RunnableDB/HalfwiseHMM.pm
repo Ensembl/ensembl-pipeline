@@ -57,9 +57,9 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_SIMILARITY_DATABASES
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
+							     GB_SIMILARITY_DATABASES
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 

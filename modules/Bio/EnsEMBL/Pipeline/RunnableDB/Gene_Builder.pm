@@ -49,19 +49,25 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_VCONTIG
-					 GB_FINALDBNAME
-					 GB_FINALDBHOST
-					 GB_DBUSER
-					 GB_DBPASS
-					 GB_FINAL_GENETYPE
-					 GB_INPUTID_REGEX
-					 GB_COMB_DBHOST
-					 GB_COMB_DBNAME
-					 GB_COMB_DBUSER
-					 GB_COMB_DBPASS
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
+							       GB_FINALDBNAME
+							       GB_FINALDBHOST
+							       GB_FINALDBUSER
+							       GB_FINALDBPASS
+							       GB_COMB_DBHOST
+							       GB_COMB_DBNAME
+							       GB_COMB_DBUSER
+							       GB_COMB_DBPASS
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+							       GB_VCONTIG
+							       GB_FINAL_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
+							       GB_INPUTID_REGEX
+							      );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -136,8 +142,8 @@ sub write_output {
     # write genes out to a different database from the one we read genewise genes from.
     my $dbname = $GB_FINALDBNAME;
     my $dbhost = $GB_FINALDBHOST;
-    my $dbuser = $GB_DBUSER;
-    my $dbpass = $GB_DBPASS;
+    my $dbuser = $GB_FINALDBUSER;
+    my $dbpass = $GB_FINALDBPASS;
     
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
@@ -149,7 +155,7 @@ sub write_output {
     # sort out analysis
     my $genetype = $GB_FINAL_GENETYPE;
     unless ( $genetype ){
-	$self->throw("Please, define GB_FINAL_GENETYPE in Pipeline::GeneConf");
+	$self->throw("Please, define GB_FINAL_GENETYPE in Config::GeneBuild::GeneBuilder");
     }
     my $analysis = $self->analysis;
     unless ($analysis){
