@@ -19,13 +19,19 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CPG
 =head1 SYNOPSIS
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
+
 my $cpg = Bio::EnsEMBL::Pipeline::RunnableDB::CPG->new ( 
-                                                    -dbobj      => $db,
-			                            -input_id   => $input_id
-                                                    -analysis   => $analysis );
+                                   -dbobj      => $db,
+			           -input_id   => $input_id
+                                   -analysis   => $analysis 
+                                    );
+
 $cpg->fetch_input();
+
 $cpg->run();
+
 $cpg->output();
+
 $cpg->write_output(); #writes to DB
 
 =head1 DESCRIPTION
@@ -50,7 +56,6 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::CPG;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CPG;
 use vars qw(@ISA);
@@ -145,7 +150,13 @@ sub runnable {
         }
         $parameters{'-cpg'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::CPG object
-        $self->{'_runnable'} = $runnable->new(%parameters);
+        $self->{'_runnable'} = $runnable->new( 
+					      -clone => $parameters{'-clone'},
+					      -length => $parameters{'-length'},
+					      -gc => $parameters{'-gc'},
+					      -oe => $parameters{'-oe'},
+					      -cpg => $parameters{'-cpg'},
+					     );
     }
     return $self->{'_runnable'};
 }

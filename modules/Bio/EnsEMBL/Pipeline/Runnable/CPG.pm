@@ -19,14 +19,23 @@ Bio::EnsEMBL::Pipeline::Runnable::CPG
 =head1 SYNOPSIS
 
 #create and fill Bio::Seq object
+
 my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+
 my $seq = Bio::Seq->new();
+
 my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+
 $seq = $seqstream->next_seq();
+
 #create Bio::EnsEMBL::Pipeline::Runnable::CPG object
+
 my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-CLONE => $seq);
+
 $cpg->workdir($workdir);
+
 $cpg->run();
+
 my @results = $cpg->output();
 
 =head1 DESCRIPTION
@@ -85,6 +94,8 @@ sub _initialize {
   $self->{_min_gc} = 0;        # minimum %GC required for a predicted cpg island to be reported
   $self->{_min_oe} = 0;        # minimum observed/expected ratio required for a predicted cpg island to be reported
   
+  print STDERR "args: ", @args, "\n";
+
   my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange(['CLONE', 'LENGTH', 'GC', 'OE', 'CPG'], @args);
   
   $self->clone($sequence) if ($sequence);       
@@ -127,7 +138,6 @@ sub clone {
         }
       $self->{_sequence} = $seq ;
       
-      $self->clonename($self->clone->id);
       $self->filename($self->clone->id.".$$.seq");
       $self->results($self->filename.".out");
     }
@@ -147,9 +157,11 @@ sub cpg {
     my ($self, $location) = @_;
     if ($location)
     {
-        $self->throw("cpg not found at $location: $!\n") 
-                                                    unless (-e $location);
+      $self->throw("cpg not found at $location: $!\n") 
+	unless (-e $location);
         $self->{_cpg} = $location ;
+      $self->throw("cpg not executable: $!\n") 
+      	unless (-x $location);
     }
     return $self->{_cpg};
 }
@@ -229,11 +241,8 @@ sub run {
     $self->checkdir();
 
     # reset filename and results as necessary
-    my $tmp = $self->workdir();
-    my $input = $tmp."/".$self->filename();
-    $self->filename($input);
-    $tmp .= "/".$self->results();
-    $self->results($tmp);
+    $self->filename($self->workdir()."/".$self->filename());
+    $self->results($self->workdir()."/".$self->results());
 
     #write sequence to file
     $self->writefile();        
@@ -272,8 +281,7 @@ sub run_cpg {
 
 =cut
 sub parse_results {
-    my ($self) = @_;
-    my $filehandle;
+    my ($self, $filehandle) = @_;
 #   my $resfile = $self->workdir()."/".$self->results();
    my $resfile = $self->results();
 
@@ -295,7 +303,7 @@ sub parse_results {
     {  
         if (/\d+/) #ignore introductory lines
         {
-            my @element = split (/\s+/, $_); 
+            my @element = split;
 	    my $oe = $element[7];
 	    if($oe eq "-") { $oe = 0; }
 	    next unless (($element[2] - $element[1] + 1 >= $self->min_length)
@@ -338,7 +346,6 @@ sub parse_results {
 
 sub output {
     my ($self) = @_;
-    my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
 }
 

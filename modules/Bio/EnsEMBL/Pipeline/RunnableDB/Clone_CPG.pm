@@ -19,13 +19,19 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Clone_CPG
 =head1 SYNOPSIS
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
+
 my $cpg = Bio::EnsEMBL::Pipeline::RunnableDB::Clone_CPG->new ( 
-                                                    -dbobj      => $db,
-         		                            -input_id   => $input_id
-                                                    -analysis   => $analysis );
+                                            -dbobj      => $db,
+         		                    -input_id   => $input_id
+                                            -analysis   => $analysis 
+                                            );
+
 $cpg->fetch_input();
+
 $cpg->run();
+
 $cpg->output();
+
 $cpg->write_output();
 
 =head1 DESCRIPTION
@@ -149,7 +155,13 @@ sub runnable {
 
         $parameters {'-clone'} = $genseq;
         #creates empty Bio::EnsEMBL::Runnable::CPG object
-        push (@{$self->{'_runnable'}}, $runnable->new(%parameters));
+        push (@{$self->{'_runnable'}}, $runnable->new(
+						      -clone => $parameters{'-clone'},
+						      -length => $parameters{'-length'},
+						      -gc => $parameters{'-gc'},
+						      -oe => $parameters{'-oe'},
+						      -cpg => $parameters{'-cpg'}
+						     ));
     }
     return @{$self->{'_runnable'}};
 }
