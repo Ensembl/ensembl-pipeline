@@ -129,9 +129,9 @@ JOB:foreach my $job(@jobs) {
       print STDERR "the batch_q_object ".$queue_manger." needs to implement ".
         " the copy_output method\n";
     }
-    if($batch_q_object->can('delete_output')){
-      $batch_q_object->delete_output() unless(!$cleanup);
-    }
+    #if($batch_q_object->can('delete_output')){
+    #  $batch_q_object->delete_output() unless(!$cleanup);
+    #}
   }
   if( !$job) {
     print STDERR ( "Couldnt recreate job $job_id\n" );
@@ -172,8 +172,8 @@ JOB:foreach my $job(@jobs) {
   print STDERR "Finished job $job_id\n";
 }
 
-if($batch_q_object->can('delete_output')){
-  $batch_q_object->delete_output();
-}
+#if($batch_q_object->can('delete_output')){
+#  $batch_q_object->delete_output();
+#}
 
 
