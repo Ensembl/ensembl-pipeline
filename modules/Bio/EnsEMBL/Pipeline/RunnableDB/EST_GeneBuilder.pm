@@ -1,4 +1,3 @@
-
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
 # Copyright GRL & EBI
@@ -86,7 +85,9 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_GENEBUILDER_INTRON_MISMATCH
 									 EST_GENEBUILDER_EXON_MATCH
 									 CHECK_SPLICE_SITES
-									);
+									 RAISE_SINGLETON_COVERAGE
+									 FILTER_ON_SINGLETON_SIZE
+									 );
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -481,7 +482,7 @@ sub _check_Transcripts {
       # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
       if ( scalar(@exons) == 1 ){
 	
-	if ( $FILTER_ON_SINGLETONS && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETONS ){
+	if ( $FILTER_ON_SINGLETON_SIZE && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETON_SIZE ){
 	  next TRANSCRIPT;
 	}
 	if ( $RAISE_SINGLETON_COVERAGE ){
@@ -901,7 +902,7 @@ We want introns of the form:
 sub check_splice_sites{
   my ($self,$transcript,$strand) = @_;
   $transcript->sort;
-  my $verbose = 1;
+  my $verbose = 0;
   
   #my $strand = $transcript->start_Exon->strand;
   my @exons  = @{$transcript->get_all_Exons};
@@ -1009,6 +1010,7 @@ sub check_splice_sites{
   }
   unless ( $introns == $other + $correct ){
     print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
+    return 0;
   }
   if ( $other ){
     print STDERR "rejecting for having non-canonical splice-sites\n" if $verbose;
@@ -1516,28 +1518,28 @@ sub _cluster_into_Genes{
   
   # safety and sanity checks
   $self->check_Clusters(scalar(@transcripts), \@clusters);
-
+  
   # make and store genes
   
-  print STDERR scalar(@clusters)." clusters created, turning them into genes...\n";
+  print STDERR scalar(@clusters)." clusters created, making genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
-    my $count = 0;
-    my $gene = new Bio::EnsEMBL::Gene;
-    my $genetype = $self->genetype;
-    my $analysis = $self->analysis;
-    $gene->type($genetype);
-    $gene->analysis($analysis);
-    
-    # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
-    foreach my $transcript( @{$cluster} ){
-      $gene->add_Transcript($transcript);
-    }
-    
-    # prune out duplicate exons
-    my $new_gene = $self->prune_Exons($gene);
-    push( @genes, $new_gene );
-   }
+      my $count = 0;
+      my $gene = new Bio::EnsEMBL::Gene;
+      my $genetype = $self->genetype;
+      my $analysis = $self->analysis;
+      $gene->type($genetype);
+      $gene->analysis($analysis);
+      
+      # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
+      foreach my $transcript( @{$cluster} ){
+	  $gene->add_Transcript($transcript);
+      }
+      
+      # prune out duplicate exons
+      my $new_gene = $self->prune_Exons($gene);
+      push( @genes, $new_gene );
+  }
   
   # test
   #foreach my $gene (@genes){
