@@ -43,16 +43,26 @@ Internal methods are usually preceded with a _
 
 =cut
 
-  package Bio::EnsEMBL::Pipeline::Tools::ApproxAlign; 
+package Bio::EnsEMBL::Pipeline::Tools::ApproxAlign;
 
 use vars qw(@ISA);
 use strict;
-use base (aat);
+use aat;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+ @ISA = qw (aat Bio::EnsEMBL::Pipeline::RunnableI);
 
 
-  # names of fasta files on which avid runs on (there must also be a .masked-file)
+
+
+### TODO:
+### Constructing new ApproxAlign-Object (inherits aat.pm)
+### option for workdir can be added, Super the constructor !!
+### option for filename can be added, Super the constructor !!
+### needs in -ApproxAlign: new constructor
+###          -run-method which reads the supplied files and the alignment
+###          -DESTROY method which destroys written file
+###          -filename which returns name of written file for handling over to slam
+
 
 # Reads in approximate alignment from supplied filename
 
@@ -64,7 +74,6 @@ sub read {
   $this->{'aat'} = [];
 
   open(IN,"<$file") || die "Could not open file: $file\n";
-
   while(<IN>) {
     @fields = split;
     die "aat->read(): bad format in line ".($i+1).", should have 3 fields\n" if(scalar(@fields) != 3);
@@ -74,8 +83,6 @@ sub read {
     $i++;
   }
   close(IN);
-
-
   $aatLenY = scalar(@{$this->{'aat'}});
   $aatLenZ = 1 + $this->{'aat'}->[$aatLenY-1][1];
   if(defined($this->{seqY}) && ($aatLenY != scalar(@{$this->{seqY}}))) {
@@ -88,13 +95,16 @@ sub read {
 }
 
 
-# Writes sequence to supplied file
+# Writes sequence to a file (filename will be created by Bio::EnsEMBL::Pipeline::RunnableI->get_tmp_filename
+# Bio::EnsEMBL::Pipeline::RunnableI must be in your path
+# and return the filename of the written file
 
 sub write {
   my($this, $out) = @_;
   my($n,$i);
+
   $n = scalar(@{$this->{'aat'}});
-  open(OUT,">$out") || die "could not write to file\n";
+  open(OUT,">$out") || die "Could not write to file $out\n";
 
   for($i=0; $i < $n; $i++) {
     print OUT $i . " " . ${$this->{'aat'}}[$i][0] . " " . ${$this->{'aat'}}[$i][1] . "\n";
