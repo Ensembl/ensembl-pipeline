@@ -107,7 +107,7 @@ sub new {
     }  
     
     $self->use_vcontig($use_vcontig);
-    
+
     return $self;
 }
 
@@ -187,7 +187,7 @@ sub write_output {
 		};
 		if ($@) {
 		    $self->warn("Cannot convert gene to raw contigs:\n$@");
-		    foreach my $tran (@{$gene->get_all_Trascripts}){
+		    foreach my $tran (@{$gene->get_all_Transcripts}){
 		      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
 		    }
 		}
