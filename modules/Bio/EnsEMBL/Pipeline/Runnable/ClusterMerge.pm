@@ -1054,11 +1054,9 @@ sub compare{
   my $comparator = 
     Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator
       ->new(
-	    #-comparison_level        => $self->_comparison_level, 
-	    -comparison_level         => 5,  # loose
+	    -comparison_level        => $self->_comparison_level, 
 	    -exon_match               => $self->_exon_match,
-	    #-splice_mismatch          => 1000,#$self->_splice_mismatch,
-	    #-splice_mismatch          => $self->_splice_mismatch,
+	    -splice_mismatch          => $self->_splice_mismatch,
 	    -intron_mismatch          => $self->_intron_mismatch,
 	    -minimum_order            => 2,
 	   );
