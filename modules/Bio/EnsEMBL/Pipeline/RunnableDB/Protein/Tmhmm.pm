@@ -58,9 +58,9 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm;
 =head2 new
 
  Title    : new
- Usage    : $self->new ( -DBOBJ       => $db
-                         -INPUT_ID    => $id
-                         -ANALYSIS    => $analysis,
+ Usage    : $self->new ( -dbobj       => $db
+                         -input_id    => $id
+                         -analysis    => $analysis,
                        );
  Function : creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm object
  Example  : 
@@ -142,9 +142,7 @@ sub write_output {
     my ($self) = @_;
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
     my @featurepairs = $self->output;
-    foreach my $featurepair (@featurepairs) {
-        $proteinFeatureAdaptor->write_Protein_feature ($featurepair);
-    }
+    $proteinFeatureAdaptor->store (@featurepairs);
 }
 
 # runnable method

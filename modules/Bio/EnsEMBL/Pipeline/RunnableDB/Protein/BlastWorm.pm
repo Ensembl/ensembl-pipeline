@@ -57,9 +57,9 @@ use Bio::EnsEMBL::Pipeline::Runnable::BlastWorm;
 =head2 new
 
  Title    : new
- Usage    : $self->new ( -DBOBJ       => $db
-                         -INPUT_ID    => $id
-                         -ANALYSIS    => $analysis,
+ Usage    : $self->new ( -dbobj       => $db
+                         -input_id    => $id
+                         -analysis    => $analysis,
                        );
  Function : creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::BlastWorm object
  Example  : 
@@ -88,7 +88,9 @@ sub new {
     # define the database
     $params .= "-database=>".$self->analysis->db_file.",";
     # set the filter
-    $params .= "-filter=>1,";
+    if ($self->analysis->db =~ /swall/i) {
+        $params .= "-filter=>1,";
+    }
     # define some threshold
     $params .= "-threshold=>0.1,";
     $params .= "-threshold_type=>PVALUE,";
@@ -141,9 +143,7 @@ sub write_output {
     my ($self) = @_;
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
     my @featurepairs = $self->output;
-    foreach my $featurepair (@featurepairs) {
-        $proteinFeatureAdaptor->write_Protein_Blast_feature ($featurepair);
-    }
+    $proteinFeatureAdaptor->store (@featurepairs);
 }
 
 # runnable method
