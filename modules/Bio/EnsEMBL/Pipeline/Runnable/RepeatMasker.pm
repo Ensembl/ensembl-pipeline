@@ -343,7 +343,7 @@ sub parse_results {
 	    $hit_start = 1 if $hit_start == 0;
 	    $hit_end   = 1 if $hit_end   == 0;
       if($hit_end < $hit_start){
-        $temp_end = $hit_start;
+        my $temp_end = $hit_start;
         $hit_start = $hit_end;
         $hit_end = $temp_end;
       }
