@@ -30,6 +30,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
 							      EST_REFDBHOST
 							      EST_REFDBUSER
 							      EST_REFDBNAME
+							      EST_DBHOST
 							      LSF_OPTIONS
 							      EST_SCRIPTDIR
 							      EST_TMPDIR
@@ -77,8 +78,11 @@ sub make_exonerate_bsubs {
   
   my $lsf_options   = $LSF_OPTIONS;
   
-  #$lsf_options .= " -R\"select[myecs2b < 440 && myecs2f < 440] rusage[myecs2b=10]\" ";
-  $lsf_options .= " -R\"select[myecs2b < 440 && myecs2f < 440] rusage[myecs2b=10:duration=2:decay=1:myecs2f=10:duration=2:decay=1]\"";
+  my $refdb_host = $EST_REFDBHOST;
+  my $est_host   = $EST_DBHOST;
+  
+  #$lsf_options .= " -R\"select[$refdb_host < 440 && $est_host < 440] rusage[$refdb_host=10]\" ";
+  $lsf_options .= " -R\"select[$refdb_host < 440 && $est_host < 440] rusage[$refdb_host=10:duration=2:decay=1:$est_host=10:duration=2:decay=1]\"";
     
   my $scriptdir     = $EST_SCRIPTDIR;
   my $check         = $scriptdir . "check_node.pl";
