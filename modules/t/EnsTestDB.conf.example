@@ -26,5 +26,5 @@
     'schema_sql'    => [ '../sql/table.sql', '../../ensembl/sql/table.sql' ],
 
     #EnsEMBL DBSQL::Obj module name - optional                   
-    'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::Obj',
+    'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor',
 }

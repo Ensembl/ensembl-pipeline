@@ -72,7 +72,7 @@ my $counter=0;
             'port'          => '3306',
             'password'      => undef,
             'schema_sql'    => ['../sql/table.sql'],
-            'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::Obj'
+            'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor'
             };
         foreach my $f (keys %$self) {
             confess "Unknown config field: '$f'" unless $known_field{$f};
@@ -206,7 +206,7 @@ sub test_locator {
 sub ensembl_locator {
     my( $self) = @_;
     
-    my $module = ($self->module() || 'Bio::EnsEMBL::Pipeline::DBSQL::Obj');
+    my $module = ($self->module() || 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor');
     my $locator = '';
     foreach my $meth (qw{ host port dbname user }) {
         my $value = $self->$meth();
