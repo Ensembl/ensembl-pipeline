@@ -42,7 +42,8 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::ProcessList;
-
+use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
+use Bio::Seq;
 
 my $dbhost = 'croc';
 my $dbport = 3306;
@@ -105,8 +106,26 @@ my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $db,
 						      );
 
 # This is the module that does all the work
+#my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ProcessList();
 
-my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ProcessList();
+##CHANGED FOR Est2Genome ******************************************************************
+use Data::Dumper;
+
+#create Bio::SeqIO objects to fill Bio::Seq objects
+my $genseq= Bio::Seq->new();    
+my $estseq= Bio::Seq->new();
+
+my $genfilename = '/nfs/disk65/mq2/cutgen.seq';
+my $estfilename = '/nfs/disk65/mq2/S67581.seq';
+
+my $genstream = Bio::SeqIO->new(-file => $genfilename, -fmt => 'Fasta');
+$genseq = $genstream->next_seq();
+
+my $eststream = Bio::SeqIO->new(-file => $estfilename, -fmt => 'Fasta');
+$estseq = $eststream->next_seq();
+my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome(-genomic => $genseq, 
+                                                                -est => $estseq);
+#******************************************************************************************
 
 print(STDERR "Created new job object\n");
 
@@ -141,13 +160,29 @@ my $runjob  = $db->get_Job($id);      print(STDERR "Fetching job from database\n
 my $outjob = $db    ->get_Job($id);   print(STDERR "Fetching run job from database\n");
 my @out    = $outjob->output;         print(STDERR "Fetching output\n");
 
+my @methods = qw( seqname start end hseqname hstart hend );
+
+##CHANGED FOR Est2Genome ****************************************
 print(STDERR "Output is : \n");
 
-foreach my $out (@out) {
-    print(STDERR $out->{name} . "\t" . $out->{pid} . "\t" . $out->{cmd} . "\n");
+foreach my $obj (@out)
+{
+    print "\n";
+    foreach my $method_name (@methods) {
+        my $value = $obj->$method_name();
+        printf("%10s = $value\n", $method_name);
+        print OUT "$method_name: $value\n";
+    }
 }
+****************************************************************
+
+#foreach my $out (@out) {
+#    print(STDERR $out->{name} . "\t" . $out->{pid} . "\t" . $out->{cmd} . "\n");
+#}
 
 $db->_db_handle->disconnect;
+
+
 
 
 

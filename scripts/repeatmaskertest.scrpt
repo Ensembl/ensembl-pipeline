@@ -27,14 +27,13 @@ $seq = $seqstream->next_seq();
 #create Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker object
 my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
 $repmask->workdir($workdir);
+$repmask->repeatmasker('/nfs/disk65/mq2/temp/sources/RepeatMasker04042000/RepeatMasker');
 $repmask->run();
 #$repmask->output();
 
 #get and store the output
 my @methods = qw( seqname start end hseqname hstart hend );
 my @results = $repmask->output();
-my $outfile = "results.seq";   
-open (OUT, ">$outfile");
 
 foreach my $obj (@results)
 {
@@ -42,7 +41,5 @@ foreach my $obj (@results)
     foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
         printf("%10s = $value\n", $method_name);
-        print OUT "$method_name: $value\n";
     }
 }
-close (OUT);
