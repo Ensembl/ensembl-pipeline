@@ -42,6 +42,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -113,6 +114,9 @@ sub new {
       $self->make_filenames;
     }
     $self->runner($runner);
+    if(!$self->runner){
+      $self->runner($PIPELINE_RUNNER_SCRIPT);
+    }
     return $self;
 }
 
@@ -276,12 +280,12 @@ sub flush_runs {
   # and fail if not found
 
   my $runner = $self->runner;
-
+  #print STDERR "have runner ".$self->runner."\n";
   unless (-x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);
-    $self->throw("runner not found - needs to be set in $caller\n") unless -x $runner;
+    $self->throw("runner ".$runner." not found - needs to be set in $caller\n") unless -x $runner;
   }
 
   # $anal is a logic_name
