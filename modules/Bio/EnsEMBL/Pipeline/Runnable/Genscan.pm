@@ -420,6 +420,7 @@ sub parse_results {
 
 sub calculate_and_set_phases_new {
     my ($self) = @_;
+    my $min_gene_length = 10;
 
     my @genes       = $self->genscan_genes();
     my @peptides    = $self->genscan_peptides();
@@ -435,6 +436,11 @@ sub calculate_and_set_phases_new {
 #      print STDERR "Gene " . $genes[$i]->seqname . "\n";
 
       my $peptide = $peptides[$i];
+      if (length $peptide < $min_gene_length) {
+	  print STDERR "peptide $i too short (", length($peptide), "bp)\n";
+	  $i++;
+	  next GENE;
+      }
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
       my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->query);
