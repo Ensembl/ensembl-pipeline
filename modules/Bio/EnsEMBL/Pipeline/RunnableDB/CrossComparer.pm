@@ -321,8 +321,8 @@ sub write_output {
   $ab->align_start($align_start);
   $ab->align_end($align_end);
   
-  $ab->start($align_start);
-  $ab->end($align_end);
+  $ab->start($offset_min);
+  $ab->end($offset_max);
   $ab->strand(1);
   $ab->dnafrag($dnafrag);
     
