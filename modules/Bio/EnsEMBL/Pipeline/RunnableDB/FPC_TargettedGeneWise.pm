@@ -38,7 +38,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
@@ -46,6 +46,7 @@ use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_INPUTID_REGEX
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -150,11 +151,11 @@ sub make_targetted_runnables {
   # take a note of those that fall across the ends of the vc? and do what, precisely?
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
-
+  #input_id cb25.fpc4118.1-298757 has invalid format - expecting chrname.start-end
   my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->db );
   my $input_id = $self->input_id;
   my $msg = "input_id $input_id has invalid format - expecting chrname.start-end";
-  $self->throw($msg) unless $input_id =~ /(^\w+)\.(\d+)-(\d+)/;
+  $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
   
   my $chrname = $1;
   my $start   = $2;
