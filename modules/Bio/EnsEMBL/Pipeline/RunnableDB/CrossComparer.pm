@@ -55,7 +55,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
 
     min_score is an argument for the 'crossmatch' runnable to set the 
     minimum score used in the crossmatch run. In the case of 'bl2seq' runnable 
-    it sets the minimum Eval used in bl2seq run.
+    it sets the minimum Eval used in bl2seq run. bl2seq runnable runs by default
+    a 'blastn' alignment type. Other alignment types ('blastp','blastx','tblastx' 
+    and 'tblastn') are not implemented yet.
 
 =head1 CONTACT
 
@@ -139,11 +141,11 @@ sub fetch_input {
 
     my $gadp = $self->dbobj->get_GenomeDBAdaptor();
 
-    $db1 = $gadp->fetch_by_species_tag($db1)->ensembl_db();
-    $db2 = $gadp->fetch_by_species_tag($db2)->ensembl_db();
+    $db1 = $gadp->fetch_by_species_tag($db1);
+    $db2 = $gadp->fetch_by_species_tag($db2);
 
-    my $contig1 = $db1->get_Contig($c1);
-    my $contig2 = $db2->get_Contig($c2);
+    my $contig1 = $db1->get_Contig($c1,'RawContig');
+    my $contig2 = $db2->get_Contig($c2,'RawContig');
 
     my $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
     my $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
@@ -156,8 +158,11 @@ sub fetch_input {
 								       -seq2 => $seq2,
 								       -score => $self->min_score,
 								       -minmatch => 14,
-								       -masklevel => 80);
+								       -masklevel => 101);
     } elsif ($self->alnprog eq 'bl2seq') {
+
+# bl2seq runnable runs by default a 'blastn' alignment type.
+      
       $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(-seq1 => $seq1,
 								   -seq2 => $seq2,
 								   -min_score => 40,
@@ -217,10 +222,12 @@ sub output {
 
     Title   :   _greedy_filter
     Usage   :   _greedy_filter(@)
-    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in two step, 
+    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in three steps, 
                 First, determines the highest scored hit, and fix the expected strand hit
                 Second, hits on expected strand are kept if they do not overlap, 
                 either on query or subject sequence, previous strored, higher scored hits.
+                If hit goes trough the second step, the third test makes sure that the hit
+                is coherent position according to previous ones. 
     Returns :   Array of Bio::EnsEMBL::FeaturePairs
     Args    :   Array of Bio::EnsEMBL::FeaturePairs
 
@@ -250,6 +257,19 @@ sub _greedy_filter {
 	$add_fp = 0;
 	last;
       }
+      if ($ref_strand == 1) {
+	unless (($fp->start > $end && $fp->hstart > $hend) ||
+		($fp->end < $start && $fp->hend < $hend)) {
+	  $add_fp = 0;
+	  last
+	}
+      } elsif ($ref_strand == -1) {
+	unless (($fp->start > $end && $fp->hstart < $hend) ||
+		($fp->end < $start && $fp->hend > $hend)) {
+	  $add_fp = 0;
+	  last
+	}
+      }
     }
     push @features_filtered, $fp if ($add_fp);
   }
@@ -269,11 +289,11 @@ sub _greedy_filter {
 
 sub write_output {
   my ($self) = @_;
-  
 
-  if (! scalar($self->output)){
-      return undef;
+  if (! scalar($self->output)) {
+      return 1;
   } 
+
   my @features = _greedy_filter($self->output);
 
   my $db = $self->dbobj();
@@ -321,8 +341,8 @@ sub write_output {
   $ab->align_start($align_start);
   $ab->align_end($align_end);
   
-  $ab->start($align_start);
-  $ab->end($align_end);
+  $ab->start($offset_min);
+  $ab->end($offset_max);
   $ab->strand(1);
   $ab->dnafrag($dnafrag);
     
