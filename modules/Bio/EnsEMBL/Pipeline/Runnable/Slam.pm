@@ -99,7 +99,8 @@ Internal (private) methods are usually preceded with a "_".
 package Bio::EnsEMBL::Pipeline::Runnable::Slam;
 
 use vars qw(@ISA);
-#use strict;
+use strict;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::PredictionTranscript;
 use Bio::EnsEMBL::PredictionExon;
 
@@ -235,8 +236,10 @@ sub parse_results {
   # parsing results of first organism
   # returns ref to array of predicted transcripts
   # could be empty arrays or arrays full of predicted transcripts (paradise :-)
+
   my $arrayref1 = $self->_parser( ${$self->slices}[0], ${$self->fasta}[0] );
   my $arrayref2 = $self->_parser( ${$self->slices}[1], ${$self->fasta}[1] );
+
   #     [HPT HPT HPT] [HM HM HM] or  [ [][] ]
   $self->predtrans( $arrayref1,$arrayref2 );
 }
@@ -251,37 +254,44 @@ sub _parser {
   my (%transcripts);
 
   $gff=~s/(\.fasta)/\.gff/;     # subst. .fasta-suffix with .gff-suffix
-  print "Slam.pm: Parsing $gff\n";
 
-  # processing the written gff-file
-  open(IN,"$gff") || die "Slam.pm: Out of MEMORY-ERROR !\n BROKE UP BY SIGINT \n Could not read $gff: $0 \n";
-  while (<IN>) {
-    chomp;
-    my $aline = $_;
-    if ($aline =~m/gene_id/) {
-      #if the line contains a CDS
+  ## data for error-message if slam-run fails due to out-of-memory-error
+  my $e_start = $slice->start;
+  my $e_end = $slice->end;
+  my $e_chr = $slice->seq_region_name;
 
-      if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
-        # if the line is no start-or stopcodon
 
-        my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
-        my @attributes = split /\s+/,$line[0];
-        my @transc_id =  split /\s+/,$line[1];
+  # processing the written gff-file #### or write an errorlog !!! with statistics !!!! like percentage of repeats in sequence etc
+  # open(IN,"$gff") || die ("Slam.pm: OUT OF MEMORY-ERROR !\n Failed to run Slam on region :Chr $e_chr: $e_start-$e_end bp. \n_SLAM-PROCESS BROKE UP BY SIGINT \n Could not read $gff: $0 \n");
 
-        # building a unique key for each transcript
-        my $key = "$attributes[8] $attributes[9]"; # key: -->gene_id "001"<--
+    open(IN,"$gff") || $self->throw("Slam.pm: OUT OF MEMORY-ERROR !\n XXXX\nCould not read $gff: $0 \n");
+    while (<IN>) {
+      chomp;
+      my $aline = $_;
+      if ($aline =~m/gene_id/) {
+        #if the line contains a CDS
 
-        # we concatenate the first and second part of the line
-        push (@attributes, @transc_id);
-        my $attr_ref = \@attributes;
+        if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
+          # if the line is no start-or stopcodon
 
-        # we store the ref of line with attributes of the exon using the unique transcript-key as key
-        # an HASH of ARRAYS of ARRAYS
-     push (@{ $transcripts{$key}}, $attr_ref );
+          my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
+          my @attributes = split /\s+/,$line[0];
+          my @transc_id =  split /\s+/,$line[1];
+
+          # building a unique key for each transcript
+          my $key = "$attributes[8] $attributes[9]"; # key: -->gene_id "001"<--
+
+          # we concatenate the first and second part of the line
+          push (@attributes, @transc_id);
+          my $attr_ref = \@attributes;
+
+          # we store the ref of line with attributes of the exon using the unique transcript-key as key
+          # an HASH of ARRAYS of ARRAYS
+          push (@{ $transcripts{$key}}, $attr_ref );
+        }
       }
     }
-  }
-  close(IN);
+    close(IN);
 
   # array of length 0
   my @all_predicted_transcripts=();
@@ -325,9 +335,6 @@ sub _parser {
 
 
 
-
-
-
 =pod
 
 =head2 run
@@ -348,20 +355,19 @@ sub run {
   my $gcdir  = $self->_getgcdir;
   my $fasta1 = ${$self->fasta}[0];
   my $fasta2 = ${$self->fasta}[1];
+  my $slice1 = ${$self->slices}[0];
+  my $slice2 = ${$self->slices}[1];
 
-    my $t = ${$self->org}[1];
-    my $command =  $self->slam_bin .
-      " -a ".$self->approx_align .
+  my $t = ${$self->org}[1];
+  my $command =  $self->slam_bin .
+    " -a ".$self->approx_align .
         " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
           " -org1 ".${$self->org}[0] .
             " -org2 ".${$self->org}[1];
-    $command .= " -v " if $self->verbose;
-    $command .= " -debug " if $self->debug;
+  $command .= " -v " if $self->verbose;
+  $command .= " -debug " if $self->debug;
 
-    print "Slam.pm: Slam-command:\n $command\n" if $self->verbose;
-
-
-
+  print "Slam.pm: Slam-command:\n $command\n" if $self->verbose;
 
   # kick of fasta suffix for gff-filenames and cns-tempfile
   (my $base1 = $fasta1) =~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
@@ -370,35 +376,44 @@ sub run {
   my $gff1 = $base1.".gff";
   my $gff2 = $base2.".gff";
 
-
   my $slength1 = &_seqlen($fasta1);
   my $slength2 = &_seqlen($fasta2);
 
-
   print "Slam.pm: Length of Sequence1: $slength1\t Sequenc2: $slength2\tSlam-run follows\n" if $self->verbose;
 
-  # One of the sequences is too short to process, just make empty gff files.
   if (($slength1<$self->minlength) || ($slength2 < $self->minlength)) {
 
-    $self->warn("Sequencelength (of cutted sequence) is too small.\nSkipping the sequence and not running slam on the small seqs\n");
+    $self->warn("Sequencelength of cutted sequence is smaller than min. Offset  (Slamconf.pm). The Sequence will be skipped (no Slam-run)");
+    # if one of the sequences is too short to process, just make empty gff files.
     open(GFF, ">$gff1") ||  die "$0: $gff1: $!\n";
     close (GFF);
     open(GFF, ">$gff2") ||  die "$0: $gff2: $!\n";
-
     close (GFF);
   } else {
-    print "Both seqs have goog length. I will run slam now, bastard \n"  if $self->verbose;
     eval ( system (" $command"));     # all ok, run slam
   }
-
     # add cns-file to list of tempfiles
     my $wdir = $self->workdir;
     $base1=~s/$wdir\///;       # get rid of workdir-prefix (/tmp/)
     $base2=~s/$wdir\///;       # get rid of workdir-prefix 
     $self->file($base1."_".$base2.".cns");
 
-    # parses the two resultfiles
-    $self->parse_results;
+  # parse results if resultfiles are written
+    if ( (-e $gff1) &&( -e $gff2 )) {
+      print "\nTwo gff-files exist. $gff1 $gff2\tI parse them\n";
+      $self->parse_results;
+  }else{
+    # error-message, evtl re-analysis
+    my $e1_start = $slice1->start;    my $e1_end = $slice1->end;    my $e1_chr = $slice1->seq_region_name;
+    my $e2_start = $slice2->start;    my $e2_end = $slice2->end;    my $e2_chr = $slice2->seq_region_name;
+
+    print "\t\t\t\t------------------\n\t\t\t\tOUT OF MEMORY:\n";
+    print "\tFailed to run Slam on region $e1_chr-$e1_start-$e1_end---$e2_chr-$e2_start-$e2_end\n\t\t\t\t------------------\n";
+    # store empty array because the run failed
+    my $aref = [];
+    $self->predtrans($aref,$aref);
+  }
+
   return 1;
 }
 
@@ -533,7 +548,7 @@ sub predtrans{
   my ($self,$ref_predtrans1,$ref_predtrans2) = @_;
 
   if ($ref_predtrans1 && $ref_predtrans2) {
-    print "Slam.pm: Storing the refernces to the array of predicted transcripts in an array of predicted tansc\n";
+    # Storing the refernces to the array of predicted transcripts in an array of predicted transcripts
     $self->{_ref_predtrans} = [$ref_predtrans1,$ref_predtrans2];
   }
   return $self->{_ref_predtrans};
