@@ -126,7 +126,7 @@ sub store {
  
   if($analysis->created ) {
     my $sth = $self->prepare( q{
-      INSERT INTO analysis
+      INSERT IGNORE INTO analysis
       SET created = ?,
           logic_name = ?,
 	  db = ?,
@@ -159,7 +159,7 @@ sub store {
   } else {
     my $sth = $self->prepare( q{
 
-      INSERT INTO analysis
+      INSERT IGNORE INTO analysis
       SET created = now(),
           logic_name = ?,
 	  db = ?,
