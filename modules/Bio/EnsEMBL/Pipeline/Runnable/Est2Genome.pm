@@ -14,7 +14,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Est2Genome - Runs Est2Genome
+Bio::EnsEMBL::Pipeline::Runnable::Est2Genome
 
 =head1 SYNOPSIS
 
@@ -31,7 +31,8 @@ Bio::EnsEMBL::Pipeline::Runnable::Est2Genome - Runs Est2Genome
 Object to store the details of an est2genome run.
 Stores the est2genome matches as an array of Bio::EnsEMBL::FeaturePair
 
-Methods:
+=head2 Methods:
+
 new,
 genomic_sequence,
 est_sequence,
@@ -174,6 +175,7 @@ sub run {
     #run est_genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
     my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
+
     eval {
       print (STDERR "Running command $est_genome_command\n");
       open (ESTGENOME, $est_genome_command) 
@@ -186,7 +188,6 @@ sub run {
       
       #read output
       while (<ESTGENOME>) {
-
 
 	if ($_ =~ /^Segment/) {
 
@@ -263,15 +264,24 @@ sub _createfeatures {
     
 
     #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
-                                              -end =>     $f1end,
-                                              -seqname =>      $f1id,
-                                              -strand =>  $f1strand,
-                                              -score =>   $f1score,
-                                              -source =>  $f1source,
-                                              -primary => $f1primary,
+    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>   $f1start,
+                                              -end =>      $f1end,
+                                              -seqname =>  $f1id,
+                                              -strand =>   $f1strand,
+                                              -score =>    $f1score,
+                                              -source_tag =>   $f1source,
+                                              -primary_tag =>  $f1primary,
                                               -analysis => $analysis_obj );
  
+<<<<<<< Est2Genome.pm
+     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
+                                                -end =>      $f2end,
+                                                -seqname =>  $f2id,
+                                                -strand =>   $f2strand,
+                                                -score =>    undef,
+                                                -source_tag =>   $f2source,
+                                                -primary_tag =>  $f2primary,
+=======
      my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
                                                 -end =>    $f2end,
                                                 -seqname =>$f2id,
@@ -279,6 +289,7 @@ sub _createfeatures {
                                                 -score =>  $f1score,
                                                 -source => $f2source,
                                                 -primary =>$f2primary,
+>>>>>>> 1.11
                                                 -analysis => $analysis_obj );
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
@@ -350,11 +361,19 @@ sub _diskspace {
 
 sub _deletefiles {
     my ($self, $genfile, $estfile, $dirname) = @_;
+<<<<<<< Est2Genome.pm
+    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
+    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
+    chdir ("../");
+    rmdir ($dirname) or $self->throw("Cannot remove $dirname \n");
+}
+
+=======
 #    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
 #    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
 
 }
+>>>>>>> 1.9
 
-1;
 
 
