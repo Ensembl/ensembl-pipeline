@@ -344,6 +344,8 @@ sub parse_results {
       #   Also, hstrand will be always +1
       ############################################################
 
+      my ($query_start,$query_end);
+
       if ( $strand eq '+' ){
 	$query_start = $q_start_positions[$i] + 1;
 	$query_end   = $query_start + $block_sizes[$i] - 1;
