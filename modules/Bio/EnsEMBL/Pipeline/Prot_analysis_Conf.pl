@@ -22,8 +22,12 @@ package main;
 #	    'dbuser'      => 'ensadmin',
 	    'dbuser'      => '',
 
-#	    'dbpass'      => 'xxxxx',
+#	    'dbpass'      => 'ensembl',
 	    'dbpass'      => '',	  
+	    
+            'dnadbhost'   => '',
+
+            'dnadbname'   => '',
 );
 
 # parameters for ensembl-pipeline/scripts/protein_pipeline/*.pl
@@ -36,19 +40,19 @@ package main;
 		  #'tmpdir'      => '/acari/scratch1/ensembl/mongin/test',
 		  'tmpdir'  => '',
 
-#	    'queue'       => 'acari',
+#	    'queue'       => '',
 		  'queue'       => '',
 		  
 #Location of the peptide file (file containing predicted peptides in fasta format)
-		  #'pep_file'     => '/work4/mongin/dros/GeneBuild3/mapping/dros_pep.fa',
+		  #'pep_file'     => '/work4/mongin/dros/GeneBuild3/mapping/dros_pep',
 
-		  'pep_file'    '',
+		  'pep_file'    => '',
 
 #Put here all of the analysis which should be run, the analysis names are:
-#Prints,Prosite,Profile,Pfam,Tmhmm,ncoils,Signalp,Seg,Superfamily
+#Prints, Prosite, Profile, Pfam, Tmhmm, ncoils, Signalp, Seg, Superfamily
 		  #'2berun' => 'prints,prosite',
 
-		  '2berun' => 'Pfam',
+		  '2berun' => '',
 
 #Chunk size for each analysis 1 (whole genome but 1 entry at a time), 3 (give a full peptide dataset) and 2 if want to use the chunks...promise I will change it
 		  'Superfamily_chunk' => '',
@@ -63,7 +67,7 @@ package main;
 		  'Profile_chunk' => '',
 
 		  #'Pfam_chunk'    => '',
-		  'Pfam_chunk'    => '',
+		  'Pfam_chunk'    => '1',
 
 		  #'Tmhmm_chunk'       => '2',
 		  'Tmhmm_chunk'       => '',
