@@ -43,13 +43,13 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder;
 
-use diagnostics;
+#use diagnostics;
 use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
+use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -267,10 +267,11 @@ GENE:
       # make a genomewise runnable for each cluster of transcripts
       foreach my $tran (@transcripts){
 	print STDERR "new genomewise with one ".ref($tran). "\n";
-	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
-	$runnable->seq($contig->primary_seq);
-	#    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
+
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									    -genomic => $contig->primary_seq,
+									   );
+
 	$self->add_runnable($runnable);
 	$runnable->add_Transcript($tran);
       }
@@ -329,9 +330,10 @@ GENE:
       foreach my $tran (@transcripts) {
 	print STDERR "new genomewise with one ".ref($tran)."\n";
 	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
-	$runnable->seq($revcontig->primary_seq);
-	#    my $genseq    = $contig->get_repeatmasked_seq; use repmasked seq instead of primary seq?
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+									    -genomic => $revcontig->primary_seq,
+									   );
+
 	$self->add_runnable($runnable, $reverse);
 	$runnable->add_Transcript($tran);
       }
@@ -1193,6 +1195,7 @@ sub make_genes {
     my @exons = $transcript->get_all_Exons;
 
     foreach my $exon(@exons){
+
       $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->attach_seq($contig->primary_seq);
