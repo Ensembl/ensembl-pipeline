@@ -56,37 +56,37 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
-use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
-						     EST_INPUTID_REGEX
-						     EST_REFDBHOST
-						     EST_REFDBUSER
-						     EST_REFDBNAME
-						     EST_REFDBPASS
-						     EST_DBNAME
-						     EST_DBHOST
-						     EST_DBUSER
-						     EST_DBPASS     
-						     EST_GENEBUILDER_INPUT_GENETYPE
-						     EST_MIN_INTRON_SIZE
-						     EST_MAX_INTRON_SIZE
-						     EST_MAX_EVIDENCE_DISCONTINUITY
-						     EST_GENEBUILDER_INTRON_MISMATCH
-						     EST_GENOMEWISE_GENETYPE
-						     USE_cDNA_DB
-						     cDNA_DBNAME
-						     cDNA_DBHOST
-						     cDNA_DBUSER
-						     cDNA_DBPASS
-						     cDNA_GENETYPE
-						     REJECT_SINGLE_EXON_TRANSCRIPTS
-						     GENOMEWISE_SMELL
-						     EST_MIN_EXON_SIZE
-						     EST_GENEBUILDER_COMPARISON_LEVEL
-						     EST_GENEBUILDER_SPLICE_MISMATCH
-						     EST_GENEBUILDER_INTRON_MISMATCH
-						     EST_GENEBUILDER_EXON_MATCH
-						     CHECK_SPLICE_SITES
-						     );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
+									 EST_INPUTID_REGEX
+									 EST_REFDBHOST
+									 EST_REFDBUSER
+									 EST_REFDBNAME
+									 EST_REFDBPASS
+									 EST_DBNAME
+									 EST_DBHOST
+									 EST_DBUSER
+									 EST_DBPASS     
+									 EST_GENEBUILDER_INPUT_GENETYPE
+									 EST_MIN_INTRON_SIZE
+									 EST_MAX_INTRON_SIZE
+									 EST_MAX_EVIDENCE_DISCONTINUITY
+									 EST_GENEBUILDER_INTRON_MISMATCH
+									 EST_GENOMEWISE_GENETYPE
+									 USE_cDNA_DB
+									 cDNA_DBNAME
+									 cDNA_DBHOST
+									 cDNA_DBUSER
+									 cDNA_DBPASS
+									 cDNA_GENETYPE
+									 REJECT_SINGLE_EXON_TRANSCRIPTS
+									 GENOMEWISE_SMELL
+									 EST_MIN_EXON_SIZE
+									 EST_GENEBUILDER_COMPARISON_LEVEL
+									 EST_GENEBUILDER_SPLICE_MISMATCH
+									 EST_GENEBUILDER_INTRON_MISMATCH
+									 EST_GENEBUILDER_EXON_MATCH
+									 CHECK_SPLICE_SITES
+									);
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -285,7 +285,7 @@ sub fetch_input {
     # process transcripts in the forward strand
     
     if( scalar(@forward_transcripts) ){
-	my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
+	my @transcripts  = $self->_process_Transcripts(\@forward_transcripts,$strand);
 	foreach my $tran (@transcripts){
 	    my $runnable = 
 		new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
@@ -308,7 +308,7 @@ sub fetch_input {
     my $rev_slice = $slice->invert;
     $self->revcomp_query($rev_slice);
     my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
-    my @minus_transcripts;
+    my @reverse_transcripts;
     
     if ( $USE_cDNA_DB ){
 	my $cdna_revslice = $cdna_slice->invert;
@@ -386,20 +386,20 @@ sub _process_Transcripts {
   
   my @checked_transcripts = @transcripts;
   
-
+  
   if ( scalar(@checked_transcripts) == 0 ){
-      print STDERR "No transcripts left\n";
-      return;
+    print STDERR "No transcripts left\n";
+    return;
   }
   my $merge_object 
-      = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
-	->new(
-	      -transcripts      => \@checked_transcripts,
-	      -comparison_level => $EST_GENEBUILDER_COMPARISON_LEVEL,
-	      -splice_mismatch  => $EST_GENEBUILDER_SPLICE_MISMATCH,
-	      -intron_mismatch  => $EST_GENEBUILDER_INTRON_MISMATCH,
-	      -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
-	      );
+    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
+      ->new(
+	    -transcripts      => \@checked_transcripts,
+	    -comparison_level => $EST_GENEBUILDER_COMPARISON_LEVEL,
+	    -splice_mismatch  => $EST_GENEBUILDER_SPLICE_MISMATCH,
+	    -intron_mismatch  => $EST_GENEBUILDER_INTRON_MISMATCH,
+	    -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
+	   );
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
@@ -409,14 +409,14 @@ sub _process_Transcripts {
   if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
       @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
       print STDERR scalar(@filtered_transcripts)
-	  ." transcripts left after rejecting single-exon transcripts\n";
-  }
+	." transcripts left after rejecting single-exon transcripts\n";
+    }
   else{
-      @filtered_transcripts = @merged_transcripts;
-      print STDERR scalar(@filtered_transcripts)
-	  ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
+    @filtered_transcripts = @merged_transcripts;
+    print STDERR scalar(@filtered_transcripts)
+      ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
   }
-
+  
   return @filtered_transcripts;
 }
 
@@ -586,7 +586,7 @@ sub _check_Transcripts {
       # check the splice sites
       ############################################################
       if ( $CHECK_SPLICE_SITES ){
-	  next TRANSCRIPT unless $self->check_splice_sites($new_transcript);
+	  next TRANSCRIPT unless $self->check_splice_sites($new_transcript,$strand);
       }
       # if the transcript made it to this point, keep it
       push (@alltranscripts, $new_transcript);
@@ -899,17 +899,21 @@ We want introns of the form:
 sub check_splice_sites{
   my ($self,$transcript,$strand) = @_;
   $transcript->sort;
-  
-  #print STDERR "checking splice sites in transcript:\n";
-  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+  my $verbose = 1;
   
   #my $strand = $transcript->start_Exon->strand;
   my @exons  = @{$transcript->get_all_Exons};
   
+  # no need to check single-exon ones
   my $introns  = scalar(@exons) - 1 ; 
   if ( $introns <= 0 ){
-    return $transcript;
+    return 1;
+  }
+
+  if ($verbose){
+   print STDERR "checking splice sites in transcript:\n";
+   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
   }
   
   my $correct  = 0;
@@ -932,6 +936,8 @@ sub check_splice_sites{
 		  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
 	      $downstream_site = 
 		  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+
+              print STDERR "forward; upstream: $upstream_site, downstream:$downstream_site\n" if $verbose;
 	  };
 	  unless ( $upstream_site && $downstream_site ){
 	      print STDERR "problems retrieving sequence for splice sites\n$@";
@@ -941,7 +947,7 @@ sub check_splice_sites{
 	  #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
 	  ## good pairs of upstream-downstream intron sites:
 	  ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
-	  
+	  # AT-AC is the U12 spliceosome
 	  if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 		($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 		($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -974,19 +980,20 @@ sub check_splice_sites{
       my $up_site;
       my $down_site;
       eval{
-	  $up_site = 
+	  $upstream_site = 
 	      $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-	  $down_site = 
+	  $downstream_site = 
 	      $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+          
       };
-      unless ( $up_site && $down_site ){
+      unless ( $upstream_site && $downstream_site ){
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
       }
-      ( $upstream_site   = $up_site   =~ tr/ACGTacgt/TGCAtgca/;
-      ( $downstream_site = $down_site =~ tr/ACGTacgt/TGCAtgca/;
+      #$upstream_site   =~ tr/ACGTacgt/TGCAtgca/;
+      #$downstream_site =~ tr/ACGTacgt/TGCAtgca/;
       
-      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+      print STDERR "reverse; upstream $upstream_site, downstream: $downstream_site\n" if $verbose;
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -1007,300 +1014,6 @@ sub check_splice_sites{
   else{
       return 1;
   }
-}
-
-############################################################
-
-# this is very slow, need to find out why
-#my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
-
-sub check_splice_sites2{
-    my ($self,$transcripts_ref,$strand) = @_;
-    my @checked_transcripts;    
-
-    print STDERR "checking splice sites\n";
-
-  TRANSCRIPT:
-    foreach my $transcript ( @$transcripts_ref ){
-	
-	# all transcripts are in forward coordinates
-	my @exons  = sort{ $a->start <=> $b->start } @{$transcript->get_all_Exons};
-	
-	print STDERR "checking splice sites in transcript:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
-	
-	my $introns  = scalar(@exons) - 1 ; 
-	if ( $introns <= 0 ){
-	    push ( @checked_transcripts, $transcript );
-	    next TRANSCRIPT;
-	}
-	
-	my $correct  = 0;
-	my $other    = 0;
-	
-      INTRON:
-	for (my $i=0; $i<$#exons; $i++ ){
-	    my $upstream_exon   = $exons[$i];
-	    my $downstream_exon = $exons[$i+1];
-	    my $upstream_site;
-	    my $downstream_site;
-	    if ($strand == 1){
-		print STDERR "forward strand\n";
-		eval{
-		$upstream_site = 
-		    $self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-		$downstream_site = 
-		    $self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-		};
-		unless ( $upstream_site && $downstream_site ){
-		    print STDERR "problems retrieving sequence for splice sites\n$@";
-		    next INTRON;
-		}
-	    }
-	    elsif( $strand == -1 ){
-		print STDERR "reverse strand\n";
-		# in the reverse strand, exon coords are forward in the revcomp_slice
-		#
-		#  example:
-		#  exons originaly in - strand:       this is how we read the exons:
-		#
-		#     ------CT...AC---...            ---> 5...#exon1#CA...TC#exon2#...3'
-		#  3' #exon2#GA...TG#exon1#...5'               ------GT...AG-----...
-		#
-		# we calculate CA..TC in the revcomp_query and 
-		# make the complementary to get GT..AG (we do not need to apply the reverse)
-		
-		eval{
-		$upstream_site = 
-		    $self->revcomp_query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-		$downstream_site = 
-		    $self->revcomp_query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-		};
-		unless ( $upstream_site && $downstream_site ){
-		    print STDERR "problems retrieving sequence for splice sites\n$@";
-		    next INTRON;
-		}
-		$upstream_site   =~ tr/ACGTacgt/TGCAtgca/;
-		$downstream_site =~ tr/ACGTacgt/TGCAtgca/;
-	    }
-	    
-	    print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
-	    ## good pairs of upstream-downstream intron sites:
-	    ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
-	    if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
-		  ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
-		  ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
-		$correct++;
-	    }
-	    else{
-		$other++;
-	    }
-	} # end of INTRON
-	
-	unless ( $introns == $other + $correct ){
-	    print STDERR "STRANGE: introns:  $introns, correct: $correct, other: $other\n";
-	}
-	
-	if ( $other > 1 || $other > $correct ){
-	    print STDERR "rejected - splice sites correct = $correct, other = $other";
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
-	    next TRANSCRIPT;
-	}
-	else{
-	    push ( @checked_transcripts, $transcript );
-	}
-	
-    } # end of TRANSCRIPT
-    
-    return @checked_transcripts;
-}
-
-############################################################
-
-# not in use anymore. It might be reusable though
- 
-sub _check_splice_Sites{
-  my ($self, $ref_transcripts, $strand) = @_;
-
-  if ( scalar( @$ref_transcripts ) == 0 ){
-    return (0,0,0,0,0); 
-  }
-
-  print STDERR "EST_GeneBuilder: checking splice sites in strand $strand...\n";
-
-  # get the contig being analysed
-  my $slice = $self->query;
-  
-  # for reverse strand,  invert the contig, since the exons were retrieved in revcontig
-  my $revslice = $slice->invert;   
-  
-  # upstream/downstream are with respect to the exon
-  my ($upstream_AG, $downstream_GT) = (0,0);  # 99%
-  my $downstream_GC                 = 0;       
-  my ($upstream_AC, $downstream_AT) = (0,0);  # U12 spliceosome
-  my $site_count = 0;
-  
- TRANSCRIPT:
-  foreach my $transcript (@$ref_transcripts){
-    
-    # count the number of exons
-    my $count = 0; 
-    my @exons = @{$transcript->get_all_Exons};
-    
-  EXON:
-    foreach my $exon ( @exons ){
-
-      # take the 2 bases right before the exon and after the exon
-      my ($upstream, $downstream);
-        
-      # forward strand
-      if ($strand == 1){
-	my $seq = $slice; # a Bio::PrimarySeq object
-	
-	# catch possible exceptions in gettting the sequence (it might not be there!)
-	eval{
-	    $upstream   = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
-	};
-	if ($@){
-	    print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
-	  print STDERR $@;
-	  $upstream = 'NN';
-	}
-	eval{
-	  $downstream = $seq->subseq( ($exon->end)+1   , ($exon->end)+2   ); 
-	};
-	if ($@){
-	  print STDERR "Unable to get subsequence (".(($exon->end)+1).",".(($exon->end)+2).")\n";
-	  print STDERR $@;
-	  $downstream = 'NN';
-	}
-	# print-outs to test it
-	#      if ( $count ==0 ){
-	#	print STDERR "FIRST EXON-->".$downstream;
-	#      }
-	#      if ( $count != 0 && $count != $#clusters ){
-	#	print STDERR $upstream."-->EXON-->".$downstream;
-	#      }
-	#      if ( $count == $#clusters ){
-	#	print STDERR $upstream."-->LAST EXON";
-	#      }
-	#      print "\n";
-	
-	# the first and last exon are not checked - potential UTR's
-	if ( $count != 0 && $upstream eq 'AG') {       
-	  $upstream_AG++;
-	}
-	elsif ( $count != 0 && $upstream eq 'AC') {       
-	  $upstream_AC++;
-	}
-	if ( $count !=$#exons && $downstream eq 'GT') { 
-	  $downstream_GT++;
-	}
-	elsif ( $count !=$#exons && $downstream eq 'GC') { 
-	  $downstream_GC++;
-	}
-	elsif ( $count !=$#exons && $downstream eq 'AT') { 
-	  $downstream_AT++;
-	}
-
-	$count++;
-      } # end of forward strand
-      
-      # reverse strand
-      if ($strand == -1 ){
-	my $seq = $revslice; # a Bio::PrimarySeq object
-	
-	# catch possible exceptions in gettting the sequence (it might not be there!)
-	eval{
-	  $upstream = $seq->subseq( ($exon->start)-2 , ($exon->start)-1 ); 
-	};
-	if ($@){
-	  print STDERR "Unable to get subsequence (".(($exon->start)-2).",".(($exon->start)-1).")\n";
-	  #print STDERR $@;
-	  $upstream ='NN';
-	}
-	eval{
-	  $downstream   = $seq->subseq( ($exon->end)+1   , ($exon->end)+2   ); 
-	};
-	if ($@){
-	  print STDERR "Unable to get subsequence (".(($exon->end)+1).",".(($exon->end)+2).")\n";
-	  #print STDERR $@;
-	  $downstream = 'NN';
-	}
-	#  in the reverse strand we're looking at coordinates in the reversed-complement slice:
-	#
-	#        $slice : --------------------TG----GA------------>  forward strand
-	#                                     AC    CT               reverse strand 
-	#                           downstream   EXON   upstream
-	#
-	#
-	#                   upstream   EXON   downstream              
-	#     $revslice : ----------AG----GT-------------------->    forward strand
-	#                                                             reverse strand
-	#
-	# and take the reverse complement
-	( $downstream = reverse( $downstream) ) =~ tr/ACGTacgt/TGCAtgca/;
-	( $upstream   = reverse( $upstream )  ) =~ tr/ACGTacgt/TGCAtgca/;
-	
-	# so the conserved sequence should be AC<-EXON<-CT printed as in the reverse strand
-	
-	#      if ( $count ==0 ){
-	#	print STDERR "LAST EXON<--".$upstream;
-	#      }
-	#      if ( $count != 0 && $count != $#clusters ){
-	#	print STDERR $downstream."<--EXON<--".$upstream;
-	#      }
-	#      if ( $count == $#clusters ){
-	#	print STDERR $downstream."<--FIRST EXON";
-	#      }
-	#      print "\n";
-	
-	# the first and last exon are not checked - potential UTR's
-	# we count it as if everything was in the forward strand
-	if ( $count != $#exons && $downstream eq 'AC') {       
-	  $downstream_GT++;
-	}
-	elsif ( $count != $#exons && $downstream eq 'GC') {       
-	    $downstream_GC++;
-	}
-	elsif ( $count != $#exons && $downstream eq 'AT') {       
-	  $downstream_AT++;
-	}
-	if ( $count != 0 && $upstream eq 'CT') { 
-	  $upstream_AG++;
-	}
-	elsif ( $count != 0 && $upstream eq 'GT') {
-	  $upstream_AC++;
-	}
-	$count++;
-      } # end of reverse strand
-            
-    }   # end of EXON
-    
-    $site_count += $#exons; # count the number of splice sites
-    
-  }   # end of TRANSCRIPT
-    
-  my $perc_upstream_AG   = 100*$upstream_AG/$site_count;
-  my $perc_downstream_GT = 100*$downstream_GT/$site_count;
-  my $prec_upstream_AC   = 100*$upstream_AC/$site_count;
-  my $perc_downstream_AT = 100*$downstream_AT/$site_count;
-
-  # most common spliceosome
-  print STDERR "upstream   ( of an exon ) splice-sites AG: ".$upstream_AG. 
-    " out of ".($site_count)." splice-sites, percentage: $perc_upstream_AG\n";
-  print STDERR "downstream ( of an exon ) splice-sites GT: ".$downstream_GT. 
-    " out of ".($site_count)." splice-sites, percentage: $perc_downstream_GT\n\n";
-
-  # U12 spliceosome
-  print STDERR "upstream   ( of an exon ) U12-splice-sites AC: ".$upstream_AC. 
-    " out of ".($site_count)." splice-sites, percentage: $prec_upstream_AC\n";
-  print STDERR "downstream ( of an exon ) U12-splice-sites AT: ".$downstream_AT. 
-    " out of ".($site_count)." splice-sites, percentage: $perc_downstream_AT\n\n";
-
-  # eventually, we may modify start/end of exons according to these checks
-  return ($site_count, $upstream_AG, $downstream_GT, $upstream_AC, $downstream_AT);    
 }
 
 ############################################################
