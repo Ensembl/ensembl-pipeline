@@ -1111,115 +1111,7 @@ sub _merge_Transcripts{
 			} @transcripts;
     
 
-#    ### ALTERNATIVE:
-#    # build a graph where each node is a transcript and the edges connect
-#    # two transcripts that can merge. Using Depth-first search we can
-#    # find the connected components of the graph. Each one of the connected components
-#    # can be merged into one transcript.
-    
-#    # creat and Adjacency list for each transcript
-#    # each transcript (key) holds the array of transcripts merging with it
-    
-#    # for tests:
-#    my %myid;
-#    my $label = 1;
-#    foreach my $transcript ( @transcripts ){
-#      $myid{$transcript} = $label;
-#      $label++;
-#    }
-
-#    my %adj;
-#  TRANSCRIPT_1:
-#    for (my $u=0; $u<scalar(@transcripts); $u++){
-      
-#      # go over the rest
-#    TRANSCRIPT_2:
-#      for (my $v=0; $v<scalar(@transcripts); $v++){
-	
-#	next TRANSCRIPT_2 if $v==$u;
-	
-#	$adj{$transcripts[$u]} = [];
-	
-#	my ($merge,$overlaps) = $self->_test_for_Merge( $transcripts[$u], $transcripts[$v] );
-	
-#	if ($merge == 1){
-#	  push (@{ $adj{$transcripts[$u]} }, $transcripts[$v] );
-#	}
-#      } # end of TRAN2
-#    }   # end of TRAN1
-    
-#    print STDERR "\nAdj lists\n";
-#    foreach my $tran (@transcripts){
-#      print STDERR $myid{$tran}." -> ";
-#      foreach my $othertran ( @{ $adj{$tran} } ){
-#	print STDERR $myid{$othertran}." -> ";
-#      }
-#      print STDERR "\n";
-#    }
-
-#    # we should have the same number of adj lists as transcripts we started with
-#    unless ( scalar( keys %adj ) == scalar( @transcripts ) ) {
-#      print STDERR "Odd, the number of adj lists is smaller than the number of transcripts\n";
-#    }
-    
-#    # color all vertices in 'white'
-#    my %color;
-#    foreach my $trans ( @transcripts ){
-#      $color{$trans} = "white";
-#    }
-
-#    # here we'll hold the arrays of transcripts to be merged
-#    my @stuff_to_merge;
-    
-#    # do the depth-first search
-#    foreach my $trans ( @transcripts ){
-#      if ( $color{$trans} eq 'white' ){
-#	my $merge_this = [];
-#	$self->_DFS_visit( $trans, \%color, \%adj, $merge_this);
-#	push ( @stuff_to_merge, $merge_this );
-#      }
-#    }
-    
-#    # check the clusters made:
-#    print STDERR "Check clusters made with the graph:\n";
-#    my $counter = 1;
-#    foreach my $cluster ( @stuff_to_merge ){
-#      print STDERR "cluster: ".$counter++."\n";
-#      foreach my $tran ( @{ $cluster } ){
-#	print STDERR $myid{$tran}."<->";
-#	#$self->_print_Transcript($tran);
-#      }
-#      print STDERR "\n";
-#    }
-    
-    
-#    my @final_transcripts;
-#    foreach my $cluster ( @stuff_to_merge ){
-#      push( @final_transcripts, $self->_produce_Transcript( $cluster, $strand ) );
-#    }
-#    push ( @total_merged_transcripts, @final_transcripts);
-#  }
-		        
-		       
-#  return @total_merged_transcripts;
-		      
-
-    #    # test
-
-    #print STDERR "\nNew Cluster:\n";
-    #foreach my $tran (@transcripts){
-    #  print STDERR "transcript: $tran\n";
-    #  foreach my $exon ( $tran->get_all_Exons ){
-    #	print STDERR $exon->start.":".$exon->end."  ";
-    #  }
-    #  print STDERR "\n";
-    #}
-    
-    # now we loop over the transcripts, 
-    my %is_merged;
-    
-
-
+   
     # the algorithm goes roughly as follows
     #
     # for each cluster of transcripts T={t}
@@ -1247,6 +1139,9 @@ sub _merge_Transcripts{
     my %created_transcripts;
     my %chosen_list;
     
+    # now we loop over the transcripts, 
+    my %is_merged;
+    
     # for each transcript
   TRAN1:
     for (my $u=0; $u<scalar(@transcripts); $u++){
@@ -1273,12 +1168,12 @@ sub _merge_Transcripts{
 	  # ...there must be at least one in @current_list to which $transcripts[$v] merges
 	  if ( 1 == $merge ){
 	    $merge_to_current = 1;
-	  }
-
+	}
+	  
 	  # ...and it should not overlap with those to which it does not merge
 	  unless (1 == $merge){
-	    $overlap_ifnot_merged += $overlaps;
-	  }
+	      $overlap_ifnot_merged += $overlaps;
+	}
 	}
 	
 	# ... and then it can merge to the list in @current_list
