@@ -262,8 +262,13 @@ sub run {
    my ($self,@args) = @_;
 
    #print STDERR "run runnable\n";
-   $self->runnable->run();
-   
+   eval{
+     $self->runnable->run();
+   };
+   if($@){
+     $self->throw("Error in BlastMiniGenewise run: \n[$@]\n");
+   }
+
    $self->convert_gw_output;
    #print STDERR "converted output\n";
    # clean up tmpfile
