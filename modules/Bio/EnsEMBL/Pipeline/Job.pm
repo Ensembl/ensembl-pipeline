@@ -66,8 +66,7 @@ my %BATCH_QUEUES = &set_up_queues;
 sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
-    #print STDERR "calling Job->new from ".(caller)."\n";
-    #print STDERR "@args\n";
+    my ($p, $f, $l) = caller;
     my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
@@ -305,6 +304,7 @@ sub flush_runs {
     
     my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
    
+
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
@@ -320,20 +320,24 @@ sub flush_runs {
     
 
     # check if the password has been defined, and write the
-    # "connect" command line accordingly (otherwise -pass gets the
-    # first job id as password, instead of remaining undef)
+    # "connect" command line accordingly otherwise -pass gets the
+    # first job id as password, instead of remaining undef
     if ($pass) {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass -port $port";
+      $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
     }
     else {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -port $port";
+      $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
     }
     $cmd .= " -output_dir ".$self->output_dir;
+    $cmd .= " -queue_manager $QUEUE_MANAGER  " ;
+    if($self->cleanup){
+      $cmd .= " -cleanup "
+    }
     $cmd .= " @job_ids";
     
     $batch_job->construct_command_line($cmd);
     $batch_job->open_command_line();
-    #print STDERR $batch_job->bsub."\n";
+    #print STDERR "\n\n".$batch_job->bsub."\n\n";
     if( ! defined $batch_job->id ) {
       print STDERR ( "Couldnt batch submit @job_ids\n" );
       print STDERR ($batch_job->bsub."\n");
@@ -480,7 +484,7 @@ sub run_module {
     if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "READING: Lost the will to live Error\n");
-      die "Problems with $module fetching input for " . $self->input_id . " [$err]\n";
+      $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
     }
     if ($res eq "") {
     }
@@ -497,7 +501,7 @@ sub run_module {
     if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "RUNNING: Lost the will to live Error\n");
-      die "Problems running $module for " . $self->input_id . " [$err]\n";
+      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
     }
 
     # "WRITING"
@@ -519,7 +523,7 @@ sub run_module {
     if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "WRITING: Lost the will to live Error\n");
-      die "Problems for $module writing output for " . $self->input_id . " [$err]" ;
+      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
     }
   } # STATUS
 
@@ -529,26 +533,19 @@ sub run_module {
       my $sic = $self->adaptor->db->get_StateInfoContainer;
       # -------------------------------------------------------------
       $sic->store_input_id_analysis(
-        $self->input_id,
-        $self->analysis,
-		$SAVE_RUNTIME_INFO
-      );
+                                    $self->input_id,
+                                    $self->analysis,
+                                    $self->execution_host,
+                                    $SAVE_RUNTIME_INFO
+                                   );
       # -------------------------------------------------------------
     };
     if ($err = $@) {
       print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
+      $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
     }
     else {
       print STDERR "Updated successful job ".$self->dbID."\n";
-      eval {
-        $self->remove($self->analysis->logic_name);
-      };
-      if ($err = $@) {
-         print STDERR "Error deleting job ".$self->dbID." [$err]\n";
-      }
-      else {
-         print STDERR "Deleted job ".$self->dbID."\n";
-      }
     }
   }
 }
@@ -657,7 +654,7 @@ sub make_filenames {
   my ($self) = @_;
   
   my $num = int(rand(10));
-
+  
   my $dir = $self->output_dir . "/$num/";
   if( ! -e $dir ) {
     system( "mkdir $dir" );
@@ -706,8 +703,12 @@ sub stdout_file {
 sub stderr_file {
     my ($self, $arg) = @_;
 
-    if (defined($arg)) {
-	$self->{'_stderr_file'} = $arg;
+    if ($arg) {
+      if($arg !~ /err/){
+        my ($p, $f, $l) = caller;
+        $self->throw("You can't set stderr file to ".$arg." $f:$l\n");
+      }
+      $self->{'_stderr_file'} = $arg;
     }
     return $self->{'_stderr_file'};
 }
@@ -736,9 +737,8 @@ sub submission_id {
 sub output_dir{
  my ($self, $arg) = @_;
 
- my ($p, $f, $l) = caller;
  if($arg){
-   #print STDERR $f." ".$l." is calling output_dir with ".$arg."\n";
+   
    $self->{'_output_dir'} = $arg;
  }
 
@@ -759,11 +759,9 @@ sub output_dir{
 
 sub retry_count {
   my ($self, $arg) = @_;
-  if(defined $arg) {
-    #print STDERR "setting retry count to ".$arg."\n"; 
+  if($arg) {
     $self->{'_retry_count'} = $arg; 
    }
-  #print STDERR "retry count is = ".$self->{'_retry_count'}."\n";;
   $self->{'_retry_count'};
 }
 
@@ -774,17 +772,25 @@ sub can_retry{
   if(!$BATCH_QUEUES{$logic_name}){
      $logic_name = 'default';
   }
-  #print STDERR "Checking if can retry ".$self->dbID." ".
-  #  $self->logic_name."\n";
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
-  #print STDERR "Retry count is ".$self->retry_count." max retries ".
-  #  $max_retry."\n";
   if($self->retry_count <= $max_retry){
-    #print STDERR "Can retry\n";
      return 1;
   }else{
-    #print STDERR "Can't retry\n";
-     return 0;
+    return 0;
+  }
+}
+
+sub cleanup{
+  my ($self, $logic_name) = @_;
+
+  $logic_name = $self->analysis->logic_name if(!$logic_name);
+  if(!$BATCH_QUEUES{$logic_name}){
+     $logic_name = 'default';
+  }
+  if($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes'){
+    return 1;
+  }else{
+    return 0;
   }
 }
 
@@ -857,5 +863,45 @@ sub set_up_queues {
   
     return %q;
 }
+
+sub execution_host {
+  my ($self, $arg) = @_;
+  
+  if ($arg) {
+    $self->{'_execution_host'} = $arg;
+  }
+  return $self->{'_execution_host'};
+}
+
+
+sub temp_dir {
+  my ($self, $arg) = @_;
+
+  if($arg){
+    $self->{'_temp_dir'} = $arg;
+  }
+  if(!$self->{'_temp_dir'}){
+    $self->{'_temp_dir'} = $self->batch_q_object->temp_filename;
+  }
+  return $self->{'_temp_dir'};
+}
+
+
+sub batch_q_object {
+    my ($self, $arg) = @_;
+
+    if ($arg) {
+      $self->{'_batch_q_object'} = $arg;
+    }
+    if(!$self->{'_batch_q_object'}){
+      my $object = $batch_q_module->new();
+      $self->{'_batch_q_object'} = $object;
+    }
+
+
+    return $self->{'_batch_q_object'};
+}
+
+
 
 1;
