@@ -735,7 +735,7 @@ sub _difuse_small_introns{
     }
   }
   else{
-    $self->("LEVEL 4 invoked but no intron_mismatch value defined. Doing level 3 instead");
+    #$self->warn("LEVEL 4 invoked but no intron_mismatch value defined. Doing level 3 instead");
     return $tran;
   }
 }
