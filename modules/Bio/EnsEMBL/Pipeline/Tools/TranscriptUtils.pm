@@ -1043,7 +1043,24 @@ sub set_stop_codon{
     
     # this gives you the sequence 5' to 3'
     my $bioseq = $end_exon->seq; 
-    my $last_codon = $bioseq->subseq( $end - 2, $end );
+    my $last_codon;
+    if ( $end > 2 ){
+      $last_codon = $bioseq->subseq( $end - 2, $end );
+    }
+    else{
+      my $donor    = 3 - $end;
+      my $acceptor = $end;
+
+      my $previous_exon = $self->get_previous_Exon( $transcript, $end_exon );
+      if ($previous_exon ){
+	my $donor_seq =  
+	  $previous_exon->seq->subseq( $previous_exon->end - $previous_exon->start + 1 - $end + 1, $previous_exon->end - $previous_exon->start + 1 );
+	my $acceptor_seq = 
+	  $end_exon->seq->subseq( 1, $end );
+	
+	$last_codon = $donor_seq.$acceptor_seq;
+      }
+    }
     if ( uc($last_codon) eq 'TAA' || uc($last_codon) eq 'TAG' || uc($last_codon) eq 'TGA' ){ 
       print STDERR "transcript already has a stop at the end - no need to modify\n" if $verbose;
       return $transcript;
@@ -1204,7 +1221,6 @@ sub get_next_Exon{
   # this order the exons 5' to 3'
   $transcript->sort;
   my @exons = @{$transcript->get_all_Exons};
-  $transcript->sort;
   for (my $i=0; $i<=$#exons; $i++ ){
     if ( $exons[$i]->start == $exon->start 
 	 && 
@@ -1220,6 +1236,32 @@ sub get_next_Exon{
   return undef;
 }
   
+
+############################################################
+
+sub get_previous_Exon{
+  my ($self, $transcript, $exon ) = @_;
+    
+  # this order the exons 5' to 3'
+  $transcript->sort;
+  my @exons = @{$transcript->get_all_Exons};
+  
+  for (my $i=0; $i<=$#exons; $i++ ){
+    if ( $exons[$i]->start == $exon->start 
+	 && 
+	 $exons[$i]->end   == $exon->end
+	 &&
+	 $exons[$i]->strand == $exon->strand 
+	 &&
+	 $i > 0 
+       ){
+      return $exons[$i-1];
+    }
+  }
+  return undef;
+}
+  
+
 
 
 1;
