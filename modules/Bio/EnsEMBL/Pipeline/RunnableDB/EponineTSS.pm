@@ -102,11 +102,8 @@ sub fetch_input {
     my( $self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
-    
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-   
-    $self->query($contig);
+
+    $self->fetch_sequence;
 }
 
 #get/set for runnable and args

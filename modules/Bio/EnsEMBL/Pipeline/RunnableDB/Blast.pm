@@ -83,14 +83,7 @@ sub fetch_input {
    
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    my $genseq;
-    if(@$PIPELINE_REPEAT_MASKING){
-      my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-      $self->query($genseq);
-    }else{
-      $self->query($contig);
-    }
+    $self->fetch_sequence($PIPELINE_REPEAT_MASKING);
   
     my $seq = $self->query->seq;
     my $unmasked;
@@ -114,17 +107,18 @@ sub fetch_input {
       $ungapped = undef;
     }
     
-    my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query          => $self->query,
-							   -database       => $self->analysis->db_file,
-							   -program        => $self->analysis->program,
-							   -options        => $self->analysis->parameters,
-							   -threshold_type => 'PVALUE',
-							   -threshold      => 1,
-							   -ungapped       => $ungapped,
-							  );
-
+    my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
+      (-query          => $self->query,
+       -database       => $self->analysis->db_file,
+       -program        => $self->analysis->program,
+       -options        => $self->analysis->parameters,
+       -threshold_type => 'PVALUE',
+       -threshold      => 1,
+       -ungapped       => $ungapped,
+      );
+    
     $self->runnable($run);
-
+    
     return 1;
 }
 

@@ -67,10 +67,7 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
     
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-
-    $self->query($contig);
+    $self->fetch_sequence;
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker(
 	      -query => $self->query,
