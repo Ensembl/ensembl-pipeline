@@ -93,7 +93,7 @@ sub fetch_input {
 
     @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 $o <=> $t } @db;
+                 $o cmp $t } @db;
     
   } else {
     push(@db,$database);
