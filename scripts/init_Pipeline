@@ -1,0 +1,99 @@
+#!/usr/local/bin/perl
+
+use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+
+use strict;
+use Getopt::Long;
+
+my $host;
+my $user = 'ensadmin';
+my $pass = 'ensembl';
+my $port = 3306;
+my $dbname;
+my $logic_name;
+my $slicesize;
+my $type;
+
+&GetOptions(
+            'host:s'    => \$host,
+            'port:n'    => \$port,
+            'user:s'    => \$user,
+            'pass:s'    => \$pass,
+            'dbname:s'  => \$dbname,
+            'slicesize:s' => \$slicesize,
+            'logic_name:s' => \$logic_name,
+            'type:s'    => \$type,
+           );
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
+                                                      -user   => $user,
+                                                      -pass   => $pass,
+                                                      -port   => $port,
+                                                      -dbname => $dbname);
+
+
+if ($slicesize > 0) {
+  my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name('SubmitSlice');
+
+  if (!defined($analysis)) {
+     my $analysis = new Bio::EnsEMBL::Analysis(-logic_name => 'SubmitSlice');
+     $db->get_AnalysisAdaptor->store($analysis);
+  }
+
+  if ($type) {
+    $db->assembly_type($type);
+  } else {
+    $type = $db->assembly_type;
+  }
+  if (!defined($type)) {
+    die "No assemby type defined";
+  }
+
+  my $sa = $db->get_SliceAdaptor;
+
+  for my $chr (@{$db->get_ChromosomeAdaptor->fetch_all}) {
+    print "Got chromosome " . $chr . " " . $chr->chr_name . " " . $chr->length . "\n";
+   
+    my $sth = $db->prepare("select max(chr_end) from assembly where type = '$type'");
+    my $res = $sth->execute;
+
+    my $ref = $sth->fetchrow_arrayref;
+    my $len = $ref->[0];
+ 
+    my $name = $chr->chr_name; 
+    my $start = 1;
+    my $end;
+
+    while ($start <= $len) {
+       $end = $start + $slicesize -1;
+       if ($end > $len) {
+           $end = $len;
+       }
+       my $input_id = $name . "." . $start . "-" . $end;
+       print "Storing input_id " . $input_id . "\n";
+       $db->get_StateInfoContainer->store_input_id_class_analysis($input_id,'slice',$analysis);
+
+       $start += $slicesize;
+    }
+  }
+} else {
+
+  my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name('SubmitContig');
+
+  if (!defined($analysis)) {
+     my $analysis = new Bio::EnsEMBL::Analysis(-logic_name => 'SubmitContig');
+     $db->get_AnalysisAdaptor->store($analysis);
+  }
+  my @contigs = @{$db->get_RawContigAdaptor->fetch_all};
+
+  foreach my $contig (@contigs) {
+     my $input_id = $contig->name;
+     print "Storing for $input_id\n";
+     $db->get_StateInfoContainer->store_input_id_class_analysis($input_id,'contig',$analysis);
+  }
+}
+
+
+
