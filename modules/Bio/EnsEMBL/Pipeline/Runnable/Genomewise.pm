@@ -2,7 +2,7 @@
 #
 # Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm
 #
-# Cared for by EWan Birney <birney@ebi.ac.uk>
+# Cared for by Ewan Birney <birney@ebi.ac.uk>
 #
 # Copyright GRL and EBI
 #
@@ -12,11 +12,25 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm - DESCRIPTION of Object
+Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm - Runs Genomewise and makes a set of Transcripts
 
 =head1 SYNOPSIS
 
-Give standard usage here
+   $run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new();
+
+   $trans = Bio::EnsEMBL::Transcript->new();
+   $exon  = Bio::EnsEMBL::Exon->new();
+   $exon->start(123);
+   $exon->end(345);
+ 
+   $trans->add_Exon($exon);
+   # add more Exons, and more Transcripts as desired
+
+   $run->add_Transcript($trans);
+   $run->seq($genomic_seq);
+
+   $run->run;
+
 
 =head1 DESCRIPTION
 
@@ -28,7 +42,8 @@ Ensembl - ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -103,39 +118,130 @@ sub run{
   close(E);
   
   #   open(GW,"genomewise $genome_file $evi_file |");
-  open(GW,"genomewise -gff -notrans -nogenes $genome_file $evi_file |");
+  open(GW,"genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file |");
   
 
   
   # parse gff output for start, stop, strand, phase
   my $genename = '';
-  my $t;
-  while( <GW> ) {
-    /cds\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\d+)\s+(\S+)/ || next;
-    if ($genename ne $5){
-      $genename = $5;
-      $t = Bio::EnsEMBL::Transcript->new();
-      push(@{$self->{'_output_array'}},$t);
-    }
 
-    my $start = $1;
-    my $end   = $2;
-    my $strand = 1;
-    my $phase = $4;
-    if ($phase == 2) { 
-      $phase = 1;
-    }	elsif ($phase == 1) { 
-      $phase = 2;
-    }
-    
-    my $exon = Bio::EnsEMBL::Exon->new();
-    $exon->start($start);
-    $exon->end  ($end);
-    $exon->strand($strand);
-    $exon->phase($phase);
-    $t->add_Exon($exon);
+ GENE:
+  while( <GW> ) {
+      /\/\// && last;
+      if( /Gene/ ) {
+
+	  my $t = Bio::EnsEMBL::Transcript->new();
+	  my $trans = Bio::EnsEMBL::Translation->new();
+	  $t->translation($trans);
+	  push(@{$self->{'_output_array'}},$t);
+
+	  my $seen_cds = 0;
+	  my $seen_utr3 = 0;
+	  my $prev = undef;
+	  while( <GW> ) {
+	      chomp;
+	      #print "Seen $_\n";
+	      if( /End/ ) {
+		  if( $seen_utr3 == 0 ) {
+		      # ended on a cds 
+		      $trans->end_exon($prev);
+		      $trans->end($prev->length);
+		  }
+		  next GENE;
+	      }
+
+	      if( /utr5\s+(\d+)\s+(\d+)/) {
+		  my $start = $1;
+		  my $end   = $2;
+		  my $strand = 1;
+
+		  my $exon = Bio::EnsEMBL::Exon->new();
+		  $exon->start($start);
+		  $exon->end  ($end);
+		  $exon->strand($strand);
+		  $t->add_Exon($exon);
+		  $prev = $exon;
+		  next;
+	      }
+	      if( /cds\s+(\d+)\s+(\d+)\s+phase\s+(\d+)/ ) {
+		  my $start = $1;
+		  my $end   = $2;
+		  my $strand = 1;
+		  my $phase = $3;
+
+		  my $cds_start = $start;
+		  my $exon;
+		  if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
+		      # we have an abutting utr5
+		      $start = $prev->start();
+		      $exon  = $prev;
+		  } else {
+		      # make a new Exon
+		      $exon  = Bio::EnsEMBL::Exon->new();
+		      $t->add_Exon($exon);
+		  }
+
+		  $exon->start($start);
+		  $exon->end  ($end);
+		  $exon->strand($strand);
+		  $exon->phase($phase);
+
+		  if( $seen_cds == 0 ) {
+		      $trans->start_exon($exon);
+		      $trans->start($cds_start-$start+1);
+		  }
+		  $seen_cds = 1;
+		  $prev = $exon;
+		  next;
+	      }
+
+	      if( /utr3\s+(\d+)\s+(\d+)/ ) {
+		  my $start = $1;
+		  my $end   = $2;
+		  my $strand = 1;
+
+		  my $orig_end;
+		  my $exon;
+		  if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
+		      # abutting 3utr
+		      $orig_end = $prev->end;
+		      $exon = $prev;
+		      $start = $prev->start;
+		  } else {
+		      # not abutting; should be fine.
+		      $exon =  Bio::EnsEMBL::Exon->new();
+		      $t->add_Exon($t);
+		  }
+
+
+		  $exon->start($start);
+		  $exon->end  ($end);
+		  $exon->strand($strand);
+
+		  if( $seen_utr3 == 0 ) {
+		      if( !defined $orig_end ) {
+			  $self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
+		      } else {
+			  $trans->end_exon($exon);
+			  $trans->end($orig_end-$start);
+		      }
+		  }
+		  $seen_utr3 = 1;
+		  next;
+	      }
+	      
+	      # else - worrying 
+	      
+	      chomp;
+	      $self->throw("Should not able to happen - unparsable line in geneutr $_");
+	  }
+      }
+      chomp;
+      $self->throw("Should not able to happen - unparsable in between gene line $_");
   }
 
+		      
+  
   # tidy up output files.
   unlink $genome_file;
   unlink $evi_file;
