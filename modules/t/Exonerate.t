@@ -52,23 +52,23 @@ my @genomics;
 
 push(@ests,$estseq1);
 push(@ests,$estseq2);
-push(@genomics,$genseq);
 
 foreach my $es(@ests) {
 	
 $es->isa("Bio::PrimarySeqI") || die("argh!");
 }
 
-unless (scalar(@ests) && scalar(@genomics)) 
+unless (scalar(@ests) && defined($genseq)) 
 { print "not ok 2\n"; }
 else
 { print "ok 2\n"; }
 
 #create Exonerate object    
-my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new 
-    (-EST       => \@ests, 
-     -GENOMIC   => $genseq);
- 	
+my $exe = '/work2/gs2/gs2/bin/exonerate-0.3d'; # or another version of exonerate that has cigar output ...
+my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
+								  -GENOMIC   => $genseq,
+	                                                          -EXONERATE => $exe);
+ 
 unless ($exonerate)
 { print "not ok 3\n"; }
 else
