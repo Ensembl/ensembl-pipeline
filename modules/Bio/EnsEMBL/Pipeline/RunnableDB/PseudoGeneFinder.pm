@@ -526,8 +526,6 @@ sub _has_repeat_in_intron{
 						     -dbname           => $REPEAT_DBNAME,
 						    );
   
-  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
-
   ############################################################
   # pseudogene is a transcript
   my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
