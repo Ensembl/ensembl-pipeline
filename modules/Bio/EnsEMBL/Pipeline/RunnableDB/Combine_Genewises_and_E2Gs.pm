@@ -223,7 +223,7 @@ sub run {
   $self->gw_genes( @similarity_genes, @targetted_genes );
 
   # get e2g genes  
-  my @e2g = $self->cdna_vc->get_Genes_by_Type('exonerate_e2g','evidence');
+  my @e2g = $self->cdna_vc->get_Genes_by_Type($GB_cDNA_GENETYPE,'evidence');
 
   print STDERR "got " . scalar(@e2g) . " exonerate_e2g genes\n";
   my @newe2g;
@@ -694,7 +694,7 @@ sub combine_genes{
       foreach my $tran ( $gene->get_all_Transcripts ){
 	  foreach my $exon ( $tran->get_all_Exons ){
 	      print STDERR "exon: ".$exon->start."-".$exon->end." phase: ".$exon->phase." end_phase ".$exon->end_phase."\n";
-	      #foreach my $sf ($exon->each_Supporting_Feature){
+	      #foreach my $sf ($exon->get_all_supporting_features){
 	      #  print STDERR "evidence: ".$sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	      #}
 	  }
@@ -959,13 +959,13 @@ sub _merge_gw_genes {
 	$previous_exon->add_sub_SeqFeature($exon,'');
 	
 	my %evidence_hash;
-	foreach my $sf($exon->each_Supporting_Feature){
+	foreach my $sf($exon->get_all_supporting_features){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	      next;
 	    }
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
-	  $previous_exon->add_Supporting_Feature($sf);
+	  $previous_exon->add_supporting_features($sf);
 	}
 	  next EXON;
       } 
@@ -984,13 +984,13 @@ sub _merge_gw_genes {
 	
 	#print STDERR "in merged gw_gene, adding evidence in cloned exon:\n";
 	my %evidence_hash;
-	foreach my $sf($exon->each_Supporting_Feature){
+	foreach my $sf($exon->get_all_supporting_features){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	    next;
 	  }
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
-	  $cloned_exon->add_Supporting_Feature($sf);
+	  $cloned_exon->add_supporting_features($sf);
 	}
 	push(@pred_exons, $cloned_exon);
       }
@@ -1170,7 +1170,7 @@ sub _make_newtranscript {
       $ex->attach_seq($self->vcontig);
       $ex->contig_id($self->vcontig->id);
       # add new analysis object to the supporting features
-      foreach my $sf($ex->each_Supporting_Feature){
+      foreach my $sf($ex->get_all_supporting_features){
 	$sf->analysis($analysis_obj);
 	$sf->source_tag($genetype);
       }
@@ -1808,13 +1808,13 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->attach_seq($self->vcontig);
 	my %evidence_hash;
 	#print STDERR "adding evidence at 5':\n";
-	foreach my $sf($oldexon->each_Supporting_Feature){
+	foreach my $sf($oldexon->get_all_supporting_features){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	    next;
 	  }
 	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
-	  $newexon->add_Supporting_Feature($sf);
+	  $newexon->add_supporting_features($sf);
 	}
 #	print STDERR "Adding 5prime exon " . $newexon->start . " " . $newexon->end . "\n";
 	$transcript->add_Exon($newexon);
@@ -1912,13 +1912,13 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->attach_seq($self->vcontig);
 	#print STDERR "adding evidence in 3':\n";
 	my %evidence_hash;
-	foreach my $sf($oldexon->each_Supporting_Feature){
+	foreach my $sf($oldexon->get_all_supporting_features){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	    next;
 	  }
 	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
-	  $newexon->add_Supporting_Feature($sf);
+	  $newexon->add_supporting_features($sf);
 	}
 	#	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
 	$transcript->add_Exon($newexon);
@@ -1974,7 +1974,7 @@ GENE:
 	  # sort out supporting feature coordinates
 	  foreach my $tran ($newgene->get_all_Transcripts) {
 	      foreach my $exon($tran->get_all_Exons) {
-		  foreach my $sf($exon->each_Supporting_Feature) {
+		  foreach my $sf($exon->get_all_supporting_features) {
 		      # this should be sorted out by the remapping to rawcontig ... strand is fine
 		      if ($sf->start > $sf->end) {
 			  my $tmp = $sf->start;
@@ -2155,7 +2155,7 @@ sub _make_transcript{
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
       
-      $exon->add_Supporting_Feature($subf);
+      $exon->add_supporting_features($subf);
     }
     
     push(@exons,$exon);

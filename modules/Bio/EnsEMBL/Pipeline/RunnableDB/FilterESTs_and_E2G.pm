@@ -294,7 +294,7 @@ sub write_exons_as_features {
 	my $hend;
 	my $hid;
 
-	foreach my $sf($exon->each_Supporting_Feature){
+	foreach my $sf($exon->get_all_suppporting_features){
 	  if(defined $hid){
 	    if ($hid ne $sf->hseqname){
 	      $self->warn("trying to change hid between supporting features for same exon: " . $exon->temporary_id . "\n");
@@ -770,7 +770,7 @@ sub make_transcript{
      
       $subf->feature2->analysis($self->analysis);
       
-      $exon->add_Supporting_Feature($subf);
+      $exon->add_supporting_features($subf);
     }
     
     push(@exons,$exon);
@@ -834,17 +834,17 @@ sub remap_genes {
     my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
     eval {
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $gene->transform;
       # need to explicitly add back genetype and analysis.
-      $newgene->type($gene->type);
-      $newgene->analysis($gene->analysis);
+      $gene->type($gene->type);
+      $gene->analysis($gene->analysis);
       
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
       
       my @oldtrans = $gene->get_all_Transcripts;
       my @oldexons  = $oldtrans[0]->get_all_Exons;
       
-      my @newtrans = $newgene->get_all_Transcripts;
+      my @newtrans = $gene->get_all_Transcripts;
       my @newexons  = $newtrans[0]->get_all_Exons;
       
       if($#oldexons == $#newexons){
@@ -855,10 +855,10 @@ sub remap_genes {
       }
       
       else{
-	$self->warn("cannot transfer exon scores for " . $newgene->id . "\n");
+	$self->warn("cannot transfer exon scores for " . $gene->id . "\n");
       }
       
-      push(@remapped,$newgene);
+      push(@remapped,$gene);
       
     };
     if ($@) {

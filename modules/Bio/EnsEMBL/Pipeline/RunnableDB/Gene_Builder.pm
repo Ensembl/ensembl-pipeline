@@ -239,14 +239,11 @@ sub write_output {
       eval {
 	$gene->analysis($analysis_obj);
 	$gene->type($genetype);
-	my $newgene;
+      
 	if ($self->use_vcontig) {
-	  $newgene = $vc->convert_Gene_to_raw_contig($gene);
+	  $gene->transform;
 	}
-	else {
-	  $newgene = $gene;
-	}
-	push(@newgenes,$newgene);
+	push(@newgenes,$gene);
       };
       if ($@) {
 	print STDERR "ERROR: Can't convert gene to raw contigs. Skipping:\n[$@]\n";

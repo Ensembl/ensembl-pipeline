@@ -583,21 +583,21 @@ GENE:  foreach my $gene (@genes) {
       
       my $translates = $self->check_translation($tran);
       if(!$translates){
-	my $msg = "discarding gene - tranlation has stop codons\n";
+	my $msg = "discarding gene - translation has stop codons\n";
 	$self->warn($msg);
 	next GENE;
       }
   }
     eval {
       my $genetype = $gene->type;
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $gene->transform;
       # need to explicitly add back genetype and analysis.
-      $newgene->type($genetype);
-      $newgene->analysis($gene->analysis);
-      push(@newf,$newgene);
+      #$newgene->type($genetype);
+      #$newgene->analysis($gene->analysis);
+      push(@newf,$gene);
 
       # sort out supporting feature coordinates
-      foreach my $tran ($newgene->get_all_Transcripts) {
+      foreach my $tran ($gene->get_all_Transcripts) {
 	#print STDERR "transcript has ".$tran->get_all_Exons." exons\n";
 	foreach my $exon($tran->get_all_Exons) {
 #	  print STDERR "exon has ".$exon->get_all_supporting_features." supporting features\n";
@@ -689,8 +689,10 @@ sub check_coverage{
     #}else{
     #  print "exon adaptor is ".$exonadp."\n";
     #}
-    foreach my $f($exon->get_all_supporting_features){
-      
+    my @sfs = $exon->get_all_supporting_features;
+    #print STDERR "have ".@sfs." supporting features\n";
+    foreach my $f(@sfs){
+     #print STDERR "have ".$f." from get_all_supporting_features\n";
       if (!defined($protname)){
 	$protname = $f->hseqname;
       }
@@ -782,16 +784,21 @@ sub make_transcript{
     
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
+    #print STDERR "Making Supporting Features in TargettedGeneWise\n";
+    #foreach my $f(@sf){
+    #  print STDERR "supporting feature ".$f->gffstring."\n";
+    #}
+    #print STDERR "\n\n";
     if(@sf){
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
     
       $align->seqname($contig->dbID);
-      $align->attach_seq($contig);
-      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
-      $align->adaptor($prot_adp);
+      $align->contig($contig);
+#      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
+#      $align->adaptor($prot_adp);
       $align->score(100);
       $align->analysis($analysis_obj);
-      
+      #print STDERR "adding ".$align." to exon\n";
       $exon->add_supporting_features($align);
     }
     

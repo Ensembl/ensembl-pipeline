@@ -401,7 +401,7 @@ sub _make_transcript{
       $align->score(100);
       $align->analysis($analysis_obj);
       
-      $exon->add_Supporting_Feature($align);
+      $exon->add_supporting_features($align);
     }
     
     push(@exons,$exon);
@@ -536,7 +536,7 @@ sub validate_transcript {
     $newtranscript->translation->end($transcript->translation->end);
     foreach my $exon($transcript->get_all_Exons){
       $newtranscript->add_Exon($exon);
-      foreach my $sf($exon->each_Supporting_Feature){
+      foreach my $sf($exon->get_all_supporting_features){
 	  $sf->feature1->seqname($exon->contig_id);
       }
     }
@@ -658,7 +658,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       # just add the exon
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
-    foreach my $sf($exon->each_Supporting_Feature){
+    foreach my $sf($exon->get_all_supporting_features){
 	  $sf->feature1->seqname($exon->contig_id);
 
       }
@@ -746,7 +746,7 @@ sub check_coverage{
     $pstart = 0;
     $pend   = 0;
     
-    foreach my $f($exon->each_Supporting_Feature){
+    foreach my $f($exon->get_all_supporting_features){
       
       if (!defined($protname)){
 	$protname = $f->hseqname;
@@ -894,14 +894,14 @@ sub remap_genes {
   my $trancount=1;
   foreach my $gene (@$genes) {
     eval {
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $gene->transform;
       # need to explicitly add back genetype and analysis.
-      $newgene->type($gene->type);
-      $newgene->analysis($gene->analysis);
+      #$newgene->type($gene->type);
+      #$gene->analysis($gene->analysis);
 
-      foreach my $tran ($newgene->get_all_Transcripts) {
+      foreach my $tran ($gene->get_all_Transcripts) {
 	foreach my $exon($tran->get_all_Exons) {
-	  foreach my $sf($exon->each_Supporting_Feature) {
+	  foreach my $sf($exon->get_all_supporting_features) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
 	      my $tmp = $sf->start;
@@ -911,7 +911,7 @@ sub remap_genes {
 	  }
 	}
       }
-      push(@newf,$newgene);
+      push(@newf,$gene);
 
     };
     if ($@) {
