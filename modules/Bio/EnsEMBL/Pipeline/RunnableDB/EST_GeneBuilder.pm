@@ -67,6 +67,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_DBHOST
 									 EST_DBUSER
 									 EST_DBPASS     
+									 EST_GENOMIC
 									 EST_GENEBUILDER_INPUT_GENETYPE
 									 EST_USE_DENORM_GENES
 									 EST_MIN_INTRON_SIZE
@@ -942,11 +943,10 @@ We want introns of the form:
 
 sub check_splice_sites{
   my ($self,$transcript,$strand) = @_;
-  $transcript->sort;
-  my $verbose = 0;
+ 
+  my $verbose = 1;
   
-  #my $strand = $transcript->start_Exon->strand;
-  my @exons  = @{$transcript->get_all_Exons};
+  my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
   
   # no need to check single-exon ones
   my $introns  = scalar(@exons) - 1 ; 
@@ -973,22 +973,38 @@ sub check_splice_sites{
       for (my $i=0; $i<$#exons; $i++ ){
 	  my $upstream_exon   = $exons[$i];
 	  my $downstream_exon = $exons[$i+1];
+	  
+	  #my $upstream_start   = $upstream_exon->end + 1;
+	  #my $upstream_end     = $upstream_exon->end + 2;
+	  #my $downstream_start = $downstream_exon->start - 2;
+	  #my $downstream_end   = $downstream_exon->start - 1;
+	  
+	  #my $up_start   = $slice->chr_start + $upstream_start - 1;
+	  #my $up_end     = $slice->chr_start + $upstream_end - 1;
+	  #my $down_start = $slice->chr_start + $downstream_start - 1;
+	  #my $down_end   = $slice->chr_start + $downstream_end - 1;
+	  #my $upstream_site   = 
+	  #  $self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
+	  #my $downstream_site = 
+	  #  $self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
+	  
+
 	  my $upstream_site;
 	  my $downstream_site;
 	  eval{
-	      $upstream_site = 
-		  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-	      $downstream_site = 
-		  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+	    $upstream_site = 
+		$slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+            $downstream_site = 
+		$slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
 
-              print STDERR "forward; upstream: $upstream_site, downstream:$downstream_site\n" if $verbose;
+	    #print STDERR "forward; upstream: $upstream_site, downstream:$downstream_site\n" if $verbose;
 	  };
 	  unless ( $upstream_site && $downstream_site ){
 	      print STDERR "problems retrieving sequence for splice sites\n$@";
 	      next INTRON;
 	  }
 	  
-	  #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+	  print STDERR "upstream $upstream_site, downstream: $downstream_site\n" if $verbose;
 	  ## good pairs of upstream-downstream intron sites:
 	  ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
 	  # AT-AC is the U12 spliceosome
@@ -1014,35 +1030,37 @@ sub check_splice_sites{
     
     # we see CA-TC in the slice and we need 
     # to find the complementary sequence to look for a good site
+
+    #my $chr_length = $slice->adaptor->db->get_ChromosomeAdaptor->fetch_by_chr_name( $slice->chr_name )->length;
     
   INTRON:
     for (my $i=0; $i<$#exons; $i++ ){
       my $upstream_exon   = $exons[$i];
       my $downstream_exon = $exons[$i+1];
-      my $upstream_site;
-      my $downstream_site;
       
-      my $upstream_start   = $upstream_exon->end + 1;
-      my $upstream_end     = $upstream_exon->end + 2;
-      my $downstream_start = $downstream_exon->start - 2;
-      my $downstream_end   = $downstream_exon->start - 1;
-     
+      #my $upstream_start   = $upstream_exon->end + 1;
+      #my $upstream_end     = $upstream_exon->end + 2;
+      #my $downstream_start = $downstream_exon->start - 2;
+      #my $downstream_end   = $downstream_exon->start - 1;
+      
+     	  my $upstream_site;
+	  my $downstream_site;
       eval{
 	$upstream_site = 
 	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
 	$downstream_site = 
 	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
       };
-
-      #my $up_start   = $slice->chr_start + $upstream_start - 1;
-      #my $up_end     = $slice->chr_start + $upstream_end - 1;
-      #my $down_start = $slice->chr_start + $downstream_start - 1;
-      #my $down_end   = $slice->chr_start + $downstream_end - 1;
+      
+      #my $up_start   = $chr_length  - ($slice->chr_start + $upstream_start - 1)   + 1;
+      #my $up_end     = $chr_length  - ($slice->chr_start + $upstream_end - 1  )   + 1;
+      #my $down_start = $chr_length  - ($slice->chr_start + $downstream_start - 1) + 1;
+      #my $down_end   = $chr_length  - ($slice->chr_start + $downstream_end - 1)   + 1;
       #my $upstream_site   = 
 #	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
 #      my $downstream_site = 
 #	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
-            
+#            
       unless ( $upstream_site && $downstream_site ){
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
@@ -1077,25 +1095,30 @@ sub check_splice_sites{
 }
 ############################################################
 
-#sub get_chr_subseq{
-#  my ( $self, $chr_name, $start, $end, $strand ) = @_;
+=head2 get_chr_subseq
 
-#  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
-#  my $command = "chr_subseq $chr_file $start $end |";
-#  #print STDERR "command: $command\n";
-#  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
-#  my $seq = uc <SEQ>;
-#  chomp $seq;
-#  close( SEQ );
+It return a piece of chromosome sequence specified
+by start, end and strand. Its purpose is to
+check the splice site sequences and it needs to know
+where the dumps of the chromosomes are (fasta files),
+which reads from the variable EST_GENOMIC in EST_GeneBuilder_conf.pm
+strand is not used.
 
-#  if ( $strand == 1 ){
-#    return $seq;
-#  }
-#  else{
-#    ( my $revcomp_seq = reverse( $seq ) ) =~ tr/ACGTacgt/TGCAtgca/;
-#    return $revcomp_seq;
-#  }
-#}
+=cut
+
+sub get_chr_subseq{
+  my ( $self, $chr_name, $start, $end, $strand ) = @_;
+
+  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+  my $command = "chr_subseq $chr_file $start $end |";
+  #print STDERR "command: $command\n";
+  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+  my $seq = uc <SEQ>;
+  chomp $seq;
+  close( SEQ );
+
+  return $seq;
+}
 
 ############################################################
 
