@@ -187,7 +187,28 @@ sub add_extension_parent{
     }
     return $self->{_extension_parents};
 }
+############################################################
 
+sub inclusion_parents{
+  my ($self) = @_;
+  unless( $self->{_inclusion_parents} ){
+    $self->{_inclusion_parents} = [];
+  }
+  return $self->{_inclusion_parents};
+}
+
+############################################################
+
+sub add_inclusion_parent{
+    my ($self,$node) = @_;
+    unless( $self->{_inclusion_parents} ){
+      $self->{_inclusion_parents} = [];
+    }
+    if ($node){
+      push ( @{$self->{_inclusion_parents}}, $node );
+    }
+    return $self->{_inclusion_parents};
+}
 ############################################################
 
 sub add_extension_child{
@@ -249,6 +270,35 @@ sub transcript{
 }
 
 ############################################################
+
+sub candidate_extension_parents{
+  my ($self) = @_;
+  unless( $self->{_candidate_extension_parents} ){
+    $self->{_candidate_extension_parents} = [];
+  }
+  return $self->{_candidate_extension_parents};
+}
+############################################################
+
+sub add_candidate_extension_parent{
+    my ($self,$node) = @_;
+    unless( $self->{_candidate_extension_parents} ){
+      $self->{_candidate_extension_parents} = [];
+    }
+    if ($node){
+      push ( @{$self->{_candidate_extension_parents}}, $node );
+    }
+    return $self->{_candidate_extension_parents};
+}
+############################################################
+
+sub is_candidate{
+  my ($self, $boolean ) = @_;
+  if ( $boolean ){
+    $self->{_is_candidate} = $boolean;
+  }
+  return $self->{_is_candidate};
+}
 
 1;
 
