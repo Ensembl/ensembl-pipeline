@@ -44,6 +44,7 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Rule;
+use Bio::Root::RootI;
 use vars qw(@ISA);
 use strict;
 
@@ -62,10 +63,8 @@ use strict;
 
 
 sub new {
-  my $class = shift;
-  my $self = bless {},$class;
-
-  my $dbobj = shift;
+  my ($class,$dbobj) = @_;
+  my $self = $class->SUPER::new();
 
   $self->db( $dbobj );
   return $self;
@@ -242,8 +241,8 @@ Function: gets the DBSQL::Obj for the Adaptor. Set is private.
 sub db {
   my ($self,$db) = @_;
   ( defined $db ) &&
-    ( $self->{_db} = $db );
-  $self->{_db};
+    ( $self->{'_db'} = $db );
+  $self->{'_db'};
 }
 
 # Convenience prepare function

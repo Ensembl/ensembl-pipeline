@@ -50,18 +50,15 @@ use Bio::Root::RootI;
 
 @ISA = qw(Bio::Root::RootI Bio::EnsEMBL::DB::CloneI);
 
-# new() is inherited from Bio::Root::RootI
 
-# _initialize is where the heavy stuff will happen when new is called
+sub new {
+  my($class,@args) = @_;
 
-sub _initialize {
-  my($self,@args) = @_;
-
-  my $make = $self->SUPER::_initialize;
+  my $self = $class->SUPER::new(@args);
 
   my ($dbobj,$disk_id) = $self->_rearrange([qw(DBOBJ
-					  DISK_ID
-					  )],@args);
+					       DISK_ID
+					       )],@args);
 
   $disk_id || $self->throw("Cannot make clone db object without a disk_id");
   $dbobj   || $self->throw("Cannot make clone db object without db object");
@@ -70,8 +67,7 @@ sub _initialize {
   $self->disk_id($disk_id);
   $self->_dbobj($dbobj);
 
-# set stuff in self from @args
-  return $make; # success - we hope!
+  return $self;
 }
 
 =head2 disk_id
@@ -354,18 +350,19 @@ sub _dbobj{
 sub add_Contig {
     my ($self,$contig) = @_;
 
-    if (!(defined($self->{_contigs}))) {
-	$self->{_contigs} = [];
+    if (!(defined($self->{'_contigs'}))) {
+	$self->{'_contigs'} = [];
     }
-    push(@{$self->{_contigs}},$contig);
+    push(@{$self->{'_contigs'}},$contig);
 
 }
 
 sub get_all_Contigs {
     my ($self) = @_;
 
-    return @{$self->{_contigs}};
+    return @{$self->{'_contigs'}};
 }
+
 1;
 
 

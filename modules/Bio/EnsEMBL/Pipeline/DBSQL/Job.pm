@@ -47,14 +47,17 @@ use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::LSFJob;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
-    my ($dbobj,$id,$lsfid,$input_id,$analysis,$queue,$create,$stdout,$stderr,$input,$output,$status) 
+    my $self = $class->SUPER::new(@args);
+    
+    my ($dbobj,$id,$lsfid,$input_id,$analysis,
+	$queue,$create,$stdout,$stderr,$input,$output,$status) 
 	= $self->_rearrange([qw(DBOBJ
 				ID
 				LSF_ID
@@ -95,14 +98,13 @@ sub _initialize {
     my $job = new Bio::EnsEMBL::Pipeline::LSFJob(-queue     => $queue,
 						 -exec_host => "__NONE__",
 						 -id        => $lsfid);
-
     $self->_LSFJob($job);
 
     if ($create == 1) {
 	$self->get_id;
     }
 
-    return $make; # success - we hope!
+    return $self; 
 }
 
 =head2 id
@@ -122,9 +124,9 @@ sub id {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_id} = $arg;
+	$self->{'_id'} = $arg;
     }
-    return $self->{_id};
+    return $self->{'_id'};
 
 }
 
@@ -188,9 +190,9 @@ sub input_id {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_input_id} = $arg;
+	$self->{'_input_id'} = $arg;
     }
-    return $self->{_input_id};
+    return $self->{'_input_id'};
 }
 
 =head2 analysis
@@ -209,10 +211,9 @@ sub analysis {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-	$self->{_analysis} = $arg;
+	$self->{'_analysis'} = $arg;
     }
-    return $self->{_analysis};
-
+    return $self->{'_analysis'};
 }
 
 
@@ -468,7 +469,7 @@ sub current_status {
     {
 	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
 	    $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-	    $self->{_status} = $arg;
+	    $self->{'_status'} = $arg;
     }
     else 
     {
@@ -494,9 +495,9 @@ sub current_status {
 							       -created => $time,
 							       );
 
-	    $self->{_status} = $statusobj;
+	    $self->{'_status'} = $statusobj;
     }
-    return $self->{_status};
+    return $self->{'_status'};
 }
 
 =head2 get_all_status
@@ -555,9 +556,9 @@ sub _dbobj {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj") unless 
 	    $arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj");
 
-	$self->{_dbobj} = $arg;
+	$self->{'_dbobj'} = $arg;
     }
-    return $self->{_dbobj};
+    return $self->{'_dbobj'};
 }
 
 
@@ -629,9 +630,9 @@ sub stdout_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_stdout_file} = $arg;
+	$self->{'_stdout_file'} = $arg;
     }
-    return $self->{_stdout_file};
+    return $self->{'_stdout_file'};
 }
 
 =head2 stderr_file
@@ -648,9 +649,9 @@ sub stderr_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_stderr_file} = $arg;
+	$self->{'_stderr_file'} = $arg;
     }
-    return $self->{_stderr_file};
+    return $self->{'_stderr_file'};
 }
 
 =head2 status_file
@@ -667,9 +668,9 @@ sub status_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-        $self->{_status_file} = $arg;
+        $self->{'_status_file'} = $arg;
     }
-    return $self->{_status_file};
+    return $self->{'_status_file'};
 }
 
 =head2 output_file
@@ -686,9 +687,9 @@ sub output_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_output_file} = $arg;
+	$self->{'_output_file'} = $arg;
     }
-    return $self->{_output_file};
+    return $self->{'_output_file'};
 }
 
 
@@ -706,9 +707,9 @@ sub input_object_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_input_object_file} = $arg;
+	$self->{'_input_object_file'} = $arg;
     }
-    return $self->{_input_object_file};
+    return $self->{'_input_object_file'};
 }
     
 
@@ -727,13 +728,12 @@ sub _LSFJob {
 
     if (defined($arg)) {
 	if ($arg->isa("Bio::EnsEMBL::Pipeline::LSFJob")) {
-	    $self->{_LSFJob} = $arg;
+	    $self->{'_LSFJob'} = $arg;
 	} else {
 	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::LSFJob");
 	}
     }
-
-    return $self->{_LSFJob};
+    return $self->{'_LSFJob'};
 }
 
 

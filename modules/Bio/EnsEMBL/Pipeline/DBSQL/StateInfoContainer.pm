@@ -46,30 +46,27 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::Root::RootI;
 use vars qw(@ISA);
 use strict;
-
 
 @ISA = qw( Bio::Root::RootI );
 
 sub new {
-  my $class = shift;
-  my $self = bless( {}, $class);
-
-  my $dbobj = shift;
+  my ($class, $dbobj) = @_;
+  my $self = $class->SUPER::new();
 
   $self->db( $dbobj );
   return $self;
 }
 
 sub fetch_analysis_by_inputId_class {
-  my $self = shift;
-  my $inputId = shift;
-  my $class = shift;
+  my ($self,$inputId, $class) = @_;
+
   my @result;
   my @row;
 
-  my $anaAd = $self->db->get_AnalysisAdaptor;
+  my $anaAd = $self->db->get_AnalysisAdaptor();
 
   my $sth = $self->prepare( q {
     SELECT analysisId
@@ -201,8 +198,8 @@ sub delete_inputId_analysis {
 sub db {
   my ( $self, $arg )  = @_;
   ( defined $arg ) &&
-    ($self->{_db} = $arg);
-  $self->{_db};
+    ($self->{'_db'} = $arg);
+  $self->{'_db'};
 }
 
 sub prepare {

@@ -56,10 +56,10 @@ use Bio::EnsEMBL::DBSQL::RawContig;
 
 # _initialize is where the heavy stuff will happen when new is called
 
-sub _initialize {
-  my($self,@args) = @_;
+sub new {
+  my($class,@args) = @_;
 
-  my $make = $self->SUPER::_initialize(@args);
+  my $self = $class->SUPER::new(@args);
 
   my ($id,$dbobj) = $self->_rearrange([qw(ID
 					  DBOBJ
@@ -73,11 +73,10 @@ sub _initialize {
   $self->id($id);
   $self->_dbobj($dbobj);
 
-  $self->{_exon_pairs} = [];
-  $self->{_genes}      = [];
-  return $make; # success - we hope!
+  $self->{'_exon_pairs'} = [];
+  $self->{'_genes'}      = [];
+  return $self; # success - we hope!
 }
-
 
 sub id {
     my ($self,$value) = @_;
@@ -106,18 +105,18 @@ sub add_SimilarityFeature {
     my ($self,$arg) = @_;
 
     if (defined($arg) && $arg->isa("Bio::EnsEMBL::SeqFeatureI")) {
-	if (!(defined($self->{_similarity_features}))) {
-	    $self->{_similarity_features} = [];
+	if (!(defined($self->{'_similarity_features'}))) {
+	    $self->{'_similarity_features'} = [];
 	}
-	push(@{$self->{_similarity_features}},$arg);
+	push(@{$self->{'_similarity_features'}},$arg);
     }
 }
 sub get_all_SimilarityFeatures {
     my ($self) = @_;
 
 
-    if (defined($self->{_similarity_features})) {
-	return @{$self->{_similarity_features}};
+    if (defined($self->{'_similarity_features'})) {
+	return @{$self->{'_similarity_features'}};
     } 
 }
     
@@ -227,14 +226,14 @@ sub makePair {
 sub get_all_ExonPairs {
     my ($self) = @_;
 
-    return @{$self->{_exon_pairs}};
+    return @{$self->{'_exon_pairs'}};
 }
 
 sub add_ExonPair {
     my ($self,$arg) = @_;
 
     if (defined($arg) && $arg->isa("Bio::EnsEMBL::Pipeline::ExonPair")) {
-	push(@{$self->{_exon_pairs}},$arg);
+	push(@{$self->{'_exon_pairs'}},$arg);
     } else {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::ExonPair");
     }
@@ -272,17 +271,15 @@ sub get_Tails {
 sub add_Gene {
     my ($self,$gene) = @_;
 
-    if (!(defined($self->{_genes}))) {
-	$self->{_genes} = [];
+    if (!(defined($self->{'_genes'}))) {
+	$self->{'_genes'} = [];
     }
 
-    push(@{$self->{_genes}},$gene);
+    push(@{$self->{'_genes'}},$gene);
 
 }
 
 sub get_all_Genes {
     my ($self) = @_;
-
-    return @{$self->{_genes}};
-
+    return @{$self->{'_genes'}};
 }

@@ -37,13 +37,12 @@ The rest of the documentation details each of the object methods. Internal metho
 
 =cut
 
-
 # Let the code begin...
-
 
 package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::Root::RootI;
 
 use vars qw(@ISA);
 use strict;
@@ -51,10 +50,8 @@ use strict;
 @ISA = qw( Bio::Root::RootI );
 
 sub new {
-  my $class = shift;
-  my $self = bless {},$class;
-
-  my $dbobj = shift;
+  my ($class, $dbobj) = @_;
+  my $self = $class->SUPER::new();
 
   $self->db( $dbobj );
   return $self;
@@ -71,7 +68,7 @@ sub new {
 =cut
 
 sub fetch_all {
-  my $self = shift;
+  my ($self) = @_;
   my %analyses;
   my ( $analysis, $dbID );
   my $rowHashRef;
@@ -106,11 +103,10 @@ sub fetch_all {
 =cut
 
 sub fetch_by_dbID {
-  my $self = shift;
-  my $id = shift;
+  my ($self,$id) = @_;
 
-  if( defined $self->{_cache}->{$id} ) {
-    return $self->{_cache}->{$id};
+  if( defined $self->{'_cache'}->{$id} ) {
+    return $self->{'_cache'}->{$id};
   }
 
   my $sth = $self->prepare( q{
@@ -130,13 +126,12 @@ sub fetch_by_dbID {
   }
 
   my $anal = $self->_objFromHashref( $rowHashRef );
-  $self->{_cache}->{$anal->dbID} = $anal;
+  $self->{'_cache'}->{$anal->dbID} = $anal;
   return $anal;
 }
 
 sub fetch_by_newest_logic_name {
-  my $self = shift;
-  my $logic_name = shift;
+  my ($self,$logic_name) = @_;
 
   my $sth = $self->prepare( q{
     SELECT analysisId, logic_name,
@@ -160,8 +155,7 @@ sub fetch_by_newest_logic_name {
 
 
 sub fetch_by_logic_name {
-  my $self = shift;
-  my $logic_name = shift;
+  my ($self,$logic_name) = @_;
   my @result;
   my $analysis;
   my $rowHash;
@@ -191,9 +185,7 @@ sub fetch_by_logic_name {
 # store makes dbID for analysis object
 # sets the creation time in created if it wasnt set before
 sub store {
-
-  my $self = shift;
-  my $analysis = shift;
+  my ($self,$analysis) = @_;
 
   if( defined $analysis->created ) {
     my $sth = $self->prepare( q{
@@ -338,8 +330,7 @@ sub exists {
 
 
 sub _objFromHashref {
-  my $self = shift;
-  my $rowHash = shift;
+  my ($self,$rowHash) = @_;
 
   my $analysis = Bio::EnsEMBL::Pipeline::Analysis->new
     ( -id => $rowHash->{analysisId},
@@ -398,8 +389,8 @@ sub submitInputId {
 sub db {
   my ( $self, $arg )  = @_;
   ( defined $arg ) &&
-    ($self->{_db} = $arg);
-  $self->{_db};;
+    ($self->{'_db'} = $arg);
+  $self->{'_db'};
 }
 
 sub prepare {
@@ -409,7 +400,7 @@ sub prepare {
 
 
 sub deleteObj {
-  my $self = shift;
+  my ($self) = @_;
   my @dummy = values %{$self};
   foreach my $key ( keys %$self ) {
     delete $self->{$key};
@@ -421,4 +412,4 @@ sub deleteObj {
   }
 }
 
-
+1;

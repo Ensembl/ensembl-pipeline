@@ -42,28 +42,23 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-
 package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Job;
+use Bio::Root::RootI;
 
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Pipeline::Job;
 
 @ISA = qw( Bio::Root::RootI );
 
 sub new {
-  my $class = shift;
-  my $self = bless( {}, $class);
+  my ($class,$dbobj) = @_;
+  my $self = $class->SUPER::new();
   
-  my $dbobj = shift;
-
   $self->db( $dbobj );
   return $self;
 }
-
-
 
 =head2 fetch_by_dbID
 
@@ -389,16 +384,16 @@ sub _objFromHashref {
 
   $job = Bio::EnsEMBL::Pipeline::Job->new
   (
-   -dbobj => $self->db,
-   -adaptor => $self,
-   -id => $hashref->{jobId},
-   -lsf_id => $hashref->{LSF_id},
-   -input_id => $hashref->{input_id},
-   -stdout => $hashref->{stdout_file},
-   -stderr=> $hashref->{stderr_file},
-   -input_object_file => $hashref->{object_file},
-   -analysis => $analysis,
-   -retry_count => $hashref->{retry_count}
+   '-dbobj'    => $self->db,
+   '-adaptor'  => $self,
+   '-id'       => $hashref->{'jobId'},
+   '-lsf_id'   => $hashref->{'LSF_id'},
+   '-input_id' => $hashref->{'input_id'},
+   '-stdout'   => $hashref->{'stdout_file'},
+   '-stderr'   => $hashref->{'stderr_file'},
+   '-input_object_file' => $hashref->{'object_file'},
+   '-analysis' => $analysis,
+   '-retry_count' => $hashref->{'retry_count'}
   );
 
   return $job;
@@ -458,9 +453,9 @@ sub set_status {
 	my $time    = $rowhash->[0];
 
 	$status = Bio::EnsEMBL::Pipeline::Status->new
-	  (  -jobid   => $job->dbID,
-	     -status  => $arg,
-	     -created => $time,
+	  (  '-jobid'   => $job->dbID,
+	     '-status'  => $arg,
+	     '-created' => $time,
 	  );
 	
 	$self->current_status($job, $status);
@@ -490,39 +485,40 @@ sub set_status {
 
 sub current_status {
     my ($self, $job, $arg) = @_;
-    
+
     if (defined($arg)) 
     {
-	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
-	    $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-	    $job->{_status} = $arg;
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") 
+	    unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
+	$job->{'_status'} = $arg;
     }
     else 
     {
-	    $self->throw("Can't get status if id not defined") unless defined($job->dbID);
-	    my $id =$job->dbID;
-	    my $sth = $self->prepare
-	      ("select status from current_status where jobId=$id");
-	    my $res = $sth->execute();
-	    my $status;
-	    while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	        $status = $rowhash->{'status'};
-	    }
-	
-	    $sth = $self->prepare("select now()");
-	    $res = $sth->execute();
-	    my $time;
-	    while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	        $time    = $rowhash->{'now()'};
-	    }
-	    my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $id,
-							       -status  => $status,
-							       -created => $time,
-							       );
+	$self->throw("Can't get status if id not defined") 
+	    unless defined($job->dbID);
+	my $id =$job->dbID;
+	my $sth = $self->prepare
+	    ("select status from current_status where jobId=$id");
+	my $res = $sth->execute();
+	my $status;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $status = $rowhash->{'status'};
+	}
 
-	    $job->{_status} = $statusobj;
+	$sth = $self->prepare("select now()");
+	$res = $sth->execute();
+	my $time;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $time    = $rowhash->{'now()'};
+	}
+	my $statusobj = new Bio::EnsEMBL::Pipeline::Status
+	    ('-jobid'   => $id,
+	     '-status'  => $status,
+	     '-created' => $time,
+	     );
+	$job->{'_status'} = $statusobj;
     }
-    return $job->{_status};
+    return $job->{'_status'};
 }
 
 =head2 get_all_status
@@ -595,17 +591,16 @@ sub get_last_status {
   }
 
   my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
-  my $status    = $rowHashRef->{'status'};
+  $status    = $rowHashRef->{'status'};
   my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
-						       -status  => $status,
-						       -created => $time,
-						      );
+						     -status  => $status,
+						     -created => $time,
+						     );
   return $statusobj;
 }
 
 sub list_jobId_by_status {
-  my $self = shift;
-  my $status = shift;
+  my ($self,$status) = @_;
   my @result;
   my @row;
 
@@ -626,9 +621,7 @@ sub list_jobId_by_status {
 
 
 sub list_jobId_by_status_age {
-  my $self = shift;
-  my $status = shift;
-  my $age = shift;
+  my ($self,$status,$age) = @_;
   
   my @result;
   my @row;
@@ -652,9 +645,10 @@ sub list_jobId_by_status_age {
 
 sub db {
   my ( $self, $arg )  = @_;
-  ( defined $arg ) &&
-    ($self->{_db} = $arg);
-  $self->{_db};
+  if(  defined $arg ) {
+      $self->{'_db'} = $arg;
+  }
+  $self->{'_db'};
 }
 
 sub prepare {
@@ -663,7 +657,7 @@ sub prepare {
 }
 
 sub deleteObj {
-  my $self = shift;
+  my ($self) = @_;
   my @dummy = values %{$self};
   foreach my $key ( keys %$self ) {
     delete $self->{$key};
@@ -675,13 +669,4 @@ sub deleteObj {
   }
 }
 
-  
-
-
 1;
-
-
-
-
-
-

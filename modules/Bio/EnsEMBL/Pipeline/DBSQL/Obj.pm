@@ -51,17 +51,13 @@ use Bio::Root::RootI;
 
 # use FreezeThaw qw(freeze thaw);
 
-# Inherits from the base bioperl object
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::EnsEMBL::DBSQL::Obj
+	Bio::Root::RootI );
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::EnsEMBL::DBSQL::Obj);
-
-sub _initialize {
-    my ($self,@args) = @_;
-
-    my $make = $self->SUPER::_initialize(@args);
-
-    return $make; # success - we hope!
-
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);
+    return $self;
 }
 
 =head2 get_JobAdaptor
@@ -73,18 +69,17 @@ sub _initialize {
  Returns : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
  Args    : 
 
-
 =cut
 
 sub get_JobAdaptor {
   my ($self) = @_;
 
-  if( ! defined $self->{_JobAdaptor} ) {
-    $self->{_JobAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
+  if( ! defined $self->{'_JobAdaptor'} ) {
+    $self->{'_JobAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
       ( $self );
   }
 
-  return $self->{_JobAdaptor};
+  return $self->{'_JobAdaptor'};
 }
 
 sub get_OldAnalysis {
@@ -108,12 +103,12 @@ sub get_OldAnalysis {
 sub get_AnalysisAdaptor {
   my ($self) = @_;
 
-  if( ! defined $self->{_AnalysisAdaptor} ) {
-    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
+  if( ! defined $self->{'_AnalysisAdaptor'} ) {
+    $self->{'_AnalysisAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
       ( $self );
   }
 
-  return $self->{_AnalysisAdaptor};
+  return $self->{'_AnalysisAdaptor'};
 }
 
 
@@ -132,12 +127,12 @@ sub get_AnalysisAdaptor {
 sub get_RuleAdaptor {
   my ($self) = @_;
 
-  if( ! defined $self->{_RuleAdaptor} ) {
-    $self->{_RuleAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
+  if( ! defined $self->{'_RuleAdaptor'} ) {
+    $self->{'_RuleAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
       ( $self );
   }
 
-  return $self->{_RuleAdaptor};
+  return $self->{'_RuleAdaptor'};
 }
 
 =head2 get_StateInfoContainer
@@ -155,12 +150,12 @@ sub get_RuleAdaptor {
 sub get_StateInfoContainer {
   my ($self) = @_;
 
-  if( ! defined $self->{_StateInfoContainer} ) {
-    $self->{_StateInfoContainer} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
+  if( ! defined $self->{'_StateInfoContainer'} ) {
+    $self->{'_StateInfoContainer'} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
       ( $self );
   }
 
-  return $self->{_StateInfoContainer};
+  return $self->{'_StateInfoContainer'};
 }
 
 
@@ -445,9 +440,9 @@ sub _db_handle {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_db_handle} = $arg;
+	$self->{'_db_handle'} = $arg;
     }
-    return $self->{_db_handle};
+    return $self->{'_db_handle'};
 }
 
 
@@ -540,6 +535,4 @@ sub deleteObj {
   }
 }
 
-
-
-
+1;
