@@ -26,7 +26,7 @@ Importer
                                 -mirror_dir => $mirror_dir);
 
   $importer->importClones;
-                                
+
 =head1 DESCRIPTION
 
 Reads sequences from files in a directory, makes them into clone objects
@@ -72,21 +72,21 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
     Function:   Initializes module
     Returns :   
     Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,directory name
-  
+
 =cut
 
 sub _initialize {
   my ($self,@args) = @_;
-  
+
   my $make = $self->SUPER::_initialize(@_);    
-  
+
   $self->{_dbobj}        = undef;     
   $self->{_mirror_dir}   = undef;
   $self->{_clones}       = [];
-  
+
   my( $dbobj,$mirror_dir, ) = 
     $self->_rearrange(['DBOBJ','MIRROR_DIR'], @args);
-  
+
   if ($dbobj) {
     $self->dbobj($dbobj);
   } else {
@@ -97,7 +97,7 @@ sub _initialize {
   } else {
     $self->throw("No mirror directory input");
   }
-  
+
     return $self; # success - we hope!
 }
 
@@ -156,7 +156,7 @@ sub checkClones {
 	$self->warn("ERROR: Clone $clone inhas no id");
 	$ok = 0;
       }
-      
+
       my $file = $self->{_clonehash}{$clone->id}{file};
       
       if (!defined($clone->htg_phase)) {
@@ -178,7 +178,7 @@ sub checkClones {
 	$self->warn("ERROR: No contigs for clone " . $clone->id . " in file $file \n");
 	$ok = 0;
       }
-      
+
       foreach my $contig (@contigs) {
 	if (!defined($contig->id)) {
 	  $self->warn("ERROR: Contig $contig in file $file has no id");
@@ -294,7 +294,7 @@ sub writeClones {
                 i.e. their names aren\'t in the import.log file
     Returns :   @string
     Args    :   none
-  
+
 =cut
 
 sub getNewFiles {
@@ -345,7 +345,7 @@ sub getNewFiles {
     Function:   Reads sequences from files
     Returns :   @Bio::SeqI
     Args    :   @string
-  
+
 =cut
 
 sub readFile {
@@ -425,7 +425,7 @@ sub readFile {
     Function:   Import the chromosomes from a mirrored file
     Returns :   nothing
     Args    :   none
-  
+
 =cut
 
 sub readChromosomes {
@@ -451,7 +451,7 @@ sub readChromosomes {
     Function:   Turns the data in $clonehashref into clone objects
     Returns :   Nothing
     Args    :   hash reference
-  
+
 =cut
 
 sub makeClones {
@@ -498,9 +498,10 @@ sub makeClones {
 	  
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  my $padlen    = 5 - length($count);
-	  my $pad       =  "0" x $padlen;
-	  my $contigid  = $acc . ".$pad$count";
+	  # my $padlen    = 5 - length($count);
+	  # my $pad       =  "0" x $padlen;
+	  # my $contigid  = $acc . ".$pad$count";
+	  my $contigid  = $acc . ".$ver.$offset." . $contig->{end};
 	  
 	  $newcontig->id          ($contigid);
 	  $newcontig->seq         (new Bio::Seq(-id => $id, -seq =>$seqstr));    
@@ -518,7 +519,8 @@ sub makeClones {
       } else {
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  my $contigid  = $acc . ".00001";
+	  # my $contigid  = $acc . ".00001";
+	  my $contigid  = $acc . ".1.1." . length $seq;
 
 
 	  $newcontig->id          ($contigid);
@@ -546,7 +548,7 @@ sub makeClones {
     Function:   Get/set method for database handle
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   Bio::EnsEMBL::Pipeline::DB::ObjI
-  
+
 =cut
 
 sub dbobj {
@@ -571,7 +573,7 @@ sub dbobj {
     Function:   Get/set method for mirror directory name
     Returns :   string
     Args    :   string
-  
+
 =cut
 
 sub mirror_dir {
@@ -595,7 +597,7 @@ sub mirror_dir {
     Function:   Get/set method for adding a clone and returning all clones
     Returns :   Bio::EnsEMBL::DB::CloneI
     Args    :   Bio::EnsEMBL::DB::CloneI
-  
+
 =cut
 
 sub clones {
