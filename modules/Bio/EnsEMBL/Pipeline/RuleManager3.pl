@@ -895,11 +895,14 @@ sub job_existance{
   my @jobs = $job_adaptor->fetch_all;
   my %job_submission_ids;
   $job_adaptor->lock_tables;
-  foreach my $job(@jobs){
+  JOB:foreach my $job(@jobs){
     my $status = $job->current_status->status;
     if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
        $status eq 'READING' ||$status eq 'WRITING' ||
        $status eq 'WAITING'){
+      if(!$job->submission_id){
+        next JOB;
+      }
       if(!$job_submission_ids{$job->submission_id}){
         $job_submission_ids{$job->submission_id} = [];
       }
