@@ -92,7 +92,7 @@ sub run{
   close(F);
   
   foreach my $t ( $self->each_Transcript ) {
-    foreach my $e ( $t->each_Exon ) {
+    foreach my $e ( $t->get_all_Exons ) {
       if( $e->strand == -1 ) {
 	$self->throw("Genomewise cannot handle reverse strand exons. Must flip outside");
       }
