@@ -100,15 +100,25 @@ sub _initialize {
 
     my $make = $self->SUPER::_initialize(@args);
 
-    my ($contig) = $self->_rearrange([qw(CONTIG
+    my ($contig,$genewiseonly) = $self->_rearrange([qw(CONTIG GENEWISE
 					 )],@args);
 
     $self->throw("Must input a contig to GeneBuilder") unless defined($contig);
     
     $self->contig($contig);
-    $self->get_all_Features;
+    $self->genewise_only($genewiseonly);
+    $self->{_genes} = [];
 
     return $make; # success - we hope!
+}
+
+sub genewise_only {
+	my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+        $self->{_genewiseonly} = $arg;
+  }
+  return $self->{_genewiseonly};
 }
 
 =head2 build_Genes
@@ -129,6 +139,7 @@ sub build_Genes {
 
     print STDERR "Building genes\n";
 
+    $self->get_all_Features;
     $self->get_Features;
     $self->make_Exons;
     
@@ -139,11 +150,11 @@ sub build_Genes {
 
     $self->filter_Transcripts;
     $self->make_Genes;
-    $self->print_Genes;
+    #$self->print_Genes;
 
-    print STDERR "Finished printing genes...\n";
+    #print STDERR "Finished printing genes...\n";
 
-    $self->print_gff;
+    #$self->print_gff;
 
     print STDERR "Out of build Genes...\n";
 
@@ -190,11 +201,13 @@ sub get_Features {
 						$f->primary_tag ."\n\n";
 
 	    my @fset = $self->set_phases($f,$contig);
-
+            foreach my $fs (@fset) {
+                  print STDERR "FSET $fs\n";
+            }
 	    if (defined(@fset) && $f->source_tag eq "genewise") {
 		push(@genewise,@fset);
 
-	    } elsif (defined(@fset) && $f->source_tag eq "genscan") {
+	    } elsif (defined(@fset) && $f->source_tag eq "genscan" && $self->genewise_only != 1) {
 		push(@genscan,@fset);
 
 	    } elsif (defined(@fset))  {
@@ -204,12 +217,12 @@ sub get_Features {
 		print STDERR "Problem with validating feature set : skipping\n";
 	    }
 
-	} elsif ($f->primary_tag eq "similarity") {
+	} elsif ($f->primary_tag eq "similarity" && $self->genewise_only != 1) {
 	    
 	    $f->seqname  ($contig->id);
 
 	    if ($f->source_tag eq "est2genome") {
-#		push(@extras,$f);
+		#push(@extras,$f);
 	    } elsif ($f->source_tag eq "hmmpfam" && $f->score > 25) {
 		push(@features,$f);
             } elsif ($f->score >= 100) {
@@ -222,9 +235,9 @@ sub get_Features {
     $self->genewise(@genewise);
     $self->feature (@features);
     
-    print STDERR "\nNumber of similarity features " . scalar(@features) . "\n";
-    print STDERR "Number of genscans              " . scalar(@genscan)  . "\n";
-    print STDERR "Number of genewise features     " . scalar(@genewise) . "\n\n";
+    print STDERR "\nNumber of similarity features " . scalar($self->feature) . "\n";
+    print STDERR "Number of genscans              " . scalar($self->genscan)  . "\n";
+    print STDERR "Number of genewise features     " . scalar($self->genewise) . "\n\n";
 
 }
     
@@ -269,10 +282,18 @@ sub make_genscanExons {
     my @features = $self->feature;
     my $gscount  = 1;
     
-    foreach my $gs ($self->genscan) {
+   GS:  foreach my $gs ($self->genscan) {
 	
-	my $excount    = 1;
-
+     my $excount    = 1;
+     my @subf;
+     eval {
+        @subf = $gs->sub_SeqFeature;
+     };
+     if ($@) {
+	print STDERR "No sub features for $gs [$@]\n";
+        next GS;
+     }
+        
       EXON: foreach my $f ($gs->sub_SeqFeature) {
 	  print STDERR "Looking at " . $f->id . "\t" . $f->start . "\t" . $f->end . "\n";  
 	  # Don't include any genscans that are inside a genewise
@@ -317,18 +338,19 @@ sub make_genewiseExons {
 #    @fset = sort {$a->start <=> $b->start} @fset;
     my @newfset;
 
-    FSET: foreach my $f (@fset) {
+  FSET: foreach my $f (@fset) {
 	my @gwexons;
 
 	my $excount = 1;
+        my @subfs;
 
-	# throw out single genewises
-	my @sf = $f->sub_SeqFeature;
-
-	if ($#sf == 0) {
-	    next FSET;
-	}
-
+      eval {
+        @subfs = $f->sub_SeqFeature;
+      };
+      if ($@) {
+        print STDERR "No sub features for $f - skipping [$@]\n";
+        next FSET;
+      }
       SUBF: foreach my $subf ($f->sub_SeqFeature) {
 
 	  my $found   = 0;
@@ -404,6 +426,9 @@ sub make_genewise_ExonPairs {
 	      $self->print_Exon($f1);
 	      $self->print_Exon($f2);
 
+              my @ev1 = $f1->each_Supporting_Feature;
+              my @ev2 = $f2->each_Supporting_Feature;
+
 	      if ($f1->strand == $f2->strand) {
 		  print "found\n";
 		  my $spliceseq = $f1->{_3splice} . $f2->{_5splice};
@@ -411,6 +436,9 @@ sub make_genewise_ExonPairs {
 		  if ($spliceseq eq "GTAG") {
 		      $makepair = 1;
 		      
+		  }  elsif ($#ev1 >= 0 && $#ev2 >= 0 &&
+                            $ev1[0]->hseqname eq $ev2[0]->hseqname) {
+                      $makepair = 1;
 		  } elsif ($f1->strand == $f2->strand) {
 		      if ($f1->strand == 1) {
 			  if (abs($f1->end - $f2->start) <= 20) {
@@ -421,7 +449,7 @@ sub make_genewise_ExonPairs {
 			      $makepair = 1;
 			  }
 		      } 
-		  } 
+                  } 
 		  if ($makepair == 1) {
 		      print "Making pair\n";
 		      
@@ -736,13 +764,26 @@ sub check_link {
 sub link_ExonPairs {
     my ($self) = @_;
 
-    my @genewise = $self->genewise_exons;
+    my @tmp_genewise = $self->genewise_exons;
     my @genscan  = $self->genscan_exons;
+
+    # throw out single genewises
+    my @genewise;
+
+    foreach my $gw (@tmp_genewise) {
+	my @pairs = $self->_getPairs($gw);
+        print STDERR "Pairs for " + $gw->id + " @pairs\n";
+	if ($#pairs >= 0) {
+	    push(@genewise,$gw);
+	}
+    }
 
     my @exons;
 
     push(@exons,@genewise);
     push(@exons,@genscan);
+
+
 
   EXON: foreach my $exon (@exons) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
@@ -1490,7 +1531,9 @@ sub add_ExonPhase {
 
 sub set_phases {
     my ($self,$fset) = @_;
-
+    
+    my @newfset;
+    eval {
     my $strand;
     my $mrna     = "";
     
@@ -1510,7 +1553,7 @@ sub set_phases {
     }
 
     foreach my $ex (@subf) {
-
+        print STDERR "Found feature $ex\n";
 	my $found = 0;
 	foreach my $nex (@nrf) {
 	    if ($ex->start == $nex->start && $ex->end == $nex->end) {
@@ -1519,7 +1562,7 @@ sub set_phases {
 	}
 	
 	if ($found == 1) {
-	#    print STDERR "Duplicate sub feature  - skipping\n";
+	    print STDERR "Duplicate sub feature  - skipping\n";
 	} else {
 	    
 	    if ($ex->strand == 1) {
@@ -1569,7 +1612,6 @@ sub set_phases {
 
     push(@fset,$sf);
     
-    my @newfset;
 
     foreach my $fset (@fset) {
 	my $phase = $self->find_phase($fset->sub_SeqFeature);
@@ -1605,8 +1647,15 @@ sub set_phases {
 		$ex->{_3splice}   . "\n";	
 	}
     }
-	
-    return @newfset;
+    print STDERR "@newfset\n";	
+    };
+
+    if ($@) {
+	$self->warn("Problem setting phases for fset - skipping [$@]\n");
+   } else {
+      return @newfset;
+   }
+
 }
 
 # This is a somewhat kludgy attempt to deal with gene repeats
@@ -1708,7 +1757,7 @@ sub filter_Transcripts {
 
 	  EX3: foreach my $ex (@exons) {
 	      next EX3 if ($ex == $gexons[0]);
-		  print STDERR "\t Gap $gap";
+#		  print STDERR "\t Gap $gap";
 		  $self->print_Exon($ex);
 
 	      # find nearest 3' exon
@@ -1718,7 +1767,7 @@ sub filter_Transcripts {
 		  $exon3 = $ex;
 		  $gap = ($ex->start - $gexons[0]->end);
 	      }
-	    print STDERR "\t Gap $gap";
+#	    print STDERR "\t Gap $gap";
 	    $self->print_Exon($ex);
 
 	  }
@@ -1827,7 +1876,12 @@ sub get_all_Features {
 
 
     if (!defined($self->{_all_Features})) {
-	my @tmp = $self->contig->get_all_SimilarityFeatures;
+        my @tmp;
+        if ($self->genewise_only == 1) {
+	  @tmp = $self->contig->get_all_SimilarityFeatures_above_score('genewise',1);
+        } else {
+	  @tmp = $self->contig->get_all_SimilarityFeatures;
+        }
 	print STDERR "Got features " . @tmp . "\n";
 	$self->{_all_Features} = [];
 	push(@{$self->{_all_Features}},@tmp);
@@ -2111,6 +2165,7 @@ sub print_gff {
 	}
 
     }
+
     foreach my $gen ($self->genscan) {
 	foreach my $ex ($gen->sub_SeqFeature) {
 	    print POG  $ex->id . "\t" . $ex->source_tag . "\texon\t" . 
@@ -2120,7 +2175,7 @@ sub print_gff {
 	    } else {
 		print POG ("-\t.\t");
 	    }
-	    print POG $gen->id . "\n";
+	    print POG $gen->seqname . "\n";
 	}
     }
     foreach my $gen ($self->genewise) {
@@ -2132,7 +2187,11 @@ sub print_gff {
 	    } else {
 		print POG ("-\t.\t");
 	    }
-	    print POG $gen->id . "\n";
+	    if (ref($ex) =~ "FeaturePair") {
+		print (POG $ex->hseqname . "\t" . $ex->hstart . "\t" . $ex->hend . "\n");
+	    } else {
+		print POG $gen->seqname . "\n";
+	    }
 	}
     }
 

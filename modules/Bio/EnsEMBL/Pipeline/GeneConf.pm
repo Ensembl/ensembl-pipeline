@@ -55,7 +55,7 @@ package Bio::EnsEMBL::Pipeline::GeneConf;
 use strict;
 use vars qw( %GeneConf );
 
-my $prefix='F15';
+my $prefix='SEPT20';
 
 # Hash containing config info
 %GeneConf = (

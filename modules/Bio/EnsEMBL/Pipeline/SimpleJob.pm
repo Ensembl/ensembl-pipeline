@@ -78,7 +78,10 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 #use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_MiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BigGene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Genewise_Builder;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
