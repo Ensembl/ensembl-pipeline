@@ -287,6 +287,7 @@ sub runInLSF {
   my $self = shift;
   my $module = $self->analysis->module;
   my $rdb;
+  
 
   eval {
     if( $module =~ /::/ ) {
@@ -298,14 +299,16 @@ sub runInLSF {
 	  -dbobj => $self->adaptor->db );
     } else {
       require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-      $rdb = "Bio::EnsEMBL::Pipeline::Monitor::${module}"->new
+      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	( -analysis => $self->analysis,
 	  -input_id => $self->inputId,
 	  -dbobj => $self->adaptor->db );
     }
-
+    $self->set_status( "READING" );
     $rdb->fetch_input;
+    $self->set_status( "RUNNING" );
     $rdb->run;
+    $self->set_status( "WRITING" );
     $rdb->write_output;
     $self->set_status( "SUCCESSFUL" );
   }; 
@@ -581,6 +584,18 @@ sub retry_count {
   (defined $arg) &&
     ( $self->{_retry_count} = $arg );
   $self->{_retry_count};
+}
+
+sub remove {
+  my $self = shift;
+  
+  if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
+  if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
+  if( -e $self->object_file ) { unlink( $self->object_file ) };
+
+  if( defined $self->adaptor ) {
+    $self->adaptor->remove( $self );
+  }
 }
 
 1;

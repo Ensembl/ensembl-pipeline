@@ -18,8 +18,8 @@ Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
 
 =head1 SYNOPSIS
 
-  $jobAdaptor = $dbobj->getJobAdaptor;
-  $jobAdaptor = $jobobj->getJobAdaptor;
+  $jobAdaptor = $dbobj->get_JobAdaptor;
+  $jobAdaptor = $jobobj->adaptor;
 
 
 =head1 DESCRIPTION
@@ -546,11 +546,33 @@ sub get_all_status {
 }
 
 
+sub list_jobId_by_status {
+  my $self = shift;
+  my $status = shift;
+  my @result;
+  my @row;
+
+  my $sth = $self->preprare( qq{
+    SELECT j.jobId
+      FROM job j, current_status c
+     WHERE j.jobId = c.jobId
+       AND c.status = '$status'
+     ORDER BY jobId } );
+  $sth->execute;
+  
+  while( @row = $sth->fetchrow_array ) {
+    push( @result, $row[0] );
+  }
+  
+  return @result;
+}
+
+
 sub db {
   my ( $self, $arg )  = @_;
   ( defined $arg ) &&
     ($self->{_db} = $arg);
-  $self->{_db};;
+  $self->{_db};
 }
 
 sub prepare {

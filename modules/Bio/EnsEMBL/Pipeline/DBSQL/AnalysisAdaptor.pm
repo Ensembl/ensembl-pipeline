@@ -74,6 +74,10 @@ sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
 
+  if( defined $self->{_cache}->{$id} ) {
+    return $self->{_cache}->{$id};
+  }
+
   my $sth = $self->prepare( q{
     SELECT analysisId, logic_name,
            program,program_version,program_file,
@@ -90,7 +94,9 @@ sub fetch_by_dbID {
     return undef;
   }
 
-  return $self->_objFromHashref( $rowHashRef );
+  my $anal = $self->_objFromHashref( $rowHashRef );
+  $self->{_cache}->{$anal->dbID} = $anal;
+  return $anal;
 }
 
 sub fetch_by_newest_logic_name {
@@ -118,7 +124,7 @@ sub fetch_by_newest_logic_name {
 }
 
 
-sub fetch_all_logic_name {
+sub fetch_by_logic_name {
   my $self = shift;
   my $logic_name = shift;
   my @result;

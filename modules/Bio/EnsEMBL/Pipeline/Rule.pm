@@ -103,7 +103,6 @@ sub add_condition {
 =cut
 
 
-
 sub list_conditions {
   my $self = shift;
 
@@ -127,6 +126,38 @@ sub goalAnalysis {
     ( $self->{_goal} = $arg );
   $self->{_goal};
 }
+
+
+# return 0 if nothing can be done or $goalAnalysis,
+# if it should be done.
+
+sub check_for_analysis {
+  my $self = shift;
+  my @analist = @_;
+  my %anaHash;
+
+  # reimplement with proper identity check!
+  my $goal = $self->goalAnalysis->dbID;
+
+  for my $analysis ( @analist ) {
+    $anaHash{$analysis->logic_name} = $analysis;
+    if( $goal == $analysis->dbID ) {
+      # already done
+      return 0;
+    }
+  }
+
+  for my $cond ( @{$self->list_conditions} ) {
+    if( ! defined $anaHash{$cond} ) {
+      return 0;
+    }
+  }
+  return $self->goalAnalysis;
+}
+
+
+
+
 
 sub dbID {
   my ( $self, $dbID ) = @_;
