@@ -93,12 +93,11 @@ sub _initialize {
 	    my @f = @$features;
 	    
 	    foreach my $f (@f) {
-		
 		if ($f->isa("Bio::EnsEMBL::FeaturePair")) {
 		    $self->addFeature($f);
 		} else {
 		    $self->warn("Can't add feature [$f]. Not a Bio::EnsEMBL::FeaturePair");
-		}
+        }
 	    }
 	} else {
 	    $self->throw("[$features] is not an array ref.");
@@ -116,7 +115,7 @@ sub _initialize {
     Returns :   Bio::Seq object
     Args    :   Bio::Seq object
 
-=cut 
+=cut
 
 sub genomic_sequence {
     my( $self, $value ) = @_;    
@@ -165,7 +164,7 @@ sub get_all_FeaturesById {
     my  %idhash;
 
     FEAT: foreach my $f ($self->get_all_Features) {
-#	print("Feature is $f " . $f->seqname . "\t" . $f->hseqname . "\n");
+#	print STDERR ("Feature is $f " . $f->seqname . "\t" . $f->hseqname ."\n");
     if (!(defined($f->hseqname))) {
 #	    $self->warn("No hit name for " . $f->seqname . "\n");
 	    next FEAT;
@@ -173,8 +172,9 @@ sub get_all_FeaturesById {
 	if (defined($idhash{$f->hseqname})) {
 	    push(@{$idhash{$f->hseqname}},$f);
 	} else {
-	    $idhash{$f->id} = [];
-	    push(@{$idhash{$f->hseqname}},$f);
+	    #$idhash{$f->id} = []; #shouldn't this be hseqname not id
+	    $idhash{$f->hseqname} = [];
+        push(@{$idhash{$f->hseqname}},$f);
 	}
     }
 
@@ -262,7 +262,7 @@ sub make_miniseq {
     my ($self,@features) = @_;
 
     my $strand = $features[0]->strand;
-    
+    my $seqname = $features[0]->seqname;;
     @features = sort {$a->start <=> $b->start} @features;
     
     my $count  = 0;
@@ -276,8 +276,7 @@ sub make_miniseq {
     my $prevcdnaend = 0;
     
     foreach my $f (@features) {
-#      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n";
-      
+    # print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
 	if ($f->strand != $strand) {
 	    $self->throw("Mixed strands in features set");
 	}
@@ -307,7 +306,8 @@ sub make_miniseq {
 	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
 
-	    $newfeature->start     ($start);
+        $newfeature->seqname ($f->hseqname);
+        $newfeature->start     ($start);
 	    $newfeature->end       ($end);
 	    $newfeature->strand    (1);
 	    $newfeature->attach_seq($self->genomic_sequence);
@@ -345,7 +345,9 @@ sub make_miniseq {
 	my $cdna_start = $current_coord;
 	my $cdna_end   = $current_coord + ($f->end - $f->start);
 	
-	my $tmp = new Bio::EnsEMBL::SeqFeature(-start => $cdna_start,
+	my $tmp = new Bio::EnsEMBL::SeqFeature(
+                           -seqname => $f->seqname.'.cDNA',
+                           -start => $cdna_start,
 					       -end   => $cdna_end,
 					       -strand => $strand);
 	
@@ -359,7 +361,10 @@ sub make_miniseq {
 	$current_coord = $cdna_end+1;
     }
 	
-    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => 'Genomic',
+    #changed id from 'Genomic' to seqname
+    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(
+                               -id        => $seqname,
+                              #-id        => 'Genomic',
 						      -pairalign => $pairaln);
 
     my $newgenomic = $miniseq->get_cDNA_sequence;
@@ -391,8 +396,8 @@ sub exon_padding {
 
 sub print_FeaturePair {
     my ($self,$nf) = @_;
-    
-    print(STDERR "FeaturePair is " . $nf->id    . "\t" . 
+    #changed $nf->id to $nf->seqname
+    print(STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
 	  $nf->start . "\t" . 
 	  $nf->end   . "\t(" . 
 	  $nf->strand . ")\t" .
@@ -569,6 +574,7 @@ sub minirun {
     my ($self) = @_;
 
     my $idhash = $self->get_all_FeaturesById;
+    
     my @ids    = keys %$idhash;
     print ("here\n");
    # $self->get_all_Sequences(@ids);
@@ -585,20 +591,18 @@ sub minirun {
 
 	eval {
 	    my $miniseq = $self->make_miniseq(@$features);
-	    
 	    my $hseq    = $self->get_Sequence($id);
 #	    print("Hseq $id " . $hseq->seq . "\n");
 	    if (!defined($hseq)) {
 		$self->throw("Can't fetch sequence for id [$id]\n");
 	    }
-	    
-	    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome(-genomic => $miniseq->get_cDNA_sequence,
-								      -est     => $hseq);
+	    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome(  -genomic => $miniseq->get_cDNA_sequence,
+								                                    -est     => $hseq);
 	    
 	    $eg->run;
 	    
 	    my @f = $eg->output;
-	    my @newf;
+        my @newf;
 	    
 	    foreach my $f (@f) {
 #		print(STDERR "Aligned output is " . $f->id    . "\t" . 
@@ -610,12 +614,15 @@ sub minirun {
 #		      $f->hend       . "\t(" .
 #		      $f->hstrand    . ")\n");
 		
-		my @newfeatures = $miniseq->convert_FeaturePair($f);
-		
+        #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
+		my @newfeatures = $miniseq->convert_FeaturePair($f);         
 		push(@newf,@newfeatures);
 		
 		foreach my $nf (@newf) {
-		  $nf->hseqname($id);
+        #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+		  $nf->seqname($f->seqname);
+          $nf->hseqname($id);
+        #end BUGFIX
 #		    print(STDERR "Realigned output is " . $nf->id    . "\t" . 
 #			  $nf->start     . "\t" . 
 #			  $nf->end       . "\t(" . 
@@ -630,7 +637,8 @@ sub minirun {
 	    
 	    push(@{$self->{_output}},@newf);
 	    foreach my $nf (@newf) {
-	      print(STDERR "Realigned output is " . $nf->id    . "\t" . 
+        #changed $nf->id to $nf->seqname
+        print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
 		    $nf->start     . "\t" . 
 		    $nf->end       . "\t(" . 
 		    $nf->strand    . ")\t" .
