@@ -100,10 +100,10 @@ sub analysis {
 }
 
 
-=head2 LSF_id
+=head2 submission_id
 
-  Title   : LSF_id
-  Usage   : $self->LSF_id($id)
+  Title   : submission_id
+  Usage   : $self->submission_id($id)
   Function: Get/set method for the LSF id of the job
   Returns : int
   Args    : int
@@ -111,7 +111,7 @@ sub analysis {
 =cut
 
 
-sub LSF_id {
+sub submission_id {
     my ($self) = @_;
 
     $self->throw("Method input_id not implemented");
