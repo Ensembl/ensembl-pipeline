@@ -111,10 +111,105 @@ sub score_Transcripts{
     ############################################################
     # cluster transcripts into genes according to exon overlap
     # but without make exons unique:
-    my @clusters = $self->cluster_Transcripts( $self->transcripts );
+    my @clusters = @{$self->cluster_Transcripts( $self->transcripts )};
+
+    ############################################################
+    # get the sites of alt-splicing on each transcript cluster
+    foreach my $cluster ( @clusters ){
+
+      $self->get_alternative_sites( $cluster );
+
+ 
+    }
     
 
 }
+
+############################################################
+
+sub get_alternative_sites{
+  my ($self, $cluster ) = @_;
+
+  my @trans = @{ $cluster->get_Transcripts };
+
+  my %exon2transcript;
+  my @all_exons;
+  foreach my $tran ( @trans ){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
+      $exon2transcript{ $exon } = $tran;
+      push( @all_exons, $exon );
+    }
+  }
+
+  ############################################################
+  # cluster the exons according to overlap
+  $exon_cluster_list = $self->_cluster_Exons( @all_exons );
+  @clusters = sort { $a->start <=> $b->start } $cluster_list->sub_SeqFeature;
+  
+  
+
+
+}
+  
+############################################################
+
+=head2 _cluster_Exons
+ 
+ Function: it cluster exons according to overlap,
+           it returns a Bio::EnsEMBL::SeqFeature, where the sub_SeqFeatures
+           are exon_clusters, which are at the same time Bio::EnsEMBL::SeqFeatures,
+           whose sub_SeqFeatures are exons
+=cut
+
+sub _cluster_Exons{
+  my ($self, @exons) = @_;
+  
+  # no point if there are no exons!
+  return unless ( scalar( @exons) > 0 );   
+
+  # keep track about in which cluster is each exon
+  my %exon2cluster;
+  
+  # main cluster feature - holds all clusters
+  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  
+  # sort exons by start coordinate
+  @exons = sort { $a->start <=> $b->start } @exons;
+
+  # Create the first exon_cluster
+  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  
+  # Start off the cluster with the first exon
+  $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
+  $exon_cluster->strand($exons[0]->strand);    
+  $cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');
+  
+  # Loop over the rest of the exons
+  my $count = 0;
+  
+ EXON:
+  foreach my $exon (@exons) {
+    if ($count > 0) {
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( $exon_cluster->overlaps($exon) && ( $exon->strand == $exon_cluster->strand) ) { 
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+      }  
+      else {
+	# Start a new cluster
+	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+	$exon_cluster->strand($exon->strand);
+	
+	# and add it to the main_cluster feature
+	$cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
 
 ############################################################
 
