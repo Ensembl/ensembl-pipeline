@@ -47,8 +47,9 @@ my $protein_annotation;
 my @whole_commandline_tables;
 my @partial_commandline_tables;
 my $pipeline_tables = 1;
-my $sequence_tables = 1;
 my $no_defaults;
+my $help;
+my $all;
 &GetOptions(
             'dbhost:s'   => \$host,
             'dbport:n'   => \$port,
@@ -69,46 +70,43 @@ my $no_defaults;
             'raw_computes!' => \$raw_computes,
             'genes!' => \$genes,
             'protein_annotation!' => \$protein_annotation,
+            'no_defaults!' => \$no_defaults,
+            'all!' => \$all,
            ) or throw("Can't get options");
 
+if ($help) {
+    exec('perldoc', $0);
+}
+
 unless ($host && $dbname && $dbuser) {
-  throw("Can't run without database argument");
+  throw("Can't run without database argument, use -help option ",
+        "to see commandline args");
 }
-my %whole_tables;
-my %partial_tables;
-if(!$no_defaults){
-  %whole_tables = %{setup_tablelist(\%whole_tables, 
-                                     \@whole_commandline_tables)};
-  %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                       \@partial_commandline_tables)};
-  %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                       \@partial_standard_tables)};
-  %whole_tables = %{setup_tablelist(\%whole_tables, 
-                                     \@whole_standard_tables)};
-  if($pipeline_tables){
-    %whole_tables = %{setup_tablelist(\%whole_tables, 
-                                       \@whole_pipeline_tables)};
-  }
-  if($raw_computes){
-    %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                         \@raw_compute_tables)};
-  }
-  if($genes){
-    %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                        \@gene_tables)};
-  }
-  if($protein_annotation){
-    %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                         \@protein_annotation_tables)};
-  }
-}else{
-  %whole_tables = %{setup_tablelist(\%whole_tables, 
-                                     \@whole_commandline_tables)};
-  %partial_tables = %{setup_tablelist(\%partial_tables, 
-                                       \@partial_commandline_tables)};
+
+unless($output_dir){
+  throw("You must specify an output directory on the command line with the ".
+        "option -output_dir, use -help to get docs");
 }
-@whole_tables = keys(%whole_tables);
-@partial_tables = keys(%partial_tables);
+
+if(!$seq_region_name || !$cs_name){
+  throw("You must specify a seq_region_name and a coord_system_name on the ".
+        "commandline use -help for more information about commandline options");
+}
+
+if($no_defaults){
+  print "Only tables specified with -whole_table or -partial_table ".
+    "will now be dumped regardless of other commandline options\n";
+}
+if($all){
+  print "All tables will be dumped regardless of your commandline ".
+    "options\n";
+}
+
+if($all && $no_defaults){
+  throw("You can specify -all and -no_defaults this are mutually ".
+        "exclusive options see -help to read docs");
+}
+
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
     -host   => $host,
@@ -118,6 +116,7 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 );
 
 my $dump_dir = $output_dir."/".$dbname;
+
 if(! -e $dump_dir){
   my $mkdir_cmd = "mkdir $dump_dir";
   print $mkdir_cmd."\n";
@@ -127,6 +126,7 @@ if(! -e $dump_dir){
   throw("Couldn't make ".$dump_dir." $! ") unless(-d $dump_dir);
   system($chmod_cmd); 
 }
+
 my %dumped_whole;
 my $slicedump = Bio::EnsEMBL::Pipeline::Utils::SliceDump->new
   (
@@ -143,6 +143,55 @@ if(!$slice){
   throw("Have been unable to fetch slice for ".$seq_region_name." ".
         $cs_name);
 }
+
+my %whole_tables;
+my %partial_tables;
+if($no_defaults){
+  %whole_tables = %{setup_tablelist(\%whole_tables, 
+                                    \@whole_commandline_tables)};
+  %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                      \@partial_commandline_tables)};
+  @whole_tables = keys(%whole_tables);
+  @partial_tables = keys(%partial_tables);
+}elsif($all){
+  my @tables = @{get_tables($db)};
+  foreach my $table(@tables){
+    my $method = "dump_".$table."_table";
+    if($slicedump->can($method)){
+      push(@partial_tables, $table);
+    }else{
+      push(@whole_tables, $table);
+    }
+  }
+}else{
+  %whole_tables = %{setup_tablelist(\%whole_tables, 
+                                    \@whole_commandline_tables)};
+  %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                      \@partial_commandline_tables)};
+  %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                      \@partial_standard_tables)};
+  %whole_tables = %{setup_tablelist(\%whole_tables, 
+                                    \@whole_standard_tables)};
+  if($pipeline_tables){
+    %whole_tables = %{setup_tablelist(\%whole_tables, 
+                                      \@whole_pipeline_tables)};
+  }
+  if($raw_computes){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@raw_compute_tables)};
+  }
+  if($genes){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@gene_tables)};
+  }
+  if($protein_annotation){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@protein_annotation_tables)};
+  }
+  @whole_tables = keys(%whole_tables);
+  @partial_tables = keys(%partial_tables);
+}
+
 foreach my $table(@whole_tables){
   if(!$dumped_whole{$table} || -e ($dump_dir."/".$table)){
     $slicedump->dump_table($table);
@@ -192,6 +241,22 @@ PATH:foreach my $path(@paths){
 
 #print STDERR "Have ".@pieces." slices\n";
 #print STDERR "Have hash with ".keys(%coord_system)." keys\n";
+my %table_coord_systems;
+my $meta_container = $db->get_MetaCoordContainer;
+TABLE:foreach my $table(@partial_tables){
+  my @coord_systems = @{$meta_container->
+                          fetch_all_CoordSystems_by_feature_type
+                            ($table)};
+  if(@coord_systems == 0){
+    next TABLE;
+  }
+  foreach my $cs(@coord_systems){
+    if(!$table_coord_systems{$table}){
+      $table_coord_systems{$table} = {};
+    }
+    $table_coord_systems{$table}->{$cs->name} = 1;
+  }
+}
 my %partial_dumped;
 SLICE:foreach my $consituent_slice(@pieces){
   print "Replacing ".$slicedump->slice->name." with ".
@@ -201,6 +266,11 @@ SLICE:foreach my $consituent_slice(@pieces){
     $partial_dumped{$consituent_slice->name} = {};
   }
   TABLE:foreach my $table(@partial_tables){
+      if($table_coord_systems{$table}){
+        if(!$table_coord_systems{$table}->{$consituent_slice}){
+          next TABLE;
+        }
+      }
       if( $partial_dumped{$consituent_slice->name}->{$table}){
         next TABLE;
       }else{
@@ -234,3 +304,96 @@ sub setup_tablelist{
   }
   return $hash;
 }
+
+
+sub get_tables {
+  my ($db) = @_;
+
+ 	my $query = "show tables";
+  
+	my $sth = $db->prepare($query);
+	my $res = $sth->execute;
+  
+	my @tables;
+  
+	while (my $ref = $sth->fetchrow_arrayref) {
+    push(@tables,$ref->[0]);
+	}
+
+  return \@tables;
+}
+
+
+=pod
+
+=head1 NAME slice_to_sql.pl
+
+ mail ensembl-dev@ebi.ac.uk
+
+=head1 SYNOPSIS
+
+This is a script which given information about a slice and a 
+list of tables will dump information about that slice in a form
+which can then be reloaded using mysqlimport
+
+=head1 OPTIONS
+
+DB Connection Details
+
+
+   -dbhost     The host where the pipeline database is.
+   -dbport     The port.
+   -dbuser     The user to connect as.
+   -dbpass     The password to use.
+   -dbname     The database name.
+
+Slice details
+
+  -coord_system_name the name of the coordinate system you want the
+  slice from
+  -coord_system_version the version of the coordinate system you want
+  the slice from
+  -seq_region_name  seq_region details
+  -seq_region_start
+  -seq_region_end
+  -seq_region_strand
+
+Other details
+
+  -output_dir the directory the files will be dumped into
+  -verbose prints information about what the script is doing
+
+Tables to dump. The script requires a list of tables to dump.
+There is a list of standard tables which involve sequence storage.
+There are other groupings of tables like pipeline, raw compute and genes
+which mean you don't need to specify every table required on the 
+commandline just a single option'. Those tables which are to be dumped
+partially need to have a method implemented in SliceDump in the form
+dump_TABLENAME_table otherwise the whole table will just be dumped
+
+  -whole_table, name of a table to dump the entire contents of
+  -partial_table, name of the table to dump contents based on the
+  specified seq_region
+  -pipeline dump the pipeline tables, by default this is on but it can be
+  switched off with -nopipeline
+  -raw_computes dump the raw compute tables
+  -genes dump the gene tables
+  -protein_annotation dump the protein_annotation tables
+  
+  -no_defaults this option means only the tables specified on the
+  commandline with the options -whole_table or -partial_table will
+  be dumped none of the standard tables or table group options will be
+  used
+  -all dump all the tables in the database as defined by show tables
+
+the complusory options are the database arguments and slice name
+and coord system name, all other arguments are optional
+
+=head1 EXAMPLES
+
+
+=head1 SEE ALSO
+
+  Bio::EnsEMBL::Pipeline::Utils::SliceDump
+
+=cut
