@@ -366,14 +366,14 @@ sub flush_runs {
         }
         $cmd .= " -q $queue "   if defined $queue;
         $cmd .= " -J $jobname " if defined $jobname;
-        
-        # Horrible hard coded hack to avoid sending Fgenesh 
-        # jobs to the rlx blades
-        if ( $adaptor->logic_name eq 'Fgenesh') {
-            $cmd .= " -Ralpha";
+
+        #Horrible hard coded hack to avoid sending Fgenesh 
+        #jobs to the rlx blades        
+        if ( $self->analysis->logic_name eq 'Fgenesh' ) {
+            $cmd .= " -R'alpha' ";
         }
-        
-        $cmd .= " -r -e " . $lastjob->stderr_file . " -E \"$runner -check\" ";
+
+        $cmd .= " -r -e " . $lastjob->stderr_file . " ";
 
         # check if the password has been defined, and write the
         # "connect" command line accordingly (otherwise -pass gets the
@@ -388,7 +388,7 @@ sub flush_runs {
               $runner . " -host $host -dbuser $username -dbname $dbname " . join ( " ", @{ $batched_jobs{$queue} } );
         }
 
-        print STDERR "$cmd\n";
+        print STDERR "\n$cmd\n";
         open( SUB, "$cmd 2>&1 |" );
 
         while (<SUB>) {
@@ -399,7 +399,7 @@ sub flush_runs {
         close(SUB);
 
         if ( !defined $lsfid ) {
-            print STDERR ( "Couldnt submit " . join ( " ", @{ $batched_jobs{$queue} } ) . " to LSF" );
+            print STDERR ( "Could not submit " . join ( " ", @{ $batched_jobs{$queue} } ) . " to LSF " );
             foreach my $jobid ( @{ $batched_jobs{$queue} } ) {
                 my $job = $adaptor->fetch_by_dbID($jobid);
                 $job->set_status("FAILED");
@@ -532,11 +532,15 @@ sub runRemote {
         $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
     }
 
-    $cmd = "bsub -C0 -q " . $queue . " -o " . $self->stdout_file .
+    $cmd = "bsub -C0 -q " . $queue . " -o " . $self->stdout_file;
 
-      #    " -q acarichunky " .
-      #    " -R osf1 ".
-      " -e " . $self->stderr_file . " -E \"$runner -check\" ";
+    #Horrible hard coded hack to avoid sending Fgenesh 
+    #jobs to the rlx blades        
+    if ( $self->analysis->logic_name eq 'Fgenesh' ) {
+        $cmd .= " -R'alpha' ";
+    }
+
+    $cmd .= " -e " . $self->stderr_file . " ";
 
     if ( !defined $useDB ) {
         $useDB = 1;
@@ -576,7 +580,7 @@ sub runRemote {
     close(SUB);
 
     if ( $self->LSF_id == -1 ) {
-        print STDERR ( "Couldnt submit " . $self->dbID . " to LSF" );
+        print STDERR ( "Could not submit " . $self->dbID . " to LSF" );
     }
     else {
         $self->retry_count( $self->retry_count + 1 );
