@@ -80,8 +80,8 @@ use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Pipeline::Tools::BPlite;
+use Bio::Root::RootI;
+use Bio::Tools::BPlite;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -130,6 +130,7 @@ sub new {
     $self->{'_ungapped'}  = undef;         # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
     $self->{'_ungapped_features'} = [];
+
     #print STDERR "@args\n";
     # Now parse the input options and store them in the object
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$ungapped,$options) = 
