@@ -1079,8 +1079,12 @@ sub set_stop_codon{
     if ( $end + 3 <= ($end_exon->end - $end_exon->start + 1) ){
       my $next_codon = $bioseq->subseq( $end+1, $end+3 );      
       if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
-	print STDERR "next codon is a stop - extending translation\n" if $verbose;
+	print STDERR "simple-case: next codon is a stop - extending translation\n" if $verbose;
+	#print STDERR "Before:\n";
+	#$self->_print_Translation( $transcript->translation );
 	$transcript->translation->end( $end + 3 );
+	#print STDERR "After:\n";
+	#$self->_print_Translation( $transcript->translation );
 	return $transcript;
       }
       else{
@@ -1114,7 +1118,7 @@ sub set_stop_codon{
       
       my $next_codon = $donor.$acceptor;
       if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
-	print STDERR "next codon is a stop - extending translation\n" if $verbose;
+	print STDERR "shared-codon: next codon is a stop - extending translation\n" if $verbose;
 	
 	$transcript->translation->end_Exon( $next_exon );
 	$transcript->translation->end( $acceptor_bases_count );
@@ -1157,15 +1161,28 @@ sub set_stop_codon{
 
 	  ############################################################
 	  # calculate the next codon start/end in chr coordinates 
-	  my $codon_start = $slice_start + ( $end_exon->start + $end - 1 ) - 1;
+	  
+	  #print STDERR "exon_end: ".$end_exon->end."\n";
+	  my $codon_start = $slice_start + ( $end_exon->start + $end - 1 );
 	  my $codon_end   = $codon_start + 2;
+	  
+	  #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
 	  my $codon_slice = $adaptor
 	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
 	  my $codon = $codon_slice->seq;
 	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
-	    print STDERR "next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
+	    print STDERR "forward-strand:next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
+	    
+	    #print STDERR "Before:\n";
+	    #$self->_print_Transcript( $transcript );
+	    #$self->_print_Translation( $transcript->translation );
+	    
 	    $end_exon->end( $end_exon->end + $acceptor_bases_count );
 	    $transcript->translation->end( $end + 3 );
+	    
+	    #print STDERR "After:\n";
+	    #$self->_print_Transcript( $transcript );
+	    #$self->_print_Translation( $transcript->translation );
 	    return $transcript;
 	  }
 	  else{
@@ -1178,17 +1195,21 @@ sub set_stop_codon{
 	  
 	  ############################################################
 	  # calculate the next codon start/end in chr coordinates 
+	  #print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n";
 	  my $codon_end   = $slice_start + $end_exon->end - $end - 1;
 	  my $codon_start = $codon_end - 2;
+	  #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
 	  my $codon_slice = $adaptor
 	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
 	  my $pre_codon = $codon_slice->seq;
+	  #print STDERR "sequence: $pre_codon\n";
 
 	  # need to reverse and complement:
 	  my $codon;
-	  ( $codon = reverse $pre_codon ) = ~ tr/gatcGATC/ctagCTAG/; 
+	  ( $codon = reverse $pre_codon ) =~tr/gatcGATC/ctagCTAG/; 
+	  #print STDERR "revcomp sequence: $codon\n";
 	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
-	    print STDERR "next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
+	    print STDERR "reverse-strand: next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
 	    $end_exon->start( $end_exon->start - $acceptor_bases_count);
 	    $transcript->translation->end( $end + 3 );
 	    return $transcript;
