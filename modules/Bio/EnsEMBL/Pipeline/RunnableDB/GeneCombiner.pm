@@ -306,6 +306,9 @@ sub run{
   print STDERR "getting genes of type $ESTGENE_TYPE\n";
   my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE ) };
   
+  # filter the est genes on basis of ORF size
+  @est_genes = @{$self->_check_est_genes(\@est_genes)};
+
   # get ensembl genes (from GeneBuilder)
   print STDERR "getting genes of type $ENSEMBL_TYPE\n";
   my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE ) };
@@ -408,6 +411,7 @@ sub run{
 	 foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+	  # do not reject any transcript on basis of intron size - assume this has been handled in the earlier stages as each stage has different rules
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -2342,6 +2346,33 @@ sub _transfer_transcript_supporting_evidence{
     }
 }
 
+############################################################
+
+sub _check_est_genes{
+  my ($self, $genearrayref) = @_;
+  my @checked_genes;
+  foreach my $est_gene(@{$genearrayref}){
+    my $added_trans = 0;
+    my $gene = new Bio::EnsEMBL::Gene;
+    $gene->type($est_gene->type);
+    $gene->analysis($est_gene->analysis);
+    
+    foreach my $transcript(@{$est_gene->get_all_Transcripts}){
+      print STDERR "looking at transcript " . $transcript->dbID . "\n"; 
+      next unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_get_ORF_coverage($transcript) >= 50;
+    #  print "keeping transcript " . $transcript->dbID . "\n";
+      $gene->add_Transcript($transcript);
+      $added_trans++;
+    }
+    
+    # don't add the gene unless it has at least one transcript!
+    next unless $added_trans;
+    push(@checked_genes, $gene);
+
+  }
+
+  return \@checked_genes;
+}
 ############################################################
 
 1;
