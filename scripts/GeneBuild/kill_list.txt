@@ -135,3 +135,32 @@ O54850 Endonuclease/reverse transcriptase scp
 Q61787 ORF 2 scp
 Q61786 ORF 1 scp
 Q60712 ORF 1 protein scp
+O00172 doesnt look healthy eb
+Q8TE30 HindIII repetitive element eb
+Q9Y443 HindIII repetitive element eb
+Q8N4M7 Hypothetical protein that is possibly based on a pseudogene
+NP_775848 Hypothetical protein that is possibly based on a pseudogene
+Q07826
+O60375 Hypothetical protein fragment 
+O95133 Partial protein, although now has a HUGO id
+Q8N7L3 Line element
+Q8NAQ0 Line element
+O00370 Line element
+Q14755 Line element
+Q8N281 Line element
+Q8N9G8 Line element
+Q8N212 Line element
+O00172 Line element
+Q8WY74 Line element
+Q8N929 Line element
+Q8N933 Line element
+Q8NBE4 Line element
+Q8N7V1 Line element
+Q8N545 Line element
+Q8N1T7 Line element
+Q8WXC4 Line element
+Q8WYV8 Line element
+Q8N1K2 Line element
+Q8NB08 Line element
+Q9P074 hypothetical gene fragment that contains repeats - dta
+Q8NF61 protein fragment -dta 
