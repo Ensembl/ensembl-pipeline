@@ -333,9 +333,9 @@ sub _test_for_fuzzy_semiexact_Merge{
     $allowed_mismatch =  $self->splice_mismatch;
   }
   
-  print STDERR "=========== comparing ================\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran );
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran );
+  #print STDERR "=========== comparing ================\n";
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran );
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran );
   
   my @exons1 = @{$est_tran->get_all_Exons};
   my @exons2 = @{$ens_tran->get_all_Exons};	
@@ -353,8 +353,8 @@ sub _test_for_fuzzy_semiexact_Merge{
     
   EXON2:
     for (my $k=$start; $k<=$#exons2; $k++){
-      print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
-        " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+      #print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
+      #  " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
       
       # we allow some mismatches at the extremities
       #                        ____     ____     ___   
@@ -364,12 +364,12 @@ sub _test_for_fuzzy_semiexact_Merge{
       
       # if there is no overlap, go to the next EXON2
       if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
+	#print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
 	next EXON2;
       }
       # if there is no overlap and we had found a link, there is no merge
       elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	print STDERR "foundlink = 1 and no overlap --> leaving\n";
+	#print STDERR "foundlink = 1 and no overlap --> leaving\n";
 	$merge = 0;
 	last EXON1;
       }	
@@ -384,8 +384,8 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  $foundlink = 1;
 	  $overlaps++;
 	  $merge = 1;
-	  print STDERR "found link\n";
-	  print STDERR "merged single exon transcript\n";
+	  #print STDERR "found link\n";
+	  #print STDERR "merged single exon transcript\n";
 	  last EXON1;
 	}
 	elsif ( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
@@ -394,7 +394,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  $foundlink = 1;
 	  $overlaps++;
 	  $start = $k+1;
-	  print STDERR "found link\n";
+	  #print STDERR "found link\n";
 	  next EXON1;
 	}
       }
@@ -404,7 +404,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	      ( $foundlink == 1 )                  &&
 	      ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
 	    ){
-	print STDERR "link completed, merged transcripts\n";
+	#print STDERR "link completed, merged transcripts\n";
 	$merge = 1;
 	$overlaps++;
 	last EXON1;
@@ -419,7 +419,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	    ){
 	$overlaps++;
 	$start = $k+1;
-	print STDERR "continue link\n";
+	#print STDERR "continue link\n";
 	next EXON1;
       }
       
