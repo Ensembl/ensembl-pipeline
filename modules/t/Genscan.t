@@ -2,7 +2,7 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN { $| = 1; plan test => 6;}
+BEGIN { $| = 1; plan test => 9;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
 use Bio::PrimarySeq;
@@ -49,7 +49,6 @@ foreach my $feat_pair (@results) {
       $exon->end          ($feat_pair->end);
       $exon->strand       ($feat_pair->strand);
       $exon->phase        ($feat_pair->phase);
-      $exon->contig_id    ($clone->id);
       $exon->contig       ($clone);
 
       foreach my $full_pep (@peptides) {
@@ -77,15 +76,16 @@ sub display {
   
   foreach my $obj (@results) {
 
-    print ($obj->gffstring . "\n");
+    print STDERR ($obj->gffstring . "\n");
 
     if ($obj->sub_SeqFeature) {
 
       foreach my $exon ($obj->sub_SeqFeature) {
-	print "Exon: ".$exon->gffstring."\n";
+	print STDERR "Exon: ".$exon->gffstring."\n";
       }
     }
   }
+  return 1;
 }
 
 sub set_seq {
