@@ -2,8 +2,6 @@
 #
 # Cared for by Ensembl <ensembl-dev@ebi.ac.uk>
 #
-# Based on VC_EponineTSS.pm
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -85,7 +83,7 @@ sub new {
     
     $self->throw("Analysis object required") unless ($self->analysis);
     
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::VC_MarkovRegions');
+    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::MarkovRegions');
     return $self;
 }
 
@@ -137,7 +135,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
-        #creates empty Bio::EnsEMBL::Runnable::EponineTSS object
+        #creates empty Bio::EnsEMBL::Runnable::MarkovRegions object
         $self->{'_runnable'} = $runnable->new
 	    ( '-threshold'  => $parameters{'-threshold'},
 	      '-iterations' => $parameters{'-iterations'},
