@@ -218,38 +218,40 @@ sub get_tmp_file {
 sub write_sequence_to_file {
     my ($self, $seqobj) = @_;
   
-		if (!defined($seqobj)) {
-			$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
-		}
-		if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeq")) {
-			$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file. Currently [$seqobj]");
-		}
+    if (!defined($seqobj)) {
+	$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
+    }
+    if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeq")) {
+        $self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file. Currently [$seqobj]");
+    }
 
-		my $file      = $self->get_tmp_file($self->workdir,"seq",".fa");
-		my $clone_out = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
+    my $file      = $self->get_tmp_file($self->workdir,"seq",".fa");
+    my $clone_out = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
       
-		$clone_out->write_seq($seqobj);
+    $clone_out->write_seq($seqobj);
 
-		$self->file($file);
-         return $file;
-	}
+    $self->file($file);
+    return $file;
+}
 
 sub file {
-	my ($self,$arg) = @_;
+    my ($self,$arg) = @_;
 
-	if (!defined($self->{_files})) {
-		$self->{_files} = [];
-	}
-	if (defined($arg)) {
-		push(@{$self->{_files}},$arg);
-	}
-	return @{$self->{_files}};
+    if (!defined($self->{_files})) {
+	$self->{_files} = [];
+    }
+    if (defined($arg)) {
+	push(@{$self->{_files}},$arg);
+    }
+    return @{$self->{_files}};
 }
 
 sub deletefiles {
     my ($self) = @_;
 
     foreach my $result ($self->file) {
+
+        next unless -e $result;
 
         my $protected = undef; #flag for match found in $protected
 
@@ -258,7 +260,7 @@ sub deletefiles {
         }
         unless ($protected)
         {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
+            unlink ($result) or $self->throw ("Couldn't delete $result :$!");
         }
     }
 }
