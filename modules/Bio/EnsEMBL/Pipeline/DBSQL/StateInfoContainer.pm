@@ -53,6 +53,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Analysis;
+use Sys::Hostname;
 use vars qw(@ISA);
 use strict;
 
@@ -113,17 +114,19 @@ sub fetch_analysis_by_input_id {
 }
 
 
-=head2 store_input_id_type_analysis
+=head2 store_input_id_analysis
 
-Stores an input ID, class and analysis.
-Takes an input ID, class (as strings)
-and a Bio::EnsEMBL::Analysis object. Throws an
-exception if any of the inputs are invalid.
+Stores an input ID, type and analysis [optionally runtime info].
+Takes an input ID (as string), Bio::EnsEMBL::Analysis object, 
+and [optionally save_runtime_info Boolean].
+Throws an exception if any of the inputs are invalid or if 
+the analysis object does not have a type.
+ called by: Job->run_module
 
 =cut
 
 sub store_input_id_analysis {
-  my ($self, $inputId, $analysis ) = @_;
+  my ($self, $inputId, $analysis, $save_runtime_info ) = @_;
 
   $self->throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
    unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
@@ -135,13 +138,27 @@ sub store_input_id_analysis {
    unless defined($analysis->input_id_type);
 
   # do we want to use a default class here?
-
-  my $sth = $self->prepare(qq{
-    INSERT INTO input_id_analysis
-                (input_id, input_id_type, analysis_id, created)
-                values (?, ?, ?, now())
-  });
-  $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID);
+# -----------------------------------------------------------------
+  if($save_runtime_info){
+  	print "Saving runtime info\n";
+  	my $hostname = [ split(/\./, hostname()) ];
+  	my $host = shift(@$hostname);
+  	print join("\t",($inputId, $analysis->dbID, $host, $analysis->db_version)) . "\n";
+      my $sth = $self->prepare(qq{
+      	REPLACE INTO input_id_analysis
+      	(input_id, input_id_type, analysis_id, created, runhost, db_version)
+      	values (?, ?, ?, now(), ?, ?)
+      	});
+      $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version);
+  }else{
+      my $sth = $self->prepare(qq{
+      	INSERT INTO input_id_analysis
+      	(input_id, input_id_type, analysis_id, created)
+      	values (?, ?, ?, now())
+      	});
+      $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID);
+  }
+#-----------------------------------------------------------------
 }
 
 
