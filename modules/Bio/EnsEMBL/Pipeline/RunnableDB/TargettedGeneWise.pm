@@ -191,7 +191,7 @@ sub fetch_input{
   
   $self->query($slice);
   $self->protein_id($protein_id);
-  
+  print STDERR $protein_id."\n";
   # genewise runnable
   # repmasking?
 
@@ -304,12 +304,13 @@ sub write_output {
     # do a per gene eval...
     eval {
       $gene_adaptor->store($gene);
-      #print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
     }
   }
+  return @genes;
 }
 
 =head2 gw_genes
@@ -358,7 +359,7 @@ sub convert_gw_output {
     $self->warn("Setting genetype to $genetype\n");
   }
   my @results  = $self->runnable->output;
-  #print STDERR "have ".@results." from blastmini genewise\n";
+  print STDERR "have ".@results." from blastmini genewise\n";
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
@@ -411,14 +412,14 @@ sub make_genes {
   ##print STDERR "making genes\n";
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
-
+  print STDERR "have ".@$results." transcript\n";
  MAKE_GENE:  foreach my $tmpf (@$results) {
     my $transcript = $self->make_transcript($tmpf,$self->query,$genetype,$count, $analysis_obj);
-	
+    #print STDERR "have validated transcript\n";	
     # validate transcript - validate_transcript returns an array ref
     my $valid_transcripts = $self->validate_transcript($transcript);
     next MAKE_GENE unless defined $valid_transcripts;
-      
+
     my $gene;
     # make one gene per valid transcript
     foreach my $valid (@$valid_transcripts){
@@ -426,11 +427,11 @@ sub make_genes {
       $gene->type($genetype);
       $gene->analysis($analysis_obj);
       $gene->add_Transcript($valid);
-
       push(@genes,$gene);
     }
 
   }
+  #print STDERR "have made ".@genes." genes\n";
   return @genes;
 }
 
@@ -619,8 +620,8 @@ GENE:  foreach my $gene (@genes) {
 
     # did we throw exceptions?
     if ($@) {
-      #print STDERR "Couldn't reverse map gene:  [$@]\n";
-      $self->throw("couldn't reverse map gene $@");
+      print STDERR "Couldn't reverse map gene:  [$@]\n";
+      #$self->throw("couldn't reverse map gene $@");
     }
   }
 
@@ -642,7 +643,8 @@ GENE:  foreach my $gene (@genes) {
 sub check_translation {
   my ($self, $transcript) = @_;
   my $tseq;
-
+  
+  
   eval{
     $tseq = $transcript->translate;
   };
@@ -652,7 +654,7 @@ sub check_translation {
     $self->warn($msg);
     return 0;
   }
-
+  #print "translation ".$tseq->seq."\n";
   if ($tseq->seq =~ /\*/ ) {
     return 0;
   }
@@ -660,6 +662,8 @@ sub check_translation {
     return 1;
   }
 }
+
+
 
 =head2 check_coverage
 
