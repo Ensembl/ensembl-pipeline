@@ -305,10 +305,6 @@ sub flush_runs {
 
     my $this_runner = $queue->{'runner'};
 
-    if (!defined($this_runner)) {
-      print "this_runner not defined for anal $anal\n";
-    }
-
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
    
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
@@ -427,25 +423,6 @@ sub batch_runRemote {
   
   push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
  
-  if (!defined($queue)) {
-    print "queue not defined\n";
-  }
-  if (!exists($BATCH_QUEUES{$queue})) {
-    print "BATCH_QUEUES{$queue} doesn't exist\n";
-  }
-  if (!exists($BATCH_QUEUES{$queue}{'jobs'})) {
-    print "BATCH_QUEUES{$queue}{jobs} doesn't exist\n";
-  }
-  if (!defined($BATCH_QUEUES{$queue}{'jobs'})) {
-    print "BATCH_QUEUES{$queue}{jobs} not defined\n";
-  }
-  if (!exists($BATCH_QUEUES{$queue}{'batch_size'})) {
-    print "BATCH_QUEUES{$queue}{batch_size} doesn't exist\n";
-  }
-  if (!defined($BATCH_QUEUES{$queue}{'batch_size'})) {
-    print "BATCH_QUEUES{$queue}{batch_size} not defined\n";
-  }
-
   if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
