@@ -137,7 +137,7 @@ sub write_output {
     my $chrend   = $3;
 
     my $sla       = $self->db->get_SliceAdaptor();
-    my $slice     = $sla->fetch_Slice_by_chr_start_end($chrid,$chrstart,$chrend);
+    my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
     my $genseq    = $slice->get_repeatmasked_seq;
 
     

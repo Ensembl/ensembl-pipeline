@@ -190,12 +190,12 @@ sub fetch_input{
   
   # genewises
   my $sliceA = $self->genewise_db->get_SliceAdaptor();
-  my $vc = $sliceA->fetch_Slice_by_chr_start_end($chrname,$start,$end);
+  my $vc = $sliceA->fetch_by_chr_start_end($chrname,$start,$end);
   $self->vcontig($vc);
   
   # cdna
   $sliceA = $self->cdna_db->get_SliceAdaptor();
-  my $cdna_vc = $sliceA->fetch_Slice_by_chr_start_end($chrname,$start,$end);
+  my $cdna_vc = $sliceA->fetch_by_chr_start_end($chrname,$start,$end);
   $self->cdna_vc($cdna_vc);
   
 }
