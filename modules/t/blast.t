@@ -44,7 +44,7 @@ else
 #create blast object    
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
                                                              -BLAST => 'blastn',
-                                                             -DB    => 'dbEST');
+                                                             -DB    => 'dbSTS');
  
 unless ($blast)
 { print "not ok 3\n"; }
