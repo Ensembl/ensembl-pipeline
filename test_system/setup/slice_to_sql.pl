@@ -29,6 +29,7 @@ my @whole_standard_tables = ('meta', 'meta_coord',
                              'coord_system', 'analysis', 'attrib_type');
 my @whole_pipeline_tables = ('rule_goal', 'rule_conditions', 
                              'input_id_type_analysis') ;
+my @pmatch_tables = ('pmatch_feature', 'protein');
 my @partial_standard_tables = ('seq_region', 'assembly', 'dna', 
                                'seq_region_attrib', 'assembly_exception');
 my @raw_compute_tables = ('repeat_consensus', 'repeat_feature',
@@ -46,7 +47,8 @@ my $genes;
 my $protein_annotation;
 my @whole_commandline_tables;
 my @partial_commandline_tables;
-my $pipeline_tables = 1;
+my $pipeline_tables;
+my $pmatch;
 my $no_defaults;
 my $help;
 my $all;
@@ -70,6 +72,7 @@ my $all;
             'raw_computes!' => \$raw_computes,
             'genes!' => \$genes,
             'protein_annotation!' => \$protein_annotation,
+            'pmatch!' => \$pmatch,
             'no_defaults!' => \$no_defaults,
             'all!' => \$all,
            ) or throw("Can't get options");
@@ -93,10 +96,7 @@ if(!$seq_region_name || !$cs_name){
         "commandline use -help for more information about commandline options");
 }
 
-if($no_defaults){
-  print "Only tables specified with -whole_table or -partial_table ".
-    "will now be dumped regardless of other commandline options\n";
-}
+
 if($all){
   print "All tables will be dumped regardless of your commandline ".
     "options\n";
@@ -151,6 +151,26 @@ if($no_defaults){
                                     \@whole_commandline_tables)};
   %partial_tables = %{setup_tablelist(\%partial_tables, 
                                       \@partial_commandline_tables)};
+  if($pipeline_tables){
+    %whole_tables = %{setup_tablelist(\%whole_tables, 
+                                      \@whole_pipeline_tables)};
+  }
+  if($raw_computes){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@raw_compute_tables)};
+  }
+  if($genes){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@gene_tables)};
+  }
+  if($protein_annotation){
+    %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                        \@protein_annotation_tables)};
+  }
+  if($pmatch){
+     %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                         \@pmatch_tables)};
+  }
   @whole_tables = keys(%whole_tables);
   @partial_tables = keys(%partial_tables);
 }elsif($all){
@@ -188,11 +208,16 @@ if($no_defaults){
     %partial_tables = %{setup_tablelist(\%partial_tables, 
                                         \@protein_annotation_tables)};
   }
+  if($pmatch){
+     %partial_tables = %{setup_tablelist(\%partial_tables, 
+                                         \@pmatch_tables)};
+  }
   @whole_tables = keys(%whole_tables);
   @partial_tables = keys(%partial_tables);
 }
 
 foreach my $table(@whole_tables){
+  print STDERR "Looking at table ".$table."\n";
   if(!$dumped_whole{$table} || -e ($dump_dir."/".$table)){
     $slicedump->dump_table($table);
     $dumped_whole{$table} = 1;
@@ -267,18 +292,22 @@ SLICE:foreach my $consituent_slice(@pieces){
   }
   TABLE:foreach my $table(@partial_tables){
       if($table_coord_systems{$table}){
-        if(!$table_coord_systems{$table}->{$consituent_slice}){
+        if(!$table_coord_systems{$table}->{$consituent_slice
+                                           ->coord_system->name}){
+          print "Can't dump ".$table." for ".
+            $consituent_slice->coord_system->name."\n" if($verbose);
           next TABLE;
         }
       }
       if( $partial_dumped{$consituent_slice->name}->{$table}){
+        print STDERR "Have already dumped ".$table." for ".
+          $consituent_slice->name."\n" if($verbose);
         next TABLE;
       }else{
         $partial_dumped{$consituent_slice->name}->{$table} = 1;
       }
-      #print "Dumping table ".$table."\n";
       my $method = "dump_".$table."_table";
-      print "Trying to use ".$method." method\n";
+      #print "Trying to use ".$method." method\n";
       if($slicedump->can($method)){
         $slicedump->$method;
       }else{
@@ -374,16 +403,15 @@ dump_TABLENAME_table otherwise the whole table will just be dumped
   -whole_table, name of a table to dump the entire contents of
   -partial_table, name of the table to dump contents based on the
   specified seq_region
-  -pipeline dump the pipeline tables, by default this is on but it can be
-  switched off with -nopipeline
+  -pipeline dump the pipeline tables
   -raw_computes dump the raw compute tables
   -genes dump the gene tables
   -protein_annotation dump the protein_annotation tables
   
   -no_defaults this option means only the tables specified on the
   commandline with the options -whole_table or -partial_table will
-  be dumped none of the standard tables or table group options will be
-  used
+  be dumped or those from the table_group flags none of the standard 
+  tables  
   -all dump all the tables in the database as defined by show tables
 
 the complusory options are the database arguments and slice name
