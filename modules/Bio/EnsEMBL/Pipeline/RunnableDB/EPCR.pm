@@ -29,10 +29,10 @@ $epcr->write_output(); #writes to DB
 =head1 DESCRIPTION
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::EPCR to add
-functionality for reading and writing to databases.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
-extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
-required for databse access.
+functionality for reading and writing to databases. The appropriate
+Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+is required for databse access.
 
 =head1 CONTACT
 
@@ -126,7 +126,8 @@ sub runnable {
             }
         }
         $parameters {'-db'}      = $self->analysis->db_file();  
-        #creates empty Bio::EnsEMBL::Runnable::Blast object
+        $parameters {'-pcr'}     = $self->analysis->program_file();  
+        #creates empty Bio::EnsEMBL::Runnable::EPCR object
         $self->{'_runnable'} = $runnable->new(%parameters);
     }
     return $self->{'_runnable'};

@@ -32,6 +32,7 @@ Bio::EnsEMBL::Pipeline::Runnable::EPCR
 EPCR takes a Bio::Seq (or Bio::PrimarySeq) object and runs e-PCR on it. The
 resulting .out file is parsed to produce a set of feature pairs.
 Arguments can be passed to e-PCR through the arguments() method. 
+Options can be passed to e-PCR through the options() method. 
 
 =head2 Methods:
 
@@ -44,6 +45,8 @@ Arguments can be passed to e-PCR through the arguments() method.
 =item workdir($directory_name)
 
 =item arguments($args)
+
+=item options($args)
 
 =item run()
 
@@ -64,6 +67,10 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 use vars qw(@ISA);
 use strict;
 # Object preamble - inherits from Bio::Root::RootI;
@@ -75,14 +82,13 @@ use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
-#use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (-CLONE => $seq);
+    Usage   :   my $obj = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(-CLONE => $seq);
     Function:   Initialises EPCR object
     Returns :   a EPCR Object
     Args    :   A Bio::Seq object (-CLONE), a database (-DB).
@@ -99,24 +105,49 @@ sub new {
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_results'}   = undef; # file to store results of EPCR
+    $self->{'_options'}   = undef; # file to store results of EPCR
     $self->{'_protected'} = [];    # a list of files protected from deletion
     $self->{'_db'}        = undef;
     
-    my( $clone, $epcr, $db) = $self->_rearrange([qw(CLONE PCR DB)], @args);
+    my( $clone, $epcr, $db, $options) = $self->_rearrange([qw(
+	CLONE PCR DB OPTIONS
+    )], @args);
     
     $self->clone($clone) if ($clone);       
-    if ($epcr)
-    {   $self->epcr($epcr);  }
-    else
-    {   
-        eval 
-        { $self->epcr($self->locate_executable('e-PCR')); };
-        if ($@)
-        { $self->epcr('/usr/local/badger/bin/e-PCR'); }
+    $self->options($options) if ($options);       
+
+    my $bindir = $::pipeConf{'bindir'} || undef;
+    my $datadir = $::pipeConf{'datadir'} || undef;
+
+    if (-x $epcr) {
+	# passed from RunnableDB (full path assumed)
+	$self->epcr($epcr);
+    }
+    elsif ($::pipeConf{'bin_EPCR'} && -x ($epcr = "$::pipeConf{'bin_EPCR'}")) {
+	$self->epcr($epcr);
+    }
+    elsif ($bindir && -x ($epcr = "$bindir/e-PCR")) {
+	$self->epcr($epcr);
+    }
+    else {   
+	# search shell $PATH
+        eval {
+            $self->epcr($self->locate_executable('e-PCR'));
+	};
+        if ($@) {
+            $self->throw("Can't find executable e-PCR");
+	}
     }
     
-    $self->throw("sts or primer Database required ($db)\n") unless ($db);
-    $self->db($db);
+    if (-e $db) {
+	$self->db($db);
+    }
+    elsif ($db && -e "$datadir/$db") {
+	$self->db("$datadir/$db");
+    }
+    else {
+        $self->throw("sts or primer database required");
+    }
     
     return $self; 
 }
@@ -162,6 +193,24 @@ sub epcr {
     return $self->{'_epcr'};
 }
 
+=head2 options
+
+    Title   :   options
+    Usage   :   $obj->options('M=500');
+    Function:   Get/set method for e-PCR options
+    Args    :   File path (optional)
+
+=cut
+
+sub options {
+    my ($self, $args) = @_;
+    if ($args)
+    {
+        $self->{'_options'} = $args ;
+    }
+    return $self->{'_options'};
+}
+
 =head2 arguments
 
     Title   :   arguments
@@ -197,7 +246,7 @@ sub db {
 
 =head2 run
 
-    Title   :  run
+    Title   :   run
     Usage   :   $obj->run($workdir, $args)
     Function:   Runs EPCR and creates array of featurepairs
     Returns :   none
@@ -236,7 +285,8 @@ sub run {
 sub run_epcr {
     my ($self) = @_;
     #run EPCR
-    my $command = $self->epcr.' '.$self->db.' '.$self->filename.' > '.$self->results;
+    my $command = $self->epcr.' '.$self->db.' '.$self->filename.' '.
+     $self->options.' > '.$self->results;
     print STDERR "Running EPCR ($command)\n";
     $self->throw("Error running EPCR on ".$self->filename."\n")
      if system($command); 
@@ -271,6 +321,8 @@ sub parse_results {
     
     foreach my $output (@output) #loop from 3rd line
     {  
+	# OK? - this split will break if line doesn't start with whitespace
+	# needs checking ...
         my @element = split (/\s+/, $output);  
         my (%feat1, %feat2);
         
