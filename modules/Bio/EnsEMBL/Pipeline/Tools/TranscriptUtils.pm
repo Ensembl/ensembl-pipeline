@@ -766,6 +766,9 @@ sub _clone_Transcript{
   if (defined $transcript->type ){
     $newtranscript->type($transcript->type);
   }
+  if ( defined $transcript->stable_id ){
+    $newtranscript->stable_id( $transcript->stable_id );
+  }
   if ( defined $transcript->translation ){
     $newtranscript->translation($newtranslation);
   }
