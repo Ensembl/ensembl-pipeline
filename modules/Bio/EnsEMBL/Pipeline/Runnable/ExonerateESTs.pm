@@ -56,6 +56,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
