@@ -131,6 +131,25 @@ sub new {
     return $self;
 }
 
+sub genewise_db{
+ my ($self,$genewise_db) = @_;
+ if ( $genewise_db ){
+   $self->{_genewise_db} = $genewise_db;
+ }
+ return $self->{_genewise_db};
+}
+
+sub combine_db{
+ my ($self,$combine_db) = @_;
+ if ($combine_db){
+   $self->{_combine_db} = $combine_db;
+ }
+ return $self->{_combine_db};
+}
+
+
+
+
 =head2 input_id
 
  Title   : input_id
