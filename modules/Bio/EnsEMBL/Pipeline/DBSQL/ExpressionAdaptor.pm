@@ -23,10 +23,21 @@ use vars qw(@ISA);
 use strict;
 
 
-#use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 
-@ISA = qw(Bio::EnsEMBL::DBSQL::DBConnectio);
+@ISA = qw(Bio::EnsEMBL::DBSQL::DBConnection);
+
+
+############################################################
+
+sub new {
+  my($class, @args) = @_;
+    
+  #call superclass constructor
+  my $self = $class->SUPER::new(@args);
+  
+  return $self;
+}
 
 
 ####################################################################
@@ -226,27 +237,27 @@ sub get_Tree_by_id{
   my %tree;
   
   # get the root of the tree
-  my $q = qq ( SELECT Ontology.Name
+  my $q1 = qq ( SELECT Ontology.Name
 	       FROM   Ontology
 	       WHERE  Ontology.Id = $ontology_id
 	     );
   
-  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute      || $self->throw("can't execute: $q");
+  my $sth1 = $self->prepare($q1) || $self->throw("can't prepare: $q1");
+  my $res1 = $sth1->execute      || $self->throw("can't execute: $q1");
 
-  $tree{root} = $sth->fetchrow_array;
+  $tree{root} = $sth1->fetchrow_array;
   
   print STDERR "getting tree structure\n";
   # store terms and parent ids
-  my $q = qq ( SELECT Node.Id, Node.ParentId, Vocabulary.Term
-	       FROM   Vocabulary, Node
-	       WHERE  Vocabulary.NodeId = Node.Id
-	       AND    Node.OntologyId = $ontology_id
-	     );
+  my $q2 = qq ( SELECT Node.Id, Node.ParentId, Vocabulary.Term
+		FROM   Vocabulary, Node
+		WHERE  Vocabulary.NodeId = Node.Id
+		AND    Node.OntologyId = $ontology_id
+	      );
   
-  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute      || $self->throw("can't execute: $q");
-  while( my ($node_id, $parent_id, $term) = $sth->fetchrow_array){
+  my $sth2 = $self->prepare($q2) || $self->throw("can't prepare: $q2");
+  my $res2 = $sth2->execute      || $self->throw("can't execute: $q2");
+  while( my ($node_id, $parent_id, $term) = $sth1->fetchrow_array){
     $tree{term}{$node_id}   = $term;
     $tree{parent}{$node_id} = $parent_id;
     push( @{ $tree{children}{$parent_id} }, $node_id );  
@@ -255,16 +266,16 @@ sub get_Tree_by_id{
   
   print STDERR "getting libraries for this tree\n";
   # get all the leaves in this tree
-  my $q = qq ( SELECT Node.Id, Mapping.ClonelibId
-	       FROM   Node, Mapping
-	       WHERE  Mapping.NodeId  = Node.Id
-	       AND    Node.OntologyId = $ontology_id
-	     );
+  my $q3 = qq ( SELECT Node.Id, Mapping.ClonelibId
+		FROM   Node, Mapping
+		WHERE  Mapping.NodeId  = Node.Id
+		AND    Node.OntologyId = $ontology_id
+	      );
   
-  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute      || $self->throw("can't execute: $q");
+  my $sth3 = $self->prepare($q3) || $self->throw("can't prepare: $q3");
+  my $res3 = $sth3->execute      || $self->throw("can't execute: $q3");
   my $count = 0;
-  while( my ($node_id, $lib_id) = $sth->fetchrow_array){
+  while( my ($node_id, $lib_id) = $sth3->fetchrow_array){
     $count++;
     push( @{ $tree{libraries}{$node_id} }, $lib_id);
   }
