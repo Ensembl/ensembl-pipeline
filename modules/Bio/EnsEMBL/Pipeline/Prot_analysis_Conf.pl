@@ -16,7 +16,7 @@ package main;
 #	    'dbhost'      => 'ecs1b',
 	    'dbhost'      => '',
 
-#	    'dbname'      => 'simon_dec12',
+#	    'dbname'      => 'human_110',
 	    'dbname'      => '',
 
 #	    'dbuser'      => 'ensadmin',
@@ -30,14 +30,14 @@ package main;
 
 %scripts_conf = ( 
 	    # general options
-	    #'runner'      => '/work2/vac/ensembl-pipeline/scripts/test_RunnableDB',
+	    #'runner'      => '',
 		  'runner'      => '',
 
-#	    'tmpdir'      => '/scratch3/ensembl/vac',
+#	    'tmpdir'      => '',
 		  'tmpdir'      => '',
 		  
-#	    'queue'       => 'acarilong',
-		  'queue'       => 'acari',
+#	    'queue'       => '',
+		  'queue'       => '',
 		  
 #Location of the different databases
 		  'prints'      => '',
@@ -50,8 +50,15 @@ package main;
 
 		  'scanprosite'  => '',
 
-#Chunk size for each analysis 1 (whole genome but 1 entry at a time) or 0 (give a full peptide dataset)
-#If nothing is set, will consider that you don't want to run it...
+		  'pep_file'     => '',
+
+#Put here all of the analysis which should be run, the analysis names are:
+#prints, prosite, profile, pfam, scanprosite, tmhmm, coils, signalp, seg
+		  #'2berun' => 'prints,prosite',
+
+		  '2berun' => '',
+
+#Chunk size for each analysis 1 (whole genome but 1 entry at a time), 0 (give a full peptide dataset) and 2 if want to use the chunks...promise I will change it
 
 		  'prints_chunk' => '',
 		  
@@ -73,10 +80,12 @@ package main;
 
 #paracel use 0 from no, 1 for yes. If nothing is set, suppose that the paracel is not used
 
-		  'paracel'  => ''
- 
-}
+		  'paracel'  => '',
 
+#Define the chunk size (how many protein are going to be in each chunks)
+		  'chunk_size' => ''
+		  )
+}
 
 
 1;
