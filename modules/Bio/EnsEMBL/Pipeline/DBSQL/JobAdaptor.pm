@@ -46,6 +46,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Job;
 use Bio::Root::RootI;
+use Bio::EnsEMBL::Pipeline::Status;
 
 use vars qw(@ISA);
 use strict;
@@ -112,10 +113,10 @@ sub fetch_by_Status_Analysis {
     my $analysisId = $analysis->dbID;
 
     my $query = "select j.jobId, j.input_id, j.class, j.analysisId, j.LSF_id," .
-	                   "j.stdout_file, j.stderr_file,".
+                           "j.stdout_file, j.stderr_file,".
                        "j.object_file, j.retry_count".
                        "j.status_file " . 
-	            "from job as j, current_status as cs, jobstatus as js ". 
+                    "from job as j, current_status as cs, jobstatus as js ". 
                 "where j.jobId = cs.jobId and js.jobId = cs.jobId and ". 
                        "cs.status = js.status and ".
                        "j.analysis = $analysisId and ".
@@ -130,8 +131,8 @@ sub fetch_by_Status_Analysis {
     
     while (my $row = $sth->fetchrow_hashref) 
     {
-	    my $job = $self->_objFromHashref($row);
-	    push(@jobs,$job);
+            my $job = $self->_objFromHashref($row);
+            push(@jobs,$job);
     }
     return @jobs;
 }
@@ -170,8 +171,8 @@ sub fetch_by_Age {
     my @jobs;
 
     while (my $row = $sth->fetchrow_hashref) {
-	my $job = $self->_objFromHashref($row);
-	push(@jobs,$job);
+        my $job = $self->_objFromHashref($row);
+        push(@jobs,$job);
     }
 
     return @jobs;
@@ -352,11 +353,11 @@ sub update {
      WHERE jobId = ? } );
 
   $sth->execute( $job->stdout_file,
-		 $job->stderr_file,
-		 $job->input_object_file,
-		 $job->retry_count,
-		 $job->LSF_id,
-		 $job->dbID );
+                 $job->stderr_file,
+                 $job->input_object_file,
+                 $job->retry_count,
+                 $job->LSF_id,
+                 $job->dbID );
 }
 
 
@@ -435,43 +436,43 @@ sub set_status {
 
     my $status;
 
-    eval {	
-	my $sth = $self->prepare("insert delayed into jobstatus(jobId,status,time) values (" .
-					 $job->dbID . ",\"" .
-					 $arg      . "\"," .
-					 "now())");
-	my $res = $sth->execute();
+    eval {      
+        my $sth = $self->prepare("insert delayed into jobstatus(jobId,status,time) values (" .
+                                         $job->dbID . ",\"" .
+                                         $arg      . "\"," .
+                                         "now())");
+        my $res = $sth->execute();
 
-	$sth = $self->prepare("replace into current_status(jobId,status) values (" .
-				      $job->dbID . ",\"" .
-				      $arg      . "\")");
+        $sth = $self->prepare("replace into current_status(jobId,status) values (" .
+                                      $job->dbID . ",\"" .
+                                      $arg      . "\")");
 
-	$res = $sth->execute();
-	
-	$sth = $self->prepare("select now()" );
-	
-	$res = $sth->execute();
-	
-	my $rowhash = $sth->fetchrow_arrayref();
-	my $time    = $rowhash->[0];
+        $res = $sth->execute();
+        
+        $sth = $self->prepare("select now()" );
+        
+        $res = $sth->execute();
+        
+        my $rowhash = $sth->fetchrow_arrayref();
+        my $time    = $rowhash->[0];
 
-	$status = Bio::EnsEMBL::Pipeline::Status->new
-	  (  '-jobid'   => $job->dbID,
-	     '-status'  => $arg,
-	     '-created' => $time,
-	  );
-	
-	$self->current_status($job, $status);
-	
-#	print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
+        $status = Bio::EnsEMBL::Pipeline::Status->new
+          (  '-jobid'   => $job->dbID,
+             '-status'  => $arg,
+             '-created' => $time,
+          );
+        
+        $self->current_status($job, $status);
+        
+#       print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
     };
 
     if ($@) {
-#      print( " $@ " );
+      print( " $@ " );
 
-	$self->throw("Error setting status to $arg");
+        $self->throw("Error setting status to $arg");
     } else {
-	return $status;
+        return $status;
     }
 }
 
@@ -491,35 +492,35 @@ sub current_status {
 
     if (defined($arg)) 
     {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") 
-	    unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-	$job->{'_status'} = $arg;
+        $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") 
+            unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
+        $job->{'_status'} = $arg;
     }
     else 
     {
-	$self->throw("Can't get status if id not defined") 
-	    unless defined($job->dbID);
-	my $id =$job->dbID;
-	my $sth = $self->prepare
-	    ("select status from current_status where jobId=$id");
-	my $res = $sth->execute();
-	my $status;
-	while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	    $status = $rowhash->{'status'};
-	}
+        $self->throw("Can't get status if id not defined") 
+            unless defined($job->dbID);
+        my $id =$job->dbID;
+        my $sth = $self->prepare
+            ("select status from current_status where jobId=$id");
+        my $res = $sth->execute();
+        my $status;
+        while (my  $rowhash = $sth->fetchrow_hashref() ) {
+            $status = $rowhash->{'status'};
+        }
 
-	$sth = $self->prepare("select now()");
-	$res = $sth->execute();
-	my $time;
-	while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	    $time    = $rowhash->{'now()'};
-	}
-	my $statusobj = new Bio::EnsEMBL::Pipeline::Status
-	    ('-jobid'   => $id,
-	     '-status'  => $status,
-	     '-created' => $time,
-	     );
-	$job->{'_status'} = $statusobj;
+        $sth = $self->prepare("select now()");
+        $res = $sth->execute();
+        my $time;
+        while (my  $rowhash = $sth->fetchrow_hashref() ) {
+            $time    = $rowhash->{'now()'};
+        }
+        my $statusobj = new Bio::EnsEMBL::Pipeline::Status
+            ('-jobid'   => $id,
+             '-status'  => $status,
+             '-created' => $time,
+             );
+        $job->{'_status'} = $statusobj;
     }
     return $job->{'_status'};
 }
@@ -551,9 +552,9 @@ sub get_all_status {
     my $time      = $rowhash->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
     my $status    = $rowhash->{'status'};
     my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
-						       -status  => $status,
-						       -created => $time,
-						      );
+                                                       -status  => $status,
+                                                       -created => $time,
+                                                      );
                                
     push(@status,$statusobj);
     
@@ -594,9 +595,9 @@ sub get_last_status {
   my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
   my $status    = $rowHashRef->{'status'};
   my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
-						     -status  => $status,
-						     -created => $time,
-						     );
+                                                     -status  => $status,
+                                                     -created => $time,
+                                                     );
   return $statusobj;
 }
 
@@ -730,3 +731,4 @@ sub create_tables {
 }
 
 1;
+
