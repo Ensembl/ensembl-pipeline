@@ -164,14 +164,14 @@ my $prefix='COB';
 					 {				  
 					  'type'       => 'Swall',
 					  'threshold'  => '200',
-					  'index'      => '/usr/local/ensembl/data/blastdb/Ensembl/swall_270602'
+					  'index'      => '/usr/local/ensembl/data/blastdb/Ensembl/swall_270602',
 					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
 					# example:
 					 {
 					  'type'       => 'Wormpep',
 					  'threshold'  => '200',
-					  'index'      => '/usr/local/ensembl/data/blastdb/Worms/wormpep'
+					  'index'      => '/usr/local/ensembl/data/blastdb/Worms/wormpep',
 					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
 					],
