@@ -78,23 +78,35 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GB_MIN_GENSCAN_EXONS
-					 GB_GENSCAN_MAX_INTRON
-					 GB_TARGETTED_GW_GENETYPE
-					 GB_SIMILARITY_GENETYPE
-					 GB_COMBINED_GENETYPE
-					 GB_MIN_FEATURE_SCORE
-					 GB_MIN_FEATURE_LENGTH
-					 GB_INPUTID_REGEX
-					 GB_ABINITIO_TYPE
-					 GB_ABINITIO_SUPPORTED_TYPE
-					 GB_MAXSHORTINTRONLEN
-					 GB_MINSHORTINTRONLEN
-					 GB_MAX_TRANSCRIPTS_PER_GENE
-					 GB_USE_ABINITIO
-					);
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted   qw (
+							       GB_TARGETTED_GW_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined    qw (
+							       GB_COMBINED_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
+							       GB_SIMILARITY_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
+							       GB_INPUTID_REGEX
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+							       GB_MIN_GENSCAN_EXONS
+							       GB_GENSCAN_MAX_INTRON
+							       GB_MIN_FEATURE_SCORE
+							       GB_MIN_FEATURE_LENGTH
+							       GB_ABINITIO_TYPE
+							       GB_ABINITIO_SUPPORTED_TYPE
+							       GB_MAXSHORTINTRONLEN
+							       GB_MINSHORTINTRONLEN
+							       GB_MAX_TRANSCRIPTS_PER_GENE
+							       GB_USE_ABINITIO
+							      );
 
 use vars qw(@ISA);
 use strict;
@@ -122,7 +134,7 @@ sub new {
     $self->gene_types($GB_SIMILARITY_GENETYPE);
 
     unless ( $input_id =~ /$GB_INPUTID_REGEX/ ){
-      $self->throw("format of the input is not defined in GeneConf::GB_INPUTID_REGEX = $GB_INPUTID_REGEX");
+      $self->throw("format of the input is not defined in Config::GeneBuild::General::GB_INPUTID_REGEX = $GB_INPUTID_REGEX");
     }
     $self->input_id($input_id);
 
