@@ -62,6 +62,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
 					 GB_SIMILARITY_GENETYPE
 					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
+					 GB_INPUTID_REGEX
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -130,11 +131,10 @@ sub write_output {
 
     $self->throw("No input id") unless defined($self->input_id);
     
-    my $chrid  = $self->input_id;
-       $chrid =~ s/\.(.*)-(.*)//;
-
-    my $chrstart = $1;
-    my $chrend   = $2;
+    $self->input_id = /$GB_INPUT_ID_REGEX/;
+    my $chr_id = $1;
+    my $chrstart = $2;
+    my $chrend   = $3;
 
     my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
     my $slice    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
