@@ -4,6 +4,7 @@ import pathsteps.common.*;
 public class PathStepsModel implements AModel{
   public static String ROOT = "ROOT";
   public static String PATH_STEPS_PANEL  = "PATH_STEPS_PANEL";
+  public static String PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION = "PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION";
   public static String PATH_STEPS_PANEL_ALL_NODES  = "PATH_STEPS_PANEL_ALL_NODES";
   
   public static String MESSAGE = "MESSAGE";

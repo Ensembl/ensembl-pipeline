@@ -12,6 +12,7 @@ public class Application{
     
   public static String PIPELINE_TOOL_ROOT = "PIPELINE_TOOL_ROOT";
   public static String DEFAULT_CONFIGURATION_FILE_NAME = "pathsteps.conf";
+  public static String DEFAULT_GRAPH_LAYOUT_CONFIGURATION_FILE_NAME = "graphlayout.conf";
   public static String DEFAULT_HISTORY_FILE_NAME = "pathsteps.history";
   public static String LOGGING_CONFIG_FILE_NAME = "logging.properties";
   public static String JAVA_LOGGING_PROPERTIES_FILE_NAME = "java.util.logging.config.file";
@@ -239,6 +240,18 @@ public class Application{
     }
   }
   
+  public void writeGraphLayoutConfiguration(Properties history){
+    String fileName = getGraphLayoutConfigurationFileName();
+    if(getApplicationLogger().isLoggingLow()){
+      getApplicationLogger().logLow("writing graph layout config to file :"+fileName+" contents: "+history);
+    }
+    try{
+      history.store(new FileOutputStream(fileName), "Graph Layout Configuratio");
+    }catch(IOException exception){
+      throw new FatalAException("Could not graph layout configuration for file: "+fileName, exception);
+    }
+  }
+  
   private void setConfiguration(Properties properties){
     configuration = properties;
   }
@@ -257,6 +270,10 @@ public class Application{
   
   private String getConfigurationFileName(){
     return getApplicationRoot()+"/"+DEFAULT_CONFIGURATION_FILE_NAME;
+  }
+  
+  private String getGraphLayoutConfigurationFileName(){
+    return getApplicationRoot()+"/"+DEFAULT_GRAPH_LAYOUT_CONFIGURATION_FILE_NAME;
   }
   
   private String getTestConfigurationFileName(){

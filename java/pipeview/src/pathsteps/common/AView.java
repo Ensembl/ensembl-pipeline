@@ -31,6 +31,8 @@ public interface AView{
   public static String CONFIRM_DELETE_NODE_KEY  = "CONFIRM_DELETE_NODE_KEY";
   public static String CONFIRM_CONNECT_NODE_KEY  = "CONFIRM_CONNECT_NODE_KEY";
   
+  public static String SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY  = "CONFIRM_CONNECT_NODE_KEY";
+  
   public static String CANCEL_NODE_DIALOG_KEY  = "CANCEL_NODE_DIALOG_KEY";
 
   public void read(AModel model);

@@ -30,6 +30,7 @@ public class PathStepsEventHandler implements AEventHandler{
     getActions().put(AView.CANCEL_LAYOUT_PREFERENCES_KEY, new CancelLayoutConfigurationAction(this));
     getActions().put(AView.SELECT_GRAPH_NODE_PARENTS_KEY, new SelectGraphNodeParentsAction(this));
     getActions().put(AView.CREATE_NODE_DIALOG_KEY, new CreateNodeDialogAction(this));
+    getActions().put(AView.SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY, new SaveGraphLayoutConfigurationAction(this));
   }
 
   
