@@ -227,7 +227,7 @@ sub show_analyses {
   }
 }
 
-=head2 show_analyses
+=head2 show_rules
 
   Title   : show_rules
   Usage   : show_rules
@@ -236,6 +236,7 @@ sub show_analyses {
   Args    : None
 
 =cut
+
 sub show_rules {
 
   scalar(@existing_rules) or die "There are no rules in the database\n";
@@ -246,11 +247,20 @@ sub show_rules {
     "    conditions:\t";
     my @conditions = @{$rule->list_conditions()};
     foreach my $cond(@conditions) {
-      print "$cond ";
+      print "$cond (",get_analysis_id($cond),") ";
     }
-    print "\n    goal:\t", $rule->goalAnalysis()->logic_name(),"\n\n"; 
+    print "\n    goal:\t", $rule->goalAnalysis()->logic_name()," (",$rule->goalAnalysis()->dbID,")\n\n";
   }
 }
+
+sub get_analysis_id {
+  my ($logic) = shift;
+
+  my $ana = $anaAdaptor->fetch_by_logic_name($logic);
+
+  return $ana->dbID;
+}
+
 
 =head2 check_dependencies
 
