@@ -541,4 +541,40 @@ sub remove{
   $sth->finish();
 }
 
+=head2 remove
+
+  Arg [1]   : listref of ints $ids
+  Function  : removes a list of jobs (via their ids) from the job tables
+              This is much more efficient then retrieving and deleting
+              individual jobs via the remove method.
+  Returntype: none
+  Exceptions: none
+  Caller    : PipelineManager::update_status
+  Example   : $jobadaptor->remove_by_id_list(\@delete_list);
+
+=cut
+
+sub remove_by_id_list {
+  my $self = shift;
+  my $ids  = shift;
+
+  return if(!$ids);
+  return if(!@$ids);
+
+  #split queries into 1000 ids at a time
+  my $max = 1000;
+
+  while(my @ar = splice(@$ids, 0, $max)) {
+    my $list = join(',',@ar);
+    my $sth = $self->prepare("delete from job where job_id in ($list)");
+    $sth->execute();
+    $sth->finish();
+
+    $sth = $self->prepare("delete from job_status where job_id in ($list)");
+    $sth->execute();
+    $sth->finish();
+  }
+
+}
+
 1;
