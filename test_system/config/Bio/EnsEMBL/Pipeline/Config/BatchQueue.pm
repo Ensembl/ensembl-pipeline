@@ -48,7 +48,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-  DEFAULT_OUTPUT_DIR  => '',
+  DEFAULT_OUTPUT_DIR  => '/ecs4/scratch1/lec/test_out',
   DEFAULT_CLEANUP     => 'yes',	
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
@@ -56,8 +56,8 @@ use vars qw(%Config);
                       # the value to very high ie 100000 for a certain period of time
   JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be
                                      # counted
-                                     # valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE
-  MARK_AWOL_JOBS      => 1,
+                                     # valid statuses for this array are RUN, PEND, SSUSP, EXIT, MARK_AWOL_JOBS
+  DONE      => 1,
   MAX_JOB_SLEEP       => 3600, # the maximun time to sleep for when job limit 
                                # reached
   MIN_JOB_SLEEP      => 120, # the minium time to sleep for when job limit reached
@@ -76,8 +76,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Genscan',        
@@ -87,8 +87,30 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+    },
+    {
+      logic_name => 'Genefinder',        
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+    },
+    {
+      logic_name => 'Snap',        
+      batch_size => 5,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Fgenesh',        
@@ -98,8 +120,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Swall',        
@@ -109,8 +131,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'long',
-      cleanup    => 'yes', 
-     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no', 
+     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Vertrna',        
@@ -120,8 +142,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'long',
-      cleanup    => 'yes',  
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',  
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Unigene',        
@@ -131,8 +153,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'long',
-      cleanup    => 'yes',     
-     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',     
+     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'CpG',
@@ -142,8 +164,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',
- runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',
+ runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Dust',
@@ -153,8 +175,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',
-     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',
+     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'tRNAscan',
@@ -164,8 +186,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',
-     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',
+     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'TRF',
@@ -175,8 +197,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'Eponine',        
@@ -186,8 +208,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes', 
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',    
+      cleanup    => 'no', 
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',    
     },
     {
       logic_name => 'marker',        
@@ -197,8 +219,8 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => 'normal',
-      cleanup    => 'yes',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      cleanup    => 'no',        
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
     {
       logic_name => 'FirstEF',        
@@ -209,7 +231,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
                          
   ]

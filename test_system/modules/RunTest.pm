@@ -286,14 +286,7 @@ sub cleanup{
   if(!$testdb){
     $testdb = $self->testdb;
   }
-  my ($p, $f, $l) = caller;
-  if(!$testdb){
-    print "Something is wrong $testdb testdb isn't defined RunTest290 "
-      ." called by $f:$l\n";
-  }else{
-    print "have testdb ".$testdb."\n";
-    $testdb->cleanup;
-  }
+  $testdb->cleanup;
   $self->environment->return_environment;
   return;
 }
@@ -609,25 +602,27 @@ sub run_pipeline{
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   $self->whole_pipeline_stats();
   if($self->comparison_conf){
+    my @comparison_tables = ('repeat_feature',  'prediction_transcript', 
+                              'marker_feature', 'dna_align_feature', 
+                              'protein_align_feature', 'simple_feature');
     my $ref_testdb = TestDB->new(
                                  -SPECIES => $self->testdb->species, 
                                  -VERBOSE => $self->verbosity,
                                  -CONF_FILE => $self->comparison_conf,
                                 );
     my $tables_to_fill = $self->tables;
-    push(@$tables_to_fill, 'raw_compute');
+    push(@$tables_to_fill, @comparison_tables);
     $self->setup_database($ref_testdb, $tables_to_fill);
     $self->ref_testdb($ref_testdb);
     $self->feature_comparison->pipeline_compare
-      (['repeat_feature', 'prediction_exon', 'prediction_transcript',
-        'dna_align_feature', 'protein_align_feature', 'simple_feature'],
-       $self->testdb->db, $ref_testdb->db);
+      (\@comparison_tables, $self->testdb->db, $ref_testdb->db);
     $ref_testdb->cleanup unless($self->dont_cleanup_tests);
     if($self->dont_cleanup_tests){
       $self->cleanup_command($ref_testdb);
     }
   }
-  $self->cleanup($cleanup_dir) unless($self->dont_cleanup_tests);
+  $self->cleanup($cleanup_dir, $self->testdb) 
+    unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
     $self->environment->return_environment;
