@@ -193,13 +193,13 @@ if ($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
   $accumulators = 0;
 }
 
-$accumulators = 1 if($force_accumulators);
-
 my $all_rules = $rulemanager->rules;
 
 if ($accumulators && $accumulator_sanity) {
   $accumulators = $sanity->accumulator_sanity_check($all_rules, $accumulators);
 }
+
+$accumulators = 1 if($force_accumulators);
 
 if ($rules_sanity) {
   $sanity->rule_type_sanity($all_rules, $verbose);
