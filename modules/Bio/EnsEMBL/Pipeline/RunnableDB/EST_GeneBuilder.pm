@@ -869,30 +869,10 @@ sub run {
   my ($self) = @_;
 
   # run genomewise 
-  # plus strand
-  foreach my $gw_runnable( $self->each_runnable) {
-    print STDERR "about to run genomewise\n";
-    $gw_runnable->run;
 
-    # convert_output
-    $self->convert_output($gw_runnable);
-  }
-
-  # minus strand
-  my $reverse = 1;
-  foreach my $gw_runnable( $self->each_runnable($reverse)) {
-    print STDERR "about to run genomewise\n";
-    $gw_runnable->run;
-
-    # convert_output
-    $self->convert_output($gw_runnable, $reverse);
-  }
-}
-
-# convert genomewise output into genes
-sub convert_output {
-  my ($self, $gwr, $reverse) = @_;
-  my $genetype = 'genomewise'; 
+  # sort out analysis & genetype here or we will get into trouble with duplicate analyses
+#  my $genetype = 'genomewise'; 
+  my $genetype = 'new_genomewise'; 
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis_obj;
@@ -915,33 +895,60 @@ sub convert_output {
 	 -module          => 'EST_GeneBuilder',
       );
   }
- 
-  my @genes = $self->make_genes($gwr, $reverse, $genetype, $analysis_obj);
 
+  $self->genetype($genetype);
+  $self->analysis($analysis_obj);
 
+  # plus strand
+  foreach my $gw_runnable( $self->each_runnable) {
+    print STDERR "about to run genomewise\n";
+    $gw_runnable->run;
 
-  # check translations
-#  foreach my $gene(@genes){
-#    foreach my $trans ( $gene->each_Transcript ) {
-#      print STDERR "translation: \n";
-#      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-#      print STDERR "checktrans: ";
-#      $seqio->write_seq($trans->translate); 
-#      print STDERR "\n ";	
-#    }
-#  }
-  
+    # convert_output
+    $self->convert_output($gw_runnable);
+  }
+
+  # minus strand
+  my $reverse = 1;
+  foreach my $gw_runnable( $self->each_runnable($reverse)) {
+    print STDERR "about to run genomewise\n";
+    $gw_runnable->run;
+
+    # convert_output
+    $self->convert_output($gw_runnable, $reverse);
+  }
+}
+
+sub genetype {
+  my ($self, $genetype) = @_;
+
+  if(defined $genetype){
+    $self->{'_genetype'} = $genetype;
+  }
+
+  return $self->{'_genetype'};
+}
+
+# override method from RunnableDB.pm
+sub analysis {
+  my ($self, $analysis) = @_;
+
+  if(defined $analysis){
+    $self->throw("$analysis is not a Bio::EnsEMBL::Analysis") unless $analysis->isa("Bio::EnsEMBL::Analysis");
+    $self->{'_analysis'} = $analysis;
+  }
+
+  return $self->{'_analysis'};
+}
+
+# convert genomewise output into genes
+sub convert_output {
+  my ($self, $gwr, $reverse) = @_;
+
+  my @genes = $self->make_genes($gwr, $reverse);
+
   my @remapped = $self->remap_genes(\@genes, $reverse);
-  # check translations
-#  foreach my $gene(@remapped){
-#    foreach my $trans ( $gene->each_Transcript ) {
-#      print STDERR "translation: \n";
-#      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-#      print STDERR "checktrans: ";
-#      $seqio->write_seq($trans->translate); 
-#      print STDERR "\n ";	
-#    }
-#  }
+
   # store genes
  
   $self->output(@remapped);
@@ -952,7 +959,9 @@ sub convert_output {
 
 sub make_genes {
 
-  my ($self, $runnable, $reverse, $genetype, $analysis_obj) = @_;
+  my ($self, $runnable, $reverse) = @_;
+  my $genetype = $self->genetype;
+  my $analysis_obj = $self->analysis;
   my $count = 0;
   my @genes;
 
@@ -972,6 +981,8 @@ sub make_genes {
     $gene->type($genetype);
     $gene->id($contig->id . ".$genetype.$count");
     $gene->version(1);
+    $gene->created($time);
+    $gene->modified($time);
     $gene->analysis($analysis_obj);
 
     # add transcript to gene
