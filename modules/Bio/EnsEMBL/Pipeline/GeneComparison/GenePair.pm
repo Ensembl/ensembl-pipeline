@@ -10,6 +10,13 @@ $gene_pair->compare_isoforms();
 
 =head1 DESCRIPTION
 
+Class to compare the isoforms between two orthologous genes.
+It carry out two comparisons. First it pairs up the transcript by using blastn
+and a stable-marriage optimization procedure. Then it
+takes each of the found transcript-pairs and pair up the exons by
+using a Needlemann-Wusch method on the exon space, using as score matrix the
+tblastx comparison between exons.
+
 =head1 CONTACT
 
 eae@sanger.ac.uk
@@ -72,15 +79,15 @@ sub gap_penalty{
 ############################################################
 
 sub compare{
-  my ($self,$human_gene,$mouse_gene) = @_;
+    my ($self,$human_gene,$mouse_gene) = @_;
   
-  my @human_transcripts = @{$human_gene->get_all_Transcripts};
-  my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
-   
-  ############################################################
-  # we make a pair only if the transcripts align with gaps 
-  # no longer than the smallest exon
-  
+    my @human_transcripts = @{$human_gene->get_all_Transcripts};
+    my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
+    
+    ############################################################
+    # we make a pair only if the transcripts align with gaps 
+    # no longer than the smallest exon
+    
   my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
   my @transcript_matches;
   foreach my $human_t ( @human_transcripts ){
@@ -96,7 +103,8 @@ sub compare{
   
   ############################################################
   # pairs created:
-  print STDERR "pairs created: ".scalar($best_pairs_object->list1)."\n";
+  my $pair_count = scalar($best_pairs_object->list1);
+  print STDERR "pairs created: ".$pair_count."\n";
   foreach my $element1 ( $best_pairs_object->list1 ){
       foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
 	  # there should be only one
@@ -109,6 +117,9 @@ sub compare{
   ############################################################
   # compare the exons for each pair
   print STDERR "comparing exons\n";
+  my $conserved_count        = 0;
+  my $skipped_exons_count    = 0;
+  my $terminal_missing_count = 0;
   foreach my $element1 ( $best_pairs_object->list1 ){
       foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
 	  
@@ -117,12 +128,35 @@ sub compare{
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
 	  
-	  $self->compare_Exons( $element1, $partner, $gap_penalty);
+	  my ($missing_terminal_exons, $exon_skipping) = 
+	      $self->compare_Exons( $element1, $partner, $self->gap_penalty);
 	  
+	  if ($exon_skipping ){
+	      $skipped_exons_count++;
+	  }
+	  if ($missing_terminal_exons){
+	      $terminal_missing_count++;
+	  }
+	  unless ( $exon_skipping || $missing_terminal_exons ){
+	      $conserved_count++;
+	  }
+
 	  #$self->print_alignment( $element1, $partner, \@score_matrix);
 	  
       }
   }
+
+  my $human_id = $human_gene->stable_id || $human_gene->dbID;
+  my $mouse_id = $mouse_gene->stable_id || $mouse_gene->dbID;
+  my $human_trans_count = scalar(@human_transcripts);
+  my $mouse_trans_count = scalar(@mouse_transcripts);
+  print STDERR "GENEPAIR\t".
+      "$human_id\thuman_trans_count:$human_trans_count\t".
+	  "$mouse_id\tmouse_trans_count:$mouse_trans_count\t".
+	      "pairs:$pair_count\t".
+		  "conserved:$conserved_count\t".
+		      "with_skipped_exons:$skipped_exons_count\t".
+			  "with_missing_terminals:$terminal_missing_count\n";
 }
 
 ############################################################
@@ -179,14 +213,15 @@ sub blast_isoforms{
     system("pressdb $database > /dev/null 2>&1");
     
     ############################################################
-    my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'     => $seq1,
-							       '-program'   => 'wublastn',
-							       '-database'  => $database,
-							       -threshold_type => "PVALUE",
-							       '-threshold' => 1e-10,
-							       #'-filter'    => $filter,
-							       '-options'   => 'V=1000000'
-							       );
+    my $options = "-nogap W=5";
+    my $blast =  
+      Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
+						    '-program'        => 'wublastn',
+						    '-database'       => $database,
+						    '-threshold_type' => "PVALUE",
+						    '-threshold'      => 1e-10,
+						    '-options'        => $options,
+						    );
     
     $blast->add_regex($file,'(\S+)');
     $blast->run();
@@ -421,21 +456,25 @@ sub process_query{
 ############################################################
 
 sub print_Feature{
-  my $f = shift;
+  my ($self,$f) = @_;
   print STDERR
-    $f->seqname."\t".
-      $f->start."-".$f->end."\t".
-	  ($f->end - $f->start + 1)."\t".
-	    $f->strand."\t".
-	      $f->hseqname."\t".
-		$f->hstart."-".$f->hend."\t".
-		    ($f->hend - $f->hstart + 1 )."\t".
-		      $f->strand."\t".
-			"score:".$f->score."\t".
-			  "perc_id:".$f->percent_id."\n";
+      $f->seqname."\t".
+	  $f->start."-".$f->end."\t".
+	      ($f->end - $f->start + 1)."\t".
+		  $f->strand."\t".
+		      $f->hseqname."\t".
+			  $f->hstart."-".$f->hend."\t".
+			      ($f->hend - $f->hstart + 1 )."\t".
+				  $f->strand."\t".
+				      "score:".$f->score."\t".
+					  "perc_id:".$f->percent_id."\n";
 }
 	    
 ############################################################
+
+# dynamic programming method to align the exons
+# It uses a global alignment algorithm to
+# pair up the exons from each transcript
 
 sub compare_Exons{
   my ($self,$human_t, $mouse_t, $gap_penalty ) = @_;
@@ -443,78 +482,155 @@ sub compare_Exons{
   # get the exons 5' to 3'
   my @human_exons;
   if ( $human_t->start_Exon->strand == 1 ){
-    @human_exons = sort {$a->start <=> $b->start} @{$human_t->get_all_Exons};
+      @human_exons = sort {$a->start <=> $b->start} @{$human_t->get_all_Exons};
   }
   else{
-    @human_exons = sort {$b->start <=> $a->start} @{$human_t->get_all_Exons};
+      @human_exons = sort {$b->start <=> $a->start} @{$human_t->get_all_Exons};
   }
   my @mouse_exons;
   if ( $mouse_t->start_Exon->strand == 1 ){
-    @mouse_exons = sort {$a->start <=> $b->start} @{$mouse_t->get_all_Exons};
+      @mouse_exons = sort {$a->start <=> $b->start} @{$mouse_t->get_all_Exons};
   }
   else{
-    @mouse_exons = sort {$b->start <=> $a->start} @{$mouse_t->get_all_Exons};
+      @mouse_exons = sort {$b->start <=> $a->start} @{$mouse_t->get_all_Exons};
   }
   
   my @score_matrix;
   my %comparison_score;
-
+  
   my $human_length = scalar(@human_exons);
   my $mouse_length = scalar(@mouse_exons);
-
+  
   foreach my $i (0..$human_length){
-    $score_matrix[$i][0] = $i * $gap_penalty;
+      $score_matrix[$i][0] = $i * $gap_penalty;
   }
   foreach my $j (0..$mouse_length){
-    $score_matrix[0][$j] = $j * $gap_penalty;
+      $score_matrix[0][$j] = $j * $gap_penalty;
   }
   
   foreach my $i ( 1..$human_length ){
-    foreach my $j ( 1..$mouse_length ){
-      $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} = $self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
-      #print STDERR "comparison( ".$human_exons[$i-1]->stable_id."-".$mouse_exons[$j-1]->stable_id." ) = ".
-      #$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} ."\n";
-      
-      $score_matrix[$i][$j] = 
-	$self->max( $score_matrix[$i-1][$j]   + $gap_penalty,
-	      $score_matrix[$i][$j-1]   + $gap_penalty,
-	      $score_matrix[$i-1][$j-1] + $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} );
-    }
+      foreach my $j ( 1..$mouse_length ){
+	  $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} = 
+	      $self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
+	  
+	  #print STDERR "comparison( ".$human_exons[$i-1]->stable_id."-".$mouse_exons[$j-1]->stable_id." ) = ".
+	  #$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} ."\n";
+	  
+	  $score_matrix[$i][$j] = 
+	      $self->max( $score_matrix[$i-1][$j]   + $gap_penalty,
+			  $score_matrix[$i][$j-1]   + $gap_penalty,
+			  $score_matrix[$i-1][$j-1] + $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} );
+      }
   }
-  #return $score_matrix[$human_length][$mouse_length];
-  #return @score_matrix;
   
   my ($human_list, $mouse_list ) = 
-    $self->get_alignment( \@human_exons, \@mouse_exons, \@score_matrix, \%comparison_score, $gap_penalty );
+      $self->get_alignment( \@human_exons, \@mouse_exons, \@score_matrix, \%comparison_score, $gap_penalty );
+  
+  my $human_missing = 0;
+  my $mouse_missing = 0;
+  my $human_internal_missing = 0;
+  my $mouse_internal_missing = 0;
+  my $exon_skipping = 0;
+  my $conserved     = 0;
+  for ( my $i=0 ; $i< scalar(@$human_list); $i++ ){
+      if ( $human_list->[$i] eq 'gap' ){
+	  $human_missing++;
+      }
+      if ( $mouse_list->[$i] eq 'gap'){
+	  $mouse_missing++;
+      }
+      if ( !( $human_list->[$i] eq 'gap' || $mouse_list->[$i] eq 'gap') ){
+	  $conserved++;
 
-  for ( my $i=0; $i<scalar(@$human_list); $i++ ){
-    my $human_string;
-    my $mouse_string;
-    if ( $human_list->[$i] eq 'gap'){
-      $human_string = "             ####GAP####";
-    }
-    else{
-      $human_string = $self->exon_string( $human_list->[$i] );
-    }
-    if ( $mouse_list->[$i] eq 'gap'){
-      $mouse_string = "             ####GAP####";
-    }
-    else{
-      $mouse_string = $self->exon_string( $mouse_list->[$i] );
-    }
-    my $score;
-    if( !($human_string eq "gap" || $mouse_string eq "gap") ){
-      $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
-    }
-    else{
-      $score = 0;
-    }
-    print STDERR $human_string."\t<---->\t".$mouse_string.
-      "\t score= ".$score."\n";
-  }  
+      if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
+	  if ( $self->haspredecessor( $human_list, $i) 
+	       && 
+	       $self->hassuccessor( $human_list, $i )
+	       &&
+	       $self->haspredecessor( $mouse_list, $i )
+	       && 
+	       $self->hassuccessor( $mouse_list, $i )
+	       ){
+	      if ( $human_list->[$i] eq 'gap' ){ 
+		  $exon_skipping++;
+		  $human_internal_missing++;
+	      }
+	      elsif( $mouse_list->[$i] eq 'gap'){
+		  $exon_skipping++;
+		  $mouse_internal_missing++;
+	      }
+	  }
+      }
+  }
+  
+  my $human_terminal_missing = $human_missing - $human_internal_missing;
+  my $mouse_terminal_missing = $mouse_missing - $mouse_internal_missing;
+
+  my $human_id = $human_t->stable_id || $human_t->dbID;
+  my $mouse_id = $mouse_t->stable_id || $mouse_t->dbID;
+
+  print STDERR "TRANPAIR\t".
+      "$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
+	  "conserved_exons:$conserved\t".
+	      "$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
+      
+  my $print_report = 1;
+  if ( $print_report ){
+      for ( my $i=0; $i<scalar(@$human_list); $i++ ){
+	  my $human_string;
+	  my $mouse_string;
+	  if ( $human_list->[$i] eq 'gap'){
+	      $human_string = "             ####GAP####";
+	      }
+	  else{
+	      $human_string = $self->exon_string( $human_list->[$i] );
+	  }
+	  if ( $mouse_list->[$i] eq 'gap'){
+	      $mouse_string = "             ####GAP####";
+	      }
+	  else{
+	      $mouse_string = $self->exon_string( $mouse_list->[$i] );
+	  }
+	  my $score;
+	  if( !($human_string eq "gap" || $mouse_string eq "gap") ){
+	      $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
+	  }
+	  unless ($score){
+	      $score = "-";
+	  }
+	  print STDERR $human_string."\t<---->\t".$mouse_string.
+	      "\t score= ".$score."\n";
+      }  
+  }
+  my $missing_terminal_exons = 0;
+  if ( $human_terminal_missing || $mouse_terminal_missing ){
+      $missing_terminal_exons = 1;
+  }
+  return ($missing_terminal_exons, $exon_skipping);
 }
 
 ############################################################
+sub haspredecessor{
+    my ($self,$list,$i) = @_;
+    for( my $j=$i-1; $j>0; $j-- ){
+	if ( !( $list->[$j] eq 'gap' ) ){
+	    return 1;
+	}
+    }
+    return 0;
+}
+############################################################
+sub hassuccessor{
+    my ($self,$list,$i) = @_;
+    for( my $j=$i+1; $j< scalar(@$list); $j++ ){
+	if ( !( $list->[$j] eq 'gap' ) ){
+	    return 1;
+	}
+    }
+    return 0;
+}
+############################################################
+# method to recover the alignment
 
 sub get_alignment{
   my ($self,$human_list, $mouse_list, $matrix, $comparison, $gap_penalty) = @_;
@@ -527,32 +643,33 @@ sub get_alignment{
   my $mouse_length = scalar( @mouse_list );
 
   unless( $human_length ){
-    for ( my $i=1; $i<= $mouse_length; $i++ ){
-      push( @human_list, "gap" );
-    }
-    return ( \@human_list, \@mouse_list );
+      for ( my $i=1; $i<= $mouse_length; $i++ ){
+	  push( @human_list, "gap" );
+      }
+      return ( \@human_list, \@mouse_list );
   }
   unless( $mouse_length ){
-    for ( my $j=1; $j<= $human_length; $j++ ){
-      push( @mouse_list, "gap" );
-    }
-    return ( \@human_list, \@mouse_list );
+      for ( my $j=1; $j<= $human_length; $j++ ){
+	  push( @mouse_list, "gap" );
+      }
+      return ( \@human_list, \@mouse_list );
   }
   
   my $human_last = $human_list[-1];
   my $mouse_last = $mouse_list[-1];
-
+  
   ############################################################
   # last exons are paried-up in the optimal alignment
   if ( $matrix[$human_length][$mouse_length] 
-       == $matrix[$human_length-1][$mouse_length-1] + $comparison{$human_last}{$mouse_last} ){
-    pop @human_list;
-    pop @mouse_list;
-    my ( $human_list2, $mouse_list2) = 
-      $self->get_alignment( \@human_list, \@mouse_list, $matrix, $comparison, $gap_penalty);
-    push ( @{$human_list2}, $human_last );
-    push ( @{$mouse_list2}, $mouse_last );
-    return ( $human_list2, $mouse_list2 );
+       == $matrix[$human_length-1][$mouse_length-1] 
+       + $comparison{$human_last}{$mouse_last} ){
+      pop @human_list;
+      pop @mouse_list;
+      my ( $human_list2, $mouse_list2) = 
+	  $self->get_alignment( \@human_list, \@mouse_list, $matrix, $comparison, $gap_penalty);
+      push ( @{$human_list2}, $human_last );
+      push ( @{$mouse_list2}, $mouse_last );
+      return ( $human_list2, $mouse_list2 );
   }
   ############################################################
   # last exon of the first list is paired-up with a gap
@@ -648,17 +765,16 @@ sub blast_Exons{
   
   system("pressdb $database > /dev/null 2>&1");
   
-
   ############################################################
-  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'     => $seq1,
-							     '-program'   => 'wutblastx',
-							     '-database'  => $database,
-							     -threshold_type => "PVALUE",
-							     '-threshold' => 1e-10,
-							     #'-filter'    => $filter,
-							     '-options'       => 'V=200 B=200 W=5 E=0.01 E2=0.01',
-							     #'-options'   => 'V=1000000'
-							    );
+  my $options = 'V=200 B=200 W=5 E=0.01 E2=0.01 -nogap';
+  my $blast =  
+    Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
+						  '-program'        => 'wutblastx',
+						  '-database'       => $database,
+						  '-threshold_type' => "PVALUE",
+						  '-threshold'      => 1e-10,
+						  '-options'        => $options,
+						  );
   
   
   $blast->add_regex($file,'(\S+)');
