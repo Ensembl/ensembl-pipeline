@@ -132,7 +132,9 @@ while( my $cdna = $seqin->next_seq ){
      ){
     $is_noncoding = 1;
   }
-  
+  if ( $description =~/non-coding/i || $description =~/non coding/i ){
+    $is_noncoding = 1;
+  }
   if ( $description =~/partial cds/i || $description =~/partial/i ){
     $is_partial = 1;
   }
