@@ -252,3 +252,6 @@ Q80WC8 10 Q80WC8 Q80WC8 Hist1h4i protein (Fragment).(for rat)
 Q811M0 10 Q811M0 Q811M0 Hist1h4h protein (Fragment). (for rat)
 Q8BYP8 23 Q8BYP8 Q8BYP8 Mus musculus adult male hypothalamus cDNA, RIKEN full-length enriched library, clone:A230056F15 product:hypothetical Tyrosine-rich region containing protein, full insert sequence. (for rat)
 O08905 O08905 RNP particle component (Fragment). mouse transposon 
+Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
+Q63498 Q63498 Pot.ORF (Fragment). (for rat lec)
+Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
