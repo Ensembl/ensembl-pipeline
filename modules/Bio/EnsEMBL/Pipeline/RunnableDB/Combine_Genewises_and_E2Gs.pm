@@ -58,6 +58,15 @@ use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_GOLDEN_PATH
+					 GB_DBHOST
+					 GB_DBNAME
+					 GB_DBUSER
+					 GB_DBPASS
+					);
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					 EST_DBHOST
+					 EST_DBNAME
+					 EST_REFDBUSER
 					);
 
 
@@ -77,22 +86,16 @@ sub new {
   
   # need 2 dbs, one for getting genewises, one for getting e2gs
   my $genedb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => 'xxxxx',
-						   '-user'   => 'xxxxxxx',
-						   '-pass'   => 'xxxxxxx',
-						   '-dbname' => 'xxxxxxx',
+						   '-host'   => $GB_DBHOST,
+						   '-user'   => $GB_DBUSER,
+						   '-pass'   => $GB_DBPASS,
+						   '-dbname' => $GB_DBNAME,
 						  );
 
-#  my $dnadb  =   new Bio::EnsEMBL::DBSQL::DBAdaptor(
-#						   '-host'   => 'ecs1e',
-#						   '-user'   => 'xxxxxxx',
-#						   '-dbname' => 'mouse_sanger_Oct01',
-#						  );
-
   my $cdnadb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => 'xxxxx',
-						   '-user'   => 'xxxxx',
-						   '-dbname' => 'xxxxx',
+						   '-host'   => $EST_DBHOST,
+						   '-user'   => $EST_REFDBUSER,
+						   '-dbname' => $EST_DBNAME,
 						   '-dnadb'  => $genedb,
 						  ); 
   
