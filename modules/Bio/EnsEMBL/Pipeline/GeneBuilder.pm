@@ -235,7 +235,7 @@ sub build_Genes{
   
   unless( @all_transcripts ){
       print STDERR "no transcripts left to cook. Exiting...\n";
-      exit(0);
+      return;
   }
 
   print STDERR "clustering transcripts...\n";
