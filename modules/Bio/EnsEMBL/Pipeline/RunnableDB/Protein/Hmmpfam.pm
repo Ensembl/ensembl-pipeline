@@ -110,7 +110,8 @@ sub new {
 sub fetch_input {
     my ($self) = @_;
     my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
-    my $prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id)
+
+    my $prot = $proteinAdaptor->fetch_Protein_ligth ($self->input_id)
 	|| $self->throw ("couldn't get the protein sequence from the database");
     my $pepseq    = $prot->seq;
     my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
