@@ -80,6 +80,7 @@ use vars qw( %Similarity );
 	       GB_SIMILARITY_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
 		#No similarity genes will be build overlapping the gene type put in this list. If nothing is put, the default will be to take Targetted genewise genes
 	       GB_SIMILARITY_GENETYPEMASKED => [],
+	       GB_SIMILARITY_BLAST_FILTER => 0, #set it to one if you want to filter the blast scores before sending to BlastMiningenewise. Currently used for anopheles. For Ano, speeds up the process by 10 folds
 	   );
 
 sub import {
