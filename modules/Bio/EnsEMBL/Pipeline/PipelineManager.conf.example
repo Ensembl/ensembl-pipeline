@@ -17,6 +17,9 @@ dbname = homo_sapiens_core_20_40
 [DNA_DATABASE]
 dbname = homo_sapiens_core_20_40
 
+[LSF]
+tempdir = /nfs/acari/tmp
+path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 #
 # This is a list of tasks to be run by the pipeline manager
@@ -32,10 +35,16 @@ genscan_task      = Bio::EnsEMBL::Pipeline::Task::Task
 ensdb = ensembl_database
 dnadb = dna_database
 where = LSF:acari:
+batchsize = 500
+#timeout in seconds 86400 = 24hours
+timeout = 86400
 
 [REPEATMASKER_TASK]
+timout  = 3600
 
 [GENSCAN_TASK]
+timeout = 3600
 
 [TRIBE_MCL_TASK]
 where = LSF:aristotle:
+batchsize = 1

@@ -4,6 +4,53 @@ use warnings;
 package Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF;
 
 use constant LSF_MAX_BATCH_SIZE => 65536;
+use constant MAX_INT => 2147483647; # (2^31)-1 max 32 bit signed int
+
+=head2 kill
+
+  Arg [1]    : Bio::EnsEMBL::Pipeline::Job
+  Example    : $lsf_sub_system->kill($job);
+  Description: kills a job that has been submitted already
+  Returntype : none
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub kill {
+  my $self = shift;
+  my $job  = shift;
+
+	my $job_id    = $job->dbID;
+  my $array_idx = $job->array_index;
+	my $taskname  = $job->taskname;
+	my $sub_id    = $job->submission_id;
+	
+	if(!$sub_id) {
+		$self->warn("Cannot kill job [$job_id] - does not have submission id");
+		return;
+	}
+
+	my $arg;
+	if($array_idx) {
+		$arg = '"' . $job_id . "[$array_idx]" . '"';
+	} else {
+		$arg = $job_id;
+	}
+
+	my $path = $self->get_Config->get_parameter('LSF', 'path');
+
+	my $rc = system($path.'bkill', $arg);
+
+	if($rc & 0xffff) {
+		$self->warn("bkill returned non-zero exit status $!");
+		return;
+	}
+ 
+
+	$job->update_status('KILLED');
+}
+
 
 
 =head2 flush
@@ -24,8 +71,16 @@ sub flush {
 	my $self = shift;
 	my $taskname = shift;
 
+	#keep track of the number of submissions to guarentee unique names
+  $self->{'sub_count'} = 0 if(!defined($self->{'sub_count'}));
+	$self->{'sub_count'}++;
+
+	#don't want to exceed max int size
+	$self->{'sub_count'} = 1 if($self->{'sub_count'} == MAX_INT);
+
 	my @tasknames;
 
+	#if no task name specified, flush all task queues
 	if($taskname) {
 		@tasknames = ($taskname);
 	} else {
@@ -33,7 +88,7 @@ sub flush {
 	}
 
 	my $config = $self->get_Config();
-	my $lsf_job_adaptor = $config->db()->get_LSFJobAdaptor();
+	my $job_adaptor = $config->get_DBAdaptor->get_JobAdaptor();
 
 	foreach $taskname (@tasknames) {
 
@@ -46,68 +101,72 @@ sub flush {
 		$queue ||
 			$self->throw("Could not determine LSF queue for task [$taskname]");
 
-		my @jobs = $self->_task_queue->{$taskname};
+		my @jobs = @{$self->_task_queue->{$taskname}};
 
 		next if(@jobs == 0);
 
+		#submission needs to be uniquely named
+		my $lsf_job_name = join('_', $taskname, time(),$self->{'sub_count'});
+
+		#add the preexec to the arguments
+		my @args = ('-E', '"runLSF.pl -pre_exec"');
+		#add the queue name
+		push @args, ('-q', $queue);
+		
 		#
 		# If there is only a single job submit it normally
 		# otherwise submit it as a job array
-		#
-		#array index needs to be uniquely named
-		my $lsf_job_name = $job->taskname() . '_' . time();
-
-		my $bsub = 'bsub';
-		my $pre_exec = "runLSF.pl -pre_exec ";
-		$bsub .= "-E $pre_exec";
-		
-		
-		
+		#				
 		if(@jobs == 1) {
-			my $job = $jobs[0];
+			my ($job) = @jobs;
 			my $file_prefix = $self->_generate_file_prefix($job);
 
-			$job->lsf_job_id($lsf_job_name);
-			$job->stdout("${file_prefix}.out");
-			$job->stderr("${file_prefix}.err");
+			$job->job_name($lsf_job_name);
+			$job->stdout_file("${file_prefix}.out");
+			$job->stderr_file("${file_prefix}.err");
 			$job->array_index(undef);
 
-			$lsf_job_adaptor->store($job);
+			$job_adaptor->update($job);
 			$job->update_status('SUBMITTED');
 
+			#add the output dirs to the stdout list
+			push @args, ('-o', $job->stdout_file);
+			push @args, ('-e', $job->stderr_file);
+			push @args, ('-J', $lsf_job_name);
 		} else {
 			my $array_index = 1;
 
 			foreach my $job (@jobs) {
 				my $file_prefix = $self->_generate_file_prefix($job);
 
-				$job->stdout("${file_prefix}.out");
-				$job->stderr("${file_prefix}.err");
-				$job->lsf_job_id($lsf_job_name);
+				#$job->stdout_file("${file_prefix}.out");
+				#$job->stderr_file("${file_prefix}.err");
+				$job->job_name($lsf_job_name);
 				$job->array_index($array_index++);
 
-				# write entry into LSF job table
-				$lsf_job_adaptor->store($job);
+				# write entry into job table
+				$job_adaptor->update($job);
 
 				# set each job status to submitted
-				$job->update_status($submitted);
+				$job->update_status('SUBMITTED');
 			}	
+			#add the output dirs to the stdout list
+			#push @args, ('-o', $job->stdout_file);
+			#push @args, ('-e', $job->stderr_file);
 			
-			$bsub .= " -o " . $job->stdout . " -e " . $job->stderr .
-				" -E $pre_exec -q $queue -J${lsf_job_name}[".scalar(@jobs).']';
+			#add the job name and array index
+			push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
 		}
 
 		#execute the bsub to submit the job or job_array
-			
-			#update the LSF job table to include the lsf job id
-			$
+		system('bsub', @args, split($other_parms));
+
+		foreach my $job(@jobs) {
+			#update the job table so that the submission id is also stored
+			$job->submission_id($sub_id);
+			$job_adaptor->update($job);
 		}
 	}
-
-
-		
-
-
 
 	return;
 }
@@ -119,9 +178,9 @@ sub flush {
 	Arg [2]    :
   Example    : $lsf->submit($job);
   Description: Submits an LSF job.
-  Returntype : 
-  Exceptions : 
-  Caller     : 
+  Returntype : none
+  Exceptions : thrown if
+  Caller     : PipelineManager
 
 =cut
 
@@ -129,8 +188,8 @@ sub submit {
 	my $self = shift;
 	my $job  = shift;
 
-	unless(ref($job) && $job->isa('Bio::EnsEMBL::Job::LSFJob')) {
-		$self->throw('expected Bio::EnsEMBL::Job::LSFJob argument');
+	unless(ref($job) && $job->isa('Bio::EnsEMBL::Pipeline::Job')) {
+		$self->throw('expected Bio::EnsEMBL::Pipeline::Job argument');
 	}
 
 	# retrieve batch size from config
@@ -178,17 +237,19 @@ sub submit {
 =cut
 
 sub create_Job {
-	my ($self, $taskname, $module, $input_id, $parameter_string);
+	my ($self, $taskname, $module, $input_id, $parameter_string) = @_;
 
 	my $config = $self->get_Config();
-	my $job_adaptor = $config->db()->get_JobAdaptor();
+	my $job_adaptor = $config->get_DBAdaptor->get_JobAdaptor();
 
-	my $job = new Bio::EnsEMBL::Job::LSFJob->new($taskname, $module,
-																							 $input_id, $parameter_string);
+	my $job = new Bio::EnsEMBL::Job::Job->new($taskname, $module,
+																						$input_id, $parameter_string);
 
 
+	#store the job and set its status to created
 	$job_adaptor->store($job);
-	$job->update_status('CREATED');
+
+	return $job;
 }
 
 
@@ -205,16 +266,25 @@ sub _generate_filename_prefix {
 	my $self = shift;
 	my $job  = shift;
 
+  #distribute temp files evenly into 10 different dirs so that we don't
+  #get too many files in the same dir
+  $self->{'dir_num'} = 0 if(!defined($self->{'dir_num'}));
+	$self->{'dir_num'} = $self->{'dir_num'} +1 % 10;
+	
 	#
 	# get temp dir from config
 	#
-	my $taskname = 
 	my $config = $self->get_Config();
-	my $temp_dir = $config->get_parameter($job->taskname(), 'temp_dir');
+	my $temp_dir = $config->get_parameter('LSF', 'tmpdir');
 
 	$temp_dir || $self->throw('Could not determine temp dir for task ['.
 														$task->taskname() . ']');
 	
+	$temp_dir .= $self->{'dir_num'};
+
+	#create the dir if it doesn't exist
+	mkdir($temp_dir) if(! -e $temp_dir);
+
 	my $time = localtime(time());
 	$time =~ tr/ :/_./;
 

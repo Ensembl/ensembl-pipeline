@@ -308,6 +308,7 @@ sub run {
 			my $retry_count = $config->get_parameter($taskname, 'retries');
 			if($job->retry_count() < $retry_count) {
 				my $ss = $self->_submission_systems()->{$taskname};
+				$job->retry_count(++$job->retry_count);
 				$ss->submit($job);
 			} else {
 				$job->set_status('FATAL');
@@ -385,7 +386,7 @@ sub _update_task_status {
 	#
 	foreach my $task (values %{$self->_tasks}) {
 		$task->get_TaskStatus()->clean();
-		$timeout_values{$task->name()} = 
+		$timeout_values{$task->name()} =
 			$config->get_parameter($task->name(), 'timeout');
 	}
 
