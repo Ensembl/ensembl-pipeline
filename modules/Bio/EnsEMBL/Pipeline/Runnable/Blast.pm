@@ -396,6 +396,12 @@ sub parse_results {
 
     }
   } 
+  # re-filter, with pruning
+  my @allfeatures = $self->output;
+  my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune => 1);
+  my @pruned = $search->run(@allfeatures);
+  print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+  $self->output(@pruned);
   return $self->output;
 }
 
@@ -788,7 +794,11 @@ sub _findTypes {
 =cut
 
 sub output {
-    my ($self) = @_;
+    my ($self, @arg) = @_;
+
+    if (@arg) {
+      @{$self->{'_fplist'}} = @arg;
+    }
 
     if (!defined($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
