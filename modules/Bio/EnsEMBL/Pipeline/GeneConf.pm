@@ -67,8 +67,6 @@ my $prefix='COB';
 	     GB_FINALDBHOST             => '',
 	     GB_FINALDBNAME             => '',
 
-	     GB_GOLDEN_PATH             => '',
-
 	     # general variables
 	     # path to run_GeneBuild_RunnableDB
 	     GB_RUNNER      => '',
@@ -113,6 +111,8 @@ my $prefix='COB';
 	     GB_TARGETTED_MAX_INTRON               => '250000',
 	     # minimum coverage required to prevent splitting on long introns - keep it high!
 	     GB_TARGETTED_MIN_SPLIT_COVERAGE       => '95',
+	     # genetype for Targetted_GeneWise
+	     GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',
 
 	     # similairity genewise specific parameters
 	     GB_SIMILARITY_TYPE      => 'swall',
@@ -123,12 +123,19 @@ my $prefix='COB';
 	     GB_SIMILARITY_MAX_INTRON         => 150000,
 	     # minimum coverage required to prevent splitting on long introns - keep it high!
 	     GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
+	     # gene type for FPC_BlastMiniGenewise
+	     GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
+
+	     # Combine Genewises_and_E2Gs specific parameters
+	     # gene type for Combine_Genewises_and_E2Gs
+	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
 
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
 	     GB_MIN_GENSCAN_EXONS    => 4,
 	     GB_GENSCAN_MAX_INTRON   => 150000,
+	     GB_FINAL_GENETYPE       => 'ensembl',
 
 	     # Post gene build integrity checking script parameters
 	     GB_MINSHORTINTRONLEN    => 7, 
