@@ -415,13 +415,15 @@ sub find_file {
   my $datadir = $::pipeConf{'datadir'} || undef;
   my $libdir  = $::pipeConf{'libdir'}  || undef;
 
+  my $full_name;
+
   if (-e $name) {
     return $name;
     
-  } elsif ($datadir && -e ($name = "$datadir/$name")) {
-    return $name;
-  } elsif ($libdir && -e ($name = "$libdir/$name")) {
-    return $name;
+  } elsif ($datadir && -e ($full_name = "$datadir/$name")) {
+    return $full_name;
+  } elsif ($libdir && -e ($full_name = "$libdir/$name")) {
+    return $full_name;
   } else {
     $self->throw("Can't find file [$name]");
   }
