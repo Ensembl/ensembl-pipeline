@@ -66,18 +66,18 @@ $dbuser = "ensro";
 	    'genetype:s'  => \$genetype,
 );
 
-unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
+unless ( $dbname && $dbhost ){
   print STDERR "script to check the sanity of genes and transcripts after a build\n";
-  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost -genetype\n";
+  print STDERR "Usage: $0 -dbname -dbhost\n";
   exit(0);
 }
 
-my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       '-host'   => $dnadbhost,
-					       '-user'   => $dnadbuser,
-					       '-dbname' => $dnadbname,
-					       '-pass'   => $dnadbpass,
-					      );
+#my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+#					       '-host'   => $dnadbhost,
+#					       '-user'   => $dnadbuser,
+#					       '-dbname' => $dnadbname,
+#					       '-pass'   => $dnadbpass,
+#					      );
 
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -85,7 +85,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    '-dnadb'  => $dnadb,
+#					    '-dnadb'  => $dnadb,
 					   );
 
 
@@ -93,7 +93,6 @@ print STDERR "connected to $dbname : $dbhost\n";
 
 print STDERR "checking genes of type $genetype\n";
 
-#print STDERR "path: ".$path."\n";
 
 my @gene_ids = &get_gene_ids($db,$genetype);
 
@@ -107,13 +106,23 @@ foreach my $gene_id ( @gene_ids){
   foreach my $tran_id ( @transcript_ids ){
     print STDERR "checking transcript dbID: ".$tran_id."\n";
     my ($exons,$info) = &check_transcript($db,$tran_id);
+    #&print_transcript($exons,$info);
+    
     my @exons = @$exons;
     my %info = %$info;
-
+    
     my $strand;
     my $end_phase;
     my $previous_exon;
     my $exon_count = 0;
+    
+    # mark single exon transcripts
+    if ( scalar(@exons) == 1){
+      my $exon_id = shift @exons;
+      my $length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
+      print STDERR "single exon transcript $tran_id of length: $length\n";      
+    }
+
   EXON:
     foreach my $exon_id (@exons){
       $exon_count++;
@@ -122,7 +131,7 @@ foreach my $gene_id ( @gene_ids){
       if ( !defined $info{strand}{$exon_id} ){
 	print STDERR "PROBLEM: exon $exon_id has no strand\n";
       }
-
+      
       # is strand consistent among exons?
       unless ( $strand ){
 	$strand = $info{strand}{$exon_id};
@@ -132,12 +141,6 @@ foreach my $gene_id ( @gene_ids){
 	&print_transcript( $exons,$info);
       }
      
-      # mark single exon transcripts
-      if ( scalar(@exons) == 1){
-	my $length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
-	print STDERR "PROBLEM: single exon transcript $tran_id of length: $length\n";      
-      }
-      
       # are phases consistent?
       if ($exon_count>1){
 	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
@@ -207,6 +210,7 @@ sub get_chrlengths{
 sub check_transcript{
   my $db = shift;
   my $t_id = shift;
+  my $path = $db->assembly_type;
 
   my $q = qq( SELECT e.exon_id,  
 	      if(ass.contig_ori=1,(e.contig_start-ass.contig_start+ass.chr_start),
@@ -232,7 +236,7 @@ sub check_transcript{
 	      et.transcript_id=tr.transcript_id AND 
 	      ass.chromosome_id=c.chromosome_id AND                              
 	      ass.contig_id=e.contig_id AND 
-	      ass.type = 'NCBI_30' AND
+	      ass.type = '$path' AND
 	      tr.transcript_id = 243 AND  
 	      tr.translation_id=tl.translation_id
 	      ORDER BY et.rank
@@ -243,7 +247,7 @@ sub check_transcript{
   
   my %exon;
   my @exons;
-
+  
   while( my ($exon_id,$start,$end,$strand,$chr,$length,$phase,$end_phase,$rank,$transl,$sticky) = $sth->fetchrow_array) {
     #print STDERR "$exon_id\t$start\t$end\t$phase\t$end_phase\t$strand\t$chr\t$length\t$rank\t$transl\t$sticky\n";
     push (@exons,$exon_id);
@@ -318,7 +322,10 @@ sub print_transcript{
   my $exons = shift;
   my $info  = shift;
 
+  print STDERR "printing $exons $info\n";
+
   my @exons = @$exons;
+  print STDERR "exons: @exons\n";
   my %info = %$info;
 
   my $strand = $info{strand}{$exons[0]};
@@ -328,7 +335,7 @@ sub print_transcript{
   elsif($strand == -1){
     @exons = sort{ $info{start}{$b} <=> $info{start}{$a} } @exons;
   }
-
+  
   foreach my $exon_id ( @exons ){
     my $sticky_label ='';
     if ( $info{sticky}{$exon_id} == 1){
