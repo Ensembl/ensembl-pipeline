@@ -128,8 +128,8 @@ sub process_proteins {
 
   while(<PMATCHES>){
 
-    # chr22:10602496,10603128:Q9UGV6:99.4
-    if(!/(chr\S+):(\d+),(\d+):(\S+):(\S+)/){
+    # eg chr22:10602496,10603128:Q9UGV6:99.4
+    if(!/(\S+):(\d+),(\d+):(\S+):(\S+)/){
       die "Cannot parse [$_]\nClean out protein and pmatch_feature tables before rerunning script!\n";
     }
 
