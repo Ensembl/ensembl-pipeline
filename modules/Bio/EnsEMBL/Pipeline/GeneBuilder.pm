@@ -2868,7 +2868,7 @@ sub prune_gene {
 	#print STDERR "to exon ".$target_exon->{'temporary_id'}." in transcript ";
 	#foreach my $tran ( @{ $exon2transcript{ $target_exon } } ){
 	#  print STDERR $tran->{'temporary_id'}." ";
-	}
+	#}
 	#print STDERR "\n";
 	$self->transfer_supporting_evidence($source_exon, $target_exon)
       }
@@ -3050,11 +3050,11 @@ sub validate_transcript{
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
   $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1);$i++){
+  for (my $i=0;$i<(scalar(@exons-1));$i++){
     my $endphase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
-    if ( $phase != $end_phase ){
-      $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
+    if ( $phase != $endphase ){
+      $self->warn("rejecting transcript with inconsistent phases( $phase <-> $endphase) ");
       return undef;
     }
   }
