@@ -51,6 +51,11 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
+					 TRANSCRIPT_ID_SUBSCRIPT
+					 GENE_ID_SUBSCRIPT
+					 PROTEIN_ID_SUBSCRIPT
+					 );
 
 use Data::Dumper;
 
@@ -130,93 +135,99 @@ sub fetch_output {
 sub write_output {
     my($self,@features) = @_;
 
-    my $db = $self->dbobj();
+    my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=bcs121;dbname=simon_oct07;user=ensadmin";
+    
+    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
+   
+    if( !defined $db ) {
+      $self->throw("unable to make write db");
+    }
+    
+    my %contighash;
     my $gene_obj = $db->gene_Obj;
 
+    # this now assummes that we are building on a single VC.
 
-    my $EXON_ID_SUBSCRIPT       = "BGWE";
-    my $TRANSCRIPT_ID_SUBSCRIPT = "BGWT";
-    my $GENE_ID_SUBSCRIPT       = "BGWG";
-    my $PROTEIN_ID_SUBSCRIPT    = "BGWP";
 
-    my $sth = $db->prepare("lock tables gene write, genetype write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
-    $sth->execute;
-
+    my @newgenes = $self->output;
+    return unless ($#newgenes >= 0);
 
     eval {
-	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
-	    =~ s/$GENE_ID_SUBSCRIPT//;
-	(my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
-	    =~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
-	(my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
-	    =~ s/$PROTEIN_ID_SUBSCRIPT//;
-	print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
-	(my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
-	    =~ s/$EXON_ID_SUBSCRIPT//;
-	
 
-	foreach my $gene (@features) {
-	    print STDERR "Feature is $gene\n";
+      GENE: foreach my $gene (@newgenes) {	
 
-	    print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
-	    
-	    
-	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
-	    $gcount++;
-	    print (STDERR "Writing gene " . $gene->id . "\n");
-	    
-            # Convert all exon ids and save in a hash
-            my %namehash;
-	    
-            foreach my $ex ($gene->each_unique_Exon) {
-		print STDERR "Exon id " . $ex . " " . $ex->id . " " . $EXON_ID_SUBSCRIPT . "\n";
-		$namehash{$ex->id} = $EXON_ID_SUBSCRIPT.$ecount;
-		$ex->id($EXON_ID_SUBSCRIPT.$ecount);
-		$ecount++;
-            }
-	    
-	    print (STDERR "Transcripts are\n");
-	    foreach my $tran ($gene->each_Transcript) {
-		$tran->id             ($TRANSCRIPT_ID_SUBSCRIPT . $tcount);
-		$tran->translation->id($PROTEIN_ID_SUBSCRIPT . $pcount);
+	    # do a per gene eval...
+	    eval {
+
+		my @exons = $gene->each_unique_Exon();
+
+		next GENE if (scalar(@exons) == 1);
+    
+		$gene->type('genewise');
 		
-		my $translation = $tran->translation;
+		my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
 		
-		$tcount++;
-		$pcount++;
+		$gene->id($geneid);
+		print (STDERR "Writing gene " . $gene->id . "\n");
 		
-		print (STDERR "Transcript  " . $tran->id . "\n");
-		print (STDERR "Translation " . $tran->translation->id . "\n");
-		
-		foreach my $ex ($tran->each_Exon) {
-                    my @sf = $ex->each_Supporting_Feature;
-                    print STDERR "Supporting features are " . scalar(@sf) . "\n";
-		    
-                    if ($namehash{$translation->start_exon_id} ne "") {
-			$translation->start_exon_id($namehash{$translation->start_exon_id});
-                    }
-                    if ($namehash{$translation->end_exon_id} ne "") {
-			$translation->end_exon_id  ($namehash{$translation->end_exon_id});
-                    }
-		    print(STDERR "Exon         " . $ex->id . "\n");
+		# Convert all exon ids and save in a hash
+		my %namehash;
+
+		my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
+		my $count = 0;
+		foreach my $ex (@exons) {
+		    $namehash{$ex->id} = $exonids[$count];
+		    $ex->id($exonids[$count]);
+		    print STDERR "Exon id is ".$ex->id."\n";
+		    $count++;
 		}
 		
+		my @transcripts = $gene->each_Transcript;
+		my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
+		my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
+		$count = 0;
+		foreach my $tran (@transcripts) {
+		    $tran->id             ($transcript_ids[$count]);
+		    $tran->translation->id($translation_ids[$count]);
+		    $count++;
+		    
+		    my $translation = $tran->translation;
+		    
+		    print (STDERR "Transcript  " . $tran->id . "\n");
+		    print (STDERR "Translation " . $tran->translation->id . "\n");
+		    
+		    foreach my $ex ($tran->each_Exon) {
+			my @sf = $ex->each_Supporting_Feature;
+			print STDERR "Supporting features are " . scalar(@sf) . "\n";
+			
+			if ($namehash{$translation->start_exon_id} ne "") {
+			    $translation->start_exon_id($namehash{$translation->start_exon_id});
+			}
+			if ($namehash{$translation->end_exon_id} ne "") {
+			    $translation->end_exon_id  ($namehash{$translation->end_exon_id});
+			}
+			print(STDERR "Exon         " . $ex->id . "\n");
+		    }
+		    
+		}
+		
+		$gene_obj->write($gene);
+	    }; 
+	    if( $@ ) {
+		print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
 	    }
 	    
-	    $gene_obj->write($gene);
 	}
-	};
-	if ($@) {
-	    $sth = $db->prepare("unlock tables");
-	    $sth->execute;
-	    
-	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
-	} else {
-	    $sth = $db->prepare("unlock tables");
-	    $sth->execute;
-	}
+    };
+    if ($@) {
 
-}
+      $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
+    } else {
+      # nothing
+    }
+
+
+  }
 
 =head2 fetch_input
 
@@ -258,10 +269,10 @@ sub fetch_input {
 	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
     }
 
-    my $genseq    = $contig->primary_seq;
+    my $genseq    = $contig->get_repeatmasked_seq;
 
     print STDERR "Length is " . $genseq->length . "\n";
-    print STDERR "Fetching features " . $contig . "\n";
+    print STDERR "Fetching features \n";
 
     my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200);
     
@@ -270,8 +281,6 @@ sub fetch_input {
     my @genes     = $contig->get_Genes_by_Type('pruned_TGW');
 
     print STDERR "Found " . scalar(@genes) . " genewise genes\n";
-
-
 
     my %redids;
     my $trancount = 1;
@@ -286,12 +295,14 @@ sub fetch_input {
 	    $strand = "-";
 	  }
 
-	  print STDERR $exon->contig_id . "\tGD_CDS\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
-	  
-	   FEAT: foreach my $f (@features) {
-	    if ($exon->overlaps($f)) {
-	      $redids{$f->hseqname} = 1;
-	      print STDERR "ID " . $f->hseqname . " covered by genewise\n";
+	  if ($exon->seqname eq $contig->id) {
+	    print STDERR $exon->contig_id . "\tGD_CDS\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
+	    
+	  FEAT: foreach my $f (@features) {
+	      if ($exon->overlaps($f)) {
+		$redids{$f->hseqname} = 1;
+		print STDERR "ID " . $f->hseqname . " covered by genewise\n";
+	    }
 	    }
 	  }
 	}
@@ -304,18 +315,20 @@ sub fetch_input {
     foreach my $f (@features) {
 #        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
       if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-	  defined($f->hseqname)                &&
-	  $redids{$f->hseqname} != 1) {
-	$idhash{$f->hseqname} = 1;
-      }
+	  defined($f->hseqname) &&
+	    $redids{$f->hseqname} != 1) {
+      $idhash{$f->hseqname} = 1;
+      
     }
+  }
     
     my @ids = keys %idhash;
-    
+
     print STDERR "Feature ids are @ids\n";
-#    my @ids = ('O00468');
+
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
-									   '-ids'      => \@ids);
+									   '-ids'      => \@ids,
+									   '-trim'     => 1);
     
     
     $self->add_Runnable($runnable);
@@ -362,7 +375,6 @@ sub run {
 sub convert_output {
   my ($self) =@_;
   
-  my @tmpf;
   my $count = 1;
   my $time  = time; chomp($time);
   

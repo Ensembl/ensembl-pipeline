@@ -49,9 +49,18 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
+
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
+use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
+use Bio::EnsEMBL::DBLoader;
+use Bio::EnsEMBL::Utils::GTF_handler;
+use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
+					 TRANSCRIPT_ID_SUBSCRIPT
+					 GENE_ID_SUBSCRIPT
+					 PROTEIN_ID_SUBSCRIPT
+					 );
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::Object );
@@ -161,66 +170,114 @@ sub fetch_output {
 sub write_output {
     my($self,@genes) = @_;
 
-    my $db = $self->dbobj();
+    my $dblocator = "Bio::EnsEMBL::DBSQL::Obj/host=ensrv4.sanger.ac.uk;dbname=arne_freeze05_ewan;user=ensadmin";
+    
+    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
    
+    if( !defined $db ) {
+	$self->throw("unable to make write db");
+    }
+
+#    my $db = $self->_dbobj;
+
     my %contighash;
     my $gene_obj = $db->gene_Obj;
 
-        return unless ($#genes >= 0);
+    # this now assummes that we are building on a single VC.
+    my $genebuilders = $self->get_genebuilders;
+    my ($contig) = keys %$genebuilders;
+    my $vc = $genebuilders->{$contig}->contig;
+
+    return unless ($#genes >= 0);
+    my @newgenes;
+
+     foreach my $gene (@genes) { 
+	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
+       push(@newgenes,$newgene);
+     }
 
 
-	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write, dna read, contig read, clone read, analysis read, supporting_feature write");
-	      $sth->execute;
+    eval {
 
-	  foreach my $gene (@genes) {
-	    (my $gcount = $gene_obj->get_new_GeneID("F24G"))        =~ s/F24G//;
-	    (my $tcount = $gene_obj->get_new_TranscriptID("F24T"))  =~ s/F24T//;
-	    (my $pcount = $gene_obj->get_new_TranslationID("F24P")) =~ s/F24P//;
-	    (my $ecount = $gene_obj->get_new_ExonID("F24E"))        =~ s/F24E//;
-	    
-	    $gene->id("F24G" . $gcount);
+        foreach my $gene (@newgenes) {	
 
-	    print (STDERR "Writing gene " . $gene->id . "\n");
-	    print (STDERR "Transcripts are\n");
-	    foreach my $tran ($gene->each_Transcript) {
-		$tran->id             ("F24T" . $tcount);
-		$tran->translation->id("F24P" . $pcount);
-
-		my $translation = $tran->translation;
-
-		$tcount++;
-		$pcount++;
-
-		print (STDERR "Transcript  " . $tran->id . "\n");
-		print (STDERR "Translation " . $tran->translation->id . "\n");
-		foreach my $ex ($tran->each_Exon) {
-                    my @sf = $ex->each_Supporting_Feature;
-                    print STDERR "Supporting features are " . scalar(@sf) . "\n";
-
-		    if ($ex->id !~ /F24E/) {
-			my $tmpid = $ex->id;
-			$ex->id("F24E".$ecount);
-
-			if ($translation->start_exon_id eq $tmpid) {
-			    $translation->start_exon_id("F24E".$ecount);
-			}
-
-			if ($translation->end_exon_id eq $tmpid) {
-			    $translation->end_exon_id("F24E".$ecount);
-			}
-			$ecount++;
-			print(STDERR "Exon         " . $ex->id . "\n");
-		    }
+	    # do a per gene eval...
+	    eval {
+    
+		$gene->type('pruned');
+		
+		my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
+		
+		$gene->id($geneid);
+		print (STDERR "Writing gene " . $gene->id . "\n");
+		
+		# Convert all exon ids and save in a hash
+		my %namehash;
+		my @exons = $gene->each_unique_Exon();
+		my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
+		my $count = 0;
+		foreach my $ex (@exons) {
+		    $namehash{$ex->id} = $exonids[$count];
+		    $ex->id($exonids[$count]);
+		    print STDERR "Exon id is ".$ex->id."\n";
+		    $count++;
 		}
 		
+		my @transcripts = $gene->each_Transcript;
+		my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
+		my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
+		$count = 0;
+		foreach my $tran (@transcripts) {
+		    $tran->id             ($transcript_ids[$count]);
+		    $tran->translation->id($translation_ids[$count]);
+		    $count++;
+		    
+		    my $translation = $tran->translation;
+		    
+		    print (STDERR "Transcript  " . $tran->id . "\n");
+		    print (STDERR "Translation " . $tran->translation->id . "\n");
+		    
+		    foreach my $ex ($tran->each_Exon) {
+			my @sf = $ex->each_Supporting_Feature;
+			print STDERR "Supporting features are " . scalar(@sf) . "\n";
+			
+			if ($namehash{$translation->start_exon_id} ne "") {
+			    $translation->start_exon_id($namehash{$translation->start_exon_id});
+			}
+			if ($namehash{$translation->end_exon_id} ne "") {
+			    $translation->end_exon_id  ($namehash{$translation->end_exon_id});
+			}
+			print(STDERR "Exon         " . $ex->id . "\n");
+		    }
+		    
+		}
+		
+		$gene_obj->write($gene);
+	    }; 
+	    if( $@ ) {
+		print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
 	    }
-
-	    $gene_obj->write($gene);
-
+	    
 	}
-	      $sth = $db->prepare("unlock tables");
-	      $sth->execute;
+    };
+    if ($@) {
 
+	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
+	} else {
+	    # nothing
+	}
+
+
+     # Set attribute tag on all contigs
+     $db->extension_tables(1);
+
+     foreach my $contig (keys %$genebuilders) {
+        my @contigs = $vc->get_all_RawContigs;
+
+        foreach my $contig (@contigs) {
+            $contig->set_attribute('GENE_BUILD_NOV05',1); 
+        }
+     }
 }
 
 =head2 fetch_input
@@ -238,45 +295,32 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
+  #  $self->dbobj->static_golden_path_type('UCSC');
+
+  #  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
+#	$contigid =~ s/\.(.*)//;
+#    my $contignum = $1;
 
-    if ($self->vcontig) {
-	my $focus = int(($contig->golden_start + $contig->golden_end)/2);
+    print STDERR "Contig id = $contigid \n";
 
-	$self->focuscontig($contig);
+    #my @contig	  = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
 
-	$contig = new Bio::EnsEMBL::DB::ConvertibleVirtualContig(-focuscontig   => $contig,
-						      -focusposition => $focus,
-						      -ori           => 1,
-						      -left          => $self->extend,
-						      -right         => $self->extend);
+    my $contig	  = $self->dbobj->get_Contig($contigid);
 
-	$contig = $contig->extend_maximally;
 
-	print(STDERR "Contig length is " . $contig->length . "\n");
-
-	if ($contig->length > 50000000) {
-	    $self->throw("Aborting - virtual contig loo tong");
-	}
-
-    }
-
-    $contig->_dump_map(\*STDOUT);
     $contig->primary_seq;
 
-    print STDERR "Length of primary seq is",$contig->primary_seq->length,"\n";
+    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
 
-    my $analysis = $self->dbobj->get_OldAnalysis(8);
-           
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $contig,
-							      -analysis => $analysis,
 							      );
 
 
 
     $self->addgenebuilder($genebuilder,$contig);
-    
+
 }
 sub focuscontig {
     my ($self,$arg) = @_;
@@ -305,7 +349,7 @@ sub extend {
 	$self->{_extend} = $arg;
     }
 
-    return $self->{_extend} || 200000;
+    return $self->{_extend} || 400000;
 }
 
 sub addgenebuilder {
@@ -340,34 +384,29 @@ sub run {
     my ($self) = @_;
 
     my $genebuilders = $self->get_genebuilders;
-    my @gene;
+    #my @gene;
 
     $self->{_output} = [];
     
+    my @vcgenes;
     foreach my $contig (keys %$genebuilders) {
         my $vc = $genebuilders->{$contig}->contig;
 	print(STDERR "Building for $contig\n");
 	$genebuilders->{$contig}->build_Genes;
-	my @vcgenes = @{$genebuilders->{$contig}{_genes}};
+	@vcgenes = @{$genebuilders->{$contig}{_genes}};
         print STDERR "Genes before conversion\n";
+#	$vc->_dump_map(\*STDERR);
         $genebuilders->{$contig}->print_Genes(@vcgenes);
         print STDERR "Converting coordinates";
-        foreach my $g (@vcgenes) {
-           my $newgene = $vc->convert_Gene_to_raw_contig($g);
+        #foreach my $g (@vcgenes) {
+        #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
            #$self->check_gene($newgene);
-	   push(@gene,$newgene);
-        }
-         $vc = undef;
-         $genebuilders->{$contig} = undef;
+	#   push(@gene,$newgene);
+        #}
     }
     
-    foreach my $gene (@gene) {
-	foreach my $exon ($gene->each_unique_Exon) {
-	    $exon->{_gsf_seq} = undef;
-	}
-    }
 	    
-    push(@{$self->{_output}},@gene);
+    push(@{$self->{_output}},@vcgenes);
 }
 
 sub output {
