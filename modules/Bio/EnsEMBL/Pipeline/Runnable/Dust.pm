@@ -78,10 +78,9 @@ sub new {
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_results'}   = undef; # file to store results of dust
 
-    my( $sequence, $cutoff, $dust, $level) = $self->_rearrange([qw(
+    my( $sequence, $dust, $level) = $self->_rearrange([qw(
         QUERY
         DUST
-        CUTOFF
         LEVEL
     )], @args);
 
@@ -91,7 +90,6 @@ sub new {
     $self->dust($self->find_executable($dust));
 
     $self->query($sequence) if ($sequence);
-    $self->cutoff($cutoff)  if ($cutoff);
     $self->level($level)    if ($level);
 
     return $self;
