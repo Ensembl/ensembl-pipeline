@@ -159,6 +159,7 @@ sub make_MiniSeq {
       $fp->start($f->start);
       $fp->end($f->end);
       $fp->seqname($f->seqname);
+      $fp->attach_seq($self->genomic_sequence);
       $fp->strand($f->strand);
       $fp->score($f->score);
       $fp->hstart($cdna_start);
