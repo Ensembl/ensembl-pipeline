@@ -250,7 +250,7 @@ sub run {
         $self->throw("Genomic sequence not provided");
     my $estseq = $self->est_sequence ||
         $self->throw("EST sequence not provided");
-    
+    my $est_length = $self->est_sequence->length;
     #extract filenames from args and check/create files and directory
     my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
 
@@ -283,7 +283,7 @@ sub run {
     }
     elsif($estgenome =~ /est2genome/){
       # emboss version has -reverse behaviour on by default 
-      $est_genome_command = $self->est_genome . " -genome $genfile -est $estfile -space 500000 -out stdout |";
+      $est_genome_command = $self->est_genome . " -genome $genfile -est $estfile -space 500000 -out stdout | ";
     }
     else{
       $self->throw ("cannot determine correct command to use when running " . $self->est_genome . " - bailing out.\n");
@@ -314,6 +314,12 @@ sub run {
 
       # put the gene on the minus strand if splice sites imply reversed gene
 
+      if($firstline =~ /reversed est/){
+	$est_strand = -1;
+      }else {
+	$est_strand = 1;
+      }
+
       if ($firstline =~/REVERSE/){
 	$genomic_strand = -1;
       }
@@ -321,11 +327,7 @@ sub run {
 	$genomic_strand = 1;
       }
 
-      if($firstline =~ /reversed est/){
-	  $est_strand = -1;
-      }else {
-	  $est_strand = 1;
-      }
+    
 
       # This hash is used below for looking up exon scores.
       my %exon_lookup;      
@@ -409,17 +411,19 @@ sub run {
 	  my $f2primary = $f1primary;
 	  
 	  #ensure start is always less than end
-	  if ($elements[6] < $elements[7])
+	  if ($est_strand == 1)
 	    {
 	      $f2start =  $elements[6]; 
 	      $f2end = $elements[7];
 	    }
 	  else
 	    {
-	      $f2start =  $elements[7]; 
-	      $f2end = $elements[6];
+	      $f2start =  $est_length - $elements[7] + 1; 
+	      $f2end = $est_length - $elements[6] + 1;
 	    }              
-
+	  if($f1strand == -1){
+	    $f2strand *= -1;
+	  }
 	  #create array of featurepairs and add them to $self->{'_fplist'}
 	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
 				  $f2start, $f2end, $f2id, $f1source, 
