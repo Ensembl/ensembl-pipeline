@@ -152,10 +152,10 @@ sub new {
     }
     
     if ($options) {
-	  if ($::pipeConf{'B_factor'}){
-		my $b_factor = $::pipeConf{'B_factor'};
+	  if ($::blastconf{'B_factor'}){
+		my $b_factor = $::blastconf{'B_factor'};
 		my $b_value = int ($query->length / 1000 * $b_factor); 
-		 if ($::pipeConf{'blast'} eq 'ncbi'){
+		 if ($::blastconf{'blast_type'} eq 'ncbi'){
             $options .= " -b $b_value" unless ($b_value < 250);
         }
         else {
@@ -258,8 +258,8 @@ sub run_analysis {
 	$db =~ s/.*\///;
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.	
 	my $command = $self->program ;
-	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
-	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
+	$command .= ($::blastconf{'blast_type'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
+	$command .= ($::blastconf{'blast_type'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
 	$command .= ' '.$self->options. ' > '.$self->results . ".$db";
 
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
@@ -436,9 +436,9 @@ sub parse_results {
   }
 
 
-# Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
+# Alternate feature filter. If option not present in blastconf, should default to FeatureFilter -prune
 
-  if ($::pipeConf{'filter_blast'}){
+  if ($::blastconf{'filter_blast'}){
     # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
     my @selected_features = $self->select_features($self->output);
     $self->output(@selected_features);
@@ -883,18 +883,21 @@ sub select_features {
  
 	my @selected_features;
  
-	my $best_hit = $features[0];
+	my $best_hit = shift @features;
  
 	foreach my $feat (@features){
 		if ($feat->overlaps($best_hit,'strong')) {
 			if ($feat->score > $best_hit->score) {
 				$best_hit = $feat;
 			}
-			}else {
-				push (@selected_features,$best_hit);
-				$best_hit = $feat;
-			}
+		}else {
+			push (@selected_features,$best_hit);
+			$best_hit = $feat;
+		}
 	}
+
+	push (@selected_features,$best_hit); # add the last Best scoring feature
+                                         # into array.
 	 
 	my @newfeatures;	
 	FEAT: foreach my $feat (@features){
