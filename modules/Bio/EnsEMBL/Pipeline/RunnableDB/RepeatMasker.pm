@@ -164,7 +164,7 @@ sub write_output{
     $repeat_f_a->store($f);
   }
 
-
+  return 1;
 }
 
 
