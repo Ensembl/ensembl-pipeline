@@ -383,7 +383,6 @@ sub _flush_Transcripts {
 
 =head2 _process_Transcripts
 
-    Title   :   _process_Transcripts
     Usage   :   @new_transcripts= $self->_process_Transcripts(@read_transcripts)
     Function:   main magic and witchcraft on the transcripts. 
                 It checks, clusters and  merges an input array of transcripts
@@ -402,7 +401,8 @@ sub _process_Transcripts {
   print STDERR scalar(@transcripts)." transcripts returned from _check_Transcripts\n";
   
   # reject ests/cdnas if they have more than one non-standard intron splice site consensus sequence
-  # (GT-AG, AT-AC, GC-AG) or if the only intron they have is non standard.
+  # or if the only intron they have is non standard.
+  # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
   my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
   
   if ( scalar(@checked_transcripts) == 0 ){
