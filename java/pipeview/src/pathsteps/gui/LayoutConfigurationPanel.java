@@ -25,6 +25,7 @@ public class LayoutConfigurationPanel extends JPanel{
   private JTextField movementLimitTextField = new JTextField(10);
   private JTextField gravityTextField = new JTextField(10);
   private JCheckBox fixNodesCheckBox = new JCheckBox("Fix nodes");
+  private JCheckBox showJobDetailCheckBox = new JCheckBox("Show job detail");
   
   private JButton setButton = new JButton("Set");
   private JButton cancelButton = new JButton("Cancel");
@@ -73,6 +74,9 @@ public class LayoutConfigurationPanel extends JPanel{
     add(getFixNodesCheckBox(),makeConstraintAt(0,row,2));
     row++;
 
+    add(getShowJobDetailCheckBox(),makeConstraintAt(0,row,2));
+    row++;
+
     getView().connectToActionEventRouter(
       getSetButton(),
       AView.SET_LAYOUT_PREFERENCES_KEY
@@ -101,6 +105,7 @@ public class LayoutConfigurationPanel extends JPanel{
     String movementLimit;
     String gravity;
     String fixNodes;
+    String showJobDetail;
 
     ModelElement dialogModel = model.getRootElement().getChildElement(model.LAYOUT_DIALOG);
 
@@ -120,6 +125,7 @@ public class LayoutConfigurationPanel extends JPanel{
     movementLimit = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_MOVEMENT_LIMIT);
     gravity = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_GRAVITY);
     fixNodes = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_FIX_ROOTS);
+    showJobDetail = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL);
 
     getIteratesTextField().setText(iterates);
     getSpringLengthTextField().setText(springLength);
@@ -129,6 +135,7 @@ public class LayoutConfigurationPanel extends JPanel{
     getMovementLimitTextField().setText(movementLimit);
     getGravityTextField().setText(gravity);
     getFixNodesCheckBox().setSelected(Boolean.valueOf(fixNodes).booleanValue());
+    getShowJobDetailCheckBox().setSelected(Boolean.valueOf(showJobDetail).booleanValue());
     
     if(getView().getLogger().isLoggingMedium()){
       getView().getLogger().logMedium("Finished data source configuration panel read");
@@ -144,13 +151,14 @@ public class LayoutConfigurationPanel extends JPanel{
     String movementLimit = getMovementLimitTextField().getText();
     String gravity = getGravityTextField().getText();
     String fixNodes = Boolean.valueOf(getFixNodesCheckBox().isSelected()).toString();
+    String showJobDetail = Boolean.valueOf(getShowJobDetailCheckBox().isSelected()).toString();
 
     ModelElement dialogModel = model.getRootElement().getChildElement(model.LAYOUT_DIALOG);
 
     if(dialogModel == null){
       throw new FatalAException("ReadDBDialog expecting a model called: "+model.READ_DB_DIALOG+" but none was found");
     }
-    
+
     dialogModel.addProperty(model.LAYOUT_DIALOG_ITERATES,iterates);
     dialogModel.addProperty(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH, springLength);
     dialogModel.addProperty(model.LAYOUT_DIALOG_REPULSION_MULTIPLIER, repulsionMultiplier);
@@ -159,8 +167,9 @@ public class LayoutConfigurationPanel extends JPanel{
     dialogModel.addProperty(model.LAYOUT_DIALOG_MOVEMENT_LIMIT, movementLimit);
     dialogModel.addProperty(model.LAYOUT_DIALOG_GRAVITY, gravity);
     dialogModel.addProperty(model.LAYOUT_DIALOG_FIX_ROOTS, fixNodes);
+    dialogModel.addProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL, showJobDetail);
   }
-  
+
   protected GridBagConstraints makeConstraintAt(
     int x,
     int y,
@@ -217,6 +226,10 @@ public class LayoutConfigurationPanel extends JPanel{
   
   private PathStepsSwingView getView(){
     return view;
+  }
+
+  private JCheckBox getShowJobDetailCheckBox(){
+    return showJobDetailCheckBox;
   }
   
   private JCheckBox getFixNodesCheckBox(){

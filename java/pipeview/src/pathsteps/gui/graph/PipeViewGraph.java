@@ -39,46 +39,54 @@ public class PipeViewGraph extends JGraph{
     String readingString = "";
     String runningString = "";
     String voidString = "";
+    boolean showDetail = false;
     java.util.Map attributes = view.getAllAttributes();
     
     if (view != null) {
       if(view instanceof VertexView){
-        attributes = view.getAllAttributes();
-        property = attributes.get(ModelElement.FINISHED_COUNT);
-        if(property != null){
-          finishedString = ((Integer)property).toString();
-        }
-        
-        property = attributes.get(ModelElement.ANALYSIS_STATUS_COUNT);
-        if(property != null){
-          statusMap = (Map)property;
-          
-          if(statusMap.get(ModelElement.CREATED) != null){
-            createdString = ((Integer)statusMap.get(ModelElement.CREATED)).toString(); 
+
+        property = attributes.get(ModelElement.SHOW_DETAIL);
+        showDetail = Boolean.valueOf((String)property).booleanValue();
+        if(showDetail){
+          attributes = view.getAllAttributes();
+          property = attributes.get(ModelElement.FINISHED_COUNT);
+          if(property != null){
+            finishedString = ((Integer)property).toString();
           }
-          
-          if(statusMap.get(ModelElement.RUNNING) != null){
-            runningString = ((Integer)statusMap.get(ModelElement.RUNNING)).toString(); 
+
+          property = attributes.get(ModelElement.ANALYSIS_STATUS_COUNT);
+          if(property != null){
+            statusMap = (Map)property;
+            if(statusMap.get(ModelElement.CREATED) != null){
+              createdString = ((Integer)statusMap.get(ModelElement.CREATED)).toString(); 
+            }
+
+            if(statusMap.get(ModelElement.RUNNING) != null){
+              runningString = ((Integer)statusMap.get(ModelElement.RUNNING)).toString(); 
+            }
+
+            if(statusMap.get(ModelElement.FAILED) != null){
+              failedString = ((Integer)statusMap.get(ModelElement.FAILED)).toString(); 
+            }
           }
-          
-          if(statusMap.get(ModelElement.FAILED) != null){
-            failedString = ((Integer)statusMap.get(ModelElement.FAILED)).toString(); 
-          }
-          
         }
       }
       
       newValue = GraphConstants.getValue(view.getAllAttributes());
       
       if (newValue != null){
-				value = 
-          "<html> "+
-          "<strong><em>" +newValue+"</em></strong>"+
-          " <br>FIN: "+finishedString+
-          " <br>CRE: "+createdString+
-          " <br>RUN: "+runningString+
-          " <br>FAI: "+failedString+
-          " <html>";
+        if(showDetail){
+          value = 
+            "<html> "+
+            "<strong><em>" +newValue+"</em></strong>"+
+            " <br>FIN: "+finishedString+
+            " <br>CRE: "+createdString+
+            " <br>RUN: "+runningString+
+            " <br>FAI: "+failedString+
+            " <html>";
+        }else{
+          value = newValue;
+        }
       }else{
 				value = view.getCell();
       }

@@ -382,9 +382,15 @@ public class PathStepsPanel extends JPanel{
     ArrayList list = new ArrayList();
     Comparator inverseChildNumber = new PathStepsPanel.InverseChildNumberComparator();
     Map elementMap = (Map)graphRoot.getProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES_MAP);
+    String showDetail = (String)graphRoot.getProperty(PathStepsModel.PATH_STEPS_PANEL_SHOW_JOB_DETAIL);
     String finalLabel = "";
     String minimumString = "SubmitSlice";
     int minimumWidth = getFontMetrics().stringWidth(minimumString)+15;
+    int rectangleHeight = RECTANGLE_HEIGHT;
+    
+    if(!Boolean.valueOf(showDetail).booleanValue()){
+      rectangleHeight = RECTANGLE_HEIGHT/4;
+    }
     
     for(int i=0; i<nodes.length; i++){
       
@@ -398,7 +404,7 @@ public class PathStepsPanel extends JPanel{
         (new Long(Math.round(nodes[i].x))).intValue(), 
         (new Long(Math.round(nodes[i].y))).intValue(), 
         width, 
-        RECTANGLE_HEIGHT, 
+        rectangleHeight, 
         nodePositionsAndLabels[i].lbl
       );
     }

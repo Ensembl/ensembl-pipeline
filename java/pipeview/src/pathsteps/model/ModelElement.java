@@ -28,6 +28,7 @@ public class ModelElement{
   public static String READING = "FINISHED_COUNT";
   public static String RUNNING = "FINISHED_COUNT";
   public static String SUBMITTED = "FINISHED_COUNT";
+  public static String SHOW_DETAIL = "SHOW_DETAIL";
   
   public ModelElement(String key){
     this.key = key;

@@ -4,6 +4,7 @@ import pathsteps.common.*;
 public class PathStepsModel implements AModel{
   public static String ROOT = "ROOT";
   public static String PATH_STEPS_PANEL = "PATH_STEPS_PANEL";
+  public static String PATH_STEPS_PANEL_SHOW_JOB_DETAIL = "PATH_STEPS_PANEL_SHOW_JOB_DETAIL";
   public static String PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION = "PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION";
   public static String PATH_STEPS_PANEL_ALL_NODES = "PATH_STEPS_PANEL_ALL_NODES";
   public static String PATH_STEPS_PANEL_ALL_NODES_MAP = "PATH_STEPS_PANEL_ALL_NODES_MAP";
@@ -27,6 +28,7 @@ public class PathStepsModel implements AModel{
   public static String LAYOUT_DIALOG_FIX_ROOTS = "LAYOUT_DIALOG_FIX_ROOTS";
   public static String LAYOUT_DIALOG_MOVEMENT_LIMIT = "LAYOUT_DIALOG_MOVEMENT_LIMIT";
   public static String LAYOUT_DIALOG_GRAVITY = "LAYOUT_DIALOG_GRAVITY";
+  public static String LAYOUT_DIALOG_SHOW_JOB_DETAIL = "LAYOUT_DIALOG_SHOW_JOB_DETAIL";
 
   public static String CREATE_NODE_DIALOG = "CREATE_NODE_DIALOG";
   public static String CREATE_NODE_DIALOG_NAME = "CREATE_NODE_DIALOG_NAME";

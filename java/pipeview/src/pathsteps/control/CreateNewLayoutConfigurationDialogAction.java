@@ -48,6 +48,7 @@ public class CreateNewLayoutConfigurationDialogAction extends AAction{
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_MOVEMENT_LIMIT, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_MOVEMENT_LIMIT));
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_GRAVITY, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_GRAVITY));
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_FIX_ROOTS, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_FIX_ROOTS));
+      layoutDialogElement.addProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL));
       layoutDialogElement.addProperty(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH, getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH));
     }else{
       if(getLogger().isLoggingMedium()){

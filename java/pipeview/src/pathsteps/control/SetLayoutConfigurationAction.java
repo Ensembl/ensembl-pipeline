@@ -4,10 +4,6 @@ import pathsteps.model.*;
 import pathsteps.gui.*;
 import java.util.*;
 
-/**
- * When the user types into the db-change field, the databases in the dropdown
- * should be blanked out: this is what this action does.
-**/
 public class SetLayoutConfigurationAction extends AAction{
   public SetLayoutConfigurationAction(AEventHandler eventHandler){
     super(eventHandler);
@@ -25,6 +21,8 @@ public class SetLayoutConfigurationAction extends AAction{
     String horizontalSpacing;
     String movementLimit;
     String gravity;
+    String fixRoots;
+    String showDetail;
 
     iterates = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_ITERATES);
     validateNumber(
@@ -68,6 +66,10 @@ public class SetLayoutConfigurationAction extends AAction{
       "Movement Limit is not a valid number"
     );
 
+    fixRoots = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_FIX_ROOTS);
+    showDetail = (String)dialogModel.getProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL);
+    
+    /*
     dialogModel.addProperty(model.LAYOUT_DIALOG_ITERATES, iterates);
     dialogModel.addProperty(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH, springNaturalLength);
     dialogModel.addProperty(model.LAYOUT_DIALOG_REPULSION_MULTIPLIER, repulsionMultiple);
@@ -75,6 +77,7 @@ public class SetLayoutConfigurationAction extends AAction{
     dialogModel.addProperty(model.LAYOUT_DIALOG_HORIZONTAL_SPACING, horizontalSpacing);
     dialogModel.addProperty(model.LAYOUT_DIALOG_MOVEMENT_LIMIT, movementLimit);
     dialogModel.addProperty(model.LAYOUT_DIALOG_GRAVITY, gravity);
+    */
     
     history.setProperty(model.LAYOUT_DIALOG_ITERATES, iterates);
     history.setProperty(model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH, springNaturalLength);
@@ -83,13 +86,14 @@ public class SetLayoutConfigurationAction extends AAction{
     history.setProperty(model.LAYOUT_DIALOG_HORIZONTAL_SPACING, horizontalSpacing);
     history.setProperty(model.LAYOUT_DIALOG_MOVEMENT_LIMIT, movementLimit);
     history.setProperty(model.LAYOUT_DIALOG_GRAVITY, gravity);
+    history.setProperty(model.LAYOUT_DIALOG_FIX_ROOTS, fixRoots);
+    history.setProperty(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL, showDetail);
     
     if(getLogger().isLoggingMedium()){
       getLogger().logMedium("Added layout dialog paramters to history - writing history "+history);
     }
-    
+
     view.getApplication().writeHistory(history);
-    
     view.closeLayoutConfigurationDialog();
   }
   

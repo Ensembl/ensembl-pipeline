@@ -21,6 +21,15 @@ public abstract class AbstractReadDBAction extends AAction{
     Collection databases = null;
     String selectedDatabase = null;
     ModelElement dialogModel = model.getRootElement().getChildElement(model.READ_DB_DIALOG);
+    ModelElement layoutDialogModel = model.getRootElement().getChildElement(model.LAYOUT_DIALOG);
+    String showDetail = null;
+    
+    view.getApplication().readHistory(); //picks up the user's last choices from history instead of internal state.
+    showDetail = getStringFromHistoryOrConfig(model.LAYOUT_DIALOG_SHOW_JOB_DETAIL);
+    if(showDetail == null){
+      showDetail = Boolean.FALSE.toString();
+    }
+    
     Collection list;
     String host = null;
     String port = null;
@@ -67,7 +76,7 @@ public abstract class AbstractReadDBAction extends AAction{
     //Run the logic to store the chains of dependent path/steps in the model
     model.getRootElement().addChildElement(
       PathStepsModel.PATH_STEPS_PANEL,
-      createPathStepsPanelModel(selectedDatabase)
+      createPathStepsPanelModel(selectedDatabase, showDetail)
     );
     
     //System.out.println(model.toString());
@@ -88,7 +97,7 @@ public abstract class AbstractReadDBAction extends AAction{
     }
   }
 
-  protected ModelElement createPathStepsPanelModel(String selectedDatabase){
+  protected ModelElement createPathStepsPanelModel(String selectedDatabase, String showJobDetail){
     
     ModelElement rootElement = new ModelElement(PathStepsModel.PATH_STEPS_PANEL);
     
@@ -125,6 +134,7 @@ public abstract class AbstractReadDBAction extends AAction{
         currentElement = new ExtendedModelElement(logic_name);
         currentElement.addProperty("analysis_id", String.valueOf(analysis_id));
         currentElement.addProperty("logic_name", String.valueOf(logic_name));
+        currentElement.addProperty(ModelElement.SHOW_DETAIL, showJobDetail);
         elementsByLogicName.put(logic_name, currentElement);
         elementsByAnalysisId.put(String.valueOf(analysis_id), currentElement);
       }
@@ -186,6 +196,11 @@ public abstract class AbstractReadDBAction extends AAction{
       rootElement.addProperty(
         PathStepsModel.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION,
         getView().getApplication().readGraphLayoutConfiguration()
+      );
+      
+      rootElement.addProperty(
+        PathStepsModel.PATH_STEPS_PANEL_SHOW_JOB_DETAIL,
+        showJobDetail
       );
 
       statement.close();
