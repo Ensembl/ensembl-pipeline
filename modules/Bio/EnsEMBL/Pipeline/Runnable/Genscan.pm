@@ -68,6 +68,10 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::Genscan;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 use vars qw(@ISA);
 use strict;
 # Object preamble - inherits from Bio::Root::RootI;
@@ -117,25 +121,45 @@ sub new {
 
     $self->clone($clonefile) if ($clonefile);
     print STDERR "GENSCAN $genscan\tMATRIX $matrix\n";
-    if ($genscan)       
-    {
-        $self->genscan($genscan) ;
+
+    my $bindir = $::pipeConf{'bindir'} || undef;
+    my $datadir = $::pipeConf{'datadir'} || undef;
+
+    if (-x $genscan) {
+        # passed from RunnableDB (full path assumed)
+        $self->genscan($genscan);
     }
-    else                
-    { 
-        $self->genscan($self->locate_executable('genscan'));
+    elsif ($::pipeConf{'bin_Genscan'} && -x ($genscan = "$::pipeConf{'bin_Genscan'}")) {
+        $self->genscan($genscan);
     }
-    
-    if ($matrix)    
-    { $self->matrix($matrix) ; }
-    else                
-    {$self->throw("Path to Matrix required ($matrix)\n"); }
-         
+    elsif ($bindir && -x ($genscan = "$bindir/genscan")) {
+        $self->genscan($genscan);
+    }
+    else {
+        # search shell $PATH
+        eval {
+            $self->genscan($self->locate_executable('genscan'));
+        };
+        if ($@) {
+            $self->throw("Can't find executable genscan");
+        }
+    }
+
+    if (-e $matrix) {
+        $self->matrix($matrix);
+    }
+    elsif ($matrix && -e "$datadir/$matrix") {
+        $self->matrix("$datadir/$matrix");
+    }
+    else {
+        $self->throw("path to matrix required");
+    }
+
     if ($parameters)    
     { $self->parameters($parameters) ; }
     else                
     {$self->parameters(''); }     
-    
+
     return $self;
 }
 
