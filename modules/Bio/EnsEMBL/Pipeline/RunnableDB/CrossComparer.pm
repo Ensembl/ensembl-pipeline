@@ -141,11 +141,11 @@ sub fetch_input {
 
     my $gadp = $self->dbobj->get_GenomeDBAdaptor();
 
-    $db1 = $gadp->fetch_by_species_tag($db1)->ensembl_db();
-    $db2 = $gadp->fetch_by_species_tag($db2)->ensembl_db();
+    $db1 = $gadp->fetch_by_species_tag($db1);
+    $db2 = $gadp->fetch_by_species_tag($db2);
 
-    my $contig1 = $db1->get_Contig($c1);
-    my $contig2 = $db2->get_Contig($c2);
+    my $contig1 = $db1->get_Contig($c1,'RawContig');
+    my $contig2 = $db2->get_Contig($c2,'RawContig');
 
     my $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
     my $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
