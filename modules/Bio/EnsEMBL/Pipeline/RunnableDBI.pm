@@ -42,7 +42,7 @@ if ($BIOPERLDB) {
   require Bio::DB::SQL::DBAdaptor;
 }
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
