@@ -1,5 +1,5 @@
 #
-# BioPerl module for Bio::EnsEMBL::Pipeline::GeneComp
+# BioPerl module for Bio::EnsEMBL::Pipeline::GeneCompNew
 #
 # Cared for by Ewan Birney <birney@ebi.ac.uk>
 #
@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneComp - Comparison of old and new Gene/Transcript/Exons
+Bio::EnsEMBL::Pipeline::GeneCompNew - Comparison of old and new Gene/Transcript/Exons
 
 =head1 SYNOPSIS
 
@@ -28,7 +28,7 @@ Bio::EnsEMBL::Pipeline::GeneComp - Comparison of old and new Gene/Transcript/Exo
     
     $log is the logfile filehandle to which all mappings are logged
 
-    my $gc =  Bio::EnsEMBL::Pipeline::GeneComp->new('-vc' => $vc,
+    my $gc =  Bio::EnsEMBL::Pipeline::GeneCompNew->new('-vc' => $vc,
 						    '-archive' => $arcdb,
 						    '-finaldb' => $finaldb,
 						    '-log' => \*LOG);
@@ -101,7 +101,7 @@ Ensembl - ensembl-dev@ebi.ac.uk
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::GeneComp;
+package Bio::EnsEMBL::Pipeline::GeneCompNew;
 use strict;
 use vars qw(@ISA);
 use Bio::Root::RootI;
@@ -113,7 +113,7 @@ use Carp;
 =head2 new
 
  Title   : new
- Usage   : $genecomp = Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc,
+ Usage   : $GeneComp = Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc,
                       -archive => $archive,-finaldb => $db,-log => $log);
  Function: Builds a new genecomp object, based around a virtual contig, 
  Example :
@@ -142,13 +142,9 @@ sub new {
   }
 
   if( !defined $archive || !ref $archive || 
-      !$archive->isa('Bio::EnsEMBL::DBArchive::Obj') ) {
+      !$archive->isa('Bio::EnsEMBL::Archive::DBSQL::DBAdaptor') ) {
       $self->throw("must have an archive database, got a [$archive]");
   }
-
-  #if( !defined $finaldb || !ref $finaldb || !$finaldb->isa('Bio::EnsEMBL::DBSQL::Obj') ) {
-  #    $self->throw("must have a final database, got a [$finaldb]");
-  #}
 
   if( !defined $log ) {
       $self->throw("Must have a log file");
@@ -156,13 +152,11 @@ sub new {
 
   $self->vc($vc);
   $self->archive($archive);
-  #$self->finaldb($finaldb);
   $self->log($log);
   $self->mapfile($map);
   $self->maphref($maphref);
   $self->{'_fitted_trans_hash'} = ();
 
-  # this usually dies if we can't write
   print $log "Built GeneComp object\n";
 
   return $self;
@@ -235,7 +229,7 @@ sub map{
 
 sub map_temp_Exons_to_real_Exons{
    my ($self) = @_;
-   my $arc = $self->archive;
+      
    my $vc = $self->vc();
    my $log = $self->log;
    my $map = $self->mapfile;
@@ -271,7 +265,11 @@ sub map_temp_Exons_to_real_Exons{
        $ismapped{$tempexon->id} = 0;
    }
    print $log "Getting all old exons...";
-   my @oldexons=$vc->get_old_Exons($log,$self->maphref);
+   my (@oldexons)=$vc->get_old_Exons($log,$self->maphref);
+   
+   foreach my $ke ($vc->unmapped_Exons) {
+       $self->_archive_exon($ke);
+   }
 
    my $size=scalar(@oldexons);
    print $log " got $size old exons\n";
@@ -292,12 +290,6 @@ sub map_temp_Exons_to_real_Exons{
        #}
        #exit 0;
    #}
-   my %e_v;
-   foreach my $oldexon ( @oldexons ) {
-       $e_v{$oldexon->id}=$oldexon->version;
-   }
-   
-
    my @tempexons2;
    my %bestfit;
    # go over each exon and map old->new...
@@ -459,8 +451,7 @@ sub map_temp_Exons_to_real_Exons{
 }
    foreach my $alternative (keys (%bf)) {
        my $tempid = $bf{$alternative};
-       my $v = $e_v{$alternative};
-       $arc->write_deleted_id('exon',$alternative,$v,$temp_old{$tempid});
+       $self->_archive_exon($alternative,$temp_old{$tempid});
        print $log "EXON MAP KILLED $alternative (ALTERNATIVE BESTFIT ".$temp_old{$tempid}.")\n";
    }
    $self->{'_exon_map_hash'} = \%temp_old;
@@ -1244,6 +1235,97 @@ sub archive{
     return $obj->{'archive'};
 
 }
+
+=head2 _archive_exon
+
+ Title   : _archive_exon
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _archive_exon{
+   my ($self,$dead,$alternative) = @_;
+
+   my $arc = $self->archive;
+   my $arc_vsad = $arc->get_VersionedSeqAdaptor;
+   
+   my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
+
+   my $dead_exon = $old_db->gene_Obj->get_Exon($dead);
+   my $dead_exon_vseq = $self->_create_exon_vseq($dead_exon);
+   
+   if ($alternative) {
+       my $alt_exon = $old_db->gene_Obj->get_Exon($alternative);
+       $alt_exon->version($alt_exon->version+1);
+       my $alt_exon_vseq = $self->_create_exon_vseq($alt_exon);
+       $dead_exon_vseq->add_future_vseq($alt_exon_vseq);
+   }
+   $arc_vsad->store($dead_exon_vseq);
+}
+
+=head2 _create_exon_vseq
+
+ Title   : _create_exon_vseq
+ Usage   : 
+ Function: Creates a Bio::EnsEMBL::Archive::VersionedSeq object
+           from a Bio::EnsEMBL::Exon
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _create_exon_vseq {
+    my ($exon) = @_;
+
+    my $seq  = Bio::EnsEMBL::Archive::Seq->new(
+					       -name => $exon->id,
+					       -type => 'exon',
+					       -created => $exon->created
+					       );
+
+
+    my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
+    my ($start_contig,$start,$end_contig,$end);
+    
+    if ($exon->isa('Bio::EnsEMBL::StickyExon')) {
+       $exon->_sort_by_sticky_rank;
+       foreach my $ce ($exon->each_component_Exon) {
+	   if (!$start) {
+	       $start = $ce->start;
+	       $start_contig = $ce->contig_id;
+	   }
+	   $end = $ce->end;
+	   $end_contig = $ce->contig_id;
+       }
+   }
+   else {
+       $start = $exon->start;
+       $end = $exon->end;
+       $start_contig = $exon->contig_id;
+       $end_contig = $exon->contig_id;
+   }
+
+   my $vseq = Bio::EnsEMBL::Archive::VersionedSeq->new(
+							-archive_seq => $seq,
+							-version => $exon->version,
+							-start_contig => $start_contig,
+							-start => $start,
+							-end_contig => $end_contig,
+							-end => $end,
+							-sequence => $exon->seq,
+							-modified => $exon->modified,
+							-release_number => $old_db->release_number
+						       );
+    return $vseq;
+}
+
 
 #At the moment, no final db writing...
 #=head2 finaldb
