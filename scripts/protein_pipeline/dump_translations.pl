@@ -27,6 +27,10 @@ my $dbhost    = '';
 my $dbuser    = '';
 my $dbname    = '';
 my $dbpass    = undef;
+my $dnadbhost    = '';
+my $dnadbuser    = '';
+my $dnadbname    = '';
+my $dnadbpass    = undef;
 my $dbport    = 3306;
 my $stable_id;
 my $db_id;
@@ -37,23 +41,46 @@ GetOptions(
 	   'dbuser=s'    => \$dbuser,
 	   'dbpass=s'    => \$dbpass,
 	   'dbport=s'    => \$dbport,
+	   'dnadbhost=s'    => \$dnadbhost,
+	   'dnadbname=s'    => \$dnadbname,
+	   'dnadbuser=s'    => \$dnadbuser,
+	   'dnadbpass=s'    => \$dnadbpass,
 	   'stable_id=s' => \$stable_id,
 	   'db_id=s' => \$db_id,  
 )
 or die ("Couldn't get options");
 
-
+if(!$dbhost || !$dbuser || !$dbname){
+  die ("need to pass database settings in on the commandline -dbhost -dbuser -dbname -dbpass");
+}
+if(!$dnadbhost || !$dnadbname || !$dnadbuser){
+  print STDERR "you have passed in no dnadb settings you db must have dna in it otherwise this won't work\n";
+}
 if(!$stable_id && !$db_id){
   die "need to specify to use either stable_id or dbId for the header line";
 }elsif($stable_id && $db_id){
   print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
 }
+
+my $dnadb;
+ 
+$dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					    '-host'   => $dnadbhost,
+					    '-user'   => $dnadbuser,
+					    '-dbname' => $dnadbname,
+					    '-pass'   => $dnadbpass,
+					    '-port'   => $dbport,
+					   ) unless(!$dnadbhost || !$dnadbname || !$dnadbuser);
+
+
+#print STDERR "have dnadb ".$dnadb."\n";
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-host'   => $dbhost,
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
 					    '-port'   => $dbport,
+					    '-dnadb' => $dnadb,
 					   );
 
 
@@ -69,11 +96,14 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
     my $gene_id = $gene->dbID();
     
     foreach my $trans ( @{$gene->get_all_Transcripts}) {
+      
       if ($trans->translation) {
         # get out first exon. Tag it to clone and gene on this basis
         my @exon = @{$trans->get_all_Exons};
         my $fe = $exon[0];
         
+
+
         my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
         my $identifier;
         if($db_id){
