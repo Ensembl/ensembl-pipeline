@@ -23,6 +23,7 @@ path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 [LOCAL]
 output_dir = /tmp
+maxjobs = 1
 
 [PIPELINE_MANAGER]
 check_interval = 35
