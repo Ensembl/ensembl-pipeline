@@ -1,0 +1,2 @@
+delete from job;
+delete from job_status;

@@ -1,0 +1,125 @@
+0) cvs checkout the code
+
+cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl
+cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-pipeline
+cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-otter
+bioperl ??
+
+setenv ENSDIR /home/ensuser
+setenv PERL5LIB ${ENSDIR}/ensembl/modules:${ENSDIR}/ensembl-pipeline/modules:${ENSDIR}/ensembl-otter/modules
+setenv PATH ${ENSDIR}/ensembl-pipeline/scripts:${ENSDIR}/ensembl-otter/scripts:${PATH}
+
+1) First create your database
+
+
+mysql -u ensadmin -pensembl -h ecs2b -e "create database my_database"
+
+
+2) Load up the sql
+
+mysql -u ensadmin -pensembl -h ecs2b my_database < $ENSDIR/ensembl/sql/table.sql
+mysql -u ensadmin -pensembl -h ecs2b my_database < $ENSDIR/ensembl-pipeline/sql/table.sql
+
+3) Now you need to load up some data. To download a slice of genome from the public ensembl mysql database :
+
+
+   slice2sql -chr 6 -start 1 -end 1000000 -databases core -core_name homo_sapiens_core_13_31
+
+
+ This will download *all* the sql from the public ensembl database (including features and genes) and put the files into /tmp/homo_sapiens_core_13_31.6.1-1000000.NCBI31/
+
+To upload these files 
+
+   cd /tmp/homo_sapiens_core_13_31.6.1-1000000.NCBI31
+
+   mysqlimport  -u ensadmin -pensembl -h ecs2b my_database *.sql
+
+
+4) Deleting existing features
+
+If you want to keep the existing features skip this step
+
+mysql -u ensadmin -pensembl -h ecs2b my_database < ${ENSDIR}/ensembl-pipeline/sql/delete_features
+
+
+5) Deleting existing genes;
+
+If you wan t to keep the existing genes skip this step
+
+mysql -u ensadmin -pensembl -h ecs2b my_database < ${ENSDIR}/ensembl-pipeline/sql/delete_genes
+
+6) Generating input ids
+
+Analyses can be run on either individual contigs or on slices (regions of genome).
+
+To generate contig input ids :
+
+  make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -contig -input_type CONTIG -logic_name SubmitContig
+
+To generate slice input ids (size 1Mb) :
+
+  make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -slice -slice_size 1000000 -input_type SLICE -logic_name SubmitSlice
+
+
+7) Adding analyses
+
+We will first set up a simple pipeline with RepeatMasking , Genscan predictions, CpG prediction and a blast against swall.  These will all be done on contigs.
+
+  add_Analysis -logic_name RepeatMask -module RepeatMasker    -db repbase
+  add_Analysis -logic_name Genscan    -module Genscan         -db HumanIso.smat
+  add_Analysis -logic_name Swall      -module BlastGenscanPep -db swall
+  add_Analysis -logic_name CpG        -module CPG
+
+
+Note that the first three analyses all have databases defined but the CpG island predictor doesn't need one.
+
+
+8) Adding Rules
+
+As it stands we have defined anything to run yet.  All we have a contigs ready and waiting in the pipeline and some analyses ready to be applied to those contigs.  We have to tell the pipeline which analyses to run and in which order.
+
+First of all we want to repeat mask so we do that first
+
+  add_to_Pipeline -logic_name RepeatMask -dependents SubmitContig
+
+Note the the SubmitContig string is the logic name we gave to the contigs when we put them into the pipeline
+
+Then we want to run genscan and CpG islands on the repeatmasked data
+
+  add_to_Pipeline -logic_name Genscan -dependents RepeatMask
+  add_to_Pipeline -logic_name CpG     -dependents RepeatMask
+
+This tells the pipeline to only run genscan and cpg when the repeat masking is finished.
+
+Finally we want to run blast against swall on the genscan predicted peptides
+
+  add_to_Pipeline -logic_name BlastGenscanPep -dependents Genscan
+
+
+All your rules and inputs are now set up and you are ready to run.  First of all let's run the  monitor script to see if everything is ok.
+
+
+  monitor -host ecs2b -user ensro -dbname my_database -rules -conditions
+
+
+This will print out a summary of any running jobs (there won't be any of course) and a summary of the rules and conditions. 
+
+Example output is shown below.
+
+
+This script is very useful in showing you the progress of the pipeline as it is running.
+
+
+9) Starting the pipeline
+
+
+
+
+
+
+
+
+
+
+
+

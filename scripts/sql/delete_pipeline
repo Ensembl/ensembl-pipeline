@@ -1,0 +1,6 @@
+delete from rule_goal;
+delete from rule_conditions;
+delete from job;
+delete from job_status;
+delete from input_id_analysis;
+delete from input_id_type_analysis;

@@ -1,0 +1,6 @@
+delete from dna_align_feature;
+delete from protein_align_feature;
+delete from simple_feature;
+delete from repeat_feature;
+delete from repeat_consensus;
+delete from prediction_transcript;
