@@ -140,17 +140,16 @@ sub open_command_line{
   my ($self, $verbose)= @_;
 
   my $lsf = '';
-  local *PIPE;
 
-  if (open(PIPE, '-|')) {
-      while (<PIPE>) {
+  if (open(my $pipe, '-|')) {
+      while (<$pipe>) {
 	  if (/Job <(\d+)>/) {
 	      $lsf = $1;
 	  } else {
 	      $self->warn("DEBUG: unexpected from bsub: '$_'");
 	  }	  
       }
-      if (close(PIPE)) {
+      if (close $pipe) {
 	  if ( ($? >> 8) == 0 ){
 	      if ($lsf) {
 		  $self->id($lsf);
@@ -166,26 +165,26 @@ sub open_command_line{
   } 
   else {      
       # We want STDERR and STDOUT merged for the bsub process
-      open STDERR, '>&STDOUT';
-      
-      exec($self->bsub);
-      $self->throw("Could not run bsub");
+      # open STDERR, '>&STDOUT'; 
+      # probably better to do with shell redirection as above can fail
+      exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
   }  
 }
 
 
 sub get_pending_jobs {
-  my($self, %args) = @_;
-
-  my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
-  my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
+  my($self, $args) = @_;
+  $args ||= $self;
+  my $user  = $args->{'-user'}  || $args->{'-USER'}  || undef;
+  my $queue = $args->{'-queue'} || $args->{'-QUEUE'} || undef;
+  my $debug = $args->{'-debug'} || $args->{'-DEBUG'} || undef;
 
   my $cmd = "bjobs";
   $cmd .= " -q $queue" if $queue;
   $cmd .= " -u $user"  if $user;
   $cmd .= " | grep -c PEND ";
 
-  print STDERR "$cmd\n" if $args{'-debug'};
+  print STDERR "$cmd\n" if $debug;
 
   my $pending_jobs = 0;
   if( my $pid = open (my $fh, '-|') ){
@@ -203,7 +202,7 @@ sub get_pending_jobs {
       exec( $cmd );
       die q{Something went wrong here $!: } . $! . "\n";
   }
-  print STDERR "FOUND $pending_jobs jobs pending\n" if $args{'-debug'};
+  print STDERR "FOUND $pending_jobs jobs pending\n" if $debug;
   return $pending_jobs;
 }
 
