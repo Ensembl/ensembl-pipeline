@@ -328,11 +328,12 @@ sub retrieve_alignment {
 
   $self->_type($type);
 
+  $merge_sequences = 1 unless defined $merge_sequences;
+
   unless ($self->_is_computed($type)){
     my $alignment_success = $self->_align($type, 
 					  $show_missing_evidence, 
-					  $remove_introns, 
-					  $self->_padding, 
+					  $remove_introns,
 					  $merge_sequences);
     unless ($alignment_success) {
       warning "Alignment generation failed.  There probably were" . 
@@ -1122,13 +1123,13 @@ sub _truncate_introns {
 	$seq = 
 	  substr($seq, 0, $intron_start + $self->_padding - 1) . 
 	    '---intron-truncated---' . 
-	      subseq($seq, ($intron_end - 2*$self->_padding + 1), length($seq));
+	      substr($seq, ($intron_end - 2*$self->_padding + 1), length($seq));
       }
 
       if (($offcut =~ /[atgc]/)&&($align_seq->name ne 'genomic_sequence')) {
-	warning("Truncating intron sequences has caused some aligned evidence\n" .
-		"to be discarded.  Try again with a higher amount of padding\n".
-		"around the exon sequences.\n");
+	info("Truncating intron sequences has caused some aligned evidence\n" .
+	     "to be discarded.  Try again with a higher amount of padding\n".
+	     "around the exon sequences.\n");
       }
     }
     $align_seq->seq($seq);
@@ -1182,9 +1183,9 @@ sub _merge_same_sequences {
 
 	if ($seq_array->[$i] ne '-'){
 	  if ($chimera[$i] && $chimera[$i] ne '-'){
-	    warning("Very bad - evidence from the same sequence overlaps between " .
-		    "exons.  You should not be merging sequences.  Set : " .
-		    "\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
+	    info("Evidence from the same sequence overlaps between exons.  " . 
+		 "You probably should not be merging sequences.  Set : " .
+		 "\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
 	  } else {
 	    $chimera[$i] = $seq_array->[$i] unless $seq_array->[$i] eq '-';
 	  }
@@ -1665,9 +1666,9 @@ sub _build_evidence_seq {
   my $fetched_seq = $self->_fetch_sequence($base_align_feature->hseqname);
 
   if ( ! $fetched_seq) {
-    warning("Error fetching sequence [" . 
-	    $base_align_feature->hseqname . 
-	    "].  Ignoring.");
+    info("Error fetching sequence [" . 
+	 $base_align_feature->hseqname . 
+	 "].  Ignoring.");
 
     return 0;
   } elsif (($fetched_seq->seq eq '')||
@@ -1965,7 +1966,7 @@ sub _genomic_sequence {
     if ($self->_strand == 1) {
       $genomic_sequence = $self->_slice->seq;
     } elsif ($self->_strand == -1) {
-print STDERR "Reverse complimenting genomic sequence.\n";
+#print STDERR "Reverse complimenting genomic sequence.\n";
       $genomic_sequence = $self->_slice->revcom->seq;
     }
 
@@ -2318,7 +2319,7 @@ sub _fetch_sequence {
     unless $self->{'_cache_is_built'};
 
   unless ($self->{'_fetched_seq_cache'}->{$accession}){
-    warning("Sequence $accession could not be retrieved from cache.");
+    info("Sequence $accession could not be retrieved from cache.");
   }
 
   return $self->{'_fetched_seq_cache'}->{$accession}; 
