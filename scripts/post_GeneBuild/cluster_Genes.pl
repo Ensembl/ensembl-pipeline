@@ -12,7 +12,6 @@ them into genes.
 
 =head1 OPTIONS
 
-    -input_id  The input id: chrname.chrstart-chrend
 
 =cut
 
@@ -28,7 +27,6 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
 my $dbhost = 'ecs1d';
 my $dbname = 'homo_sapiens_estgene_9_30';
-my $type   = ['genomewise'];
 my $dbuser = 'ensro'; 
 
 my $dnadbhost	= 'ecs1d';
@@ -42,6 +40,7 @@ my $pepfile;
 my $gff_file;
 
 my $genome;
+my @genetypes;
 
 # options
 &GetOptions( 
@@ -49,27 +48,30 @@ my $genome;
 	    'dbname:s'    => \$dbname,
 	    'dbhost:s'    => \$dbhost,
 	    'genome'      => \$genome,
+	    'genetypes:s'  => \@genetypes,
 	   );
 
 unless( $input_id || $genome ){     
-  print STDERR "Usage: $0 -input_id < chrname.chrstart-chrend >\n";
-  print STDERR "Usage: $0 -genome ( for all the genes )\n";
+  print STDERR "Usage: $0 -dbname -dbhost\n";
+  print STDERR "          -input_id < optional: chrname.chrstart-chrend >\n";
+  print STDERR "          -genome ( for all the genes )\n";
+  print STDERR "          -genetypes ( optional: omit for all genetypes)\n";
   exit(0);
 }
     
 # connect to the databases 
 # only use one of them
-my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       -host  => $dnadbhost,
-					       -user  => $dnadbuser,
-					       -dbname=> $dnadbname,
-					      );
+#my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
+#					       -host  => $dnadbhost,
+#					       -user  => $dnadbuser,
+#					       -dbname=> $dnadbname,
+#					      );
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    -host  => $dbhost,
 					    -user  => $dbuser,
 					    -dbname=> $dbname,
-					    -dnadb => $dna_db,
+#					    -dnadb => $dna_db,
 					   );
 
 
@@ -122,19 +124,24 @@ foreach my $slice ( @slices ){
   my @genes;
   my @transcripts;
   
-  foreach my $type ( @{ $type } ){
-    print STDERR "Fetching genes of type $type\n";
-    my @more_genes = @{$slice->get_all_Genes_by_type($type)};
-    my @more_trans = ();
-    foreach my $gene ( @more_genes ){
-      push ( @more_trans, @{$gene->get_all_Transcripts} );
-    }
-    push ( @genes, @more_genes ); 
-    push ( @transcripts, @more_trans );
-    print STDERR scalar(@more_genes)." genes found\n";
-    print STDERR "with ".scalar(@more_trans)." transcripts\n";
-  }
+  my @all_the_genes = @{$slice->get_all_Genes};
   
+  if ( @genetypes ){
+    foreach my $gene ( @all_the_genes ){
+      my $type = $gene->type;
+      if ( grep /^$type$/, @genetypes ){
+	push ( @genes, $gene );
+      }
+    }
+  }
+  else{
+    @genes = @all_the_genes;
+  }
+  foreach my $gene ( @genes ){
+    push ( @transcripts, @{$gene->get_all_Transcripts} );
+  }
+  print STDERR scalar(@genes)." genes found\n";
+  print STDERR "with ".scalar(@transcripts)." transcripts\n";
   my $clusters = &cluster_Transcripts( \@transcripts );
   print STDERR scalar(@$clusters)." clusters found\n";
   push (@all_clusters, @$clusters );
