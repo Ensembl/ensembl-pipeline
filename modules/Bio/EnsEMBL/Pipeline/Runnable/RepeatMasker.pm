@@ -140,7 +140,6 @@ sub query {
         }
         $self->{'_query'} = $seq ;
         
-        $self->queryname($self->query->id);
         $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".out");
     }
@@ -175,26 +174,6 @@ sub repeatmasker {
     }
     return $self->{_repeatmasker};
 }
-
-=head2 workdir
-
-    Title   :   workdir
-    Usage   :   $obj->wordir('~humpub/temp');
-    Function:   Get/set method for the location of a directory to contain temp files
-    Args    :   File path (optional)
-
-=cut
-
-=head2 queryname
-
-    Title   :   queryname
-    Usage   :   $obj->queryname('AC00074');
-    Function:   Get/set method for query name. 
-                This must be set manually when a file or pipe is parsed and the queryname is 
-                not present in the executable output
-    Args    :   File suffixes
-
-=cut
 
 =head2 arguments
 
@@ -257,9 +236,19 @@ sub run_repeatmasker {
     my ($self) = @_;
     #run RepeatMasker
     print "Running RepeatMasker; ";
-    print "cmd: ", $self->repeatmasker.' '.$self->arguments.' '.$self->filename, "\n";
+
+    my $arguments = "";
+    my $filename  = "";
+
+    if (defined($self->arguments)) {
+       $arguments = $self->arguments;
+    }
+    if (defined($self->filename)) {   
+       $filename = $self->filename;
+    }
+    print "cmd: ", $self->repeatmasker.' '.$arguments.' '.$filename, "\n";
     $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
-        if (system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename)); 
+    if (system ($self->repeatmasker.' '.$arguments.' '.$filename)); 
 }
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
