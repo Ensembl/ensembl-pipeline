@@ -245,6 +245,7 @@ sub genscan_genes {
         $gene->isa("Bio::EnsEMBL::SeqFeature") 
                 || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
         push(@{$self->{'_genes'}}, $gene);
+        @{$self->{'_genes'}} = sort { $a->seqname <=> $b->seqname } @{$self->{'_genes'}};
     }
     return @{$self->{'_genes'}};
 }
@@ -343,7 +344,11 @@ sub parse_results {
                 if (/init|term|sngl|intr/i)
                 {
                    my @element = split;
-                   $feature {name} = $element[0];
+                   $self->throw("Unable to parse Genscan ouput (".scalar(@element).") Line: $_\n") 
+                                unless (scalar(@element) == 13); 
+                                
+                   my ($gene, $exon) = split (/\./, $element[0]); 
+                   $feature {name} = $gene + ($exon/100); #name must be a number
                    #arrange numbers so that start is always < end
                    if ($element[2] eq '+')
                    {
@@ -374,22 +379,26 @@ sub parse_results {
             }
             #begin parsing of peptide data
             my $peptide_string;
+            my $reading_peptide =0;
             while (<$filehandle>)
             {
-
-                if (!/(^>|^\n)/)
-                {   
+                if (/\A[\W]\Z/)
+                {
+                    $self->genscan_peptides($peptide_string);
+                    $peptide_string = undef;
+                    $reading_peptide = 0;
+                }
+                elsif ($reading_peptide)
+                {
+                    $_ =~ s/\n//g;
                     $peptide_string .= $_;
-                    $peptide_string =~ s/\s//g; #remove newlines etc
                 }
                 elsif (/^>/)
                 {
-                    $peptide_string .= "::" if defined($peptide_string); #:: separates peptides
+                    $reading_peptide = 1;
                 }
             }
-            my @peptides = split (/::/, $peptide_string);
-            foreach (@peptides)
-                { $self->genscan_peptides($_); }
+            $self->genscan_peptides($peptide_string); #final peptide 
         }
     }
     #end of big loop. Now build up genes
@@ -411,8 +420,9 @@ sub calculate_and_set_phases {
     my @peptides    = $self->genscan_peptides();
 
     #check file has been correctly parsed to give equal genes and peptides
-    $self->throw("Mismatch in number of genes and peptides parsed from file") 
-            unless (scalar(@genes) == scalar (@peptides));
+    $self->throw("Mismatch in number of genes (".scalar(@genes).") and peptides ("
+                 .scalar(@peptides).") parsed from file") 
+                 unless (scalar(@genes) == scalar (@peptides));
 
     #Genscan phases are just the result of modulo 3 division which is useless.
     #Correct calculation of phases requires the sequence to be translated into
@@ -433,6 +443,7 @@ sub calculate_and_set_phases {
         #$genes[$index]->attach_seq ($self->clone()); 
         my @exons = $genes[$index]->sub_SeqFeature();
         
+        my $translated_exons;
         my $translation_found = 0;
         for (my $phase_index = 0; $phase_index < 3; $phase_index++)
         {
@@ -446,18 +457,19 @@ sub calculate_and_set_phases {
                 $exon->phase($phase);
                 $exon->end_phase($end_phase);
                 $phase = $end_phase;
+                
             }
-            my $translated_exons = $self->translation(@exons);
+            $translated_exons = $self->translation(@exons);
             
             if (index ($peptide, $translated_exons) > -1)
             {
                 $translation_found = 1;
+                #print STDERR "MATCHED\n $translated_exons\n";
                 last;
             }
         }
-        $self->throw("Translation not found in genscan peptide\n".
-                     "Genscan peptide\$translated_exons\nTranslation\n$peptide\n") 
-                     unless ($translation_found);
+        $self->throw("Translation (".$exons[0]->id.") not found in genscan peptide\n$peptide\n")
+                    unless ($translation_found);
         
     }
 }
@@ -550,7 +562,8 @@ sub create_genes {
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
     {
-        my ($group_number) = ($exon->seqname =~ /\d+/g);
+        my ($group_number) = ($exon->seqname =~ /(\d+)\./);
+                     
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
