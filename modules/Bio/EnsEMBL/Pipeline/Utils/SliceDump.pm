@@ -89,6 +89,17 @@ sub slice {
 
 
 
+=head2 output_dir
+
+  Arg [1]   : string, path to directory
+  Function  : container for path to directoy
+  Returntype: string,
+  Exceptions: throws if directory doesn't exist'
+  Example   : my $filename = $self->output_dir'/filename'
+
+=cut
+
+
 sub output_dir{
   my ($self, $output_dir) = @_;
   if($output_dir){
@@ -103,42 +114,31 @@ sub output_dir{
 #################
 #Utility methods#
 #################
-
+#these are methods which provide generic functionality for the
+#object
 
 
 =head2 dump_table
 
-  Arg [1]   : 
-  Function  : method to specified table
-  into the desired directory
+  Arg [1]   : string, name of table
+  Arg [2]   : string, name of file to dump to
+  Arg [3]   : string, where clause for sql statement if wanted
+  Arg [4]   : string, select clause for sql if wanted
+  Arg [5]   : string, from clause of sql if wanted
+  Arg [6]   : string, into outfile clause of wanted
+  Function  : construction the sql to dump a particular tables
+  contents for a particular slice if desire. The last four arguments
+  are options to allow for various different statements to be generated
+  as not all tables fit the select * from table where seq_region_id = $id
+  model
   Returntype: filename
-  Exceptions: 
+  Exceptions: throws if not passed a table name or if the filename
+  already exists as mysql won't dump to an existing file'
   Example   : my $filename = $slice_dump->dump_table()
 
 
 =cut
 
-#sub dump_table{
-#  my ($self, $table_name, $filename, $where_clause) = @_;
-#  #print STDERR "Dumping ".$table_name."\n";
-#  #print STDERR "with where clause ".$where_clause."\n" if($where_clause);
-#  if(!$table_name){
-#    throw("Can't dump table without tablename");
-#  }
-#  if(!$filename){
-#    $filename = $self->output_dir."/".$table_name;
-#    #warning("No filename provided so using ".$filename);
-#  }
-#  if(-e $filename){
-#    throw($filename." exists mysql can't dump into an existing file ");
-#  }
-#  my $sql = "select * from ".$table_name;
-#  $sql .= " where ".$where_clause if($where_clause);
-#  $sql .= " into outfile '".$filename."'";
-#  my $sth = $self->db->prepare($sql);
-#  $sth->execute();
-#  return $filename;
-#}
 
 sub dump_table{
   my ($self, $table_name, $filename, $where, $select, $from, $out) = @_;
@@ -161,8 +161,27 @@ sub dump_table{
   print $sql."\n";
   my $sth = $self->db->prepare($sql);
   $sth->execute;
-  return $out;
+  return $filename;
 }
+
+
+
+=head2 genereate_where_clause
+
+  Arg [1]   : int, seq_region_id
+  Arg [2]   : int, seq_region_start
+  Arg [3]   : int, seq_region_end
+  Arg [4]   : int, boolean toggle 
+  Function  : This method will construct a standard where clause
+  working on the assumption that the column names are seq_region_id,
+  seq_region_start and seq_region_end the last toggle is to whether to
+  get features which overlap the specified boundaries
+  Returntype: string, the where clause
+  Exceptions: throws if not passed a seq_region_id
+  Example   : 
+
+=cut
+
 
 
 sub generate_where_clause{
@@ -181,6 +200,23 @@ sub generate_where_clause{
   }
   return $where_clause;
 }
+
+
+
+=head2 can_dump
+
+  Arg [1]   : string table_name
+  Arg [2]   : int seq_region_id
+  Arg [3]   : string column name
+  Function  : This checks if the id passed in has any entries in the
+  table specified for the column name specified, the default column name
+  is seq_region_id
+  Returntype: int, count
+  Exceptions: throws if not passed either a table name or a seq_region_id
+  Example   : if($self->can_dump('seq_region', 1))
+
+=cut
+
 
 
 sub can_dump{
@@ -203,10 +239,24 @@ sub can_dump{
 
 
 
+=head2 get_filename
+
+  Arg [1]   : string table name
+  Arg [2]   : Bio::EnsEMBL::Slice
+  Function  : generate a filename useable by mysql import on the basis of
+  the tablename and info from the slice, can't use Slice::name as the 
+  format upsets mysqlimport
+  Returntype: string, filename
+  Exceptions: none
+  Example   : my $filename = $self->get_filename(seq_region', $slice)
+
+=cut
+
+
 sub get_filename{
   my ($self, $table_name, $slice) = @_;
-  return $self->output_dir."/".$table_name.".".$slice->seq_region_name.".".
-    $slice->start."-".$slice->end;
+  return $self->output_dir."/".$table_name.".".$slice->seq_region_name.
+    ".".$slice->start."-".$slice->end;
 }
 
 
@@ -215,6 +265,27 @@ sub get_filename{
 #All these dumps will require a slice object and will take either the
 #slice held by the SliceDump object or a slice which is passed in
 #
+
+#the following tables have structures which fit a standard model
+#they all have columns seq_region_id, seq_region_start and seq_region_end
+#all these methods have the name which follows the structure
+#dump_table_name_table to allow for on the fly calling of methods
+#for appropriate tables
+
+=head2 dump_name_table
+
+  Arg [1]   : Bio::EnsEMBL::Slice
+  Function  : check if any data can be dumped from the defined table
+  and if it can call the dump table method with the appropriate
+  arguments
+  Returntype: returns 1 if a dump was made 0 if not 
+  Exceptions: throws if no slice is defined either in the method args or
+  SliceDump::Slice or if that slice isn't a slice object'
+  Example   : $SliceDump->dump_seq_region_table
+
+=cut
+
+
 
 sub dump_seq_region_table{
   my ($self, $slice) = @_;
@@ -471,6 +542,12 @@ sub dump_transcript_table{
 ##
 
 
+
+#dumps entries from the assembly table
+#can use standard model as must take entries whose column labelled
+#asm_seq_region_id match the given id and the start and end are asm_start
+#and asm_end respectively
+
 sub dump_assembly_table{
   my ($self, $slice) = @_;
   if(!$slice){
@@ -490,6 +567,10 @@ sub dump_assembly_table{
   }
   return 0;
 }
+
+#dumps entries from the repeat_consensus table
+#this must generate sql which joins to the repeat feature table
+# in order to dump its entries
 
 sub dump_repeat_consensus_table{
   my ($self, $slice) = @_;
@@ -517,6 +598,9 @@ sub dump_repeat_consensus_table{
 }
 
 
+#dumps entries from the translation table
+#must join to the transcript table to do this
+
 sub dump_translation_table{
   my ($self, $slice) = @_;
   if(!$slice){
@@ -542,6 +626,10 @@ sub dump_translation_table{
   }
   return 0;
 }
+
+
+#dumps entries from the exon_transcript table
+#must join to the transcript table to do this
 
 sub dump_exon_transcript_table{
   my ($self, $slice) = @_;
@@ -569,6 +657,9 @@ sub dump_exon_transcript_table{
   return 0;
 }
 
+#dumps entries from the supporting_feature table
+#must join to the exon table to do this
+
 sub dump_supporting_feature_table{
   my ($self, $slice) = @_;
   if(!$slice){
@@ -595,7 +686,8 @@ sub dump_supporting_feature_table{
   return 0;
 }
 
-
+#dumps entries from the transcript_stable_id table
+#must join to the transcript table to do this
 
 sub dump_transcript_stable_id_table{
   my ($self, $slice) = @_;
@@ -623,6 +715,9 @@ sub dump_transcript_stable_id_table{
   return 0;
 }
 
+#dumps entries from the exon_stable_id table
+#must join to the exon table to do this
+
 sub dump_exon_stable_id_table{
   my ($self, $slice) = @_;
   if(!$slice){
@@ -648,6 +743,9 @@ sub dump_exon_stable_id_table{
   }
   return 0;
 }
+
+#dumps entries from the gene_stable_id table
+#must join to the gene table to do this 
 
 sub dump_gene_stable_id_table{
   my ($self, $slice) = @_;
@@ -677,7 +775,8 @@ sub dump_gene_stable_id_table{
 
 
 
-
+#dumps entries from the protein_feature table
+#must join to the translation and transcript tables to do this
 
 sub dump_protein_feature_table{
   my ($self, $slice) = @_;
