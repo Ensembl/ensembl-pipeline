@@ -134,7 +134,8 @@ sub query {
         $self->{'_query'} = $seq ;
         $self->filename($seq->id.".$$.seq");
         $self->results($self->filename.".pmatch");
-	$self->file($self->results);
+        $self->file($self->results);
+        $self->file($self->filename);
     }
     return $self->{'_query'};
 }
