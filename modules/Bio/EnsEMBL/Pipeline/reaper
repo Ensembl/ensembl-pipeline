@@ -19,6 +19,7 @@ my %stats = ( );
 my $dbhost = $::pipeConf{'dbhost'};
 my $dbname = $::pipeConf{'dbname'};
 my $dbuser = $::pipeConf{'dbuser'};
+my $dbpass = $::pipeConf{'dbpass'};
 my $queue  = $::pipeConf{'queue'};
 
 my $test   = 0;
@@ -28,6 +29,7 @@ my $once = 0;
 GetOptions(     'host=s'     => \$dbhost,
                 'dbname=s'   => \$dbname,
                 'dbuser=s'   => \$dbuser,
+                'dbpass=s'   => \$dbpass,
 		'test'       => \$test,
 		'resubmit'   => \$resubmit,
 		'once'       => \$once,
@@ -46,6 +48,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
     ( -host   => $dbhost,
       -dbname => $dbname,
       -user   => $dbuser,
+      -pass   => $dbpass,
   );
 
 print STDERR "Connected\n";
