@@ -32,28 +32,32 @@ reduces redundant data (e.g., almost-identical ESTs with different
 accession numbers) and prune reduces overlapping features (e.g., hits
 to a repetitive sequence).
 
-In detail, coverage filtering acts as follows:
+Coverage filtering is compulsory and is intended to reduce coverage of
+the query to a given depth per strand. In detail, coverage filtering
+does this:
 
   sort hit-sequence-accessions in decreasing order of
   maximum feature score;
 
-  for each hit-sequence-accession in turn:
+  for each strand:
 
-    if all parts of all features for hit-sequence-accession are
-    already covered by other features to a depth of <coverage>
+    for each hit-sequence-accession in turn:
 
-      remove all features for this hit-sequence-accession;
+      if ( all parts of all features for
+      hit-sequence-accession are already covered by
+      other features to a depth of <coverage> )
 
-Within the set of features for a given hit-sequence-accession, features
-are considered in decreasing order of score. Where two or more
-hit-sequence-accessions have equal maximum feature score, secondary
-sorting is in decreasing order of total score for the
-hit-sequence-accession's features, followed by alphabetical order for
-hit-sequence accession number.
+        remove all features for this hit-sequence-accession;
 
-The option prune allows only a maximum number of features per
-strand per genomic base per hit sequence accession, this number also
-being specified by the coverage parameter. Prune works on a
+Where two or more hit-sequence-accessions have equal maximum feature
+score, secondary sorting is in decreasing order of total score,
+followed by alphabetical order of hit-sequence accession number.
+Within the set of features for a given hit-sequence-accession,
+features are considered in decreasing order of score.
+
+The option prune, if on, allows only a maximum number of features
+per strand per genomic base per hit sequence accession, this number
+also being specified by the coverage parameter. Prune works on a
 per-hit-sequence-accession basis and removes features (not entire
 hit-sequence-accessions) until the criterion is met for each
 hit-sequence-accession. Prune filtering occurs after coverage
@@ -77,7 +81,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::EnsEMBL::Pipeline::RunnableI;
+# Object preamble - inherits from Bio::EnsEMBL::Pipeline::RunnableI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
@@ -117,11 +121,10 @@ sub new {
 =head2 run
 
  Title   : run
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
+ Usage   : my @filteredfeatures = $search->run(@features);
+ Function: filter Blast or other search results
+ Returns : array of featurepairs
+ Args    : array of featurepairs
 
 
 =cut
@@ -131,23 +134,21 @@ sub run{
 
   my ($minscore,$maxevalue,$coverage);
   
-  $minscore = $self->minscore;
-  $maxevalue= $self->maxevalue;
-  $coverage = $self->coverage;
+  $minscore  = $self->minscore;
+  $maxevalue = $self->maxevalue;
+  $coverage  = $self->coverage;
   
   my %validhit;
   my %hitarray;
   
-  # print "XXX start filter with ".scalar(@input)." features \n";
-
   # first- scan across all features, considering
   # valid to be > minscore < maxevalue
   
-  my $maxend   = 0;
+  my $maxend = 0;
   my %totalscore;     # total score per hid
   
-  # all featurepairs have a score. 
-  # some may have an evalue.
+  # All featurepairs have a score. 
+  # Some may have an evalue.
   
   # valid hits are stored in a hash of arrays
   # we sort by score to know that the first score for a hseqname is its best  
@@ -156,7 +157,7 @@ sub run{
 
     if( $f->score > $minscore ) {
       
-      unless ( $validhit{$f->hseqname} ){
+      unless ( $validhit{$f->hseqname} ) {
 	$validhit{$f->hseqname} = 0;
 	$totalscore{$f->hseqname} = 0;
       }
@@ -172,7 +173,6 @@ sub run{
 	  if( $f->end > $maxend ) {
 	    $maxend = $f->end;
 	  }
-	  	  
 	}
       }
 
@@ -183,13 +183,11 @@ sub run{
 	if( $f->end > $maxend ) {
 	  $maxend = $f->end;
 	}
-	
       }
     }
     
-    
-    # irregardless of score, take if this hseqname is valid
-    if( exists $validhit{$f->hseqname} == 1 ) {
+    # regardless of score, take if this hseqname is valid
+    if( $validhit{$f->hseqname} ) {
       if( ! exists $hitarray{$f->hseqname} ) {
 	$hitarray{$f->hseqname} = [];
       }
@@ -197,42 +195,48 @@ sub run{
     }
     
   }
-  my @feature_counts;
-  foreach my $hid(keys(%hitarray)){
-    push(@feature_counts, @{$hitarray{$hid}});
-  }
 
-  # print "have ".scalar(@feature_counts)." after filtering by score\n";
-
-  @input = ();
+  @input = ();	# free some memory
   
-  # perl will automatically extend this array 
-  my @list;
-  $list[$maxend] = 0;
-  
-  # sort the list by highest score, then by total score for ties, and
-  # alphabetically as a last resort
+  # sort the HID list by highest score per feature, then by highest
+  # total score, and alphabetically as a last resort
   my @inputids = sort {    $validhit{$b}   <=> $validhit{$a}
                         or $totalscore{$b} <=> $totalscore{$a}
-			or $a cmp $b } keys %validhit;
+			or $a cmp $b
+		      } keys %validhit;
   
-  # this now holds the accepted hids ( a much smaller array )
-  my @accepted_hids;
+  # This will hold the accepted hids for both strands.
+  # Hash not array to avoid duplication if same hid accepted on both
+  # strands, but the keys (HIDs) are the only important part.
+  my %accepted_hids;
 
-  # we accept all feature pairs which are valid and meet coverage criteria
-  FEATURE :
+  my @strands = ( +1, -1 );
+
+  foreach my $strand (@strands) {
+
+    # coverage vector, Perl will automatically extend this array
+    my @list;
+    $list[$maxend] = 0;
+ 
+    # we accept all feature pairs which are: (1) on the strand being
+    # considered, (2) valid, and (3) meet coverage criteria
+    FEATURE :
     foreach my $hseqname ( @inputids ) {
-      
+
       my $hole = 0;
-      
+
       foreach my $f ( @{$hitarray{$hseqname}} ) {
+
+        next if $f->strand != $strand;
+
 	# only mark if this feature is valid
-	if( $f->score > $minscore || ($f->can('evalue') && defined $f->evalue && $f->evalue<$maxevalue ) ) {
+	if( $f->score > $minscore || ($f->can('evalue')
+	    && defined $f->evalue && $f->evalue < $maxevalue ) )
+	{
 	  for my $i ( $f->start .. $f->end ) {
 	    unless( $list[$i] ){
 	      $list[$i] = 0;
 	    }
-
 	    if( $list[$i] < $coverage ) {
 	      # accept!
 	      $hole = 1;
@@ -243,57 +247,37 @@ sub run{
       }
       
       if( $hole == 0 ) { 
-	# completely covered 
+	# all f's for HID completely covered at a depth >= $coverage
 	next;
       }
       
-      push ( @accepted_hids, $hseqname );
+      $accepted_hids{$hseqname} = 1;
       foreach my $f ( @{$hitarray{$hseqname}} ) {
-	for my $i ( $f->start .. $f->end ) {
-	  $list[$i]++; 
-	}
+
+        if ($f->strand == $strand) {
+          for my $i ( $f->start .. $f->end ) {
+	    $list[$i]++; 
+	  }
+        }
       }
     }
-  @feature_counts = ();
-
-  foreach my $hid(@accepted_hids){
-    push(@feature_counts, @{$hitarray{$hid}});
   }
-
-  # drop this huge array to save memory
-  @list = ();
   
   if ($self->prune) {
-    my @new;
-
-    my @all_features;
-    
-    # collect all the features
-    foreach my $hseqname ( @accepted_hids ){
-      my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
+    my @new = ();
+    foreach my $hid ( keys %accepted_hids ){
+      my @tmp = $self->prune_features(@{$hitarray{$hid}});
       push(@new,@tmp);
-      push ( @all_features, @{$hitarray{$hseqname}} );
     }
-    # and prune all together taking the first '$self->coverage' according to score 
-    #@new = $self->prune_features( @all_features );
-
-    ## prune the features per hid (per hseqname)
-    #foreach my $hseqname ( @accepted_hids ) {
-    #  my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
-    #  push(@new,@tmp);
-    #  #push(@{$self->{'_output'}},@tmp);
-    #}
-    @accepted_hids = ();
+    %accepted_hids = ();	# free some memory?
     return @new;
   
-  } 
-  else {
-    my @accepted_features;
-    foreach my $hid ( @accepted_hids ){
+  } else {
+    my @accepted_features = ();
+    foreach my $hid ( keys %accepted_hids ){
       push(@accepted_features, @{$hitarray{$hid}} );
     }
-    @accepted_hids = ();
-    #push(@{$self->{'_output'}},@accepted_features);
+    %accepted_hids = ();	# free some memory?
     return @accepted_features;
   }
 }
@@ -322,8 +306,6 @@ sub prune {
 sub prune_features {
   my ($self, @input) = @_;
   $self->throw('interface fault') if @_ < 1;	# @input optional
-
-  $self->warn('experimental new prune_features method!');
 
     my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
     my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
@@ -430,9 +412,6 @@ sub output{
    } 
    return @{$self->{'_output'}};
 }
-
-
-
 
 =head2 minscore
 
