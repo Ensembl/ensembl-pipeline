@@ -64,6 +64,14 @@ use vars qw( %Targetted );
 	      GB_TARGETTED_EXON_PADDING                       => '200',
 	      GB_TARGETTED_MINIMUM_INTRON                     => '1000',
 
+	      # Parameters for genewise - targetted needs different parameters than similarity.
+	      # Seriously, don't touch these unless you know exactly what you're doing.
+	      # These are deliberately here and not in the genewise config as they should not 
+	      # need to be changed, and will be a pain to fiddle with halfway through a build.
+	      GB_TARGETTED_GENEWISE_MATRIX                    => 'BLOSUM80.bla',
+	      GB_TARGETTED_GENEWISE_GAP                       => 20,
+	      GB_TARGETTED_GENEWISE_EXTENSION                 => 8,
+
 	      # genetype for Targetted_GeneWise
 	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   
 	      GB_TARGETTED_MASKING => [],
