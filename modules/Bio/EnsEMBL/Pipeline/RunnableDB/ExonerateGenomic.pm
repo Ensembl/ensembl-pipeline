@@ -154,7 +154,15 @@ sub _split_db_to_files {
     }
     my @contigids = $db->get_all_Contig_id();
     while (my $cid = shift (@contigids)) {
-	my $contig = $db->get_Contig($cid);
+	my $contig;
+	eval {
+	    $contig = $db->get_Contig($cid);
+	};
+	if ($@) {
+	    print STDERR "Couldn't fetch contig $@\n";
+	    next;
+	}
+
 	$length += $contig->length;
 	if ($length > $max) {
 	    push (@genseqfiles,$filename);
