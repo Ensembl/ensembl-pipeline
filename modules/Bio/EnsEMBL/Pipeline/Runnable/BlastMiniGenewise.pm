@@ -390,10 +390,12 @@ sub make_blast_db {
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
                                -file   => ">$blastfile");
 
-#    print STDERR "Blast db file is $blastfile\n";
+    #print STDERR "Blast db file is $blastfile\n";
 
     foreach my $seq (@seq) {
-        $seqio->write_seq($seq);
+      #print STDERR "have ".$seq->id." will write with ".$seqio."\n";
+      $seq->desc($seq->id);
+      $seqio->write_seq($seq);
     }
 
     close($seqio->_filehandle);
