@@ -4,7 +4,6 @@
 # it reads a bit of sequence and dump it into a fasA file, to eb able to view it in Apollo
 
 use strict;
-use diagnostics;
 
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -16,36 +15,46 @@ my $mask;
 my $softmask;
 my $dust;
 my $outfile;
-my $chr;
+my $name;
 my $maskall;
-
+my $coord_system;
 my $dbhost;
 my $dbuser = 'ensro';
 my $dbname;
+my $dbpass;
+my $dbport = 3306;
 
 &GetOptions(
-	    'chr:s'          => \$chr,
-	    'dbname:s'       => \$dbname,
-	    'dbhost:s'       => \$dbhost,
-	    'mask'           => \$mask,
-	    'dust'           => \$dust,
-	    'softmask'       => \$softmask,
-	    'maskall'        => \$maskall,
-	    'outfile:s'      => \$outfile,
+            'seq_region_name:s' => \$name,
+            'dbname:s'       => \$dbname,
+            'dbhost:s'       => \$dbhost,
+            'dbpass:s' => \$dbpass,
+            'dbuser:s' => \$dbuser,
+            'dbport:s' => \$dbport,
+            'mask'           => \$mask,
+            'dust'           => \$dust,
+            'softmask'       => \$softmask,
+            'maskall'        => \$maskall,
+            'outfile:s'      => \$outfile,
+            'coord_system:s' => \$coord_system,
 	    
 	    );
 
-unless( $dbhost && $dbname && $chr && $outfile ){
-  print STDERR "Usage: $0 -chr -dbname -dbhost [ -mask -dust -softmask -maskall ] -outfile\n";
+unless( $dbhost && $dbname && $name && $outfile ){
+  print STDERR ("Usage: -dbname $dbname -dbhost $dbhost -dbuser $dbuser ".
+                "-seq_region_name $name -coord_system $coord_system ".
+                "[ -mask -dust -softmask -maskall ] -outfile $outfile\n");
   exit(0);
 }
 
 # connect to the database
 my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					   -host  => $dbhost,
-					   -user  => $dbuser,
-					   -dbname=> $dbname
-					  );
+                                           -host  => $dbhost,
+                                           -user  => $dbuser,
+                                           -port => $dbport,
+                                           -dbname=> $dbname,
+                                           -dbpass => $dbpass,
+                                          );
 
 
 open OUT, ">$outfile";
@@ -53,7 +62,7 @@ my $out = Bio::SeqIO->new(-format=>'Fasta',
 			  -fh =>  \*OUT,
 			 );
 
-my $slice = $db->get_SliceAdaptor->fetch_by_chr_name( $chr );
+my $slice = $db->get_SliceAdaptor->fetch_by_region($coord_system, $name );
 
 
 my @logic_names;

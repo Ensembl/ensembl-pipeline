@@ -20,26 +20,18 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -port => $WB_DBPORT,
 					   );
 
-
-# adding assembly type to meta table
-my $meta_sql = "insert into meta(meta_key, meta_value) values(\'assembly.default\', ?)";
-
-my $meta_sth = $db->prepare($meta_sql);
-$meta_sth->execute($WB_AGP_TYPE); 
-
+my $clone_cs = &store_coord_system($db, $WB_CLONE_SYSTEM_NAME, 
+                                   '', 0, 1, 1);
+my $chromosome_cs = &store_coord_system($db, $WB_CHROMOSOME_SYSTEM_NAME, 
+                                        $WB_AGP_TYPE, 1, 0, 1);
 
 
 foreach my $chromosome_info(@{$WB_CHR_INFO}) {
 
   print "handling ".$chromosome_info->{'chr_name'}." with files ".$chromosome_info->{'agp_file'}." and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
   
+  my $chromosome = &store_slice($db, $chromosome_info->{'chr_name'}, 1, $chromosome_info->{'length'}, 1, $chromosome_cs);
 
-  my $chromosome = Bio::EnsEMBL::Chromosome->new(-chr_name => $chromosome_info->{'chr_name'},
-						 -length => $chromosome_info->{'length'},
-						 -adaptor =>$db->get_ChromosomeAdaptor, 
-						);
-
-  $db->get_ChromosomeAdaptor->store($chromosome); # adding chromosome to database
   open(FH, $chromosome_info->{'agp_file'}) or die "couldn't open ".$chromosome_info->{'agp_file'}." $!";
   my $fh = \*FH;
   my ($seq_ids, $non_ids) = &get_seq_ids($fh); # getting embl accs from agp
@@ -54,36 +46,30 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
  
 
   my %seqs = %{&get_sequences_pfetch($seq_ids, $pfetch)};
-  my %chr_hash = %{&agp_parse($fh, $chromosome->dbID, $WB_AGP_TYPE)};
-
+  my %chr_hash = %{&agp_parse($fh, 
+                              $chromosome->adaptor->get_seq_region_id($chromosome), 
+                              $WB_AGP_TYPE)};
   my %contig_id;
   foreach my $id(keys(%seqs)){
     my $seq = $seqs{$id};
-    my ($acc, $version) = $id =~ /(\S+)\.(\d+)/;
-    my $clone_name = $WB_ACC_2_CLONE->{$acc};
-    my $contig_id = $id.".1.".$seq->length;
-    my $time = time;
-    my $contig = &make_Contig($contig_id, $seq->seq, $seq->length);
-    my $clone = &make_Clone($clone_name, 1, $acc, $version, 3, $contig, $time, $time);
-    eval{
-      $db->get_CloneAdaptor->store($clone);
-    };
-    if($@){
-      die("couldn't store ".$clone->id." ".$clone->embl_id." $@");
-    }
-    $contig_id{$id} = $contig->dbID;
-    if(!$WB_RAW_COMPUTES){
-    
-    }
+    my $strand = $chr_hash{$seq->id}->{'contig_ori'};
+    my $contig = &store_slice($db, $id, 1, $seq->length, $strand, $clone_cs, $seq->seq);
+    $contig_id{$id} = $contig->adaptor->get_seq_region_id($contig);
   }
-
-  foreach my $id(keys(%chr_hash)){
+  
+   foreach my $id(keys(%chr_hash)){
     my $agp = $chr_hash{$id};
     my $contig = $contig_id{$id};
 
-    &insert_agp_line($agp->{'chromosome_id'}, $agp->{'chr_start'}, $agp->{'chr_end'}, $agp->{'superctg_name'}, $agp->{'superctg_start'}, $agp->{'superctg_end'}, $agp->{'superctg_ori'}, $contig, $agp->{'contig_start'}, $agp->{'contig_end'}, $agp->{'contig_ori'}, $agp->{'type'}, $db);
+    &insert_agp_line($agp->{'chromosome_id'}, $agp->{'chr_start'}, 
+                     $agp->{'chr_end'}, $contig, $agp->{'contig_start'},
+                     $agp->{'contig_end'}, $agp->{'contig_ori'}, 
+                     $db);
   }
-
-
-  
 }
+
+my $mc = $db->get_MetaContainer();
+$mc->store_key_value('assembly.mapping', 
+                     $chromosome_cs->name.":".$chromosome_cs->version."|".
+                     $clone_cs->name);
+

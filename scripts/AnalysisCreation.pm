@@ -218,7 +218,7 @@ sub write_into_db{
 	    my $stored_sql = "insert into input_id_type_analysis ".
 	      "(analysis_id, input_id_type) values(?, ?)";
 	    my $stored_sth = $db->prepare($stored_sql);
-	    $stored_sth->execute($analysis_id, $a->type);
+	    $stored_sth->execute($analysis_id, $a->input_id_type);
 	  }
 	}
       }

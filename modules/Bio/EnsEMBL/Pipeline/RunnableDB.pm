@@ -52,7 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
@@ -93,18 +93,18 @@ sub new {
     $self->{'_parameters'}  = undef;
     $self->{'_analysis'}    = undef;
 
-    $self->throw("No database handle input") unless defined($db);
+    &throw("No database handle input") unless defined($db);
     $self->db($db);
 
-    $self->throw("No input id input")        unless defined($input_id);
+    &throw("No input id input")        unless defined($input_id);
     $self->input_id($input_id);
     
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
-    $self->throw("No analysis object input") unless defined($analysis);
+    &throw("No analysis object input") unless defined($analysis);
     $self->analysis($analysis);
-
+    &verbose('EXCEPTION');
     return $self;
 }
 
@@ -122,7 +122,7 @@ sub analysis {
     my ($self, $analysis) = @_;
     
     if ($analysis) {
-        $self->throw("Not a Bio::EnsEMBL::Analysis object")
+        &throw("Not a Bio::EnsEMBL::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
         $self->{'_analysis'} = $analysis;
         $self->parameters($analysis->parameters);
@@ -223,7 +223,7 @@ sub db {
 
     if ($value) {
        $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
-         || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
+         || &throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
 
        $self->{'_db'} = $value;
     }
@@ -289,7 +289,7 @@ sub output {
 
     if(@r && scalar(@r)){
       foreach my $r ($self->runnable){
-	push(@{$self->{'_output'}}, $r->output);
+        push(@{$self->{'_output'}}, $r->output);
       }
     }
     return @{$self->{'_output'}};
@@ -310,10 +310,10 @@ sub run {
 
     foreach my $runnable ($self->runnable) {
 
-      $self->throw("Runnable module not set") unless ($runnable);
+      &throw("Runnable module not set") unless ($runnable);
 
       # Not sure about this
-      $self->throw("Input not fetched")       unless ($self->query);
+      &throw("Input not fetched")       unless ($self->query);
 
       $runnable->run();
     }
@@ -342,7 +342,7 @@ sub runnable {
       if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
 	  push(@{$self->{'_runnables'}},$arg);
       } else {
-	  $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
+	  &throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
       }
   }
   
@@ -366,7 +366,7 @@ sub write_output {
     my $db       = $self->db();
     my @features = $self->output();
     my $contig;
-
+    print STDERR "Write output have ".@features." features\n";
     my $sim_adp  = $self->db->get_SimpleFeatureAdaptor;
     my $mf_adp   = $self->db->get_MarkerFeatureAdaptor;
     my $pred_adp = $self->db->get_PredictionTranscriptAdaptor;
@@ -376,14 +376,14 @@ sub write_output {
     my $gene_adp = $self->db->get_GeneAdaptor;
 
 
-    $self->warn("shouldn't be using the write_output method of runnabledb");
+
 
     eval {
-      $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+      $contig = $db->get_SliceAdaptor->fetch_by_name($self->input_id);
     };
 
     if ($@) {
-      $self->throw("Can't find contig " . $self->input_id . " . Can't write output");
+      &throw("Can't find contig " . $self->input_id . " . Can't write output");
     }
   
     my %features;
@@ -393,77 +393,75 @@ sub write_output {
       $f->analysis($self->analysis);
 
       unless ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
-        print $f->gffstring . "\n";
-        $f->attach_seq($contig);
+        $f->slice($contig);
       }
 
       if ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
-	foreach my $exon (@{$f->get_all_Exons}) {
-	  $exon->contig($contig);
-	}
+        foreach my $exon (@{$f->get_all_Exons}) {
+          $exon->slice($contig);
+        }
 
-	if (!defined($features{prediction})) {
-	  $features{prediction} = [];
-	}
-
-	push(@{$features{prediction}},$f);
-
-	print "F " . $features{prediction} . "\n";
-
+        if (!defined($features{prediction})) {
+          $features{prediction} = [];
+        }
+        
+        push(@{$features{prediction}},$f);
+        
+        
       } elsif ($f->isa("Bio::EnsEMBL::SimpleFeature")) {
-
-	if (!defined($features{simple})) {
-	  $features{simple} = [];
-	}
-
-	push(@{$features{simple}},$f);
-
+        
+        if (!defined($features{simple})) {
+          $features{simple} = [];
+        }
+        
+        push(@{$features{simple}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::Map::MarkerFeature")) {
-
-	if (!defined($features{marker})) {
-	  $features{marker} = [];
-	}
-
-	push(@{$features{marker}},$f);
-
+        
+        if (!defined($features{marker})) {
+          $features{marker} = [];
+        }
+        
+        push(@{$features{marker}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+        
+        if (!defined($features{dnapep})) {
+          $features{dnapep} = [];
+        }
 
-	if (!defined($features{dnapep})) {
-	  $features{dnapep} = [];
-	}
-
-	push(@{$features{dnapep}},$f);
-
+        push(@{$features{dnapep}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::DnaDnaAlignFeature")) {
-
-	if (!defined($features{dnadna})) {
-	  $features{dnadna} = [];
-	}
-
-	push(@{$features{dnadna}},$f);
-
+        
+        if (!defined($features{dnadna})) {
+          $features{dnadna} = [];
+        }
+        
+        push(@{$features{dnadna}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
-
-	if (!defined($features{repeat})) {
-	  $features{repeat} = [];
-	}
-
-	push(@{$features{repeat}},$f);
-
+        
+        if (!defined($features{repeat})) {
+          $features{repeat} = [];
+        }
+        
+        push(@{$features{repeat}},$f);
+        
       } elsif ($f->isa("Bio::EnsEMBL:Gene")) {
-
-	  foreach my $exon (@{$f->get_all_Exons}) {
-	    $exon->contig($contig);
-	  }
-	  if (!defined($features{gene})) {
-	    $features{gene} = [];
-	  }
-	  
-	push(@{$features{gene}},$f);
-	  
+        
+        foreach my $exon (@{$f->get_all_Exons}) {
+          $exon->slice($contig);
+        }
+        if (!defined($features{gene})) {
+          $features{gene} = [];
+        }
+        
+        push(@{$features{gene}},$f);
+        
       }
     }
-
+    
     if ($features{prediction}) {
       $pred_adp->store(@{$features{prediction}});
       print "Storing " . @{$features{prediction}} . "\n";
@@ -568,5 +566,47 @@ sub failing_job_status{
     return $self->{'_error_status'};
 }
 
+
+=head fetch_sequence
+
+    Title   :  failing_job_status
+    Useage  :  $self->fetch_sequence
+    Function:  fetch a slice out of a specified database  
+    Returns :  Bio::EnsEMBL::Slice, which is also placed in $self->query
+    Args    :  array ref, to an array specifying what repeats are to be masked
+               if any. If there is no ref no repeats with be masked if the 
+               array exists but is empty e.g [''] all repeats will be masked
+               if the array has entries repeats of those logic_names will be
+               masked e.g ['RepeatMask']
+               Bio::EnsEMBL::DBAdaptor to allow slices to be fetched from 
+               a database not specified by $self->db
+    Caller  :  Bio::EnsEMBL::Pipeline::RunnableDB::module->fetch_input
+    Why     :  In this schema sequence is always fetched in the same way
+               provided the name matched the format specified in 
+               Bio::EnsEMBL::Slice::name 
+    Example :  See RunnableDB::Blast::fetch_input
+
+=cut
+
+sub fetch_sequence{
+  my ($self, $repeat_masking, $db) = @_;
+
+  if(!$db){
+    $db = $self->db;
+  }
+  #print STDERR "Fetching sequence from ".$self->db->dbname."\n";
+  my $sa = $db->get_SliceAdaptor;
+#print STDERR "Have input_id ".$self->input_id."\n";
+  my $slice = $sa->fetch_by_name($self->input_id);
+  $repeat_masking = [] unless($repeat_masking);
+  if(@$repeat_masking){
+    my $sequence = $slice->get_repeatmasked_seq($repeat_masking);
+    $self->query($sequence);
+  }else{
+    $self->query($slice);
+  }
+  #print STDERR "have sequence ".$self->query."\n";
+  return $self->query;
+}
 
 1;

@@ -74,7 +74,6 @@ use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::PepDnaAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::Root;
@@ -93,13 +92,13 @@ my %REFILTER;
 
 foreach my $db (@$DB_CONFIG) {
     my ($name, $header, $flavour, $refilter) = ($db->{'name'}, 
-						$db->{'header'}, 
-						$db->{'flavour'}, 
-						$db->{'refilter'});
+                                                $db->{'header'}, 
+                                                $db->{'flavour'}, 
+                                                $db->{'refilter'});
     
     if($db && $name){
       $FASTA_HEADER{$name} = $header; 
-      $BLAST_FLAVOUR{$name} = $flavour;
+      $BLAST_FLAVOUR{$name} = $flavour; 
       $REFILTER{$name} = $refilter;
     }else{
       my($p, $f, $l) = caller;
@@ -111,7 +110,7 @@ foreach my $db (@$DB_CONFIG) {
 
 =head2 new
 
-    Title   :   new
+Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
     (-query    => $seq,
      -program  => 'blastp',
@@ -164,7 +163,7 @@ sub new {
                                   FILTER 
                                   COVERAGE
                                   PRUNE
-				  HARDPRUNE
+                                  HARDPRUNE
                                   UNGAPPED
                                   OPTIONS)], 
                               @args);
@@ -188,29 +187,29 @@ sub new {
       $self->options(' -cpus=1 ');  
     }
     
-    if (defined($threshold)) {
+    if ($threshold) {
       $self->threshold($threshold);
     }
 
-    if (defined($threshold_type)) {
+    if ($threshold_type) {
       $self->threshold_type($threshold_type);
     }
 
-    if (defined($filter)) {
+    if ($filter) {
         $self->filter($filter);
     }
     
-    if (defined($prune)) {
+    if ($prune) {
       $self->prune($prune);
     }
-    if (defined($hardprune)) {
+    if ($hardprune) {
       $self->hardprune($hardprune);
     }
-    if (defined($coverage)) {
+    if ($coverage) {
       $self->coverage($coverage);
     }
     #print STDERR "setting ungapped = ".$ungapped."\n";
-    if (defined($ungapped)) {
+    if ($ungapped) {
       $self->ungapped($ungapped);
     }
     return $self; # success - we hope!
@@ -254,7 +253,7 @@ sub run {
 sub databases {
   my ($self,@dbs) = @_;
 
-  if (!defined($self->{_databases})) {
+  if (!$self->{_databases}) {
      $self->{_databases} = [];
   }
   if (@dbs) {
@@ -286,7 +285,7 @@ sub run_analysis {
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
-        print STDERR "\nDatabase: '".$database."'\n";
+        #print STDERR "\nDatabase: '".$database."'\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
         
         #my $command = "ulimit -d 2000; " . $self->program ;
@@ -294,8 +293,8 @@ sub run_analysis {
         my $blastype = "";
         my $filename = $self->filename;
 
-        if ($BLAST_FLAVOUR{$self->database} && 
-            ($BLAST_FLAVOUR{$self->database} eq 'ncbi')) {
+        if ($BLAST_FLAVOUR{$self->database} 
+            && $BLAST_FLAVOUR{$self->database} eq 'ncbi') {
             $command .= " -d $database -i $filename ";
         } else {
             $command .= " $database $filename ";
@@ -305,67 +304,77 @@ sub run_analysis {
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-        print STDERR "Running cmd: $command\n";
+        #print STDERR "Running cmd: $command\n";
 
-        open(my $fh, "$command |") || $self->throw("Error opening Blast cmd <$command>." .
-                                                   " Returned error $? BLAST EXIT: '" . ($? >> 8) . "'," .
-                                                   " SIGNAL '" . ($? & 127) . "', There was " . ($? & 128 ? 'a' : 'no') . 
-                                                   " core dump");
+        open(my $fh, "$command |") || 
+          $self->throw("Error opening Blast cmd <$command>." .
+                       " Returned error $? BLAST EXIT: '" . 
+                       ($? >> 8) . "'," ." SIGNAL '" . ($? & 127) . 
+                       "', There was " . ($? & 128 ? 'a' : 'no') . 
+                       " core dump");
         # this loop reads the STDERR from the blast command
         # checking for FATAL: messages (wublast) [what does ncbi blast say?]
         # N.B. using simple die() to make it easier for RunnableDB to parse.
-        #print STDERR "-------------- Here begins Blast's STDERR ---------------\n";
+        #print STDERR "-------------- Here begins Blast's STDERR ---".
+        #"------------\n";
         while(<$fh>){
-           # print STDERR "$_";
-            if(/FATAL:(.+)/){
-                my $match = $1;
-                if($match =~ /There are no valid contexts in the requested search/){
-                    # $self->input_is_void(1); # not available to runnable only to runnabledb
-                    die qq{"VOID"\n}; # hack instead
-                }
-                elsif($match =~ /Bus Error signal received/){
-                    die qq{"BUS_ERROR"\n}; # can we work out which host?
-                }
-                elsif($match =~ /Segmentation Violation signal received./){
-                    die qq{"SEGMENTATION_FAULT"\n}; # can we work out which host?
-                }
-                elsif($match =~ /Out of memory;(.+)/){
-                    # (.+) will be something like "1050704 bytes were last requested."
-                    die qq{"OUT_OF_MEMORY"\n}; # resent to big mem machine by rulemanager
-                }
-                else{
-                    $self->warn("Something FATAL happened to BLAST we've ".
-                                "not seen before, please add it to Package: ".
-                                 __PACKAGE__ . ", File: " . __FILE__); 
-                    die ($UNKNOWN_ERROR_STRING."\n"); # send appropriate 
-                    #string as standard this will be failed so job can be 
-                    #retried when in pipeline
-                }
+          # print STDERR "$_";
+          if(/FATAL:(.+)/){
+            my $match = $1;
+            if($match =~ /There are no valid contexts in the requested search/){
+              # $self->input_is_void(1); # not available to runnable only to runnabledb
+              die qq{"VOID"\n}; # hack instead
             }
-            elsif(/WARNING:(.+)/){
-                # ONLY a warning usually something like hspmax=xxxx was exceeded
-                # skip ...
-            }elsif(/^\s{10}(.+)/){ # ten spaces
-                # Continuation of a WARNING: message
-                # Hope this doesn't catch more than these.
-                # skip ...
+            elsif($match =~ /Bus Error signal received/){
+              die qq{"BUS_ERROR"\n}; # can we work out which host?
             }
-            #else{ # I really want to check for more here.
-            #    $self->warn("Something happened on STDERR we've not seen before, please add it to " . 
-            #            "Package: " . __PACKAGE__ . ", File: " . __FILE__);
-            #    die qq{"UNKNOWN_ERROR"\n};
-            #}
+            elsif($match =~ /Segmentation Violation signal received./){
+              die qq{"SEGMENTATION_FAULT"\n}; # can we work out which host?
+            }
+            elsif($match =~ /Out of memory;(.+)/){
+              # (.+) will be something like "1050704 bytes were last requested."
+              die qq{"OUT_OF_MEMORY"\n}; # resent to big mem machine by rulemanager
+            }
+            else{
+              $self->warn("Something FATAL happened to BLAST we've not ".
+                          "seen before, please add it to Package: " 
+                          . __PACKAGE__ . ", File: " . __FILE__);
+              die ($UNKNOWN_ERROR_STRING."\n"); # send appropriate string 
+              #as standard this will be failed so job can be retried
+              #when in pipeline
+            }
+          }
+          elsif(/WARNING:(.+)/){
+            # ONLY a warning usually something like hspmax=xxxx was exceeded
+            # skip ...
+          }elsif(/^\s{10}(.+)/){ # ten spaces
+            # Continuation of a WARNING: message
+            # Hope this doesn't catch more than these.
+            # skip ...
+          }
+          #else{ # I really want to check for more here.
+          #    $self->warn("Something happened on STDERR we've not seen before, please add it to " . 
+          #            "Package: " . __PACKAGE__ . ", File: " . __FILE__);
+          #    die qq{"UNKNOWN_ERROR"\n};
+          #}
         }
-        #print STDERR "-------------- Here ends Blast's STDERR ---------------\n";
+        #print STDERR "-------------- Here ends Blast's STDERR ------".
+        #"---------\n";
         unless(close $fh){
-            # checking for failures when closing.
-            # we should't get here but if we do then $? is translated below see man perlvar
-            $self->warn("Error running Blast cmd <$command>. Returned error $? BLAST EXIT: '" 
-                        . ($? >> 8) . "', SIGNAL '" . ($? & 127) . "', There was " . ($? & 128 ? 'a' : 'no') . " core dump");
-            die qq{"UNKNOWN_ERROR"\n}; # hang around until someone works out what went wrong.
+          # checking for failures when closing.
+          # we should't get here but if we do then $? is translated 
+          #below see man perlvar
+          $self->warn("Error running Blast cmd <$command>. Returned ".
+                      "error $? BLAST EXIT: '" . ($? >> 8) . 
+                      "', SIGNAL '" . ($? & 127) . "', There was " . 
+                      ($? & 128 ? 'a' : 'no') . " core dump");
+          die ($UNKNOWN_ERROR_STRING."\n"); # hang around until someone works 
+          #out what went wrong.
         }
       }
-}
+  }
+
+
 
 =head2 fetch_databases
 
@@ -402,7 +411,7 @@ sub fetch_databases {
     #
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
-    print STDERR "Checking if ".$dbname." exists\n";
+    #print STDERR "Checking if ".$dbname." exists\n";
     if (-f $dbname) {
       push(@databases,$dbname);
     } else {
@@ -463,28 +472,28 @@ sub get_parsers {
 
 sub parse_results {
   my ($self,$fh) = @_;
-  
+
   my %ids;
   my $count = 0;
   my @parsers;
-  
-  if (defined($fh)) {
+ 
+  if ($fh) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
     @parsers = $self->get_parsers;
   }
-  
+ 
   if ($self->filter) {
     %ids = $self->filter_hits(@parsers);
   }
-  
-  print STDERR "Ids " . keys(%ids) . "\n";
-  
+ 
+  #print STDERR "Ids " . keys(%ids) . "\n";
+
   @parsers = ();
   seek $fh, 0, 0 if ref $fh;
   
-  if (defined($fh)) {
+  if ($fh) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
@@ -504,56 +513,59 @@ sub parse_results {
       my $fasta_header = $sbjct->name ;     
       my ($name) = $fasta_header =~ /$re/;
       unless ($name) {
-	      $self->throw("Error getting a valid accession from \"" .
-                     $fasta_header .
-                     "\"; check your blast config and / or blast headers");
+        $self->throw("Error getting a valid accession from \"" .
+                     $fasta_header ."\"; check your blast config ".
+                     "and / or blast headers");
       }
       
       # print STDERR "Name " . $fasta_header . "\n";
-      if (($self->filter == 1) && !defined($ids{$fasta_header})) {
-	      next NAME;
+      if (($self->filter == 1) && !($ids{$fasta_header})) {
+        next NAME;
       }
+
+    #print "Parsing name $name\n";
+    
+  HSP: while (my $hsp = $sbjct->nextHSP) {
       
-      #print "Parsing name $name\n";
-      
-	  HSP: while (my $hsp = $sbjct->nextHSP) {
-	      if($self->threshold_type){
-          if ($self->threshold_type eq "PID") {
-            next HSP
-              if $self->threshold and ($hsp->percent < $self->threshold);
-          } elsif ($self->threshold_type eq "SCORE") {
-            next HSP
-              if ($self->threshold) and ($hsp->score < $self->threshold);
-          } elsif ($self->threshold_type eq "PVALUE") {
-            next HSP
-              if ($self->threshold) and ($hsp->P > $self->threshold);
-          }
+      if($self->threshold_type){
+        if ($self->threshold_type eq "PID") {
+          next HSP
+            if  $self->threshold and ($hsp->percent < $self->threshold);
+        } elsif ($self->threshold_type eq "SCORE") {
+          next HSP
+            if ($self->threshold) and ($hsp->score < $self->threshold);
+        } elsif ($self->threshold_type eq "PVALUE") {
+          next HSP
+            if ($self->threshold) and ($hsp->P > $self->threshold);
         }
-	      # Each HSP is a gapped alignment.
-	      # This method splits the gapped alignment into
-	      # ungapped pieces
-	      #print STDERR "HSP " . $hsp->P . "\n";
-	      $count++;
-	      $self->split_HSP($hsp,$name);
-	      
       }
+      # Each HSP is a gapped alignment.
+      # This method splits the gapped alignment into
+      # ungapped pieces
+      #print STDERR "HSP " . $hsp->P . "\n";
+      $count++;
+      $self->split_HSP($hsp,$name);
+        
     }
   }
-  
-  print STDERR "have ".$count." hsps\n";
-  # Alternate feature filter. 
-  # If option not present in config, should default to FeatureFilter -prune
+ }
+  #print STDERR "have ".$count." hsps\n";
+
+# Alternate feature filter. If option not present in config, should default to FeatureFilter -prune
   
   if ($REFILTER{$self->database}){
-    # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
+    # re-filter, with pruning - rewrotee to use a local select_feature 
+    #function instead of FeatureFilter 
     my @selected_features = $self->select_features($self->output);
     $self->output(@selected_features);
   } else {
     # re-filter, with pruning
     my @allfeatures = $self->output;
+    #print STDERR "Have ".@allfeatures." fetures to filter\n";
     if($self->threshold_type){
       if ($self->threshold_type eq "PID") {
-        @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
+        @allfeatures = sort {$b->percent_id 
+                               <=> $a->percent_id} @allfeatures;
       } elsif ($self->threshold_type eq "SCORE") {
         @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
       } else {
@@ -561,27 +573,25 @@ sub parse_results {
       }
     }
     if ($self->filter) {
-      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter
-        (
-         -prune     => $self->prune,
-         -hardprune => $self->hardprune,
-         -coverage  => $self->coverage
-        );
+      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
+                                         -prune     => $self->prune,
+                                         -hardprune => $self->hardprune,
+                                         -coverage  => $self->coverage);
       my @pruned = $search->run(@allfeatures);
-      
-      #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+
       $self->output(@pruned);
     }
   }
-  print STDERR "Have ".$self->output." results to output\n";
   #print "have parsed resultz\n";
-  return $self->output;   
+  #print STDERR "Have ".$self->output." results to output\n";
+  return $self->output;
+
 }
 
 sub prune {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_prune} = $arg;
   }
   return $self->{_prune};
@@ -590,7 +600,7 @@ sub prune {
 sub hardprune {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_hardprune} = $arg;
   }
   return $self->{_hardprune};
@@ -599,7 +609,7 @@ sub hardprune {
 sub coverage {
   my($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_coverage} = $arg;
   }
   return $self->{_coverage};
@@ -611,79 +621,69 @@ sub filter_hits {
   my %ids;
 
   my @features;
-  
-  my @hsps;
 
-  foreach my $parser (@parsers) {
-      while (my $sbjct = $parser->nextSbjct) {
-	  while (my $hsp = $sbjct->nextHSP) {
+    
+   foreach my $parser (@parsers) {
+     while (my $sbjct = $parser->nextSbjct) {
+       HSP:while (my $hsp = $sbjct->nextHSP) {
       
-	      my $name = $hsp->subject->seqname ;
-	      if($self->threshold_type){
-          if ($self->threshold_type eq "PID") {
-            next if defined $self->threshold 
-              and ($hsp->percent < $self->threshold);
-          } elsif ($self->threshold_type eq "SCORE") {
-            next if defined $self->threshold 
-              and ($hsp->score < $self->threshold);
-          } elsif ($self->threshold_type eq "PVALUE") {
-            next if defined $self->threshold 
-              and ($hsp->P > $self->threshold);
-          } 
-        }
-	      
-	      my $qstart = $hsp->query->start();
-	      my $hstart = $hsp->subject->start();
-	      
-	      my $qend   = $hsp->query->end();
-	      my $hend   = $hsp->subject->end();      
-	
-	      my $qstrand = $hsp->query->strand(),
-	      my $hstrand = $hsp->subject->strand();
-	      
-	      my $score  = $hsp->score;
-	      
-	      my $feature1 = new Bio::EnsEMBL::SeqFeature();
-	      $feature1->start($qstart);
-	      $feature1->end  ($qend);
-	      $feature1->strand($qstrand);
-	      $feature1->score($score);
-	      
-	      my $feature2 = new Bio::EnsEMBL::SeqFeature();
-	      $feature2->start  ($hstart);
-	      $feature2->end    ($hend);
-	      $feature2->strand ($hstrand);
-	      $feature2->score  ($score);
-	      $feature2->seqname($name);
-	      
-	      my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
-						     -feature2 => $feature2);
-	      $fp->p_value($hsp->P);
-	      $fp->percent_id($hsp->percent);
-	      
-	      push(@features,$fp);
-	  }
-      }
-  }
+           my $name = $hsp->subject->seqname ;
+           if($self->threshold_type){
+             if ($self->threshold_type eq "PID") {
+               next HSP if ($hsp->percent < $self->threshold);
+             } elsif ($self->threshold_type eq "SCORE") {
+               next HSP if ($hsp->score < $self->threshold);
+             } elsif ($self->threshold_type eq "PVALUE") {
+               if ($hsp->P > $self->threshold){
+                 next HSP;
+               }
+             } 
+           }
+           
+           my $qstart = $hsp->query->start();
+           my $hstart = $hsp->subject->start();
+           
+           my $qend   = $hsp->query->end();
+           my $hend   = $hsp->subject->end();      
+           
+           my $qstrand = $hsp->query->strand(),
+             my $hstrand = $hsp->subject->strand();
+           
+           my $score  = $hsp->score;
+           my $p_value = $hsp->P;
+           my $percent = $hsp->percent;
+           
+           my $fp = $self->create_FeaturePair($qstart, $qend, $qstrand, 
+                                              $hstart, $hend, $hstrand, 
+                                              $name, $score, $percent, 
+                                              $p_value, 
+                                              $self->query->id);
+           
+           push(@features,$fp);
+         }
+       }
+   }
   if($self->threshold_type){
     if ($self->threshold_type eq "PID") {
       @features = sort {$b->percent_id <=> $a->percent_id} @features;
-    } 
-    elsif ($self->threshold_type eq "SCORE") {
+    } elsif ($self->threshold_type eq "SCORE") {
       @features = sort {$b->score <=> $a->score} @features;
-    } 
-    elsif ($self->threshold_type eq "PVALUE") {
+    } elsif ($self->threshold_type eq "PVALUE") {
       @features = sort {$a->p_value <=> $b->p_value} @features;
     } 
-  } 
-  my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-coverage => $self->coverage);
+  }
+  
+  my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter
+    (
+     -coverage => $self->coverage
+    );
   
   my @newfeatures = $search->run(@features);
   
   foreach my $f (@newfeatures) {
-      my $id = $f->hseqname;
-      
-      $ids{$id} = 1;
+    my $id = $f->hseqname;
+    
+    $ids{$id} = 1;
   }
   
   return %ids;
@@ -784,13 +784,14 @@ sub split_HSP {
 
     my @tmpf;
 
-    my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
-                                              -db_version      => 1,
-                                              -program         => $source,
-                                              -program_version => 1,
-                                              -gff_source      => $source,
-                                              -gff_feature     => 'similarity',
-                                              -logic_name      => 'blast');
+    my $analysis = new Bio::EnsEMBL::Analysis
+      (-db => $self->database,
+       -db_version      => 1,
+       -program         => $source,
+       -program_version => 1,
+       -gff_source      => $source,
+       -gff_feature     => 'similarity',
+       -logic_name      => 'blast');
     
     # Here goes...
   
@@ -821,7 +822,7 @@ sub split_HSP {
         } 	 
         if ($fp->can("identical_matches")) { 	 
           $fp->identical_matches($hsp->match); 	 
-        }
+       }
 	      push(@tmpf,$fp);
 	      #$self->growfplist($fp);                                         
             }
@@ -885,6 +886,14 @@ sub split_HSP {
       $fp->{'qseq'} = $hsp->querySeq();
       $fp->{'sseq'} = $hsp->sbjctSeq();
 
+      # for compara
+      if ($fp->can("positive_matches")) { 	 
+        $fp->positive_matches($hsp->positive); 	 
+      } 	 
+      if ($fp->can("identical_matches")) { 	 
+        $fp->identical_matches($hsp->match); 	 
+      }
+
       $self->growfplist($fp);
     }
 }
@@ -903,7 +912,7 @@ sub split_HSP {
 
 sub _convert2FeaturePair {
     my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis) = @_;
-
+  
     # The actual end of the alignment is the previous character.
     
     my $tmpqend = $qend; $tmpqend -= $qinc;
@@ -935,55 +944,17 @@ sub _convert2FeaturePair {
     
     # print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\t" . $name . "\n";
 
-    my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
-                                     $hsp->percent,$hsp->P,$name,$analysis);
+    my $fp = $self->create_FeaturePair($tmpqstart,$tmpqend,$qstrand,
+                                       $tmphstart,$tmphend,$hstrand,
+                                       $name, $hsp->score, $hsp->percent,
+                                       $hsp->P, $self->query->id, 
+                                       $analysis);
 
     return $fp;
 }
 
-=head2 _makeFeaturePair
-
-    Title   :   _makeFeaturePair
-    Usage   :   $obj->_makeFeaturePair
-    Function:   Internal function that makes feature pairs
-    Returns :   Bio::EnsEMBL::FeaturePair
-    Args    :   int,int,int,int,int,int,int,int,BPlite::HSP
-                 
-
-=cut
-
-sub _makeFeaturePair {
-    my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$score,$pid,$evalue,$name,$analysis)  = @_;
-
-    my $source = $self->program;             
-    $source =~ s/\/.*\/(.*)/$1/;
-
-    my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->query->id,
-                                                -start       => $qstart,
-                                                -end         => $qend,
-                                                -strand      => $qstrand,
-                                                -analysis    => $analysis,
-                                                -score       => $score);
-        
-    $feature1->percent_id($pid);
-    $feature1->p_value($evalue);
 
 
-    my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
-                                                -start   => $hstart,
-                                                -end     => $hend,
-                                                -strand  => $hstrand,
-                                                -analysis => $analysis,
-                                                -score    => $score);
-    
-    my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
-                                           -feature2 => $feature2);
-   
-    $feature2->percent_id($pid);
-    $feature2->p_value($evalue);
- 
-    return $fp;
-}
 
 sub _findIncrements {
     my ($self,$hsp,$qstrand,$hstrand,$qtype,$htype) = @_;
@@ -1101,9 +1072,12 @@ sub output {
       @{$self->{'_fplist'}} = @arg;
     }
 
-    if (!defined($self->{'_fplist'})) {
+    if (!($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
     }
+#    foreach my $f(@{$self->{'_fplist'}}){
+#      print STDERR "Blast::output ".$f->seqname." ".$f->hseqname."\n";
+#    }
     return @{$self->{'_fplist'}};
 }
 
@@ -1121,8 +1095,9 @@ sub query {
 
       $self->{'_query'} = $seq ;
 
-      $self->filename($seq->id.".$$.seq");
-      $self->results($self->filename.".blast.out");
+      my $filename = $self->get_tmp_file('/tmp/', $seq->id.".$$", "seq");
+      $self->filename($filename);
+      $self->results($filename.".blast.out");
 
       # Add file to list for later cleanup.
     }
@@ -1162,7 +1137,7 @@ sub database {
   my ($self, $db) = @_;
   my $re_string;
     
-  if (defined($db)) {
+  if ($db) {
     $self->{'_database'} = $db;
     $db =~ s!.*/!!;       
     #print STDERR "have ".keys(%$FASTA_HEADER)." blast regexs defined\n";
@@ -1183,7 +1158,7 @@ sub database {
 sub options {
   my ($self, $args) = @_;
   
-  if (defined($args)) {
+  if ($args) {
     $self->{'_options'} = $args ;
   }
   return $self->{'_options'};
@@ -1192,7 +1167,7 @@ sub options {
 sub ungapped {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_ungapped} = $arg;
   }
   return $self->{_ungapped};
@@ -1203,7 +1178,7 @@ sub ungapped {
 sub filter {
     my ($self,$args) = @_;
 
-    if (defined($args)) {
+    if ($args) {
         if ($args != 0 && $args != 1) {
             $self->throw("Filter option must be 0 or 1");
         }
@@ -1224,8 +1199,8 @@ sub threshold_type {
   my %allowed = map { $_, 1 } $self->get_threshold_types;
   
   if ($type) {
-    unless (defined $allowed{$type}) {
-      $self->throw("Unallowed threshold type $type");
+    unless  ($allowed{$type}) {
+    $self->throw("Unallowed threshold type $type");
     }
     $self->{'_threshold_type'} = $type;
   }
@@ -1238,7 +1213,7 @@ sub blast_re {
   my ($self, $re_string) = @_;
   my $re;
 
-  if (defined $re_string) {
+  if ( $re_string) {
     eval {
       $re = $re_string;
     };
@@ -1264,8 +1239,14 @@ sub get_regex{
   #print STDERR "getting the regex for ".$name."\n";
   if($name =~/\/tmp\//){
     $name =~ s/\/tmp\///g;
-  }
+  } 
   return $FASTA_HEADER{$name};
 }
-1;
 
+
+sub blast_flavour{
+
+}
+
+
+1;

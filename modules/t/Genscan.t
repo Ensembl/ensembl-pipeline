@@ -2,27 +2,42 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN { $| = 1; plan test => 9;}
+BEGIN { $| = 1; plan test => 11;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Exon;
-
+use Bio::EnsEMBL::CoordSystem;
+use Bio::EnsEMBL::Slice;
 ok(1);
 
 ok(my $seq =  set_seq());
+uc($seq);
+my $length = length($seq);
 
-ok(my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
-				       -id          => 'HSAC74',
-				       -accession   => 'ACOOOO74',
-				       -moltype     => 'dna'));
+my $cs;
+ok( $cs = Bio::EnsEMBL::CoordSystem->new(
+     -NAME            => 'contig',
+     -VERSION         => '',
+     -DEFAULT         => 1,
+     -SEQUENCE_LEVEL  => 1,
+     -TOP_LEVEL       => 0,
+    ));
+
+ok( my $slice = Bio::EnsEMBL::Slice->new(
+   -seq_region_name  => 'HSAC74',
+   -start            => 1,
+   -end              => $length,
+   -strand           => 1,
+   -coord_system     => $cs,
+   -seq => $seq));
 
 
 
 ok(my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
-    -QUERY => $clone,
+    -QUERY => $slice,
     -GENSCAN => 'genscan',
     -MATRIX  => 'HumanIso.smat'
 ));
@@ -68,7 +83,8 @@ sub display {
   foreach my $obj (@results) {
 
     foreach my $exon (@{$obj->get_all_Exons}) {
-	print STDERR "Exon: ".$exon->gffstring."\n";
+    	print STDERR "Exon: ".$exon->start." ".$exon->end." ".$exon->strand.
+      " ".$exon->phase."\n";
     }
   }
   return 1;

@@ -46,15 +46,15 @@ use vars qw( %Similarity );
 # Hash containing config info
 %Similarity = (
 
-	       GB_SIMILARITY_INPUTID_EXTRA_REGEX => '^\S+\.\d+\-\d+:(\S+):(\S+)',
+	       GB_SIMILARITY_INPUTID_REGEX => '^([^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*)(?::([^:]+):([^:]+))?$',
 
 	       # fill in one complete hash for each database from which blast 
 	       # features are to be retrieved
 	       GB_SIMILARITY_DATABASES => [
 					  {				  
 					    'type'       => 'Swall',
-					    'threshold'  => '100',
-					    # 'upper_threshold' => '200',
+					    'threshold'  => '200',
+					    'upper_threshold' => '',
 					    'index'      => '/data/blastdb/Ensembl/swall_index',
 					    'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					   },

@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/bin/perl -w
 
 =head1 NAME
 
@@ -28,7 +28,6 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw (
 								      EST_TMPDIR
 								      EST_REFDBHOST
-								      EST_REFDBPORT
 								      EST_REFDBUSER
 								      EST_REFDBNAME
 								      EST_QUEUE
@@ -89,8 +88,6 @@ sub get_chrlengths{
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $EST_REFDBHOST,
 					      -user   => $EST_REFDBUSER,
 					      -dbname => $EST_REFDBNAME,
-                                              -port   => $EST_REFDBPORT 
-                                            
 					     );
   my $q = "SELECT c.name, max(a.chr_end) 
            FROM   chromosome c, assembly a

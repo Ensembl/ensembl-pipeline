@@ -1,3 +1,4 @@
+
 #
 # BioPerl module for PredictionGeneBuilder
 #
@@ -145,20 +146,20 @@ sub run{
   
   # get all exons from the PredictionTranscripts, take only exons with overlapping similarity features, which
   # are incorporated as supporting evidence
-  print STDERR "making exons...\n";
+  #print STDERR "making exons...\n";
   my @supported_exons = $self->make_Exons;
 
-  print STDERR "Number of exons supported out of predictions ".scalar( @supported_exons )."\n";
+  #print STDERR "Number of exons supported out of predictions ".scalar( @supported_exons )."\n";
   
   # pair up the exons according to consecutive overlapping supporting evidence
   # pairs can be retrieved using 'get_all_ExonPairs'
-  print STDERR "making exonpairs...\n";
+  #print STDERR "making exonpairs...\n";
   $self->make_ExonPairs(@supported_exons);
-  print STDERR scalar($self->get_all_ExonPairs)." Exon pairs created\n";
+  #print STDERR scalar($self->get_all_ExonPairs)." Exon pairs created\n";
 
   # link exons recursively according to the exon pairs with shared evidence to form transcripts
   my @linked_predictions = $self->link_ExonPairs(@supported_exons);
-  print STDERR scalar(@linked_predictions)." linked transcripts generated\n";
+  #print STDERR scalar(@linked_predictions)." linked transcripts generated\n";
 
   # check the generated transcripts:
   my @checked_predictions;
@@ -169,7 +170,7 @@ sub run{
       push( @checked_predictions, $prediction );
   }
   
-  print STDERR scalar(@checked_predictions)." checked predictions generated\n";
+  #print STDERR scalar(@checked_predictions)." checked predictions generated\n";
   return @checked_predictions;
 }  
 
@@ -181,7 +182,7 @@ sub run_pfam {
     my @predictions = $self->predictions;
     my @newpred;
     
-    print STDERR "INITIAL PREDICTIONS: ".scalar(@predictions)."\n";
+    #print STDERR "INITIAL PREDICTIONS: ".scalar(@predictions)."\n";
     
   PREDICTION:  
     foreach my $prediction (@predictions) {
@@ -210,7 +211,7 @@ sub run_pfam {
     
     
     
-    print STDERR "PREDICTIONS KEPT: ".scalar(@newpred)."\n";
+    #print STDERR "PREDICTIONS KEPT: ".scalar(@newpred)."\n";
     
     my @newannot;
 
@@ -240,7 +241,7 @@ sub run_pfam {
 	}
 	$self->make_Translation($new_transcript);
 	
-	print STDERR "NB EXONS: ".scalar(@{$new_transcript->get_all_Exons})."\n";
+	#print STDERR "NB EXONS: ".scalar(@{$new_transcript->get_all_Exons})."\n";
 	
 #If the transcript is not supported but has more than 3 exons ... we take the risk
 #	if (scalar(@{$new_transcript->get_all_Exons}) >= 3) {
@@ -269,9 +270,9 @@ sub run_pfam {
 	    
 	    foreach my $o (@output) {
 		
-		print STDERR "$o\n";
+		#print STDERR "$o\n";
 	    }
-	    print STDERR "Adding transcript\n";
+	    #print STDERR "Adding transcript\n";
 	    push(@newannot,$new_transcript);
 	}
 
@@ -414,7 +415,7 @@ sub _find_supporting_evidence {
   while ($i >= 0 && $i < $nfeat && $exon->start - $features->[$i]->end < $max_feat_len) {
     my $f = $features->[$i];
     if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
-      if ($f->entire_seq()->name eq $exon->contig()->name) {
+      if ($f->slice()->name eq $exon->slice()->name) {
         push @sup,$f;
       }
     }
@@ -425,7 +426,7 @@ sub _find_supporting_evidence {
   while ($i < $nfeat && $features->[$i]->start <= $exon->end) {
     my $f = $features->[$i];
     if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
-      if ($f->entire_seq()->name eq $exon->contig()->name) {
+      if ($f->slice()->name eq $exon->slice()->name) {
         push @sup,$f;
       }
     }
@@ -446,7 +447,7 @@ sub _find_supporting_evidence {
 #      return;
 #    }
 #    if ($f->end >= $exon->start && $f->start <= $exon->end && $f->strand == $exon->strand) {
-#      if ($f->entire_seq()->name eq $exon->contig()->name) {
+#      if ($f->slice()->name eq $exon->slice()->name) {
 #        print "Got overlap\n";
 #        push @sup,$f;
 #      }
@@ -464,7 +465,7 @@ sub _make_Exon {
   my $exon       = new Bio::EnsEMBL::Exon;
   
   $exon->seqname   ($exon_prediction->seqname);
-  $exon->contig    ($exon_prediction->contig);
+  $exon->slice    ($exon_prediction->slice);
   $exon->start     ($exon_prediction->start);
   $exon->end       ($exon_prediction->end  );
   $exon->strand    ($exon_prediction->strand);
@@ -484,7 +485,7 @@ sub _make_Exon {
   
 sub  make_ExonPairs {
   my ($self,@exons) = @_;
-  
+  no warnings;
   my $gap = 5;  
   my %pairhash;
   
@@ -568,7 +569,7 @@ sub  make_ExonPairs {
             # This checks if the coordinates are consistent if the 
             # exons are on the same contig
             if ($ispair == 1) {
-              if ($exon1->contig->name eq $exon2->contig->name) {
+              if ($exon1->slice->name eq $exon2->slice->name) {
                 if ($f1->strand == 1) {
                   if ($f1->end >  $f2->start) {
                     $ispair = 0;
@@ -592,7 +593,7 @@ sub  make_ExonPairs {
                 my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
                           
                 if ( $pair) {
-                  print STDERR "pair created\n";
+                  #print STDERR "pair created\n";
                   $idhash    {$f1->hseqname} = 1;
                   $doneidhash{$f1->hseqname} = 1;
                               
@@ -608,7 +609,7 @@ sub  make_ExonPairs {
                 }
               };
               if ($@) {
-                $self->throw("Error making ExonPair from\n".$exon1->gffstring."\nand\n".$exon2->gffstring."\n$@");
+                $self->throw("Error making ExonPair from\n$@");
               }
             }
           }
@@ -617,6 +618,7 @@ sub  make_ExonPairs {
     }
   }
   return $self->get_all_ExonPairs;
+  use warnings;
 }
 
 ############################################################
@@ -643,9 +645,9 @@ sub makePair {
   
   # create a new pair
   my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
-						     -exon2 => $exon2,
-						     -type  => $type,
-						     );
+                                                     -exon2 => $exon2,
+                                                     -type  => $type,
+                                                    );
   
   my $found = 0;
   foreach my $pair ($self->get_all_ExonPairs) {
@@ -657,7 +659,7 @@ sub makePair {
   }
   
   if ($found == 0 ){
-      print STDERR "adding exon pair\n";
+      #print STDERR "adding exon pair\n";
       $self->add_ExonPair($tmppair);
       return $tmppair;
   }
@@ -721,7 +723,7 @@ sub check_link {
     my ($self,$exon1,$exon2,$f1,$f2) = @_;
     
     my @pairs = $self->get_all_ExonPairs;
-    print STDERR "Comparing with ".scalar(@pairs)." exixsting pairs\n";
+    #print STDERR "Comparing with ".scalar(@pairs)." exixsting pairs\n";
     
     # are these 2 exons already linked in another pair
     foreach my $pair (@pairs) {
@@ -764,7 +766,7 @@ sub check_link {
     }
     
     # exons are not already linked
-    print STDERR "returning 1 from check link\n";
+    #print STDERR "returning 1 from check link\n";
     return 1;
 }
 
@@ -1290,7 +1292,7 @@ sub validate_transcript{
       my $phase    =  $exons[$i+1]->phase;
       if ( $phase != $end_phase ){
 	  $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	  return undef;
       }
   }
@@ -1310,14 +1312,14 @@ sub validate_transcript{
       
       if ($intron > $GB_GENSCAN_MAX_INTRON) {
 	  print STDERR "Intron too long $intron  for transcript\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	  $split = 1;
 	  $valid = 0;
       }
       
       if ($exon->strand != $previous_exon->strand) {
 	  print STDERR "Mixed strands for transcript\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	  $valid = 0;
       }
    }

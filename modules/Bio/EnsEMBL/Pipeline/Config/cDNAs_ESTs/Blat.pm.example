@@ -1,5 +1,7 @@
 #
-# module Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat
+# BioPerl module for Bio::EnsEMBL::Analysis::ESTConf;
+#
+# Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
 #
 # Copyright GRL & EBI
 #
@@ -30,7 +32,7 @@ so that it can be used when "use strict" is in use in the calling
 script.  Without arguments all the standard variables are set, and
 with a list, only those variables whose names are provided are set.
 The module will die if a variable which doesn\'t appear in its
-C<%Blat> hash is asked to be set.
+C<%ESTConf> hash is asked to be set.
 
 The variables can also be references to arrays or hashes.
 
@@ -130,7 +132,7 @@ sub import {
   my $pack = shift; # Need to move package off @_
   
   # Get list of variables supplied, or else
-  # all variables
+  # all of ESTConf:
   my @vars = @_ ? @_ : keys( %Blat );
   return unless @vars;
   

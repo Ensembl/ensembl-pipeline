@@ -26,13 +26,16 @@ this script allows input_ids to be generated and written to the input_id_analysi
 
     -help      Displays script documentation with PERLDOC
 
-    -contig    signals to insert contig name input_ids
 
     -logic_name the logic_name of the analysis object which needs to be 
                 associated with these entries 
     
     -slice     signals to insert slice type input ids using
                the format chrname.start-end
+
+    -coord_system the coordinate system you want slices in
+    
+    -coord_system_version the version of the coord system you want
 
     -slice_size the size to make the slice ids
 
@@ -45,17 +48,21 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -file_regex a regex to impose on the filenames before using them
     
     -single if you just want a single dummy input_id ie for genome wide analyses
-    
-    -translation_id if you want your input ids to be translation ids
+    -single_name , by default this is genome but you can specify something
+    different here, for example for protein annotation jobs which use the 
+    whole proteome this must be proteome
+    -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
-    
-
     -input_type if you want to specific an input_id_type not already
      used by the analysis object
-
     -insert_analysis if you want to insert an analysis object if it doesn't
      already exist in the database'
-
+    -seq_level if you want the ids for the seq_level seq_regions, can
+    work with slice_size but the -slice options isn't required'
+    -top_level this will fetch all the non_redundant pieces in
+     the database this may produce ids which are a mixture of different
+     coordinate systems, if -coord_system_version is specified it will
+     be ignored
 =head1 EXAMPLES
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
@@ -81,7 +88,7 @@ as input_ids
 
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
-  -dbname my_database -translation_id
+  -dbname my_database -translation_ids
 
 this will use all the translation ids as input_ids
 
@@ -89,24 +96,26 @@ this will use all the translation ids as input_ids
 
 
 
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use strict;
 use Getopt::Long;
 
 my $host;
-my $user = 'ensadmin';
-my $pass = 'ensembl';
+my $user;
+my $pass;
 my $port = 3306;
 my $dbname;
 my $logic_name;
 my $slice_size;
 my $slice_overlap;
 my $type;
-my $contig;
+my $coord_system;
+my $cs_version;
 my $slice;
 my $input_type;
 my $file;
@@ -116,15 +125,18 @@ my $single;
 my $verbose;
 my $help = 0;
 my $translation_id;
-my $insert_analysis = 0;
 my $name = 'genome';
+my $seq_level;
+my $top_level;
+my $insert_analysis = 0;
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
             'dbuser:s'     => \$user,
             'dbpass:s'     => \$pass,
             'dbname:s'     => \$dbname,
-            'contig'       => \$contig,
+            'coord_system:s'       => \$coord_system,
+            'coord_system_version:s' => \$cs_version,
             'slice'        => \$slice,
             'slice_size:s' => \$slice_size,
             'slice_overlap:s' => \$slice_overlap,
@@ -136,32 +148,52 @@ my $name = 'genome';
             'single'       => \$single,
             'single_name:s'=> \$name,
             'verbose'      => \$verbose,
-            'translation_id' => \$translation_id,
+            'translation_ids' => \$translation_id,
+            'seq_level' => \$seq_level,
+            'top_level' => \$top_level,
             'h|help'            => \$help,
             'insert_analysis!' => \$insert_analysis,
            );
 
+
+
+if(!$host || !$user || !$dbname){
+  warn("Can't run without -dbhost $host -dbuser $user -dbname $dbname");
+  $help = 1;
+}
+
 if ($help) {
     exec('perldoc', $0);
 }
-
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,
                                                       -pass   => $pass,
                                                       -port   => $port,
                                                       -dbname => $dbname);
-if ($type) {
-    $db->assembly_type($type);
-} else {
-    $type = $db->assembly_type;
+
+if($seq_level && $top_level){
+  print STDERR "YOU can get both the seq_level and top_level ids at the ".
+    "same time\n";
+  exec('perldoc', $0);
+
 }
-if (!($type)) {
-    die "No assemby type defined";
+if($seq_level){
+  $slice = 1;
+  $coord_system = 'seqlevel';
+}elsif($top_level){
+  $slice = 1;
+  $coord_system = 'toplevel';
 }
 
-if (!($contig) && !($slice) && !($single) && !($file) && !($translation_id)) {
-  die "Must define input as either contig, slice, file, translation_id ".
-  "or single";
+if (!($slice) && !($single) && !($file) && !($translation_id)) {
+  throw("Must define input as either contig, slice, file, translation_id ".
+  "single, seq_level or top_level");
+  exec('perldoc', $0);
+}
+
+if(!$logic_name){
+  throw("Can't run with out a logic_name");
+  exec('perldoc', $0);
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
@@ -170,25 +202,25 @@ my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
 
 
-if( ($slice + $contig + $single + $file + $translation_id) > 1){
-  #die "must only define one of these options on the commandline ".
-  #  "-slice $slice -contig $contig -single $single -file $file ".
-  #  " -translation_id $translation_id";
+if( ($slice + $single + $file + $translation_id) > 1){
+  die "must only define one of these options on the commandline ".
+    "-slice $slice  -single $single -file $file  -translation_id ".
+      "$translation_id";
 }
+
+$input_type = $analysis->input_id_type unless($input_type);
 
 my @ids;
 
 if ($slice) {
  
   $input_type = "SLICE" unless $input_type;
-  
-  @ids = $inputIDFactory->generate_slice_input_ids($slice_size, $slice_overlap);
-  
-}elsif($contig) {
+  die ("Must define a coord system name when fetching slice names") 
+    unless($coord_system);
 
-  $input_type = "CONTIG" unless $input_type;
-  @ids = $inputIDFactory->generate_contig_input_ids;
-  
+  $cs_version = '' unless($cs_version);
+  print STDERR "Fetching slices for ".$coord_system." coord system\n";
+  @ids = $inputIDFactory->generate_slice_input_ids($coord_system, $cs_version, $slice_size, $slice_overlap); 
 }elsif($single){
   $input_type = 'GENOME' unless $input_type;
   @ids = ($name);
@@ -226,6 +258,7 @@ if($insert_analysis && !$analysis){
       "exist in the database");
 }
 
+
 print STDERR "have analysis ".$analysis->logic_name ." ".$analysis->input_id_type."\n";
 $analysis->input_id_type($input_type) if(!$analysis->input_id_type); 
 
@@ -234,6 +267,7 @@ foreach my $id (@ids) {
       print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
 
       $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis, '');  
+    
     };
     if ($@) {
       print "Input id $id already present $@";

@@ -12,6 +12,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 unless (&config_sanity_check) {
     exit 1;
 }
@@ -28,7 +29,7 @@ unless (&config_sanity_check) {
 my $term_sig =  0;
 my $rst_sig  =  0;
 my $alarm    =  0;
-my $wakeup   =  300;   # period to check batch queues; set to 0 to disable
+my $wakeup   =  0;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
 $SIG{USR1} = \&sighandler;
@@ -131,6 +132,7 @@ GetOptions(
            'max_pending_jobs:s' => \$max_pending_jobs,
            'perldoc!' => \$perldoc,
            'dont_off_accumulators!' => \$dont_switch_off_accumulators,
+           'wakeup:n' => \$wakeup,
           ) or useage(\@command_args);
 
 
@@ -157,7 +159,7 @@ if($idlist_file || @analyses || @input_id_types || @starts_from ||
     $accumulators = 0;
   }
 }
-
+&verbose('WARNING');
 $max_time = $MAX_JOB_TIME unless($max_time);
 $killed_file = $KILLED_INPUT_IDS unless($killed_file);
 $queue_manager = $QUEUE_MANAGER unless($queue_manager);
@@ -229,10 +231,10 @@ my %tmp = logic_name2dbID($ana_adaptor, @starts_from);
 
 
 if ($idlist_file && ! -e $idlist_file) {
-  die("Must be able to read $idlist_file");
+  throw("Must be able to read $idlist_file");
 }
 if($skip_idfile && ! -e $skip_idfile){
-  die("Must be able to read $skip_idfile");
+  throw("Must be able to read $skip_idfile");
 }
 
 # Lock to prevent >1 instances of the same pipeline running together
@@ -279,7 +281,9 @@ $db->pipeline_lock($lock_str);
 # analyses we want to run and the dependences between them. e.g. the
 # fact that we only want to run blast jobs after we've repeat masked etc.
 my @all_rules    = $rule_adaptor->fetch_all;
+print STDERR "Accumulators ".$accumulators."\n";
 $accumulators = $sanity->accumulator_sanity_check(\@all_rules, $accumulators, $die_if_broken) if($accumulators);
+print STDERR "Accumulators ".$accumulators."\n";
 my @rules;
 my %accumulator_analyses;
 
@@ -294,10 +298,11 @@ foreach my $rule (@all_rules) {
                         \%always_incomplete_accumulators)};
 
 if(scalar(@rules) == 0){
-  die("Something is wrong with the code or your commandline setup ".
-      "rules_setup has returned no rules");
+  throw("Something is wrong with the code or your commandline setup ".
+        "rules_setup has returned no rules");
 }
-$sanity->rule_type_sanity(\@rules, $rules_die) if($rules_sanity);
+
+$sanity->rule_type_sanity(\@rules, $verbose, $rules_die) if($rules_sanity);
 
 
 
@@ -468,6 +473,7 @@ while (1) {
 	  $done = 0;
     $reset = 1;
     print "Got reset signal\n" if($verbose);
+    @all_rules = $rule_adaptor->fetch_all;
 	  @rules  = @{&rules_setup(\%analyses, \%skip_analyses, 
                              \@all_rules, \%accumulator_analyses, 
                              \%always_incomplete_accumulators)};
@@ -481,10 +487,20 @@ while (1) {
 	# check all rules, which jobs can be started
 	
 
-        print STDERR "Running with ".$id."\n" if($very_verbose);
+	#print STDERR "Running with ".$id."\n";
       RULE: for my $rule (@rules)  {
-          print "Checking ",$rule->goalAnalysis->logic_name, " - " . $id if $very_verbose;
-          
+	  if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
+	    if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
+	      $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
+	    }
+	    next RULE;
+	  }
+    if(keys %skip_analyses && 
+       defined $skip_analyses{$rule->goalAnalysis->dbID}){
+      next RULE;
+    }
+	  print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $very_verbose;
+	  
 	  
 	  my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses, $very_verbose);
 	  
@@ -824,7 +840,7 @@ sub shuffle {
 
 sub config_sanity_check {
     my $ok = 1;
-    no strict 'vars';
+    #no strict 'vars';
     print STDERR "checking config sanity\n" if($verbose);
     unless ($QUEUE_MANAGER) {
         print "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
@@ -910,6 +926,7 @@ sub job_time_check{
 
 
 
+
 sub job_existance{
   my ($batch_q_module, $verbose, $job_adaptor) = @_;
   my @jobs = $job_adaptor->fetch_all;
@@ -936,17 +953,16 @@ sub job_existance{
     }
   }
   
-  my @jobs = @{$batch_q_module->check_existance
+  my @awol_jobs = @{$batch_q_module->check_existance
                  (\%job_submission_ids, $verbose)};
   
-  foreach my $job(@jobs){
+  foreach my $job(@awol_jobs){
     if($valid_status{$job->current_status->status}){
       $job->set_status('AWOL');
     }
   }
   #$job_adaptor->unlock_tables;
 }
-
 
 #sub job_existance{
 #  my ($batch_q_module, $verbose, $job_adaptor, $id) = @_;
@@ -1015,6 +1031,7 @@ sub time_to_sleep{
   return $sleep;
 }
 
+
 sub rules_setup{
   my ($analyses_to_run, $analyses_to_skip, $all_rules, 
       $accumulator_analyses, $incomplete_accumulators) = @_;
@@ -1079,7 +1096,7 @@ sub perldoc{
 
 =head1 NAME
 
-monitor
+RuleManager3.pl
 
 =head1 SYNOPSIS
 
@@ -1165,6 +1182,10 @@ Other options
     maximum defaults to 60s
    -max_pending_jobs defaults ot what is set in MAX_PENDING_JOBs in 
     BatchQueue.pm
+   -wakeup this marks how frequently the pipeline should check if it has
+    to many pending jobs in the system by default it is off. If it is 
+    to be switched on it is a good idea to set it to at least 5 minutes
+    ie 300secs
    
 -h or -help will print out the help again
 

@@ -37,7 +37,6 @@ use vars   qw(@ISA);
 # Object preamble
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::SeqIO;
@@ -80,6 +79,7 @@ sub new {
   $self->subs($subs);
   $options = $GB_GENEWISE_OPTIONS unless($options);
   $self->options($options);
+  #print STDERR "Have genomic of length ".$self->genomic->length."\n";
   return $self;
 }
 
@@ -123,7 +123,8 @@ sub align_protein {
   my $ext = $self->extension;
   my $subs = $self->subs;
   my $options = $self->options;
-  #my $genfile  = $self->get_tmp_file('/tmp/',$self->protein->id,".gen.fa");
+  my $results_file  = $self->get_tmp_file('/tmp/',$self->protein->id,
+                                          ".gen.fa");
   #my $pepfile  = $self->get_tmp_file('/tmp/',$self->protein->id,".pro.fa");
 
   my $genfile = $self->write_sequence_to_file($self->genomic);
@@ -131,19 +132,20 @@ sub align_protein {
 
   my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
 
-  #print STDERR $command."\n";
+  # print STDERR $command."\n";
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }
 
-  if (defined($self->reverse) && $self->reverse == 1) {
+  if (($self->reverse) && $self->reverse == 1) {
     $command .= " -trev ";
   }
-  
+  #open FH, '>'.$results_file or $self->throw("can't open $results_file");
+  #print STDERR "Have openned ".$results_file."\n";
   #print STDERR "GENEWISE running on ".$self->protein->id." with command ".$command."\n";
-  my @time = times;
+  #my @time = times;
   #print STDERR "BEFORE GENEWISE @time\n"; 
-  open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
+  open(GW, "$command | ") or $self->throw("error piping to genewise: $!\n");
 
   my @genesf_exons;
   my $curr_exon;
@@ -153,7 +155,7 @@ sub align_protein {
 
  GENESF: 
   while (<GW>) {
-   
+    #print FH;
     chomp;
     my @f = split;
    
@@ -192,14 +194,12 @@ sub align_protein {
 
       my $end_phase   = ( $exon_length + $phase ) %3;
 
-      $curr_exon = new Bio::EnsEMBL::SeqFeature;
+      $curr_exon = new Bio::EnsEMBL::Feature;
       $curr_exon->seqname  ($self->genomic->id);
       $curr_exon->id       ($self->protein->id);
       $curr_exon->start    ($start);
       $curr_exon->end      ($end);
       $curr_exon->strand   ($strand);
-      $curr_exon->phase    ($phase);
-      $curr_exon->end_phase($end_phase);
 
       $self->addExon($curr_exon);
 
@@ -240,13 +240,13 @@ sub align_protein {
       $fp->hstart  ($pstart);
       $fp->hend    ($pend);
       $fp->hstrand (1);
-
       $curr_exon->add_sub_SeqFeature($fp,'');
     }
   } 
   
   close(GW) or $self->throw("Error running genewise with command line ".$command."\n $!");
-  @time = times;
+  #close(FH) or $self->throw("error closing $results_file");
+  #@time = times;
   #print STDERR "AFTER GENEWISE @time\n"; 
   unlink $genfile;
   unlink $pepfile;

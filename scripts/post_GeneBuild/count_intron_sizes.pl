@@ -14,6 +14,7 @@ my $dnadbname;
 my $dbpass    = undef;
 my $introns;
 my $transcripts;
+
 my $genetype;
 
 
@@ -102,7 +103,7 @@ my $mode = 0;
 #my $transcripts = "/ecs2/work2/lec/code/rat_build/data/".$dbname.$dbhost."transcripts_per_intron_size";
 
 $introns = "intron_size.txt" if(!$introns);
-$transcripts = "transcripts_per_intron_size.txt" if(!$transcripts);
+$transcripts = "transcripts_per_intron_size.txt". if(!$transcripts);
 
 my $total = scalar(keys(%intron_size));
 my $middle = $total/2;

@@ -5,6 +5,7 @@ use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -79,6 +80,7 @@ sub module_compile{
   my $db = shift;
   my $info = shift;
   my @analyses = @{$db->get_AnalysisAdaptor->fetch_all};
+  my %queues = &set_up_batchqueue_hash;
   my $ok = 1;
   ANALYSIS:foreach my $analysis(@analyses){
     my $module = $analysis->module;
@@ -89,8 +91,15 @@ sub module_compile{
     if($module eq  'Dummy'){
       next ANALYSIS;
     }
+    my $hash_key = $analysis->logic_name;
+    if(!$queues{$hash_key}){
+      print $hash_key." isn't found in batchqueue has using default\n" 
+        if($info);
+      $hash_key = 'default';
+    }
     my $perl_path;
-    my $runnable_db_path = 'Bio/EnsEMBL/Pipeline/RunnableDB';
+    my $runnable_db_path = 
+      $queues{$hash_key}{runnabledb_path};
     if($module =~ /::/){
       print STDERR "Module contains path info already\n" if($info);
       $module =~ s/::/\//g;
@@ -100,6 +109,7 @@ sub module_compile{
     }
     eval {
       require $perl_path.".pm";
+      $perl_path =~ s/\//::/g;
     };
     if($@){
       $ok = 0;
@@ -110,6 +120,38 @@ sub module_compile{
   return $ok;
 }
 
+sub set_up_batchqueue_hash{
+  my %q;
+  
+  foreach my $queue (@$QUEUE_CONFIG) {
+    my $ln = $queue->{'logic_name'};
+    next unless $ln;
+    delete $queue->{'logic_name'};
+    while (my($k, $v) = each %$queue) {
+      $q{$ln}{$k} = $v;
+      $q{$ln}{'jobs'} = [];
+      $q{$ln}{'last_flushed'} = undef;
+      $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
+      $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+      $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+      $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
+      $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+    }
+    
+    # a default queue for everything else
+    unless (defined $q{'default'}) {
+	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
+      $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
+	    $q{'default'}{'last_flushed'} = undef;
+	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
+      $q{'default'}{'jobs'} = [];
+      $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
+      $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+    }
+  }
+  
+  return %q;
+}
 
 
 sub batchqueue_sanity_check{
@@ -127,6 +169,13 @@ sub batchqueue_sanity_check{
   }else{
     print "Your DEFAULT_OUTPUT_DIR $DEFAULT_OUTPUT_DIR is either not ".
       "defined or doesn't exist\n";
+    $ok = 0;
+  }
+  if($DEFAULT_RUNNABLEDB_PATH){
+    print $DEFAULT_RUNNABLEDB_PATH." is your default runnabledb path\n" 
+      if($info);
+  }else{
+    print "Your DEFAULT_RUNNABLEDB_PATH isn't defined\n";
     $ok = 0;
   }
   my $number_of_analyses = scalar(@$QUEUE_CONFIG);
@@ -175,6 +224,7 @@ sub config_sanity_check {
   
   return $ok;
 }
+
 
 
 

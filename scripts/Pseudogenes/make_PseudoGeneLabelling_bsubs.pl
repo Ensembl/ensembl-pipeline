@@ -68,7 +68,7 @@ sub get_gene_ids{
     return @ids;
   }
   else{
-    my $gene_ids = $db->get_GeneAdaptor->list_dbIDs;
+    my $gene_ids = $db->get_GeneAdaptor->list_geneIds;
     return @{$gene_ids};
   }
 }
@@ -99,7 +99,7 @@ sub make_pseudogene_bsubs {
   my $bsubdir       = $TMPDIR . "/" . $pseudogene_bsubdir . "/";
   
   foreach my $id (@$gene_ids){
-    my $num = int(rand(100));
+    my $num = int(rand(10));
     my $dir = $bsubdir."/".$num."/";
     if( ! -e $dir ) {
       system( "mkdir $dir" );

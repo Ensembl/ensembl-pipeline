@@ -74,7 +74,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::TranscriptFactory;
+use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
 use Bio::EnsEMBL::PredictionTranscript;
 use Bio::Seq;
 use Bio::EnsEMBL::Root;
@@ -126,11 +126,12 @@ sub new{
      $self->matrix ($self->find_file($matrix));
 
 
-     if ($parameters)    
-     { $self->parameters($parameters) ; }
-     else                
-     {$self->parameters(''); }     
-     
+     if ($parameters){ 
+       $self->parameters($parameters); 
+     }else{
+       $self->parameters(''); 
+     }
+
      return $self;
 
  }
@@ -421,13 +422,13 @@ sub run {
     }else{
       $self->writefile();
     } 
-    #print "about to run Fgenesh\n";
+    print STDERR "about to run Fgenesh\n";
 #run fgenesh       
     $self->run_fgenesh();
-    #print "have run fgenesh\n";
+    print STDERR "have run fgenesh\n";
     #parse output and create features
     $self->parse_results();
-    #print "have parsed output\n";
+    print STDERR "have parsed output\n";
     $self->deletefiles();
 
     1;
@@ -447,7 +448,7 @@ sub run_fgenesh {
     my ($self) = @_;
     #print STDERR "Running fgenesh on ".$self->filename."\n";
     my $command = $self->fgenesh.' '.$self->matrix.' '.$self->filename.' > '.$self->results;
-    #print $command."\n";
+    print STDERR $command."\n";
     system ($command);
     $self->throw($self->results." not created by fgenesh\n") unless (-e $self->results);
     #print "leaving run_fgenesh\n";
@@ -681,7 +682,7 @@ sub create_genes {
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
 	#print STDERR "seq = ".$self->query."\n";
-	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
+	my $tran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_with_seq($gene, $self->query);
 	#print "have ".$tran."\n";
 	$self->add_Fgenesh_Transcript($tran);
     }
@@ -745,20 +746,12 @@ sub create_feature {
 sub output {
     my ($self) = @_;
     my @pred;
-
-    my $analysis = Bio::EnsEMBL::Analysis->new(
-        -db              => undef,
-        -db_version      => undef,
-        -program         => 'genscan',
-        -program_version => 1,
-        -gff_source      => 'genscan',
-        -gff_feature     => 'prediction',
-        -logic_name      => 'genscan',
-    );
+    print STDERR "Getting output\n";
 
     foreach my $transcript (@{$self->get_all_Transcripts}) {
 
         my $exons = $transcript->get_all_Exons();
+        print STDERR "Have ".@$exons." exons\n";
         my @exons;
 
         if ($exons->[0]->strand == 1) {
@@ -767,7 +760,7 @@ sub output {
             @exons = sort {$b->start <=> $a->start } @{$exons};
         }
 
-        push @pred, Bio::EnsEMBL::PredictionTranscript->new(@exons);
+        push @pred, Bio::EnsEMBL::PredictionTranscript->new(-exons => \@exons);
     }
     return @pred;
 }

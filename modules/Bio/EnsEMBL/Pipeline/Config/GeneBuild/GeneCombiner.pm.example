@@ -59,12 +59,11 @@ my $prefix='COB';
 		     # EST GENES PROPERTIES
 		     ############################################################
 		     
-		     # db from where we get the cdna-genes
+		     # db from where we get the est-genes
 		     ESTGENE_DBHOST              => '',
 		     ESTGENE_DBUSER              => '', 
 		     ESTGENE_DBNAME              => '',
 		     ESTGENE_DBPASS              => '',
-		     ESTGENE_DBPORT              => '',
 		     # gene type for est-genes
 		     ESTGENE_TYPE                => '',
 		     
@@ -76,7 +75,6 @@ my $prefix='COB';
 		     ENSEMBL_DBUSER              => '',
 		     ENSEMBL_DBNAME              => '',
 		     ENSEMBL_DBPASS              => '',
-		     ENSEMBL_DBPORT              => '',
 		     # gene type for the ensembl genes
 		     ENSEMBL_TYPE                => 'ensembl',
 		     		     
@@ -85,7 +83,6 @@ my $prefix='COB';
 		     REF_DBUSER              => '',
 		     REF_DBNAME              => '',
 		     REF_DBPASS              => '',
-		     REF_DBPORT              => '',
 		     
 		     # different db for writing final genes to - to get round table locks
 		     # this db needs to have clone & contig & static_golden_path tables populated
@@ -93,7 +90,6 @@ my $prefix='COB';
 		     FINAL_DBNAME             => '',
 		     FINAL_DBUSER             => '',
 		     FINAL_DBPASS             => '',
-		     FINAL_DBPOT             => '',
 		     
 		     # final gene type
 		     FINAL_TYPE               => 'ensembl',

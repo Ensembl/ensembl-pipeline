@@ -163,19 +163,23 @@ sub verifyExons {
   
   $self->throw("No exon1 defined") unless $self->exon1;
   $self->throw("No exon2 defined") unless $self->exon2;
-  
-  if ($self->exon1->contig->name eq $self->exon2->contig->name) {
+ 
+  if ($self->exon1->slice->name eq $self->exon2->slice->name) {
       if ($self->exon1->strand != $self->exon2->strand) {
       $self->throw("Exons are on opposite strands");
     }
     
     if ($self->exon1->strand == 1) {
       if ($self->exon1->end >  $self->exon2->start) {
-	$self->throw("Inconsistent coordinates for exons [" . $self->exon1->end . "][" . $self->exon2->start ."]");
+	$self->throw("Inconsistent coordinates for exons [exon 1 end " . 
+               $self->exon1->end . "][exon 2 start " . 
+               $self->exon2->start ."]");
       }
     } 
     elsif ($self->exon2->end >  $self->exon1->start) {
-      $self->throw("Inconsistent coordinates for exons (-1)[" . $self->exon2->end . "][" . $self->exon1->start ."]");
+      $self->throw("Inconsistent coordinates for exons (-1)[exon 2 end " . 
+                   $self->exon2->end . "][exon 1 start " . 
+                   $self->exon1->start ."]");
     }
   }
 }
@@ -229,7 +233,7 @@ sub is_Covered {
   my ($self) = @_;
   my $est = 0;  
   for my $f (@{$self->get_all_Evidence}) {
-    if ($f->source_tag eq "est2genome" || $f->source_tag eq "genewise") {
+    if ($f->analysis->gff_source eq "est2genome" || $f->analysis->gff_source eq "genewise") {
       $est = 1;
     }
   }

@@ -1,3 +1,4 @@
+
 #
 # BioPerl module for GeneBuilder
 #
@@ -107,8 +108,8 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_ABINITIO_TYPE
 							       GB_ABINITIO_SUPPORTED_TYPE
 							       GB_ABINITIO_PROTEIN_EVIDENCE
-							       GB_ABINITIO_DNA_EVIDENCE
                      GB_ABINITIO_LOGIC_NAME
+							       GB_ABINITIO_DNA_EVIDENCE
 							       GB_MAXSHORTINTRONLEN
 							       GB_MINSHORTINTRONLEN
 							       GB_MAX_TRANSCRIPTS_PER_GENE
@@ -145,9 +146,7 @@ sub new {
       $self->gene_types($bgt->{'type'});
     }
 
-    unless ( $input_id =~ /$GB_INPUTID_REGEX/ ){
-      $self->throw("format of the input is not defined in Config::GeneBuild::General::GB_INPUTID_REGEX = $GB_INPUTID_REGEX");
-    }
+  
     $self->input_id($input_id);
 
     return $self;
@@ -194,7 +193,7 @@ sub build_Genes{
   #print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
   
   #test
-#  foreach my $t ( $self->combined_Transcripts ){
+  #  foreach my $t ( $self->combined_Transcripts ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
 
 #  }
@@ -218,8 +217,6 @@ sub build_Genes{
       
       my @predictions = $self->predictions;
       my @features    = $self->features;
-      print STDERR "Passing ".@predictions." predictions ".@features.
-        " features and ".@annotations." annotations into Genebuilder\n";
       if(@predictions && @features){
 	  my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
 											 -predictions => \@predictions,
@@ -247,7 +244,7 @@ sub build_Genes{
   }
   
   unless( @all_transcripts ){
-      #print STDERR "no transcripts left to cook. Exiting...\n";
+      print STDERR "no transcripts left to cook. Exiting...\n";
       return;
   }
 
@@ -365,7 +362,7 @@ sub _prune_redundant_transcripts {
           if (  exists $blessed_genetypes{$comp_trans->type} && 
               ! exists $blessed_genetypes{$trans->type}) {
 # Hack to make sure transcript gets through if its like a blessed one
-            #print "Hacking transcript type from " . $trans->type . " to " . $comp_trans->type . "\n";
+            ##print "Hacking transcript type from " . $trans->type . " to " . $comp_trans->type . "\n";
             $trans->type($comp_trans->type);
           }
 
@@ -576,15 +573,8 @@ sub _make_shared_exons_unique{
 sub get_Genes {
   my ($self) = @_;
   my @transcripts;
-  my $db = $self->genes_db;
-  my $sa = $db->get_SliceAdaptor;
-  
-  my $input_id = $self->input_id;
-  $input_id =~/$GB_INPUTID_REGEX/;
-  my $chr   = $1;
-  my $start = $2;
-  my $end   = $3;
-  my $slice = $sa->fetch_by_chr_start_end($chr,$start,$end);
+ 
+  my $slice = $self->fetch_sequence($self->input_id, $self->genes_db);
   
   my @unchecked_genes;
 
@@ -595,15 +585,15 @@ sub get_Genes {
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
-	
-	# do NOT check intron sizes - they're already tightly controlled by Targetted & Similarity stages
-	unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query ) && 
-		 Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)
-	       ){
-	  next TRANSCRIPT;
-	}
-	$tran->type($type);
-	push(@transcripts, $tran);
+        
+        # do NOT check intron sizes - they're already tightly controlled by Targetted & Similarity stages
+        unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query ) && 
+                 Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)
+               ){
+          next TRANSCRIPT;
+        }
+        $tran->type($type);
+        push(@transcripts, $tran);
       }
     }
   }
@@ -1118,7 +1108,7 @@ sub _bin_sort_transcripts{
 
     foreach my $tran (@transcripts){
       if ( $tran->dbID ){
-	print STDERR $tran->dbID." ";
+	#print STDERR $tran->dbID." ";
       }
       #print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
       my @exons = @{$tran->get_all_Exons};
@@ -1403,12 +1393,12 @@ Args    : none
 sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
-  foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts 
-                            ($GB_ABINITIO_LOGIC_NAME)} ){
+  foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts
+                                ($GB_ABINITIO_LOGIC_NAME) } ){
     $prediction->type("ab-initio");
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
-      $self->warn("We let in a prediction with wrong phases!");
+      #$self->warn("We let in a prediction with wrong phases!");
     }
     
     # now need to explicitly check intron sizes if required
@@ -1514,7 +1504,7 @@ sub merge {
 	
 	@features = sort { $a->start <=> $b->start} @features;
 	unless ( @features ){
-	    #print STDERR "No features here for id: $id\n";
+	    print STDERR "No features here for id: $id\n";
 	    next ID;
 	}
 	while ( @features && !defined $features[0] ){
@@ -1617,7 +1607,7 @@ sub merge {
 	    push(@mergedfeatures,@pruned);
 	}
 	else{
-	    #print STDERR "No features merged\n";
+	    print STDERR "No features merged\n";
 	}
     }
     
@@ -1645,7 +1635,7 @@ sub prune_features {
 	@features = sort {$a->start <=> $b->start} @features;
 	
 	unless ( @features ){
-	    #print STDERR "No features here for id: $id\n";
+	    print STDERR "No features here for id: $id\n";
 	    next ID;
 	}
 	while ( @features && !defined $features[0] ){
@@ -1700,6 +1690,7 @@ sub genes_db{
  if ( $genes_db ){
    $self->{_genes_db} = $genes_db;
  }
+ 
  return $self->{_genes_db};
 }
 
@@ -2132,5 +2123,17 @@ sub print_FeaturePair{
 }
 
 ############################################################
+
+#fetches sequence from appropriate database
+
+sub fetch_sequence{
+  my ($self, $name, $db) = @_;
+
+  my $sa = $db->get_SliceAdaptor; 
+
+  my $slice = $sa->fetch_by_name($name);
+
+  return $slice;
+}
 
 1;

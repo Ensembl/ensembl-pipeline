@@ -57,51 +57,55 @@ use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::Tools::TranslationUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (EST_ONE_FILE_PER_CHROMOSOME);
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
-									 EST_INPUTID_REGEX
-									 EST_GENE_DBHOST
-									 EST_GENE_DBPORT
-									 EST_GENE_DBUSER
-									 EST_GENE_DBPASS
-									 EST_GENE_DBNAME
-									 EST_DBNAME
-									 EST_DBHOST
-									 EST_DBPORT
-									 EST_DBUSER
-									 EST_DBPASS     
-									 EST_GENOMIC
-									 EST_GENEBUILDER_INPUT_GENETYPE
-									 EST_USE_DENORM_GENES
-									 EST_MIN_INTRON_SIZE
-									 BRIDGE_OVER_SMALL_INTRONS
-									 EST_MAX_INTRON_SIZE
-									 EST_MAX_EVIDENCE_DISCONTINUITY
-									 EST_GENEBUILDER_INTRON_MISMATCH
-									 ESTGENE_TYPE
-									 USE_cDNA_DB
-									 cDNA_DBNAME
-									 cDNA_DBHOST
-									 cDNA_DBPORT
-									 cDNA_DBUSER
-									 cDNA_DBPASS
-									 cDNA_GENETYPE
-									 REJECT_SINGLE_EXON_TRANSCRIPTS
-									 USE_GENOMEWISE
-									 GENOMEWISE_SMELL
-									 EST_MIN_EXON_SIZE
-									 EST_GENEBUILDER_COMPARISON_LEVEL
-									 EST_GENEBUILDER_SPLICE_MISMATCH
-									 EST_GENEBUILDER_INTRON_MISMATCH
-									 EST_GENEBUILDER_EXON_MATCH
-									 CHECK_SPLICE_SITES
-									 RAISE_SINGLETON_COVERAGE
-									 FILTER_ON_SINGLETON_SIZE
-									 MAX_TRANSCRIPTS_PER_GENE
-									 CLUSTERMERGE_MIN_EVIDENCE_NUMBER
-									 EST_USE_DENORM_GENES
-									 MAX_NUMBER_ESTS
-);
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
+  qw(
+     EST_ONE_FILE_PER_CHROMOSOME
+    );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf 
+  qw (
+      EST_INPUTID_REGEX
+      EST_GENE_DBHOST
+      EST_GENE_DBUSER
+      EST_GENE_DBPASS
+      EST_GENE_DBNAME
+      EST_GENE_DBPORT
+      EST_DBNAME
+      EST_DBHOST
+      EST_DBUSER
+      EST_DBPASS
+      EST_DBPORT
+      EST_GENOMIC
+      EST_GENEBUILDER_INPUT_GENETYPE
+      EST_USE_DENORM_GENES
+      EST_MIN_INTRON_SIZE
+      BRIDGE_OVER_SMALL_INTRONS
+      EST_MAX_INTRON_SIZE
+      EST_MAX_EVIDENCE_DISCONTINUITY
+      EST_GENEBUILDER_INTRON_MISMATCH
+      ESTGENE_TYPE
+      USE_cDNA_DB
+      cDNA_DBNAME
+      cDNA_DBHOST
+      cDNA_DBUSER
+      cDNA_DBPASS
+      cDNA_DBPORT
+      cDNA_GENETYPE
+      REJECT_SINGLE_EXON_TRANSCRIPTS
+      USE_GENOMEWISE
+      GENOMEWISE_SMELL
+      EST_MIN_EXON_SIZE
+      EST_GENEBUILDER_COMPARISON_LEVEL
+      EST_GENEBUILDER_SPLICE_MISMATCH
+      EST_GENEBUILDER_INTRON_MISMATCH
+      EST_GENEBUILDER_EXON_MATCH
+      CHECK_SPLICE_SITES
+      RAISE_SINGLETON_COVERAGE
+      FILTER_ON_SINGLETON_SIZE
+      MAX_TRANSCRIPTS_PER_GENE
+      CLUSTERMERGE_MIN_EVIDENCE_NUMBER
+      EST_USE_DENORM_GENES
+      MAX_NUMBER_ESTS
+     );
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -109,74 +113,83 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-  
-  my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						     -host             => $EST_GENE_DBHOST,
-						     -port             => $EST_GENE_DBPORT,
-						     -user             => $EST_GENE_DBUSER,
-						     -dbname           => $EST_GENE_DBNAME,
-						     -pass             => $EST_GENE_DBPASS,
-						    );
-  
-  my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  -host             => $EST_DBHOST,
-						  -port             => $EST_DBPORT,
-						  -user             => $EST_DBUSER,
-						  -dbname           => $EST_DBNAME,
-						  -pass             => $EST_DBPASS,
-						 );
-  
-  $est_db->dnadb($self->db);
-  $self->est_db($est_db);
-    
-  $self->output_db($output_db);
-  $self->output_db->dnadb($self->db);
-  if ( $USE_cDNA_DB ){
-    my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						     -host             => $cDNA_DBHOST,
-						     -port             => $cDNA_DBPORT,
-						       -user             => $cDNA_DBUSER,
-						       -dbname           => $cDNA_DBNAME,
-						       -pass             => $cDNA_DBPASS,
-						       -dnadb            => $self->db,
-						      );
-      
-      $self->cdna_db($cdna_db);
-    }
-    
-    $self->genetype($ESTGENE_TYPE);
 
-    $self->{_reverse_transcripts} = [];
-    $self->{_forward_transcripts} = [];
+  $self->genetype($ESTGENE_TYPE);
+  $self->{_reverse_transcripts} = [];
+  $self->{_forward_transcripts} = [];
 
-    return $self; 
+  return $self; 
 }
 
 ############################################################
 
-sub est_db{
-    my ($self, $est_db) = @_;
+sub output_db {
+    my( $self, $output_db ) = @_;
+    
+    if ($output_db){
+      $output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$output_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_output_db} = $output_db;
+    }
+    if(!$self->{_output_db}){
+      $self->{_output_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $EST_GENE_DBHOST,
+         '-user'   => $EST_GENE_DBUSER,
+         '-pass'   => $EST_GENE_DBPASS,
+         '-port'   => $EST_GENE_DBPORT,
+         '-dbname' => $EST_GENE_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
+    }
+    return $self->{_output_db};
+}
+
+sub est_db {
+    my( $self, $est_db ) = @_;
+    
     if ($est_db){
-	$self->{_est_db} = $est_db;
+      $est_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$est_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_est_db} = $est_db;
+    }
+    if(!$self->{_est_db}){
+      $self->{_est_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $EST_DBHOST,
+         '-user'   => $EST_DBUSER,
+         '-pass'   => $EST_DBPASS,
+         '-port'   => $EST_DBPORT,
+         '-dbname' => $EST_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
     }
     return $self->{_est_db};
 }
 
-sub output_db{
-    my ($self, $output_db) = @_;
-    if ($output_db){
-	$self->{_output_db} = $output_db;
+sub cdna_db {
+    my( $self, $cdna_db ) = @_;
+    
+    if ($cdna_db){
+      $cdna_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$cdna_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_cdna_db} = $cdna_db;
     }
-    return $self->{_output_db};
-}
-############################################################
-
-sub cdna_db{
- my ($self, $cdna_db);
- if ($cdna_db){
-  $self->{_cdna_db} = $cdna_db;
- }
- return $self->cdna_db;
+    if(!$self->{_cdna_db}){
+      $self->{_cdna_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $cDNA_DBHOST,
+         '-user'   => $cDNA_DBUSER,
+         '-pass'   => $cDNA_DBPASS,
+         '-port'   => $cDNA_DBPORT,
+         '-dbname' => $cDNA_DBNAME,
+         '-dnadb' => $self->db,
+        ); 
+    }
+    return $self->{_cdna_db};
 }
 
 sub revcomp_query{
@@ -231,7 +244,7 @@ sub write_output {
     foreach my $tran (@trans){
       ############################################################
       # put fake stable_ids to keep track of the scoring
-      
+      $self->_label(1);
       if ( $self->_label ){
 	
 	last TRAN unless ( $tran->stable_id );
@@ -245,7 +258,7 @@ sub write_output {
 	  $gene_id = $$."_".$gene_count;
 	}	
 	
-	print STDERR "write_output: transcript: $tran_id\n";
+	#print STDERR "write_output: transcript: $tran_id\n";
 	my $exon_count = 0;
  	foreach my $exon ( @{$tran->get_all_Exons} ){
 	  $exon_count++;
@@ -253,7 +266,7 @@ sub write_output {
 	  $exon->created(1);
 	  $exon->version(1);
 	  $exon->modified(1);
-	  print STDERR "exon: ".$exon->stable_id."\n";
+	  #print STDERR "exon: ".$exon->stable_id."\n";
 	}
 	if ( $tran->translation ){
 	  $tran->translation->stable_id( $tran_id."_peptide" );
@@ -262,19 +275,22 @@ sub write_output {
 	#print STDERR "transcript ".$tran_id."\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
       } 
-      print STDERR "gene: $gene_id\n";
+      #print STDERR "gene: $gene_id\n";
       $gene->stable_id( $gene_id );
       $gene->created(1);
       $gene->modified(1);
       $gene->version(1);
     }
-    
+    #####################################
+    ##NASTY HACK from lec is it has been committed it is a mistake
+    #####################################
+    $gene->{'stable_id'} = undef;
     $gene_adaptor->store($gene);
-    print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
+    #print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
     
     if ( $self->_label ){
       foreach my $tran (@trans){
-	print STDERR "transcript dbID:".$tran->dbID." stable_id:".$tran->stable_id."\n";
+	#print STDERR "transcript dbID:".$tran->dbID." stable_id:".$tran->stable_id."\n";
       } 
     }
   }
@@ -290,134 +306,131 @@ sub write_output {
 =cut
 
 sub fetch_input {
-    my( $self) = @_;
-    my $strand;
-
-    # the type of the genes being read is specified in
-    # Bio/EnsEMBL/Pipeline/Config/cDNAs_ESTs/EST_GeneBuilder_Conf
-    my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
-
-    # make sure you have an analysis
-    $self->throw("No analysis") unless defined( $self->analysis );
-
-    #print STDERR "Fetching input: " . $self->input_id. " \n";
-    $self->throw("No input id") unless defined($self->input_id);
+  my( $self) = @_;
+  my $strand;
+  
+  # the type of the genes being read is specified in
+  # Bio/EnsEMBL/Pipeline/Config/cDNAs_ESTs/EST_GeneBuilder_Conf
+  my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
+  
+  # make sure you have an analysis
+  $self->throw("No analysis") unless ($self->analysis);
+  
+  #print STDERR "Fetching input: " . $self->input_id. " \n";
+  $self->throw("No input id") unless ($self->input_id);
+  
+  # get genomic region 
+  $self->fetch_sequence([], $self->est_db);
+  my $slice = $self->query;
+  ############################################################
+  # forward strand
+  ############################################################
+  
+  $strand = 1;
+  #print STDERR "\n****** forward strand ******\n\n";
+  
+  # get genes
+  
+  my $genes;
+  if ($EST_USE_DENORM_GENES){
+    my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
+    #print STDERR "getting denormalised genes from slice: ".
+	  #$slice->seq_region_name.".".$slice->start."-".$slice->end.
+    #" with genetype $genetype\n";
+    $genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
+  } else {
+    #print STDERR "Fetching genes from ".$slice->adaptor->db->dbname."\n";
+    $genes  = $slice->get_all_Genes_by_type($genetype);
+  } 
+  
+  #print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) 
+  #. "\n";
+  
+  my $cdna_slice;
+  if ( $USE_cDNA_DB ){
+    my $cdna_db = $self->cdna_db;
     
-    # get genomic region 
-    my $input_id    = $self->input_id;
-    unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
-      $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
-    }
-    my $chrname  = $1;
-    my $chrstart = $2;
-    my $chrend   = $3;
-
-    print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
-
-    my $slice = $self->est_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
-    $slice->chr_name($chrname);
-    $self->query($slice);
-    
-    ############################################################
-    # forward strand
-    ############################################################
-
-    $strand = 1;
-    print STDERR "\n****** forward strand ******\n\n";
-
-    # get genes
-
-    my $genes;
-    if ($EST_USE_DENORM_GENES){
-	my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
-	print STDERR "getting denormalised genes from slice: ".
-	    $slice->chr_name.".".$slice->chr_start."-".$slice->chr_end." with genetype $genetype\n";
-	$genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
-    } 
-    else {
-	$genes  = $slice->get_all_Genes_by_type($genetype);
-    } 
-    
-    print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) . "\n";
-    
-    my $cdna_slice;
-    if ( $USE_cDNA_DB ){
-	my $cdna_db = $self->cdna_db;
-	
-	$cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-	my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
-	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
-	push (@$genes, @$cdna_genes);
-	
-    }
-    
-    my @forward_transcripts;
-      
-    # split by strand
-  GENE:    
-    foreach my $gene (@$genes) {
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+    $cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_name
+      ($self->input_id);
+    my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
+    # print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) 
+    #. "\n";
+    push (@$genes, @$cdna_genes);
+    $self->cdna_db->disconnect_when_inactive(1); 
+  }
+  
+  my @forward_transcripts;
+  
+  # split by strand
+ GENE:    
+  foreach my $gene (@$genes) {
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	    my $exons = $transcript->get_all_Exons;
 	    # keep only genes in the forward strand
 	    if ($exons->[0]->strand == 1){
-		push (@forward_transcripts, $transcript );
+        push (@forward_transcripts, $transcript );
 	    }
-	}
-    }
-    
-    print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@forward_transcripts) . " forward strand genes\n";
-    
-    # process transcripts in the forward strand    
-    if( scalar(@forward_transcripts) ){
-      $self->_forward_transcripts( @forward_transcripts );
-    }
-    @forward_transcripts = ();
-    
-    ############################################################
-    # reverse strand
-    ############################################################    
-    print STDERR "\n****** reverse strand ******\n\n";
-    $strand = -1;
-    
-    # this will return a slice which corresponds to the reversed complement of $slice:
-    my $rev_slice = $slice->invert;
-    $self->revcomp_query($rev_slice);
-
-    my $revgenes;
-    if ($EST_USE_DENORM_GENES){
-	my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
-	$revgenes = $dga->get_genes_by_Slice_and_type($rev_slice, $genetype);
-    } 
-    else {
-	$revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
-    } 
-    
-    my @reverse_transcripts;
-    
-    if ( $USE_cDNA_DB ){
-	my $cdna_revslice = $cdna_slice->invert;
-	my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
-	print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
-	push ( @$revgenes, @$cdna_revgenes ); 
-    }
-    
-  REVGENE:    
-    foreach my $gene (@$revgenes) {
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	
-	my @exons = @{$transcript->get_all_Exons};
-	# these are really - strand, but the Slice is reversed, so they are relatively + strand
-	if( $exons[0]->strand == 1){
-	  push (@reverse_transcripts, $transcript);
-	}
-      }
-    }
-    print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@reverse_transcripts) . " reverse strand genes\n";
-    
-    if(scalar(@reverse_transcripts)){
-      $self->_reverse_transcripts( @reverse_transcripts );
     }
   }
+  
+  #print STDERR "In EST_GeneBuilder.fetch_input(): ".
+  #scalar(@forward_transcripts) . " forward strand genes\n";
+  
+  # process transcripts in the forward strand    
+  if( scalar(@forward_transcripts) ){
+    $self->_forward_transcripts( @forward_transcripts );
+  }
+  @forward_transcripts = ();
+  
+  ############################################################
+  # reverse strand
+  ############################################################    
+  #print STDERR "\n****** reverse strand ******\n\n";
+  $strand = -1;
+  
+  # this will return a slice which corresponds to the reversed complement 
+  #of $slice:
+  my $rev_slice = $slice->invert;
+  $self->revcomp_query($rev_slice);
+  
+  my $revgenes;
+  if ($EST_USE_DENORM_GENES){
+    my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
+    $revgenes = $dga->get_genes_by_Slice_and_type($rev_slice, $genetype);
+  } 
+  else {
+    $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
+  } 
+  
+  my @reverse_transcripts;
+  
+  if ( $USE_cDNA_DB ){
+    my $cdna_revslice = $cdna_slice->invert;
+    my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
+    #print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
+    push ( @$revgenes, @$cdna_revgenes ); 
+  }
+  
+ REVGENE:    
+  foreach my $gene (@$revgenes) {
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	
+      my @exons = @{$transcript->get_all_Exons};
+      # these are really - strand, but the Slice is reversed, 
+      #so they are relatively + strand
+      if( $exons[0]->strand == 1){
+        push (@reverse_transcripts, $transcript);
+      }
+    }
+  }
+  #print STDERR "In EST_GeneBuilfer.fetch_input(): ".
+  #scalar(@reverse_transcripts) . " reverse strand genes\n";
+  
+  if(scalar(@reverse_transcripts)){
+    $self->_reverse_transcripts( @reverse_transcripts );
+  }
+  $self->est_db->disconnect_when_inactive(1); 
+}
 
 ############################################################
 
@@ -454,11 +467,11 @@ sub _reverse_transcripts{
 sub _process_Transcripts {
   my ($self, $alltranscripts, $strand) = @_;
 
-  print STDERR "EST_GeneBuilder: processing input transcripts...\n";
-
+  #print STDERR "EST_GeneBuilder: processing input transcripts...\n";
+  #print STDERR "Have been passed ".@$alltranscripts." transcripts\n";
   # first check transcripts and hold info about est_evidence, etc...
   my @checked_transcripts = $self->_check_Transcripts($alltranscripts,$strand);
-  print STDERR scalar(@checked_transcripts)." transcripts returned from _check_Transcripts\n";
+  #print STDERR scalar(@checked_transcripts)." transcripts returned from _check_Transcripts\n";
   
   # reject ests/cdnas if they have more than one non-standard intron splice site consensus sequence
   # or if the only intron they have is non standard.
@@ -468,7 +481,7 @@ sub _process_Transcripts {
   
   unless ( $tight ){
     if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
-      print STDERR "applying filtering\n";
+      #print STDERR "applying filtering\n";
       
       my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
 	->new( -coverage => 97,
@@ -477,27 +490,26 @@ sub _process_Transcripts {
 	     );
       
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
-      print STDERR scalar(@checked_transcripts)." transcripts after filtering\n";
+      #print STDERR scalar(@checked_transcripts)." transcripts after filtering\n";
     }
   }
   if ($tight){
     if ( scalar( @checked_transcripts ) > 50 ){
-      print STDERR "applying tight filtering\n";
+      #print STDERR "applying tight filtering\n";
       
       my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
 	->new( -coverage => 97,
 	       -perc_id  => 99,
 	       -depth    => 5,
 	     );
-      
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
-      print STDERR scalar(@checked_transcripts)." transcripts after tight filtering\n";
+      #print STDERR scalar(@checked_transcripts)." transcripts after tight filtering\n";
     }
   }
 
 
   if ( scalar(@checked_transcripts) == 0 ){
-    print STDERR "No transcripts left\n";
+    #print STDERR "No transcripts left\n";
     return;
   }
   my $label = 'forward';
@@ -530,7 +542,7 @@ sub _process_Transcripts {
   $merge_object->run;
   my $t2 = time;
   
-  print STDERR "TIME TO RUN CLUSTERMERGE: ".($t2 - $t1)."\n";
+  #print STDERR "TIME TO RUN CLUSTERMERGE: ".($t2 - $t1)."\n";
 
   my @merged_transcripts = $merge_object->output;
   
@@ -538,13 +550,13 @@ sub _process_Transcripts {
   my @filtered_transcripts;
   if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
     @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
-    print STDERR scalar(@filtered_transcripts)
-      ." transcripts left after rejecting single-exon transcripts\n";
+    #print STDERR scalar(@filtered_transcripts)
+    #." transcripts left after rejecting single-exon transcripts\n";
   }
   else{
     @filtered_transcripts = @merged_transcripts;
-    print STDERR scalar(@filtered_transcripts)
-      ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
+    #print STDERR scalar(@filtered_transcripts)
+    #  ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
   }
   
   
@@ -552,14 +564,14 @@ sub _process_Transcripts {
   foreach my $tran (@filtered_transcripts ){
     foreach my $exon ( @{$tran->get_all_Exons} ){
       if ( $strand == 1 ){
-	$exon->contig( $self->query );
+        $exon->slice( $self->query );
       }
       else{
-	$exon->contig( $self->revcomp_query );
+        $exon->slice( $self->revcomp_query );
       }
     }
   }
-	
+	#print STDERR "have ".@filtered_transcripts." filtered\n";
   return @filtered_transcripts;
 }
 
@@ -595,7 +607,7 @@ sub _check_Transcripts {
   # reject exons that are smaller or equal to $EST_MIN_EXON_SIZE;
 
 
-  print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
+  #print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
 
   my @allexons;       # here we'll put all exons that pass the check
   my @alltranscripts; # here we'll put all the transcripts that pass the check
@@ -605,13 +617,14 @@ sub _check_Transcripts {
 
   my $slice;
   if ( $strand == +1 ){
+    print STDERR "On forward strand\n";
     $slice = $self->query;
-  }
-  else{
+  }else{
+    print STDERR "On the reverse strand\n";
     $slice = $self->revcomp_query;
   }
   
-  #print STDERR "transcripts:\n";
+  ##print STDERR "transcripts:\n";
   #foreach my $t (@$ref_transcripts){
   #    print $t->dbID."\n";
   #}
@@ -619,157 +632,163 @@ sub _check_Transcripts {
  TRANSCRIPT: 
   while ( @$ref_transcripts ){
       
-      my $transcript = shift @$ref_transcripts;
-      my $new_transcript = Bio::EnsEMBL::Transcript->new();
-      if ( defined $transcript->dbID){
-	  $new_transcript->dbID($transcript->dbID);
-      }
-      
-      ############################################################
-      # reject the transcripts that fall off the slice at the lower end
-      ############################################################
-      unless ( $self->_check_Transcript_Location($transcript,$slice,$strand) ){
-	  next TRANSCRIPT;
-      }
-      my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
-      my $exon_count = 0;
-      my $previous_exon;
+    my $transcript = shift @$ref_transcripts;
+    my $new_transcript = Bio::EnsEMBL::Transcript->new();
+    if ( defined $transcript->dbID){
+      $new_transcript->dbID($transcript->dbID);
+    }
     
-      ############################################################
-      # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
-      if ( scalar(@exons) == 1 ){
-	
-	  if ( $FILTER_ON_SINGLETON_SIZE && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETON_SIZE ){
+    ############################################################
+    # reject the transcripts that fall off the slice at the lower end
+    ############################################################
+    unless ( $self->_check_Transcript_Location
+             ($transcript,$slice,$strand) ){
+      print STDERR "Losing transcript to location check\n";
+      next TRANSCRIPT;
+    }
+    my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
+    my $exon_count = 0;
+    my $previous_exon;
+    
+    ############################################################
+    # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
+    if ( scalar(@exons) == 1 ){
+      
+      if ( $FILTER_ON_SINGLETON_SIZE && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETON_SIZE ){
 	      next TRANSCRIPT;
-	  }
-	  if ( $RAISE_SINGLETON_COVERAGE ){
+      }
+      if ( $RAISE_SINGLETON_COVERAGE ){
 	      my @evidence = @{$exons[0]->get_all_supporting_features};
 	      my $coverage = $evidence[0]->score;
 	      if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
-		  next TRANSCRIPT;
+          next TRANSCRIPT;
 	      }
-	  }
       }
+    }
+    
+  EXON:
+    foreach my $exon (@exons){
       
-    EXON:
-      foreach my $exon (@exons){
-	  
-	  my $hstart;
-	  my $hend;
-	  # get the supporting_evidence for each exon
-	  my @sf = sort { $a->hstart <=> $b->hstart } @{$exon->get_all_supporting_features};
-	  
-	  # check that you get suporting_evidence at all
-	  if ( scalar( @sf ) == 0 ){
-	      print STDERR "exon ".$exon->dbID." in transcript ".
-		  $transcript->dbID."has no supporting evidence - ";
+      my $hstart;
+      my $hend;
+      # get the supporting_evidence for each exon
+      my @sf = sort { $a->hstart <=> $b->hstart } @{$exon->get_all_supporting_features};
+      
+      # check that you get suporting_evidence at all
+      if ( scalar( @sf ) == 0 ){
+	      #print STDERR "exon ".$exon->dbID." in transcript ".
+        #$transcript->dbID."has no supporting evidence - ";
 	      if ( $exon->is_sticky ){
-		  print STDERR "it is a sticky exon\n";
+          #print STDERR "it is a sticky exon\n";
 	      }
 	      else{
-		  print STDERR "it is NOT a sticky exon\n";
+          #print STDERR "it is NOT a sticky exon\n";
 	      }
-	  }
-	  ############################################################
-	  # reject transcripts with too-small exons:
-	  ############################################################
-	  my $size = $exon->end - $exon->start + 1;
-	  if ( $size  < $EST_MIN_EXON_SIZE ){
-	    print STDERR "rejecting transcript with very small exon size = $size\n";
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	    #$self->warn("rejecting very small exon: size=$size");
-	    next TRANSCRIPT;
-	  }
-	  ############################################################
-	  # check the gap with the evidence of the next exon
-	  # if the ESTs are of good quality, this should not reject any
-	  ############################################################
-	  if ( $exon_count > 1 ){
+      }
+      ############################################################
+      # reject transcripts with too-small exons:
+      ############################################################
+      my $size = $exon->end - $exon->start + 1;
+      if ( $size  < $EST_MIN_EXON_SIZE ){
+        #print STDERR "rejecting transcript with very small exon size = $size\n";
+        #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+        #$self->warn("rejecting very small exon: size=$size");
+        next TRANSCRIPT;
+      }
+      ############################################################
+      # check the gap with the evidence of the next exon
+      # if the ESTs are of good quality, this should not reject any
+      ############################################################
+      if ( $exon_count > 1 ){
 	      my $est_gap = 0;
 	      
 	      my @previous_sf = sort { $a->hstart <=> $b->hstart } @{$previous_exon->get_all_supporting_features};
 	      
 	      if ( @previous_sf ){
+          
+          # if the hstart increases per exon, the EST runs in the same direction of the gene 
+          if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
+            $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
+          }elsif (  $previous_sf[0]->hstart > $sf[0]->hstart ){
+            # if hstart decreases that means that the EST runs in the 
+            #opposite direction
+            $est_gap = abs( $previous_sf[0]->hstart - $sf[$#sf]->hend) - 1;
+          } else{
+            print STDERR "same bit of evidence is hitting two exons!\n";
+            # else, same EST piece is hitting two exons, not good!
+          }
 		  
-		  # if the hstart increases per exon, the EST runs in the same direction of the gene 
-		  if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
-		      $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
-		  }
-		  # if hstart decreases that means that the EST runs in the opposite direction
-		  elsif (  $previous_sf[0]->hstart > $sf[0]->hstart ){
-		      $est_gap = abs( $previous_sf[0]->hstart - $sf[$#sf]->hend) - 1;
-		  }
-		  # else, same EST piece is hitting two exons, not good!
-		  else{
-		      print STDERR "same bit of evidence is hitting two exons!\n";
-		  }
-		  
-                  # check the evidence gap between both exons
-		  if ( $est_gap > $EST_MAX_EVIDENCE_DISCONTINUITY ){
-		      print STDERR "Rejecting transcript: EST evidence with gap too large: $est_gap\n";
-		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-		      next TRANSCRIPT;
-		  }
+          # check the evidence gap between both exons
+          if ( $est_gap > $EST_MAX_EVIDENCE_DISCONTINUITY ){
+            print STDERR "Rejecting transcript: EST evidence with gap too ".
+            "large: $est_gap\n";
+            #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+            #->_print_Evidence($transcript);
+            next TRANSCRIPT;
+          }
 	      }
-	  }
-	  ############################################################
-	  # reject transcript with too large intron length
-	  ############################################################
-	  my $intron_length;
-	  if ($exon_count > 1 ){
-	    my ( $s, $e, $intron_length);
-	    $s             = $previous_exon->end;
-	    $e             = $exon->start;
-	    $intron_length = $e - $s - 1;
-	    if ( $intron_length > $EST_MAX_INTRON_SIZE ){
-	      print STDERR "Rejecting transcript for having too long intron: $intron_length\n";
-	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	      next TRANSCRIPT;
-	    }
-	  }
-	  
-	  ############################################################
-	  # check tiny introns
-	  ############################################################
-	  if ( $EST_MIN_INTRON_SIZE && $exon_count>1 ){
-	    if ( $exon->start - $previous_exon->end - 1 <=  $EST_MIN_INTRON_SIZE ){
-	      if ( $BRIDGE_OVER_SMALL_INTRONS ){
-		$previous_exon->end( $exon->end );
-		next EXON;
-	      }
-	      ############################################################
-	      # if not bridged - reject it
-	      ############################################################
-	      else{
-		print STDERR "Rejecting transcript with small intron size =  ".
-		  ($exon->start - $previous_exon->end - 1)."\n";
-		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-		next TRANSCRIPT;
-	      }
-	    }
-	  }
-      	  
-	  $previous_exon = $exon;
-	  $new_transcript->add_Exon( $previous_exon );
-	  $exon_count++;
-	  
-      } # end of EXON
-      
-      ############################################################
-      # check the splice sites
-      ############################################################
-      if ( $CHECK_SPLICE_SITES ){
-	  my $check = $self->check_splice_sites($new_transcript,$strand);
-	  unless ( $check ){
-	      print STDERR "rejecting transcript ".$new_transcript->dbID." for not having all splice sites canonical\n";
-	      next TRANSCRIPT;
-	  }
       }
-      # if the transcript made it to this point, keep it
-      push (@alltranscripts, $new_transcript);
+      ############################################################
+      # reject transcript with too large intron length
+      ############################################################
+      my $intron_length;
+      if ($exon_count > 1 ){
+        my ( $s, $e, $intron_length);
+        $s             = $previous_exon->end;
+        $e             = $exon->start;
+        $intron_length = $e - $s - 1;
+        if ( $intron_length > $EST_MAX_INTRON_SIZE ){
+          print STDERR "Rejecting transcript for having too long intron: ".
+            "$intron_length\n";
+          #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+          #->_print_Transcript($transcript);
+          next TRANSCRIPT;
+        }
+      }
       
+      ############################################################
+      # check tiny introns
+      ############################################################
+      if ( $EST_MIN_INTRON_SIZE && $exon_count>1 ){
+        if ( $exon->start - $previous_exon->end - 1 
+             <=  $EST_MIN_INTRON_SIZE ){
+          if ( $BRIDGE_OVER_SMALL_INTRONS ){
+            $previous_exon->end( $exon->end );
+            next EXON;
+          }else{
+            ############################################################
+            # if not bridged - reject it
+            ############################################################
+            print STDERR "Rejecting transcript with small intron size =  ".
+              ($exon->start - $previous_exon->end - 1)."\n";
+            #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+            #->_print_Transcript($transcript);
+            next TRANSCRIPT;
+          }
+        }
+      }
+      
+      $previous_exon = $exon;
+      $new_transcript->add_Exon( $previous_exon );
+      $exon_count++;
+      
+    } # end of EXON
+      
+    ############################################################
+    # check the splice sites
+    ############################################################
+    if ( $CHECK_SPLICE_SITES ){
+      my $check = $self->check_splice_sites($new_transcript,$strand);
+      unless ( $check ){
+	      #print STDERR "rejecting transcript ".$new_transcript->dbID." for not having all splice sites canonical\n";
+	      next TRANSCRIPT;
+      }
+    }
+    # if the transcript made it to this point, keep it
+    push (@alltranscripts, $new_transcript);
+    
   }    # end of TRANSCRIPT
-  
+  #print STDERR "Have ".@alltranscripts." transcripts to return\n";
   return @alltranscripts;
   
 }
@@ -784,19 +803,18 @@ sub _check_Transcript_Location{
     my $id = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->transcript_id( $transcript );
     
     # never ever trus the order in which the exons come out! 
-    $transcript->sort;
 
     # check that transcripts are not completely outside the slice
     if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	print STDERR "transcript $id outside the slice\n";
-	$valid = 0;
+	  #print STDERR "transcript $id outside the slice\n";
+  	$valid = 0;
     }
     ############################################################
     # if the transcript is in the forward strand,
     # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
     ############################################################
     elsif ( $strand == 1 && $transcript->start < 1 && $transcript->end > 1 ){
-      print STDERR "transcript $id falls off the slice by its lower end\n";
+      #print STDERR "transcript $id falls off the slice by its lower end\n";
       $valid = 0;
     }
     ############################################################
@@ -805,7 +823,7 @@ sub _check_Transcript_Location{
     # vice versa, so  
     ############################################################
     elsif ( $strand == -1 && $transcript->start <=  $slice->length && $transcript->end >  $slice->length ){
-      print STDERR "transcript $id in reverse strand falls off the revcomp-slice by its higher end\n";
+      #print STDERR "transcript $id in reverse strand falls off the revcomp-slice by its higher end\n";
       $valid = 0;
     }
 
@@ -813,17 +831,19 @@ sub _check_Transcript_Location{
     # check for possible coordinate nonsense in the exons
     ############################################################    
     my @exons = @{$transcript->get_all_Exons};
+    my $apparent_strand = $exons[0]->strand * $exons[0]->slice->strand;
+  
     if ($#exons > 0) {
 	for (my $i = 1; $i <= $#exons; $i++) {
 	    
 	    # check for folded transcripts
-	    if ($exons[0]->strand == 1) {
+	    if ($apparent_strand == 1) {
 		if ($exons[$i]->start < $exons[$i-1]->end) {
 		    print STDERR "transcript $id folds back on itself\n";
 		    $valid = 0;
 		} 
 	    } 
-	    elsif ($exons[0]->strand == -1) {
+	    elsif ($apparent_strand == -1) {
 		if ($exons[$i]->end > $exons[$i-1]->start) {
 		    print STDERR "transcript $id folds back on itself\n";
 		    $valid = 0;
@@ -832,7 +852,7 @@ sub _check_Transcript_Location{
 	}
     }
     if ($valid == 0 ){
-       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
     }
     return $valid;
 }
@@ -855,7 +875,7 @@ sub _cluster_Transcripts{
   my ($self,$ref_transcripts) = @_;
   my @transcripts = @{ $ref_transcripts };
   my @clusters;
-  print STDERR "EST_GeneBuilder: clustering transcripts...\n";
+  #print STDERR "EST_GeneBuilder: clustering transcripts...\n";
 			 
   # first sort the transcripts by their start position coordinate
   my %start_table;
@@ -1088,8 +1108,8 @@ sub check_splice_sites{
   }
 
   if ($verbose){
-   print STDERR "checking splice sites in transcript:\n";
-   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+   #print STDERR "checking splice sites in transcript:\n";
+   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
   }
   
@@ -1098,7 +1118,7 @@ sub check_splice_sites{
   my $other    = 0;
   
   # all exons in the transcripts are in the same seqname coordinate system:
-  my $slice = $transcript->start_Exon->contig;
+  my $slice = $transcript->start_Exon->slice;
   
   if ($strand == 1 ){
     
@@ -1112,31 +1132,35 @@ sub check_splice_sites{
       my $downstream_start = $downstream_exon->start - 2;
       my $downstream_end   = $downstream_exon->start - 1;
       
-      my $up_start   = $slice->chr_start + $upstream_start - 1;
-      my $up_end     = $slice->chr_start + $upstream_end - 1;
-      my $down_start = $slice->chr_start + $downstream_start - 1;
-      my $down_end   = $slice->chr_start + $downstream_end - 1;
-      my $upstream_site   = 
-	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
-      my $downstream_site = 
-	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
+      my $up_start   = $slice->start + $upstream_start - 1;
+      my $up_end     = $slice->start + $upstream_end - 1;
+      my $down_start = $slice->start + $downstream_start - 1;
+      my $down_end   = $slice->start + $downstream_end - 1;
+      my $upstream_site  = $self->get_chr_subseq($slice->coord_system->name, 
+                                                 $slice->seq_region_name,
+                                                 $up_start, $up_end, 
+                                                 $strand );
+      my $downstream_site = $self->get_chr_subseq($slice->coord_system->name,
+                                                  $slice->seq_region_name,
+                                                  $down_start, $down_end, 
+                                                  $strand );
       
       unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites\n$@";
-	next INTRON;
+        print STDERR "problems retrieving sequence for splice sites\n$@";
+        next INTRON;
       }
       
-      print STDERR "upstream $upstream_site, downstream: $downstream_site\n" if $verbose;
+      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n" if $verbose;
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
       # AT-AC is the U12 spliceosome
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
-	$correct++;
+        $correct++;
       }
       else{
-	$other++;
+        $other++;
       }
     } # end of INTRON
   }
@@ -1163,20 +1187,24 @@ sub check_splice_sites{
       my $downstream_start = $downstream_exon->start - 2;
       my $downstream_end   = $downstream_exon->start - 1;
       
-      my $slice_length = $slice->chr_end - $slice->chr_start + 1;
-      my $up_start   = $slice->chr_start + ( $slice_length - $upstream_start   + 1 ) - 1;
-      my $up_end     = $slice->chr_start + ( $slice_length - $upstream_end     + 1 ) - 1;
-      my $down_start = $slice->chr_start + ( $slice_length - $downstream_start + 1 ) - 1;
-      my $down_end   = $slice->chr_start + ( $slice_length - $downstream_end   + 1 ) - 1;
+      my $slice_length = $slice->end - $slice->start + 1;
+      my $up_start   = $slice->start + ( $slice_length - $upstream_start   + 1 ) - 1;
+      my $up_end     = $slice->start + ( $slice_length - $upstream_end     + 1 ) - 1;
+      my $down_start = $slice->start + ( $slice_length - $downstream_start + 1 ) - 1;
+      my $down_end   = $slice->start + ( $slice_length - $downstream_end   + 1 ) - 1;
       
-      my $upstream_site   = 
-	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
-      my $downstream_site = 
-	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
+      my $upstream_site = $self->get_chr_subseq($slice->coord_system->name,
+                                                $slice->seq_region_name, 
+                                                $up_start, $up_end, 
+                                                $strand );
+      my $downstream_site = $self->get_chr_subseq($slice->coord_system->name, 
+                                                  $slice->seq_region_name,
+                                                  $down_start, $down_end, 
+                                                  $strand );
       
       unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites: $up_start:$up_end:$down_start:$down_end\n$@";
-	next INTRON;
+        print STDERR "problems retrieving sequence for splice sites\n$@";
+        next INTRON;
       }
       $upstream_site   =~ tr/ACGTacgt/TGCAtgca/;
       $downstream_site =~ tr/ACGTacgt/TGCAtgca/;
@@ -1184,24 +1212,26 @@ sub check_splice_sites{
       $upstream_site   = reverse ( $upstream_site );
       $downstream_site = reverse ( $downstream_site );
       
-      print STDERR "reverse; upstream $upstream_site, downstream: $downstream_site\n" if $verbose;
+      #print STDERR "reverse; upstream $upstream_site, downstream: ".
+      #  "$downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
-	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
-	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
-	$correct++;
+            ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+            ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+        $correct++;
       }
       else{
-	$other++;
+        $other++;
       }
       
     } # end of INTRON
   }
   unless ( $introns == $other + $correct ){
-    print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
+    print STDERR "STRANGE: introns:  $introns, correct: $correct, ".
+    "wrong: $wrong, other: $other\n";
     return 0;
   }
   if ( $other ){
-    print STDERR "rejecting for having non-canonical splice-sites\n" if $verbose;
+    print STDERR "rejecting for having non-canonical splice-sites\n";
     return  0;
   }
   else{
@@ -1222,79 +1252,41 @@ strand is not used.
 
 =cut
 
+
 sub get_chr_subseq{
-  my ( $self, $chr_name, $start, $end, $strand ) = @_;
-
+  my ( $self, $cs_name, $chr_name, $start, $end, $strand) = @_;
+  
   my $seq;
-
-  if ($start > $end) {
-      # normal if reverse strand
-      if ($strand == -1) {
-	  my $tmp = $start; $start = $end; $end = $tmp; 
-      }
-      else {
-	  $self->throw("Error: not expecting start ($start) to be > end ($end) in subseq fetch\n");
-      }
-  }
-
+  
   if ($EST_ONE_FILE_PER_CHROMOSOME) {
       my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+
+      unless (-e $chr_file) {
+        $self->throw("Could not fine chromosome file $chr_file; ".
+                     "unable to fetch sequence so dying\n");
+      }
+
       my $command = "chr_subseq $chr_file $start $end |";
+      
       #print STDERR "command: $command\n";
-      open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+      open( SEQ, $command ) || $self->throw("Error running chr_subseq ".
+                                            "within ExonerateToGenes");
       $seq = uc <SEQ>;
       chomp $seq;
       close( SEQ );
-  }
-  else {
-      my ($stored_seq, $stored_start, $stored_end) = $self->_cached_seq;
-
-      if (not $stored_seq) {
-	  ($stored_start, $stored_end) = ($self->query->chr_start, $self->query->chr_end);
+    }else {
+      if($strand == -1){
+        my $temp_start  = $end;
+        $end = $start;
+        $start = $temp_start;
       }
-      if (not $stored_seq or 
-	  # need to refetch if being asked for outside original slice
-	  $start < $stored_start or $end > $stored_end) {
-	  
-
-	  $stored_start = $start if $start < $stored_start;
-	  $stored_end = $end if $end > $stored_end;
-										  
-	  my $new_slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name, 
-									      $stored_start,
-									      $stored_end);
-	  $stored_seq = $new_slice->seq;
-	  $self->_cached_seq( $stored_seq, $stored_start, $stored_end );
-      }
-      
-      # can now get dna by substring. 
-      $seq = substr($stored_seq, $start - $stored_start, $end - $start + 1); 
-  }
-
+      my $slice_seq = $self->est_db->get_SliceAdaptor
+        ->fetch_by_region($cs_name, $chr_name, $start, $end, 1);
+      $seq = uc($slice_seq->seq);
+    }
+  
   return $seq;
 }
-
-sub _cached_seq {
-    my ($self, $seq, $start, $end) = @_;
-    
-    if ($seq and $start and $end) {
-	$self->{'_cached_genomic_seq'} = $seq;
-	$self->{'_cached_genomic_seq_start'} = $start;
-	$self->{'_cached_genomic_seq_end'} = $end;
-    }
-
-    if ($self->{'_cached_genomic_seq'}) {
-	return ($self->{'_cached_genomic_seq'},
-		$self->{'_cached_genomic_seq_start'},
-		$self->{'_cached_genomic_seq_end'});
-    }
-    else {
-	return ();
-    }
-}
-
-
-
 ############################################################
 
 =head2 get_chr_length
@@ -1327,7 +1319,7 @@ sub get_chr_length{
     $length = $1;
   }
   close( SEQ );
-  print STDERR "chr_length for $chr_name: $length\n";
+  #print STDERR "chr_length for $chr_name: $length\n";
   return $self->{'_chr_length'}{$chr_name} = $length;
   return $length;
 }
@@ -1442,38 +1434,41 @@ sub each_runnable{
 sub run {
   my ($self) = @_;
   my $strand;
-    
+  
   # sort out analysis here or we will get into trouble with duplicate analyses
   my $analysis = $self->analysis;
   
   unless ( $analysis ){
-      $self->throw("You need an analysis to run this");
+    $self->throw("You need an analysis to run this");
   }
-
-  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
+  
+  #print STDERR "Analysis is: ".$self->analysis->dbID."\n";
   ############################################################
   #### forward strand 
   ############################################################
   $strand = 1;
   my $tcount=0;
-
-  print STDERR "\n## forward strand ##\n\n";
-
+  
+ # print STDERR "\n## forward strand ##\n\n";
+  
   my @f_transcripts1 = $self->_forward_transcripts;
+  print STDERR @f_transcripts1." forward transcripts\n";
   my @f_transcripts2 = $self->_process_Transcripts(\@f_transcripts1,$strand);
+  print STDERR @f_transcripts2." forward transcripts after processing\n";
   my @forward_transcripts;
   
-
+  
   ############################################################
   # run genomewise?
   if ( $USE_GENOMEWISE ){
     foreach my $tran (@f_transcripts2){
       my $runnable = 
-	new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-							     -genomic  => $self->query,
-							     -analysis => $self->analysis,
-							     -smell    => $GENOMEWISE_SMELL,
-							    );
+        new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise
+          (
+           -genomic  => $self->query,
+           -analysis => $self->analysis,
+           -smell    => $GENOMEWISE_SMELL,
+          );
       $self->add_runnable($runnable,$strand);
       $runnable->add_Transcript($tran);
     }
@@ -1482,50 +1477,48 @@ sub run {
     foreach my $gw_runnable( $self->each_runnable($strand) ){
       $tcount++;
       eval{
-	$gw_runnable->run;
+        $gw_runnable->run;
       };
       if ($@){
-	print STDERR "Your runnable $gw_runnable didn't succeed!\n";
-	print STDERR $@;
-	next RUN1;
+        #print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+        #print STDERR $@;
+        next RUN1;
       }
       foreach my $transcript ( $gw_runnable->output ){
-	#$self->_set_evidence( $transcript );
-	push (@forward_transcripts, $transcript);
+        #$self->_set_evidence( $transcript );
+        push (@forward_transcripts, $transcript);
       }
     }
-    print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
+    # print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
     
-  }
-  ############################################################
-  # else use a simpler method
-  else{
+  }else{
     foreach my $tran (@f_transcripts2){
-      my $new_tran = Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation( $tran );
+      my $new_tran = Bio::EnsEMBL::Pipeline::Tools::TranslationUtils
+        ->compute_translation( $tran );
       if ( $new_tran ){
-	push ( @forward_transcripts, $new_tran );
+        push ( @forward_transcripts, $new_tran );
       }
     }
   }
-  
+  print STDERR @forward_transcripts." from translation compute\n";
   # set slice in exons and place last stop codon in ORF definition
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
-  
+  print STDERR @checked_forward_transcripts." from translation check\n";
   # cluster them into genes
   my @forward_genes                 = $self->_cluster_into_Genes(@checked_forward_transcripts);
-  
+  print STDERR @forward_genes." genes from clusters\n";
   # take the best ten transcripts from each gene
   my @selected_forward_transcripts  = $self->_select_best_transcripts(@forward_genes);
-
+   print STDERR @selected_forward_transcripts." from transcript selection\n";
   # cluster again into genes
   my @selected_forward_genes        = $self->_cluster_into_Genes( @selected_forward_transcripts );
-
+  #print STDERR @selected_forward_genes." genes from clusters\n";
   # important: make shared exons unique
   my @ready_forward_genes           = $self->_make_shared_exons_unique( @selected_forward_genes );
-
+  
   # map them to raw contig coordinates
   my @forward_remapped              = $self->remap_genes(\@ready_forward_genes, $strand);
-
+   print STDERR @forward_remapped." genes from remapping\n";
   $self->output(@forward_remapped);
 
 
@@ -1535,21 +1528,24 @@ sub run {
   $strand = -1;
   my $tcount2=0;
   
-  print STDERR "\n## reverse strand ##\n\n";
+  #print STDERR "\n## reverse strand ##\n\n";
   my @reverse_transcripts;
+ 
   my @r_transcripts1 = $self->_reverse_transcripts;
+  print STDERR @r_transcripts1." reverse transcripts\n";
   my @r_transcripts2 = $self->_process_Transcripts(\@r_transcripts1,$strand);  
-  
+  print STDERR @r_transcripts2." reverse transcripts after processing\n";
   ############################################################
   # use genomewise?
   if ( $USE_GENOMEWISE ){
     foreach my $tran (@r_transcripts2) {
       my $runnable = 
-	new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-							     -genomic  => $self->revcomp_query,
-							     -analysis => $self->analysis,
-							     -smell    => $GENOMEWISE_SMELL,
-							    );
+        new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise
+          (
+           -genomic  => $self->revcomp_query,
+           -analysis => $self->analysis,
+           -smell    => $GENOMEWISE_SMELL,
+          );
 	    $self->add_runnable($runnable, $strand);
 	    $runnable->add_Transcript($tran);
     }
@@ -1558,60 +1554,58 @@ sub run {
     foreach my $gw_runnable( $self->each_runnable($strand)) {
       $tcount2++;
       eval{
-	$gw_runnable->run;
+        $gw_runnable->run;
       };
       if ($@){
-	print STDERR "Your runnable $gw_runnable didn't succeed!\n";
-	print STDERR $@;
-	next RUN2;
+        #print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+        #print STDERR $@;
+        next RUN2;
       }
       foreach my $transcript ( $gw_runnable->output ){
-	#$self->_set_evidence( $transcript );
-	push (@reverse_transcripts, $transcript);
+        #$self->_set_evidence( $transcript );
+        push (@reverse_transcripts, $transcript);
       }
     }
-    print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
+    #print STDERR $tcount2." transcripts run in genomewise in the reverse strand\n";
     
-  }
-  ############################################################
-  # else use a simpler method
-  else{
+  }else{
     foreach my $tran (@r_transcripts2){
       my $new_tran = Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation( $tran );
       if ( $new_tran ){
-	push ( @reverse_transcripts, $new_tran );
+        push ( @reverse_transcripts, $new_tran );
       }
     }
   }
   
   # set slice in exons and place last stop codon in ORF definition
+  print STDERR @reverse_transcripts." from translation compute\n";
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
-  
+  print STDERR @checked_reverse_transcripts." from translation check\n";
   # cluster them into genes
   my @reverse_genes               = $self->_cluster_into_Genes(@checked_reverse_transcripts);
-  
+  print STDERR @reverse_genes." genes from clusters\n";
   # take the best ten transcripts from each gene
   my @selected_reverse_transcripts = $self->_select_best_transcripts(@reverse_genes);
-  
+  print STDERR @selected_reverse_transcripts." from transcript selection\n";
   # cluster them again into genes
   my @selected_reverse_genes       = $self->_cluster_into_Genes( @selected_reverse_transcripts );
-
+  
   # important: make shared exons unique
   my @ready_reverse_genes          = $self->_make_shared_exons_unique( @selected_reverse_genes );
   
   # map them to raw contig coordinates
   my @reverse_remapped             = $self->remap_genes(\@ready_reverse_genes, $strand);
-  
+   print STDERR @reverse_remapped." genes from remapping\n";
   $self->output(@reverse_remapped);
-
+  
 
   ############################################################
   # these is the final set of genes:
   foreach my $gene ( $self->output ){
-    print STDERR "gene with ".scalar(@{$gene->get_all_Transcripts})." transcripts\n";
+    #print STDERR "gene with ".scalar(@{$gene->get_all_Transcripts})." transcripts\n";
     foreach my $t ( @{$gene->get_all_Transcripts} ){
       my $id = $t->stable_id || 'none';
-      print STDERR "transcript $id\n";
+     # print STDERR "transcript $id\n";
     }
     
   }
@@ -1635,7 +1629,7 @@ sub _select_best_transcripts{
 		       }
 		     }  @{$gene->get_all_Transcripts};
     
-    print STDERR " $gene has ".scalar(@trans)." transcripts\n";
+    #print STDERR " $gene has ".scalar(@trans)." transcripts\n";
   TRAN:
     foreach my $tran ( @trans ){
       $count++;
@@ -1714,7 +1708,6 @@ sub _check_Translations {
   foreach my $transcript (@trans) {
 
     # sort the exons 
-    $transcript->sort;
     my @exons = @{$transcript->get_all_Exons};
 
     # at this point, if necessary, only accepts transcripts with more than one exon
@@ -1727,14 +1720,12 @@ sub _check_Translations {
     
   EXON:
     foreach my $exon(@exons){
-      $exon->contig($slice);
-      $exon->attach_seq($slice);
-      
+      $exon->slice($slice);  
       # if strand = -1 we have inverted the contig, thus
       $exon->strand(1);
  
       # when the gene gets stored, the strand is flipped automatically
-      print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
+      #print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
     }
 
     my $translation = $transcript->translation;
@@ -1751,22 +1742,22 @@ sub _check_Translations {
       
       # total length of the exons in the transcript
       my $t_length = $transcript-> length;
-      print STDERR "Translation length : $length\n";
-      print STDERR "Exons length       : $t_length\n";
+      #print STDERR "Translation length : $length\n";
+      #print STDERR "Exons length       : $t_length\n";
       
       # 5' UTR is usually shorter than 3' UTR, the latter can be very long compared
       # with the translation length ( 5000 vs. 500 ) see e.g. gene SCL ( aka TAL1)
-      my $five_prime  = $transcript->five_prime_utr  or print STDERR "No five prime UTR";
-      my $three_prime = $transcript->three_prime_utr or print STDERR "No three prime UTR";
+      my $five_prime  = $transcript->five_prime_utr; #or print STDERR "No five prime UTR";
+      my $three_prime = $transcript->three_prime_utr; #or print STDERR "No three prime UTR";
       
       # UTRs above are Bio::Seq
       if ( $five_prime ){
 	my $length5    = $five_prime->length;
-	print STDERR "5prime UTR length  : $length5\n";
+	#print STDERR "5prime UTR length  : $length5\n";
       }
       if ( $three_prime ){
 	my $length3    = $three_prime->length;
-	print STDERR "3prime UTR length  : $length3\n";
+	#print STDERR "3prime UTR length  : $length3\n";
       }
       
       # only store the genes whose translation has no stop codons
@@ -1822,16 +1813,16 @@ sub remap_genes {
 	my $newgene;
 	# convert to raw contig coords
 	eval {
-	    # transforming gene to raw contig coordinates.
-	    $newgene = $gene->transform;
+    # transforming gene to raw contig coordinates.
+    $newgene = $gene;
 	};
 	if ($@) {
 	    print STDERR "Couldn't reverse map gene [$@]\n";
 	    foreach my $t ( @{$gene->get_all_Transcripts} ){
-		$self->_print_Transcript($t);
+        $self->_print_Transcript($t);
 	    }
 	    next;
-	}
+    }
 	$newgene->type($gene->type);
 	$newgene->analysis($gene->analysis);
 	push(@newf,$newgene);
@@ -1907,7 +1898,7 @@ sub _cluster_into_Genes{
   my ($self, @transcripts_unsorted) = @_;
   
   my $num_trans = scalar(@transcripts_unsorted);
-  print STDERR "clustering $num_trans transcripts into genes\n";
+  #print STDERR "clustering $num_trans transcripts into genes\n";
 
   #foreach my $t ( @transcripts_unsorted ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
@@ -1985,7 +1976,7 @@ sub _cluster_into_Genes{
   
   # make and store genes
   
-  print STDERR scalar(@clusters)." clusters created, making genes...\n";
+  #print STDERR scalar(@clusters)." clusters created, making genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
     my $count = 0;

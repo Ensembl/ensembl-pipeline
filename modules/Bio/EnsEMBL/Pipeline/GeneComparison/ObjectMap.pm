@@ -18,7 +18,7 @@
     my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
 
     for some $i, $j
-    $object_map->match($object_list1[$i], $object_list2[$j], $score);
+    $object_map->match($object_list1[$i], $object_list2[$j]);
 
     my @list1 = $object_map->list1();
     my @list2 = $object_map->list2();
@@ -181,7 +181,6 @@ sub partners{
 
 sub stable_marriage{
   my ($self) = @_;
-  my $verbose = 0;
 
   # get one list
   my @list1 = $self->list1;
@@ -220,7 +219,7 @@ sub stable_marriage{
       #print STDERR "checking partner list for $this_target\n";
       my $potential_partner_in_list2 = shift( @{ $candidates_in_list2{ $object1 } } );
       
-      print STDERR "looking at $potential_partner_in_list2\n" if $verbose;
+      #print STDERR "looking at $potential_partner_in_list2\n";
       # check whether it is already married
       if ( $married_object2{ $potential_partner_in_list2 } 
 	   && $married_object2{ $potential_partner_in_list2 } == 1 ){
@@ -239,17 +238,17 @@ sub stable_marriage{
 	    }
 
 	    # divorce the 'worse partner'
-	    print STDERR "divorcing ".$partner{ $potential_partner_in_list2}."\n" if $verbose;
+	    #print STDERR "divorcing ".$partner{ $potential_partner_in_list2}."\n";
 	    delete $married_object1{ $partner{ $potential_partner_in_list2 } };
 	    delete $partner{ $partner{ $potential_partner_in_list2 } };
 	    delete $partner{ $potential_partner_in_list2 };
-	    
+
 	    # let be happier marriage
 	    $married_object1{ $object1 } = 1;
 	    $married_object2{ $potential_partner_in_list2 } = 1;
 	    $partner{ $potential_partner_in_list2 } = $object1;
 	    $partner{ $object1 } = $potential_partner_in_list2;
-	    print STDERR "new marriage: $object1 -- $potential_partner_in_list2\n" if $verbose;
+	    #print STDERR "new marriage: $object1 -- $potential_partner_in_list2\n";
 	    next MARRIAGE;
 	    
 	  }

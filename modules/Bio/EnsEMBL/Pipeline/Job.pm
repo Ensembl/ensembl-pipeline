@@ -101,9 +101,9 @@ sub new {
     }else{
       my $dir;
       if(!$BATCH_QUEUES{$analysis->logic_name}){
-	$dir =  $DEFAULT_OUTPUT_DIR;
+        $dir =  $DEFAULT_OUTPUT_DIR;
       }else{
-	$dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
+        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
       }
       $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
       $self->output_dir($dir);
@@ -308,9 +308,6 @@ sub flush_runs {
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
-       #-STDERR     => $lastjob->stderr_file, # to do the LSF hack with -e /dev/null
-       # shouldn't this be in the LSF module though so that other submission system users
-       # can get a custom stderr_file
        -PARAMETERS => $queue->{'sub_args'},
        -PRE_EXEC   => $pre_exec,
        -QUEUE      => $queue->{'queue'},
@@ -319,10 +316,10 @@ sub flush_runs {
        -RESOURCE   => $queue->{'resource'}
       );
     my $cmd;
-  
     if(!$self->cleanup){
       $batch_job->stderr_file($lastjob->stderr_file);
     }
+    
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly otherwise -pass gets the
@@ -342,7 +339,7 @@ sub flush_runs {
     
     $batch_job->construct_command_line($cmd);
     eval {
-	print STDERR "Submitting: ", $batch_job->bsub, "\n";
+	#print STDERR "Submitting: ", $batch_job->bsub, "\n";
 	$batch_job->open_command_line();
     };
     if ($@) {
@@ -467,131 +464,136 @@ sub runLocally {
 sub run_module {
   my $self = shift;
   my $module = $self->analysis->module;
+  print STDERR "Running ".$module." with ".$self."\n";
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
-
-  STATUS: 
+  my $hash_key = $self->analysis->logic_name;
+  if(!$BATCH_QUEUES{$hash_key}){
+    $hash_key = 'default';
+  }
+  my $runnable_db_path = 
+    $BATCH_QUEUES{$hash_key}{runnabledb_path};
+  my $perl_path;
+  print STDERR "Getting ".$hash_key." batchqueue value\n";
+  if($module =~ /::/){
+    print STDERR "Module contains path info already\n";
+    $module =~ s/::/\//g;
+    $perl_path = $module;
+  }else{
+    $perl_path = $runnable_db_path."/".$module;
+  }
+  print STDERR "have perlpath ".$perl_path."\n";
+ STATUS: 
   { 
-      # "SUBMITTED"
+    eval {
+      require $perl_path.".pm";
+      $perl_path =~ s/\//::/g;
+      $rdb = $perl_path->new( -analysis => $self->analysis,
+                              -input_id => $self->input_id,
+                              -db => $self->adaptor->db );
+    };
+    
+    if ($err = $@) {
+      print (STDERR "CREATE: Lost the will to live Error\n");
+      $self->set_status( "FAILED" );
+      $self->throw( "Problems creating runnable $module for " . 
+                    $self->input_id . " [$err]\n");
+    }
+    
+    # "READING"
+    eval {   
+      $self->set_status( "READING" );
+      $res = $rdb->fetch_input;
+    };
+    if ($err = $@) {
+      $self->set_status( "FAILED" );
+      print (STDERR "READING: Lost the will to live Error\n");
+      $self->throw( "Problems with $module fetching input for " . 
+                    $self->input_id . " [$err]\n");
+    }
+    
+    if ($rdb->input_is_void) {
+      $self->set_status( "VOID" );
+    }
+    else {
+      # "RUNNING"
       eval {
-	  if( $module =~ /::/ ) {
-	      $module =~ s/::/\//g;
-	      require "${module}.pm";
-	      $module =~ s/\//::/g;
-	      
-	      $rdb = "${module}"->new
-		  ( -analysis => $self->analysis,
-		    -input_id => $self->input_id,
-		    -db => $self->adaptor->db );
-	  } else {
-	      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-	      $module =~ s/\//::/g;
-	      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-		  ( -analysis => $self->analysis,
-		    -input_id => $self->input_id,
-		    -db => $self->adaptor->db );
-	  }
-      };
-      
-      if ($err = $@) {
-	  print (STDERR "CREATE: Lost the will to live Error\n");
-	  $self->set_status( "FAILED" );
-	  $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
-      }
-      
-      # "READING"
-      eval {   
-	  $self->set_status( "READING" );
-	  $res = $rdb->fetch_input;
-      };
-      if ($err = $@) {
-	  $self->set_status( "FAILED" );
-	  print (STDERR "READING: Lost the will to live Error\n");
-	  $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
-      }
-      
-      if ($rdb->input_is_void) {
-	  $self->set_status( "VOID" );
-      }
-      else {
-	  # "RUNNING"
-	  eval {
 	      $self->set_status( "RUNNING" );
 	      $rdb->db->disconnect_when_inactive(1); 
         $rdb->run;
         $rdb->db->disconnect_when_inactive(0); 
-	  };
-	  if ($err = $@) {
-
-	    print STDERR $@ . "\n";
-
-	    if(my $err_state = $rdb->failing_job_status){
-	      $self->set_status( $err_state );
-	    }else{
-	      $self->set_status( "FAILED" ); # default to just failed these jobs get retried
-	    }
-	    print (STDERR "RUNNING: Lost the will to live Error\n");
-	    $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
-	  }
-	  
-	  # "WRITING"
-	  eval {
-	      $self->set_status( "WRITING" );
-	      $rdb->write_output;
-	      # -------------------------------------------------------------------
-	      if($rdb->can('db_version_searched')){
-		  my $new_db_version = $rdb->db_version_searched();
-		  my $analysis = $self->analysis();
-		  my $old_db_version = $analysis->db_version();
-		  $analysis->db_version($new_db_version);
-		  # where is the analysisAdaptor??
-		  # $self->adaptor->get_AnalysisAdaptor->store($analysis);# if $new_db_version gt $old_db_version;
-	      } else {
-		  $SAVE_RUNTIME_INFO = 0;
-	      }
-	      # ------------------------------------------------------------------
-             $self->set_status("SUCCESSFUL");
-	  }; 
-	  if ($err = $@) {
-	      $self->set_status( "FAILED" );
-	      print (STDERR "WRITING: Lost the will to live Error\n");
-	      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
-	  }
+      };
+      if ($err = $@) {
+        
+        print STDERR $@ . "\n";
+        
+        if(my $err_state = $rdb->failing_job_status){
+          $self->set_status( $err_state );
+        }else{
+          $self->set_status( "FAILED" ); # default to just failed 
+          #these jobs get retried
+        }
+        print (STDERR "RUNNING: Lost the will to live Error\n");
+        $self->throw("Problems running $module for " . 
+                     $self->input_id . " [$err]\n");
       }
       
+      # "WRITING"
+      eval {
+	      $self->set_status( "WRITING" );
+	      $rdb->write_output;
+	      # ------------------------------------------------------------
+	      if($rdb->can('db_version_searched')){
+          my $new_db_version = $rdb->db_version_searchd();
+          my $analysis = $self->analysis();
+          my $old_db_version = $analysis->db_version();
+          $analysis->db_version($new_db_version);
+          # where is the analysisAdaptor??
+          # $self->adaptor->get_AnalysisAdaptor->store($analysis);
+          # if $new_db_version gt $old_db_version;
+	      } else {
+          $SAVE_RUNTIME_INFO = 0;
+	      }
+	      # -----------------------------------------------------------
+        $self->set_status("SUCCESSFUL");
+      }; 
+      if ($err = $@) {
+	      $self->set_status( "FAILED" );
+	      print (STDERR "WRITING: Lost the will to live Error\n");
+	      $self->throw("Problems for $module writing output for " . 
+                     $self->input_id . " [$err]" );
+      }
+    }
+    
   }    
   
   # update job in StateInfoContainer
   if ($autoupdate) {
-	eval {
+    eval {
 	    my $sic = $self->adaptor->db->get_StateInfoContainer;
 	    # -------------------------------------------------------------
 	    $sic->store_input_id_analysis(
-					  $self->input_id,
-					  $self->analysis,
-					  $self->execution_host,
-					  $SAVE_RUNTIME_INFO
-					  );
+                                    $self->input_id,
+                                    $self->analysis,
+                                    $self->execution_host,
+                                    $SAVE_RUNTIME_INFO
+                                   );
 	    # -------------------------------------------------------------
-	};
-	if ($err = $@) {
-            my $error_msg = "Job finished successfully, but could not be recorded as finished.  Job : [" 
-              . $self->input_id . "]\n[$err]";
-
-            eval {
-              $self->set_status("FAIL_NO_RETRY");
-            };
-            $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
-        
-            $self->throw($error_msg);
-	}
-	else {
-	    print STDERR "Updated successful job ".$self->dbID."\n";
-	}
+    };
+    if ($err = $@) {
+      my $error_msg = "Job finished successfully, but could not be ".
+        "recorded as finished.  Job : [" . $self->input_id . "]\n[$err]";
+      eval {
+        $self->set_status("FAIL_NO_RETRY");
+      };
+      $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
+      $self->throw($error_msg);
+    }else {
+      print STDERR "Updated successful job ".$self->dbID."\n";
     }
+  }
 }
-
 
 =head2 set_status
 
@@ -609,7 +611,7 @@ sub set_status {
   $self->throw("No status input" ) unless defined($arg);
   
   
-  if (!(defined($self->adaptor))) {
+  if (!$self->adaptor) {
     $self->warn("No database connection.  Can't set status to $arg");
     return;
   }
@@ -637,10 +639,15 @@ sub current_status {
   my $status;
   eval{
     $status = $self->adaptor->current_status( $self, $arg );
+      
   };
   if($@){
     $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
                  " ".$self->analysis->logic_name." error $@");
+  }
+  if($status->status eq 'SUCCESSFUL'){
+    my ($p, $f, $l) = caller;
+    print STDERR $f.":".$l."\n";
   }
   return $status;
 }
@@ -804,7 +811,7 @@ sub retry_count {
   if($arg) {
     $self->{'_retry_count'} = $arg; 
    }
-  $self->{'_retry_count'} ? $self->{'_retry_count'} : 0;
+  $self->{'_retry_count'};
 }
 
 sub can_retry{
@@ -879,18 +886,19 @@ sub set_up_queues {
     my %q;
 
     foreach my $queue (@$QUEUE_CONFIG) {
-	my $ln = $queue->{'logic_name'};
-	next unless $ln;
-	delete $queue->{'logic_name'};
-	while (my($k, $v) = each %$queue) {
-	    $q{$ln}{$k} = $v;
-	    $q{$ln}{'jobs'} = [];
-	    $q{$ln}{'last_flushed'} = undef;
-	    $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
-	    $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
-            $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
-	    $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
-	}
+      my $ln = $queue->{'logic_name'};
+      next unless $ln;
+      delete $queue->{'logic_name'};
+      while (my($k, $v) = each %$queue) {
+        $q{$ln}{$k} = $v;
+        $q{$ln}{'jobs'} = [];
+        $q{$ln}{'last_flushed'} = undef;
+        $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
+        $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+        $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+        $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
+        $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+      }
 
 	# a default queue for everything else
 	unless (defined $q{'default'}) {
@@ -900,6 +908,7 @@ sub set_up_queues {
 	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
             $q{'default'}{'jobs'} = [];
             $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
+       $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
 	}
     }
   

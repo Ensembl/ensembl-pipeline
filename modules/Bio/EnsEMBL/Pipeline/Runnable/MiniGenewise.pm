@@ -43,7 +43,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -128,13 +127,13 @@ sub make_MiniSeq {
 	
       } else {
 	
-	my $newfeature = new Bio::EnsEMBL::SeqFeature;
+	my $newfeature = new Bio::EnsEMBL::Feature;
 	
         $newfeature->seqname   ($f->hseqname);
         $newfeature->start     ($start);
 	$newfeature->end       ($end);
 	$newfeature->strand    (1);
-	$newfeature->attach_seq($self->genomic_sequence);
+	$newfeature->slice($self->genomic_sequence);
 	
 	push(@genomic_features,$newfeature);
 	
@@ -159,15 +158,12 @@ sub make_MiniSeq {
       $fp->start($f->start);
       $fp->end($f->end);
       $fp->seqname($f->seqname);
-      $fp->attach_seq($self->genomic_sequence);
+      $fp->slice($self->genomic_sequence);
       $fp->strand($f->strand);
-      $fp->score($f->score);
       $fp->hstart($cdna_start);
       $fp->hend($cdna_end);
       $fp->hstrand(1);
       $fp->hseqname($f->seqname."cdna");
-      $fp->p_value($f->p_value);
-      $fp->percent_id($f->percent_id);
       
       $pairaln->addFeaturePair($fp);
       
@@ -196,7 +192,7 @@ sub run {
 
   my $miniseq = $self->make_MiniSeq;
 	my $minigen = $miniseq->get_cDNA_sequence;
-
+  
   my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $minigen,
 							    -protein => $self->protein_sequence,
 							    -reverse => $self->_is_reversed,
@@ -234,12 +230,15 @@ sub run {
     $ec++;
     
     $f->strand($strand); 
-    print STDERR "Converting ".$f->start." ".$f->end." back into genomic ".
-      " coordinates\n";
+    #print STDERR "Converting ".$f->start." ".$f->end." back into genomic "
+    #      " coordinates\n";
     # need to convert whole exon back to genomic coordinates
     my @genomics = $miniseq->convert_SeqFeature($f);         
     my $gf;
-    
+    if(!@genomics){
+      print STDERR "Don't have anything returned by MiniSeq\n";
+      next FEAT;
+    }
     if ($#genomics > 0) {
       
       # all hell will break loose as the sub alignments will probably not map cheerfully 
@@ -253,11 +252,8 @@ sub run {
       $gf = $genomics[0];
     }
     
-    $gf->phase    ($f->phase);
-    $gf->end_phase($f->end_phase);
     $gf->strand   ($strand);
-    $gf->seqname  ($self->genomic_sequence->id);
-    $gf->score    (100);
+    $gf->seqname  ($self->genomic_sequence->seq_region_name);
     
     # also need to convert each of the sub alignments back to genomic coordinates
     
@@ -271,11 +267,11 @@ sub run {
       foreach my $a(@alns) {
 	$a->strand($strand); 
 	$a->hstrand(1);      
-	$a->seqname($self->genomic_sequence->id);
+	$a->seqname($self->genomic_sequence->seq_region_name);
 	$a->hseqname($self->protein_sequence->id);
 	
 	# Maybe put a check in that this really is a sub feature
-	
+
 	$gf->add_sub_SeqFeature($a,'');
       }
     }
@@ -288,7 +284,7 @@ sub run {
   # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
   # sub_SeqFeatures representing ungapped alignments making up the exon:protein alignment
   
-  my $fset = new Bio::EnsEMBL::SeqFeature();
+  my $fset = new Bio::EnsEMBL::Feature();
   
   foreach my $nf (@newf) {
     $fset->add_sub_SeqFeature($nf,'EXPAND');
@@ -441,4 +437,3 @@ sub endbias {
 
 
 1;
-

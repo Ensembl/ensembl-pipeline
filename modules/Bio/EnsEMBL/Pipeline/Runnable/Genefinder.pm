@@ -71,7 +71,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::TranscriptFactory;
+use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::PredictionTranscript;
 
@@ -82,7 +82,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
     $self->{'_exons'}     = [];    # an array of Bio::Seqfeatures (exons)
-    $self->{'_genes'}     = [];    # an array of arrays of SeqFeature 
+    $self->{'_genes'}     = [];    # an array of arrays of Feature 
     $self->{_transcripts} = [];
     $self->{'_tablenamefile'} = undef;
     $self->{'_intronpenalty'} = undef;
@@ -599,67 +599,67 @@ sub create_feature {
 #creates groups of exons as subseqfeatures.
 #relies on seqname of exons being in genefinder format 3.01, 3.02 etc
 sub create_genes {
-    my ($self) = @_;
-    #print "creating genes \n";
-    my (%genes, %gene_start, %gene_end, %gene_score, %gene_p,
-        %gene_strand, %gene_source, %gene_primary, %gene_analysis);
-
-    my @ordered_exons = sort { $a->start <=> $b->start } $self->exons();
-
-    #sort exons into hash by initial numbers of seqname (genes)
-    foreach my $exon (@ordered_exons)
+  my ($self) = @_;
+  #print "creating genes \n";
+  my (%genes, %gene_start, %gene_end, %gene_score, %gene_p,
+      %gene_strand, %gene_source, %gene_primary, %gene_analysis);
+  
+  my @ordered_exons = sort { $a->start <=> $b->start } $self->exons();
+  
+  #sort exons into hash by initial numbers of seqname (genes)
+  foreach my $exon (@ordered_exons)
     {
       #print $exon->seqname."\n";
-        my ($group_number) = $exon->seqname;
-	#print "seqname =  ".$exon->seqname."\n";
-	#print $group_number."\n";
-        #intialise values for new gene
-        unless (defined ($genes {$group_number}))
+      my ($group_number) = $exon->seqname;
+      #print "seqname =  ".$exon->seqname."\n";
+      #print $group_number."\n";
+      #intialise values for new gene
+      unless (defined ($genes {$group_number}))
         {
-	  #print "creating a new trancripts for ".$group_number."\n";
-            $genes          {$group_number} = [];
-            $gene_start     {$group_number} = $exon->start;
-            $gene_end       {$group_number} = $exon->end;
-            $gene_score     {$group_number} = 0 ;
-            $gene_strand    {$group_number} = $exon->strand;
-            $gene_analysis  {$group_number} = $exon->analysis;
+          #print "creating a new trancripts for ".$group_number."\n";
+          $genes          {$group_number} = [];
+          $gene_start     {$group_number} = $exon->start;
+          $gene_end       {$group_number} = $exon->end;
+          $gene_score     {$group_number} = 0 ;
+          $gene_strand    {$group_number} = $exon->strand;
+          $gene_analysis  {$group_number} = $exon->analysis;
         }
-        #fill array of exons
-	#print "adding an exon to ".$group_number."\n";
-        push (@{$genes {$group_number}}, $exon);
-        #calculate gene boundaries and total score
-        $gene_start {$group_number} = $exon->start() 
-            if ($exon->start() < $gene_start{$group_number});
-        $gene_end   {$group_number} = $exon->end() 
-            if ($exon->end() > $gene_end{$group_number});
-        $gene_score {$group_number} += $exon->score();
-        
+      #fill array of exons
+      #print "adding an exon to ".$group_number."\n";
+      push (@{$genes {$group_number}}, $exon);
+      #calculate gene boundaries and total score
+      $gene_start {$group_number} = $exon->start() 
+        if ($exon->start() < $gene_start{$group_number});
+      $gene_end   {$group_number} = $exon->end() 
+        if ($exon->end() > $gene_end{$group_number});
+      $gene_score {$group_number} += $exon->score();
+      
     }
-
-    #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
-    foreach my $gene_number (keys(%genes))
+  
+  #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
+  foreach my $gene_number (keys(%genes))
     {
-        my $gene = Bio::EnsEMBL::SeqFeature->new
-                        (   -seqname     => $gene_number,
-                            -strand      => $gene_strand   {$gene_number},
-                            -score       => $gene_score    {$gene_number}
-                                            /(scalar @{$genes {$gene_number}}),
-                            -start       => $gene_start    {$gene_number},
-                            -end         => $gene_end      {$gene_number},
-                            -analysis    => $gene_analysis {$gene_number}, )
-                    or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
-	$gene->contig($self->query);
-        foreach my $exon (@{$genes {$gene_number}})
+      my $gene = Bio::EnsEMBL::SeqFeature->new
+        (   -seqname     => $gene_number,
+            -strand      => $gene_strand   {$gene_number},
+            -score       => $gene_score    {$gene_number}
+            /(scalar @{$genes {$gene_number}}),
+            -start       => $gene_start    {$gene_number},
+            -end         => $gene_end      {$gene_number},
+            -analysis    => $gene_analysis {$gene_number}, )
+          or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
+      $gene->contig($self->query);
+      foreach my $exon (@{$genes {$gene_number}})
         {
           $gene->add_sub_SeqFeature($exon, '');
         }
-        $self->genefinder_genes($gene); #add gene to main object
-	#print STDERR "contig ".$gene->contig."\n";
-	$self->query->id($gene_number);
-	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
-	#print "have ".$tran."\n";
-	$self->add_Transcript($tran);
-      }
+      $self->genefinder_genes($gene); #add gene to main object
+      #print STDERR "contig ".$gene->contig."\n";
+      $self->query->id($gene_number);
+      my $tran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_with_seq($gene, $self->query);
+      #print "have ".$tran."\n";
+      $self->add_Transcript($tran);
+    }
 }
 
 ##############
@@ -703,7 +703,10 @@ sub output {
             @exons = sort {$b->start <=> $a->start } @{$exons};
         }
 
-        push @pred, Bio::EnsEMBL::PredictionTranscript->new(@exons);
+        push @pred, Bio::EnsEMBL::PredictionTranscript->new
+          (
+           -exons => \@exons
+          );
     }
     return @pred;
 }

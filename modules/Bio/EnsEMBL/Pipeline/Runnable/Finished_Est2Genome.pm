@@ -52,6 +52,7 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome;
 
+use vars qw(@ISA $verbose);
 use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
@@ -59,9 +60,9 @@ use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Data::Dumper;
 
-our @ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Est2Genome);
+@ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Est2Genome);
 
-my $verbose = 0;
+$verbose = 0;
 
 sub run{
     my ($self, @args) = @_;
@@ -90,8 +91,6 @@ sub run{
     }
 
     my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
-#    my $est_genome_command = $self->est_genome . " -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
-#/nfs/disk100/pubseq/emboss/bin/
         # use -align to get alignment
     print STDERR "\nRunning command $est_genome_command\n\n";
 
@@ -103,12 +102,7 @@ sub run{
 	    # Catch 'Align EST and genomic DNA sequences'. This comes from STDERR!! [ 2>&1 ]
 	    $firstline = <ESTGENOME>;
 	    print STDERR "\$firstline (secondline!): \t$firstline" if $verbose;	    
-	}elsif($firstline =~ /error/i){
-            close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-            $self->throw("There was an error.  Here is the first line of est2genomes output:\n" .
-                         $firstline);
-            return (0);
-        }
+	}
 
 	if( $firstline =~ m/reversed\sest/ ){
 	    $self->est_strand(-1);
@@ -144,22 +138,21 @@ sub run{
 		    -primary    => $primary
 		    );
 	    }elsif ($_ =~ /Segmentation fault/) {
+		$self->warn("Segmentation fault from est_genome\n");
 		close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-		$self->throw("Segmentation fault from est_genome\n");
 		return(0);
 	    }elsif ($_ =~ /(ERROR:.+)/) {
+		$self->warn("Error from est_genome: \n<$1>\n");
 		close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-		$self->throw("Error from est_genome: \n<$1>\n");
 		return(0);
 	    }
 	}
-
 	foreach my $seg_array( keys(%{$self->{'_exons'}}) ){
 	    my $dnafp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => $self->{'_exons'}->{$seg_array});
 	    $self->add_output($dnafp);
 	}
 	if(!close(ESTGENOME)){
-	    $self->throw("Problems running est_genome when closing pipe: $!\n");
+	    $self->warn("Problems running est_genome when closing pipe: $!\n");
 	    return (0);
 	}
     };

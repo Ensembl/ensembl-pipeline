@@ -725,7 +725,7 @@ sub get_Exons{
   my @newexons;
   my $strand = $trans->start_Exon->strand;
 
-  my $verbose = 0;
+  my $verbose = 1;
 
   if ( $coding ){
     if ( $strand == 1 ){
@@ -804,7 +804,7 @@ sub get_exon_pairs{
     my @exons1 = @{$self->get_Exons( $tran1,$coding)};
     my @exons2 = @{$self->get_Exons( $tran2,$coding)};
     
-    my $verbose = 0;
+    my $verbose = 1;
     print STDERR "get_exon_pairs()\n" if $verbose;
     my %exon_map;
     my %exon_pointer_map;
@@ -2054,7 +2054,7 @@ sub _get_start_end {
 sub blast_CDSs{
     my ( $self,$tran1,$tran2) = @_;
     
-    my $verbose = 0;
+    my $verbose = 1;
 
     # query
     my $id1;
@@ -2221,7 +2221,7 @@ sub blast_CDSs{
 sub blast_unmapped_transcripts{
   my ( $self,$seq1,$seq2) = @_;
   
-  my $verbose = 0;
+  my $verbose = 1;
   
   # query
   my $id1 = $seq1->display_id;
@@ -2253,8 +2253,6 @@ sub blast_unmapped_transcripts{
   
   #my $options = "W=5";
   my $options = "";
-  # abel options
-  $options .= " -span1 ";
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						  '-program'        => 'wublastn',
@@ -2566,7 +2564,7 @@ sub process_unmapped_query{
 sub blast_unmapped_proteins{
     my ( $self,$seq1,$seq2) = @_;
     
-    my $verbose = 0;
+    my $verbose = 1;
     my $id1 = $seq1->display_id;
     my $id2 = $seq2->display_id;
 
@@ -2596,16 +2594,12 @@ sub blast_unmapped_proteins{
     system("setdb $database > /dev/null 2>&1");
     
     my $options = " -warnings";
-    
-    ############################################################
-    # abel options
-    $options .= " -postsw -span1 V=20 B=20 ";
     my $blast =  
       Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						    '-program'        => 'wublastp',
 						    '-database'       => $database,
 						    '-threshold_type' => "PVALUE",
-						    '-threshold'      => 1e-10,
+						    #'-threshold'      => 1e-10,
 						    '-options'        => $options,
 						   );
     
@@ -2687,8 +2681,8 @@ sub blast_unmapped_proteins{
       }
       $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
       
-      print STDERR "\ttarget:$id1 coverage:$target_coverage spliced:$target_spliced\n";
-      print STDERR "\tquery :$id2 coverage:$query_coverage spliced:$query_spliced\n";
+      print STDERR "\ttarget:$id1 coverage:$target_coverage spliced:$query_spliced\n";
+      print STDERR "\tquery :$id2 coverage:$query_coverage spliced:$target_spliced\n";
       print STDERR "\taveraged percent id: $perc_id\n";
       
       $best_score = 0 if ( $target_coverage + $query_coverage < 100 );

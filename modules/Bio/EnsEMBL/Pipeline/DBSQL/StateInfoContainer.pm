@@ -103,8 +103,8 @@ sub fetch_analysis_by_input_id {
      WHERE input_id = ? } );
   $sth->execute($inputId);
 
-  while( my @row = $sth->fetchrow_array ) {
-    my $analysis = $anaAd->fetch_by_dbID( $row[0] );
+  while( my $row = $sth->fetchrow_arrayref ) {
+    my $analysis = $anaAd->fetch_by_dbID( $row->[0] );
     if($analysis ) {
       push( @result, $analysis );
     }
@@ -128,10 +128,6 @@ the analysis object does not have a type.
 sub store_input_id_analysis {
   my ($self, $inputId, $analysis, $host, $save_runtime_info ) = @_;
 
-  my $hostname = [ split(/\./, hostname()) ];
-
-  $host = $host || shift(@$hostname);
-
   $self->throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
    unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
@@ -146,12 +142,12 @@ sub store_input_id_analysis {
   if($save_runtime_info){
   	print "Saving runtime info\n";
   	print join("\t",($inputId, $analysis->dbID, $host, $analysis->db_version)) . "\n";
-        my $sth = $self->prepare(qq{
-                REPLACE INTO input_id_analysis
-                (input_id, input_id_type, analysis_id, created, runhost, db_version)
-                values (?, ?, ?, now(), ?, ?)
-                });
-        $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version || 'ERROR');
+      my $sth = $self->prepare(qq{
+      	REPLACE INTO input_id_analysis
+      	(input_id, input_id_type, analysis_id, created, runhost, db_version)
+      	values (?, ?, ?, now(), ?, ?)
+      	});
+    $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version || 'ERROR');
   }else{
       my $sth = $self->prepare(qq{
       	INSERT INTO input_id_analysis
@@ -353,15 +349,9 @@ sub list_input_ids_by_type {
   my $type = shift;
   my @ids;
   my @row;
-# input_id_type is NOT indexed, this together with the DISTINCT make for a slow query [ALL table scan]
-# mysql> explain SELECT DISTINCT input_id FROM input_id_analysis WHERE input_id_type = 'CONTIG';
-# +-------------------+------+---------------+------+---------+------+-------+-----------------------------+
-# | table             | type | possible_keys | key  | key_len | ref  | rows  | Extra                       |
-# +-------------------+------+---------------+------+---------+------+-------+-----------------------------+
-# | input_id_analysis | ALL  | NULL          | NULL |    NULL | NULL | XXXXX | where used; Using temporary |
-# +-------------------+------+---------------+------+---------+------+-------+-----------------------------+
+
   my $sth = $self->prepare( qq{
-    SELECT DISTINCT input_id FROM input_id_analysis WHERE input_id_type=?
+    SELECT distinct input_id FROM input_id_analysis where input_id_type=?
     });
 
   $sth->execute($type);
@@ -373,47 +363,16 @@ sub list_input_ids_by_type {
   return \@ids;
 }
 
-# returns true if is current = 'Y', false if = 'N'
-
-sub check_is_current{
-  my ($self, $analysis_id, $input_id) = @_;
-  my $id;
-
-  my $sql = qq{
-    SELECT IF(is_current <> 'N', 1, 0)
-      FROM input_id_analysis iia,
-           db_version_table db
-      WHERE iia.db_version = db.db_verion
-        && iia.analysis_id = ?
-        && iia.input = ?
-    };
-  ################################
-  $sql =~ s/\?/\'$analysis_id\'/;# Comment me l8r
-  $sql =~ s/\?/\'$input_id\'/;   # Comment me l8r
-  #print "\nexecuting : $sql";    # Comment me l8r
-  ################################
-  #my $sth = $self->prepare( $sql );
-  #
-  #$sth->execute($analysis_id, $id);
-  #$sth->bind_columns(\$id);
-  #$sth->fetch();
-  return 1;
-  return $id;
-
-}
-
 sub list_input_ids_by_analysis {
   my $self = shift;
   my $analysis_id = shift;
   my @ids;
   my @row;
-
   if(!$analysis_id){
     $self->throw("need an analysis id list from");
   }
-  # do we really need DISTINCT ? input_id, analysis_id is PRIMARY KEY
   my $sth = $self->prepare( qq{
-    SELECT input_id FROM input_id_analysis where analysis_id=?
+    SELECT distinct input_id FROM input_id_analysis where analysis_id=?
     });
 
   $sth->execute($analysis_id);
@@ -523,56 +482,6 @@ sub deleteObj {
       $obj->deleteObj;
     }
   }
-}
-
-##########################
-sub list_input_id_by_Analysis_assembly_type_priority {
-  my ($self, $analysis, $assembly, $priority) = @_;
-  
-  if (ref $analysis && $analysis->isa("Bio::EnsEMBL::Analysis")) {
-    $analysis = $analysis->dbID;
-  }
-  $assembly ||= [];
-  my @result;
-  my $query;
-  if($priority){ # order by priority
-      $priority = priority($priority);
-      $query = qq{
-	  SELECT input_id
-	      FROM input_id_analysis i STRAIGHT_JOIN contig c 
-	     LEFT JOIN assembly a ON c.contig_id = a.contig_id
-	     LEFT JOIN sequence_set s ON s.assembly_type = a.type
-	     WHERE i.input_id = c.name 
-	     && i.analysis_id = ?
-	 };
-      if (scalar(@$assembly) > 0){
-	  $query .= "&& ( " . join("||", map{ " a.type = ? " } @$assembly ) . " )";
-      }
-      $query .= qq{ && s.analysis_priority = '$priority' };
-#      $query .= qq{ ORDER BY ISNULL(s.analysis_priority), s.analysis_priority};
-  }else{
-      $query = qq{
-	  SELECT input_id
-	      FROM input_id_analysis i STRAIGHT_JOIN contig c 
-	     LEFT JOIN assembly a ON c.contig_id = a.contig_id 
-	     WHERE i.input_id = c.name 
-	     && i.analysis_id = ?
-	 };
-      if (scalar(@$assembly) > 0){
-	  $query .= "&& ( " . join("||", map{ " a.type = ? " } @$assembly ) . " )";
-      }
-  }
-  my $sth = $self->prepare($query);
-  #warn $sth->{Statement};
-  $sth->execute($analysis, @$assembly);
-
-  my $table = $sth->fetchall_arrayref;
-
-  foreach my $row (@{$table}) {
-    push @result, $row->[0];
-  }
-
-  return \@result || reset_priority() && [];
 }
 
 1;

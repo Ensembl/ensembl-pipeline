@@ -75,7 +75,7 @@ sub new {
 sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
-  #print STDERR "Fetching job ".$id."\n";
+
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count, temp_dir, exec_host
@@ -109,7 +109,7 @@ sub fetch_by_submission_id {
   while( my $rowHashRef = $sth->fetchrow_hashref ) {
     push( @result, $self->_objFromHashref( $rowHashRef ));
   }
-  #print STDERR "Have ".@result." from fetching by ".$submissionid."\n";
+ 
   return @result;
 }
 
@@ -173,7 +173,7 @@ sub fetch_by_Status_Analysis {
            j.temp_dir, j.exec_host
 	FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
-        AND      j.analysis = ?
+        AND      j.analysis_id = ?
         AND      js.status = ?
 	AND      js.is_current = 'y'
         ORDER BY time desc
@@ -394,10 +394,9 @@ sub store {
                 $job->temp_dir,
                 $job->execution_host,
                );
-  $sth = $self->prepare("SELECT LAST_INSERT_ID()");
-  $sth->execute;
 
-  my $dbId = ($sth->fetchrow_arrayref)->[0];
+ 
+  my $dbId = $sth->{'mysql_insertid'};
   $job->dbID( $dbId );
   $job->adaptor( $self );
 
@@ -534,8 +533,8 @@ sub _objFromHashref {
   my $hashref = shift;
   my $job;
   my $analysis;
-  my ($p, $f, $l) = caller;
-  #print STDERR "calling JobADaptor->objectfromHashref from $f:$l\n";
+ 
+  
   $analysis =
     $self->db->get_AnalysisAdaptor->
       fetch_by_dbID( $hashref->{analysis_id} );
@@ -585,7 +584,7 @@ sub set_status {
                                 SET    is_current = 'n'
                                 WHERE  job_id = ?
                                });
-	$res = $sth->execute($jobId);
+        $res = $sth->execute($jobId);
         
         $sth = $self->prepare(q{
                                 INSERT into job_status
@@ -607,12 +606,11 @@ sub set_status {
           );
         
         $self->current_status($job, $status);
-        
-        #	print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
+        $sth->finish;
       };
     
     if ($@) {
-      #      print( " $@ " );
+      print( " $@ " );
       
       $self->throw("Error setting status to $stat_str");
     } else {
@@ -664,9 +662,10 @@ sub current_status {
           $time    = $rowhash->[0];
         }
         if(!$status){
+          my ($p, $f, $l) = caller;
           $self->warn("Have found no status for ".$job->dbID." ".
                       $job->input_id." ".$job->analysis->dbID.
-                      " assuming is sucessful\n");
+                      " assuming is sucessful $f:$l\n");
           $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
@@ -675,6 +674,7 @@ sub current_status {
                                                             '-created' => $time,
                                                            );
         $job->{'_status'} = $statusobj;
+        $sth->finish;
       }
     return $job->{'_status'};
   }

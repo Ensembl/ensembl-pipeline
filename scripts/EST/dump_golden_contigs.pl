@@ -25,13 +25,11 @@ use strict;
 use Getopt::Long;
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-# use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::XXX qw (
-#         EST_REFDBNAME
-#         EST_REFDBHOST
-#         EST_REFDBUSER
-# );
-# scp - not sure which config module from Config::cDNAs_ESTs
-# (all have EST_REFDB.... entries)
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_REFDBNAME
+					EST_REFDBHOST
+					EST_REFDBUSER
+				       );
 
 $| = 1;
 

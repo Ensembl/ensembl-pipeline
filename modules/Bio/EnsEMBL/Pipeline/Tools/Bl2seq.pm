@@ -4,8 +4,6 @@ package Bio::EnsEMBL::Pipeline::Tools::Bl2seq;
 use strict;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::Block;
-use Bio::EnsEMBL::Pipeline::RunnableI;
-
 use Carp;
 use vars qw(@ISA);
 

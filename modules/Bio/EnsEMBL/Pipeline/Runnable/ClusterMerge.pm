@@ -169,6 +169,7 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
+  #$use_score = 1;
   if ( $use_score ){
       $self->use_score($use_score);
   }
@@ -176,7 +177,7 @@ sub new {
 
   if ( $comparison_level ){
     $self->_comparison_level($comparison_level);
-    print STDERR "comparison_level = ".$self->_comparison_level."\n";
+    #print STDERR "comparison_level = ".$self->_comparison_level."\n";
   }
   else{
     print STDERR "defaulting comparison_level to 2\n";
@@ -224,11 +225,11 @@ sub new {
 
   if ( defined $internal_splice_overlap ){
     $self->_internal_splice_overlap( $internal_splice_overlap );
-    print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
+    #print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
   }
   else{
     $self->_internal_splice_overlap( 0 );
-    print STDERR "defaulting internal_splice_overlap = 0\n";
+    #print STDERR "defaulting internal_splice_overlap = 0\n";
   }
 
   if ( defined $exon_match ){
@@ -1248,7 +1249,7 @@ sub run {
   ############################################################
   # cluster the transcripts
   my @transcript_clusters = $self->_cluster_Transcripts(\@transcripts);
-  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
+  #print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
   ############################################################
   # restrict the number of ESTs per cluster, for the time being, to avoid deep recursion 
@@ -1257,12 +1258,12 @@ sub run {
   ############################################################
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
-  print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
+  #print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
 
   ############################################################
   # merge each list into a putative transcript
   my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
-  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
+  #print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
   
   ############################################################
   # we can score the predictions:
@@ -1273,7 +1274,7 @@ sub run {
       $label = $self->_label;
     }
 
-    print STDERR "calculating scores\n";
+    #print STDERR "calculating scores\n";
     my $score_model = 
       Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel
 	->new(
@@ -1341,8 +1342,6 @@ sub _filter_clusters{
 sub _cluster_Transcripts {
   my ($self,$transcripts) = @_;
  
-  my $verbose = $self->verbose();
-  
   my $forward_transcripts;
   my $reverse_transcripts;
  
@@ -1360,14 +1359,14 @@ sub _cluster_Transcripts {
   if ( $forward_transcripts && @$forward_transcripts ){
     my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( $forward_transcripts );
     if ( @forward_clusters){
-      print STDERR scalar( @forward_clusters )." clusters in forward strand\n" if $verbose;
+      #print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
       push( @clusters, @forward_clusters);
     }
   }
   if ( $reverse_transcripts && @$reverse_transcripts ){
     my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( $reverse_transcripts );
     if ( @reverse_clusters ){
-      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n" if $verbose;
+      #print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
       push( @clusters, @reverse_clusters);
     }
   }
@@ -1414,7 +1413,7 @@ sub _cluster_Transcripts_by_genomic_range{
 		      } @$mytranscripts;
   
   @$mytranscripts = ();
-  print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
+  #print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
   
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
@@ -1477,7 +1476,7 @@ sub _cluster_Transcripts_by_genomic_range{
       my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
       push( @new_clusters, $new_cluster );
       my @transcripts = @{$cluster->get_Transcripts};
-      print STDERR "cluster $ccount: ".scalar(@transcripts)." transcripts\n";
+      #print STDERR "cluster $ccount: ".scalar(@transcripts)." transcripts\n";
       @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @transcripts;
       
       #take only the longest 50;
@@ -1487,7 +1486,7 @@ sub _cluster_Transcripts_by_genomic_range{
         $new_cluster->put_Transcripts( $trans );
 	last if $c == 50;
       }
-      print STDERR "new_cluster $ccount: ".scalar( @{$new_cluster->get_Transcripts} )." transcripts\n";
+      #print STDERR "new_cluster $ccount: ".scalar( @{$new_cluster->get_Transcripts} )." transcripts\n";
     }
     return @new_clusters;
   }
@@ -1602,7 +1601,7 @@ description: make a transcript for every list built above in link_Transcripts().
 
 sub _merge_Transcripts{
     my ($self,$lists) = @_;
-    print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
+    #print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
     my $verbose = $self->verbose;
     
@@ -1617,7 +1616,7 @@ sub _merge_Transcripts{
       $count++;
       
       if ($verbose){
-	print STDERR "list $count:\n";
+	#print STDERR "list $count:\n";
 	foreach my $t ( @$list ){
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
 	}
@@ -1688,7 +1687,7 @@ sub _merge_Transcripts{
 	$new_exon->start($exon_cluster->start );
 	$new_exon->end  ($exon_cluster->end   );
 	$new_exon->seqname( $transcript->type."_".$exon_count);
-	$new_exon->score(100);
+	#$new_exon->score(100);
 
 	############################################################
 	# they should not have a translation
@@ -1709,8 +1708,8 @@ sub _merge_Transcripts{
       }
       
       if ($verbose){
-	  print STDERR "Produced transcript:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcript );
+	  #print STDERR "Produced transcript:\n";
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcript );
       }
       
       if ( $self->use_score ){
@@ -1738,7 +1737,7 @@ sub _merge_Transcripts{
  
  Function: it cluster exons according to overlap,
            it returns a Bio::EnsEMBL::SeqFeature, where the sub_SeqFeatures
-           are exon_clusters, which are at the same time Bio::EnsEMBL::SeqFeatures,
+           are exon_clusters, which are at the same time Bio::EnsEMBL::Features,
            whose sub_SeqFeatures are exons
 =cut
 
@@ -1754,13 +1753,13 @@ sub _cluster_Exons{
   my %exon2cluster;
   
   # main cluster feature - holds all clusters
-  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  my $cluster_list = new Bio::EnsEMBL::Feature; 
   
   # sort exons by start coordinate
   @exons = sort { $a->start <=> $b->start } @exons;
 
   # Create the first exon_cluster
-  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  my $exon_cluster = new Bio::EnsEMBL::Feature;
   
   # Start off the cluster with the first exon
   $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
@@ -1777,16 +1776,16 @@ sub _cluster_Exons{
       
       # Add to cluster if overlap AND if strand matches
       if ( $exon_cluster->overlaps($exon) && ( $exon->strand == $exon_cluster->strand) ) { 
-	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+        $exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
       }  
       else {
-	# Start a new cluster
-	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
-	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
-	$exon_cluster->strand($exon->strand);
-		
-	# and add it to the main_cluster feature
-	$cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
+        # Start a new cluster
+        $exon_cluster = new Bio::EnsEMBL::Feature;
+        $exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+        $exon_cluster->strand($exon->strand);
+        
+        # and add it to the main_cluster feature
+        $cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
       }
     }
     $count++;

@@ -47,16 +47,16 @@ use vars qw( %PseudoGenes );
 %PseudoGenes = (
 	      
 	############################################################
-	# parameters common to both types of pseudogene analysis
-		
-		
-	TMPDIR      => '/ecs2/scratch1/ensembl/eae/Human_PseudoGenes',
-        BSUBS_FILE  => '/ecs2/scratch1/ensembl/eae/Human_PseudoGenes/jobs',
+	# parameters common to both types of
+	# pseudogene analysis
+
+        TMPDIR      => '/ecs2/scratch1/ensembl/eae/Rat_PseudoGenes',
+        BSUBS_FILE  => '/ecs2/scratch1/ensembl/eae/Rat_PseudoGenes/jobs',
         LSF_OPTIONS => ' -C0 -q acari ',
 	      
         # database with the syntenic regions. orthologs, etc
-	COMPARA_DBNAME  => 'ensembl_compara_18_1',
-	COMPARA_DBHOST  => 'ecs2b',
+	COMPARA_DBNAME  => 'ensembl_compara_16_1',
+	COMPARA_DBHOST  => 'ecs2f',
 				
 	
 	# Species we compare to:
@@ -64,25 +64,25 @@ use vars qw( %PseudoGenes );
 	# compatible with the compara database use above.
 	# We do it like this and not using a compara_config file to
 	# avoid having multiple config files
-	FOCUS_SPECIES => 'Homo sapiens',
+	FOCUS_SPECIES => 'Rattus norvegicus',
 	COMPARATIVE_DBS    => [
 				       {
-					SPECIES => 'Rattus norvegicus',
-					DBHOST  => 'ecs2d',
-					DBNAME  => 'rattus_norvegicus_18_3',
-					PATH    => 'RGSC3.1',
+					SPECIES => 'Homo sapiens',
+					DBHOST  => 'ecs2f',
+					DBNAME  => 'homo_sapiens_core_16_33',
+					PATH    => 'NCBI33',
 				       },
 				       {
 					SPECIES => 'Mus musculus',
-					DBHOST  => 'ecs2',
-					DBNAME  => 'mus_musculus_core_16_30_ro',
+					DBHOST  => 'ecs2f',
+					DBNAME  => 'mus_musculus_core_16_30',
 					PATH    => 'NCBIM30',
 				       },
 				      ],
 
 	# refdb, where the sequence is, sometimes this can be different from genewise_db
-	REF_DBNAME   => 'human_ncbi34_raw',
-	REF_DBHOST   => 'ecs2e',	
+	REF_DBNAME   => 'rattus_norvegicus_core_16_2',
+	REF_DBHOST   => 'ecs2f',	
 
 	############################################################
 	#
@@ -114,25 +114,23 @@ use vars qw( %PseudoGenes );
 	PSEUDO_PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl -check',
 				
 	INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	      	      	
+	      	      
+	
 	# database where we will write the pseudogenes
 	PSEUDO_DBUSER   => 'ensadmin',
-	PSEUDO_DBNAME   => 'NCBI34_pseudogene_eae',
-	PSEUDO_DBHOST   => 'ecs2c',
-	PSEUDO_DBPASS   => 'ensembl',
+	PSEUDO_DBNAME   => '',
+	PSEUDO_DBHOST   => '',
+	PSEUDO_DBPASS   => '',
 
         # EXONERATE OPTIONS #
 		      
 	# full path fo the dir where we have the masked-dusted chromosomes
-	      GENOMIC                 => '/data/blastdb/Ensembl/Human/NCBI34/genome/masked_dusted',
+	      GENOMIC                 => '/data/blastdb/Ensembl/NCBI33/genome/',
       	      # path to file with repeatmasked dusted genomic sequences
 	      # NB this file is huge - distribute it across the farm or 
 	      # be prepared to face the wrath of systems when the network 
 	      # seizes up!
 	
-	# location of the cdnas
-		CHUNKS => '/ecs2/work4/eae/NCBI33/cdnas/Coding_mRNAs/chunks/',
-
 	      # which version of exonerate      
 	      EXONERATE              => '/usr/local/ensembl/bin/exonerate-0.6.7',
 	      
@@ -151,9 +149,6 @@ use vars qw( %PseudoGenes );
 	    PSEUDO_ANALYSIS     => 'pseudogene',	      
 	    PSEUDO_SOURCE       => 'RefSeq-EMBL',      
 	      	    
-
-		REPEAT_DBNAME  => 'human_ncb34_raw',
-		REPEAT_DBHOST  => 'ecs2e',
 
 		    
 	     );	      

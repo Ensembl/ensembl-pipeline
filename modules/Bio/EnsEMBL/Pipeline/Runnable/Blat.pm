@@ -327,7 +327,7 @@ sub run {
       $feat2 {start} = $query_start;
       $feat2 {end}   = $query_end;
       if ( $query_end <  $query_start ){
-	$self->throw("dodgy feature coordinates: end = $query_end, start = $query_start. Reversing...");
+	$self->warn("dodgy feature coordinates: end = $query_end, start = $query_start. Reversing...");
 	$feat2 {end}   = $query_start;
 	$feat2 {start} = $query_end;
       }

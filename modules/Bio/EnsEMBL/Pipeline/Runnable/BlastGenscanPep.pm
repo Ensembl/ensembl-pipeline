@@ -98,45 +98,45 @@ sub new {
     $self->_rearrange ([qw(GENOMIC PEPTIDE PROGRAM DATABASE THRESHOLD THRESHOLD_TYPE
 			   OPTIONS)], @args);
   
-  if (defined($genomic) && $genomic->isa("Bio::PrimarySeqI")) {
+  if (($genomic) && $genomic->isa("Bio::PrimarySeqI")) {
     $self->genomic($genomic);
   } else {
     $self->throw("No genomic sequence input");
   }
   
-  if (defined($peptide) && $peptide->isa("Bio::EnsEMBL::PredictionTranscript")) {
+  if (($peptide) && $peptide->isa("Bio::EnsEMBL::PredictionTranscript")) {
       $self->peptide($peptide);
-  } elsif (defined($peptide)) {
+  } elsif ($peptide) {
       $self->throw("[$peptide] is not a Bio::EnsEMBL::PredictionTranscript");
   } else {
     $self->throw("No peptide input");
   }
   
-  if (defined($program)) {
+  if ($program) {
     $self->program($self->find_executable($program));
   } else {
     $self->throw ("No program input");
   }
   
-  if (defined($database)) {
+  if ($database) {
     $self->database($database);
   } else {
-    $self->throw("No database defined");
+    $self->throw("No database ");
   }
 
-  if (defined($threshold)) {
+  if ($threshold) {
     $self->threshold($threshold);
   } else {
     $self->threshold(0);
   }
 
-  if (defined($threshold_type)) {
+  if ($threshold_type) {
     $self->threshold_type($threshold_type);
   } else {
     $self->threshold_type('PVALUE');
   }
   
-  if (defined($options)) {
+  if ($options) {
     $self->options($options);
   } 
   
@@ -159,7 +159,7 @@ sub run {
   
   my $transcript = $self->peptide;
 
-  if (!defined($transcript)) {
+  if (!$transcript) {
     $self->throw("No peptide input");
   }
   
@@ -418,7 +418,7 @@ sub check_features {
   my %seqhash;
 
   foreach my $f (@f) {
-    if (!defined($seqhash{$f->hseqname})) {
+    if (!($seqhash{$f->hseqname})) {
       my $seq = $self->get_Sequence($f->hseqname);
       $seqhash{$f->hseqname} = $seq;
     }
@@ -438,7 +438,7 @@ sub get_Sequence {
     my ($self,$id) = @_;
 
 
-    next ID unless defined($id);
+    next ID unless ($id);
 
     #print(STDERR "Sequence id :  is [$id]\n");
     my $seq;
@@ -450,8 +450,8 @@ sub get_Sequence {
 	$seq = $seqfetcher->get_Seq_by_acc($id);
       };
       if ($@) {
-	print STDERR ("Couldn't find sequence for [$id] in BlastGenscanPep");
-	return;
+        print STDERR ("Couldn't find sequence for [$id] in BlastGenscanPep");
+        return;
       }
       
     }
@@ -461,13 +461,13 @@ sub get_Sequence {
       my $seqstr;
 	
       while (<IN>) {
-	chomp;
-	$seqstr .= $_;
+        chomp;
+        $seqstr .= $_;
       }
     
     
 
-      if (!defined($seqstr) || $seqstr eq "no match") {
+      if (!($seqstr) || $seqstr eq "no match") {
         print STDERR ("Couldn't find sequence for [$id] in BlastGenscanPep");
 	return;
       }
@@ -496,9 +496,9 @@ sub get_Sequence {
 sub genomic {
     my($self,$seq) = @_;
     
-    if (defined($seq)) {
+    if ($seq) {
       if (!($seq->isa("Bio::PrimarySeqI"))) {
-	$self->throw("[$seq] is not a Bio::PrimarySeqI");
+        $self->throw("[$seq] is not a Bio::PrimarySeqI");
       }
 
       $self->{'_genomic'} = $seq;
@@ -520,7 +520,7 @@ sub genomic {
 sub peptide {
     my($self,$seq) = @_;
     
-    if (defined($seq)) {
+    if ($seq) {
       if (!($seq->isa("Bio::EnsEMBL::PredictionTranscript"))) {
 	$self->throw("[$seq] is not a Bio::EnsEMBL::PredicitionTranscript");
       }
@@ -543,7 +543,7 @@ sub peptide {
 sub program {
     my($self,$arg) = @_;
     
-    if (defined($arg)) {
+    if ($arg) {
       $self->{'_program'} = $arg;
     }
 
@@ -563,7 +563,7 @@ sub program {
 sub database {
     my($self,$arg) = @_;
     
-    if (defined($arg)) {
+    if ($arg) {
       $self->{'_database'} = $arg;
     }
 

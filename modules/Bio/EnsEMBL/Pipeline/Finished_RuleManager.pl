@@ -1,20 +1,19 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/bin/perl5.6.1
 #
 # Script for operating the analysis pipeline
 #
 # You may distribute this code under the same terms as perl itself
 
-BEGIN{
-    $ENV{'BLASTDB'}     = '/data/blastdb/Ensembl';
-    $ENV{'BLASTMAT'}    = '/usr/local/ensembl/data/blastmat';
-    $ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
-}
+$ENV{'BLASTDB'}     = '/data/blastdb/Ensembl';
+$ENV{'BLASTMAT'}    = '/usr/local/ensembl/data/blastmat';
+$ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
+
 
 use strict;
 use Getopt::Long;
 use Sys::Hostname;
 use Socket;
-use POSIX qw(:signal_h setsid);
+use POSIX 'setsid';
 use FindBin ();
 use File::Basename ();
 use File::Spec::Functions;
@@ -23,13 +22,10 @@ use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-use IO::Socket;
-use Data::Dumper; 
 
-$| = 1; # localise?
+my $script = File::Basename::basename($0);
+my $SELF = catfile $FindBin::Bin, $script;
 
-my $SCRIPT                = File::Basename::basename($0);
-my $SELF                  = catfile $FindBin::Bin, $SCRIPT;
 my $DEFAULT_HOME          = '';
 my $HOME                  = $DEFAULT_HOME;
 my $HOSTNAME              = Sys::Hostname::hostname();
@@ -38,9 +34,20 @@ my $DEBUG                 = 1;
 my $NAMED                 = 'FINISHED_PIPELINE';
 my $OUT                   = $ENV{$NAMED."_OUTFILE"};
 
-my $OVERLOAD_SLEEP        = 10;  # THIS SHOULD BE SIG_BLOCKED [3600]
-my $PAUSE                 = 6;     # THIS DOESN'T NEED TO BE    [60]
-my $GET_PEND_JOBS         = undef; # subroutine to check number of pending jobs in queue
+
+# POSIX unmasks the sigprocmask properly
+my $sigset = POSIX::SigSet->new();
+my $action = POSIX::SigAction->new('sigHUP_handler',
+                                $sigset,
+                                &POSIX::SA_NODEFER);
+POSIX::sigaction(&POSIX::SIGHUP, $action);
+# remove daemon control args from ARGV copy
+
+
+
+unless (&config_sanity_check) {
+    exit 1;
+}
 
 # Also, an alarm is set to go off every (say) 2 minutes (or not at all if
 # $wakeup is false). When the script receives this it looks to see how many
@@ -50,102 +57,74 @@ my $GET_PEND_JOBS         = undef; # subroutine to check number of pending jobs 
 # It looks for failed jobs as well and restarts them.
 
 # signal parameters
-my $term_sig = 0;
-my $rst_sig  = 0;
-my $alarm    = 0;
-my $wakeup   = 6;   # period to check batch queues; set to 0 to disable
+my $term_sig =  0;
+my $rst_sig  =  0;
+my $alarm    =  0;
+my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
+$SIG{USR1} = \&sighandler;
+$SIG{ALRM} = \&alarmhandler;
+$SIG{TERM} = \&termhandler;
+$SIG{INT} = \&termhandler;
 
-# handler for SIGTERM
-sub sigTERMhandler {
-    print STDERR "Handling a TERM/INT SIGNAL\n";
-    $term_sig = 1;
-}
-# handler for SIGUSR1
-sub sigUSR1handler {
-    print STDERR "Handling a USR1 SIGNAL\n";
-    $rst_sig = 1;
-    $SIG{SIG1} = \&sigUSR1handler;
+
+# dynamically load appropriate queue manager (e.g. LSF)
+
+my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
+
+my $file = "$batch_q_module.pm";
+$file =~ s{::}{/}g;
+eval {
+    require "$file";
 };
-# handler for SIGUSR2
-sub sigUSR2handler {
-    print STDERR "Handling a USR2 SIGNAL\n";
-    &pause(1);
-};
-# handler for SIGALRM
-sub sigALRMhandler {
-    print STDERR "Handling a ALRM SIGNAL\n";
-    &check_not_overloaded;
-    alarm $wakeup if $wakeup;
-    $SIG{ALRM} = \&sigALRMhandler;
-}
-
-# POSIX unmasks the sigprocmask properly
-my $sigset1       = POSIX::SigSet->new();
-my $sigHUPaction  = POSIX::SigAction->new('sigHUP_handler', $sigset1, &POSIX::SA_NODEFER);
-POSIX::sigaction(&POSIX::SIGHUP, $sigHUPaction)   or warn "Couldn't $sigHUPaction";
-
-my $sigset2       = POSIX::SigSet->new();
-my $sigUSR1action = POSIX::SigAction->new('sigUSR1handler', $sigset2, &POSIX::SA_NODEFER);
-POSIX::sigaction(&POSIX::SIGUSR1, $sigUSR1action) or warn "Couldn't $sigUSR1action";
-
-my $sigset3       = POSIX::SigSet->new();
-my $sigUSR2action = POSIX::SigAction->new('sigUSR2handler', $sigset3, &POSIX::SA_NODEFER);
-POSIX::sigaction(&POSIX::SIGUSR2, $sigUSR2action) or warn "Couldn't $sigUSR2action";
-
-my $sigset4       = POSIX::SigSet->new();
-my $sigALRMaction = POSIX::SigAction->new('sigALRMhandler', $sigset4);#, &POSIX::SA_NODEFER);
-POSIX::sigaction(&POSIX::SIGALRM, $sigALRMaction) or warn "Couldn't $sigALRMaction";
-
-my $sigset5       = POSIX::SigSet->new();
-my $sigTERMaction = POSIX::SigAction->new('sigTERMhandler', $sigset5);
-POSIX::sigaction(&POSIX::SIGTERM, $sigTERMaction) or warn "Couldn't $sigTERMaction";
-
-my $sigset6       = POSIX::SigSet->new();
-my $sigINTaction  = POSIX::SigAction->new('sigTERMhandler', $sigset6);
-POSIX::sigaction(&POSIX::SIGINT, $sigINTaction)   or warn "Couldn't $sigINTaction";
-
-sigprocmask(SIG_BLOCK, $sigset6) or die "Can't block $sigset6"; # blocks TERM
-
-unless (&config_sanity_check) {
+if ($@) {
+    print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
     exit 1;
 }
+
+my $get_pend_jobs;
+if ($batch_q_module->can("get_pending_jobs")) {
+    my $f = $batch_q_module . "::get_pending_jobs";
+    $get_pend_jobs = \&$f;
+}
+
 
 # command line options override 
 # anything set in the environment variables.
 
-my $dbhost         = $ENV{'ENS_DBHOST'};
-my $dbname         = $ENV{'ENS_DBNAME'};
-my $dbuser         = $ENV{'ENS_DBUSER'};
-my $dbpass         = $ENV{'ENS_DBPASS'};
-my $dbport         = $ENV{'ENS_DBPORT'} || 3306;
+my $dbhost    = $ENV{'ENS_DBHOST'};
+my $dbname    = $ENV{'ENS_DBNAME'};
+my $dbuser    = $ENV{'ENS_DBUSER'};
+my $dbpass    = $ENV{'ENS_DBPASS'};
+my $dbport    = $ENV{'ENS_DBPORT'} || 3306;
 
-my $local          = 0;                # Run failed jobs locally
-my @analyses       = ();               # Only run these analysis ids
-my $submitted      = undef;
-my $idlist         = undef;
-my ($done, $once)  = (0) x 2;
-my $no_run         = 0; # makes it only create jobs but doesn't submit to LSF
-my $runner         = undef;
-my $shuffle        = 0;  
-my $output_dir     = undef;
-my @start_from     = ();
+$| = 1;
+
+my $local        = 0;       # Run failed jobs locally
+my @analyses;               # Only run this analysis ids
+my $submitted;
+my $idlist;
+my ($done, $once);
+my $no_run; # makes it only create jobs but doesn't submit to LSF
+my $runner;
+my $shuffle;  
+my $output_dir;
+my @start_from;
 my @assembly_types = ();
 my $db_sanity      = 1;
-my %analyses       = ();
-my $priority       = 0;
+my %analyses;
 my $verbose        = 1;
-my $rerun_sleep    = 100;
-
-my ($start, $stop, $restart, $status, $daemonFree, $pause) = (0) x 6;
+my $rerun_sleep    = 3600;
+my $overload_sleep = 300;
+my ($start, $stop, $restart, $status, $daemonFree);
 my @controls = ('start'     => \$start,
                 'stop'      => \$stop,
                 'restart'   => \$restart,
                 'status'    => \$status,
-                'buffyMode' => \$daemonFree,
-		'pause'     => \$pause);
+                'buffyMode' => \$daemonFree);
 restart_string(@ARGV);
+
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -165,7 +144,6 @@ GetOptions(
     'analysis=s@'   => \@analyses,
     'dbsanity!'     => \$db_sanity,
     'v!'            => \$verbose,
-    'priority'      => \$priority,
     @controls
 )
 or die ("Couldn't get options");
@@ -177,55 +155,18 @@ unless ($dbhost && $dbname && $dbuser) {
 # -------------------------------------
 # Handle daemon control all sub routines called must exit!
 # check uniqueness of control parameters
-if($start + $stop + $status + $restart + $daemonFree + $pause > 1){ useage(); }
+if($start + $stop + $status + $restart + $daemonFree > 1){ useage(); }
 # decide which one
 elsif($start)      { daemonize($OUT); }
 elsif($stop)       { stop_daemon();   }
 elsif($status)     { daemon_status(); }
 elsif($restart)    { restart();       }
-elsif($pause)      { pause();         }
 elsif($daemonFree) { print "$NAMED : Odd I'm not running as a daemon. Hit Ctrl-C quick\n" unless eval{ get_pid() }; }
 else               { useage();        } # Catch when no daemon control specified
-
-sigprocmask(SIG_UNBLOCK, $sigset6);
-
 # -------------------------------------
 # this is now the daemon's code
 
-# dynamically load appropriate queue manager (e.g. LSF)
-
-my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
-
-my $file = "$batch_q_module.pm";
-$file =~ s{::}{/}g;
-eval {
-    require "$file";
-};
-if ($@) {
-    print STDERR "Error trying to load $batch_q_module;\ncan't find $file : $@\n";
-    exit 1;
-}
-
-if ($batch_q_module->can("get_pending_jobs")) {
-    my $f = $batch_q_module . "::get_pending_jobs";
-    $GET_PEND_JOBS = \&$f;
-}
-
-sub check_not_overloaded{
-    warn "$NAMED : Checking Queue Manager status\n";
-    # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-    my $queue = {
-        '-USER'  => 'rds', 
-        '-QUEUE' => $DEFAULT_BATCH_QUEUE, 
-        '-DEBUG' => 0
-        };
-    #while ((ref($GET_PEND_JOBS) eq 'CODE') && !$term_sig && (&$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS)) {
-    while ($GET_PEND_JOBS && !$term_sig && &$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS) {
-	&pause(1);
-    }
-}
-
-my $DBADAPTOR = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
     -dbname => $dbname,
     -user   => $dbuser,
@@ -233,30 +174,27 @@ my $DBADAPTOR = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -port   => $dbport,
 );
 if($db_sanity){
-    &db_sanity_check($DBADAPTOR);
+    &db_sanity_check($db);
 }else{
     print STDERR "$NAMED : NO DB SANITY CHECK.  OK?\n" if($verbose);
 }
-
-################################################################################
-##### SIG HUP HANDLER
 my @restart = restart_array();
 
 sub sigHUP_handler {
     print STDERR "\n";
-    print STDERR "$NAMED : got SIGHUP @ ".scalar(localtime())."\n";
-    print STDERR "$NAMED : exec'ing: $SELF @restart\n";
-    $DBADAPTOR->pipeline_unlock() if $DBADAPTOR;
+    print STDERR "$NAMED : got SIGHUP @ ".localtime()."\n";
+    print STDERR "$NAMED : execing: $SELF @restart\n";
+    $db->pipeline_unlock() if $db;
     exec($SELF, @restart) or die "Couldn't restart: $!\n";
 }
-################################################################################
 
-my $rule_adaptor = $DBADAPTOR->get_RuleAdaptor;
-my $job_adaptor  = $DBADAPTOR->get_JobAdaptor;
-my $ana_adaptor  = $DBADAPTOR->get_AnalysisAdaptor;
-my $sic          = $DBADAPTOR->get_StateInfoContainer;
+my $rule_adaptor = $db->get_RuleAdaptor;
+my $job_adaptor  = $db->get_JobAdaptor;
+my $ana_adaptor  = $db->get_AnalysisAdaptor;
+my $sic          = $db->get_StateInfoContainer;
 
 # analysis options are either logic names or analysis dbID's
+
 unless (@start_from) {
     print "Need to specify at least 1 analysis to start from with -start_from\n";
     exit 1;
@@ -264,27 +202,12 @@ unless (@start_from) {
 
 
 %analyses   = logic_name2dbID($ana_adaptor, @analyses);
-my %tmp     = logic_name2dbID($ana_adaptor, @start_from);
+my %tmp = logic_name2dbID($ana_adaptor, @start_from);
 @start_from = keys %tmp;
 
-
-die "Must be able to read $idlist"          if ($idlist && ! -e $idlist);
-
-alarm $wakeup if $wakeup;
-#my $i = 0;
-#while($i < 10000){
-#    print "$i \n";
-#    &pause(1) unless($i % 100);
-#    if($term_sig){
-#	print STDERR "$NAMED : got SIGNAL\n";
-#	exit;
-#    }
-#    sleep(1);
-#    $i++;
-#}
-
-#exit();
-
+if ($idlist && ! -e $idlist) {
+    die "Must be able to read $idlist";
+}
 
 
 # Lock to prevent >1 instances of the same pipeline running together
@@ -293,7 +216,7 @@ alarm $wakeup if $wakeup;
 # gives the host running the script, user, PID and when it was
 # started
 
-if (my $lock_str = $DBADAPTOR->pipeline_lock && !$no_run) {
+if (my $lock_str = $db->pipeline_lock) {
     # Another pipeline is running: describe it
     my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
     $started = scalar localtime $started;
@@ -324,7 +247,7 @@ EOF
 my $host = &qualify_hostname(hostname());
 my $user = scalar getpwuid($<);
 my $lock_str = join ":", "$user\@$host", $$, time();
-$DBADAPTOR->pipeline_lock($lock_str);
+$db->pipeline_lock($lock_str);
 
 
 # Fetch all the analysis rules.  These contain details of all the
@@ -341,42 +264,8 @@ alarm $wakeup if $wakeup;
                 # Signal to the script to do something in the future,
                 # Such as check for failed jobs, no of jobs in queue
 
-{
-    my $no_of_loops = {};
-    my $max_loops   = 10;
-    sub flush_created_if_they_might_never_get_done{
-	my ($submitteds, $db) = @_;
-	my $overall = 0;
-	foreach my $k(keys(%$submitteds)){
-	    my $a = $submitteds->{$k} || 0;
-	    warn "Checking analysis $k, which has $a submitted this loop";
-	    if($a == 0){
-		$no_of_loops->{$k} ||= 1;
-		warn $no_of_loops->{$k} . " of $max_loops loops with no submits passed for analysis $k";
-		$no_of_loops->{$k}++;
-		$overall++;
-	    }
-	    if($no_of_loops->{$k} > $max_loops){
-		warn "max_loops reached (".$no_of_loops->{$k}.") for $k. flushing runs.";
-		my $job_a   = $db->get_JobAdaptor();
-		my ($a_job) = $job_a->fetch_by_Status("CREATED");
-		if ($a_job) {
-                    my $sigset2 = POSIX::SigSet->new(&POSIX::SIGALRM);
-                    sigprocmask(SIG_BLOCK, $sigset2) or die "Can't block SIGALRM for flush runs: $!\n";
-                    $a_job->flush_runs($job_a);
-		    $overall--;
-                    sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after flush runs: $!\n";
-		}
-		$no_of_loops->{$k} = 0;
-	    }
-	}
-	return $overall > 0 ? 1 : 0;
-    }
-}
-
 while (1) {
-    
-    $submitted = {};
+    $submitted = 0;
 
     # This loop reads input ids from the database a chunk at a time
     # until we have all the input ids.
@@ -405,10 +294,8 @@ while (1) {
         print "Reading IDs ... ";
 
         foreach my $a (@start_from) {
-	    push @id_list, @{$sic->list_input_id_by_Analysis_assembly_type_priority($a, \@assembly_types, $priority)};
+	    push @id_list, @{$sic->list_input_id_by_Analysis_assembly_type($a, \@assembly_types)};
 	}
-#	print scalar(@id_list);
-	#&Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer::increment_priority();
     }
 
     @id_list = &shuffle(@id_list) if $shuffle;
@@ -424,7 +311,7 @@ while (1) {
 
     JOBID: while (@id_list) {
         my $id = shift @id_list;
-    
+
         # handle signals. they are 'caught' in the handler subroutines but
         # it is only here they we do anything with them. so if the script
         # is doing something somewhere else (getting IDs at the start of
@@ -433,7 +320,11 @@ while (1) {
 
         if ($alarm == 1) {
             $alarm = 0;
-	    &check_not_overloaded();
+
+            # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
+            while ($get_pend_jobs && !$term_sig && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
+                sleep $overload_sleep;
+            }
             alarm $wakeup;
         }
 
@@ -475,9 +366,6 @@ while (1) {
                 if(!($anal & 4) && ($anal & 2) && !$sic->check_is_current($rule->goalAnalysis->dbID, $id)){
                     print " fullfilled **** IS_CURRENT FALSE ****\n" if $verbose;
                     $analHash{$rule->goalAnalysis->dbID} = $rule->goalAnalysis();
-		}elsif($anal & 4){
-		    #&Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer::reset_priority();
-		    print " not fullfilled *** is_current true BUT CONDITION NOT MET ***\n" if $verbose;
                 }else{
                     print " not fullfilled **** is_current true ****\n" if $verbose;
                 }
@@ -498,49 +386,28 @@ while (1) {
         ANAL: for my $anal (values %analHash) {
             # print "Checking analysis " . $anal->dbID . "\n\n";
             # Check whether it is already running in the current_status table?
-	    $submitted->{$anal->logic_name} ||= 0;
-            my $submittable = 1;
+
             eval {
                 foreach my $cj (@current_jobs) {
 
-                    #print "Comparing to current_job " . $cj->input_id . " " .
-                    #$cj->analysis->dbID . " " .
-                    #$cj->current_status->status . " " .
-                    #$anal->dbID . "\n";
+                    # print "Comparing to current_job " . $cj->input_id . " " .
+                           $cj->analysis->dbID . " " .
+                           $cj->current_status->status . " " .
+                           $anal->dbID . "\n";
 
                     if ($cj->analysis->dbID == $anal->dbID) {
                         if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
-                            my $sigset2 = POSIX::SigSet->new(&POSIX::SIGALRM);
-                            sigprocmask(SIG_BLOCK, $sigset2) or die "Can't block SIGALRM for batch_runRemote: $!\n";
                             $cj->batch_runRemote;
-                            sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after batch_runRemote: $!\n";
                             # print "Retrying job\n";
-                        }elsif($cj->current_status->status eq 'VOID'){
-                            $submittable = 0;
-                            my $input_id = $cj->input_id();
-                            my $analysis = $cj->analysis();
-                            my $dbID     = $cj->dbID();
-                            eval{
-                                $sic->store_input_id_analysis($input_id,
-                                                              $analysis,
-                                                              'localhost'
-                                                              );
-                            };
-                            if($@){
-                                print STDERR "Error updating 'VOID' job $dbID :\n[$@]\n";
-                            }else{
-                                print STDERR " *** Updated 'VOID' job <$dbID> *** \n";
-                            }
                         }
                         else {
-                            $submittable = 0;
                             # print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n";
                         }
-                        #next ANAL;
+                        next ANAL;
                     }
                 }
             };
-            next ANAL unless $submittable;
+
 
             if ($@) {
                 print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
@@ -549,16 +416,14 @@ while (1) {
 
             my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => $id,
 						       -analysis => $anal,
-						       -output_dir => $output_dir,
-						       -runner => $PIPELINE_RUNNER_SCRIPT);
+						      -output_dir => $output_dir,
+						      -runner => $PIPELINE_RUNNER_SCRIPT);
 
 
             print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
-            $submitted->{$anal->logic_name}++;
+            $submitted++;
             $job_adaptor->store($job);
 
-            my $sigset2 = POSIX::SigSet->new(&POSIX::SIGALRM);
-            sigprocmask(SIG_BLOCK, $sigset2) or die "Can't block SIGALRM for batch_runRemote: $!\n";
             if ($local) {
                 print "Running job locally\n" if $verbose;
                 eval {
@@ -571,39 +436,27 @@ while (1) {
               eval {
                 print "\tBatch running job\n" if $verbose;
                 $job->batch_runRemote unless $no_run;
-		#&Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer::reset_priority();
               };
               if ($@) {
                 print STDERR "ERROR running job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
               }
             }
-            sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after batch_runRemote: $!\n";
-            
+
         }
 
     }
 
-    &shut_down($DBADAPTOR) if $done || $once;
-    my $this_time;# = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
-    my $slept;
-    if($this_time){ 
-        # not much was submitted, probably because
-	# there was too many unfulfilled dependancies
-	# wait while the jobs finish
-	local $SIG{ALRM} = 'IGNORE';
-	warn "time to sleep for $rerun_sleep seconds... IGNORING \$SIG{ALRM}";
-	$slept = sleep $rerun_sleep;
-    }else{
-	warn "time to sleep for $rerun_sleep seconds...";
-	$slept = sleep $rerun_sleep;
-    }
+    &shut_down($db) if $done || $once;
+    sleep($rerun_sleep) if $submitted == 0;
     @id_list = ();
-    print STDERR "After sleeping for $slept . Waking up and run again!\n" if $verbose;
+    print "Waking up and run again!\n" if $verbose;
 }
 
 # --------------------------------------------------------
 # Subroutines
 # --------------------------------------------------------
+
+
 # remove 'lock'
 sub shut_down {
     my ($db) = @_;
@@ -616,6 +469,26 @@ sub shut_down {
     exit 0;
 }
 
+
+# handler for SIGTERM
+sub termhandler {
+    $term_sig = 1;
+}
+
+
+# handler for SIGUSR1
+sub sighandler {
+
+    $rst_sig = 1;
+    $SIG{SIG1} = \&sighandler;
+};
+
+
+# handler for SIGALRM
+sub alarmhandler {
+    $alarm = 1;
+    $SIG{ALRM} = \&alarmhandler;
+}
 
 
 # turn a name of the form 'ecs1a' into 'ecs1a.sanger.ac.uk'
@@ -647,41 +520,41 @@ sub retry_failed_jobs {
 
 # NB Incomplete
 # Delete RUNNING jobs which are not known to LSF.
-# sub check_lsf_status {
-#     my ($LSF_params) = @_;
+sub check_lsf_status {
+    my ($LSF_params) = @_;
 
-#     my $queue = $LSF_params->{'queue'};
-#     my (%lsf_id, %jobs);
-#     my $ja = $db->get_JobAdaptor;
+    my $queue = $LSF_params->{'queue'};
+    my (%lsf_id, %jobs);
+    my $ja = $db->get_JobAdaptor;
 
-#     my $age = 300;   # 5 hours
+    my $age = 300;   # 5 hours
 
-#     my $lsf = Bio::EnsEMBL::Pipeline::LSF->new(
-#         -queue => $queue,
-#         # -user  => $username,
-#     );
+    my $lsf = Bio::EnsEMBL::Pipeline::LSF->new(
+        -queue => $queue,
+        # -user  => $username,
+    );
 
-#     foreach my $job ($lsf->get_all_jobs()) {
-#         my $stat = $job->status;
-#         my $id   = $job->id;
-#         $jobs{$stat}++;
-#         $lsf_id{$id} = 1;
-#     }
+    foreach my $job ($lsf->get_all_jobs()) {
+        my $stat = $job->status;
+        my $id   = $job->id;
+        $jobs{$stat}++;
+        $lsf_id{$id} = 1;
+    }
 
-#     foreach my $job ($db->fetch_by_Age($age)) {
-#         my $lsf = $job->submission_id;
-#         local $_ = $job->get_last_status->status;   # Are you local?
-#         STAT: {
-#             /RUNNING/ && do {
-#                 #$job->remove unless defined $lsf_id{$lsf};
-#                 last STAT;
-#             };
-#             /SUBMITTED/ && do {
-#                 last STAT;
-#             };
-#         } # STAT
-#     }
-# }
+    foreach my $job ($db->fetch_by_Age($age)) {
+        my $lsf = $job->submission_id;
+        local $_ = $job->get_last_status->status;   # Are you local?
+        STAT: {
+            /RUNNING/ && do {
+                #$job->remove unless defined $lsf_id{$lsf};
+                last STAT;
+            };
+            /SUBMITTED/ && do {
+                last STAT;
+            };
+        } # STAT
+    }
+}
 
 
 sub shuffle {
@@ -734,10 +607,10 @@ sub db_sanity_check{
   #check all rules in the rule_condition table have existing analyses
   $query = qq{SELECT COUNT(DISTINCT c.rule_id)
                 FROM rule_conditions c
-                LEFT JOIN analysis a ON c.condition = a.logic_name || c.condition IS NULL
+                LEFT JOIN analysis a ON c.condition = a.logic_name
 	        WHERE a.logic_name IS NULL};
   $msg = "Some of your conditions in the rule_condition table don't" .
-         " seem to have entries in the analysis table\n $query";
+         " seem to have entries in the analysis table";
   execute_sanity_check($db, $query, $msg);
   #check all the analyses have types
   $query = qq{SELECT COUNT(DISTINCT(a.analysis_id))
@@ -847,13 +720,9 @@ sub stop_daemon{
     exit;
 }
 sub daemon_status{
-    my $checked;
     if(my $pid = eval{get_pid()}){
-	if($checked = check_pid($pid)){
-	    print STDERR "$NAMED : Instance running under PID: $pid\n";
-        }else{
-	    print STDERR "$NAMED : Instance NOT running under PID: $pid on this host check below\n";
-	}
+        print STDERR "$NAMED : Instance running under PID: $pid\n";
+        
         print STDERR "$NAMED : Checking the database...\n";
         my $db;
         eval{ 
@@ -872,22 +741,25 @@ sub daemon_status{
         }else{
             if(my @lock = split("[\@:]", $db->pipeline_lock())){
                 $lock[3] = localtime($lock[5] = $lock[3]);
-		print STDERR "The db suggests the pipeline is running! \n\n";
-		print STDERR "    db       $dbname\@$dbhost              \n";
-		print STDERR "    pid      $lock[2] on host $lock[1]     \n";
-		print STDERR "    started  $lock[3] ($lock[5])         \n\n";
-		if($checked){
-		    print STDERR "The process above can be terminated by rerunning this script with\n";
-		    print STDERR "-stop option rather than -status.\n";
-		}else{
-		    print STDERR "The process does not exist, remove the lock by removing the lock   \n";
-		    print STDERR "from the pipeline database:                                      \n\n";
-		    print STDERR "    echo \" delete from meta where meta_key = 'pipeline.lock'; \" ";
-		    print STDERR "| mysql -h $dbhost -D $dbname -u $dbuser -P $dbport \n";
-		    print STDERR "-p$dbpass" if $dbpass;
-		    print STDERR "\n\n You probably need to remove $PID_FILE too.                  \n\n";
-		    print STDERR "    rm -f $PID_FILE\n";
-		}
+                print STDERR <<EOF;
+This pipeline appears to be running!
+
+    db       $dbname\@$dbhost
+    pid      $lock[2] on host $lock[1]
+    started  $lock[3] ($lock[5])
+
+The process above can be terminated by rerunning this script with
+-stop option rather than -status.
+If the process does not exist, remove the lock by removing the lock
+from the pipeline database:
+
+    delete from meta where meta_key = 'pipeline.lock';
+
+You probably need to remove $PID_FILE too.
+
+Thank you.
+
+EOF
             }else{
                 print STDERR "$NAMED : No lock present in the database! This is wrong\n";
             }
@@ -902,42 +774,6 @@ sub get_pid{
     my $pid = <PID>;
     close PID;
     return $pid;
-}
-sub check_pid{
-    my $pid = shift;
-    my $found = 0;
-    open(my $fh, "ps -p $pid |") || die "Can't open pipe with ps";
-    while(<$fh>){
-	my @F = split;
-	$found = 1 if $F[0] eq $pid;
-    }
-    close $fh;
-    return $found ? 1 : 0;
-}
-
-sub pause{
-    my $script = shift;
-    if($script & 1){ # called from within SIG HANDLER
-	print STDERR "$NAMED : Going to sleep for $OVERLOAD_SLEEP secs [blocking SIGnals]\n";
-	my $sigset = POSIX::SigSet->new(&POSIX::SIGINT);
-	$sigset->addset(&POSIX::SIGALRM); # If we want to block ALARMS TOO.
-	sigprocmask(SIG_BLOCK, $sigset)   or die "Can't Block SIGINT for sleep  : $!\n";
-	sleep($OVERLOAD_SLEEP);
-	sigprocmask(SIG_UNBLOCK, $sigset) or die "Can't Unblock SIGINT for sleep: $!\n";
-    }elsif($script & 2){
-	print STDERR "$NAMED : Going to sleep for $PAUSE secs\n";
-	sleep($PAUSE);	
-    }else{       # called from this script as a control
-	my $SIG = 31;
-	if(my $pid = eval{get_pid()}){
-	    kill $SIG, $pid;
-	}else{
-	    print STDERR "$NAMED : COULDN'T DO IT\n";
-	}
-    }
-}
-sub check_db{
-    
 }
 sub restart{
     print STDERR "$NAMED : ****************************************\n";
@@ -985,19 +821,32 @@ sub useage{
 
 =pod
 
-=head1
+=head1 Useage
 
 FinishedRuleManager [-options]
 
- -start
- -stop
- -restart
- -status
- -buffy
- -dbhost
- -dbport
- -dbuser
- -dbuser
- -dbname
+(general)
+
+ -help      (show this pod)
+ -start_from __ANALYSIS_ID__ (analysis id to start from)
+ -once      (only go through main loop once)
+ -norun     (just create jobs in job & job_status tables, useful for debug)
+ -idlist __IDLISTFILE__      (file of input_ids to use)
+ -assembly __ASSEMBLY_TYPE__ (assembly type of input_ids to use)
+
+(database stuff)
+
+ -dbhost __HOSTNAME__
+ -dbport __PORT__    
+ -dbname __DBNAME__  
+ -dbuser __USERNAME__
+ -dbpass __PASSWORD__
+   
+(control stuff pick one)
+ -start   (starts the script as a daemon)
+ -stop    (stops the daemon previously started)
+ -restart (tries to restart, not recommended, use -stop then -start)
+ -status  (tries to work out the status of the daemon)
+ -buffy   (just runs the script without any vampires)
 
 =cut

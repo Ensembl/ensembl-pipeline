@@ -33,13 +33,11 @@ my $estfile;
 my $seqoutfile;
 my $clip;
 my $softmask;
-my $all_orgs = 0;
 
 &GetOptions( 
-	     'cdnafile:s'     => \$estfile,
-	     'clip'          => \$clip,
-	     'softmask'      => \$softmask,
-	     'allorgs'       => \$all_orgs
+	    'cdnafile:s'     => \$estfile,
+	    'clip'          => \$clip,
+	    'softmask'      => \$softmask,
 	   );
 
 # usage
@@ -81,13 +79,14 @@ while( my $cdna = $seqin->next_seq ){
   
   my $display_id    = $cdna->display_id;
   my $description   = $cdna->desc;
+  
   my $is_pseudogene = 0;
   my $is_noncoding  = 0;
   my $is_codinggene = 0;
   my $is_partial    = 0;
 
   # First select the species:
-  next SEQFETCH unless ($all_orgs or $description =~ /Homo sapiens/ or $description =~ /DNA.*coding.*human/ );
+  next SEQFETCH unless (   $description =~ /Homo sapiens/ || $description =~ /DNA.*coding.*human/ );
 
   next SEQFETCH if ( $description =~ /RIKEN/ 
 		     && ( $description =~/Mus musculus/

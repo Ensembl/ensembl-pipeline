@@ -55,7 +55,7 @@ use vars qw( %GeneBuilder );
 		GB_ABINITIO_PROTEIN_EVIDENCE => ['Swall'],
 		GB_ABINITIO_DNA_EVIDENCE     => ['Vertrna', 'Unigene'],
     GB_ABINITIO_LOGIC_NAME => 'Genscan', 
-    #this must be a single logic_name it only has to be defined if you
+    #this must be a single logic_name, it only has to be defined if you
     #have more than one type in the prediction transcript table as this
     #breaks the PredictionGenebuilder if multiple sets are passed in
 		GB_MIN_GENSCAN_EXONS        => 4,

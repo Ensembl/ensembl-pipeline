@@ -44,24 +44,10 @@ sub fetch_input{
   #print STDERR "Fetching input\n";
   $self->make_protlist;
   #print STDERR "Trying to parse ".$self->input_id." with ".$GB_INPUTID_REGEX."\n";
-  $self->input_id =~ /$GB_INPUTID_REGEX/;
-  my $chrid = $1;
-  my $chrstart = $2;
-  my $chrend   = $3;
-  #print STDERR "Fetching ".$self->input_id."\n";
-  #print STDERR "Fetching ".$chrid." ".$chrstart." ".$chrend."\n";  
-  my $sla       = $self->db->get_SliceAdaptor();
-  my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $genseq;
-  $self->query($slice);
-  if(@$GB_PMATCH_MASKING){
-    $genseq    = $slice->get_repeatmasked_seq($GB_PMATCH_MASKING, $GB_PMATCH_SOFTMASK);
-  }else{
-    $genseq = $slice;
-  }
+  $self->fetch_sequence($GB_PMATCH_MASKING);
   #print STDERR "Have sequence ".$self->query->name."\n";
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Pmatch->new(
-							       '-query' => $genseq,
+							       '-query' => $self->query,
 							       '-protein_file' => $self->protein_file,
 							       '-options' => $self->analysis->parameters,
 							       '-max_intron_size' => $self->max_intron,
@@ -77,15 +63,18 @@ sub run{
   my ($self) = @_;
   $self->runnable->run;
   my @hits = $self->runnable->output;
+  #prin STDERR "Have ".@hits." output from pmatch\n";
   my @output;
-  #print STDERR "Have ".@hits." output from pmatch\n";
   foreach my $hit(@hits){
     #print STDERR "have ".$hit."\n";
-     my ($name, $start, $end) = $self->convert_coords_to_genomic($hit->query, $hit->qstart, $hit->qend);
-     $hit->query($name);
-     $hit->qstart($start);
-     $hit->qend($end);
-     push(@output, $hit);
+    my ($name, $start, $end) = 
+      $self->convert_coords_to_genomic($hit->query,
+                                       $hit->qstart,
+                                       $hit->qend);
+    $hit->query($name);
+    $hit->qstart($start);
+    $hit->qend($end);
+    push(@output, $hit);
   }
   #print STDERR "Have ".@output." output from conversion\n";
   $self->convert_output(\@output);
@@ -183,7 +172,6 @@ sub output{
 
 
 
-
 sub make_protlist{
   my ($self) = @_;
   ##print STDERR "making prot_length list from $protfile\n";
@@ -198,19 +186,21 @@ sub make_protlist{
   my $ref = \%plengths;
   #print STDERR "have ".$ref." hash \n";
   $self->prot_lengths($ref);
-}
 
+}
 
 sub convert_coords_to_genomic{
   my ($self, $name, $start, $end) = @_;
   #print STDERR "Have ".$name." ".$start." ".$end."\n";
-  my ($chr_name, $chr_start, $chr_end) = $self->input_id =~ /$GB_INPUTID_REGEX/;
+  my $chr_name = $self->query->seq_region_name;
+  my $chr_start = $self->query->start;
+  my $chr_end = $self->query->end; 
   if($start - 1 == 0){
     return ($chr_name, $start, $end);
   }
   my $genomic_start = $start+$chr_start-1;
   my $genomic_end = $end+$chr_start-1;
-   #print STDERR "Have ".$chr_name." ".$genomic_start." ".$genomic_end."\n";
+  # print STDERR "Have ".$chr_name." ".$genomic_start." ".$genomic_end."\n";
   return($chr_name, $genomic_start, $genomic_end);
 }
 
@@ -223,11 +213,7 @@ sub convert_output{
   
   my @out = $self->uniquify(@results);
   foreach my $f(@out){
-   my $query = $f->chr_name;
-   if($query =~ /$GB_INPUTID_REGEX/){
-     my $chr = $1;
-     $f->chr_name($chr);
-   }
+     $f->chr_name($self->query->seq_region_name);
   }
   $self->output(@out);
 }

@@ -41,11 +41,9 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 
 use Getopt::Long;
 my $slice_file;
-my $use_label;
 
 &GetOptions(
-	    'slice_file:s'      => \$slice_file,
-	    'use_label'         => \$use_label,
+	        'slice_file:s'      => \$slice_file,
 	       );
 
 
@@ -55,13 +53,6 @@ if ( $slice_file ){
 else{
   print STDERR "generating slices\n";
   print STDERR "to read slices from a file use: $0 -slice_file filename\n";
-}
-
-if ($use_label){
-  print STDERR "using a label to make fake ids\n";
-}
-else{
-  print STDERR "not using label. To use it put option -use_label\n";
 }
 
 my %chrhash;
@@ -141,7 +132,7 @@ sub get_chrlengths{
 sub make_EST_GeneBuilder_bsubs{
   my $jobfile    = $EST_GENEBUILDER_BSUBS;
   my $scratchdir = $EST_TMPDIR;
-  #my $queue      = $EST_QUEUE;
+  my $queue      = $EST_QUEUE;
   
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
@@ -155,12 +146,8 @@ sub make_EST_GeneBuilder_bsubs{
   my $runnable = $EST_GENEBUILDER_RUNNABLE;
   my $analysis = $EST_GENEBUILDER_ANALYSIS;
 
-  my $command1 = "bsub -C0 "; 
+  my $command1 = "bsub -q $queue -C0 "; 
   my $command2 = " -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis ";
-
-  if ( $use_label ){
-    $command2 .= " -use_label ";
-  }
 
   if ( $slice_file ){
     open (SLICE,"<$slice_file") or die("cannot open file $slice_file");
@@ -170,12 +157,12 @@ sub make_EST_GeneBuilder_bsubs{
       my @entries = split;
       my $input_id = $entries[0];
       $input_id =~/(\S+)\.(\d+-\d+)/;
-      my $node = " -q acarichunky -R'rlx' ";
+      my $node = " -R'rlx' ";
       if ( $entries[2] ){
 	$entries[2] =~/feature_count:(\d+)/;
 	my $features = $1;
-	if ( $features >= 1000 ){
-	  #$node = " -q acari -R'ens && ncpus>1' ";
+	if ( $features >= 800 ){
+	  $node = " -R'ens && ncpus>1' ";
 	}
       }
       my $chrdir = $filter . $1;

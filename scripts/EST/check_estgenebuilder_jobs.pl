@@ -8,17 +8,15 @@ use Getopt::Long;
 my $exit;
 my $memory;
 my $exception;
-my $time;
 
 &GetOptions( 
 	    'exit'     => \$exit,
 	    'memory'   => \$memory,
 	    'exception'=> \$exception,
-	    'time'     => \$time,
 	   );
 
-unless ( $exit || $memory || $exception || $time){
-  print STDERR "$0 -exit -exception -memory -time\n";
+unless ( $exit || $memory || $exception ){
+  print STDERR "$0 -exit -exception -memory\n";
   exit(0);
 }
 
@@ -37,9 +35,6 @@ while(<LS>){
   }
   next unless ( $file_name  =~/(\S+\.\d+-\d+)\./ );
   
-  if ( $time ){
-    next unless ( $file_name  =~/(\S+\.\d+-\d+)\.out$/ );
-  }
 
   #unless ( $exception || $memory ){
   # next unless ( $file_name  =~/(\S+\.\d+-\d+)\.out$/ );
@@ -73,13 +68,6 @@ while(<LS>){
       $file_name =~/(\S+\.\d+-\d+)\./;  
       my $input_id = $1;  
       print "$input_id Out of memory\n";  
-    } 
-    if ( $time && $line =~ /CPU time/i ){
-      $line =~/CPU time\s+:(.*)/;
-      my $time = $1;
-      $file_name =~/(\S+\.\d+-\d+)\./;  
-      my $input_id = $1;  
-      print "$input_id time $time\n";
     }
   }
   close(IN);

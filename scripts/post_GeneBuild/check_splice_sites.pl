@@ -24,22 +24,18 @@ GetOptions(
 	   'genetype:s'  => \$genetype,
 	  );
 
-unless ( $dbname && $dbhost){
+unless ( $dbname && $dbhost && $dnadbhost && $dnadbname ){
   print STDERR "script to check splice sites\n";
   print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost (-genetype)\n";
   exit(0);
 }
 
-my $dnadb;
-
-if($dnadbhost && $dnadbname){
-  $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					      '-host'   => $dnadbhost,
-					      '-user'   => $dbuser,
-					      '-dbname' => $dnadbname,
-					      '-pass'   => $dbpass,
-					     );
-}
+my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					       '-host'   => $dnadbhost,
+					       '-user'   => $dbuser,
+					       '-dbname' => $dnadbname,
+					       '-pass'   => $dbpass,
+					      );
 
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -47,13 +43,9 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    #'-dnadb'  => $dnadb,
+					    '-dnadb'  => $dnadb,
 					   );
 
-$db->dnadb($dnadb) if($dnadb);
-
-print STDERR "You defined no dna database are you sure your database ".
-  "contains sequence\n" if(!$dnadb);
 
 print STDERR "connected to $dbname : $dbhost\n";
 
@@ -241,6 +233,5 @@ sub check_splice_sites{
       
     } # end of INTRON
   }
-  
   return ( $correct, $other, $wrong );
 }

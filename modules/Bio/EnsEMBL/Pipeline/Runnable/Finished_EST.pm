@@ -43,7 +43,7 @@ sub new {
     $self->analysis($analysis);
     # this should make a OBDAIndexSeqFetcher, but will default to Pfetch
     my $indices = [ split(",", $self->analysis->db) ];
-    $seqfetcher = $self->_make_seqfetcher($indices);
+    my $seqfetcher = $self->_make_seqfetcher($indices);
     $self->seqfetcher($seqfetcher);
     
     return $self;
@@ -143,9 +143,9 @@ sub run {
     # keep the features
     my $features = [ $blast->output ];
     # set the db_version_searched
-    my $dbv = $blast->get_db_version();
+    my $dbv = $blast->db_version_searched;
     print "using $dbv\n";
-    $self->get_db_version($dbv);
+    $self->db_version_searched($dbv);
     
     # print STDERR Dumper($features);
     
@@ -290,30 +290,11 @@ sub _make_seqfetcher {
     }
     return $seqfetcher;
 }
-
-=head2 get_db_version
-
-    Title   :  get_db_version 
-               [ distinguished from RunnableDB::*::db_version_searched() ]
-    Useage  :  $self->get_db_version('version string')
-               $obj->get_db_version()
-    Function:  Get/Set a blast database version that was searched
-               The actual look up is done in Runnable::Finished_Blast
-               This is just a holding place for the string in this
-               module
-    Returns :  String or undef
-    Args    :  String
-    Caller  :  $self::run()
-               RunnableDB::Finished_EST::db_version_searched()
-
-=cut
-
-
-sub get_db_version{
-    my ($self, $arg) = @_;
+sub db_version_searched{
+    my $self = shift;
     
-    $self->{'_db_version_searched'} = $arg if $arg;
-
+    $self->{'_db_version_searched'} = shift if @_;
+    print "I've decided to search db version: " . $self->{'_db_version_searched'} . "\n";
     return $self->{'_db_version_searched'};
 }
 1;

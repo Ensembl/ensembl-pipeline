@@ -51,7 +51,6 @@ use Bio::EnsEMBL::Root;
 use Bio::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;
-use BlastableVersion;
 #use DB_File;
 use Fcntl;
 use Data::Dumper;
@@ -109,7 +108,7 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/data/blastdb/Ensembl/Pfam_ls');
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensembl/Pfam_ls');
 	
     }
     $self->memory ($memory)    if (defined($memory));
@@ -129,22 +128,6 @@ sub pfamDB{
     $self->throw("Not a Bio::EnsEMBL::DBSQL::DBAdaptor")
         unless $self->{'_pfamDB'}->isa("Bio::EnsEMBL::DBSQL::DBConnection");
     return $self->{'_pfamDB'};
-}
-sub pfam_db_version{
-    my ($self) = @_;
-    unless($self->{'_pfam_db_version'}){
-        my $db = $self->pfamDB();
-        $self->{'_pfam_db_version'} = $db->get_meta_value_by_key('version');
-    }
-    return $self->{'_pfam_db_version'};
-}
-sub pfam_ls_version{
-    my ($self) = @_;
-    unless($self->{'_pfam_ls_version'}){
-	my $ver = BlastableVersion->new($self->hmmdb);
-	$self->{'_pfam_ls_version'} = $ver->version();
-    }
-    return $self->{'_pfam_ls_version'};
 }
 sub program{
     my ($self, $program) = @_;
@@ -389,8 +372,7 @@ sub get_pfam_ids{
     my $create_table = qq{CREATE TEMPORARY TABLE $tbl_name(
                             pfamseq_id varchar(12) NOT NULL PRIMARY KEY,
                             strand enum('1','0','-1') DEFAULT '0'
-                            )TYPE = HEAP
-			}; # should this be HEAP?
+                            )TYPE = HEAP}; # should this be HEAP?
                             # There's never gonna be that many matches
                             # to exceed tmp_table_size = 10048576 ???
     my $db = $self->pfamDB();
@@ -398,33 +380,19 @@ sub get_pfam_ids{
     $sth->execute();
     $sth->finish();
     # INSERT
-    my (@binds, @values);
-    my $sql = qq{INSERT IGNORE INTO $tbl_name (pfamseq_id, strand) VALUES };
+    $sth = $db->prepare(qq{INSERT IGNORE INTO $tbl_name (pfamseq_id, strand) VALUES(?, ?)});
     while (my ($swiss_id, $strand) = each(%$swissprot_ids)){
         #print STDERR "$swiss_id : $strand\n";
-	push(@binds, $swiss_id, $strand);
-	push(@values, qq{ (?, ?)});
+        $sth->execute($swiss_id, $strand);
     }
-    if(scalar(@values)){
-	$sql .= join(", ", @values);
-	warn $sql;
-	$sth = $db->prepare($sql);
-	$sth->execute(@binds);
-	$sth->finish();
-    }
+    $sth->finish();
     # SELECT
-#     my $select = qq{SELECT a.pfamA_acc, t.strand, t.pfamseq_id, a.pfamA_id, a.description
-#                         FROM pfamA a, pfamA_reg_full f, pfamseq p, $tbl_name t
-#                         WHERE p.auto_pfamseq = f.auto_pfamseq
-#                         && a.auto_pfamA = f.auto_pfamA
-#                         && p.pfamseq_id = t.pfamseq_id
-#                         && f.in_full = 1};
-    my $select = qq{SELECT a.pfamA_acc, t.strand, t.pfamseq_id, a.pfamA_id, p.description
-			FROM pfamA_reg_full f, pfamseq p, $tbl_name t,  pfamA a
-			WHERE f.auto_pfamseq = p.auto_pfamseq
-			&& p.pfamseq_acc     = t.pfamseq_id
-			&& f.in_full         = 1
-			&& a.auto_pfamA      = f.auto_pfamA;};
+    my $select = qq{SELECT a.pfamA_acc, t.strand, t.pfamseq_id, a.pfamA_id, a.description
+                        FROM pfamA a, pfamA_reg_full c, pfamseq p, $tbl_name t
+                        WHERE p.auto_pfamseq = c.auto_pfamseq
+                        && a.auto_pfamA = c.auto_pfamA
+                        && p.pfamseq_id = t.pfamseq_id
+                        && c.in_full = 1};
     $sth = $db->prepare($select);
     $sth->execute();
     my ($pfam_acc, $strand, $swall, $pfam_id, $description);
@@ -523,7 +491,7 @@ sub create_genewisehmm_complete{
     $self->checkdir();
 
     print STDERR "there are ".scalar(keys(%$pfam_ids))." pfam ids in database\n"; ##########
-    return unless scalar(keys(%$pfam_ids));
+  
     print STDERR "doing the hmm for ids: ". join(" ", keys(%$pfam_ids)) . "\n"; ##########
     $self->get_hmmdb($pfam_ids);
     if (-z $self->hmmfilename){
@@ -572,9 +540,6 @@ sub get_GenewiseHMM{
   my $reverse = ($strand == -1 ? 1 : undef);
   print STDERR "creating genewisehmm strand $strand reverse $reverse\n"; ##########
   print STDERR "OPTIONS To Genewise: ".$self->options()."\n"; ##########
-#  $genewisehmm->set_environment("/usr/local/ensembl/data/wisecfg/");
-  $ENV{WISECONFIGDIR} = "/usr/local/ensembl/data/wisecfg/";
-
   my $genewisehmm =
     Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm->new('-query'    => $self->query(),
                                                                 '-memory'   => $memory,

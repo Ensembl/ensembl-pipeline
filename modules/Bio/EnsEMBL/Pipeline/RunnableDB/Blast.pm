@@ -57,7 +57,7 @@ my %UNGAPPED;
 my %UNMASKED;
 
 foreach my $db (@$DB_CONFIG) {
-  my ($name, $ungapped, $unmasked) = ($db->{'name'}, $db->{'ungapped'}, $db->{'min_unmasked'});
+  my ($name, $ungapped, $unmasked) = ($db->{'name'}, $db->{'ungapped'}, $db->{min_unmasked});
   
   if($db && $name){
     $UNGAPPED{$name} = $ungapped;
@@ -83,19 +83,12 @@ sub fetch_input {
    
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    my $genseq;
-    if(@$PIPELINE_REPEAT_MASKING){
-      my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-      $self->query($genseq);
-    }else{
-      $self->query($contig);
-    }
+    $self->fetch_sequence($PIPELINE_REPEAT_MASKING);
   
     my $seq = $self->query->seq;
     my $unmasked;
     if($UNMASKED{$self->analysis->db_file}){
-      $unmasked = $UNMASKED{$self->analysis->db_file};
+      $unmasked = 1;
     } else {
       $unmasked = 3;
     }
@@ -103,7 +96,7 @@ sub fetch_input {
         $self->input_is_void(0);
     } else {
         $self->input_is_void(1);
-        $self->warn("Need at least $UNMASKED{$self->analysis->db_file} nucleotides");
+        $self->warn("Need at least 3 nucleotides");
     }
 
     my $ungapped;
@@ -113,20 +106,23 @@ sub fetch_input {
     } else {
       $ungapped = undef;
     }
-    
+    # note the parameters column of the analysis table for a blast
+    # run must follow this format
+    # -runnable_arg => value, -runnable_arg => value
+    #for example -filter => 0, -options => -cpus 1 -spoutmax 1 
+    #-hitdist 40 W=4 T=16 V=700000 B=700000 Y=320000000 Z=500000000
     my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
-      (-query => $self->query,
+      (-query          => $self->query,
        -database       => $self->analysis->db_file,
        -program        => $self->analysis->program,
        -threshold_type => 'PVALUE',
        -threshold      => 1,
        -ungapped       => $ungapped,
-       $self->parameter_hash 
-       # allows parameters to be passed from analysis 'parameters' field
+       $self->parameter_hash, 
       );
-
+    
     $self->runnable($run);
-
+    
     return 1;
 }
 
@@ -153,4 +149,5 @@ sub run {
       push (@{$self->{'_output'}}, $runnable->output);
     }
 }
+
 1;

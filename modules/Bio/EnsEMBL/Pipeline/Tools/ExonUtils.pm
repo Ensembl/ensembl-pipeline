@@ -83,14 +83,14 @@ sub _transfer_supporting_evidence{
       next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
       
       if($feat->start    == $tsf->start &&
-	 $feat->end      == $tsf->end &&
-	 $feat->strand   == $tsf->strand &&
-	 $feat->hseqname eq $tsf->hseqname &&
-	 $feat->hstart   == $tsf->hstart &&
-	 $feat->hend     == $tsf->hend){
-	
-	#print STDERR "feature already in target exon\n";
-	next SOURCE_FEAT;
+         $feat->end      == $tsf->end &&
+         $feat->strand   == $tsf->strand &&
+         $feat->hseqname eq $tsf->hseqname &&
+         $feat->hstart   == $tsf->hstart &&
+         $feat->hend     == $tsf->hend){
+        
+        #print STDERR "feature already in target exon\n";
+        next SOURCE_FEAT;
       }
     }
     #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
@@ -166,7 +166,7 @@ sub _print_Exon{
     $id = "no id";
   }
   print STDERR "Exon: ".$id."\n";
-  print STDERR $exon->gffstring."\n";
+  $self->print_gff($exon);
 }
 
 sub _print_Evidence{
@@ -184,9 +184,9 @@ sub _print_Evidence{
   my @evidence = @{$exon->get_all_supporting_features};
 
   print STDERR "Exon: ".$id."\n"; 
-  print STDERR $exon->gffstring."\n";
+  $self->print_gff($exon);
   foreach my $sf(@evidence){
-    print STDERR "\t ".$sf->gffstring."\n";
+    $self->print_gff($sf->gffstring);
   }
 
 }
@@ -203,7 +203,6 @@ sub _clone_Exon{
   $newexon->strand     ($exon->strand);
   $newexon->dbID       ($exon->dbID);
   $newexon->contig     ($exon->contig);
-  $newexon->sticky_rank($exon->sticky_rank);
   $newexon->seqname    ($exon->seqname);
   
   if ( defined( $exon->stable_id ) ){
@@ -231,7 +230,26 @@ sub _clone_Exon{
 
 
 
+sub print_gff{
+  my ($self, $feature) = @_;
 
+  my $id = $feature->dbID;
+  if(!$id){
+    $id = '*';
+  }
+  my $score = $feature->score;
+  if(!$score){
+    $score = 100;
+  }
+  my $str = $id."\t";
+  $str .= "feature\t";
+  $str .= $feature->start."\t";
+  $str .= $feature->end."\t";
+  $str .= $score."\t";
+  $str .= $feature->strand."\t";
+  
+  print STDERR $str."\n";
+}
 
 
 1;

@@ -40,7 +40,7 @@ my $file;
 
 unless ( $file ){
   print "Usage: submit_jobs.pl  [ -jobs N1 -sleep N2 -slowdown N3 -panic N4 ] -file bsub_commands_file\n";
-  print "       where sensible values are N1..N4 integers, N4>N3>N1 and 20<N2<300\n";
+  print "       where sensible values are N1..N4 integers, N4>N3>N1 and 600<N2<1200\n";
   exit(0);
 }
 
@@ -108,7 +108,7 @@ close( FILE );
 
 sub read_jobs{
   #system("busers | grep eae > number_file");
-  system("bjobs -w | grep RUN | wc -l > number_file");
+  system("bjobs -w | wc -l > number_file");
   open(IN,"<number_file");
   my $result;
   while(<IN>){

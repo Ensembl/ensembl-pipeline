@@ -137,7 +137,7 @@ sub _check_coverage {
 	$protname = $f->hseqname;
       }
       if($protname ne $f->hseqname){
-	warn("$protname ne " . $f->hseqname . "\n");
+	$self->warn("$protname ne " . $f->hseqname . "\n");
       }
       
       if((!$pstart) || $pstart > $f->hstart){
@@ -152,30 +152,28 @@ sub _check_coverage {
   }
   
   my $seq; 
- SEQFETCHER:
-  foreach my $seqfetcher (@$seqfetchers){
+  SEQFETCHER: foreach my $seqfetcher (@$seqfetchers){
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($protname);
     };
     if ($@) {
-      warn("GeneUtils:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+      $self->warn("GeneUtils:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
     }
     
     if (defined $seq) {
       last SEQFETCHER;
-    }
-    
+    }    
   }
   
   if(!defined $seq){
-    warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, assuming 100%\n");
+    $self->warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, assuming 100%\n");
     return 100;
   }
   
   $plength = $seq->length;
   
   if(!defined($plength) || $plength == 0){
-    warn("GeneUtils: no sensible length for $protname - assuming 0%\n");
+    $self->warn("GeneUtils: no sensible length for $protname - assuming 0%\n");
     return 0;
   }
   
@@ -203,8 +201,8 @@ sub _check_coverage {
 	    
 sub SeqFeature_to_Transcript {
   my ($self, $gene, $contig, $analysis_obj, $db, $phase) = @_;
-  unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI")){
-    print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";
+  unless ($gene->isa ("Bio::EnsEMBL::Feature")){
+    print "$gene must be Bio::EnsEMBL::Feature\n";
   }
 
   my $curr_phase = 0;  
@@ -215,13 +213,7 @@ sub SeqFeature_to_Transcript {
   my $transcript   = new Bio::EnsEMBL::Transcript;
   my $translation  = new Bio::EnsEMBL::Translation;    
   $transcript->translation($translation);
-  
-  
-  my $ea;
-  if ($db ne "" && defined($db)) {
-    $ea = $db->get_ExonAdaptor;
-  }
-  
+    
   my @pred = $gene->sub_SeqFeature;
   if ($pred[0]->strand ==1 ) {
     @pred = sort {$a->start <=> $b->start} @pred;
@@ -244,30 +236,24 @@ sub SeqFeature_to_Transcript {
       $exon->end_phase($end_phase);
       
       $curr_phase = $end_phase;
-    } else {
-      $exon->phase    ($exon_pred->phase);
-      $exon->end_phase($exon_pred->end_phase);
+    }
+    else {
+      $exon->phase(0);
+      $exon->end_phase(0);
     }
     
-    $exon->contig   ($contig); 
-    $exon->adaptor  ($ea);
+    $exon->slice($contig); 
     
     # sort out supporting evidence for this exon prediction
     # Now these should be made in the correct type to start with
     
     my @sf = $exon_pred->sub_SeqFeature;
-    my $prot_adp;
-    
-    if ($db ne "" && defined($db)) {
-      $prot_adp = $db->get_ProteinAlignFeatureAdaptor;    
-    }
     
     if(@sf){
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
       
       $align->seqname($contig->dbID);
-      $align->contig($contig);
-      $align->adaptor($prot_adp);
+      $align->slice($contig);
       $align->score(100); # Hmm!!!!
       $align->analysis($analysis_obj);
       

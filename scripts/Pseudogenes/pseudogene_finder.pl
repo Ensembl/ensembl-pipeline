@@ -2,6 +2,7 @@
 
 use strict;
 use Getopt::Long;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;						     
 use Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
@@ -9,12 +10,13 @@ use strict;
 use Getopt::Long;
 use Bio::SeqIO;
 
-use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes qw (
-								 REF_DBNAME
-								 REF_DBHOST
-								 GENOMIC
-								 EXONERATE_OPTIONS
-								);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes qw (
+							       REFDBNAME
+							       REFDBUSER
+							       REFDBHOST
+							       GENOMIC
+							       EXONERATE_OPTIONS
+							      );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -50,9 +52,9 @@ print STDERR "REFDB: $EST_REFDBHOST : $EST_REFDBUSER : $EST_REFDBNAME\n";
 ############################################################
 # this is just a refdb where we get dna/assembly/chromosomes from
 my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       -host             => $REF_DBHOST,
-					       -user             => 'ensro',
-					       -dbname           => $REF_DBNAME,
+					       -host             => $EST_REFDBHOST,
+					       -user             => $EST_REFDBUSER,
+					       -dbname           => $EST_REFDBNAME,
 					      );
 
 ############################################################

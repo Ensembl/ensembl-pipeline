@@ -117,10 +117,8 @@ my $cluster_merge =
 
   
 
-#my $t1 = time;
+
 $cluster_merge->run;
-#my $t2 = time;
-#print STDERR "TIME TO RUN CLUSTERMERGE: ".($t2-$t1)." *********************\n";
 
 open ( OUT, ">$output") || die("could not open input file $output");
 

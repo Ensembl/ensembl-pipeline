@@ -57,6 +57,7 @@ use vars qw( %Sequences );
 	      GB_CDNA_INDEX    => '',
 
 	      GB_CDNA_SEQFETCHER => ''
+	      
 	   );
 
 sub import {

@@ -134,50 +134,56 @@ sub construct_command_line{
   
 }
 
-
-
 sub open_command_line{
   my ($self, $verbose)= @_;
-  
+
   my $lsf = '';
-  
+
   if (open(my $pipe, '-|')) {
-    while (<$pipe>) {
-      if (/Job <(\d+)>/) {
-        $lsf = $1;
-      } else {
-        $self->warn("DEBUG: unexpected from bsub: '$_'");
-      }	  
-    }
-    if (close $pipe) {
-      if ( ($? >> 8) == 0 ){
-        if ($lsf) {
-          $self->id($lsf);
-        } else {
-          $self->warn("Bsub worked but returned no job ID. Weird");
-        }
-      } else {
-        $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
+      while (<$pipe>) {
+	  if (/Job <(\d+)>/) {
+	      $lsf = $1;
+	  } else {
+	      $self->warn("DEBUG: unexpected from bsub: '$_'");
+	  }	  
       }
-    } else {
-      $self->throw("Could not close bsub pipe : $!\n");
-    }      
-  } else {      
-    # We want STDERR and STDOUT merged for the bsub process
-    # open STDERR, '>&STDOUT'; 
-    # probably better to do with shell redirection as above can fail
-    exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
+      if (close $pipe) {
+	  if ( ($? >> 8) == 0 ){
+	      if ($lsf) {
+		  $self->id($lsf);
+	      } else {
+		  $self->warn("Bsub worked but returned no job ID. Weird");
+	      }
+	  } else {
+	      $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
+	  }
+      } else {
+	  $self->throw("Could not close bsub pipe : $!\n");
+      }      
+  } 
+  else {      
+      # We want STDERR and STDOUT merged for the bsub process
+      # open STDERR, '>&STDOUT'; 
+      # probably better to do with shell redirection as above can fail
+      exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
   }  
 }
 
 
+
+
 sub get_pending_jobs {
-  my($self, $verbose) = @_;
+  my($self, %args) = @_;
+
+  my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
+  my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
 
   my $cmd = "bjobs";
+  $cmd .= " -q $queue" if $queue;
+  $cmd .= " -u $user"  if $user;
   $cmd .= " | grep -c PEND ";
 
-  print STDERR "$cmd\n" if($verbose);
+  print STDERR "$cmd\n" if $args{'-debug'};
 
   my $pending_jobs = 0;
   if( my $pid = open (my $fh, '-|') ){
@@ -195,7 +201,7 @@ sub get_pending_jobs {
       exec( $cmd );
       die q{Something went wrong here $!: } . $! . "\n";
   }
-  print STDERR "FOUND $pending_jobs jobs pending\n" if $verbose;
+  print STDERR "FOUND $pending_jobs jobs pending\n" if $args{'-debug'};
   return $pending_jobs;
 }
 
@@ -222,6 +228,9 @@ sub get_job_time{
   return \%id_times;
 }
 
+
+
+
 sub check_existance{
   my ($self, $id_hash, $verbose) = @_;
   my %job_submission_ids = %$id_hash;
@@ -237,9 +246,9 @@ sub check_existance{
     }
     my @values = split;
     if($values[0] =~ /\d+/){
-      if($values[2] eq 'UNKWN'){
-        next LINE;
-      }
+      #if($values[2] eq 'UNKWN'){
+      #  next LINE;
+      #}
       $existing_ids{$values[0]} = 1;
     }
   }
@@ -253,14 +262,12 @@ sub check_existance{
   #or $self->throw("Can't close pipe to bjobs");
   return \@awol_jobs;
 }
-
-
 #sub check_existance{
 #  my ($self, $id, $verbose) = @_;
 #  if(!$id){
 #    die("Can't run without an LSF id");
 #  }
-#  my $command = "bjobs ".$id."\n";
+#  my $command = "bjobs ".$id;
 #  #print STDERR "Running ".$command."\n";
 #  my $flag = 0; 
 #  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
@@ -288,29 +295,6 @@ sub kill_job{
   my $command = "bkill ".$job_id;
   system($command);
 }
-
-
-=head2 stdout_file and stderr_file
-
-Unless explicitly set, these default to the file
-B</dev/zero>.  Thus bsub is given the arguments:
-
-  -o /dev/zero -e /dev/zero
-
-when the job is submitted.  We copy the stderr
-and stdout output to the designated output files
-after the job has finished with the
-B<copy_output> method which uses B<lsrcp> (to
-avoid the use of NFS).  bsub then copies the
-files to /dev/zero, which (on most systems)
-allows writes and will discard any input.
-
-We cannot use B</dev/null> as the arguments to -e
-and -o, because LSF will notice this and send
-data directly to /dev/null instead of creating
-the output files in /tmp.
-
-=cut
 
 sub stdout_file{
    my ($self, $arg) = @_;
@@ -430,6 +414,8 @@ sub copy_output {
         }
     }
 }
+
+
 
 sub delete_output{
   my ($self) = @_;

@@ -1,3 +1,4 @@
+
 #
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
@@ -246,26 +247,9 @@ sub fetch_input {
 
   # get genomic region 
   my $chrid    = $self->input_id;
-  print STDERR "input_id: $chrid\n";
 
-  my $chrname;
-  my $chrstart;
-  my $chrend;
-  if ( $chrid =~/$GENECOMBINER_INPUTID_REGEX/ ){
-    $chrname  = $1;
-    $chrstart = $2;
-    $chrend   = $3;
-  }
-  else{
-    $self->throw("Not a valid input_id... $chrid");
-  }
-  print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
-
-  my $ensembl_gpa = $self->ensembl_db->get_SliceAdaptor();
-  my $estgene_gpa = $self->estgene_db->get_SliceAdaptor();
-
-  my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-  my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $ensembl_vc  = $self->fetch_sequence($chrid, $self->ensembl_db);
+  my $estgene_vc  = $self->fetch_sequence($chrid, $self->estgene_db);
 
   $self->ensembl_vc( $ensembl_vc );
   $self->estgene_vc( $estgene_vc );
@@ -306,9 +290,9 @@ sub run{
     }
     my @newgenes = $self->_make_Genes(\@transcripts);
 
-    my @remapped = $self->_remap_Genes(\@newgenes);
+    
 
-    $self->output(@remapped);
+    $self->output(@newgenes);
     return;
   }
 
@@ -332,6 +316,10 @@ sub run{
   # store the original transcripts, just for the numbers
   my @original_ens_transcripts;
   foreach my $gene ( $self->ensembl_genes ){
+    if(!$gene->get_all_Transcripts){
+      $self->throw("Gene ".$gene->dbID." doesn't seem to have any ".
+                   "transcripts");
+    }
     my @transcripts =@{ $gene->get_all_Transcripts};
   TRAN1:
     foreach my $transcript (@transcripts){
@@ -526,20 +514,12 @@ sub run{
 
   print STDERR scalar(@newgenes)." genes 2b remapped\n";
   # remap them to raw contig coordinates
-  my @remapped = $self->_remap_Genes(\@newgenes);
-  print STDERR "==================== REMAPPED GENES =====================\n";
-  foreach my $gene ( @remapped ){
-      #print STDERR "type    : ".$gene->type."\n";
-      #print STDERR "analysis: ".$gene->analysis->dbID." ".$gene->analysis->logic_name."\n";
-
-  }
-  print STDERR scalar(@remapped)." genes remapped\n";
-
+  
   # store the genes
-  $self->output(@remapped);
+  $self->output(@newgenes);
   print STDERR scalar($self->output)." stored, to be written on the db\n";
 
-  return @remapped;
+  return @newgenes;
 
 }
 
@@ -951,12 +931,12 @@ sub _pair_Transcripts{
 	print STDERR "exon_in_intron : $exon_in_intron\n";
 	
 	print STDERR "not using the protein info\n";
-	if ( $canonical_splice_sites == 1 &&
+	if ( ($canonical_splice_sites == 1) && (
 	     ($one_exon_shared == 1 || $one_intron_shared == 1)
 	     #&& $similar_protein == 1
 	     && $exon_in_intron  == 1
 	     #&& $exact_merge     == 0 
-	   ){
+	   )){
 	    print STDERR "BINGO, and ISOFORM found !!\n";
 	
 	    # if they don't have the same start/end translation, try to lock phases:
@@ -995,7 +975,6 @@ sub _pair_Transcripts{
 
 }
 #########################################################################
-
 sub _lock_Phases{
   my ($self,$est_tran,$ens_tran) = @_;
   
@@ -1139,9 +1118,9 @@ sub _check_Completeness{
 sub _check_splice_sites{
   my ($self, $est_tran, $ens_tran) = @_;
 
-  my $self->throw("Problem with est transcript [$est_tran]") 
+  $self->throw("Problem with est transcript [$est_tran]") 
     unless defined($est_tran) && $est_tran->isa("Bio::EnsEMBL::Transcript");
-  my $self->throw("Problem with ensembl transcript [$ens_tran]") 
+  $self->throw("Problem with ensembl transcript [$ens_tran]") 
     unless defined($ens_tran) && $ens_tran->isa("Bio::EnsEMBL::Transcript");
 
   my $canonical_splice_sites = 0;
@@ -1923,52 +1902,18 @@ sub _make_Genes{
 
 ###################################################################
 
-sub _remap_Genes {
-  my ($self,$genes) = @_;
-  my @genes = @$genes;
-  my @new_genes;
 
-  my $final_db  = $self->final_db; 
-  my $final_gpa = $self->final_db->get_SliceAdaptor();
-  my $chrid     = $self->input_id;
-  if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
-    $self->throw("Not a valid input_id... $chrid");
-  }
-  $chrid       =~ s/\.(.*)-(.*)//;
-  my $chrstart = $1;
-  my $chrend   = $2;
-  my $final_vc = $final_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $genetype = $FINAL_TYPE;
-  
- GENE:  
-  foreach my $gene (@genes) {
-    
-    $gene->analysis($self->analysis);
-    $gene->type($genetype);
-    my @trans = @{$gene->get_all_Transcripts};
-    my $new_gene;
-    # convert to raw contig coords
-    eval {
-      # transforming gene to raw contig coordinates.
-      $new_gene = $gene->transform;
-    };
-    if ($@) {
-      print STDERR "Couldn't reverse map gene [$@]\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	$self->_print_Transcript($t);
-      }
-      next;
-    }
-    $new_gene->type($gene->type);
-    $new_gene->analysis($gene->analysis);  
 
-    push( @new_genes, $new_gene);
-    
-  }
-  return @new_genes;
+
+sub fetch_sequence{
+  my ($self, $name, $db) = @_;
+
+  my $sa = $db->get_SliceAdaptor; 
+
+  my $slice = $sa->fetch_by_name($name);
+
+  return $slice;
 }
-
-
 
 
 
@@ -2217,7 +2162,18 @@ sub write_output {
   print STDERR "writing to ".$self->final_db->dbname."\n";
  GENE: 
   foreach my $gene (@genes) {	
-    
+    foreach my $transcript(@{$gene->get_all_Transcripts}){
+      $transcript->dbID('');
+      $transcript->adaptor('');
+      foreach my $exon(@{$transcript->get_all_Exons}){
+        $exon->dbID('');
+        $exon->adaptor('');
+        foreach my $sf(@{$exon->get_all_supporting_features}){
+          $sf->dbID('');
+          $sf->adaptor('');
+        }
+      }
+    }
     unless ( $gene->analysis ){
       $gene->analysis( $self->analysis );
     }
@@ -2233,8 +2189,8 @@ sub write_output {
     #}
     
     eval {
-	$gene_adaptor->store($gene);
-	print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+      $gene_adaptor->store($gene);
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";

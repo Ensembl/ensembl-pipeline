@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl 
 
 # default pipeline runner script
 # this script is passed as part of the batch submission request
@@ -116,6 +116,11 @@ my $hostname = [ split(/\./, hostname()) ];
 $host = shift(@$hostname);
 
 
+#if($batch_q_object->can('delete_output')){
+#  $batch_q_object->delete_output();
+#}
+
+
 if($cleanup){
   &run_jobs_with_selfcopy(\@jobs, $host);
 }else{
@@ -209,9 +214,11 @@ sub run_jobs_with_lsfcopy{
     if ($pants) {
       print STDERR "Job $job_id failed: [$pants]";
     }
+    
+    print STDERR "Finished job $job_id\n";
     if ($job->current_status->status eq "SUCCESSFUL"){
       $job->adaptor->remove( $job );
     }
-    print STDERR "Finished job $job_id\n";
   }
+  
 }

@@ -1,5 +1,5 @@
 #
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise.pm
 #
 # Cared for by Ensembl <ensembl-dev@ebi.ac.uk>
 #
@@ -11,11 +11,11 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm - Targetted genewise Runnable DB
+Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise.pm - Targetted genewise Runnable DB
 
 =head1 SYNOPSIS
 
-my $tgw = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise
+my $tgw = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise
     (  -db => $db,
        -input_id => $input_id);
 
@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
@@ -76,12 +76,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-                                                             GB_GW_DBHOST
-                                                             GB_GW_DBUSER
-                                                             GB_GW_DBPASS
-                                                             GB_GW_DBNAME
-                                                             GB_GW_DBPORT
-                                                            );
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							     GB_GW_DBNAME
+                   GB_GW_DBPORT                                          
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -92,21 +92,13 @@ sub new {
   my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
 
   # makes it easier to run standalone if required
-  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-    (
-     '-host'   => $GB_GW_DBHOST,
-     '-user'   => $GB_GW_DBUSER,
-     '-pass'   => $GB_GW_DBPASS,
-     '-dbname' => $GB_GW_DBNAME,
-     '-port' => $GB_GW_DBPORT,
-    ) if(!$output_db);
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
     my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
     $self->seqfetcher($seqfetcher);
   }
-  $self->throw("no output database defined can't store results $!") unless($output_db);
+  throw("no output database defined can't store results $!") unless($output_db);
   $self->output_db($output_db);
   # IMPORTANT
   # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
@@ -142,7 +134,7 @@ sub make_seqfetcher{
     $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
-    $self->throw("Can't make seqfetcher\n");
+    throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -184,43 +176,49 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my $chr_name;
-  my $start;
-  my $end;
+  my $name;
   my $protein_id; 
-
+  print STDERR "\n\nInput id = ".$entry."\n";
   # chr12:10602496,10603128:Q9UGV6:
-#  print STDERR $entry."\n";
-  if( !($entry =~ /([^\:]+):(\d+),(\d+):([^\:]+):/)) {
-    $self->throw("Not a valid input id... $entry");
-  }
-  
-  $chr_name    = $1;
-  $protein_id = $4;
-  $start   = $2;
-  $end     = $3;
-  if ($2 > $3) { # let blast sort it out
-      $start  = $3;
-      $end    = $2;
-  }
- #print STDERR "Parsed input id name ".$chr_name." start ".$start." end ".$end."\n";
-  
-  #print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
-  my $sliceadp = $self->db->get_SliceAdaptor();
+  #  print STDERR $entry."\n";
+  ($name, $protein_id) = split /\|/, $self->input_id;
+  my @array = split(/:/,$name);
 
+  if(@array != 6) {
+    throw("Malformed slice name [$name].  Format is " .
+          "coord_system:version:start:end:strand");
+  }
+  
+  my ($cs_name, $cs_version, $seq_region, $start, $end, $strand) = @array;
   # we want to give genewise a bit more genomic than the one found by pmatch, 
+  if($start > $end){
+    my $tmp_start = $end;
+    $end = $start;
+    $start = $tmp_start;
+  }
+  #print STDERR "Have pmatch results ".$start." ".$end." ".protein_id."\n";
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
+  
+  #print STDERR "Fetching ".$seq_region." ".$start." ".$end."\n";
+  if($new_start < 1){
+    $new_start = 1;
+  }
+  my $sliceadp = $self->db->get_SliceAdaptor();
+  my $slice = $sliceadp->fetch_by_region($cs_name,$seq_region,
+                                         $new_start,$new_end,
+                                         $strand, $cs_version);
+  
+  if($slice->end() > $slice->seq_region_length) {
+    #refetch slice, since we went past end, second call is fast
+   $new_end = $slice->seq_region_length();
+    $slice = $sliceadp->fetch_by_region($cs_name, $seq_region,
+                                        $new_start, $new_end,
+                                        $strand, $cs_version);
+  }
 
-  # The below checks that the adjusted co-ords are within the bounds of
-  # the chromosome; removed for now due to database load concerns
 
-  # $chromosome = $sliceadp->fetch_by_chr_name($chr_name);  
-  # $new_start = $chromosome->chr_start if $new_start < $chromosome->chr_start;
-  # $new_end = $chromosome->chr_end if $new_end > $chromosome->chr_end;
-
-  my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
-      
+  #print STDERR "Have ".$slice->name." sequence to run\n";
   $self->query($slice);
   my $seq;
   if(@$GB_TARGETTED_MASKING){
@@ -235,7 +233,7 @@ sub fetch_input{
   # genewise runnable
   # repmasking?
 
-  
+  #print STDERR "Have slice ".$new_start." ".$new_end." ".$seq->length."\n";
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
 								    '-ids'            => [ $protein_id ] ,
 								    '-seqfetcher'     => $self->seqfetcher,
@@ -266,9 +264,9 @@ sub run {
      $self->runnable->run();
    };
    if($@){
-     $self->throw("Error in BlastMiniGenewise run: \n[$@]\n");
+     $throw("Error in BlastMiniGenewise run: \n[$@]\n");
    }
-
+   
    $self->convert_gw_output;
    #print STDERR "converted output\n";
    # clean up tmpfile
@@ -402,7 +400,7 @@ sub convert_gw_output {
   my ($self) = @_;
   my $count = 1;
   my $genetype = $GB_TARGETTED_GW_GENETYPE;
-  if(!defined $genetype || $genetype eq ''){
+  if(!$genetype){
     $genetype = 'TGE_gw';
     $self->warn("Setting genetype to $genetype\n");
   }
@@ -412,15 +410,20 @@ sub convert_gw_output {
   # Throw here if zero results? Suggests something v. bad has happened 
   # - usually corrupt sequence file means sequences not fetched. We should 
   # never fail to fetch sequences ina a targetted run!
-  $self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
-  
+  if(!@results){
+    $self->warn("BMG didn't produce any results for ".$self->input_id." ".
+               $self->protein_id);
+    return;
+  }
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
-  my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
-  #print STDERR "have adaptor and analysis objects\n";
-
-  if ( !defined $analysis_obj ) {
+  my $analysis_obj = $self->analysis;
+  if(!$analysis_obj){
+    $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
+    #print STDERR "have adaptor and analysis objects\n";
+  }
+  if (!$analysis_obj) {
     # make a new analysis object
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
@@ -430,7 +433,7 @@ sub convert_gw_output {
        -gff_source      => $genetype,
        -gff_feature     => 'gene',
        -logic_name      => $genetype,
-       -module          => 'TargettedGeneWise',
+       -module          => 'TargettedGenewise',
       );
   }
 
@@ -440,6 +443,17 @@ sub convert_gw_output {
   # check for stops?
   #print STDERR "have made ".@genes." genes\n";
   #print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
+  my $exon_count;
+  foreach my $g(@genes){
+    foreach my $t(@{$g->get_all_Transcripts}){
+      $exon_count += @{$t->get_all_Exons};
+      # foreach my $e(@{$t->get_all_Exons}){
+      # print STDERR "exon ".$e->start." ".$e->end." ".$e->strand."\n";
+      # }
+    }
+  }
+  print STDERR "Have ".$exon_count." exons from ".$self->input_id.
+    "'s analysis\n";
   $self->gw_genes(@genes);
   
 }
@@ -465,7 +479,7 @@ sub make_genes {
   my $contig = $self->query;
   my @genes;
   ##print STDERR "making genes\n";
-  $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
+  throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
   #print STDERR "have ".@$results." transcript\n";
  MAKE_GENE:  foreach my $tmpf (@$results) {
@@ -522,7 +536,7 @@ sub validate_transcript {
   # check exon phases:
   my @exons = @{$transcript->get_all_Exons};
   #print "there are ".@exons." exons\n";
-  $transcript->sort;
+  #$transcript->sort;
   for (my $i=0;$i<(scalar(@exons-1));$i++){
     my $end_phase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
@@ -600,7 +614,7 @@ sub validate_transcript {
 		foreach my $exon (@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
       foreach my $sf (@{$exon->get_all_supporting_features}){
-				$sf->feature1->seqname($exon->dbID);
+				$sf->seqname($exon->dbID);
       }
     }
 		
@@ -643,20 +657,25 @@ GENE:  foreach my $gene (@genes) {
 
     my @t = @{$gene->get_all_Transcripts};
     my $tran = $t[0];
+    #print STDERR "Have transcript ".$tran."\n";
+    #foreach my $exon(@{$tran->get_all_Exons}){
+      #print STDERR "Exon ".$exon->start." ".$exon->end." ".
+    #    $exon->strand."\n";
+    #}
     #print STDERR "gene has ".@t." transcripts\n";
     # check that it translates
     if($gene->type eq $GB_TARGETTED_GW_GENETYPE){
       
       my $translates = $self->check_translation($tran);
       if(!$translates){
-	my $msg = "discarding gene - translation has stop codons\n";
-	$self->warn($msg);
-	next GENE;
+        my $msg = "discarding gene - translation has stop codons\n";
+        $self->warn($msg);
+        next GENE;
       }
-  }
+    }
     eval {
       my $genetype = $gene->type;
-      $gene->transform;
+      #$gene->transform;
       # need to explicitly add back genetype and analysis.
       #$newgene->type($genetype);
       #$newgene->analysis($gene->analysis);
@@ -752,7 +771,7 @@ sub check_coverage{
   foreach my $exon (@{$transcript->get_all_Exons}) {
     $pstart = 0;
     $pend   = 0;
-    my $exonadp = $exon->adaptor;
+    #my $exonadp = $exon->adaptor;
     #if(!$exonadp){
     #  die "no exon adaptor defined : $!";
     #}else{
@@ -785,10 +804,10 @@ sub check_coverage{
     $seq = $self->seqfetcher->get_Seq_by_acc($protname);
   };
   if ($@) {
-    $self->throw("Error fetching sequence for [$protname]: [$@]\n");
+    throw("Error fetching sequence for [$protname]: [$@]\n");
   }
   
-  $self->throw("No sequence fetched for [$protname]\n") unless defined $seq;
+  throw("No sequence fetched for [$protname]\n") unless defined $seq;
   
   $plength = $seq->length;
 
@@ -836,7 +855,6 @@ sub make_transcript{
   my @exons;
   #print "have ".scalar($gene->sub_SeqFeature)." exons\n";
   foreach my $exon_pred ($gene->sub_SeqFeature) {
-    # make an exon
     my $exon = Bio::EnsEMBL::Exon->new;
    
     $exon->start($exon_pred->start);
@@ -846,12 +864,12 @@ sub make_transcript{
     $exon->phase($exon_pred->phase);
     $exon->end_phase($exon_pred->end_phase);
     
-    $exon->contig($contig);
-    $exon->adaptor($self->db->get_ExonAdaptor);
+    $exon->slice($contig);
+    #$exon->adaptor($self->db->get_ExonAdaptor);
     
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
-    #print STDERR "Making Supporting Features in TargettedGeneWise\n";
+    #print STDERR "Making Supporting Features in TargettedGenewise\n";
     #foreach my $f(@sf){
     #  print STDERR "supporting feature ".$f->gffstring."\n";
     #}
@@ -859,10 +877,8 @@ sub make_transcript{
     if(@sf){
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
     
-      $align->seqname($contig->dbID);
-      $align->contig($contig);
-#      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
-#      $align->adaptor($prot_adp);
+      $align->seqname($contig->seq_region_name);
+      $align->slice($contig);
       $align->score(100);
       $align->analysis($analysis_obj);
       #print STDERR "adding ".$align." to exon\n";
@@ -973,7 +989,7 @@ sub validate_exon{
 
 sub split_transcript{
   my ($self, $transcript) = @_;
-  $transcript->sort;
+  #$transcript->sort;
   my @split_transcripts   = ();
 
   if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
@@ -1065,7 +1081,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
     foreach my $sf (@{$exon->get_all_supporting_features}){
-	  $sf->feature1->seqname($exon->contig->dbID);
+	  $sf->feature1->seqname($exon->slice->seq_region_name);
 
       }
     # this exon becomes $prev_exon for the next one
@@ -1078,7 +1094,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
   my $count = 1;
   
   foreach my $st(@split_transcripts){
-    $st->sort;
+    #$st->sort;
     my @ex = @{$st->get_all_Exons};
     if(scalar(@ex) > 1){
       $st->{'temporary_id'} = $transcript->dbID . "." . $count;
@@ -1105,14 +1121,25 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
 sub output_db {
     my( $self, $output_db ) = @_;
     
-    if ($output_db) 
-    {
-	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
-	$self->{_output_db} = $output_db;
+    if ($output_db) {
+      $output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || throw("Input [$output_db] isn't a Bio::EnsEMBL::".
+                 "DBSQL::DBAdaptor");
+      $self->{_output_db} = $output_db;
+    }
+    if(!$self->{_output_db}){
+      $self->{_output_db}= new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $GB_GW_DBHOST,
+         '-user'   => $GB_GW_DBUSER,
+         '-pass'   => $GB_GW_DBPASS,
+         '-dbname' => $GB_GW_DBNAME,
+         '-port' => $GB_GW_DBPORT,
+        );
     }
     return $self->{_output_db};
 }
+
 
 
 1;

@@ -177,21 +177,15 @@ Nasty hack to get a handle to a pfam database, should probably use pfam code
 sub getPfamDB{
     my ($self) = @_;
     unless($self->{'_pfam_db'}){
-        my $pfam_meta = $self->db->get_MetaContainer();
-	my $value = $pfam_meta->list_value_by_key('pfam_db') || $self->throw("please enter pfam_db key - value into meta table\n");
-	my $pfam_db_conn = $self->db->make_hash_from_meta_value($value->[0]);
-#        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%{$pfam_meta->get_hash_by_key('pfam_db')});
-        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%$pfam_db_conn);
+        my $pfam_db = $self->db->get_meta_value_by_key('pfam_db');        
+        $self->{'_pfam_db'} = Bio::EnsEMBL::DBSQL::DBAdaptor->new(%{$self->db->make_hash_from_meta_value($pfam_db)});
     }
     return $self->{'_pfam_db'};
 } 
 sub db_version_searched{
-    my ($self) = @_;    
-    unless($self->{'_pfam_db_version'}){
-#       uncomment later
-#	$self->{'_pfam_db_version'} = $self->getPfamDB()->single_value_by_key('version');
-    }
-    return $self->{'_pfam_db_version'} || 10;
+    my $self = @_;
+# remove comment when pfam database has a version in meta table
+#    return $runnable->pfam_db_version();
 }
 =head2  runnable
 
@@ -534,7 +528,7 @@ sub output{
      $self->{'_output'} = [];
    }
     
-   if(scalar(@genes)){
+   if(defined @genes){
      push(@{$self->{'_output'}},@genes);
    }
    

@@ -30,7 +30,7 @@ require Exporter;
 
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check make_Clone make_Contig insert_agp_line display_exons non_translate process_file parse_operons write_simple_features parse_rnai parse_expr parse_SL1 parse_SL2 parse_pseudo_gff);
+our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check insert_agp_line display_exons non_translate process_file parse_operons write_simple_features parse_rnai parse_expr parse_SL1 parse_SL2 parse_pseudo_gff store_coord_system store_slice);
 
 use strict;
 use Bio::EnsEMBL::Exon;
@@ -38,6 +38,11 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::SimpleFeature;
+use Bio::EnsEMBL::CoordSystem;
+use Bio::EnsEMBL::Slice;
+
+
+
 
 =head2 get_seq_ids
 
@@ -258,16 +263,18 @@ sub process_file{
   my %five_prime;
   my %three_prime;
  LOOP: while(<$fh>){
-    #CHROMOSOME_I    UTR     UTR     111036  111054  .       +       .       UTR "5_UTR:F53G12.10"
-    #CHROMOSOME_I    UTR     UTR     112228  112295  .       +       .       UTR "3_UTR:F53G12.10"
-    #CHROMOSOME_I    curated CDS     111055  111065  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111161  111260  .       +       1       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111510  111707  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     111755  111971  .       +       0       Sequence "F53G12.10"
-    #CHROMOSOME_I    curated CDS     112019  112227  .       +       2       Sequence "F53G12.10"
+#CHROMOSOME_I	Coding_transcript	exon	49919	50016	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	50815	51030	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	52283	52410	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	52466	52572	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53266	53337	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53391	53695	.	+	.	Transcript "Y48G1C.4"
+#CHROMOSOME_I	Coding_transcript	exon	53944	54360	.	+	.	Transcript "Y48G1C.4"
+
     chomp;
     my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split;
     my $element = $_;
+    #print STDERR $element."\n" if($type eq 'exon');
     if($chr =~ /sequence-region/){
       #print STDERR $_;
       next LOOP;
@@ -299,6 +306,7 @@ sub process_file{
     }elsif($line ne 'curated coding_exon'){
       next LOOP;
     }
+    print "line ".$line."\n";
     $gene =~ s/\"//g;
     if(!$transcripts{$gene}){
       $transcripts{$gene} = [];
@@ -308,6 +316,8 @@ sub process_file{
     }
     
   }
+  print STDERR "Have ".keys(%transcripts). " transcripts ".
+    keys(%five_prime)." 5' UTRS and ".keys(%three_prime)." 3' UTRS\n";
   return \%transcripts, \%five_prime, \%three_prime;
 }
 
@@ -355,7 +365,7 @@ sub process_transcripts{
       $exon->start($start);
       $exon->end($end);
       $exon->analysis($analysis);
-      $exon->contig($slice);
+      $exon->slice($slice);
       $exon->phase($phase);
       my $end_phase = ($phase + ($exon->end-$exon->start) + 1)%3;
       #print STDERR "end phase calculated to be ".$end_phase."\n";
@@ -365,7 +375,7 @@ sub process_transcripts{
       }else{
 	$exon->strand(-1);
       }
-      $exon->score(100);
+      #$exon->score(100);
       push(@exons, $exon);
     }
     if($exons[0]->strand == -1){
@@ -503,8 +513,8 @@ sub create_transcripts{
     my $exon_count = 1;
     my $phase = 0;
     foreach my $exon(@sorted_exons){
-      $exon->created($time);
-      $exon->modified($time);
+      #$exon->created($time);
+      #$exon->modified($time);
       $exon->version(1);
       $exon->stable_id($transcript_id.".".$exon_count);
       $exon_count++;
@@ -570,8 +580,8 @@ sub create_gene{
   my $analysis = $exons->[0]->analysis;
   $gene->analysis($analysis);
   $gene->type($analysis->logic_name);
-  $gene->created($time);
-  $gene->modified($time);
+  #$gene->created($time);
+  #$gene->modified($time);
   $gene->version(1);
   $gene->stable_id($name);
   foreach my $transcript(@$transcripts){
@@ -609,29 +619,27 @@ sub prune_Exons {
       my $found;
       #always empty
     UNI:foreach my $uni (@unique_Exons) {
-        if ($uni->start  == $exon->start  &&
-            $uni->end    == $exon->end    &&
-            $uni->strand == $exon->strand &&
-            $uni->phase  == $exon->phase  &&
-            $uni->end_phase == $exon->end_phase
-           ) {
-          $found = $uni;
-          last UNI;
-        }
+	if ($uni->start  == $exon->start  &&
+	    $uni->end    == $exon->end    &&
+	    $uni->strand == $exon->strand &&
+	    $uni->phase  == $exon->phase  &&
+	    $uni->end_phase == $exon->end_phase
+	   ) {
+	  $found = $uni;
+	  last UNI;
+	}
       }
       if (defined($found)) {
-        push(@newexons,$found);
-        if($tran->translation){
-          if ($exon == $tran->translation->start_Exon){
-            $tran->translation->start_Exon($found);
-          }
-          if ($exon == $tran->translation->end_Exon){
-            $tran->translation->end_Exon($found);
-          }
-        }
+	push(@newexons,$found);
+	if ($exon == $tran->translation->start_Exon){
+	  $tran->translation->start_Exon($found);
+	}
+	if ($exon == $tran->translation->end_Exon){
+	  $tran->translation->end_Exon($found);
+	}
       } else {
-        push(@newexons,$exon);
-        push(@unique_Exons, $exon);
+	push(@newexons,$exon);
+	push(@unique_Exons, $exon);
       }
     }          
     $tran->flush_Exons;
@@ -658,43 +666,6 @@ sub prune_Exons {
 =cut
 
 
-#sub write_genes{
-#  my ($genes, $db) = @_;
-#  
-#  my %non_translating;
-#  my %non_transforming;
-#  
-# GENE: foreach my $gene(@$genes){
-#    eval{
-#      $gene->transform;
-#    };
-#    if($@){
-#      warn("gene ".$gene->stable_id." wouldn't transform ".$@);
-#      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
-#      if(!$non_transforming{$gene->stable_id}){
-#	$non_transforming{$gene->stable_id} = 1;
-#	next GENE;
-#      }else{
-#	push(@{$non_transforming{$clone_name}}, $gene);
-#	next GENE;
-#      }
-#    }
-# 
-#    #print STDERR "BEFORE STORAGE \n";
-#    #&display_exons(@{$gene->get_all_Exons});
-#    my $gene_adaptor = $db->get_GeneAdaptor;
-#    eval{
-#      $gene_adaptor->store($gene);
-#    };
-#    if($@){
-#      die "couldn't store ".$gene->stable_id." problems ".$@;
-#    }
-#    #print STDERR "AFTER STORAGE\n";
-#    #&display_exons(@{$gene->get_all_Exons});
-#  }
-
-#  return \%non_transforming;
-#}
 
 sub write_genes{
   my ($genes, $db, $stable_id_check) = @_;
@@ -708,42 +679,28 @@ sub write_genes{
       $stable_ids{$stable_id} = 1;
     }
   }
-  my %non_transforming;
   my %stored;
  GENE: foreach my $gene(@$genes){
-    eval{
-      $gene->transform;
-    };
-    if($@){
-      warn("gene ".$gene->stable_id." wouldn't transform ".$@);
-      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
-      if(!$non_transforming{$gene->stable_id}){
-	$non_transforming{$gene->stable_id} = 1;
-	next GENE;
-      }else{
-	push(@{$non_transforming{$clone_name}}, $gene);
-	next GENE;
-      }
-    }
- 
+   
+    
     #print STDERR "BEFORE STORAGE \n";
     #&display_exons(@{$gene->get_all_Exons});
     if($stable_id_check){
       if($stable_ids{$gene->stable_id}){
-	#print STDERR $gene->stable_id." already exists\n";
-	my $id = $gene->stable_id;
-	$id .= '.pseudo';
-	$gene->stable_id($id);
-	foreach my $transcript(@{$gene->get_all_Transcripts}){
-	  my $trans_id = $transcript->stable_id;
-	  $trans_id .= '.pseudo';
-	  $transcript->stable_id($trans_id);
-	  foreach my $e(@{$transcript->get_all_Exons}){
-	    my $id = $e->stable_id;
-	    $id .= '.pseudo';
-	    $e->stable_id($id);
-	  }
-	}
+        #print STDERR $gene->stable_id." already exists\n";
+        my $id = $gene->stable_id;
+        $id .= '.pseudo';
+        $gene->stable_id($id);
+        foreach my $transcript(@{$gene->get_all_Transcripts}){
+          my $trans_id = $transcript->stable_id;
+          $trans_id .= '.pseudo';
+          $transcript->stable_id($trans_id);
+          foreach my $e(@{$transcript->get_all_Exons}){
+            my $id = $e->stable_id;
+            $id .= '.pseudo';
+            $e->stable_id($id);
+          }
+        }
       }
     }
     if($stored{$gene->stable_id}){
@@ -758,11 +715,10 @@ sub write_genes{
     if($@){
       die "couldn't store ".$gene->stable_id." problems ".$@;
     }
-    #print STDERR "AFTER STORAGE\n";
-    #&display_exons(@{$gene->get_all_Exons});
+   
   }
 
-  return \%non_transforming;
+ 
 }
 =head2 translation_check
 
@@ -801,62 +757,6 @@ sub translation_check{
 }
 
 
-=head2 make_Contig
-
-  Arg [1]   : name of contig
-  Arg [2]   : sequence of contig
-  Arg [3]   : length of sequence
-  Function  : makes a Bio::EnsEMBL::RawContig object from information provided
-  Returntype: Bio::EnsEMBL::RawContig
-  Exceptions: 
-  Caller    : 
-  Example   : 
-
-=cut
-
-
-sub make_Contig{
-  my ($name, $seq, $length) = @_;
-
-  my $contig = Bio::EnsEMBL::RawContig->new();
-
-  $contig->name($name);
-  $contig->seq($seq);
-  $contig->length($length);
-
-  return $contig;
-  
-}
-
-
-=head2 make_Clone
-
-  Arg [1]   : args are all strings providing info about clone
-  Function  : making a Bio::EnsEMBL::Clone
-  Returntype: Bio::EnsEMBL::Clone
-  Exceptions: 
-  Caller    : 
-  Example   : 
-
-=cut
-
-
-sub make_Clone{
-  my ($name, $version, $embl_acc, $embl_version, $htg_phase, $contig, $created, $modified) = @_;
-
-  my $clone = Bio::EnsEMBL::Clone->new();
-  $clone->id($name);
-  $clone->version($version);
-  $clone->embl_id($embl_acc);
-  $clone->embl_version($embl_version);
-  $clone->htg_phase($htg_phase);
-  $clone->add_Contig($contig);
-  $clone->created($created);
-  $clone->modified($modified);
-
-  return $clone;
-  
-}
 
 
 =head2 insert_agp_line
@@ -873,16 +773,16 @@ sub make_Clone{
 
 
 sub insert_agp_line{
-  my ($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type, $db) = @_;
+  my ($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori, $db) = @_;
 
   if(!$contig){
     #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
     die "contig id must be defined for this to work\n";
   }
-  my $sql = "insert into assembly(chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  my $sql = "insert into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
   
   my $sth = $db->prepare($sql);
-  $sth->execute($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type); 
+  $sth->execute($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori); 
 }
 
 
@@ -979,7 +879,7 @@ sub parse_operons{
       $simple_feature->end($end);
       $id =~ s/\"//g;
       $simple_feature->display_label($id);
-      $simple_feature->contig($seq);
+      $simple_feature->slice($seq);
       $simple_feature->analysis($analysis);
       push(@operons, $simple_feature);
   }
@@ -1242,7 +1142,7 @@ sub create_simple_feature{
   $simple_feature->strand($strand);
   $simple_feature->end($end);
   $simple_feature->display_label($id);
-  $simple_feature->contig($seq);
+  $simple_feature->slice($seq);
   $simple_feature->analysis($analysis);
 
   return $simple_feature;
@@ -1250,39 +1150,17 @@ sub create_simple_feature{
 
 sub write_simple_features{
   my ($operons, $db) = @_;
-
-  
-  
-  my %non_transforming;
-  
- GENE: foreach my $operon(@$operons){
-    my @split;
-    eval{
-      #print STDERR "Transforming ".$operon->display_label." ".$operon->start." ".$operon->end."\n";
-      $operon->is_splittable(1);
-      @split = $operon->transform;
-    };
-    if($@){
-      warn("operon ".$operon->display_label." wouldn't transform ".$@);
-      $non_transforming{$operon->display_label} = 1;
-      next GENE;
-    }
  
-    #print STDERR "WORMBASE have ".@split." operons\n";
-    my $operon_adaptor = $db->get_SimpleFeatureAdaptor;
-    foreach my $operon(@split){
-      #print STDERR "trying to store ".$operon."\n";
-      eval{
-	$operon_adaptor->store($operon);
-      };
-      if($@){
-	die "couldn't store ".$operon->display_label." problems ".$@;
-      }
-    }
+  my $operon_adaptor = $db->get_SimpleFeatureAdaptor;
+  
+  eval{
+    $operon_adaptor->store(@$operons);
+  };
+  if($@){
+    die "couldn't store simple features problems ".$@;
   }
-
-  return \%non_transforming;
 }
+
 
 
 
@@ -1306,9 +1184,7 @@ sub parse_pseudo_gff{
   #print "PARSE GFF there are ".keys(%$genes)." genes\n";
   foreach my $gene_id(keys(%$genes)){
     my $transcripts = $genes->{$gene_id};
-    my $unpruned = &create_gene($transcripts, $gene_id);
-    #print STDERR "gene ".$unpruned."\n";
-    my $gene = &prune_Exons($unpruned);
+    my $gene = &create_gene($transcripts, $gene_id);
     push(@genes, $gene);
   }
   close(FH);
@@ -1385,7 +1261,7 @@ sub process_pseudo_transcripts{
       $exon->start($start);
       $exon->end($end);
       $exon->analysis($analysis);
-      $exon->contig($slice);
+      $exon->slice($slice);
       $exon->phase($phase);
       my $end_phase = ($phase + ($exon->end-$exon->start) + 1)%3;
       #print STDERR "end phase calculated to be ".$end_phase."\n";
@@ -1395,7 +1271,7 @@ sub process_pseudo_transcripts{
       }else{
 	$exon->strand(-1);
       }
-      $exon->score(100);
+      #$exon->score(100);
       push(@exons, $exon);
     }
     if($exons[0]->strand == -1){
@@ -1460,5 +1336,48 @@ sub create_pseudo_transcripts{
   return \%genes;
 
 }
+
+sub store_coord_system{
+  my ($db, $name, $version, $top_level, $sequence_level, $default) = @_;
+  
+  my $csa = $db->get_CoordSystemAdaptor();
+  
+  my $cs = Bio::EnsEMBL::CoordSystem->new
+    (
+     -NAME            => $name,
+     -VERSION         => $version,
+     -DEFAULT         => $default,
+     -SEQUENCE_LEVEL  => $sequence_level,
+     -TOP_LEVEL       => $top_level
+    );
+  
+  $csa->store($cs);
+
+  return $cs;
+}
+
+
+
+sub store_slice{
+  my ($db, $name, $start, $end, $strand, $coord_system, $sequence) = @_;
+  
+  my $sa  = $db->get_SliceAdaptor();
+
+  my $slice = Bio::EnsEMBL::Slice->new
+  (-seq_region_name  => $name,
+   -start            => $start,
+   -end              => $end,
+   -strand           => $strand,
+   -coord_system     => $coord_system);
+  
+  my $seq_ref;
+  if($sequence){
+    $seq_ref = \$sequence;
+  }
+  $sa->store($slice, $seq_ref);
+  $slice->adaptor($sa);
+  return $slice;
+}
+
 
 1;

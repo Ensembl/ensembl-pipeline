@@ -174,15 +174,12 @@ foreach my $gene (@genes) {
     # size of the overlap between the transcript bits is pseudo-random
     # for each transcript:
     my $rand2 = rand;
-    my $rand  = ($rand1 + $rand2)/2;
+    my $rand = ($rand1 + $rand2)/2;
     
-    my $overlap     = int(20 + $rand*40);
-    my $est_length  = int(300 + $rand*300);
-    #my $overlap    = 590;
-    #my $est_length = 640;
-
+    my $overlap = int(20 + $rand*30);
+    my $est_length = int(200 + $rand*200);
     print STDERR "overlap = $overlap - est_length = $est_length\n" if $verbose;
-    
+
     my @this_trans_bits;
     my $length = $tran->length;
     my $strand = $tran->start_Exon->strand;
@@ -208,13 +205,13 @@ foreach my $gene (@genes) {
     # calculate the cuts:
     my @cuts;
     my $start = 1;
-    my $end   = $est_length;
+    my $end   = $est_length + $overlap;
     if ( $pieces > 1 ){
       for(my $i=1; $<=$pieces; $i++){
 	print STDERR "piece: ( $start, $end )\n" if $verbose;
 	push( @cuts, [$start,$end] );
-	$start = $start + $est_length - $overlap;
-	$end   = $start + $est_length - 1;
+	$start = $start + $est_length;
+	$end   = $start + $est_length + $overlap - 1;
 	if ( $start > $length ){
 	  last;
 	}

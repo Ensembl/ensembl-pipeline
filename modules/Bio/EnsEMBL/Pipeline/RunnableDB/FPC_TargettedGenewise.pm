@@ -47,25 +47,35 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
-							     GB_GW_DBPORT
+                   GB_GW_DBPORT                                          
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
-							     GB_PROTEIN_INDEX
-							     GB_PROTEIN_SEQFETCHER
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences 
+  qw (
+      GB_PROTEIN_INDEX
+      GB_PROTEIN_SEQFETCHER
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
-							     GB_INPUTID_REGEX
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   
+  qw (
+      GB_INPUTID_REGEX
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
-							     GB_KILL_LIST
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    
+  qw (
+      GB_KILL_LIST
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    qw (
-							     GB_FINAL_PMATCH_LOGICNAME
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    
+  qw (
+      GB_FINAL_PMATCH_LOGICNAME
+     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw 
+  (
+   GB_TARGETTED_MASKING
+   GB_TARGETTED_SOFTMASK
+  );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -77,7 +87,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    qw (
 			   -SEQFETCHER  => $sf,
                            -ANALYSIS    => $analysis);
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise object
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Args    :   -db:      A Bio::EnsEMBL::DBSQL::DBAdaptor,
                 -input_id:   Contig input id (required), 
@@ -173,56 +183,57 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-
-  my $pipeline_db = $self->db;
-
-  my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
-  #print STDERR "have ".$pmfa." adaptor\n";
-  my $input_id = $self->input_id;
-  my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
-  $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
   
-  my $chr_name = $1;
-  my $start   = $2;
-  my $end     = $3;
-
-  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						       '-host'   => $GB_GW_DBHOST,
-						       '-user'   => $GB_GW_DBUSER,
-						       '-pass'   => $GB_GW_DBPASS,
-						       '-port'	 => $GB_GW_DBPORT,
-						       '-dbname' => $GB_GW_DBNAME,
-						       '-port' => $GB_GW_DBPORT,                               
-						      );
+  my $pmfa = $self->db->get_PmatchFeatureAdaptor();
+ 
+  $self->fetch_sequence($GB_TARGETTED_MASKING);
+  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end
+    ($self->query->seq_region_name, $self->query->start, 
+     $self->query->end, $GB_FINAL_PMATCH_LOGICNAME );
+ 
+  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     '-host'   => $GB_GW_DBHOST,
+     '-user'   => $GB_GW_DBUSER,
+     '-pass'   => $GB_GW_DBPASS,
+     '-dbname' => $GB_GW_DBNAME,
+     '-port' => $GB_GW_DBPORT,
+    );
   
   
   $genewise_db->dnadb($self->db);
   $self->output_db($genewise_db);
   my %kill_list = %{$self->fill_kill_list};
 
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end, $GB_FINAL_PMATCH_LOGICNAME)){
-
+  foreach my $feat(@features){
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
-      #rpint STDERR "skipping " . $feat->protein_id . "\n";
+      #print STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
+    
+    my ($start, $end);
+    
+    $start = $feat->start;
+    $end = $feat->end;
 
-
-    my $input = $feat->chr_name   . ":" . 
-                $feat->start      . "," . 
-                $feat->end        . ":" . 
-                $feat->protein_id . ":" ;
+    my $input = ($self->query->coord_system->name.":".
+                 $self->query->coord_system->version.":".
+                 $self->query->seq_region_name.":".
+                 $start.":".$end.":".
+                 $self->query->strand."|".
+                 $feat->protein_id);
 
     #print STDERR "TGW input: $input\n";
 
-    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise(
-									-db => $self->db,
-									-input_id => $input,
-									-seqfetcher => $protein_fetcher,
-									-analysis => $self->analysis,
-									-output_db => $self->output_db,
-								       );
+    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise
+      (
+       -db => $self->db,
+       -input_id => $input,
+       -seqfetcher => $protein_fetcher,
+       -analysis => $self->analysis,
+       -output_db => $self->output_db,
+      );
     $self->targetted_runnable($tgr);
   }
 
@@ -294,8 +305,11 @@ sub run {
       $self->warn("problems running TargettedGenewise: [$@]\n");
       next TGE;
     }
-
+    
+    
   }
+  
+  
 
 }
 
@@ -334,17 +348,16 @@ sub output{
 sub write_output {
   my ($self) = @_;
   foreach my $tge($self->targetted_runnable){
-   eval{
-     $tge->write_output;
-     #print "\n\n";
+    eval{
+      my @genes = $tge->write_output;
     };
-
+    
     if($@){
-      $self->warn("problems writing output for TargettedGeneWise: [$@]\n");
+      $self->warn("problems writing output for TargettedGenewise: [$@]\n");
       next TGE;
     }
- }
-
+  }
+  # data has already been written out, so no need to do anything here.
 }
 
 sub convert_output {

@@ -7,6 +7,8 @@ use vars qw(@ISA);
 @ISA = ('Bio::EnsEMBL::Root');
 
 
+use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
+
 =head2 new
 
   Arg [1]   : Bio::EnsEMBL::DBSQL::DBAdaptor
@@ -60,59 +62,29 @@ sub db{
 
 =cut
 
-sub generate_contig_input_ids{
-  my ($self) = @_;
 
-  my @ids  = @{$self->get_contig_names};
-
-  return @ids;
-
-}
 
 sub generate_slice_input_ids {
-    my ($self,$size,$overlap) = @_;
+    my ($self,$cs_name, $cs_version, $size,$overlap) = @_;
 
-    $overlap = 0 if (!defined($overlap));
-
-    if ($size <= 0) {
-       $self->throw("Slice size must be > 1. Currently " . $size);
+   
+    if ($size && $size < 0) {
+       $self->throw("Slice size must be >= 0. Currently " . $size);
     }
 
-    my @ids = @{$self->get_slice_names($size,$overlap)};
+    my @ids = @{$self->get_slice_names($cs_name, $cs_version,
+                                       $size,$overlap)};
 
     return @ids;
 }
 
 
-=head2 get_contig_names
-
-  Arg [1]   : none
-  Function  : uses the core dbconnection to get a list of contig names
-  Returntype: Bio::EnsEMBL::Pipeline::IDSet
-  Exceptions: throws if there is no db connection
-  Caller    : 
-  Example   : 
-
-=cut
-
-sub get_contig_names{
-    my ($self) = @_;
-    
-    if(!$self->db){
-	$self->throw("if you getting contig names InputIDFactory needs a dbconnection to a core db");
-    }
-    my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
-
-    my $names = $rawcontig_adaptor->fetch_all_names;
-
-    return $names;
-}
-
-
 =head2 get_slice_names
 
-  Arg [1]   : size, int
-  Arg [2]   : overlap, int
+  Arg [1]   : coord system name str
+  Arg [2]   : coord system version
+  Arg [3]   : size, int
+  Arg [4]   : overlap, int
   Function  : produces a set of slice names based on the size and overlap
   specified in the format chr_name.start-end
   Returntype:  Bio::EnsEMBL::Pipeline::IDSet
@@ -122,50 +94,38 @@ sub get_contig_names{
 
 =cut
 
-
 sub get_slice_names{
-  my ($self, $size, $overlap) = @_;
+  my ($self, $cs_name, $cs_version, $size, $overlap) = @_;
 
-  if(!$self->db) {
-    $self->throw("if you're getting slice names InputIDFactory needs a dbconnection to a core db");
+  $overlap = 0 if (!$overlap);
+  $size = 0 if(!$size);
+  $cs_version = '' unless($cs_version);
+  my $csa = $self->db->get_CoordSystemAdaptor();
+  my $sa = $self->db->get_SliceAdaptor();
+  
+  my $slices = $sa->fetch_all($cs_name, $cs_version);
+  
+  if($size > 0){
+    $slices = split_Slices($slices,$size,$overlap);
+  }
+  
+  my @ids;
+  foreach my $slice(@$slices){
+    push(@ids, $slice->name);
   }
 
-  my @input_ids;
-
-  my @chromosomes = @{$self->db->get_ChromosomeAdaptor->fetch_all};
-
-  foreach my $chr (@chromosomes){
-
-    my $query = "select min(chr_start), max(chr_end) from assembly where chromosome_id = " . $chr->dbID;
-    my $sth   = $self->db->prepare($query);
-    my $res   = $sth->execute;
-
-    my ($chrstart, $length);
-   
-    while (my $ref = $sth->fetchrow_arrayref) {
-      ($chrstart, $length) = ($ref->[0], $ref->[1]);
-    }
-
-    my $count = $chrstart;
-    while ($count < $length) {
-      my $start = $count;
-      my $end   = $count + $size - 1;
-      
-      if ($end > $length) {
-	$end = $length;
-      }
-      
-      my $input_id = $chr->chr_name . "." . $start . "-" .  $end;
-
-      push(@input_ids, $input_id);
-
-      $count = $count + $size - $overlap;
-    }
-  }
-
-  return \@input_ids;
-
+  return \@ids;
 }
+
+
+
+
+
+
+
+
+
+
 
 sub get_filenames{
   my ($self, $dir, $regex) = @_;
@@ -223,6 +183,7 @@ sub generate_translation_id_input_ids{
 
   my $ids = $self->get_translation_ids;
   
+  print STDERR "have ".@$ids." ids\n";
   return @$ids;
 }
 
