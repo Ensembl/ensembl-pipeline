@@ -5,7 +5,7 @@ Bio::EnsEMBL::Pipeline::Config::GeneDupl
 =head1 SYNOPSIS
 
     use Bio::EnsEMBL::Pipeline::Config::GeneDupl;
-    use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw( GD_HIT_COVERAGE );
+    use Bio::EnsEMBL::Pipeline::Confihead g::GeneDupl qw( GD_HIT_COVERAGE );
 
 =head1 DESCRIPTION
 
@@ -19,8 +19,74 @@ use vars qw( %GeneDupl );
 # Hash containing config info
 %GeneDupl = 
   (
-   # Location of the _formatted_ blast database - the formatted fasta file.
-   GD_BLASTDB_FILE         => '',
+
+   # Species specific options:
+   #
+   # To allow multiple species to be included in the same running pipeline
+   # the species-specific config options are held in hashes keyed by the
+   # prefix of gene stable ids.  Code that uses this config can auto-detect
+   # which set of options to use.  A generic set of options could
+   # also be included, keyed on '.*' or some other regex that would
+   # match all possible ids.
+   #
+   # Explanation of these config options:
+   #
+   # GD_BLASTDB_FILE -
+   #   Location of the _formatted_ blast database - the formatted fasta file.
+   # GD_INGROUP_REGEX -
+   #   Regex that will match ids from ingroup species (eg. ENSG for Homo sapiens).
+   # GD_OUTGROUP_REGEXES -
+   #   Listref of regexes that will match ids from outgroup species.
+   # GD_TRANSL_REGEX
+   #   Ingroup stable translation id regex
+   # GD_HIT_COVERAGE -
+   #   Minimum permitted coverage of match sequences.  Defaults to 0.80.
+   # GD_HIT_IDENTITY -
+   #   Mimimum permitted identity for homology matches.  Defaults to 0.80.
+   # GD_DISTANCE_CUTOFF -
+   #  Arbritrary genetic distance (Ks) cutoff to use when an outgroup match
+   #  has not been found.  Also used when outgroup matches are more 
+   #  distant than this cutoff value.  Defaults to 1.0.
+   # GD_GENETIC_CODE -
+   #  Genetic code to use when translating sequences.  Codes are exactly the
+   #  same as those used within BioPerl.  Universal genetic code is 1.  Vertebrate
+   #  mitochondrial genetic code is 2.  See the Bio::Tools::CodonTable method 
+   #  for a full list of options.
+   # GD_OUTPUT_DIR
+   #  Location of directory where output files should be written.
+
+   GD_OPTIONS => {'ENSG0'    => {GD_BLASTDB_FILE     => '',
+				GD_INGROUP_REGEX    => 'ENSG0',
+				GD_OUTGROUP_REGEXES => ['ENSRNOG0', 'ENSMUSG0'],
+				GD_TRANSL_REGEX     => 'ENSP',
+				GD_HIT_COVERAGE     => '90',
+				GD_HIT_IDENTITY     => '60',
+				GD_DISTANCE_CUTOFF  => '0.6',
+				GD_GENETIC_CODE     => '1',
+				GD_OUTPUT_DIR       => '',
+			       },
+		  'ENSRNOG0' => {GD_BLASTDB_FILE     => '',
+				GD_INGROUP_REGEX    => 'ENSRNOG0',
+				GD_OUTGROUP_REGEXES => ['ENSG0'],
+				GD_TRANSL_REGEX     => 'ENSRNOP',
+				GD_HIT_COVERAGE     => '90',
+				GD_HIT_IDENTITY     => '60',
+				GD_DISTANCE_CUTOFF  => '0.6',
+				GD_GENETIC_CODE     => '1',
+				GD_OUTPUT_DIR       => '',
+			       },
+		  'ENSMUSG0' => {GD_BLASTDB_FILE     => '',
+				GD_INGROUP_REGEX    => 'ENSMUSG0',
+				GD_OUTGROUP_REGEXES => ['ENSG0'],
+				GD_TRANSL_REGEX     => 'ENSMUSP',
+				GD_HIT_COVERAGE     => '90',
+				GD_HIT_IDENTITY     => '60',
+				GD_DISTANCE_CUTOFF  => '0.6',
+				GD_GENETIC_CODE     => '1',
+				GD_OUTPUT_DIR       => '',
+			       },
+		 },
+
 
    # Location of blastn executable to use.  Defaults to 'wublastn'.  This
    # blast flavour should match the index type specified in GB_BLAST_VARIANT.
@@ -38,32 +104,6 @@ use vars qw( %GeneDupl );
    # Location of codeml executable (from PAML package).
    GD_CODEML_EXE           => '',
 
-   # Regex that will match ids from ingroup species (eg. ENSG for Homo sapiens).
-   GD_INGROUP_REGEX        => 'ENSG',
-
-   # Listref of regexes that will match ids from outgroup species.
-   GD_OUTGROUP_REGEXES     => ['ENSMUSG', 'ENSRNOG'],
-
-   # Ingroup stable translation id regex
-   GD_TRANSL_REGEX         => 'ENSP',
-
-   # Minimum permitted coverage of match sequences.  Defaults to 0.80.
-   GD_HIT_COVERAGE         => '90',
-
-   # Mimimum permitted identity for homology matches.  Defaults to 0.80.
-   GD_HIT_IDENTITY         => '60',
-
-   # Arbritrary genetic distance (Ks) cutoff to use when an outgroup match
-   # has not been found.  Also used when outgroup matches are more 
-   # distant than this cutoff value.  Defaults to 1.0.
-   GD_DISTANCE_CUTOFF      => '0.6',
-
-   # Genetic code to use when translating sequences.  Codes are exactly the
-   # same as those used within BioPerl.  Universal genetic code is 1.  Vertebrate
-   # mitochondrial genetic code is 2.  See the Bio::Tools::CodonTable method 
-   # for a full list of options.
-   GD_GENETIC_CODE         => '1',
-
    # Location of temporary working disk space.  Defaults to /tmp.
    GD_WORK_DIR             => '/tmp',
 
@@ -78,9 +118,6 @@ use vars qw( %GeneDupl );
    #   'db'     - output written directly to a Compara database.
    GD_OUTPUT_METHOD        => 'files',
 
-   # Location of directory where output files should be written.
-   GD_OUTPUT_DIR          => '',
-
    # Details of Compara schema database where output should be written.
    GD_OUTPUT_DBNAME        => '',
    GD_OUTPUT_DBHOST        => '',
@@ -94,7 +131,7 @@ use vars qw( %GeneDupl );
    #   'nucleotide'  - alignments as nucleotide sequences
    #   'aminoacid'   - alignments as amino acid sequences
    # Defaults to 'nucleotide'.
-   GD_OUTPUT_TYPE          => 'nucleotide',
+   GD_OUTPUT_TYPE          => 'aminoacid',
 
   );
 
