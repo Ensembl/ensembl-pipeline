@@ -31,7 +31,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Clone_EPCR
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::EPCR to add
 functionality for reading and writing to databases.
-This object takes clone ids, while Bio::EnsEMBL::Pipeline::RunnabdleDB::CPG
+This object takes clone ids, while Bio::EnsEMBL::Pipeline::RunnableDB::EPCR
 acts on contigs. This allows us to submit one Job per clone rather
 than one per contig and should speed things up ...
 
@@ -129,8 +129,8 @@ sub runnable {
         }
         $parameters {'-db'}      = $self->analysis->db_file();  
         $parameters {'-clone'}   = $genseq;
-        my $runnable = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters);
-        push (@{$self->{'_runnable'}}, $runnable);
+        push (@{$self->{'_runnable'}}, 
+         Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters);
     }
     return @{$self->{'_runnable'}};
 }
