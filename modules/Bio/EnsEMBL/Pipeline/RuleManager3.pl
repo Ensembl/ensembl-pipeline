@@ -10,7 +10,7 @@ use Socket;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::Config::Blast;
+
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -42,6 +42,9 @@ $SIG{INT} = \&termhandler;
 
 # dynamically load appropriate queue manager (e.g. LSF)
 
+
+my $max_time = $MAX_JOB_TIME;
+my $killed_file = $KILLED_INPUT_IDS;
 my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
 
 my $file = "$batch_q_module.pm";
@@ -53,7 +56,7 @@ if ($@) {
     print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
     exit 1;
 }
- 
+
 my $get_pend_jobs;
 if ($batch_q_module->can("get_pending_jobs")) {
     my $f = $batch_q_module . "::get_pending_jobs";
@@ -80,11 +83,11 @@ my ($done, $once);
 my $runner;
 my $shuffle;  
 my $output_dir;
-my @start_from;
 my %analyses;
 my $verbose;
 my $rerun_sleep = 3600;
 my $overload_sleep = 300;
+my $db_sanity = 1; 
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -98,9 +101,9 @@ GetOptions(
     'output_dir=s'  => \$output_dir,
     'once!'         => \$once,
     'shuffle!'      => \$shuffle,
-    'start_from=s@' => \@start_from,
     'analysis=s@'   => \@analyses,
     'v!'            => \$verbose,
+    'dbsanity!'     => \$db_sanity,
 )
 or die ("Couldn't get options");
 
@@ -118,7 +121,12 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -port   => $dbport,
 );
 
-&db_sanity_check($db);
+if($db_sanity){
+  &db_sanity_check($db);
+}else{
+  print STDERR "You are not checking db sanity are you sure you set it ".
+    "up correctly?\n" if($verbose);
+}
 
 my $rule_adaptor = $db->get_RuleAdaptor;
 my $job_adaptor  = $db->get_JobAdaptor;
@@ -127,15 +135,10 @@ my $sic          = $db->get_StateInfoContainer;
 
 # analysis options are either logic names or analysis dbID's
 
-unless (@start_from) {
-    print STDERR "Need to specify at least 1 analysis to start from with -start_from\n";
-    exit 1;
-}
 
 
 %analyses   = logic_name2dbID($ana_adaptor, @analyses);
-my %tmp = logic_name2dbID($ana_adaptor, @start_from);
-@start_from = keys %tmp;
+
 
 if ($idlist_file && ! -e $idlist_file) {
     die "Must be able to read $idlist_file";
@@ -186,19 +189,14 @@ $db->pipeline_lock($lock_str);
 # analyses we want to run and the dependences between them. e.g. the
 # fact that we only want to run blast jobs after we've repeat masked etc.
 
-my @rules  = $rule_adaptor->fetch_all;
+my @rules       = $rule_adaptor->fetch_all;
 
-print STDERR "have ".@rules." rules\n";
 my %accumulator_analyses;
-my %rule_types;
+
 foreach my $rule (@rules) {
   if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
     $accumulator_analyses{$rule->goalAnalysis->logic_name} = $rule->goalAnalysis;
   }
-  if(!$rule_types{$rule->goalAnalysis->input_id_type}){
-    $rule_types{$rule->goalAnalysis->input_id_type} = [];
-  }
-  push (@{$rule_types{$rule->goalAnalysis->input_id_type}}, $rule);
 }
 
 # Need here to strip rules which don't need to be run.
@@ -240,11 +238,8 @@ while (1) {
         # NB It's almost as much work to get one ID as the whole lot, so setting
         # the 'chunksize' variable to a small number doesn't really achieve much.
 
-        print STDERR "Reading IDs ... \n";
+        print "Reading IDs ... ";
 
-        foreach my $a (@start_from) {
-            push @id_list, @{$sic->list_input_id_by_Analysis($a)};
-        }
         $id_type_hash = $sic->get_all_input_id_analysis_sets;
     }
 
@@ -252,7 +247,7 @@ while (1) {
 
     foreach my $anal (@anals) {
         if ($anal->input_id_type eq 'ACCUMULATOR') {
-            print STDERR "Adding completed accumulator for " . $anal->logic_name . "\n";
+            print "Adding completed accumulator for " . $anal->logic_name . "\n";
 
             $completed_accumulator_analyses{$anal->logic_name} = 1;
         } else {
@@ -269,17 +264,23 @@ while (1) {
     # All the analyses we're allowed to run are stored in a hash %analHash
 
     my %incomplete_accumulator_analyses;
-    #print STDERR "have ".keys(%$id_type_hash)." types of input_id\n";
+
     INPUT_ID_TYPE: foreach my $input_id_type (keys %$id_type_hash) {
 	
         next INPUT_ID_TYPE if ($input_id_type eq 'ACCUMULATOR');
-	print STDERR "check rules for input_ids ".$input_id_type."\n";
-	my @rule_list = @{$rule_types{$input_id_type}};
+	
+	if($batch_q_module->can('get_job_time')){
+	  my @running_jobs = $job_adaptor->fetch_by_Status('RUNNING');
+	  &job_time_check($batch_q_module, $verbose, \@running_jobs, 
+			  $killed_file, $max_time);
+	}
+
         @id_list = keys %{$id_type_hash->{$input_id_type}};
+
         @id_list = &shuffle(@id_list) if $shuffle;
 
-        print STDERR "Checking $input_id_type ids\n";
-	print STDERR "have ".@rule_list." rules and ".@id_list." ids to check\n";
+        print "Checking $input_id_type ids\n";
+
         JOBID: foreach my $id (@id_list) {
     
             # handle signals. they are 'caught' in the handler subroutines but
@@ -316,35 +317,35 @@ while (1) {
             # check all rules, which jobs can be started
     
             my @current_jobs = $job_adaptor->fetch_by_input_id($id);
-	  RULE: for my $rule (@rule_list)  {
-	      if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
-		if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
-		  $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
-		}
-		print STDERR $rule->goalAnalysis->logic_name." doesn't seem to have an entry in the analyses hash skipping\n"; 
-		next RULE;
-	      }
-	      print STDERR "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
-	      
-	      my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses);
-	      
-	      if ($anal) {
-		print STDERR " fullfilled.\n" if $verbose;
-		if ($rule->goalAnalysis->input_id_type ne 'ACCUMULATOR') {
-		  $analHash{$anal->dbID} = $anal;
-		}
-	      } else {
-		print STDERR " not fullfilled.\n" if $verbose;
-		
-		if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
-		    $rule->has_condition_of_input_id_type($input_id_type) ) {
-		  
-		  print " Makes ACCUMULATOR " . $rule->goalAnalysis->logic_name  . " incomplete\n" if $verbose;
-		  $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
-		}
-	      }
+    
+            RULE: for my $rule (@rules)  {
+                if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
+                    if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
+                        $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
+                    }
+                    next RULE;
+                }
+                print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
+    
+                my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses);
+    
+                if ($anal) {
+                    print " fullfilled.\n" if $verbose;
+                    if ($rule->goalAnalysis->input_id_type ne 'ACCUMULATOR') {
+                      $analHash{$anal->dbID} = $anal;
+                    }
+                } else {
+                    print " not fullfilled.\n" if $verbose;
+
+                    if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
+                        $rule->has_condition_of_input_id_type($input_id_type) ) {
+
+                        print " Makes ACCUMULATOR " . $rule->goalAnalysis->logic_name  . " incomplete\n";
+                        $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
+                    }
+                }
             }
-	    
+    
             # Now we loop over all the allowed analyses in the hash. We
             # first check the database to see if the job is already running.
             # If so we skip it.
@@ -377,7 +378,7 @@ while (1) {
     if ( ! $done) {
         my @current_jobs = $job_adaptor->fetch_by_input_id('ACCUMULATOR');
         foreach my $accumulator_logic_name (keys %accumulator_analyses) {
-            print STDERR "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
+            print "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
             if (!exists($incomplete_accumulator_analyses{$accumulator_logic_name}) &&
                 !exists($completed_accumulator_analyses{$accumulator_logic_name})) {
                 my $result_flag = run_if_new('ACCUMULATOR',
@@ -387,12 +388,12 @@ while (1) {
                                              $verbose,
                                              $output_dir,
                                              $job_adaptor);
-                if ($result_flag == 1 && $verbose) { print STDERR "Started accumulator type job for anal $accumulator_logic_name\n"; }
+                if ($result_flag == 1 && $verbose) { print "Started accumulator type job for anal $accumulator_logic_name\n"; }
     
             } elsif (exists($incomplete_accumulator_analyses{$accumulator_logic_name})) {
-                print STDERR "Accumulator type analysis $accumulator_logic_name conditions unsatisfied\n" if $verbose;
+                print "Accumulator type analysis $accumulator_logic_name conditions unsatisfied\n" if $verbose;
             } else {
-                print STDERR "Accumulator type analysis $accumulator_logic_name already run\n" if $verbose;
+                print "Accumulator type analysis $accumulator_logic_name already run\n" if $verbose;
             }
         }
     }
@@ -400,21 +401,21 @@ while (1) {
     &shut_down($db) if $done || $once;
     sleep($rerun_sleep) if $submitted == 0;
     @id_list = ();
-    print STDERR "Waking up and run again!\n" if $verbose;
+    print "Waking up and run again!\n" if $verbose;
 }
 
 
 sub run_if_new {
     my ($id, $anal, $current_jobs, $local, $verbose, $output_dir, $job_adaptor) = @_;
 
-    print STDERR "Checking analysis " . $anal->dbID . "\n\n" if $verbose;
+    print "Checking analysis " . $anal->dbID . "\n\n" if $verbose;
     # Check whether it is already running in the current_status table?
 
     my $retFlag=0;
     eval {
         foreach my $cj (@$current_jobs) {
 
-             print STDERR "Comparing to current_job " . $cj->input_id . " " .
+             print "Comparing to current_job " . $cj->input_id . " " .
                   $cj->analysis->dbID . " " .
                   $cj->current_status->status . " " .
                   $anal->dbID . "\n" if $verbose;
@@ -422,10 +423,10 @@ sub run_if_new {
             if ($cj->analysis->dbID == $anal->dbID) {
                 if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
                     $cj->batch_runRemote;
-                    #print STDERR "Retrying job\n";
+                    print "Retrying job\n";
                 }
                 else {
-                    print STDERR "\nJob already in pipeline with status : " . $cj->current_status->status . "\n" if $verbose ;
+                    print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n" if $verbose ;
                 }
                 $retFlag = 1;
             }
@@ -434,7 +435,7 @@ sub run_if_new {
 
 
     if ($@) {
-        print STDERR "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
+        print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
         return -1;
     } elsif ($retFlag) {
         return 0;
@@ -446,11 +447,11 @@ sub run_if_new {
                                                -runner => $PIPELINE_RUNNER_SCRIPT);
 
 
-    print STDERR "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
+    print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
     $job_adaptor->store($job);
 
     if ($local) {
-        print STDERR "Running job locally\n" if $verbose;
+        print "Running job locally\n" if $verbose;
         eval {
           $job->runLocally;
         };
@@ -459,7 +460,7 @@ sub run_if_new {
         }
     } else {
         eval {
-            print STDERR "\tBatch running job\n" if $verbose;
+            print "\tBatch running job\n" if $verbose;
             $job->batch_runRemote;
         };
         if ($@) {
@@ -586,19 +587,19 @@ sub config_sanity_check {
     no strict 'vars';
     print STDERR "checking config sanity\n";
     unless ($QUEUE_MANAGER) {
-        print STDERR "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
+        print "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
 	$ok = 0;
     }
     unless ($LIB_DIR) {
-        print STDERR "Need to specify LIB_DIR in Config/General.pm\n";
+        print "Need to specify LIB_DIR in Config/General.pm\n";
 	$ok = 0;
     }
     unless ($DATA_DIR) {
-        print STDERR "Need to specify DATA_DIR in Config/General.pm\n";
+        print "Need to specify DATA_DIR in Config/General.pm\n";
 	$ok = 0;
     }
     unless ($BIN_DIR) {
-        print STDERR "Need to specify BIN_DIR in Config/General.pm\n";
+        print "Need to specify BIN_DIR in Config/General.pm\n";
 	$ok = 0;
     }
 
@@ -630,6 +631,75 @@ sub logic_name2dbID {
 sub db_sanity_check{
   my ($db) = @_;
 
-  #check all rules have analyses
+  my ($sth, $query, $count);
+  #check all rules in the rule_goal table have existing analyses
+  $query = "SELECT count(distinct g.rule_id) "
+          ."from rule_goal g "
+          ."left join analysis a on g.goal = a.analysis_id "
+	  ."where a.analysis_id is null";
+
+  $sth = $db->prepare($query);
+  $sth->execute;
+  $count = $sth->fetchrow;
+  if($count){
+    die "Some of your goals in the rule_goal table don't seem ".
+      "to have entries in the analysis table";
+  }
+  #check all rules in the rule_condition table have existing analyses
+  $query = "select count(distinct c.rule_id) ".
+    "from rule_conditions c ".
+      "left join analysis a on c.condition = a.logic_name ".
+	"where a.logic_name is null";
+
+  $sth = $db->prepare($query);
+  $sth->execute;
+  $count = $sth->fetchrow;
+  if($count){
+    die "Some of your conditions in the rule_condition table don't ".
+      "seem to have entries in the analysis table";
+  }
+  #check all the analyses have types
+  $query = "select count(distinct(a.analysis_id)) ".
+    "from analysis a left join input_id_type_analysis t ".
+      "on a.analysis_id = t.analysis_id ".
+	"where t.analysis_id is null";
+  $sth = $db->prepare($query);
+  $sth->execute;
+  $count = $sth->fetchrow;
+  if($count){
+    die "Some of you analyses don't have entries in the ".
+      " input_id_type_analysis table"; 
+  }
+  #check that all types which aren't accumulators have entries in
+  #input__id_analysis table
+  $query = "select distinct(t.input_id_type) ".
+    "from input_id_type_analysis t ".
+      "left join input_id_analysis i ".
+	"on t.input_id_type = i.input_id_type ".
+	  "where i.input_id_type is null ".
+	    "and t.input_id_type != 'ACCUMULATOR'";
+  
+  $sth = $db->prepare($query);
+  $sth->execute;
+  $count = $sth->fetchrow;
+  if($count){
+    die "Some of you types  don't have entries in the ".
+      " input_id_type_analysis table"; 
+  }
+}
+
+
+sub job_time_check{
+  my ($batch_q_module, $verbose, $running_jobs, $file, $time) = @_;
+   open(KILLED, "+>>".$file) or die("couldn't open ".$file." $!");
+  foreach my $job(@$running_jobs){
+    my $time = $batch_q_module->get_job_time($job->submission_id);
+    if($time >= $max_time){
+      $batch_q_module->kill_job($job->submission_id);
+      print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
+      print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
+      $job->set_status('KILLED');
+    }
+  }
 
 }
