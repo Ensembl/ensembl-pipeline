@@ -44,6 +44,15 @@ All get/sets and generic methods found here, while specific methods such as
 construct_command_line have to be implemented in the specific child 
 classes Bio::EnsEMBL::Pipeline::BatchSubmission::*
 
+the specific methods which must be implemented are
+
+construct_command_line, a method to build the submission statement
+open_command_line, a method to open the submission statement 
+copy_output ,a method copy the output of a job at to the defined 
+             destination if desired
+delete_output, a method to delete the output from the temporary location
+               that held it
+
 =head1 CONTACT
 
 Post general queries to B<ensembl-dev@ebi.ac.uk>
