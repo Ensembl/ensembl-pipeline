@@ -117,21 +117,40 @@ sub score_Transcripts{
     # get the sites of alt-splicing on each transcript cluster
     foreach my $cluster ( @clusters ){
 
-      $self->get_alternative_sites( $cluster );
+      my @sites = $self->get_alternative_sites( $cluster );
+      
+      my @trans = @{ $cluster->get_Transcripts };
 
- 
+      ############################################################
+      # now get the sites of alternative splicing
+      # contained in each transcript
+      # and then calculate the distances between 
+      # those sites and the lengths
+      # of the list of ESTs making up the transcript
+      # and compare them!
+
+
     }
     
 
 }
 
 ############################################################
+#
+# this method takes a cluster of transcripts which
+# can make up a gene. It cluster the exons and
+# walks along the exon clusters to find out where are
+# the sites of alternative splicing. Each of these
+# sites is modelled as an exon-cluster which contains
+# the exons in that position (contitutive and alternative exons )
+# and has a position in the genomic coordinates, so that we
+# do not lose information of the relative position between
+# each of them in the genomic
 
 sub get_alternative_sites{
   my ($self, $cluster ) = @_;
 
   my @trans = @{ $cluster->get_Transcripts };
-
   my %exon2transcript;
   my @all_exons;
   foreach my $tran ( @trans ){
@@ -140,15 +159,66 @@ sub get_alternative_sites{
       push( @all_exons, $exon );
     }
   }
-
+  
   ############################################################
   # cluster the exons according to overlap
   $exon_cluster_list = $self->_cluster_Exons( @all_exons );
   @clusters = sort { $a->start <=> $b->start } $cluster_list->sub_SeqFeature;
   
-  
+  ############################################################
+  # get the sites of alternative splicing:
+  my @sites;
+  my %added;
+ EXON_CLUSTER:
+  foreach my $exon_cluster ( @clusters ){
+    my @exons = $exon_cluster->sub_SeqFeature;
+    my $previous_exon;
+    my @transcripts = @trans;
+    my %seen_transcript;
+    
+  EXON:
+    while ( @exons ){
+      my $exon = shift @exons;
+      my $found = 0;
+      while ( found == 0 ){
+	my $t = shift @transcripts;
+	last if ( $seen_transcript{$t} );
+	if ( $t == $exon2transcript{ $exon } ){
+	  $found = 1;
+	  $seen_transcript{$t} = 1;
+	}
+	else{
+	  push ( @transcripts, $t );
+	}
+      }
+    
+      ############################################################
+      # unless all exons have the same splice coordinates
+      # we have a case of alternative splicing: alterantive 3'/5' site, intron retention
+      if ( $previous_exon ){
+	unless ( $previous_exon->start == $exon->start && $previous_exon->end == $exon->end ){
+	  unless ( $added{$exon_cluster} ){
+	    push( @sites, $exon_cluster );
+	  }
+	}
+      }
+      $previous_exon = $exon;
+    
+    } # end of EXON
+    ############################################################
+    # if there are transcripts that had no exons in this cluster
+    # we have a case of exon skipping:
+    if ( @transcripts  ){
+      unless ( $added{$exon_cluster} ){
+	push( @sites, $exon_cluster );
+      }
+    }
+  }   # end of EXON_CLUSTER
 
-
+  ############################################################
+  # sites of alternative splicing are described by a cluster of exons 
+  # which has genomic coordinates
+  return @sites;
 }
   
 ############################################################
