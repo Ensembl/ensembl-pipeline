@@ -226,18 +226,19 @@ sub run {
     my ($self, $dir) = @_;
 
     my $seq = $self->query || $self->throw("Query seq required for Blast\n");
-
+   
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
-
+   
     #write sequence to file
     $self->writefile(); 
     $self->run_analysis();
-
+    
     #parse output and create features
     $self->parse_results;
-
+   
     $self->deletefiles();
+   
 }
 
 sub databases {
@@ -275,6 +276,7 @@ sub run_analysis {
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
+	#print STDERR "\n".$database."\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
         my $command = $self->program ;
         $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
@@ -283,6 +285,7 @@ sub run_analysis {
 	print STDERR $command."\n";
         $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
+  
 }
 
 =head2 fetch_databases
@@ -384,7 +387,7 @@ sub parse_results {
   my %ids;
   my $count = 0;
   my @parsers;
-
+ 
   if (defined($fh)) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
@@ -404,7 +407,7 @@ sub parse_results {
     %ids = $self->filter_hits(@hsps);
     
   }
-
+ 
   #print STDERR "Ids " . keys(%ids) . "\n";
 
   @parsers = ();
@@ -423,7 +426,6 @@ sub parse_results {
   NAME: while  ( my $sbjct =$parser->nextSbjct) {
       
     my $fasta_header = $sbjct->name ;     
-
     my ($name) = $fasta_header =~ /$re/;
     unless ($name) {
         $self->throw("Error getting a valid accession from \"" .
@@ -437,7 +439,7 @@ sub parse_results {
     }
 
     #print "Parsing name $name\n";
-
+    
   HSP: while (my $hsp = $sbjct->nextHSP) {
       
       if ($self->threshold_type eq "PID") {
@@ -487,12 +489,12 @@ sub parse_results {
                                          -coverage  => $self->coverage);
       my @pruned = $search->run(@allfeatures);
 
-      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+      #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
-
-return $self->output;
+  #print "have parsed resultz\n";
+  return $self->output;
 
 }
 
@@ -636,20 +638,20 @@ sub split_HSP {
     # Find out which Blast program generated the results
     my $source = $self->program;             
     $source =~ s/\/.*\/(.*)/$1/;
-
+   
     # Use the Blast analysis source to determine what the sequences are
     my ($qtype,  $htype)   = $self->_findTypes($source);
-
+    
     my $qstrand = $hsp->query->strand(),
     my $hstrand = $hsp->subject->strand();
-
+   
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
-
+   
     #print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
     #print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
-    #print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand $name\n";
+#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand $name\n";
 
-    if ($qtype eq "dna" && $htype eq "dna") {exit()};
+    #if ($qtype eq "dna" && $htype eq "dna") {exit()};
     
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
@@ -706,11 +708,11 @@ sub split_HSP {
                                               -logic_name      => 'blast');
     
     # Here goes...
-
+  
     while ($count <= $#qchars) {
         # We have hit an ungapped region.  Increase the query and hit counters.
         # and flag that we have a feature pair.
-
+     
         if ($qchars[$count] ne '-' &&
             $hchars[$count] ne '-') {
 
@@ -755,7 +757,7 @@ sub split_HSP {
         }
         $count++;
     }                        
-
+    
     # Remember the last feature
     if ($found == 1) {
 
