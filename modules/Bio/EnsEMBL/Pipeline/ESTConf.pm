@@ -99,6 +99,8 @@ use vars qw( %ESTConf );
 	    EST_GENOMEWISE_GENETYPE     => 'genomewise',
 	    EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
 	    EST_EVIDENCE_TAG            => 'exonerate_e2g',
+	    EST_MIN_EVIDENCE_SIMILARITY => '',
+	    EST_MAX_EVIDENCE_DISCONTINUITY => '',
 
 	    # database config
 	    # ref_db - holds the static golden path, contig and dna information
