@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
@@ -226,7 +227,8 @@ sub write_genes {
       print STDERR "Wrote gene " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      print STDERR "UNABLE TO WRITE GENE\n" .
+	$@ . "Skipping this gene\n";
     }
     
   }
@@ -247,7 +249,7 @@ sub write_genes {
 sub fetch_input {
   my ($self) = @_;
   
-    $self->throw("No input id") unless defined($self->input_id);
+  $self->throw("No input id") unless defined($self->input_id);
 
   # get Slice of input region
   $self->input_id  =~ /$EST_INPUTID_REGEX/;
@@ -259,7 +261,7 @@ sub fetch_input {
   my $slice_adaptor = $self->estdb->get_SliceAdaptor();
   my $slice         = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
 
-  $self->vcontig($slice);
+  $self->query($slice);
 
   # find exonerate features amongst all the other features  
   my $allfeatures = $self->estdb->get_DnaAlignFeatureAdaptor->fetch_all_by_Slice($slice);
@@ -355,7 +357,7 @@ sub fetch_input {
   my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->db);
   
   # only fetch this once for the whole set or it's SLOW!
-  my $genomic  = $self->vcontig->get_repeatmasked_seq;
+  my $genomic  = $self->query->get_repeatmasked_seq;
   
  ID:    
   foreach my $id(keys %final_ests) {
@@ -461,13 +463,29 @@ sub convert_output {
   # make an array of genes for each runnable
   foreach my $runnable ($self->runnable) {
     my @results = $runnable->output;
+    foreach my $result (@results){
+print STDERR "RESULT is a " . $result . "\n";
+    }
     #print STDERR "runnable produced ".@results." results\n";
     my @g = $self->make_genes($count, \@results);
     #print STDERR "have made ".@g." genes\n";
     $count++;
     push(@genes, @g);
   }
-
+###
+#foreach my $gene (@genes){
+#  my $transcripts = $gene->get_all_Transcripts;
+#  foreach my $transcript (@$transcripts){
+#    my $exons = $transcript->get_all_Exons;
+#    foreach my $exon (@$exons){
+#      my $supporting_evidence = $exon->get_all_supporting_features;
+#      foreach my $supp_feat (@$supporting_evidence){
+#	print STDERR $supp_feat . "\n";
+#      }
+#    }
+#  }
+#}
+###
   my @remapped = $self->remap_genes(@genes);	
   $self->output(@remapped);
 }
@@ -489,7 +507,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $count, $results) = @_;
-  my $slice = $self->vcontig;
+  my $slice = $self->query;
   my $genetype = 'exonerate_e2g';
   my @genes;
   
@@ -498,7 +516,7 @@ sub make_genes {
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
-    my $transcript = $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
+    my $transcript = $self->make_transcript($tmpf, $self->query, $genetype, $count);
 
     $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
@@ -518,7 +536,7 @@ sub make_genes {
   Arg [2]    : Bio::EnsEMBL::Slice - the slice in question
   Arg [3]    : String - logic name/genetype
   Arg [4]    : Int  - transcript count (optional)
-  Example    : $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
+  Example    : $self->make_transcript($tmpf, $self->query, $genetype, $count);
   Description: Generates transcripts from genes returned from est2genome.
   Returntype : A single Bio::EnsEMBL::Transcript
   Exceptions : Thrown if gene is not a SeqFeatureI
@@ -564,15 +582,18 @@ sub make_transcript{
     $exon->score      ($exon_pred->score);
     $exon->adaptor    ($self->estdb->get_ExonAdaptor);
 
-    # sort out supporting evidence for this exon prediction
-    foreach my $subf($exon_pred->sub_SeqFeature){
- 
-      $subf->feature1->analysis($self->analysis);
-      $subf->feature2->analysis($self->analysis);
-      $subf->contig($slice);
 
-      $exon->add_supporting_features($subf);
-    }
+
+    my @sfs = $exon_pred->sub_SeqFeature;
+    # sort out supporting evidence for this exon prediction
+    if(@sfs){
+      my $align = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@sfs);
+      $align->seqname($self->input_id);
+      $align->contig($slice);
+      $align->score(100);
+      $align->analysis($self->analysis);
+      $exon->add_supporting_features($align);
+    } 
     
     push(@exons,$exon);
     
@@ -625,7 +646,7 @@ sub make_transcript{
 
 sub remap_genes {
   my ($self, @genes) = @_;
-  my $slice = $self->vcontig;
+  my $slice = $self->query;
   my @remapped;
   
  GENEMAP:
@@ -807,7 +828,7 @@ sub make_blast_db {
   Arg [1]    : blast database filename - String 
   Arg [2]    : number of sequences - Int
   Example    : $self->run_blast($db, $numests)
-  Description: runs blast between $self->slice and $db, allowing a max of 
+  Description: runs blast between $self->query and $db, allowing a max of 
                $numests alignments. parses output.
   Returntype : List of Bio::EnsEMBL::FeaturePair each representing a BLAST hit
   Exceptions : None
@@ -824,7 +845,7 @@ sub run_blast {
   my $blastout = "/tmp/FEE_blastout." . $$ . ".fa";;
   my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			      -file   => ">$seqfile");
-  $seqio->write_seq($self->vcontig);
+  $seqio->write_seq($self->query);
   close($seqio->_filehandle);
 
   # set B here to make sure we can show an alignment for every EST
