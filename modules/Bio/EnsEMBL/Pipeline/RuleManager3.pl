@@ -907,15 +907,17 @@ sub job_existance{
                         "We can't check if it still exists and the ".
                         "status is aparently ".$status."\n");
         }
+      }
       if(!$job_submission_ids{$job->submission_id}){
         $job_submission_ids{$job->submission_id} = [];
       }
       push(@{$job_submission_ids{$job->submission_id}}, $job);
     }
   }
+  
   my @jobs = @{$batch_q_module->check_existance
                  (\%job_submission_ids, $verbose)};
-
+  
   foreach my $job(@jobs){
     $job->set_status('AWOL');
   }
