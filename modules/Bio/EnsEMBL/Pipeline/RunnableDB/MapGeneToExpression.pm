@@ -63,30 +63,30 @@ use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 
 
 
-use Bio::EnsEMBL::Pipeline::GeneToExpression_Conf qw(
-						     EST_INPUTID_REGEX
-						     EST_REFDBHOST
-						     EST_REFDBUSER
-						     EST_REFDBNAME
-						     EST_REFDBPASS
-						     EST_DBHOST
-						     EST_DBUSER
-						     EST_DBNAME
-						     EST_DBPASS
-						     EST_TARGET_DBNAME
-						     EST_TARGET_DBHOST
-						     EST_TARGET_DBUSER
-						     EST_TARGET_DBPASS      
-						     EST_TARGET_GENETYPE
-						     EST_GENEBUILDER_INPUT_GENETYPE
-						     EST_EXPRESSION_DBHOST
-						     EST_EXPRESSION_DBNAME
-						     EST_EXPRESSION_DBUSER
-						     EST_EXPRESSION_DBPASS
-						     SKIP_SINGLE_EXONS
-						     USE_ONLY_ESTS_IN_EXPRESSION_DB
-						     MAX_ESTS_PER_TRANSCRIPT 
-						    );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw(
+								   EST_INPUTID_REGEX
+								   EST_REFDBHOST
+								   EST_REFDBUSER
+								   EST_REFDBNAME
+								   EST_REFDBPASS
+								   EST_DBHOST
+								   EST_DBUSER
+								   EST_DBNAME
+								   EST_DBPASS
+								   EST_TARGET_DBNAME
+								   EST_TARGET_DBHOST
+								   EST_TARGET_DBUSER
+								   EST_TARGET_DBPASS      
+								   EST_TARGET_GENETYPE
+								   EST_GENETYPE
+								   EST_EXPRESSION_DBHOST
+								   EST_EXPRESSION_DBNAME
+								   EST_EXPRESSION_DBUSER
+								   EST_EXPRESSION_DBPASS
+								   SKIP_SINGLE_EXONS
+								   USE_ONLY_ESTS_IN_EXPRESSION_DB
+								   MAX_ESTS_PER_TRANSCRIPT 
+								  );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -301,8 +301,8 @@ sub fetch_input {
   $self->est_slice( $est_slice );
 
   # get ests 
-  print STDERR "getting genes of type $EST_GENEBUILDER_INPUT_GENETYPE\n";
-  $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE ) });
+  print STDERR "getting genes of type $EST_GENETYPE\n";
+  $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENETYPE ) });
   print STDERR "got ".scalar( $self->ests )." ests\n";
 
 
@@ -350,7 +350,7 @@ sub run{
       
       # get genes of each type
       my @genes = $cluster->get_Genes_of_Type( $EST_TARGET_GENETYPE );
-      my @ests  = $cluster->get_Genes_of_Type( $EST_GENEBUILDER_INPUT_GENETYPE );
+      my @ests  = $cluster->get_Genes_of_Type( $EST_GENETYPE );
       
       # if we have genes of either type, let's try to match them
       if ( @genes && @ests ){
@@ -481,7 +481,7 @@ sub cluster_Genes{
   
   # before putting any genes, we must declare the types
   my $ensembl    = [$EST_TARGET_GENETYPE];
-  my $est        = [$EST_GENEBUILDER_INPUT_GENETYPE];
+  my $est        = [$EST_GENETYPE];
   $cluster->gene_Types($ensembl,$est);
 
   # put the first gene into these cluster
@@ -851,10 +851,7 @@ sub write_output {
 	      }
 	    }
 	    
-	    #print STDERR "(Not writing) Storing pairs $t_id, @est_ids\n";
-	    
-	   
-
+	    print STDERR "Storing pairs $t_id, @est_ids\n";	    
 	    $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
 	}
     }
