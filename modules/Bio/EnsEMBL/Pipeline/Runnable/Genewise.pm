@@ -132,7 +132,8 @@ sub align_protein {
 
   my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
 
-  # print STDERR $command."\n";
+  #print STDERR $command."\n";
+
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }
@@ -196,7 +197,7 @@ sub align_protein {
 
       $curr_exon = new Bio::EnsEMBL::Feature;
       $curr_exon->seqname  ($self->genomic->id);
-      $curr_exon->id       ($self->protein->id);
+#      $curr_exon->id       ($self->protein->id);
       $curr_exon->start    ($start);
       $curr_exon->end      ($end);
       $curr_exon->strand   ($strand);
