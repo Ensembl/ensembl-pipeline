@@ -53,6 +53,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
+use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Gene;
@@ -557,63 +558,18 @@ sub _get_Sequence {
     return $self->{_seq_cache}{$id};
   } 
   
-  my $newid = $self->_parse_Header($id);
+  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+  my $seq = $seqfetcher->run_efetch($id);
   
-  return unless defined($newid);
-  print(STDERR "New pog id :  is $newid [$id]\n");
-  
-  # seq fetching choices: pfetch, then efetch, then sfetch, finally getz
-  # there has to be a tidier way!
-  my $format = "";
-  my $seq = "";
- FETCH: while ($format eq ""){
-    # try efetch
-    $seq = "";
-    print STDERR "Trying efetch\n";
-    open(IN,"efetch $newid |") or $self->throw("Can't pipe to efetch for id [$newid]");
-
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /Can/ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
-    # try getz
-    $seq = "";
-    print STDERR "Trying getz\n";
-    open(IN,"getz -e '[libs=embl-ID:$newid]' |") 
-      or $self->throw("Can't pipe to getz for id [$newid]");
-
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /getz: No match./ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
- #   # if get here, there's a big problem
-    $self->throw("Couldn't find sequence for $newid [$id]");
-   
+  if(!defined $seq) {
+    $seq = $seqfetcher->run_getz($id, 'embl');
   }
   
-  # hopefully we now have a sequence string
-  $self->throw("Couldn't find sequence for $newid [$id]") unless defined ($seq);
-  my $seqfile = $self->_get_tmp_file('/tmp/','getseq','seq');
-
-  open (OUT, ">$seqfile") or $self->throw("Can't write to $seqfile");
-  print OUT $seq;
-  close (OUT) or $self->throw("Can't close $seqfile");
-
-  my $seqin = Bio::SeqIO->new('-format' => $format,
-			      -file   => "$seqfile");
-  $seq = $seqin->next_seq();
+  if(!defined $seq) {
+    $self->throw("Couldn't find sequence for [$id]");
+  }
   
-  unlink $seqfile;
-  
-  print (STDERR "Found sequence for $newid [" . $seq->length() . "]\n");
+  print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
   $self->{_seq_cache}{$id} = $seq;
   
   return $seq;
