@@ -107,7 +107,6 @@ unless ($dbhost && $dbname && $dbuser) {
     exit 1;
 }
 
-my $RUNNER_SCRIPT = $PIPELINE_RUNNER_SCRIPT || $runner;
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
@@ -335,7 +334,8 @@ while (1) {
 
             my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => $id,
 						       -analysis => $anal,
-						      -output_dir => $output_dir);
+						      -output_dir => $output_dir,
+						      -runner => $PIPELINE_RUNNER_SCRIPT);
 
 
             print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
