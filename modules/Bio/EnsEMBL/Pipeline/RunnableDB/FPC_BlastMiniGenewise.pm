@@ -84,6 +84,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
 							     GB_INPUTID_REGEX
 							    );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
+							     GB_KILL_LIST
+							    );
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
 sub new {
@@ -212,7 +216,8 @@ sub write_output {
       #print STDERR "Number of features = " . scalar(@features) . "\n\n";
       my %redids;
       my $trancount = 1;
-      
+      my %kill_list = %{$self->fill_kill_list};
+
       # check which TargettedGenewise exons overlap similarity features
       foreach my $gene (@genes) {
 	foreach my $tran (@{$gene->get_all_Transcripts}) {
@@ -234,9 +239,15 @@ sub write_output {
       my %idhash;
       
       # collect those features which haven't been used by Targetted GeneWise
+      # reject them if they appear in the kill list
       foreach my $f (@features) {
 	      #print "Feature : " . $f->gffstring . "\n";
-	
+
+	if (defined $kill_list{$f->hseqname}){
+	  print STDERR "skipping over " . $f->hseqname . "\n";
+	  next;
+	}	
+
 	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	    defined($f->hseqname) &&
 	    $redids{$f->hseqname} != 1) {
@@ -613,6 +624,35 @@ sub output_db {
 	$self->{_output_db} = $output_db;
     }
     return $self->{_output_db};
+}
+
+
+=head2 fill_kill_list
+
+ Title   : fill_kill_list
+ Usage   : 
+ Function: 
+           
+ Returns : 
+ Args    : 
+
+=cut
+
+sub fill_kill_list {
+  my ($self) = @_;
+  my %kill_list;
+  open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
+  while (<KILL_LIST>) {
+
+    chomp;
+    my @list = split;
+    next unless scalar(@list); 	# blank or empty line
+    $kill_list{$list[0]} = 1;
+  }
+
+  close KILL_LIST or die "error closing $GB_KILL_LIST\n";
+
+  return \%kill_list;
 }
 
 1;
