@@ -91,7 +91,7 @@ my $job_adaptor = $db->get_JobAdaptor();
 # to parse these output files for CPU/Mem usage etc.
 print STDOUT "LSF Batch summary\n";
 print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
-# print STDOUT "LSF ID: ", $job_adaptor->fetch_by_dbID($ARGV[0])->LSF_id, "\n";
+# print STDOUT "LSF ID: ", $job_adaptor->fetch_by_dbID($ARGV[0])->submission_id, "\n";
 print STDOUT "Job ID\tinput ID\tanalysis ID\n";
 foreach my $id (@ARGV) {
     my $job = $job_adaptor->fetch_by_dbID($id);
