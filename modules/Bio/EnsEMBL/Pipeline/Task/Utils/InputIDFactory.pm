@@ -317,15 +317,9 @@ sub get_file_names{
 	
   local *FILE;
 
-  foreach my $f(@allfiles) {
-      my $file;
-      if($regex){
-	if($f =~ m|$regex|){
-	  $file = $f;
-	}
-      }else{
-	$file = $f;
-      }
+  foreach my $file (@allfiles) {
+      next if -d "$dir/$file";
+      next if $regex && $file !~ m|$regex|;
 
       open FILE, "< $dir/$file" or do {
           warn "can't open $dir/$file for reading input_id list";
