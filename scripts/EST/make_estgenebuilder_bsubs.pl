@@ -47,6 +47,14 @@ my $slice_file;
 	       );
 
 
+if ( $slice_file ){
+  print STDERR "reading slice input_ids from $slice_file\n";
+}
+else{
+  print STDERR "generating slices\n";
+  print STDERR "to read slices from a file use: $0 -slice_file filename\n";
+}
+
 my %chrhash;
 
 # declare these here so we can refer to them later
@@ -138,7 +146,7 @@ sub make_EST_GeneBuilder_bsubs{
   my $runnable = $EST_GENEBUILDER_RUNNABLE;
   my $analysis = $EST_GENEBUILDER_ANALYSIS;
 
-  my $command1 = "bsub -q $queue -R'rlx' -C0 "; 
+  my $command1 = "bsub -q $queue -C0 "; 
   my $command2 = " -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis ";
 
   if ( $slice_file ){
@@ -149,41 +157,49 @@ sub make_EST_GeneBuilder_bsubs{
       my @entries = split;
       my $input_id = $entries[0];
       $input_id =~/(\S+)\.(\d+-\d+)/;
+      my $node = " -R'rlx' ";
+      if ( $entries[2] ){
+	$entries[2] =~/feature_count:(\d+)/;
+	my $features = $1;
+	if ( $features >= 800 ){
+	  $node = " -R'ens && ncpus>1' ";
+	}
+      }
       my $chrdir = $filter . $1;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = $command1." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
+      my $command = $command1.$node." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
       print OUT "$command\n"; 
     }
     close(SLICE);
   }
-
-
-  foreach my $chr(keys %chrhash) {
-    my $length = $chrhash{$chr};
-    
-    my $chrdir = $filter . "$chr";
-    my $count = 1;
-
-    while($count < $length) {
-      my $start = $count;
-      my $end   = $count + $size -1;
+  else{
+    foreach my $chr(keys %chrhash) {
+      my $length = $chrhash{$chr};
       
-      if ($end > $length) {
-	$end = $length;
+      my $chrdir = $filter . "$chr";
+      my $count = 1;
+      
+      while($count < $length) {
+	my $start = $count;
+	my $end   = $count + $size -1;
+	
+	if ($end > $length) {
+	  $end = $length;
+	}
+	
+	my $input_id = $chr . "." . $start . "-" .  $end;
+	my $outfile  = $chrdir . "/$input_id.out";
+	my $errfile  = $chrdir . "/$input_id.err";
+	
+	my $command = $command1." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
+	print OUT "$command\n";
+	
+	$count = $count + $size;
       }
-      
-      my $input_id = $chr . "." . $start . "-" .  $end;
-      my $outfile  = $chrdir . "/$input_id.out";
-      my $errfile  = $chrdir . "/$input_id.err";
-
-      my $command = $command1." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
-      print OUT "$command\n";
-      
-      $count = $count + $size;
     }
   }
-
+  
   close (OUT) or die (" Error closing $jobfile: $!");
 }
 
