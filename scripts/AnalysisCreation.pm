@@ -1,10 +1,10 @@
 # AnalysisCreation, class for creating analysis tables from config and 
-# writing config from analysis tables and blantanly plager from code
+# writing config from analysis tables and blantanly plagered from code
 # written by Glenn Procter while designig a pipeline alternative
 #
-# Cared for by Laura Clarke
+# Cared for by ensembl
 #
-# Copyright Laura Clarke
+# Copyright ensembl
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -33,9 +33,9 @@ module=RepeatMasker
 module_version=1
 gff_source=RepeatMasker
 gff_feature=Repeat
-type=CONTIG
+input_id_type=CONTIG
 
-
+#comment lines can be made if they start with a # symbol
 =head1 DESCRIPTION
 
 
@@ -60,13 +60,14 @@ package AnalysisCreation;
 use strict;
 use warnings;
 use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 require Exporter;
 
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(parse_files write_into_db read_db write_file);
 
-
+verbose('WARNING');
 
 
 =head2 parse_files
@@ -95,11 +96,11 @@ sub parse_files {
   foreach my $file (@files) {
 
     if (! -e $file) {
-      die("analysis file $file not found\n");
+      throw("analysis file $file not found\n");
     }
     my $header = "";
 
-    open (FILE, $file) or die "Couldn't open file $file";
+    open (FILE, $file) or throw "Couldn't open file $file";
     while (<FILE>) {
       chomp();
 
@@ -120,14 +121,14 @@ sub parse_files {
 	my $value = $2;
 
 	if (length($header) == 0) {
-	  die("Found key/value pair $key/$value outside stanza");
+	  throw("Found key/value pair $key/$value outside stanza");
 	}
 
 	#print "Key: $key Value: $value\n";
 
 	# Check if this header/key is already defined
 	if (exists($config->{$header}->{$key})) {
-	  die("$key is already defined for [$header]; cannot be redefined");
+	  throw("$key is already defined for [$header]; cannot be redefined");
 	} else {
 	  # store them in the config hash
 	  $config->{$header}->{$key} = $value;
@@ -145,9 +146,14 @@ sub parse_files {
   my @analyses;
   # add a blank key/value for any headers that have no keys
   foreach my $h (keys (%headers)) {
-    if ($headers{$h} == 0) {
-      print STDERR "you seem to have no values for $h will create a".
-	"analysis object with just a logic_name";
+    if (!$config->{$h}->{'input_id_type'}) {
+      throw("you seem to have no input_id_type for $h can't ".
+            "create a an analysis object without an input_id_type");
+    }
+    if($headers{$h} == 1){
+      print STDERR "You seem to only have an input_id_type of ".
+        $config->{$h}->{'input_id_type'}." defined for $h but will ".
+          "create the sparse analysis object anyway\n";
     }
     my $analysis = Bio::EnsEMBL::Pipeline::Analysis->new
       (
@@ -163,7 +169,7 @@ sub parse_files {
        -module_version  => $config->{$h}->{module_version},
        -parameters      => $config->{$h}->{parameters},
        -logic_name      => $h,
-       -input_id_type   => $config->{$h}->{type},
+       -input_id_type   => $config->{$h}->{input_id_type},
     );
     push(@analyses, $analysis);
   }
@@ -194,7 +200,7 @@ sub write_into_db{
   
   #print "have analysis adaptor ".$analysis_adaptor."\n";
   if(!($db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor'))){
-    die("need a Pipeline::DBAdaptor not ".$db);
+    throw("need a Pipeline::DBAdaptor not ".$db);
   }
 
   my $analysis_adaptor = $db->get_AnalysisAdaptor;
@@ -212,7 +218,7 @@ sub write_into_db{
 	  $sth->execute($analysis_id);
 	  my ($type) = $sth->fetchrow;
 	  if($type){
-	    die("need ".$type." to be the same as ".$a->type) 
+	    throw("need ".$type." to be the same as ".$a->type) 
 	      unless($type eq $a->type);
 	  }else{
 	    my $stored_sql = "insert into input_id_type_analysis ".
@@ -248,7 +254,7 @@ sub read_db{
   my $db = shift;
 
   if(!($db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor'))){
-    die("need a DBAdaptor not ".$db);
+    throw("need a DBAdaptor not ".$db);
   }
  
   my $analysis_adaptor = $db->get_AnalysisAdaptor;
@@ -275,7 +281,7 @@ sub write_file{
   my $file = shift;
   my $analyses = shift;
   print STDERR "opening ".$file."\n";
-  open (FH, '>'.$file) or die ("couldn't open $file to write to");
+  open (FH, '>'.$file) or throw ("couldn't open $file to write to");
   foreach my $a(@$analyses){
     print FH "[".$a->logic_name."]\n";
     print FH "db=".$a->db."\n" if($a->db);
@@ -289,7 +295,7 @@ sub write_file{
     print FH "gff_source=".$a->gff_source."\n" if($a->gff_source);
     print FH "gff_feature=".$a->gff_feature."\n" if($a->gff_feature);
     if($a->can("input_id_type")){
-      print FH "type=".$a->input_id_type."\n" if($a->input_id_type);
+      print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);
     }
     print FH "\n\n";
   }

@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl 
+#!/usr/local/ensembl/bin/perl -w
 
 use strict;
 use Getopt::Long;
@@ -35,9 +35,8 @@ my $logic_name;
 my $config_sanity = 1;
 my $queue;
 my $runnabledb_path;
-my $write;
+my $write = 0;
 my $update;
-my $pre-exec;
 my $script_verbosity;
 my $resource;
 my $sub_args;
@@ -51,7 +50,6 @@ my $slice_overlap;
 my $coord_system;
 my $coord_system_version;
 my $slice;
-my $input_id_type;
 my $file;
 my $dir;
 my $regex;
@@ -63,6 +61,7 @@ my $top_level;
 my $pre_exec;
 my $open;
 my $submission_interval = 5;
+
 GetOptions(
            'dbhost=s'      => \$dbhost,
            'dbname=s'      => \$dbname,
@@ -80,7 +79,6 @@ GetOptions(
            'logic_name=s' => \$logic_name,
            'config_sanity!' => \$config_sanity,
            'runnabledb_path=s' =>\$runnabledb_path,
-           'write!' => $write,
            'update_input_id_analysis!' => \$update,
            'pre_exec!' => \$pre_exec,
            'script_verbosity!' => \$script_verbosity,
@@ -93,7 +91,6 @@ GetOptions(
            'slice!'        => \$slice,
            'slice_size:s' => \$slice_size,
            'slice_overlap:s' => \$slice_overlap,
-           'logic_name:s' => \$logic_name,
            'file!'         => \$file,
            'dir:s'        => \$dir,
            'file_regex:s' => \$regex,
@@ -104,8 +101,8 @@ GetOptions(
            'top_level!' => \$top_level,
            'open!' => \$open,
            'submission_interval:s' => \$submission_interval,
+           'write!' => \$write,
           ) or useage(\@command_args);
-
 perldoc() if $perldoc;
 verbose($utils_verbosity);
 unless ($dbhost && $dbname && $dbuser) {
@@ -133,13 +130,13 @@ if(!$queue_manager){
 my $batch_q_module = 
   "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
-my $file = "$batch_q_module.pm";
-$file =~ s{::}{/}g;
+my $batch_q_file = "$batch_q_module.pm";
+$batch_q_file =~ s{::}{/}g;
 eval {
-  require "$file";
+  require "$batch_q_file";
 };
 if($@){
-  throw("Can't find $file [$@]");
+  throw("Can't find $batch_q_file [$@]");
 }
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   (
@@ -197,7 +194,7 @@ if($insert_analysis){
 if(!$analysis){
   throw("Can't run without an Analysis object");
 }
-
+print STDERR "3Have write ".$write." update ".$update."\n";
 my $input_ids = setup_input_ids($analysis, $db, $ids_to_run, 
                                 $make_input_ids, $slice, $file, 
                                 $translation_id, $single, $slice_size, 
@@ -206,7 +203,7 @@ my $input_ids = setup_input_ids($analysis, $db, $ids_to_run,
                                 $logic_name);
 
 my @batch_submission_objects;
-
+print STDERR "4Have write ".$write." update ".$update."\n";
 foreach my $input_id(@$input_ids){
   my ($stdout, $stderr) = make_filenames($output_dir, $input_id, 
                                          $logic_name);
@@ -236,6 +233,7 @@ foreach my $input_id(@$input_ids){
   #  if($utils_verbosity);
   $command .= " -input_id_type ".$input_id_type." " if($input_id_type);
   $command .= " -module ".$module." " if($module);
+  #print STDERR "Have commandline ".$command."\n";
   $batch_job->construct_command_line($command);
   push(@batch_submission_objects, $batch_job);
 }
@@ -253,7 +251,7 @@ foreach my $batch_object(@batch_submission_objects){
     print $batch_object->bsub."\n" if($verbose);
     sleep($submission_interval);
   }else{
-    print $batch_object->bsub."\n";
+    #print $batch_object->bsub."\n";
   }
 }
 print STDERR "YOU DIDN'T BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T SPECIFY ".
@@ -385,24 +383,26 @@ sub useage{
   print "Your commandline was :\n".
     "lsf_submission.pl ".join("\t", @$command_args), "\n\n";
   print ("lsf_submission.pl is a script which will create and open ".
-         "commandlines for the appropriate batch submission system ".
-         "based on the test_RunnableDB script. It will only run ".
+         "commandlines for the\nappropriate batch submission system ".
+         "based on the test_RunnableDB script. It\nwill only run ".
          "RunnableDB's which fit the standard model\n\n".
          "Everytime you run job_submission.pl you must pass in the ".
          "database options\n\n-dbhost The host where the pipeline ".
-         "database is.\n-dbport     The port.\n-dbuser   The user to ".
-         "connect as.\n-dbpass     The password to use.\n".
-         "-dbname   The database name.\n\n".
+         "database is.\n-dbport The port.\n-dbuser The user to ".
+         "connect as.\n-dbpass The password to use.\n".
+         "-dbname The database name.\n\n".
          "This script also requires a logic_name of an analysis ".
          "specified with -logic_name.\n\n".
          "Other useful options include:\n\n".
          "-queue_manager allows you to change which ".
-         "Bio::EnsEMBL::Pipeline::BatchSubmission module to use\n".
-         "-output_dir the directory to put the stderr and stdout ".
+         "Bio::EnsEMBL::Pipeline::BatchSubmission module\nbeing used\n".
+         "-output_dir the directory to put the stderr and stdout".
          "of your analysis runs \n".
-         "-script_dir the directory where the test_RunnableDB script ".
-         "you want to run lives otherwise it assumes the script is in ".
-         "the current working directory\n");
+         "-script_dir the directory where the test_RunnableDB script".
+         "you want to run lives otherwise\nit assumes the script is in".
+         "the current working directory\n\n-help will print out this".
+         "information again\n-perldoc will print out the perl ".
+         "documentation\n\n");
   exit(0);
 }
 sub perldoc{

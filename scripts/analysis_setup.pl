@@ -76,7 +76,7 @@ db_file=repbase
 program=RepeatMasker
 program_version=1
 program_file=RepeatMasker
-parameters=-low, -lib, /acari/work5a/lec/briggsae.lib 
+parameters=-low, -lib, /path/to/file/briggsae.lib 
 module=RepeatMasker
 module_version=1
 gff_source=RepeatMasker
@@ -89,7 +89,6 @@ use strict;
 use AnalysisCreation;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Analysis;
 use Getopt::Long;
 
 my $dbhost;
