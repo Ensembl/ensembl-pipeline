@@ -165,12 +165,28 @@ sub new {
 
   # Create the slice we will work on
   
-  $self->_slice($transcript->stable_id);
+  $self->_slice($transcript);
 
   # Due to padding, it is necessary to re-construct our transcript
   # in proper slice coordinates.
 
   $self->_transcript($transcript, $self->_slice);
+
+
+  # Determine if our database contains translations.  If it doesn't
+  # we'll have to skip adding a set of translated exons to our 
+  # alignment.
+
+  if ($self->_transcript->translation){
+    $self->_translatable(1);
+  } else {
+    $self->warn("Database doesn't contain translation.  Subsequently, ".
+		"wont be able to display translations of each exon ".
+		"or calculate protein identity scores.");
+    $self->_translatable(0);
+  }
+
+
 
   # The line length in the fasta alignment is set to a default
   # or a user specified value
@@ -327,7 +343,8 @@ sub _align {
   my $exon_nucleotide_sequence = $self->_exon_nucleotide_sequence;
   
   my $exon_protein_sequence;
-  if (($type eq 'protein')||($type eq 'all')){
+  if (($self->_translatable)
+      &&(($type eq 'protein')||($type eq 'all'))){
     $exon_protein_sequence = $self->_exon_protein_translation;
   }
   
@@ -357,7 +374,8 @@ sub _align {
       $genomic_sequence->insert_gap($i, 1);
       $exon_nucleotide_sequence->insert_gap($i, 1);
 
-      if (($type eq 'protein')||($type eq 'all')){
+      if ($self->_translatable
+	  &&(($type eq 'protein')||($type eq 'all'))){
 	$exon_protein_sequence->insert_gap($i, 1);  
       }
 
@@ -378,7 +396,8 @@ sub _align {
   $self->_working_alignment('genomic_sequence', $genomic_sequence);
   $self->_working_alignment('exon_nucleotide', $exon_nucleotide_sequence);
 
-  if (($type eq 'protein')||($type eq 'all')) {
+  if ($self->_translatable
+      &&(($type eq 'protein')||($type eq 'all'))) {
     $self->_working_alignment('exon_protein', $exon_protein_sequence);
   }
 
@@ -406,7 +425,7 @@ sub _align {
 =cut
 
 sub _create_Alignment_object {
-my ($self, $type) = @_;
+  my ($self, $type) = @_;
 
   my $alignment = Bio::EnsEMBL::Pipeline::Alignment->new(
 			      '-name' => 'evidence alignment');
@@ -414,7 +433,8 @@ my ($self, $type) = @_;
   $alignment->add_sequence($self->_working_alignment('genomic_sequence'));
   $alignment->add_sequence($self->_working_alignment('exon_nucleotide'));
 
-  if (($type eq 'protein')||($type eq 'all')) {
+  if ($self->_translatable
+      &&(($type eq 'protein')||($type eq 'all'))) {
     $alignment->add_sequence($self->_working_alignment('exon_protein'));
   }
 
@@ -422,7 +442,7 @@ my ($self, $type) = @_;
     $alignment->add_sequence($evidence_sequence);
   }
 
-return $alignment;
+  return $alignment;
 }
 
 
@@ -480,7 +500,8 @@ sub _compute_identity {
       # The top identities are grouped according to whether
       # they are protein or nucleotide sequences.
 
-      if (($evidence_item->type eq 'protein')
+      if (($self->_translatable)
+	  &&($evidence_item->type eq 'protein')
 	  &&($self->_type ne 'nucleotide')){
 	($identity, $coverage) = $self->_compare_to_reference($exon, 
 							      $evidence_item, 
@@ -772,9 +793,17 @@ sub _transcript {
 
   GENE:
     foreach my $candidate_gene (@{$slice->get_all_Genes}){
+
     TRANSCRIPT:
       foreach my $candidate_transcript (@{$candidate_gene->get_all_Transcripts}) {
-	unless ($candidate_transcript->stable_id eq $input_transcript->stable_id){
+
+	# Check whether the transcripts are the same, first using the stable_id
+	# if it exists, otherwise with the dbID.
+	unless (($candidate_transcript->stable_id 
+		 && $input_transcript->stable_id 
+		 && $candidate_transcript->stable_id eq $input_transcript->stable_id)
+		||($candidate_transcript->dbID 
+		   && $candidate_transcript->dbID == $input_transcript->dbID)){
 	  next TRANSCRIPT;
 	}
 	
@@ -795,7 +824,8 @@ sub _transcript {
   if (defined $self->{'_transcript'}){
     return $self->{'_transcript'}
   } else {
-    $self->throw("Transcript has not yet been extracted from new Slice.");
+    $self->throw("Something has gone wrong.  A Transcript has not yet been".
+		 " extracted from our new Slice.");
   }
 }
 
@@ -813,17 +843,30 @@ sub _transcript {
 
 sub _slice {
 
-  my ($self, $transcript_stable_id) = @_;
+  my ($self, $transcript) = @_;
 
-  if (! defined $self->{'_slice'} && defined $transcript_stable_id) {
+  if (! defined $self->{'_slice'} && defined $transcript) {
 
     my $slice_adaptor = $self->{'_db_adaptor'}->get_SliceAdaptor;
 
-    $self->{'_slice'} = 
-      $slice_adaptor->fetch_by_transcript_stable_id($transcript_stable_id, 
-						    $self->{'_transcript_padding'});
-  }
+    # Ideally, stable_ids should be used to fetch things - just in 
+    # case the transcript comes from a different db to our current
+    # db.  Otherwise, fall over to using dbID.
 
+    if ($transcript->stable_id){
+
+      $self->{'_slice'} = 
+	$slice_adaptor->fetch_by_transcript_stable_id($transcript->stable_id, 
+						      $self->{'_transcript_padding'});
+    } else {
+      
+      $self->{'_slice'} = 
+	$slice_adaptor->fetch_by_transcript_id($transcript->dbID, 
+						      $self->{'_transcript_padding'});
+
+    }
+  }
+  
   return $self->{'_slice'};
 }
 
@@ -1215,7 +1258,6 @@ sub _exon_nucleotide_sequence {
       }elsif ($self->_strand == -1) {
 	$exon_position = $self->_slice->length - $exon->end;
       }
-
       
       foreach my $exon_nucleotide (@exon_seq){
 	if (!defined $exon_only_sequence[$exon_position]){
@@ -1277,6 +1319,7 @@ sub _exon_protein_translation {
     
     foreach my $exon (@{$exons}){
       # Add a translation of this exon peptide to our translated exon sequence.
+
       my $peptide_obj = $exon->peptide($self->_transcript);
       my $peptide = $peptide_obj->seq;
 
@@ -1418,13 +1461,34 @@ sub _build_sequence_cache {
 
   my $fetched_seqs;
 
-  eval {
-    $fetched_seqs = $self->_seq_fetcher->batch_fetch(@array_of_accessions);
-  };
+  if ($self->_seq_fetcher->can("batch_fetch")){
 
-  if ($@){
-    $self->warn("Not all evidence sequences could be pfetched.\n".
-		"Ignoring missing sequences.\n$@\n");
+    eval {
+      $fetched_seqs = $self->_seq_fetcher->batch_fetch(@array_of_accessions);
+    };
+    
+    if ($@){
+      $self->warn("Not all evidence sequences could be pfetched.\n".
+		  "Ignoring missing sequences.\n$@\n");
+    }
+
+  } else {
+
+    foreach my $accession (@array_of_accessions){
+
+      my $fetched_seq;
+
+      eval {
+	$fetched_seq = $self->_seq_fetcher->get_Seq_by_acc($accession);
+      };
+
+      if ($@) {
+	$self->warn("The seqfetcher is having trouble.\t$@\n");
+      }
+
+      push(@$fetched_seqs, $fetched_seq);
+
+    }
   }
   
   # Build cache.
@@ -1489,6 +1553,31 @@ sub _line_length {
 
   return $self->{'_fasta_line_length'};
 }
+
+
+
+=head2 _translatable
+
+  Arg [1]    :
+  Example    : 
+  Description: Toggle indicating whether translations are available.
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+
+sub _translatable {
+  my $self = shift;
+
+  if (@_) {
+    $self->{'_translatable'} = shift;
+  }
+
+  return $self->{'_translatable'};
+}
+
 
 
 
