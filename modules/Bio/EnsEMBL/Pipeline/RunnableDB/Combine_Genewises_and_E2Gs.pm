@@ -72,14 +72,17 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
 							     GB_GW_DBNAME
+							     GB_GW_DBPORT
 							     GB_cDNA_DBHOST
 							     GB_cDNA_DBUSER
 							     GB_cDNA_DBNAME
 							     GB_cDNA_DBPASS
+							     GB_cDNA_DBPORT
 							     GB_COMB_DBHOST
 							     GB_COMB_DBUSER
 							     GB_COMB_DBNAME
 							     GB_COMB_DBPASS
+							     GB_COMB_DBPORT
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
@@ -114,6 +117,7 @@ sub new {
 						   '-host'   => $GB_GW_DBHOST,
 						   '-user'   => $GB_GW_DBUSER,
 						   '-pass'   => $GB_GW_DBPASS,
+						   '-port'   => $GB_GW_DBPORT,
 						   '-dbname' => $GB_GW_DBNAME,
 						  );
   
@@ -126,8 +130,9 @@ sub new {
     (
      '-host'   => $GB_cDNA_DBHOST,
      '-user'   => $GB_cDNA_DBUSER,
+     '-pass'   => $GB_cDNA_DBPASS,
+     '-port'   => $GB_cDNA_DBPORT,
      '-dbname' => $GB_cDNA_DBNAME,
-     '-pass' => $GB_cDNA_DBPASS,
     ); 
   
   $cdna_db->dnadb($self->db);
@@ -138,8 +143,9 @@ sub new {
   my $comb_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						    '-host'   => $GB_COMB_DBHOST,
 						    '-user'   => $GB_COMB_DBUSER,
-						    '-dbname' => $GB_COMB_DBNAME,
 						    '-pass'   => $GB_COMB_DBPASS,
+						    '-port'   => $GB_COMB_DBPORT,
+						    '-dbname' => $GB_COMB_DBNAME,
                                                     ); 
   
   $comb_db->dnadb($self->db);
@@ -181,6 +187,7 @@ sub fetch_input{
   my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
   print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
   print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
+
   $self->gw_genes( @similarity_genes, @targetted_genes );
   
   # cdnas db
@@ -229,7 +236,7 @@ sub run {
   foreach my $gw (@merged_gw_genes){
  
     # should be only 1 transcript
-    my @gw_tran  = @{$gw->get_all_Transcripts};
+    my @gw_tran  = @{$gw->get_all_Transcripts};			
     my @gw_exons = @{$gw_tran[0]->get_all_Exons}; # ordered array of exons
     my $strand   = $gw_exons[0]->strand;
     
@@ -791,8 +798,8 @@ sub _merge_gw_genes {
 	    
 	    # the first exon (5'->3' orientation always) is the containing exon,
 	    # which gets expanded and the other exons are added into it
-	    print STDERR "merging $exon into $previous_exon\n";
-	    print STDERR $exon->start."-".$exon->end." into ".$previous_exon->start."-".$previous_exon->end."\n";
+	    #print STDERR "merging $exon into $previous_exon\n";
+	    #print STDERR $exon->start."-".$exon->end." into ".$previous_exon->start."-".$previous_exon->end."\n";
 	    
 	    $previous_exon->end($exon->end);
 	    $previous_exon->add_sub_SeqFeature($exon,'');
