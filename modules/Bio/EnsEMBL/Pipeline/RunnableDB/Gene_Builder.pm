@@ -203,8 +203,8 @@ sub write_output {
 		print STDERR "wrote gene " . $gene->dbID . " \n";
 	    }; 
 	    if( $@ ) {
-		$self->warn("NABLE TO WRITE GENE:\n$@");
-		foreach my $tran (@{$gene->get_all_Trascripts}){
+		$self->warn("UNABLE TO WRITE GENE:\n$@");
+		foreach my $tran (@{$gene->get_all_Transcripts}){
 		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
 		}
 	    }
