@@ -1,7 +1,6 @@
 CREATE TABLE job (
   job_id            int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
   input_id          varchar(40) NOT NULL,
-  class             enum("clone", "contig", "slice", "gene") not null,
   analysis_id       smallint(5) unsigned NOT NULL,
   submission_id     mediumint(10) unsigned NOT NULL,
   stdout_file       varchar(100) NOT NULL,
@@ -15,7 +14,6 @@ CREATE TABLE job (
 
 # job_id        - job internal ID
 # input_id      - name (e.g. accession/Ensembl ID) of input
-# class         - distinguish different input types
 # analysis_id   - internal ID of analysis (analysis table)
 # submission_id - ID of job in LSF
 # *_file        - files created to contain job output/error
@@ -80,20 +78,18 @@ CREATE TABLE rule_conditions (
 
 CREATE TABLE input_id_analysis (
   input_id          varchar(40) not null,
-  class             enum("clone" ,"contig", "slice", "gene") not null,
   analysis_id       smallint(10) unsigned NOT NULL,
   created           datetime NOT NULL,
   result            smallint(10) unsigned NOT NULL,
 
-  PRIMARY KEY       (analysis_id, input_id, class),
-  KEY input_created (input_id, created),
-  KEY input_class   (input_id, class)
+  PRIMARY KEY       (analysis_id, input_id),
+  KEY input_created (input_id, created)
 );
 
 # pipeline 'history' table - records each job performed in the
 # pipeline with the time it was completed
 #
-# input_id/class/analysis_id - see table 'job'
+# input_id/analysis_id       - see table 'job'
 # timestamp                  - when this job was completed
 
 # ?? need an extra column to hold exit status
