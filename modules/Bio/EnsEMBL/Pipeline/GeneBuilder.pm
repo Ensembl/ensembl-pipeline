@@ -106,6 +106,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_MINSHORTINTRONLEN
 							       GB_MAX_TRANSCRIPTS_PER_GENE
 							       GB_USE_ABINITIO
+							       GB_CONFIRM_PFAM
 							      );
 
 use vars qw(@ISA);
@@ -132,6 +133,7 @@ sub new {
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
+
 
     unless ( $input_id =~ /$GB_INPUTID_REGEX/ ){
       $self->throw("format of the input is not defined in Config::GeneBuild::General::GB_INPUTID_REGEX = $GB_INPUTID_REGEX");
@@ -213,7 +215,13 @@ sub build_Genes{
 											 );
 	  
 	  $genecooker->query($self->query);
-	  @supported_predictions = $genecooker->run;
+
+	  if ($GB_CONFIRM_PFAM) {
+	      @supported_predictions = $genecooker->run_pfam;
+	  }
+	  else {
+	       @supported_predictions = $genecooker->run;
+	   }
       }
   }
   
@@ -1113,7 +1121,7 @@ sub get_Predictions {
   my @checked_predictions;
   foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
     $prediction->type("ab-initio");
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
       $self->warn("We let in a prediction with wrong phases!");
     }
