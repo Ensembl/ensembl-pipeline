@@ -102,7 +102,7 @@ sub get_ids {
 sub make_directories {
 #Find out which analysis should be run
     my $run = $::scripts_conf{'2berun'};
-    
+    #print STDERR "making directories\n";
     my @toberun = split /,/, $run;
 
     my $chunks = $scratchdir."/chunks";
@@ -124,16 +124,17 @@ sub chunk_pepfile {
     open (PEPFILE, "$pep_file");
     my $count = 0;
     my $chunk = 1;
-
+    #print STDERR "chunking peptide file\n";
     my $size = $::scripts_conf{'chunk_size'};
 
     $/ = "\>";
-    
+    #print "have opened ".$pep_file."\n";
     while(<PEPFILE>){
-	
+	#print $_."\n";
 	if ($_ ne "\>") {
 	    if ($count == 0) {
 		open (CHUNK,">".$scratchdir."/chunks/chunk.$chunk");
+		#print "have opened ".$scratchdir."/chunks/chunk.$chunk\n";
 	    }
 	    
 	    $_ =~ s/\>$//;  
@@ -154,7 +155,7 @@ sub run_jobs {
     
     #Find out which analysis should be run
     my $run = $::scripts_conf{'2berun'};
-
+    #print STDERR "running jobs\n";
     my @toberun = split /,/, $run;
 
     my $queue = $::scripts_conf{'queue'};
@@ -164,7 +165,7 @@ sub run_jobs {
     
      foreach my $r(@toberun) {
 	 #First get the analysisId of the module which is supposed to run
-	 
+	 #print STDERR "running ".$r."\n";
 	 my $q = "select analysis_id from analysis where module = '$r'";
     
 	 my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
@@ -172,21 +173,21 @@ sub run_jobs {
     
 	 my ($analysis_id) = $sth->fetchrow_array;
 
-	 unless ($analysis_id) {die "AnalysisId not defined\n"};
+	 unless ($analysis_id) {die "AnalysisId not defined for ".$r."\n"};
 
 	 #Try to know how this analysis should be run
 	 my $chunk_name = $r."_chunk";
 
 	 my $chunk = $::scripts_conf{$chunk_name};
 
-	 unless ($chunk) {die "No chunk option defined\n"};
+	 unless ($chunk) {die "No chunk option defined for ".$r."\n"};
 
 	 my $runnabledb = $runnables{$r};
 
-	 unless ($runnabledb) {die "No runnableDB defined\n"};
+	 unless ($runnabledb) {die "No runnableDB defined for ".$r."\n"};
 
 	 my $check = "-E \"".$runner." -check -runnable ".$runnabledb."\"";
-
+	 #print STDERR "using chunk ".$chunk."\n";
 #Three diffenrent way of running the analysis 1,2,3 (see documentation in the configuration file and in the perldoc of this script)
 	 if ($chunk == 1) {
 	     my @chunk;
@@ -194,7 +195,7 @@ sub run_jobs {
 	     foreach my $i(@id) {
 		 $count++;
 		 push (@chunk,$i);
-		 if ($count >= 10) {
+		 if ($count >= 25) {
 		     my $subm = join(":",@chunk);
 		     
 		     print STDERR "ID: $subm\n";
@@ -222,12 +223,14 @@ sub run_jobs {
 	 }
 	 
 	 if ($chunk == 2) {
+	   print STDERR "have chunk ".$chunk."\n";
 	     my $dir = $scratchdir."/chunks";     
 	     opendir(DIR, $dir);
 	     my @allfiles = readdir DIR;
 	     closedir DIR;
 	     
 	     foreach my $f(@allfiles) {
+	       print STDERR "have file ".$f."\n";
 		 if (($f ne ".") && ($f ne "..")) {
 		      my $command = "bsub -Ralpha -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
 		  
