@@ -831,7 +831,7 @@ sub select_features {
  
 	my @selected_features;
  
-	my $best_hit = @features[0];
+	my $best_hit = $features[0];
  
 	foreach my $feat (@features){
 		if ($feat->overlaps($best_hit,'strong')) {
