@@ -145,10 +145,9 @@ sub list_inputId_class_by_start_count {
   my @row;
 
   my $query = qq{
-    SELECT inputId, class, count(*) as c
+    SELECT inputId, class
       FROM InputIdAnalysis
-     GROUP by inputId, class
-     ORDER by c };
+     GROUP by inputId, class };
 
   if( defined $start && defined $count ) {
     $query .= "LIMIT $start,$count";
