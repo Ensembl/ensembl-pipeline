@@ -26,6 +26,10 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
 my ($seq) =  set_seq();
@@ -43,7 +47,7 @@ else
 { print "ok 2\n"; }
 
 #create EPCR object    
-my $sts_db = '/usr/local/ensembl/data/mapprimer';
+my $sts_db = $::pipeConf{'datadir'} . '/mapprimer';
 my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
     -CLONE   => $clone,
     -DB      => $sts_db,
