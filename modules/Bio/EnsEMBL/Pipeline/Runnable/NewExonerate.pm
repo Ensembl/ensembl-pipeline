@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Blat
+Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
 
 =head1 SYNOPSIS
 $database  = a full path location for the directory containing the target (genomic usually) sequence,
@@ -103,7 +103,7 @@ sub new {
 												      )
 												   ], @args);
   
-
+  
   $self->{_output} = [];
   # must have a target and a query sequences
   unless( $query_seqs ){
@@ -152,11 +152,12 @@ sub new {
   #$self->exonerate('exonerate-0.6.7');
 
   # can add extra options as a string
-  $self->options("   --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "); 
+  my $basic_options = "  --softmasktarget --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
   
-  #if ($options){
-  #  $self->options($options);
-  #}
+  if ($options){
+    $basic_options .= $options;
+  }
+  $self->options( $basic_options);
   return $self;
 }
 
@@ -223,8 +224,8 @@ sub run {
   close( QUERY_SEQ );
   
   my $command ="exonerate-0.6.7 ".
-      $self->options.
-	  " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
+    $self->options.
+      " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
   print STDERR "running exonerate: $command\n";
   
   # system calls return 0 (true in Unix) if they succeed
@@ -282,7 +283,7 @@ sub parse_results {
   # extract values
   while (<$filehandle>){
       
-      print $_;
+    #print STDERR $_;
       
       ############################################################
       # the output is of the format:
@@ -321,49 +322,49 @@ sub parse_results {
       # G 1 0      |
       # M 7 7     /
       # 
-      chomp;
-      my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
+    chomp;
+    my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
+    
+    # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
+    $q_start++;
+    $t_start++;
+    
+    next unless ( $tag && $tag eq 'RESULT:' );
+    
+    ############################################################
+    # initialize the feature
+    my (%query, %target);
+    ( $query{score}  , $target{score} )  = ($score,$score);
+    ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
+    ( $query{source} , $target{source} ) = ('exonerate','exonerate');
+    ( $query{start}  , $target{start})   = ( $q_start, $t_start );
+    ( $query{name}   , $target{name})    = ( $q_id, $t_id);
+    if ( $q_strand eq '+' ){ $q_strand = 1; }
+    else{ $q_strand = -1; }
+    if ( $t_strand eq '+' ){ $t_strand = 1; }
+    else{ $t_strand = -1; }
+    
+    if ( $gene_orientation eq '+' ){ $gene_orientation = 1 }
+    elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
+    else{ $gene_orientation = 0 }
+    
+    ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
+    
+    
+    
+    my $transcript = Bio::EnsEMBL::Transcript->new();      
+    my $exon = Bio::EnsEMBL::Exon->new();
+    my @features;
+    my $in_exon = 0;
+    my $target_gap_length = 0;
+    
+    ############################################################
+    # exons are delimited by M - I
+    # supporting features are delimited by M - G  and  M - I
+  TRIAD:
+    for( my $i=0; $i<=$#blocks; $i+=3){
       
-      # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
-      $q_start++;
-      $t_start++;
-
-      next unless ( $tag && $tag eq 'RESULT:' );
-      
-      ############################################################
-      # initialize the feature
-      my (%query, %target);
-      ( $query{score}  , $target{score} )  = ($score,$score);
-      ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
-      ( $query{source} , $target{source} ) = ('exonerate','exonerate');
-      ( $query{start}  , $target{start})   = ( $q_start, $t_start );
-      ( $query{name}   , $target{name})    = ( $q_id, $t_id);
-      if ( $q_strand eq '+' ){ $q_strand = 1; }
-      else{ $q_strand = -1; }
-      if ( $t_strand eq '+' ){ $t_strand = 1; }
-      else{ $t_strand = -1; }
-
-      if ( $gene_orientation eq '+' ){ $gene_orientation = 1 }
-      elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
-      else{ $gene_orientation = 0 }
-
-      ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
-      
-      
-
-      my $transcript = Bio::EnsEMBL::Transcript->new();      
-      my $exon = Bio::EnsEMBL::Exon->new();
-      my @features;
-      my $in_exon = 0;
-      my $target_gap_length = 0;
-      
-      ############################################################
-      # exons are delimited by M - I
-      # supporting features are delimited by M - G  and  M - I
-    TRIAD:
-      for( my $i=0; $i<=$#blocks; $i+=3){
-	  
-	  # do not look at splice sites now
+      # do not look at splice sites now
 	  if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
 	      next TRIAD;
 	  }
@@ -387,8 +388,8 @@ sub parse_results {
 	      # start a new feature pair
 	      $query{end}  = $query{start}  + $blocks[$i+1] - 1;
 	      $target{end} = $target{start} + $blocks[$i+2] - 1;
-	      print STDERR "query : $query{start} -  $query{end}\n";
-	      print STDERR "target: $target{start} -  $target{end}\n";
+	      #print STDERR "query : $query{start} -  $query{end}\n";
+	      #print STDERR "target: $target{start} -  $target{end}\n";
 	      
 	      my $feature_pair = $self->create_FeaturePair(\%target, \%query);
 	      push( @features, $feature_pair);
@@ -428,7 +429,7 @@ sub parse_results {
 		  eval{
 		      $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
 		  };
-		  print STDERR "intron: adding evidence : ".$supp_feature->cigar_string."\n";
+		  #print STDERR "intron: adding evidence : ".$supp_feature->cigar_string."\n";
 		  $exon->add_supporting_features( $supp_feature );
 		  
 		  $in_exon = 0;
@@ -442,24 +443,27 @@ sub parse_results {
 	  }
       } # end of TRIAD
       
-      ############################################################
-      # emit the last exon and the last set of supporting features
-      # and add the supporting features
-      #print STDERR "created features:\n";
-      #foreach my $f (@features){
-      #print STDERR $f->gffstring."\n";
-      #}
-
-      my $supp_feature;
-      eval{
-	  $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
-      };
-      print STDERR "outside: adding evidence : ".$supp_feature->cigar_string."\n";
-      $exon->add_supporting_features( $supp_feature );
-      $transcript->add_Exon($exon);
-      
-      my $coverage = sprintf "%.2f", ( $q_length - $target_gap_length ) / $length{$q_id};
-      print STDERR "coverage: $coverage\n";
+    ############################################################
+    # emit the last exon and the last set of supporting features
+    # and add the supporting features
+    #print STDERR "created features:\n";
+    #foreach my $f (@features){
+    #print STDERR $f->gffstring."\n";
+    #}
+    
+    my $supp_feature;
+    eval{
+	$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+	};
+    #print STDERR "outside: adding evidence : ".$supp_feature->cigar_string."\n";
+    $exon->add_supporting_features( $supp_feature );
+    $transcript->add_Exon($exon);
+    
+    # q_start reported by the sugar/cigar lines is one less 
+    my $aligned_length = $q_length - ($q_start + 1) + 1;
+    my $coverage = sprintf "%.2f", ( $aligned_length - $target_gap_length ) / $length{$q_id};
+    
+    #print STDERR "coverage = ( $aligned_length - $target_gap_length ) / ".$length{$q_id}." =  $coverage\n";
       
       foreach my $exon ( @{$transcript->get_all_Exons} ){
 	  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
@@ -468,19 +472,19 @@ sub parse_results {
       }
 
       # test
-      print STDERR "produced transcript:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-      
-      ############################################################
-      # reject single-exon alignments which cover less than half the cdna/est:
-      if ( scalar( @{$transcript->get_all_Exons} ) ){
-	  my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
-	  if ( $mapped_length <= $length{$q_id}/2 ){
-	      next;
-	  }
+    #print STDERR "produced transcript:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    
+    ############################################################
+    # reject single-exon alignments which cover less than half the cdna/est:
+    if ( scalar( @{$transcript->get_all_Exons} ) ){
+      my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
+      if ( $mapped_length <= $length{$q_id}/2 ){
+	next;
       }
-      
-      push( @transcripts, $transcript );
+    }
+    
+    push( @transcripts, $transcript );
       
   } # end of while loop
   
