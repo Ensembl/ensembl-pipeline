@@ -414,17 +414,30 @@ sub _process_Transcripts {
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
+
+  my $merge_object2 
+    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
+      ->new(
+	    -transcripts      => \@merged_transcripts,
+	    -comparison_level => $EST_GENEBUILDER_COMPARISON_LEVEL,
+	    -splice_mismatch  => $EST_GENEBUILDER_SPLICE_MISMATCH,
+	    -intron_mismatch  => $EST_GENEBUILDER_INTRON_MISMATCH,
+	    -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
+	    -minimum_order    => $CLUSTERMERGE_MIN_EVIDENCE_NUMBER,
+	   );
   
+  $merge_object2->run;
+  my @merged_transcripts2 = $merge_object2->output;
 
   # reject the single exon transcripts
   my @filtered_transcripts;
   if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
-    @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
+    @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts2)};      
     print STDERR scalar(@filtered_transcripts)
       ." transcripts left after rejecting single-exon transcripts\n";
   }
   else{
-    @filtered_transcripts = @merged_transcripts;
+    @filtered_transcripts = @merged_transcripts2;
     print STDERR scalar(@filtered_transcripts)
       ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
   }
