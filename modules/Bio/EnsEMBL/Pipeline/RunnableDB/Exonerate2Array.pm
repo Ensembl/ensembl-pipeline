@@ -106,10 +106,10 @@ sub fetch_input {
   
   $self->throw("No exonerate executable") unless defined($executable);
 
-  my $target_file = $target_dir."*";
+  #my $target_file = $target_dir . "*";###exonerate-0.8.2 can use both file and dir
   my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateArray(
 								      '-db'           => $self->db,
-								      '-database'  => $target_file,
+								      '-database'  => $target_dir,
 								      '-query_seqs'   => \@query_seqs,
 								      '-query_type'   => 'dna',
 								      '-target_type'  => 'dna',
