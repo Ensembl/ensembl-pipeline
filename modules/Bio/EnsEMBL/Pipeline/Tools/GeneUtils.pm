@@ -449,30 +449,5 @@ sub _clone_Gene{
 
 ############################################################
 
-###################
-# Printing methods
-###################
-
-sub print_Gene{
-  my ($self,$gene) = @_;
-   my $id;
-  if ($gene->stable_id){
-    $id = $gene->stable_id;
-  }
-  elsif ( $gene->dbID ){
-    $id = $gene->dbID;
-  }
-  else{
-    $id = "no id";
-  }
-  if ( defined( $gene->type ) ){
-    $id .= " ".$gene->type;
-  }
-  foreach my $transcript (@{$gene->get_all_Transcripts} ){
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-  }
-}
-
-
 1;
 
