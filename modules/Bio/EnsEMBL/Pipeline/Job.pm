@@ -43,7 +43,6 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-# use Bio::EnsEMBL::Pipeline::Config::General qw(PIPELINE_OUTPUT_DIR AUTO_JOB_UPDATE);
 use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
@@ -251,8 +250,6 @@ sub analysis {
 sub flush_runs {
   my ($self, $adaptor, $queue) = @_;
 
-  print STDERR "in flush runs: queue = $queue\n";
-
   # flush_runs is optionally sent a queue to deal with
   # @analyses is a list of logic_names (strings)
   my @analyses = ($queue) || (keys %BATCH_QUEUES);
@@ -280,7 +277,7 @@ sub flush_runs {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);
-    $self->throw("runner undefined - needs to be set in $caller\n") unless defined $runner;
+    $self->throw("runner not found - needs to be set in $caller\n") unless -x $runner;
   }
 
   # $anal is a logic_name
@@ -290,20 +287,23 @@ sub flush_runs {
     my @job_ids = @{$queue->{'jobs'}};
     next unless @job_ids;
 
+    my $this_runner = $queue->{'runner'};
+    $this_runner = (-x $this_runner) ? $this_runner : $runner;
+ 
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
 
     if( ! defined $lastjob ) {
       $self->throw( "Last batch job not in db" );
     }
   
-    my $pre_exec = $runner." -check -output_dir $::PIPELINE_OUTPUT_DIR";
+    my $pre_exec = $this_runner." -check -output_dir $::PIPELINE_OUTPUT_DIR";
     my $batch_job = $batch_q_module->new(
 	-STDOUT     => $lastjob->stdout_file,
 	-STDERR     => $lastjob->stderr_file,
 	-PARAMETERS => $queue->{'sub_args'},
 	-PRE_EXEC   => $pre_exec,
 	-QUEUE      => $queue->{'queue'},
-	-JOBNAME    => $anal,
+	-JOBNAME    => $dbname . '/' . $anal,
 	-NODES      => $queue->{'nodes'},
 	-RESOURCE   => $queue->{'resource'}
     );
@@ -348,6 +348,7 @@ sub flush_runs {
       $adaptor->update(@jobs);
     }
     $queue->{'jobs'} = [];
+    $queue->{'last_flushed'} = time;
   }
 }
 
@@ -747,6 +748,7 @@ sub remove {
 
 # scp: set up package variable for queue config
 # i'm not sure this is the best way of doing this
+# should ideally have this stuff in object(s)
 
 sub set_up_queues {
     my %q;
