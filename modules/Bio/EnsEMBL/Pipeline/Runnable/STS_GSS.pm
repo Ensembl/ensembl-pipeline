@@ -174,7 +174,7 @@ sub new {
         $self->percent_filter($percent_filter);
     }
     else {
-        $self->percent_filter(0);
+        $self->percent_filter(50);
     }
 
     #print "options = ".$self->options."\n";
