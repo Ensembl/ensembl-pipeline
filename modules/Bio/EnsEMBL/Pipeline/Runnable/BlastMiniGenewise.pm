@@ -85,7 +85,6 @@ sub new {
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
-  $check_repeated = 1;
   if (defined $check_repeated){
     $self->check_repeated($check_repeated);
   }else {
@@ -219,7 +218,6 @@ sub run {
   my $mg_runnables;
 
   if ($self->check_repeated > 0){ 
-    #print STDERR "Oooh - turning on the new repeat checking code (grepmehere)\n";
     $mg_runnables = $self->build_runnables(@features);
   } else {
     my $runnable = $self->make_mmgw($self->genomic_sequence, \@features);
@@ -269,7 +267,7 @@ sub run_blast {
     }else {
       $regex = '^(\w+)\s+';
     }
-     
+    
      
      my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
 							   -program  => 'wutblastn',
@@ -394,7 +392,7 @@ sub build_runnables {
       print STDERR "Minigenomic sequence could contain a number "
 	. " of highly similar genes.  Fragmenting the minigenomic "
 	  . "sequence to try to resolve these genes individually.\n";
-      print STDERR "COULD BE TWO OR MORE GENES SUPPORTED BY THE SAME PROTEIN HERE\n";
+
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
 
       # Determine the extreme start and ends of each gene
