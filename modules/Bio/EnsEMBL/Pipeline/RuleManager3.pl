@@ -84,33 +84,35 @@ my $rename_on_retry = 1;
 my $kill_jobs = 1;
 my $die_if_broken = 0;
 my $rules_check_die = 1;
-
+my $rules_sanity = 1;
 GetOptions(
-    'dbhost=s'      => \$dbhost,
-    'dbname=s'      => \$dbname,
-    'dbuser=s'      => \$dbuser,
-    'dbpass=s'      => \$dbpass,
-    'dbport=s'      => \$dbport,
-    'local'         => \$local,
-    'idlist_file=s' => \$idlist_file,
-    'runner=s'      => \$runner,
-    'output_dir=s'  => \$output_dir,
-    'once!'         => \$once,
-    'shuffle!'      => \$shuffle,
-    'analysis=s@'   => \@analyses,
-    'skip_analysis=s@'   => \@skip_analyses,
-    'input_id_types=s@' => \@input_id_types,
-    'start_from=s@' => \@starts_from,	   
-    'v|verbose!'            => \$verbose,
-    'dbsanity!'     => \$db_sanity,
-    'accumulators!' => \$accumulators,
-    'accumulator_die!' => \$die_if_broken,
-    'max_job_time=s' => \$max_time,
-    'killed_file=s' => \$killed_file,
-    'kill_jobs!' => \$kill_jobs,
-    'queue_manager=s' => \$queue_manager,	   
-    'h|help'	    => \$help,
-    'rename_on_retry!' => \$rename_on_retry,	   
+           'dbhost=s'      => \$dbhost,
+           'dbname=s'      => \$dbname,
+           'dbuser=s'      => \$dbuser,
+           'dbpass=s'      => \$dbpass,
+           'dbport=s'      => \$dbport,
+           'local'         => \$local,
+           'idlist_file=s' => \$idlist_file,
+           'runner=s'      => \$runner,
+           'output_dir=s'  => \$output_dir,
+           'once!'         => \$once,
+           'shuffle!'      => \$shuffle,
+           'analysis=s@'   => \@analyses,
+           'skip_analysis=s@'   => \@skip_analyses,
+           'input_id_types=s@' => \@input_id_types,
+           'start_from=s@' => \@starts_from,	   
+           'v|verbose!'            => \$verbose,
+           'dbsanity!'     => \$db_sanity,
+           'accumulators!' => \$accumulators,
+           'accumulator_die!' => \$die_if_broken,
+           'max_job_time=s' => \$max_time,
+           'killed_file=s' => \$killed_file,
+           'kill_jobs!' => \$kill_jobs,
+           'queue_manager=s' => \$queue_manager,	   
+           'h|help'	    => \$help,
+           'rename_on_retry!' => \$rename_on_retry,
+           'rules_sanity!' => \$rules_sanity,
+           'rules_die!' => \$rules_die,
 ) or useage();
 
 if(!$dbhost || !$dbname || !$dbuser){
@@ -244,7 +246,7 @@ $db->pipeline_lock($lock_str);
 
 my @rules    = $rule_adaptor->fetch_all;
 $accumulators = $sanity->accumulator_sanity_check(\@rules, $accumulators, $die_if_broken) if($accumulators);
-$sanity->rule_type_sanity(\@rules, $rules_check_die);
+$sanity->rule_type_sanity(\@rules, $rules_check_die) if($rules_sanity);
 my %accumulator_analyses;
 
 foreach my $rule (@rules) {
