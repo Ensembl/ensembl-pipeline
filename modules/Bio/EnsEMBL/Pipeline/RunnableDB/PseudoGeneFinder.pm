@@ -237,7 +237,7 @@ sub run{
   
   ############################################################
   # test for homology
-  my @processed_pseudogenes = $self->test_homology( @genes );
+  my @processed_pseudogenes = $self->_test_homology( @genes );
  
   ############################################################
   # check that pseudogenes are not overlapping each other
@@ -411,6 +411,107 @@ sub filter_output{
   
   return @potential_processed_pseudogenes;
 }
+
+############################################################
+# this method check whether the found gene
+# has any homology in a region in another species
+# homologous to the regions it is contained within
+
+sub _test_homology{
+  my ($self,@genes) = @_;
+  my @selected;
+  
+  my $focus_species = $FOCUS_SPECIES;
+  
+  # compara database
+  my $compara_db = Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
+								-user      => 'ensro',
+								-dbname    => $COMPARA_DBNAME,
+								-host      => $COMPARA_DBHOST,
+							       );
+
+  # database where the focus species dna is
+  my $focusdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						   '-host'   => $REF_DBHOST,
+						   '-user'   => 'ensro',
+						   '-dbname' => $REF_DBNAME,
+						  );
+  
+  
+  my ($target_db, $target_db2);
+  my ($target_species, $target_species2);
+
+  if ( @$COMPARATIVE_DBS ){
+    if ( $COMPARATIVE_DBS->[0] ){
+      $target_species = $COMPARATIVE_DBS->[0]->{SPECIES};
+      
+      $target_db = $compara_db->get_db_adaptor($target_species,$COMPARATIVE_DBS->[0]->{PATH});
+      
+      unless ( $target_db ){
+	$target_db =  
+	  Bio::EnsEMBL::DBSQL::DBAdaptor
+	    ->new(
+		  -user      => 'ensro',
+		  -dbname    => $COMPARATIVE_DBS->[0]->{DBNAME},
+		  -host      => $COMPARATIVE_DBS->[0]->{DBHOST},
+		 );
+	$target_db->assembly_type( $COMPARATIVE_DBS->[0]->{PATH} );
+	$compara_db->add_db_adaptor( $target_db );
+      }
+    }
+    if ( $COMPARATIVE_DBS->[1] ){
+      $target_species2 = $COMPARATIVE_DBS->[1]->{SPECIES};
+      $target_db2 = $compara_db->get_db_adaptor($target_species2,$COMPARATIVE_DBS->[1]->{PATH});
+      
+      unless( $target_db2){
+	$target_db2 =  
+	  Bio::EnsEMBL::DBSQL::DBAdaptor
+	    ->new(
+		  -user      => 'ensro',
+		  -dbname    => $COMPARATIVE_DBS->[1]->{DBNAME},
+		  -host      => $COMPARATIVE_DBS->[1]->{DBHOST},
+		 );
+	$target_db2->assembly_type( $COMPARATIVE_DBS->[1]->{PATH} );
+	$compara_db->add_db_adaptor( $target_db2 );
+      }
+    }
+  }
+ 
+  my %gene_ref;
+  my $threshold = 40;
+  foreach my $gene (@genes){
+    
+    my ($homology1,$homology2) = (0,0);
+    my @transcripts = @{$gene->get_all_Transcripts};
+    my $transcript = $transcripts[0];
+
+    my $gene_ref{$transcript} = $self->_evidence_id($transcript);
+    
+    ############################################################
+    # has it got homology in the first species?
+    if ( $target_species ){
+      print STDERR "\n--- testing for homology in $target_species ---\n";
+      $homology1 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+	->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, \%gene_ref );
+    }
+    
+    ############################################################
+    # has it got homology in the second species?
+    if ( $target_species2 ){
+      print STDERR "\n--- testing for homology in $target_species2 ---\n";
+      $homology2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+	->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, \%gene_ref );
+    }
+    unless ( $homology1 || $homology2 ){
+      push (@selected, $gene);
+    }
+  }
+
+  return @selected;
+}
+
+
+
 
 ############################################################
 # method to check whether real introns in a transcript
