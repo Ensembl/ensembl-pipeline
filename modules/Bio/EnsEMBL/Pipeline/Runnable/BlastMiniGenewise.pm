@@ -71,12 +71,16 @@ sub new {
 
   my $self = $class->SUPER::new(@args);
   
-  my( $genomic, $ids, $seqfetcher, $endbias, $check_repeated) = $self->_rearrange([qw(GENOMIC
-										      IDS
-										      SEQFETCHER
-										      ENDBIAS
-										      CHECK_REPEATED)],
-										  @args);
+  my( $genomic, $ids, $seqfetcher, $endbias, $terminal_padding, $exon_padding, $minimum_intron, $check_repeated) = 
+    $self->_rearrange([qw(GENOMIC
+			  IDS
+			  SEQFETCHER
+			  ENDBIAS
+			  TERMINAL_PADDING
+			  EXON_PADDING
+			  MINIMUM_INTRON
+			  CHECK_REPEATED)],
+		      @args);
   
   $self->throw("No genomic sequence input")            unless defined($genomic);
   $self->throw("No seqfetcher provided")               unless defined($seqfetcher);
@@ -88,6 +92,9 @@ sub new {
   $self->ids($ids)                                     if defined($ids);
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
+  $self->terminal_padding($terminal_padding)           if defined($terminal_padding);
+  $self->exon_padding($exon_padding)                   if defined($exon_padding);
+  $self->minimum_intron($minimum_intron)               if defined($minimum_intron);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
 
   # Repeated genes are checked by default.
@@ -160,6 +167,80 @@ sub endbias {
     return $self->{'_endbias'};
 }
 
+=head2 terminal_padding
+
+    Title   :   terminal_padding
+    Usage   :   $self->terminal_padding($terminal_padding)
+    Function:   Get/set method for padding level for miniseqs
+    Returns :   
+    Args    :   
+
+=cut
+
+sub terminal_padding {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_terminal_padding'} = $arg;
+    }
+
+    if (!defined($self->{'_terminal_padding'})) {
+      $self->{'_terminal_padding'} = 0;
+    }    
+
+    return $self->{'_terminal_padding'};
+}
+
+
+=head2 exon_padding
+
+    Title   :   exon_padding
+    Usage   :   $self->exon_padding($exon_padding)
+    Function:   Get/set method for padding level for miniseqs
+    Returns :   
+    Args    :   
+
+=cut
+
+sub exon_padding {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_exon_padding'} = $arg;
+    }
+
+    if (!defined($self->{'_exon_padding'})) {
+      $self->{'_exon_padding'} = 0;
+    }    
+
+    return $self->{'_exon_padding'};
+}
+
+=head2 minimum_intron
+
+    Title   :   minimum_intron
+    Usage   :   $self->minimum_intron($minimum_intron)
+    Function:   Get/set method for padding level for miniseqs
+    Returns :   
+    Args    :   
+
+=cut
+
+sub minimum_intron {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_minimum_intron'} = $arg;
+    }
+
+    if (!defined($self->{'_minimum_intron'})) {
+      $self->{'_minimum_intron'} = 0;
+    }    
+
+    return $self->{'_minimum_intron'};
+}
+
+
 =head2 seqfetcher
 
     Title   :   seqfetcher
@@ -213,13 +294,7 @@ sub check_repeated {
 sub run {
   my ($self) = @_;
   
-  my @time = times;
-  #print STDERR "BEFORE BLAST @time\n"; 
   my @blast_features = $self->run_blast;
-  @time = times;
-  #print STDERR "AFTER BLAST @time\n"; 
-  #print STDERR "BLASTMINI have ".@blast_features." to run with\n";
-  #print STDERR "There are ".scalar @features." features remaining after re-blasting.\n";
   
   unless (@blast_features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
@@ -232,27 +307,25 @@ sub run {
   foreach my $f (@blast_features){
     $f->invert($self->genomic_sequence);
   }
+
+  @blast_features = sort{$a->start <=> $b->start  
+			   || $a->end <=> $b->end} @blast_features; 
+
   if ($self->check_repeated > 0){ 
-    #print STDERR "BMG:249 Checking if there are repeated genes\n";
     $mg_runnables = $self->build_runnables(@blast_features);
   } else {
     my $runnable = $self->make_object($self->genomic_sequence, \@blast_features);
     push (@$mg_runnables, $runnable); 
   }
-  @time = times;
-  my $count = 0;
-  #print STDERR "BEFORE MINIGENEWISE @time\n";
+
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
     #print STDERR "There were " . scalar @f . " $f[0]  " 
     #  . " features after the MiniGenewise run.\n";
-    $count++;
     push(@{$self->{'_output'}},@f);
   }
-  @time = times;
-  #print STDERR "AFTER MINIGENEWISE @time\n";
-  #print STDERR "have made ".$count." multiminigenewise runnables\n";
+
   return 1;
 
 }
@@ -303,7 +376,8 @@ sub run_blast {
         -query    => $seq,
         -program  => 'wutblastn',
         -database => $blastdb->dbfile,
-        -filter => 1,
+        -filter   => 1,
+	-coverage => 100,
        );
 #     print STDERR "Adding ".$dbname." ".$regex."\n";
      $run->add_regex($dbname, $regex);
@@ -390,9 +464,12 @@ sub make_object {
   # just converted.
   my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise(
                                                                         '-genomic'    => $miniseq,
-				       '-features'   => $features,
-				       '-seqfetcher' => $self->seqfetcher,
-				       '-endbias'    => $self->endbias
+									'-features'   => $features,
+									'-seqfetcher' => $self->seqfetcher,
+									'-terminal_padding' => $self->terminal_padding,
+									'-exon_padding'     => $self->exon_padding,
+									'-minimum_intron'   => $self->minimum_intron,
+									'-endbias'    => $self->endbias
 				      );
 
   return $mg;
