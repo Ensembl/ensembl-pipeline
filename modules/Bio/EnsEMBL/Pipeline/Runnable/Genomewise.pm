@@ -115,7 +115,7 @@ sub run{
   my %supp_evidence;
   foreach my $transcript ( $self->each_Transcript ) {
     
-    print STDERR "In Genomewise, before going through genomewise\n";
+    #print STDERR "In Genomewise, before going through genomewise\n";
     my $excount = 0;
     foreach my $exon ( $transcript->get_all_Exons ) {
       $excount++;
@@ -123,6 +123,25 @@ sub run{
       # store supporting evidence
       my @evi = $exon->each_Supporting_Feature;
       #print STDERR "Exon $excount: ".scalar(@evi)." features\n";
+
+## need to sort out a new analysis for this supp_evidence (in progress)
+#  print STDERR "check that you have this analysis_id\n";      
+#      my $analysis_obj = new Bio::EnsEMBL::Analysis
+#	(-db              => 'NULL',
+#	 -db_version      => 1,
+#	 -program         => 'genomewise',
+#	 -program_version => 1,
+#	 -gff_source      => 'genomewise',
+#	 -gff_feature     => 'gene',
+#	 -logic_name      => 'EST_GeneBuilder',
+#	 -module          => 'EST_GeneBuilder',
+#      );
+#      $analysis_obj->dbID(5);
+
+#      foreach my $feat (@evi){
+#      	$feat->analysis($analysis_obj);
+#	print STDERR $feat->gffstring."\n";
+#      }      
 
       $supp_evidence{ $exon } = \@evi;
 
@@ -302,7 +321,6 @@ sub run{
     }
   #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
   
-
   ##### need to put back the supporting evidence
   # since exons have been created anew, need to check overlaps
   my @trans_out = $self->output;
@@ -315,7 +333,7 @@ sub run{
     
     # most of the time the numbers of exons doesn't vary
     if ( scalar( @exons_in ) == scalar ( @exons_out ) ){
-      print STDERR "passing evi info between 2 transcripts with same number of exons\n";
+      #print STDERR "passing evi info between 2 transcripts with same number of exons\n";
       while ( scalar ( @exons_in ) > 0 ){
 	my $exon_in  = shift( @exons_in  );
 	my $exon_out = shift( @exons_out );  
@@ -333,7 +351,7 @@ sub run{
     }
     else{
       # if not the same number of exons, we cannot know how the split happened
-      print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+      #print STDERR "passing evi info between 2 transcripts with different number of exons\n";
       foreach my $exon_in ( @exons_in ){
 	foreach my $exon_out( @exons_out ){
 	  if ( $exon_out->overlaps($exon_in) ){
@@ -348,7 +366,7 @@ sub run{
   }
   else{
     # if we have more than one transcript at one or both sides, we also have to check them all
-    print STDERR "passing evi info between more than 2 transcripts\n";
+    #print STDERR "passing evi info between more than 2 transcripts\n";
     foreach my $tran_in ( @trans_in){
       my @exons_in  = $trans_in[0] ->get_all_Exons;
       
@@ -371,7 +389,7 @@ sub run{
     
   ## now we check that all the evi info has been correctly passed
   foreach my $tran_out ( @trans_out ){
-    print STDERR "In Genomewise, AFTER going through genomewise\n";
+    #print STDERR "In Genomewise, AFTER going through genomewise\n";
     my $count = 0;
     foreach my $exon_out ( $tran_out->get_all_Exons ) {
       $count++;
@@ -383,7 +401,7 @@ sub run{
   	#}
       }
       else{
-  	print STDERR "No supporting evidence\n";
+  	#print STDERR "No supporting evidence\n";
       }
     }
   }
@@ -399,8 +417,8 @@ sub run{
 #    }
 #  }
   # tidy up output files.
-   #unlink $genome_file;
-   #unlink $evi_file;
+   unlink $genome_file;
+   unlink $evi_file;
 
 }
 
