@@ -43,13 +43,13 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS',
+my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS-1',
                                                     -db_version     => 1,
-                                                    -program        => 'blastn',
+                                                    -program        => 'wublastn',
                                                     -program_version=> 1,
                                                     -module         => $runnable,
                                                     -module_version => 1,
-                                                    -gff_source     => 'blastn',
+                                                    -gff_source     => 'wublastn',
                                                     -gff_feature    => 'similarity', 
                                                     -parameters     => '',
                                                 );
@@ -62,7 +62,7 @@ $ana_adaptor->exists( $ana );
 my $id = 'AB016897';
 my $runobj = "$runnable"->new(  
                                 -dbobj      => $db,
-			                    -input_id   => $id,
+			        -input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
@@ -70,7 +70,7 @@ else
 { print "ok 4\n"; }
 
 $runobj->fetch_input;;
-$runobj->run;
+$runobj->run('/tmp/');
 
 my @out = $runobj->output;
 unless (@out)

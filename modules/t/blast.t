@@ -53,7 +53,7 @@ else
 { print "ok 3\n"; }
 
 #run Inverted                                                
-$blast->run();
+$blast->run('/tmp/');
 print "ok 4\n"; # 4th test passed
 
 #get and store the output

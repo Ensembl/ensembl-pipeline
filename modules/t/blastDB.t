@@ -71,7 +71,7 @@ else
 { print "ok 4\n"; }
 
 $runobj->fetch_input;;
-$runobj->run;
+$runobj->run('/tmp/');
 
 my @out = $runobj->output;
 unless (@out)

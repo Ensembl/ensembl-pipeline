@@ -37,7 +37,7 @@ $seq1 = Bio::PrimarySeq->new(-id => 'seq1',-seq => $str1);
 $seq2 = Bio::PrimarySeq->new(-id => 'seq2',-seq => $str2);
 
 
-$runnable = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( -seq1 => $seq1, -seq2 => $seq2);
+$runnable = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( -seq1 => $seq1, -seq2 => $seq2, -score => 50);
 
 
 $runnable->run();
