@@ -207,6 +207,46 @@ sub list_input_id_created_by_analysis {
 }
 
 
+=head2 list_input_id_class_by_Analysis
+
+Returns a list of all input_id and class
+for this analysis type
+
+  foreach my $idlist ($sic->list_input_id_class_by_Analysis('SubmitSlice')) {
+    my $id    = $idlist->[0];
+    my $class = $idlist->[1];
+  }
+
+
+=cut
+
+sub list_input_id_class_by_Analysis {
+  my ($self, $analysis) = @_;
+
+  if (ref $analysis && $analysis->isa("Bio::EnsEMBL::Analysis")) {
+    $analysis = $analysis->dbID;
+  }
+
+  my @result;
+
+  my $sth = $self->prepare(qq{
+    SELECT input_id, class
+      FROM input_id_analysis
+     WHERE analysis_id = ?
+  });
+
+  $sth->execute($analysis);
+
+  my $table = $sth->fetchall_arrayref;
+
+  foreach my $row (@{$table}) {
+    push @result, $row;
+  }
+
+  return @result;
+}
+
+
 =head2 list_input_id_class_by_start_count
 
 Returns a list of all input_id and class,
@@ -364,6 +404,5 @@ sub deleteObj {
     }
   }
 }
-
 
 1;
