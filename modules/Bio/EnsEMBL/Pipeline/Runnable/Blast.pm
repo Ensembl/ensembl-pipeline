@@ -82,19 +82,26 @@ use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 
 my %FASTA_HEADER;
+my %BLAST_FLAVOUR;
+my %REFILTER;
 
 foreach my $db (@$DB_CONFIG) {
-    my ($name, $header) = ($db->{'name'}, $db->{'header'});
-   
-    $FASTA_HEADER{$name} = $header if $db && $name;
+    my ($name, $header, $flavour, $refilter) = ($db->{'name'}, $db->{'header'}, $db->{'flavour'}, $db->{'refilter'});
+    
+    if($db && $name){
+      $FASTA_HEADER{$name} = $header; 
+      $BLAST_FLAVOUR{$name} = $flavour; 
+      $REFILTER{$name} = $refilter;
+    }else{
+      my($p, $f, $l) = caller;
+      warn("either db ".$db." or name ".$name." isn't defined so can't work $f:$l\n");
+    }
 }
 
 
@@ -143,7 +150,7 @@ sub new {
     $self->{'_ungapped'}  = undef;     # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
 
-    #print STDERR "@args\n";
+    #print STDERR "BLAST args : @args\n";
     # Now parse the input options and store them in the object
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$hardprune,$ungapped,$options) = 
             $self->_rearrange([qw(QUERY 
@@ -173,16 +180,6 @@ sub new {
     }
     
     if ($options) {
-          if ($::pipeConf{'B_factor'}){
-                my $b_factor = $::pipeConf{'B_factor'};
-                my $b_value = int ($query->length / 1000 * $b_factor); 
-                 if ($::pipeConf{'blast'} eq 'ncbi'){
-            $options .= " -b $b_value" unless ($b_value < 250);
-        }
-        else {
-            $options .= " B=$b_value" unless ($b_value < 250);
-        }
-          } 
       $self->options($options);
     } else {
       $self->options(' -cpus=1 ');  
@@ -293,7 +290,7 @@ sub run_analysis {
         my $blastype = "";
         my $filename = $self->filename;
 
-        if (defined($::pipeConf{blast}) && $::pipeconf{blast} eq 'ncbi') {
+        if ($BLAST_FLAVOUR{$self->database} eq 'ncbi') {
             $command .= " -d $database -i $filename ";
         } else {
             $command .= " $database $filename ";
@@ -303,7 +300,7 @@ sub run_analysis {
  	# Add the result file to our clean-up list.
  	$self->file($self->results . ".$db");
 
-	#print STDERR $command."\n";
+	#print STDERR "running ".$command."\n";
         $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
   
@@ -329,7 +326,7 @@ sub fetch_databases {
     my @databases;
 
     my $dbname = $self->database; 
-
+    #print "fetching databases for ".$dbname."\n";
     $dbname =~ s/\s//g;
 
     # prepend the environment variable $BLASTDB if
@@ -356,7 +353,7 @@ sub fetch_databases {
     }
 
     if (scalar(@databases) == 0) {
-	$self->throw("No databases exist for " . $self->database);
+	$self->throw("No databases exist for " . $dbname);
     }
 
     return @databases;
@@ -491,7 +488,7 @@ sub parse_results {
 
 # Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
-  if ($::pipeConf{'filter_blast'}){
+  if ($REFILTER{$self->database}){
     # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
     my @selected_features = $self->select_features($self->output);
     $self->output(@selected_features);
@@ -1186,12 +1183,14 @@ sub blast_re {
 
 sub add_regex{
   my ($self, $name, $re_string) = @_;
+  #print STDERR "adding regex ".$re_string." for ".$name."\n";
   $FASTA_HEADER{$name} = $re_string;
   
 }
 
 sub get_regex{
   my ($self, $name) = @_;
+  #print STDERR "getting the regex for ".$name."\n";
   if($name =~/\/tmp\//){
     $name =~ s/\/tmp\///g;
   }
