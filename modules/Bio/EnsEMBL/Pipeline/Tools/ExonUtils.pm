@@ -189,4 +189,31 @@ sub _print_Evidence{
 
 }
 
+############################################################
+
+sub _clone_Exon{
+  my ($self,$exon) = @_;
+  my $newexon = new Bio::EnsEMBL::Exon;
+  $newexon->start      ($exon->start);
+  $newexon->end        ($exon->end);
+  $newexon->phase      ($exon->phase);
+  $newexon->end_phase  ($exon->end_phase);
+  $newexon->strand     ($exon->strand);
+  $newexon->dbID       ($exon->dbID);
+  $newexon->contig     ($exon->contig);
+  $newexon->sticky_rank($exon->sticky_rank);
+  $newexon->seqname    ($exon->seqname);
+  $newexon->attach_seq ($self->ensembl_vc);
+
+  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
+    $newexon->add_supporting_features( $evidence );
+  }
+  return $newexon;
+}
+
+
+
+
+
+
 1;
