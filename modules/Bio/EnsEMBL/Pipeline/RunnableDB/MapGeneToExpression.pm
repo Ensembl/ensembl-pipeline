@@ -302,8 +302,8 @@ sub fetch_input {
   my $ensembl_sa = $self->ensembl_db->get_SliceAdaptor();
   my $est_sa     = $self->est_db->get_SliceAdaptor();
 
-  my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-  my $est_slice      = $est_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $ensembl_slice  = $ensembl_sa->fetch_by_region('chromosome',$chrname,$chrstart,$chrend);
+  my $est_slice      = $est_sa->fetch_by_region('chromosome',$chrname,$chrstart,$chrend);
 
   $self->ensembl_slice( $ensembl_slice );
   $self->est_slice( $est_slice );
