@@ -287,7 +287,7 @@ sub write_output {
       }
     }
     
-    my $feat_adp = Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+    my $feat_adp = $self->db->get_FeatureAdaptor;
     $feat_adp->store(@features);
     
     return 1;
