@@ -28,7 +28,7 @@ use Data::Dumper;
 
 
 #homo sapiens is used if no species is specified
-my $DEFAULT_SPECIES  = 'homo_sapiens';
+my $DEFAULT_SPECIES  = 'pipeline';
 
 #configuration file extension appended onto species name
 my $FROZEN_CONF_EXT  = '.MultiTestDB.frozen.conf';
