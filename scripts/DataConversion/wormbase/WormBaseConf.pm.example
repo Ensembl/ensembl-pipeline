@@ -51,7 +51,6 @@ use vars qw( %WormBaseConf );
 		 WB_DBHOST => '',
 		 WB_DBUSER => '',
 		 WB_DBPASS => '',
-      WB_DBPORT => '',      
 		 #path to index based on clone name
 		 WB_CLONE_INDEX => [''],
 		 # logic name of analysis object to be assigned to genes
@@ -68,14 +67,12 @@ use vars qw( %WormBaseConf );
 		 WB_WORMPEP_RELEASE => ,
 		 WB_NEW_CONTIGS => '', # when running raw_computes_transfer.pl this the the file where the tab file for loading into the 
 		 #input_id_analysis table to run new raw computes will be written too
-		 WB_SUBMIT_CONTIG_ID => '', #the analysis id of the submit contig analysis object for the raw computes
-		 WB_RAW_COMPUTES => 0, #check for wormbase_to_ensembl.pl to see if there are existing raw computes if set to 0 will write entries to input_id_analysis table
+		 WB_SUBMIT_CONTIG_ID => '' #the analysis id of the submit contig analysis object for the raw computes
+		 WB_RAW_COMPUTES => 0 #check for wormbase_to_ensembl.pl to see if there are existing raw computes if set to 0 will write entries to input_id_analysis table
 		 WB_OPERON_LOGIC_NAME => '', #logic names
 		 WB_RNAI_LOGIC_NAME => '',  # for simple features to be 
 		 WB_EXPR_LOGIC_NAME => '', # parsed out of the gff
 		 WB_PSEUDO_LOGIC_NAME => 'Pseudogene',
-     WB_CLONE_SYSTEM_NAME => 'Clone',
-     WB_CHROMOSOME_SYSTEM_NAME => 'Chromosome',
 		);
 
 sub import {
