@@ -420,78 +420,79 @@ sub parse_results {
 
 
 sub calculate_and_set_phases_new {
-    my ($self) = @_;
+  my ($self) = @_;
   
-    my @genes       = $self->genscan_genes();
-    my @peptides    = $self->genscan_peptides();
-
-    $self->throw("Mismatch in number of genes (".scalar(@genes).
-                 ") and peptides ("             .scalar(@peptides).
-                 ") parsed from file") unless (scalar(@genes) == scalar (@peptides));
-
-    my $i = 0;
-    my $count = 1;
-  GENE: while ($i < scalar(@genes)) {
-
-
-
-      my $peptide = $peptides[$i];
-      my @exons   = $genes[$i]->sub_SeqFeature();
-      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
-
-      my $translation_found = 0;
-
-      foreach my $tran (@newtran) {
-
-        my $temp_tran = $tran->translate->seq;
-
-
-
-        # clean the translated sequence
-
-        #genscan translated partial genes correctly whilst exon translation begin with M
-        #$temp_tran =~ s/^M//i; #remove initial M from exon was removed as it updets the comparision
-
-        # remove any initial X's from the translation
-        $temp_tran =~ s/^x//i;
-        
-        # remove any terminal X's from the translation
-        $temp_tran =~ s/x$//i;
-	my $genscan = $peptides[$i];
-	my $x = 0;
-	while (($x = index($temp_tran, 'X', $x)) != -1) {
-	
-	  substr($genscan, $x, 1) = 'X';
-	  $x++;
-	}
+  my @genes       = $self->genscan_genes();
+  my @peptides    = $self->genscan_peptides();
+  
+  $self->throw("Mismatch in number of genes (".scalar(@genes).
+	       ") and peptides ("             .scalar(@peptides).
+	       ") parsed from file") unless (scalar(@genes) == scalar (@peptides));
+  
+  my $i = 0;
+  my $count = 1;
+ GENE: while ($i < scalar(@genes)) {
     
     
-        if (index($genscan ,$temp_tran) >= 0) 
 
-          $translation_found = 1;
-        
-          $tran->temporary_id($self->clone->id . "." . $count);
-          $count++;
-	 
-	  if($temp_tran =~/\*/){
-	    
-	  } else {
-	   
-	    $self->add_Transcript($tran);
-	  }
-	  $i++;
-          next GENE;
-        }
-      }
+    my $peptide = $peptides[$i];
+    my @exons   = $genes[$i]->sub_SeqFeature();
+    my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
+    
+    my $translation_found = 0;
+
+    foreach my $tran (@newtran) {
       
-      unless ($translation_found) {
-        $self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
-                     " in a translation\n");
+      my $temp_tran = $tran->translate->seq;
+
+
+
+      # clean the translated sequence
+
+      #genscan translated partial genes correctly whilst exon translation begin with M
+      #$temp_tran =~ s/^M//i; #remove initial M from exon was removed as it updets the comparision
+      
+      # remove any initial X's from the translation
+      $temp_tran =~ s/^x//i;
+        
+      # remove any terminal X's from the translation
+      $temp_tran =~ s/x$//i;
+      my $genscan = $peptides[$i];
+      my $x = 0;
+      while (($x = index($temp_tran, 'X', $x)) != -1) {
+	
+	substr($genscan, $x, 1) = 'X';
+	$x++;
       }
+    
+    
+      if (index($genscan ,$temp_tran) >= 0){ 
+	
+	$translation_found = 1;
+        
+	$tran->temporary_id($self->clone->id . "." . $count);
+	$count++;
+	 
+	if($temp_tran =~/\*/){
+	  
+	} else {
+	   
+	  $self->add_Transcript($tran);
+	}
+	$i++;
+	next GENE;
+      }
+    }
+      
+    unless ($translation_found) {
+      $self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
+		   " in a translation\n");
+    }
     
     $i++;
   }
 }
+
 
 sub add_Transcript {
   my ($self,$transcript) = @_;
