@@ -37,7 +37,9 @@ print STDERR scalar(@chrs)." chromosomes found\n";
 my $fh = new IO::File;
 foreach my $chr ( @chrs ){
     my $chr_name = $chr->chr_name;
-    my $command = 'calculate_slices.pl -chr_name $chr_name -outfile $outdir/$chr_name.list -dbname $dbname -dbhost $dbhost';
+    my $command = 
+      "calculate_slices.pl -chr_name $chr_name -outfile $outdir/$chr_name.list -dbname $dbname -dbhost $dbhost";
+    #print STDERR "command $command\n";
     $fh->open("| bsub -q acari -C0 -o $outdir/lsf-out-$chr_name");
     $fh->print($command);
     $fh->close;
