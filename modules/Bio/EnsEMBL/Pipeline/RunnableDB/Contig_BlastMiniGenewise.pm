@@ -75,11 +75,11 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 							       GB_SIMILARITY_DATABASES
 							       GB_SIMILARITY_GENETYPE
+							       GB_SIMILARITY_MASKING
+							       GB_SIMILARITY_SOFTMASK
 							      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
-							       GB_REPEAT_MASKING
-							      );
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -216,7 +216,12 @@ sub fetch_input {
 
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
 
-    my $genseq    = $contig->get_repeatmasked_seq($GB_REPEAT_MASKING);
+    if(@$GB_SIMILARITY_MASKING){
+      my $seq = $contig->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
+      $self->query($seq);
+    }else{
+      $self->query($contig);
+    }
 
     #print STDERR "Length is " . $genseq->length . "\n";
     #print STDERR "Fetching features \n";
@@ -264,7 +269,7 @@ sub fetch_input {
 
                         my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
 
-                        my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $genseq,
+                        my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $self->query,
                                                                      '-features'   => \@{$bdbs{$bioperldb}},
                                                                      '-seqfetcher' => $self->seqfetcher,
                                                                      '-forder'     => \@forder,
@@ -279,7 +284,7 @@ sub fetch_input {
                                 push (@ids, $f->hseqname);
                         }
  
-                         my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+                         my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $self->query,
                                            '-ids'        => \@ids,
                                            '-seqfetcher' => $self->seqfetcher,
                                            '-trim'       => 1);
@@ -311,7 +316,7 @@ sub fetch_input {
       my @ids = keys %idhash;
       my $seqfetcher = $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $self->query,
                                                                              '-ids'        => \@ids,
                                                                              '-seqfetcher' => $seqfetcher,
                                                                              '-trim'       => 1);

@@ -1,4 +1,4 @@
-#
+##
 #
 # Cared for by Ensembl  <ensembl-dev@ebi.ac.uk>
 #
@@ -65,12 +65,15 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
-							     GB_SIMILARITY_DATABASES
-							     GB_SIMILARITY_COVERAGE
-							     GB_SIMILARITY_MAX_INTRON
-							     GB_SIMILARITY_MIN_SPLIT_COVERAGE
-							     GB_SIMILARITY_GENETYPE
-							     GB_SIMILARITY_MAX_LOW_COMPLEXITY
+							      GB_SIMILARITY_DATABASES
+							      GB_SIMILARITY_COVERAGE
+							      GB_SIMILARITY_MAX_INTRON
+							      GB_SIMILARITY_MIN_SPLIT_COVERAGE
+							      GB_SIMILARITY_GENETYPE
+							      GB_SIMILARITY_MAX_LOW_COMPLEXITY 
+							      GB_SIMILARITY_MASKING
+							      GB_SIMILARITY_SOFTMASK
+							      
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
@@ -174,20 +177,31 @@ sub write_output {
     
     my $sla       = $self->db->get_SliceAdaptor();
     my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-    my $genseq    = $slice->get_repeatmasked_seq($GB_REPEAT_MASKING);
-    
     $slice->chr_name($chrid);
+    if(@$GB_SIMILARITY_MASKING){
+      my $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
+      $self->query($seq);
+    }else{
+      $self->query($slice);
+    }
+    
+    
 
     my @genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
     
-    foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+    DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       
       print STDERR "Fetching features for " . $database->{'type'} . 
 	" with score above " . $database->{'threshold'}. "\n\n";
       my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
+      #print STDERR "Fetching features from db ".$self->db->dbname." on ".$self->db->host."\n";
       my @features  = @{$pafa->fetch_all_by_Slice_and_score($slice, $database->{'threshold'}, $database->{'type'})};
       print STDERR "have ".@features." \n";
       # lose version numbers - probably temporary till pfetch indices catch up
+      if(!@features){
+	print STDERR "have zero features for ".$database->{'type'}." exiting\n";
+	next DATABASE;
+      }
       foreach my $f(@features) {
 	my $name = $f->hseqname;
 	if ($name =~ /(\S+)\.\d+/) { 
@@ -237,7 +251,7 @@ sub write_output {
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
       
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $self->query,
 									     '-ids'      => \@ids,
 									     '-seqfetcher' => $seqfetcher,
 									     '-trim'     => 1);
@@ -246,7 +260,7 @@ sub write_output {
 
       # at present, we'll only ever have one ...
 
-      $self->query($slice);
+      
     }
   }     
   

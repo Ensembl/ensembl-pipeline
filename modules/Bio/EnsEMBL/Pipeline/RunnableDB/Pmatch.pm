@@ -53,7 +53,7 @@ sub fetch_input{
   my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   my $genseq;
   if(@$GB_PMATCH_MASKING){
-    $genseq    = $slice->get_repeatmasked_seq($GB_PMATCH_MASKING);
+    $genseq    = $slice->get_repeatmasked_seq($GB_PMATCH_MASKING, $GB_PMATCH_SOFTMASK);
   }else{
     $genseq = $slice;
   }
