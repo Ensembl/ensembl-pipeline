@@ -227,7 +227,14 @@ sub config_sanity_check {
 
 
 
+
 sub db_sanity_check{
   my ($sanity) = @_;
-  $sanity->db_sanity_check;
+  eval{
+    $sanity->db_sanity_check;
+  };
+  if($@){
+    print STDERR "Your database doesn't pass all the sanity checks\n".
+      "$@\n";
+  }
 }

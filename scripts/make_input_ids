@@ -53,7 +53,10 @@ this script allows input_ids to be generated and written to the input_id_analysi
     whole proteome this must be proteome
     -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
-    -input_type if you want to override the standard input_id types
+    -input_type if you want to specific an input_id_type not already
+     used by the analysis object
+    -insert_analysis if you want to insert an analysis object if it doesn't
+     already exist in the database'
     -seq_level if you want the ids for the seq_level seq_regions, can
     work with slice_size but the -slice options isn't required'
     -top_level this will fetch all the non_redundant pieces in
@@ -93,6 +96,7 @@ this will use all the translation ids as input_ids
 
 
 
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
@@ -124,7 +128,7 @@ my $translation_id;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
-
+my $insert_analysis = 0;
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -148,6 +152,7 @@ my $top_level;
             'seq_level' => \$seq_level,
             'top_level' => \$top_level,
             'h|help'            => \$help,
+            'insert_analysis!' => \$insert_analysis,
            );
 
 
@@ -236,19 +241,23 @@ if ($slice) {
 
 
 
-
-if (!($analysis)) {
-    $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name    => $logic_name,
-                                                     -input_id_type => $input_type);
-
-    print "storing analysis ".$analysis->logic_name."\n" if($verbose);
- 
-    $db->get_AnalysisAdaptor->store($analysis);
-    if(!$analysis->logic_name){
-      die "you  must specify a logic_name for your analysis otherwise".
-	" this won't work properly\n";
-    }
+if($insert_analysis && !$analysis){
+  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
+    (-logic_name    => $logic_name,
+     -input_id_type => $input_type);
+  
+  print "storing analysis ".$analysis->logic_name."\n" if($verbose);
+  
+  $db->get_AnalysisAdaptor->store($analysis);
+  if(!$analysis->logic_name){
+    die "you  must specify a logic_name for your analysis otherwise".
+      " this won't work properly\n";
   }
+}elsif(!$analysis){
+  die("Can't run without a defined analysis $logic_name doesn't seem to ".
+      "exist in the database");
+}
+
 
 print STDERR "have analysis ".$analysis->logic_name ." ".$analysis->input_id_type."\n";
 $analysis->input_id_type($input_type) if(!$analysis->input_id_type); 
