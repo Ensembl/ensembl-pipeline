@@ -39,7 +39,7 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
-
+use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::Root::Object;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object);
