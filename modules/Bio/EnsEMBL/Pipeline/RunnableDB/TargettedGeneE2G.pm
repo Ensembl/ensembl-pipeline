@@ -56,7 +56,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
@@ -119,7 +119,7 @@ sub make_seqfetcher{
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }
@@ -216,13 +216,11 @@ sub fetch_input{
   my $protein_id; 
   my $cdna_id;
 
-  # input format: ctg1234:10602496,10603128:Q9UGV6:AC00012
-  # or ctg1234:10602496,10603128:Q9UGV6 if no cDNA
+  # input format: chr12:10602496,10603128:Q9UGV6:AC00012
+  # or chr12:10602496,10603128:Q9UGV6 if no cDNA
   if( !(($entry =~ /(\S+):(\d+),(\d+):(\S+):(\S+)/) || ($entry =~ /(\S+):(\d+),(\d+):(\S+):/))) {
       $self->throw("Not a valid input id... $entry");
   }
-  
-  print STDERR "input: ".$entry . "\n";
   
   $chrname    = $1;
   $protein_id = $4;
@@ -236,9 +234,6 @@ sub fetch_input{
   }
 
   
-#  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
-#  print STDERR "$chrname $chrstart $chrend\n";
-#  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
@@ -529,11 +524,9 @@ sub convert_e2g_output {
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
-    print STDERR "fiound one for e2g!\n";
     $analysis_obj = $analyses[0];
   }
   else{
-    print STDERR "making new analysis for e2g!\n";
     # make a new analysis object
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
@@ -549,8 +542,6 @@ sub convert_e2g_output {
 
   my @genes = $self->make_genes($count, $genetype, $analysis_obj, \@results);
   
-  print STDERR "e2g genes: " . scalar(@genes) . "\n";
-
   $self->e2g_genes(@genes);  
 }
 
@@ -581,12 +572,10 @@ sub convert_gw_output {
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
-    print STDERR "fiound one for genewise!\n";
     $analysis_obj = $analyses[0];
   }
   else{
     # make a new analysis object
-    print STDERR "making new one for genewise!\n";
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
        -db_version      => 1,
@@ -604,7 +593,7 @@ sub convert_gw_output {
   my @checked  = $self->check_gw_genes(@genes);
 
   # check for stops?
-  print STDERR "gw genes: " . scalar(@checked) . "\n";
+
   $self->gw_genes(@checked);
   
 }
@@ -628,12 +617,22 @@ sub check_gw_genes{
 
   GENE:
   foreach my $gene(@genes) {
-    my $covered = $self->_check_coverage($gene);
+     # single exon genes must cover 80% of the protein length; multi exon ones 
+    # can get away with 25% though we might raise this later
+    
+    my $threshold = 80;    
+    my @t = $gene->each_Transcript;
+    my @exons = $t[0]->get_all_Exons;
+    if(scalar(@exons) > 1){
+      $threshold = 25;
+    }
+
+    my $covered = $self->_check_coverage($gene, $threshold);
     if(!$covered){
-      my $msg = "rejecting gene because < 80% coverage of parent protein\n";
-      $self->warn($msg);
+#      my $msg = "rejecting gene because < $threshold% coverage of parent protein\n";
+#      $self->warn($msg);
       next GENE;
-    };
+    }
 
     if($self->validate_gene($gene)){
       push (@checked, $gene);
@@ -679,12 +678,10 @@ sub combine_genes{
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
-    print STDERR "fiound one for combined!\n";
     $analysis_obj = $analyses[0];
   }
   else{
     # make a new analysis object
-    print STDERR "making new one for combined!\n";
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
        -db_version      => 1,
@@ -785,7 +782,8 @@ sub _merge_gw_genes {
       $merged_transcript->add_Exon($pe);
     }
     
-# ??can't just clone the translation; all the memory addresses will be screwed for the component exons
+    $merged_transcript->sort;
+
     my $cloned_translation = dclone($trans[0]->translation);
     $merged_transcript->translation($cloned_translation);
     
@@ -845,6 +843,9 @@ sub _make_newtranscripts {
       $newtranscript->translation($translation);
       my $eecount = 0;
       
+      $newtranscript->translation->start_exon($newtranscript->start_exon);
+      $newtranscript->translation->end_exon($newtranscript->end_exon);
+
       # check strands are consistent
       foreach my $ee(@e2g_exons){
 	if ($ee->strand != $strand){
@@ -880,11 +881,15 @@ sub _make_newtranscripts {
       # the new transcript is made from a merged genewise gene
       # check the transcript and expand frameshifts in all but original 3' gw_exon
       if (defined($newtranscript)){
+
 	foreach my $ex($newtranscript->get_all_Exons){
+
 	  if(scalar($ex->sub_SeqFeature) > 1 ){
 	    my @sf    = $ex->sub_SeqFeature;
 	    my $first = shift(@sf);
+
 	    $ex->end($first->end);
+
 	    # add back the remaining component exons
 	    foreach my $s(@sf){
 	      $newtranscript->add_Exon($s);
@@ -897,6 +902,7 @@ sub _make_newtranscripts {
 	
 	# dclone messes up database handles
 	foreach my $ex($newtranscript->get_all_Exons){
+
 	  $ex->attach_seq($self->vc);
 	  $ex->contig_id($self->vc->id);
 	  # add new analysis object to the supporting features
@@ -911,7 +917,7 @@ sub _make_newtranscripts {
 	foreach my $gwg($self->gw_genes) {
 	  $foundtrans = $self->compare_transcripts($gwg, $newtranscript);
  
-	  if ($foundtrans = 1){
+	  if ($foundtrans == 1){
 	    push (@combined_transcripts, $newtranscript); 	
 	    last GWG;
 	  }
@@ -944,7 +950,6 @@ sub compare_transcripts{
   };
 
   if ($@) {
-#    print STDERR "Couldn't translate genewise gene: [$@]\n";
     print STDERR "Couldn't translate genewise gene\n";
     return 0;
   }
@@ -955,7 +960,6 @@ sub compare_transcripts{
 
 
   if ($@) {
-#    print STDERR "Couldn't translate combined gene: [$@]\n";
     print STDERR "Couldn't translate combined gene\n";
     return 0;
   }
@@ -1057,12 +1061,6 @@ sub transcript_from_multi_exon_genewise {
   my @egtran  = $eg_gene->each_Transcript;
   my @egexons = $egtran[0]->get_all_Exons;
 
-  # explicitly set translation start and end exons
-  $translation->start_exon($transcript->start_exon);
-  # end exon may be changed if there is a frameshift in the 3' genewise exon
-  $translation->end_exon($transcript->end_exon);
-  
-  
   # compare to the first genewise exon
   if($gwexons[0]->strand == 1){
   FORWARD:
@@ -1072,9 +1070,6 @@ sub transcript_from_multi_exon_genewise {
       my $ex = $transcript->start_exon;
       $ex->start($current_exon->start);
 
-      # need to explicitly set the translation start exon for translation to work out
-      $translation->start_exon($ex);
-	      
       # add all the exons from the est2genome transcript, previous to this one
       $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
       
@@ -1226,8 +1221,6 @@ sub make_genes {
 #$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Pipeline::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Pipeline::Analysis");
 $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
-print STDERR "***analysis dbID: " . $analysis_obj->dbID . "\n";
-
   foreach my $tmpf (@$results) {
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
@@ -1267,7 +1260,7 @@ sub remap_genes {
   push(@genes, $self->combined_genes);
 
 GENE:  foreach my $gene (@genes) {
-    print STDERR "about to remap\n";
+
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
 
@@ -1387,14 +1380,14 @@ sub check_translation {
  Usage   :
  Function: checks how much of the parent protein is covered by the genewise prediction
  Example :
- Returns : 1 if > 80% coverage, otherwise 0
+ Returns : 1 if > $threshold% coverage, otherwise 0
  Args    :
 
 
 =cut
 
 sub _check_coverage{
-  my ($self, $gene) = @_;
+  my ($self, $gene, $threshold) = @_;
   my $pstart = 0;
   my $pend = 0;
   my $protname = $self->protein_id;
@@ -1449,12 +1442,12 @@ sub _check_coverage{
 
   my $coverage = $matches/$plength;
   $coverage *= 100;
-  if ($coverage < 80){
-    warn "Coverage of $protname is only $coverage\n";
+  if ($coverage < $threshold){
+    $self->warn ("Coverage of $protname is only $coverage - will be rejected\n");
     return 0;
   }
   
-  print STDERR "***Coverage of $protname is $coverage\n";
+  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
   return 1;
 }
 
@@ -1528,8 +1521,6 @@ sub _make_transcript{
   } 
   else {
     
-    print STDERR "num exons: " . scalar(@exons) . "\n";
-
     if ($exons[0]->strand == -1) {
       @exons = sort {$b->start <=> $a->start} @exons;
     } else {
@@ -1621,9 +1612,9 @@ sub validate_exon{
   }
 
   elsif($exon->start == $exon->end){
-    my $msg = "rejecting exon, start == end : " . $exon->start . " == " . $exon->end . "\n";
+    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - letting it through\n";
     $self->warn($msg);
-    return 0;
+    return 1;
   }
   
   return 1;
