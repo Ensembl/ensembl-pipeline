@@ -419,10 +419,11 @@ sub batch_runRemote {
 sub runLocally {
   print STDERR "Running locally\n"; 
   my $self = shift;
-  #local *STDOUT;
-  #local *STDERR;
 
   print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
+
+  local *STDOUT;
+  local *STDERR;
 
   if( ! open ( STDOUT, ">".$self->stdout_file )) {
     $self->set_status( "FAILED" );
@@ -579,18 +580,18 @@ sub runInLSF {
       );
     };
     if ($err = $@) {
-      print STDERR "Error updating successful job $self->dbID [$err]\n";
+      print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
     }
     else {
-      print STDERR "Updated successful job $self->dbID\n";
+      print STDERR "Updated successful job ".$self->dbID."\n";
       eval {
         $self->remove;
       };
       if ($err = $@) {
-         print STDERR "Error deleting job $self->dbID [$err]\n";
+         print STDERR "Error deleting job ".$self->dbID." [$err]\n";
       }
       else {
-         print STDERR "Deleted job $self->dbID\n";
+         print STDERR "Deleted job ".$self->dbID."\n";
       }
     }
   }
