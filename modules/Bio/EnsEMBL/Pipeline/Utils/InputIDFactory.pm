@@ -7,6 +7,8 @@ use vars qw(@ISA);
 @ISA = ('Bio::EnsEMBL::Root');
 
 
+use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
+
 =head2 new
 
   Arg [1]   : Bio::EnsEMBL::DBSQL::DBAdaptor
@@ -100,9 +102,10 @@ sub get_slice_names{
   my $csa = $self->db->get_CoordSystemAdaptor();
   my $sa = $self->db->get_SliceAdaptor();
 
-  my @slices = @{$sa->fetch_all($cs_name, $cs_version, $size, $overlap)};
+  my $slices = $sa->fetch_all($cs_name, $cs_version);
+  $slices = split_Slices($slices,$size,$overlap);
   my @ids;
-  foreach my $slice(@slices){
+  foreach my $slice(@$slices){
     push(@ids, $slice->name);
   }
 
