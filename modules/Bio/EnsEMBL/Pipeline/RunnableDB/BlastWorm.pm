@@ -10,37 +10,36 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::BlastWorm
+  Bio::EnsEMBL::Pipeline::RunnableDB::BlastWorm
 
 =head1 SYNOPSIS
 
-my $seg = Bio::EnsEMBL::Pipeline::RunnableDB::BlastWorm->new ( -dbobj      => $db,
- 	  	                                               		   -input_id   => $input_id,
-                                                               -analysis   => $analysis,
-                                                             );
-$seg->fetch_input;  # gets sequence from DB
-$seg->run;
-$seg->output;
-$seg->write_output; # writes features to to DB
+  my $seg = Bio::EnsEMBL::Pipeline::RunnableDB::BlastWorm->new ( -dbobj      => $db,
+ 	    	                                                 -input_id   => $input_id,
+                                                                 -analysis   => $analysis,
+                                                               );
+  $seg->fetch_input;  # gets sequence from DB
+  $seg->run;
+  $seg->output;
+  $seg->write_output; # writes features to to DB
 
 =head1 DESCRIPTION
 
-This object wraps Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
-to add functionality to read and write to databases.
-A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
-The query sequence is provided through the input_id.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object
-must be passed for extraction of parameters.
-
+  This object wraps Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
+  to add functionality to read and write to databases.
+  A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
+  The query sequence is provided through the input_id.
+  The appropriate Bio::EnsEMBL::Pipeline::Analysis object
+  must be passed for extraction of parameters.
 
 =head1 CONTACT
 
-Marc Sohrmann: ms2@sanger.ac.uk
+  Marc Sohrmann: ms2@sanger.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
-Internal methods are usually preceded with a _.
+  The rest of the documentation details each of the object methods. 
+  Internal methods are usually preceded with a _.
 
 =cut
 
@@ -58,9 +57,9 @@ use Bio::EnsEMBL::Pipeline::Runnable::BlastWorm;
 =head2 new
 
  Title    : new
- Usage    : $self->new ( -DBOBJ       => $db
-                         -INPUT_ID    => $id
-                         -ANALYSIS    => $analysis,
+ Usage    : $self->new ( -dbobj       => $db
+                         -inpout_id    => $id
+                         -analysis    => $analysis,
                        );
  Function : creates a Bio::EnsEMBL::Pipeline::RunnableDB::Blastp object
  Example  : 
@@ -87,8 +86,6 @@ sub new {
     # if ($params ne "") { $params .= ","; }
     # get the path to the binaries from the Analysis object (analysisprocess table)
     my $params .= "-program=>".$self->analysis->program_file.",";
-    # get the analysisId from the Analysis object (analysisprocess table)
-    $params .= "-analysisid=>".$self->analysis->dbID.",";
     # define the database
     $params .= "-database=>".$self->analysis->db_file.",";
     # set the filter
@@ -132,7 +129,7 @@ sub fetch_input {
 
     $self->genseq($genseq);
     print STDERR "Set genseq to " . $self->genseq. "\n";
-# input sequence needs to contain at least 3 consecutive nucleotides
+    # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq->seq;
     $self->throw("Need at least 3 nucleotides") unless ($seq =~ /[CATG]{3}/);
 }
@@ -167,29 +164,55 @@ sub write_output {
     $sth->execute ($featurepairs[0]->seqname);
     my $internalId = ($sth->fetchrow_array)[0];
 
-#    print "name ".$featurepairs[0]->seqname." and internal $internalId\n";
-
 
     $sth = $self->dbobj->prepare ( q{ INSERT INTO feature
-                                                     (id, contig, seq_start, seq_end,
-                                                      score, strand, analysis, name,
-                                                      hstart, hend, hid, evalue, perc_id)
-                                              VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                       } );
+                                                  (id, contig, seq_start, seq_end,
+                                                   score, strand, analysis, name,
+                                                   hstart, hend, hid, evalue, perc_id)
+                                           VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    } );
 
+
+    # get AnalysisAdaptor
+    my $analysisAdaptor = $self->dbobj->get_AnalysisAdaptor;
+
+    # write analysis to the database
     my $analysis = $featurepairs[0]->analysis;
-    unless ($analysis) {
-        $self->throw ("Feature ".$featurepairs[0]->seqname ." doesn't have analysis. Cannot write to database");
-    }
-    my $analysisId = $self->dbobj->get_FeatureAdaptor->store($analysis);
+    my $analysisId;
 
+    unless ($analysis) {
+        $self->throw ("Feature ".$featurepairs[0]->id ." doesn't have analysis. Cannot write to database");
+    }
+
+    unless ($analysisId = $analysisAdaptor->exists ($analysis)) {
+        $analysisId = $analysisAdaptor->store ($analysis);
+    }
+
+    # loop over all featurepairs
     foreach my $featurepair (@featurepairs) {
-#        print "featurepair ".$featurepair->hseqname."\n";
+
+        $featurepair->feature1->validate_prot_feature;
+        $featurepair->feature2->validate_prot_feature;
+
+        ################
+        my $target_seqname;
+
+        # a little temporary hack to modify gadfly id's (Fly database)
+        if ($featurepair->hseqname =~ /^\S+\|FB\S+\|(CT\d+)\|FB\S+/) {
+            $target_seqname = "$1";
+        }
+        else {
+            $target_seqname = $featurepair->hseqname;
+        }
+
+        ################
+
         $sth->execute ($internalId, $featurepair->start, $featurepair->end,
                        $featurepair->score, $featurepair->strand,
                        $analysisId, $self->analysis->program, 
-                       $featurepair->hstart, $featurepair->hend, $featurepair->hseqname,
-                       $featurepair->p_value, $featurepair->percent_id);
+#                       $featurepair->hstart, $featurepair->hend, $featurepair->hseqname,
+                      $featurepair->hstart, $featurepair->hend, $target_seqname, 
+                      $featurepair->p_value, $featurepair->percent_id);
         
         my $sth_last = $self->dbobj->prepare ( q{ SELECT last_insert_id() } );
         $sth_last->execute;
@@ -204,7 +227,6 @@ sub write_output {
                                                 } );
 
         foreach my $ref (@blast_coor) {
-#            print "segment ".$ref->[0]." ".$ref->[1]." ".$ref->[2]."\n";
             $sth_blast->execute ($insert_id, $ref->[0], $ref->[1], $ref->[2]);
         }
         $sth_last->finish;
