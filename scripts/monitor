@@ -7,20 +7,19 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
-
-my $host = 'ecs2a';
-my $port;
-my $dbname = 'rat_Nov02';
+use Bio::EnsEMBL::Pipeline::Config;
+my $host = '';
+my $port = 3306;
+my $dbname = '';
 my $user = 'ensro';
 my $pass = undef;
-
-my $current = 1;
-my $current_summary = 1;
-my $finished = 1;
 my $analysis;
-my $rules;
-my $conditions;
-my $status_analysis;
+my $current_status;
+my $current_summary;
+my $finished;
+my $core;
+my $config;
+my @files;
 
 &GetOptions( 
 	    'host:s'    => \$host,
@@ -28,32 +27,49 @@ my $status_analysis;
 	    'user:s'    => \$user,
 	    'pass:s'    => \$pass,
 	    'dbname:s'  => \$dbname,
-	    'current'   => \$current,
-	    'current_summary' => \$current_summary,
-	    'finished'  => \$finished,
-	    'rules'     => \$rules,
-	    'conditions'=> \$conditions,
-	    'status_analysis:s'    => \$status_analysis,
-	    'analysis'  => \$analysis,
+	    'current_status' => \$current_status,
+	    'current_status_summary' => \$current_summary,
+	    'finished' => \$finished,
+	    'core' => \$core,
+	    'analysis' => \$analysis,
+	    'config' => \$config,
+	    'file:s@' => \@files,
 	   );
-
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 						      -user   => $user,
 						      -pass   => $pass,
-						      -dbname => $dbname);
+						      -dbname => $dbname,
+						      -port => $port,
+						     );
+my $config_obj;
+if($config){
+ if(@files){
+   $config_obj = new Bio::EnsEMBL::Pipeline::Config(-FILES => @files);
+ }else{
+   $config_obj = new Bio::EnsEMBL::Pipeline::Config(-DB => $db);
+ }
+}
 
-my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 
-$monitor->show_current_status                 if ($current);
-$monitor->show_current_status_summary         if ($current_summary);
-$monitor->show_finished_summary               if ($finished);
-$monitor->show_analysisprocess                if ($analysis);
-$monitor->show_Rules                          if ($rules);
-$monitor->show_Rules_and_Conditions           if ($conditions);
 
-if ($status_analysis) {
-  my ($status,$analysis)  = split(/:/,$status_analysis);
+my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-db => $db);
 
-  $monitor->show_jobs_by_status_and_analysis($status,$analysis);
+
+$monitor->show_current_status if($current_status);
+$monitor->show_current_status_summary if($current_summary);
+$monitor->show_finished if($finished);
+if($core){
+  $monitor->show_analysis if($analysis);
+}
+
+if($config_obj){
+  foreach my $taskname ($config_obj->get_keys('TASKS')) {
+    my $module = $config_obj->get_parameter('TASKS', $taskname); 
+    eval "require $module";
+    print $module.": ";
+    $module->description;
+    print "\n";
+  }
+  print "\n";
 }
