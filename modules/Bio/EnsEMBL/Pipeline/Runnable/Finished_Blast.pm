@@ -383,6 +383,13 @@ __END__
 
 =head1 NAME - Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast
 
+=head1 DESCRIPTION
+
+Unlike Bio::EnsEMBL::Pipeline::Runnable::Blast,
+this module creates FeaturePairs from HSPs after
+doing any depth filtering to save time and memory
+when searching genomic sequences that generate
+large numbers of blast matches.
 
 =head2 usage of Bio::EnsEMBL::Pipeline::Config::Blast with this module
 
