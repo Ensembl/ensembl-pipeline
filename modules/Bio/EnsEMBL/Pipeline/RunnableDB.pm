@@ -81,25 +81,31 @@ sub new {
     
     my $self = {};
     bless $self, $class;
-    #print STDERR "@args\n";
-    my ($db,$input_id, $seqfetcher, 
-	$analysis) = $self->_rearrange([qw(DB
-					   INPUT_ID
-					   SEQFETCHER 
-					   ANALYSIS )], 
-				       @args);
-    
+ 
+    my ($db,$input_id, $seqfetcher, $analysis) = $self->_rearrange([qw(DB
+					    INPUT_ID
+					    SEQFETCHER 
+					    ANALYSIS )], 
+				        @args);
+
+
+    $self->{'_genseq'}      = undef;
+    $self->{'_runnable'}    = undef;
+    $self->{'_parameters'}  = undef;
+    $self->{'_analysis'}    = undef;
+
     $self->throw("No database handle input") unless defined($db);
     $self->db($db);
 
-    $self->throw("No input id input") unless defined($input_id);
+    $self->throw("No input id input")        unless defined($input_id);
     $self->input_id($input_id);
     
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
-    # this is an optional field, (I think)
-    $analysis && $self->analysis($analysis);
+    $self->throw("No analysis object input") unless defined($analysis);
+    $self->analysis($analysis);
+
     return $self;
 }
 
@@ -140,7 +146,66 @@ sub parameters {
 
     $self->analysis->parameters($parameters) if ($parameters);
 
+
     return $self->analysis->parameters();
+}
+
+sub arguments {
+  my ($self) = @_;
+
+  my %parameters = $self->parameter_hash;
+
+  my $options = "";
+
+  foreach my $key (%parameters) {
+    if ($parameters{$key} ne "__NONE__") {
+      $options .= " " . $key . " " . $parameters{$key};
+    } else {
+      $options .= " " . $key;
+    }
+  }
+  return $options;
+}
+
+=head2 parameter_hash
+
+ Title   : parameter_hash
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub parameter_hash{
+   my ($self,@args) = @_;
+
+    my ($parameter_string) = $self->analysis->parameters() ;
+
+    my %parameters;
+
+    if ($parameter_string) {
+
+      my @pairs = split (/,/, $parameter_string);
+      foreach my $pair (@pairs) {
+	
+	my ($key, $value) = split (/=>/, $pair);
+
+	if ($key && $value) {
+	  $key   =~ s/^\s+//g;
+	  $key   =~ s/\s+$//g;
+	  $value =~ s/^\s+//g;
+	  $value =~ s/\s+$//g;
+	  
+	  $parameters{$key} = $value;
+	} else {
+          $parameters{$key} = "__NONE__";
+	}
+      }
+    }
+    return %parameters;
 }
 
 =head2 db
@@ -186,25 +251,25 @@ sub input_id {
     return $self->{'_input_id'};
 }
 
-=head2 genseq
+=head2 query
 
-    Title   :   genseq
-    Usage   :   $self->genseq($genseq);
-    Function:   Get/set genseq
+    Title   :   query
+    Usage   :   $self->query($query);
+    Function:   Get/set query
     Returns :   
     Args    :   
 
 =cut
 
-sub genseq {
-    my ($self, $genseq) = @_;
+sub query {
+    my ($self, $query) = @_;
 
-    if (defined($genseq)){ 
-	$self->{'_genseq'} = $genseq; 
+    if (defined($query)){ 
+	$self->{'_query'} = $query; 
     }
-    return $self->{'_genseq'}
-}
 
+    return $self->{'_query'}
+}
 
 =head2 output
 
@@ -247,10 +312,10 @@ sub run {
     foreach my $runnable ($self->runnable) {
 
       $self->throw("Runnable module not set") unless ($runnable);
-      $self->throw("Input not fetched") unless ($self->genseq());
 
-      # Ugh!!!!
-      $runnable->query($self->genseq());
+      # Not sure about this
+      $self->throw("Input not fetched")       unless ($self->query);
+
       $runnable->run();
     }
     return 1;
@@ -285,49 +350,6 @@ sub runnable {
   return @{$self->{'_runnables'}};  
 }
 
-=head2 vcontig
-
- Title   : vcontig
- Usage   : $obj->vcontig($newval)
- Function: 
- Returns : value of vcontig
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vcontig {
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_vcontig'} = $value;
-    }
-    return $obj->{'_vcontig'};
-
-}
-
-
-=head2 slice
-
- Title   : slice
- Usage   : $obj->slice($newval)
- Function: 
- Returns : value of slice
- Args    : newvalue (optional)
-
-
-=cut
-
-sub slice {
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_slice'} = $value;
-    }
-    return $obj->{'_slice'};
-
-}
-
 
 =head2 write_output
 
@@ -346,6 +368,14 @@ sub write_output {
     my @features = $self->output();
     my $contig;
 
+    my $sim_adp  = $self->db->get_SimpleFeatureAdaptor;
+    my $pred_adp = $self->db->get_PredictionTranscriptAdaptor;
+    my $dna_adp  = $self->db->get_DnaAlignFeatureAdaptor;
+    my $rept_adp = $self->db->get_RepeatFeatureAdaptor;
+    my $pep_adp  = $self->db->get_ProteinAlignFeatureAdaptor;
+    my $gene_adp = $self->db->get_GeneAdaptor;
+
+
     $self->warn("shouldn't be using the write_output method of runnabledb");
 
     eval {
@@ -353,22 +383,100 @@ sub write_output {
     };
 
     if ($@) {
-	print STDERR "Contig not found, skipping writing output to db: $@\n";
-	return 1;
+      $self->throw("Can't find contig " . $self->input_id . " . Can't write output");
     }
   
+    my %features;
+
     foreach my $f (@features) {
-	$f->analysis($self->analysis);
-	$f->attach_seq($contig);
+
+      print $f->gffstring . "\n";
+      $f->analysis($self->analysis);
+      $f->attach_seq($contig);
+
+      if ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
+	foreach my $exon (@{$f->get_all_Exons}) {
+	  $exon->contig($contig);
+	}
+
+	if (!defined($features{prediction})) {
+	  $features{prediction} = [];
+	}
+
+	push(@{$features{prediction}},$f);
+
+	print "F " . $features{prediction} . "\n";
+
+      } elsif ($f->isa("Bio::EnsEMBL::SimpleFeature")) {
+
+	if (!defined($features{simple})) {
+	  $features{simple} = [];
+	}
+
+	push(@{$features{simple}},$f);
+
+	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+
+	if (!defined($features{dnapep})) {
+	  $features{dnapep} = [];
+	}
+
+	push(@{$features{dnadna}},$f);
+	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+
+	if (!defined($features{dnapep})) {
+	  $features{dnapep} = [];
+	}
+
+	push(@{$features{dnapep}},$f);
+	} elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
+
+	if (!defined($features{dnapep})) {
+	  $features{dnapep} = [];
+	}
+
+	push(@{$features{dnapep}},$f);
+	} elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
+
+	if (!defined($features{repeat})) {
+	  $features{repeat} = [];
+	}
+
+	push(@{$features{repeat}},$f);
+	} elsif ($f->isa("Bio::EnsEMBL:Gene")) {
+
+	  foreach my $exon (@{$f->get_all_Exons}) {
+	    $exon->contig($contig);
+	  }
+	  if (!defined($features{gene})) {
+	    $features{gene} = [];
+	  }
+	  
+	push(@{$features{gene}},$f);
+	  
+	}
     }
 
-    if (@features) {
-	print STDERR "Writing features to database\n";
-
-        my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	print STDERR $feat_adp." is a feature adpator\n";
-	$feat_adp->store(@features);
+    if ($features{prediction}) {
+      $pred_adp->store(@{$features{prediction}});
+      print "Storing " . @{$features{prediction}} . "\n";
     }
+    if ($features{simple}) {
+      $sim_adp->store(@{$features{simple}});
+    }
+    if ($features{dnadna}) {
+      $dna_adp->store(@{$features{dnadna}});
+    }
+    if ($features{dnapep}) {
+      $pep_adp->store(@{$features{dnapep}});
+    }
+    if ($features{repeat}) {
+      $rept_adp->store(@{$features{repeat}});
+    }
+    if ($features{gene}) {
+      $gene_adp->store(@{$features{gene}});
+    }
+
     return 1;
 }
 
