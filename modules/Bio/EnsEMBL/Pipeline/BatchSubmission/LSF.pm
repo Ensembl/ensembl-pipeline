@@ -260,7 +260,8 @@ sub check_existance{
       push(@awol_jobs, @{$job_submission_ids{$job_id}});
     }
   }
-  close(BJOB) or $self->throw("Can't close pipe to bjobs");
+  close(BJOB);
+  #or $self->throw("Can't close pipe to bjobs");
   return \@awol_jobs;
 }
 #sub check_existance{
