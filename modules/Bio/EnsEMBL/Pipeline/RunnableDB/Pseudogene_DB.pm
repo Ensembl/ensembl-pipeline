@@ -30,7 +30,7 @@ Describe contact details here
 package Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB;
 
 use strict;
-
+use Carp qw(cluck);
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Pseudogene;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
@@ -60,7 +60,7 @@ sub fetch_input {
   $self->fetch_sequence;
   my $results = [];		# array ref to store the output
   my %parameters = $self->parameter_hash;
-  my %repeats;
+  my %repeat_blocks;
   $parameters{'-query'} = $self->query;
 
 
@@ -76,7 +76,6 @@ sub fetch_input {
      '-port'   => $GB_DBPORT,
      '-dnadb'  => $self->db,
     );
-
   my $genes = $self->query->get_all_Genes;
   foreach my $gene (@{$genes}) {
     my $rsa = $rep_db->get_SliceAdaptor;
@@ -87,10 +86,10 @@ sub fetch_input {
 					       $gene->end,
 					      );
 
-    $repeats{$gene} = $rep_gene_slice->get_all_RepeatFeatures;
-    $gene->transfer($rep_gene_slice);
+    $repeat_blocks{$gene} = $self->get_all_repeat_blocks($rep_gene_slice->get_all_RepeatFeatures);
+
   }
-    
+
   if ($self->validate_genes($genes)) {
     my $runnable = $runname->new
       ( 
@@ -98,13 +97,57 @@ sub fetch_input {
        '-max_intron_coverage' => $PS_MAX_INTRON_COVERAGE,
        '-max_exon_coverage' => $PS_MAX_EXON_COVERAGE,
        '-genes' => $genes,
-       '-repeat_features' => \%repeats
+       '-repeat_features' => \%repeat_blocks
       );
     $self->runnable($runnable);
     $self->results($runnable->output);
   }
   return 1;
 }
+
+
+=head2 get_all_repeat_blocks
+
+  Args       : none
+  Description: merges repeats into blocks for each gene
+  Returntype : array of Seq_Feature blocks;
+
+=cut 
+
+sub get_all_repeat_blocks {
+  my ($self,$repeat_ref) = @_;
+  my @repeat_blocks;
+  my @repeats = @{$repeat_ref};
+  @repeats = sort {$a->start <=> $b->start} @repeats;
+  my $curblock = undef;
+
+  REPLOOP: foreach my $repeat (@repeats) {
+      my $rc = $repeat->repeat_consensus;
+      if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) { 
+	next REPLOOP;
+      }
+      if ($repeat->start <= 0) { 
+	$repeat->start(1); 
+      }
+      if (defined($curblock) && $curblock->end >= $repeat->start) {
+	if ($repeat->end > $curblock->end) { 
+	  $curblock->end($repeat->end); 
+	}
+      }
+      else {
+	$curblock = Bio::EnsEMBL::SeqFeature->new(
+						  -START => $repeat->start,
+						  -END => $repeat->end, 
+						  -STRAND => $repeat->strand
+						 );
+	push (@repeat_blocks,$curblock);
+      }
+    }
+  @repeat_blocks = sort {$a->start <=> $b->start} @repeat_blocks;
+  return\@repeat_blocks;
+}
+
+
 
 sub write_output {
   my($self) = @_;
@@ -139,7 +182,7 @@ sub write_output {
     # store
     eval {
      $gene_adaptor->store($gene);
-      print STDERR "wrote gene " . $gene->dbID . " to database ".
+      print STDERR  "wrote gene " . $gene->dbID . " to database ".
 	$gene_adaptor->db->dbname."\n";
     };
     if ( $@ ) {
