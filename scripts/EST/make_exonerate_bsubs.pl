@@ -46,7 +46,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
 my %chrhash;
 
 # declare these here so we can refer to them later
-my $exonerate_bsubdir          = "exonerate_results/";
+my $exonerate_bsubdir          = "exonerate_results";
 
 # make output directories
 &make_directories();
@@ -76,17 +76,22 @@ sub make_exonerate_bsubs {
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
   
   my $lsf_options   = $LSF_OPTIONS;
+  
+  #$lsf_options .= " -R\"select[myecs2b < 440 && myecs2f < 440] rusage[myecs2b=10]\" ";
+  $lsf_options .= " -R\"select[myecs2b < 440 && myecs2f < 440] rusage[myecs2b=10:duration=2:decay=1:myecs2f=10:duration=2:decay=1]\"";
+    
   my $scriptdir     = $EST_SCRIPTDIR;
-  my $check         = $scriptdir . "/check_node.pl";
-  my $exonerate     = $scriptdir . "/run_exonerate.pl";
+  my $check         = $scriptdir . "check_node.pl";
+  my $exonerate     = $scriptdir . "run_exonerate.pl";
   my $bsuberr       = $EST_TMPDIR . "/" . $exonerate_bsubdir . "/stderr/";
   my $bsubout       = $EST_TMPDIR . "/" . $exonerate_bsubdir . "/stdout/";
   my $runnable_db   = $EST_EXONERATE_RUNNABLE;
-  my $analysis      = $EST_EXONERTAE_ANALYSIS;
+  my $analysis      = $EST_EXONERATE_ANALYSIS;
   
   my $estfile = $EST_FILE; # may be a full path
   my @path = split /\//, $estfile;
   $estfile = $path[$#path];
+  $estfile =~ s/\.fa$//i; 
   $estfile .= "_chunk_";
   
   my $numchunks = $EST_CHUNKNUMBER;
@@ -101,9 +106,12 @@ sub make_exonerate_bsubs {
     my $outfile   = $bsubout . $chunk;
     my $errfile   = $bsuberr . $chunk;
     my $chunk_file = $EST_CHUNKDIR."/".$chunk;
-    
+    my $query_chunk = "/tmp/".$chunk;
+
+    #my $command = "bsub $lsf_options -f \" $chunk_file > $query_chunk \" -o $outfile -e $errfile -E \"$check $query_chunk\" $exonerate -runnable $runnable_db -analysis $analysis -query_seq  $query_chunk  -write";
     my $command = "bsub $lsf_options -o $outfile -e $errfile -E \"$check $chunk\" $exonerate -runnable $runnable_db -analysis $analysis -query_seq  $chunk_file  -write";
     
+
     print OUT "$command\n";
   }
   
