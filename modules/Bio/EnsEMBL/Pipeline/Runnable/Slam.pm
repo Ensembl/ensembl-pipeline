@@ -157,7 +157,6 @@ sub new {
   $self->slice1($slice1);
   $self->slice2($slice2);
 
-
   $self->fasta1($fasta1);
   $self->fasta2($fasta2);
 
@@ -281,7 +280,7 @@ sub _parser {
         push (@attributes, @transc_id);
         my $attr_ref = \@attributes;
 
-        # we store the refernce to the line with the attributes of the exon using the unique transcript-key as key
+        # we store the ref of line with attributes of the exon using the unique transcript-key as key
         # an HASH of ARRAYS of ARRAYS
         push (@{ $transcripts{$key}}, $attr_ref );
       }
@@ -310,8 +309,6 @@ sub _parser {
       # extracting startbp, endbp strand and phase
       my ($start,$end,$strand,$phase) = @attributes[3,4,6,7];
 
-      print "st $start ed $end str $strand ph $phase\n";
-
       $strand = 1 if ($strand eq "+");
       $strand = -1 if ($strand eq "-");
       $strand = 0 if ($strand eq ".");
@@ -331,7 +328,6 @@ sub _parser {
       $pred_trans->add_Exon( $pred_exon );
     }
     push @all_predicted_transcripts, $pred_trans;
-    print "---------\n";
   }
   return \@all_predicted_transcripts;
 }
@@ -371,28 +367,8 @@ sub run {
   $command .= " -debug " if $self->debug;
 
   print "slam-command; $command\n" if $self->verbose;
-################################################################################
-# testing if the files exist:
 
-  if( -e $self->slam_bin){ print "slam_bin ok\n"; }else{ print "ERROR slam-binary file missing\n"; }
-  if( -e $self->approx_align){ print "aat-file ok\n"; }else{ print "ERROR aat-file missing\n"; }
-  if( -e $fasta1){ print "fasta-file1ok\n"; }else{ print "ERROR fasta-file 1 missing\n"; }
-  if( -e $fasta2){ print "fasta-file2 ok\n"; }else{ print "ERROR fasta-file 2 missing\n"; }
-
-  if( -e $fasta1.".masked"){ print "fasta.masked-file1ok\n"; }else{ print "ERROR fasta.masked-file 1 missing\n"; }
-  if( -e $fasta2.".masked"){ print "fasta.masked-file2 ok\n"; }else{ print "ERROR fasta.masked-file 2 missing\n"; }
-  if( -e $gcdir){ print "gcdir ok\n"; }else{ print "ERROR gcdir missing\n"; }
-
-
-
-################################################################################
-
- my  $status =  system (" $command ");
-
-
-
-
-
+  eval ( system (" $command"));
 
   $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
@@ -410,8 +386,6 @@ sub run {
 }
 
 
-
-
 sub files_to_delete {
   my ($self,$file) = @_;
 
@@ -422,8 +396,6 @@ sub files_to_delete {
   }
   return;
 }
-
-
 
 
 sub _getgcdir{
@@ -528,17 +500,6 @@ sub fasta1 {
   return $self->{_fasta1}
 }
 
-=pod
-
-=head2 fasta2
-
-  Title    : fasta2
-  Usage    : $obj->fasta2
-  Function : sets/gets the path and name of the second fasta-file
-  Returns  : String
-  Args     : opt. String
-
-=cut
 
 sub fasta2 {
   my $self = shift;
