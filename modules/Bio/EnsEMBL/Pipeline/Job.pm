@@ -262,7 +262,7 @@ sub flush_runs {
 
   my @analyses = ($queue) || (keys %BATCH_QUEUES);
   
-  if( !defined $adaptor ) {
+  if ( !defined $adaptor) {
     $self->throw( "Cannot run remote without db connection" );
   }
   
@@ -281,7 +281,7 @@ sub flush_runs {
 
   my $runner = $self->runner;
 
-  if(!$runner || ! -x $runner){
+  if (!$runner || ! -x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);
@@ -293,14 +293,21 @@ sub flush_runs {
  
  ANAL:
   for my $anal (@analyses) {
+
     my $queue = $BATCH_QUEUES{$anal};
+
     
     my @job_ids = @{$queue->{'jobs'}};
-    if(!@job_ids){
+    if (!@job_ids) {
       next ANAL;
     }
 
     my $this_runner = $queue->{'runner'};
+
+    if (!defined($this_runner)) {
+      print "this_runner not defined for anal $anal\n";
+    }
+
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
    
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
@@ -411,7 +418,7 @@ sub batch_runRemote {
 
   my $queue;
   
-  if (!$BATCH_QUEUES{$self->analysis->logic_name}) {
+  if (!exists($BATCH_QUEUES{$self->analysis->logic_name})) {
     $queue = 'default';
   } else {
     $queue = $self->analysis->logic_name;
@@ -419,6 +426,25 @@ sub batch_runRemote {
   
   push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
  
+  if (!defined($queue)) {
+    print "queue not defined\n";
+  }
+  if (!exists($BATCH_QUEUES{$queue})) {
+    print "BATCH_QUEUES{$queue} doesn't exist\n";
+  }
+  if (!exists($BATCH_QUEUES{$queue}{'jobs'})) {
+    print "BATCH_QUEUES{$queue}{jobs} doesn't exist\n";
+  }
+  if (!defined($BATCH_QUEUES{$queue}{'jobs'})) {
+    print "BATCH_QUEUES{$queue}{jobs} not defined\n";
+  }
+  if (!exists($BATCH_QUEUES{$queue}{'batch_size'})) {
+    print "BATCH_QUEUES{$queue}{batch_size} doesn't exist\n";
+  }
+  if (!defined($BATCH_QUEUES{$queue}{'batch_size'})) {
+    print "BATCH_QUEUES{$queue}{batch_size} not defined\n";
+  }
+
   if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
@@ -489,7 +515,7 @@ sub run_module {
 
   #print STDERR "Running ".$module." with ".$self."\n";
 
-  if (!$BATCH_QUEUES{$hash_key}) {
+  if (!exists($BATCH_QUEUES{$hash_key})) {
     $hash_key = 'default';
   }
 
@@ -842,7 +868,7 @@ sub can_retry{
   my ($self, $logic_name) = @_;
 
   $logic_name = $self->analysis->logic_name if(!$logic_name);
-  if (!$BATCH_QUEUES{$logic_name}) {
+  if (!exists($BATCH_QUEUES{$logic_name})) {
     $logic_name = 'default';
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
@@ -861,7 +887,7 @@ sub cleanup{
 
   $logic_name = $self->analysis->logic_name if(!$logic_name);
 
-  if (!$BATCH_QUEUES{$logic_name}) {
+  if (!exists($BATCH_QUEUES{$logic_name})) {
     $logic_name = 'default';
   }
 
@@ -887,7 +913,7 @@ sub remove {
   my $self = shift;
   my $logic_name = shift;
 
-  if (!$BATCH_QUEUES{$logic_name}) {
+  if (!exists($BATCH_QUEUES{$logic_name})) {
      $logic_name = 'default';
   } 
   if ($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes') {
@@ -921,26 +947,27 @@ sub set_up_queues {
 
     while (my($k, $v) = each %$queue) {
       $q{$ln}{$k}     = $v;
-      $q{$ln}{'jobs'} = [];
-      $q{$ln}{'last_flushed'} = undef;
-      $q{$ln}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
-      $q{$ln}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
-      $q{$ln}{'retries'}         ||= $DEFAULT_RETRIES;
-      $q{$ln}{'cleanup'}         ||= $DEFAULT_CLEANUP;
-      $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
     }
-
-    # a default queue for everything else
-    unless (defined $q{'default'}) {
-      $q{'default'}{'jobs'} = [];
-      $q{'default'}{'last_flushed'} = undef;
-      $q{'default'}{'batch_size'}        = $DEFAULT_BATCH_SIZE;
-      $q{'default'}{'queue'}             = $DEFAULT_BATCH_QUEUE;
-      $q{'default'}{'retries'}         ||= $DEFAULT_RETRIES;
-      $q{'default'}{'cleanup'}           = $DEFAULT_CLEANUP;
-      $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
-    }
+    $q{$ln}{'jobs'} = [];
+    $q{$ln}{'last_flushed'} = undef;
+    $q{$ln}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
+    $q{$ln}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
+    $q{$ln}{'retries'}         ||= $DEFAULT_RETRIES;
+    $q{$ln}{'cleanup'}         ||= $DEFAULT_CLEANUP;
+    $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
   }
+
+  # a default queue for everything else
+  if ( ! exists($q{'default'})) {
+    $q{'default'}{'jobs'} = [];
+    $q{'default'}{'last_flushed'} = undef;
+  }
+  # Need these set 
+  $q{'default'}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
+  $q{'default'}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
+  $q{'default'}{'retries'}         ||= $DEFAULT_RETRIES;
+  $q{'default'}{'cleanup'}         ||= $DEFAULT_CLEANUP;
+  $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
   
   return %q;
 }
