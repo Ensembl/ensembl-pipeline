@@ -177,7 +177,6 @@ use Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
 
 
 sub new {
-
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
@@ -437,7 +436,8 @@ sub _align {
   # the parent sequence (with a bit of fiddling to place
   # gaps into the evidence sequences that need them).
 
-  for (my $i = 1; $i <= $self->_slice->length; $i++) {
+  for (my $i = 1; ($i <= $self->_slice->length) 
+       && ($self->_there_are_deletions); $i++) {
     my $is_deletion = 0;
 
   DELETION_HUNT:
@@ -563,7 +563,6 @@ sub _create_Alignment_object {
 =cut
 
 sub _compute_identity {
-
   my ($self) = @_;
 
   my $genomic_sequence = $self->_working_alignment('genomic_sequence');
@@ -1011,6 +1010,7 @@ sub _truncate_introns {
 			   ($intron_end - 2*$padding - $intron_start), 
 			   '---intron-truncated---');
 
+
       my $offcut;
       foreach my $discarded_element (@offcut) {
 	$offcut .= $discarded_element;
@@ -1194,7 +1194,6 @@ sub _type {
 =cut
 
 sub _working_alignment {
-
   my ($self, $slot, $align_seq) = @_;
 
   unless (defined $slot && 
@@ -1471,6 +1470,7 @@ sub _corroborating_sequences {
 
   FEATURE:
     foreach my $base_align_feature (@{$exon->get_all_supporting_features}){
+
       if ((($type eq 'nucleotide')
 	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	  ||(($type eq 'protein')
@@ -1512,6 +1512,7 @@ sub _corroborating_sequences {
     }
 
     $exon_placemarker++;
+
   }
   # The order in which we add things to our array effects the order
   # in the final alignment.  Here, if they exist, protein features 
@@ -1622,6 +1623,7 @@ sub _fiddly_bits {
   my $added_gaps = 0;
   my $hit_sequence_position = $base_align_feature->start;
   my @deletion_sequence;
+  my $deletions;
 
   foreach my $instruction (@cigar_instructions) {
 
@@ -1639,12 +1641,18 @@ sub _fiddly_bits {
       
     } elsif ($instruction->{'type'} eq 'D') {
 
+      $deletions++;
+
       for (my $i = $hit_sequence_position; $i < ($hit_sequence_position + $instruction->{'length'});$i++){
 	$deletion_sequence[$i] = 'D';
       }
       
     }
     
+  }
+
+  if ($deletions) {
+    $self->_there_are_deletions(1);
   }
 
   # Determine the point in the genomic sequence that the
@@ -1726,7 +1734,6 @@ sub _fiddly_bits {
 =cut
 
 sub _genomic_sequence {
-
   my ($self) = @_;
 
   if (!defined $self->{'_genomic_sequence'}) {
@@ -2102,6 +2109,29 @@ sub _translatable {
   }
 
   return $self->{'_translatable'};
+}
+
+
+=head2 _there_are_deletions
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+
+sub _there_are_deletions {
+  my $self = shift;
+
+  if (@_) {
+    $self->{'_there_are_deletions'} = shift;
+  }
+
+  return $self->{'_there_are_deletions'};
 }
 
 
