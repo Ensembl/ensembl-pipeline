@@ -390,45 +390,34 @@ sub parse_results {
 	  print STDERR "rev_query{start} = ".($q_length)." - ".$query{start}." + 1\n" 
 	    if $self->_verbose;
 
-### Back port of code from new schema trunk to old schema branch.
-my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);
-
-#	  my $feature_pair = $self->create_FeaturePair($rev_target{start}, 
-#                                                 $rev_target{end}, 
-#                                                 $rev_target{strand},
-#                                                 $rev_query{start},
-#                                                 $rev_query{end},
-#                                                 $rev_query{strand},
-#                                                 $rev_query{name},
-#                                                 $rev_query{score},
-#                                                 $rev_query{percent},
-#                                                 0,
-#                                                 $rev_target{name});
-
-### end
+	  my $feature_pair = $self->create_FeaturePair($rev_target{start}, 
+                                                 $rev_target{end}, 
+                                                 $rev_target{strand},
+                                                 $rev_query{start},
+                                                 $rev_query{end},
+                                                 $rev_query{strand},
+                                                 $rev_query{name},
+                                                 $rev_query{score},
+                                                 $rev_query{percent},
+                                                 0,
+                                                 $rev_target{name});
 
 	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
 
 	  push( @features, $feature_pair);
 	}
 	else{
-
-### Back port of code from new schema trunk to old schema branch.
-my $feature_pair = $self->create_FeaturePair(\%target, \%query);
-
-#	  my $feature_pair = $self->create_FeaturePair($target{start}, 
-#                                                 $target{end}, 
-#                                                 $target{strand},
-#                                                 $query{start},
-#                                                 $query{end},
-#                                                 $query{strand},
-#                                                 $query{name},
-#                                                 $query{score},
-#                                                 $query{percent},
-#                                                 0,
-#                                                 $target{name});
-
-### end
+	  my $feature_pair = $self->create_FeaturePair($target{start}, 
+                                                 $target{end}, 
+                                                 $target{strand},
+                                                 $query{start},
+                                                 $query{end},
+                                                 $query{strand},
+                                                 $query{name},
+                                                 $query{score},
+                                                 $query{percent},
+                                                 0,
+                                                 $target{name});
 
 	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
 
