@@ -1818,6 +1818,9 @@ sub remap_genes {
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
       $transcount++;
       $transcript->type( $genecount."_".$transcount );
+
+      # set start and stop codons
+      $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($transcript);
       $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($transcript);
       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
     }

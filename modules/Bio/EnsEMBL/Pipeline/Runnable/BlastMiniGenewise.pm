@@ -220,6 +220,7 @@ sub run {
   #print STDERR "AFTER BLAST @time\n"; 
   #print STDERR "BLASTMINI have ".@blast_features." to run with\n";
   #print STDERR "There are ".scalar @features." features remaining after re-blasting.\n";
+  
   unless (@blast_features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
     return;
@@ -236,8 +237,16 @@ sub run {
     #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
     #push(@feature_pairs, $feature_pair);
   }
-
+  my @blast_features = sort{$a->start <=> $b->start  
+                              || $a->end <=> $b->end} @blast_features; 
+  foreach my $bf(@blast_features){
+    #print STDERR "BLAST RESULTS ".$bf->start." ".$bf->end." ".$bf->strand.
+    #  " ".$bf->hseqname." ".$bf->hstart." ".$bf->hend." ".
+    #    $bf->hstrand." ".$bf->percent_id." ".$bf->p_value." ".$bf->score.
+    #      "\n";
+  }
   if ($self->check_repeated > 0){ 
+    #print STDERR "BMG:249 Checking if there are repeated genes\n";
     $mg_runnables = $self->build_runnables(@blast_features);
   } else {
     my $runnable = $self->make_object($self->genomic_sequence, \@blast_features);
@@ -265,6 +274,10 @@ sub run_blast {
   my ($self) = @_;
   
   my @seq         = $self->get_Sequences;
+  if (@seq != $self->ids) {
+    $self->warn("Managed to get only " . scalar(@seq) . "  of ".
+                scalar($self->ids) ."for BLAST run; check indices\n");
+  }
   my @valid_seq   = $self->validate_sequence(@seq);
   #print STDERR "there are ".@valid_seq." valid sequences\n";
 
@@ -382,7 +395,7 @@ sub make_object {
   # Create a MultiMiniGenewise object with the features weve
   # just converted.
   my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise(
-				       '-genomic'    => $miniseq,
+                                                                        '-genomic'    => $miniseq,
 				       '-features'   => $features,
 				       '-seqfetcher' => $self->seqfetcher,
 				       '-endbias'    => $self->endbias
