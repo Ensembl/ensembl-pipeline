@@ -49,12 +49,22 @@ use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 use vars qw(@ISA);
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
+
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
+my %UNGAPPED;
+
+foreach my $db (@$DB_CONFIG) {
+  my ($name, $ungapped) = ($db->{'name'}, $db->{'ungapped'});
+  
+  if($db && $name){
+    $UNGAPPED{$name} = $ungapped if $db && $name;
+  }else{
+    my($p, $f, $l) = caller;
+    warn("either db ".$db." or name ".$name." isn't defined so can't work $f:$l\n");
+  }
+}
 
 =head2 fetch_input
 
@@ -87,7 +97,7 @@ sub fetch_input {
 
     my $ungapped;
 
-    if($::pipeConf{'ungapped'}){
+    if($UNGAPPED{$self->analysis->db_file}){
       $ungapped = 1;
     } else {
       $ungapped = undef;
