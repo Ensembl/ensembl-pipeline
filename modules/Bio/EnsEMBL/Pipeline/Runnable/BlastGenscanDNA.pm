@@ -339,8 +339,8 @@ sub align_hits_to_contig {
     {   
         unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'})
         {
-            $self->throw("Feature length (".$fp->start."-".$fp->end. 
-               ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
+            #$self->throw("Feature length (".$fp->start."-".$fp->end. 
+            #   ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
         }
         #find each matching exon
         my (@aligned_exons);
