@@ -168,7 +168,7 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
-  $use_score = 0;
+  $use_score = 1;
   if ( $use_score ){
       $self->use_score($use_score);
   }
@@ -279,32 +279,37 @@ sub solutions{
 	  my $solutions = $self->solutions( $extension_parent );
 	  
 	  foreach my $solution ( @$solutions ){
-	      # add itself to the list
-	      push ( @$solution, $node );
+	    # add itself to the list
+	    push ( @$solution, $node );
 	  }
 	  
 	  # if the node $node has inclusion children
 	  if ( @{$node->inclusion_children} ){
-	      foreach my $inclusion_child ( @{$node->inclusion_children} ){
-		  
-	  ############################################################
-	  # add the inclusion children recursively
-	  # from this child unless this is included as well in the extension parent
-	  # We only need checking in the first generation
-          ############################################################
-          unless ( $self->compare( $inclusion_child, $extension_parent) eq 'inclusion' ){
-	    my $list = [];
-	    $self->collect_inclusion_children( $inclusion_child , $list);
-	    foreach my $solution ( @$solutions ){
-		push ( @$solution, @$list );
+	    my %added;
+	    foreach my $inclusion_child ( @{$node->inclusion_children} ){
+	      
+	      ############################################################
+	      # add the inclusion children recursively
+	      # from this child unless this is included as well in the extension parent
+	      # We only need checking in the first generation
+	      ############################################################
+	      unless ( $added{$inclusion_child} 
+		       ||
+		       $self->compare( $inclusion_child, $extension_parent) eq 'inclusion' 
+		     ){
+		my $list = [];
+		$self->collect_inclusion_children( $inclusion_child , $list);
+		$added{$inclusion_child}++;
+		foreach my $solution ( @$solutions ){
+		  push ( @$solution, @$list );
+		}
+	      }
 	    }
+	  }
+	  
+	  push (@all_solutions, @$solutions);
 	}
-      }
-      }
-      
-      push (@all_solutions, @$solutions);
     }
-  }
   else{
     print STDERR "no ext-parent - collecting inclusion-children and itself\n" if $verbose;
     my $list = [];
@@ -329,7 +334,7 @@ sub solutions{
 sub collect_inclusion_children{
   my ($self, $node, $list) = @_;
 
-  my $verbose = 1;
+  my $verbose = $self->verbose();
   my %seen;
   print STDERR "collecting inclusion tree from node ".$node->transcript->dbID."\n" if $verbose;
   my $generation = 1;
@@ -338,7 +343,7 @@ sub collect_inclusion_children{
     
     while( @next_generation ){
       push( @$list, @next_generation);
-      print STDERR "generation $generation: ".scalar(@next_generation)."\n";
+      print STDERR "generation $generation: ".scalar(@next_generation)."\n" if $verbose;
       $generation++;
       my @new_generation = ();
       while( @next_generation ){
@@ -562,8 +567,8 @@ sub link_Transcripts{
   ############################################################
   my @lists;
   foreach my $solution ( @all_solutions ){
-      my @tmp = map { $_->transcript } @$solution;
-      push (@lists, \@tmp );
+    my @tmp = map { $_->transcript } @$solution;
+    push (@lists, \@tmp );
   }  
   # clean up some memory
   @all_solutions = ();
@@ -1584,7 +1589,7 @@ sub _merge_Transcripts{
     my ($self,$lists) = @_;
     print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
-    my $verbose = $self->verbose;
+    my $verbose = 1;#$self->verbose;
     
     
     # $list is an arrayref of the ests/cdnas that we can merge
@@ -1614,8 +1619,13 @@ sub _merge_Transcripts{
       my %is_last;			
       
       # collect all exons
+      my %seen_already;
+      my $newlist;
+    EST:
       foreach my $tran (@{ $list }){
-	  
+	next EST if $seen_already{$tran};
+	$seen_already{$tran} = 1;
+	push ( @$newlist, $tran );
 	my @exons = @{$tran->get_all_Exons};
 	
 	# sort them in genomic order regardless of the strand
@@ -1640,6 +1650,7 @@ sub _merge_Transcripts{
 	  $exon2transcript{$exons[$i]} = $tran;
 	}
       }
+      $list = $newlist;
       
       # cluster the exons
       my $first_cluster_list = $self->_cluster_Exons( @allexons );
@@ -1688,7 +1699,16 @@ sub _merge_Transcripts{
       }
       
       if ( $self->use_score ){
-	  $self->hold_list( $transcript, $list );
+	my %duplicated;
+	foreach my $est ( @$list ){
+	  $duplicated{$est}++;
+	  if ( $duplicated{$est}==2 ){
+	    print STDERR "CHECK1 est $est duplicated\n";
+	  }
+	}
+
+
+	$self->hold_list( $transcript, $list );
       }
       push ( @merged_transcripts, $transcript );
       
