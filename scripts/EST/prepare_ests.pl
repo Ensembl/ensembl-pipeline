@@ -21,19 +21,25 @@
 
 =head1 OPTIONS
 
-  all options set in EST_conf.pl
+  all options set in ESTConf.pm
 
 =cut
 
 use strict;
 use Getopt::Long;
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_FILE
+					EST_CHUNKDIR
+					EST_CHUNKNUMBER
+					EST_FILESPLITTER
+					EST_MAKESEQINDEX
+				       );
 
-my $estfile   = $::scripts_conf{'estfile'};
-my $chunkdir  = $::scripts_conf{'estfiledir'};
-my $chunknum  = $::scripts_conf{'estchunknumber'};
-my $splitter  = $::scripts_conf{'filesplitter'};
-my $makeindex = $::scripts_conf{'makeindex'};
+my $estfile   = $EST_FILE;
+my $chunkdir  = $EST_CHUNKDIR;
+my $chunknum  = $EST_CHUNKNUMBER;
+my $splitter  = $EST_FILESPLITTER;
+my $makeindex = $EST_MAKESEQINDEX;
 
 print "1 $estfile\n2 $chunkdir\n3 $chunknum\n4 $splitter\n5 $makeindex\n\n";
 

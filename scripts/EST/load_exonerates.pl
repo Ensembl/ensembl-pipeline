@@ -38,7 +38,17 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Analysis;
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_SOURCE
+					EST_DBHOST
+					EST_REFDBHOST
+					EST_DBNAME
+					EST_REFDBNAME
+					EST_DBUSER
+					EST_REFDBUSER
+					EST_DBPASS
+					EST_REFDBPASS
+				       );
 
 my $esthost   = undef;
 my $refhost   = undef;
@@ -168,14 +178,14 @@ sub process_ests {
 =cut
 
 sub get_variables{
-  $esthost = $::db_conf{'estdbhost'};
-  $refhost = $::db_conf{'refdbhost'};
-  $estdbname = $::db_conf{'estdbname'};
-  $refdbname = $::db_conf{'refdbname'};
-  $estdbuser = $::db_conf{'estdbuser'};
-  $refdbuser = $::db_conf{'refdbuser'};
-  $estpass = $::db_conf{'estdbpass'};
-  $refpass = $::db_conf{'refdbpass'};
+  $esthost   = $EST_DBHOST;
+  $refhost   = $EST_REFDBHOST;
+  $estdbname = $EST_DBNAME;
+  $refdbname = $EST_REFDBNAME;
+  $estdbuser = $EST_DBUSER;
+  $refdbuser = $EST_REFDBUSER;
+  $estpass   = $EST_DBPASS;
+  $refpass   = $EST_REFDBPASS;
 
   &GetOptions( 
 	      'estfile:s'      => \$estfile,
@@ -236,7 +246,7 @@ sub get_analysis{
   my $anaAdaptor = $db->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
-  my $dbest = $::est_genome_conf{'est_source'};
+  my $dbest = $EST_SOURCE;
 
   if(scalar(@analyses) > 1){
     die("panic! > 1 analysis for $logicname\n");

@@ -25,7 +25,23 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_TMPDIR
+					EST_REFDBHOST
+					EST_REFDBUSER
+					EST_REFDBNAME
+					EST_EXONERATE_BSUBS
+					EST_FILTER_BSUBS
+					EST_QUEUE
+					EST_SCRIPTDIR
+					EST_TMPDIR
+					EST_CHUNKNUMBER
+					EST_FILTERCHUNKSIZE
+					EST_GENEBUILDER_BSUBS
+					EST_GENEBUILDER_CHUNKSIZE
+					EST_FILE
+					EST_RUNNER
+				       );
 
 my %chrhash;
 
@@ -61,7 +77,7 @@ my $est_genebuilder_dir = "est_genebuilder";
 =cut
 
 sub make_directories {
-  my $scratchdir =  $::scripts_conf{'tmpdir'};
+  my $scratchdir =  $EST_TMPDIR ;
 
   my @resdirs = split /\//, $ex_resultsdir;
 
@@ -116,9 +132,9 @@ sub make_directories {
 =cut
 
 sub get_chrlengths{
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $::db_conf{'refdbhost'},
-					      -user   => $::db_conf{'refdbuser'},
-					      -dbname => $::db_conf{'refdbname'},
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $EST_REFDBHOST,
+					      -user   => $EST_REFDBUSER,
+					      -dbname => $EST_REFDBNAME,
 					     );
   my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
   
@@ -142,22 +158,22 @@ sub get_chrlengths{
 =cut
 
 sub make_exonerate_bsubs {
-  my $jobfile = $::scripts_conf{'exonerate_bsubsfile'};
+  my $jobfile = $EST_EXONERATE_BSUBS;
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
-  my $queue         = $::scripts_conf{'queue'};
-  my $scriptdir     = $::scripts_conf{'scriptdir'};
+  my $queue         = $EST_QUEUE;
+  my $scriptdir     = $EST_SCRIPTDIR;
   my $check         = $scriptdir . "/check_node.pl";
   my $exonerate_est = $scriptdir . "/exonerate_est.pl";
-  my $bsuberr       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stderr/";
-  my $bsubout       = $::scripts_conf{'tmpdir'} . "/" . $ex_bsubdir . "/stdout/";
+  my $bsuberr       = $EST_TMPDIR . "/" . $ex_bsubdir . "/stderr/";
+  my $bsubout       = $EST_TMPDIR . "/" . $ex_bsubdir . "/stdout/";
   
-  my $estfile = $::scripts_conf{'estfile'}; # may be a full path
+  my $estfile = $EST_FILE; # may be a full path
   my @path = split /\//, $estfile;
   $estfile = $path[$#path];
   $estfile .= "_chunk_";
 
-  my $numchunks = $::scripts_conf{'estchunknumber'};
+  my $numchunks = $EST_CHUNKNUMBER;
 
   for(my $i = 0; $i < $numchunks; $i++){
     my $num = $i;
@@ -187,17 +203,17 @@ sub make_exonerate_bsubs {
 =cut
 
 sub make_filter_bsubs {
-  my $jobfile    = $::scripts_conf{'filter_bsubsfile'};
-  my $scratchdir = $::scripts_conf{'tmpdir'};
-  my $queue      = $::scripts_conf{'queue'};
-  my $scriptdir  = $::scripts_conf{'scriptdir'};
+  my $jobfile    = $EST_FILTER_BSUBS;
+  my $scratchdir = $EST_TMPDIR;
+  my $queue      = $EST_QUEUE;
+  my $scriptdir  = $EST_SCRIPTDIR;
   my $filter_e2g = $scriptdir . "/filter_and_e2g.pl";
 
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
   my $filter = $scratchdir . "/" . $filterdir . "/";
-  my $size   = $::scripts_conf{'filter_chunksize'};
-  my $runner = $::scripts_conf{'runner'};
+  my $size   = $EST_FILTERCHUNKSIZE;
+  my $runner = $EST_RUNNER;
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
@@ -236,10 +252,10 @@ sub make_filter_bsubs {
 =cut
 
 sub make_EST_GeneBuilder_bsubs{
-  my $jobfile    = $::scripts_conf{'EST_GeneBuilder_bsubsfile'};
-  my $scratchdir = $::scripts_conf{'tmpdir'};
-  my $queue      = $::scripts_conf{'queue'};
-  my $scriptdir  = $::scripts_conf{'scriptdir'};
+  my $jobfile    = $EST_GENEBUILDER_BSUBS;
+  my $scratchdir = $EST_TMPDIR;
+  my $queue      = $EST_QUEUE;
+  my $scriptdir  = $EST_SCRIPTDIR;
 
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
 
@@ -247,9 +263,9 @@ sub make_EST_GeneBuilder_bsubs{
   my $filter = $scratchdir . "/" . $est_genebuilder_dir . "/";
 
   # genomic size for each job
-  my $size   = $::scripts_conf{'est_genebuilder_chunksize'};
+  my $size   = $EST_GENEBUILDER_CHUNKSIZE;
   
-  my $runner = $::scripts_conf{'runner'};
+  my $runner = $EST_RUNNER;
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
