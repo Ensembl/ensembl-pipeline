@@ -61,13 +61,13 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    
 	    	    
 	    # where the result-directories are going to go	
-    	    EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/cdnas',
+    	    EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests',
 	    
 	    # job-queue in the farm
 	    EST_QUEUE         => 'acari',
 	    
-	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch3/ensembl/eae/NCBI_31/cdnas/EST_GeneBuilder.jobs',
-	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch3/ensembl/eae/NCBI_31/cdnas/genes2ests.jobs', 
+	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/EST_GeneBuilder.jobs',
+	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/genes2ests.jobs', 
 	    
 	    ############################################################
 	    # each runnable has an analysis
@@ -83,15 +83,15 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # EST_GeneBuilder
 	    ############################################################
 			 
-			 EST_GENEBUILDER_CHUNKSIZE   => 1000000,      #  we use 1000000 (ie 1MB) chunks
-			 # it should be equal to EST_FILTERCHUNKSIZE
-			 EST_GENEBUILDER_INPUT_GENETYPE => 'human_cdna',
-			 EST_GENOMEWISE_GENETYPE        => 'genomewise',
-			 EST_EVIDENCE_TAG               => 'human_cdna',
+	    EST_GENEBUILDER_CHUNKSIZE        => 1000000,      #  we use 1000000 (ie 1MB) chunks
+		  
+	    EST_GENEBUILDER_INPUT_GENETYPE => 'human_est',
+	    EST_GENOMEWISE_GENETYPE        => 'genomewise',
+	    EST_EVIDENCE_TAG               => 'human_est',
 			 
 			 
-			 ## you must choose one type of merging for cdnas/ests: 2 and 3 are the common ones
-			 EST_GENEBUILDER_COMPARISON_LEVEL => 3,
+	                 ## you must choose one type of merging for cdnas/ests: 2 and 3 are the common ones
+			 EST_GENEBUILDER_COMPARISON_LEVEL => 4,
 			 
 			 # for details see documentation 
 			 # in Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator
@@ -101,24 +101,32 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # 4---> allow intron mismatches
 			 
 			 # you can alow a mismatch in the splice sites
-			 EST_GENEBUILDER_SPLICE_MISMATCH  => 0,
+			 EST_GENEBUILDER_SPLICE_MISMATCH  => 10,
 			 
 			 # you can alow to bridge over small introns:
-			 EST_GENEBUILDER_INTRON_MISMATCH  => 0,
+			 EST_GENEBUILDER_INTRON_MISMATCH  => 10,
 			 
 			 # you can choose whether you only want tw ests/cdnas to merge if
 			 # they have the same number of exons
 			 EST_GENEBUILDER_EXON_MATCH     => 0,
   	    	    
-			 EST_MAX_EVIDENCE_DISCONTINUITY => 10,
-			 REJECT_SINGLE_EXON_TRANSCRIPTS => 0,
-			 GENOMEWISE_SMELL               => 0,
+			 # how much discontinuity we allow in the supporting evidence
+			 # this might be correlated with the 2-to-1 merges, so we
+			 # usually put it =  EST_GENEBUILDER_INTRON_MISMATCH for ESTs
+			 EST_MAX_EVIDENCE_DISCONTINUITY  => 10,
+			 REJECT_SINGLE_EXON_TRANSCRIPTS  => 1,
+			 GENOMEWISE_SMELL                => 1,
 			 
-			 EST_MAX_INTRON_SIZE => 200000,
+			 # exons smaller than this will not be include in the merging algorithm
+			 EST_MIN_EXON_SIZE               => 8,
+
+			 # ests with intron bigger than this will not be incuded either
+			 EST_MAX_INTRON_SIZE             => 200000,
 			 
-			 # not used at this moment
-			 EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
-			 EST_MIN_EVIDENCE_SIMILARITY => 65,
+			 # this says to ClusterMerge what's the minimum
+			 # number of ESTs/cDNAs that must be 'included' into a
+			 # final transcript
+			 CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 1,
 			 
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
@@ -141,14 +149,14 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # this is in general the database where we read the mapped ests/cdnas
 	    # from, in order to use them for the EST_GeneBuilder
 			 
-	    EST_E2G_DBNAME                  => 'ens_NCBI_31_cdna',
+	    EST_E2G_DBNAME                  => 'ens_NCBI_31_est',
 	    EST_E2G_DBHOST                  => 'ecs2f',
-	    EST_E2G_DBUSER                  => 'ensadmin',
-	    EST_E2G_DBPASS                  => 'ensembl',
+	    EST_E2G_DBUSER                  => 'ensro',
+	    EST_E2G_DBPASS                  => '',
 
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
-	    EST_GENE_DBNAME                  => 'ens_NCBI_31_cdna',
-	    EST_GENE_DBHOST                  => 'ecs2f',
+	    EST_GENE_DBNAME                  => 'ens_NCBI_31_estgene',
+	    EST_GENE_DBHOST                  => 'ecs2c',
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
@@ -174,16 +182,16 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # ( see Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression )
 	    # set this to 1 if you want to map genes to ests after the genebuild
 	    # this is only for human
-	    MAP_GENES_TO_ESTS            => '0',
+	    MAP_GENES_TO_ESTS            => '1',
 
 	    # you can specify here the database where those genes are
-	    EST_TARGET_DBNAME            => '',
-	    EST_TARGET_DBHOST            => '',
-	    EST_TARGET_DBUSER            => '',
+	    EST_TARGET_DBNAME            => 'ens_NCBI_31',
+	    EST_TARGET_DBHOST            => 'ecs2b',
+	    EST_TARGET_DBUSER            => 'ensro',
 	    EST_TARGET_DBPASS            => '',
 	    
 	    # gene type to which we are going to map the ests
-	    EST_TARGET_GENETYPE          => '',
+	    EST_TARGET_GENETYPE          => 'ensembl',
 	   
 	    	    
 	    # you can specify here the database (non ensembl schema)
