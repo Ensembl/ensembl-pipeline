@@ -30,6 +30,19 @@ foreach my $align_seq (@$alignment){
   print $sequence->seq . "\n";
 }
 
+# NEU!  If you want to see the fragments of evidence sequence that
+# havent matched the genomic sequence do this:
+
+my $alignment = $alignment_tool->retrieve_alignment('all', 1);
+
+# The turns on an portion of code that generates sequences
+# composed of all the fragments in the evidence sequence that
+# havent been matched.  The final sequence/s in the alignment 
+# subsequently will be all the fragmentary pieces.  Good for 
+# genebuilders worrying about similarity matching algorithms
+# missing things.
+
+
 # More fussy (set a few things to non-default, change the
 # amount of padding up- and down-stream of the transcript
 # nucleotide sequence):
@@ -42,7 +55,7 @@ my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
 			   '-fasta_line_length' => 60);
 
 
-# 
+# Erm...
 
 my $exon_identities = $alignment_tool->identity;
 
@@ -456,6 +469,8 @@ sub _create_Alignment_object {
   }
 
   if ($show_missing_evidence) {
+    $self->_compute_evidence_coverage;
+
     foreach my $missing_sequence (@{$self->_unmatched_sequence_fragments}){
       $alignment->add_sequence($missing_sequence);
     }
@@ -694,9 +709,12 @@ sub _compute_evidence_coverage {
       }
     }
 
+print "Should not be 1 :  " . $sorted_matches[0]->[0] . "\n";
+
     if ($sorted_matches[0]->[0] != 1){ 
       $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
 				   'before', $sorted_matches[0]->[2]);
+print "It isnt\n";
     }
 
     if ($sorted_matches[-1]->[1] != $length){
@@ -777,10 +795,10 @@ sub _unmatched_sequence_fragments {
     my @sorted_missing_bits = sort {$a->[0] <=> $b->[0]} @{$self->{'_unmatched_evidence_sequence'}->{$seqname}};
 
     my $fetched_seq = $self->_fetch_sequence($seqname);
-    my @fetched_seq_array = split /./, $fetched_seq;
+    my @fetched_seq_array = split //, $fetched_seq->seq;
 
     my $slice_seq = '-' x $self->_slice->length;
-    my @slice_seq_array = split /./, $slice_seq;
+    my @slice_seq_array = split //, $slice_seq;
 
     foreach my $missed_fragment (@sorted_missing_bits){
 
