@@ -55,35 +55,45 @@ or die ("Couldn't get options");
 if(!$dbhost || !$dbuser || !$dbname){
   die ("need to pass database settings in on the commandline -dbhost -dbuser -dbname -dbpass");
 }
-if(!$dnadbhost || !$dnadbname || !$dnadbuser){
-  print STDERR "you have passed in no dnadb settings you db must have dna in it otherwise this won't work\n";
-}
+
 if(!$stable_id && !$db_id){
   die "need to specify to use either stable_id or dbId for the header line";
 }elsif($stable_id && $db_id){
   print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
 }
 
-my $dnadb;
+my $db;
+
+if ($dnadbname) {
+  if (!$dnadbhost or ! $dnadbuser) {
+    die "Fine. Your DNA is not in '$dbname' but in '$dnadbname'. But you must give a user and host for it\n";
+  }
  
-$dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					    '-host'   => $dnadbhost,
-					    '-user'   => $dnadbuser,
-					    '-dbname' => $dnadbname,
-					    '-pass'   => $dnadbpass,
-					    '-port'   => $dbport,
-					   ) unless(!$dnadbhost || !$dnadbname || !$dnadbuser);
+  my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                                 '-host'   => $dnadbhost,
+                                                 '-user'   => $dnadbuser,
+                                                 '-dbname' => $dnadbname,
+                                                 '-pass'   => $dnadbpass,
+                                                 '-port'   => $dbport,
+                                              );
 
-
-#print STDERR "have dnadb ".$dnadb."\n";
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					    '-host'   => $dbhost,
-					    '-user'   => $dbuser,
-					    '-dbname' => $dbname,
-					    '-pass'   => $dbpass,
-					    '-port'   => $dbport,
-					    '-dnadb' => $dnadb,
-					   );
+  $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                              '-host'   => $dbhost,
+                                              '-user'   => $dbuser,
+                                              '-dbname' => $dbname,
+                                              '-pass'   => $dbpass,
+                                              '-port'   => $dbport,
+                                              '-dnadb' => $dnadb,
+                                              );
+} else {
+  $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                              '-host'   => $dbhost,
+                                              '-user'   => $dbuser,
+                                              '-dbname' => $dbname,
+                                              '-pass'   => $dbpass,
+                                              '-port'   => $dbport,
+                                              );
+}
 
 
 print STDERR "connected to $dbname : $dbhost going to write to file ".
