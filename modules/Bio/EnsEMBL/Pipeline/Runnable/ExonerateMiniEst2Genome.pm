@@ -332,7 +332,6 @@ sub run {
 
 sub run_exonerate {
   my ($self) = @_;
-  my @res;
 
   my $estseq  = $self->queryseq;
   my $estfile = $self->queryfilename;
