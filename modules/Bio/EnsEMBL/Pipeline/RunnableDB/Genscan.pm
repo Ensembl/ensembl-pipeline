@@ -11,15 +11,15 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Genscan
 
 =head1 SYNOPSIS
 
-my $db      = Bio::EnsEMBL::DBLoader->new($locator);
-my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::Genscan->new ( 
+  my $db      = Bio::EnsEMBL::DBLoader->new($locator);
+  my $genscan = Bio::EnsEMBL::Pipeline::RunnableDB::Genscan->new ( 
                                                     -dbobj      => $db,
-			                                        -input_id   => $input_id
+			                            -input_id   => $input_id
                                                     -analysis   => $analysis );
-$repmask->fetch_input();
-$repmask->run();
-$repmask->output();
-$repmask->write_output(); #writes to DB
+  $genscan->fetch_input();
+  $genscan->run();
+  $genscan->output();
+  $genscan->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
@@ -31,7 +31,7 @@ required for databse access.
 
 =head1 CONTACT
 
-Describe contact details here
+Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -52,12 +52,6 @@ use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 fetch_input
-
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for repeatmasker from the database
-    Returns :   none
-    Args    :   none
 
 =cut
 
