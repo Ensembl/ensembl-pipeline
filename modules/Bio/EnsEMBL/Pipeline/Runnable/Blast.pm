@@ -886,6 +886,14 @@ sub split_HSP {
       $fp->{'qseq'} = $hsp->querySeq();
       $fp->{'sseq'} = $hsp->sbjctSeq();
 
+      # for compara
+      if ($fp->can("positive_matches")) { 	 
+        $fp->positive_matches($hsp->positive); 	 
+      } 	 
+      if ($fp->can("identical_matches")) { 	 
+        $fp->identical_matches($hsp->match); 	 
+      }
+
       $self->growfplist($fp);
     }
 }
