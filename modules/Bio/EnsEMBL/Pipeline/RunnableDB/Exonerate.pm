@@ -59,7 +59,6 @@ use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
-#@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Root);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {

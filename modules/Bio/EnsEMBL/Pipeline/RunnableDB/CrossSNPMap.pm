@@ -53,10 +53,9 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my($class,@args) = @_;

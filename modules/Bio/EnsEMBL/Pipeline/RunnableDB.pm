@@ -21,8 +21,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB
 =head1 DESCRIPTION
 
 This is the base implementation of
-Bio::EnsEMBL::Pipeline::RunnableDBI.  This object encapsulates the
-basic main methods of a RunnableDB which a subclass may override.
+This object encapsulates the basic main methods of a RunnableDB
+which a subclass may override.
 
 parameters to new
 -db:        A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
@@ -49,7 +49,6 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
@@ -57,7 +56,7 @@ use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 =head2 new
 
