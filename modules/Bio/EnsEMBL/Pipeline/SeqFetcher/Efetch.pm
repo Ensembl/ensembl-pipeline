@@ -109,7 +109,7 @@ sub library {
 =head2 get_Seq_by_acc
 
   Title   : get_Seq_by_acc
-  Usage   : $self->get_eq_by_acc($accession);
+  Usage   : $self->get_Seq_by_acc($accession);
   Function: Does the sequence retrieval via efetch
   Returns : Bio::Seq
   Args    : 
