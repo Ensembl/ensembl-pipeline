@@ -73,8 +73,8 @@ my $prefix='COB';
 	     # IMPORTANT: we should have copied the genewise genes to this db before hand:
 	     GB_COMB_DBHOST                  => 'ecs1f',
 	     GB_COMB_DBNAME                  => 'ens_NCBI_30_combined_genes',
-	     GB_COMB_DBUSER                  => 'ensadmin',
-	     GB_COMB_DBPASS                  => 'ensembl',
+	     GB_COMB_DBUSER                  => 'ensro',
+	     GB_COMB_DBPASS                  => '',
 	     
 	     # database containing the cdnas mapped, to be combined with the genewises
 	     # by putting this info here, we free up ESTConf.pm so that two analysis can
@@ -122,6 +122,14 @@ my $prefix='COB';
 	     GB_PROTEIN_INDEX           => '',
 	     # species specific protein index
 	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Ensembl/NCBI_30_proteome.fa.jidx',
+	     
+	     # one of the available modules: 
+	     # Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
+	     # Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs
+	     # Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher
+	     #
+	     GB_TARGETTED_PROTEIN_SEQFETCHER => '',
+
 	     #GB_TARGETTED_PROTEIN_INDEX => '/acari/work6a/eae.tmp/Human/NCBI_29/proteome/NCBI_29_proteome.fa',
 	     GB_TARGETTED_CDNA_INDEX    => '',
 
@@ -145,7 +153,8 @@ my $prefix='COB';
 					  'type'       => 'swall',
 					  'threshold'  => '200',
 					  'index'      => '/data/blastdb/Ensembl/swall_indicate_index/',
-					 },
+					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
+ 					 },
 					],
 	     
 	     # minimum required parent protein coverage
