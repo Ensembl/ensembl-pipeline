@@ -15,28 +15,22 @@ use warnings;
 =cut
 
 sub new {
+
+  my $caller = shift;
+  my $pm = shift;
+
+  my $class = ref($caller) || $caller;
+
+  # if the singleton has already been created, return it,
+  # otherwise create the singleton first
+  my $singleton;
+  unless (defined $singleton){
+    $singleton = bless {}, $class;
+  }
+
+  return $singleton;
 	
 }
-
-
-=head2 flush
-
-  Arg [1]    : 
-  Example    : 
-  Description: Present so this is polymorphic with all submission systems
-               flush() does nothing for the local submission system.
-  Returntype : 
-  Exceptions : 
-  Caller     : 
-
-=cut
-
-sub flush {
-	my $self = shift;
-
-	return;
-}
-
 
 =head2 submit
 
@@ -51,8 +45,9 @@ sub flush {
 =cut
 
 sub submit {
-	my $self = shift;
-	my $job  = shift;
+
+  my $self = shift;
+  my $job  = shift;
 
 }
 
@@ -73,10 +68,30 @@ sub submit {
 =cut
 
 sub create_job {
-	my $self = shift;
+	
+  my $self = shift;
 
 }
 
+=head2 flush
+
+  Arg [1]    : 
+  Example    : 
+  Description: Present so this is polymorphic with all submission systems
+               flush() does nothing for the local submission system.
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub flush {
+
+  my $self = shift;
+
+  return;
+
+}
 
 
 1;
