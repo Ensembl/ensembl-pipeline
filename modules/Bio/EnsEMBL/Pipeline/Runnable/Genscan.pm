@@ -91,6 +91,7 @@ sub _initialize {
     $self->{_workdir} = undef;      #location of temp directory
     $self->{_filename} =undef;      #file to store Bio::Seq object
     $self->{_results}   =undef;     #file to store results of genscan
+    $self->{_protected} =[];        #a list of file suffixes protected from deletion
     $self->{_parameters} =undef;    #location of parameters for genscan
     my($clonefile, $genscan, $parameters) = $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM'], @args);
     
@@ -113,7 +114,7 @@ sub clone {
     {
         $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{_clone} = $seq ;
-        $self->filename($self->clone->id."$$.seq");
+        $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".genscan");
         $self->seqfeature($seq);
     }
@@ -160,6 +161,19 @@ sub results {
     my ($self, $results) = @_;
     $self->{_results} = $results if ($results);
     return $self->{_results};
+}
+
+=head2 protect
+    Title   :   protect
+    Usage   :   $obj->protect('.masked', '.p');
+    Function:   Protects files with suffix from deletion when execution ends
+    Args    :   File suffixes
+    
+=cut
+sub protect {
+    my ($self, @filename) =@_;
+    push (@{$self->{_protected}}, @filename) if (@filename);
+    return @{$self->{_protected}};
 }
 
 =head2 genscan
@@ -274,6 +288,14 @@ sub run_genscan {
     close RESULTS;
 }
 
+=head2 parsefile
+Title   :  parsefile
+    Usage   :   $obj->parsefile($filename)
+    Function:   Parses Genscan output to give a set of seqfeatures
+    Returns :   none
+    Args    :   optional filename
+
+=cut
 sub parsefile {
     my ($self, $filename) = @_;
     $self->results($filename) if ($filename);
@@ -332,7 +354,6 @@ sub parse_genscan {
                 elsif ($element[0] && $element[0] =~ /predicted/i)
                 {
                     close GENSCAN;
-                    $self->create_genes();
                     return;
                 }
             }
@@ -460,6 +481,8 @@ sub output_exons {
 =cut
 sub output_genes {
     my ($self) = @_;
+    #Decided to create genes here to save uneccesary storage - genes are just reorganised exons
+    $self->create_genes();
     return @{$self->{'_genes'}};
 }
 
@@ -477,9 +500,17 @@ sub deletefiles {
     my ($self) = @_;
     #delete all analysis files 
     my @list = glob($self->filename."*");
-    foreach (@list)
+    foreach my $result (@list)
     {
-        unlink ($_) or $self->throw ("Couldn't delete $_ :$!");
+        my $protected = undef; #flag for match found in $protected
+        foreach my $suffix ($self->protect)
+        {        
+            $protected = 'true' if ($result eq $self->filename.$suffix);
+        }
+        unless ($protected)
+        {
+            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
+        }
     }
 }
 

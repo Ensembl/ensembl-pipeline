@@ -87,11 +87,18 @@ sub _initialize {
     $self->{_workdir}   = undef;     #location of temp directory
     $self->{_filename}  =undef;      #file to store Bio::Seq object
     $self->{_results}   =undef;      #file to store results of RepeatMaskerHum
+    $self->{_protected} =[];        #a list of files protected from deletion
     $self->{_arguments} =undef;      #arguments for RepeatMaskerHum
     
-    $self->repeatmasker('/tmp_mnt/nfs/disk100/humpub/scripts/RepeatMaskerHum');
-    my( $clonefile, $arguments) = $self->_rearrange(['CLONE', 'ARGS'], @args);
+    my( $clonefile, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
     $self->clone($clonefile) if ($clonefile);       
+    if ($repmask)
+    {   $self->repeatmasker($repmask);  }
+    else
+    {  
+        $self->repeatmasker('/tmp_mnt/nfs/disk100/humpub/scripts/RepeatMaskerHum');
+    }
+    
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
@@ -109,8 +116,8 @@ sub clone {
     {
         $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{_clone} = $seq ;
-        $self->filename($self->clone->id."$$.seq");
-        $self->results($self->filename.".Repmask.out");
+        $self->filename($self->clone->id.".$$.seq");
+        $self->results($self->filename.".RepMask.out");
     }
     return $self->{_clone};
 }
@@ -125,6 +132,19 @@ sub results {
     my ($self, $results) = @_;
     $self->{_results} = $results if ($results);
     return $self->{_results};
+}
+
+=head2 protect
+    Title   :   protect
+    Usage   :   $obj->protect('.masked', '.p');
+    Function:   Protects files with suffix from deletion when execution ends
+    Args    :   File suffixes
+    
+=cut
+sub protect {
+    my ($self, @filename) =@_;
+    push (@{$self->{_protected}}, @filename) if (@filename);
+    return @{$self->{_protected}};
 }
 
 =head2 repeatmasker
@@ -206,6 +226,14 @@ sub run {
     $self->deletefiles();
 }
 
+=head2 parsefile
+Title   :  parsefile
+    Usage   :   $obj->parsefile($filename)
+    Function:   Parses RepeatMaskerHum output to give a set of feature pairs
+    Returns :   none
+    Args    :   optional filename
+
+=cut
 sub parsefile {
     my ($self, $filename) = @_;
     $self->results($filename) if ($filename);
@@ -247,13 +275,15 @@ sub parse_repmask {
         $feat1 {start} = $element[6];
         $feat1 {end} = $element[7];
         #set strand ('+' = 1 and 'c' = -1)
-        $feat1 {strand} = 1 if ($element[9] eq '+');
-        $feat1 {strand} = -1 if ($element[9] eq 'C');
+        $feat2 {strand} = 1 if ($element[9] eq '+');
+        $feat2 {strand} = -1 if ($element[9] eq 'C');
         $feat2 {name} = $element[10];
         $feat2 {score} = $element[1];
-        $feat2 {start} = ($element[12] =~ s/(|)//); #strip away parentheses from $element[11]
-        $feat2 {end} = $element[13];
-        $feat2 {strand} = 1;
+        ($element[13] =~ tr/()//d); #strip away parentheses from $element[13]
+        ($element[14] =~ tr/()//d); #strip away parentheses from $element[14]
+        $feat2 {start} = $element[13];     
+        $feat2 {end} = $element[14];
+        $feat1 {strand} = 1;
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
     close REPOUT;   
@@ -335,11 +365,19 @@ sub writefile {
 
 sub deletefiles {
     my ($self) = @_;
-    #delete all analysis files? probably need to 'glob' or something
+    #delete all analysis files 
     my @list = glob($self->filename."*");
-    foreach (@list)
+    foreach my $result (@list)
     {
-        unlink ($_) or $self->throw ("Coudln't delete $_ :$!");
+        my $protected = undef; #flag for match found in $protected
+        foreach my $suffix ($self->protect)
+        {        
+            $protected = 'true' if ($result eq $self->filename.$suffix);
+        }
+        unless ($protected)
+        {
+            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
+        }
     }
 }
 
