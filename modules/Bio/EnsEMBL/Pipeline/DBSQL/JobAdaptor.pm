@@ -76,7 +76,7 @@ sub fetch_by_dbID {
   my $id = shift;
 
   my $sth = $self->prepare( q{
-    SELECT jobId, input_id, analysisId, LSF_id, object_file,
+    SELECT jobId, input_id, class, analysisId, LSF_id, object_file,
       stdout_file, stderr_file, retry_count
     FROM job
     WHERE jobId = ? } );
@@ -111,7 +111,7 @@ sub fetch_by_Status_Analysis {
     }
     my $analysisId = $analysis->dbID;
 
-    my $query = "select j.jobId, j.input_id, j.analysisId, j.LSF_id," .
+    my $query = "select j.jobId, j.input_id, j.class, j.analysisId, j.LSF_id," .
 	                   "j.stdout_file, j.stderr_file,".
                        "j.object_file, j.retry_count".
                        "j.status_file " . 
@@ -155,7 +155,7 @@ sub fetch_by_Age {
         unless defined($age);
     #convert age from minutes to seconds
 
-    my $query = 'SELECT j.jobId, j.input_id, j.analysisId, j.LSF_id, '
+    my $query = 'SELECT j.jobId, j.input_id, j.class, j.analysisId, j.LSF_id, '
                 .'j.stdout_file, j.stderr_file, j.object_file, '
                 .'j.retry_count '     
                 .'FROM job as j, jobstatus as js, current_status as cs ' 
@@ -195,7 +195,7 @@ sub fetch_by_inputId {
   my @result;
 
   my $sth = $self->prepare( q{
-    SELECT jobId, input_id, analysisId, LSF_id, object_file,
+    SELECT jobId, input_id, class, analysisId, LSF_id, object_file,
       stdout_file, stderr_file, retry_count
     FROM job
     WHERE input_id = ? } );
@@ -228,12 +228,13 @@ sub store {
   }
 
   my $sth = $self->prepare( q{
-    INSERT into job( input_id, analysisId,
+    INSERT into job( input_id, class, analysisId,
       LSF_id, stdout_file, stderr_file, object_file,
       retry_count ) 
-    VALUES ( ?, ?, ?, ?, ?, ?, ? ) } );
+    VALUES ( ?, ?, ?, ?, ?, ?, ?, ? ) } );
 
   $sth->execute( $job->input_id,
+                 $job->class,
                  $job->analysis->dbID,
                  $job->LSF_id,
                  $job->stdout_file,
@@ -390,6 +391,7 @@ sub _objFromHashref {
    '-id'       => $hashref->{'jobId'},
    '-lsf_id'   => $hashref->{'LSF_id'},
    '-input_id' => $hashref->{'input_id'},
+   '-class'    => $hashref->{'class'},
    '-stdout'   => $hashref->{'stdout_file'},
    '-stderr'   => $hashref->{'stderr_file'},
    '-input_object_file' => $hashref->{'object_file'},
