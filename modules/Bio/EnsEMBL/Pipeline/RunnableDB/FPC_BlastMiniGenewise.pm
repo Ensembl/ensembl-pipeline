@@ -244,7 +244,7 @@ sub fetch_input {
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 
-    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end('chr20',1000000,2000000);
+    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end('chr20',1,4000000);
     #my $contig    = $contig[$contignum];
     $contig->_chr_name('chr20');
     print STDERR "Analysing contig " . $contig->id . " " . $contignum . "\n";
@@ -334,6 +334,7 @@ sub convert_output {
     # <sigh> no time to change it now
     my $analysis = $self->dbobj->get_OldAnalysis(7);
     my $trancount = 1;
+
     foreach my $runnable ($self->get_Runnables) {
 	my $contig = $self->{$runnable};
 	my @tmpf   = $runnable->output;
@@ -440,41 +441,39 @@ sub convert_output {
 		    $transl->end  ($exons[$#exons]->start);
 		} 
 		
-		my @newf;
 
-		foreach my $gene (@genes) {
-		    foreach my $tran ($gene->each_Transcript) {
-			print STDERR " Translation is " . $tran->translate->seq . "\n";
-			foreach my $exon ($tran->each_Exon) {
-			    my $strand = "+";
-			    if ($exon->strand == -1) {
-				$strand = "-";
-			    }
-			    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
-			}
-			$trancount++;
-		    }
-		    
-		    eval {
-			my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-			$newgene->type('genewise');
-			push(@newf,$newgene);
-		    };
-		    if ($@) {
-			print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
-		    }
-		}
-		
-		
-		if (!defined($self->{_output})) {
-		    $self->{_output} = [];
-		}
-		
-		push(@{$self->{_output}},@newf);
 	    }
 	}
+	my @newf;
+	foreach my $gene (@genes) {
+	    foreach my $tran ($gene->each_Transcript) {
+		print STDERR " Translation is " . $tran->translate->seq . "\n";
+		foreach my $exon ($tran->each_Exon) {
+		    my $strand = "+";
+		    if ($exon->strand == -1) {
+			$strand = "-";
+		    }
+		    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
+		}
+		$trancount++;
+	    }
+	    
+	    eval {
+		my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+		$newgene->type('genewise');
+		push(@newf,$newgene);
+	    };
+	    if ($@) {
+		print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+	    }
+	    
+	    if (!defined($self->{_output})) {
+		$self->{_output} = [];
+	    }
+	    
+	    push(@{$self->{_output}},@newf);
+	}
     }
-    
 }
 
 sub check_splice {
