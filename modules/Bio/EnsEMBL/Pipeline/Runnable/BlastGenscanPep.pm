@@ -48,11 +48,9 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pep_SeqFeature;
-use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					      BIOPERLDB
 					     );
