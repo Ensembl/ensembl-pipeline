@@ -1589,7 +1589,7 @@ sub _merge_Transcripts{
     my ($self,$lists) = @_;
     print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
-    my $verbose = 1;#$self->verbose;
+    my $verbose = $self->verbose;
     
     
     # $list is an arrayref of the ests/cdnas that we can merge
