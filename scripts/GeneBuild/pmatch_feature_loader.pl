@@ -40,8 +40,7 @@ my $host   = $GB_DBHOST;
 my $pass   = $GB_DBPASS;
 my $pmfile = $GB_PM_OUTPUT;
 if(defined $pmfile && $pmfile ne ''){
-#  $pmfile .= "/pm_best.out";
-  $pmfile .= "/14.pm_best.out";
+  $pmfile .= "/pm_best.out";
 }
 
 # usage
