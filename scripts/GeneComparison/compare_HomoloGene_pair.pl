@@ -98,7 +98,8 @@ print STDERR "comparing $this_humanLL (".scalar(@human_cdnas)." transcripts ) ".
   "and $this_mouseLL (".scalar(@mouse_cdnas)." transcripts )\n";
 
 my $transcript_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
-my $protein_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+my $protein_map    = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+
 my %seqobj;
 my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
 
@@ -206,14 +207,6 @@ my $best_transcript_pairs_object = $transcript_map->stable_marriage;
 my $transcript_pair_count = scalar($best_transcript_pairs_object->list1);
 print STDERR "Transcript pairs created: ".$transcript_pair_count."\n";
 
-my $best_protein_pairs_object = $protein_map->stable_marriage;
-my $protein_pair_count = scalar($best_protein_pairs_object->list1);
-print STDERR "Protein pairs created: ".$protein_pair_count."\n";
-
-if ( $transcript_pair_count != $protein_pair_count ){
-  print STDERR "PAIR_MISMATCH\n";
-}
-
 foreach my $element1 ( $best_transcript_pairs_object->list1 ){
   foreach my $partner ( $best_transcript_pairs_object->partners( $element1 ) ){
     
@@ -241,27 +234,6 @@ foreach my $element1 ( $best_transcript_pairs_object->list1 ){
 	      "perc_id:$perc_id\t".
 		"length_diff:$length_diff\n";
     
-     
-    ############################################################
-    # do cdna alignments agree with the protein ones?
-    my $found = 0;
-  CDS:
-    foreach my $humanNP_seq ( $best_protein_pairs_object->list1 ){
-      if ( $protein_id1 eq $humanNP_seq->display_id ){
-	foreach my $mouseNP_seq ( $best_transcript_pairs_object->partners( $humanNP_seq ) ){
-	  if ( $protein_id2 eq $humanNP_seq->display_id ){
-	    $found = 1;
-	    print STDERR "CDS_PAIR_MATCH\n";
-	    last CDS;
-	  }
-	}
-      }
-    }
-    if ( $found == 0 ){
-      print STDERR "CDS_MISMATCH\t".
-	"$this_humanLL\t$id1\t$protein_id1\t".
-	  "$this_mouseLL\t$id2\t$protein_id2\n";
-    }
   }
 }
 
@@ -270,52 +242,126 @@ foreach my $element1 ( $best_transcript_pairs_object->list1 ){
 my %human_protein2cdna = reverse %human_cdna2protein;
 my %mouse_protein2cdna = reverse %mouse_cdna2protein;
 
-foreach my $element1 ( $best_protein_pairs_object->list1 ){
-  foreach my $partner ( $best_protein_pairs_object->partners( $element1 ) ){
-    # there should be only one
-    my $id1 = $element1->display_id;
-    my $id2 = $partner->display_id;
-    print STDERR "Pair ( $id1 , $id2 ) with score: ".$best_protein_pairs_object->score( $element1, $partner )."\n";
-    
-    ############################################################
-    # summary line
-    my $length1 = $element1->length;
-    my $length2 = $partner->length;
-    my $perc_id         = $perc_id{$element1}{$partner};
-    my $target_coverage = $target_coverage{$element1}{$partner};
-    my $query_coverage  = $query_coverage{$element1}{$partner};
-    my $length_diff      = $length1 - $length2;
-    print STDERR "PROTEIN_PAIR\t".
-      "$this_humanLL\t$id1\tlength1:$length1\t".
-	"coverage1:$target_coverage\t".
-	  "$this_mouseLL\t$id2\tlength2:$length2\t".
-	    "coverage2:$query_coverage\t".
-	      "perc_id:$perc_id\t".
-		"length_diff:$length_diff\n";
-    
-    ############################################################
-    # do cdna alignments agree with the protein ones?
-    my $found = 0;
-  CDNA:
-    foreach my $humanNM_seq ( $best_transcript_pairs_object->list1 ){
-      my $protein_id1 = $human_cdna2protein{ $humanNM_seq->display_id};
-      if ( $protein_id1 eq $id1 ){
-	foreach my $mouseNM_seq ( $best_transcript_pairs_object->partners( $humanNM_seq ) ){
-	  my $protein_id2 = $mouse_cdna2protein{ $mouseNM_seq->display_id};
-	  if ( $protein_id2 eq $id2 ){
-	    $found = 1;
-	    print STDERR "CDNA_PAIR_MATCH\n";
-	    last CDNA;
-	  }
+
+############################################################
+# this requires a bit more of work - it can happen that
+# 2 human proteins are exactly the same but have different transcripts
+# so they have the same similarity to a mouse protein, leaving an ambiguity
+
+# we need three graphs
+# $stable  = with the stable (marriage) protein pairs (1-to-1)
+# $correct = with the correct pairs (according to cdna pairs) (1-to-1)
+# $all     = with all the comparisons (many-to-many)
+
+# we bin the pairs in $all according to score
+# from each bin we take the right pairs and if none
+# we take the stable pairs
+
+my $all     = $protein_map;
+my $stable  = $protein_map->stable_marriage;
+my $protein_pair_count = scalar($stable->list1);
+print STDERR "Protein pairs created: ".$protein_pair_count."\n";
+my $correct = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+# build the correct pairs
+foreach my $element1 ( $best_transcript_pairs_object->list1 ){
+  foreach my $partner ( $best_transcript_pairs_object->partners( $element1 ) ){
+    my $humanNP = $human_cdna2protein{ $element1->display_id};
+    my $mouseNP = $mouse_cdna2protein{ $partner->display_id};
+    my $humanNP_seq = $human_protein_seqs{$humanNP};
+    my $mouseNP_seq = $mouse_protein_seqs{$mouseNP};
+    $correct->match($humanNP_seq, $mouseNP_seq, $all->score($humanNP_seq,$mouseNP_seq) );
+  }
+}
+
+my %bin_pairs;
+foreach my $h ( $all->list1 ){
+  foreach my $m ( $all->partners( $h ) ){
+    my $score = $all->score($h,$m);
+    push ( @{$bin_pairs{$score}}, [$h,$m] );
+  }
+}
+
+my %seen;
+my @selected_pairs;
+foreach my $score ( sort { $b <=> $a } keys %bin_pairs ){
+  my $has_correct = 0;
+  foreach my $pair ( @{$bin_pairs{$score}} ){
+    if ( $correct->score( $pair->[0], $pair->[1] ) ){
+      $has_correct = 1;
+    }
+  }
+  if ( $has_correct ){
+    foreach my $pair ( @{$bin_pairs{$score}} ){
+      if ( $correct->score( $pair->[0], $pair->[1] ) ){
+	unless ( $seen{ $pair->[0] } || $seen{ $pair->[1] } ){
+	  push ( @selected_pairs, $pair );
+	  $seen{ $pair->[0] } = 1;
+	  $seen{ $pair->[1] } = 1;
 	}
       }
     }
-    if ( $found == 0 ){
-      my $cdna_id1 = $human_protein2cdna{ $id1 };
-      my $cdna_id2 = $mouse_protein2cdna{ $id2 };
-      print STDERR "CDNA_MISMATCH\t".
-	"$this_humanLL\t$cdna_id1\t$id1\t".
-	  "$this_mouseLL\t$cdna_id2\t$id2\n";
+  }
+  else{
+    foreach my $pair ( @{$bin_pairs{$score}} ){
+      if ( $stable->score( $pair->[0], $pair->[1] ) ){
+	unless ( $seen{ $pair->[0] } || $seen{ $pair->[1] } ){
+	  push ( @selected_pairs, $pair );
+	  $seen{ $pair->[0] } = 1;
+	  $seen{ $pair->[1] } = 1;
+	}
+      }
     }
   }
 }
+
+print STDERR "pairs selected:\n";
+foreach my $pair ( @selected_pairs ){
+  my $humanNP = $pair->[0]->display_id;
+  my $mouseNP = $pair->[1]->display_id;
+  my $humanNM = $human_protein2cdna{ $humanNP };
+  my $mouseNM = $mouse_protein2cdna{ $mouseNP };
+  #print STDERR "$humanNP ($humanNM) <--> $mouseNP ($mouseNM)\n";
+  
+  ############################################################
+  # summary line
+  my $length1 = $pair->[0]->length;
+  my $length2 = $pair->[1]->length;
+  my $perc_id         = $perc_id{$pair->[0]}{$pair->[1]};
+  my $target_coverage = $target_coverage{$pair->[0]}{$pair->[1]};
+  my $query_coverage  = $query_coverage{$pair->[0]}{$pair->[1]};
+  my $length_diff      = $length1 - $length2;
+  print STDERR "PROTEIN_PAIR\t".
+    "$this_humanLL\t$humanNM\t$humanNP\tlength1:$length1\t".
+      "coverage1:$target_coverage\t".
+	"$this_mouseLL\t$mouseNM\t$mouseNP\tlength2:$length2\t".
+	  "coverage2:$query_coverage\t".
+	    "perc_id:$perc_id\t".
+	      "length_diff:$length_diff\n";
+}
+
+############################################################
+# do cdna alignments agree with the protein ones?
+
+
+
+    
+ #   ############################################################
+#    # do cdna alignments agree with the protein ones?
+#    my $found = 0;
+#  CDS:
+#    foreach my $humanNP_seq ( $best_protein_pairs_object->list1 ){
+#      if ( $protein_id1 eq $humanNP_seq->display_id ){
+#	foreach my $mouseNP_seq ( $best_transcript_pairs_object->partners( $humanNP_seq ) ){
+#	  if ( $protein_id2 eq $humanNP_seq->display_id ){
+#	    $found = 1;
+#	    print STDERR "CDS_PAIR_MATCH\n";
+#	    last CDS;
+#	  }
+#	}
+#      }
+#    }
+#    if ( $found == 0 ){
+#      print STDERR "CDS_MISMATCH\t".
+#	"$this_humanLL\t$id1\t$protein_id1\t".
+#	  "$this_mouseLL\t$id2\t$protein_id2\n";
+#    }
