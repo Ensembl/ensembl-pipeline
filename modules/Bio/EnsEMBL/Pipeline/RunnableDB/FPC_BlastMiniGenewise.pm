@@ -262,10 +262,11 @@ sub write_output {
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
       
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
-									     '-ids'      => \@ids,
-									     '-seqfetcher' => $seqfetcher,
-									     '-trim'     => 1);
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'        => $seq,
+									     '-ids'            => \@ids,
+									     '-seqfetcher'     => $seqfetcher,
+									     '-trim'           => 1,
+									     '-check_repeated' => 1);
       
       $self->runnable($runnable);
 

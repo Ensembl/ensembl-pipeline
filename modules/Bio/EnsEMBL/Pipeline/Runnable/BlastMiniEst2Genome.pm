@@ -113,7 +113,7 @@ sub new {
     if (defined $check_repeated){
       $self->check_repeated($check_repeated);
     }else {
-      $self->check_repeated(0);
+      $self->check_repeated(1);
     }
 
 

@@ -240,9 +240,10 @@ sub fetch_input {
   my $blastdb   = $self->blastdb;
   print STDERR "fpc blastdb: $blastdb\n";
   
-  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'     => $genseq, 
-									    '-queryseq'     => $blastdb,
-									    '-seqfetcher'  => $self->seqfetcher);
+  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'        => $genseq, 
+									    '-queryseq'       => $blastdb,
+									    '-seqfetcher'     => $self->seqfetcher,
+									    -'check_repeated' => 1);
     
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
