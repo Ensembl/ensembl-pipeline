@@ -27,7 +27,7 @@ Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
 ClusterMerge takes a set of transcripts, it clusters them first and them
 create sets of transcripts that can all merge with each other. This merging can be
 exact, so that exon boundaries must match exactily, or fuzzy where 
-exon boundaries don't necessarily coincide. The latter case could be useful for
+exon boundaries do not necessarily coincide. The latter case could be useful for
 ests, whereas the former case is advisable with full length cdnas.
 The output is given in the form of the resulting transcripts.
 
@@ -58,52 +58,53 @@ use Bio::EnsEMBL::Pipeline::ESTConf;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
-    my ($class,@args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    my( $transcripts, $exact_merge ) = $self->_rearrange([qw(
-							     TRANSCRIPTS
-							     EXACT_MERGE
-							     )], 
-							 @args);
-       
-    
-    unless( $transcripts ){
-	$self->warn("No transcripts passed it. We cannot go further");
-	exit(0);
-    }
-    $self->input_transcripts(@{$transcripts});
-
-    if (defined($exact_merge)){
-	$self->exact_merge($exact_merge);
-    }
-    
-    return $self;
+  my ($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);
+  
+  my( $transcripts, $exact_merge ) = $self->_rearrange([qw(
+							   TRANSCRIPTS
+							   EXACT_MERGE
+							  )], 
+						       @args);
+  
+  
+  unless( $transcripts ){
+    $self->warn("No transcripts passed it. We cannot go further");
+    exit(0);
+  }
+  $self->input_transcripts(@{$transcripts});
+  
+  if (defined($exact_merge)){
+    $self->exact_merge($exact_merge);
+  }
+  
+  return $self;
 }
 
 ############################################################
 
 =head2 run
 
-    Usage   :   $self->run
-    Function:   main magic and witchcraft on the transcripts. 
-                it fills up the holder $self->output with transcript objects
+Usage   :   $self->run
+ Function:   main magic and witchcraft on the transcripts. 
+  it fills up the holder $self->output with transcript objects
+  
 =cut
 
 sub run {
-  my ($self) = @_;
-
+  my $self = shift;
   my @transcripts = $self->input_transcripts;
-
+	 
   # cluster the transcripts
-  my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
-  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
-  
-  # merge the transcripts in each cluster according to consecutive exon overlap
-  my @merged_transcripts  = $self->_merge_Transcripts(\@transcript_clusters);
-  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
-
-  $self->output(@merge_transcripts);
+ my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
+	 print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
+	 
+	 # merge the transcripts in each cluster according to consecutive exon overlap
+	 my @merged_transcripts  = $self->_merge_Transcripts(\@transcript_clusters);
+	 print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
+	 
+	 $self->output(@merged_transcripts);
+	
 }
 
 ############################################################
