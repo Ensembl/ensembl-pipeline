@@ -43,25 +43,7 @@ $SIG{INT} = \&termhandler;
 # dynamically load appropriate queue manager (e.g. LSF)
 
 
-my $max_time = $MAX_JOB_TIME;
-my $killed_file = $KILLED_INPUT_IDS;
-my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
 
-my $file = "$batch_q_module.pm";
-$file =~ s{::}{/}g;
-eval {
-    require "$file";
-};
-if ($@) {
-    print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
-    exit 1;
-}
-
-my $get_pend_jobs;
-if ($batch_q_module->can("get_pending_jobs")) {
-    my $f = $batch_q_module . "::get_pending_jobs";
-    $get_pend_jobs = \&$f;
-}
 
 
 # command line options override 
@@ -87,7 +69,14 @@ my %analyses;
 my $verbose;
 my $rerun_sleep = 3600;
 my $overload_sleep = 300;
-my $db_sanity = 1; 
+my $max_time;
+my $killed_file;
+my @input_id_types;
+my @starts_from;
+my $queue_manager;
+my $accumulators = 1; #these two options are on as default but that can 
+my $db_sanity = 1; #be switched off by sticiking no infront of the 
+                   #standard command line options (see GetOpts long docs)
 my $help;
 
 GetOptions(
@@ -103,11 +92,16 @@ GetOptions(
     'once!'         => \$once,
     'shuffle!'      => \$shuffle,
     'analysis=s@'   => \@analyses,
+    'input_id_types=s@' => \@input_id_types,
+    'start_from=s@' => \@starts_from,	   
     'v!'            => \$verbose,
     'dbsanity!'     => \$db_sanity,
-    'h|help'	    => \$help,	   
-)
-or useage();
+    'accumulators!' => \$accumulators,
+    'max_job_time=s' => \$max_time,
+    'killed_file=s' => \$killed_file,
+    'queue_manager=s' => \$queue_manager,	   
+    'h|help'	    => \$help,	  
+) or useage();
 
 if(!$dbhost || !$dbname || !$dbuser){
   print STDERR " you must provide a host and a database name and a user".
@@ -116,6 +110,36 @@ if(!$dbhost || !$dbname || !$dbuser){
 }
 
 useage() if $help;
+
+if($id_list_file || @analyses || @input_id_types || @starts_from){
+  print STDERR " you are running the rulemanager in a fashion which".
+  ." will probably break the accumulators so they are being ".
+  ."turned off\n";
+
+  $accumulators = 0;
+} 
+my $max_time = $MAX_JOB_TIME unless($max_time);
+my $killed_file = $KILLED_INPUT_IDS unless($killed_file);
+my $queue_manager = $QUEUE_MANAGER unless($queue_manager);
+
+my $batch_q_module = 
+  "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
+
+my $file = "$batch_q_module.pm";
+$file =~ s{::}{/}g;
+eval {
+    require "$file";
+};
+if ($@) {
+    print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
+    exit 1;
+}
+
+my $get_pend_jobs;
+if ($batch_q_module->can("get_pending_jobs")) {
+    my $f = $batch_q_module . "::get_pending_jobs";
+    $get_pend_jobs = \&$f;
+}
 
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
@@ -130,6 +154,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -pass   => $dbpass,
     -port   => $dbport,
 );
+
 
 if($db_sanity){
   &db_sanity_check($db);
@@ -148,7 +173,8 @@ my $sic          = $db->get_StateInfoContainer;
 
 
 %analyses   = logic_name2dbID($ana_adaptor, @analyses);
-
+my %tmp = logic_name2dbID($ana_adaptor, @starts_from);
+@starts_from = keys %tmp;
 
 if ($idlist_file && ! -e $idlist_file) {
     die "Must be able to read $idlist_file";
@@ -219,6 +245,20 @@ alarm $wakeup if $wakeup;
 
 my %completed_accumulator_analyses;
 
+my %ids_to_run;
+if($id_list_file){
+  open IDS, "< $idlist_file" or die "Can't open $idlist_file";
+  my $count = 0;
+  while (<IDS>) {
+    chomp;
+    my($id, $type) = split;
+    if(!$id_to_run{$type}){
+      $id_to_run{$type} = [];
+    }
+    push( @{$id_to_run{$type}}, $id);
+  }
+  close IDS;
+}
 while (1) {
     $submitted = 0;
 
@@ -226,29 +266,23 @@ while (1) {
     # until we have all the input ids.
 
     my $id_type_hash;
-
-    if (defined $idlist_file) {
-
-        # read list of id's from a file,
-        # e.g. a list of contigs on the golden path
-
-        open IDS, "< $idlist_file" or die "Can't open $idlist_file";
-        while (<IDS>) {
-            chomp;
-            my($id) = split;
-            ($id) or die "Invalid id $_";
-            push @id_list, $id;
-        }
-        close IDS;
-    }
-    else {
+    print "Reading IDs ... ";
+    if ($idlist_file) {
+      $id_type_hash = \%ids_to_run;
+    } elsif(@input_id_types){
+      $all_ids_hash = $sic->get_all_input_id_analysis_sets;
+      foreach my $i(@input_id_types){
+	my $ids = $all_ids_hash->{$i}; 
+	$id_type_hash->{$i} = $ids;
+      }
+    }else {
 
         # This loop reads input ids from the database a chunk at a time
         # until we have all the input ids.
         # NB It's almost as much work to get one ID as the whole lot, so setting
         # the 'chunksize' variable to a small number doesn't really achieve much.
 
-        print "Reading IDs ... ";
+        
 
         $id_type_hash = $sic->get_all_input_id_analysis_sets;
     }
@@ -280,9 +314,11 @@ while (1) {
         next INPUT_ID_TYPE if ($input_id_type eq 'ACCUMULATOR');
 	
 	if($batch_q_module->can('get_job_time')){
-	  my @running_jobs = $job_adaptor->fetch_by_Status('RUNNING');
-	  &job_time_check($batch_q_module, $verbose, \@running_jobs, 
-			  $killed_file, $max_time);
+	  if($killed_file){
+	    my @running_jobs = $job_adaptor->fetch_by_Status('RUNNING');
+	    &job_time_check($batch_q_module, $verbose, \@running_jobs, 
+			    $killed_file, $max_time);
+	  }
 	}
 
         @id_list = keys %{$id_type_hash->{$input_id_type}};
@@ -386,6 +422,9 @@ while (1) {
     }
 
     if ( ! $done) {
+      if($accumulators){# this option means you can turn off accumulators
+	#checks if you don't want them checked or they don't need to be
+	#checked, it is on as standard
         my @current_jobs = $job_adaptor->fetch_by_input_id('ACCUMULATOR');
         foreach my $accumulator_logic_name (keys %accumulator_analyses) {
             print "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
@@ -406,8 +445,9 @@ while (1) {
                 print "Accumulator type analysis $accumulator_logic_name already run\n" if $verbose;
             }
         }
+      }
     }
-
+    
     &shut_down($db) if $done || $once;
     sleep($rerun_sleep) if $submitted == 0;
     @id_list = ();
@@ -744,7 +784,14 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head2 [Other Options]
 
-   -local run the pipeline locally and not using LSF
+   
+   
+-h or -help will print out the help again
+
+=head1 EXAMPLES
+
+   -local run the pipeline locally and not using the batch submission 
+    system
    -idlist_file a path to a file containing a list of input ids to use
    -runner path to a runner script (if you want to overide the setting
 				    in BatchQueue.pm)
@@ -754,14 +801,30 @@ A Simple script using the Monitor.pm module to display information on the status
    -shuffle before running though the loop shuffle the order of the 
     input ids
    -analysis only run with these analyses objects, can be logic_names or
-    analysis ids
+    analysis ids, this option can appear in the commandline multiple 
+    times
    -v verbose mode
    -dbsanity peform some db sanity checks, can be switched of with 
     -nodbsanity
+   -input_id_types, which input id types to run the RuleManager with,
+    this option can also appear in the commandline multiple times
+   -start_from, this is which analysis to use to gather the input ids
+    which will be checked by the RuleManagers central loop
+   -accumulators, this flag switches the accumulators on, the 
+    accumulators are on by default but can be swtiched on with the 
+    -noaccumulators flag
+   -max_job_time, can overide the $MAX_JOB_TIME value from General.pm
+    with this flag
+   -killed_file can overide the path to the $KILLED_INPUT_IDS file from
+    General.pm
+   -queue_manager can overide the $QUEUE_MANAGER from General.pm
+    		    
    
 -h or -help will print out the help again
 
 =head1 EXAMPLES
+
+a standard rule of the pipeline would look like this
 
 
 
