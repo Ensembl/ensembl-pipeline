@@ -228,13 +228,14 @@ sub get_Sequence {
 
     if ($id =~ /\|/) {
         # Take unigene id or accession
+        my ($ug) = $id =~ m{/ug=(.*?)\ };
         if ($id =~ /\|UG\|/) {
-           $id =~ s/.*\|.*\|(.*)/$1/;
-#
-# scp - untested - read 'correct' unigene identifier from header line
-# replace line above with:
-#          $id =~ s{/ug=(.*?)\ }{$1};
-#
+           if (length $ug > 0) {
+              $id = $ug;
+           }
+           else {
+              $id =~ s/.*\|.*\|(.*)/$1/;
+           }
         } else {
 	   $id =~ s/.*\|(.*)\|.*/$1/;
         }
