@@ -1778,7 +1778,7 @@ sub _build_evidence_seq {
       $base_align_feature->start > $self->_slice->length ||
       $base_align_feature->end > $self->_slice->length || 
       $base_align_feature->end < 0) {
-    warning("Feature [". $base_align_feature->hseqname . " start:" . 
+    info("Feature [". $base_align_feature->hseqname . " start:" . 
 	    $base_align_feature->start . " end:" . $base_align_feature->end 
 	    ."] extends\npast the start or end of genomic slice.  Truncating\n" . 
 	    "overhanging sequence");
@@ -1787,30 +1787,30 @@ sub _build_evidence_seq {
 	 $base_align_feature->end < 0)||
 	($base_align_feature->start > $self->_slice->length &&
 	 $base_align_feature->end > $self->_slice->length)) {
-      warning("Feature [" . $base_align_feature->hseqname . 
+      info("Feature [" . $base_align_feature->hseqname . 
 	      "] lies completely outside the bounds of Slice.  Chuck.");
       splice (@fetched_seq, 0, scalar @fetched_seq);
     } elsif ($self->_strand == 1) {
       my $start_overshoot = 0;
       if ($base_align_feature->start < 0) {
-print STDERR "Case 1.\n";
+#print STDERR "Case 1.\n";
 	$start_overshoot = ($base_align_feature->start * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->end > $self->_slice->length) {
-print STDERR "Case 2.\n";
+#print STDERR "Case 2.\n";
 	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
 	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
       }
     } elsif ($self->_strand == -1) {
       my $start_overshoot = 0;
       if ($base_align_feature->end < 0) {
-print STDERR "Case 3.\n";
+#print STDERR "Case 3.\n";
 	$start_overshoot = ($base_align_feature->end * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->start > $self->_slice->length) {
-print STDERR "Case 4.\n";
+#print STDERR "Case 4.\n";
 	my $end_overshoot = $base_align_feature->start - $self->_slice->length - 1;
 	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
       }
