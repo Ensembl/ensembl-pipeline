@@ -48,7 +48,7 @@ use Bio::EnsEMBL::DnaPepAlignFeature;
 #
 ###########################################################
 
-sub _check_Transcipt{
+sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
       
     my $id = $self->transcript_id( $transcript );
@@ -381,7 +381,7 @@ sub _print_Evidence{
   my $count = 0;
   foreach my $exon ( @exons){
     $count++;
-    print STDERR "Exon: ".$exon->gffstring."\n";
+    print STDERR "Exon $exon: ".$exon->gffstring."\n";
     my @evidence = @{$exon->get_all_supporting_features};
     if (@evidence){
       foreach my $evi ( @evidence ){
@@ -420,4 +420,11 @@ sub _print_Peptide{
 
 ############################################################
 
+#sub _print_Exon{
+#  my ($self,$exon) = @_;
+
+#  print STDERR $exon->contig->
+#  if ($exon->isa('Bio::EnsEMBL::Sticky'){
+
+#  }
 1;
