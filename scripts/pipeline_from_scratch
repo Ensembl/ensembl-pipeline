@@ -1,0 +1,40 @@
+  1022	14:08	cvs -d cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl ensembl-pipeline ensembl-otter
+
+  1023	14:09	setenv ENSDIR `pwd`
+  1024	14:09	setenv PERL5LIB ${ENSDIR}/ensembl/modules:${ENSDIR}/ensembl-pipeline/modules:${ENSDIR}/ensembl-otter/modules
+  1025	14:09	setenv PATH ${ENSDIR}/ensembl-pipeline/scripts:${ENSDIR}/ensembl-otter/scripts:${PATH}
+
+  1028	14:10	mysql -u ensadmin -pensembl -h ecs2b -e "create database my_database"
+  1029	14:10	mysql -u ensadmin -pensembl -h ecs2b my_database < $ENSDIR/ensembl/sql/table.sql
+  1030	14:10	mysql -u ensadmin -pensembl -h ecs2b my_database < $ENSDIR/ensembl-pipeline/sql/table.sql
+
+  1035	14:11	slice2sql -chr 6 -start 1 -end 1000000 -databases core -core_name homo_sapiens_core_13_31
+  1036	14:13	cd /tmp/homo_sapiens_core_13_31.6.1-1000000.NCBI31/
+  1037	14:13	mysqlimport -u ensadmin -pensembl -h ecs2b my_database *.sql
+
+  1039	14:15	cd ~/pipetest/
+
+  1041	14:15	mysql -u ensadmin -pensembl -h ecs2b my_database < $ENSDIR/ensembl-pipeline/scripts/sql/delete_features
+
+  1042	14:18	cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/General.pm.example $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/General.pm
+  1043	14:18	cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
+  1045	14:18	cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm.example $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm
+
+  1046	14:19	vi ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/General.pm
+  1049	14:23	vi ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
+  1050	14:27	vi ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm
+
+  1218	15:15	make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type SLICE -logic_name SubmitSlice -slice -slice_size 100000
+  1220	15:15	make_input_ids -host ecs2b -user ensadmin -pass ensembl -dbname my_database -input_type CONTIG -logic_name SubmitContig -contig
+
+  1221	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -module RepeatMasker -database repbase -input_type CONTIG
+  1222	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -module Genscan -database HumanIso.smat -input_type CONTIG
+  1223	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -module BlastGenscanPep -database swall -input_type CONTIG
+  1224	15:15	add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG -module CPG -input_type CONTIG
+
+add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -dependents SubmitContig
+add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -dependents RepeatMask
+add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG -dependents RepeatMask
+add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -dependents Genscan
+
+  1233	15:18	monitor -host ecs2b -user ensro -dbname my_database -rules -conditions
