@@ -1,7 +1,7 @@
-
-# Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
-# Copyright GRL & EBI
+# Written by Eduardo Eyras
+#
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -17,12 +17,18 @@ Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression->new(
 									   -input_id  => $id,
-									  );
+									   );
     $obj->fetch_input;
     $obj->run;
     my %expression_map = %{ $obj->output };
     where @{ $expression_map{$transcript_id} } is an array of ests mapped to this transcript
     ests are here Bio::EnsEMBL::Transcript objects   
+    
+    one can do:
+    my @transcript_ids = keys %expression_map;
+    foreach my $transcript_id ( @transcripts_ids ){
+	@mapped_ests = $expression_map{ $transcript_id };
+    }
 
     $obj->write_output;
 
@@ -55,12 +61,9 @@ use strict;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
-use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-use Bio::EnsEMBL::DBSQL::DBEntryAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 
 
@@ -343,60 +346,72 @@ sub run{
    
   # cluster the genes:
   my @clusters = $self->cluster_Genes( $self->ensembl_genes, $self->ests );
- 
+  
  CLUSTER:
   foreach my $cluster ( @clusters ){
-    
-    # get genes of each type
-    my @genes = $cluster->get_Genes_of_Type( $EST_TARGET_GENETYPE );
-    my @ests  = $cluster->get_Genes_of_Type( $EST_GENEBUILDER_INPUT_GENETYPE );
-    
-    # if we have genes of either type, let's try to match them
-    if ( @genes && @ests ){
-      print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
-
-      ############################################################
-      #
-      #
-      # See if you can map genes to clone libraries instead of ESTs
-      #
-      #
-      ############################################################
       
-      my @est_transcripts;
-      foreach my $est ( @ests ){
-	push ( @est_transcripts, @{$est->get_all_Transcripts} );
+      # get genes of each type
+      my @genes = $cluster->get_Genes_of_Type( $EST_TARGET_GENETYPE );
+      my @ests  = $cluster->get_Genes_of_Type( $EST_GENEBUILDER_INPUT_GENETYPE );
+      
+      # if we have genes of either type, let's try to match them
+      if ( @genes && @ests ){
+	  print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
+	  
+	  ############################################################
+	  #
+	  #
+	  # See if you can map genes to clone libraries instead of ESTs
+	  #
+	  #
+	  ############################################################
+	  
+	  my @est_transcripts;
+	  foreach my $est ( @ests ){
+	      my @est_trans = @{$est->get_all_Transcripts};
+	      push ( @est_transcripts, $self->in_SANBI( @est_trans ));
+	  }
+	  
+	  foreach my $gene ( @genes ){
+	      push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
+	  }
+	  
+	  my $matcher = 
+	    Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher->new(
+										  -reference_set => \@ensembl_transcripts,
+										  -match_set => \@est_transcripts,
+										  );
+	  
+	  $matcher->run;
+	  
+	  my $matching_map = $matcher->output;
+	  $self->output( $matching_map );
       }
       
-      foreach my $gene ( @genes ){
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	 
-	  $self->_map_ESTs( $transcript, \@est_transcripts );
-	}
+      
+      
+      # else we could have only ensembl genes
+      elsif(  @genes && !@ests ){
+	  # we have nothing to modify them, hence we accept them...
+	  print STDERR "Skipping cluster with no ests\n";
+	  next CLUSTER;
       }
-    }
-    
-    # else we could have only ensembl genes
-    elsif(  @genes && !@ests ){
-      # we have nothing to modify them, hence we accept them...
-      print STDERR "Skipping cluster with no ests\n";
-      next CLUSTER;
-    }
-    # else we could have only ests
-    elsif( !@genes && @ests ){
-      print STDERR "Cluster with no genes\n";
-      next CLUSTER;
-    }
-    # else we could have nothing !!?
-    elsif( !@genes && !@ests ){
-      print STDERR "empty cluster, you must be kidding!\n";
-      next CLUSTER
-    }
+      # else we could have only ests
+      elsif( !@genes && @ests ){
+	  print STDERR "Cluster with no genes\n";
+	  next CLUSTER;
+      }
+      # else we could have nothing !!?
+      elsif( !@genes && !@ests ){
+	  print STDERR "empty cluster, you must be kidding!\n";
+	  next CLUSTER;
+      }
   } # end of CLUSTER
   
   # before returning, check that we have written anything
-  unless( $self->expression_Map ){
-    exit(0);
+  unless( $self->output ){
+      print STDERR "No matches found, I'm so sorry\n";
+      exit(0);
   }
   return;
 }
@@ -515,120 +530,6 @@ sub _get_end_of_Gene{
   }
   return $end;
 }
-
-#########################################################################
-#
-#  Method for mapping ESTs to genes:
-#
-#  For a given transcript,
-#
-# link to it all the ests that have exons which
-# are consecutively included in the transcript
-# (this will avoid linking to alternative variants which may in fact be expressed differently)
-# allow the 5' and 3' exons of the ests to extend beyond the transcript
-# (they may contain UTRs that we failed to annotate)
-
-# ests           (1)###------###
-#                          (2)#####--------#######
-#           (3)########------###
-#                (4)#####----#####
-#             (5)####--------#####
-
-#transcript      ######------######--------######
-
-# (1),(2) and (3) would be linked. I'm not sure yet about cases like (4) and
-# (5).
-
-# Also, case (2) could be a hint for alternative polyA site if we have
-# already annotated an UTR for that transcript. We could check for this case
-# and only add (2) if there is no 3'UTR, to be sure.
-
-# Case (3) could be also related to an alternative start of transcription,
-# we could add it only for cases that a 5'UTR is not annotated.
-
-# Part of the alternative polyA sites and start of transcription is
-# correlated with alternative splicing so maybe this 'ambiguity' cases will
-# not cause too many problems.
-
-# We can keep the conditions tight for a start. As ests have been filtered,
-# we could accept the splicing of (4) and (5) with some confidence, and
-# we can include the check of UTRs for (2) and (3). ESTs that are not linked
-# would be rejected in principle, I cannot predict yet how much data wil
-# remain unused by doing this.
-
-sub _map_ESTs{
-  my ($self,$transcript,$ests) = @_;
-  #if (  !( $ests[0]->isa('Bio::EnsEMBL::Transcript')) || !( $transcript->isa('Bio::EnsEMBL::Transcript')) ){
-  #  $self->throw('expecting only transcripts, you have est = $ests[0] and transcript = $transcript');
-  #} 
-
-  # get only the ests that are in the SANBI database
-  #my @ests = $self->_in_SANBI( @{ $ests } );
-  my @ests = @$ests;
-
-  # check this transcript first:
-  my $check = $self->_check_Transcript($transcript);
-  unless ($check){
-    return;
-  }
-
-  # a map from gene to est
-  my %expression_map;
-  
-  # a comparison tool
-  my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
-  
- EST:
-  foreach my $est (@ests){
-    
-    # check this transcript first:
-    unless ($self->_check_Transcript($est)){
-      next EST;
-    }
-
-    # compare this est
-    my $merge = $transcript_comparator->_test_for_semiexact_Merge($transcript,$est);
-
-    # (this method checks exact exon boundary matches but
-    # allows mismatches at outer end of the 5' and 3' exons)
-
-    # check 5' and 3' ends in case ESTs give an alternative transcription 
-    # start or alternative polyA site, respectively
-    if ($merge){
-      my $alt_start = $self->_check_5prime($transcript,$est);
-      my $alt_polyA = $self->_check_3prime($transcript,$est);
-      if ( $alt_start || $alt_polyA ){
-	$self->_print_Transcript($transcript);
-	$self->_print_Transcript($est);
-      }
-    }
-
-
-    # if match, put est in $expression_map{ $transcript }
-    if ($merge){
-      $self->expression_Map($transcript,$est);
-      
-      # test results:
-      my $t_id; 
-      if ( $transcript->stable_id ){
-	$t_id = $transcript->stable_id;
-      }
-      elsif( $transcript->dbID ){
-	$t_id = $transcript->dbID;
-      }
-      my $e_id = $self->_find_est_id( $est);
-      
-      print STDERR "mapped $t_id to $e_id\n";
-
-      #print STDERR $t_id."\t".$e_id."\n";
-      #$self->_print_Transcript($transcript);
-      #$self->_print_Transcript($est);
-      #print STDERR "\n";
-    }
-  }
-}
-
-  
 
 #########################################################################
 
@@ -832,25 +733,6 @@ sub _transcript_length{
 }
 
 #########################################################################
-
-sub _check_Transcript{
-  my ($self,$tran) = @_;
-  
-  my @exons = @{$tran->get_all_Exons};
-  @exons = sort {$a->start <=> $b->start} @exons;
-  
-  for (my $i = 1; $i <= $#exons; $i++) {
-    
-    # check contig consistency
-    if ( !( $exons[$i-1]->seqname eq $exons[$i]->seqname ) ){
-      print STDERR "transcript ".$tran->dbID." (".$self->_find_est_id($tran).") is partly outside the contig, skipping it...\n";
-      return 0;
-    }
-  }
-  return 1;
-}
-
-#########################################################################
 #
 # METHODS INVOLVED IN WRITTING THE RESULTS
 #
@@ -859,10 +741,21 @@ sub _check_Transcript{
 
 #########################################################################
 
+=head2 output
+
+the output is a list of Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap objects
+
+=cut
+
 sub output{
-  my ($self)= @_;
-  
-  return $self->expression_Map
+  my ($self, $map)= @_;
+  unless ($self->{_output}){
+      $self->{_output} = [];
+  }
+  if ($map){
+      push(@{$self->{_output}}, $map );
+  }
+  return @{$self->{_output}};
 }
 
 #########################################################################
@@ -885,58 +778,46 @@ sub _find_est_id{
  
 #########################################################################
 
-# we write the results in the Xref table in the est_db:
-
 sub write_output {
-  my ($self) = @_;
-  my $expression_adaptor = $self->expression_adaptor;
+    my ($self) = @_;
+    my $expression_adaptor = $self->expression_adaptor;
     
-  # recall we have stored the results in self->expression_Map as push ( @{ $self->{_est_map}{$transcript} }, $est );
-  my %expression_map = %{ $self->expression_Map };
-  
-  foreach my $transcript_id ( keys %expression_map ){
+    my @maps = $self->output;
     
-    # $transcript_id should be a stable_id
-    my @est_ids;
-    foreach my $est ( @{ $expression_map{$transcript_id} }  ){
-      my $est_id = $self->_find_est_id($est);
-      if ( $est_id){
-	my $est_id_no_version;
-	if ( $est_id =~/(\S+)\.(\d+)/){
-	  $est_id_no_version = $1;
+    foreach my $map ( @maps ){
+	my @list1 = $map->list1;
+	foreach my $transcript ( @list1 ){
+	    
+	    my $t_id;
+	    if ($transcript->stable_id){
+		$t_id = $transcript->stable_id;
+	    }
+	    elsif($transcript->dbID){
+		$t_id = $transcript->dbID;
+	    }
+	    
+	    my @est_matches = $map->partners($transcript);
+	    my @est_ids;
+	    foreach my $est ( @est_matches ){
+		my $est_id = $self->_find_est_id($est);
+		if ( $est_id){
+		    my $est_id_no_version;
+		    if ( $est_id =~/(\S+)\.(\d+)/){
+			$est_id_no_version = $1;
+		    }
+		    else{
+			$est_id_no_version = $est_id;
+		    }
+		    push (@est_ids, $est_id_no_version);
+		}
+	    }
+	    print STDERR "Storing pairs $transcript_id, @est_ids\n";
+	    $expression_adaptor->store_ensembl_link($transcript_id,\@est_ids);
 	}
-	else{
-	  $est_id_no_version = $est_id;
-	}
-	push (@est_ids, $est_id_no_version);
-      }
     }
-    print STDERR "Storing pairs $transcript_id, @est_ids\n";
-    $expression_adaptor->store_ensembl_link($transcript_id,\@est_ids);
-  }
 }
-
 
 ########################################################################
 
-sub _print_Transcript{
-  my ($self,$transcript) = @_;
-  my @exons = @{$transcript->get_all_Exons};
-  my $id;
-  if ( $transcript->stable_id ){
-    $id = $transcript->stable_id;
-  }
-  else{
-    $id = $transcript->dbID;
-  }
-  my $evidence = $self->_find_est_id($transcript);
-  print STDERR "$id ($evidence)\n";
-  foreach my $exon ( @exons){
-    print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
-  }
-  print STDERR "\n";
-}
-
-#########################################################################
 
 1;
