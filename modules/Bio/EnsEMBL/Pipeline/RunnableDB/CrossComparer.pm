@@ -165,7 +165,7 @@ sub fetch_input {
     } elsif ($self->alnprog eq 'exonerate') {
       $self->throw("exonarate aligment runnable not implemented yet");
 #      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
-								      -est => [$seq1]);
+#								      -est => [$seq1]);
     } 
     
     $self->runnable($alnrunnable);
