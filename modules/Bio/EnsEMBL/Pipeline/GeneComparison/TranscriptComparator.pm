@@ -57,7 +57,7 @@ restrict_external_splice_site ---> TRUE if we want to restrict how much can exce
                                    ESTs it is most likely to be an artifact
     
 
-comparison_level = INT ----------> There are currently 4 comparison levels:
+comparison_level = INT ----------> There are currently 5 comparison levels:
  
    1 --> strict: exact exon matching (unrealistic). This one does not use any other parameteres passed in
 
@@ -148,7 +148,20 @@ sub new{
   if( defined $restrict_external_splice_site ){
       $self->restrict_external_splice($restrict_external_splice_site);
   }
+
+  $self->verbose(0);
+
   return $self;  
+}
+
+############################################################
+
+sub  verbose{
+  my ($self,$boolean) = @_;
+  if (defined $boolean){
+    $self->{_verbose} = $boolean;
+  }
+  return $self->{_verbose};
 }
 
 ############################################################
@@ -160,6 +173,8 @@ sub comparison_level{
   }
   return $self->{_comparison_level};
 }
+
+############################################################
 
 sub exon_match{
   my ($self, $boolean) = @_;
@@ -473,7 +488,7 @@ sub _compare_Transcripts {
 sub _test_for_merge{
   my ($self,$tran1,$tran2) = @_;
 
-  my $verbose   = 0;
+  my $verbose   = $self->verbose;
 
   if ($verbose){
       print STDERR "comparing ".
@@ -526,7 +541,7 @@ sub _test_for_merge{
   ############################################################
   # else, check splice site mismatches
   ############################################################
-  return ( $self->_process_comparison( $object_map, $tran1, $tran2 ), $overlaps);
+  return ( $self->_process_comparison( $object_map, $tran1, $tran2, $merge, $is_first, $is_last ), $overlaps);
   
 }
 
@@ -548,7 +563,7 @@ sub _test_for_merge{
 sub discrete_compare{
   my ($self, $tran1, $tran2 ) = @_;
   
-  my $verbose   = 1;
+  my $verbose   =  $self->verbose;
   
   if ( ( 4 == $self->comparison_level || 5 == $self->comparison_level )
        && $self->intron_mismatch > 0 ){
@@ -633,7 +648,7 @@ sub discrete_compare{
   ############################################################
   # else, check splice site mismatches
   ############################################################
-  if ( $self->_process_comparison($object_map, $tran1, $tran2, $merge) ){
+  if ( $self->_process_comparison($object_map, $tran1, $tran2, $merge, $is_first, $is_last) ){
     if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
       print STDERR "EXTENSION\n" if $verbose;
       return 'extension';
@@ -665,7 +680,7 @@ sub _fast_compare{
   # an ObjectMap holds an application between any two sets of objects
   my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
 
-  my $verbose = 1;
+  my $verbose = $self->verbose;
 
   # we follow a greedy aproach to try to match all the exons
   # we jump out as soon as we find a problem with the matching
@@ -720,23 +735,23 @@ sub _fast_compare{
       }
       elsif ( $exons1[$j]->overlaps($exons2[$k]) ){
 	if ( $j == $#exons1 || $k == $#exons2 ){
-	  #if ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] )
-	  #     ||
-	  #     $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] )
-	  #     ){
-	  #    print STDERR "terminal exon overlaps two exons. Not merging\n" if $verbose;
-	  #    $merge = 0;
-	  #    last EXON1;
-	  #}
-	  #else{
-	  print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
-	  $object_map->match( $exons1[$j], $exons2[$k] );
-	  print STDERR "end of transcripts - there is potential merge|\n" if $verbose;
-	  $merge = 1;
-	  $overlaps++;
-	  $foundlink = 1;
-	  last EXON1;
-	  #}
+	  if ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] )
+	       ||
+	       $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] )
+	       ){
+	      print STDERR "terminal exon overlaps two exons. Not merging\n" if $verbose;
+	      $merge = 0;
+	      last EXON1;
+	  }
+	  else{
+	    print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+	    $object_map->match( $exons1[$j], $exons2[$k] );
+	    print STDERR "end of transcripts - there is potential merge|\n" if $verbose;
+	    $merge = 1;
+	    $overlaps++;
+	    $foundlink = 1;
+	    last EXON1;
+	  }
 	}
 	else{
 	  print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
@@ -768,9 +783,10 @@ sub _fast_compare{
 sub _process_comparison{
   my ($self, $object_map, $tran1, $tran2, $merge, $is_first, $is_last) = @_;
   
-  my $verbose = 1;
+  my $verbose = $self->verbose;
 
   my $splice_mismatch = $self->splice_mismatch;
+  
   my %is_first = %$is_first;
   my %is_last  = %$is_last;
 
@@ -829,7 +845,7 @@ sub _process_comparison{
     ############################################################
     elsif( (  $is_first{ $list1[0] } && $is_last{ $list1[0] } 
 	      &&
-	      $self->_check_high_site( $list1[0], $list2[2], $tran2 )
+	      $self->_check_high_site( $list1[0], $list2[0], $tran2 )
 	      &&
 	      $self->_check_low_site(  $list1[0], $list2[0], $tran2 )
 	   )
@@ -841,6 +857,9 @@ sub _process_comparison{
 	      $self->_check_low_site(  $list2[0], $list1[0], $tran1 )
 	   )
 	 ){
+      print STDERR "list2[0]: ".$list2[0]->start."-".$list2[0]->end." is_first: ".$is_first{ $list2[0] }." is_last: ".$is_last{ $list2[0] }."\n";
+      print STDERR "list1[0]: ".$list1[0]->start."-".$list1[0]->end." is_first: ".$is_first{ $list1[0] }." is_last: ".$is_last{ $list1[0] }."\n";
+      
       print STDERR "here 2 --- merge ---\n" if $verbose;
       $merge = 1 ;
     }
@@ -898,49 +917,68 @@ sub _process_comparison{
     ############################################################
     # one of them could be the first one
     ############################################################
-    elsif ( ( $is_first{ $exon1 } 
-	      &&
-	      $self->_check_low_site( $exon1, $exon2, $tran2 )
-	      &&
-	      abs( $exon2->end - $exon1->end ) <= $splice_mismatch
-	    )
-	    ||
-	    ( $is_first{ $exon2 }
-	      &&
-	      $self->_check_low_site( $exon2, $exon1, $tran1 )
-	      &&
-	      abs( $exon1->end - $exon2->end ) <= $splice_mismatch
-	    )
-	  ){
-      next PAIR;
+    elsif ( $is_first{ $exon1 } ||   $is_first{ $exon2 } ){
+      
+      if ( ( $is_first{ $exon1 } 
+	     &&
+	     $self->_check_low_site( $exon1, $exon2, $tran2 )
+	     &&
+	     abs( $exon2->end - $exon1->end ) <= $splice_mismatch
+	   )
+	   ||
+	   ( $is_first{ $exon2 }
+	     &&
+	     $self->_check_low_site( $exon2, $exon1, $tran1 )
+	     &&
+	     abs( $exon1->end - $exon2->end ) <= $splice_mismatch
+	   )
+	 ){
+	print STDERR "yes1\n";
+	next PAIR;
+      }
+      else{
+	print STDERR "CLASH\n" if $verbose;
+	return 0;
+      }
+    
     }
     ############################################################
     # both could be the last one
     ############################################################
-    elsif ( $is_last{ $exon1} && $is_last{ $exon2 }
+    elsif ( $is_last{ $exon1} && $is_last{ $exon2 } 
 	    &&
 	    abs( $exon2->start - $exon1->start ) <= $splice_mismatch
 	  ){
+      print STDERR "yes2\n";
       next PAIR;
     }
     ############################################################
     # one of them could be the last one
     ############################################################
-    elsif ( ( $is_last{ $exon1 } 
-	      &&
-	      $self->_check_high_site( $exon1, $exon2, $tran2 )
-	      &&
-	      abs( $exon2->start - $exon1->start ) <= $splice_mismatch
-	    )
-	    ||
-	    ( $is_last{ $exon2 }
-	      &&
-	      $self->_check_high_site( $exon2, $exon1, $tran1 )
-	      &&
-	      abs( $exon1->start - $exon2->start ) <= $splice_mismatch
-	    )
-	  ){
-      next PAIR;
+    elsif (  $is_last{ $exon1 } || $is_last{ $exon2 } ){ 
+      
+      if ( ( $is_last{ $exon1 } 
+	     &&
+	     $self->_check_high_site( $exon1, $exon2, $tran2 )
+	     &&
+	     abs( $exon2->start - $exon1->start ) <= $splice_mismatch
+	   )
+	   ||
+	   ( $is_last{ $exon2 }
+	     &&
+	     $self->_check_high_site( $exon2, $exon1, $tran1 )
+	     &&
+	     abs( $exon1->start - $exon2->start ) <= $splice_mismatch
+	   )
+	 ){
+	print STDERR "yes3\n";
+	next PAIR;
+      }
+      else{
+        print STDERR "CLASH\n" if $verbose;
+	return 0;
+      }
+    
     }
     ############################################################
     # we have already covered the case: first overlaps last
@@ -949,6 +987,7 @@ sub _process_comparison{
 	   &&
 	   abs( $exon1->end - $exon2->end ) <= $splice_mismatch
 	 ){
+      print STDERR "yes4\n";
       next PAIR;
     }
     else{	    
@@ -973,14 +1012,21 @@ sub _check_high_site{
   my ($self, $last_exon, $middle_exon, $tran ) = @_;
   
   # middle_exon is from tran, and last_exon is from the other transcript (not used here)
+  #print STDERR "check_high_site(): checking exon ".$last_exon->start."-".$last_exon->end."\n";
+  #print STDERR "against:\n";
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+
 
   ############################################################
   # allow any excess, as long as it does not overlap the next exon
   ############################################################
-  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_exons};
+  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_Exons};
+  #print STDERR "Exons: @exons\n";
+  #print STDERR "middle_exon = $middle_exon : ".$middle_exon->start."-".$middle_exon->end."\n";
   for ( my $i=0; $i<= $#exons; $i++){
     if ( $middle_exon == $exons[$i] ){
       if ( $i+1 <= $#exons && $last_exon->overlaps($exons[$i+1]) ){
+	print STDERR "overlaps with next exon\n"; 
 	return 0;
       }
       else{
@@ -1016,16 +1062,23 @@ sub _check_high_site{
 
 sub _check_low_site{
   my ($self, $first_exon, $middle_exon, $tran ) = @_;
+  #print STDERR "check_low_site(): checking exon ".$first_exon->start."-".$first_exon->end."\n";
+  #print STDERR "against:\n";
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
   
+
   # middle_exon is from tran, and first_exon is from the other transcript (not used here)
   
   ############################################################
   # allow any excess, as long as it does not overlap the previous exon
   ############################################################
-  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_exons};
+  my @exons = sort { $a->start <=> $b->start } @{$tran->get_all_Exons};
+  #print STDERR "Exons: @exons\n";
+  #print STDERR "middle_exon = $middle_exon : ".$middle_exon->start."-".$middle_exon->end."\n";
   for ( my $i=0; $i<= $#exons; $i++){
     if ( $middle_exon == $exons[$i] ){
       if ( $i-1 >= 0 && $first_exon->overlaps($exons[$i-1]) ){
+	print STDERR "overlaps with previous exon\n"; 
 	return 0;
       }
       else{
