@@ -268,15 +268,15 @@ sub _test_for_strict_merge{
   my @exons2 = sort { $a->start <=> $b->start } @{$tran2->get_all_Exons};	
   
   unless ( scalar(@exons1) == scalar(@exons2) ){
-    return 0;
+    return (0,0);
   }
 
   for ( my $i=0; $i<=$#exons1; $i++ ){
     unless ( $exons1[$i]->start == $exons2[$i]->start && $exons1[$i]->end == $exons2[$i]->end ){
-      return 0;
+      return (0,0);
     }
   }
-  return 1;
+  return (1,scalar(@exons1));
 }
       
 
