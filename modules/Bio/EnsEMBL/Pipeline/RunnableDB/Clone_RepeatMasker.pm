@@ -100,17 +100,6 @@ sub new {
     return $self;
 }
 
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=cut
-
 =head2 fetch_input
 
     Title   :   fetch_input
