@@ -23,7 +23,8 @@ Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair
 
 =head1 DESCRIPTION
 
-Mickeymouse implementation of RunnableI that returns the process list
+Implementation of RunnableI that creates exon pairs from
+exons with supporting evidence.
 
 =head1 CONTACT
 
@@ -84,10 +85,12 @@ sub run {
 	my @features = $contig->get_all_SimilarityFeatures;
 
 	foreach my $gene (@genes) {
+
 	    foreach my $exon ($gene->each_unique_Exon) {
 		$exon->find_supporting_evidence(\@features);
 	    }
-	    $contig->make_ExonPairs($gene);
+
+	    $contig->make_ExonPairs($gene->each_unique_Exon);
 	}
 
 	
@@ -121,11 +124,33 @@ sub output {
 
 }
 
+
+=head2 add_ExonPair
+  Title   : add_ExonPair
+  Usage   : $self->add_ExonPair
+  Function: Adds an exon pair 
+  Returns : nothing
+  Args    : Bio::EnsEMBL::Pipeline::ExonPair
+
+=cut
+
 sub add_ExonPair {
     my ($self,$arg) = @_;
 
     push(@{$self->{_pairs}},$arg);
 }
+
+
+=head2 clone
+  Title   : clone
+  Usage   : $self->clone($clone)
+  Function: Get/set method for the input clone
+            that we want to generate exon pairs for
+  Returns : Bio::EnsEMBL::DB::CloneI
+  Args    : Bio::EnsEMBL::DB::CloneI
+
+=cut
+
 
 sub clone {
     my ($self,$arg) = @_;
@@ -143,3 +168,4 @@ sub clone {
 }
 
 1;
+
