@@ -920,7 +920,7 @@ sub cluster_into_Genes{
   
   # safety and sanity checks
   $self->check_Clusters(scalar(@transcripts), \@clusters);
-
+  
   # make and store genes
   print STDERR scalar(@clusters)." created, turning them into genes...\n";
   my @genes;
@@ -930,6 +930,7 @@ sub cluster_into_Genes{
     foreach my $transcript (@$cluster){
       $gene->add_Transcript($transcript);
     }
+    push( @genes, $gene );
   }
   return @genes;
 }

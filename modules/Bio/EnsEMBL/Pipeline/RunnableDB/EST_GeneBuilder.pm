@@ -1219,7 +1219,7 @@ sub run {
   
   # take the best ten transcripts from each gene
   my @selected_reverse_transcripts = $self->_select_best_transcripts(@reverse_genes);
-
+  
   # cluster them again into genes
   my @selected_reverse_genes       = $self->_cluster_into_Genes( @selected_reverse_transcripts );
 
@@ -1606,6 +1606,7 @@ sub _cluster_into_Genes{
     foreach my $transcript( @{$cluster} ){
       $gene->add_Transcript($transcript);
     }
+    push ( @genes, $gene);
   }
   
   # test
