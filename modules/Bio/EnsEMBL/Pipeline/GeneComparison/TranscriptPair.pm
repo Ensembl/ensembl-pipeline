@@ -73,7 +73,7 @@ sub new {
 sub blast_isoforms{
     my ( $self,$tran1,$tran2, $coding_exons ) = @_;
     
-    my $verbose = 0;
+    my $verbose = 1;
 
     # query
     my $id1;
@@ -167,10 +167,13 @@ sub blast_isoforms{
     
 #    $blastz->run();
     
-#    my @featurepairs = $blastz->output();
-#    foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
-#      print $fp->gffstring . "\n";
-#    }
+    #my @featurepairs = $blastz->output();
+    
+
+
+    #foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
+    #  print $fp->gffstring . "\n";
+    #}
 
 
     unlink ( $database );
@@ -217,34 +220,43 @@ sub blast_isoforms{
      my $coverage = 0;
      my $spliced = 0;
 
-  
-     if ( $best_features ){
-
+    
+    if ( $best_features ){
+      
       ############################################################
       # calculate coverage
       # we use query/target as in feature pairs the target=seqname and query=hseqname
       my ($query_coverage,  $query_spliced)  = 
-        $self->process_query( $best_features, $tran2 , $coding_exons);
+	$self->process_query( $best_features, $tran2 , $coding_exons);
       my ($target_coverage, $target_spliced) = 
- 	$self->process_target( $best_features, $tran1, $coding_exons);
+	$self->process_target( $best_features, $tran1, $coding_exons);
       $coverage = ( $query_coverage + $target_coverage )/2;
-       
+      
       if ($verbose){
 	foreach my $f ( sort { $a->start <=> $b->start } @{$best_features} ){
 	  $self->print_Feature($f);
 	}
       }
       if ( $query_spliced || $target_spliced ){
- 	$spliced = 1;
+	$spliced = 1;
       }
+    
+      ############################################################
+      # calculate the perc id
+      my $perc_id = 0;
+      foreach my $f ( @$best_features ){
+	$perc_id += $f->percent_id;
+      }
+      $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
       
       print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
-     print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
-    $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
+      print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+      print STDERR "\taveraged percent id: $perc_id\n";
+      $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
     }
     
-     $best_score = 0 if $spliced;
-        return ( $best_score, $best_features );
+    $best_score = 0 if $spliced;
+    return ( $best_score, $best_features );
   }
 
 
@@ -253,11 +265,11 @@ sub blast_isoforms{
 ############################################################
 
 sub process_target{
-    my ($self,$feat, $tran, $coding_exons) = @_;
+    my ($self,$feat, $tran, $coding_exons, $protein) = @_;
     my $transcript_length;
     my @exons;
 
-    if ( $coding_exons ){
+    if ( $coding_exons || $protein ){
       $transcript_length = length($tran->translateable_seq);
       @exons = sort { $a->length <=> $b->length } @{$tran->get_all_translateable_Exons};
     }
@@ -265,9 +277,17 @@ sub process_target{
       $transcript_length = $tran->seq->length;
       @exons = sort { $a->length <=> $b->length } @{$tran->get_all_Exons};
     }
-    
     my $min_exon_length = $exons[0]->length;
-    
+    if ( $protein ){
+      if ( $tran->translateable_seq=~/TAA$|TGA$|TAG$/i ){
+	$transcript_length = ($transcript_length - 3)/3;
+      }
+      else{
+	$transcript_length /= 3;
+      }
+      $min_exon_length /= 3;
+    }  
+        
     my $is_spliced;
     
     my @clusters;
@@ -297,25 +317,25 @@ sub process_target{
 	    
 	    # re-adjust size of cluster
 	    if ($f->start < $cluster_starts[$count]) {
-		$cluster_starts[$count] = $f->start;
+	      $cluster_starts[$count] = $f->start;
 	    }
 	    if ($f->end  > $cluster_ends[$count]) {
-		$cluster_ends[$count]   = $f->end;
+	      $cluster_ends[$count]   = $f->end;
 	    }
-	}
+	  }
 	else{
-	    # else, start create a new cluster with this feature
-	    $count++;
-	    $cluster = [];
-	    push (@$cluster, $f);
-	    $cluster_starts[$count] = $f->start;
-	    $cluster_ends[  $count] = $f->end;
-	    
-	    # store it in the list of clusters
-	    push(@clusters,$cluster);
+	  # else, start create a new cluster with this feature
+	  $count++;
+	  $cluster = [];
+	  push (@$cluster, $f);
+	  $cluster_starts[$count] = $f->start;
+	  $cluster_ends[  $count] = $f->end;
+	  
+	  # store it in the list of clusters
+	  push(@clusters,$cluster);
 	}
-    }
-
+      }
+    
     ############################################################
     # check whether the transcript has one or more exons unaligned
     if ( scalar( @clusters ) == 1 ){
@@ -339,10 +359,12 @@ sub process_target{
     # calculate the coverage of the transcript
     my $feature_length = 0;
     for(my $i=0; $i<=$#clusters; $i++){
-	#print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
-	$feature_length += $cluster_ends[$i] - $cluster_starts[$i] + 1;
+      print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
+      $feature_length += $cluster_ends[$i] - $cluster_starts[$i] + 1;
     }
-    my $coverage = 100*$feature_length/$transcript_length;
+    print STDERR "feature length   : $feature_length\n";
+    print STDERR "transcript length: $transcript_length\n";
+    my $coverage = sprintf "%.2f", 100*$feature_length/$transcript_length;
     #$self->print_exons_in_transcript($tran);
     return ($coverage,$is_spliced);
    
@@ -352,11 +374,11 @@ sub process_target{
 # the query 
 ############################################################
 sub process_query{
-  my ($self,$feat, $qtran, $coding_exons) = @_;
+  my ($self,$feat, $qtran, $coding_exons, $protein) = @_;
 
   my $qtranscript_length;
   my @exons;
-  if ( $coding_exons ){
+  if ( $coding_exons || $protein){
     $qtranscript_length = length($qtran->translateable_seq);
     @exons = sort { $a->length <=> $b->length } @{$qtran->get_all_translateable_Exons};
   }
@@ -364,35 +386,44 @@ sub process_query{
     $qtranscript_length = $qtran->seq->length;
     @exons = sort { $a->length <=> $b->length } @{$qtran->get_all_Exons};
   }
-  
   my $min_exon_length = $exons[0]->length;
-  
+  if ( $protein ){
+    if ( $qtran->translateable_seq=~/TAA$|TGA$|TAG$/i ){
+      $qtranscript_length = ($qtranscript_length - 3)/3;
+    }
+    else{
+      $qtranscript_length /= 3;
+    }
+    $min_exon_length /= 3;
+  }  
+
+
   my $is_spliced;
- 
- my @clusters;
- my @cluster_hstarts;
- my @cluster_hends;
- my @features = sort{ $a->hstart <=> $b->hstart} @$feat;
- 
- # create the first cluster
- my $count = 0;
- my $cluster = [];
   
- # start it off with the first feature
- my $first_feat = shift( @features );
- push (@$cluster, $first_feat);
- $cluster_hstarts[$count] = $first_feat->hstart;
- $cluster_hends[  $count] = $first_feat->hend;
- 
- # store the list of clusters
- push(@clusters,$cluster);
- 
- ############################################################
- # loop over the rest of the features
+  my @clusters;
+  my @cluster_hstarts;
+  my @cluster_hends;
+  my @features = sort{ $a->hstart <=> $b->hstart} @$feat;
+  
+  # create the first cluster
+  my $count = 0;
+  my $cluster = [];
+  
+  # start it off with the first feature
+  my $first_feat = shift( @features );
+  push (@$cluster, $first_feat);
+  $cluster_hstarts[$count] = $first_feat->hstart;
+  $cluster_hends[  $count] = $first_feat->hend;
+  
+  # store the list of clusters
+  push(@clusters,$cluster);
+  
+  ############################################################
+  # loop over the rest of the features
  FEATURE:
- foreach my $f ( @features ){
-     if (!($f->hend < $cluster_hstarts[$count] || $f->hstart > $cluster_hends[$count])) {      
-	 push(@$cluster,$f);
+  foreach my $f ( @features ){
+    if (!($f->hend < $cluster_hstarts[$count] || $f->hstart > $cluster_hends[$count])) {      
+      push(@$cluster,$f);
 	 
 	 # re-adjust size of cluster
 	 if ($f->hstart < $cluster_hstarts[$count]) {
@@ -421,55 +452,78 @@ sub process_query{
      $is_spliced = 0;
  }
  else{
-     # compute the size of the 'gaps'
-     my @gaps;
-     $is_spliced = 0;
-     for(my $i=0; $i<$#clusters-1; $i++){
-	 my $gap = $cluster_hstarts[$i+1] - $cluster_hends[$i] - 1;
-	 #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
-	 if ( $gap >= $min_exon_length ){
-	     $is_spliced = 1;
-	     #print STDERR "is spliced\n";
-	 }
+   # compute the size of the 'gaps'
+   my @gaps;
+   $is_spliced = 0;
+   for(my $i=0; $i<$#clusters-1; $i++){
+     my $gap = $cluster_hstarts[$i+1] - $cluster_hends[$i] - 1;
+     #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+     if ( $gap >= $min_exon_length ){
+       $is_spliced = 1;
+       #print STDERR "is spliced\n";
      }
+   }
  }
- 
+  
  ############################################################
- # calculate the coverage of the transcript
- my $feature_length = 0;
- for(my $i=0; $i<=$#clusters; $i++){
-     #print STDERR "query cluster $i: $cluster_hstarts[$i] - $cluster_hends[$i]\n";
-     $feature_length += $cluster_hends[$i] - $cluster_hstarts[$i] + 1;
- }
- my $coverage = sprintf "%.2f", 100*$feature_length/$qtranscript_length;
- #print STDERR "coverage = $feature_length / $qtranscript_length = $coverage\n";
-
- #$self->print_exons_in_transcript($qtran);
- 
- return ($coverage,$is_spliced);
+  # calculate the coverage of the transcript
+  my $feature_length = 0;
+  for(my $i=0; $i<=$#clusters; $i++){
+    #print STDERR "query cluster $i: $cluster_hstarts[$i] - $cluster_hends[$i]\n";
+    $feature_length += $cluster_hends[$i] - $cluster_hstarts[$i] + 1;
+  }
+  my $coverage = sprintf "%.2f", 100*$feature_length/$qtranscript_length;
+  #print STDERR "coverage = $feature_length / $qtranscript_length = $coverage\n";
+  
+  #$self->print_exons_in_transcript($qtran);
+  
+  return ($coverage,$is_spliced);
 }
 
 ############################################################
 
 sub print_Feature{
-    my ($self,$f, $cigar) = @_;
-    my $string =
-	$f->seqname."\t".
-	    $f->start."-".$f->end."\t".
-		($f->end - $f->start + 1)."\t".
-		    $f->strand."\t".
-			$f->hseqname."\t".
-			    $f->hstart."-".$f->hend."\t".
-				($f->hend - $f->hstart + 1 )."\t".
-				    $f->strand."\t".
-					"score:".$f->score."\t".
-					    "perc_id:".$f->percent_id;
-    if ($cigar){
-	$string .= "\t".$f->cigar_string;
-    }
-    print STDERR $string."\n";
+  my ($self,$f, $cigar) = @_;
+  my $seqname = $f->seqname;
+  my ($chr_start,$chr_end);
+  if ( $seqname =~ /(\S+)\.(\d+)-(\d+)/ ){
+    $chr_start = $2 + $f->start - 1;
+    $chr_end   = $2 + $f->end   - 1;
+  }
+  else{
+    $chr_start = $f->start;
+    $chr_end   =  $f->end;
+  }
+  
+  my ($chr_hstart, $chr_hend);
+  my $hseqname = $f->hseqname;
+  if ( $hseqname =~ /(\S+)\.(\d+)-(\d+)/ ){
+    $chr_hstart = $2 + $f->hstart - 1;
+    $chr_hend   = $2 + $f->hend   - 1;
+  }
+  else{
+    $chr_hstart =  $f->hstart;
+    $chr_hend   =  $f->hend;
+  }
+  my $string =
+    $f->seqname."\t".
+      $chr_start."-".$chr_end."\t".
+	$f->start."-".$f->end."\t".
+	  ($f->end - $f->start + 1)."\t".
+	    $f->strand."\t".
+	      $f->hseqname."\t".
+		$chr_hstart."-".$chr_hend."\t".
+		  $f->hstart."-".$f->hend."\t".
+		    ($f->hend - $f->hstart + 1 )."\t".
+		      $f->strand."\t".
+			"score:".$f->score."\t".
+			  "perc_id:".$f->percent_id;
+  if ($cigar){
+    $string .= "\t".$f->cigar_string;
+  }
+  print STDERR $string."\n";
 }
-	    
+
 ############################################################
 
 sub gap_penalty{
@@ -486,10 +540,12 @@ sub gap_penalty{
 sub blast_genomic_isoforms{
   my ( $self,$tran1, $tran2, $coding_exons , $gene_id1, $gene_id2) = @_;
   
+  my $verbose = 1;
+
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran1);
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran2);
 
-  my $padding = 500;
+  my $padding = 2000;
   # query
   my $id1;
   if ( $tran1->dbID ){
@@ -616,10 +672,12 @@ sub blast_genomic_isoforms{
   $blastz->run();
   
   my @featurepairs = $blastz->output();
-  
-  #foreach my $fp (@featurepairs) {
-  #    print STDERR $self->print_Feature($fp);
-  #}
+
+  if ( $verbose ){
+    foreach my $fp (@featurepairs) {
+      print STDERR $self->print_Feature($fp);
+    }
+  }
   #print STDERR "##############################\n";
   unlink ( $database );
   unlink( $database."csq" );
@@ -655,13 +713,19 @@ sub map_to_slice{
 }
 ############################################################
 
+############################################################
+# this method get the exons from a transcript
+# all of them or only coding ones.
+# It correct teh exon coordinates to
+# bridge over small frameshifts
+
 sub get_Exons{
   my ( $self, $trans , $coding) = @_;
   my @exons;
   my @newexons;
   my $strand = $trans->start_Exon->strand;
 
-  my $verbose = 0;
+  my $verbose = 1;
 
   if ( $coding ){
     if ( $strand == 1 ){
@@ -725,7 +789,6 @@ sub get_Exons{
   #    ." exon_seq length: ".$exon->seq->length." seq length ".length($exon->seq->seq)."\n";
   #}
   
-
   return \@newexons;
 }
 
@@ -741,7 +804,7 @@ sub get_exon_pairs{
     my @exons1 = @{$self->get_Exons( $tran1,$coding)};
     my @exons2 = @{$self->get_Exons( $tran2,$coding)};
     
-    my $verbose = 0;
+    my $verbose = 1;
     print STDERR "get_exon_pairs()\n" if $verbose;
     my %exon_map;
     my %exon_pointer_map;
@@ -839,8 +902,8 @@ sub get_exon_pairs{
 		      # (s1,e1) is on the seq1 system
 		      # (s2,e2) is on the seq2 system
 		      my ($s1,$e1,$s2,$e2) = (0,$feat->start - 1,0,$feat->hstart - 1);
-		      foreach my $block ( @blocks ){
-			  my ($length) = ( $block =~ /^(\d*)/ );
+		    foreach my $block ( @blocks ){
+		      my ($length) = ( $block =~ /^(\d*)/ );
 			  $length =1 if $length eq "";
 			  
 			  if ( $block =~ /M$/ ){
@@ -1313,18 +1376,18 @@ sub get_exon_pairs{
 			      if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
 				  $start2 = $exon2->start - $s2 + 1;
 				  print STDERR "exon2 starts at pos $start2 in D-state\n" if $verbose;
-			  }
-			    if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
-			      $end2 = $exon2->end - $s2 + 1;
-			      print STDERR "exon2 ends at pos $end2 in D-state\n" if $verbose;
-			    }
+				}
+			      if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
+				$end2 = $exon2->end - $s2 + 1;
+				print STDERR "exon2 ends at pos $end2 in D-state\n" if $verbose;
+			      }
 			    
 			    $seen_exon2 = 1 if $end2;
-
+			      
 			      if ( !($start2 || $end2 ) && $in_exon2 ){
 				$exon_map{$i}{$j} .= ($e2 - $s2 + 1)."D";
 				print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
-			    }
+			      }
 			      elsif( $start2 && !$end2 ){
 				$exon_map{$i}{$j} .= ($e2 - $exon2->start + 1 )."D";
 				$in_exon2 = 1;
@@ -1602,7 +1665,7 @@ sub hassuccessor{
 sub get_exon_pair_alignment{
   my ($self,$human_list, $mouse_list, $exon_map, $exon_pointer_map ) = @_;
   
-  my $verbose = 0;
+  my $verbose = 1;
   print STDERR "get_exon_pair_alignment()\n" if $verbose;
   my %exon_map = %$exon_map;
   my @human_list = @$human_list;
@@ -1985,5 +2048,628 @@ sub _get_start_end {
   return ($start, $end);
 }    
 
+
+############################################################
+
+sub blast_CDSs{
+    my ( $self,$tran1,$tran2) = @_;
+    
+    my $verbose = 1;
+
+    # query
+    my $id1;
+    if ( $tran1->dbID ){
+      $id1 = $tran1->stable_id || $tran2->dbID;
+    }
+    else{
+      $id1 = "no id";
+    }
+    
+    #target
+    my $id2;
+    if ( $tran2->dbID ){
+      $id2 = $tran2->stable_id || $tran2->dbID;
+    }
+    else{
+	$id2 = "no id";
+      }
+    
+    print STDERR "\tcomparing $id1 and $id2\n";
+
+    my ($seq1, $seq2 );
+    eval{
+      $seq1    = $tran1->translate;
+      unless ( $seq1->display_id ){
+	$seq1->display_id($id1);
+      }
+      $seq2    = $tran2->translate;
+      unless ( $seq2->display_id ){
+	$seq2->display_id($id2);
+      }
+    };
+    unless ( $seq1 && $seq2 ){
+      $self->warn("could not retrieve all the proteins");
+      return (0,undef);
+    }
+    
+    my $length1 = $seq1->length;
+    my $length2 = $seq2->length;
+    print STDERR "\t$id1 length = $length1\n";
+    print STDERR "\t$id2 length = $length2\n";
+        
+    
+    ############################################################
+    # create database
+    my $file = 'seq_'.$$.'.fa';
+    my $database = "/tmp/".$file;
+    open( DB_SEQ,">$database") || die("Could not open $database $!");
+    
+    my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
+				 '-fh'     => \*DB_SEQ);
+    
+    $seqout->write_seq($seq2);
+    close( DB_SEQ );
+    
+    system("setdb $database > /dev/null 2>&1");
+    
+    my $options = "W=5 -warnings";
+    my $blast =  
+      Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
+						    '-program'        => 'wublastp',
+						    '-database'       => $database,
+						    '-threshold_type' => "PVALUE",
+						    #'-threshold'      => 1e-10,
+						    '-options'        => $options,
+						   );
+    
+    $blast->add_regex($file,'(\S+)');
+    $blast->run();
+    
+    my @featurepairs = $blast->output();
+    #foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
+    #  print $fp->gffstring . "\n";
+    #}
+    
+
+    unlink ( $database );
+
+        
+    ############################################################
+    # separate by strands
+
+    my @pos_features = grep { $_->strand == 1 } @featurepairs;  
+    my @neg_features = grep { $_->strand == -1} @featurepairs; 
+    my @features;
+    # hpos - gpos
+    @{$features[0]} = grep { $_->hstrand == 1 } @pos_features;
+    # hneg - gpos
+    @{$features[1]} = grep { $_->hstrand == -1} @pos_features;
+    # hpos - gneg
+    @{$features[2]} = grep { $_->hstrand == 1 } @neg_features;
+    # hneg - hneg
+    @{$features[3]} = grep { $_->hstrand == -1} @neg_features;
+    
+    my $best_score = 0;
+    my $best_features;
+    for (my $i=0; $i<4; $i++ ){
+      unless ( $features[$i] && @{$features[$i]} ){
+	next;
+      }
+      
+      ############################################################
+      # compute the score
+      my $score = 0;
+      foreach my $fp (sort {$a->hstart <=> $b->hstart} @{$features[$i]}) {
+        $score += $fp->score;
+        #print $fp->gffstring . "\n";
+      }
+      if ( $score > $best_score ){
+        $best_score    = $score;
+        $best_features = $features[$i];
+      }
+     }
+    
+    my $coverage = 0;
+    my $spliced = 0;
+    my $perc_id=0;
+    my ($query_coverage, $query_spliced);
+    my ($target_coverage, $target_spliced);
+     if ( $best_features ){
+
+      ############################################################
+      # calculate coverage
+      # we use query/target as in feature pairs the target=seqname and query=hseqname
+       my $coding_exons = 1;
+       ($query_coverage,  $query_spliced)  = 
+	 $self->process_query( $best_features, $tran2 , $coding_exons,1);
+       ($target_coverage, $target_spliced) = 
+	 $self->process_target( $best_features, $tran1, $coding_exons,1);
+       $coverage = ( $query_coverage + $target_coverage )/2;
+       
+       if ($verbose){
+	 foreach my $f ( sort { $a->start <=> $b->start } @{$best_features} ){
+	   $self->print_Feature($f,1);
+	 }
+       }
+       if ( $query_spliced || $target_spliced ){
+	 $spliced = 1;
+       }
+       
+      foreach my $f ( @$best_features ){
+	$perc_id += $f->percent_id;
+      }
+      $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
+      
+      print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
+      print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+      print STDERR "\taveraged percent id: $perc_id\n";
+      
+      $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
+    }
+    
+    $best_score = 0 if $spliced;
+    
+    return ( $best_score, $best_features, $target_coverage, $query_coverage, $perc_id );
+  }
+
+############################################################
+
+############################################################
+# this method aligns two transcript sequences
+# which are not attached to any ensembl transcript object
+
+sub blast_unmapped_transcripts{
+  my ( $self,$seq1,$seq2) = @_;
+  
+  my $verbose = 1;
+  
+  # query
+  my $id1 = $seq1->display_id;
+  my $id2 = $seq2->display_id;
+  my $length1 = $seq1->length;
+  my $length2 = $seq2->length;
+    
+  ############################################################
+  # create database
+  my $file = 'seq_'.$$.'.fa';
+  my $database = "/tmp/".$file;
+  open( DB_SEQ,">$database") || die("Could not open $database $!");
+  
+  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
+				 '-fh'     => \*DB_SEQ);
+  
+  $seqout->write_seq($seq2);
+  close( DB_SEQ );
+  
+  system("pressdb $database > /dev/null 2>&1");
+  
+  ############################################################
+  #my $options = "-nogap W=5";
+  
+  # Ian's parameters:
+  #my $options = "W=5 M=1 N=-1 Q=3 R=3";
+  
+  my $options = "W=5";
+  my $blast =  
+    Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
+						  '-program'        => 'wublastn',
+						  '-database'       => $database,
+						  '-threshold_type' => "PVALUE",
+						  #'-threshold'      => 1e-10,
+						  '-options'        => $options,
+						 );
+  
+  $blast->add_regex($file,'(\S+)');
+  $blast->run();
+  
+  my @featurepairs = $blast->output();
+  unlink ( $database );
+        
+  #print STDERR "\t$id1 length = $length1\n";
+  #print STDERR "\t$id2 length = $length2\n";
+  
+  ############################################################
+  # separate by strands
+  
+  my @pos_features = grep { $_->strand == 1 } @featurepairs;  
+  my @neg_features = grep { $_->strand == -1} @featurepairs; 
+  my @features;
+  # hpos - gpos
+  @{$features[0]} = grep { $_->hstrand == 1 } @pos_features;
+  # hneg - gpos
+  @{$features[1]} = grep { $_->hstrand == -1} @pos_features;
+  # hpos - gneg
+  @{$features[2]} = grep { $_->hstrand == 1 } @neg_features;
+  # hneg - hneg
+  @{$features[3]} = grep { $_->hstrand == -1} @neg_features;
+  
+  my $best_score = 0;
+  my $best_features;
+  for (my $i=0; $i<4; $i++ ){
+    unless ( $features[$i] && @{$features[$i]} ){
+      next;
+    }
+    
+    ############################################################
+    # compute the score
+    my $score = 0;
+    foreach my $fp (sort {$a->hstart <=> $b->hstart} @{$features[$i]}) {
+      $score += $fp->score;
+      #print $fp->gffstring . "\n";
+    }
+    if ( $score > $best_score ){
+      $best_score    = $score;
+      $best_features = $features[$i];
+    }
+  }   
+  my $coverage = 0;
+  my $spliced = 0;
+  my $perc_id=0;
+  my ($query_coverage, $query_spliced);
+  my ($target_coverage, $target_spliced);
+  
+
+  ############################################################
+  # must check whether there are big splits in the alignment
+  if ( $best_features ){
+    
+    ############################################################
+    # calculate coverage
+    # we use query/target as in feature pairs the target=seqname and query=hseqname
+    ($query_coverage,  $query_spliced)  = 
+      $self->process_unmapped_query( $best_features, $seq2);
+    ($target_coverage, $target_spliced) = 
+      $self->process_unmapped_target( $best_features, $seq1);
+    $coverage = ( $query_coverage + $target_coverage )/2;
+    
+    if ($verbose){
+      foreach my $f ( sort { $a->start <=> $b->start } @{$best_features} ){
+	$self->print_Feature($f);
+      }
+    }
+    if ( $query_spliced || $target_spliced ){
+      $spliced = 1;
+    }
+    
+    ############################################################
+    # calculate the perc id
+    foreach my $f ( @$best_features ){
+      $perc_id += $f->percent_id;
+    }
+    $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
+    
+    print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
+    print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+    print STDERR "\taveraged percent id: $perc_id\n";
+    $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
+  }
+  
+  $best_score = 0 if $spliced;
+  return ( $best_score, $best_features, $target_coverage, $query_coverage, $perc_id );
+}
+
+
+############################################################
+# the unmapped target
+############################################################
+
+sub process_unmapped_target{
+    my ($self,$feat, $seq, $coding_exons, $protein) = @_;
+    my $transcript_length = $seq->length;
+    my $min_exon_length = 50;
+    if ( $protein ){
+      $min_exon_length = 16;
+    }
+    my $is_spliced;
+    my @clusters;
+    my @cluster_starts;
+    my @cluster_ends;
+    my @features = sort{ $a->start <=> $b->start} @$feat;
+ 
+    # create the first cluster
+    my $count = 0;
+    my $cluster = [];
+    
+    # start it off with the first feature
+    my $first_feat = shift( @features );
+    push (@$cluster, $first_feat);
+    $cluster_starts[$count] = $first_feat->start;
+    $cluster_ends[  $count] = $first_feat->end;
+ 
+    # store the list of clusters
+    push(@clusters,$cluster);
+    
+    ############################################################
+    # loop over the rest of the features
+  FEATURE:
+    foreach my $f ( @features ){
+      if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {      
+	push(@$cluster,$f);
+	
+	# re-adjust size of cluster
+	if ($f->start < $cluster_starts[$count]) {
+	  $cluster_starts[$count] = $f->start;
+	}
+	if ($f->end  > $cluster_ends[$count]) {
+	  $cluster_ends[$count]   = $f->end;
+	}
+	  }
+      else{
+	# else, start create a new cluster with this feature
+	$count++;
+	$cluster = [];
+	push (@$cluster, $f);
+	$cluster_starts[$count] = $f->start;
+	$cluster_ends[  $count] = $f->end;
+	
+	# store it in the list of clusters
+	push(@clusters,$cluster);
+      }
+    }
+    
+    ############################################################
+    # check whether the transcript has one or more exons unaligned
+    if ( scalar( @clusters ) == 1 ){
+      $is_spliced = 0;
+    }
+    else{
+      # compute the size of the 'gaps'
+      my @gaps;
+      $is_spliced = 0;
+      for(my $i=0; $i<$#clusters-1; $i++){
+	my $gap = $cluster_starts[$i+1] - $cluster_ends[$i] - 1;
+	#print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+	if ( $gap >= $min_exon_length ){
+	  $is_spliced = 1;
+	  #print STDERR "is spliced\n";
+	}
+      }
+    }
+    
+    ############################################################
+    # calculate the coverage of the transcript
+    my $feature_length = 0;
+    for(my $i=0; $i<=$#clusters; $i++){
+      print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
+      $feature_length += $cluster_ends[$i] - $cluster_starts[$i] + 1;
+    }
+    print STDERR "feature length   : $feature_length\n";
+    print STDERR "transcript length: $transcript_length\n";
+    my $coverage = sprintf "%.2f", 100*$feature_length/$transcript_length;
+    #$self->print_exons_in_transcript($tran);
+    return ($coverage,$is_spliced);
+}
+
+############################################################
+# the unmapped_query 
+############################################################
+sub process_unmapped_query{
+  my ($self,$feat, $seq, $coding_exons, $protein) = @_;
+
+  my $transcript_length = $seq->length;
+  my $min_exon_length = 50;
+  if ( $protein ){
+    $min_exon_length = 16;
+  }  
+  my $is_spliced;
+  
+  my @clusters;
+  my @cluster_hstarts;
+  my @cluster_hends;
+  my @features = sort{ $a->hstart <=> $b->hstart} @$feat;
+  
+  # create the first cluster
+  my $count = 0;
+  my $cluster = [];
+  
+  # start it off with the first feature
+  my $first_feat = shift( @features );
+  push (@$cluster, $first_feat);
+  $cluster_hstarts[$count] = $first_feat->hstart;
+  $cluster_hends[  $count] = $first_feat->hend;
+  
+  # store the list of clusters
+  push(@clusters,$cluster);
+  
+  ############################################################
+  # loop over the rest of the features
+ FEATURE:
+  foreach my $f ( @features ){
+    if (!($f->hend < $cluster_hstarts[$count] || $f->hstart > $cluster_hends[$count])) {      
+      push(@$cluster,$f);
+	 
+	 # re-adjust size of cluster
+	 if ($f->hstart < $cluster_hstarts[$count]) {
+	     $cluster_hstarts[$count] = $f->hstart;
+	 }
+	 if ($f->hend  > $cluster_hends[$count]) {
+	     $cluster_hends[$count] = $f->hend;
+	 }
+    }
+     else{
+	 # else, start create a new cluster with this feature
+	 $count++;
+	 $cluster = [];
+	 push (@$cluster, $f);
+	 $cluster_hstarts[$count] = $f->hstart;
+	 $cluster_hends[$count]   = $f->hend;
+	 
+	 # store it in the list of clusters
+	 push(@clusters,$cluster);
+     }
+ }
+
+  ############################################################
+  # check whether the transcript has one or more exons unaligned
+  if ( scalar( @clusters ) == 1 ){
+    $is_spliced = 0;
+  }
+  else{
+    # compute the size of the 'gaps'
+    my @gaps;
+    $is_spliced = 0;
+    for(my $i=0; $i<$#clusters-1; $i++){
+      my $gap = $cluster_hstarts[$i+1] - $cluster_hends[$i] - 1;
+      #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+      if ( $gap >= $min_exon_length ){
+	$is_spliced = 1;
+	#print STDERR "is spliced\n";
+      }
+    }
+ }
+  
+  ############################################################
+  # calculate the coverage of the transcript
+  my $feature_length = 0;
+  for(my $i=0; $i<=$#clusters; $i++){
+    #print STDERR "query cluster $i: $cluster_hstarts[$i] - $cluster_hends[$i]\n";
+    $feature_length += $cluster_hends[$i] - $cluster_hstarts[$i] + 1;
+  }
+  my $coverage = sprintf "%.2f", 100*$feature_length/$transcript_length;
+  #print STDERR "coverage = $feature_length / $qtranscript_length = $coverage\n";
+  
+  #$self->print_exons_in_transcript($qtran);
+  
+  return ($coverage,$is_spliced);
+}
+
+############################################################
+
+
+############################################################
+
+sub blast_unmapped_proteins{
+    my ( $self,$seq1,$seq2) = @_;
+    
+    my $verbose = 1;
+    my $id1 = $seq1->display_id;
+    my $id2 = $seq2->display_id;
+
+    unless ( $seq1 && $seq2 ){
+      $self->warn("could not retrieve all the proteins");
+      return (0,undef);
+    }
+    
+    my $length1 = $seq1->length;
+    my $length2 = $seq2->length;
+    print STDERR "\t$id1 length = $length1\n";
+    print STDERR "\t$id2 length = $length2\n";
+    
+    
+    ############################################################
+    # create database
+    my $file = 'seq_'.$$.'.fa';
+    my $database = "/tmp/".$file;
+    open( DB_SEQ,">$database") || die("Could not open $database $!");
+    
+    my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
+				 '-fh'     => \*DB_SEQ);
+    
+    $seqout->write_seq($seq2);
+    close( DB_SEQ );
+    
+    system("setdb $database > /dev/null 2>&1");
+    
+    my $options = "W=5 -warnings";
+    my $blast =  
+      Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
+						    '-program'        => 'wublastp',
+						    '-database'       => $database,
+						    '-threshold_type' => "PVALUE",
+						    #'-threshold'      => 1e-10,
+						    '-options'        => $options,
+						   );
+    
+    $blast->add_regex($file,'(\S+)');
+    $blast->run();
+    
+    my @featurepairs = $blast->output();
+    #foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
+    #  print $fp->gffstring . "\n";
+    #}
+    
+
+    unlink ( $database );
+
+        
+    ############################################################
+    # separate by strands
+
+    my @pos_features = grep { $_->strand == 1 } @featurepairs;  
+    my @neg_features = grep { $_->strand == -1} @featurepairs; 
+    my @features;
+    # hpos - gpos
+    @{$features[0]} = grep { $_->hstrand == 1 } @pos_features;
+    # hneg - gpos
+    @{$features[1]} = grep { $_->hstrand == -1} @pos_features;
+    # hpos - gneg
+    @{$features[2]} = grep { $_->hstrand == 1 } @neg_features;
+    # hneg - hneg
+    @{$features[3]} = grep { $_->hstrand == -1} @neg_features;
+    
+    my $best_score = 0;
+    my $best_features;
+    for (my $i=0; $i<4; $i++ ){
+      unless ( $features[$i] && @{$features[$i]} ){
+	next;
+      }
+      
+      ############################################################
+      # compute the score
+      my $score = 0;
+      foreach my $fp (sort {$a->hstart <=> $b->hstart} @{$features[$i]}) {
+        $score += $fp->score;
+        #print $fp->gffstring . "\n";
+      }
+      if ( $score > $best_score ){
+        $best_score    = $score;
+        $best_features = $features[$i];
+      }
+     }
+    
+    my $coverage = 0;
+    my $spliced = 0;
+    my $perc_id=0;
+    my ($query_coverage, $query_spliced);
+    my ($target_coverage, $target_spliced);
+    if ( $best_features ){
+      
+      ############################################################
+      # calculate coverage
+      # we use query/target as in feature pairs the target=seqname and query=hseqname
+      my $coding_exons = 1;
+      ($query_coverage,  $query_spliced)  = 
+	$self->process_unmapped_query( $best_features, $seq2 , $coding_exons,1);
+      ($target_coverage, $target_spliced) = 
+	$self->process_unmapped_target( $best_features, $seq1, $coding_exons,1);
+      $coverage = ( $query_coverage + $target_coverage )/2;
+      
+      if ($verbose){
+	foreach my $f ( sort { $a->start <=> $b->start } @{$best_features} ){
+	  $self->print_Feature($f,1);
+	}
+      }
+      if ( $query_spliced || $target_spliced ){
+	$spliced = 1;
+      }
+      
+      foreach my $f ( @$best_features ){
+	$perc_id += $f->percent_id;
+      }
+      $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
+      
+      print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
+      print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+      print STDERR "\taveraged percent id: $perc_id\n";
+      
+      $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
+    }
+    
+    $best_score = 0 if $spliced;
+    
+    return ( $best_score, $best_features, $target_coverage, $query_coverage, $perc_id );
+  }
+
+############################################################
 
 1;
