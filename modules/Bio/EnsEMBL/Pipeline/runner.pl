@@ -23,14 +23,8 @@ my $dbuser;
 
 my $port            = '3306';
 my $pass            = undef;
-my $module          = undef;
-
-my $test_env; #not used at present but could be used to test LSF machine
-
-my $object_file;
 my $job_id;
 
-print STDERR join( " ", @ARGV ),"\n";
 
 GetOptions(
     'host=s'       => \$host,
@@ -39,8 +33,6 @@ GetOptions(
     'dbuser=s'     => \$dbuser,
     'pass=s'       => \$pass,
     'check!'       => \$check,
-    'objfile=s'    => \$object_file,
-    'module=s'     => \$module,
     'output_dir=s' => \$output_dir
 )
 or die ("Couldn't get options");
@@ -58,32 +50,18 @@ if( defined $check ) {
       die "Cant use this host";
     }
   }
-
-  # tests for DB existence - these probably shouldn't be hard-wired in ...
-  if (defined (my $dir = $ENV{"BLASTDB"})) {
-    -e "$dir/unigene.seq" or warn "Not found unigene";
-    -e "$dir/sptr" or warn "Not found sptr";
-  }
   exit 0;
 
 }
 
-print STDERR "In runner\n";
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $host,
     -user   => $dbuser,
     -dbname => $dbname,
     -pass   => $pass,
-    -port   => $port,
-    -perlonlyfeatures  => 1,
-    -perlonlysequences => 1
+    -port   => $port
 )
 or die ("Failed to create Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor to db $dbname \n");
-
-print STDERR "Connected to database\n";
-
-
-print STDERR "Getting job adaptor\n";
 
 my $job_adaptor = $db->get_JobAdaptor();
 
@@ -91,15 +69,11 @@ my $job_adaptor = $db->get_JobAdaptor();
 # to parse these output files for CPU/Mem usage etc.
 print STDOUT "LSF Batch summary\n";
 print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
-# print STDOUT "LSF ID: ", $job_adaptor->fetch_by_dbID($ARGV[0])->submission_id, "\n";
 print STDOUT "Job ID\tinput ID\tanalysis ID\n";
 foreach my $id (@ARGV) {
     my $job = $job_adaptor->fetch_by_dbID($id);
     print STDOUT join ("\t", $id, $job->input_id, $job->analysis->logic_name), "\n";
-    # print STDOUT $id, "\n";
 }
-
-# print STDERR "Got job adapter\n";
 
 while( $job_id = shift ) {
 
@@ -117,9 +91,6 @@ while( $job_id = shift ) {
   print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
 
   eval {
-    # scp - changed to runInLSF to prevent writing output files
-    # over NFS at the start of the job
-    # $job->runLocally;
     $job->run_module;
   };
   $pants = $@;
@@ -130,5 +101,4 @@ while( $job_id = shift ) {
 
   print STDERR "Finished job $job_id\n";
 }
-print STDERR "Leaving runner\n";
 
