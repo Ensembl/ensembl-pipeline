@@ -432,6 +432,7 @@ sub show_jobs_by_status_and_analysis {
   my @out;
   my @err;
   my @retry;
+  my @exhost;
 
   my $maxjobid = 0;
   my $maxinputid = 0;
@@ -439,6 +440,7 @@ sub show_jobs_by_status_and_analysis {
   my $maxout = 0;
   my $maxerr = 0;
   my $maxretry = 0;
+  my $maxexhost = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $jobId         = $ref->{'job_id'};
@@ -447,6 +449,7 @@ sub show_jobs_by_status_and_analysis {
     my $out           = $ref->{'stdout_file'};
     my $err           = $ref->{'stderr_file'};
     my $retry         = $ref->{'retry_count'};
+    my $exhost        = $ref->{'exec_host'};
 
     if (length($jobId) > $maxjobid) {$maxjobid = length($jobId);}
     if (length($input_id) > $maxinputid) {$maxinputid = length($input_id);}
@@ -454,6 +457,7 @@ sub show_jobs_by_status_and_analysis {
     if (length($out) > $maxout) {$maxout = length($out);}
     if (length($err) > $maxerr) {$maxerr = length($err);}
     if (length($retry) > $maxretry) {$maxretry = length($retry);}
+    if (length($exhost) > $maxexhost) {$maxexhost = length($exhost);}
 
     push(@jobIds,$jobId);
     push(@input_ids,$input_id);
@@ -461,13 +465,14 @@ sub show_jobs_by_status_and_analysis {
     push(@out,$out);
     push(@err,$err);
     push(@retry,$retry);
+    push(@exhost,$exhost);
 
   }
 
   $self->print_header("Jobs by status $status and analysis $analysis");
   
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","Input id","Job","submission id","retry","output file","error file");
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","--------","---","-------------","-----","-----------","----------");
+  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s  %-${maxexhost}s\n","Input id","Job","submission id","retry","output file","error file","exhost");
+  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s  %-${maxexhost}s\n","--------","---","-------------","-----","-----------","----------","------");
 
   while (my $jobid = shift @jobIds) {
     my $inputid = shift @input_ids;
@@ -475,8 +480,9 @@ sub show_jobs_by_status_and_analysis {
     my $out     = shift @out;
     my $err     = shift @err;
     my $retry   = shift @retry;
+    my $exhost  = shift @exhost;
     
-    printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n",$inputid,$jobid,$lsf,$retry,$out,$err);
+    printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s  %-${maxexhost}s\n",$inputid,$jobid,$lsf,$retry,$out,$err,$exhost);
   }
 
   print "\n";
