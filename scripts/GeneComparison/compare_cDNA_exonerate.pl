@@ -53,9 +53,9 @@ my $tmpoutfile;
 
 my $estfile = $estfiledir . "/" . $chunkname;
 
-#my $command = "$runner -runnable $runnable -input_id $input_id -parameters cdnas=$estfile,transcripts=$COMP_TRANSCRIPTS,exonerate=$exonerate  2>$tmperrfile | gzip -9 >$tmpoutfile";
+my $command = "$runner -runnable $runnable -input_id $input_id -parameters cdnas=$estfile,transcripts=$COMP_TRANSCRIPTS,exonerate=$exonerate  2>$tmperrfile | gzip -9 >$tmpoutfile";
 
-my $command = "$runner -runnable $runnable -input_id $input_id -parameters cdnas=$estfile,transcripts=$COMP_TRANSCRIPTS,exonerate=$exonerate  2>$tmperrfile  >$tmpoutfile";
+#my $command = "$runner -runnable $runnable -input_id $input_id -parameters cdnas=$estfile,transcripts=$COMP_TRANSCRIPTS,exonerate=$exonerate  2>$tmperrfile  >$tmpoutfile";
 
 print STDERR "command is $command\n";
 
@@ -111,7 +111,7 @@ sub get_variables {
   }
 
   # output directories have been created by make_bsubs.pl
-  $outdir   .= "/results/";
+  $outdir   .= "/exonerate_compare_cDNA/results/";
   my $errdir = $outdir . "stderr/";
   $outdir   .= "stdout/";
 
@@ -123,12 +123,12 @@ sub get_variables {
 
   my $err     =  "exest_"      . $chunkname . "_" . $$ . ".stderr";
   $errfile    = $errdir . $err;
-  #$tmperrfile = "/tmp/" . $err;
-  $tmperrfile = $err;
+  $tmperrfile = "/tmp/" . $err;
+  #$tmperrfile = $err;
 
   my $out     = "exest_"      . $chunkname . "_" . $$ . ".stdout.gz";
   $outfile    = $outdir . $out;
-  #$tmpoutfile = "/tmp/" . $out;
-  $tmpoutfile = $out;
+  $tmpoutfile = "/tmp/" . $out;
+  #$tmpoutfile = $out;
 
 }
