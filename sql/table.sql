@@ -78,6 +78,7 @@ CREATE TABLE rule_conditions (
 
 CREATE TABLE input_id_analysis (
   input_id          varchar(40) not null,
+  input_id_type     enum("CONTIG" ,"SLICE", "ALL") not null,
   analysis_id       smallint(10) unsigned NOT NULL,
   created           datetime NOT NULL,
   result            smallint(10) unsigned NOT NULL,
@@ -98,3 +99,8 @@ CREATE TABLE input_id_analysis (
 # are understood (e.g. genscan producing garbage)
 # and if, say, no genscan predictions, don't bother BlastGenscanXXX
 
+
+CREATE table input_id_type_analysis (
+  analysis_id       smallint(10) unsigned not null,
+  input_id_type     enum("CONTIG" ,"SLICE", "ALL") not null
+);
