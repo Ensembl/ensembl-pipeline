@@ -46,18 +46,15 @@ use Bio::EnsEMBL::Pipeline::LSFJob;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
-
-
 sub _initialize {
     my ($self,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
-
+    my $make = $self->SUPER::_initialize(@args);
     my ($user,$queue) = $self->_rearrange([qw(USER
-					      QUEUE)]);
+					      QUEUE)],@args);
 
-    $user  = "humpub"     unless $user;
-    $queue = "blast_farm" unless $queue;
+    $user  = "humpub"     unless defined($user);
+    $queue = "blast_farm" unless defined($queue);
 
     $self->user ($user);
     $self->queue($queue);
