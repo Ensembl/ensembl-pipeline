@@ -84,7 +84,7 @@ sub get_JobAdaptor {
 
 sub get_PmatchFeatureAdaptor{
   my ($self) = @_;
-  print STDERR "getting a pmatch feature adaptor\n";
+  #print STDERR "getting a pmatch feature adaptor\n";
   if( ! defined $self->{_PmatchFeatureAdaptor} ) {
     require Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
     $self->{_PmatchFeatureAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor->new
