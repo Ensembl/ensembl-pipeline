@@ -94,10 +94,10 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::DBSQL::Utils;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
+					 GB_MIN_GENSCAN_EXONS
+					 GB_MAX_INTRON_LENGTH
 					 );
 use vars qw(@ISA);
 use strict;
@@ -852,7 +852,7 @@ sub check_link {
 
  Title   : link_ExonPairs
  Usage   : my @transcript = $self->make_ExonPairs(@exons);
- Function: Links ExonPairs into Transcripts
+ Function: Links ExonPairs into Transcripts, validates transcripts, rejects any with < $GB_MIN_GENSCAN_EXONS exons
  Example : 
  Returns : Array of Bio::EnsEMBL::Pipeline::ExonPair
  Args    : Array of Bio::EnsEMBL::Transcript
@@ -863,7 +863,7 @@ sub link_ExonPairs {
     my ($self) = @_;
 
     my @exons  = $self->genscan_exons;
-
+    my @tmpexons;
 
   EXON: foreach my $exon (@exons) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
@@ -912,7 +912,10 @@ sub link_ExonPairs {
     foreach my $transcript(@t){
       my @valid = $self->validate_transcript($transcript);
       foreach my $vt(@valid){
-	$self->add_Transcript($vt);
+	@tmpexons = $vt->get_all_Exons;
+	if(scalar (@tmpexons) >= $GB_MIN_GENSCAN_EXONS){
+	  $self->add_Transcript($vt);
+	}
       }
     }
     return $self->get_all_Transcripts;
@@ -2924,7 +2927,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
 sub validate_transcript{
   my ($self, $transcript) = @_;
   my @valid_transcripts;
-  
+
   my $valid = 1;
   my $split = 0;
 
@@ -2939,7 +2942,7 @@ sub validate_transcript{
 	$intron = abs($exon->end   - $previous_exon->start + 1);
       }
       
-      if ($intron > 100000) {
+      if ($intron > $GB_MAX_INTRON_LENGTH) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
 	$split = 1;
 	$valid = 0;
@@ -2955,7 +2958,7 @@ sub validate_transcript{
   }
   
   if ($valid) {
-    push(@valid_transcripts,$transcript);
+      push(@valid_transcripts,$transcript);
   }
   elsif ($split){
     # split the transcript up.
