@@ -110,12 +110,10 @@ sub fetch_input {
     #print STDERR "Fetching contig $contigid\n";
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
-    my $genseq    = $contig->primary_seq() 
-        or $self->throw("Unable to fetch contig sequence");
 
-    $self->genseq($genseq);
+    $self->genseq($contig);
     #need to get features predicted by genscan
-     my @genscan_peps = $self->db->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
+    my @genscan_peps = $self->db->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
     $self->transcripts(@genscan_peps);
    
 }
@@ -163,7 +161,7 @@ sub runnable {
 sub run {
     my ($self) = @_;
     my @times = times;
-    print STDERR "started running @times \n";
+    #print STDERR "started running @times \n";
     #need to pass one peptide at a time
     $self->throw("Input must be fetched before run") unless ($self->genseq);
     #print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
@@ -209,7 +207,6 @@ sub run {
     }
 
     foreach my $transcript ($self->transcripts) {
-
 	$parameters{'-peptide'} = $transcript;
 	my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new(
 	    %parameters
@@ -220,7 +217,7 @@ sub run {
 
     }
     @times = times;
-    print STDERR "finished running @times \n"; 
+    #print STDERR "finished running @times \n"; 
 }
 
 =head2 output
