@@ -24,6 +24,10 @@ CREATE TABLE job (
   stdout_file       varchar(255),
   stderr_file       varchar(255),
   retry_count       tinyint unsigned NOT NULL,
+  current_status    enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
+                         'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED',
+                         'RETRIED') NOT NULL,
+  last_updated      datetime,
 
   PRIMARY KEY (job_id),
   UNIQUE      (taskname, input_id),
@@ -52,6 +56,14 @@ CREATE TABLE job_status (
   KEY (sequence_num)
 );
 
+
+CREATE TABLE job_current_status (
+  job_id           int(10) unsigned NOT NULL,
+  status           enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
+		        'RUNNING', 'SUCCESSFUL', 'FATAL', 'KILLED', 'FAILED',
+                        'RETRIED') NOT NULL,
+  KEY (job_id)
+);
 
 
 CREATE TABLE config (

@@ -163,9 +163,7 @@ sub fetch_all_by_job_name {
 sub fetch_all_by_status{
   my ($self, $status) = @_;
   my @jobs;
-  #print STDERR "fetching all by status ".$status."\n";
-  my @times = times;
-  #print STDERR "!, @times\n";
+
   my $q =  qq {
   SELECT j.job_id,
          j.taskname,
@@ -177,52 +175,19 @@ sub fetch_all_by_status{
          j.module,
          j.stderr_file,
 	 j.stdout_file,
-         j.retry_count,
-  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':',
-             UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
-  FROM   job_status js,
-         job j
-  WHERE  js.job_id = j.job_id 
-  GROUP BY js.job_id 
-  HAVING max_status like '%$status%'};
+         j.retry_count
+  FROM   job j
+  WHERE j.current_status = ? };
 
   my $sth = $self->prepare( $q );
-  my $p = $q;
-  $p =~ s/\?/$status/;
-  #print $p."\n";
-  $sth->execute();
-  @times = times;
-  #print STDERR "2, @times\n";
-  my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
-      $array_index, $parameters, $module, $stderr_file, $stdout_file,
-      $retry_count, $max_status);
 
-  $sth->bind_columns(\$job_id, \$taskname, \$input_id,
-		     \$submission_id, \$job_name, \$array_index,
-		     \$parameters, \$module, \$stderr_file, \$stdout_file,
-		     \$retry_count, \$max_status);
-
-  while($sth->fetch) {
-    push @jobs, Bio::EnsEMBL::Pipeline::Job->new
-      (-input_id => $input_id,
-       -taskname => $taskname,
-       -module => $module,
-       -dbID => $job_id,
-       -submission_id => $submission_id,
-       -job_name => $job_name,
-       -array_index => $array_index,
-       -parameters => $parameters,
-       -module => $module,
-       -stderr_file => $stderr_file,
-       -stdout_file => $stdout_file,
-       -retry_count => $retry_count,
-       -adaptor => $self);
-  }
+  $sth->execute("$status");
+  
+  my $result = $self->_jobs_from_sth($q);
 
   $sth->finish();
-  @times = times;
-  #print STDERR "3, @times\n\n";
-  return \@jobs;
+
+  return $result;
 }
 
 
@@ -348,12 +313,9 @@ sub fetch_current_status{
   my ($self, $job) = @_;
 
   my $query = qq {
-    SELECT status
-    FROM job_status
-    WHERE job_id = ?
-    ORDER by sequence_num
-    DESC
-    LIMIT 1};
+    SELECT current_status
+    FROM job
+    WHERE job_id = ? };
 
   my $sth = $self->prepare($query);
 
@@ -365,6 +327,7 @@ sub fetch_current_status{
 
   return $status;
 }
+
 
 =head2 list_current_status
 
@@ -380,33 +343,20 @@ sub fetch_current_status{
 sub list_current_status {
   my $self = shift;
 
-  my $q = qq {
-  SELECT j.job_id,
-         j.input_id,
-         j.taskname,
-  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':',
-             UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
-  FROM   job_status js,
-         job j
-  WHERE  js.job_id = j.job_id
-  GROUP BY js.job_id };
+  my $q = "SELECT HIGH_PRIORITY j.job_id,j.taskname, j.input_id,
+                  j.current_status, UNIX_TIMESTAMP(j.last_updated)
+            FROM job j";
 
   my $sth = $self->prepare( $q );
   $sth->execute();
 
-  my $result = [];
-  my ( $job_id, $input_id, $taskname, $max_status );
-  $sth->bind_columns(\$job_id, \$input_id, \$taskname, \$max_status);
-  while($sth->fetch() ) {
-    my ($seqnum, $timestamp, $status) = split(':', $max_status);
-    push( @$result,
-	  [ $job_id, $taskname, $input_id,  $status, $timestamp ]);
-  }
+  my $result = $sth->fetchall_arrayref();
 
   $sth->finish();
 
   return $result;
 }
+
 
 =head2 update_status
 
@@ -435,6 +385,23 @@ sub update_status {
 
   my $sth = $self->prepare( $query );
   $sth->execute( $job->dbID(), $status );
+
+  $sth->finish();
+
+  #
+  # This is a low priority update because there are many, many of these updates
+  # that need to be performed, whereas the retrieval of the current status
+  # only occurs priodically.  We don't want the selection (list_current_status
+  # method) to take a long time because it is being pre-empted by updates
+  #
+  $query = 
+    "UPDATE LOW_PRIORITY job 
+     SET last_updated = NOW(), 
+         current_status = ?
+     WHERE job_id = ?";
+
+  $sth = $self->prepare( $query );
+  $sth->execute( $status, $job->dbID() );
 
   $sth->finish();
 }
@@ -514,8 +481,10 @@ sub store{
 		      module,
 		      stdout_file,
 		      stderr_file,
-					retry_count)
-             VALUES (  ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ) };
+		      retry_count,
+                      current_status,
+                      last_updated)
+             VALUES (  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', NOW() ) };
 
   my $sth = $self->prepare($query);
 
