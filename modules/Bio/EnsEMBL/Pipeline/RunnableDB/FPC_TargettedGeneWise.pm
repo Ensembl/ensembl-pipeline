@@ -43,6 +43,12 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_GW_DBNAME
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
@@ -176,6 +182,16 @@ sub make_targetted_runnables {
   #print STDERR "fetching features for $chr_name $start $end\n";
   my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end);
   #print STDERR "have ".@features." to run with\n";
+  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						       '-host'   => $GB_GW_DBHOST,
+						       '-user'   => $GB_GW_DBUSER,
+						       '-pass'   => $GB_GW_DBPASS,
+						       '-dbname' => $GB_GW_DBNAME,
+						      );
+  
+  
+  $genewise_db->dnadb($self->db);
+  $self->output_db($genewise_db);
   foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
     
     my $input = $feat->chr_name   . ":" . 
@@ -186,11 +202,12 @@ sub make_targetted_runnables {
     #print STDERR "TGW input: $input\n";
 
     my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise(
-								       -db         => $self->db,
-								       -input_id      => $input,
-								       -seqfetcher    => $protein_fetcher,
-								       -analysis => $self->analysis,
-								      );
+									-db => $self->db,
+									-input_id => $input,
+									-seqfetcher => $protein_fetcher,
+									-analysis => $self->analysis,
+									-output_db => $self->output_db,
+								       );
     $self->targetted_runnable($tgr);
   }
 
@@ -316,5 +333,20 @@ sub convert_output {
   my ($self) = @_;
   # nothing to do
 }
+
+
+sub output_db {
+    my( $self, $output_db ) = @_;
+    
+    if ($output_db) 
+    {
+	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_output_db} = $output_db;
+    }
+    return $self->{_output_db};
+}
+
+
 
 1;

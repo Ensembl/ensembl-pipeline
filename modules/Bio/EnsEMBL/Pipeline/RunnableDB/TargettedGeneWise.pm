@@ -58,12 +58,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-							     GB_GW_DBNAME
-							     GB_GW_DBHOST
-							     GB_GW_DBUSER
-							     GB_GW_DBPASS
-							    );
+
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
@@ -87,26 +82,20 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
+  my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
+  
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
     my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX);
     $self->seqfetcher($seqfetcher);
   }
-
+  $self->throw("no output database defined can't store results $!") unless($output_db);
+  $self->output_db($output_db);
   # IMPORTANT
   # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
   # features and dna
   # Here it is used as refdb only and we need to make a connection to GB_GW_DBNAME@GB_GW_DBHOST
-  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => $GB_GW_DBHOST,
-						   '-user'   => $GB_GW_DBUSER,
-						   '-pass'   => $GB_GW_DBPASS,
-						   '-dbname' => $GB_GW_DBNAME,
-						  );
-  
-  
-  $genewise_db->dnadb($self->db);
-  $self->output_db($genewise_db);
+ 
 
   return $self;
 }
