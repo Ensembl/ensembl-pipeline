@@ -40,6 +40,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw ( EST_DBNAME
                                                                        EST_DBHOST
+                                                                       EST_DBPORT
 	                                                               EST_DBUSER
 	                                                               EST_DBPASS
                                                                      );
@@ -49,11 +50,11 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::DBLoader;
 
 my $dbtype = 'rdb';
-my $port   = undef;
 my $dbname = $EST_DBNAME;
 my $dbuser = $EST_DBUSER;
 my $dbpass = $EST_DBPASS;
 my $host   = $EST_DBHOST;
+my $port   = $EST_DBPORT; 
 
 
 my $runnable;
@@ -77,6 +78,7 @@ my $analysis;
              'dbhost:s'      => \$host,
              'dbuser:s'      => \$dbuser,
              'dbpass:s'      => \$dbpass,
+             'dbport:s'      => \$port
 	     );
 
 $| = 1;
@@ -96,13 +98,14 @@ if ($check) {
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
+    -port             => $port,
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $dbpass,
     -perlonlyfeatures => 0,
 );
 
-print STDERR "db: $db, dbname: $dbname, dbhost: $host\n";
+print STDERR "db: $db, dbname: $dbname, dbhost: $host, dbport $port\n";
 
 die "No input id entered" unless defined ($input_id);
 
