@@ -148,7 +148,9 @@ sub write_output {
     if( $@ ) {
       &warning("UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene");
       $unwritten_genes++;
-    }	
+
+
+    }
   }
   
   if ($unwritten_genes) {
@@ -465,7 +467,8 @@ sub convert_output {
     }
 
     my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-    my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
+#    my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
+    my $analysis_obj = $self->analysis;
 
     if ( !defined $analysis_obj ){
       $analysis_obj = new Bio::EnsEMBL::Analysis
@@ -499,7 +502,8 @@ sub convert_output {
         my $keep_gene = 1;
         my $mask_reg_idx = 0;
 
-        my @exons = sort {$a->start <=> $b->start} ($gene->get_all_Exons);
+        my @exons = sort {$a->start <=> $b->start} ( @{$gene->get_all_Exons});
+
         my @test_regions;
         
         if ($GB_SIMILARITY_POST_GENEMASK) {
@@ -525,7 +529,7 @@ sub convert_output {
             else {
               $mask_reg_idx++;
             }
-		}
+          }
         }
         
         if ($keep_gene) {
