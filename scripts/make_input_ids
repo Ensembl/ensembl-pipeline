@@ -19,7 +19,12 @@ my $type;
 my $contig;
 my $slice;
 my $input_type;
+my $file;
+my $dir;
+my $regex;
 my $single;
+my $verbose;
+
 
 &GetOptions(
             'host:s'       => \$host,
@@ -32,7 +37,11 @@ my $single;
             'slice_size:s' => \$slice_size,
             'logic_name:s' => \$logic_name,
             'input_type:s' => \$input_type,
-	    'single' => \$single,
+	    'file'         => \$file,
+	    'dir:s'        => \$dir,
+	    'file_regex:s' => \$regex,
+	    'single'       => \$single,
+            'verbose'      => \$verbose,
            );
 
 
@@ -46,29 +55,23 @@ if ($type) {
 } else {
     $type = $db->assembly_type;
 }
-if (!defined($type)) {
+if (!($type)) {
     die "No assemby type defined";
 }
 
-if (!($contig) && !($slice) && !($single)) {
-  die "Must define input as either contig, slice or single";
+if (!($contig) && !($slice) && !($single) && !($file)) {
+  die "Must define input as either contig, slice file or single";
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
 
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
-if (!($analysis)) {
-    $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name    => $logic_name,
-                                                     -input_id_type => $input_type);
 
-    print "Adaptor " . $db->get_AnalysisAdaptor . "\n";
- 
-    $db->get_AnalysisAdaptor->store($analysis);
-}
 
-if ($slice && $contig) {
-    die "Can't generate contig and slice input ids at the same time. Must be done separately";
+if( ($slice + $contig + $single + $file) > 1){
+  die "must only define one of these options on the commandline ".
+    "-slice $slice -contig $contig -single $single -file $file";
 }
 
 my @ids;
@@ -85,19 +88,43 @@ if ($slice) {
   @ids = $inputIDFactory->generate_contig_input_ids;
   
 }elsif($single){
+  $input_type = 'GENOME' unless $input_type;
   @ids = ('genome');
+}elsif($file){
+  $input_type = 'FILENAME' unless $input_type;
+  if(!$dir){
+    die "if you want to use filenames as a input ids you must provide".
+      " a directory to get them from"; 
+  }
+  @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
 }
-print "input id type $input_type\n";
+
+
+
+
+
+if (!($analysis)) {
+    $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name    => $logic_name,
+                                                     -input_id_type => $input_type);
+
+    print "storing analysis ".$analysis->logic_name."\n" if($verbose);
+ 
+    $db->get_AnalysisAdaptor->store($analysis);
+    if(!$analysis->logic_name){
+      die "you  must specify a logic_name for your analysis otherwise".
+	" this won't work properly\n";
+    }
+  }
 
 $analysis->input_id_type($input_type); 
 
 foreach my $id (@ids) {
     eval {
-      print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n";
+      print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
 
       $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis);  
     };
     if ($@) {
-      print "Input id $id already present\n";
+      print "Input id $id already present $@";
     }
 }
