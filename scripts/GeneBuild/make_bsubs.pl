@@ -15,7 +15,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (GB_RUNNER
 					);
 
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw (RUNNER
-						 RUNNABLE
+						 GENECOMBINER_RUNNABLES
 						 SLICE_SIZE
 						 QUEUE
 						 OUTPUT_DIR
@@ -61,7 +61,11 @@ foreach my $other_runnable_list (@{$GB_TARGETTED_RUNNABLES}) {
   make_tbsubs($runnable, $analysis) unless $runnable eq '';
 }
 
-make_genecombiner_bsubs( $RUNNABLE ) if ($RUNNABLE);
+foreach my $genecombiner_runnable ( @{$GENECOMBINER_RUNNABLES} ){
+  my $analysis =  $genecombiner_runnable->{analysis};
+  my $runnable = $genecombiner_runnable->{runnable};
+  make_genecombiner_bsubs( $runnable, $analysis ) unless $runnable eq '';
+}
 
 
 
@@ -133,7 +137,7 @@ sub make_tbsubs {
     # do we need to start another output directory? Limit the files in each so we can parse them easily
     if($tracker%100 == 0){
       $resdir = $output_dir . "/jobs" . $tracker/100;
-      print STDERR "$resdir\n";
+      #print STDERR "$resdir\n";
       system("mkdir $resdir") unless opendir(DIR, $resdir);
       closedir(DIR);   
     }
@@ -236,14 +240,14 @@ sub make_lbsubs {
 }
 	     
 sub make_genecombiner_bsubs {
-  my ($runnable) = @_;
+  my ($runnable,$analysis) = @_;
   
   my $runner      = $RUNNER;
   my $queue       = $QUEUE;
   my $size        = $SLICE_SIZE;
   my $dir         = $OUTPUT_DIR . "/$runnable";
+  print STDERR "outputdir = ".$dir."\n";
   
-
   # check them!
   foreach my $arg ($size, $OUTPUT_DIR){
     if ($arg eq '' ){
@@ -286,9 +290,9 @@ sub make_genecombiner_bsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis\"";
       $command .= "  $runner ";
-      $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
+      $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable  -analysis $analysis";
       $command .= " -input_id $input_id ";
       $command .= " -write";      
       print OUTF "$command\n";
