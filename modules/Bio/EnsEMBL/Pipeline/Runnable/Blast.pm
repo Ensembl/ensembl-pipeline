@@ -358,7 +358,6 @@ sub parse_results {
  NAME: while(my $sbjct = $parser->nextSbjct)  {
       
       my $name = $sbjct->name ;
-  
       if (($self->filter == 1) && !defined($ids{$name})) {
 	  next NAME;
       }
@@ -379,9 +378,8 @@ sub parse_results {
 	  $name = $1;
       }
       elsif ($name =~ /^(\S+) (\S+)/) {
-	  $name = $2 || $1;
+	  $name = $1 || $2;
       }
-      
     HSP: while (my $hsp = $sbjct->nextHSP) {
 	if ($self->threshold_type eq "PID") {
 	  next HSP if ($hsp->percent < $self->threshold);
