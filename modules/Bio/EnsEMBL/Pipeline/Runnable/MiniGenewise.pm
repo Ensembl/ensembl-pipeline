@@ -43,6 +43,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::DnaPepAlignFeature;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -214,7 +215,7 @@ sub run {
   my ($self) = @_;
 
   my $miniseq = $self->make_MiniSeq;
-	my $minigen = $miniseq->get_cDNA_sequence;
+  my $minigen = $miniseq->get_cDNA_sequence;
 
   my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice    => $self->genomic_sequence,
 							    -genomic  => $minigen,
@@ -252,8 +253,10 @@ sub run {
 
     foreach my $transcript(@{$gene->get_all_Transcripts}){
       my @converted_exons;
+      my @all_supp_features;
 
       # need to convert all the exons and all the supporting features
+     
       foreach my $exon(@{$transcript->get_all_Exons}){
 	$ec++;
 	$exon->strand($strand);
@@ -285,7 +288,8 @@ sub run {
 	  # also need to convert each of the sub alignments back to genomic coordinates
 	  foreach my $sf (@{$exon->get_all_supporting_features}) {
             my @features;
-            foreach my $aln ($sf->ungapped_features) {
+            my @ungapped = $sf->ungapped_features;
+            foreach my $aln (@ungapped) {
               my @alns = $miniseq->convert_PepFeaturePair($aln);
               if ($#alns > 0) {
                 print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
@@ -299,6 +303,7 @@ sub run {
               $align->score(100);
               push @features,$align;
             }
+            push @all_supp_features,@features;
             my $gapped = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@features);
             $genomic_exon->add_supporting_features($gapped);
 	  }
@@ -312,12 +317,16 @@ sub run {
       my $converted_translation = new Bio::EnsEMBL::Translation;
       $converted_transcript->translation($converted_translation);
 
+      if (scalar(@all_supp_features)) {
+        my $daf = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@all_supp_features);
+        $converted_transcript->add_supporting_features($daf);
+      }
+
       if ($#converted_exons < 0) {
 	print STDERR "Odd.  No exons found\n";
 	return undef;
-      }
 
-      else {
+      } else {
 
 	if ($converted_exons[0]->strand == -1) {
 	  @converted_exons = sort {$b->start <=> $a->start} @converted_exons;

@@ -420,6 +420,10 @@ sub to_genomic_slice {
           $sf->slice($self->genomic_sequence);
         }
       }
+
+      foreach my $tsf (@{$t->get_all_supporting_features}) {
+        $tsf->slice($self->genomic_sequence);
+      }
     }
   }
 }

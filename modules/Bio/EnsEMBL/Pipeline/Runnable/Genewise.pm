@@ -172,7 +172,6 @@ sub align_protein {
     $gene->add_Transcript($transcript);
     
     $self->addGene($gene);
-    
   }
   else{
    print "No valid transcript made, cannot make gene\n"; 
