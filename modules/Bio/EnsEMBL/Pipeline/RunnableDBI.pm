@@ -50,28 +50,6 @@ use Bio::EnsEMBL::Root;
 
 These methods are actually implemented by this "I" module.
 
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=cut
-
-sub dbobj {
-    my( $self, $value ) = @_;
-    
-    if ($value) {
-        $value->isa("Bio::EnsEMBL::Pipeline::DB::ObjI")
-            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::Pipeline::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
-
 =head1 ABSTRACT METHODS
 
 These methods need to be defined in any module
@@ -82,7 +60,7 @@ implementing C<Bio::EnsEMBL::Pipeline::RunnableI>.
     $self->fetch_input($id);
 
 Fetches the input (selected via C<$id>) for a job
-from the database (accessed via C<dbobj>), and
+from the database (accessed via C<db>), and
 stores it in the object.
 
 =head2 fetch_output
