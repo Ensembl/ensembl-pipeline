@@ -346,7 +346,10 @@ sub run_gapped {
     $self->_deletefiles($genfile, $estfile, $resfile);
   }
   else {
-    $self->_deletefiles($genfile, $resfile);
+    if(ref($genomicseq) eq 'ARRAY') {
+      $self->_deletefiles($genfile);
+    }
+    $self->_deletefiles($resfile);
   }
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
