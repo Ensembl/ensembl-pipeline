@@ -138,7 +138,11 @@ sub check_for_analysis {
 
   # reimplement with proper identity check!
   my $goal = $self->goalAnalysis->dbID;
+
+  print STDERR "My goal is " . $goal . "\n";
+
   for my $analysis ( @analist ) {
+      print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n";
     $anaHash{$analysis->logic_name} = $analysis;
     if( $goal == $analysis->dbID ) {
       # already done
