@@ -79,7 +79,7 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -pass   => $anapass);
 
 
-my @jobs = $anadb->get_JobsByCurrentStatus('SUCCESSFUL');
+my @jobs = $anadb->get_JobsByCurrentStatus('SUBMITTED');
 
 foreach my $job (@jobs) {
     $job->_dbobj($anadb);
@@ -105,15 +105,17 @@ foreach my $job (@jobs) {
 	$job->set_status('FAILED');
 	print STDERR "Failed job! STDERR file".$job->stderr_file()."\n";
     }
-    my $output= $job->output_file();
-    print STDERR "Got output file $output\n\n";
-
-    my $runnable = "$module"->new(-input_id => $job->input_id,
-				  -dbobj    => $anadb);
-    my @features=$runnable->fetch_output($output);
-    print STDERR "Got features from frozen output (when it's fixed)\n";
-    $runnable->write_output(@features);
-    $job->set_status('DONE');    
+    else {
+	my $output= $job->output_file();
+	print STDERR "Got output file $output\n\n";
+	
+	my $runnable = "$module"->new(-input_id => $job->input_id,
+				      -dbobj    => $anadb);
+	my @features=$runnable->fetch_output($output);
+	print STDERR "Got features from frozen output (when it's fixed)\n";
+	$runnable->write_output(@features);
+	$job->set_status('DONE');    
+    }
     
 }
 
