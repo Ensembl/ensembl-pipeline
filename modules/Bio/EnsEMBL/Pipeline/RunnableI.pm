@@ -435,6 +435,7 @@ sub writefile {
 
     $clone_out->write_seq($self->$seqobj())
       or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
+      $self->file($seqfilename);
 
 
   } else {
@@ -445,7 +446,7 @@ sub writefile {
 
     # This is bad.  The subclass has the query method not this interface.
     $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
-
+    $self->file($self->filename);
   }
 }
 

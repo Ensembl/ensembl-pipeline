@@ -155,6 +155,7 @@ sub query {
         $self->{'_query'} = $seq ;
         $self->filename($seq->id.".$$.seq");
         $self->results($self->filename.".genscan");
+	$self->file($self->results);
     }
     return $self->{'_query'};
 }
