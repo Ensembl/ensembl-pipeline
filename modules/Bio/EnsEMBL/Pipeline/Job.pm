@@ -268,7 +268,7 @@ sub set_current_status{
 
 sub run{
   my ($self) = @_;
-
+  print STDERR "have ".$self." object\n";
   my $rdb;
   my $module = $self->module;
   eval {

@@ -80,6 +80,7 @@ package Bio::EnsEMBL::Pipeline::Task;
 use vars qw(@ISA);
 
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::TaskStatus;
 
 @ISA = ('Bio::EnsEMBL::Root');
 
@@ -107,14 +108,15 @@ sub new {
 	my $class = ref($caller) || $caller;
 
 	my $self = bless({}, $class);
-
-	my $taskname = shift;
-	my $plm = shift;
-
+	print STDERR "args: @_\n";
+	my ($taskname, $plm) = $self->_rearrange([qw(TASKNAME PIPELINE_MANAGER)], @_);
+	
+	print STDERR "have taskname ".$taskname." plm ".$plm." ".$self->name."\n";
 	#
 	# Verify that the configuration is using the correct name
 	#
 	if($taskname ne $self->name) {
+	  
 		$self->throw("Task name in config [$taskname] != [" . $self->name() .
 								 "] as specified by the module " . ref($self));
 	}
@@ -226,8 +228,8 @@ sub create_Jobs {
   my $module = shift;
   my $id_set = shift;
   my $parameters = shift;
-
-  return $self->get_PipelineManager->createJobs($self->name(), $module, $id_set, $parameters);
+  print STDERR "module ".$module." idset ".$id_set." parameters ".$parameters."\n"; 
+  return $self->get_PipelineManager->create_Jobs($self->name(), $module, $id_set, $parameters);
 
 }
 

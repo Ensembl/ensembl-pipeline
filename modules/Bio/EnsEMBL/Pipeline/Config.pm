@@ -41,21 +41,20 @@ sub new {
     $self->throw("Cannot read config from files and dbadaptor at the same time.");
   }
 
-  # ... but at least one should be
-  if (!defined $files && !defined $db) {
-    $self->throw("One of -FILES or -DB should be defined in call to constructor of Config.pm.");
-  }
 
-  if (defined $files ) {
+  if ($files) {
+
 
     my @files = split(/ /, $files);
 
     $self->_parse_files(@files);
 
-  }
 
-  if (defined $db) {
+    # Store contents of $self->{'config'} in database
+    $self->_write_config_to_db();
 
+  } elsif($db) {
+c
     # store the DB
     $self->{'_dbobj'} = $db;
 
@@ -144,6 +143,8 @@ sub _write_config_to_db {
   }
 
   $stmt->finish();
+
+  $self->{'_dbobj'} = $dbobj;
 
 }
 

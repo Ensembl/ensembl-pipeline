@@ -5,7 +5,7 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::Config;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-
+use Bio::EnsEMBL::Pipeline::PipelineManager;
 # set a sgnal handler 
 $SIG{INT} = \&_shut_down;
 
@@ -53,6 +53,6 @@ $pipeline_manager->run();
 # Called when signal is recieved
 sub _shut_down {
 
-  $pipeline_manager->{'stop'};
+  $pipeline_manager->{'stop'} = 1;
 
 }

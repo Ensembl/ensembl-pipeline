@@ -40,6 +40,8 @@ sub new {
 
 	$self->_create_tasks();
 	$self->_create_submission_systems();
+	
+	return $self;
 }
 
 
@@ -132,8 +134,11 @@ sub _create_tasks {
       $self->throw("$module cannot be found for task $taskname.\n" .
 									 "Exception $@\n");
     }
-
-    my $task = "$module"->new($self, $taskname);
+	print STDERR "Trying to craete task ".$taskname." with ".$self."\n";	
+		my $task = "$module"->new(
+					  -TASKNAME => $taskname,
+					  -PIPELINE_MANAGER => $self,
+					 );
 
 		$self->_tasks()->{$taskname} = $task;
 	}
@@ -226,14 +231,14 @@ sub run {
 	#
 	# We maintain three lists: pending tasks, running tasks, finished tasks
 	#
-	my %pending_tasks = %{$self->{'tasks'}};
+	my %pending_tasks = %{$self->_tasks() || {}};
 	my %running_tasks;
 	my %finished_tasks;
 	
-	my $config = $self->config();
+	my $config = $self->get_Config();
 	
-	my $CHECK_INTERVAL = $config->get_parameter('PipelineManager',
-                                              'check_interval') || 120;
+	my $CHECK_INTERVAL = $config->get_parameter('Pipeline_Manager',
+                                              'check_interval');
 	my $last_check = 0;
 
 	#
@@ -241,7 +246,10 @@ sub run {
 	#
 	MAIN: while(!$self->stop()) {
 			
-		last MAIN if(!keys(%pending_tasks) && !keys(%running_tasks));
+	    if(!keys(%pending_tasks) && !keys(%running_tasks)) {
+	      print STDERR "\n\nNothing left to do, shutting down\n";
+	      last MAIN 
+	    }
 			
 		if(time() - $last_check > $CHECK_INTERVAL) {	
 			#
@@ -272,7 +280,7 @@ sub run {
 		#
 		foreach my $taskname (keys %running_tasks) {
 			my $task = $running_tasks{$taskname};
-			my ($subsystem, $parms) = @{$self->{'submission_systems'}->{$taskname}};
+			my $subsystem = $self->_submission_systems->{$taskname};
 
 			if($task->is_finished()) {
 				delete $running_tasks{$taskname};
@@ -291,11 +299,14 @@ sub run {
 			last MAIN if($self->stop());
 		}
 
-		
+		my $job_adaptor = $config->get_JobAdaptor();
 		#
 		# kill jobs that have been running for too long
 		#
-		while(my $job = shift @{$self->_timeout_list()}) {			
+		my $timeout_list = 
+		  $job_adaptor->fetch_all_by_dbID_list($self->_timeout_list());
+		$self->_timeout_list([]);
+		foreach my $job (@$timeout_list) {			
 			my $ss = $self->_submission_systems()->{$job->taskname()};
 			$ss->kill($job);
 		}
@@ -303,7 +314,10 @@ sub run {
 		#
 		# retry failed jobs
 		#
-		while(my $job = shift @{$self->_failed_list()}) {
+		my $failed_list = 
+		  $job_adaptor->fetch_all_by_dbID_list($self->_failed_list());
+		$self->_failed_list([]);
+		foreach my $job (@$failed_list) {
 			my $taskname = $job->taskname();
 			my $retry_count = $config->get_parameter($taskname, 'retries');
 			if($job->retry_count() < $retry_count) {
@@ -330,6 +344,8 @@ sub _tasks {
 
 sub _timeout_list {
 	my $self = shift;
+	
+	$self->{'_timeout_list'} = shift if(@_);
 
 	$self->{'_timeout_list'} ||= [];
 	return $self->{'_timeout_list'};
@@ -338,6 +354,7 @@ sub _timeout_list {
 sub _failed_list {
 	my $self = shift;
 	
+	$self->{'_failed_list'} = shift if(@_);
 	$self->{'_failed_list'} ||= [];
 	return $self->{'_failed_list'};
 }
@@ -370,7 +387,7 @@ sub _update_task_status {
 
 	my $config = $self->get_Config;
 
-	my $job_adaptor = $config->db()->get_JobAdaptor;
+	my $job_adaptor = $config->get_DBAdaptor()->get_JobAdaptor;
 
 	my $current_status_list = $job_adaptor->list_current_status();
 	my $current_time = time();
@@ -422,28 +439,28 @@ sub _update_task_status {
 	foreach my $taskname (keys %task_status) {
 		my $ts = $self->_tasks()->{$taskname}->get_TaskStatus();
 		if($task_status{$taskname}->{'CREATED'}) {
-			$ts->add_created_ids($task_status{$taskname}->{'CREATED'});
+			$ts->add_created($task_status{$taskname}->{'CREATED'});
 		}
 		if($task_status{$taskname}->{'SUBMITTED'}) {
-			$ts->add_submitted_ids($task_status{$taskname}->{'SUBMITTED'});
+			$ts->add_submitted($task_status{$taskname}->{'SUBMITTED'});
 		}
 		if($task_status{$taskname}->{'READING'}) {
-			$ts->add_reading_ids($task_status{$taskname}->{'READING'});
+			$ts->add_reading($task_status{$taskname}->{'READING'});
 		}
 		if($task_status{$taskname}->{'WRITING'}) {
-			$ts->add_writing_ids($task_status{$taskname}->{'WRITING'});
+			$ts->add_writing($task_status{$taskname}->{'WRITING'});
 		}
 		if($task_status{$taskname}->{'RUNNING'}) {
-			$ts->add_running_ids($task_status{$taskname}->{'RUNNINNG'});
+			$ts->add_running($task_status{$taskname}->{'RUNNINNG'});
 		}
 		if($task_status{$taskname}->{'SUCCESSFUL'}) {
-			$ts->add_successful_ids($task_status{$taskname}->{'SUCCESSFUL'});
+			$ts->add_successful($task_status{$taskname}->{'SUCCESSFUL'});
 		}
 		if($task_status{$taskname}->{'FATAL'}) {
-			$ts->add_fatal_ids($task_status{$taskname}->{'FATAL'});
+			$ts->add_fatal($task_status{$taskname}->{'FATAL'});
 		}
 		if($task_status{$taskname}->{'EXISTING'}) {
-			$ts->add_existing_ids($task_status{$taskname}->{'EXISTING'});
+			$ts->add_existing($task_status{$taskname}->{'EXISTING'});
 		}
 	}
 }
@@ -479,7 +496,7 @@ sub _update_task_status {
 
 sub create_Job {
 	my ($self, $taskname, $modulename, $input_id, $parms) = @_;
-
+	print STDERR "PM module ".$modulename." idset ".$input_id." parameters ".$parms."\n"; 
 	my $ssystem = $self->_submission_systems()->{$taskname};
 	
 	my $job = $ssystem->create_Job($taskname, $modulename, $input_id, $parms);
@@ -524,12 +541,12 @@ sub create_Jobs {
 	my $ts = $task->get_TaskStatus();
 
 	# discard ids that have already been created
-	$id_set = $id_set->not($ts->get_existing_IDSet());
+	$id_set = $id_set->not($ts->get_existing());
 
 	#
 	# submit the jobs
 	#
-	foreach my $id (@{$id_set->get_all_ids}) {
+	foreach my $id (@{$id_set->ID_list}) {
 		$self->create_Job($taskname, $modulename, $id, $parms);
 	}
 }
