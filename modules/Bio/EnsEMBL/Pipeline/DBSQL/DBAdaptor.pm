@@ -95,29 +95,6 @@ sub get_PmatchFeatureAdaptor{
   
 }
 
-=head2 get_AnalysisAdaptor
-
- Title   : get_AnalysisAdaptor
- Usage   : $db->get_AnalysisAdaptor
- Function: The Adaptor for Analysis objects in this db
- Example :
- Returns : Bio::EnsEMBL::DBSQL::AnalysisAdaptor
- Args    : nothing
-
-=cut
-
-sub get_AnalysisAdaptor {
-  my ($self) = @_;
-
-  if( ! defined $self->{_AnalysisAdaptor} ) {
-    require Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
-    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::DBSQL::AnalysisAdaptor->new
-      ( $self );
-  }
-
-  return $self->{_AnalysisAdaptor};
-}
-
 
 =head2 get_RuleAdaptor
 
@@ -166,6 +143,17 @@ sub get_StateInfoContainer {
   return $self->{_StateInfoContainer};
 }
 
+sub get_AnalysisAdaptor {
+  my ($self) = @_;
+
+  if( ! defined $self->{_AnalysisAdaptor} ) {
+    require Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
+      ( $self );
+  }
+
+  return $self->{_AnalysisAdaptor};
+}
 
 =head2 _db_handle
 

@@ -52,6 +52,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::Analysis;
 use vars qw(@ISA);
 use strict;
 
@@ -103,11 +104,11 @@ sub fetch_analysis_by_input_id {
 
   while( my @row = $sth->fetchrow_array ) {
     my $analysis = $anaAd->fetch_by_dbID( $row[0] );
-    if( defined $analysis ) {
+    if($analysis ) {
       push( @result, $analysis );
     }
   }
-
+  
   return \@result;
 }
 
@@ -338,8 +339,9 @@ and returns a Bio::EnsEMBL::DBSQL::DBAdaptor.
 sub db {
   my ( $self, $arg )  = @_;
 
-  ( defined $arg ) &&
-    ($self->{'_db'} = $arg);
+  if($arg){ 
+    $self->{'_db'} = $arg;
+  }
   $self->{'_db'};
 }
 
