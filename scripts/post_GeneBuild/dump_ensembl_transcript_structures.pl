@@ -4,6 +4,7 @@
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Getopt::Long;
 use strict;
 
@@ -39,16 +40,13 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dbhost,
 my $dnadb;
 if ($dnadbhost && $dnadbname ){
   $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dnadbhost,
-						 -user   => $dbuser,
-						 -dbname => $dnadbname,
-						);
+					      -user   => $dbuser,
+					      -dbname => $dnadbname,
+					     );
   $db->dnadb($dnadb);
 }
 
-  
-
-
-open (OUT,     ">$file" )     or die ("cannot open $file");
+  open (OUT,     ">$file" )     or die ("cannot open $file");
 
 print STDERR "connected to $dbname : $dbhost\n";
 my $sa = $db->get_SliceAdaptor;
