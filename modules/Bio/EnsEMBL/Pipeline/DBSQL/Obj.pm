@@ -41,6 +41,8 @@ use strict;
 use DBI;
 
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use FreezeThaw qw(freeze thaw);
 
 # Inherits from the base bioperl object
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::Root::Object);
@@ -115,15 +117,32 @@ sub get_Job {
 
     my $analysis    = $self->get_Analysis($analysis_id);
 
-    my $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id => $id,
-						     -input_id => $input_id,
-						     -analysis => $analysis,
-						     -LSF_id   => $LSF_id,
-						     -machine  => $machine,
-						     -object   => $object,
-						     -queue    => $queue,
-						     );
+    my $job;
 
+    if (defined($object)) {
+	print(STDERR "Recreating job object from stored version\n");
+	
+	($job)  = FreezeThaw::thaw($object);
+
+	if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) {
+	    $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
+	}
+
+	$job->_dbobj($self);
+
+    } else {
+	print(STDERR "Creating new job object - no stored version\n");
+	
+	$job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id => $id,
+						      -input_id => $input_id,
+						      -analysis => $analysis,
+						      -LSF_id   => $LSF_id,
+						      -machine  => $machine,
+						      -queue    => $queue,
+						      );
+	$job->_dbobj($self);
+    }
+    
     return $job;
 }
 
@@ -373,7 +392,7 @@ sub prepare{
  Function: Get/set method for the database handle
  Example :
  Returns : A database handle object
- Args    : a SQL string
+ Args    : A database handle object
 
 
 =cut
@@ -386,3 +405,10 @@ sub _db_handle {
     }
     return $self->{_db_handle};
 }
+
+
+
+
+
+
+

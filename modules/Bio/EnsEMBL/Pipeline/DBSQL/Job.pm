@@ -38,6 +38,8 @@ package Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use vars qw(@ISA);
 use strict;
 
+use FreezeThaw qw(freeze thaw);
+
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
@@ -73,6 +75,9 @@ sub _initialize {
     $self->input_id($input_id);
     $self->queue   ($queue);
     $self->analysis($analysis);
+
+    $self->LSF_id(-1);
+    $self->machine("__NONE__");
 
     if ($create == 1) {
 	$self->get_id;
@@ -144,7 +149,7 @@ sub get_id {
     $self->id($id);
 
     my $status  = $self->set_status('CREATED');
-
+    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
     return $id;
 }
 
@@ -266,26 +271,46 @@ sub machine {
 =cut
 
 sub submit {
-    my ($self) = @_;
+    my ($self,$obj) = @_;
 
-    $self->throw("Method submit not implemented");
+    $self->store($obj);
+
+    my $status = $self->set_status("STORED");
+    
+    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
+
+    return $status;
 }
 
+=head2 store
 
-=head2 freeze
-
-  Title   : freeze
-  Usage   : $self->freeze
-  Function: Freezes the object into a string
-  Returns : String
-  Args    : None
+  Title   : store
+  Usage   : $self->store
+  Function: Stores the object as a string in the database
+  Returns : Bio::EnsEMBL::Pipeline::Status
+  Args    : none
 
 =cut
 
-sub freeze {
-    my ($self) = @_;
+sub store {
+    my ($self,$obj) = @_;
 
-    $self->throw("Method freeze not implemented");
+    $self->throw("Not connected to database") unless defined($self->_dbobj);
+
+    my ($jobstr) = FreezeThaw::freeze($obj);
+    
+    my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue) " .
+		 "values( " . $obj->id .   "," .
+		 $obj->input_id        .   "," .
+		 $obj->analysis->id    .   "," .
+		 $obj->LSF_id          .   ",\"" .
+		 $obj->machine         . "\",\"".
+		 $jobstr               . "\",\"".
+		 $obj->queue           . "\")");
+
+    my $sth = $self->_dbobj->prepare($query);
+    my $res = $sth->execute();
+
 }
 
 
@@ -306,6 +331,7 @@ sub submission_checks {
     my ($self) = @_;
 
     $self->throw("Method submission_checks not implemented");
+
 }
 
 =head2 set_status
@@ -370,6 +396,7 @@ sub current_status {
     } 
 
     ## Should go to the database here if we don't have a status object
+    
     return $self->{_status};
 }
 

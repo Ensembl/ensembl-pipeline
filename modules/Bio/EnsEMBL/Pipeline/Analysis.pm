@@ -277,7 +277,7 @@ sub module {
   Usage   : $self->module_version
   Function: Get/set method for the module version number
   Returns : string
-  Args    : stiring
+  Args    : string
 
 =cut
 
@@ -372,3 +372,19 @@ sub created {
 }
 
 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,159 @@
+#!/usr/local/bin/perl
+
+=head1 NAME
+
+createAnalysis - creates a new analysis object
+
+=head1 SYNOPSIS
+ 
+ createAnalysis
+
+=head1 DESCRIPTION
+
+This script transfers all the features attached to a clone to a new
+database and deletes any existing features
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+    
+    -nowrite   Runs entire script without writing in recipient
+
+    -verbose   Gets all the print STDERR for testing purposes
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Bio::EnsEMBL::Pipeline::SimpleJob;
+use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Pipeline::Runnable::ProcessList;
+
+
+my $dbhost = 'croc';
+my $dbport = 3306;
+my $dbname = 'analysis';
+my $dbuser = 'root';
+my $dbpass = '';
+my $help;
+
+&GetOptions( 
+	     'dbhost:s'  => \$dbhost,
+	     'dbport:n'  => \$dbport,
+	     'dbname:s'  => \$dbname,
+	     'dbuser:s'  => \$dbuser,
+	     'dbpass:s'  => \$dbpass,
+	     'h|help'    => \$help,
+	     );
+
+if ($help) {
+    exec('perldoc', $0);
+}
+
+$| = 1;
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj      (-host   => $dbhost,
+						      -port   => $dbport,
+						      -dbname => $dbname,
+						      -user   => $dbuser,
+						      -pass   => $dbpass);
+
+die "Can't connect to database [$dbhost:$dbport:$dbname:$dbuser:$dbpass]" unless $db;
+
+print(STDERR "Connected to database $dbhost:$dbport:$dbuser:$dbname\n");
+
+# Create a new analysis object - this would usually 
+# be done by another script and we'd retrieve it from the database
+
+my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => '__NONE__',
+						      -db_version      => '__NONE__',
+						      -db_file         => '__NONE__',
+						      -program         => 'simple',
+						      -program_version => -1,
+						      -program_file    => '__NONE__',
+						      -module          => 'Bio::EnsEMBL::Pipeline::Runnable::ProcessList.pm',
+						      -module_version  => 1,
+						      -gff_source      => 'test',
+						      -gff_feature     => 'test',
+						      -parameters      => "");
+
+print(STDERR "Created new analysis object\n");
+
+$db->write_Analysis($analysis);     # Write the analysis object into the database
+
+# Create a new job and create it in  the database.  This creates
+# a unique id and sets the status to CREATED
+my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $db,
+						      -input_id => 1,
+						      -analysis => $analysis,
+						      -queue    => 'fast_blast_farm',
+						      -create   => 1,
+						      );
+
+# This is the module that does all the work
+
+my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ProcessList();
+
+print(STDERR "Created new job object\n");
+
+# SimpleJob knows about the code and programs it's going to run and contains
+# a generic Job object that knows about writing itself into the database.
+# In this case it just does a ps -ef and stores the processes in a hash.
+
+my $simjob  = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
+						    -runnable => $runnable);
+
+my $id      = $simjob->id;         
+
+print(STDERR "Created new SimpleJob object [$id]\n");
+
+# Submit the job - writes the object in the database and sets the status to STORED
+# In practice this would submit to the LSF queue and retrieve an LSF id,
+# write that in the database too and set the status to SUBMITTED
+$simjob->submit;
+
+$simjob     = undef;         
+$job        = undef;
+
+# Fetch the job from the database and run it.  This would usually be done on a machine
+# on the blast farm.
+
+my $runjob  = $db->get_Job($id);      print(STDERR "Fetching job from database\n");
+   $runjob->run();                    print(STDERR "Running job\n");
+   $runjob  = undef;
+
+# Now fetch the output from the database
+
+my $outjob = $db->get_Job($id);       print(STDERR "Fetching run job from database\n");
+my @out    = $outjob->output;         print(STDERR "Fetching output\n");
+
+print(STDERR "Output is : \n");
+
+foreach my $out (@out) {
+    print(STDERR $out->{name} . "\t" . $out->{pid} . "\t" . $out->{cmd} . "\n");
+}
+
+$db->_db_handle->disconnect;
+
+
+
+
+
+
+
+
+
