@@ -334,8 +334,8 @@ sub align_hits_to_contig {
       my $cdna_total = 1;
       foreach my $gcoord ( @split ) {
 	if($gcoord->isa('Bio::EnsEMBL::Mapper::Gap')) {
-	  $self->throw('Unexpected gap mapping peptide' .
-		       'coords to genomic coords');
+	  $cdna_total += $gcoord->length;
+	  next;
 	}
 
 	my $cdna_start = $cdna_total;
