@@ -151,7 +151,7 @@ sub score_Transcripts{
  CLUSTER:
   foreach my $cluster ( @clusters ){
 
-    my $cluster_count++;
+    $cluster_count++;
     my $label;
     
     my @trans = @{ $cluster->get_Transcripts };
@@ -164,6 +164,13 @@ sub score_Transcripts{
     
     if (scalar(@trans)==1 ){
       print STDERR "1 transcript-> all exons get 100 as score\n" if $verbose;
+      $label = '';
+      if ( $self->_label ){
+	$label = $self->_label;
+      }
+      my $tran_id = $label."-".$cluster_count."-".1;
+      $tran->stable_id($tran_id);
+      
       foreach my $exon ( @{$trans[0]->get_all_Exons} ){
 	$exon->score( 100 );
       }
@@ -193,7 +200,8 @@ sub score_Transcripts{
 	$label = $self->_label;
       }
       my $tran_id = $label."-".$cluster_count."-".$tran_count;
-      
+      $tran->stable_id($tran_id);
+
       # list of ESTs:
       my @list = @{ $self->hold_list($tran) };
 	
