@@ -49,9 +49,10 @@ package Bio::EnsEMBL::Pipeline::Tools::ApproxAlign;
 
 use aat;
 use strict;
-use vars qw(@ISA);
+
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
+use vars qw(@ISA);
 @ISA = qw (aat Bio::EnsEMBL::Pipeline::RunnableI);
 
 ### TODO:
@@ -97,6 +98,11 @@ sub new {
   $self->checkdir();
 
   return $self;
+}
+
+sub DESTROY{
+  my $self = shift;
+     $self->deletefiles;
 }
 
 sub exonbounds {
@@ -218,6 +224,8 @@ sub write {
   }
   close(OUT);
   $self->aatfile($aatfile);
+
+  $self->file($aatfile);
   return;
 }
 
