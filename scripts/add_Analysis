@@ -1,5 +1,63 @@
 #!/usr/local/bin/perl
 
+=head1 NAME
+
+add_Analysis, handles insertion of analysis objects into the database
+
+=head1 SYNOPSIS
+
+add_Analysis -host -port -user -pass -dbname -logic_name -module -type
+
+=head1 DESCRIPTION
+
+this script will insert analysis objects into a ensembl core database
+with the pipeline tables added on
+
+for the script to work the db files are required as are -logic_name
+-module and -type
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+  
+    -logic_name the logic name of the analysis
+    
+    -database the name of the analysis database
+  
+    -database_version the version of the analysis database
+   
+    -database_file the full path to the database
+ 
+    -program the name of the program being used
+ 
+    -program_version the version of the program
+
+    -module the name of the module, the module should either live in
+     Bio::EnsEMBL::Pipeline::RunnableDB or you should provide the full 
+     path to the module
+
+    -module_version the version of the module
+
+    -gff_source the source of the data ie RepeatMasker
+
+    -gff_feature the type of feature ie Repeat
+
+    -input_type the type of input_id this analysis will take, this should
+     be all in uppercase ie CONTIG or SLICE
+
+    
+=cut
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -26,6 +84,7 @@ my $module_version;
 my $gff_source;
 my $gff_feature;
 my $input_type;
+my $help;
 
 &GetOptions(
             'host:s'    => \$host,
@@ -46,27 +105,42 @@ my $input_type;
             'gff_sources:s'      => \$gff_source,
             'gff_feature:s'      => \$gff_feature,
 	    'input_type:s'       => \$input_type,
+	    'h|help'            => \$help,
            );
+
+
+my $analysis = new Bio::EnsEMBL::Pipeline::Analysis;
+if(!$help){
+  if (!defined($logic_name)) {
+    print STDERR "Analysis must have a logic_name defined\n";
+    $help = 1;
+  }
+  
+  if (!defined($module)) {
+    print STDERR "Analysis must have a module defined\n";
+    $help = 1;
+  }
+  
+  if (!defined($input_type)) {
+    print STDERR "Analysis must have an input type \n";
+    $help = 1;
+  }
+  
+  if(!$host || !$user || !$pass || !$dbname){
+    print STDERR "need to give database settings on the commandline\n";
+    $help = 1;
+  }
+}
+
+if ($help) {
+    exec('perldoc', $0);
+}
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,
                                                       -pass   => $pass,
                                                       -port   => $port,
                                                       -dbname => $dbname);
-
-my $analysis = new Bio::EnsEMBL::Pipeline::Analysis;
-
-if (!defined($logic_name)) {
-   die "Analysis must have a logic_name defined";
-}
-
-if (!defined($module)) {
-   die "Analysis must have a module defined";
-}
-
-if (!defined($input_type)) {
-    die "Analysis must have an input type";
-}
 
 if ($logic_name)       {$analysis->logic_name        ($logic_name);}
 if ($database  )       {$analysis->db                ($database);}
