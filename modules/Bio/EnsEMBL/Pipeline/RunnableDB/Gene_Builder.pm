@@ -144,12 +144,14 @@ sub write_output {
     my $dbhost = $GB_FINALDBHOST;
     my $dbuser = $GB_FINALDBUSER;
     my $dbpass = $GB_FINALDBPASS;
-    
+    my $dbport = $GB_FINALDBPORT;
+
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
 						'-user'   => $dbuser,
 						'-dbname' => $dbname,
 						'-pass'   => $dbpass,
+						'-port'   => $dbport,
 						'-dnadb'  => $self->db,
 					       );
     # sort out analysis
