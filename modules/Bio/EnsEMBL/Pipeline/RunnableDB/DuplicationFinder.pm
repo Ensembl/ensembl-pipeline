@@ -478,10 +478,6 @@ sub _write_output_as_text {
 
       ($alignment{$match->{query_id}})->desc =~ /($transl_regex\w*)/;
       my $query_translation_id = $1;
-print STDERR "REGEX : " . $transl_regex . "\n";
-print STDERR "DESCRIPTION : " . ($alignment{$match->{query_id}})->desc . "\n";
-print STDERR "QUERY TRANSLATION ID : $query_translation_id\n";
-die;
       ($alignment{$match->{match_id}})->desc =~ /($transl_regex\w*)/;
       my $match_translation_id = $1;
 
@@ -747,9 +743,12 @@ sub _make_output_file {
     throw("Output directory [" . $self->_output_dir . "] does not exist.")
   }
 
-  $self->input_id =~ /(\d\d)$/;
+  # Parse off the last two digits (or at a pinch, the last two alphanumeric
+  # characters) from our input id.  This will be used as an output directory
+  # name (so that the output directories are finely grained and managable).
+  $self->input_id =~ /(\w)[\W\_]?(\w)$/;
 
-  my $sub_dir = $self->_output_dir . "/" . $1;
+  my $sub_dir = $self->_output_dir . "/" . $1 . $2;
   $sub_dir =~ s/\/\//\//g;  # !
 
   unless (-d $sub_dir) {
