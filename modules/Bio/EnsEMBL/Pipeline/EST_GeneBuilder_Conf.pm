@@ -112,6 +112,7 @@ use vars qw( %EST_GeneBuilder_Conf );
   	    	    
 			 EST_MAX_EVIDENCE_DISCONTINUITY => 10,
 			 REJECT_SINGLE_EXON_TRANSCRIPTS => 0,
+			 GENOMEWISE_SMELL               => 0,
 			 
 			 EST_MAX_INTRON_SIZE => 200000,
 			 

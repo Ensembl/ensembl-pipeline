@@ -104,6 +104,7 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     cDNA_DBPASS
 						     cDNA_GENETYPE
 						     REJECT_SINGLE_EXON_TRANSCRIPTS
+						     GENOMEWISE_SMELL
 				       );
 
 
@@ -326,7 +327,7 @@ sub fetch_input {
 	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									      -genomic  => $slice,
 									      -analysis => $self->analysis,
-									      -smell    => 2,
+									      -smell    => $GENOMEWISE_SMELL,
 									      );
 	  
 	  $self->add_runnable($runnable,$strand);
@@ -386,7 +387,7 @@ sub fetch_input {
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic  => $rev_slice,
 									    -analysis => $self->analysis,
-									    -smell => 2,
+									    -smell    => $GENOMEWISE_SMELL,
 									   );
 	$self->add_runnable($runnable, $strand);
 	$runnable->add_Transcript($tran);
