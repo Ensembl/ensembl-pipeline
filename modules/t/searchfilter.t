@@ -23,7 +23,7 @@ END { print "not ok 1\n" unless $loaded; }
 
 
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::Runnable::SearchFiler;
+use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
