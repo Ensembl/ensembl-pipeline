@@ -51,6 +51,8 @@ require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 $| = 1; # disable buffering
 
+my %seqnames;
+
 &parse_refseq();
 &parse_sptr();
 
@@ -220,6 +222,22 @@ sub write_output {
   my ($prot, $cdna) = @_;
   my $outfile    = $::scripts_conf{'cdna_pairs'};
   my $seqoutfile = $::scripts_conf{'cdna_seqs'};
+  return unless defined $cdna;
+
+  if(defined $seqnames{$cdna->accession_number}){
+    print STDERR "already output " . $cdna->accession_number . "\n";
+    return;
+  }
+
+  # track that we've already written this sequence
+  $seqnames{$cdna->accession_number} = 1;
+
+  # catch stupidly long cdnas
+  if($cdna->length > 10000){
+    print STDERR $cdna->accession_number . " is " . $cdna->length . " bp long - rejecting it\n";
+    return;
+  }
+
   {
     open (OUT, ">>$outfile") or die "Can't open [$outfile]\n";
     print OUT "$prot : ";
