@@ -1,35 +1,16 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..5\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 6;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::CPG;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+ok(1);
+ok(my ($seq) =  set_seq());
 
 
 my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
@@ -37,35 +18,17 @@ my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
                                     -accession   => 'ACOOOO74',
                                     -moltype     => 'dna');
 
-
-unless ($clone) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
-
-#create CPG object    
-my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $clone, -GC => 75, -LENGTH => 50);
+ok($clone);
+ok(my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $clone, -GC => 75, -LENGTH => 50));
  
-unless ($cpg)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
-
-#test length setting etc
-#$cpg->min_gc(70);
-
-#run cpg                                                
 $cpg->run();
-print "ok 4\n"; # 4th test passed
 
-#get and store the output
-my @results = $cpg->output();
+ok(1);
+
+ok(my @results = $cpg->output());
+
 display(@results);
 
-unless (@results) 
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
 
 sub display {
   my @results = @_;
