@@ -49,7 +49,7 @@ use strict;
 use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::Hmmpfam;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -89,9 +89,14 @@ sub new {
     if ($params ne "") { $params .= ","; }
     # get the path to the binaries from the Analysis object (analysisprocess table)
     $params .= "-program=>".$self->analysis->program_file.",";
+    # define the database
+    $params .= "-database=>".$self->analysis->db_file.",";
+    # define the options
+    $params .= "-options=>".$self->analysis->parameters;
+
     $self->parameters($params);
 
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Hmmpfam');
+    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam');
     return $self;
 }
 
@@ -168,7 +173,8 @@ sub runnable {
             foreach my $pair (@pairs) {
                 my ($key, $value) = split (/=>/, $pair);
 		$key =~ s/\s+//g;
-                $value =~ s/\s+//g;
+                # no, we need the spaces for the hmmpfam options
+#                $value =~ s/\s+//g;
                 $parameters{$key} = $value;
             }
         }
