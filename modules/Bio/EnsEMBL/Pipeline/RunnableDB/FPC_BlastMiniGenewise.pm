@@ -495,9 +495,9 @@ sub validate_transcript {
       my $intron;
       
       if ($exon->strand == 1) {
-	$intron = abs($exon->start - $previous_exon->end + 1);
+	$intron = abs($exon->start - $previous_exon->end - 1);
       } else {
-	$intron = abs($exon->end   - $previous_exon->start + 1);
+	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
       if ($intron > 100000) {
