@@ -42,6 +42,25 @@ CREATE TABLE analysis_set (
 );
 
 #
+# Table structure for table 'clone'
+#
+CREATE TABLE clone (
+       disk_id varchar(40) NOT NULL,
+       clone_group set("SU","EU","SF","EF") NOT NULL,
+       chromosome varchar(10) DEFAULT 'unk' NOT NULL,
+       last_check datetime NOT NULL,
+       created datetime NOT NULL,
+       dna_update_state int(10) unsigned DEFAULT '0' NOT NULL,
+       update_state int(10) unsigned DEFAULT '2' NOT NULL,
+       update_label varchar(40) DEFAULT 'dna_read' NOT NULL,
+       update_date datetime DEFAULT 'now()' NOT NULL,
+       modified datetime NOT NULL,
+       internal_lock int(10) DEFAULT '1' NOT NULL,
+       external_lock int(10) DEFAULT '1' NOT NULL,
+       PRIMARY KEY (disk_id)
+);
+
+#
 # Table structure for table 'exon_pair'
 #
 CREATE TABLE exon_pair (
