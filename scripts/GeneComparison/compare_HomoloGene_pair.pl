@@ -60,7 +60,7 @@ while(<MAP>){
   push( @{$human_cdnas{$humanLL}}, $humanNM );
   push( @{$mouse_cdnas{$mouseLL}}, $mouseNM );
   $human_cdna2protein{$humanNM}=$humanNP;
-  $mouse_cdna2protein{$mouseNP}=$mouseNP;
+  $mouse_cdna2protein{$mouseNM}=$mouseNP;
 }
 close(MAP);
 
@@ -151,17 +151,25 @@ foreach my $humanNM ( @human_cdnas ){
 ############################################################
 # pairs created:
 my $best_transcript_pairs_object = $transcript_map->stable_marriage;
+my $transcript_pair_count = scalar($best_transcript_pairs_object->list1);
+print STDERR "Transcript pairs created: ".$transcript_pair_count."\n";
+my $best_protein_pairs_object = $protein_map->stable_marriage;
+my $protein_pair_count = scalar($best_protein_pairs_object->list1);
+print STDERR "Protein pairs created: ".$protein_pair_count."\n";
 
-my $pair_count = scalar($best_transcript_pairs_object->list1);
-print STDERR "Transcript pairs created: ".$pair_count."\n";
+if ( $transcript_pair_count != $protein_pair_count ){
+  print STDERR "PAIR_MISMATCH\n";
+}
+
 foreach my $element1 ( $best_transcript_pairs_object->list1 ){
   foreach my $partner ( $best_transcript_pairs_object->partners( $element1 ) ){
+    
     # there should be only one
     my $id1 = $element1->display_id;
     my $id2 = $partner->display_id;
     my $protein_id1 =  $human_cdna2protein{$id1};
     my $protein_id2 =  $mouse_cdna2protein{$id2};
-      
+    
     print STDERR "Pair ( $id1 , $id2 ) with score: ".$best_transcript_pairs_object->score( $element1, $partner )."\n";
     
     ############################################################
@@ -179,12 +187,36 @@ foreach my $element1 ( $best_transcript_pairs_object->list1 ){
 	    "coverage2:$query_coverage\t".
 	      "perc_id:$perc_id\t".
 		"length_diff:$length_diff\n";
+    
+     
+    ############################################################
+    # do cdna alignments agree with the protein ones?
+    my $found = 0;
+  CDS:
+    foreach my $humanNP_seq ( $best_protein_pairs_object->list1 ){
+      if ( $protein_id1 eq $humanNP_seq->display_id ){
+	foreach my $mouseNP_seq ( $best_transcript_pairs_object->partners( $humanNP_seq ) ){
+	  if ( $protein_id2 eq $humanNP_seq->display_id ){
+	    $found = 1;
+	    print STDERR "CDS_PAIR_MATCH\n";
+	    last CDS;
+	  }
+	}
+      }
+    }
+    if ( $found == 0 ){
+      print STDERR "CDS_MISMATCH\t".
+	"$this_humanLL\t$id1\t$protein_id1\t".
+	  "$this_mouseLL\t$id2\t$protein_id2\n";
+    }
   }
 }
 
-my $best_protein_pairs_object = $protein_map->stable_marriage;
-$pair_count = scalar($best_protein_pairs_object->list1);
-print STDERR "Protein pairs created: ".$pair_count."\n";
+############################################################
+# protein pairs:
+my %human_protein2cdna = reverse %human_cdna2protein;
+my %mouse_protein2cdna = reverse %mouse_cdna2protein;
+
 foreach my $element1 ( $best_protein_pairs_object->list1 ){
   foreach my $partner ( $best_protein_pairs_object->partners( $element1 ) ){
     # there should be only one
@@ -207,5 +239,30 @@ foreach my $element1 ( $best_protein_pairs_object->list1 ){
 	    "coverage2:$query_coverage\t".
 	      "perc_id:$perc_id\t".
 		"length_diff:$length_diff\n";
+    
+    ############################################################
+    # do cdna alignments agree with the protein ones?
+    my $found = 0;
+  CDNA:
+    foreach my $humanNM_seq ( $best_transcript_pairs_object->list1 ){
+      my $protein_id1 = $human_cdna2protein{ $humanNM_seq->display_id};
+      if ( $protein_id1 eq $id1 ){
+	foreach my $mouseNM_seq ( $best_transcript_pairs_object->partners( $humanNM_seq ) ){
+	  my $protein_id2 = $mouse_cdna2protein{ $mouseNM_seq->display_id};
+	  if ( $protein_id2 eq $id2 ){
+	    $found = 1;
+	    print STDERR "CDNA_PAIR_MATCH\n";
+	    last CDNA;
+	  }
+	}
+      }
+    }
+    if ( $found == 0 ){
+      my $cdna_id1 = $human_protein2cdna{ $id1 };
+      my $cdna_id2 = $mouse_protein2cdna{ $id2 };
+      print STDERR "CDNA_MISMATCH\t".
+	"$this_humanLL\t$cdna_id1\t$id1\t".
+	  "$this_mouseLL\t$cdna_id2\t$id2\n";
+    }
   }
 }
