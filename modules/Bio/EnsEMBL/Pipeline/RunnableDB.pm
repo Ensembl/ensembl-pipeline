@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
@@ -66,7 +67,7 @@ use vars qw(@ISA);
                            -INPUT_ID    => $id,
                            -SEQFETCHER  => $sf,
 			   -ANALYSIS    => $analysis);
-                           
+
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB object
     Args    :   -db:         A Bio::EnsEMBL::DBSQL::DBAdaptor (required), 
@@ -77,15 +78,17 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    
+
     my $self = {};
     bless $self, $class;
- 
-    my ($db,$input_id, $seqfetcher, $analysis) = $self->_rearrange([qw(DB
-					    INPUT_ID
-					    SEQFETCHER 
-					    ANALYSIS )], 
-				        @args);
+
+    my ($db,
+        $input_id, 
+        $seqfetcher, 
+        $analysis) = &rearrange([qw(DB
+				    INPUT_ID
+				    SEQFETCHER
+			     	    ANALYSIS )], @args);
 
 
     $self->{'_genseq'}      = undef;
@@ -98,7 +101,7 @@ sub new {
 
     &throw("No input id input")        unless defined($input_id);
     $self->input_id($input_id);
-    
+
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
@@ -502,10 +505,6 @@ sub seqfetcher {
   my( $self, $value ) = @_;    
 
   if (defined($value)) {
-
-    #need to check if passed sequence is Bio::DB::RandomAccessI object
-    #$value->isa("Bio::DB::RandomAccessI") || 
-    #  $self->throw("Input isn't a Bio::DB::RandomAccessI");
 
     $self->{'_seqfetcher'} = $value;
   }
