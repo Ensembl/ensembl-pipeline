@@ -90,7 +90,7 @@ use vars qw( %GeneBuilder );
 		#
 
 		# introns longer than this are too long
-		GB_MINLONGINTRONLEN     => 10000, 
+		GB_MINLONGINTRONLEN     => 200000, 
 		
 		# exons smaller than this could be real due to framshifts
 		GB_MINSHORTEXONLEN      => 3, 
