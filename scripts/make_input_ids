@@ -43,6 +43,8 @@ this script allows input_ids to be generated and written to the input_id_analysi
     
     -verbose if you want more information about what the script is doing
     
+
+    -input_type if you want to override the standard input_id types
     
 =cut
 
@@ -172,7 +174,8 @@ if (!($analysis)) {
     }
   }
 
-$analysis->input_id_type($input_type); 
+print STDERR "have analysis ".$analysis->logic_name ." ".$analysis->input_id_type."\n";
+$analysis->input_id_type($input_type) if(!$analysis->input_id_type); 
 
 foreach my $id (@ids) {
     eval {
