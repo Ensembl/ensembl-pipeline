@@ -50,7 +50,7 @@ use strict;
 use Getopt::Long;
 
 use Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Pipeline::Analysis;
@@ -90,7 +90,7 @@ if ($help) {
     exec('perldoc', $0);
 }
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   ( -host   => $host,
     -dbname => $dbname,
     -user   => $dbuser,
