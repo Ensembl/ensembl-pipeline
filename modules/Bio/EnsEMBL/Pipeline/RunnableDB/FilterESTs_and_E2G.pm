@@ -59,8 +59,19 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::Tools::BPlite;
 use FileHandle;
 
-# config file; parameters searched for here if not passed in as @args
-do "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_GOLDEN_PATH
+					EST_REFDBHOST
+					EST_REFDBNAME
+					EST_REFDBUSER
+					EST_REFDBPASS
+					EST_DBNAME
+					EST_DBHOST
+					EST_DBUSER 
+					EST_DBPASS
+					EST_SOURCE
+					EST_INDEX
+				       );
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -109,24 +120,24 @@ sub new {
       
     }
 
-    $path = $::db_conf{'golden_path'};
+    $path = $EST_GOLDEN_PATH;
     $path = 'UCSC' unless (defined $path && $path ne '');
 #    print STDERR "path: $path\n";
     $self->dbobj->static_golden_path_type($path);
 
 #print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
-    $refdbname = $::db_conf{'refdbname'} unless (defined $refdbname && $refdbname ne '');
-    $refdbuser = $::db_conf{'refdbuser'} unless (defined $refdbuser && $refdbuser ne '');
-    $refdbhost = $::db_conf{'refdbhost'} unless (defined $refdbhost && $refdbhost ne '');
-    $refpass   = $::db_conf{'refdbpass'} unless (defined $refpass   && $refpass   ne '');
+    $refdbname = $EST_REFDBNAME unless (defined $refdbname && $refdbname ne '');
+    $refdbuser = $EST_REFDBUSER unless (defined $refdbuser && $refdbuser ne '');
+    $refdbhost = $EST_REFDBHOST unless (defined $refdbhost && $refdbhost ne '');
+    $refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
 
 #print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
-    my $estdbname = $::db_conf{'estdbname'};
-    my $estdbuser = $::db_conf{'estdbuser'};
-    my $estdbhost = $::db_conf{'estdbhost'};
-    my $estpass   = $::db_conf{'estdbpass'};
+    my $estdbname = $EST_DBNAME;
+    my $estdbuser = $EST_DBUSER;
+    my $estdbhost = $EST_DBHOST;
+    my $estpass   = $EST_DBPASS;
 
 #print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
     # if we have all the parameters for a refdb, make one
@@ -379,7 +390,7 @@ sub get_exon_analysis{
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
-  my $est_source = $::est_genome_conf{'est_source'};
+  my $est_source = $EST_SOURCE;
 
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $logicname\n");
@@ -437,7 +448,7 @@ sub fetch_input {
   print STDERR "got " . scalar(@allfeatures) . " external features\n";
   my @exonerate_features;
   my %exonerate_ests;
-  my $est_source = $::est_genome_conf{'est_source'};
+  my $est_source = $EST_SOURCE;
 
   foreach my $feat(@allfeatures){
     if (defined($feat->analysis)      && defined($feat->score) && 
@@ -1126,7 +1137,7 @@ sub run_blast {
 
 sub make_seqfetcher {
   my ( $self ) = @_;
-  my $index   = $::est_genome_conf{'est_index'};
+  my $index   = $EST_INDEX;
 
   my $seqfetcher;
 

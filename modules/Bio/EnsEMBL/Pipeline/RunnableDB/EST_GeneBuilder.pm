@@ -59,8 +59,19 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::TranscriptCluster;
 
 # config file; parameters searched for here if not passed in as @args
-# do FILE == the file FILE gets executed as script
-do "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_REFDBHOST
+					EST_REFDBUSER
+					EST_REFDBNAME
+					EST_REFDBPASS
+					EST_GOLDEN_PATH	
+					EST_INDEX
+					EST_GENEBUILDER_INPUT_GENETYPE
+					EST_EVIDENCE_TAG
+					EST_MIN_EVIDENCE_SIMILARITY
+					EST_MAX_EVIDENCE_DISCONTINUITY
+					EST_GENOMEWISE_GENETYPE
+				       );
 
 # use new Adaptor to get some extra info from the ESTs
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
@@ -78,10 +89,10 @@ sub new {
     }
     # dbobj needs a reference dna database
     my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  -host             => $::db_conf{'refdbhost'},
-						  -user             => $::db_conf{'refdbuser'},
-						  -dbname           => $::db_conf{'refdbname'},
-						  -pass             => $::db_conf{'refdbpass'},
+						  -host             => $EST_REFDBHOST,
+						  -user             => $EST_REFDBUSER,
+						  -dbname           => $EST_REFDBNAME,
+						  -pass             => $EST_REFDBPASS,
 						  -perlonlyfeatures => 0,
 						 );
 
@@ -99,7 +110,7 @@ sub new {
 
 
 
-    my $path = $::db_conf{'golden_path'};
+    my $path = $EST_GOLDEN_PATH;
     $path    = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
 
@@ -123,7 +134,7 @@ sub new {
 
 sub make_seqfetcher {
   my ( $self ) = @_;
-  my $index   = $::est_genome_conf{'est_index'};
+  my $index   = $EST_INDEX;
 
   my $seqfetcher;
 
@@ -223,7 +234,7 @@ sub fetch_input {
     print STDERR "IN THE 121 BRANCH\n";
 
     # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
-    my $genetype =  $::est_genome_conf{'genetype'};
+    my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
 
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
@@ -444,13 +455,13 @@ sub _check_Transcripts {
   my ($self, $ref_transcripts, $strand) = @_;
 
   # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-  my $evidence_tag = $::evidence_conf{'evidence_tag'};
+  my $evidence_tag    = $EST_EVIDENCE_TAG;
   
   # the minimum allowed perc. identity of the evidence per exon 
-  my $min_similarity  = $::evidence_conf{'min_evidence_similarity'};
+  my $min_similarity  = $EST_MIN_EVIDENCE_SIMILARITY;
 
   # the maximum allowed discontinuity in EST hits
-  my $max_est_gap  = $::evidence_conf{'max_evidence_discontinuity'};
+  my $max_est_gap     = $EST_MAX_EVIDENCE_DISCONTINUITY;
 
   print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
 
@@ -614,7 +625,7 @@ sub _check_Transcripts {
       my $addition = int( $decimals / 50 );  # gives 1 ( or 0 ) if $decimals > ( or < ) 50
       $exon_score  = int( $exon_score ) + $addition;
       
-      # reject EXONS with perc_identity below $min_similarity = $::evidence_conf{'min_evidence_similarity'}
+      # reject EXONS with perc_identity below $min_similarity = $EST_MIN_EVIDENCE_SIMILARITY
 #      if ($min_similarity > $exon_score ){
 #	print STDERR "rejecting Exon due to low percentage identity = $exon_score\n";
 #	$rejected++;
@@ -2013,7 +2024,7 @@ sub run {
   # run genomewise 
 
   # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-  my $genetype = $::genomewise_conf{'genetype'};
+  my $genetype = $EST_GENOMEWISE_GENETYPE;
   
   # sort out analysis here or we will get into trouble with duplicate analyses
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
