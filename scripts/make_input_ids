@@ -20,9 +20,9 @@ this script allows input_ids to be generated and written to the input_id_analysi
 
     -dbname    For RDBs, what name to connect to (dbname= in locator)
 
-    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -user      For RDBs, what username to connect as (user= in locator)
 
-    -dbpass    For RDBs, what password to use (dbpass= in locator)
+    -pass      For RDBs, what password to use (pass= in locator)
 
     -help      Displays script documentation with PERLDOC
 
