@@ -1,7 +1,4 @@
 
-my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
-
-
 ### Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome
 
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
