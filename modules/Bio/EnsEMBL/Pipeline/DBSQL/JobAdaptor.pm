@@ -63,12 +63,14 @@ sub fetch_by_dbID{
   my $query = qq {
     SELECT $cols
     FROM job
-    WHERE job_id = $dbID };
+    WHERE job_id = ? };
 	
   my $sth = $self->prepare($query);
-  $sth->execute;
+  $sth->execute($dbID);
 
   my $jobs = $self->_jobs_from_sth($sth);
+
+  $sth->finish();
 
 	return undef if(!@$jobs);
 
@@ -103,10 +105,16 @@ sub fetch_all_by_dbID_list {
     FROM job
     WHERE job_id IN ($id_list) };
 	
+  print STDERR "\n\nSQL:\n$query\n\n";
+
   my $sth = $self->prepare($query);
   $sth->execute;
 	
-	return $self->_jobs_from_sth($sth);
+  my $result = $self->_jobs_from_sth($sth);
+
+  $sth->finish();
+
+	return $result;
 }
 
 
@@ -145,7 +153,11 @@ sub fetch_all_by_job_name {
   my $sth = $self->prepare($q);
   $sth->execute(@bindvals);
 
-  return $self->_jobs_from_sth($sth);
+  my $result = $self->_jobs_from_sth($sth);
+
+  $sth->finish();
+
+  return $result;
 }
 
 
@@ -202,6 +214,8 @@ sub fetch_all_by_status{
        -adaptor => $self);
   }
 
+  $sth->finish();
+
   return \@jobs;
 }
 
@@ -252,6 +266,8 @@ sub fetch_all_by_taskname{
 
 	my $jobs = $self->_jobs_from_sth($sth);
 
+  $sth->finish();
+
 	foreach my $job (@$jobs) {
     my $status = $self->fetch_current_status($job);
     $job->status($status);
@@ -276,11 +292,12 @@ sub _jobs_from_sth{
   my ($self, $sth) = @_;
 
   my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
-      $array_index, $parameters, $module, $stderr_file, $stdout_file,      $retry_count);
-  
+      $array_index, $parameters, $module, $stderr_file, $stdout_file,
+      $retry_count);
+
   $sth->bind_columns(\$job_id, \$taskname, \$input_id, 
-		     \$submission_id, \$job_name, \$array_index,
-		     \$parameters, \$module,
+                     \$submission_id, \$job_name, \$array_index,
+                     \$parameters, \$module,
 										 \$stderr_file, \$stdout_file, \$retry_count);
 
 	my @jobs;
@@ -301,6 +318,8 @@ sub _jobs_from_sth{
 			 -retry_count => $retry_count,
 			 -adaptor => $self);
   }
+
+  $sth->finish();
 
   return \@jobs;
 }
@@ -335,6 +354,8 @@ sub fetch_current_status{
   $sth->execute($job->dbID);
 
   my ($status) = $sth->fetchrow;
+
+  $sth->finish();
 
   return $status;
 }
@@ -375,6 +396,9 @@ sub list_current_status {
     push( @$result,
 	    [ $job_id, $taskname, $input_id,  $status, $timestamp ]);
   }
+
+  $sth->finish();
+
   return $result;
 }
 
@@ -405,6 +429,8 @@ sub update_status {
 
   my $sth = $self->prepare( $query );
   $sth->execute( $job->dbID(), $status );
+
+  $sth->finish();
 }
 
 
@@ -450,6 +476,8 @@ sub update {
 								$job->stdout_file,
 								$job->retry_count,
 							$job->dbID);
+
+  $sth->finish();
 }
 
 
@@ -496,6 +524,8 @@ sub store{
 		 $job->stderr_file,
 		 $job->retry_count);
 
+  $sth->finish();
+
   $job->adaptor($self);
   $job->dbID($sth->{'mysql_insertid'});
   $self->update_status($job, 'CREATED');
@@ -532,6 +562,8 @@ sub remove{
 
   $sth = $self->prepare($second);
   $sth->execute($job_id);
+
+  $sth->finish();
 }
 
 1;
