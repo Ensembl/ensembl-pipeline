@@ -234,16 +234,6 @@ sub build_Genes{
   my @transcript_clusters = $self->cluster_Transcripts(@all_transcripts);
   print STDERR scalar(@transcript_clusters)." clusters formed\n";
   
-  ## test
-  #my $ccount =0;
-  #foreach my $cluster (@transcript_clusters){
-  #  $ccount++;
-  #  print STDERR "* cluster $ccount:\n";
-  #  foreach my $tran ( @{$cluster->get_Transcripts} ){
-  #    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-  #  }
-  #}
-
   # prune the redundant transcripts for each cluster
   print STDERR "pruning transcripts...\n";
   my @pruned_transcripts = $self->prune_Transcripts(@transcript_clusters);
@@ -352,10 +342,7 @@ sub get_Genes {
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
 	
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $tran ); 
-	# my @valid_transcripts = $self->validate_transcript($t);
-	# next TRANSCRIPT unless scalar(@valid_transcripts);
-	
+	# do NOT check intron sizes - they're already tightly controlled by Targetted & Similarity stages
 	unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query ) && 
 		 Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)
 	       ){
@@ -572,6 +559,10 @@ sub prune_Transcripts {
     # allows retrieval of exon objects by exon->id - convenience
     my %exonhash;
     
+    # keep track of single exon transcripts (automatically rejected if the "top" transcript is multi exon), 
+    # so we can check their supporting evidence at the very end.
+    my %single_exon_rejects;    
+
     ##############################
     #
     # prune redundant transcripts
@@ -601,6 +592,7 @@ sub prune_Transcripts {
       # this loop, so they'll always be marked "transcript already seen"
       # How to sort them out? If the single exon overlaps an exon in a multi exon transcript then 
       # by our rules it probably ought to be rejected the same way transcripts with shared exon-pairs are.
+      # 27/5/2003 VAC But the supporting evidence should be transferred if we can! 
       # Tough one.
       # more of a problem is that if the transcript with the largest number of exons is really a
       # single exon with frameshifts, it will get rejected here based on intron size but in addition
@@ -653,10 +645,10 @@ sub prune_Transcripts {
 		# transfer evidence between exons, assuming the suppfeat coordinates are OK.
 		# currently not working as the supporting evidence is not there - 
 		# can get it for genewsies, but why not there for genscans?
-		#	      $self->transfer_supporting_evidence($exon1, $exon1a);
-		#	      $self->transfer_supporting_evidence($exon1a, $exon1);
-		#	      $self->transfer_supporting_evidence($exon2, $exon2a);
-		#	      $self->transfer_supporting_evidence($exon2a, $exon2);
+			      $self->transfer_supporting_evidence($exon1, $exon1a);
+			      $self->transfer_supporting_evidence($exon1a, $exon1);
+			      $self->transfer_supporting_evidence($exon2, $exon2a);
+			      $self->transfer_supporting_evidence($exon2a, $exon2);
 	      }
 	    }
 	  }
@@ -682,6 +674,12 @@ sub prune_Transcripts {
 	push(@newtran,$tran);
 	@evidence_pairs = ();
       } 
+      elsif ($found == 1 && $#exons == 0){
+	# save the transcript and check though at the end to see if we can transfer supporting
+	# evidence; if we try it now we may not (yet) have any exons that overlap in %exonhash
+	$single_exon_rejects{$tran} = $tran;
+
+      }
       else {
 	#print STDERR "transcript already seen:\n";
 	if ( $tran == $transcripts[0] ){
@@ -702,8 +700,28 @@ sub prune_Transcripts {
 	}
       }
     } # end of this transcript
-  }
+
+    # check to see if we can transfer evidence from rejected single exon transcripts
+    foreach my $reject(values %single_exon_rejects){
+      my @exons = @{$reject->get_all_Exons};
+      
+      # is there any supporting evidence?
+      my @sf = @{$exons[0]->get_all_supporting_features};
+      
+      foreach my $stored_exon(values %exonhash){
+	
+	if($exons[0]->overlaps($stored_exon)){
+	  # note that we could end up with bizarre situations of a single exon transcript overlapping 
+	  # two exons in a multi exon transcript, so the supporting evidence would be transferred in 
+	  # entirety to both exons.
+	  $self->transfer_supporting_evidence($exons[0], $stored_exon);
+	  
+	}
+      }
+    }
   
+  } #end CLUSTER 
+    
   return @newtran;
 }
  
@@ -1094,10 +1112,16 @@ sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
   foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
-      $prediction->type("ab-initio");
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
+    $prediction->type("ab-initio");
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
       $self->warn("We let in a prediction with wrong phases!");
+    }
+    
+    # now need to explicitly check intron sizes if required
+    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns( $prediction, $self->query ) ){
+      $self->warn("Rejecting prediction with long introns!");
+      next;
     }
     push ( @checked_predictions, $prediction );
   }
