@@ -181,7 +181,7 @@ sub getPfamDB{
 	my $value = $pfam_meta->list_value_by_key('pfam_db') || $self->throw("please enter pfam_db key - value into meta table\n");
 	my $pfam_db_conn = $self->db->make_hash_from_meta_value($value->[0]);
 #        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%{$pfam_meta->get_hash_by_key('pfam_db')});
-        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new($%pfam_db_conn);
+        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%$pfam_db_conn);
     }
     return $self->{'_pfam_db'};
 } 
