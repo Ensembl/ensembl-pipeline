@@ -259,7 +259,7 @@ sub run {
     }
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
-print $self->seqfetcher . "\n";
+
     my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $self->genomic_sequence,
                                                                      '-features'   => \@features,
                                                                      '-seqfetcher' => $self->seqfetcher,
