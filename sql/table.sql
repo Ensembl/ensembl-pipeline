@@ -26,9 +26,9 @@ CREATE TABLE job (
   retry_count       tinyint unsigned NOT NULL,
 
   PRIMARY KEY (job_id),
+  UNIQUE      (taskname, input_id),
   KEY         (job_name, array_index),
-  KEY         (input_id),
-  KEY         (taskname)
+  KEY         (input_id)
 );
 
 
