@@ -1,8 +1,8 @@
 #
 #
-# Cared for by Val Curwen  <vac@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Val Curwen
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -70,26 +70,28 @@ use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
 
 sub new {
   my ($class,@args) = @_;
-  my $self = $class->SUPER::new(@args);    
+  my $self = bless {}, $class;
   
-  $self->{'_fplist'}    = [];      # create key to an array of feature pairs
-  $self->{'_clone'}     = undef;   # location of Bio::Seq object
-  $self->{'_exonerate'} = undef;   # location of exonerate
-  $self->{'_workdir'}   = undef;   # location of temp directory
-  $self->{'_filename'}  = undef;   # file to store Bio::Seq object
-  $self->{'_estfilename'} = undef; # file to store EST Bio::Seq object
-  $self->{'_results'}     = undef; # file to store results of analysis
-  $self->{'_protected'}   = [];    # a list of files protected from deletion
-  $self->{'_arguments'}   = undef; # arguments for exonerate
+  $self->{'_fplist'}    = []; #create key to an array of feature pairs
+  $self->{'_clone'}     = undef;        #location of Bio::Seq object
+  $self->{'_exonerate'} = undef;     #location of exonerate
+  $self->{'_workdir'}   = undef;     #location of temp directory
+  $self->{'_filename'}  =undef;      #file to store Bio::Seq object
+  $self->{'_estfilename'} = undef;   #file to store EST Bio::Seq object
+  $self->{'_results'}     = undef;      #file to store results of analysis
+  $self->{'_protected'}   = [];         #a list of files protected from deletion
+  $self->{'_arguments'}   = undef;      #arguments for exonerate
   
   my( $genomic, $est, $exonerate, $arguments ) = 
     $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS)], @args);
   
   $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
+
+  # allow it to take a filename or an array ref
   $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
   if ($exonerate) 
   {   $self->exonerate($exonerate) ;}
@@ -115,23 +117,19 @@ sub new {
     Title   :   genomic_sequence
     Usage   :   $self->genomic_sequence($seq)
     Function:   Get/set method for genomic sequences
-    Returns :   reference to an array of Bio::Seq
-    Args    :   reference to an array of Bio::Seq
+    Returns :   Bio::PrimarySeqI
+    Args    :   Bio::PrimarySeqI
 
 =cut
 
 sub genomic_sequence {
   my( $self, $value ) = @_;    
   
-  print STDERR "In this function!!!\n";
-
-  if ($value) {
-      (ref($value) && $value->isa("Bio::PrimarySeqI")) 
-	  || $self->throw("Input [$value] isn't a Bio::PrimarySeqI");
-      
-      $self->{'_genomic_sequence'} = $value;
-      $self->filename($value->id.".$$.seq");
-      $self->results($self->filename.".exonerate.out");
+  if (defined $value) {
+    $self->throw("Input isn't a Bio::PrimarySeqI") unless $value->isa("Bio::PrimarySeqI");
+    $self->{'_genomic_sequence'} = $value;
+    $self->filename($value->id.".$$.seq");
+    $self->results($self->filename.".exonerate.out");
   }
   # returns a Bio::Seq
   return $self->{'_genomic_sequence'};
@@ -143,7 +141,7 @@ sub genomic_sequence {
     Usage   :   $self->est_sequence($seq)
     Function:   Get/set method for est sequences
     Returns :   reference to an array of Bio::Seq
-    Args    :   reference to an array of Bio::Seq
+    Args    :   Either a filename or a reference to an array of Bio::Seq
 
 =cut
 
@@ -151,14 +149,19 @@ sub est_sequence {
   my( $self, $value ) = @_;
 
   if ($value) {
-    # $value should be a reference to an array of Bio::Seq objects. These need to be written out to file
-    ref($value) eq 'ARRAY' || $self->throw("Expected an array reference, not $value");
-    foreach my $est(@$value) {
-      $est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+    if (ref($value) eq 'ARRAY') {
+      foreach my $est(@$value) {
+	$est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+      }
+      $self->{'_est_sequences'} = $value;
+      $self->estfilename("/tmp/estfile_.$$.fn");
     }
-    $self->{'_est_sequences'} = $value;
-    $self->estfilename($value->[0]->id.".$$.est.seq");
-    
+    else {
+      # it's a filename - check the file exists
+      $self->throw("[$value] : file does not exist\n") unless -e $value;
+      $self->estfilename($value);
+      $self->{'_est_sequences'} = $value;
+    }
   }
   
   #NB ref to an array of Bio::Seq
@@ -244,19 +247,23 @@ sub run {
     $self->throw("EST sequences not provided");
   
   #extract filenames from args and check/create files and directory
-  my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
-  my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $self->workdir());
+  my $genfile = "/tmp/genfile_$$.fn";
+  my $estfile = $self->estfilename;
   
   #use appropriate Bio::Seq method to write fasta format files
   {
     my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
+       #fill inputs
+    $genOutput->write_seq($genomicseq);
+  }
+  
+  # do we need to write out the est sequences?
+  if(ref($estseq) eq 'ARRAY'){
     my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
     
-    #fill inputs
-    $genOutput->write_seq($genomicseq);
-
+    
     foreach my $eseq(@$estseq) {
       $estOutput->write_seq($eseq);
     }
@@ -265,7 +272,7 @@ sub run {
   # finally we run the beast.
 
   $self->results($self->workdir()."/".$self->results());
-  my $exonerate_command = $self->exonerate() . " --cdna $estfile --genomic $genfile >" . $self->results();
+  my $exonerate_command = $self->exonerate() . " -n true -A false --cdna $estfile --genomic $genfile >" . $self->results();
   
   eval {
     # better to do this as a pipe?
@@ -277,12 +284,17 @@ sub run {
   };  
   
   #clean up temp files
-  $self->_deletefiles($genfile, $estfile);
+  if(ref($estseq) eq 'ARRAY'){
+    $self->_deletefiles($genfile, $estfile, $self->results);
+  }
+  else {
+    $self->_deletefiles($genfile, $self->results);
+  }
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
   else {
-   return (1);
+    return (1);
   }
 }
 
@@ -316,49 +328,90 @@ sub parse_results {
   my $queryname = "";
   while (<$filehandle>) {
     
-    if ($_ =~ /exonerate/) {
+# VAC temporary-ish changes - we're not using exonerate fully at the moment.
+# output parsing needs to be rahashed once exonerate is stable
+
+#    if ($_ =~ /exonerate/) {
+    if ($_ =~ /cigar/) {
       next if($_ =~ /^Message/);
-      
 
       #split on whitespace
       my @elements = split;
 
-      if( $elements[1] ne 'exonerate' ) { next; }
+#      if( $elements[1] ne 'exonerate' ) { next; }
+      next unless $elements[0] eq 'cigar:';
 
       if($_ =~ /query\s+\"(\w+)\"/) {
 	$queryname = $1;
       }
 
+# cigar parsing needs a LOT of looking at
+      # cigar: gi|550092|dbj|D29023.1|D29023 0 311 + static0 1996 2307 + 1555.00 M 311
       #extract values from output line [0] - [7]
-      my $primary_tag = $elements[2];
-      my $f1score  = $elements[5];
-      if ($f1score eq ".") { $f1score = 0; } # only genes have a score
-      my $f1start  = $elements[3];
-      my $f1end    = $elements[4];
-      my $f1id     = $elements[0];
+
+#      my $primary_tag = $elements[2];
+      my $primary_tag = 'Gene';
+
+      my $genomic_start  = $elements[6];
+      my $genomic_end    = $elements[7];
+      my $genomic_id     = $elements[5];
       # start & end on EST sequence are not currently given by exonerate output ...
-      my $f2start  = 1;
-      my $f2end    = 1;
+      my $est_id     = $elements[1];
+      my $est_start  = $elements[2];
+      my $est_end    = $elements[3];
       
       # est seqname
-      my $f2id     = $queryname;
-      my $f1source = $source_tag;
-      my $f2source = $source_tag;
-      my $f1strand = 1;
-      if ($elements[6] eq '-') {
-	$f1strand = -1;
+      my $genomic_score  = $elements[9];
+      if ($genomic_score eq ".") { $genomic_score = 0; } 
+      my $est_score = $genomic_score;
+
+      my $genomic_source = $source_tag;
+      my $est_source = $source_tag;
+
+      my $genomic_strand = 1;
+      if ($elements[4] eq '-') {
+	$genomic_strand = -1;
       }
+      my $est_strand = 1;
+      if ($elements[8] eq '-') {
+	$est_strand = -1;
+      }
+
       # currently doesn't deal well with - strand ... genes
-      #	  my $f2strand = $estOrientation;
-      my $f2strand = $f1strand;
-      my $f1primary = $primary_tag;
-      my $f2primary = $primary_tag;
+      my $genomic_primary = $primary_tag;
+      my $est_primary = $primary_tag;
+      
+
+#      my $primary_tag = $elements[2];
+#      my $f1score  = $elements[5];
+#      if ($f1score eq ".") { $f1score = 0; } # only genes have a score
+#      my $f1start  = $elements[3];
+#      my $f1end    = $elements[4];
+#      my $f1id     = $elements[0];
+#      # start & end on EST sequence are not currently given by exonerate output ...
+#      my $f2start  = 1;
+#      my $f2end    = 1;
+      
+#      # est seqname
+#      my $f2id     = $queryname;
+#      my $f1source = $source_tag;
+#      my $f2source = $source_tag;
+#      my $f1strand = 1;
+#      if ($elements[6] eq '-') {
+#	$f1strand = -1;
+#      }
+#      # currently doesn't deal well with - strand ... genes
+#      #	  my $f2strand = $estOrientation;
+#      my $f2strand = $f1strand;
+#      my $f1primary = $primary_tag;
+#      my $f2primary = $primary_tag;
       
       #create array of featurepairs              
-      $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
-      				$f2start, $f2end, $f2id, $f1source, 
-      				$f2source, $f1strand, $f2strand, 
-      				$f1primary, $f2primary);
+      $self->_createfeatures ($genomic_score, $genomic_start, $genomic_end, $genomic_id, 
+			      $est_start, $est_end, $est_id, 
+			      $genomic_source, $est_source, 
+			      $genomic_strand, $est_strand, 
+			      $genomic_primary, $est_primary);
     }    
   }
   close($filehandle);
@@ -422,7 +475,9 @@ sub output {
 
   #  could return a list of featurepairs, one per gene, as with Genewise.
 
-  return @{$self->{'_output'}};
+# TEMPORARY FIXME
+#  return @{$self->{'_output'}};
+  return @{$self->{'_fplist'}};
 }
 
 =head2 _create_features
