@@ -172,19 +172,19 @@ sub run {
       $self->throw("No peptide input");
     }
 
-    #print STDERR "Creating BioPrimarySeq ". " " . $transcript->get_cdna . "\n";
+    #print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
 
-    my $cdna = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
-				       -seq        => $transcript->get_cdna,
-				       -moltype    => 'dna' );
+    my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
+				       -seq        => $transcript->translate(),
+				       -moltype    => 'protein' );
 
-    #print STDERR "cDNA length: ", $cdna->length, "\n";
-    if ($cdna->length < 9) {
-      print "cDNA too short (min length is 9); skipping transcript\n";
+    #print STDERR "cDNA length: ", $peptide->length, "\n";
+    if ($peptide->length < 3) {
+      print "Peptide too short (min length is 3); skipping transcript\n";
       return;
     }
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $cdna,
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $peptide,
 								 -program   => $self->program,
 								 -database  => $self->database,
 								 -threshold => $self->threshold,
