@@ -45,7 +45,6 @@ The rest of the documentation details each of the object methods. Internal metho
 
 package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
-use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::Root::RootI;
 use vars qw(@ISA);
 use strict;
@@ -69,9 +68,9 @@ sub fetch_analysis_by_inputId_class {
   my $anaAd = $self->db->get_AnalysisAdaptor();
 
   my $sth = $self->prepare( q {
-    SELECT analysisId
-      FROM InputIdAnalysis
-     WHERE inputId = ?
+    SELECT analysis_id
+      FROM input_id_analysis
+     WHERE input_id = ?
        AND class = ? } );
   $sth->execute( $inputId, $class );
 
@@ -86,11 +85,11 @@ sub fetch_analysis_by_inputId_class {
 }
 
 sub store_inputId_class_analysis {
-  my ( $self, $inputId, $class, $analysis ) = @_;
+  my ($self, $inputId, $class, $analysis ) = @_;
 
   my $sth = $self->prepare( qq{
-    INSERT INTO InputIdAnalysis (
-          inputId, class, analysisId, created)
+    INSERT INTO input_id_analysis (
+          input_id, class, analysis_id, created)
           values (
           '$inputId',
           '$class',
@@ -107,9 +106,9 @@ sub list_inputId_by_analysis {
   my @row;
 
   my $sth = $self->prepare( q {
-    SELECT inputId
-      FROM InputIdAnalysis
-     WHERE analysisId = ? } );
+    SELECT input_id
+      FROM input_id_analysis
+     WHERE analysis_id = ? } );
   $sth->execute( $analysis->dbID );
 
   while( @row = $sth->fetchrow_array ) {
@@ -126,9 +125,9 @@ sub list_inputId_created_by_analysis {
   my @row;
 
   my $sth = $self->prepare( q {
-    SELECT inputId, unix_timestamp(created)
-      FROM InputIdAnalysis
-     WHERE analysisId = ? } );
+    SELECT input_id, unix_timestamp(created)
+      FROM input_id_analysis
+     WHERE analysis_id = ? } );
   $sth->execute( $analysis->dbID );
 
   while( @row = $sth->fetchrow_array ) {
@@ -145,10 +144,9 @@ sub list_inputId_class_by_start_count {
   my @row;
 
   my $query = qq{
-    SELECT inputId, class, count(*) as c
-      FROM InputIdAnalysis
-     GROUP by inputId, class
-     ORDER by c };
+    SELECT input_id, clasS
+      FROM input_id_analysis
+     GROUP by input_id, class };
 
   if( defined $start && defined $count ) {
     $query .= "LIMIT $start,$count";
@@ -168,8 +166,8 @@ sub delete_inputId_class {
   my ($inputId, $class) = @_;
 
   my $sth = $self->prepare( qq{
-    DELETE FROM InputIdAnalysis
-    WHERE  inputId = ?
+    DELETE FROM input_id_analysis
+    WHERE  input_id = ?
     AND    class = ?} );
   $sth->execute($inputId, $class);
 }
@@ -179,8 +177,8 @@ sub delete_inputId {
   my ($inputId) = shift;
 
   my $sth = $self->prepare( qq{
-    DELETE FROM InputIdAnalysis
-    WHERE  inputId = ?} );
+    DELETE FROM input_id_analysis
+    WHERE  input_id = ?} );
   $sth->execute($inputId);
 }
 
@@ -189,9 +187,9 @@ sub delete_inputId_analysis {
   my ($inputId, $analysisId) = @_;
 
   my $sth = $self->prepare( qq{
-    DELETE FROM InputIdAnalysis
-    WHERE inputId    = ?
-    AND   analysisId = ?} );
+    DELETE FROM input_id_analysis
+    WHERE  input_id    = ?
+    AND    analysis_id = ?} );
   $sth->execute($inputId, $analysisId);
 }
 
@@ -224,11 +222,11 @@ sub create_tables {
   my $self = shift;
   my $sth;
 
-  $sth = $self->prepare("drop table if exists InputIdAnalysis");
+  $sth = $self->prepare("drop table if exists input_id_analysis");
   $sth->execute();
 
   $sth = $self->prepare(qq{
-    CREATE TABLE InputIdAnalysis (
+    CREATE TABLE input_id_analysis (
     input_id     varchar(40) not null,
     class        enum("clone","contig","vc","gene") not null,
     analysis_id  int not null,

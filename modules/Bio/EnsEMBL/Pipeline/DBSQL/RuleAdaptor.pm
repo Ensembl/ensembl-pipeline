@@ -16,24 +16,23 @@ Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
 
 =head1 SYNOPSIS
 
-  $jobAdaptor = $dbobj->getRuleAdaptor;
-  $jobAdaptor = $jobobj->getRuleAdaptor;
-
+ $jobAdaptor = $dbobj->getRuleAdaptor();
+ $jobAdaptor = $jobobj->getRuleAdaptor();
 
 =head1 DESCRIPTION
 
-  Module to encapsulate all db access for persistent class Rule.
-  There should be just one per application and database connection.
-
+Module to encapsulate all db access for persistent class Rule.
+There should be just one per application and database connection.
 
 =head1 CONTACT
 
-    Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-    Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
+Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
+Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
 
 =cut
 
@@ -54,10 +53,10 @@ use strict;
 =head2 Constructor
 
   Title   : new
-  Usage   : $$dbobj->get_RuleAdaptor
+  Usage   : $dbobj->get_RuleAdaptor
   Function: Standard Adaptor Constructor
   Returns : Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
-  Args    : Bio::EnsEMBL::Pipeline::DBSQL::Obj
+  Args    : Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 =cut
 
@@ -83,20 +82,23 @@ sub new {
 
 sub store {
   my ( $self, $rule ) = @_;
+
   my $sth = $self->prepare( q{
-    INSERT INTO RuleGoal
-       SET goalAnalysisId = ? } );
+    INSERT INTO rule_goal
+       SET goal = ? } );
   $sth->execute( $rule->goalAnalysis->dbID );
+
   $sth = $self->prepare( q {
     SELECT last_insert_id() } );
   $sth->execute;
   my $dbID = ($sth->fetchrow_array)[0];
+
   my @literals = $rule->list_conditions;
   for my $literal ( @literals ) {
     $sth = $self->prepare( qq{
-      INSERT INTO RuleConditions
-         SET ruleId=$dbID,
-             conditionLiteral='$literal' } );
+      INSERT INTO rule_conditions
+         SET rule_id = $dbID,
+             condition = '$literal' } );
     $sth->execute;
   }
   $rule->dbID( $dbID );
@@ -123,11 +125,12 @@ sub remove {
   }
 
   my $sth = $self->prepare( qq {
-    DELETE FROM RuleGoal
-    WHERE ruleId = $dbID } );
+    DELETE FROM rule_goal
+    WHERE  rule_id = $dbID } );
   $sth->execute;
+
   $sth = $self->prepare( qq {
-    DELETE FROM RuleConditions
+    DELETE FROM rule_conditions
      WHERE ruleID = $dbID } );
   $sth->execute;
 }
@@ -151,32 +154,40 @@ sub fetch_all {
   my @queryResult;
 
   my $sth = $self->prepare( q {
-    SELECT ruleId,goalAnalysisId
-      FROM RuleGoal } );
+    SELECT rule_id, goal
+    FROM   rule_goal } );
   $sth->execute;
 
-  while( @queryResult = $sth->fetchrow_array ) {
-    $analysis = $anaAdaptor->fetch_by_dbID( $queryResult[1] );
-    $dbID = $queryResult[0];
+  RULE: while( my($ruleId, $goal) = $sth->fetchrow_array ) {
+    if ($goal =~ /\D/) {
+      $analysis = $anaAdaptor->fetch_by_newest_logic_name($goal) or do {
+        $self->warn("Couldn't find analysis to match logic_name $goal");
+	next RULE;
+      };
+    }
+    else {
+      $analysis = $anaAdaptor->fetch_by_dbID($goal) or do {
+        $self->warn("Couldn't find analysis to match dbID $goal");
+	next RULE;
+      };
+    }
+    $dbID = $ruleId;
 
     $rule = Bio::EnsEMBL::Pipeline::Rule->new
       ( '-dbid'    => $dbID,
 	'-goal'    => $analysis,
         '-adaptor' => $self );
-    # print STDERR "Setting $dbID rule\n";
     $rules{$dbID} = $rule;
   }
 
   $sth= $self->prepare( q{
-    SELECT ruleId, conditionLiteral
-      FROM RuleConditions } );
+    SELECT rule_id, condition
+    FROM   rule_conditions } );
   $sth->execute;
 
-  while( @queryResult = $sth->fetchrow_array ) {
-      # print STDERR "@queryResult\n";
-      $rules{$queryResult[0]}->add_condition( $queryResult[1] );
+  while( my($ruleId, $cond) = $sth->fetchrow_array ) {
+      $rules{$ruleId}->add_condition($cond) if defined $rules{$ruleId};
   }
-  # print STDERR "Found @{[scalar keys %rules]} rules\n";
   return values %rules;
 }
 
@@ -193,35 +204,43 @@ sub fetch_all {
 sub fetch_by_dbID {
   my $self = shift;
   my $dbID = shift;
-  
+
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my ( $analysis, $rule );
   my $queryResult;
 
   my $sth = $self->prepare( q {
-    SELECT ruleId,goalAnalysisId
-      FROM RuleGoal 
-      WHERE ruleId = ? } );
+    SELECT rule_id, goal
+    FROM   rule_goal
+    WHERE  rule_id = ? } );
   $sth->execute( $dbID  );
 
   $queryResult = $sth->fetchrow_hashref;
   if( ! defined $queryResult ) {
     return undef;
   }
-  
-  $analysis = $anaAdaptor->fetch_by_dbID( $queryResult->{goalAnalysisId} );
-      
+
+  if ((my $goal = $queryResult->{goal}) =~ /\D/) {
+    $analysis = $anaAdaptor->fetch_by_newest_logic_name($goal)
+     or $self->throw("Can't find analysis with logic_name $goal");
+  }
+  else {
+    $analysis = $anaAdaptor->fetch_by_dbID($goal)
+     or $self->throw("Can't find analysis with dbID $goal");
+  }
+
+
   $rule = Bio::EnsEMBL::Pipeline::Rule->new
     ( '-dbid'    => $dbID,
       '-goal'    => $analysis,
       '-adaptor' => $self );
 
   $sth= $self->prepare( q{
-    SELECT ruleId, conditionLiteral
-      FROM RuleConditions 
-      WHERE ruleId = ?} );
+     SELECT rule_id, condition
+     FROM   rule_conditions
+     WHERE  rule_id = ?} );
   $sth->execute( $dbID );
-  
+
   while( $queryResult = $sth->fetchrow_hashref ) {
     $rule->add_condition( $queryResult->{conditionLiteral} );
   }
@@ -232,8 +251,8 @@ sub fetch_by_dbID {
 
   Title   : db
   Usage   : $self->db;
-Function: gets the DBSQL::Obj for the Adaptor. Set is private.
-  Returns : Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+  Function: gets the DBSQL::DBAdaptor for the Adaptor. Set is private.
+  Returns : Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
   Args    : -
 
 =cut
@@ -269,24 +288,24 @@ sub create_tables{
   my ($self) = @_;
   my $sth;
 
-  $sth = $self->prepare("drop table if exists RuleGoal");
+  $sth = $self->prepare("drop table if exists rule_goal");
   $sth->execute();
 
   $sth = $self->prepare(qq{
-    CREATE TABLE RuleGoal (
+    CREATE TABLE rule_goal (
     rule_id           int unsigned default 0 not null auto_increment,
-    goal_analysis_id  int unsigned,
+    goal              int unsigned,
 
     PRIMARY KEY (rule_id)
     );
   });
   $sth->execute();
 
-  $sth = $self->prepare("drop table if exists RuleConditions");
+  $sth = $self->prepare("drop table if exists rule_conditions");
   $sth->execute();
 
   $sth = $self->prepare(qq{
-    CREATE TABLE RuleConditions (
+    CREATE TABLE rule_conditions (
     rule_id            int not null,
     condition_literal  varchar(40)
     );

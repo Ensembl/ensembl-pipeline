@@ -14,7 +14,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor 
+Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
 
 =head1 SYNOPSIS
 
@@ -23,15 +23,15 @@ Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
 
 
 =head1 DESCRIPTION
-  
+
   Module to encapsulate all db access for persistent class Job.
   There should be just one per application and database connection.
-     
+
 
 =head1 CONTACT
 
-    Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-    Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
+  Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
+  Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
 
 =head1 APPENDIX
 
@@ -45,6 +45,7 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Job;
+use Bio::EnsEMBL::Pipeline::Status;
 use Bio::Root::RootI;
 
 use vars qw(@ISA);
@@ -55,7 +56,7 @@ use strict;
 sub new {
   my ($class,$dbobj) = @_;
   my $self = $class->SUPER::new();
-  
+
   $self->db( $dbobj );
   return $self;
 }
@@ -67,7 +68,7 @@ sub new {
   Function: Retrieves a job from database by internal id
   Returns : throws exception when something goes wrong.
             undef if the id is not in the db.
-  Args    : 
+  Args    :
 
 =cut
 
@@ -75,13 +76,14 @@ sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
 
-  my $sth = $self->prepare( q{
-    SELECT jobId, input_id, class, analysisId, LSF_id, object_file,
-      stdout_file, stderr_file, retry_count
-    FROM job
-    WHERE jobId = ? } );
-  
-  $sth->execute( $id );
+  my $sth = $self->prepare(q{
+    SELECT job_id, input_id, class, analysis_id, lsf_id,
+           object_file, stdout_file, stderr_file, retry_count
+    FROM   job
+    WHERE  job_id = ?
+  });
+
+  $sth->execute($id);
   my $rowHashRef = $sth->fetchrow_hashref;
   if( ! defined $rowHashRef ) {
     return undef;
@@ -94,7 +96,7 @@ sub fetch_by_dbID {
 
   Title   : fetch_by_Status_Analysis
   Usage   : my @jobs = $adaptor->fetch_by_Status_Analysis($id, $status)
-  Function: Retrieves all jobs in the database matching status and 
+  Function: Retrieves all jobs in the database matching status and
             an analysis id
   Returns : @Bio::EnsEMBL::Pipeline::Job
   Args    : Analysis obj, string status, and optional start and end limits
@@ -104,31 +106,33 @@ sub fetch_by_dbID {
 sub fetch_by_Status_Analysis {
     my ($self,$status, $analysis, $start, $end) = @_;
 
-    $self->throw("Require status and analysis id for fetch_by_Status_Analysis") 
-                            unless ($analysis && $status); 
+    $self->throw("Require status and analysis id for fetch_by_Status_Analysis")
+                            unless ($analysis && $status);
     if( ! defined $analysis->dbID ){
        $self->throw( "Analysis needs to be in database" );
     }
     my $analysisId = $analysis->dbID;
 
-    my $query = "select j.jobId, j.input_id, j.class, j.analysisId, j.LSF_id," .
-	                   "j.stdout_file, j.stderr_file,".
-                       "j.object_file, j.retry_count".
-                       "j.status_file " . 
-	            "from job as j, current_status as cs, jobstatus as js ". 
-                "where j.jobId = cs.jobId and js.jobId = cs.jobId and ". 
-                       "cs.status = js.status and ".
-                       "j.analysis = $analysisId and ".
-                       "cs.status = \'$status\' ".
-                       "order by js.time DESC";
-    $query .= " limit $start, $end" if ($start && $end);
-                 
+    my $query = q{
+	SELECT   j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id,
+	         j.stdout_file, j.stderr_file, j.object_file, j.retry_count
+                 j.status_file
+	FROM     job j, job_status js
+        WHERE    j.job_id = js.job_id
+        AND      j.analysis = ?
+        AND      js.status = ?
+	AND      js.is_current = 'y'
+        ORDER BY time desc
+    };
+    
+    $query .= " LIMIT $start, $end" if ($start && $end);
+
     my $sth = $self->prepare($query);
-    my $res = $sth->execute();
-    
+    my $res = $sth->execute($analysisId, $status);
+
     my @jobs;
-    
-    while (my $row = $sth->fetchrow_hashref) 
+
+    while (my $row = $sth->fetchrow_hashref)
     {
 	    my $job = $self->_objFromHashref($row);
 	    push(@jobs,$job);
@@ -151,22 +155,22 @@ sub fetch_by_Status_Analysis {
 sub fetch_by_Age {
     my ($self,$age) = @_;
 
-    $self->throw("No input status for get_JobsByAge") 
+    $self->throw("No input status for get_JobsByAge")
         unless defined($age);
     #convert age from minutes to seconds
 
-    my $query = 'SELECT j.jobId, j.input_id, j.class, j.analysisId, j.LSF_id, '
-                .'j.stdout_file, j.stderr_file, j.object_file, '
-                .'j.retry_count '     
-                .'FROM job as j, jobstatus as js, current_status as cs ' 
-                .'WHERE cs.jobId = js.jobId '
-                    .'AND cs.status = js.status '
-                    .'AND cs.jobId = j.jobId '
-                    ."AND js.time < DATE_SUB( NOW(), INTERVAL $age MINUTE )";
-            
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute();
+    my $sth = $self->prepare(q{
+	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id
+               j.stdout_file, j.stderr_file, j.object_file
+               j.retry_count
+	FROM   job j, job_status js
+	WHERE  j.job_id = js.job_id
+	AND    is_current = 'y'
+	AND    js.time < DATE_SUB(NOW(), INTERVAL $age MINUTE)
+    });
     
+    my $res = $sth->execute();
+
     my @jobs;
 
     while (my $row = $sth->fetchrow_hashref) {
@@ -185,7 +189,7 @@ sub fetch_by_Age {
   Function: Retrieves all jobs from adaptor with certain input id
   Returns : list of job objects
             throws exception when something goes wrong.
-  Args    : 
+  Args    :
 
 =cut
 
@@ -194,13 +198,14 @@ sub fetch_by_inputId {
   my $inputid = shift;
   my @result;
 
-  my $sth = $self->prepare( q{
-    SELECT jobId, input_id, class, analysisId, LSF_id, object_file,
-      stdout_file, stderr_file, retry_count
-    FROM job
-    WHERE input_id = ? } );
-  
-  $sth->execute( $inputid );
+  my $sth = $self->prepare(q{
+    SELECT job_id, input_id, class, analysis_id, LSF_id, object_file,
+           stdout_file, stderr_file, retry_count
+    FROM   job
+    WHERE  input_id = ?
+  });
+
+  $sth->execute($inputid);
   while( my $rowHashRef = $sth->fetchrow_hashref ) {
     push( @result, $self->_objFromHashref( $rowHashRef ));
   }
@@ -215,7 +220,7 @@ sub fetch_by_inputId {
   Function: puts a job in the db and gives it an internal id
             expects analysis to be already in db.
   Returns : throws exception when something goes wrong.
-  Args    : 
+  Args    :
 
 =cut
 
@@ -227,11 +232,12 @@ sub store {
     $self->throw( "Need to store analysis first" );
   }
 
-  my $sth = $self->prepare( q{
-    INSERT into job( input_id, class, analysisId,
-      LSF_id, stdout_file, stderr_file, object_file,
-      retry_count ) 
-    VALUES ( ?, ?, ?, ?, ?, ?, ?, ? ) } );
+  my $sth = $self->prepare(q{
+    INSERT into job (input_id, class, analysis_id,
+                     lsf_id, stdout_file, stderr_file, object_file,
+                     retry_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  });
 
   $sth->execute( $job->input_id,
                  $job->class,
@@ -242,7 +248,7 @@ sub store {
                  $job->input_object_file,
                  $job->retry_count );
 
-  $sth = $self->prepare( "SELECT LAST_INSERT_ID()" );
+  $sth = $self->prepare("SELECT LAST_INSERT_ID()");
   $sth->execute;
 
   my $dbId = ($sth->fetchrow_arrayref)->[0];
@@ -258,7 +264,7 @@ sub store {
   Function: deletes entries for job from database tables.
             deletes also history of status.
   Returns : throws exception when something goes wrong.
-  Args    : 
+  Args    :
 
 =cut
 
@@ -272,19 +278,16 @@ sub remove {
   }
   my $dbID = $job->dbID;
 
-  my $sth = $self->prepare( qq{
+  my $sth = $self->prepare(qq{
     DELETE FROM job
-     WHERE jobId = $dbID } );
+    WHERE  job_id = $dbID
+  });
   $sth->execute;
 
   $sth = $self->prepare( qq{
-    DELETE FROM current_status
-     WHERE jobId=$dbID } );
-  $sth->execute;
-
-  $sth = $self->prepare( qq{
-    DELETE FROM jobstatus
-     WHERE jobId = $dbID } );
+    DELETE FROM job_status
+    WHERE  job_id = $dbID
+  });
   $sth->execute;
 }
 
@@ -296,30 +299,28 @@ sub remove {
   Function: deletes entries for job from database tables.
             deletes also history of status. Can take a list of ids.
   Returns : throws exception when something goes wrong.
-  Args    : 
+  Args    :
 
 =cut
 
 sub remove_by_dbID {
   my $self = shift;
   my @dbIDs = @_;
-  
+
   if( $#dbIDs == -1 ) { return }
-  
-  my $inExpr = "(".join( ",",@dbIDs ).")";
-  
-  my $sth = $self->prepare( qq{
+
+  my $inExpr = "(".join(",", @dbIDs).")";
+
+  my $sth = $self->prepare(qq{
     DELETE FROM job
-     WHERE jobId IN $inExpr } );
+    WHERE       job_id IN $inExpr
+  });
   $sth->execute;
 
-  $sth = $self->prepare( qq{
-    DELETE FROM current_status
-     WHERE jobId IN $inExpr } );
-  $sth->execute;
-  $sth = $self->prepare( qq{
-    DELETE FROM jobstatus
-     WHERE jobId IN $inExpr } );
+  $sth = $self->prepare(qq{
+    DELETE FROM job_status
+    WHERE       job_id IN $inExpr
+  });
   $sth->execute;
 }
 
@@ -332,24 +333,25 @@ sub remove_by_dbID {
             it only updates stdout_file, stderr_file, retry_count
             and LSF_id
   Returns : throws exception when something goes wrong.
-  Args    : 
+  Args    :
 
 =cut
 
 sub update {
   my $self = shift;
   my $job = shift;
-  
+
   # only stdout, stderr, retry, LSF_id and status are likely to be updated
 
-  my $sth = $self->prepare( q{
+  my $sth = $self->prepare(q{
     UPDATE job
-       SET stdout_file = ?,
+    SET    stdout_file = ?,
            stderr_file = ?,
            object_file = ?,
            retry_count = ?,
            LSF_id = ?
-     WHERE jobId = ? } );
+    WHERE  job_id = ?
+  });
 
   $sth->execute( $job->stdout_file,
 		 $job->stderr_file,
@@ -366,7 +368,7 @@ sub update {
   Title   : _objFromHashref
   Usage   : my $job = $self->objFromHashref( $queryResult )
   Function: Creates a Job object from given hash reference.
-            The hash contains column names and content of the column. 
+            The hash contains column names and content of the column.
   Returns : the object or undef if that wasnt possible
   Args    : a hash reference
 
@@ -380,23 +382,22 @@ sub _objFromHashref {
   my $job;
   my $analysis;
 
-  $analysis = 
+  $analysis =
     $self->db->get_AnalysisAdaptor->
-      fetch_by_dbID( $hashref->{analysisId} );
+      fetch_by_dbID( $hashref->{analysis_id} );
 
-  $job = Bio::EnsEMBL::Pipeline::Job->new
-  (
-   '-dbobj'    => $self->db,
-   '-adaptor'  => $self,
-   '-id'       => $hashref->{'jobId'},
-   '-lsf_id'   => $hashref->{'LSF_id'},
-   '-input_id' => $hashref->{'input_id'},
-   '-class'    => $hashref->{'class'},
-   '-stdout'   => $hashref->{'stdout_file'},
-   '-stderr'   => $hashref->{'stderr_file'},
-   '-input_object_file' => $hashref->{'object_file'},
-   '-analysis' => $analysis,
-   '-retry_count' => $hashref->{'retry_count'}
+  $job = Bio::EnsEMBL::Pipeline::Job->new(
+      '-dbobj'     => $self->db,
+      '-adaptor'   => $self,
+      '-id'        => $hashref->{'job_id'},
+      '-lsf_id'    => $hashref->{'lsf_id'},
+      '-input_id'  => $hashref->{'input_id'},
+      '-class'     => $hashref->{'class'},
+      '-stdout'    => $hashref->{'stdout_file'},
+      '-stderr'    => $hashref->{'stderr_file'},
+      '-input_object_file' => $hashref->{'object_file'},
+      '-analysis'  => $analysis,
+      '-retry_count' => $hashref->{'retry_count'}
   );
 
   return $job;
@@ -427,39 +428,42 @@ sub exists {
 =cut
 
 sub set_status {
-    my ($self,$job,$arg) = @_;
+    my ($self, $job, $stat_str) = @_;
+    my $status;
+    my $jobId;
 
-    if( ! defined $job->dbID ) {
+    if( ! defined ($jobId = $job->dbID)) {
       $self->throw( "Job has to be in database" );
     }
 
-    my $status;
 
     eval {	
-	my $sth = $self->prepare("insert delayed into jobstatus(jobId,status,time) values (" .
-					 $job->dbID . ",\"" .
-					 $arg      . "\"," .
-					 "now())");
-	my $res = $sth->execute();
+        my ($sth, $res);
 
-	$sth = $self->prepare("replace into current_status(jobId,status) values (" .
-				      $job->dbID . ",\"" .
-				      $arg      . "\")");
+        $sth = $self->prepare(q{
+	    UPDATE job_status
+	    SET    is_current = 'n'
+	    WHERE  job_id = ?
+	});
+	$res = $sth->execute($jobId);
 
+	$sth = $self->prepare(q{
+	    INSERT DELAYED into job_status
+		   (job_id, status, time, is_current)
+	    VALUES (?, ?, NOW(), 'y')
+	});
+	$res = $sth->execute($jobId, $stat_str);
+
+	$sth = $self->prepare("SELECT NOW()");
 	$res = $sth->execute();
 	
-	$sth = $self->prepare("select now()" );
-	
-	$res = $sth->execute();
-	
-	my $rowhash = $sth->fetchrow_arrayref();
-	my $time    = $rowhash->[0];
+	my $time = ($sth->fetchrow_arrayref())->[0];
 
-	$status = Bio::EnsEMBL::Pipeline::Status->new
-	  (  '-jobid'   => $job->dbID,
-	     '-status'  => $arg,
-	     '-created' => $time,
-	  );
+	$status = Bio::EnsEMBL::Pipeline::Status->new(
+ 	    '-jobid'   => $jobId,
+	    '-status'  => $stat_str,
+	    '-created' => $time,
+	);
 	
 	$self->current_status($job, $status);
 	
@@ -469,7 +473,7 @@ sub set_status {
     if ($@) {
 #      print( " $@ " );
 
-	$self->throw("Error setting status to $arg");
+	$self->throw("Error setting status to $stat_str");
     } else {
 	return $status;
     }
@@ -489,36 +493,39 @@ sub set_status {
 sub current_status {
     my ($self, $job, $arg) = @_;
 
-    if (defined($arg)) 
+    if (defined($arg))
     {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") 
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object")
 	    unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
 	$job->{'_status'} = $arg;
     }
-    else 
+    else
     {
-	$self->throw("Can't get status if id not defined") 
+	$self->throw("Can't get status if id not defined")
 	    unless defined($job->dbID);
 	my $id =$job->dbID;
-	my $sth = $self->prepare
-	    ("select status from current_status where jobId=$id");
-	my $res = $sth->execute();
+	my $sth = $self->prepare(q{
+	    SELECT status
+	    FROM   job_status
+	    WHERE  job_id = ?
+	});
+	my $res = $sth->execute($id);
 	my $status;
 	while (my  $rowhash = $sth->fetchrow_hashref() ) {
 	    $status = $rowhash->{'status'};
 	}
 
-	$sth = $self->prepare("select now()");
+	$sth = $self->prepare("SELECT NOW()");
 	$res = $sth->execute();
 	my $time;
-	while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	    $time    = $rowhash->{'now()'};
+	while (my $rowhash = $sth->fetchrow_arrayref()) {
+	    $time    = $rowhash->[0];
 	}
-	my $statusobj = new Bio::EnsEMBL::Pipeline::Status
-	    ('-jobid'   => $id,
-	     '-status'  => $status,
-	     '-created' => $time,
-	     );
+	my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
+	    '-jobid'   => $id,
+	    '-status'  => $status,
+	    '-created' => $time,
+	);
 	$job->{'_status'} = $statusobj;
     }
     return $job->{'_status'};
@@ -528,7 +535,7 @@ sub current_status {
 
   Title   : get_all_status
   Usage   : my @status = $job->get_all_status
- Function: Get all status objects associated with this job
+  Function: Get all status objects associated with this job
   Returns : @Bio::EnsEMBL::Pipeline::Status
   Args    : Bio::EnsEMBL::Pipeline::Job
 
@@ -536,29 +543,32 @@ sub current_status {
 
 sub get_all_status {
   my ($self, $job) = @_;
-  
-  $self->throw("Can't get status if id not defined") 
+  my @status;
+
+  $self->throw("Can't get status if id not defined")
     unless defined($job->dbID);
 
-  my $sth = $self->prepare
-    ("select jobId,status, UNIX_TIMESTAMP(time) from  jobstatus " . 
-     "where id = \"" . $job->dbID . "\" order by time desc");
-  
-  my $res = $sth->execute();
-  
-  my @status;
+  my $sth = $self->prepare(q{
+    SELECT   job_id, status, UNIX_TIMESTAMP(time)
+    FROM     job_status
+    WHERE    id = ?
+    ORDER BY time desc
+  });
+
+  my $res = $sth->execute($job->dbID);
+
   while (my $rowhash = $sth->fetchrow_hashref() ) {
-    my $time      = $rowhash->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
+    my $time      = $rowhash->{'UNIX_TIMESTAMP(time)'};
     my $status    = $rowhash->{'status'};
-    my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
-						       -status  => $status,
-						       -created => $time,
-						      );
-                               
+    my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
+      '-jobid'   => $job->dbID,
+      '-status'  => $status,
+      '-created' => $time,
+    );
+
     push(@status,$statusobj);
-    
   }
-  
+
   return @status;
 }
 
@@ -579,11 +589,11 @@ sub get_last_status {
     unless defined($job->dbID);
 
   my $sth = $self->prepare (qq{
-    SELECT js.jobId, cs.status, UNIX_TIMESTAMP(time)
-      FROM jobstatus js, current_status cs
-     WHERE js.jobId = cs.jobId
-       AND js.status = cs.status
-       AND js.jobId = ?} );
+    SELECT job_id, status, UNIX_TIMESTAMP(time)
+    FROM   job_status
+    WHERE  is_current = 'y'
+    AND    job_id = ?
+  });
 
   my $res = $sth->execute($job->dbID);
   my $rowHashRef = $sth->fetchrow_hashref();
@@ -591,55 +601,58 @@ sub get_last_status {
     return undef;
   }
 
-  my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
+  my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};
   my $status    = $rowHashRef->{'status'};
-  my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
-						     -status  => $status,
-						     -created => $time,
-						     );
+  my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
+    '-jobid'   => $job->dbID,
+    '-status'  => $status,
+    '-created' => $time,
+  );
+
   return $statusobj;
 }
 
-sub list_jobId_by_status {
+sub list_job_id_by_status {
   my ($self,$status) = @_;
   my @result;
   my @row;
 
-  my $sth = $self->prepare( qq{
-    SELECT j.jobId
-      FROM job j, current_status c
-     WHERE j.jobId = c.jobId
-       AND c.status = '$status'
-     ORDER BY jobId } );
+  my $sth = $self->prepare(qq{
+    SELECT   j.job_id
+      FROM   job j, job_status js
+     WHERE   j.job_id = js.job_id
+       AND   js.status = '$status'
+       AND   is_current = 'y'
+    ORDER BY job_id
+  });
   $sth->execute;
-  
+
   while( @row = $sth->fetchrow_array ) {
     push( @result, $row[0] );
   }
-  
+
   return @result;
 }
 
 
-sub list_jobId_by_status_age {
+sub list_job_id_by_status_age {
   my ($self,$status,$age) = @_;
-  
+
   my @result;
   my @row;
-  my $sth = $self->prepare( qq{
-    SELECT js.jobId
-      FROM current_status c, jobstatus js
-     WHERE js.jobId = c.jobId
-       AND c.status = '$status'
-       AND js.status = '$status'
-       AND js.time < DATE_SUB( NOW(), INTERVAL $age MINUTE )
-     ORDER BY jobId } );
+  my $sth = $self->prepare(qq{
+    SELECT   job_id
+      FROM   job_status
+       AND   status = '$status'
+       AND   time < DATE_SUB(NOW(), INTERVAL $age MINUTE)
+    ORDER BY job_id
+  });
   $sth->execute;
-  
+
   while( @row = $sth->fetchrow_array ) {
     push( @result, $row[0] );
   }
-  
+
   return @result;
 }
 
@@ -670,8 +683,8 @@ sub deleteObj {
   }
 }
 
-# creates all tables for this adaptor - job, jobstatus and current_status
-# if they exist they are emptied and newly created
+# creates all tables for this adaptor - job and job_status
+# if they exist they are dropped and newly created
 sub create_tables {
   my $self = shift;
   my $sth;
@@ -681,48 +694,36 @@ sub create_tables {
 
   $sth = $self->prepare(qq{
     CREATE TABLE job (
-    job_id        int(10) unsigned  default 0  not null auto_increment,
-    input_id      varchar(40)       default '' not null,
-    class         enum("clone","contig","vc","gene") not null,
-    analysis_id   int(10) unsigned  default 0  not null,
-    LSF_id        int(10) unsigned  default 0,
-    stdout_file   varchar(100)      default '' not null,
-    stderr_file   varchar(100)      default '' not null,
-    object_file   varchar(100)      default '' not null,
-    retry_count   int               default 0,
+      job_id       int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+      input_id     varchar(40) NOT NULL,
+      class        enum("clone", "contig", "vc", "gene") not null,
+      analysis_id  smallint(5) unsigned NOT NULL,
+      lsf_id       mediumint(10) unsigned NOT NULL,
+      stdout_file  varchar(100) NOT NULL,
+      stderr_file  varchar(100) NOT NULL,
+      object_file  varchar(100) NOT NULL,
+      retry_count  tinyint(2) unsigned default 0,
 
-    PRIMARY KEY   (job_id),
-    KEY input     (input_id),
-    KEY analysis  (analysis_id)
+      PRIMARY KEY (job_id),
+      KEY (input_id),
+      KEY (analysis_id)
     );
   });
   $sth->execute();
 
-  $sth = $self->prepare("drop table if exists jobstatus");
+  $sth = $self->prepare("drop table if exists job_status");
   $sth->execute();
 
   $sth = $self->prepare(qq{
-    CREATE TABLE jobstatus (
-    job_id     int(10) unsigned  default 0 not null,
-    status     varchar(40)       default 'CREATED' not null,
-    time       datetime          default '0000-00-00 00:00:00' not null,
+    CREATE TABLE job_status (
+      job_id            int(10) unsigned NOT NULL,
+      status            varchar(40) DEFAULT 'CREATED' NOT NULL,
+      time              datetime NOT NULL,
+      is_current        enum('n', 'y') DEFAULT 'n',
 
-    KEY job    (job_id),
-    KEY status (status)
-    );
-  });
-  $sth->execute();
-
-  $sth = $self->prepare("drop table if exists current_status");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE current_status (
-    job_id  int(10) unsigned  default 0 not null,
-    status  varchar(40)       default '' not null,
-
-    PRIMARY KEY (job_id),
-    KEY status  (status)
+      KEY (job_id),
+      KEY (status),
+      KEY (is_current)
     );
   });
   $sth->execute();
