@@ -466,9 +466,12 @@ sub rogue_exons {
 sub _align {
   my ($self, $type, $show_missing_evidence, $truncate_introns, 
       $merge_sequences) = @_;
-
+use Benchmark;
+my $start = new Benchmark;
   my $evidence_sequences = $self->_corroborating_sequences($type);
-
+my $end = Benchmark->new;
+my $diff = timediff($end, $start);
+print STDERR "BUILDING SEQUENCES : " . $diff->timestr . "\n";
   return 0 unless $evidence_sequences;
 
   # Insert deletions in the appropriate places in the genomic
@@ -500,7 +503,8 @@ sub _align {
 	[$length, $evidence_sequence->name]; 
     }
   }
-
+use Benchmark;
+my $start = Benchmark->new;
   my @all_deletions = sort {$a <=> $b} keys %all_deletions;
 
   $self->{_total_inserted_deletions} = 0; # Initialise this method-less value.
@@ -578,15 +582,18 @@ sub _align {
   # Print the locations of our deletions, handy for finding conserved gaps and
   # frameshifts
 
-  foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
+#  foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
 #    print STDOUT $tracked_deletion . "\t" . 
-      scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
+#      scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
 #    foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
 #      print STDOUT $deletion->[1] ." (" . $deletion->[0] . ")  ";
 #    }
 #    print STDOUT "\n";
-  }
+#  }
 
+my $end = Benchmark->new;
+my $diff = timediff($end, $start);
+print STDERR "RECONCILING DELETIONS : " . $diff->timestr . "\n";
 
   # Put our working alignments somewhere handy
 
@@ -605,11 +612,6 @@ sub _align {
 			      $evidence_sequence_hash{$evidence_key});
   }
 
-  # If sequences are to be merged, do this now.
-  if ($merge_sequences){
-    $self->_merge_same_sequences;
-  }
-
   # If unaligned fragments are to be shown, find these now.
 
   if ($show_missing_evidence) {
@@ -618,10 +620,24 @@ sub _align {
   }
 
   # If introns are to be truncated, do this now.
-
+use Benchmark;
+my $start = new Benchmark;
   if ($truncate_introns) {
     $self->_truncate_introns;
   }
+my $end = Benchmark->new;
+my $diff = timediff($end, $start);
+print STDERR "TRUNCATING INTRONS : " . $diff->timestr . "\n";
+
+  # If sequences are to be merged, do this now.
+use Benchmark;
+my $start = new Benchmark;
+  if ($merge_sequences){
+    $self->_merge_same_sequences;
+  }
+my $end = Benchmark->new;
+my $diff = timediff($end, $start);
+print STDERR "MERGING SEQUENCES : " . $diff->timestr . "\n";
 
   # Set flag to indicate that the alignment has been computed.
 
@@ -1632,8 +1648,13 @@ sub _corroborating_sequences {
 	&&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
       next FEATURE;
     }
-
+use Benchmark;
+my $start = new Benchmark;
     my $align_seq = $self->_build_evidence_seq($base_align_feature);
+my $end = Benchmark->new;
+my $diff = timediff($end, $start);
+print STDERR "BUILT SEQUENCE : " . $diff->timestr . "\n";
+
     next FEATURE unless $align_seq;
 
     $align_seq->exon($exon_placemarker);
@@ -1756,6 +1777,13 @@ sub _build_evidence_seq {
     my $last_aa = ($hend * 3) - 1;
 
     my $length = $last_aa - $first_aa + 1;
+
+    if (($first_aa + 1 > scalar @full_seq)||
+	($length + $first_aa > scalar @full_seq)) {
+      warning("Evidence sequence coordinates lie outside " .
+	      "the bounds of that sequence.  Data problem.");
+      return 0
+    }
 
     @fetched_seq = splice(@full_seq, $first_aa, $length);
   }
@@ -1900,15 +1928,14 @@ sub _build_evidence_seq {
   # Here we are actually building the sequence that will
   # align to our slice
 
-  my $feature_sequence = '-' x $self->_slice->length;
-  my @feature_sequence = split //, $feature_sequence;
-
+  my $feature_sequence;
   my $genomic_start;
 
   $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start - 1 : 0;
 
-  if ($genomic_start <= scalar @feature_sequence){
-    splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
+  if ($genomic_start <= $self->_slice->length){
+    my $end_bit_length = $self->_slice->length - ($genomic_start + scalar @fetched_seq);
+    $feature_sequence = ('-' x $genomic_start) . join('', @fetched_seq) . ('-' x $end_bit_length);
   } else {
     info("Feature [". $base_align_feature->hseqname . " start:" . 
 	 $base_align_feature->start . " end:" . $base_align_feature->end .
@@ -1918,7 +1945,6 @@ sub _build_evidence_seq {
     return 0
   }
 
-  $feature_sequence = join '', @feature_sequence;
   $partially_aligned->seq($feature_sequence);
 
   return $partially_aligned;
