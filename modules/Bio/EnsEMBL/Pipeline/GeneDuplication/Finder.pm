@@ -117,6 +117,7 @@ sub new {
   $self->_coverage_cutoff(80) unless $self->_coverage_cutoff;
 
   $self->_distance_method($distance_method) if $distance_method;
+  $self->_distance_cutoff($distance_cutoff) if $distance_cutoff;
 
   return $self
 }
@@ -374,10 +375,10 @@ sub _process_for_same_species_duplicates {
       next
         unless $sorted_species_hits{$regex};
 
-    if (defined $sorted_species_hits{$regex}->[0]->name && 
-	defined $hit_distance{$sorted_species_hits{$regex}->[0]->name} &&
-	$hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance) && 
-	  $hit_distance{$sorted_species_hits{$regex}->[0]->name} > 0) {
+    if ((defined $sorted_species_hits{$regex}->[0]->name) && 
+	(defined $hit_distance{$sorted_species_hits{$regex}->[0]->name}) &&
+	($hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance) && 
+	($hit_distance{$sorted_species_hits{$regex}->[0]->name} > 0)) {
 
       $closest_outgroup_distance = $hit_distance{$sorted_species_hits{$regex}->[0]->name};
     }
