@@ -46,20 +46,11 @@ print "ok 2\n";
 ###########################
 
 my $runnable    = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA';
-my $parameters  = '-THRESHOLD 1e-10'; 
-my $ana_adaptor = $db->get_AnalysisAdaptor;
 
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
-					  -db_file        => 'embl_vertrna',
-					  -db_version     => '__NONE__',
-					  -program        => 'wutblastn',
-					  -program_file   => 'wutblastn',
-					  -module         => $runnable,
-					  -module_version => 1,
-					  -gff_source     => 'wutblastn',
-					  -gff_feature    => 'similarity',
-					  -parameters     => $parameters,	
-					  -logic_name     => 'blastgenscanDNA' );
+my $ana_adaptor = $db->get_AnalysisAdaptor();
+my $ana = $ana_adaptor->fetch_by_logic_name('blastgenscanDNA');
+
+$ana->parameters('-B=10');
 
 unless ($ana) {
   print "not ok 3\n"; 
@@ -74,9 +65,9 @@ $ana_adaptor->exists( $ana );
 # Create the runnable
 #####################
 
-my $id = 'AB015752.00001';
+my $id = 'Z84721.1.1.43058';
 
-my $runobj = "$runnable"->new(-dbobj      => $db,
+my $runobj = "$runnable"->new(-db         => $db,
 			      -input_id   => $id,	
 			      -analysis   => $ana );
 unless ($runobj) {
@@ -112,7 +103,7 @@ $runobj->write_output();
 # Retrieve the features from the database
 #########################################
 
-my $contig   = $db->get_Contig($id);
+my $contig   = $db->get_RawContigAdaptor()->fetch_by_name($id);
 my @features = $contig->get_all_SimilarityFeatures();
 
 display(@features);
@@ -128,7 +119,6 @@ unless (@features) {
 sub display {
     my @results = @_;
     #Display output
-    print STDERR "RESULTS FROM RUN\n";
     foreach my $obj (@results)
     {
        print STDERR ($obj->gffstring."\n");
