@@ -988,13 +988,19 @@ sub combine_genes{
       
       print STDERR "after genomewise:\n";
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+
+      unless($self->compare_translations($gw_tran[0], $newtranscript) ){
+	print STDERR "translation has been modified\n";
+      }
+      
+      # if the genomewise results gets stop codons, return the original transcript:
+      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
+	print STDERR "Arrgh, stop codons, returning the original transcript\n";
+	$newtrans = $newtranscript;
+      }
     }
     else{
       $newtrans = $newtranscript;
-    }
-    
-    unless($self->compare_translations($gw_tran[0], $newtranscript) ){
-      print STDERR "translation has been modified\n";
     }
     
     return $newtrans;
@@ -1752,7 +1758,7 @@ sub compare_translations{
     $seqout->write_seq($genewise_translation);
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($genewise_transcripts[0]);
   }
-  
+ 
   $@ = '';
   
   eval{
