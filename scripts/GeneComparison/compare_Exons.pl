@@ -96,19 +96,30 @@ $vcontig2 = $sgp2->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
 
 # get the genes of type @type1 and @type2 from $vcontig1 and $vcontig2, respectively #
 my (@genes1,@genes2);
+my (@trascripts1,@transcripts2);
 
 foreach my $type ( @{ $type1 } ){
   print STDERR "Fetching genes of type $type\n";
   my @more_genes = $vcontig1->get_Genes_by_Type($type);
+  my @more_trans = ();
+  foreach my $gene ( @more_genes ){
+    push ( @more_trans, $gene->each_Transcript );
+  }
   push ( @genes1, @more_genes ); 
   print STDERR scalar(@more_genes)." genes found\n";
+  print STDERR "with ".scalar(@more_trans)." transcripts\n";
 }
 
 foreach my $type ( @{ $type2 } ){
   print STDERR "Fetching genes of type $type\n";
   my @more_genes = $vcontig2->get_Genes_by_Type($type);
+  my @more_trans = ();
+  foreach my $gene ( @more_genes ){
+    push ( @more_trans, $gene->each_Transcript );
+  }
   push ( @genes2, @more_genes ); 
   print STDERR scalar(@more_genes)." genes found\n";
+  print STDERR "with ".scalar(@more_trans)." transcripts\n";
 }
 
 # get a GeneComparison object 
