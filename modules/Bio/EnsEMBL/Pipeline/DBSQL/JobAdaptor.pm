@@ -394,7 +394,10 @@ sub store {
                 $job->temp_dir,
                 $job->execution_host,
                );
-  my $dbId = $sth->{'mysql_insertid'};
+  $sth = $self->prepare("SELECT LAST_INSERT_ID()");
+  $sth->execute;
+
+  my $dbId = ($sth->fetchrow_arrayref)->[0];
   $job->dbID( $dbId );
   $job->adaptor( $self );
 
@@ -661,8 +664,9 @@ sub current_status {
           $time    = $rowhash->[0];
         }
         if(!$status){
-          $self->warn("Have found no status for ".$job->dbID." assuming is ".
-                      "sucessful\n");
+          $self->warn("Have found no status for ".$job->dbID." ".
+                      $job->input_id." ".$job->analysis->dbID.
+                      " assuming is sucessful\n");
           $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
