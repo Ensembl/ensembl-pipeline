@@ -7,6 +7,7 @@ package Bio::EnsEMBL::Pipeline::Config;
 use vars qw(@ISA);
 
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 @ISA = ('Bio::EnsEMBL::Root');
 
@@ -46,11 +47,18 @@ sub new {
 
     $self->_parse_files(@files);
 
+    # Store contents of $self->{'config'} in database
+    $self->_write_config_to_db();
+
   }
 
   if (defined $db) {
 
-    # TODO DB Stuff
+    # store the DB
+    $self->{'_dbobj'} = $db;
+
+    my $config_rows = $self->_read_db($db);
+    print "Read $config_rows rows from database.\n";
 
   }
 
@@ -60,9 +68,79 @@ sub new {
 
 }
 
+sub _read_db {
+
+  my ($self, $dbobj) = @_;
+
+  my $stmt = $dbobj->prepare("SELECT * FROM config");
+  my $result = $stmt->execute;
+
+  my $rows = 0;
+
+  while (my $ref = $stmt->fetchrow_hashref) {
+    my $header  = lc($ref->{'header'});
+    my $keyname = lc($ref->{'key_name'});
+    my $value   = $ref->{'value'};
+    $rows++;
+    #print "|$header"  . "\t|$keyname" . "\t|$value" . "\t|\n"
+    $self->{'config'}->{$header}->{$keyname} = $value;
+  }
+
+  $stmt->finish();
+
+  return $rows;
+}
+
+
+
+sub _write_config_to_db {
+
+  my $self = shift;
+
+  # get the config values that will be required to set up the DBAdaptor
+  my @required_params = ( "host", "user", "pass", "dbname", "port" );
+  my %params = {};
+  foreach my $param (@required_params) {
+    $params{$param} =  $self->get_parameter('pipeline_database', $param);
+    print "Got pipeline database parameter $param, value = $params{$param}\n";
+  }
+
+  # create the DBAdaptor
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor('-host'   => $params{'host'},
+							   '-port'   => $params{'port'},
+							   '-dbname' => $params{'dbname'},
+							   '-user'   => $params{'user'},
+							   '-pass'   => $params{'pass'});
+
+  # check if there is any existing config and throw if there is
+  my $stmt = $dbobj->prepare("SELECT count(*) FROM config");
+  my $result = $stmt->execute;
+  my ($count) = $stmt->fetchrow_array;
+  $stmt->finish();
+  if ($count != 0) {
+    $self->throw("config table in " . $params{'dbname'} . " on " . $params{'host'} . " already contains $count rows; it should be empty");
+  }
+
+  # do the insert
+  $stmt = $dbobj->prepare("INSERT INTO config VALUES (?,?,?)");
+
+  foreach my $header ($self->get_headers()) {
+
+    foreach my $key ($self->get_keys($header)) {
+
+      my $value = $self->get_parameter($header, $key);
+      my $result = $stmt->execute($header, $key, $value);
+
+    }
+
+  }
+
+  $stmt->finish();
+}
 
 
 sub _parse_files {
+
 
   my $self = shift;
   my @files = shift;
@@ -86,10 +164,11 @@ sub _parse_files {
       if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
 	$header = lc($1);
 	print "Reading stanza $header\n";
+	# TODO insert dummy key or something so all headers get put into the hash
       }
 
       # key=value
-      if (/^(\w+)\s*=\s*(\w+)/) {   # $1 = key, $2 = value
+      if (/^(\S+)\s*=\s*(\S+)/) {   # $1 = key, $2 = value
 
 	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
 	my $value = $2;
@@ -106,6 +185,7 @@ sub _parse_files {
 	} else {
 	  # store them
 	  $self->{'config'}->{$header}->{$key} = $value;
+	  print "$header:$key=$value\n";
 	}
 
       }
@@ -235,23 +315,25 @@ sub get_headers {
 
 
 
-=head2 db
+=head2 get_DBAdaptor
 
   Arg [1]    : (optional)
   Example    : $db = $conf->db();
   Description: Getter/Setter for the dbadaptor to the pipeline database, 
                which is either specified directly in the constructor or
                read from a configuration file.
-  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Returntype : Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   Exceptions : none
   Caller     : general
 
 =cut
 
-sub db {
+sub get_DBAdaptor {
+
+  my $self = shift;
+
+  return $self->{'_dbobj'};
 
 }
-
-
 
 1;
