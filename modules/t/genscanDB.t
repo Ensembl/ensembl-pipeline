@@ -86,14 +86,14 @@ $runobj->write_output();
 
 #print STDERR "Written output\n";
 my $contig = $db->get_RawContigAdaptor()->fetch_by_name($id);
-my @prediction_transcripts = $contig->get_all_PredictionFeatures();
+my $prediction_transcripts = $contig->get_all_PredictionTranscripts();
 
 #print STDERR "Have features\n";
-foreach my $pred_trans (@prediction_transcripts) {
+foreach my $pred_trans (@{$prediction_transcripts}) {
   print "Transcript  " . $pred_trans->translate . "\n";
 }    
 
-unless (@prediction_transcripts)
+unless ($prediction_transcripts)
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
