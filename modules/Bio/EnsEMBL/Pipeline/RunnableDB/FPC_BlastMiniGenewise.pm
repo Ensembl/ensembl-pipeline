@@ -74,11 +74,23 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-    my ($path,$type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
+    my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
+
+    # double check in GB_conf.pl
+    if(!defined $path || $path eq ''){
+      $path = $::db_conf{'golden_path'};
+    }
+
+    if(!defined $type || $type eq ''){
+      $path = $::similarity_conf{'type'};
+    }
+    
+    if(!defined $threshold){
+      $path = $::similarity_conf{'threshold'};
+    }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
     $type = 'sptr' unless (defined $type && $type ne '');
-
     $threshold = 200 unless (defined($threshold));
 
     $self->dbobj->static_golden_path_type($path);
