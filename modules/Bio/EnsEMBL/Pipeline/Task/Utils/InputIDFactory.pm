@@ -134,11 +134,14 @@ sub generate_input_ids{
   }elsif($type eq 'file'){
     my ($dir, $regex) = @other_info;
     $idset = $self->get_file_names($dir, $regex);
+  }elsif($type eq 'inputidfile'){
+    my ($file) = @other_info;
+    ($idset, $type) = $self->get_from_file($file);
   }else{
     $self->throw("don't recognise input_id type $type from string $type_string");
   }
-
-  return $idset;
+  
+  return ($idset, $type);
 }
 
 
@@ -294,7 +297,8 @@ sub get_Chromosomes{
 =head2 get_file_names
 
   Arg [1]   : directory path (string)
-  Function  : to get a list of filenames from the directory
+  Function  : to get a list of filenames from the directory to use as input
+  ids
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: throws if no directory is passed in 
   Caller    : 
@@ -306,30 +310,31 @@ sub get_Chromosomes{
 sub get_file_names{
   my ($self, $dir, $regex) = @_;
   if(!$dir){
-    $self->throw("need a directory inorder to fetch the filenames to be used as input_ids");
+    $self->throw("need a directory inorder to fetch the filenames to be used as input_ids $!");
   }
 
   my @input_ids;
 
   opendir(DIR, $dir);   
-  my @allfiles = grep !/^\.\.?$/, readdir DIR;
+  my @allfiles = readdir DIR;
   closedir DIR;
 	
-  local *FILE;
-
-  foreach my $file (@allfiles) {
-      next if -d "$dir/$file";
-      next if $regex && $file !~ m|$regex|;
-
-      open FILE, "< $dir/$file" or do {
-          warn "can't open $dir/$file for reading input_id list";
-	  next;
-      };
-      while (<FILE>) {
-	  chomp;
-	  push @input_ids, $_;
+  foreach my $f(@allfiles) {
+    if($f eq '.' || $f eq '..'){
+      next;
+    }elsif(-d $f){
+      next;
+    }else{
+      my $file;
+      if($regex){
+	if($f =~ m|$regex|){
+	  $file = $f;
+	}
+      }else{
+	$file = $f;
       }
-      close FILE;
+      push(@input_ids, $file) if($file);
+    }    
   }
   my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
 						 -id_list => \@input_ids,
@@ -338,5 +343,57 @@ sub get_file_names{
   return $idset;
 }
 
+
+
+=head2 get_from_file
+
+  Arg [1]   : filename
+  Function  : to produce a list of input_ids from a file
+  Returntype: Bio::EnEMBL::Pipeline::IDSet
+  Exceptions: thro
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
+sub get_from_file{
+  my ($self, $file) = @_;
+  
+  if($file && -e $file){
+    
+    my @input_ids;
+  
+    open FILE, "< $file" or do {
+      $self->throw("can't open $file for reading input_id list");
+    };
+    my $first_type;
+    while (<FILE>) {
+      chomp;
+      my ($input_id, $type) = split;
+      if(!$first_type){
+	$first_type = $type;
+      }else{
+	if($type ne $first_type){
+	  $self->throw("you can have  file which contains different input".
+		       "id types $first_type versus $type");
+	}
+      }
+      
+      push @input_ids, $input_id;
+    }
+    close FILE;
+    
+    my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						   -id_list => \@input_ids,
+						  );
+    
+    return $idset, $first_type;
+  }else{
+    $self->throw("need a file  which exists $file inorder to fetch".
+		 "input_ids from it");
+  }
+}
 
 1;

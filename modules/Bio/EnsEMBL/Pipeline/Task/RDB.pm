@@ -93,7 +93,7 @@ sub logic_names{
     
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-                   " seems to be missing its config");
+                   " seems to be missing its config $!");
     }
     my $logic_name = $config->get_parameter($self->name, 'logic_name');
     $self->{'logic_name'} = $logic_name;
@@ -105,14 +105,14 @@ sub logic_names{
 sub module{
   my ($self) = @_;
   
-  $self->throw("module should be implemented by subclass");
+  $self->throw("module should be implemented by subclass $!");
 }
 
 
 sub input_ids_to_start{
  my ($self) = @_;
   
- $self->throw("input_ids_to_start should be implemented by subclass"); 
+ $self->throw("input_ids_to_start should be implemented by subclass $!"); 
 }
 
 
@@ -134,18 +134,51 @@ sub get_input_ids{
  my ($self) = @_;
   
  if(!$self->{'input_ids'}){
-   my $idset = $self->input_id_factory->generate_input_ids;
+   my ($idset, $type) = $self->input_id_factory->generate_input_ids;
    $self->{'input_ids'} = $idset; 
  }
  return $self->{'input_ids'}; 
 }
 
-=head2 parameter_strisng
+
+
+=head2 input_id_type
+
+  Arg [1]   : string of input_id type (optional)
+  Function  : storing input_id type and retriving it from config if
+  necessary
+  Returntype: string
+  Exceptions: none 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
+sub input_id_type{
+ my $self = shift;
+
+ if(@_){
+   $self->{'input_id_type'} = shift;
+ }
+
+ if(!$self->{'input_id_type'}){
+   my $type_string = $self->get_Config->get_parameter($self->name, 'input_id');
+   my (@other_info) = split /:/, $type_string;
+   my $type = lc(shift @other_info);
+   $self->{'input_id_type'} = $type;
+ }
+
+ return $self->{'input_id_type'};
+}
+
+=head2 parameter_string
 
   Arg [1]   : none
   Function  : returns a string which contains information about
   database connection and analysis type required by RunnableDBs
-  Returntype: arrayref
+  Returntype: string
   Exceptions: throws if PipelineManager has no config object
   Caller    : 
   Example   : my @parameters = @{$self->parameter_strings}
@@ -153,17 +186,16 @@ sub get_input_ids{
 =cut
 
 
-sub parameter_strings{
+sub parameter_string{
   my ($self) = @_;
 
-
-  if(!$self->{'parameter_strings'}){
-    $self->{'parameter_strings'} = [];
+  if(!$self->{'parameter_string'}){
+    $self->{'parameter_string'} = undef;
     my $config = $self->get_Config;
 
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-                   " seems to be missing its config");
+                   " seems to be missing its config $!");
     }
     my $dbheader = $config->get_parameter($self->name, 'ensdb');
     my $dbhost = $config->get_parameter($dbheader, 'host');
@@ -171,15 +203,14 @@ sub parameter_strings{
     my $dbpass = $config->get_parameter($dbheader, 'pass');
     my $dbname = $config->get_parameter($dbheader, 'dbname');
     my $dbport = $config->get_parameter($dbheader, 'port');
-
-    my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:";
-    foreach my $l($self->logic_names){
-      my $params = $string.$l;
-      push(@{$self->{'parameter_strings'}}, $params);
-    }
+    my $l = $config->get_parameter($self->name, 'logic_name');
+    my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:$l";
+    
+    $self->{'parameter_string'} = $string;
   }
-
-  return $self->{'parameter_strings'};
+  
+  return $self->{'parameter_string'};
+  
 }
 
 
@@ -202,7 +233,7 @@ sub db{
     
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-		   " seems to be missing its config");
+		   " seems to be missing its config $!");
     }
     my $dbheader = $config->get_parameter($self->name, 'ensdb');
     my $dbhost = $config->get_parameter($dbheader, 'host');
@@ -297,22 +328,22 @@ sub get_Config{
 
 sub start{
   my $self = shift;
-  my @parameters = @{$self->parameter_strings};
+  my $parameters = $self->parameter_string;
   my $module = $self->module;
   my $potential = $self->input_ids_to_start;
-  my $existing = $self->get_TaskStatus->get_existing;
+  my $taskstatus = $self->get_TaskStatus;
+  my $existing = $taskstatus->get_existing;
   my $id_set = $potential->not($existing)->subset($self->max_create);
-  foreach my $parameters(@parameters){
     eval{
       $self->create_Jobs($module, 
 			 $id_set, $parameters);
     };
-
-    if($@){
-      print STDERR "Creation of jobs for ".$self->name." failed $@\n";
-      return 'TASK_FAILED';
-    }
+  
+  if($@){
+    print STDERR "Creation of jobs for ".$self->name." failed $@\n";
+    return 'TASK_FAILED';
   }
+  
 
   if($self->get_input_ids->count == $self->get_TaskStatus->get_existing->count){
     return 'TASK_DONE';

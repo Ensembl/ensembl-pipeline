@@ -164,10 +164,15 @@ sub ID_list{
 sub _calculate{
   my ($self, $idlist) = @_;
 
-  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
-		$self->throw("Need to passs these methods (and/or/not) an" .
-								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise" .
-								 "won't work you passed in $idlist");
+  if($idlist){
+    $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
+    $self->throw("Need to passs these methods (and/or/not) an " .
+		 "Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work " .
+		 "you passed in $idlist");
+  }else{
+    $self->throw("you must pass in an IDSet object to the and/or method not".
+		 "$idlist an undefined value");
+  }
 
   my %count;
   my @own_ids =  @{$self->{'_ID_list'}};
@@ -196,7 +201,7 @@ sub _calculate{
 
 sub and{
   my ($self, $idlist) = @_;
-  
+ 
   my %count = %{$self->_calculate($idlist)};
   my @and;
   foreach my $e(keys(%count)){
@@ -261,11 +266,15 @@ sub or{
 
 sub not{
   my ($self, $idlist) = @_;
-  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
-		$self->throw("Need to passs these methods (and/or/not) an " .
-								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work " .
-								 "you passed in $idlist");
-
+  if($idlist){
+    $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
+    $self->throw("Need to passs these methods (and/or/not) an " .
+		 "Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work " .
+		 "you passed in $idlist");
+  }else{
+    $self->throw("you must pass in an IDSet object to the not method not".
+		 "$idlist an undefined value");
+  }
   my @own_ids =  @{$self->{'_ID_list'}};
   my @comp_ids = @{$idlist->ID_list};
   my %seen;

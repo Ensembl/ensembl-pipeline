@@ -365,7 +365,8 @@ sub get_parameter {
   my $key    = lc(shift);
 
   if (!exists($self->{'config'}->{$header}->{$key})) {
-    $self->warn("Config key [$key] is not defined in header [$header]");
+    my ($p, $f, $l) = caller;
+    $self->warn("Config key [$key] is not defined in header [$header] $f:$l");
     return undef;
   }
   return $self->{'config'}->{$header}->{$key};

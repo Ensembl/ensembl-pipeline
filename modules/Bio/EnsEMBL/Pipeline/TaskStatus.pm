@@ -37,6 +37,7 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::IDSet;
+use warnings;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -255,6 +256,7 @@ sub add_killed{
 
 sub add_existing{
     my ($self, $arg) = @_;
+    
     my $idset = $self->_check($arg);
     if(!$self->{'_existing'}){
       $self->{'_existing'} = $idset;
@@ -366,13 +368,14 @@ sub get_existing{
     if(!$self->{'_existing'}){
       $self->create_existing;
     }
+    
     return $self->{'_existing'};
 }
 
-sub get_existing{
+sub get_retried{
     my ($self) = @_;
     if(!$self->{'_retried'}){
-      $self->create_existing;
+      $self->{'_retried'} = Bio::EnsEMBL::Pipeline::IDSet->new;
     }
     return $self->{'_retried'};
 }
@@ -432,9 +435,9 @@ sub create_existing{
        my $idset = $total_ids->or($self->get_fatal);
        $total_ids = $idset;
     }
+   
     $self->add_existing($total_ids);
-
-    return $total_ids;
+     
 }
 
 

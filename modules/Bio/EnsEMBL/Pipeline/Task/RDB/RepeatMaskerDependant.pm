@@ -34,15 +34,12 @@ sub can_start{
  
   my $input_ids = $self->get_input_ids;
   my $config = $self->get_Config;
-  my $type_string = $self->get_Config->get_parameter($self->name, 'input_id');
-  my (@other_info) = split /:/, $type_string;
-  my $type = lc(shift @other_info);
+  my $type = $self->input_id_type;
   if($type eq 'contig'){
     my $repeatmask_success = $self->get_TaskStatus('repeatmasker_task')->get_successful;
     
-    my $can_start = $input_ids->and($repeatmask_success);
-    $self->input_ids_to_start($can_start);
-    return $self->input_ids_to_start->count;
+   
+    return $repeatmask_success->count;
   }else{
     $self->warn("this task ".$self->name." uses a input_id type which isn't ".
 		 "contig but ".$type." its going to wait till all RepeatMasker jobs are finished");
