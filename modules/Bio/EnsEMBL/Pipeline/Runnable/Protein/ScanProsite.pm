@@ -75,7 +75,6 @@ sub new {
     
     $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
     $self->{'_sequence'}  = undef; # location of Bio::Seq object
-    $self->{'_program'}   = undef; # location of ScanProsite executable
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_database'}  = undef; # Location of the database
@@ -85,48 +84,42 @@ sub new {
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
     
   
-    print STDERR "args: ", @args, "\n";
-    
-    my( $query, $program, $database, $threshold, $workdir, $parameters) = $self->_rearrange([qw(QUERY
-										   PROGRAM
-										   DATABASE
-										   THRESHOLD
-										   WORKDIR
-										   PARAMETERS
-										   )],
-									       @args);
+    my( $query, $database, $threshold, $workdir, $analysis, $parameters) = $self->_rearrange([qw(QUERY
+												 DATABASE
+												 THRESHOLD
+												 WORKDIR
+												 ANALYSIS
+												 PARAMETERS
+												 )],
+											     @args);
     
     
-    #$self->clone($sequence) if ($sequence);       
   
     if ($query) {
 	$self->clone($query);
     } else {
 	$self->throw("No query sequence given");
     }
-    
-    if ($program) {   
-	$self->program($program); }
-    #else {   
-	#$self->program($self->locate_executable('pfscan')); }
+ 
+    if ($analysis) {
+	$self->analysis($analysis);
+    }
+   
     
     if ($threshold) {
 	$self->threshold($threshold);
     }
     
-    if ($database) {
-	$self->database($database);
-    } else {
+    if (!defined $self->analysis->db) {
 	$self->throw("No database given");
     }
     if ($workdir) {
 	$self->workdir($workdir);
     }
+
     if ($parameters) {
 	$self->parameters($parameters);
-    }
-
-    print STDERR "PAR: ".$self->parameters."\n";
+    }      
 	
     return $self; # success - we hope!
 }
@@ -164,44 +157,24 @@ sub clone{
     return $self->{'_sequence'};
 }
 
-=head2 program
+=head2 analysis
 
- Title   : program
- Usage   : $obj->program($newval)
+ Title   : analysis
+ Usage   : $obj->analysis($newval)
  Function: 
- Returns : value of program
+ Returns : value of analysis
  Args    : newvalue (optional)
 
 
 =cut
 
-sub program{
+sub analysis{
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'_program'} = $value;
+      $obj->{'analysis'} = $value;
     }
-    return $obj->{'_program'};
-}
-
-=head2 database
-
- Title   : database
- Usage   : $obj->database($newval)
- Function: 
- Returns : value of database
- Args    : newvalue (optional)
-
-
-=cut
-
-sub database{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_database'} = $value;
-    }
-    return $obj->{'_database'};
+    return $obj->{'analysis'};
 
 }
 
@@ -250,13 +223,14 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR "RUNNING: ".$self->program . ' -pattern ' .$self->database. ' -emotif ' .$self->parameters.' '.$self->filename . ' > ' .$self->results."\n";
+    print STDERR "RUNNING: perl ".$self->analysis->program . ' -pattern ' .$self->analysis->db. ' -emotif ' .$self->parameters.' '.$self->filename . ' > ' .$self->results."\n";
 
     $self->throw("Failed during ScanProsite run $!\n")
 	    
-       unless (system ($self->program . 
-		       ' -pattern ' .$self->database.
-		       ' -emotif '.$self->parameters.' '.
+       unless (system ('perl '.$self->analysis->program . 
+		       ' -pattern ' .$self->analysis->db.
+		       ' -confirm /analysis/iprscan/data/confirm.patterns'.
+		       $self->parameters.' '.
 			$self->filename. ' >  ' .
 		       $self->results) == 0) ;
 }
@@ -345,15 +319,6 @@ sub output {
 sub create_feature {
     my ($self, $feat, $sequenceId) = @_;
     
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-	(   -db              => "PROSITE",
-	    -db_version      => 1,
-	    -program         => "ScanProsite",
-	    -program_version => 1,
-	    -gff_source      => "Prosite",
-	    -gff_feature     => "domain");
-    
     my @f = split (/,/,$feat);
 
 #Here the score is either the match has been confirmed by emotif patterns or not. If the match has been confirmed: score = 1 if not score = 0    
@@ -361,18 +326,21 @@ sub create_feature {
     if ($score eq "?") {
 	$score = 0;
     }
+    else {
+	$score = 1;
+    }
 
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
 					       -end => $f[2],        
 					       -score => $score,
-					       -analysis => $analysis_obj,
+					       -analysis => $self->analysis,
 					       -seqname => $self->clone->id,
 					       -percent_id => 'NULL',
 					       -p_value => 'NULL');
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
 					      -end => 0,
-					      -analysis => $analysis_obj,
+					      -analysis => $self->analysis,
 					      -seqname => $f[0]);
     
     
