@@ -106,6 +106,8 @@ sub new {
   
   $self->clone($sequence) if ($sequence);       
 
+  $epojar = 'eponine-scan.jar' unless $epojar;
+
   my $bindir = $::pipeConf{'bindir'} || undef;
 
   if (-x $java) {
@@ -115,7 +117,7 @@ sub new {
   elsif ($::pipeConf{'bin_JAVA'} && -x ($java = "$::pipeConf{'bin_JAVA'}")) {
     $self->java($java);
   }
-  elsif ($bindir && -x ($java = "/usr/opt/java130/bin/java")) {
+  elsif (-x ($java = "/usr/opt/java130/bin/java")) {
     $self->java($java);
     }
   else {
@@ -127,15 +129,9 @@ sub new {
       $self->throw("Can't find executable java");
     }
   }
-  
-  if (-e $epojar) {
-      $self->epojar($epojar);
-  } elsif ($::pipeConf{'bin_EPONINE'} && -e ($epojar = $::pipeConf{'bin_EPONINE'})) {
-      $self->epojar($epojar);
-  } else {
-      $self->throw("Can't find eponine-scan.jar");
-  }
-  
+
+  $self->epojar ($self->find_file($epojar));
+
   if (defined $threshold && $threshold >=0 ){
       $self->threshold($threshold);
   } else {
