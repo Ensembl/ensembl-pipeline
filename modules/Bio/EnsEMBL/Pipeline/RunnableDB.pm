@@ -56,7 +56,7 @@ use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
 
