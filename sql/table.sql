@@ -61,8 +61,7 @@ CREATE TABLE job_status (
 
 CREATE TABLE rule_goal (
   rule_id           smallint(5) unsigned default '0' not null auto_increment,
-  goal              varchar(40) unsigned,
- 
+  goal              varchar(40),
   PRIMARY KEY (rule_id)
 );
 
