@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::C
+Bio::EnsEMBL::Pipeline::Runnable::GC
 
 =head1 SYNOPSIS
 
@@ -26,8 +26,6 @@ Bio::EnsEMBL::Pipeline::Runnable::C
   $gc->workdir($workdir);
   $gc->run();
   my @genes = $gc->output();
-  my @exons = $gc->output_exons();
-  my $seqfeature = $gc->output_singlefeature();
 
 =head1 DESCRIPTION
 
@@ -55,7 +53,7 @@ Bio::EnsEMBL::Pipeline::Runnable::C
 
 =head1 CONTACT
 
-ensembl-dev.ebi.ac.uk
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
@@ -85,7 +83,7 @@ use Bio::EnsEMBL::Root;
     Function:   Initialises GC object
     Returns :   a GC object
     Args    :   A Bio::Seq object 
-                (sizw of window to be analysed)
+                (size of window to be analysed)
 
 =cut
 
@@ -296,6 +294,8 @@ sub output {
     my ($self) = @_;
     return @{$self->{'_flist'}};
 }
+
+
 
 
 
