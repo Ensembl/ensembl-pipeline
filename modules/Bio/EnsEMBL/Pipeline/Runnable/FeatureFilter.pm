@@ -176,7 +176,6 @@ sub run{
 
    # we accept all feature pairs which are valid and meet coverage criteria
 
-   my @accepted;
    FEATURE :
    foreach my $hseqname ( @inputids ) {
 
