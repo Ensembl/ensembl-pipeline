@@ -325,6 +325,7 @@ sub parse_results {
             $feature {primary}= 'cpg_island';
 	    $feature {program} = 'cpg';
 	    $feature {program_version} = '1';
+	    $feature {display_label} = "oe = $oe";
           
 	    $self->create_feature(\%feature);
 
@@ -386,7 +387,7 @@ sub create_feature {
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
-    $cpg->display_text('');
+    $cpg->display_label($feat->{'display_label'});
     if ($cpg)
       {
 	$cpg->validate();
