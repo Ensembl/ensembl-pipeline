@@ -1,5 +1,9 @@
 #!/usr/local/bin/perl
 
+BEGIN {
+  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl-pipeline/modules");
+  unshift (@INC,"/nfs/acari/enspipe/src_mouse/EnsEMBL/ensembl/modules");
+}
 =head1 NAME
 
 test_RunnableDB
@@ -35,24 +39,24 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
+use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
-
-use vars qw(@ISA);
-
-@ISA = qw(Bio::Root::Object);
+use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
 
 my $dbtype = 'rdb';
-my $host   = 'ecs1c';
+my $host   = 'ensrv3';
 my $port   = '410000';
-my $dbname = 'arne_freeze05';
+my $dbname = 'simon_oct07';
 my $dbuser = 'ensadmin';
 my $pass   = undef;
 my $runnable;
 my $input_id;
 my $analysisid;
 my $write  = 0;
+my $check  = 0;
 
 &GetOptions( 
 	     'host:s'      => \$host,
@@ -64,13 +68,17 @@ my $write  = 0;
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,
 	     'write'     => \$write,
+             'check'       => \$check,
 	     );
 
 $| = 1;
-
+if ($check) {
+   exit(0);
+}
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => $host,
 						-user => $dbuser,
-						-dbname => $dbname
+						-dbname => $dbname,
+#                                                -perlonlyfeatures => 0,
 					       );
 
 
