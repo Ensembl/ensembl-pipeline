@@ -294,15 +294,41 @@ sub run_program {
     print STDERR "running ".$self->program." against ".$self->database."\n";
 
     # some of these options require HMMER 2.2g (August 2001)
-    my $cmd = $self->program .' '.
-              '--acc --cut_ga --cpu 1 '.
-              $self->options .' '.
-	      $self->database      .' '.
-	      $self->filename.' > '.
-	      $self->results;
+    
+    @dbfiles = split(/;/,$analysis->db_file);
+
+    if ($dbfiles[0] =~ /ls/) {
+	 
+
+	my $cmd = $self->program .' '.
+	        '--acc --cut_ga --cpu 1 '.
+	        $self->options .' '.
+	        $dbfiles[0]      .' '.
+	        $self->filename.' > '.
+		$self->lsresults;
     print STDERR "$cmd\n";   
-    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$self->database) 
+    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[0]) 
         unless ((system ($cmd)) == 0);
+    }
+    else {
+	die || "ls pfam file has not been provided";
+    }
+
+   if ($dbfiles[0] =~ /fs/) { 
+       
+	my $cmd = $self->program .' '.
+	        '--acc --cut_ga --cpu 1 '.
+	        $self->options .' '.
+	        $dbfiles[1]      .' '.
+	        $self->filename.' > '.
+		$self->fsresults;
+	print STDERR "$cmd\n";   
+    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[1]) 
+        unless ((system ($cmd)) == 0);
+    }
+    else {
+	die || "fs pfam file has not been provided";
+    }
 }
 
 
@@ -321,27 +347,34 @@ sub run_program {
 sub parse_results {
     my ($self) = @_;
     my $filehandle;
-    my $resfile = $self->results;
-    
+    my $fshandle;
+    my $resfile = $self->lsresults;
+    my $fsfile  = $self->fsresults;
+
     if (-e $resfile) {
         # it's a filename
-        if (-z $self->results) {  
+        if ((-z $self->lsresults) && (-z $self->fsresults)) {  
             print STDERR $self->program." didn't find anything\n";
             return;
         }       
         else {
             open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
             $filehandle = \*OUT;
+	    close (OUT);
+	    open (OUT, "<$fsfile")  or $self->throw ("Error opening $fsfile");
+	    $fshandle = \*OUT;
+	    close (OUT);
       }
     }
     else {
         # it'a a filehandle
         $filehandle = $resfile;
+	$fshandle = $fsfile;
     }
     
-    # parse
-    my $id;
+#First parse what comes from the ls mode matches. Every match in that case is take
     while (<$filehandle>) {
+	my $id;
         chomp;
         last if /^Alignments of top-scoring domains/;
         next if (/^Model/ || /^\-/ || /^$/);
@@ -366,7 +399,48 @@ sub parse_results {
             $self->create_feature (\%feature);
 	}
     }
-    close $filehandle;   
+    close $filehandle; 
+
+#Then read all of the fs mode matches. If a match does not overlap with any ls match thus its taken
+    while (<$fshandle>) {
+	my $id;
+        chomp;
+        last if /^Alignments of top-scoring domains/;
+        next if (/^Model/ || /^\-/ || /^$/);
+        if (/^Query sequence:\s+(\S+)/) {
+            $id = $1;
+        }
+        if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+	    my $overlap = undef;
+	    foreach ($featpair($self->'_flist')) {
+		my $lsstart = $featpair->feature1->start;
+		my $lsend = $featpair->feature1->end;
+		if ((($start >= $lsstart) && ($start <= $lsend)) || (($end >= $lsstart) && ($end <= $lsend))) {
+		    $overlap = 1;
+		}
+	    }
+
+	    if (!defined $overlap) {
+		#There is no ovelap thus create a feature
+		my %feature;
+		($feature{name}) = $id;
+		$feature{score} = $score;
+		$feature{p_value} = sprintf ("%.3e", $evalue);
+		$feature{start} = $start;
+		$feature{end} = $end;
+		$feature{hname} = $hid;
+		$feature{hstart} = $hstart;
+		$feature{hend} = $hend;
+		($feature{source}) = $self->program =~ /([^\/]+)$/;
+		$feature{primary} = 'similarity';
+		($feature{program}) = $self->program =~ /([^\/]+)$/;
+		($feature{db}) = $self->database =~ /([^\/]+)$/;
+		($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
+		$self->create_feature (\%feature);
+	    }
+	}
+    }
+    close $fshandle;
 }
 
 
@@ -436,6 +510,20 @@ sub output {
     my ($self) = @_;
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
+}
+
+
+sub lsresults {
+    my ($self, $results) = @_;
+    $self->{_lsresults} = $results if ($results);
+    return $self->{_lsresults};
+}
+
+
+sub fsresults {
+    my ($self, $results) = @_;
+    $self->{_fsresults} = $results if ($results);
+    return $self->{_fsresults};
 }
 
 1;
