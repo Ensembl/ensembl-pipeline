@@ -20,14 +20,14 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 
 my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
-			   '-seqfetcher'        => $pfetcher,
+			   '-seqfetcher'        => $seqfetcher,
 			   '-transcript'        => $transcript);
 
 my $alignment = $alignment_tool->retrieve_alignment('all');  
                              # Or just 'nucleotide' or 'protein'
 
-foreach my $sequence (@$alignment){
-  print $sequence . "\n";
+foreach my $align_seq (@$alignment){
+  print $sequence->seq . "\n";
 }
 
 # More fussy (set a few things to non-default, change the
@@ -42,10 +42,8 @@ my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
 			   '-fasta_line_length' => 60);
 
 
-# Get identities of best item of evidence for each exon (returns 
-# an arrayref, where each array element is another list that 
-# contains (highest_protein_identity, protein_coverage, 
-# highest_nucleotide_evidence, nucleotide_coverage).
+# 
+
 my $exon_identities = $alignment_tool->identity;
 
 # NOTE : The definition of identity used by this module ignores all
@@ -60,9 +58,14 @@ my $evidence_coverage = $alignment_tool->hit_coverage;
   
 foreach my $hit (@$hit_coverage){
 
-  print "Hit sequence   : " . $hit->{'name'} . "\n";
-  print "Coverage       : " . $hit->{'coverage'} . "\n";
-  print "Presumed exons : " . $hit->{'exons'} . "\n";
+  print "Hit sequence             : " . $hit->{'name'} . "\n";
+  print "Coverage                 : " . $hit->{'coverage'} . "\n";
+  print "Number of presumed exons : " . $hit->{'exons'} . "\n";
+  print "Unmatched 5prime bases   : " . $hit->{'unmatched_5prime'} . "\n";
+  print "Unmatched 3prime bases   : " . $hit->{'unmatched_3prime'} . "\n";
+  print "Unmatched internal bases : " . $hit->{'unmatched_internal'} . "\n\n";
+  
+
 
   # Look for missing evidence:
 
@@ -232,7 +235,7 @@ sub new {
 =cut
 
 sub retrieve_alignment {
-  my ($self, $type) = @_;
+  my ($self, $type, $show_missing_evidence) = @_;
 
   unless ($type) {
     $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
@@ -243,7 +246,7 @@ sub retrieve_alignment {
     $self->_align($type);
   }
 
-  return $self->_create_Alignment_object($type);
+  return $self->_create_Alignment_object($type, $show_missing_evidence);
 }
 
 
@@ -435,7 +438,7 @@ sub _align {
 =cut
 
 sub _create_Alignment_object {
-  my ($self, $type) = @_;
+  my ($self, $type, $show_missing_evidence) = @_;
 
   my $alignment = Bio::EnsEMBL::Pipeline::Alignment->new(
 			      '-name' => 'evidence alignment');
@@ -450,6 +453,12 @@ sub _create_Alignment_object {
 
   foreach my $evidence_sequence (@{$self->_working_alignment('evidence')}){
     $alignment->add_sequence($evidence_sequence);
+  }
+
+  if ($show_missing_evidence) {
+    foreach my $missing_sequence (@{$self->_unmatched_sequence_fragments}){
+      $alignment->add_sequence($missing_sequence);
+    }
   }
 
   return $alignment;
@@ -599,21 +608,20 @@ sub _compare_to_reference {
     $exon_end = $exon_start + $exon_length - 1;
   }
 
-#print STDERR "Exon start : " . $exon_start . "\tExon end: " . $exon_end . "\n"; 
   for (my $i = $exon_start - 1; $i < $exon_end; $i++) {
-#print STDERR $i . " " . $reference_sequence->[$i] . " " . $match_sequence->[$i] . "\n";
+
     unless (defined ($match_sequence->[$i]) &&
 	    defined ($reference_sequence->[$i]) &&
 	    (($reference_sequence->[$i] eq $match_sequence->[$i])||
 	     (($reference_sequence->[$i] eq '-')
 	      ||($match_sequence->[$i] eq '-')))) {
-#print STDERR "MISMATCH\n";
+
       $mismatches += $align_unit;
     }
     
     if (($reference_sequence->[$i] ne '-')
 	&&($match_sequence->[$i] eq '-')) {
-#print STDERR "NONCOVERED\n";
+
       $noncovered += $align_unit;
     }
   }
@@ -626,8 +634,6 @@ sub _compare_to_reference {
   $noncovered = $exon_length if $noncovered > $exon_length;
   
   my $coverage = (1 - ($noncovered/$exon_length))*100;
-  
-#print STDERR "Identity : $identity\tCoverage : $coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
   
   return ($identity, $coverage);
 }
@@ -654,7 +660,8 @@ sub _compute_evidence_coverage {
 
     foreach my $supporting_feature (@{$exon->get_all_supporting_features}){
       push (@{$coordinates_hash{$supporting_feature->hseqname}}, 
-	    [$supporting_feature->hstart, $supporting_feature->hend]);
+	    [$supporting_feature->hstart, $supporting_feature->hend, 
+	     $supporting_feature->start, $supporting_feature->end]);
     }
 
   }  
@@ -673,17 +680,41 @@ sub _compute_evidence_coverage {
     my $presumed_exons = scalar @{$coordinates_hash{$sequence_identifier}};
 	
     my $covered_length = 0;
-			  
-    foreach my $coordinate_pair (@{$coordinates_hash{$sequence_identifier}}) {
+    my $previous_end;
+    my @sorted_matches = sort {$a->[0] <=> $b->[0]} @{$coordinates_hash{$sequence_identifier}};
+
+    foreach my $coordinate_pair (@sorted_matches) {
 
                           # Hit end        minus hit start       plus one;
       $covered_length += $coordinate_pair->[1] - $coordinate_pair->[0] + 1;
 
+      if ($previous_end && $coordinate_pair->[0] != $previous_end + 1) {
+	$self->_add_unmatched_region($sequence_identifier, $coordinate_pair->[0], 
+				     $coordinate_pair->[1], 'before',$coordinate_pair->[1]);
+      }
     }
 
-    my %these_stats = ('name'     => $sequence_identifier,
-		       'coverage' => (($covered_length / $length) * 100),
-		       'exons'    => $presumed_exons		  
+    if ($sorted_matches[0]->[0] != 1){ 
+      $self->_add_unmatched_region($sequence_identifier, 1, ($sorted_matches[0]->[0] - 1), 
+				   'before', $sorted_matches[0]->[2]);
+    }
+
+    if ($sorted_matches[-1]->[1] != $length){
+      $self->_add_unmatched_region($sequence_identifier, ($sorted_matches[-1]->[1] + 1), 
+				   $length, 'after', $sorted_matches[-1]->[3]);
+    }
+
+    my $uncovered_5prime_bases = $sorted_matches[0]->[0] - 1;
+    my $uncovered_3prime_bases = $length - $sorted_matches[-1]->[1];
+    my $uncovered_internal_bases = $length - $covered_length - 
+      $uncovered_5prime_bases - $uncovered_3prime_bases;
+
+    my %these_stats = ('name'               => $sequence_identifier,
+		       'coverage'           => (($covered_length / $length) * 100),
+		       'exons'              => $presumed_exons,
+		       'unmatched_5prime'   => $uncovered_5prime_bases,
+		       'unmatched_3prime'   => $uncovered_3prime_bases,
+		       'unmatched_internal' => $uncovered_internal_bases
 		      );
 
     push (@evidence_coverage_stats, \%these_stats);
@@ -693,6 +724,111 @@ sub _compute_evidence_coverage {
   return \@evidence_coverage_stats;
 
 }
+
+=head2 _add_unmatched_region
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _add_unmatched_region {
+  my ($self, $seqname, $start, $end, $before_or_after, $genomic_coord) = @_;
+
+  if ($seqname && $start && $end && 
+      ($before_or_after eq 'before' || $before_or_after eq 'after') && $genomic_coord) {
+    
+    push (@{$self->{'_unmatched_evidence_sequence'}->{$seqname}}, [$start, $end, 
+								   $before_or_after, 
+								   $genomic_coord]);
+
+  } else {
+    $self->throw("Incorrect arguments specified.");
+  }
+
+}
+
+=head2 _unmatched_sequence_fragments
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _unmatched_sequence_fragments {
+  my ($self) = @_;
+
+  my $spacing = 5;
+  my @sequences;
+
+  $self->warn("No unmatched sequences have been found")
+    unless $self->{'_unmatched_evidence_sequence'};
+
+  foreach my $seqname (keys %{$self->{'_unmatched_evidence_sequence'}}){
+
+    my @sorted_missing_bits = sort {$a->[0] <=> $b->[0]} @{$self->{'_unmatched_evidence_sequence'}->{$seqname}};
+
+    my $fetched_seq = $self->_fetch_sequence($seqname);
+    my @fetched_seq_array = split /./, $fetched_seq;
+
+    my $slice_seq = '-' x $self->_slice->length;
+    my @slice_seq_array = split /./, $slice_seq;
+
+    foreach my $missed_fragment (@sorted_missing_bits){
+
+      my $insert_start;
+
+      if ($missed_fragment->[2] eq 'before'){
+
+	$insert_start = $missed_fragment->[3] - 
+	  ($missed_fragment->[1] - $missed_fragment->[0]) - $spacing;
+
+      } elsif ($missed_fragment->[2] eq 'after') {
+
+	$insert_start = $missed_fragment->[3] + $spacing;
+
+      } else {
+	$self->throw("Before or after not specified. Internal error.");
+      }
+
+      my $insert_point = $insert_start;
+
+      for (my $i = $missed_fragment->[0]; $i <= $missed_fragment->[1]; $i++) {
+	$slice_seq_array[$insert_point] = $fetched_seq_array[$i];
+	$insert_point++;
+      }      
+    }
+
+    my $sequence = '';
+
+    foreach my $element (@slice_seq_array) {
+      $sequence .= $element;
+    }
+
+    my $display_seqname = "Unmatched " . $seqname;
+
+    my $align_seq = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+                              '-name'      => $display_seqname,
+			      '-seq'       => $sequence,
+			      '-deletions' => 0,
+			      '-type'      => 'nucleotide');
+
+
+    push (@sequences, $align_seq);
+
+  }
+
+  return \@sequences;
+}
+
 
 
 =head2 _is_computed
