@@ -1,74 +1,104 @@
-#
-# Table structure for table 'current_status'
-#
-CREATE TABLE current_status (
-  jobId             int(10) unsigned DEFAULT '0' NOT NULL,
-  status            varchar(40) DEFAULT '' NOT NULL,
-
-  PRIMARY KEY (jobId),
-  KEY status_index (status)
-);
-
-#
-# Table structure for table 'job'
-#
 CREATE TABLE job (
-  jobId             int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
-  input_id          varchar(40) DEFAULT '' NOT NULL,
-  class             enum ("clone","contig","vc","gene") not null,
-  analysisId        int(10) unsigned DEFAULT '0' NOT NULL,
-  LSF_id            int(10) unsigned DEFAULT '0',
-  stdout_file       varchar(100) DEFAULT '' NOT NULL,
-  stderr_file       varchar(100) DEFAULT '' NOT NULL,
-  object_file       varchar(100) DEFAULT '' NOT NULL,
-  retry_count       int default 0,
+  job_id            int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+  input_id          varchar(40) NOT NULL,
+  class             enum("clone", "contig", "vc", "gene") not null,
+  analysis_id       smallint(5) unsigned NOT NULL,
+  lsf_id            mediumint(10) unsigned NOT NULL,
+  stdout_file       varchar(100) NOT NULL,
+  stderr_file       varchar(100) NOT NULL,
+  object_file       varchar(100) NOT NULL,
+  retry_count       tinyint(2) unsigned default 0,
 
-  PRIMARY KEY (jobId),
-  KEY input_index (input_id),
-  KEY analysis_index (analysisId)
+  PRIMARY KEY (job_id),
+  KEY         (input_id),
+  KEY         (analysis_id)
 );
 
-#
-# Table structure for table 'jobstatus'
-#
-CREATE TABLE jobstatus (
-  jobId             int(10) unsigned DEFAULT '0' NOT NULL,
+# job_id      - job internal ID
+# input_id    - name (e.g. accession/Ensembl ID) of input
+# class       - distinguish different input types
+# analysis_id - internal ID of analysis (analysis table)
+# lsf_id      - ID of job in LSF
+# *_file      - files created to contain job output/error
+# retry_count - number of times job restarted
+
+# ?? what is job.objectfile - do we need/use it?
+
+
+
+
+CREATE TABLE job_status (
+  job_id            int(10) unsigned NOT NULL,
   status            varchar(40) DEFAULT 'CREATED' NOT NULL,
-  time              datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  time              datetime NOT NULL,
+  is_current        enum('n', 'y') DEFAULT 'n',
 
-  KEY (jobId),
-  KEY status_index (status)
+  KEY (job_id),
+  KEY (status),
+  KEY (is_current)
 );
 
-CREATE TABLE RuleGoal (
-  ruleId            int unsigned default '0' not null auto_increment,
-  goalAnalysisId    int unsigned,
+# job 'history' table - tracks each state of a job in its 'life'
+# one line per job/status
+#
+# job_id     - job internal ID
+# status     - text string (e.g. 'CREATED' , 'RUNNING')
+# is_current - whether this status is the current status
+
+
+
+# rule tables: rule_goal and rule_conditions
+#
+# an analysis A depends on a number of rules R1 .. RN. it can
+# be run when all rules with rule_goal.analysis = A are satisfied.
+# in order to satisfy a rule R, at least one of the conditions
+# rule_conditions.condition must have been met for that rule.
+#
+# rule_goal.analysis and rule_conditions.contitions relate to
+# entries in table 'analysis'
+# currently, rule_goal.analysis is an analysis internal ID,
+# rule_conditions.condition is an analysis logic_name
+
+CREATE TABLE rule_goal (
+  rule_id           smallint(5) unsigned default '0' not null auto_increment,
+  goal              varchar(40) unsigned,
  
-  PRIMARY KEY (ruleID)
+  PRIMARY KEY (rule_id)
 );
 
-CREATE TABLE RuleConditions (
-  ruleId            int not null,
-  conditionLiteral  varchar(20)
+CREATE TABLE rule_conditions (
+  rule_id           smallint(10) unsigned not null,
+  condition         varchar(40)
 );
 
-CREATE TABLE InputIdAnalysis (
-  inputId           varchar(40) not null,
-  class             enum ("clone","contig","vc","gene") not null,
-  analysisId        int not null,
-  created           datetime not null,
+# rule_id     - rule internal ID
+# goal - internal ID (if +ve integer) or logic_name of analysis
+# condition   - a literal, such as analysis.logic_name
 
-  PRIMARY KEY (analysisId, inputId, class),
-  KEY inputIdx      (inputId, created),
-  KEY inputId_class (inputId, class)
+# need also to include rules like 'run job X on all contigs'
+
+
+
+CREATE TABLE input_id_analysis (
+  input_id          varchar(40) not null,
+  class             enum("clone" ,"contig", "vc", "gene") not null,
+  analysis_id       smallint(10) unsigned NOT NULL,
+  created           datetime NOT NULL,
+
+  PRIMARY KEY       (analysis_id, input_id, class),
+  KEY input_created (input_id, created),
+  KEY input_class   (input_id, class)
 );
 
-CREATE TABLE VoidInputIdAnalysis (
-  inputId           varchar(40) DEFAULT '' NOT NULL,
-  analysisId        int(11) DEFAULT '0' NOT NULL,
-  exception         varchar(40),
+# pipeline 'history' table - records each job performed in the
+# pipeline with the time it was completed
+#
+# input_id/class/analysis_id - see table 'job'
+# timestamp                  - when this job was completed
 
-  PRIMARY KEY (inputId,analysisId),
-  KEY exc (exception)
-);
+# ?? need an extra column to hold exit status
+# e.g. for repeat masked seq need to know if seq is all repeat
+# (prevent e.g. blast running) - and store failures here that
+# are understood (e.g. genscan producing garbage)
+# and if, say, no genscan predictions, don't bother BlastGenscanXXX
 
