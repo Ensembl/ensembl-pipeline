@@ -77,7 +77,7 @@ foreach my $obj (@results)
 sub set_seq {
 #embedded sequence! Because I can't create Bio::PrimarySeqs from files 
 #The capitalised sequence is taken from pBR322
-my $seq = 'CCATTATCGCCGGCATGGCGGCCGACGCGCTGGGCTACGTCTTGCTGGCGT'.<SEQ>;
+my $seq = 'CCATTATCGCCGGCATGGCGGCCGACGCGCTGGGCTACGTCTTGCTGGCGT'.;
 'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
 'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.
 'gcacaaggctggcatttctgaaccttgcccctctgcaaacacaagggggcgatggtggcactccaagcaaaggggcg'.
