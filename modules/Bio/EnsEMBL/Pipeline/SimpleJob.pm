@@ -75,8 +75,6 @@ use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
-use Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
-use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
