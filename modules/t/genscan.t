@@ -58,7 +58,6 @@ print "ok 4\n"; # 4th test passed
 
 #get and store the output
 my @results = $genscan->output();
-print STDERR "GENES:\n";
 display (@results);
 
 unless (@results) 
@@ -67,8 +66,8 @@ else
 { print "ok 5\n"; }
 
 my @exons = $genscan->output_exons();
-print STDERR "EXONS:\n";
-display(@exons);
+#print STDERR "Exons\n";
+#display(@exons);
 
 unless (@exons) 
 { print "not ok 6\n"; }
@@ -81,6 +80,13 @@ sub display {
     foreach my $obj (@results)
     {
        print STDERR ($obj->gffstring . "\n");
+       if ($obj->sub_SeqFeature)
+       {
+            foreach my $exon ($obj->sub_SeqFeature)
+            {
+                print STDERR "Exon: ".$exon->gffstring."\n";
+            }
+       }
     }
 }
 
