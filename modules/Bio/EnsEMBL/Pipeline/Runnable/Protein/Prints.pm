@@ -248,7 +248,7 @@ sub run_analysis {
 	$self->throw("Failed during prints run $!\n")
 	    
 	    unless (system ($self->analysis->program . ' ' . 
-			    $self->analysis->db . ' ' .
+			    $self->analysis->db_file . ' ' .
 			    $self->filename. ' ' .
 			    '-fjR >'.
 			    #'-fj -a -o 15   > ' . 
