@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl
 # Copyright GRL & EBI 2001
 # Author: Emmanuel Mongin
 # Creation: 03.19.2001
@@ -82,45 +82,65 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -perlonlyfeatures => 0
 );
 
-my $sf;
-
-
-my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
-
-
-my %hparams;
-# eg -parameters param1=value1,param2=value2
-foreach my $p(split /,/, $params){
-  my @sp = split /=/, $p;
-  $sp[0] = '-' . $sp[0];
-  $hparams{$sp[0]} =  $sp[1];
+if ($runnable =~ /Hmmpfam/) {
+    print STDERR "INPUT_ID: $input_id\n";
+    my @subm = split(/:/,$input_id);
+    foreach my $i(@subm) {
+	print STDERR "ID: $i\n";
+	if($i) {
+	    my $sf;
+	    my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
+	    my %hparams;
+	    
+	    foreach my $p(split /,/, $params){
+		my @sp = split /=/, $p;
+		$sp[0] = '-' . $sp[0];
+		$hparams{$sp[0]} =  $sp[1];
+	    }
+	    
+	    my $runobj = "$runnable"->new(-db    => $db,
+					  -input_id => $i,
+					  -analysis => $analysis,
+					  -seqfetcher => $sf,
+					  %hparams,
+					  );
+	    $runobj->fetch_input;
+	    $runobj->run;
+	    $runobj->write_output;
+	}
+    }
 }
 
-my $runobj = "$runnable"->new(-dbobj    => $db,
-			      -input_id => $input_id,
-			      -analysis => $analysis,
-			      -seqfetcher => $sf,
-			      %hparams,
-			     );
+else {
+    my $sf;
+    
 
-$runobj->fetch_input;
-$runobj->run;
- 
+    my $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysisid);
+    
+
+    my %hparams;
+
+    foreach my $p(split /,/, $params){
+	my @sp = split /=/, $p;
+	$sp[0] = '-' . $sp[0];
+  $hparams{$sp[0]} =  $sp[1];
+    }
+    
+    my $runobj = "$runnable"->new(-db    => $db,
+				  -input_id => $input_id,
+				  -analysis => $analysis,
+				  -seqfetcher => $sf,
+				  %hparams,
+				  );
+
+    $runobj->fetch_input;
+    $runobj->run;
+    
 
 
 
-$runobj->write_output;
-
-#my @out = $runobj->output;
-
-#foreach my $out (@out) {
-#    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
-#      print ($out->gffstring . "\n");
-#    } else {
-#      print $out->gffstring . "\n";
-#    }
-#}
-
+    $runobj->write_output;
+}
 
 
 

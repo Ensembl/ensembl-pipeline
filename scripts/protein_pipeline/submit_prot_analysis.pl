@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl
 # Author: Emmanuel Mongin
 # Creation: 03.19.2001
 
@@ -165,7 +165,7 @@ sub run_jobs {
      foreach my $r(@toberun) {
 	 #First get the analysisId of the module which is supposed to run
 	 
-	 my $q = "select analysisId from analysisprocess where module = '$r'";
+	 my $q = "select analysis_id from analysis where module = '$r'";
     
 	 my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
 	 my $res = $sth->execute || $db->throw("can't execute: $q");
@@ -189,19 +189,29 @@ sub run_jobs {
 
 #Three diffenrent way of running the analysis 1,2,3 (see documentation in the configuration file and in the perldoc of this script)
 	 if ($chunk == 1) {
+	     my @chunk;
+	     my $count = 0;
 	     foreach my $i(@id) {
-		 my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
+		 $count++;
+		 push (@chunk,$i);
+		 if ($count >= 10) {
+		     my $subm = join(":",@chunk);
+		     
+		     print STDERR "ID: $subm\n";
+		     my $command = "bsub -Ralpha -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$subm." -analysis ".$analysis_id;
 				 
-		 print STDERR "RUNNING: $command\n";
+		     print STDERR "RUNNING: $command\n";
 		 
-		 system($command)==0 || die "$0\Error running '$command' : $!";
-
+		     system($command)==0 || die "$0\Error running '$command' : $!";
+		     @chunk = undef;
+		     $count = 0;
+		 }
 	     }
 	 }
 
 	 
 	 if ($chunk == 3) {
-	     my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
+	     my $command = "bsub -Ralpha -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
 	    
 
 	     print STDERR "RUNNING: $command\n";
@@ -219,7 +229,7 @@ sub run_jobs {
 	     
 	     foreach my $f(@allfiles) {
 		 if (($f ne ".") && ($f ne "..")) {
-		      my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
+		      my $command = "bsub -Ralpha -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
 		  
 
 		      print STDERR "RUNNING: $command\n";
