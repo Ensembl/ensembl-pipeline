@@ -450,9 +450,9 @@ sub calculate_and_set_phases {
                                             -moltype =>  'dna' );
             #translate in all three frames. 
             #The parameters are (stop, unknown, frame)
-            my @translation = ( $bioseq->translate('*','.',0), 
-                                $bioseq->translate('*','.',1),
-                                $bioseq->translate('*','.',2));
+            my @translation = ( $bioseq->translate('*','.',0,1,1), 
+                                $bioseq->translate('*','.',1,1,1),
+                                $bioseq->translate('*','.',2,1,1));
 
             my $modulo = $exon->length() % 3;
             my ($phase_3, $phase_5);
