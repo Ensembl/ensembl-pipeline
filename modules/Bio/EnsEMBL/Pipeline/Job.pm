@@ -74,6 +74,7 @@ sub new{
    $self->{'_status'} = undef;
    $self->{'_adaptor'} = undef;
 	 $self->{'_job_name'} = undef;
+	 $self->{'_retry_count'} = 0;
 
    my ($dbID, $taskname, $input_id, $submission_id, $array_index,
 			 $parameters, $module, $stderr_file, $stdout_file, $status,
@@ -100,7 +101,7 @@ sub new{
    if(!$module){
      $self->throw("Must define a module when creating a Job : $!");
    }else{
-     $self->module($input_id);
+     $self->module($module);
    }
    $self->stderr_file($stderr_file) if($stderr_file);
    $self->stdout_file($stdout_file) if($stdout_file);
@@ -189,6 +190,13 @@ sub status{
   my $self = shift;
 	$self->{'_status'} = shift if(@_);
   return $self->{'_status'};
+}
+
+
+sub retry_count {
+	my $self = shift;
+	$self->{'_retry_count'} = shift if(@_);
+	return $self->{'_retry_count'};
 }
 
 

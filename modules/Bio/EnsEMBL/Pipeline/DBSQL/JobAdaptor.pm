@@ -73,6 +73,7 @@ sub fetch_by_dbID{
 	 , module
 	 , stderr_file
 	 , stdout_file
+	 , retry_count
     FROM job
     WHERE job_id = $dbID };
 	
@@ -115,6 +116,7 @@ sub fetch_all_by_taskname{
 	 , module
 	 , stderr_file
 	 , stdout_file
+   , retry_count
     FROM job
     WHERE taskname = ? };
 
@@ -161,6 +163,7 @@ sub _job_from_hashref{
   $job->parameters($hashref->{'parameters'});
   $job->stderr_file($hashref->{'stderr_file'});
   $job->stdout_file($hashref->{'stdout_file'});
+	$job->retry_count($hashref->{'retry_count'});
   $job->adaptor($self);
 
   return $job;
@@ -295,7 +298,8 @@ sub update {
 	                  parameters = ?,
 	                  module = ?,
 	                  stderr_file = ?,
-	                  stdout_file = ?
+	                  stdout_file = ?,
+                    retry_count = ?
     WHERE job_id = ?');
 
 	$sth->execute($job->taskname,
@@ -307,7 +311,8 @@ sub update {
 								$job->module,
 								$job->stderr_file,
 								$job->stdout_file,
-							 $job->dbID);
+								$job->retry_count,
+							$job->dbID);
 }
 
 
@@ -337,8 +342,9 @@ sub store{
 		      parameters,
 		      module,
 		      stdout_file,
-		      stderr_file )
-             VALUES (  ?, ?, ?, ?, ?, ?, ?, ?, ? ) };
+		      stderr_file,
+					retry_count)
+             VALUES (  ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ) };
 
   my $sth = $self->prepare($query);
 
@@ -350,7 +356,8 @@ sub store{
 		 $job->parameters,
 		 $job->module,
 		 $job->stdout_file,
-		 $job->stderr_file );
+		 $job->stderr_file,
+		 $job->retry_count);
 
   $job->adaptor($self);
   $job->dbID($sth->{'mysql_insertid'});
