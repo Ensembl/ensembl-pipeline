@@ -179,7 +179,7 @@ sub dbname {
 sub remove_index_files {
   my ($self) = @_;
 
-print "Sating my appetite for destruction.\n";
+#print "Sating my appetite for destruction.\n";
   
   if (!defined($self->dbfile)) {
     $self->throw("No database file defined - can't remove index files.");
@@ -280,16 +280,18 @@ sub copied_dbfile {
 
 sub index_type {
   my $self = shift;
-  
-  if (@_ || (($self->{_index_type} !=~ /ncbi/i)
-	     &&($self->{_index_type} !=~ /wu/i))) {
 
-    my $value = shift;
-    
+  if (@_ || 
+      (($self->{_index_type} !~ /ncbi/i)
+       &&($self->{_index_type} !~ /wu/i))
+     ) {
+
+    my $value = shift if @_;
+
     # Default to new wu blast.
     $value = 'new wu' 
       unless $value;
-    
+
     if ($value =~ /wu/i) {
       
       if (($value =~ /new/i)&&($self->type eq 'DNA')) {
@@ -330,7 +332,7 @@ sub index_type {
 	      && $self->{_seqfetch_command});
     
   }
-  
+
   return $self->{_index_type}
 }
 
