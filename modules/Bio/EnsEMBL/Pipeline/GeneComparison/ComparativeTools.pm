@@ -534,7 +534,7 @@ sub test_for_orthology{
   #}
   
   ############################################################
-  # run genewise for this gene
+  # run exonerate for this gene
   my @orthologues;
   foreach my $target_slice ( @target_slices ){
     push( @orthologues, $self->align_with_exonerate( $transcript, $target_slice ) );
@@ -761,7 +761,14 @@ sub test_for_orthology_with_tblastx{
   my @coverage;
   my $count = 0;
   foreach my $target_slice ( @target_slices ){
-      ( $orthologues[$count], $coverage[$count] ) = $self->align_with_tblastx( $transcript, $target_slice );
+      eval{
+	  ( $orthologues[$count], $coverage[$count] ) = $self->align_with_tblastx( $transcript, $target_slice );
+      };
+      if ($@){
+	  print STDERR $@;
+	  print STDERR "skipping...\n";
+	  next;
+      }
       $count++;
   }
   print STDERR "Found ".scalar(@orthologues)." orthologues\n";
