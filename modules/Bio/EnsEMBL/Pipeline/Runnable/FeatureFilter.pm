@@ -16,9 +16,11 @@ Bio::EnsEMBL::Pipeline::Runnable::SearchFilter - Filters a search runnable
 
 =head1 SYNOPSIS
 
-    $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -coverage => 5,
-								  -minscore => 100,
-								  -maxevalue => 0.001);
+    $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -coverage  => 5,
+								   -minscore  => 100,
+								   -maxevalue => 0.001,
+								   -prune     => 1
+								 );
     
 
    my @filteredfeatures = $search->run(@features);
@@ -28,7 +30,10 @@ Bio::EnsEMBL::Pipeline::Runnable::SearchFilter - Filters a search runnable
 Filters search results, such as Blast, on a number of criteria. The
 most important ones are minscore, maxevalue, coverage. Coverage means
 that only XX number of completely containing higher scores will be
-permitted for this feature
+permitted for this feature. The option prune performs a clustering of 
+the features according to overlap with respect to the genomic sequence
+and take only a maximum number of features per cluster; this number being
+specified by coverage.
 
 =head1 CONTACT
 
