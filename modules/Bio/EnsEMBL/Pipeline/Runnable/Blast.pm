@@ -122,7 +122,7 @@ sub new {
 
       
     # Now parse the input options and store them in the object
-
+    #print STDERR "args: ", @args, "\n";
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$options) = 
 	    $self->_rearrange([qw(QUERY 
 				  PROGRAM 
@@ -137,7 +137,7 @@ sub new {
     } else {
       $self->throw("No query sequence input.");
     }
-
+    #print STDERR "find executable output ".$self->find_executable($program)."\n";
     $self->program($self->find_executable($program));
     if ($database) {
       $self->database($database);
@@ -161,7 +161,7 @@ sub new {
     } else {
       $self->options(' -p1 ');  
     }
-    
+    #print "options = ".$self->options."\n";
     if (defined($threshold)) {
       $self->threshold($threshold);
     }
@@ -199,13 +199,14 @@ sub run {
 
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
-
+    #print STDERR "checked directories\n";
     #write sequence to file
     $self->writefile(); 
     $self->run_analysis();
-
+    #print STDERR "ran analysis\n";
     #parse output and create features
     $self->parse_results();
+    #print STDERR "parsed results\n";
     $self->deletefiles();
   }
 
@@ -226,8 +227,11 @@ sub run_analysis {
     # split databases
 
     my @databases = $self->fetch_databases;
-
+    
     foreach my $database (@databases) {
+      
+#print STDERR "database ".$database."\n";
+
 #allow system call to adapt to using ncbi blastall. defaults to WU blast.	
 	my $command = $self->program ;
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
@@ -235,6 +239,7 @@ sub run_analysis {
 	$command .= ' '.$self->options. ' >> '.$self->results;
 
 	print STDERR ("Running blast and BPlite:$command\n");    
+
 
 	$self->throw("Failed during blast run $!\n")
 	    
@@ -320,19 +325,24 @@ sub parse_results {
   # If we have input a filehandle use that. Otherwise use
   # the results file stored in the object
   my $filehandle;
-
+  my $filesize = (-s $self->results);
+    
+  if (!defined $filesize || $filesize == 0)
+    {
+      print STDERR "sequence file ".$self->results." has not been created or is empty\n";
+    }
   if (defined($fh)) {
-      $filehandle = $fh;
+    $filehandle = $fh;
   } elsif (ref ($self->results) !~ /GLOB/) {
-      open (BLAST, "<".$self->results)
-	  or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-      $filehandle = \*BLAST;
+    open (BLAST, "<".$self->results)
+      or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+    $filehandle = \*BLAST;
   } else {
-      $filehandle = $self->results;
+    $filehandle = $self->results;
   }    
-
+      
   unless (<$filehandle>) {
-    print "No hit found with blast \n";
+    print  "No hit found with blast \n";
     return;
   }
 
@@ -365,8 +375,9 @@ sub parse_results {
  NAME: while(my $sbjct = $parser->nextSbjct)  {
       
       my $name = $sbjct->name ;
+      #print STDERR "name = ".$name."\n";
       if (($self->filter == 1) && !defined($ids{$name})) {
-	  next NAME;
+         next NAME;
       }
 	  
       my ($ug) = $name =~ m{/ug=(.*?)\ };
@@ -375,18 +386,30 @@ sub parse_results {
 # scp - unigene ID 'patch'
 # there must be a better way of doing this...
          if (length $ug > 0) { # just in case "/ug=" not in header
-             $name = $ug;
+	   $name = $ug;
          }
-         else {
-             $name = $1;
+	 else {  
+	   $name = $1;
          }
+       }
+      elsif ($name =~ /\S+\|(\S+)\|\S+/) {  
+	$name = $1;
       }
-      elsif ($name =~ /\S+\|(\S+)\|\S+/) {
-	  $name = $1;
-      }
+
       elsif ($name =~ /^(\S+) (\S+)/) {
-	  $name = $1 || $2;
+	my $word = $2;
+        if ($self->database =~ /halfwise/i) {
+         if ($word =~ /^([^;]*)/) {
+	   $name = $1;
+	 } else {
+	   $self->throw("unable to parse name properly for halfwise : $!");
+	 }
+       } else {
+	 $name = $1 || $2;
+       }
+        
       }
+      
     HSP: while (my $hsp = $sbjct->nextHSP) {
 	if ($self->threshold_type eq "PID") {
 	  next HSP if ($hsp->percent < $self->threshold);
@@ -399,7 +422,7 @@ sub parse_results {
 
 	$self->split_HSP($hsp,$name);
 
-    }
+      }
   } 
 
 
@@ -678,7 +701,7 @@ sub _convert2FeaturePair {
 	$tmphend   = $tmp;
     }
     
-    #print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
+    #print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
 
     my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
 				     $hsp->percent,$hsp->P,$name,$analysis);
@@ -851,7 +874,7 @@ sub select_features {
 
 sub output {
     my ($self, @arg) = @_;
-
+    
     if (@arg) {
       @{$self->{'_fplist'}} = @arg;
     }
@@ -859,6 +882,7 @@ sub output {
     if (!defined($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
     }
+  
     return @{$self->{'_fplist'}};
   }
 
@@ -979,3 +1003,8 @@ sub threshold_type {
   return $self->{_threshold_type} || $types[0];
 }
 1;
+
+
+
+
+
