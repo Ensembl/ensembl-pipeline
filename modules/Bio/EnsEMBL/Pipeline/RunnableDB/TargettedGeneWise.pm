@@ -110,10 +110,14 @@ sub fetch_input{
   
   foreach my $entry(@$input) {
     # input format: chr22:10602496,10603128;Q9UGV6:1,105
-    if( !($entry =~ /(\S+):(\d+),(\d+);(\S+):(\d+),(\d+)/) ) {
+    # changed to use _ as field separator - for bsub
+#    if( !($entry =~ /(\S+):(\d+),(\d+);(\S+):(\d+),(\d+)/) ) {
+    if( !($entry =~ /(\S+):(\d+),(\d+)_(\S+):(\d+),(\d+)/) ) {
       $self->throw("Not a valid input id... $entry");
     }
     
+    print STDERR "input: ".$entry . "\n";
+
     if ($fpc) { $self->throw("mixed fpc contigs") unless $fpc = $1; }
     if ($pid) { $self->throw("mixed protein hits") unless $pid = $4; }
     $fpc = $1;
@@ -142,11 +146,13 @@ sub fetch_input{
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
 
-  # 500 bp is not enough ...
-  #  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-500,$end+500);
+  print STDERR "$fpc $start $end\n";
+
+  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-500,$end+500);
   # I *think* the chr start and end will be handled by sgpa->fetch_rawcontigs_by_chr_start_end
   # can make sure $start > 0, but what to compare $end with?
-  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-250000,$end+250000);
+  #  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-250000,$end+250000);
+  print STDERR "$chrname $chrstart $chrend\n";
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   
   $self->vc($vc);
@@ -222,17 +228,18 @@ sub write_output {
   my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
   foreach my $gene (@genes) {
     print STDERR "**** remapping\n";
+    # bug in here ?
     my $newgene = $vc->convert_Gene_to_raw_contig($gene);
     push(@newgenes,$newgene);
 
     # VC phase not reset when remapped to raw contig???
-    print STDERR "checking remapped translation\n";
-    foreach my $trans ( $newgene->each_Transcript ) {
-      $seqio->write_seq($trans->translate);
-    }
+    #    print STDERR "checking remapped translation\n";
+    #    foreach my $trans ( $newgene->each_Transcript ) {
+    #      $seqio->write_seq($trans->translate);
+    #    }
       
-   print STDERR "checking non-remapped translation\n";
-   foreach my $trans ( $gene->each_Transcript ) {
+    print STDERR "checking non-remapped translation\n";
+    foreach my $trans ( $gene->each_Transcript ) {
       $seqio->write_seq($trans->translate);
     }
 
@@ -245,7 +252,7 @@ sub write_output {
     }
   }
   
-#  $self->throw("exiting before real write");
+  #$self->throw("exiting before real write");
   
   eval {
     foreach my $gene (@newgenes) {	    
@@ -364,6 +371,8 @@ sub convert_output {
 	    $subf->hsource_tag('TGW');
 	    $subf->primary_tag('TGW');
 	    $subf->hprimary_tag('TGW');
+	    $subf->score(100);
+	    $subf->hscore(100);
 
 	    $exon->add_Supporting_Feature($subf);
 
