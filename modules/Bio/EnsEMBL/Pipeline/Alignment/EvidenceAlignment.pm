@@ -1549,7 +1549,7 @@ sub _corroborating_sequences {
       push (@{$self->{'_corroborating_sequences'}}, $align_seq);
       next FEATURE;
     }
-      
+
     if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 
       if ($base_align_feature->hstrand == -1) {
@@ -1728,7 +1728,7 @@ sub _build_evidence_seq {
       my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
 
-      if ($hit_position < scalar @fetched_seq){
+      if ($hit_position <= scalar @fetched_seq){
 	splice(@fetched_seq, $hit_position - 1, 0, @gap);
       } else {
 	throw("Gap in sequence [" . $base_align_feature->hseqname . 
