@@ -166,7 +166,7 @@ sub parse_fasta{
     #you are getting you may want to comment out the warning about this
     
     my @values = split /\s+/, $seq->desc;
-    my $name = $seq->id;
+    my $name = @values[0];
     warning("You are going to store with name ".$name." are you sure ".
             "this is what you wanted");
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
