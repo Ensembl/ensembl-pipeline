@@ -98,25 +98,25 @@ sub new {
     
     my( $genomic, $est, $est_genome, $arguments ) =   $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
 
-				 $self->genomic_sequence($genomic) if $genomic; 
-				 $self->est_sequence    ($est)     if $est; 
+	 $self->genomic_sequence($genomic) if $genomic; 
+	 $self->est_sequence    ($est)     if $est; 
 	 
-				 print "est display_id: ".$est->display_id." accession_number: ".$est->accession_number."\n";
-
-				 if ($est_genome) {   
-					 $self->est_genome($est_genome) ;
-				 } else  {   
-					 eval 
-						 { $self->est_genome($self->locate_executable('est2genome')); };
+	 print "est display_id: ".$est->display_id." accession_number: ".$est->accession_number."\n";
+	 
+	 if ($est_genome) {   
+	   $self->est_genome($est_genome) ;
+	 } else  {   
+	   eval 
+	     { $self->est_genome($self->locate_executable('est2genome')); };
+	 }
+	 if ($arguments) {   
+	   $self->arguments($arguments);
+	 } else {
+	   $self->arguments(' -reverse ');
 				 }
-				 if ($arguments) {   
-					 $self->arguments($arguments);
-				 } else {
-					 $self->arguments(' -reverse ');
-				 }
-    
-				 return $self;
-				}
+	 
+	 return $self;
+	}
 
 #################
 # get/set methods 
@@ -483,10 +483,12 @@ sub convert_output {
     my $added = 0;
     
     foreach my $g(@genes){
-      if($ex->start >= $g->start  && $ex->end <= $g->end
-				 && $ex->strand == $g->strand && !$added){
-				$g->feature1->add_sub_SeqFeature($ex,'');
-				$added = 1;
+      if(   $ex->start  >= $g->start  && 
+	    $ex->end    <= $g->end    && 
+	    $ex->strand == $g->strand && 
+	    !$added){
+	$g->feature1->add_sub_SeqFeature($ex,'');
+	$added = 1;
       }
     }
     $self->warn("Exon $ex could not be added to a gene ...\n") unless $added;     
@@ -497,12 +499,12 @@ sub convert_output {
     my $added = 0;
     
     foreach my $e(@exons){
-      if($sf->start  >= $e->start  && $sf->end <= $e->end &&
-				 $sf->strand == $e->strand && !$added) {
-
-				$e->feature1->add_sub_SeqFeature($sf,'');
-				$added = 1;
-
+      if($sf->start  >= $e->start  && 
+	 $sf->end    <= $e->end    &&
+	 $sf->strand == $e->strand && 
+	 !$added) {
+	$e->feature1->add_sub_SeqFeature($sf,'');
+	$added = 1;
       }
     }
     $self->warn("Feature $sf could not be added to an exon ...\n") unless $added;     
@@ -517,19 +519,18 @@ sub _createfeatures {
         $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
     
 
-    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => "none",
-                                 -db_version      => "none",
-                                 -program         => "est_genome",
-                                 -program_version => "none",
-                                 -gff_source      => $f1source,
-                                 -gff_feature     => $f1primary,);
+    my $analysis_obj    = new Bio::EnsEMBL::Analysis(-db              => "none",
+						     -db_version      => "none",
+						     -program         => "est_genome",
+						     -program_version => "none",
+						     -gff_source      => $f1source,
+						     -gff_feature     => $f1primary,);
     #create features
     my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
-                                              -end         =>   $f1end,
-                                              -seqname     =>   $f1id,
-                                              -strand      =>   $f1strand,
-                                              -score       =>   $f1score,
+					       -end         =>   $f1end,
+					       -seqname     =>   $f1id,
+					       -strand      =>   $f1strand,
+					       -score       =>   $f1score,
 					      -percent_id  =>   $f1score, 
 					      -source_tag  =>   $f1source,
                                               -primary_tag =>   $f1primary,
