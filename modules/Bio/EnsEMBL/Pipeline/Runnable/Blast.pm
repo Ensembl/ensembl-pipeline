@@ -37,14 +37,14 @@ Arguments can be passed to BPLite through the arguments() method.
 
 =head2 Methods:
 
-new($seq_obj)
-blast($path_to_blast)
-BPLite($path_to_bplite)
-database($path_to_database);
-workdir($directory_name)
-arguments($args)
-run()
-output()
+    new($seq_obj)
+    blast($path_to_blast)
+    BPLite($path_to_bplite)
+    database($path_to_database);
+    workdir($directory_name)
+    arguments($args)
+    run()
+    output()
 
 =head1 CONTACT
 
@@ -101,8 +101,8 @@ sub _initialize {
     $self->{_arguments} =undef;      #arguments for blast
     
     
-    my( $clonefile, $arguments, $blast, $database) = 
-            $self->_rearrange(['CLONE', 'ARGS', 'BLAST', 'DB'], @args);
+    my( $clonefile, $blast, $database, $arguments) = 
+            $self->_rearrange(['CLONE', 'BLAST', 'DB', 'ARGS'], @args);
     $self->clone($clonefile) if ($clonefile);       
     
     if ($blast =~ m!/!) #path to blast is provided 
@@ -123,7 +123,7 @@ sub _initialize {
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments('') ;      }
+    { $self->arguments(' ') ;      }
     return $self; # success - we hope!
 }
 
@@ -135,12 +135,11 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) 
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
-        
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".blast.out");
@@ -277,9 +276,14 @@ sub run {
 
 sub run_analysis {
     my ($self) = @_;
-    print "Running blast and BPLite on ".$self->filename."\n";
-    system ($self->blast.' '.$self->database.' '.$self->filename.'
-            .'.$self->arguments.' > '.$self->results);
+    
+    print STDERR ("Running blast and BPlite:\n ".$self->blast.' '
+                    .$self->database.' '.$self->filename.' '
+                    .$self->arguments.' > ' .$self->results."\n");
+    
+    system ($self->blast.' '.$self->database.' '.$self->filename
+            .' '.$self->arguments.' > '.$self->results);
+    
     $self->throw("Couldn't create file for Blast results: $!\n") 
                 unless (-e $self->results);
 }
@@ -323,7 +327,13 @@ sub parse_results {
                 if ($1) { $feat1{name} = $1; }
                 elsif ($2) { $feat1{name} = $2; }
             }
+            
             $feat1 {score}       = $hsp->score;
+            $feat2 {score}       = $hsp->score;
+            $feat1 {percent}     = $hsp->percent;
+            $feat2 {percent}     = $hsp->percent;
+            $feat1 {p}           = $hsp->P;
+            $feat2 {p}           = $hsp->P;
             
             unless ($hsp->queryBegin > $hsp->queryEnd)
             {
@@ -333,14 +343,13 @@ sub parse_results {
             }
             else
             {
-                $feat1 {end}   = $hsp->queryBegin;
-                $feat1 {start}     = $hsp->queryEnd;
+                $feat1 {end}     = $hsp->queryBegin;
+                $feat1 {start}   = $hsp->queryEnd;
                 $feat1 {strand}  = -1;
             }
             
             $sbjct->name =~ /\|(.+)\|/; #extract subjectname
             $feat2 {name}    = $1;
-            $feat2 {score}   = $hsp->P;
             
             unless ($hsp->sbjctBegin > $hsp->sbjctEnd)
             {
@@ -350,15 +359,10 @@ sub parse_results {
             }
             else
             {
-                $feat2 {end}   = $hsp->sbjctBegin;
-                $feat2 {start}     = $hsp->sbjctEnd;
+                $feat2 {end}     = $hsp->sbjctBegin;
+                $feat2 {start}   = $hsp->sbjctEnd;
                 $feat2 {strand}  = -1;
             }
-            
-            $feat1 {primary} = 'similarity';
-            $feat1 {source}  = 'Blast';
-            $feat2 {primary} = 'similarity';
-            $feat2 {source}  = 'Blast';
             
             if ($self->database)
             {
@@ -368,13 +372,13 @@ sub parse_results {
             {
                 $feat2 {db} = 'unknown';
             }
-            
-            
+                        
             if ($self->blast)
             {
                 $self->blast =~ m!/.+/(.+)|(.+)!; #extract executable name
                 if ($1) 
-                    { $feat2 {program} = $1; }
+                    { 
+                    $feat2 {program} = $1; }
                 elsif ($2) 
                     { $feat2 {program} = $2; }
             }
@@ -382,15 +386,31 @@ sub parse_results {
             {
                 $feat2 {program} = 'unknown';
             }
-            
-            $feat2 {p_version} = 'unknown';
-            $feat2 {db_version} = 'unknown';
+            $feat2 {p_version} = '1';
+            $feat2 {db_version} = '1';
+            $feat1 {primary} = 'similarity';
+            $feat1 {source}  = $feat2{program};
+            $feat2 {primary} = 'similarity';
+            $feat2 {source}  = $feat2{program};
             $self->createfeaturepair(\%feat1, \%feat2); 
         }
 
     }
            
 }
+
+# FeaturePair methods:
+#sub createfeaturepair {
+#    my ($self, $feat1, $feat2) = @_;
+#    #call Bio::EnsEMBL::Pipeline::RunnableI version
+#    $self->SUPER::createfeaturepair($feat1, $feat2);
+#    my $fp = $self->shrinkfplist();
+#    $fp->percent_id     ($feat1->{percent});
+#    $fp->hpercent_id    ($feat2->{percent});
+#    $fp->p_value        ($feat1->{p});
+#    $fp->hp_value       ($feat2->{p});
+#    $self->growfplist($fp);                             
+#}
 
 ##############
 # input/output methods
