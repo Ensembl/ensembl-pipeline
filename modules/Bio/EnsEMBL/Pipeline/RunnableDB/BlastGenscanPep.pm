@@ -164,7 +164,7 @@ sub run {
     my ($self) = @_;
     #need to pass one peptide at a time
     $self->throw("Input must be fetched before run") unless ($self->genseq);
-    #print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
+    print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
 
     #extract parameters into a hash
     my ($parameter_string) = $self->analysis->parameters();
@@ -253,6 +253,7 @@ sub write_output{
   my @features = $self->output();
   my $pep_f_a = $self->db->get_ProteinAlignFeatureAdaptor();
   my $contig;
+
   eval {
     $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
   };
@@ -262,6 +263,7 @@ sub write_output{
     return;
   }
   foreach my $f(@features){
+    print "Feature " . $f->hseqname . "\n";
     $f->analysis($self->analysis);
     $f->attach_seq($contig);
     if($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
