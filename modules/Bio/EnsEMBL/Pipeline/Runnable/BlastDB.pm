@@ -145,6 +145,8 @@ sub remove_index_files {
 		$self->throw("No database file defined - can't removed index files");
 	}
 
+ 	unlink $self->dbfile;
+
 	if ($self->type eq 'DNA') {
 		unlink $self->dbfile . ".csq";
 		unlink $self->dbfile . ".nhd";

@@ -300,6 +300,9 @@ sub run_analysis {
         }
         $command .= ' '.$self->options. ' > '.$self->results . ".$db";
 
+ 	# Add the result file to our clean-up list.
+ 	$self->file($self->results . ".$db");
+
 	#print STDERR $command."\n";
         $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
@@ -1049,6 +1052,9 @@ sub query {
 
       $self->filename($seq->id.".$$.seq");
       $self->results($self->filename.".blast.out");
+
+      # Add file to list for later cleanup.
+      $self->file($self->filename);
       
     }
     return $self->{'_query'};
