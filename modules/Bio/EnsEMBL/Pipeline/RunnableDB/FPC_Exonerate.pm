@@ -88,7 +88,7 @@ sub fetch_input {
     # eg ctg25118
     my $contigid  = $self->input_id;
 
-    $self->dbobj->static_golden_path_type('UCSC');
+    $self->dbobj->assembly_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 
