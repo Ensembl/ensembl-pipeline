@@ -138,9 +138,8 @@ if($verbose){
       my $type = $out->type;
       foreach my $tran (@{$out->get_all_Transcripts}) {
         foreach my $exon (@{$tran->get_all_Exons}) {
-          print($exon->dbID."\t".$type."\texon\t".$exon->start."\t".
-                $exon->end."\t300\t".$exon->strand."\t.\t".
-                $transcript_count." \n");
+          print("exon\t".$exon->start."\t".
+                $exon->end."\t300\t".$exon->strand."\n");
           foreach my $ev (@{$exon->get_all_supporting_features}) {
             print print_gff($ev) . "\n";
           }
