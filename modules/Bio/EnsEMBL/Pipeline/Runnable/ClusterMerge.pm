@@ -138,7 +138,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $internal_splice_overlap, $use_score) 
+  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $internal_splice_overlap, $use_score, $speed_up) 
       = $self->_rearrange([qw(
 			      TRANSCRIPTS
 			      COMPARISON_LEVEL
@@ -148,6 +148,7 @@ sub new {
 			      MINIMUM_ORDER
 			      INTERNAL_SPLICE_OVERLAP
 			      USE_SCORE
+			      SPEED_UP
 			      )], 
 			  @args);
   
@@ -187,6 +188,13 @@ sub new {
   }
   else{
     $self->_minimum_order(1);
+  }
+
+  if ( defined $speed_up ){
+    $self->_speed_up( $speed_up );
+  }
+  else{
+    $self->_speed_up( 0 );
   }
   
   if ( defined $splice_mismatch ){
@@ -2105,6 +2113,16 @@ sub _minimum_order{
     $self->{_minimum_order} = $minimum_order;
   }
   return $self->{_minimum_order};
+}
+
+############################################################
+
+sub _speed_up{
+  my ($self,$boolean) = @_;
+  if ( defined $boolean ){
+    $self->{_speed_up} = $boolean;
+  }
+  return $self->{_speed_up};
 }
 
 ############################################################
