@@ -275,11 +275,10 @@ sub flush_runs {
     $cmd = "bsub -q ".$queue." -o ".$firstjob->stdout_file.
     " -e ".$firstjob->stderr_file." -E \"$runner -check\" ";
 
-
     $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
     
     print STDERR "$cmd\n";
-    open (SUB,"$cmd |");
+    open (SUB,"$cmd 2>&1 |");
   
     while (<SUB>) {
       if (/Job <(\d+)>/) {
@@ -422,7 +421,7 @@ sub runRemote {
     $self->throw( "useDB=0 not implemented yet." );
   }
   print STDERR "$cmd\n";
-  open (SUB,"$cmd |");
+  open (SUB,"$cmd 2>&1 |");
   
   while (<SUB>) {
     if (/Job <(\d+)>/) {
