@@ -5,8 +5,10 @@ package Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use vars '@ISA';
-@ISA = qw{ Bio::EnsEMBL::Pipeline::Runnable::Blast };
+
+use vars qw(@ISA);
+@ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Blast);
+
 
 sub split_gapped_alignments {
     my( $self, $flag ) = @_;
