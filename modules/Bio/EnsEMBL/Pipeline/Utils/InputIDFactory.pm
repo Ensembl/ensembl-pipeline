@@ -116,27 +116,7 @@ sub get_slice_names{
 
 
 
-sub generate_non_redundant_input_ids{
-  my ($self) = @_;
 
-  my @ids = @{$self->get_non_redundant_ids()};
-
-  return @ids;
-}
-
-
-sub get_non_redundant_ids{
-  my ($self) = @_;
-
-  my @slices = @{$self->db->get_SliceAdaptor->fetch_all_non_redundant()};
-  my @ids;
-  foreach my $slice(@slices){
-    push(@ids, $slice->name);
-  }
-
-  return \@ids;
-  
-}
 
 
 sub get_filenames{
