@@ -47,6 +47,7 @@ my $anadbname   = 'pipeline',
 my $anadbuser   = 'root';
 my $anapass     =  undef;
 my $status      = 'FAILED';
+my $analysis    = undef;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -55,6 +56,7 @@ my $status      = 'FAILED';
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
             'status:s'      => \$status,
+	    'analysis:s'    => \$analysis
 	    );
 
 
@@ -64,18 +66,25 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -dbname => $anadbname,
 						    -user   => $anadbuser,
 						    -pass   => $anapass);
+my @jobs;
+if ($analysis){
+    @jobs = $anadb->get_JobsByAnalysis($analysis);
+}
+else {
+    @jobs = $anadb->get_JobsByCurrentStatus($status);
+} 
 
-
-my @jobs = $anadb->get_JobsByCurrentStatus($status);
-
+print "<BODY TEXT=\"#000000\" BGCOLOR=\"#FFFFFF\">";
     print("<TABLE>\n");
 foreach my $job (@jobs) {
+    print STDERR "Tracking job ".$job->id."\n";
     $job->_dbobj($anadb);
     $job->get_all_status;
-    my $status = $job->current_status;
+    my $status = $job->current_status->status;
 
     print("<TR><TD>"            . $job->id . "</TD><TD>" .
-          " Status : "      . $status->status . "</TD><TD>" .
+          "  Status : "      . $status. "</TD><TD>" .
+	  "Analysis : "      .$job->analysis->program."</TD><TD>" .
           "<a href=\"file:" . $job->stdout_file . "\">stdout</a>" . "</TD><TD>" .
           "<a href=\"file:" . $job->stderr_file . "\">stderr</a></TD><TD></TR>" 
 );    
