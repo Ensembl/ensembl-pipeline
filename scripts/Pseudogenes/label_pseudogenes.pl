@@ -137,7 +137,7 @@ foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 					 $threshold,\%gene_ref
 				       );
   
-  my $real_introns = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_real_introns;
+  my $real_introns = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_real_introns($transcript);
   
   if ($evidence){
     my $evidence_ids = &_get_evidence($transcript);
