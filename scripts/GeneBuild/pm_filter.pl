@@ -92,6 +92,7 @@ my $check    = 0;
 my $outfile;
 my $chr_name;
 my $run_pmatch = 1; # 1 to run pmatch, 0 if pmatch already run
+#my $run_pmatch = 0; # 1 to run pmatch, 0 if pmatch already run
 my $pmatchfile; # can provide a pmatch results file - will be sorted by both protein id and chr_start
                 # gets ignored if run_pmatch is set
 
@@ -179,7 +180,7 @@ foreach my $fpcfile(@files){
 sub process_pmatches{
   my($fpcfile) = @_;
   # sort pmatch results file
-  my $command = "sort -k6,6 -k3,3n $pmatchfile > $pmatchfile.tmp";
+  my $command = "sort -k6,6 -k3,3n -u $pmatchfile > $pmatchfile.tmp";
   system($command);
   print STDERR $command."\n";
   rename "$pmatchfile.tmp", $pmatchfile;
@@ -290,7 +291,7 @@ sub make_protlist{
     }
     
     $bs->seq($seq);
-    #print STDERR $bs->display_id ." = ".$bs->length."\n";
+#    print STDERR $bs->display_id ." = ".$bs->length."\n";
     $plengths{$bs->display_id} = $bs->length;
   }
 
