@@ -27,8 +27,8 @@ my $id;
 die ("Input id or status") unless ($id || $status);
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-dbname => 'analysis',
-						-host => 'croc',
-						-user => 'root');
+						-host => 'obi-wan',
+						-user => 'ensro');
 
 print("Connected to analysis database\n");
 

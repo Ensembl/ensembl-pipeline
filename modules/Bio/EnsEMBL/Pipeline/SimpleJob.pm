@@ -163,16 +163,9 @@ sub runnable {
 
 sub run {
     my ($self) = @_;
-
-    my $status = $self->set_status("RUNNING");
-
+    print("Running in simplejob\n");
     $self->runnable->run;
-
-    my $status = $self->set_status("DONE");
-
-    $self->store     ($self);
-
-    my $status = $self->set_status("STORED_OUTPUT");
+    print ("done\n");
 }
 
 =head2 output
@@ -331,7 +324,6 @@ sub machine {
 
 sub submit {
     my ($self) = @_;
-
 
     $self->jobobj->submit($self);
 
@@ -510,6 +502,13 @@ sub input_object_file {
     return $self->jobobj->input_object_file($arg);
 }
 
+
+sub disconnect {
+   my ($self) = @_;
+
+   $self->jobobj->disconnect;
+
+}
 1;
 
 

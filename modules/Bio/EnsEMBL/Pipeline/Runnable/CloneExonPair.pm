@@ -62,7 +62,6 @@ sub _initialize {
 
     $self->clone($clone);
     $self->{_pairs} = [];
-
     return $make; # success - we hope!
 }
 
@@ -92,15 +91,6 @@ sub run {
 	    }
 	    $contig->make_ExonPairs($gene->each_unique_Exon);
 	}
-
-	
-	my @pairs = $contig->get_all_ExonPairs;
-	
-	foreach my $p (@pairs) {
-	    $self->add_ExonPair($p);
-	}
-    }
-
     $self->{_clone} = undef;
 }
 
@@ -119,7 +109,10 @@ sub run {
 
 sub output {
     my ($self) = @_;
-
+    
+    if (!(defined($self->{_pairs}))) {
+        $self->{_pairs} = [];
+    }
     return @{$self->{_pairs}};
 
 }

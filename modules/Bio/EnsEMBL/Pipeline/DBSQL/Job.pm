@@ -293,6 +293,9 @@ sub machine {
 sub submit {
     my ($self,$obj) = @_;
 
+    my $tmpdb = $obj->_dbobj;
+    $obj->disconnect;
+
     $self->write_object_file($obj);
 
     my $status = $self->set_status("WRITTEN_OBJECT_FILE");
@@ -316,6 +319,7 @@ sub submit {
     } else {
 	$self->throw("Couldn't submit job " . $self->id . " to queue " . $self->queue);
     }
+    $obj->_dbobj($tmpdb);
 }
 
 =head2 store
@@ -335,8 +339,7 @@ sub store {
     $self->throw("Not connected to database") unless defined($obj->_dbobj);
     
     my $tmpdb = $obj->_dbobj;
-    
-    $obj->{_dbobj} = undef;
+    $obj->disconnect;
     
     my ($jobstr) = FreezeThaw::freeze($obj);
     
@@ -716,7 +719,12 @@ sub print_var {
     printf("%20s %20s\n",$str,$var);
 }
 
-1;
+sub disconnect {
+    my ($self) = @_;
+
+    $self->{_dbobj} = undef;
+}
+;
 
 
 

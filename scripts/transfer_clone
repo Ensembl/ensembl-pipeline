@@ -1,9 +1,9 @@
 #!/usr/local/bin/perl
 
 BEGIN {
-  unshift (@INC,"/nfs/disk89/michele/bioperl-live");
-  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
-  unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-live");
+  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
+  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
 }
 
 =head1 NAME
@@ -111,7 +111,7 @@ foreach my $cloneid (@cloneids) {
 							      -queue    => 'blast_farm',
 							      -create   => 1,
 							      );
-	$job->make_files;
+	#$job->make_files;
 
 	print(STDERR "Created new job object\n");
 
