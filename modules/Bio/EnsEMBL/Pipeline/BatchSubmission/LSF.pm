@@ -248,9 +248,9 @@ sub check_existance{
     }
     my @values = split;
     if($values[0] =~ /\d+/){
-      if($values[2] eq 'UNKWN'){
-        next LINE;
-      }
+      #if($values[2] eq 'UNKWN'){
+      #  next LINE;
+      #}
       $existing_ids{$values[0]} = 1;
     }
   }
