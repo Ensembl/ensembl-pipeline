@@ -218,7 +218,6 @@ sub DESTROY {
 #  seq2      SLAM     start_codon 23923   23925    .        -       .     gene_id "002" ; transcript_id "002.1";
 #  seq2      SLAM     SLAM_CNS    26181   26242    .        .       .     cns_id "007"  ; identity "68.9"
 
-
 # interesting lines
 # <seqname> <source> <feature>   <start>  <end> <score> <strand> <frame> [attributes]   [comments]
 #  seq1      SLAM     CDS         18350   18443    .        +       1     gene_id "001" ; transcript_id "001.1"; exontype "internal"
@@ -233,77 +232,89 @@ sub DESTROY {
 #  seq2      SLAM     start_codon 23923   23925    .        -       .     gene_id "002" ; transcript_id "002.1";
 
 
-sub _parse_results {
 
-  # parsing the results and adding predicted exons (predictionExon-obj) to transcript-objects
-  my ($self,$slice,$basefile) = @_;
+sub parse_results {
+  my $self = shift;
 
-  my $path = $self->workdir;
-  my $gff  = $self->workdir."/".$basefile.".gff";
+  my $arrayref1 = $self->_parser( $self->slice1,$self->fasta1 ) ;
+  my $arrayref2 = $self->_parser( $self->slice2,$self->fasta2 );
+
+  $self->predtrans1( $arrayref1 );
+  $self->predtrans2( $arrayref2 );
+}
+
+
+
+
+
+# parsing the results and adding predicted exons to container of PredictionTranscripts
+
+sub _parser {
+  my ($self,$slice,$gff) = @_;
+
+  $gff=~s/(\..+$)/\.gff/; # subst. file-suffix (all after last dot to end)
+  my $tran;
+  my @transcripts;
 
   # what to do if resultfile contains no data ?
   $gff  = "/tmp/seq1.38047.gff";
 
   # we will walk through the file
-  # if a line has a gene_id we will store the gene-id in a hash-keyhash
-  # we also store the line in another hash
-  # later, we'll process the two hashes
+  # if a line has a gene_id we will store the gene-id as hashkey (we get a unique key for every predicted transcripts)
+  # next we store the first two parts (s.a) of the line in another hash
+
   my (%genes,%predex);
-
   open(IN,"$gff") || die "could not read file $gff";
-
   while (<IN>) {
     chomp;
-    if (/gene_id/) {
-      my @line = split /;/; #only the attributes 0-9 are stable
-      my @attributes = /\s+/,$line[0];
-      my $key = "$attributes[8] $attributes[9]";
-      $genes{$key}=();  # key: -->gene_id "001"<-- FIND THE ERROR !
-      $predex{$_}=\@attributes;
+    my $aline = $_;
+    if ($aline =~m/gene_id/) {
+      if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
+        my @line = split /;/; # split line in 3 parts, bcs only the attributes 0-9 are stable
+
+        my @attributes = split /\s+/,$line[0];
+        my @transc_id =  split /\s+/,$line[1];
+
+        my $key = "$attributes[8] $attributes[9]"; # key: -->gene_id "001"<--
+        $genes{$key}=();
+        push (@attributes, @transc_id);
+        $predex{$aline}=\@attributes;
+      }
     }
-  } # EOF
+  }
   close(IN);
 
-## now let's process the predicted genes !!!
-#  my ($gene,$predict);
-#  foreach(keys %genes) {
-#    $gene = $_;
-#    print "\n-$gene-\n";
-#    foreach(keys %predex){
-#      if (/$gene/){
-#        # reference to an array !!!
-#        my @temp = @{$predex{$_}};
-#        print "$temp[0]\t$temp[1]\n";
-#      }
-#    }
-#  }
-##    # processing the whole line
+  my ($gene,$predict);
+  foreach(sort (keys %genes)) {
 
-#      my ($seq,$src,$feat,$start,$end,$score,$strand,$frame,$gid_act,$ginr) = split/\s+/, $line[0];
-#      my ($tr_id,$tr_nr) = split/\s+/, $line[1];
-#      my ($et, $extype) = split/\s+/, $line[2];
+    # construct new predictionTranscript
+    $tran = new Bio::EnsEMBL::PredictionTranscript();
 
-#    if ($ln=~m/gene_id/) {      # we have coding sequence and we have a transcript
+    # add predicted exons to transcript
+    foreach(keys %predex){
+      my @attr = @{$predex{$_}};        # dereference the array !
 
-#      if ($geneid_old ne $geneid_act) {
-#      $strand = 1 if ($strand eq "+");
-#      $strand = -1 if ($strand eq "-");
-#      $strand = 0 if ($strand eq ".");
+      my ($start,$end,$strand) = @attr[3,4,6]; # extracting startbp, endbp and strand
 
+      $strand = 1 if ($strand eq "+");
+      $strand = -1 if ($strand eq "-");
+      $strand = 0 if ($strand eq ".");
 
-
-#      my $ex = new Bio::EnsEMBL::PredictionExon(
-#                                                -START     => $start,
-#                                                -END       => $end,
-#                                                -STRAND    => $strand, #valid values (Feature.pm: 1,-1,0)
-#                                                -SLICE     => $slice,
-#                                                -DBID      => 100, # EDIT!
-#                                                -P_VALUE   => 0,
-#                                                -SCORE     => 0
-#                                               );
-#    }
-#    $geneid_old = $geneid_act;
-
+      my $pred_exon = new Bio::EnsEMBL::PredictionExon(
+                                                -START     => $start,
+                                                -END       => $end,
+                                                -STRAND    => $strand, #valid values (Feature.pm: 1,-1,0)
+                                                -SLICE     => $slice,
+                                                -DBID      => 100, # EDIT!
+                                                -P_VALUE   => 0,
+                                                -SCORE     => 0
+                                               );
+      $tran->add_Exon( $pred_exon );
+    }
+    #storing refrence of predicted transcript-obj
+    push @transcripts, $tran;
+  } #1st foreach
+  return \@transcripts;
 }
 
 
@@ -314,8 +325,8 @@ sub _parse_results {
 
   Title    : run
   Usage    : $obj->run
-  Function : runs the slam-algorithm on the two supplied fasta-sequences. The run needs the modified approximate alignemnt 
-             (see Bio::EnsEMBL::Pipeline::Tools::ApproxAlign ).
+  Function : runs the slam-algorithm on the two supplied fasta-sequences and reads the modified approximate alignemnt-file.
+             (see Bio::EnsEMBL::Pipeline::Tools::ApproxAlign ). The results (gff-files) will be parsed.
   Returns  : none
   Args     : none
 
@@ -356,10 +367,12 @@ sub run {
 
   $self->file($fasta1."_".$fasta2.".cns");
 
-  $self->_parse_results($self->slice1,$fasta1); #  only file-basename
-  $self->_parse_results($self->slice2,$fasta2); #  only file-basename
-  return 1
+  $self->parse_results;
+  return 1;
 }
+
+
+
 
 sub files_to_delete {
   my ($self,$file) = @_;
@@ -458,7 +471,17 @@ sub _seqlen {
 }
 
 
+=pod
 
+=head2 fasta1
+
+  Title    : fasta1
+  Usage    : $obj->fasta1
+  Function : sets/gets the path and name of the first fasta-file
+  Returns  : String
+  Args     : opt. String
+
+=cut
 
 sub fasta1 {
   my $self = shift;
@@ -467,12 +490,62 @@ sub fasta1 {
   return $self->{_fasta1}
 }
 
+=pod
+
+=head2 fasta2
+
+  Title    : fasta2
+  Usage    : $obj->fasta2
+  Function : sets/gets the path and name of the second fasta-file
+  Returns  : String
+  Args     : opt. String
+
+=cut
 
 sub fasta2 {
   my $self = shift;
 
   $self->{_fasta2} = shift   if (@_);
   return $self->{_fasta2}
+}
+
+=pod
+
+=head2 predtrans1
+
+  Title    : predtrans1
+  Usage    : $obj->predtrans1
+  Function : Sets/gets the Predicted transcripts for the first organism
+  Returns  : Arrayref. to Bio::EnsEMBL::PredictionTranscript
+  Args     : opt.Array
+
+=cut
+
+
+sub predtrans1{
+  my ($self,$predtrans1) = @_;
+
+  $self->{_predtrans1} = $predtrans1 if (defined $predtrans1);
+  return $self->{_predtrans1};
+}
+
+=pod
+
+ =head2 predtrans2
+
+  Title    : predtrans2
+  Usage    : $obj->predtrans2
+  Function : Sets/gets the Predicted transcripts for the second organism
+  Returns  : Arrayref. to Bio::EnsEMBL::PredictionTranscript
+  Args     : opt.Arrayref.
+
+=cut
+
+sub predtrans2{
+  my ($self,$predtrans2) = @_;
+
+  $self->{_predtrans2} = $predtrans2 if (defined $predtrans2);
+  return $self->{_predtrans2};
 }
 
 
