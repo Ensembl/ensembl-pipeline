@@ -87,7 +87,16 @@ sub fetch_input {
       $parameters{-subsetcutoff} = $SUBSETAXT_CUTOFF;
     }
     if ($AXT_FILTERS->{$logic_name}->{target_lengths}) {
-      $parameters{-targetlengths} = $AXT_FILTERS->{$logic_name}->{targetlengths};
+      my $tlf = $AXT_FILTERS->{$logic_name}->{target_lengths};
+      my ($fh, %lengths);
+      open($fh, $tlf)
+          or $self->throw("Could not open file of target seq lengths '$tlf' for reading\n");
+      while(<$fh>) {
+        /^(\S+)\s+(\d+)/ and $lengths{$1} = $2;
+      }
+      close($fh);
+      
+      $parameters{-targetlengths} = \%lengths;
     }
 
     $parameters{-targetnib} = $AXT_FILTERS->{$logic_name}->{targetnib};
