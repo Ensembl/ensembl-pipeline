@@ -84,10 +84,6 @@ sub new {
   $self->endbias($endbias)                             if defined($endbias);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
 
-###
-#print STDERR $self->genomic_sequence->id . "\n" . $self->genomic_sequence->seq . "\n";
-
-
   return $self;
 }
 
@@ -184,6 +180,7 @@ sub run {
   my ($self) = @_;
   
   my @features = $self->run_blast;
+
   print STDERR "There are ".@features." remaining features after reblasting.\n";
   unless (@features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
@@ -374,12 +371,18 @@ sub build_runnables {
        	my $cluster_start = $sorted_gene_cluster[0]->{_hstart} - 1000;
 	my $cluster_end = $sorted_gene_cluster[-1]->{_hend} + 1000;
         unless ($cluster_start > 0) {
-	  next GENE;
-#	  $cluster_start = 1;
+	  if ($sorted_gene_cluster[0]->{_hend} > 0) {
+	    $cluster_start = 1;
+	  } else {
+	    next GENE;
+	  }
 	}
         unless ($cluster_end <= $self->genomic_sequence->length) {
-	  next GENE;
-#	  $cluster_end = $self->genomic_sequence->length;
+	  if ($sorted_gene_cluster[0]->{_hstart} <= $self->genomic_sequence->length) {
+	    $cluster_end = $self->genomic_sequence->length;
+	  } else {
+	    next GENE;
+	  }
 	}        
 
 	# Here we create our genomic fragment for passing to 
@@ -681,7 +684,7 @@ sub blast_features {
 
   foreach my $blast_feature (@$blast_features){
 
-    my ($feat_start, $feat_end) = sort {$a <=> $b;} $blast_feature->{_gsf_start}, $blast_feature->{_gsf_end};
+    my ($feat_start, $feat_end) = sort {$a <=> $b;} $blast_feature->{_hstart}, $blast_feature->{_hend};
 
     my $feat_seq = Bio::Seq->new(
                      -seq => $self->genomic_sequence->subseq($feat_start, $feat_end),
@@ -700,7 +703,7 @@ sub blast_features {
   my $db_name = $blast_db->dbname;
 
   # With a database now at hand, bam, make a query sequence object and time for the run.
-  my ($query_start, $query_end) = sort {$a <=> $b;} $query_feature->{_gsf_start}, $query_feature->{_gsf_end};
+  my ($query_start, $query_end) = sort {$a <=> $b;} $query_feature->{_hstart}, $query_feature->{_hend};
 
   my $query_seq = Bio::Seq->new(
 	           -seq => $self->genomic_sequence->subseq($query_start, $query_end),
