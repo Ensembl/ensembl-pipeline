@@ -202,7 +202,7 @@ sub make_filter_bsubs {
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
     
-    my $chrdir = $filter . "/$chr";
+    my $chrdir = $filter . "$chr";
     my $count = 1;
 
     while($count < $length) {
@@ -254,7 +254,7 @@ sub make_EST_GeneBuilder_bsubs{
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
     
-    my $chrdir = $filter . "/$chr";
+    my $chrdir = $filter . "$chr";
     my $count = 1;
 
     while($count < $length) {
