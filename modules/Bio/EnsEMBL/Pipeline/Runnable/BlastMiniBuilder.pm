@@ -128,6 +128,7 @@ sub build_runnables {
 
     # If only sparse coverage, go home early.
     unless ($coverage > 0.5) {
+
       my $runnable = $self->make_object($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
       push (@runnables, $runnable);
 
@@ -158,7 +159,7 @@ sub build_runnables {
 	}
       }
 
-      if ($number_of_clustered_features  >= (0.75 * (scalar @{$partitioned_features{$seqname}}))) {
+      if ($number_of_clustered_features  >= (0.7 * (scalar @{$partitioned_features{$seqname}}))) {
 	$clusters_seem_real = 1;
       }
     }
