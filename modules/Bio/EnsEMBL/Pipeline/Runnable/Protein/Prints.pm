@@ -287,6 +287,7 @@ sub parse_results {
     my $sequenceId;
     my @features;
     while (<CPGOUT>) {
+	print STDERR;
 	$line = $_;
 	chomp $line;
 	# Pattern match the Sn; field which should contain the SequenceId and Accession
@@ -300,7 +301,7 @@ sub parse_results {
 
 	if ($line =~ s/^1TBH//) {
 	   my  ($id) = $line =~ /^\s*(\w+)/;
-	   my ($ac) = $line =~ /(PR\w+)\s*$/;
+	   my ($ac) = $line =~ /(PR\w+);?\s*$/;
 	   $printsac{$id} = $ac;
        }
 	
