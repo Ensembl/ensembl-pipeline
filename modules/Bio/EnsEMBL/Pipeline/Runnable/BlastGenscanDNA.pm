@@ -322,7 +322,7 @@ sub output {
 
 sub align_hits_to_contig {
   my ( $self, @features )  = @_;
-
+  
   # for each feature
   for my $feature ( @features ) {
     my %exon_hash = ();
@@ -334,8 +334,8 @@ sub align_hits_to_contig {
       my $cdna_total = 1;
       foreach my $gcoord ( @split ) {
 	if($gcoord->isa('Bio::EnsEMBL::Mapper::Gap')) {
-	  $cdna_total += $gcoord->length;
-	  next;
+	  $self->throw('Unexpected gap mapping peptide' .
+		       'coords to genomic coords');
 	}
 
 	my $cdna_start = $cdna_total;
@@ -343,7 +343,7 @@ sub align_hits_to_contig {
 	my $gend    = $gcoord->end;
 	my $gstrand = $gcoord->strand;
 	my $cdna_end = $gend - $gstart + $cdna_start;
-	$cdna_total += $gend - $gend + 1;
+	$cdna_total += $gend - $gstart + 1;
 
 	#determine which exon this genomic coordinate overlaps
 	my $exon;
@@ -375,6 +375,11 @@ sub align_hits_to_contig {
 	  }
 	}
 
+	if($gstart >= $gend) {
+	  warn("$gstart >= $gend, [" .$gcoord->start .'-'. $gcoord->end ."]\n");
+	}
+	     
+
 	if( $cdna_end <= $cdna_start ) {
 	  next;
 	}
@@ -385,14 +390,14 @@ sub align_hits_to_contig {
 	$hstrand = $feature->hstrand();
 	if($hstrand == 1) {
 	  $hstart =
-	    $cdna_start - ($ugFeature->start()*3-2) + $ugFeature->hstart();
+	    $cdna_start - 1 + $ugFeature->hstart();
 	  $hend =
-	    $cdna_end - ($ugFeature->start()*3-2) + $ugFeature->hstart();
+	    $cdna_end - 1 + $ugFeature->hstart();
 	} else {
 	  $hend = 
-	    $ugFeature->hend() - $cdna_start + ($ugFeature->start()*3-2);
+	    $ugFeature->hend() - $cdna_start + 1;
 	  $hstart =
-	    $ugFeature->hend() - $cdna_end + ($ugFeature->start()*3-2);
+	    $ugFeature->hend() - $cdna_end + 1;
 	}
 
 	#create a new feature pair
