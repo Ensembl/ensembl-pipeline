@@ -112,7 +112,7 @@ sub _check{
 	return $arg;
       }
     }
-    $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array refs to TaskStatus add methods not $arg : $!");
+    $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array refs to TaskStatus add methods not $arg");
     
 
 }

@@ -45,7 +45,7 @@ sub can_start{
     return $self->input_ids_to_start->count;
   }else{
     $self->warn("this task ".$self->name." uses a input_id type which isn't ".
-		 "contig but ".$type." its going to wait till all RepeatMasker jobs are finished $!");
+		 "contig but ".$type." its going to wait till all RepeatMasker jobs are finished");
     return $self->get_TaskStatus('repeatmasker_task')->is_finished;
   }
 }

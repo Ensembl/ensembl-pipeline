@@ -78,7 +78,7 @@ sub new{
     if(ref($list) eq 'ARRAY'){
       $self->{'_ID_list'} = $list;
     }else{
-      $self->throw("ID_LIST need to be a listref not a $list $!");
+      $self->throw("ID_LIST need to be a listref not a $list");
     }
   }
   return $self;
@@ -167,7 +167,7 @@ sub _calculate{
   $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
 		$self->throw("Need to passs these methods (and/or/not) an" .
 								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise" .
-								 "won't work you passed in $idlist : $!");
+								 "won't work you passed in $idlist");
 
   my %count;
   my @own_ids =  @{$self->{'_ID_list'}};
@@ -264,7 +264,7 @@ sub not{
   $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||
 		$self->throw("Need to passs these methods (and/or/not) an " .
 								 "Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work " .
-								 "you passed in $idlist : $!");
+								 "you passed in $idlist");
 
   my @own_ids =  @{$self->{'_ID_list'}};
   my @comp_ids = @{$idlist->ID_list};
@@ -354,7 +354,7 @@ sub count{
 sub subset{
   my ($self, $size) = @_;
 
-  $self->throw("need a size inorder to return a subset of $self : $!") 
+  $self->throw("need a size inorder to return a subset of $self") 
     unless $size;
   if($size > $self->count){
     $size = $self->count;

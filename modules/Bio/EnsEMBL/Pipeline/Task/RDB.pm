@@ -93,7 +93,7 @@ sub logic_names{
     
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-                   " seems to be missing its config $!");
+                   " seems to be missing its config");
     }
     my $logic_name = $config->get_parameter($self->name, 'logic_name');
     $self->{'logic_name'} = $logic_name;
@@ -105,14 +105,14 @@ sub logic_names{
 sub module{
   my ($self) = @_;
   
-  $self->throw("module should be implemented by subclass $!");
+  $self->throw("module should be implemented by subclass");
 }
 
 
 sub input_ids_to_start{
  my ($self) = @_;
   
- $self->throw("input_ids_to_start should be implemented by subclass $!"); 
+ $self->throw("input_ids_to_start should be implemented by subclass"); 
 }
 
 
@@ -163,7 +163,7 @@ sub parameter_strings{
 
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-                   " seems to be missing its config $!");
+                   " seems to be missing its config");
     }
     my $dbheader = $config->get_parameter($self->name, 'ensdb');
     my $dbhost = $config->get_parameter($dbheader, 'host');
@@ -202,7 +202,7 @@ sub db{
     
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
-		   " seems to be missing its config $!");
+		   " seems to be missing its config");
     }
     my $dbheader = $config->get_parameter($self->name, 'ensdb');
     my $dbhost = $config->get_parameter($dbheader, 'host');
