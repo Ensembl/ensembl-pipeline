@@ -251,10 +251,12 @@ while(1){
          my $anal = $rule->check_for_analysis
            (\@anals, $type, \%completed_accumulator_analyses, $verbose);
          if(UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')){
-           $analHash{$anal->dbID} = $anal;
+           if($anal->input_id_type ne 'ACCUMULATOR'){
+             $analHash{$anal->dbID} = $anal;
+           }
          }else{
-           if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
-               $rule->has_condition_of_input_id_type($type) ) {
+           if($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
+              $rule->has_condition_of_input_id_type($type) ) {
              $incomplete_accumulator_analyses
                {$rule->goalAnalysis->logic_name} = 1;
            }
