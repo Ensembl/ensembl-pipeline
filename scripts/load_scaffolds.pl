@@ -31,7 +31,6 @@ use Bio::EnsEMBL::RawContig;
 use Bio::EnsEMBL::Clone;
 use Getopt::Long;
 
-my $dbtype = 'rdb';
 my $host   = '';
 my $port   = '';
 my $dbname = '';
@@ -44,13 +43,11 @@ my $pipe = 0;
 my $verbose = 0;
 
 &GetOptions(
-	     'dbtype:s'   => \$dbtype,
 	     'dbhost:s'   => \$host,
 	     'dbport:n'   => \$port,
 	     'dbname:s'   => \$dbname,
 	     'dbuser:s'   => \$dbuser,
 	     'dbpass:s'   => \$dbpass,
-             'pipe'       => \$pipe,
 	     'verbose'    => \$verbose,
 	     'write'      => \$write,
 	     'h|help'     => \$help
@@ -77,25 +74,37 @@ my $seqio = new Bio::SeqIO(-format=>'Fasta',
 			   -file=>$seqfile);
 my $count = 0;
 while ( my $seq = $seqio->next_seq ) {
-    my $cloneid= $seq->id;
+    my $desc = $seq->desc;
+
     my $clone     = new Bio::EnsEMBL::Clone;
-    my $contig    = new Bio::EnsEMBL::RawContig;
+    $clone->id($seq->id);
     $clone->htg_phase(-1);
-    $clone->id($cloneid);
+    $desc =~ /htg_phase\s+(\S+)/ and $clone->htg_phase($1);
     $clone->version(1);
+    $desc =~ /version\s+(\S+)/ and $clone->version($1);
     $clone->embl_id("");
+    $desc =~ /embl_id\s+(\S+)/ and $clone->embl_id($1);
     $clone->embl_version(0);
+    $desc =~ /embl_version\s+(\S+)/ and $clone->embl_version($1);
+
     my $now = time;
     $clone->created($now);
     $clone->modified($now);
+
+    my $contig    = new Bio::EnsEMBL::RawContig;
     $contig->seq($seq->seq);
-    my $bp = $seq->length;   #
-    $contig->length($bp);  
-    my $contigid = $cloneid.".1.".$bp;
+    my $seq_len = $seq->length;   #
+    $contig->length($seq_len);  
+    #my $contigid = $clone->id . ".1." . $seq_length;
+    my $contigid = $clone->id;
+
     $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
+
     $contig->name($contigid);
     $contig->embl_offset(1);
+    $desc =~ /embl_offset\s+(\S+)/ and $clone->embl_offset($1);
     $clone->add_Contig($contig);
+
     if ($write) {
        eval {
           $db->get_CloneAdaptor->store($clone);
@@ -103,11 +112,6 @@ while ( my $seq = $seqio->next_seq ) {
        };
        if( $@ ) {
          print STDERR "Could not write clone into database, error was $@\n";
-       }
-       if ($pipe) {
-          my $sth = $db->prepare("insert into input_id_analysis (input_id,class,analysis_id,created) values('".$contigid."','contig',1,now())");
-         $sth->execute;
-         $verbose && print STDERR "Written input_id_analysis entry for ".$clone->id."\n";
        }
     }
 }
