@@ -233,7 +233,7 @@ sub run {
 	$self->run_analysis;
 
 	# parse output
-	$self->parse_results($tmpseq->display_id);
+	$self->parse_results($tmpseq);
 	}
 	$self->throw("Can't remove tmp sequence $!\n")
 	    unless (system ("rm ".$self->workdir."/profile_tmp_seq") == 0);
@@ -277,7 +277,7 @@ sub run_analysis {
 
 =cut
 sub parse_results {
-    my ($self,$sequenceId) = @_;
+    my ($self,$tmpseq) = @_;
     
     my $filehandle;
     my $resfile = $self->results();
@@ -307,7 +307,7 @@ sub parse_results {
 	    }
 		
     foreach my $feats (@features) {
-	$self->create_feature($feats,$sequenceId);
+	$self->create_feature($feats,$tmpseq);
 	print STDERR "$feats\n";
     }
     @features = 0;
@@ -343,8 +343,13 @@ sub output {
 
 =cut
 sub create_feature {
-    my ($self, $feat, $sequenceId) = @_;
-    
+    my ($self, $feat, $tmpseq) = @_;
+    my $sequenceId = $tmpseq->display_id;
+    my $seq = $tmpseq->seq;
+    my $length = length($seq);
+
+    print STDERR "LENGTH: $length";
+
 #my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
     my @f = split (/,/,$feat);
     
@@ -357,6 +362,11 @@ sub create_feature {
 	$hto = $f[2] - $f[1] + 1;
     }
 
+#Check if end value is greater than the length of the protein
+    if ($f[2] > $length) {
+	print STDERR "WARNING: The end of the feature is greater than the length of the protein\n";
+	return;
+    }
 
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
 					       -end => $f[2],        
