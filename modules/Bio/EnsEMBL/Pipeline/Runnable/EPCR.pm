@@ -221,7 +221,7 @@ sub mismatch {
     my ($self, $args) = @_;
     if (defined $args)
     {
-        $self->{'mismatch'} = $args ;
+        $self->{'_mismatch'} = $args ;
     }
     return $self->{'_mismatch'};
 }
