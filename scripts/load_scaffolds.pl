@@ -35,7 +35,7 @@ my $dbtype = 'rdb';
 my $host   = '';
 my $port   = '';
 my $dbname = '';
-my $dbuser = 'ensadmin';
+my $dbuser = '';
 my $dbpass = '';
 my $write  = 0;
 
@@ -91,7 +91,9 @@ while ( my $seq = $seqio->next_seq ) {
     $clone->created($now);
     $clone->modified($now);
     $contig->name($contigid);
-    $contig->seq($seq);
+    $contig->seq($seq->seq);
+    my $bp = $seq->length;   #
+    $contig->length($bp);    #
     $contig->embl_offset(1);
     $clone->add_Contig($contig);
     if ($write) {
