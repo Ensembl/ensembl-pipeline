@@ -454,6 +454,18 @@ sub validate_transcript {
   my $valid = 1;
   my $split = 0;
 
+  # check exon phases:
+  my @exons = $transcript->get_all_Exons;
+  $transcript->sort;
+  for (my $i=0;$i<(scalar(@exons-1);$i++){
+    my $endphase = $exons[$i]->end_phase;
+    my $phase    = $exons[$i+1]->phase;
+    if ( $phase != $end_phase ){
+      $self->warn("rejecting transcript with inconsistent phases ( $phase - $end_phase) ");
+      return undef;
+    }
+  }
+
   # check coverage of parent protein
   my $coverage  = $self->check_coverage($transcript);
   if ($coverage < $GB_SIMILARITY_COVERAGE){

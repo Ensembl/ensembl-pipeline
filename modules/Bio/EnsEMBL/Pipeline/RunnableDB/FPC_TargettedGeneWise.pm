@@ -247,6 +247,7 @@ sub run {
     }
     
     eval{
+      #print STDERR "NOT WRITING THE OUTPUT YET\n";
       $tge->write_output;
     };
 
@@ -261,7 +262,6 @@ sub run {
 }
 
 =head2 output
-
  Title   : output
  Usage   :
  Function:
