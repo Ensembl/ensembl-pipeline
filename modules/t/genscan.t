@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..6\n"; 
+BEGIN { $| = 1; print "1..7\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -26,6 +26,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Exon;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
@@ -73,6 +74,42 @@ unless (@exons)
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
+
+#check re-translation of features can be matched within peptides
+my $all_exons_found = 1;
+my @peptides = $genscan->genscan_peptides;
+foreach my $feature (@exons)
+{
+    if ($all_exons_found == 1)
+    {
+        $all_exons_found = 0;
+        my $exon = Bio::EnsEMBL::Exon->new();
+        $exon->id           ($feature->seqname);
+        $exon->start        ($feature->start);
+        $exon->end          ($feature->end);
+        $exon->strand       ($feature->strand);
+        $exon->phase        ($feature->phase);
+        $exon->contig_id    ($clone->id);
+        #$exon->end_phase($feat->end_phase);
+        $exon->attach_seq   ($clone);
+
+        foreach my $full_pep (@peptides)
+        {
+            my $exon_pep = $exon->translate->seq;
+            $exon_pep =~ s/^M//i; #remove leading M's
+            if (index ($full_pep, $exon_pep) > -1)
+            {
+                $all_exons_found = 1;
+                last;
+            }
+        }
+    }
+}
+
+unless ($all_exons_found)
+{ print "not ok 7\n"; }
+else
+{ print "ok 7\n"; }
 
 sub display {
     my @results = @_;
