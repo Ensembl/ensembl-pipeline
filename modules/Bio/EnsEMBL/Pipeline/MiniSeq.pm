@@ -210,6 +210,37 @@ sub convert_FeaturePair {
     return @newfeatures;
 }
 
+=head2 convert_PepFeaturePair
+
+ Title   : convert_PepFeaturePair
+ Usage   : my @newfeatures = $self->convert_PepFeaturePair($feature)
+ Function: Converts feature pair coordinates on the cDNA sequence
+           into an array of feature pairs on the genomic sequence
+           Peptide coordinates are maintained.
+ Example : 
+ Returns : Array of Bio::EnsEMBL::FeaturePair
+ Args    : Bio::EnsEMBL::FeaturePair
+
+
+=cut
+
+sub convert_PepFeaturePair {
+    my ($self,$feature) = @_;
+
+    my @newfeatures;
+
+    my @tmp = $self->pairAlign->convert_FeaturePair($feature);
+
+    # replace protein coordinates
+    $tmp[0]->hstart($feature->hstart);
+    $tmp[0]->hend($feature->hend);
+    push(@newfeatures,@tmp);
+
+    return @newfeatures;
+}
+
+
+
 1;
 
 
