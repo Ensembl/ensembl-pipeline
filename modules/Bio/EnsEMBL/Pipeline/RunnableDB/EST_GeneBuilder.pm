@@ -131,6 +131,16 @@ sub new {
     return $self; 
 }
 
+############################################################
+
+sub est_e2g_db{
+    my ($self, $est_e2g_db) = @_;
+    if ($est_e2g_db){
+	$self->{_est_e2g_db} = $est_e2g_db;
+    }
+    return $self->{_est_e2g_db};
+}
+############################################################
 
 sub cdna_db{
  my ($self, $cdna_db);
@@ -140,7 +150,7 @@ sub cdna_db{
  return $self->cdna_db;
 }
 
-
+############################################################
 =head2 RunnableDB methods
 
 =head2 analysis
@@ -264,7 +274,7 @@ sub fetch_input {
     my $slice_adaptor = $self->db->get_SliceAdaptor();
     my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);    
     $slice->chr_name($chrid);
-    $self->slice($slice);
+    $self->query($slice);
     print STDERR "got slice\n";
     print STDERR "length ".$slice->length."\n";
     
@@ -1049,7 +1059,7 @@ sub _check_splice_Sites{
   print STDERR "EST_GeneBuilder: checking splice sites in strand $strand...\n";
 
   # get the contig being analysed
-  my $slice = $self->slice;
+  my $slice = $self->query;
   
   # for reverse strand,  invert the contig, since the exons were retrieved in revcontig
   my $revslice = $slice->invert;   
@@ -1477,7 +1487,7 @@ sub make_genes {
   my @genes;
 
   my $time  = time; chomp($time);
-  my $slice = $self->slice;
+  my $slice = $self->query;
   
   
   # are we working on the reverse strand?
