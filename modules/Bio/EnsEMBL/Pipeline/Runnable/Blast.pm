@@ -437,7 +437,7 @@ sub parse_results {
     }
 
     #print "Parsing name $name\n";
-     
+
   HSP: while (my $hsp = $sbjct->nextHSP) {
       
       if ($self->threshold_type eq "PID") {
@@ -553,8 +553,9 @@ sub filter_hits {
       my $qend   = $hsp->query->end();
       my $hend   = $hsp->subject->end();      
       
-      my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
-      
+      my $qstrand = $hsp->query->strand(),
+      my $hstrand = $hsp->subject->strand();
+
       my $score  = $hsp->score;
 
       my $feature1 = new Bio::EnsEMBL::SeqFeature();
@@ -632,15 +633,24 @@ sub split_HSP {
     # For pep-dna alignments and vice-versa the increments will be +-3 
     # for the dna sequence and +- 1 for the peptide sequence. 
 
-    my ($qtype,  $htype)   = $self->_findTypes     ($hsp);
-    my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
+    # Find out which Blast program generated the results
+    my $source = $self->program;             
+    $source =~ s/\/.*\/(.*)/$1/;
+
+    # Use the Blast analysis source to determine what the sequences are
+    my ($qtype,  $htype)   = $self->_findTypes($source);
+
+    my $qstrand = $hsp->query->strand(),
+    my $hstrand = $hsp->subject->strand();
+
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
     #print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
     #print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
+    #print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand $name\n";
 
-#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand \n";
-
+    if ($qtype eq "dna" && $htype eq "dna") {exit()};
+    
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
     # in either the query sequence or the hit sequence we make 
@@ -670,7 +680,7 @@ sub split_HSP {
     my $qend   = $hsp->query->start();                  # Set the feature pair end also
     my $hend   = $hsp->subject->start();                # ditto
 
-    if ($qstrand == -1) {
+   if ($qstrand == -1) {
       $qstart = $hsp->query->end;
       $qend   = $hsp->query->end;
     }
@@ -684,8 +694,6 @@ sub split_HSP {
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
     
-    my $source = $self->program;             
-    $source =~ s/\/.*\/(.*)/$1/;
 
     my @tmpf;
 
@@ -900,50 +908,44 @@ sub _findIncrements {
     return ($qinc,$hinc);
 }
 
-sub _findStrands {
-    my ($self,$hsp) = @_;
-
-    return ( $hsp->query->strand(),
-             $hsp->subject->strand());
-
-#    my $qstrand;
-#    my $hstrand;
-
-#    if ($hsp->query->start() < $hsp->query->end()) {
-#       $qstrand = 1;
-#    } else {
-#       $qstrand = -1;
-#    }
-#    if ($hsp->subject->start() < $hsp->subject->end()) {
-#       $hstrand = 1;
-#    } else {
-#       $hstrand = -1;
-#    }
-#    return ($qstrand,$hstrand);
-}
 
 sub _findTypes {
-    my ($self,$hsp) = @_;
+    my ($self,$blast_type) = @_;
 
-    my $type1;
-    my $type2;
-    #abs($hsp->query->end() - $hsp->query->start()) + 1;
-    my $len1 = $hsp->query->length();
-    #abs($hsp->subject->end() - $hsp->subject->start) + 1;
-    my $len2 = $hsp->subject->length();
+    my $query;
+    my $sbjct;
 
-    if ($len1/$len2 > 2) {
-        $type1 = 'dna';
-        $type2 = 'pep';
-    } elsif ($len2/$len1 > 2) {
-        $type1 = 'pep';
-        $type2 = 'dna';
-    } else {
-        $type1 = 'dna';
-        $type2 = 'dna';
+    # Determine the type of sequences used in the Blast analysis
+    # based on the following table:
+    #
+    # Analysis  Query  Subject
+    #  blastp    pep     pep
+    #  blastn    dna     dna
+    #  blastx    dna     pep
+    # tblastn    pep     dna
+    # tblastx    dna     dna
+
+    if ($blast_type =~ /tblastn/) {
+      $query = 'pep';
+      $sbjct = 'dna';
     }
-
-    return ($type1,$type2);
+    elsif ( $blast_type =~ /tblastx/ || $blast_type =~ /blastn/) {
+      $query = 'dna';
+      $sbjct = 'dna';
+    }
+    elsif ( $blast_type =~ /blastp/ ) {
+      $query = 'pep';
+      $sbjct = 'pep';
+    }
+    elsif ( $blast_type =~ /blastx/ ) {
+      $query = 'dna';
+      $sbjct = 'pep';
+    }
+    else {
+      $self->throw("Unknown Blast analysis:" . $blast_type . "\n");
+    }
+    
+    return ($query,$sbjct);
 }
 
 sub select_features {
