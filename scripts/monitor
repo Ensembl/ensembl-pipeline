@@ -73,6 +73,8 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 						      -dbname => $dbname,
 						      -port   => $port);
 
+my $ana_adaptor = $db->get_AnalysisAdaptor;
+
 my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 
 $monitor->lock_status($lock);
@@ -110,15 +112,40 @@ if ($assembly_type){
 
 }
 if ($ft_ana_id =~ /:/){
-	my ($ft, $ana_id) = split(/:/, $ft_ana_id);
+	my ($ft, $ana) = split(/:/, $ft_ana_id);
+        my $ana_id;
+	if($ana =~ /^\d+$/ ){
+          $ana_id = $ana
+	}else{
+	  $ana_id = &logic_name2dbID($ana_adaptor, $ana);
+	  if(!$ana_id){
+           die("logic name ".$ana." appears not to have a analysis id");
+	  }  
+        }  
 	my $nohits = $monitor->get_no_hit_contigs_for_analysis($ft, $ana_id) if ($ana_id);
-	$monitor->print_header("Contigs with no hits in <$ft> with analysis_id <$ana_id>");
+	$monitor->print_header("Contigs with no hits in <$ft> with analysis <$ana>");
 	map { print $_->[0] . "\n"} @$nohits;
+	if(scalar(@$nohits) == 0){
+	  print STDERR "there are no contigs which have no hits to ".$ana
+          ." in ".$ft."\n";
+	}  
 }
 
 sub useage{
 	exec('perldoc', $0);
 	exit;
+}
+
+
+sub logic_name2dbID {
+    my ($ana_adaptor, $logic_name) = @_;
+  
+    my $analysis = $ana_adaptor->fetch_by_logic_name($logic_name);
+    if($analysis){
+     return $analysis->dbID;  
+    }else{
+     return 0;
+    }
 }
 
 =pod
@@ -148,16 +175,18 @@ A Simple script using the Monitor.pm module to display information on the status
 
    -current               shows the jobs currently in the database, 
    the data is grouped by both analyses and status
-   -current_summary       shows the jobs in the database grouped by status
+   -current_summary       shows the jobs in the database grouped by 
+                          status
    -finished              shows the finished jobs summary
    -analysis              shows the analysis table
    -rules                 shows the rule_goal table
    -conditions            shows the rule_conditions table
    -status_analysis S:LN  shows the jobs with Status:Logic_Name
-   -unfinished            shows the unfinished input_ids & analyses in the 
-   database.
+   -unfinished            shows the unfinished input_ids & analyses in 
+                          the database.
    -nohits FT:ANAID       shows clones with no hits in:with 
-   Feature_Table:ANAlysis_ID
+                          Feature_Table:ANAlysis_ID, you can also use 
+                          a logic_name if you don't know the analysis id
    -assembly TYPE         shows unfinished input_ids & analyses in the 
    assembly of TYPE
    -input_id INPUT_ID     shows unfinished analyses for INPUT_ID
