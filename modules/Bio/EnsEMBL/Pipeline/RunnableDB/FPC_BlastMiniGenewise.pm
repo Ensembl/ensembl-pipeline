@@ -77,7 +77,7 @@ sub new {
     
     # make all seqfetchers
     foreach my $db(@{$GB_SIMILARITY_DATABASES}){
-      my $seqfetcher =  $self->make_seqfetcher($db->{'index'});  
+      my $seqfetcher =  $self->make_seqfetcher($db->{'index'}, $db->{seqfetcher});  
       $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
     }
 
@@ -956,16 +956,18 @@ sub output{
 =cut
 
 sub make_seqfetcher {
-  my ( $self, $index ) = @_;
+  my ( $self, $index, $seqfetcher_class ) = @_;
   my $seqfetcher;
 
-  
+  (my $class = $seqfetcher_class) =~ s/::/\//g;
+  requre "$class.pm";
+
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-  
-    ## SeqFetcher to be used with 'indicate' indexing:
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
+    
+    # make sure that your class is compatible with the index type
+    $seqfetcher = "$class"->new('-db' => \@db, );
+    
   }
   else{
     $self->throw("Can't make seqfetcher\n");
