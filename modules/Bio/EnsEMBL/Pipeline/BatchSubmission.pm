@@ -1,3 +1,60 @@
+# Base Class for handling job submission via Load Sharing software
+#
+# Cared for by Laura Clarke <lec@sanger.ac.uk>
+#
+# Copyright Laura Clarke <lec@sanger.ac.uk>
+#
+# You may distribute this module under the same terms as perl itself
+#
+# POD documentation - main docs before the code
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::BatchSubmission
+
+=head1 SYNOPSIS
+
+This is just a base class: objects should be created via child classes
+Bio::EnsEMBL::Pipeline::BatchSubmission::*
+
+my $batchjob = Bio::EnsEMBL::Pipeline::BatchSubmission::XXX->new(
+             -STDOUT     => $stdout_file,
+             -STDERR     => $stderr_file,
+             -PARAMETERS => @args,
+             -PRE_EXEC   => $pre_exec,
+             -QUEUE      => $queue,
+             -JOBNAME    => $jobname,
+             -NODES      => $nodes,
+             -RESOURCE   => $resource
+             );
+
+$batch_job->construct_command_line('test.pl');
+$batch_job->open_command_line();
+
+
+=head1 DESCRIPTION
+
+Generic base class for specific BatchSubmission modules found in 
+BatchSubmission directory for handling pipeline jobs in a distributed 
+environment with load sharing software such as LSF, PBS,etc.
+
+All get/sets and generic methods found here, while specific methods such as
+construct_command_line have to be implemented in the specific child 
+classes Bio::EnsEMBL::Pipeline::BatchSubmission::*
+
+=head1 CONTACT
+
+Post general queries to B<ensembl-dev@ebi.ac.uk>
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object methods. Internal
+methods are usually preceded with a _
+
+=cut
+
 package Bio::EnsEMBL::Pipeline::BatchSubmission;
 
 
