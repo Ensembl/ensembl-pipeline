@@ -414,7 +414,7 @@ sub make_mergelist {
       if ($cp->qend() < $cp->qstart()) { $strand = -1; }
 
       # ignore hits that don't extend the current hit
-      next CP if( $cp->tend <= $prev_cps[$#prev_cps]->tend );
+      next CP if( $strand == $prev->strand && $cp->tend <= $prev_cps[$#prev_cps]->tend );
 
       # need a fudge factor - pmatch could overlap them by 1 or 2 ... or 3
       if( $strand == $prev->strand &&
