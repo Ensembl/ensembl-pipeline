@@ -41,8 +41,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blastz;
 use Bio::EnsEMBL::Pipeline::Config::General;
-use Bio::EnsEMBL::Utils::Exception qw(throw warning);
-
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -60,41 +58,49 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 sub fetch_input {
   my( $self) = @_; 
   
-  &throw("No input id") unless defined($self->input_id);
+  $self->throw("No input id") unless defined($self->input_id);
 
-  my $sa = $self->db->get_SliceAdaptor;
-  my $slice = $sa->fetch_by_name($self->input_id);
-  if(@$PIPELINE_REPEAT_MASKING){
-    # blastz works best with soft masking
-    my $sequence = $slice->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING, 1);
-    $self->query($sequence);
-  }else{
-    $self->query($slice);
+  my $input_id  = $self->input_id;
+  
+  my ($contig, $chr_name, $chr_start, $chr_end);
+ 
+  if ($input_id =~ /$SLICE_INPUT_ID_REGEX/) {
+    ($chr_name, $chr_start, $chr_end) = ($1, $2, $3);
+    $contig  = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
+  } else {
+    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($input_id);
   }
+
+  $self->query($contig);
+
+  # if repeatmasking required, always soft mask for blastz
+  my $genseq = (@$PIPELINE_REPEAT_MASKING) 
+      ? $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING, 1)
+      : $contig;
+
+  my @db;
 
   my $executable =  $self->analysis->program_file;
   $executable = "$BIN_DIR/blastz" if not $executable;
 
   my $database = $self->analysis->db;
-  &throw("You must define a database to search against in the analysis") if not $database;
+  $self->throw("RunnableDB/Blastz error: you must define a database in your analysis") if not $database;
   
-  my @db;
   if ( -d $database) {
     @db = glob("$database/*");
     
-    # if the files have standard names, try to sort them 
-    # for consistency
+    # if the files have standard names, try to sort them for consistency
+
     @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  $o <=> $t } @db;
     
-  }
-  else {
+  } else {
     push(@db,$database);
   }
 
   foreach my $db (@db) {
-    my $blastz = new Bio::EnsEMBL::Pipeline::Runnable::Blastz(-query         => $self->query,
+    my $blastz = new Bio::EnsEMBL::Pipeline::Runnable::Blastz(-query         => $genseq,
                                                               -program       => $executable,
                                                               -database      => $db,
                                                               -options       => $self->analysis->parameters);    
@@ -116,12 +122,59 @@ sub fetch_input {
 sub run {
   my ($self) = @_;
   
-  &throw("Can't run - no runnable objects") unless defined($self->runnable);
+  $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
   
   foreach my $run ($self->runnable) {
     $run->run;
   }
 
+}
+
+
+
+=head2 write_output
+
+    Title   :   write_output
+    Usage   :   $self->write_output()
+    Function:   Writes contents of $self->{_output} into $self->db
+    Returns :   1
+    Args    :   None
+
+=cut
+
+sub write_output {
+
+  my($self) = @_;
+  
+  my @features = $self->output();
+  my $db       = $self->db;
+  
+  my $fa = $db->get_DnaAlignFeatureAdaptor;
+  
+  foreach my $output (@features) {
+    $output->contig($self->slice);
+    $output->attach_seq($self->slice);
+    
+    $output->analysis($self->analysis);
+    
+    if ($self->slice->isa("Bio::EnsEMBL::Slice")) {
+      my @mapped = $output->transform;
+      
+      if (@mapped == 0) {
+        $self->warn("Couldn't map $output - skipping");
+        next;
+      }
+      if (@mapped == 1 && $mapped[0]->isa("Bio::EnsEMBL::Mapper::Gap")) {
+        $self->warn("$output seems to be on a gap - something bad has happened ...");
+        next;
+      }
+      
+      $fa->store(@mapped);
+    } 
+    else {
+      $fa->store($output);
+    }
+  }
 }
 
 
