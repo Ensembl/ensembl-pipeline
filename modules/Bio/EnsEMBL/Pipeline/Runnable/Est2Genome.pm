@@ -351,10 +351,12 @@ sub _diskspace {
 
 sub _deletefiles {
     my ($self, $genfile, $estfile, $dirname) = @_;
+
 #    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
 #    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
 
 }
+
 
 
 
