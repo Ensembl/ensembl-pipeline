@@ -244,5 +244,11 @@ O95746 PMS2L16 protein.  - multiple pmatches vac.
 Q86WY7 Similar to Williams Beuren syndrome chromosome region 19.  - multiple pmatches vac.
 Q15157 PMS4 protein (HPMS4 protein) (Fragment).  - multiple pmatches vac.
 O62658 Canis familiaris LINE-1 element ORF2.
-Q9QZ73 Mouse pseudogene - smjs from ms
-O08905 Mouse dysfunctional protein with L1 in - smjs from ms
+NP_001002783.1 gi|50582591|ref|NP_001002783.1| RIKEN cDNA 9530085L02 gene [Mus musculus] hit the rat genome 20000 times lec (for rat)
+Q63499 6659 Q63499 Q63499 Pot.ORF (Fragment). (for rat)
+Q63298 322 Q63298 Q63298 Rat L1Rn B7 repetitive DNA element (Fragment). (for rat)
+Q7TPS2 15 Q7TPS2 Q7TPS2 Hypothetical protein. (for rat)
+Q80WC8 10 Q80WC8 Q80WC8 Hist1h4i protein (Fragment).(for rat)
+Q811M0 10 Q811M0 Q811M0 Hist1h4h protein (Fragment). (for rat)
+Q8BYP8 23 Q8BYP8 Q8BYP8 Mus musculus adult male hypothalamus cDNA, RIKEN full-length enriched library, clone:A230056F15 product:hypothetical Tyrosine-rich region containing protein, full insert sequence. (for rat)
+
