@@ -174,7 +174,7 @@ sub run {
   $command .=  " " . $fa_first    . " ";
   $command .=  " " . $fa_secnd         ;
 
-  print STDERR "avid-command : $command\n" ; # if $self->_verbose;
+  print STDERR "avid-command : $command\n"  if $self->_verbose;
 
   open( AVID, "$command |" ) || $self->throw("Error running avid $!");
   close(AVID);
