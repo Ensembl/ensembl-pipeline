@@ -249,7 +249,7 @@ sub run {
       next;
     }
     
-    print $_."n";
+    print $_."\n";
 
     # create as many features as blocks there are in each output line
     my (%feat1, %feat2);
@@ -314,7 +314,7 @@ sub run {
 	$query_end   = $query_start + $block_sizes[$i] - 1;
       }
       else{
-	$query_end   = $t_length  - $q_start_positions[$i];
+	$query_end   = $q_length  - $q_start_positions[$i];
 	$query_start = $query_end - $block_sizes[$i] + 1;
       }
       
