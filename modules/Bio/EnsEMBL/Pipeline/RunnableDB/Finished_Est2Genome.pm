@@ -1,6 +1,6 @@
 
 
-package Bio::ensEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
+package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::Root::RootI;
@@ -40,7 +40,8 @@ sub new {
     $self->{'_fplist'} = []; #create key to an array of feature pairs
    
     
-    my $index = $self->analysis->db; 
+    #my $index = $self->analysis->db; 
+    my $index = '';
     my $seqfetcher = $self->make_seqfetcher($index);
     print "seqfetcher ".$seqfetcher."\n"; 
     $self->seqfetcher($seqfetcher);
@@ -75,7 +76,7 @@ sub fetch_input {
   my $genseq   = $contig->primary_seq;
   my $repeat_masked = undef;
   my @features;
-  my $type = $self->analysis->parameters;
+  my $type = $self->analysis->db;
   #print "type = ".$type."\n";
   my $percent_id =  50;
   my $filter;
@@ -85,7 +86,7 @@ sub fetch_input {
   my $tandem =  1;
   my $no_blast = 1;
   #print "getting features\n";
-  my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200, 0);
+  my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200);
   
   print "have ".scalar(@features)." features\n";
   foreach my $f (@features) {
@@ -104,10 +105,7 @@ sub fetch_input {
     }
   }
   
-  
-  
-  
- 
+   
   #print $genseq." ".$self->seqfetcher." ".$percent_filter." ".$percent_id." ".$tandem." ".$no_blast." \n";
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new('-unmasked' => $genseq,
 								'-seqfetcher' => $self->seqfetcher,
@@ -122,11 +120,7 @@ sub fetch_input {
       
   
 }
-    
-  
-  
-
-    
+        
  
 =head2 runnable
 
