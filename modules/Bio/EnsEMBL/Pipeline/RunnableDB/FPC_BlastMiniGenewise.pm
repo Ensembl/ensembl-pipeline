@@ -176,12 +176,13 @@ sub write_output {
     
     my $sla       = $self->db->get_SliceAdaptor();
     my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+    my $seq;
+    $self->query($slice);
     $slice->chr_name($chrid);
     if(@$GB_SIMILARITY_MASKING){
-      my $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
-      $self->query($seq);
+      $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
     }else{
-      $self->query($slice);
+      $seq = $slice;
     }
     
     
@@ -250,7 +251,7 @@ sub write_output {
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
       
-      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $self->query,
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
 									     '-ids'      => \@ids,
 									     '-seqfetcher' => $seqfetcher,
 									     '-trim'     => 1);
