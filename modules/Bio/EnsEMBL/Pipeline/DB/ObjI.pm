@@ -39,10 +39,10 @@ use vars qw(@ISA);
 use strict;
 
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::DB::ObjI;
 
-@ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::Root::RootI);
 
 
 =head2 get_Job {
