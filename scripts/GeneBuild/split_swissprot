@@ -1,0 +1,64 @@
+#!/usr/local/bin/perl
+
+my %ids;
+my %seq;
+my $id;
+my $seq;
+my $foundseq = 0;
+my $len;
+my %acc;
+while (<>) {
+  if (/^ID +(\S+)/) {
+     my $tmpid = $1;
+     if (defined($os)) {
+        if (!defined($ids{$os})) {
+            $ids{$os} = [];
+         }
+        push(@{$ids{$os}},$id);
+        $seq{$id} = $seq;
+
+        if (length($seq) != $len) {
+           print "ERROR: $id sequence length doesn't tally with entry [$len]  " . length($seq) . " " .  $seq . "\n";
+        } 
+     }
+     $id = $tmpid;
+     $seq = "";
+     $len = 0;
+   }
+   if (/^AC +(\S+);/) {
+     $acc{$id} = $1;
+   }
+   if (/^OS +(\S+) +(\S+)/) {
+      $os = $1 . " " . $2;
+   }
+   if (/\/\//) {
+     $foundseq = 0;
+   }
+   if ($foundseq) {
+     $chomp;
+     $_ =~ s/ //g;
+     $_ =~ s/\n//g;
+     $seq .= $_;
+   }
+   if (/^SQ +SEQUENCE +(\d+)/) {
+     $foundseq = 1;
+     $len = $1;
+   }
+}
+
+#foreach my $os (keys %ids) {
+   my @ids = @{$ids{'Rattus norvegicus'}};
+
+   push(@ids,@{$ids{'Rattus rattus'}});
+   push(@ids,@{$ids{'Mus musculus'}});
+
+   print "$os  " . scalar(@ids) . "\n";
+
+   foreach my $id (@ids) {
+     print ">" . $acc{$id} . " $id $os\n";
+     my $seq = $seq{$id};
+     $seq =~ s/(.{72})/$1\n/g;
+     print $seq . "\n";
+   }
+
+#}
