@@ -192,9 +192,9 @@ sub job_adaptor{
 
 
 sub analysis_adaptor{
-  my ($self) = @_;
+  my ($self, $adaptor) = @_;
 
-  $self->{'analysis_adaptor'} = shift if(@_);
+  $self->{'analysis_adaptor'} = $adaptor;
 
   if(!$self->{'analysis_adaptor'}){
     $self->{'analysis_adaptor'} = $self->db->get_AnalysisAdaptor;
@@ -249,7 +249,7 @@ sub input_ids{
       unless(ref($input_ids) eq 'HASH');
     $self->{'input_ids'} = $input_ids;
   }
-  if(!%{$self->{'input_ids'}}){
+  if(!$self->{'input_ids'}){
     $self->{'input_ids'} = $self->stateinfocontainer->
       get_all_input_id_analysis_sets;
   }
@@ -259,7 +259,7 @@ sub input_ids{
 
 sub empty_input_ids{
   my ($self) = @_;
-  $self->{'input_ids'} = {};
+  $self->{'input_ids'} = undef;
 }
 
 =head2 rules
@@ -291,7 +291,7 @@ sub rules{
 
 sub empty_rules{
   my($self) = @_;
-  $self->{'rules'} = @_;
+  $self->{'rules'} = undef;
 }
 =head2 boolean toggles 
 
@@ -1078,7 +1078,6 @@ sub input_id_setup{
   }else{
     $id_hash = $self->input_ids;
   }
-  
   if($ids_to_skip){
     my $skip_id_hash = $self->read_id_file($ids_to_skip);
     foreach my $type (keys(%$skip_id_hash)){
