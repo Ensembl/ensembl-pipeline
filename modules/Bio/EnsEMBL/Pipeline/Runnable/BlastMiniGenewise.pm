@@ -259,7 +259,7 @@ sub run {
     }
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
-
+print $self->seqfetcher . "\n";
     my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $self->genomic_sequence,
                                                                      '-features'   => \@features,
                                                                      '-seqfetcher' => $self->seqfetcher,
@@ -320,7 +320,8 @@ sub run_blast {
     if(!defined $tblastn || $tblastn eq ''){
       $tblastn = 'wutblastn';
     }
-    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 -hitdist=40 > $blastout";
+#    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 -hitdist=40 > $blastout";
+    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 > $blastout";
 
    #print (STDERR "Running command $command\n");
     my $status = system($command );
@@ -507,7 +508,7 @@ sub get_Sequence {
 
     eval {
       #print STDERR "BlastMiniGenewise: getting sequence for $id\n";
-      $seq = $seqfetcher->get_Seq_by_acc($id);
+      $seq = $seqfetcher->run_pfetch($id);
     };
     if($@) {
       $self->warn("Problem fetching sequence for id [$id] $@\n");
