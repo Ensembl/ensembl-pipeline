@@ -311,7 +311,7 @@ sub flush_runs {
   
     my $cmd;
   
-    $cmd = "bsub -o ".$lastjob->stdout_file;
+    $cmd = "bsub -C 0 -o ".$lastjob->stdout_file;
     if ($nodes) {
         # $nodes needs to be a space-delimited list
         $nodes =~ s/,/ /;

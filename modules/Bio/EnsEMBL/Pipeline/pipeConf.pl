@@ -27,8 +27,8 @@ package main;
 
     'DBI.driver' => 'mysql',
 
-    'dbhost'     => 'ecs1c',
-    'dbname'     => 'laura_test',
+    'dbhost'     => 'ecs1b',
+    'dbname'     => 'chr_6_13_updated',
     'dbuser'     => 'ensadmin',
     'dbpass'     => 'ensembl',	     
     'queue'      => 'acarilong',   # farm queue
@@ -42,7 +42,8 @@ package main;
     'runner'     => '',        # path to runner.pl, needed by Job.pm
     'cpname'     => '', #this is for crosscomparer comparadb name
     'cpuser'     => '', #and comparadb user
-    'sleep'      => 3600 #sleep time in Rulemanager3
+    'sleep'      => 3600, #sleep time in Rulemanager3
+    'blast'      => 'wu',	     
     );
 }
 
