@@ -71,6 +71,8 @@ use Bio::EnsEMBL::PerlDB::Contig;
 use Bio::EnsEMBL::PerlDB::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
+use FileHandle;
+
 @ISA = qw(Bio::Root::RootI);
 
 =head2 new
