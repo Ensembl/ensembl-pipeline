@@ -1167,9 +1167,12 @@ sub _merge_same_sequences {
 
   my @sequences = @{$self->_working_alignment('evidence')};
 
-  # Blam!
+  # Blam!  Obliterate evidence sequences in favour of the new
+  # merged sequences that are about to be created.
 
   $self->_working_alignment('evidence', 'empty');
+
+  # Group evidence by sequence id.
 
   my %same_sequences_hash;
 
@@ -1178,40 +1181,70 @@ sub _merge_same_sequences {
     push (@{$same_sequences_hash{$sequence->name}}, $sequence);
   }
 
+  # Work through each distinct sequence merging all fragments into
+  # a single string.
+
   foreach my $sequence_name (keys %same_sequences_hash){
 
-    # The counter $self->{_total_inserted_deletions} is accessed directly to
-    # maintain speed.  The only place that this value should be changed is 
-    # in _align.
+    my @component_sequences;
 
-    my $chimera = '-' x ($self->_slice->length + $self->{_total_inserted_deletions});
+    foreach my $unmerged_seq (@{$same_sequences_hash{$sequence_name}}){
 
-    my @chimera = split (//, $chimera);
+      push @component_sequences, [$unmerged_seq, 
+				  $unmerged_seq->first_base_coord, 
+				  $unmerged_seq->last_base_coord];
+    }
 
-    foreach my $alike_sequence (@{$same_sequences_hash{$sequence_name}}){
+    @component_sequences = sort {$a->[1] <=> $b->[1]} @component_sequences;
 
-      my $seq_array = $alike_sequence->seq_array;
+    # Check for data problems.  Sequence from the same piece of evidence
+    # should not overlap with itself.
 
-      for (my $i = 0; $i < scalar @$seq_array; $i++) {
+    for (my $i = 0; $i < scalar @component_sequences - 1; $i++){
+      if ($component_sequences[$i]->[2] >= $component_sequences[$i+1]->[1]) {
+	warning("Parts of the same evidence sequence [" . 
+		$component_sequences[$i]->[0]->name . "] have " . 
+		"been matched to this gene twice.  Fiddling " . 
+		"alignment coordinates to make things work.");
 
-	if ($seq_array->[$i] ne '-'){
-	  if ($chimera[$i] && $chimera[$i] ne '-'){
-	    info("Evidence from the same sequence overlaps between exons.  " . 
-		 "You probably should not be merging sequences.  Set : " .
-		 "\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
-	  } else {
-	    $chimera[$i] = $seq_array->[$i] unless $seq_array->[$i] eq '-';
-	  }
-	}
+	  $component_sequences[$i+1]->[1] = $component_sequences[$i]->[2] + 1;
       }
     }
 
-    my $merged_align_seq = $same_sequences_hash{$sequence_name}->[0];
+    # Merge our sequences
 
-    $merged_align_seq->store_seq_array(\@chimera);
+    my $gap_start = 1;
+    my $merged_string = '';
+
+    foreach my $component_sequence (@component_sequences){
+      my $evidence_start  = $component_sequence->[1];
+      my $evidence_length = $component_sequence->[2] - $evidence_start + 1;
+
+      $merged_string .= 
+	('-' x ($evidence_start - $gap_start)) . 
+	substr($component_sequence->[0]->seq, 
+	       $evidence_start - 1, 
+	       $evidence_length);
+
+      $gap_start = $component_sequence->[2] + 1;
+    }
+
+      # Add last gap
+
+    $merged_string .= 
+      '-' x ($component_sequences[-1]->[0]->length - 
+	     $component_sequences[-1]->[2]);
+
+
+    # Make new align seq and store
+
+    my $merged_align_seq = 
+      Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+       -name => $component_sequences[0]->[0]->name,
+       -type => $component_sequences[0]->[0]->type,
+       -seq  => $merged_string);
 
     $self->_working_alignment('evidence', $merged_align_seq);
-
   }
 
   return 1
@@ -2219,9 +2252,48 @@ sub _all_supporting_features {
       push @{$self->{_all_supporting_features}}, 
 	       @{$exon->get_all_supporting_features};
     }
+
+    $self->{_all_supporting_features} =
+      $self->_remove_duplicate_features($self->{_all_supporting_features});
   }
 
   return $self->{_all_supporting_features}
+}
+
+
+=head2 _remove_duplicate_features
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _remove_duplicate_features {
+  my ($self, $features) = @_;
+
+  unless (defined $features){
+    throw("No features passed to filter.")
+  }
+
+  my %feature_lookup;
+  my @filtered_features;
+
+  foreach my $feat (@$features){
+    my $feat_identifier 
+      = $feat->hseqname . $feat->hstart . $feat->hend . $feat->hstrand;
+
+    unless ($feature_lookup{$feat_identifier}){
+      push @filtered_features, $feat;
+    }
+
+    $feature_lookup{$feat_identifier}++
+  }
+
+  return \@filtered_features
 }
 
 

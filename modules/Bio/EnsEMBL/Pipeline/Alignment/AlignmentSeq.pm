@@ -261,11 +261,58 @@ sub start {
   }
 
   return $self->{'_start'}
+}
+
+# Find the lengths of gaps both upstream and downstream of
+# our sequence.
+
+sub _end_gaps {
+  my $self = shift;
+
+  # Calculate both up and down stream gaps at the same
+  # time for increased overall speed (assuming that
+  # both numbers will ultimately be needed).
+  my @seq = split /[\w]/,$self->seq;
+
+  my $upstream_gaps = length($seq[0]);
+  my $downstream_gaps = length($seq[-1]);
+
+  $self->{'_first_base_coord'} = $upstream_gaps + 1;
+  $self->{'_last_base_coord'} = $self->length - $downstream_gaps;
+
+  return 1
+}
+
+
+# Find the first non-gap base of our aligned sequence
+
+sub first_base_coord {
+  my $self = shift;
+
+  unless (defined $self->{'_first_base_coord'}){
+    $self->_end_gaps;
+  }
+
+  return $self->{'_first_base_coord'}
+}
+
+
+# Find the last non-gap base of our aligned_sequence
+
+sub last_base_coord {
+  my $self = shift;
+
+  unless (defined $self->{'_last_base_coord'}){
+    $self->_end_gaps;
+  }
+
+  return $self->{'_last_base_coord'}
 
 }
 
-# This stores the exon number.  Useful to
-# Pipeline/Tools/AlignmentTool.pm
+
+# This stores the exon number.  Used by
+# Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 
 sub exon {
   my $self = shift;
@@ -287,11 +334,12 @@ sub type {
 
     my $type = shift;
 
-    $self->throw("Unknown sequence type - needs to be either \'nucleotide\' or \'protein\'.")
+    $self->throw("Unknown sequence type - needs to be either " .
+		 "'nucleotide' or 'protein'.")
       unless ($type eq 'nucleotide' || $type eq 'protein');
 
     $self->{'_type'} = $type;
-    
+
   }
 
   return $self->{'_type'};
@@ -318,6 +366,5 @@ sub fasta_string {
     $self->seq_with_newlines($line_length) . "\n";
 }
 
-return 1;
-
+1
 
