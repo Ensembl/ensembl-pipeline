@@ -201,14 +201,14 @@ sub run{
   if ( @filtered_results ){
     
     # make genes out of the features
-    print STDERR scalar(@filtered_results)." filtered results to be made into genes\n";
+    #print STDERR scalar(@filtered_results)." filtered results to be made into genes\n";
     my @genes = $self->make_genes(@filtered_results);
-    print STDERR scalar(@genes)." genes created\n";
+    #rint STDERR scalar(@genes)." genes created\n";
     
     # print out the results:
-    foreach my $gene (@genes){
-      foreach my $trans (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+    #oreach my $gene (@genes){
+     #foreach my $trans (@{$gene->get_all_Transcripts}){
+	#io::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
 	#foreach my $exon (@{$trans->get_all_Exons}){
 	#  foreach my $evi (@{$exon->get_all_supporting_features}){
 	#    print STDERR $evi->hseqname." ".
@@ -217,24 +217,24 @@ sub run{
 	#	  $evi->primary_tag." ".$evi->source_tag."\n";
 	#  }
 	#}
-      }
-    }
+      #
+    #
     
-    print STDERR "=== Before converting coordinates ===\n";
-    foreach my $gene (@genes ){
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-    	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-     } 
-    }    
+    #print STDERR "=== Before converting coordinates ===\n";
+    #foreach my $gene (@genes ){
+    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+    #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    # } 
+    #}    
     # need to convert coordinates?
     my @mapped_genes = $self->convert_coordinates( @genes );
     
-    print STDERR "=== After converting coordinates ===\n";
-    foreach my $gene (@mapped_genes ){
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-    	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    }  
-    }    
+    #print STDERR "=== After converting coordinates ===\n";
+    #foreach my $gene (@mapped_genes ){
+    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+    #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    #  }  
+    #}    
     #print STDERR "passing ".scalar(@mapped_genes)." genes to output()\n";
     $self->output(@mapped_genes);
     
@@ -273,7 +273,7 @@ sub filter_output{
 	$max_score = $match->score;
       }
       foreach my $sub_feat ( $match->sub_SeqFeature ){
-      	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
+	  print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
       }
       my $score = $match->score;
       
@@ -325,7 +325,7 @@ sub write_output{
   foreach my $gene (@output){
     #print STDERR "gene is a $gene\n";
     
-      print STDERR "about to store gene ".$gene->type." $gene\n";
+    #print STDERR "about to store gene ".$gene->type." $gene\n";
    
     foreach my $tran (@{$gene->get_all_Transcripts}){
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
@@ -341,7 +341,7 @@ sub write_output{
       print STDERR "Error message:\n$@";
     }
     else{
-      print STDERR "stored gene ".$gene->dbID."\n";
+      print STDERR "stored gene ".$gene->type." ".$gene->dbID."\n";
       foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence(   $transcript );
@@ -430,8 +430,8 @@ sub make_genes{
       }
       
     }
-    print STDERR "transcript produced:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+    #print STDERR "transcript produced:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
     push( @genes, $gene);
   }
   return @genes;
@@ -478,7 +478,7 @@ sub convert_coordinates{
     my $transformed_gene;
     # some exons may fall on gaps!!!
     eval{
-      print STDERR "about to transform gene $gene\n";
+      #print STDERR "about to transform gene $gene\n";
       $transformed_gene = $gene->transform;
     };
     if ($@ || !defined $transformed_gene){
