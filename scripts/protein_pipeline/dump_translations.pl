@@ -74,7 +74,7 @@ if ($dnadbname) {
                                                  '-user'   => $dnadbuser,
                                                  '-dbname' => $dnadbname,
                                                  '-pass'   => $dnadbpass,
-                                                 '-port'   => $dbport,
+                                                 '-port'   => $dnadbport,
                                               );
 
   $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
