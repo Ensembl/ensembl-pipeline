@@ -44,37 +44,46 @@ sub db_sanity_check{
   my $warn = 1;
   #check all rules in the rule_goal table have existing analyses
   $query = qq{SELECT COUNT(DISTINCT g.rule_id)
-                FROM rule_goal g
-                LEFT JOIN analysis a ON g.goal = a.analysis_id
-	        WHERE a.analysis_id IS NULL};
+              FROM rule_goal g
+              LEFT JOIN analysis a ON g.goal = a.analysis_id
+              WHERE a.analysis_id IS NULL};
   $msg = "Some of your goals in the rule_goal table don't seem".
-         " to have entries in the analysis table";
+    " to have entries in the analysis table";
   $self->execute_sanity_check($query, $msg);
   #check all rules in the rule_condition table have existing analyses
   $query = qq{SELECT COUNT(DISTINCT c.rule_id)
-                FROM rule_conditions c
-                LEFT JOIN analysis a ON c.condition = a.logic_name
-	        WHERE a.logic_name IS NULL};
+              FROM rule_conditions c
+              LEFT JOIN analysis a ON c.condition = a.logic_name
+              WHERE a.logic_name IS NULL};
   $msg = "Some of your conditions in the rule_condition table don't" .
-         " seem to have entries in the analysis table";
+    " seem to have entries in the analysis table";
   $self->execute_sanity_check($query, $msg);
   #check all the analyses have types
   $query = qq{SELECT COUNT(DISTINCT(a.analysis_id))
-                FROM analysis a
-                LEFT JOIN input_id_type_analysis t ON a.analysis_id = t.analysis_id
-	        WHERE t.analysis_id IS NULL};
+              FROM analysis a
+              LEFT JOIN input_id_type_analysis t 
+              ON a.analysis_id = t.analysis_id
+              WHERE t.analysis_id IS NULL};
   $msg = "Some of your analyses don't have entries in the".
-         " input_id_type_analysis table"; 
+    " input_id_type_analysis table"; 
   $self->execute_sanity_check($query, $msg, $warn);
   #check that all types which aren't accumulators have entries in
   #input__id_analysis table
   $query = qq{SELECT DISTINCT(t.input_id_type)
-                FROM input_id_analysis i 
-                LEFT JOIN input_id_type_analysis t ON i.input_id_type = t.input_id_type
-	        WHERE t.input_id_type IS NULL
+              FROM input_id_analysis i 
+              LEFT JOIN input_id_type_analysis t 
+              ON i.input_id_type = t.input_id_type
+              WHERE t.input_id_type IS NULL
                 && t.input_id_type != 'ACCUMULATOR'};
   $msg = "Some of your types don't have entries in the".
-         " input_id_type_analysis table";
+    " input_id_type_analysis table";
+  $self->execute_sanity_check($query, $msg);
+
+  $query = qq{SELECT count(input_id) 
+              FROM input_id_analysis
+              WHERE input_id_type = ''};
+  $msg = "Some of your input_ids don't have a type in the input_id_analysis ".
+    "table";
   $self->execute_sanity_check($query, $msg);
 }
 
