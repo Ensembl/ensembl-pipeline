@@ -66,9 +66,16 @@ sub get_seq_ids{
    my ($status, $contig) =
     (split)[4, 5];
    if(!$contig =~ /\S+\.\d+/){
+     #print STDERR "contig doesn't match ".$contig." accepted format\n";
      push(@non_ids, $contig);
      next;
    }
+   if($contig =~ /\S+\.$/){
+     #print STDERR "contig doesn't match ".$contig." accepted format\n";
+     push(@non_ids, $contig);
+     next;
+   }
+   #print STDERR "contig being added ".$contig."\n";
    push(@seq_ids, $contig)
   }
   return \@seq_ids, \@non_ids;
@@ -141,13 +148,10 @@ sub agp_parse{
     #print "\n";
     my ($chr, $chr_start, $chr_end, $gap,  $contig, $raw_start, $raw_end, $raw_ori) =
       (split)[0, 1, 2, 4, 5, 6, 7, 8];
-    if($gap eq 'N'){
-      next;
-    }
-    if($contig eq '.'){
-      next;
-    }
     if(!$contig =~ /\S+\.\d+/){
+      next;
+    }
+    if($contig =~ /\S+\.$/){
       next;
     }
     if ($raw_ori eq '+') {
@@ -676,7 +680,12 @@ sub make_Clone{
 sub insert_agp_line{
   my ($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type, $db) = @_;
 
+  if(!$contig){
+    print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
+    die "contig id must be defined for this to work\n";
+  }
   my $sql = "insert into assembly(chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  
   my $sth = $db->prepare($sql);
   $sth->execute($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type); 
 }
