@@ -51,11 +51,8 @@ use strict;
 # Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::FeaturePair;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
-use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
