@@ -151,7 +151,7 @@ sub _process_for_same_species_duplicates {
     # Skip hit if it is a match to self.
 
     my $sbjct_id = $sbjct->name;
-    $sbjct_id =~ s/>[^\|]*\|(\W+).*/$1/;
+    $sbjct_id =~ s/\W*(\w+).*/$1/;
 
     next PARTITION_HITS 
       if ($self->_query_seq->display_id eq $sbjct_id);
@@ -260,6 +260,11 @@ sub _calculate_pairwise_distance {
 
   my @seqs = ($self->_fetch_seq($input_id_1), 
 	      $self->_fetch_seq($input_id_2));
+
+print "Input seq 1 : " . $seqs[0]->display_id . "\n" .
+  "Input seq 2 : " . $seqs[1]->display_id . "\n";
+
+  return 0 if ($seqs[0]->display_id eq $seqs[1]->display_id);
 
   $self->throw("Didnt correctly obtain two sequences for alignment.")
     unless scalar @seqs == 2;

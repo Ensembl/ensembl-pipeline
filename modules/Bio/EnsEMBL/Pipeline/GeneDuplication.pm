@@ -218,9 +218,10 @@ sub _extract_results {
 
       $match_id = $otus[$j]->display_id unless $match_id;
 
-      $result_obj->add_match($match_id,
-			    $matrix->[$i]->[$j]->{'dN'},
-			    $matrix->[$i]->[$j]->{'dS'});
+      $result_obj->add_match($query_id,
+			     $match_id,
+			     $matrix->[$i]->[$j]->{'dN'},
+			     $matrix->[$i]->[$j]->{'dS'});
     }
   }
 
@@ -635,8 +636,5 @@ sub _codeml {
 
   return $self->{_codeml};
 }
-
-
-
 
 return 1

@@ -47,6 +47,7 @@ sub distance_method {
 
 sub add_match {
   my ($self,
+      $query_id,
       $match_id,
       $nonsyn,
       $syn) = @_;
@@ -59,9 +60,10 @@ sub add_match {
 
   my %match_hash;
 
-  $match_hash{id} = $match_id;
-  $match_hash{dN} = $nonsyn;
-  $match_hash{dS} = $syn;
+  $match_hash{query_id} = $query_id;
+  $match_hash{match_id} = $match_id;
+  $match_hash{dN}       = $nonsyn;
+  $match_hash{dS}       = $syn;
 
   push @{$self->{_matches}}, \%match_hash;
 
