@@ -227,7 +227,7 @@ while (1) {
             print "Reading IDs ... ";
 
 	    foreach my $a (@start_from) {
-		push @id_list, $sic->list_input_id_by_Analysis($a);
+		push @id_list, @{$sic->list_input_id_by_Analysis($a)};
 	    }
 
             $completeRead = 1;
@@ -269,7 +269,7 @@ while (1) {
 	    last JOBID;
 	}
 
-        my @anals = $sic->fetch_analysis_by_input_id($id);
+        my @anals = @{$sic->fetch_analysis_by_input_id($id)};
 
         my %analHash;
 
