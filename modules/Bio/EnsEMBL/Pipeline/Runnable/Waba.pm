@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Analysis;
 
  Title    : new
  Usage    : my $waba =  Bio::EnsEMBL::Pipeline::Runnable::Waba->new
-                        ( -program    => '/usr/local/pubseq/bin/waba',
+                        ( -waba       => '/usr/local/pubseq/bin/waba',
                           -query      => $query,
                           -database   => $database
                         );
@@ -79,32 +79,23 @@ sub new {
   
     $self->{'_flist'} = [];               # an array of Bio::SeqFeatures
     $self->{'_sequence'}  = undef;        # location of Bio::Seq object
-    $self->{'_program'} = undef;             # location of waba executable
+    $self->{'_waba'}      = undef;        # location of waba executable
     $self->{'_database'}  = undef;        # name of database
     $self->{'_workdir'}   = undef;        # location of tmp directory
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
     $self->{'_results'}   = undef;        # file to store results of waba run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($query, $analysis) = $self->_rearrange([qw(QUERY
-                                                   ANALYSIS)],
-					        @args);
+    my ($query, $waba, $database) = $self->_rearrange([qw(
+	QUERY
+        WABA
+	DATABASE
+    )], @args);
   
-    if ($analysis) {
-        $self->analysis($analysis);
-    } else {
-        $self->throw("Waba needs an analysis");
-    }
-
-    $self->query ($query) if ($query);       
-
-    $self->program ($self->find_executable ($self->analysis->program_file));
-
-    if ($self->analysis->db_file) {
-        $self->database($self->analysis->db_file);
-    } else {
-        $self->throw("Waba needs a database");
-    }
+    $waba ||= 'waba';
+    $self->query   ($query)    if ($query);       
+    $self->database($database) if ($database);       
+    $self->waba($self->find_executable($waba));
 
     return $self;
 }
@@ -138,10 +129,10 @@ sub query {
 }
 
 
-=head2 program
+=head2 waba
 
- Title    : program
- Usage    : $self->program ('/usr/local/pubseq/bin/waba');
+ Title    : waba
+ Usage    : $self->waba('/usr/local/pubseq/bin/waba');
  Function : get/set method for the path to the program binaries
  Example  :
  Returns  : File path
@@ -150,15 +141,15 @@ sub query {
 
 =cut
 
-sub program {
+sub waba {
     my ($self, $location) = @_;
     if ($location) {
         unless (-x $location) {
             $self->throw ("program not found at $location");
 	}
-        $self->{'_program'} = $location ;
+        $self->{'_waba'} = $location ;
     }
-    return $self->{'_program'};
+    return $self->{'_waba'};
 }
 
 
@@ -274,9 +265,9 @@ sub run_program {
     close QP;
 
     # run program
-    print STDERR "running ".$self->program."\n";
-    $self->throw ("Error running ".$self->program." on ".$self->filename) 
-        unless ((system ($self->program." all $path.query ".$self->database." ".$self->results." > /dev/null")) == 0); 
+    print STDERR "running ".$self->waba."\n";
+    $self->throw ("Error running ".$self->waba." on ".$self->filename) 
+        unless ((system ($self->waba." all $path.query ".$self->database." ".$self->results." > /dev/null")) == 0); 
 
     unlink "$path.query";
 }
@@ -286,7 +277,7 @@ sub run_program {
 
  Title    :  parse_results
  Usage    :  $self->parse_results ($filename)
- Function :  parses program output to give a set of features
+ Function :  parses waba output to give a set of features
  Example  :
  Returns  : 
  Args     : filename (optional, can be filename, filehandle or pipe, not implemented)
@@ -302,7 +293,7 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
+	    print STDERR $self->waba." didn't find anything\n";
 	    return;
         }       
         else {
@@ -478,11 +469,11 @@ sub parse_results {
                         $feature{hstrand} = 1;
                         # p_value needs to be set - TODO: fix this properly
                         $feature{p_value} = 0;
-                        ($feature{source}) = $self->program =~ /([^\/]+)$/;
+                        ($feature{source}) = $self->waba =~ /([^\/]+)$/;
                         $feature{primary} = 'similarity';
-                        ($feature{program}) = $self->program =~ /([^\/]+)$/;
+                        ($feature{program}) = $self->waba =~ /([^\/]+)$/;
                         ($feature{db}) = $self->database =~ /([^\/]+)$/;
-                        ($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
+                        ($feature{logic_name}) = $self->waba =~ /([^\/]+)$/;
                         $feature{state} = $current_state;
                         $feature{cigar} = $cigar_string;
                         my $fp = $self->create_feature (\%feature);
@@ -532,11 +523,11 @@ sub parse_results {
             $feature{hstart} = $hstart+1;
             $feature{hend} = $hend;
             $feature{hstrand} = 1;
-            ($feature{source}) = $self->program =~ /([^\/]+)$/;
+            ($feature{source}) = $self->waba =~ /([^\/]+)$/;
             $feature{primary} = 'similarity';
-            ($feature{program}) = $self->program =~ /([^\/]+)$/;
+            ($feature{program}) = $self->waba =~ /([^\/]+)$/;
             ($feature{db}) = $self->database =~ /([^\/]+)$/;
-            ($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
+            ($feature{logic_name}) = $self->waba =~ /([^\/]+)$/;
             my $fp = $self->create_feature (\%feature);
             unshift (@features, $fp);
             push (@{$self->{'_flist'}}, \@features);
