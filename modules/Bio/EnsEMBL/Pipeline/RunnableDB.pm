@@ -424,23 +424,15 @@ sub write_output {
 	  $features{dnapep} = [];
 	}
 
+	push(@{$features{dnapep}},$f);
+
+      } elsif ($f->isa("Bio::EnsEMBL::DnaDnaAlignFeature")) {
+
+	if (!defined($features{dnadna})) {
+	  $features{dnadna} = [];
+	}
+
 	push(@{$features{dnadna}},$f);
-
-      } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
-
-	if (!defined($features{dnapep})) {
-	  $features{dnapep} = [];
-	}
-
-	push(@{$features{dnapep}},$f);
-
-      } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
-
-	if (!defined($features{dnapep})) {
-	  $features{dnapep} = [];
-	}
-
-	push(@{$features{dnapep}},$f);
 
       } elsif ($f->isa("Bio::EnsEMBL::RepeatFeature")) {
 
