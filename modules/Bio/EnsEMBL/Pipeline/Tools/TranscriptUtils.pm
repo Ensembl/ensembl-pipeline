@@ -38,7 +38,7 @@ use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Utils::PolyA;
 use Bio::EnsEMBL::DBSQL::SliceAdaptor;
-
+use Bio::EnsEMBL::PredictionTranscript;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -69,7 +69,15 @@ sub _check_Transcript{
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     
-    my $strand =  $transcript->start_Exon->strand;
+    my $strand;
+    
+    my @exons = @{$transcript->get_all_Exons};
+    eval {
+    $strand =  $exons[0]->strand;
+};
+    if ($@) {
+	$self->throw;
+    }
 
     $transcript->sort;
     
@@ -187,10 +195,23 @@ sub _check_introns{
     # hardcoded stuff, to go in a config file
     my $MAX_INTRON_LENGTH = 200000;
     
+    #my $MAX_INTRON_LENGTH = 25000;
+
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     
-    my $strand =  $transcript->start_Exon->strand;
+    my @exons = @{$transcript->get_all_Exons};
+    
+    my $strand;
+    
+    eval {
+    $strand =  $exons[0]->strand;
+};
+    if ($@) {
+	$self->throw;
+    }
+
+    #my $strand =  $transcript->start_Exon->strand;
 
     $transcript->sort;
     
