@@ -63,36 +63,55 @@ unless (scalar(@ests) && defined($genseq))
 else
 { print "ok 2\n"; }
 
+my $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 ";
+
 #create Exonerate object    
 my $exe = '/work2/gs2/gs2/bin/exonerate-0.3d'; # or another version of exonerate that has cigar output ...
 my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
 								  -GENOMIC   => $genseq,
-	                                                          -EXONERATE => $exe);
- 
-unless ($exonerate)
+	                                                          -EXONERATE => $exe,
+	                                                          -ARGS      => $exargs,
+	                                                          -PRINT     => 1);
+
+
+ unless ($exonerate)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
 
 #run exonerate
-$exonerate->run();
+open(OLDOUT, ">&STDOUT");
+open(STDOUT,  ">& STDERR");
+my $ungapped = 1;
+$exonerate->run($ungapped);
+close STDOUT;
+open(STDOUT, ">&OLDOUT");
+close OLDOUT;
+
 print "ok 4\n"; # 4th test passed
 
 #get and store the output
 my @results = $exonerate->output();
-display(@results);
+#display(@results);
 
 unless (@results) 
 { print "not ok 5\n"; }
 else
 { print "ok 5\n"; }
 
+my @genes = $exonerate->each_gene;
+print STDERR "found " . scalar(@genes) . " genes\n";
+
 sub display {
   my @results = @_;
 
-  foreach my $obj (@results)
+  foreach my $pair (@results)
   {
-      print STDERR $obj->gffstring() . "\n";
+#       print STDERR "$obj\n";
+      print STDERR $pair->seqname . "\t" . $pair->start  . "\t" . $pair->end      . "\t" . 
+                $pair->percent_id . "\t" .
+	        $pair->score   . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
+                $pair->hstart  . "\t" . $pair->hend   . "\t" . $pair->hstrand  . "\n";
   }
 }
 
