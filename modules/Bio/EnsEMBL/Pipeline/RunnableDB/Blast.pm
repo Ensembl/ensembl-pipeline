@@ -50,7 +50,6 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
@@ -125,6 +124,9 @@ sub fetch_input {
 
     $self->genseq($genseq);
     print STDERR "Set genseq to " . $self->genseq. "\n";
+# input sequence needs to contain at least 3 consecutive nucleotides
+    my $seq = $self->genseq->seq;
+    $self->throw("Need at least 3 nucleotides") unless ($seq =~ /[CATG]{3}/);
 }
 
 #get/set for runnable and args
@@ -135,7 +137,7 @@ sub runnable {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
-							     -threshold => 1);
+							     -threshold => 75);
 
       $self->{'_runnable'} = $run;
     }
