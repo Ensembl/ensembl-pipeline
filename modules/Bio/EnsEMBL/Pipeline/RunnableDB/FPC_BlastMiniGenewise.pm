@@ -586,12 +586,33 @@ sub process_genes {
 
       # make genes from valid transcripts
       foreach my $checked_transcript(@$valid_transcripts){
-
-	# add start codon if appropriate
-	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
-
+	eval{
+	  # add start codon if appropriate
+	  $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
+	};
+	
+	if($@){
+	  print STDERR "problem with set_start_codon\n";
+	}
+	
+	if (!defined $checked_transcript){
+	  print STDERR "No valid transcript retruned from set_start_codon\n";
+	  next;
+	}
+	
 	# add terminal stop codon if appropriate
+	eval{
 	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+      };
+	
+	if($@){
+	  print STDERR "problem with set_stop_codon\n";
+	}
+	
+	if (!defined $checked_transcript){
+	  print STDERR "No valid transcript retruned from set_stop_codon\n";
+	  next;
+	}
 
 	# flip reverse strand supporting features. This used to be done 
 	# during remapping, whch is not necessary any more
