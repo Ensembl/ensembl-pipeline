@@ -22,6 +22,20 @@ Bio::EnsEMBL::Pipeline::MappedExon
 Extension of a normal exon that knows whether its DNA 
 sequence has changed from the previous version.
 
+Usage is the same for Bio::EnsEMBL::Exon except we have one
+new method 
+
+  $exon->has_identical_sequence(0)  # Sequence not identical to last version
+
+  or
+
+  $exon->has_identical_sequence(1)  # Sequence is the same as the last version
+
+  and
+
+  my $changed = $exon->has_identical_sequence
+
+
 =head1 CONTACT
 
 Describe contact details here
