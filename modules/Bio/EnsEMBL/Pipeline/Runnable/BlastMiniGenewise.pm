@@ -59,6 +59,8 @@ use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -294,17 +296,17 @@ sub blast_ids {
 sub run_blast {
 
     my ($self,$seq,$db) = @_;
-
-    my $blastout = $self->get_tmp_file("/tmp/","blast","swir.msptmp");
-    my $seqfile  = $self->get_tmp_file("/tmp/","seq","fa");
+    my $tmpdir = $::pipeConf{'nfstmp.dir'};
+    my $blastout = $self->get_tmp_file($tmpdir,"blast","swir.msptmp");
+    my $seqfile  = $self->get_tmp_file($tmpdir,"seq","fa");
 
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 				-file   => ">$seqfile");
 
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
-
-    my $command  = "tblast2n $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
+    my $tblastn = $::scripts_conf{'tblastn'};
+    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
 
     print (STDERR "Running command $command\n");
     my $status = system($command );
@@ -361,7 +363,8 @@ sub print_FeaturePair {
 sub make_blast_db {
     my ($self,@seq) = @_;
 
-    my $blastfile = $self->get_tmp_file('/tmp/','blast','fa');
+    my $tmpdir = $::pipeConf{'nfstmp.dir'};
+    my $blastfile = $self->get_tmp_file($tmpdir,'blast','fa');
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$blastfile");
 
@@ -425,7 +428,7 @@ sub validate_sequence {
     {
         print STDERR ("mrna feature $seq is not a Bio::PrimarySeq or Bio::Seq\n") 
                                     unless ($seq->isa("Bio::PrimarySeq") ||
-                                            $seq->isa("Bio::Seq"));
+                                            $seq->isa("Bio::SeqI"));
         my $sequence = $seq->seq;
         if ($sequence !~ /[^acgtn]/i)
         {
@@ -481,7 +484,7 @@ sub get_Sequence {
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
     if($@) {
-      $self->warn("Problem fetching sequence for id [$id]\n");
+      $self->warn("Problem fetching sequence for id [$id] $@\n");
       return undef;
     }
 
