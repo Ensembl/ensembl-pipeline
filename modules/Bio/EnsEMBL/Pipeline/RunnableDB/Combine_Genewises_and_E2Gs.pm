@@ -700,7 +700,7 @@ sub _compute_UTRlength{
      $UTRlength += $left_diff;
      $in_UTR     = 0;
    }
-   elsif( defiend $right_exons && $exon == $right_exon ){
+   elsif( defined $right_exon && $exon == $right_exon ){
      $UTRlength += $right_diff;
      $in_UTR     = 1;
    }
