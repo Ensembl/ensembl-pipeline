@@ -199,7 +199,7 @@ sub write_output {
 	
 	# test
 	print STDERR "about to store gene:\n";
-	my @transcripts = $gene->get_all_Transcripts;
+	my @transcripts = @{ $gene->get_all_Transcripts};
 	#my $tran = $transcripts[0];
     #my $strand = $tran->start_exon->strand;
 	#print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
@@ -208,7 +208,7 @@ sub write_output {
 	foreach my $tran (@transcripts){
     #  print STDERR "\ntranscript: $tran\n";
     #  print STDERR "exons:\n";
-	  foreach my $exon ($tran->get_all_Exons){
+	  foreach my $exon (@{$tran->get_all_Exons}){
 	    print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
 	    #  print STDERR "evidence:\n";
     #  foreach my $sf ( $exon->each_Supporting_Feature ){
@@ -291,9 +291,9 @@ sub fetch_input {
     if ( $USE_cDNA_DB ){
       my $cdna_db = $self->cdna_db;
       
-      my $cdna_sgp = $cdna_db->get_StaticGoldenPathAdaptor();
-      $cdna_contig = $cdna_sgp->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-      my @cdna_genes  = $cdna_contig->get_Genes_by_Type($cDNA_GENETYPE);
+      my $cdna_sa = $cdna_db->get_SliceAdaptor();
+      $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+      my @cdna_genes  = $cdna_contig->get_Genes_by_type($cDNA_GENETYPE);
       print STDERR "Number of genes from cdnas = " . scalar(@cdna_genes) . "\n";
       push (@genes, @cdna_genes);
 
@@ -307,7 +307,7 @@ sub fetch_input {
     # split by strand
 GENE:    
     foreach my $gene (@genes) {
-      my @transcripts = $gene->get_all_Transcripts;
+      my @transcripts = @{$gene->get_all_Transcripts};
       
       # skip genes with more than one transcript
       if( scalar(@transcripts) > 1 ){
@@ -316,7 +316,7 @@ GENE:
       }
       
       # Don't skip genes with one exon, potential info for UTRs
-      my @exons = $transcripts[0]->get_all_Exons;
+      my @exons = @{$transcripts[0]->get_all_Exons};
       if(scalar(@exons) == 1){
 	$single++;
       }
@@ -398,7 +398,7 @@ GENE:
     $single=0;
   REVGENE:    
     foreach my $gene (@revgenes) {
-      my @transcripts = $gene->get_all_Transcripts;
+      my @transcripts = @{$gene->get_all_Transcripts};
       
       # throw away genes with more than one transcript
       if(scalar(@transcripts) > 1 ){
@@ -406,7 +406,7 @@ GENE:
 	next REVGENE;
       }
       
-      my @exons = $transcripts[0]->get_all_Exons;
+      my @exons = @{$transcripts[0]->get_all_Exons};
       
       # DON'T throw away single-exon genes
       if(scalar(@exons) == 1){
@@ -540,7 +540,7 @@ sub _check_Transcripts {
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
     $transcript->sort;
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
     #print STDERR "Transcript with ".scalar(@exons)." exons\n";
     my $hid;
     my $this_strand;
@@ -987,7 +987,7 @@ sub _cluster_Transcripts{
 
 sub _get_start_of_Transcript{        
   my ($self,$transcript) = @_;
-  my @exons = $transcript->get_all_Exons;
+  my @exons = @{$transcript->get_all_Exons};
   my @sorted_exons = sort { $a->start <=> $b->start } @exons;
   my $start = $sorted_exons[0]->start;
   return $start;
@@ -995,7 +995,7 @@ sub _get_start_of_Transcript{
 
 sub _get_end_of_Transcript {        
   my ($self,$transcript) = @_;
-  my @exons = $transcript->get_all_Exons;
+  my @exons = @{$transcript->get_all_Exons};
   my $end = 0;
   my $this_end;
   foreach my $exon (@exons){
@@ -1019,8 +1019,8 @@ sub _get_end_of_Transcript {
 
 sub _compare_Transcripts {        
   my ($self,$transcript1,$transcript2) = @_;
-  my @exons1   = $transcript1->get_all_Exons;
-  my @exons2   = $transcript2->get_all_Exons;
+  my @exons1   = @{$transcript1->get_all_Exons};
+  my @exons2   = @{$transcript2->get_all_Exons};
   my $overlaps = 0;
   
   foreach my $exon1 (@exons1){
@@ -1068,7 +1068,7 @@ sub _merge_Transcripts{
     # sort the transcripts by the number of exons in descending order
     # for equal number of exons, order according to start coordinate
     # this is crucial!!
-    @transcripts = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
+    @transcripts = sort { my $result = ( scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) );
 			 if ($result){
 			    return $result;
 			  }
@@ -1217,7 +1217,7 @@ sub _merge_Transcripts{
     # check for the single exon transcripts ( dandruff ), they are no good
     my @final_merged_transcripts;
     foreach my $tran ( @merged_transcripts ){
-      if ( scalar ( $tran->get_all_Exons ) == 1 ){
+      if ( scalar ( @{$tran->get_all_Exons} ) == 1 ){
 	next;
       }
       else{
@@ -1257,7 +1257,7 @@ sub _check_for_residual_Merge{
    my @created_transcripts = @$created_tran_ref;
 
    # first of all, sort them again, this is CRUCIAL!!!
-   @created_transcripts = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
+   @created_transcripts = sort { my $result = ( scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) );
 				     if ($result){
 				       return $result;
 				     }
@@ -1358,8 +1358,8 @@ sub _check_for_residual_Merge{
 
 sub _test_for_Merge{
   my ($self,$tran1,$tran2) = @_;
-  my @exons1 = $tran1->get_all_Exons;
-  my @exons2 = $tran2->get_all_Exons;	
+  my @exons1 = @{$tran1->get_all_Exons};
+  my @exons2 = @{$tran2->get_all_Exons};	
  
   my $foundlink = 0; # flag that gets set when starting to link exons
   my $start     = 0; # start looking at the first one
@@ -1471,7 +1471,7 @@ sub _produce_Transcript{
 	       
   # collect all exons
   foreach my $tran (@{ $merged }){
-    my @exons = $tran->get_all_Exons;
+    my @exons = @{$tran->get_all_Exons};
 
     # sort them in genomic order
     @exons    = sort { $a->start <=> $b->start } @exons;
@@ -2019,7 +2019,7 @@ sub _check_splice_Sites{
     
     # count the number of exons
     my $count = 0; 
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
     
   EXON:
     foreach my $exon ( @exons ){
@@ -2473,7 +2473,7 @@ sub make_genes {
 
     # sort the exons 
     $transcript->sort;
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
 
     # at this point, only accepts transcripts with more than one exon
     # although we have checked this already, genomewise sometimes bridges 
@@ -2599,7 +2599,7 @@ sub remap_genes {
   my @newf;
   my $trancount=1;
   foreach my $gene (@$genes) {
-    my @trans = $gene->get_all_Transcripts;
+    my @trans = @{$gene->get_all_Transcripts};
     my $newgene;
     
     # convert to raw contig coords
