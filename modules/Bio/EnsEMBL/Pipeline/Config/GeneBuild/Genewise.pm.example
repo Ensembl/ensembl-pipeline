@@ -1,0 +1,90 @@
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise - imports global variables used by EnsEMBL gene building
+
+=head1 SYNOPSIS
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise;
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise qw(  );
+
+=head1 DESCRIPTION
+
+Genewise is a pure ripoff of humConf written by James Gilbert.
+
+humConf is based upon ideas from the standard perl Env environment
+module.
+
+It imports and sets a number of standard global variables into the
+calling package, which are used in many scripts in the human sequence
+analysis system.  The variables are first decalared using "use vars",
+so that it can be used when "use strict" is in use in the calling
+script.  Without arguments all the standard variables are set, and
+with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%Genewise> hash is asked to be set.
+
+The variables can also be references to arrays or hashes.
+
+Edit C<%Genewise> to add or alter variables.
+
+All the variables are in capitals, so that they resemble environment
+variables.
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise;
+
+use strict;
+use vars qw( %Genewise );
+
+#standard values used for most genebuilds
+# it is probably best not to change them, for some organisms we change them e.g for briggsae we increased
+#the gap extension penatly to 10 as the average length of a briggsae intron is a 100bp or so so altoigh gaps were 
+#just as likely as normal long gaps weren't
+
+# Hash containing config info
+%Genewise = (
+	     GB_GENEWISE_EXE => 'genewise', #name or path to executable
+	     GB_GENEWISE_MEMORY => 100000, #maximum number of kbs used in main calculation
+	     GB_GENEWISE_GAP => 12, # gap penalty
+	     GB_GENEWISE_EXTENSION => 2, # gap extension penatly this is sometimes increased for genomes which are denser than humna for briggsae we used
+					 # 10
+	     GB_GENEWISE_SUBS => 0.0000001, #Substitution error rate
+	     GB_GENEWISE_OPTIONS => '-quiet', #other options, -quiet reduces genewises reporting to stderr
+	    );
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+  
+  # Get list of variables supplied, or else
+  # all of Genewise:
+  my @vars = @_ ? @_ : keys( %Genewise );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $Genewise{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Genewise{ $_ };
+	} else {
+	    die "Error: Genewise: $_ not known\n";
+	}
+    }
+}
+
+1;
