@@ -152,9 +152,9 @@ sub fetch_input{
   my $protein_id; 
 
   # chr12:10602496,10603128:Q9UGV6:
-  #print STDERR $entry."\n";
-  if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
- # if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
+  print STDERR $entry."\n";
+#  if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
+  if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
       $self->throw("Not a valid input id... $entry");
   }
   
@@ -343,16 +343,11 @@ sub convert_gw_output {
   #print STDERR "converting ".@results." from runnable\n";
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+  my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
   #print STDERR "have adaptor and analysis objects\n";
-  my $analysis_obj;
-  if(scalar(@analyses) > 1){
-    $self->throw("panic! > 1 analysis for $genetype\n");
-  }
-  elsif(scalar(@analyses) == 1){
-    $analysis_obj = $analyses[0];
-  }
-  else{
+
+  if ( !defined $analysis_obj ) {
     # make a new analysis object
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
@@ -365,6 +360,7 @@ sub convert_gw_output {
        -module          => 'TargettedGeneWise',
       );
   }
+
   #print STDERR "about to make genes\n";
   my @genes = $self->make_genes($count, $genetype, $analysis_obj, \@results);
 
