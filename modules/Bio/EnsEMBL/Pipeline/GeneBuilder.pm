@@ -251,7 +251,19 @@ sub build_Genes{
   
   # cluster transcripts into genes
   print STDERR "clustering into genes...\n";
-  my @genes = $self->cluster_into_Genes(@pruned_transcripts);
+  
+  # do a preliminary clustering
+  my @preliminary_genes = $self->cluster_into_Genes(@pruned_transcripts);
+
+  # select the best ones per gene (use the GB_MAX_TRANSCRIPTS_PER_GENE )
+  my @best_transcripts = $self->_select_best_transcripts( @preliminary_genes );
+  
+  # recluster the chosen transcripts into genes
+  my @tmp_genes = $self->cluster_into_Genes(@best_transcripts);
+  
+  # make shared exons unique objects
+  my @genes =  $self->_make_shared_exons_unique( @tmp_genes );
+  
   print STDERR scalar(@genes)." genes built\n";
   
   print STDERR "Final_results:\n";
@@ -262,14 +274,48 @@ sub build_Genes{
     foreach my $tran ( @{$gene->get_all_Transcripts} ){
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     }
-  }
-
-  # final_genes is not working, check it!!
-  print STDERR scalar($self->final_genes)." final genes\n";
-    
+  }    
+  print STDERR scalar( @genes )." final genes\n";
+  $self->final_genes( @genes );
 }
 
+############################################################
 
+sub _select_best_transcripts{
+  my ( $self, @genes ) = @_;
+  my @selected_transcripts;
+  
+ GENE:
+  foreach my $gene ( @genes ){
+    
+    # sort the transcripts, get the longest CDS + UTR first (like in prune_Transcripts() )
+    my @sorted_transcripts = $self->_bin_sort_transcripts( @{$gene->get_all_Transcripts} );
+    my $count = 0;
+  TRAN:
+    foreach my $transcript( @sorted_transcripts ){
+      $count++;
+      next GENE if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
+      push ( @selected_transcripts, $transcript );
+    }
+  }
+  return @selected_transcripts;
+}
+
+############################################################
+
+sub _make_shared_exons_unique{
+  my ( $self, @genes ) = @_;
+  my @pruned_genes;
+  foreach my $gene ( @genes ){
+    
+    # make different exon objects that are shared between transcripts 
+    # ( regarding attributes: start, end, etc )
+    # into unique exon objects 
+    my $new_gene = $self->prune_Exons($gene);
+    push( @pruned_genes, $new_gene );
+  }
+  return @pruned_genes;
+}
 
 ############################################################
 
@@ -876,30 +922,15 @@ sub cluster_into_Genes{
   $self->check_Clusters(scalar(@transcripts), \@clusters);
 
   # make and store genes
-  
   print STDERR scalar(@clusters)." created, turning them into genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
     my $count = 0;
     my $gene = new Bio::EnsEMBL::Gene;
-    
-    # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
-    my @sorted_transcripts = $self->_bin_sort_transcripts( @{$cluster} );
-    foreach my $transcript( @sorted_transcripts ){
-	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE) {
-	    $gene->add_Transcript($transcript);
-	    #print STDERR "accepting:\n";
-	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-	}
-	$count++;
+    foreach my $transcript (@$cluster){
+      $gene->add_Transcript($transcript);
     }
-    
-    # prune out duplicate exons
-    my $new_gene = $self->prune_Exons($gene);
-    push( @genes, $new_gene );
-   }
-  
-  $self->final_genes(@genes);
+  }
   return @genes;
 }
 
