@@ -31,8 +31,6 @@ my $help;
             'logic_name:s' => \$logic_name,
             'feature_table:s' => \$feature_table,
             'table_to_load:s@' => \@tables_to_load,
-            'output_dir:s' => \$output_dir,
-            'queue_manager:s' => \$queue_manager,
             'run_comparison!' => \$run_comparison,
             'comparison_conf' => \$comparison_conf,
             'conf_file:s' => \$conf_file,
@@ -53,8 +51,7 @@ if(!$logic_name || !$feature_table){
   throw("Must specific which analysis you wish to run and what table its ".
         "results are written to with -logic_name and -feature_table");
 }
-$output_dir = $DEFAULT_OUTPUT_DIR if(!$output_dir);
-$queue_manager = $QUEUE_MANAGER if(!$queue_manager);
+
 $species = 'homo_sapiens' if(!$species);
 $blastdb = '/data/blastdb/Ensembl' if(!$blastdb);
 $comparison_conf = 'RefDB.conf' if(!$comparison_conf);
@@ -76,6 +73,7 @@ my $test_runner = RunTest->new(
                                -QUEUE_MANAGER => $QUEUE_MANAGER,
                                -DONT_CLEANUP => $dont_cleanup,
                                );
+
 
 if($run_comparison){
   $test_runner->comparison_conf($comparison_conf);
