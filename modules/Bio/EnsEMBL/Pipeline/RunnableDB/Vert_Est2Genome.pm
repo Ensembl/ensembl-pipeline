@@ -55,6 +55,8 @@ use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::SeqIO;
 use Bio::Tools::Blast;
 
+use Data::Dumper;
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::Object );
 
 sub _initialize {
@@ -98,7 +100,7 @@ sub input_id {
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
 
-=cut 
+=cut
 
 sub dbobj {
     my( $self, $value ) = @_;    
@@ -116,6 +118,23 @@ sub db2 {
 	$self->{_db2} = $value;
     }
     return $self->{_db2};
+}
+
+sub initialise_hash {
+    my ($self, $key) = @_;
+    if ($key)
+    {
+        $self->{_$key} = [];
+    }
+}
+
+sub features {
+    my ($self, @features) = @_;
+    if (@features)
+    {
+        push (@{$self->{_features}}, @features);
+    }
+    return @{$self->{_features}};
 }
 
 =head2 fetch_output
@@ -138,7 +157,7 @@ sub fetch_output {
     open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
     
     while (<IN>) {
-	$_ =~ s/\[//;
+    $_ =~ s/\[//;
 	$_ =~ s/\]//;
 	$object .= $_;
     }
@@ -190,7 +209,7 @@ sub write_output {
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetchs input data for est2genome from the database
+    Function:   Fetches input data for est2genome from the database
     Returns :   nothing
     Args    :   none
 
@@ -208,7 +227,8 @@ sub fetch_input {
     my @features = $contig->get_all_SimilarityFeatures;
     $self->{_genseq} = $genseq;
     $self->{_features} = [];
-    push(@{$self->{_features}},@features);
+    $self->features(@features);
+    #push(@{$self->{_features}},@features);
 }
 
 sub get_organism {
@@ -251,51 +271,71 @@ sub run {
     my ($self) = @_;
 
     my @mrnafeatures;
-    my @features =@{$self->{_features}};
+    my @features =$self->features();
     my $genseq   = $self->{_genseq};
     my %idhash;
-
+    
+    unless (@features)
+    {
+        print STDERR "Contig has no associated features\n";
+        return;
+    }
+    
     foreach my $f (@features) {
-	if (defined($f->analysis) && $f->analysis->db eq "vert"  && $f->score > 100) {
+	print $f->analysis;
+    print $f->score;
+    print $f->analysis->db;
+    print $f->score;
+    
+    if (defined($f->analysis) && defined($f->score) && defined ($f->analysis->db) 
+            && $f->analysis->db eq "vert"  && $f->score > 100) {
+
 	  my $organism = $self->get_organism($f->hseqname);
 	  if (!defined($idhash{$f->hseqname})) { #
 #	  if ($organism eq "Homo sapiens (human)" && !defined($idhash{$f->hseqname})) { #
-		push(@mrnafeatures,$f);
+        push(@mrnafeatures,$f);
 		$idhash{$f->hseqname} =1;
 	    } else {
-	      print("Ignoring feature " . $f->seqname . "\n");
+	      print STDERR ("Ignoring feature " . $f->hseqname . "\n");
 	    }
 	}
     }
     print STDERR "Number of features pre blast is " . scalar(@mrnafeatures) . "\n";
-
+    unless (@mrnafeatures)
+    {
+        print STDERR ("Contig has no features suitable for Blast\n");
+        return;
+    }
+    
     my @seq         = $self->get_Sequences(@mrnafeatures);
     my $blastdb     = $self->make_blast_db(@seq);
     my @newfeatures = $self->run_blast($genseq,$blastdb);
-
     print STDERR "Number of features post blast is " . scalar(@newfeatures) . "\n";
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature(-genomic  => $genseq,
-								      -features => \@newfeatures);
-
+    unless (@newfeatures)
+    {
+    
+        print STDERR ("No new features returned by blast\n");
+        return;
+    }
+    
+    print "GENOMIC $genseq \t FEATURES ".@newfeatures."\n";
+      
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
+								                                      '-features' => \@newfeatures);
     # Get rid of large data objects
     
-    $self->{_features} = undef;
-
+    $self->{_features} = [];
     $self->runnable($runnable);
     $self->throw("Can't run - no runnable object") unless defined($self->runnable);
     $self->runnable->minirun;
-
     my @tmpf = $self->runnable->output;
-   
     foreach my $tmpf (@tmpf) {
       $tmpf->seqname($self->input_id);
       $tmpf->id($self->input_id);
       $tmpf->source_tag("tblastn");
       $tmpf->primary_tag("similarity");
       $tmpf->strand($tmpf->hstrand);
-
-      print $tmpf->gff_string . "\n";
     }
     if ($#tmpf > 0) {
       my $i;
@@ -320,9 +360,12 @@ sub check_splice {
 
 sub output {
     my ($self) = @_;
-
-    $self->throw("Can't return output  - no runnable object") unless defined($self->runnable);
-
+    unless ($self->runnable)
+    {
+        print STDERR ("Can't return output  - no runnable object\n" 
+                        ."(no database/blast features found\n");
+        return;
+    } 
     return $self->runnable->output;
 }
 
@@ -396,7 +439,7 @@ sub check_disk_space {
 
     my $kbytes = $f[3];
 
-    if ($kbytes > $minimumkb) {
+    if ($minimumkb && $kbytes > $minimumkb) {
 	return 1;
     } else {
 	return 0;
@@ -421,8 +464,14 @@ sub run_blast {
     my $status = system($command );
 
     print("Exit status of blast is $status\n");
-
-
+    open (BLAST, "<$blastout") 
+        or $self->throw ("Unable to open Blast output $blastout: $!");    
+    if (<BLAST> =~ /BLAST ERROR: FATAL:  Nothing in the database to search!?/)
+    {
+        print "nothing found\n";
+        return;
+    }
+    
     my $msp = new Bio::EnsEMBL::Analysis::MSPcrunch(-file => $blastout,
 						    -type => 'DNA-DNA',
 						    -source_tag => 'vert_eg',
