@@ -46,6 +46,7 @@ my ($obj) = FreezeThaw::thaw($object);
 print("LSF id " . $obj->LSF_id . "\n");
 print("Job id " . $obj->id . "\n");
 print("Output file ".$obj->output_file."\n");
+print("Status file ".$obj->status_file."\n");
 print("Object is $obj\n");
 my $job = $LSF->get_job($obj->LSF_id);
 print("Job/obj [$job][$obj]\n");
