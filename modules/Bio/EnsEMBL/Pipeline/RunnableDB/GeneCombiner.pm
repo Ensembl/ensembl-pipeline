@@ -2624,7 +2624,7 @@ sub write_output {
   #print STDERR "about to write ".scalar(@genes)." into the db\n";
 
   # dbobj holds a reference to FINAL_DB
-  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
   
  GENE: 
   foreach my $gene (@genes) {	
