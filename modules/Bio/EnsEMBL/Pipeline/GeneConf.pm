@@ -94,7 +94,7 @@ my $prefix='COB';
 	     # general variables
 	     # path to run_GeneBuild_RunnableDB
 	     GB_RUNNER      => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
-	     GB_TMPDIR      => '/acari/scratch4/ensembl/lec/new_out',
+	     GB_OUTPUT_DIR      => '/acari/scratch4/ensembl/lec/new_out',
 	     # LSF queue plus any options you want to use
 	     GB_QUEUE       => 'acari',
 	     GB_TBLASTN     => '',
@@ -167,7 +167,7 @@ my $prefix='COB';
 					  'index'      => '/usr/local/ensembl/data/blastdb/Ensembl/swall_270602'
 					  'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					 },
-# example:
+					# example:
 					 {
 					  'type'       => 'Wormpep',
 					  'threshold'  => '200',
