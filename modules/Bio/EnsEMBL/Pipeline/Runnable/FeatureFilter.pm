@@ -344,7 +344,7 @@ sub run{
     }
   }
   #print STDERR "Returning ".@accepted_features." after prune across ".
-    keys(%hit_ids)." hit ids\n";
+  #  keys(%hit_ids)." hit ids\n";
   
   return @accepted_features;
     
