@@ -109,12 +109,11 @@ sub fetch_input {
 
     $self->db->assembly_type($sgp) if $sgp;
 
-    my $vc = $self->db->get_StaticGoldenPathAdaptor->
-     fetch_VirtualContig_by_chr_start_end($chr, $start, $end);
+    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end);
 
-    my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch virtual contig");
+    my $genseq = $slice->primary_seq() or $self->throw("Unable to fetch virtual contig");
 
-    $self->vcontig($vc);
+    $self->vcontig($slice);
     $self->genseq($genseq);
 }
 
