@@ -549,10 +549,11 @@ sub minirun {
     # forward and reverse split.
     my @forward;
     my @reverse;
-    
+
+    # forward/reverse strand split
     foreach my $feat(@$features) {
-      if($feat->hstrand == 1) { push(@forward,$feat); }
-      elsif($feat->hstrand == -1) { push(@reverse,$feat); }
+      if($feat->strand == 1) { push(@forward,$feat); }
+      elsif($feat->strand == -1) { push(@reverse,$feat); }
       else { $self->throw("unstranded feature not much use for gene building\n") }
     }
     
@@ -707,9 +708,9 @@ sub is_reversed {
     my $rcount = 0;
 
     foreach my $f (@features) {
-	if ($f->hstrand == 1) {
+	if ($f->strand == 1) {
 	    $fcount++;
-	} elsif ($f->hstrand == -1) {
+	} elsif ($f->strand == -1) {
 	    $rcount++;
 	}
     }
