@@ -319,6 +319,25 @@ sub list_input_ids_by_type {
   return \@ids;
 }
 
+sub list_input_ids_by_analysis {
+  my $self = shift;
+  my $analysis_id = shift;
+  my @ids;
+  my @row;
+
+  my $sth = $self->prepare( qq{
+    SELECT distinct input_id FROM input_id_analysis where analysis_id=?
+    });
+
+  $sth->execute($analysis_id);
+
+  while( @row = $sth->fetchrow_array ) {
+    push @ids,$row[0];
+  }
+
+  return \@ids;
+}
+
 
 
 =head2 delete_input_id

@@ -111,9 +111,9 @@ if(!$dbhost || !$dbname || !$dbuser){
 
 useage() if $help;
 
-if($id_list_file || @analyses || @input_id_types || @starts_from){
-  print STDERR " you are running the rulemanager in a fashion which".
-  ." will probably break the accumulators so they are being ".
+if($idlist_file || @analyses || @input_id_types || @starts_from){
+  print STDERR " you are running the rulemanager in a fashion which"
+  ." will probably break the accumulators so they are being "
   ."turned off\n";
 
   $accumulators = 0;
@@ -244,47 +244,55 @@ alarm $wakeup if $wakeup;
                 # Such as check for failed jobs, no of jobs in queue
 
 my %completed_accumulator_analyses;
-
 my %ids_to_run;
-if($id_list_file){
+my %types_to_run;
+
+if($idlist_file){
   open IDS, "< $idlist_file" or die "Can't open $idlist_file";
   my $count = 0;
   while (<IDS>) {
     chomp;
     my($id, $type) = split;
-    if(!$id_to_run{$type}){
-      $id_to_run{$type} = [];
+    if(!$type){
+      print STDERR "need to know what type the input ids in the file".
+	" are  format should be input_id type\n";
     }
-    push( @{$id_to_run{$type}}, $id);
+    $ids_to_run{$type}{$id} = 1;
   }
   close IDS;
 }
+
+if(@input_id_types){
+  foreach my $type(@input_id_types){
+    $types_to_run{$type} = 1;
+  }
+}
+
 while (1) {
     $submitted = 0;
 
     # This loop reads input ids from the database a chunk at a time
     # until we have all the input ids.
 
-    my $id_type_hash;
+    my $id_type_hash = {};
     print "Reading IDs ... ";
     if ($idlist_file) {
       $id_type_hash = \%ids_to_run;
-    } elsif(@input_id_types){
-      $all_ids_hash = $sic->get_all_input_id_analysis_sets;
-      foreach my $i(@input_id_types){
-	my $ids = $all_ids_hash->{$i}; 
-	$id_type_hash->{$i} = $ids;
-      }
     }else {
 
-        # This loop reads input ids from the database a chunk at a time
-        # until we have all the input ids.
-        # NB It's almost as much work to get one ID as the whole lot, so setting
-        # the 'chunksize' variable to a small number doesn't really achieve much.
-
-        
-
-        $id_type_hash = $sic->get_all_input_id_analysis_sets;
+      if(@starts_from){
+	foreach my $analysis_id(@starts_from){
+	  my %ids;
+	  my $analysis = $ana_adaptor->fetch_by_dbID($analysis_id);
+	  my @ids = @{$sic->list_input_ids_by_analysis};
+	  foreach my $id(@ids){
+	    $ids{$analysis->input_id_type}{$id} = 1;
+	  }
+	  $id_type_hash = \%ids;
+	}
+      }else{
+	$id_type_hash = $sic->get_all_input_id_analysis_sets;
+      }
     }
 
     my @anals = @{$sic->fetch_analysis_by_input_id('ACCUMULATOR')};
@@ -312,7 +320,9 @@ while (1) {
     INPUT_ID_TYPE: foreach my $input_id_type (keys %$id_type_hash) {
 	
         next INPUT_ID_TYPE if ($input_id_type eq 'ACCUMULATOR');
-	
+	if(keys(%types_to_run) && !$types_to_run{$input_id_type}){
+	  next;
+	}
 	if($batch_q_module->can('get_job_time')){
 	  if($killed_file){
 	    my @running_jobs = $job_adaptor->fetch_by_Status('RUNNING');
