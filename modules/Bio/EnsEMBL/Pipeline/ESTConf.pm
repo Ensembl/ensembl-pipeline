@@ -113,7 +113,6 @@ use vars qw( %ESTConf );
 	    EST_DBHOST                  => '',
 	    EST_DBUSER                  => '',
 	    EST_DBPASS                  => '',
-	    EST_GOLDEN_PATH             => '',
 	   );
 
 sub import {
