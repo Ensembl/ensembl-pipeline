@@ -113,7 +113,7 @@ my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, c
 
 if($write){
 my $sth = $db->prepare($sql);
-$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
+$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID) if($update);
 }
 
 
