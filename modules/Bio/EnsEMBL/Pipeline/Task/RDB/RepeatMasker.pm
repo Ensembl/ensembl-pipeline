@@ -57,3 +57,8 @@ sub logic_name{
   my $self = shift;
   return 'RepeatMask';
 }
+
+
+sub description{
+  print STDERR "RepeatMasker runs the runnable RepeatMasker and has no dependancies\n";
+}

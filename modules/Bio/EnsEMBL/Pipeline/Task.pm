@@ -229,4 +229,11 @@ sub create_Jobs {
 						 $id_set, $parameters);
 }
 
+
+sub description{
+  print STDERR "This is an abstract method which should be implemented\n"
+  ."in the child classes of Task describing what the Task does and\n".
+   "what its dependancies are\n";
+}
+
 1;

@@ -103,7 +103,63 @@ sub fetch_all_by_dbID_list {
 	return $self->_jobs_from_sth($sth);
 }
 
+sub fetch_all_by_status{
+  my ($self, $status) = @_;
+  my @jobs;
+  my $q = qq {
+  SELECT j.job_id,
+         j.taskname,
+         j.input_id,
+         j.submission_id,
+         j.job_name,
+         j.array_index,
+         j.parameters,
+         j.module,
+         j.stderr_file,
+	 j.stdout_file,
+         j.retry_count,
+  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':',
+             UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
+  FROM   job_status js,
+         job j
+  WHERE  js.job_id = j.job_id
+  AND    js.status = ?  
+  GROUP BY js.job_id };
 
+  my $sth = $self->prepare( $q );
+  $sth->execute($status);
+
+  
+  my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
+      $array_index, $parameters, $module, $stderr_file, $stdout_file,      
+      $retry_count, $max_status);
+  
+  $sth->bind_columns(\$job_id, \$taskname, \$input_id, 
+		     \$submission_id, \$job_name, \$array_index,
+		     \$parameters, \$module, \$stderr_file, \$stdout_file, 
+		     \$retry_count, \$max_status);
+  
+  
+  
+  while($sth->fetch) {
+    push @jobs, Bio::EnsEMBL::Pipeline::Job->new
+      (-input_id => $input_id,
+       -taskname => $taskname,
+       -module => $module,
+       -dbID => $job_id,
+       -submission_id => $submission_id,
+       -job_name => $job_name,
+       -array_index => $array_index,
+       -parameters => $parameters,
+       -module => $module,
+       -stderr_file => $stderr_file,
+       -stdout_file => $stdout_file,
+       -retry_count => $retry_count,
+       -adaptor => $self);
+  }
+
+  return \@jobs;
+}
 #
 # private method, just returns the columns in the job table
 # the implementation of _jobs_from_sth depends on this method
@@ -174,11 +230,12 @@ sub fetch_all_by_taskname{
 sub _jobs_from_sth{
   my ($self, $sth) = @_;
 
-	my ($job_id, $taskname, $input_id, $submission_id, $job_name, $array_index,
-	    $parameters, $module, $stderr_file, $stdout_file, $retry_count);
-
-	$sth->bind_columns(\$job_id, \$taskname, \$input_id, \$submission_id,
-										 \$job_name, \$array_index,	\$parameters, \$module,
+  my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
+      $array_index, $parameters, $module, $stderr_file, $stdout_file,      $retry_count);
+  
+  $sth->bind_columns(\$job_id, \$taskname, \$input_id, 
+		     \$submission_id, \$job_name, \$array_index,
+		     \$parameters, \$module,
 										 \$stderr_file, \$stdout_file, \$retry_count);
 
 	my @jobs;

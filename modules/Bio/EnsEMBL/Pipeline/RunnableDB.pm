@@ -385,7 +385,7 @@ sub write_output {
     my $gene_adp = $self->db->get_GeneAdaptor;
 
 
-    $self->warn("shouldn't be using the write_output method of runnabledb");
+    #$self->warn("shouldn't be using the write_output method of runnabledb");
 
     eval {
       $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);

@@ -324,7 +324,7 @@ sub run{
                   " failed $@");
     $self->set_current_status('FAILED');
   } else {
-    $self->set_curent_status('SUCCESSFUL');
+    $self->set_current_status('SUCCESSFUL');
   }
 
   return;

@@ -14,7 +14,7 @@ use vars qw(@ISA);
                 database.  Can be used to query and control a running
                 pipeline.
     Returns :   
-    Args    :   -dbobj:     A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+    Args    :   -db:     A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 =cut
 
@@ -22,10 +22,10 @@ sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    my ($dbobj) =   $self->_rearrange([qw(DBOBJ)],@args);
+    my ($db) =   $self->_rearrange([qw(DB)],@args);
 
-    if ($dbobj) {
-      $self->dbobj($dbobj);
+    if ($db) {
+      $self->db($db);
     } else {
       $self->throw("No database object input");
     }
@@ -34,132 +34,86 @@ sub new {
 }
 
 
-sub dbobj {
+sub db {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
     if (! $arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor")) {
       $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
     }
-    $self->{_dbobj} = $arg;
+    $self->{_db} = $arg;
   }
-  return $self->{_dbobj};
+  return $self->{_db};
 }
 
 sub print_header {
   my ($self,$str) = @_;
-
-  print "\n$str [" . $self->dbobj->host . " " . $self->dbobj->dbname . "]\n\n";
+  
+  print "\n$str [" . $self->db->host . " " . $self->db->dbname . "]\n\n";
 }
 
 sub show_current_status {
   my ($self) = @_;
-
-  #Show running/failed jobs grouped by status and analysis name.
-
-  my $sth = $self->dbobj->prepare("select count(*), js.status, a.logic_name from analysis a, job_status js, job j where j.job_id = js.job_id and a.analysis_id = j.analysis_id and js.is_current = 'y' group by a.logic_name, js.status");
-
-  my $res = $sth->execute;
-
-  my $maxcount;
-  my $maxstatus;
-  my $maxname;
-
-  my @counts;
-  my @status;
-  my @names;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $count  = $ref->{'count(*)'};
-    my $status = $ref->{'status'};
-    my $name   = $ref->{'logic_name'};
-
-    if (length($count) > $maxcount) {
-      $maxcount = length($count);
-    }
-    if (length($status) > $maxstatus) {
-      $maxstatus = length($status);
-    }
-    if (length($name) > $maxname) {
-      $maxname = length($name);
-    }
-
-    push(@counts,$count);
-    push(@status,$status);
-    push(@names,$name);
-
-  }
-    $maxcount++;
-    $maxstatus++;
-    $maxname++;
-
-  $self->print_header("Pipeline current status");
-
   
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","Name","Status","Count");
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","----","------","-----");
-
-  while (my $count = shift(@counts)) {
-    my $status = shift @status;
-    my $name   = shift @names;
-
-
-    printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n",$name,$status,$count);
+  #Show running/failed jobs grouped by status and analysis name.
+  
+  my $jobadp = $self->db->get_JobAdaptor;
+  
+  my $results = $jobadp->list_current_status;
+  
+  my %status;
+  foreach my $result(@$results){
+    my ($job_id, $taskname, $input_id, $s, $timestamp) = @$result;
+    if(!$status{$s}){
+      $status{$s} = {};
+    }
+    if(!$status{$s}{$taskname}){
+      $status{$s}{$taskname} = 0;
+    }
+    $status{$s}{$taskname}++;
   }
-
-  print("\n");
-
+  
+  $self->print_header("Pipeline current status");
+  foreach my $s(keys(%status)){
+    my %hash = %{$status{$s}};
+    my @tasks = keys(%hash);
+    foreach my $t(@tasks){
+      print $t."\t".$s."\t".$status{$s}{$t}."\n";
+    }
+  }
+  print "\n\n";
+		
+  
+  
 }
 
 
-  # Show running/failed jobs grouped by status and analysisId
-#  my $sth = $self->dbobj->prepare("select count(*),js.status,job.analysis_id from current_status js,job where job.job_id = js.job_id group by job.analysis_id";
 
 
-# show running/failed jobs grouped by status
+ 
 sub show_current_status_summary {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select count(*), status from job_status where is_current = 'y' group by status");
-
-  my $res = $sth->execute;
-
-  my $maxcount;
-  my $maxstatus;
-
-  my @counts;
-  my @status;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $count  = $ref->{'count(*)'};
-    my $status = $ref->{'status'};
-
-    if (length($count) > $maxcount) {
-      $maxcount = length($count);
-    }
-    if (length($status) > $maxstatus) {
-      $maxstatus = length($status);
-    }
-
-    push(@counts,$count);
-    push(@status,$status);
-
-  }
-  $maxcount++;
-  $maxstatus++;
+ my $jobadp = $self->db->get_JobAdaptor;
   
-  $self->print_header("Pipeline status summary");
-
-  printf("%-${maxstatus}s %-${maxcount}s\n","Status","Count");
-  printf("%-${maxstatus}s %-${maxcount}s\n","------","-----");
-
-  while (my $count = shift(@counts)) {
-    my $status = shift @status;
-
-    printf("%-${maxstatus}s %-${maxcount}s\n",$status,$count);
+  my $results = $jobadp->list_current_status;
+  
+  my %status;
+  foreach my $result(@$results){
+    my ($job_id, $taskname, $input_id, $s, $timestamp) = @$result;
+    if(!$status{$s}){
+      $status{$s} = 0;
+    }
+    
+    $status{$s}++;
   }
-
-  print "\n";
+  
+  $self->print_header("Pipeline current status summary");
+  foreach my $s(keys(%status)){
+    print $s."\t".$status{$s}."\n";
+  }
+  print "\n\n";
+		
 
 }
   
@@ -169,66 +123,30 @@ sub show_current_status_summary {
 #
 
 #show running/failed jobs grouped by status
-sub show_finished_summary {
+sub show_finished{
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_id from input_id_analysis i, analysis  a where a.analysis_id = i.analysis_id group by a.analysis_id");
-  
-  my $res = $sth->execute;
-
-  my $maxcount;
-  my $maxname;
-  my $maxid;
-
-  my @counts;
-  my @names;
-  my @ids;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $count  = $ref->{'count(*)'};
-    my $name = $ref->{'logic_name'};
-    my $id = $ref->{'analysis_id'};
-
-    if (length($count) > $maxcount) {
-      $maxcount = length($count);
+  my @jobs = @{$self->db->get_JobAdaptor->fetch_all_by_status('SUCCESSFUL')};
+  my %tasks;
+  foreach my $job(@jobs){
+    if(!$tasks{$job->taskname}){
+      $tasks{$job->taskname} = 0;
     }
-    if (length($name) > $maxname) {
-      $maxname = length($name);
-    }
-    if (length($id) > $maxid) {
-      $maxid = length($id);
-    }
-
-    push(@counts,$count);
-    push(@names,$name);
-    push(@ids,$id);
-
+    $tasks{$job->taskname}++;
   }
-
-  $maxcount++;
-  $maxname++;
-  $maxid++;
-
-  $self->print_header("Finished job summary");
-
-  printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","Count","Name","Id");
-  printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","-----","----","--");
-
-  while (my $count = shift(@counts)) {
-    my $name = shift @names;
-    my $id   = shift @ids;
-
-    printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n",$count,$name,$id);
+  $self->print_header("Pipeline finished jobs");
+  foreach my $t(keys(%tasks)){
+    print $t."\t".$tasks{$t}."\n";
   }
-  print "\n";
+  print "\n\n";
 
 }
   
 # show analysis processes
-sub show_analysisprocess {
+sub show_analysis {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select analysis_id,logic_name,db,program,parameters,module from analysis");
+  my $sth = $self->db->prepare("select analysis_id,logic_name,db,program,parameters,module from analysis");
   my $res = $sth->execute;
 
   my $maxname;
@@ -307,164 +225,6 @@ sub show_analysisprocess {
 
 
 
-# show rules
-sub show_Rules {
-  my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select a.logic_name,rg.rule_id from rule_goal rg, analysis a where a.analysis_id = rg.goal");
-
-  my $res = $sth->execute;
-
-  my @names;
-  my @ids;
- 
-  my $maxname;
-  my $maxid;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'rule_id'};
-    my $name = $ref->{'logic_name'};
-
-    if (length($id) > $maxid) { $maxid = length($id);}
-    if (length($name) > $maxname) {$maxname = length($name);}
-
-    push(@ids,$id);
-    push(@names,$name);
-  }
-  
-  $maxname++;
-  $maxid++;
-
-  $self->print_header("Pipeline rules");
-
-  printf("%-${maxname}s %-${maxid}s\n","Name","Id");
-  printf("%-${maxname}s %-${maxid}s\n","----","--");
-
-  while (my $name = shift @names) {
-    my $id = shift @ids;
-    printf("%-${maxname}s %-${maxid}s\n",$name,$id);
-  }
-
-  print "\n";
-}
-
-sub show_Rules_and_Conditions {
-  my ($self) = @_;
-
-  my $sql = "select a.logic_name,rg.rule_id,rc.condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id";
-  
-  my $sth = $self->dbobj->prepare($sql);
-
-  my $res = $sth->execute;
-
-  my @names;
-  my @ids;
-  my @conds;
-
-  my $maxname;
-  my $maxid;
-  my $maxcond;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'rule_id'};
-    my $name = $ref->{'logic_name'};
-    my $cond = $ref->{'condition'};
-
-    if (length($id) > $maxid) { $maxid = length($id);}
-    if (length($name) > $maxname) {$maxname = length($name);}
-    if (length($cond) > $maxcond) {$maxcond = length($cond);}
-
-    push(@ids,$id);
-    push(@names,$name);
-    push(@conds,$cond);
-  }
-  
-  $maxname++;
-  $maxid++;
-  $maxcond++;
-
-  $self->print_header("Rules and Conditions");
-
-  printf("%-${maxname}s %-${maxid}s %-${maxcond}s \n","Name","Id","Condition");
-  printf("%-${maxname}s %-${maxid}s %-${maxcond}s \n","----","--","---------");
-  
-
-  while (my $name = shift @names) {
-    my $id = shift @ids;
-    my $cond = shift @conds;
-
-    printf("%-${maxname}s %-${maxid}s %-${maxcond}s \n",$name,$id,$cond);
-  }
-
-  print "\n";
-}
-
-sub show_jobs_by_status_and_analysis {
-  my ($self,$status,$analysis) = @_;
-
-  if (!defined($status) || !defined($analysis)) {
-    $self->throw("No status and/or analysis input\n");
-  }
-  #print STDE
-
-  my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_id = job.analysis_id and job.job_id = js.job_id and js.status = '$status' and a.logic_name = '$analysis'");
-
-  my $res = $sth->execute;
-
-  my @jobIds;
-  my @input_ids;
-  my @lsfs;
-  my @out;
-  my @err;
-  my @retry;
-
-  my $maxjobid;
-  my $maxinputid;
-  my $maxlsf;
-  my $maxout;
-  my $maxerr;
-  my $maxretry;
-
-  while (my $ref = $sth->fetchrow_hashref) {
-    my $jobId         = $ref->{'job_id'};
-    my $input_id      = $ref->{'input_id'};
-    my $submission_id = $ref->{'submission_id'};
-    my $out           = $ref->{'stdout_file'};
-    my $err           = $ref->{'stderr_file'};
-    my $retry         = $ref->{'retry_count'};
-
-    if (length($jobId) > $maxjobid) {$maxjobid = length($jobId);}
-    if (length($input_id) > $maxinputid) {$maxinputid = length($input_id);}
-    if (length($submission_id) > $maxlsf) {$maxlsf = length($submission_id);}
-    if (length($out) > $maxout) {$maxout = length($out);}
-    if (length($err) > $maxerr) {$maxerr = length($err);}
-    if (length($retry) > $maxretry) {$maxretry = length($retry);}
-
-    push(@jobIds,$jobId);
-    push(@input_ids,$input_id);
-    push(@lsfs,$submission_id);
-    push(@out,$out);
-    push(@err,$err);
-    push(@retry,$retry);
-
-  }
-
-  $self->print_header("Jobs by status $status and analysis $analysis");
-  
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","Input id","Job","submission id","retry","output file","error file");
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","--------","---","-------------","-----","-----------","----------");
-
-  while (my $jobid = shift @jobIds) {
-    my $inputid = shift @input_ids;
-    my $lsf     = shift @lsfs;
-    my $out     = shift @out;
-    my $err     = shift @err;
-    my $retry   = shift @retry;
-    
-    printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n",$inputid,$jobid,$lsf,$retry,$out,$err);
-  }
-
-  print "\n";
-}
 1;
 
