@@ -691,9 +691,8 @@ sub align_with_exonerate{
                It is similar to the 'test_for_orthology' method but using tblastx
                It has many arguments as I have tried to make it independent of the
                way to get the focus/target databases from compara
-  Returntype : an arrayref with the orthologs in chr coordinates
-               If there are no orthologs it returns undef.
-               If there is no syntenic region it will also return undef.
+  Returntype : the maximum coverage of the potential orthologues, or zero if this is below a threshold or non-existent
+
 =cut
   
   
@@ -747,7 +746,7 @@ sub test_for_orthology_with_tblastx{
   }
   else{
       print STDERR "Could not find any syntenic region\n";
-      return undef;
+      return 0;
   }
   ############################################################
   # do some checks on the slices:
@@ -769,8 +768,17 @@ sub test_for_orthology_with_tblastx{
   
   if ( @orthologues ){
       
+      my $max;
       for(my $i=0; $i<$count;$i++){
+	  next unless ( @{$orthologues[$i]} );
 	  my $coverage = sprintf "%2.2f",$coverage[$i];
+	  unless ( $max){
+	      $max = $coverage;
+	  }
+	  if ( $coverage > $max ){
+	      $max = $coverage;
+	  }
+	  print STDERR "max: $max\n";
 	  my $id;
 	  my $extent; 
 	  my $sum_percent_id;
@@ -792,11 +800,19 @@ sub test_for_orthology_with_tblastx{
 		  push( @selected, $orthologues[$i] );
 	      }
 	  }
-	  return \@selected;
+	  if (@selected){
+	      return $max;
+	  }
+	  else{
+	      return 0;
+	  }
       }
       else{
-	  return \@orthologues;
+	  return $max;
       }
+  }
+  else{
+      return 0;
   }
 }
 
@@ -832,7 +848,7 @@ sub align_with_tblastx{
   $seqout->write_seq($seq);
   close( DB_SEQ );
   
-  system("pressdb $database");#/tmp/db_seqs.$$");
+  system("pressdb $database");
 
 
    ############################################################
@@ -853,12 +869,12 @@ sub align_with_tblastx{
   my @pos_strand = grep { $_->strand == 1} @featurepairs;  
   my @neg_strand = grep { $_->strand == -1} @featurepairs;  
 
-  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @pos_strand) {
-   print $fp->gffstring . "\n";
-  }
-  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @neg_strand) {
-   print $fp->gffstring . "\n";
-  }
+#  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @pos_strand) {
+#   print $fp->gffstring . "\n";
+#  }
+#  foreach my $fp (sort{ $a->hstart <=> $b->hstart} @neg_strand) {
+#   print $fp->gffstring . "\n";
+#  }
 
 #  ############################################################
 #  # make the blast features into likely transcript structures:
@@ -917,7 +933,7 @@ sub align_with_tblastx{
   else{
     $pos_pos_identity = 0;
     }
-  print STDERR "coverage on forward transcript - positive strand = $pos_pos_coverage\tperc_id = $pos_pos_identity\n";
+#  print STDERR "coverage on forward transcript - positive strand = $pos_pos_coverage\tperc_id = $pos_pos_identity\n";
   
   $length = 0;
   $perc_id = 0;
@@ -950,7 +966,7 @@ sub align_with_tblastx{
   else{
     $neg_pos_identity = 0;
   }
-  print STDERR "coverage on reverse transcript - positive strand = $neg_pos_coverage\tperc_id = $neg_pos_identity\n";
+#  print STDERR "coverage on reverse transcript - positive strand = $neg_pos_coverage\tperc_id = $neg_pos_identity\n";
   
   $length = 0;
   $perc_id = 0;
@@ -983,7 +999,7 @@ sub align_with_tblastx{
   else{
     $pos_neg_identity = 0;
   }
-  print STDERR "coverage on forward transcript - negative strand = $pos_neg_coverage\tperc_id = $pos_neg_identity\n";
+#  print STDERR "coverage on forward transcript - negative strand = $pos_neg_coverage\tperc_id = $pos_neg_identity\n";
 
   $length = 0;
   $perc_id = 0;
@@ -1007,7 +1023,7 @@ sub align_with_tblastx{
        $feature_count++;
      }
      $length += ( $end - $start + 1 );
-   }
+ }
   my $neg_neg_coverage = 100*$length/$transcript_length;
   my $neg_neg_identity;
   if ( $feature_count ){
@@ -1016,7 +1032,7 @@ sub align_with_tblastx{
   else{
     $neg_neg_identity = 0;
   }
-  print STDERR "coverage on reverse transcript - negative strand = $neg_neg_coverage\tperc_id = $pos_neg_identity\n";
+#  print STDERR "coverage on reverse transcript - negative strand = $neg_neg_coverage\tperc_id = $neg_neg_identity\n";
   
   ############################################################
   # calculate the maximum coverage:
@@ -1036,7 +1052,7 @@ sub align_with_tblastx{
   $alignments{identity}{neg_neg} = $neg_neg_identity;
 
   my @order = sort { $alignments{coverage}{$b} <=> $alignments{coverage}{$a} } keys %{$alignments{coverage}};
-
+  
   #print STDERR "sorting:\n";
   #foreach my $order ( @order){
   #  print STDERR $alignments{coverage}{$order}."\t".$alignments{identity}{$order}."\n";

@@ -128,7 +128,7 @@ sub pseudogene_test{
   
   ############################################################
   # is the evidence spliced elsewhere in the genome?
-  my $spliced_ones = $self->check_for_spliced_real_gene( $transcript, $focus_db );
+  my $spliced_ones = $self->check_for_gene_spliced_elsewhere( $transcript, $db );
   if ( $spliced_ones && @$spliced_ones ){
     print STDERR "Evidence is spliced elsewhere: YES\n";
     $spliced_elsewhere = 1;
@@ -141,38 +141,38 @@ sub pseudogene_test{
   ############################################################
   # if is spliced, has it got canonical splice sites?
   if ( scalar( @{$transcript->get_all_Exons} ) > 1 ){
-    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-	     ->check_splice_sites( $transcript ) ){
-	    print STDERR "Canonical splice sites:\tYES\n";
-	}
-	else{
-	    print STDERR "Canonical splice sites:\tNO\n";
-	}
-    }
-    
-  ############################################################
-  # has it got homology in mouse?
-  my $orthologues = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
-  if ( $orthologues && @{$orthologues} ){
-      $mouse_homology = 1;
-  }
-  else{
-      print STDERR "Could not find any ortholog\n";
-      $mouse_homology = 0;
+      if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+	   ->check_splice_sites( $transcript ) ){
+	  print STDERR "Canonical splice sites:\tYES\n";
+      }
+      else{
+	  print STDERR "Canonical splice sites:\tNO\n";
+      }
   }
   
   ############################################################
+  # has it got homology in mouse
+ $mouse_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
+  # if ( $orthologues && @{$orthologues} ){
+  #     $mouse_homology = 1;
+  # }
+  # else{
+  #     print STDERR "Could not find any ortholog\n";
+  #     $mouse_homology = 0;
+  # }
+  
+  ############################################################
   # has it got homology in rat?
-  my $orthologues2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
-  if ( $orthologues2 && @{$orthologues2} ){
-    $rat_homology = 1;
-  }
-  else{
-    print STDERR "Could not find any ortholog\n";
-    $rat_homology = 0;
-  }
+ $rat_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
+  # if ( $orthologues2 && @{$orthologues2} ){
+  #   $rat_homology = 1;
+  # }
+  # else{
+  #   print STDERR "Could not find any ortholog\n";
+  #   $rat_homology = 0;
+  # }
   
 #  ############################################################
 #  # Does it break synteny in mouse?
@@ -210,7 +210,8 @@ sub pseudogene_test{
     print STDERR "it does not overlap with repeats\n";
     $repeat = 0;
   }
-  
+  $break_synteny_mouse = 0;
+  $break_synteny_rat = 0;
   return ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
 }
 
@@ -380,55 +381,72 @@ sub overlap_repeats{
 # is based on evidence which is in fact spliced somethere else 
 # in the genome (provided by a database $db )
 
-sub check_for_spliced_real_gene{
-  my ($self,$transcript,$db) = @_;
-  
-  # get the evidence split by dna and protein align features:
-  my ($prot_ids, $cdna_ids) = $self->_get_split_evidence($transcript); 
-  
-  # we take only one spliced transcript per evidence (if there is any)
-  my @spliced_transcripts;
-  if ( $prot_ids ){
-    foreach my $id ( @$prot_ids ){
-      my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-	->find_transcripts_by_protein_evidence($id,$db);
-      print STDERR scalar(@trans)." found with protein evidence $id\n";
-      if ( @trans ){
-	my @selected;
-	foreach my $tran ( @trans ){
-	  if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
-	       && !$self->overlap($transcript, $tran ) ) { 
-	    push ( @selected, $tran );
-	  } 
-	}
-	my @sorted = 
-	  sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected;
-	push ( @spliced_transcripts, $sorted[0] );
-      }
-    }
-  }
-  
-  if ( $cdna_ids ){
-    foreach my $id ( @$cdna_ids ){
-      my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-	->find_transcripts_by_dna_evidence($id,$db);
-      print STDERR scalar(@trans)." found with cdna evidence $id\n";
+sub check_for_gene_spliced_elsewhere{
+    my ($self,$transcript,$db) = @_;
+    
+    print STDERR " --- paralogs for ".$transcript->stable_id."\n";
+    	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    
 
-      if ( @trans ){
-	my @selected; 
-        foreach my $tran ( @trans ){ 
-          if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
-	       && !$self->overlap($transcript, $tran ) ) {  
-            push ( @selected, $tran ); 
-          }  
-        } 
-        my @sorted =  
-          sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected; 
-        push ( @spliced_transcripts, $sorted[0] ); 
-      }
+    # get the evidence split by dna and protein align features:
+    my ($prot_ids, $cdna_ids) = $self->_get_split_evidence($transcript); 
+    
+    # we take only one spliced transcript per evidence (if there is any)
+    my @spliced_transcripts;
+    if ( $prot_ids ){
+	foreach my $id ( @$prot_ids ){
+	    my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+		->find_transcripts_by_protein_evidence($id,$db);
+	    
+	    print STDERR scalar(@trans)." found with protein evidence $id\n";
+	    if ( @trans ){
+		my @selected;
+		foreach my $tran ( @trans ){
+		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+			 && !$self->overlap($transcript, $tran ) ) { 
+			push ( @selected, $tran );
+		    } 
+		}
+		if ( @selected ){
+		    my @sorted = 
+			sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected;
+		    push ( @spliced_transcripts, $sorted[0] );
+		}
+	    }
+	}
     }
-  }
-  return \@spliced_transcripts;
+    
+    if ( $cdna_ids ){
+	foreach my $id ( @$cdna_ids ){
+	    my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+		->find_transcripts_by_dna_evidence($id,$db);
+	    print STDERR scalar(@trans)." found with cdna evidence $id\n";
+	    
+	    if ( @trans ){
+		my @selected; 
+		foreach my $tran ( @trans ){ 
+		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+			 && !$self->overlap($transcript, $tran ) ) {  
+			push ( @selected, $tran ); 
+		    }  
+		} 
+		if (@selected){
+		    my @sorted =  
+			sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected; 
+		    push ( @spliced_transcripts, $sorted[0] ); 
+		}
+	    }
+	}
+    }
+    if ( @spliced_transcripts ){
+	foreach my $transcript ( @spliced_transcripts ){
+	    print STDERR "$transcript:\n";
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+	  }
+    }
+    return \@spliced_transcripts;
 }
   
 ############################################################
@@ -463,16 +481,16 @@ sub _get_split_evidence{
 	#print STDERR "evidence is a $evidence\n";
 	if ( $evidence->isa('Bio::EnsEMBL::DnaDnaAlignFeature') ){
 	  $cdna{$evidence->hseqname}++;
-	}
-	if ( $evidence->isa('Bio::EnsEMBL::DnaPepAlignFeature') ){
-	  $prot{$evidence->hseqname}++;
-	}
       }
+	if ( $evidence->isa('Bio::EnsEMBL::DnaPepAlignFeature') ){
+	    $prot{$evidence->hseqname}++;
+	}
     }
+  }
     my @prot_ids = keys %prot;
     my @cdna_ids = keys %cdna;
     return (\@prot_ids, \@cdna_ids);
-  }
+}
 
 
 
