@@ -97,12 +97,12 @@ sub new {
 						   '-dnadb'  => $genedb,
 						  ); 
   
-  $self->dbobj($genedb);
+  $self->db($genedb);
   $self->cdnadb($cdnadb);
 
   $path = 'NCBI_26' unless (defined $path && $path ne '');
 
-  $self->dbobj->static_golden_path_type($path);
+  $self->db->static_golden_path_type($path);
   $self->cdnadb->static_golden_path_type($path);
   return $self;
 }
@@ -161,7 +161,7 @@ sub fetch_input{
   $end     = $3;
   
 
-  my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
+  my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start,$end);
   $self->vcontig($vc);
   print STDERR "Chromosome id : $chrname\n";
@@ -310,7 +310,7 @@ sub output{
 sub write_output {
   my($self) = @_;
   
-  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
   
  GENE: foreach my $gene ($self->output) {	
     # do a per gene eval...
@@ -421,7 +421,7 @@ sub combine_genes{
   my $genetype = 'combined_gw_e2g';
   
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   
   my $analysis_obj;
@@ -642,6 +642,8 @@ sub _merge_gw_genes {
 	$cloned_exon->contig_id($exon->contig_id);
 	
 	$cloned_exon->attach_seq($self->vcontig->primary_seq);
+	$cloned_exon->contig($self->vcontig->primary_seq);
+
 	$cloned_exon->add_sub_SeqFeature($exon,'');
 
 	foreach my $suppfeat($exon->each_Supporting_Feature){
@@ -713,11 +715,11 @@ sub _make_newtranscript {
   $translation->start_exon($gw_tran[0]->translation->start_exon);
   $translation->end_exon($gw_tran[0]->translation->end_exon);
 
- $newtranscript->translation($translation);
+  $newtranscript->translation($translation);
   my $eecount = 0;
   
   $newtranscript->translation->start_exon($newtranscript->start_exon);
- $newtranscript->translation->end_exon($newtranscript->end_exon);
+  $newtranscript->translation->end_exon($newtranscript->end_exon);
 
   # check strands are consistent
   foreach my $ee(@e2g_exons){
@@ -779,6 +781,8 @@ sub _make_newtranscript {
     foreach my $ex($newtranscript->get_all_Exons){
       
       $ex->attach_seq($self->vcontig);
+      $ex->contig($self->vcontig);
+  
       $ex->contig_id($self->vcontig->id);
       # add new analysis object to the supporting features
       foreach my $sf($ex->each_Supporting_Feature){
@@ -1063,6 +1067,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase($oldexon->phase);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vcontig);
+	$newexon->contig($self->vcontig);
 	foreach my $sf($oldexon->each_Supporting_Feature){
 	  $newexon->add_Supporting_Feature($sf);
 	}
@@ -1118,6 +1123,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase($oldexon->phase);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vcontig);
+	$newexon->contig($self->vcontig);
 	foreach my $sf($oldexon->each_Supporting_Feature){
 	  $newexon->add_Supporting_Feature($sf);
 	}
@@ -1325,6 +1331,7 @@ sub _make_transcript{
     
     $exon->phase($exon_pred->phase);
     $exon->attach_seq($contig);
+    $exon->contig($contig);
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
