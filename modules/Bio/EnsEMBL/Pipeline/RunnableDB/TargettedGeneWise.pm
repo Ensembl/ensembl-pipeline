@@ -57,6 +57,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
+use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 
 
 
@@ -474,111 +475,29 @@ sub make_genes {
 sub validate_transcript {
   my ($self, $transcript) = @_;
   
-  my @valid_transcripts;
-  #print STDERR "validting transcripts\n";
-  my $valid = 1;
-  my $split = 0;
-  
-  
-  # check exon phases:
-  my @exons = @{$transcript->get_all_Exons};
-  #print "there are ".@exons." exons\n";
-  $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1));$i++){
-    my $end_phase = $exons[$i]->end_phase;
-    my $phase    = $exons[$i+1]->phase;
-    if ( $phase != $end_phase ){
-      $self->warn("rejecting transcript with inconsistent phases( $phase - $end_phase) ");
-      return undef;
-    }
-  }
-
   # check coverage of parent protein
   my $threshold = $GB_TARGETTED_SINGLE_EXON_COVERAGE;
-       if(scalar(@exons) > 1){
-	 $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
-       }
-
+  if(scalar(@{$transcript->get_all_Exons}) > 1){
+    $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
+  }
+  
   if(!defined $threshold){
     print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in Config::GeneBuild::Targetted.pm\n";
     return undef;
   }
-
-  my $coverage  = $self->check_coverage($transcript);
-  if ($coverage < $threshold){
-    $self->warn ("Coverage of ". $self->protein_id . " is only $coverage - will be rejected\n");
-    return undef;
-  }
   
-  #print STDERR "Coverage of ". $self->protein_id . " is $coverage%\n";
+  my @seqfetchers = ($self->seqfetcher);
 
-  my $previous_exon;
-  foreach my $exon (@{$transcript->get_all_Exons}){
-    if(!$self->validate_exon($exon)){
-      print STDERR "Rejecting gene because of invalid exon\n";
-      return undef;
-    }
-       
-    # check intron size
-    if (defined($previous_exon)) {
-      my $intron;
-      
-      if ($exon->strand == 1) {
-				$intron = abs($exon->start - $previous_exon->end - 1);
-      } else {
-				$intron = abs($previous_exon->start - $exon->end - 1);
-      }
-      
-#      if ($intron > 250000 && $coverage < 95) {
+  my $valid_transcripts = 
+    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($transcript,
+								  $self->query,
+								  $threshold,
+								  $GB_TARGETTED_MAX_INTRON,
+								  $GB_TARGETTED_MIN_SPLIT_COVERAGE,
+								  \@seqfetchers,
+								 );
 
-      if ($intron > $GB_TARGETTED_MAX_INTRON && $coverage < $GB_TARGETTED_MIN_SPLIT_COVERAGE ) {
-	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
-	$split = 1;
-	$valid = 0;
-      }
-      
-      # check sensible strands
-      if ($exon->strand != $previous_exon->strand) {
-	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
-	return undef;
-      }
-    }
-    $previous_exon = $exon;
-  }
-  
-  if ($valid) {
-    # make a new transcript that's a copy of all the important parts of the old one
-    # but without all the db specific gubbins
-    my $newtranscript  = Bio::EnsEMBL::Transcript->new;
-    my $newtranslation = Bio::EnsEMBL::Translation->new;
-
-    $newtranscript->translation($newtranslation);
-    $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
-    $newtranscript->translation->end_Exon  ($transcript->translation->end_Exon);
-    $newtranscript->translation->start     ($transcript->translation->start);
-		$newtranscript->translation->end       ($transcript->translation->end);
-		
-		foreach my $exon (@{$transcript->get_all_Exons}){
-      $newtranscript->add_Exon($exon);
-      foreach my $sf (@{$exon->get_all_supporting_features}){
-				$sf->feature1->seqname($exon->dbID);
-      }
-    }
-		
-    push(@valid_transcripts,$newtranscript);
-  }
-  elsif ($split){
-    # split the transcript up.
-    my $split_transcripts = $self->split_transcript($transcript);
-    push(@valid_transcripts, @$split_transcripts);
-  }
-
-  if(scalar(@valid_transcripts)){
-    return \@valid_transcripts;
-  }
-  else { 
-    return undef;
-  }
+  return $valid_transcripts;
 }
 
 =head2 remap_genes
@@ -979,7 +898,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
     }
     
     if ($intron > $GB_TARGETTED_MAX_INTRON) {
-      $curr_transcript->translation->end_exon($prev_exon);
+      $curr_transcript->translation->end_Exon($prev_exon);
 
       # need to account for end_phase of $prev_exon when setting translation->end
       $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
@@ -1012,11 +931,11 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
       push(@split_transcripts, $curr_transcript);
     }
 
-    if($exon == $transcript->end_exon){
+    if($exon == $transcript->end_Exon){
       $curr_transcript->add_Exon($exon) unless $exon_added;
       $exon_added = 1;
 
-      $curr_transcript->translation->end_exon($exon);
+      $curr_transcript->translation->end_Exon($exon);
       $curr_transcript->translation->end($transcript->translation->end);
       
     }
