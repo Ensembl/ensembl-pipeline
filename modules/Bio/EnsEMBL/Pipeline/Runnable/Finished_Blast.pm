@@ -4,7 +4,6 @@ package Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use IO::String;
 use Symbol;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
