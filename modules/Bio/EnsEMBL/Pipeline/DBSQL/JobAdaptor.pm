@@ -648,7 +648,7 @@ sub list_job_id_by_status {
     push( @result, $row[0] );
   }
 
-  return @result;
+  return \@result;
 }
 
 
@@ -670,7 +670,7 @@ sub list_job_id_by_status_age {
     push( @result, $row[0] );
   }
 
-  return @result;
+  return \@result;
 }
 
 

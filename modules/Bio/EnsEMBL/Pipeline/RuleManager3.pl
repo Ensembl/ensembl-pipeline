@@ -421,7 +421,7 @@ sub qualify_hostname {
 sub retry_failed_jobs {
     my ($ja, $retry) = @_;
 
-    my @failed_jobs = $ja->list_job_id_by_status('FAILED');
+    my @failed_jobs = @{$ja->list_job_id_by_status('FAILED')};
 
     foreach my $jobId (@failed_jobs) {
         my $job = $ja->fetch_by_dbID($jobId);
