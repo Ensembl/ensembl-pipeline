@@ -99,13 +99,12 @@ sub new {
     tree but it is not valid we must do: 
     if ( $node->inclusion_children && !$node->inclusion_tree )
           
-				  
 =cut
   
 sub inclusion_tree{
   my ($self) = @_; 
   my @leaves;
-  if ( $self->inclusion_children ){
+  if ( @{$self->inclusion_children} ){
     
     foreach my $node (  @{$self->inclusion_children} ){
       unless( $node->is_extended ){ 
@@ -143,7 +142,6 @@ sub is_extended{
   }
 }
 
-
 ############################################################
 #
 # GET/SET METHODS
@@ -159,31 +157,43 @@ Function: returns an arrayref with all the extension parents (Node objects) of t
 sub extension_parents{
   my ($self) = @_;
   unless( $self->{_extension_parents} ){
-      $self->{_extension_parents} = [];
+    $self->{_extension_parents} = [];
   }
-  return $self->{_extension_parent};
+  return $self->{_extension_parents};
 }
 ############################################################
 
 sub add_extension_parent{
     my ($self,$node) = @_;
     unless( $self->{_extension_parents} ){
-	$self->{_extension_parents} = [];
+      $self->{_extension_parents} = [];
     }
     if ($node){
-	push ( @{$self->{_extension_parents}}, $node );
+      push ( @{$self->{_extension_parents}}, $node );
     }
     return $self->{_extension_parents};
 }
 
 ############################################################
 
-sub inclusion_parent{
-  my ($self,$node) = @_;
-  if ( $node ){
-    $self->{_inclusion_parent} = $node;
+sub add_extension_child{
+    my ($self,$node) = @_;
+    unless( $self->{_extension_children} ){
+      $self->{_extension_children} = [];
+    }
+    if ($node){
+      push ( @{$self->{_extension_children}}, $node );
+    }
+    return $self->{_extension_children};
+}
+############################################################
+
+sub extension_children{
+  my ($self) = @_;
+  unless ( $self->{_extension_children} ){
+    $self->{_extension_children} = [];
   }
-  return $self->{_inclusion_parent};
+  return $self->{_extension_children};
 }
 
 ############################################################
@@ -222,18 +232,6 @@ sub transcript{
 	$self->{_transcript} = $t;
     }
     return $self->{_transcript};
-}
-
-############################################################
-
-# tag the node if you do not want to visit it twice
-
-sub is_visited{
-    my ($self,$boolean) = @_;
-    if ($boolean){
-	$self->{_is_visited} = $boolean;
-    }
-    return $self->{_is_visited};
 }
 
 ############################################################
