@@ -392,7 +392,7 @@ sub write_Analysis {
 	return $analysis;
     }
     my $query = 
-	                     "insert into analysis(id,created,db,db_version,db_file," .
+	                     "insert into analysisprocess(id,created,db,db_version,db_file," .
                 	     "program,program_version,program_file," .
 			     "parameters,module,module_version," .
 			     "gff_source,gff_feature) " .
@@ -441,7 +441,7 @@ sub exists_Analysis {
 
     $self->throw("Object is not a Bio::EnsEMBL::Pipeline::Analysis") unless $anal->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-    my $query = "select id,created from analysis where " .
+    my $query = "select id,created from analysisprocess where " .
 	" program =    \""      . $anal->program         . "\" and " .
         " program_version = \"" . $anal->program_version . "\" and " .
 	" program_file = \""    . $anal->program_file    . "\" and " .
@@ -450,7 +450,6 @@ sub exists_Analysis {
         " module_version = \""  . $anal->module_version  . "\" and " .
 	" gff_source = \""      . $anal->gff_source      . "\" and" .
 	" gff_feature = \""     . $anal->gff_feature     . "\"";
-
     my $sth = $self->prepare($query);
     my $rv  = $sth->execute();
 
@@ -488,7 +487,7 @@ sub get_Analysis {
 		"module,module_version," .
 		"gff_source,gff_feature,".
 		"parameters " . 
-		"from analysis where " . 
+		"from analysisprocess where " . 
                 "id = $id";
 
     my $sth = $self->prepare($query);
