@@ -195,6 +195,9 @@ my $prefix='COB';
 	     #GB_COMBINED_GENETYPE           => 'combined_cdnaorf_e2g',
 	     
 	     # GeneBuilder parameters
+
+	     # lower bound in the 'base align features' retireved in the genebuilder
+	     GB_MIN_FEATURE_SCORE    => 50,
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
 	     GB_MIN_GENSCAN_EXONS    => 4,
