@@ -72,9 +72,7 @@ sub multiprotein{
 
 sub run_analysis {
   my ($self) = @_;
-  # run program
-  #print STDERR "Running ".$self->program." ".$self->filename." -l > ".
-  #  $self->results."\n";
+
   $self->throw ("Error running ".$self->program." on ".$self->filename) 
     unless ((system ($self->program." ".$self->filename." -l > ".
                      $self->results)) == 0); 
@@ -123,59 +121,13 @@ sub parse_results {
        my $end = $3;
        my $score = $4;
        
-      my $fp = $self->create_protein_feature($start, $end, $score, $tid, 
-                                             0, 0, 'Seg', 
-                                             $self->analysis, 0, 0);
-      $self->add_to_output($fp);
-    }
+       my $fp = $self->create_protein_feature($start, $end, $score, $tid, 
+                                              0, 0, 'Seg', 
+                                              $self->analysis, 0, 0);
+       $self->add_to_output($fp);
+     }
   }
   close $filehandle;   
-}
-
-
-=head2 create_feature
-
- Title    : create_feature
- Usage    : $self->create_feature ($feature)
- Function : creates a Bio::EnsEMBL::SeqFeature object from %feature,
-            and pushes it onto @{$self->{'_flist'}}
- Example  :
- Returns  :
- Args     :
- Throws   :
-
-=cut
-
-sub create_feature {
-    my ($self, $feat) = @_;
-
-    my $analysis = $self->analysis;
-
-
-    # create feature object
-    my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
-						-start       => $feat->{start},
-						-end         => $feat->{end},
-						-score       => 0,
-						-analysis    => $analysis,
-						-percent_id => 0,
-						-p_value => 0,
-						); 
-
-
-
-    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
-					      -end => 0,
-					      -analysis => $analysis,
-					      -seqname => 'Seg');
-    
-    
-    my $feature = new Bio::EnsEMBL::FeaturePair(-feature1 => $feat1,
-						-feature2 => $feat2);
-
-    if ($feature) {
-	push (@{$self->{'_flist'}}, $feature);
-    }
 }
 
 
@@ -197,22 +149,42 @@ sub output {
     return @{$self->{'_flist'}};
 }
 
-sub get_low_complexity_length {
-	my ($self) = @_;
 
-	my $lc_length = 0;
-  my ($p, $f, $l) = caller;
-	foreach my $feat ($self->output) {
-		$lc_length += abs($feat->end - $feat->start) + 1;
-	}
+=head2 get_low_complexity_length
+
+ Title    : get_low_complexity_length
+ Usage    : $len = $self->get_low_complexity_length;
+ Function : returns *percentage* low complexity of protein
+ Example  :
+ Returns  : a percentage_id
+ Args     :
+ Throws   :
+ Notes    : It only makes sense to call this method when the 
+    Runnable was created with a single Bio::Seq
+
+=cut
+
+
+
+sub get_low_complexity_length {
+  my ($self) = @_;
+
+  if ($self->query->length > 0) {    
+    my $lc_length = 0;
+
+    foreach my $feat ($self->output) {
+      $lc_length += abs($feat->end - $feat->start) + 1;
+    }
     
-	my $low_complexity = ($lc_length)/($self->query->length);
-  #print STDERR "Have lc_length ".$lc_length." and query length ".
-  #  $self->query->length." $f:$l\n";
-  #print STDERR "Have low complexity ".$low_complexity."\n";
-	$low_complexity *= 100;
-  #print STDERR "Have low complexity*100 ".$low_complexity."\n";
-	return $low_complexity;
+    my $low_complexity = ($lc_length)/($self->query->length);
+    
+    $low_complexity *= 100;
+    
+    return $low_complexity;
+  }
+  else {
+    return 0;
+  }
 }
 
 		
