@@ -278,17 +278,21 @@ sub fetch_input {
 	    my $exons = $transcript->get_all_Exons;
 	    if(scalar(@$exons) == 1){
 		$single++;
+		next GENE;
 	    }
 	    
 	    # keep only genes in the forward strand
 	    if ($exons->[0]->strand == 1){
 		push (@plus_transcripts, $transcript );
+		if ( scalar( @plus_transcripts ) > 50 ){
+		    last GENE;
+		}
 	    }
 	}
     }
     
     print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
-    print STDERR "($single single exon genes NOT thrown away)\n";
+    print STDERR "($single single exon genes THROWN away)\n";
 
     # process transcripts in the forward strand
     
@@ -342,17 +346,21 @@ sub fetch_input {
 	
 	# DON'T throw away single-exon genes
 	if(scalar(@exons) == 1){
-	  $single++;
+	    $single++;
+	    next REVGENE;
 	}
 	
 	# these are really - strand, but the Slice is reversed, so they are relatively + strand
 	if( $exons[0]->strand == 1){
 	  push (@minus_transcripts, $transcript);
+	  if ( scalar( @minus_transcripts ) > 50 ){
+	      last REVGENE;
+	  }
 	}
       }
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
-    print STDERR "($single single exon genes NOT thrown away)\n";
+    print STDERR "($single single exon genes THROWN away)\n";
     
     if(scalar(@minus_transcripts)){
       
