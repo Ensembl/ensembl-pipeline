@@ -14,12 +14,12 @@
 
 =head1 SYNOPSIS
 
-  my $seqstream = Bio::SeqIO->new ( -file => $seqfile,
+  my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
                                     -fmt => 'Fasta',
                                   );
   $seq = $seqstream->next_seq;
 
-  my $waba = Bio::EnsEMBL::Pipeline::Runnable::Waba->new ( -QUERY => $seq);
+  my $waba = Bio::EnsEMBL::Pipeline::Runnable::Waba->new ( -CLONE => $seq);
   $waba->workdir ($workdir);
   $waba->run;
   my @results = $waba->output;
@@ -48,7 +48,7 @@ use vars qw(@ISA);
 use strict;
 $|=1;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -62,7 +62,7 @@ use Bio::EnsEMBL::Analysis;
  Title    : new
  Usage    : my $waba =  Bio::EnsEMBL::Pipeline::Runnable::Waba->new
                         ( -program    => '/usr/local/pubseq/bin/waba',
-                          -query      => $query,
+                          -clone      => $clone,
                           -database   => $database
                         );
  Function : initialises Waba object
@@ -86,7 +86,7 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of waba run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($query, $analysis) = $self->_rearrange([qw(QUERY
+    my ($clone, $analysis) = $self->_rearrange([qw(CLONE
                                                    ANALYSIS)],
 					        @args);
   
@@ -96,7 +96,7 @@ sub new {
         $self->throw("Waba needs an analysis");
     }
 
-    $self->query ($query) if ($query);       
+    $self->clone ($clone) if ($clone);       
 
     $self->program ($self->find_executable ($self->analysis->program_file));
 
@@ -113,11 +113,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 query
+=head2 clone
 
- Title    : query
- Usage    : $self->query ($query);
- Function : get/set method for the Sequence object; assigns query, filename and results
+ Title    : clone
+ Usage    : $self->clone ($clone);
+ Function : get/set method for the Sequence object; assigns clone, filename and results
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
  Args     : a Bio::Seq or Bio::PrimarySeq object (optional)
@@ -125,14 +125,14 @@ sub new {
 
 =cut
 
-sub query {
+sub clone {
     my ($self, $seq) = @_;
     if ($seq) {
 	($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
 	    || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
 	$self->{'_sequence'} = $seq ;
-	$self->queryname ($self->query->id);
-	$self->filename ($self->query->id.".$$.seq");
+	$self->clonename ($self->clone->id);
+	$self->filename ($self->clone->id.".$$.seq");
 	$self->results ($self->filename.".out");
     }
     return $self->{'_sequence'};
@@ -227,8 +227,8 @@ sub run {
 
     # nothing to be done with $args
 
-    # check seq
-    my $seq = $self->query || $self->throw("Seq required for Program\n");
+    # check clone
+    my $seq = $self->clone || $self->throw("Clone required for Program\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -454,17 +454,23 @@ sub parse_results {
                         my $score = sprintf("%.2f", 2*($match-$mismatch)-$block_score);
                         my $pid = int(100*($match/($match+$mismatch+$qBaseInsert+$tBaseInsert)));
                         # adjust coordinates depending on strand 
+			my $tmp_substart;
+			my $tmp_subend;
                         if ($strand == -1){
                             my $tmp = $substart;
-                            $substart = $subend;
-                            $subend = $tmp;
+                            $tmp_substart = $subend;
+                            $tmp_subend = $tmp;
 		        }
+			else {
+			    $tmp_substart = $substart;
+			    $tmp_subend = $subend;
+			}
                         # build the featurepair
                         my %feature;
-                        $feature{name} = $self->query->id;
+                        $feature{name} = $self->clone->id;
                         $feature{percent_id} = $pid;
-                        $feature{start} = $substart;
-                        $feature{end} = $subend;
+                        $feature{start} = $tmp_substart;
+                        $feature{end} = $tmp_subend;
                         $feature{score} = $score;
                         $feature{strand} = $strand;
                         $feature{hname} = $hid;
@@ -514,7 +520,7 @@ sub parse_results {
             my $total_score = sprintf ("%.2f", 2*($total_match-$total_mismatch)-$total_block_score);
             my $total_pid = int(100*($total_match/($total_match+$total_mismatch+$total_query_insert+$total_target_insert)));
             my %feature;
-            $feature{name} = $self->query->id;
+            $feature{name} = $self->clone->id;
             $feature{score} = $total_score;
             $feature{percent_id} = $total_pid;
             $feature{start} = $start+1;
