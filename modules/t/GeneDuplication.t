@@ -7,7 +7,9 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::SeqIO;
 
-BEGIN { $| = 1; plan test => 4;}
+my $verbose = 1 if @ARGV;
+
+BEGIN { $| = 1; plan test => 7;}
 
 ok(1);
 
@@ -47,4 +49,16 @@ ok($input_seq->isa("Bio::Seq"));
 
 $input_seq->display_id('test_sequence');
 
-ok($gene_dupl->run($input_seq));
+ok(my $result = $gene_dupl->run($input_seq));
+
+ok(@{$result->matches});
+
+exit 1 unless $verbose;
+
+print "Query sequence       : " . $result->query_id . "\n";
+print "Distance method used : " . $result->distance_method . "\n\n";
+
+print join "\t", "match_id", "dN", "dS", "\n";
+foreach my $match (@{$result->matches}){
+  print join "\t", $match->{id}, $match->{dN}, $match->{dS}, "\n";
+}
