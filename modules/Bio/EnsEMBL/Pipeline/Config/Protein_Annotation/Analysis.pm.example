@@ -17,7 +17,11 @@ use vars qw( %Analysis );
 
 # Hash containing config info
 %Analysis = (
-	     Analysis_type[
+	     PA_SINGLE_DUMMY => 'SubmitTranscript', # this is the logic name for the dummy analysis type required in order to start those analyses
+	     PA_CHUNK_DUMMY => 'SubmitTranscriptChunk', # as above but for chunk of peptides
+	     PA_PROTEOME_DUMMY => 'SubmitProteome',
+
+	     PA_ANALYSIS_TYPE[
 			   {
 			    logic_name => '', # logic name in analysis table
 			    module => '', #module path, the runner script adds this to the start Bio/EnsEMBL/Pipeline/RunnableDB so if module in RunnableDB/Protein will need to have Protein/ on name
