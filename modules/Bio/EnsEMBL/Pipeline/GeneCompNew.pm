@@ -731,7 +731,7 @@ sub map_temp_Genes_to_real_Genes{
 		#Killing all genes in merge that are not largest
 		print $log  "GENE MAP KILLED: $oldgeneid merged into $largest\n";
 		my $oldv = $oldg{$oldgeneid}->version;
-		$self->archive->write_deleted_id('gene',$oldgeneid,$oldv,$largest);
+		$self->_archive_gene($oldgeneid,$largest);
 		$killed{$oldgeneid}=1;
 	    }
 	}
@@ -1326,6 +1326,265 @@ sub _create_exon_vseq {
     return $vseq;
 }
 
+=head2 _archive_gene
+
+ Title   : _archive_gene
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _archive_gene{
+   my ($self,$dead,$alternative) = @_;
+
+   my $arc = $self->archive;
+   my $arc_vsad = $arc->get_VersionedSeqAdaptor;
+   
+   my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
+   
+   my $dead_gene = $old_db->gene_Obj->get($dead);
+   my $dead_gene_vseq = $self->_create_gene_vseq($dead_gene);
+
+   #Add all transcripts and genes associated with this gene at the time
+   #it is archived, to preserve a picture of the structure
+   foreach my $trans ($gene->each_Transcript) {
+       my $trans_vseq = $self->_create_transcript_vseq($trans);
+       foreach my $exon ($trans->each_Exon) {
+	   my $exon_vseq = $self->_create_exon_vseq($exon);
+	   $trans_vseq->add_relative($exon_vseq);
+       }
+       $dead_gene_vseq->add_relative($trans_vseq);
+   }
+   
+   if ($alternative) {
+       my $alt_gene = $old_db->gene_Obj->get($alternative);
+       $alt_gene->version($alt_gene->version+1);
+       my $alt_gene_vseq = $self->_create_gene_vseq($alt_gene);
+       $dead_gene_vseq->add_future_vseq($alt_gene_vseq);
+   }
+   $arc_vsad->store($dead_gene_vseq);
+}
+
+=head2 _create_gene_vseq
+
+ Title   : _create_gene_vseq
+ Usage   : 
+ Function: Creates a Bio::EnsEMBL::Archive::VersionedSeq object
+           from a Bio::EnsEMBL::Gene
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _create_gene_vseq {
+    my ($gene) = @_;
+
+    my $seq  = Bio::EnsEMBL::Archive::Seq->new(
+					       -name => $gene->id,
+					       -type => 'gene',
+					       -created => $gene->created
+					       );
+
+    
+    my $start = $gene->start;
+    my $end = $gene->end;
+    my $start_contig = $gene->contig_id;
+    my $end_contig = $gene->contig_id;
+  
+    
+    my $vseq = Bio::EnsEMBL::Archive::VersionedSeq->new(
+							-archive_seq => $seq,
+							-version => $gene->version,
+							-modified => $gene->modified,
+							-release_number => $old_db->release_number
+						       );
+    return $vseq;
+}
+
+=head2 _archive_transcript
+
+ Title   : _archive_transcript
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _archive_transcript{
+   my ($self,$dead,$alternative) = @_;
+
+   my $arc = $self->archive;
+   my $arc_vsad = $arc->get_VersionedSeqAdaptor;
+   my $old_db = $self->vc->dbobj->_crossdb->old_dbobj;
+   
+   my $dead_transcript = $old_db->gene_Obj->get_Transcript($dead);
+   my $dead_transcript_vseq = $self->_create_transcript_vseq($dead_transcript);
+   
+   #Add translation and all exons associated with this transcript at the time
+   #it is archived, to preserve a picture of the structure
+   foreach my $exon ($trans->each_Exon) {
+       my $exon_vseq = $self->_create_exon_vseq($exon);
+       $dead_transcript_vseq->add_relative($exon_vseq);
+   }
+      
+   if ($alternative) {
+       my $alt_transcript = $old_db->transcript_Obj->get($alternative);
+       $alt_transcript->version($alt_transcript->version+1);
+       my $alt_transcript_vseq = $self->_create_transcript_vseq($alt_transcript);
+       $dead_transcript_vseq->add_future_vseq($alt_transcript_vseq);
+   }
+   $arc_vsad->store($dead_transcript_vseq);
+}
+
+=head2 _create_transcript_vseq
+
+ Title   : _create_transcript_vseq
+ Usage   : 
+ Function: Creates a Bio::EnsEMBL::Archive::VersionedSeq object
+           from a Bio::EnsEMBL::Transcript
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _create_transcript_vseq {
+    my ($transcript) = @_;
+
+    my $seq  = Bio::EnsEMBL::Archive::Seq->new(
+					       -name => $transcript->id,
+					       -type => 'transcript',
+					       -created => $transcript->created
+					       );
+
+
+    my ($start_contig,$start,$end_contig,$end);
+    
+    my $start_exon = $transcript->start_exon;
+    my $end_exon = $transcript->end_exon;
+    
+    if ($start_exon->isa('Bio::EnsEMBL::StickyExon')) {
+	$start_exon->_sort_by_sticky_rank;
+	foreach my $ce ($exon->each_component_Exon) {
+	    if (!$start) {
+		$start = $ce->start;
+		$start_contig = $ce->contig_id;
+	    }
+	}
+    }
+    if ($end_exon->isa('Bio::EnsEMBL::StickyExon')) {
+	$end_exon->_sort_by_sticky_rank;
+	foreach my $ce ($exon->each_component_Exon) {
+	    $end = $ce->end;
+	    $end_contig = $ce->contig_id;
+	}
+    }
+    if (!$start) {
+	$start = $start_exon->start;
+	$start_contig = $start_exon->contig_id;
+    }
+    if (!$end) {
+	$end = $end_exon->end;
+	$end_contig = $end_exon->contig_id;
+    }
+
+    
+    my $vseq = Bio::EnsEMBL::Archive::VersionedSeq->new(
+							-archive_seq => $seq,
+							-version => $transcript->version,
+							-start_contig => $start_contig,
+							-start => $start,
+							-end_contig => $end_contig,
+							-end => $end,
+							-sequence => $transcript->seq,
+							-modified => $transcript->modified,
+							-release_number => $old_db->release_number
+							);
+    
+    my $translation_vseq = $self->create_translation_vseq($trans->translation);
+    $vseq->add_relative($translation_vseq);
+    
+    return $vseq;
+}
+
+=head2 _create_translation_vseq
+
+ Title   : _create_translation_vseq
+ Usage   : 
+ Function: Creates a Bio::EnsEMBL::Archive::VersionedSeq object
+           from a Bio::EnsEMBL::Translation
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub _create_translation_vseq {
+    my ($translation) = @_;
+
+    my $seq  = Bio::EnsEMBL::Archive::Seq->new(
+					       -name => $translation->id,
+					       -type => 'translation',
+					       -created => $translation->created
+					       );
+
+    
+    my ($start_contig,$start,$end_contig,$end);
+    
+    my $start_exon = $translation->start_exon;
+    my $end_exon = $translation->end_exon;
+    
+    if ($start_exon->isa('Bio::EnsEMBL::StickyExon')) {
+	$start_exon->_sort_by_sticky_rank;
+	foreach my $ce ($exon->each_component_Exon) {
+	    if (!$start) {
+		$start = $ce->start;
+		$start_contig = $ce->contig_id;
+	    }
+	}
+    }
+    if ($end_exon->isa('Bio::EnsEMBL::StickyExon')) {
+	$end_exon->_sort_by_sticky_rank;
+	foreach my $ce ($exon->each_component_Exon) {
+	    $end = $ce->end;
+	    $end_contig = $ce->contig_id;
+	}
+    }
+    if (!$start) {
+	$start = $start_exon->start;
+	$start_contig = $start_exon->contig_id;
+    }
+    if (!$end) {
+	$end = $end_exon->end;
+	$end_contig = $end_exon->contig_id;
+    }
+    
+    
+    my $vseq = Bio::EnsEMBL::Archive::VersionedSeq->new(
+							-archive_seq => $seq,
+							-version => $translation->version,
+							-start_contig => $start_contig,
+							-start => $start,
+							-end_contig => $end_contig,
+							-end => $end,
+							-sequence => $translation->seq,
+							-modified => $translation->modified,
+							-release_number => $old_db->release_number
+							);
+
+    return $vseq;
+}
 
 #At the moment, no final db writing...
 #=head2 finaldb
