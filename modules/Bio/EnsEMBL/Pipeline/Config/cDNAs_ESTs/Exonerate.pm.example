@@ -148,7 +148,14 @@ use vars qw( %Exonerate );
 	      EST_MIN_COVERAGE            => 90,
 	      EST_MIN_PERCENT_ID          => 97,
 
-	      
+  	      # Are we in a hurry?  If so, we can use denormalised gene tables
+	      # that avoid coordinate mapping during the exonerate runs.  This
+	      # requires denormalised gene tables to be created in your write
+	      # database.  You probably need a good reason for not setting this 
+	      # to 1.
+	      EST_USE_DENORM_GENES	=> 1,
+
+
 	      ############################################################
 	      # each runnable has an analysis
 	      ############################################################
