@@ -31,6 +31,7 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;
 use Bio::Seq;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
 
 # Object preamble - inherits from Bio::Root::Object;
 
@@ -40,7 +41,7 @@ sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
-  
+
   my ($name, 
       $seq, 
       $deletions,
@@ -53,17 +54,13 @@ sub new {
 				     EXON
 				     TYPE)],@args);
 
-  # Mandatory argument
-  $self->seq($seq);
-  $self->deletions($deletions); # Even if there isn't a sequence
-                                # an undefined value will cause
-                                # a full sequence of '-' to be made.
 
   # Optional arguments
-  $self->name($name)           if $name;
-  $self->start($start)         if $start;
-  $self->exon($exon)           if $exon;
-  $self->type($type)           if $type;
+  $self->seq($seq)     if $seq;
+  $self->name($name)   if $name;
+  $self->start($start) if $start;
+  $self->exon($exon)   if $exon;
+  $self->type($type)   if $type;
 
   return $self;
 }
@@ -86,6 +83,9 @@ sub seq {
     $self->{'_seq'} = shift;
   }
 
+  $self->throw('No sequence attached to object')
+    unless $self->{'_seq'};
+
   return $self->{'_seq'};
 }
 
@@ -107,24 +107,13 @@ sub seq_array {
 sub seq_with_newlines {
   my ($self, $line_length) = @_;
 
-  my $seq = $self->seq_array;
+  $line_length = 60 unless defined $line_length;
 
-  my $concat = '';
+  my $seq_string = $self->seq;
 
-  my $column_pos = 0;
+  $seq_string =~ s/(.{$line_length})/$1\n/g;
 
-  foreach my $element (@$seq){
-
-   if (($column_pos%($line_length) == 0)&&($column_pos != 0)){
-     $concat .= "\n";
-     $column_pos = 0;
-   }
-
-   $concat .= $element;
-   $column_pos++;
-  }
-
-  return $concat;
+  return $seq_string;
 }
 
 
@@ -139,11 +128,15 @@ sub store_seq_array {
   $self->throw("Array for storage contains nothing.")
     unless (scalar @$input_array > 0);
 
-  my $concat_seq = '';
+  my $concat_seq;
 
-  foreach my $element (@$input_array) {
-    $concat_seq .= $element;
-  } 
+  for (my $i = 0; $i < scalar @$input_array; $i++){
+    if ($input_array->[$i] eq ''){
+      $concat_seq .= '-';
+    } else {
+      $concat_seq .= $input_array->[$i];
+    }
+  }
 
   $self->seq($concat_seq);
 
@@ -167,98 +160,88 @@ sub fetch_base_at_position {
 # the deletion sequence.
 
 sub insert_gap {
-  my ($self, $insert_position, $gap_length) = @_;  
+  my ($self, $insert_position, $gap_length) = @_;
 
   unless ($insert_position && $gap_length){
-    $self->throw("Need to specify gap insertion position [$insert_position] and length [$gap_length]");
+    throw("Need to specify gap insertion position [$insert_position] " . 
+	  "and length [$gap_length]");
   }
-
-  $insert_position--;
 
   my $gap = '-' x $gap_length;
-  my @gap = split //, $gap;
-  
-  my $sequence_as_array = $self->seq_array;
-  my $deletions_as_array = $self->deletion_array;
 
-  splice (@$sequence_as_array, $insert_position, 0, @gap);
-  splice (@$deletions_as_array, $insert_position, 0, @gap);
+  # Stick the gap in the sequence
 
-  $self->store_seq_array($sequence_as_array);
-  $self->store_deletion_array($deletions_as_array);
+  my $seq = $self->seq;
+  my $new_seq = substr($seq, 0, $insert_position - 1) . 
+    $gap . substr($seq, $insert_position);
 
-  return 1;
-}
+  $self->seq($new_seq);
 
-sub deletions {
-  my $self = shift;
+  # Take note of the gap in our set of deletion coordinates
 
-  if ((@_)||(!$self->{'_deletions'})) {
-    my $value = shift;
-
-    if (!$value) {
-      $value = '-';
-    }
-
-    $self->throw("Deletion list needs to be a string, you have probably passed in an array.")
-      if (ref $value);
-
-    # If the deletion string is empty or shorter
-    # than the sequence string, pad the end with
-    # '-'.
-
-    my @deletion_array = split //, $value;
-
-    my $length_difference = (scalar @{$self->seq_array}) - (scalar @deletion_array);
-
-    while ($length_difference) {
-      $value .= '-';
-      $length_difference--;
-    }
-    
-    $self->{'_deletions'} = $value;
+  for (my $i = 0; $i < $gap_length; $i++) {
+    $self->increment_deletions_above($insert_position+$i)
   }
 
-  return $self->{'_deletions'};
+  return 1
 }
 
-sub deletion_array {
+sub all_gaps {
   my $self = shift;
 
-  my @array = split //, $self->deletions;
+  my $sequence_array = $self->seq_array;
+  my @gap_coordinates;
 
-  return \@array;
+  for (my $i = 0; $i < scalar @$sequence_array; $i++) {
+    push @gap_coordinates, $i+1 if $sequence_array->[$i] eq '-'
+  }
+
+  return \@gap_coordinates
 }
 
-sub store_deletion_array {
-  my ($self, $input_array) = @_;
+sub add_deletion {
+  my ($self, $position, $length) = @_;
 
-  $self->throw("Array for storage contains nothing.")
-    unless (scalar @$input_array > 0);
+  throw("Add deletion requires a numeric argument, not this [" .
+	ref($position) . "]") 
+    if (ref($position) ne '');
 
-  my $concat_seq = '';
+  $length = 1 unless $length;
 
-  foreach my $element (@$input_array) {
-    $concat_seq .= $element;
-  } 
+  $self->deletion_hash->{$position} = $length
+    unless (defined $self->deletion_hash->{$position} &&
+	    $self->deletion_hash->{$position} > $length);
 
-  $self->deletions($concat_seq);
-
-  return 1;
-
+  return 1
 }
 
-sub fetch_deletion_at_position {
-  my ($self, $base_position) = @_;
+sub increment_deletions_above {
+  my ($self, $coord) = @_;
 
-  $self->throw("Must specify a base position to retrieve a specific position from the sequence.")
-    unless $base_position;
+  my $deletion_hash = $self->deletion_hash;
 
-  $base_position--;
+  my @coords = keys %$deletion_hash;
 
-  return substr $self->deletions, $base_position, 1;
-} 
+  for (my $i = 0; $i < scalar @coords; $i++) {
+    if ($deletion_hash->{$coords[$i]}){
+      my $deletion_length = $deletion_hash->{$coords[$i]};
+      delete $deletion_hash->{$coords[$i]};
+      $deletion_hash->{$coords[$i]+1} = $deletion_length;
+    }
+  }
 
+  return 1
+}
+
+sub deletion_hash {
+  my $self = shift;
+
+  unless ($self->{'_deletions'}){
+    $self->{'_deletions'} = {};
+  }
+
+  return $self->{'_deletions'}
+}
 
 # I'm not sure what this is used for...
 
@@ -320,11 +303,12 @@ sub length {
 sub fasta_string {
   my ($self, $line_length) = @_;
 
-  $line_length = 60 unless $line_length;
+  $line_length = 60 
+    unless $line_length;
 
-  return '>' . $self->name . "\n" . $self->seq_with_newlines($line_length) . "\n";
+  return '>' . $self->name . "\n" . 
+    $self->seq_with_newlines($line_length) . "\n";
 }
-
 
 return 1;
 

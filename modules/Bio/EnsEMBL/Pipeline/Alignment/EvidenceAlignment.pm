@@ -164,6 +164,8 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::Alignment;
 use Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
+
 
 # Object preamble - inherits from Bio::Root::Object;
 
@@ -213,13 +215,13 @@ sub new {
   # Throw an error if any of the below are undefined or
   # are the wrong thing.
   unless (defined $db && $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
-    $self->throw("No DB adaptor passed to AlignmentTool.  You passed a $db.");
+    throw("No DB adaptor passed to AlignmentTool.  You passed a $db.");
   }
   unless (defined $transcript && $transcript->isa("Bio::EnsEMBL::Transcript")){
-    $self->throw("No transcript passed to AlignmentTool.  You passed a $transcript.");
+    throw("No transcript passed to AlignmentTool.  You passed a $transcript.");
   }
   unless (defined $seqfetcher && $seqfetcher->isa("Bio::DB::RandomAccessI")) {
-    $self->throw("No sequence fetcher passed to AlignmentTool.  You passed a $seqfetcher.");
+    throw("No sequence fetcher passed to AlignmentTool.  You passed a $seqfetcher.");
   }
 
   $self->{'_db_adaptor'} = $db;
@@ -253,9 +255,9 @@ sub new {
   if ($self->_transcript->translation){
     $self->_translatable(1);
   } else {
-    $self->warn("Database doesn't contain translation.  Subsequently, ".
-		"wont be able to display translations of each exon ".
-		"or calculate protein identity scores.");
+    warning("Database doesn't contain translation.  Subsequently, ".
+	    "wont be able to display translations of each exon ".
+	    "or calculate protein identity scores.");
     $self->_type('nucleotide');
     $self->_translatable(0);
   }
@@ -385,10 +387,10 @@ sub rogue_exons {
   }
 
   unless ($self->_type eq 'all') {
-    $self->warn("The alignment used to count rogue exons has\n".
-		"not been created with both nucleotide and protein\n".
-		"evidence.  Hence, it is quite likely that you\n".
-		"will see rogue exons.");
+    warning("The alignment used to count rogue exons has\n".
+	    "not been created with both nucleotide and protein\n".
+	    "evidence.  Hence, it is quite likely that you\n".
+	    "will see rogue exons.");
   }
 
   my $evidence_alignments = $self->_working_alignment('evidence');
@@ -425,17 +427,6 @@ sub _align {
   my ($self, $type, $show_missing_evidence, $truncate_introns, 
       $merge_sequences) = @_;
 
-  # Collect all our sequences for aligning
-
-  my $genomic_sequence         = $self->_genomic_sequence;
-  my $exon_nucleotide_sequence = $self->_exon_nucleotide_sequence;
-
-  my $exon_protein_sequence;
-  if (($self->_translatable)
-      &&(($type eq 'protein')||($type eq 'all'))){
-    $exon_protein_sequence = $self->_exon_protein_translation;
-  }
-
   my $evidence_sequences = $self->_corroborating_sequences($type);
 
   # Insert deletions in the appropriate places in the genomic
@@ -447,6 +438,7 @@ sub _align {
 
   my %deletion_sets;
   my %all_deletions;
+  my %deletion_tracking;
   my %evidence_sequence_hash;
 
   foreach my $evidence_sequence (@$evidence_sequences) {
@@ -456,9 +448,15 @@ sub _align {
 
     $evidence_sequence_hash{$evidence_sequence} = $evidence_sequence;
 
-    foreach my $deletion_coord (@{$evidence_sequence->deletions}){
-      $deletion_sets{$evidence_sequence}->{$deletion_coord}++;
-      $all_deletions{$deletion_coord}++
+    while (my ($deletion_coord, $length) = each %{$evidence_sequence->deletion_hash}){
+      $deletion_sets{$evidence_sequence}->{$deletion_coord} = $length;
+
+      $all_deletions{$deletion_coord} = $length 
+	unless ((defined $all_deletions{$deletion_coord} &&
+		 $all_deletions{$deletion_coord} > $length));
+
+      push @{$deletion_tracking{$deletion_coord}}, 
+	[$length, $evidence_sequence->name]; 
     }
   }
 
@@ -466,11 +464,13 @@ sub _align {
 
   foreach my $deletion_coord (@all_deletions) {
 
+    my $length = $all_deletions{$deletion_coord};
+
     # Add a gap to the genomic and exonic sequence
 
-    $self->_genomic_sequence->insert_gap($deletion_coord, 1);
-    $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, 1);
-    $self->_exon_protein_translation->insert_gap($deletion_coord, 1);
+    $self->_genomic_sequence->insert_gap($deletion_coord, $length);
+    $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, $length);
+    $self->_exon_protein_translation->insert_gap($deletion_coord, $length);
 
     foreach my $evidence_name (keys %evidence_sequence_hash) {
 
@@ -478,17 +478,24 @@ sub _align {
       # sequences
 
       if (! $deletion_sets{$evidence_name}->{$deletion_coord}) {
-	$evidence_sequence_hash{$evidence_name}->insert_gap($deletion_coord, 1)
+	$evidence_sequence_hash{$evidence_name}->insert_gap($deletion_coord, $length)
       }
     }
 
     # Increment all deletion coords that are greater than this one.
 
-      # @all_deletions
+      # @all_deletions and %all_deletions
+
+    my %new_all_deletions;
 
     for (my $i = 0; $i < scalar @all_deletions; $i++) {
-      $all_deletions[$i]++ if ($all_deletions[$i] > $deletion_coord);
+      if ($all_deletions[$i] > $deletion_coord) {
+        $all_deletions[$i]++;
+	$new_all_deletions{$all_deletions[$i]} = $all_deletions{$all_deletions[$i] - 1};
+      }
     }
+
+    %all_deletions = %new_all_deletions;
 
       # %deletion_sets
 
@@ -496,8 +503,9 @@ sub _align {
       my @coords = keys %{$deletion_sets{$evidence_name}};
       for (my $i = 0; $i < scalar @coords; $i++) {
 	if ($deletion_sets{$evidence_name}->{$coords[$i]}){
+	  my $this_length = $deletion_sets{$evidence_name}->{$coords[$i]};
 	  delete $deletion_sets{$evidence_name}->{$coords[$i]};
-	  $deletion_sets{$evidence_name}->{$coords[$i]+1} = 1;
+	  $deletion_sets{$evidence_name}->{$coords[$i]+1} = $this_length;
 	}
       }
     }
@@ -505,12 +513,12 @@ sub _align {
 
   # Put our working alignments somewhere handy
 
-  $self->_working_alignment('genomic_sequence', $genomic_sequence);
-  $self->_working_alignment('exon_nucleotide', $exon_nucleotide_sequence);
+  $self->_working_alignment('genomic_sequence', $self->_genomic_sequence);
+  $self->_working_alignment('exon_nucleotide',  $self->_exon_nucleotide_sequence);
 
   if ($self->_translatable
       &&(($type eq 'protein')||($type eq 'all'))) {
-    $self->_working_alignment('exon_protein', $exon_protein_sequence);
+    $self->_working_alignment('exon_protein', $self->_exon_protein_translation);
   }
 
   # Place our finalised evidence sequence alignments into the right place.
@@ -786,8 +794,8 @@ sub _compute_evidence_coverage {
     my $length = $self->_fetch_sequence($sequence_identifier)->length;
 
     unless ($length){
-      $self->warn("Evidence sequence with zero length found." 
-		  . "  This sequence probably couldnt be retrieved.");
+      info("Evidence sequence with zero length found." 
+	      . "  This sequence probably couldnt be retrieved.");
       next SEQUENCE;
     }
 
@@ -874,7 +882,7 @@ sub _add_unmatched_region {
 								   $genomic_coord]);
 
   } else {
-    $self->throw("Incorrect arguments specified.");
+    throw("Incorrect arguments specified.");
   }
 
 }
@@ -896,7 +904,7 @@ sub _derive_unmatched_sequences {
   my $spacing = 0;
   my @sequences;
 
-  $self->warn("No unmatched sequences have been found")
+  warning("No unmatched sequences have been found")
     unless $self->{'_unmatched_evidence_sequence'};
 
   foreach my $seqname (keys %{$self->{'_unmatched_evidence_sequence'}}){
@@ -923,7 +931,7 @@ sub _derive_unmatched_sequences {
 	$insert_start = $missed_fragment->[3] + $spacing;
 
       } else {
-	$self->throw("Before or after not specified. Internal error.");
+	throw("Before or after not specified. Internal error.");
       }
 
       my $insert_point = $insert_start;
@@ -1056,9 +1064,9 @@ sub _truncate_introns {
       }
 
       if (($offcut =~ /atgc/i)&&($align_seq->name ne 'genomic_sequence')) {
-	$self->warn("Truncating intron sequences has caused some aligned evidence\n" .
-		    "to be discarded.  Try again with a higher amount of padding\n".
-		    "around the exon sequences.\n");
+	warning("Truncating intron sequences has caused some aligned evidence\n" .
+		"to be discarded.  Try again with a higher amount of padding\n".
+		"around the exon sequences.\n");
       }
     }
     $align_seq->store_seq_array($seq_array);
@@ -1108,9 +1116,9 @@ sub _merge_same_sequences {
 
 	if ($seq_array->[$i] ne '-'){
 	  if ($chimera[$i] && $chimera[$i] ne '-'){
-	    $self->warn("Very bad - evidence from the same sequence overlaps between" .
-			"exons.  You should not be merging sequences.  Set : " .
-			"\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
+	    warning("Very bad - evidence from the same sequence overlaps between" .
+		    "exons.  You should not be merging sequences.  Set : " .
+		    "\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
 	  } else {
 	    $chimera[$i] = $seq_array->[$i] unless $seq_array->[$i] eq '-';
 	  }
@@ -1165,9 +1173,9 @@ sub _is_computed {
   # Check whether an alignment of a specific type
   # has been run.
   if ((!defined $value)&&($self->{'_is_computed'})&&($type ne $self->_type)) { 
-    $self->warn("Alignment has been previously computed, but was not\n" .
-      "of the same type.  The previously computed alignment\n" . 
-	"type was \'" . $self->_type . "\'.\n");
+    warning("Alignment has been previously computed, but was not\n" .
+	    "of the same type.  The previously computed alignment\n" . 
+	    "type was \'" . $self->_type . "\'.\n");
 
     return 0; 
   }
@@ -1210,15 +1218,15 @@ sub _type {
     unless ($type eq 'all' ||
 	    $type eq 'nucleotide' ||
 	    $type eq 'protein') {
-      $self->throw("Type of alignment to retrieve not recognised.  Please use one " . 
-		   "of \'all\', \'nucleotide\' or \'protein\'.");
+      throw("Type of alignment to retrieve not recognised.  Please use one " . 
+	    "of \'all\', \'nucleotide\' or \'protein\'.");
     }
 
     $self->{'_computed_type'} = $type;
   }
 
-  $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
-	       "of \'all\', \'nucleotide\' or \'protein\'.") 
+  throw("Type of alignment to retrieve not specified.  Please use one " . 
+	"of \'all\', \'nucleotide\' or \'protein\'.") 
     unless $self->{'_computed_type'};
 
   return $self->{'_computed_type'};
@@ -1248,8 +1256,8 @@ sub _working_alignment {
        ||($slot eq 'exon_nucleotide')
        ||($slot eq 'evidence')
        ||($slot eq 'unaligned'))){
-    $self->throw("Was trying to retrieve or write working alignments to "
-		 . "a slot that isnt allowed ($slot)");
+    throw("Was trying to retrieve or write working alignments to "
+	  . "a slot that isnt allowed ($slot)");
   }
 
   if (defined $slot && defined $align_seq && $align_seq eq 'empty'){
@@ -1260,8 +1268,8 @@ sub _working_alignment {
   if (defined $slot && defined $align_seq){
 
     unless ($align_seq->isa("Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq")){
-      $self->throw("Sequence passed to _working alignment was not an " . 
-		   "AlignmentSeq, it was a [$align_seq]")
+      throw("Sequence passed to _working alignment was not an " . 
+	    "AlignmentSeq, it was a [$align_seq]")
     }
 
     push (@{$self->{'_working_alignment_array'}->{$slot}}, $align_seq);
@@ -1340,15 +1348,15 @@ sub _transcript {
     }
     
     unless ($self->{'_transcript'}){
-      $self->throw("Could not find transcript on Slice.  Very bad.");
+      throw("Could not find transcript on Slice.  Very bad.");
     }
   }
 
   if (defined $self->{'_transcript'}){
     return $self->{'_transcript'}
   } else {
-    $self->throw("Something has gone wrong.  A Transcript has not yet been".
-		 " extracted from our new Slice.");
+    throw("Something has gone wrong.  A Transcript has not yet been" .
+	  " extracted from our new Slice.");
   }
 }
 
@@ -1417,7 +1425,7 @@ sub _strand {
   }
 
   if (! defined $self->{'_strand'}){
-    $self->warn("No value for strand set.  Disaster awaits.");
+    warning("No value for strand set.  Disaster awaits.");
   }
 
   return $self->{'_strand'};
@@ -1504,8 +1512,8 @@ sub _corroborating_sequences {
     if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 
       if ($base_align_feature->hstrand == -1) {
-	$self->warn("Zoicks!  Surely we can't have a reverse" .
-		    " complimented protein sequence.");
+	warning("Zoicks!  Surely we can't have a reverse" .
+		" complimented protein sequence.");
       }
 
       my $align_seq = $self->_fiddly_bits($base_align_feature);
@@ -1526,9 +1534,9 @@ sub _corroborating_sequences {
   # alignment.  There could be a better way to do this, of course.
   push (@{$self->{'_corroborating_sequences'}}, @protein_features);
 
-  $self->warn("There are no displayable supporting features for this transcript.  " .
-	      "Try setting the -type attribute to 'all', instead of just " . 
-	      "'protein' or 'nucleotide'.") 
+  warning("There are no displayable supporting features for this transcript.  " .
+	  "Try setting the -type attribute to 'all', instead of just " . 
+	  "'protein' or 'nucleotide'.") 
     unless scalar @{$self->{'_corroborating_sequences'}} > 0;
 
   return $self->{'_corroborating_sequences'};
@@ -1553,7 +1561,7 @@ sub _corroborating_sequences {
 sub _fiddly_bits {
   my ($self, $base_align_feature) = @_;
 
-  # Create a AlignmentSeq object that will store our sequences
+  # Create an AlignmentSeq object that will store our sequences
   # for this feature
 
   my $partially_aligned = 
@@ -1574,9 +1582,9 @@ sub _fiddly_bits {
   my $fetched_seq = $self->_fetch_sequence($base_align_feature->hseqname);
 
   if ( ! $fetched_seq) {
-    $self->warn("Error fetching sequence " . 
-		$base_align_feature->hseqname . 
-		".  Ignoring.");
+    warning("Error fetching sequence " . 
+	    $base_align_feature->hseqname . 
+	    ".  Ignoring.");
 
     return 0;
   }
@@ -1620,11 +1628,7 @@ sub _fiddly_bits {
     # fragment first, then reverse compliment it.
 
     if ($base_align_feature->hstrand == -1) {
-      my $wrong_way_around_exon;
-
-      foreach my $nucleotide (@fetched_seq) {
-	$wrong_way_around_exon .= $nucleotide;
-      }
+      my $wrong_way_around_exon = join '', @fetched_seq;
 
       my $backwards_seq = Bio::Seq->new('-seq' => $wrong_way_around_exon);
 
@@ -1656,42 +1660,54 @@ sub _fiddly_bits {
     # treated as being on the forward strand.
 
   my $slice_position = $base_align_feature->start;
+  my $slice_rev_position = $self->_slice->length - $base_align_feature->end + 1;
 
   my $deletions;
+  my $deletions_upstream_of_slice = 0;
 
   foreach my $instruction (@cigar_instructions) {
 
     if ($instruction->{'type'} eq 'I') {
+
       my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
 
       if ($hit_position < scalar @fetched_seq){
-	splice(@fetched_seq, $hit_position, 0, @gap)
+	splice(@fetched_seq, $hit_position - 1, 0, @gap)
       } else {
-	$self->throw("Gap in sequence [" . $base_align_feature->hseqname . 
-		     "] lies outside feature.  Code problem.")
+	throw("Gap in sequence [" . $base_align_feature->hseqname . 
+	      "] lies outside feature.  Code problem.")
       }
 
       $hit_position   += $instruction->{'length'};
       $slice_position += $instruction->{'length'};
+      $slice_rev_position += $instruction->{'length'};
 
     } elsif ($instruction->{'type'} eq 'M') {
 
       $hit_position   += $instruction->{'length'};
       $slice_position += $instruction->{'length'};
+      $slice_rev_position += $instruction->{'length'};
 
     } elsif ($instruction->{'type'} eq 'D') {
-
       $deletions++;
 
-      for (my $i = 1; $i <= $instruction->{'length'}; $i++){
-	next unless $slice_position + $i >= 0;
-	$partially_aligned->add_deletion($slice_position + $i);
-	my $thing = $slice_position + $i;
+      if ($slice_position <= 0){
+	$deletions_upstream_of_slice++;
+	next
+      }
+
+      if ($self->_strand == 1) {
+	$partially_aligned->add_deletion($slice_position, 
+					 $instruction->{'length'});
+      } elsif ($self->_strand == -1) {
+	$partially_aligned->add_deletion($slice_rev_position, 
+					 $instruction->{'length'});
       }
 
       $hit_position   += $instruction->{'length'};
       $slice_position += $instruction->{'length'};
+      $slice_rev_position += $instruction->{'length'};
     }
   }
 
@@ -1706,22 +1722,23 @@ sub _fiddly_bits {
       $base_align_feature->start > $self->_slice->length ||
       $base_align_feature->end > $self->_slice->length || 
       $base_align_feature->end < 0) {
-    $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
-		$base_align_feature->start . " end:" . $base_align_feature->end 
-		."] extends past the start or end of genomic slice.  Truncating " . 
-		"overhanging sequence");
+    info("Feature [". $base_align_feature->hseqname . " start:" . 
+	    $base_align_feature->start . " end:" . $base_align_feature->end 
+	    ."] extends\npast the start or end of genomic slice.  Truncating\n" . 
+	    "overhanging sequence");
 
     if (($base_align_feature->start < 0 && 
 	 $base_align_feature->end < 0)||
 	($base_align_feature->start > $self->_slice->length &&
 	 $base_align_feature->end > $self->_slice->length)) {
-      print STDERR "Feature lies completely outside the bounds of Slice.  Chuck.\n";
+      info("Feature [" . $base_align_feature->hseqname . 
+	      "] lies completely outside the bounds of Slice.  Chuck.");
       splice (@fetched_seq, 0, scalar @fetched_seq);
     } elsif ($self->_strand == 1) {
       my $start_overshoot = 0;
       if ($base_align_feature->start < 0) {
 print STDERR "Case 1.\n";
-	$start_overshoot = $base_align_feature->start * -1;
+	$start_overshoot = ($base_align_feature->start * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->end > $self->_slice->length) {
@@ -1733,7 +1750,7 @@ print STDERR "Case 2.\n";
       my $start_overshoot = 0;
       if ($base_align_feature->end < 0) {
 print STDERR "Case 3.\n";
-	$start_overshoot = $base_align_feature->end * -1;
+	$start_overshoot = ($base_align_feature->end * -1) + $deletions_upstream_of_slice;
 	splice (@fetched_seq, 0, $start_overshoot + 1);
       }
       if ($base_align_feature->start > $self->_slice->length) {
@@ -1764,10 +1781,10 @@ print STDERR "Case 4.\n";
     }
     splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
   } else {
-    $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
-		$base_align_feature->start . " end:" . $base_align_feature->end . 
-		" strand:" . $base_align_feature->strand 
-		."] starts beyond end of genomic slice.");
+    info("Feature [". $base_align_feature->hseqname . " start:" . 
+	    $base_align_feature->start . " end:" . $base_align_feature->end . 
+	    " strand:" . $base_align_feature->strand 
+	    ."] starts beyond end of genomic slice.");
   }
 
   $feature_sequence = '';
@@ -1798,11 +1815,11 @@ sub _print_tabulated_coordinates {
   my $self = shift;
 
   print STDERR 
-    "Slice :      length    - " . $self->_slice->length    . "\n" .
-    "             chr       - " . $self->_slice->chr_name  . "\n" .
-    "             chr start - " . $self->_slice->chr_start . "\n" .
-    "             chr end   - " . $self->_slice->chr_end   . "\n" .
-    "             strand    - " . $self->_slice->strand    . "\n";
+    "Slice :      length    - " . $self->_slice->length           . "\n" .
+    "             chr       - " . $self->_slice->seq_region_name  . "\n" .
+    "             chr start - " . $self->_slice->start            . "\n" .
+    "             chr end   - " . $self->_slice->end              . "\n" .
+    "             strand    - " . $self->_slice->strand           . "\n";
 
   print STDERR "\n";
 
@@ -1810,8 +1827,8 @@ sub _print_tabulated_coordinates {
 
   print STDERR 
     "Transcript : id         - " . $self->_transcript->stable_id . "\n" . 
-    "             coding     - (start) " . $self->_transcript->coding_start . " (end) " . 
-      $self->_transcript->coding_end . "\n" .
+    "             coding     - (start) " . $self->_transcript->coding_region_start . " (end) " . 
+      $self->_transcript->coding_region_end . "\n" .
     "             exon count - " . scalar @$exons . "\n";
   foreach my $exon (@$exons) {
     print STDERR 
@@ -1828,11 +1845,11 @@ sub _print_tabulated_coordinates {
   foreach my $feature (@$supporting_features){
     print STDERR
     "           Feature : " . $feature->hseqname . "\n" .
-    "                     (start)  " . $feature->start . "\t(end)  " . 
-      $feature->end . "\t(strand)  " . $feature->strand . "\n" . 
-    "                     (hstart) " . $feature->hstart . "\t(hend) " . 
+    "                     (start)  "  . $feature->start . "\t(end)  " . 
+      $feature->end . "\t(strand)  "  . $feature->strand . "\n" . 
+    "                    (hstart)  "  . $feature->hstart . "\t(hend) " . 
       $feature->hend . "\t(hstrand) " . $feature->hstrand . "\n" . 
-    "                     (CIGAR)  " . $feature->cigar_string . "\n";
+    "                     (CIGAR)  "  . $feature->cigar_string . "\n";
   }
 
   return 1
@@ -1860,7 +1877,7 @@ sub _genomic_sequence {
     if ($self->_strand == 1) {
       $genomic_sequence = $self->_slice->seq;
     } elsif ($self->_strand == -1) {
-      print STDERR "Reverse complimenting genomic sequence.\n";
+print STDERR "Reverse complimenting genomic sequence.\n";
       $genomic_sequence = $self->_slice->revcom->seq;
     }
 
@@ -2099,8 +2116,8 @@ sub _all_supporting_features {
     my $bafs = shift;
 
     foreach my $baf (@$bafs){
-      $self->throw("Evidence provided does not consist " . 
-		   "of Bio::EnsEMBL::BaseAlignFeature")
+      throw("Evidence provided does not consist " . 
+	    "of Bio::EnsEMBL::BaseAlignFeature")
 	unless $baf->isa("Bio::EnsEMBL::BaseAlignFeature");
 
       $baf = $baf->transfer($self->_slice);
@@ -2161,8 +2178,8 @@ sub _build_sequence_cache {
     };
     
     if ($@){
-      $self->warn("Not all evidence sequences could be pfetched.\n".
-		  "Ignoring missing sequences.\n$@\n");
+      info("Not all evidence sequences could be pfetched.\n".
+	      "Ignoring missing sequences.\n$@\n");
     }
 
   } else {
@@ -2176,7 +2193,7 @@ sub _build_sequence_cache {
       };
 
       if ($@) {
-	$self->warn("The seqfetcher is having trouble.\t$@\n");
+	warning("The seqfetcher is having trouble.\t$@\n");
       }
 
       push(@$fetched_seqs, $fetched_seq);
@@ -2217,7 +2234,7 @@ sub _fetch_sequence {
     unless $self->{'_cache_is_built'};
 
   unless ($self->{'_fetched_seq_cache'}->{$accession}){
-    $self->warn("Sequence $accession could not be retrieved from cache.");
+    warning("Sequence $accession could not be retrieved from cache.");
   }
 
   return $self->{'_fetched_seq_cache'}->{$accession}; 
@@ -2350,9 +2367,12 @@ sub _cigar_reader {
 
     if ($next_char =~ /[MDI]/) {
 
+      $current_digits = 1
+	unless ($current_digits && $current_digits > 0);
+
       my %enduring_hash;
       $enduring_hash{'type'} = $next_char;
-      $enduring_hash{'length'} = $current_digits ? $current_digits : 1;
+      $enduring_hash{'length'} = $current_digits;
 
       push (@cigar_elements, \%enduring_hash);
 
@@ -2366,13 +2386,11 @@ sub _cigar_reader {
 
       die "There is an odd character in the CIGAR string retrieved from the database.\n" . 
 	$cigar_string . "\n";
-
     }
 
   }
- 
-  return @cigar_elements;
 
+  return @cigar_elements;
 }
 
 
