@@ -29,13 +29,11 @@ package Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
 
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
-# Object preamble - inherits from Bio::Root::Object;
-
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 sub new {
   my ($class, @args) = @_;
@@ -47,12 +45,12 @@ sub new {
       $deletions,
       $start, 
       $exon,
-      $type) = $self->_rearrange([qw(NAME
-				     SEQ
-				     DELETIONS
-				     START
-				     EXON
-				     TYPE)],@args);
+      $type) = rearrange([qw(NAME
+			     SEQ
+			     DELETIONS
+			     START
+			     EXON
+			     TYPE)],@args);
 
 
   # Optional arguments

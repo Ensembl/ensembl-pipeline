@@ -31,8 +31,9 @@ package Bio::EnsEMBL::Pipeline::Alignment;
 
 use vars qw(@ISA);
 use strict;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 sub new {
   my ($class, @args) = @_;
@@ -40,8 +41,8 @@ sub new {
   my $self = bless {},$class;
   
   my ($name, 
-      $align_seqs) = $self->_rearrange([qw(NAME
-					   SEQS)],@args);
+      $align_seqs) = rearrange([qw(NAME
+				   SEQS)],@args);
 
   if ($align_seqs) {
     foreach my $align_seq (@$align_seqs){
