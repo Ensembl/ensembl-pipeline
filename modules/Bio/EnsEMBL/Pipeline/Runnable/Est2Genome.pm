@@ -324,7 +324,7 @@ sub _createfiles {
     $self->throw("No directory $dirname") unless -e $dirname;
 
 
-    chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
+    #chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
     return ($genfile, $estfile);
 }
     
