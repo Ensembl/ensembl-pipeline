@@ -127,7 +127,6 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->query->id);
 	    $self->filename ($self->query->id.".$$.seq");
 	    $self->results ($self->filename.".out");
 	}
@@ -405,4 +404,19 @@ sub output {
     return @{$self->{'_flist'}};
 }
 
+sub get_low_complexity_length {
+	my ($self) = @_;
+
+	my $lc_length = 0;
+
+	foreach my $feat ($self->output) {
+		$lc_length += abs($feat->end - $feat->start) + 1;
+	}
+    
+	my $low_complexity = (100*$lc_length)/($self->query->length);
+
+	return $low_complexity;
+}
+
+		
 1;
