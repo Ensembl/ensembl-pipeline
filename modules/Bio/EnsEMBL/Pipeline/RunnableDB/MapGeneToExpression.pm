@@ -64,26 +64,29 @@ use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 
 
 use Bio::EnsEMBL::Pipeline::GeneToExpression_Conf qw(
-				       EST_INPUTID_REGEX
-				       EST_REFDBHOST
-				       EST_REFDBUSER
-				       EST_REFDBNAME
-				       EST_REFDBPASS
-				       EST_DBHOST
-			       EST_DBUSER
-				       EST_DBNAME
-				       EST_DBPASS
-				       EST_TARGET_DBNAME
-				       EST_TARGET_DBHOST
-				       EST_TARGET_DBUSER
-				       EST_TARGET_DBPASS      
-				       EST_TARGET_GENETYPE
-				       EST_GENEBUILDER_INPUT_GENETYPE
-				       EST_EXPRESSION_DBHOST
-				       EST_EXPRESSION_DBNAME
-				       EST_EXPRESSION_DBUSER
-				       EST_EXPRESSION_DBPASS
-				      );
+						     EST_INPUTID_REGEX
+						     EST_REFDBHOST
+						     EST_REFDBUSER
+						     EST_REFDBNAME
+						     EST_REFDBPASS
+						     EST_DBHOST
+						     EST_DBUSER
+						     EST_DBNAME
+						     EST_DBPASS
+						     EST_TARGET_DBNAME
+						     EST_TARGET_DBHOST
+						     EST_TARGET_DBUSER
+						     EST_TARGET_DBPASS      
+						     EST_TARGET_GENETYPE
+						     EST_GENEBUILDER_INPUT_GENETYPE
+						     EST_EXPRESSION_DBHOST
+						     EST_EXPRESSION_DBNAME
+						     EST_EXPRESSION_DBUSER
+						     EST_EXPRESSION_DBPASS
+						     SKIP_SINGLE_EXONS
+						     USE_ONLY_ESTS_IN_EXPRESSION_DB
+						     MAX_ESTS_PER_TRANSCRIPT 
+						    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -328,7 +331,7 @@ sub run{
   # for each transcript
   # calcultate the ests that map to this transcript
 
-  # if there no genes, we finish a earlier
+  # if there are no genes, we finish a earlier
   unless ( $self->ensembl_genes ){
     print STDERR "no genes found in this region, leaving...\n";
     exit(0);
@@ -351,45 +354,75 @@ sub run{
       
       # if we have genes of either type, let's try to match them
       if ( @genes && @ests ){
-	  print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
+	print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
+	
+	############################################################
+	#
+	#
+	# See if you can map genes to clone libraries instead of ESTs
+	#
+	#
+	############################################################
+	
+	my @est_transcripts;
+	foreach my $est ( @ests ){
+	  my @all_est_trans = @{$est->get_all_Transcripts};
+	  my @est_trans;
 	  
-	  ############################################################
-	  #
-	  #
-	  # See if you can map genes to clone libraries instead of ESTs
-	  #
-	  #
-	  ############################################################
-	  
-	  my @est_transcripts;
-	  foreach my $est ( @ests ){
-	      my @est_trans = @{$est->get_all_Transcripts};
-	      #push ( @est_transcripts, $self->_in_SANBI( @est_trans ));
-	      push ( @est_transcripts, @est_trans );
+	  if ( $SKIP_SINGLE_EXONS ){
+	  FILTER_EST:
+	    foreach my $t ( @est_trans ){
+	      if ( scalar( @{ $t->get_all_Exons } ) <= 1 ){
+		next FILTER_EST;
+	      }
+	      push ( @est_trans, $t );
+	    }
+	  }
+	  else{
+	    push ( @est_trans, @all_est_trans);
 	  }
 	  
-	  my @ensembl_transcripts;
-	  foreach my $gene ( @genes ){
-	      push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
+	  unless ( @est_trans ){
+	    print STDERR "All ests were rejected for being single-exons\n";
+	    next CLUSTER;
 	  }
 	  
-	  my $matcher = 
-	    Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher->new(
-										  -reference_set => \@ensembl_transcripts,
-										  -match_set => \@est_transcripts,
-										  );
-	  
-	  $matcher->run;
-	  
-	  my $matching_map = $matcher->output;
-	  $self->output( $matching_map );
+	  if ( $USE_ONLY_ESTS_IN_EXPRESSION_DB ){
+	    push ( @est_transcripts, $self->_in_SANBI( @est_trans ));
+	  }
+	  else{
+	    push ( @est_transcripts, @est_trans );
+	  }
+	}
+
+	unless ( @est_transcripts ){
+	  print STDERR "None of the ests left were in the expression database\n";
+	  next CLUSTER;
+	}
+
+
+	my @ensembl_transcripts;
+	foreach my $gene ( @genes ){
+	  push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
+	}
+	
+	my $matcher = 
+	  Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher->new(
+										-reference_set => \@ensembl_transcripts,
+										-match_set => \@est_transcripts,
+									       );
+	
+	$matcher->run;
+	
+	my $matching_map = $matcher->output;
+	$self->output( $matching_map );
       }
       
       
       
       # else we could have only ensembl genes
       elsif(  @genes && !@ests ){
-	  # we have nothing to modify them, hence we accept them...
+	# we have nothing to modify them, hence we accept them...
 	  print STDERR "Skipping cluster with no ests\n";
 	  next CLUSTER;
       }
@@ -541,7 +574,7 @@ sub _in_SANBI{
   foreach my $est ( @ests ){
     my $est_id = $self->_find_est_id($est);
     unless ($est_id){
-      #print STDERR "No accession found for ".$est->dbID."\n";
+      print STDERR "No accession found for ".$est->dbID."\n";
       next EST;
     }
     #print STDERR "est: $est, est_id: $est_id\n";
@@ -795,21 +828,33 @@ sub write_output {
 	    
 	    my @est_matches = $map->partners($transcript);
 	    my @est_ids;
+	    
+	    
+	    my $count = 0;
+	  EST_IDS:
 	    foreach my $est ( @est_matches ){
-		my $est_id = $self->_find_est_id($est);
-		if ( $est_id){
-		    my $est_id_no_version;
-		    if ( $est_id =~/(\S+)\.(\d+)/){
-			$est_id_no_version = $1;
-		    }
-		    else{
-			$est_id_no_version = $est_id;
-		    }
-		    push (@est_ids, $est_id_no_version);
+	      my $est_id = $self->_find_est_id($est);
+	      if ( $est_id){
+		my $est_id_no_version;
+		if ( $est_id =~/(\S+)\.(\d+)/){
+		  $est_id_no_version = $1;
 		}
+		else{
+		  $est_id_no_version = $est_id;
+		}
+		$count++;
+		if ( $MAX_ESTS_PER_TRANSCRIPT && $count > $MAX_ESTS_PER_TRANSCRIPT ){
+		  last EST_IDS;
+		}
+
+		push (@est_ids, $est_id_no_version);
+	      }
 	    }
 	    
 	    #print STDERR "(Not writing) Storing pairs $t_id, @est_ids\n";
+	    
+	   
+
 	    $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
 	}
     }
