@@ -35,12 +35,12 @@ use strict;
 use Getopt::Long;
 
 # this script connects to the db it is going to write to
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-                                        EST_GENE_DBNAME
-                                        EST_GENE_DBUSER
-                                        EST_GENE_DBPASS
-                                        EST_GENE_DBHOST
-                                       );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
+						     EST_GENE_DBNAME
+						     EST_GENE_DBUSER
+						     EST_GENE_DBPASS
+						     EST_GENE_DBHOST
+						     );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -93,8 +93,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $dbpass,
-    -perlonlyfeatures => 0,
-);
+    );
 
 die "No input id entered" unless defined ($input_id);
 
