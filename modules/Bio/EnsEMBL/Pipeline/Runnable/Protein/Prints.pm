@@ -391,9 +391,6 @@ sub create_feature {
     
     if ($feature)
     {
-	#$feat1->validate();
-	
-	# add to _flist
 	push(@{$self->{'_flist'}}, $feature);
     }
 }

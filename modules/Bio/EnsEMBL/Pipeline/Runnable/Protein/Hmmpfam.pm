@@ -518,27 +518,24 @@ sub create_feature {
     $feature1->end ($feat->{end});
     $feature1->score ($feat->{score});
     $feature1->p_value ($feat->{p_value});
-    $feature1->source_tag ($feat->{source});
-    $feature1->primary_tag ($feat->{primary});
+    $feature1->percent_id('NULL');
     $feature1->analysis ($self->analysis);
-
+    
+    
     my $feature2 = Bio::EnsEMBL::SeqFeature->new;
     $feature2->seqname ($feat->{hname});
     $feature2->start ($feat->{hstart});
     $feature2->end ($feat->{hend});
     $feature2->score ($feat->{score});
     $feature2->p_value ($feat->{p_value});
-    $feature2->source_tag ($feat->{source});
-    $feature2->primary_tag ($feat->{primary});
     $feature2->analysis ($self->analysis);
-
+    
+    
     my $featurepair = Bio::EnsEMBL::FeaturePair->new;
     $featurepair->feature1 ($feature1);
     $featurepair->feature2 ($feature2);
 
     if ($featurepair) {
-        $featurepair->feature1->validate_prot_feature;
-        $featurepair->feature2->validate_prot_feature;
         # add to _flist
         push (@{$self->{'_flist'}}, $featurepair);
     }

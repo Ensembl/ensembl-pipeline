@@ -134,7 +134,7 @@ sub query {
 	
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->filename ($self->query->id.".$$.seq");
+	    $self->filename ("query.$$.seq");
 	    $self->results ($self->filename.".out");
 	}
 	else {
@@ -430,8 +430,6 @@ sub create_feature {
 						-feature2 => $feat2);
 
     if ($feature) {
-	#$feature->validate_prot_feature;
-	# add to _flist
 	push (@{$self->{'_flist'}}, $feature);
     }
 }

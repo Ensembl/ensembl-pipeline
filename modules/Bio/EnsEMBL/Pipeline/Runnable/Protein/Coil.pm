@@ -368,13 +368,11 @@ sub create_feature {
 
     # create feature object
     my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
-                                                  -start       => $feat->{start},
-                                                  -end         => $feat->{end},
-                                                  -source_tag  => $feat->{source},
-                                                  -primary_tag => $feat->{primary},
-                                                  -analysis    => $analysis,
-						  -percent_id => 'NULL',
-						  -p_value => 'NULL',
+						-start       => $feat->{start},
+						-end         => $feat->{end},
+						-analysis    => $analysis,
+						-percent_id => 'NULL',
+						-p_value => 'NULL',
                                                 ); 
   
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
@@ -387,8 +385,6 @@ sub create_feature {
 						-feature2 => $feat2);
     
     if ($feature) {
-	#$feature->validate_prot_feature;
-	# add to _flist
 	push (@{$self->{'_flist'}}, $feature);
     }
 }

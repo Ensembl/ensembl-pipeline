@@ -368,12 +368,10 @@ sub create_feature {
 						-start       => $feat->{start},
 						-end         => $feat->{end},
 						-score       => $feat->{score},
-						-source_tag  => $feat->{source},
-						-primary_tag => $feat->{primary},
 						-analysis    => $analysis,
-						-percent_id  => 'NULL',
-						-p_value     => 'NULL',
-                                                ); 
+						-percent_id => 'NULL',
+						-p_value => 'NULL',
+						); 
 
 
 
@@ -387,8 +385,6 @@ sub create_feature {
 						-feature2 => $feat2);
 
     if ($feature) {
-	#$feature->validate_prot_feature;
-	# add to _flist
 	push (@{$self->{'_flist'}}, $feature);
     }
 }

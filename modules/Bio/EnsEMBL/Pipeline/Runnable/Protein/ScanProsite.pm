@@ -357,8 +357,9 @@ sub create_feature {
                                                -score => $score,
                                                -analysis => $analysis_obj,
                                                -seqname => $f[4],
-                                               -percent_id => 'NULL',
-                                               -p_value => 'NULL');
+					       -percent_id => 'NULL',
+						-p_value => 'NULL',
+					       );
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
                                               -end => 0,
@@ -371,9 +372,6 @@ sub create_feature {
     
     if ($feature)
     {
-        #$feat1->validate();
-        
-        # add to _flist
         push(@{$self->{'_flist'}}, $feature);
     }
 }
