@@ -1,12 +1,14 @@
 
 ### Bio::EnsEMBL::Pipeline::Runnable::Finished_EST
 
+
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 
 use strict;
 use Data::Dumper;
 
 use vars qw(@ISA);
+
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
@@ -207,6 +209,7 @@ sub run_est_genome_on_strand {
 sub do_mini_est_genome {
     my ( $self, $linear ) = @_;
 
+    ### Is this merging features?  - May be cause of duplicate features if isn't
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome(
         '-genomic'    => $self->unmasked,
         '-features'   => $linear,
