@@ -230,6 +230,28 @@ sub write_object_file {
     }
 }
 
+sub useDB {
+	my ($self,$arg) = @_;
+
+	if (defined($arg)) {
+	   $self->{_useDB} = $arg;
+        }
+
+   	return $self->{_useDB};
+
+}
+
+sub runlocally {
+	my ($self,$arg) = @_;
+
+	if (defined($arg)) {
+	   $self->{_runlocally} = $arg;
+        }
+
+   	return $self->{_runlocally};
+
+}
+
 =head2 LSF_id
 
   Title   : LSF_id
@@ -295,32 +317,71 @@ sub submit {
     my ($self,$obj) = @_;
 
     my $tmpdb = $obj->_dbobj;
-    $obj->disconnect;
 
     $self->write_object_file($obj);
-    $obj->_dbobj($tmpdb);
-    my $status = $self->set_status("WRITTEN_OBJECT_FILE");
-    
-    my $cmd = "bsub -q " . $self->queue;
 
-    $cmd .= " -o " . $self->stdout_file . " -e " . $self->stderr_file;
+    my $status = $self->set_status("WRITTEN_OBJECT_FILE");
+    my $cmd    = $self->make_command;
+
+    if ($self->runlocally) {
+	print STDERR "Running locally\n";
+
+	my $status = $self->set_status("SUBMITTED");
+	system($cmd);
+	return;
+    } else {
+	print (STDERR "Submitting to blast farm\n");
+
+	$self->_LSFJob->submit($cmd);
+
+	if ($self->LSF_id != -1) {
+	    $self->store($obj);
+
+	    print STDERR "Submitted job number " . $self->LSF_id . " to queue " . $self->queue . "\n";
+
+	    my $status = $self->set_status("SUBMITTED");
+	    
+	    return $status;
+	} else {
+	    $self->throw("Couldn't submit job " . $self->id . " to queue " . $self->queue);
+	}
+    }
     
-    $cmd .= " \"/nfs/disk100/humpub/michele/runner  -object " . $self->input_object_file . " " . 
-	                                           "-output " . $self->output_file       . "\"";
+    $obj->_dbobj($tmpdb);
+}
+
+
+sub make_command {
+    my ($self) = @_;
+
+    my $stub =  "/nfs/disk100/humpub/michele/runner ";
+
+    my $cmd;
+    my $useDB;
+
+    if ($self->useDB) {
+	$useDB = " -useDB ";
+    }
+    
+    if ($self->runlocally) {
+
+	$cmd = $stub  . " -object " . 
+               $self->input_object_file . " $useDB  1> " . 
+               $self->stdout_file       . " 2> "        . 
+               $self->stderr_file ;  
+
+
+    } else {
+	$cmd = "bsub -q " . $self->queue;
+	$cmd .= " -o " . $self->stdout_file . " -e " . $self->stderr_file;
+	
+	$cmd .= " \"$stub  -object " . $self->input_object_file . "$useDB\"" ;
+
+    }
 
     print STDERR "Command is $cmd\n";
 
-    $self->_LSFJob->submit($cmd);
-
-    if ($self->LSF_id != -1) {
-	$self->store($obj);
-	my $status = $self->set_status("SUBMITTED");
-	print STDERR "Submitted job number " . $self->LSF_id . " to queue " . $self->queue . "\n";
-	return $status;
-    } else {
-	$self->throw("Couldn't submit job " . $self->id . " to queue " . $self->queue);
-    }
-    $obj->_dbobj($tmpdb);
+    return $cmd;
 }
 
 =head2 store
@@ -462,37 +523,32 @@ sub set_status {
 sub current_status {
     my ($self,$arg) = @_;
     
-    if (defined($arg)) 
-    {
-	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
+    if (defined($arg)) {
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
 	    $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-	    $self->{_status} = $arg;
+	$self->{_status} = $arg;
     }
-    else 
-    {
-	    $self->throw("Can't get status if id not defined") unless defined($self->id);
-	    my $id =$self->id;
-	    my $sth = $self->_dbobj->prepare("select status from current_status where id=$id");
-	    my $res = $sth->execute();
-	    my $status;
-	    while (my  $rowhash = $sth->fetchrow_hashref() ) 
-        {
-	        $status    = $rowhash->{'status'};
-	    }
+    else {
+	$self->throw("Can't get status if id not defined") unless defined($self->id);
+	my $id =$self->id;
+	my $sth = $self->_dbobj->prepare("select status from current_status where id=$id");
+	my $res = $sth->execute();
+	my $status;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $status    = $rowhash->{'status'};
+	}
+	my $sth = $self->_dbobj->prepare("select now()");
+	my $res = $sth->execute();
+	my $time;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $time    = $rowhash->{'now()'};
+	}
+	my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+							   -status  => $status,
+							   -created => $time,
+							   );
 	
-        $sth = $self->_dbobj->prepare("select now()");
-	    $res = $sth->execute();
-	    my $time;
-	    while (my  $rowhash = $sth->fetchrow_hashref() ) 
-        {
-	        $time    = $rowhash->{'now()'};
-	    }
-	    my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
-							       -status  => $status,
-							       -created => $time,
-							       );
-
-	    $self->{_status} = $statusobj;
+	$self->{_status} = $statusobj;
     }
     return $self->{_status};
 }
@@ -574,12 +630,12 @@ sub make_filenames {
     $self->output_file      ($output_file);
     $self->status_file      ($status_file);
 
-    print STDERR "Touching files\n";
-    system("touch $input_object_file"); 
-    system("touch $stdout_file");
-    system("touch $stderr_file");
-    system("touch $output_file");
-    system("touch $status_file");
+    print STDERR "Not Touching files now\n";
+    #system("touch $input_object_file"); 
+    #system("touch $stdout_file");
+    #system("touch $stderr_file");
+    #system("touch $output_file");
+    #system("touch $status_file");
 
 }
 
@@ -777,7 +833,7 @@ sub print_var {
 sub disconnect {
     my ($self) = @_;
 
-    $self->{'_dbobj'} = undef;
+    $self->{_dbobj} = undef;
 }
 ;
 
