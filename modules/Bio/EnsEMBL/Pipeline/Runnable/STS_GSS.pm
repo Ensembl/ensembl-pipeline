@@ -35,8 +35,6 @@ BEGIN {
 
 =cut
 
-
-
 sub new {
     my ($class,@args) = @_;
 
@@ -226,6 +224,7 @@ sub unmasked {
     }
     return $self->{'_unmasked'};
 }
+
 
 sub program {
   my ($self, $location) = @_;
@@ -427,7 +426,7 @@ sub run {
   $self->checkdir();
   #print STDERR "checked directories\n";
   #write sequence to file
-  $self->writefile('unmasked');
+  #$self->writefile('unmasked');
   my @blast_output;
   if($self->no_blast == 1){
     
