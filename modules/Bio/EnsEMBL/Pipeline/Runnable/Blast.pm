@@ -164,7 +164,7 @@ sub new {
 	  } 
       $self->options($options);
     } else {
-      $self->options(' -p1 ');  
+      $self->options(' -p1 -gi ');  
     }
     
     if (defined($threshold)) {
