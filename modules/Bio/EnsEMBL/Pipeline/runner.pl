@@ -22,12 +22,15 @@ use Getopt::Long;
 
 
 #parameters for Bio::EnsEMBL::Pipeline::DBSQL::Obj
-my $host            = 'ensrv3.sanger.ac.uk';
+
+my $host   = $::pipeConf{'dbhost'};
+my $dbname = $::pipeConf{'dbname'};
+my $dbuser = $::pipeConf{'dbuser'};
+
 my $port            = '3306';
-my $dbname          = 'arne_anaTest';
-my $dbuser          = 'ensadmin';
 my $pass            = undef;
 my $module          = undef;
+
 my $test_env; #not used at present but could be used to test LSF machine
 
 my $object_file;
@@ -60,7 +63,7 @@ if( defined $check ) {
   exit 0;
 }
 
-
+print STDERR "In runner\n";
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new 
     (  -host   => $host,
        -user   => $dbuser,
@@ -70,14 +73,19 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
        -perlonlyfeatures  => 1,
        -perlonlysequences => 1 )
     or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
+
+print STDERR "Getting job adaptor\n";
+
 my $job_adaptor = $db->get_JobAdaptor();
 
 while( $job_id = shift ) {
+  print STDERR "Fetching job " . $job_id . "\n";
+
   my $job         = $job_adaptor->fetch_by_dbID($job_id);
 
   if( !defined $job) {
     print STDERR ( "Couldnt recreate job $job_id\n" );
   }
-
+  print STDERR "Running job\n";
   $job->runLocally;
 }
