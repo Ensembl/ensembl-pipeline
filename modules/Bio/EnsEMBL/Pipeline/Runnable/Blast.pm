@@ -171,7 +171,7 @@ sub new {
           } 
       $self->options($options);
     } else {
-      $self->options(' -p1 ');  
+      $self->options(' -cpus=1 ');  
     }
     
     if (defined($threshold)) {
