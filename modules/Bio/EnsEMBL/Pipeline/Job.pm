@@ -105,8 +105,8 @@ sub new {
   } else {
     my $dir;
 
-    if (!$BATCH_QUEUES{$analysis->logic_name}{output_dir}) {
-      $dir =  $DEFAULT_OUTPUT_DIR;
+    if (!exists($BATCH_QUEUES{$analysis->logic_name})) {
+      $dir = $BATCH_QUEUES{default}{output_dir};
     } else {
       $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
     }
@@ -118,7 +118,7 @@ sub new {
 
   $self->runner($runner);
   if(!$self->runner){
-    $self->runner($PIPELINE_RUNNER_SCRIPT);
+    $self->runner($DEFAULT_RUNNER);
   }
   return $self;
 }
@@ -138,7 +138,8 @@ sub new {
 sub create_by_analysis_input_id {
   my ($dummy, $analysis, $inputId, $output_dir, $auto_update) = @_;
   
-  $dummy->warn("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ".(caller)." should now call the constructor directly");
+  $dummy->warn("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ". (caller) .
+               " should now call the constructor directly");
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
 					     -input_id    => $inputId,
 					     -analysis    => $analysis,
@@ -451,8 +452,8 @@ sub batch_runRemote {
     $self->flush_runs($self->adaptor, $queue);
   } else {
     # print STDERR "Not running ".$self->dbID." yet as batch size is ".
-    # $BATCH_QUEUES{$queue}{'batch_size'}." and there are ".
-    #  scalar(@{$BATCH_QUEUES{$queue}{'jobs'}})." jobs\n";
+    #              $BATCH_QUEUES{$queue}{'batch_size'} . " and there are ".
+    #               scalar(@{$BATCH_QUEUES{$queue}{'jobs'}})." jobs\n";
   }
 }
 
@@ -489,7 +490,7 @@ sub runLocally {
     return;
   }
 
-  # print STDERR "Running inLSF\n"; 
+  # print STDERR "Running in LSF\n"; 
 
   $self->run_module();
   if ($self->current_status->status eq "SUCCESSFUL"){
@@ -939,35 +940,39 @@ sub set_up_queues {
   my %q;
 
   foreach my $queue (@$QUEUE_CONFIG) {
-    my $ln = $queue->{'logic_name'};
+    my $ln = $queue->{logic_name};
 
     next unless $ln;
 
-    delete $queue->{'logic_name'};
+    delete $queue->{logic_name};
 
     while (my($k, $v) = each %$queue) {
       $q{$ln}{$k}     = $v;
     }
-    $q{$ln}{'jobs'} = [];
-    $q{$ln}{'last_flushed'} = undef;
-    $q{$ln}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
-    $q{$ln}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
-    $q{$ln}{'retries'}         ||= $DEFAULT_RETRIES;
-    $q{$ln}{'cleanup'}         ||= $DEFAULT_CLEANUP;
-    $q{$ln}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+    $q{$ln}{jobs} = [];
+    $q{$ln}{last_flushed} = undef;
+    $q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+    $q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+    $q{$ln}{retries}         ||= $DEFAULT_RETRIES;
+    $q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
+    $q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+    $q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+    $q{$ln}{runner}          ||= $DEFAULT_RUNNER;
   }
 
   # a default queue for everything else
-  if ( ! exists($q{'default'})) {
-    $q{'default'}{'jobs'} = [];
-    $q{'default'}{'last_flushed'} = undef;
+  if ( ! exists($q{default})) {
+    $q{default}{jobs} = [];
+    $q{default}{last_flushed} = undef;
   }
-  # Need these set 
-  $q{'default'}{'batch_size'}      ||= $DEFAULT_BATCH_SIZE;
-  $q{'default'}{'queue'}           ||= $DEFAULT_BATCH_QUEUE;
-  $q{'default'}{'retries'}         ||= $DEFAULT_RETRIES;
-  $q{'default'}{'cleanup'}         ||= $DEFAULT_CLEANUP;
-  $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
+  # Need these set, so do the ||= thing 
+  $q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+  $q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+  $q{default}{retries}         ||= $DEFAULT_RETRIES;
+  $q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
+  $q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+  $q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+  $q{default}{runner}          ||= $DEFAULT_RUNNER;
   
   return %q;
 }

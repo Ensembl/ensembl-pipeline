@@ -130,7 +130,7 @@ sub new{
   }
 
   if (!$runner) {
-    $runner = $PIPELINE_RUNNER_SCRIPT;
+    $runner = $DEFAULT_RUNNER;
   }
 
   $self->batch_q_module($batch_q_module);
@@ -974,7 +974,7 @@ sub cleanup_waiting_jobs{
   if ($a_job) {
     $a_job->flush_runs($self->job_adaptor);
   } else {
-    print STDERR "have no jobs to clean up\n" if($self->verbose);
+    print STDERR "have no jobs to clean up\n" if ($self->be_verbose);
   } 
 }
 

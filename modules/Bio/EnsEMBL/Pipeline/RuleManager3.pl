@@ -680,11 +680,11 @@ sub run_if_new {
     } elsif ($retFlag) {
       return 0;
     }
-    #print STDERR "creating job with ".$PIPELINE_RUNNER_SCRIPT."\n";
+    #print STDERR "creating job with ".$DEFAULT_RUNNER."\n";
     my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => $id,
                                                -analysis => $anal,
                                                -output_dir => $output_dir,
-                                               -runner => $PIPELINE_RUNNER_SCRIPT);
+                                               -runner => $DEFAULT_RUNNER);
     
     
     print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
