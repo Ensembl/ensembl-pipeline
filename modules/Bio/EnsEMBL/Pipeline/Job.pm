@@ -305,16 +305,16 @@ sub flush_runs {
     
     my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
    
-    my $batch_job = $batch_q_module->new(
-	-STDOUT     => $lastjob->stdout_file,
-	-STDERR     => $lastjob->stderr_file,
-	-PARAMETERS => $queue->{'sub_args'},
-	-PRE_EXEC   => $pre_exec,
-	-QUEUE      => $queue->{'queue'},
-	-JOBNAME    => $dbname . ':' . $anal,
-	-NODES      => $queue->{'nodes'},
-	-RESOURCE   => $queue->{'resource'}
-    );
+    my $batch_job = $batch_q_module->new
+      (
+       -STDOUT     => $lastjob->stdout_file,
+       -PARAMETERS => $queue->{'sub_args'},
+       -PRE_EXEC   => $pre_exec,
+       -QUEUE      => $queue->{'queue'},
+       -JOBNAME    => $dbname . ':' . $anal,
+       -NODES      => $queue->{'nodes'},
+       -RESOURCE   => $queue->{'resource'}
+      );
     my $cmd;
   
     
