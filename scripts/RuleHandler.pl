@@ -132,8 +132,8 @@ sub insert_rule {
   @conditions or die "Cannot insert a rule without at least one condition logic_name\n";
   
   # check the goal is valid
-  my @analyses = $anaAdaptor->fetch_by_logic_name($goal);
-  if (scalar(@analyses) == 0) {
+  my $analysis = $anaAdaptor->fetch_by_logic_name($goal);
+  if (!$analysis) {
     die "The goal condition $goal is not found in the database\n";
   }
   
@@ -153,15 +153,14 @@ sub insert_rule {
     if exists $checked{$goal};
 
   # make and store the rule
-  foreach my $analysis(@analyses) {
-    my $rule = Bio::EnsEMBL::Pipeline::Rule->new($analysis);
-    foreach my $condition(keys %checked) {
-      $rule->add_condition($condition);
-    }
-    if (check_dependencies($rule) && check_duplications($rule)) { 
-      $ruleAdaptor->store($rule); 
-    }
+  my $rule = Bio::EnsEMBL::Pipeline::Rule->new(-goal => $analysis);
+  foreach my $condition(keys %checked) {
+    $rule->add_condition($condition);
   }
+  if (check_dependencies($rule) && check_duplications($rule)) { 
+    $ruleAdaptor->store($rule); 
+  }
+ 
   
 }
 
@@ -333,6 +332,7 @@ sub check_circles {
 
   my ($goal, $rule) = @_;
   my @conditions = $rule->list_conditions();
+  #print STDERR "checking rule ".$rule->dbID." ".$rule->goalAnalysis->logic_name."\n";
 #  die "Sorry, your rule will introduce a circular dependency\n" 
  #   if $rule->goalAnalysis()->logic_name() eq $goal;
  LOOP: while (@conditions) {
