@@ -170,6 +170,8 @@ sub make_runnables{
 
   my $pipeline_db = $self->db;
 
+  # Connect to our output database
+
   my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       '-host'   => $GB_GW_DBHOST,
 						       '-user'   => $GB_GW_DBUSER,
@@ -184,6 +186,8 @@ sub make_runnables{
   # for checking cdna_ids
   my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
 
+  # Parse the input id and derive our genomic slice.
+
   my $input_id = $self->input_id;
   my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
   $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
@@ -194,6 +198,7 @@ sub make_runnables{
 
   my $genomic = $genewise_db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name, $start, $end);
   $self->query($genomic);
+
   # write genomic seq to tmp file
   my $tmpfilename = "/tmp/KUTR.genomic.$$";
   open( TARGET_SEQ,">$tmpfilename") || $self->throw("Could not open $tmpfilename $!");
@@ -203,7 +208,8 @@ sub make_runnables{
   close( TARGET_SEQ );
   $self->tmpfile($tmpfilename);
 
-  # get all targetted genes in the given slice
+  # get all targetted genes in the given slice, from which the evidence for 
+  # these genes can be derived.
  GENE:
  foreach my $gene(@{$genomic->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)}){
     my $protein_id;
@@ -216,6 +222,9 @@ sub make_runnables{
       }
     }
 
+    # Using the protein id of the targetted gene, determine the
+    # corresponding cDNA id.
+
     print STDERR "Gene " . $gene->dbID . " built from $protein_id\n";
 
     my $cdna_id = $pmfa->get_cdna_id($protein_id);
@@ -225,8 +234,6 @@ sub make_runnables{
       next GENE;
     }
 
-    print "cdna id is $cdna_id\n";
-
     # hash genes to cdna_ids
     $self->targetted_cdna_pairs($gene, $cdna_id);
 
@@ -235,8 +242,39 @@ sub make_runnables{
     eval{
       $cdna = $cdna_fetcher->get_Seq_by_acc($cdna_id);
     };
+
     if($@) {
       $self->throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
+    }
+
+    # If the cdna cant be retrieved try decrementing the version number 
+    # and having a second attempt.
+
+    unless ($cdna) {
+
+      $self->warn("Unable to fetch cDNA sequence [$cdna_id].  Will increment\n" .
+		  "the cDNA version number and have another go.");
+
+      if ($cdna_id =~ s/([\_\w]+)\.(\d+)/$1/){
+	my $version_number = $2;
+	$version_number--;
+	$cdna_id = $1 . '.' . $version_number;
+      }
+
+      eval{
+	$cdna = $cdna_fetcher->get_Seq_by_acc($cdna_id);
+      };
+
+      if($@) {
+	$self->throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
+      }
+
+      if ($cdna) {
+	$self->targetted_cdna_pairs($gene, $cdna_id);
+      } else {
+	$self->throw("Unable to fetch cDNA sequence [$cdna_id] even after incrementing the version number.");
+      }
+
     }
 
     my @seqs = ($cdna);
@@ -468,6 +506,8 @@ sub get_targetted_gene_from_cdna{
     }
   }
 
+  $self->throw("Unable to find Targetted Gene from cDNA") 
+    unless $gene;
 
   return $gene;
 }
@@ -1457,7 +1497,7 @@ sub make_blat_genes {
   my ($self, @blat_results) = @_;
 
   print STDERR scalar(@blat_results) . " blat results found\n";
-  return undef unless scalar(@blat_results);
+  return () unless scalar(@blat_results);
 
   # take only the best hit
   @blat_results = sort { $b->score <=> $a->score  } @blat_results;
