@@ -288,10 +288,10 @@ sub run{
   my ($self,@args) = @_;
 
   # get estgenes ( from EST_GeneBuilder )
-  $self->estgenes($self->estgene_vc->get_Genes_by_Type( $ESTGENE_TYPE, 'evidence' ));
+  $self->estgenes(@{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE, 'evidence' ) } );
 
   # get ensembl genes (from GeneBuilder)
-  my @ensembl_genes = $self->ensembl_vc->get_Genes_by_Type( $ENSEMBL_TYPE, 'evidence' );
+  my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE, 'evidence' ) };
 
   # if there are no genes, we finish earlier
   unless ( $self->estgenes ){
@@ -1699,8 +1699,8 @@ sub _check_UTRMatches{
   my $strand          = $ens_exons[0]->strand;
 
   # we only look at the start and end of the translations in the ensembl gene
-  #my $ens_t_start_exon = $ens_translation->start_exon;
-  #my $ens_t_end_exon   = $ens_translation->end_exon;
+  #my $ens_t_start_exon = $ens_translation->start_Exon;
+  #my $ens_t_end_exon   = $ens_translation->end_Exon;
   my @est_exons = @{$est_tran->get_all_Exons};
   
   my $ens_start_exon = $ens_tran->start_exon;
