@@ -65,7 +65,7 @@ use vars qw(@ISA);
                           
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -db:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis 
 
@@ -80,7 +80,7 @@ sub new {
     $self->{'_runnable'}    = undef;
     $self->{'_parameters'}  = undef;
     
-    # dbobj input_id mandatory and read in by BlastableDB
+    # db input_id mandatory and read in by BlastableDB
 
     # anlaysis not mandatory for BlastableDB, so we check here 
     $self->throw("Analysis object required") unless ($self->analysis);
@@ -106,8 +106,9 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+    $self->{'contig'} = $contig;
     $self->genseq($genseq);
 
 }
@@ -171,8 +172,8 @@ sub write_output {
    my @transcripts = $genefinder_runnable->each_Transcript();
    if( ! @transcripts ) { return; }
 
-   my $ptransAdaptor = $self->dbobj()->get_PredictionTranscriptAdaptor();
-
+   my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
+   print "there are ".@transcripts." transcripts\n";
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
      my @exons = $trans->get_all_Exons();
@@ -186,7 +187,7 @@ sub write_output {
 
      $ptrans->analysis( $self->analysis() );
      for my $exon ( @exons ) {
-       #print STDERR "adding contig ".$self->{'contig'}." to exon\n";
+       print STDERR "adding contig ".$self->{'contig'}." to exon\n";
        $exon->contig( $self->{'contig'} );
        $ptrans->add_Exon( $exon );
      }

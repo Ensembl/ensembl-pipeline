@@ -62,7 +62,7 @@ use vars qw(@ISA);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
-    Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :    -db:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis
 
@@ -76,7 +76,7 @@ sub new {
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     
-    # dbobj input_id mandatory and read in by BlastableDB
+    # db input_id mandatory and read in by BlastableDB
     # anlaysis not mandatory for BlastableDB, so we check here 
     $self->throw("Analysis object required") unless ($self->analysis);
     
@@ -103,10 +103,11 @@ sub fetch_input {
     
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-    my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+    #my $genseq    = $contig->seq() or $self->throw("Unable to fetch contig");
     #@times = times;
     #print STDERR "end fetching input @times\n";
-    $self->genseq($genseq);
+    #print "have ".$genseq."\n";
+    $self->genseq($contig);
 }
 
 #get/set for runnable and args
