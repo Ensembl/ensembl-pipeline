@@ -158,7 +158,7 @@ sub fetch_input {
 								       -seq2 => $seq2,
 								       -score => $self->min_score,
 								       -minmatch => 14,
-								       -masklevel => 80);
+								       -masklevel => 101);
     } elsif ($self->alnprog eq 'bl2seq') {
 
 # bl2seq runnable runs by default a 'blastn' alignment type.
@@ -222,10 +222,12 @@ sub output {
 
     Title   :   _greedy_filter
     Usage   :   _greedy_filter(@)
-    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in two step, 
+    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in three steps, 
                 First, determines the highest scored hit, and fix the expected strand hit
                 Second, hits on expected strand are kept if they do not overlap, 
                 either on query or subject sequence, previous strored, higher scored hits.
+                If hit goes trough the second step, the third test makes sure that the hit
+                is coherent position according to previous ones. 
     Returns :   Array of Bio::EnsEMBL::FeaturePairs
     Args    :   Array of Bio::EnsEMBL::FeaturePairs
 
@@ -254,6 +256,19 @@ sub _greedy_filter {
 	  ($fp->hend >= $hstart && $fp->hend <= $hend)) {
 	$add_fp = 0;
 	last;
+      }
+      if ($ref_strand == 1) {
+	unless (($fp->start > $end && $fp->hstart > $hend) ||
+		($fp->end < $start && $fp->hend < $hend)) {
+	  $add_fp = 0;
+	  last
+	}
+      } elsif ($ref_strand == -1) {
+	unless (($fp->start > $end && $fp->hstart < $hend) ||
+		($fp->end < $start && $fp->hend > $hend)) {
+	  $add_fp = 0;
+	  last
+	}
       }
     }
     push @features_filtered, $fp if ($add_fp);
