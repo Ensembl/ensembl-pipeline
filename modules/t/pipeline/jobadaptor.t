@@ -4,12 +4,13 @@ use warnings;
 
 BEGIN { $| = 1;
 	use Test ;
-	plan tests => 11;
+	plan tests => 13;
 }
 
 use TestUtils qw(debug test_getter_setter);
 use MultiTestDB;
 
+our $verbose = 0;
 
 my $multi_test_db = new MultiTestDB();
 
@@ -63,6 +64,13 @@ my @lists = @{$job_adaptor->list_current_status};
 
 ok(@lists);
 
+if($verbose) {
+  foreach my $l(@lists){
+    print STDERR join ', ', @$l;
+    print STDERR "\n";
+  }
+}
+
 #
 # Test that the update method works
 #
@@ -78,7 +86,4 @@ ok($job->submission_id eq 'test');
 
 $multi_test_db->restore('pipeline');
 
-#foreach my $l(@lists){
-#  print STDERR join ', ', @$l;
-#  print STDERR "\n";
-#}
+
