@@ -117,6 +117,12 @@ my $pipeline = 1;
 	    ) or useage();
 
 
+
+if($help){
+  useage();
+}
+
+
 if(!($dbhost) || !($dbuser) || !($dbname)){
   print STDERR "need to pass in database arguments for script to work\n";
   print STDERR "-dbhost $dbhost -dbuser $dbuser -dbpass $dbpass -dbname".
@@ -135,10 +141,6 @@ if(!$file){
     "analysis config file to be read and stored in the database or ".
       "written based on the analysis objects in the database\n";
   $help = 1;
-}
-
-if($help){
-  useage();
 }
 
 my $db;
