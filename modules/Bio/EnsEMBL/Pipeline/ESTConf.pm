@@ -123,6 +123,7 @@ use vars qw( %ESTConf );
 	    cDNA_DBHOST                  => '',
 	    cDNA_DBUSER                  => '',
 	    cDNA_DBPASS                  => '',
+	    cDNA_GENETYPE                => '',
 	   );
 
 sub import {
