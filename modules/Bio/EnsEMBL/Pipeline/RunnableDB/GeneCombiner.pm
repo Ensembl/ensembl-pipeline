@@ -908,9 +908,17 @@ sub _pair_Transcripts{
 		 #&& $exact_merge     == 0 
 	       ){
 	      print STDERR "BINGO, and ISOFORM found !!\n";
-
-	      # try to lock phases:
-	      $est_tran = $self->_lock_Phases($est_tran, $ens_tran);
+	      
+	      # if they don't have the same start/end translation, try to lock phases:
+	      if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
+		   !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
+		$est_tran = $self->_lock_Phases($est_tran, $ens_tran) ;
+	      }
+	      else{
+		print STDERR "EST-transcript has the same translation start and end:\n";
+		print STDERR "EST translation start: ".$est_tran->translation->start." end: ".$est_tran->translation->end."\n";
+		print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
+	      }
 	      push ( @accepted_isoforms, $est_tran );
 	      
 	      next CANDIDATE; 
@@ -924,8 +932,8 @@ sub _pair_Transcripts{
 	      ############################################################
 	    }
 	  }
-	} # end of CANDIDATE 
-  }  # end of 'if (@candidates)'
+    }  # end of CANDIDATE 
+  }    # end of 'if (@candidates)'
   else{
       # nothing to do then
   }
@@ -978,7 +986,7 @@ sub _lock_Phases{
       }
     }
   }
-
+  
   # check that we get something useful:
   unless ( $est_start_exon && $est_end_exon ){
     print STDERR "could not lock phases. Translation start/end exon not overlapping\n";
