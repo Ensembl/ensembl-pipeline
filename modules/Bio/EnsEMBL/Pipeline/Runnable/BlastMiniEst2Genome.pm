@@ -263,8 +263,8 @@ sub run {
     }
 
   ID:    
-    foreach my $est(keys %filtered_ests) {
-      my @features = @{$filtered_ests{$est}};
+    foreach my $est(keys %blast_ests) {
+      my @features = @{$blast_ests{$est}};
  
       # make MiniEst2Genome runnables
       
@@ -403,23 +403,12 @@ sub make_blast_db {
       
     }
 
-    my $blastfile = $self->get_tmp_file('/tmp/','blast','fa');
-    my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
-			       -file   => ">$blastfile");
+    print STDERR "Blast db file is $estfile\n";
 
-    print STDERR "Blast db file is $blastfile\n";
-
-    foreach my $seq (@seq) {
-#	print STDERR "Writing seq " . $seq->id ."\n";
-	$seqio->write_seq($seq);
-    }
-
-    close($seqio->_filehandle);
-
-    my $status = system("pressdb $blastfile");
+    my $status = system("pressdb $estfile");
     print (STDERR "Status from pressdb $status\n");
 
-    return $blastfile;
+    return $estfile;
 }
 
 sub get_tmp_file {
