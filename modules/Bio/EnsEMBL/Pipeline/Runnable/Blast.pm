@@ -546,7 +546,7 @@ sub filter_hits {
   if ($self->threshold_type eq "PID") {
     @features = sort {$b->percent_id <=> $a->percent_id} @features;
   } elsif ($self->threshold_type eq "PVALUE") {
-    @features = sort {$b->percent_id <=> $a->percent_id} @features;
+    @features = sort {$a->p_value <=> $b->p_value } @features;
   } 
   
   my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-coverage => $self->coverage);
