@@ -3,8 +3,15 @@ use warnings;
 
 package Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF;
 
-#LSF_MAX_BATCH_SIZE could go as high as 65536, but we need a way to seperate
-#job_array output files into seperate dirs to ease filesystem burden
+use vars qw(@ISA);
+
+use Bio::EnsEMBL::Pipeline::SubmissionSystem;
+use Bio::EnsEMBL::Pipeline::Job;
+
+@ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
+
+# LSF_MAX_BATCH_SIZE could go as high as 65536, but we need a way to seperate
+# job_array output files into seperate dirs to ease filesystem burden
 use constant LSF_MAX_BATCH_SIZE => 1000;
 use constant MAX_INT => 2147483647; # (2^31)-1 max 32 bit signed int
 
@@ -72,6 +79,8 @@ sub flush {
 	my $self = shift;
 	my $taskname = shift;
 
+  #print STDERR "FLUSHING taskqueue $taskname\n";
+
 	#keep track of the number of submissions to guarentee unique names
   $self->{'sub_count'} = 0 if(!defined($self->{'sub_count'}));
 	$self->{'sub_count'}++;
@@ -98,8 +107,8 @@ sub flush {
                     '-host',   $db->host,
                     '-port',   $db->port,
                     '-dbname', $db->dbname,
-                    '-dbuser', $db->user,
-                    '-pass',   $db->pass);
+                    '-dbuser', $db->username,
+                    '-pass',   $db->password);
 
 	foreach $taskname (@tasknames) {
 
@@ -108,25 +117,33 @@ sub flush {
 		my $where = $config->get_parameter($taskname, 'where');
 		my ($queue, $other_parms);
 		(undef, $queue, $other_parms) = split(':', $where, 3);
+
+    $other_parms ||= '';
 		
 		$queue ||
 			$self->throw("Could not determine LSF queue for task [$taskname]");
 
-		my @jobs = @{$self->_task_queue->{$taskname}};
+		my @jobs = @{$self->_task_queue->{$taskname} || []};
+
+    #print STDERR "GOT " . scalar(@jobs) . " jobs from taskqueue $taskname\n";
 
 		next if(@jobs == 0);
+
+    #empty the queue
+    $self->_task_queue->{$taskname} = [];
 
 		#submission needs to be uniquely named
 		my $lsf_job_name = join('_', $taskname, time(),$self->{'sub_count'});
 
 		#add the preexec to the arguments
-		my @args = ('-E', "\"runner.pl -check $dbargs\"");
+		my @args = ('-E', "\"runner.pl -check\"");
 		#add the queue name
 		push @args, ('-q', $queue);
 		
 
     my $dir_prefix = $self->_dir_prefix($taskname);
-    my $command = "\"runner.pl -jobname $lsf_job_name $dbargs\"";
+
+    my $command;
 
 		#
 		# If there is only a single job submit it normally
@@ -137,9 +154,9 @@ sub flush {
 
 			$job->job_name($lsf_job_name);
       my $stdout = ($dir_prefix) ?
-        "$dir_prefix/$lsf_job_name.out" : '/dev/null';
+        "$dir_prefix$lsf_job_name.out" : '/dev/null';
       my $stderr = ($dir_prefix) ?
-        "$dir_prefix/$lsf_job_name.err" : '/dev/null';
+        "$dir_prefix$lsf_job_name.err" : '/dev/null';
 			$job->stdout_file($stdout);
 			$job->stderr_file($stderr);
 			$job->array_index(undef);
@@ -151,6 +168,8 @@ sub flush {
 			push @args, ('-o', $stdout);
 			push @args, ('-e', $stderr);
 			push @args, ('-J', $lsf_job_name);
+
+      $command = "\"runner.pl -jobname $lsf_job_name $dbargs\"";
 		} else {
 			my $array_index = 0;
 
@@ -158,9 +177,9 @@ sub flush {
         $array_index++;
 
         my $job_stdout = ($dir_prefix) ? 
-          "$dir_prefix/${lsf_job_name}_${array_index}.out" : '/dev/null';
+          "$dir_prefix${lsf_job_name}_${array_index}.out" : '/dev/null';
         my $job_stderr = ($dir_prefix) ?
-          "$dir_prefix/${lsf_job_name}_${array_index}.err" : '/dev/null';
+          "$dir_prefix${lsf_job_name}_${array_index}.err" : '/dev/null';
 
         $job->stdout_file($job_stdout);
         $job->stderr_file($job_stderr);
@@ -175,16 +194,16 @@ sub flush {
 			}	
 			#add the output dirs to the stdout list
       my $stdout = ($dir_prefix) ? 
-        "$dir_prefix/$lsf_job_name".'_%I.out' : '/dev/null';
+        "$dir_prefix$lsf_job_name".'_%I.out' : '/dev/null';
       my $stderr = ($dir_prefix) ?
-        "$dir_prefix/$lsf_job_name".'_%I.err' : '/dev/null';
+        "$dir_prefix$lsf_job_name".'_%I.err' : '/dev/null';
 
 			push @args, ('-o', $stdout);
 			push @args, ('-e', $stderr);
 			
 			#add the job name and array index
 			push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
-      $command .= ' -index %I';
+      $command = "\"runner.pl -jobname $lsf_job_name -index %I $dbargs\"";
 		}
 
 		#execute the bsub to submit the job or job_array
@@ -192,7 +211,8 @@ sub flush {
 		#need to get job_id out of stdout :(
 		my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
 
-    print STDERR "LSF: EXECUTING COMMAND:\n\t$command\n";
+    #print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
+    #my $sub_id = int(rand(100000));
 
 		open(SUB, $bsub." 2>&1 |") or
 			$self->throw("could not execute command [$bsub]");
@@ -238,7 +258,7 @@ sub submit {
 	# retrieve batch size from config
 	my $config = $self->get_Config();
 	my $taskname = $job->taskname();
-	my $batch_size = $config->get_parameter($taskname, 'batch_size');
+	my $batch_size = $config->get_parameter($taskname, 'batchsize');
 
 	$batch_size || $self->throw('Could not determine batch size for task ' .
 															"[$taskname] from config");
@@ -252,7 +272,9 @@ sub submit {
 
 	#place the job into a queue specific to each task and module
 	$self->_task_queue()->{$taskname} ||= [];
-	push(@{$self->_task_queue()->{$taskname}}, $job);
+  #print STDERR "SUBMITTED job to taskqueue $taskname\n";
+	#push(@{$self->_task_queue()->{$taskname}}, $job);
+
 
 	#
 	# if the queue is full submit all of the jobs in it
@@ -285,8 +307,11 @@ sub create_Job {
 	my $config = $self->get_Config();
 	my $job_adaptor = $config->get_DBAdaptor->get_JobAdaptor();
 
-	my $job = new Bio::EnsEMBL::Job::Job->new($taskname, $module,
-																						$input_id, $parameter_string);
+	my $job = Bio::EnsEMBL::Pipeline::Job->new
+    (-TASKNAME   => $taskname,
+     -MODULE     => $module,
+     -INPUT_ID   => $input_id,
+     -PARAMETERS => $parameter_string);
 
 
 	#store the job and set its status to created
@@ -333,7 +358,7 @@ sub _dir_prefix {
     return undef;
   }
 	
-	my $task_dir .= $taskname;
+	my $task_dir = "$temp_dir/$taskname";
 
   if(! -e $task_dir) {
     if(!mkdir($task_dir)) {
@@ -342,12 +367,12 @@ sub _dir_prefix {
     }
   }
 	
-	$temp_dir .= "$task_dir/".$self->{'dir_num'};
+	$temp_dir = "$task_dir/".$self->{'dir_num'};
 
 	#create the dir if it doesn't exist
   if(! -e $temp_dir) {
     if(!mkdir($temp_dir)) {
-      self->warn("could not create temp dir [$temp_dir] : using /dev/null");
+      $self->warn("could not create temp dir [$temp_dir] : using /dev/null");
       return undef;
     }
   }

@@ -3,6 +3,12 @@ use warnings;
 
 package Bio::EnsEMBL::Pipeline::SubmissionSystem;
 
+use vars qw(@ISA);
+
+use Bio::EnsEMBL::Root;
+
+@ISA = qw(Bio::EnsEMBL::Root);
+
 
 =head2 new
 
