@@ -41,10 +41,9 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
 
-use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 
 # dynamically load appropriate queue manager (e.g. LSF)
@@ -421,11 +420,9 @@ sub run_module {
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
 
-  #print STDERR "in run_module have autoupdate set to ".$autoupdate." while running ".$module."\n";
-
   STATUS:
   { 
-    # "CREATED"
+    # "SUBMITTED"
     eval {
       if( $module =~ /::/ ) {
           $module =~ s/::/\//g;
