@@ -1,92 +1,33 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
-	use vars qw($loaded); }
 
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 7;} 
 
 use Bio::EnsEMBL::Pipeline::Runnable::EponineTSS;
 use Bio::Seq;
-use strict;
 
-$loaded = 1;
-print "ok 1\n";;    # 1st test passed.
+ok(1);
 
-# Make a Bio::Seq object to play with.
-
-my ($seq) =  set_seq();
-my $seq	   =  Bio::Seq->new(	-seq         => $seq,
+ok(my ($seqstr) =  set_seq());
+ok(my $seq	   =  Bio::Seq->new(	-seq         => $seqstr,
 				-id          => 'HSAC74',
 				-accession   => 'ACOOOO74',
-				-moltype     => 'dna');
+				-moltype     => 'dna'));
 
-if ($seq) {
-  print "ok 2\n";  # 2nd test passed.
-}else {
-  print "not ok 2\n";
-}
 
-# Get a Bio::EnsEMBL::Pipeline::Runnable::Eponine object.
+ok(my $eponine = Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new(-QUERY => $seq, 
+                                                                   -EPOJAR => '/usr/local/ensembl/lib/eponine-scan.jar'));
 
-my $eponine = Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new(-QUERY => $seq);
-
-if ($eponine) {
-  print "ok 3\n";  # 3rd test passed.
-}else {
-  print "not ok 3\n";
-}
-
-# Attempt to set a workdir.
-
-if ($eponine->workdir('/tmp')) {
-  print "ok 4\n";
-} else {
-  print "not of 4\n";
-}
-
-# Attempt to set a threshold value.
-
-if ($eponine->threshold(0.999)){
-  print "ok 5\n";
-} else {
-  print "not of 5\n";
-}
-
-# Try to run.
-
+ok($eponine->workdir('/tmp'));
+ok($eponine->threshold(0.999));
 $eponine->run();
-
-print "ok 6\n";  # 4th test passed.
-
-# Retrieve output.
-
-my @output = $eponine->output;
-
-if (@output) {
-  print "ok 7\n"; # 5th test passed.
-}else {
-  print "not ok 7\n";
-}
-
-# Print some details of the output.
+ok(1);
+ok(my @output = $eponine->output);
 
 my @methods = qw(seqname start end strand score);
+
 foreach my $window (@output) {
     print "\n";
     foreach my $method_name (@methods) {
@@ -94,7 +35,7 @@ foreach my $window (@output) {
         printf ("%10s = $value\n", $method_name);
     }
 }
-
+ok(1);
 
 sub set_seq {
 
