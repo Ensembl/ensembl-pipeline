@@ -258,9 +258,11 @@ sub run {
   my ($self) = @_;
 
   my ($fhash,$ids) = $self->get_all_features_by_id;
-  
+ # print STDERR "have ".@$ids." ids\n";
+  my @forward;
+  my @reverse;
   foreach my $id (@$ids) {
-    print "Processing $id\n";
+    #print STDERR "Processing $id\n";
     
     my @features = @{$fhash->{$id}};
     my @extras   = $self->_find_extras (@features);
@@ -268,18 +270,43 @@ sub run {
     if (scalar(@extras) > 0) {
       my $pepseq = $self->get_Sequence($features[0]->hseqname);
       
+
       if (defined($pepseq)) {
+
+	foreach my $f (@extras){
+	  if($f->strand == 1){
+	    push(@forward, $f);
+	  }elsif($f->strand == -1){
+	    push(@reverse, $f);
+	  }else{
+	    $self->throw("unstranded feature not much use for gene building\n") 
+	  }
+	}
+	if(@forward){
 	my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
 									   -genomic => $self->genomic_sequence,
 									   -protein => $pepseq,
-									   -features=> \@features,
+									   -features=> \@forward,
 									   -endbias => $self->endbias);
 	
 	$runnable->run;
-	print "Runnable output " . $runnable->output . "\n";
+	#print STDERR "MiniGenewise output " . $runnable->output . "\n";
 	
 	push(@{$self->{_output}},$runnable->output);
+      }
+	if(@reverse){
+	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
+									     -genomic => $self->genomic_sequence,
+									     -protein => $pepseq,
+									     -features=> \@reverse,
+									     -endbias => $self->endbias);
+	  
+	  $runnable->run;
+	  #print STDERR "MiniGenewise output " . $runnable->output . "\n";
 	
+	  push(@{$self->{_output}},$runnable->output); 
+	}
+	  
       } else {
 	$self->throw("Can't fetch sequence for " . $features[0]->hseqname . "\n");
       }

@@ -181,7 +181,7 @@ sub run {
   
   my @features = $self->run_blast;
 
-  print STDERR "There are ".@features." remaining features after reblasting.\n";
+  #print STDERR "There are ".@features." remaining features after reblasting.\n";
   unless (@features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
     return;
@@ -189,11 +189,11 @@ sub run {
   
   my $mg_runnables = $self->build_runnables(@features);
   
-  print STDERR "Running the MultiMiniGenewise runnables.\n";
+  #print STDERR "Running the MultiMiniGenewise runnables.\n";
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
-    print STDERR "There were " . scalar @f . " $f[0]  " 
+    #print STDERR "There were " . scalar @f . " $f[0]  " 
       . " features after the MiniGenewise run.\n";
 
     push(@{$self->{'_output'}},@f);
@@ -213,9 +213,9 @@ sub run_blast {
   my $blastdb     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(
 					 -sequences => [$self->genomic_sequence],
 					 -type      => 'DNA');
-  print STDERR "\n";
+  #print STDERR "\n";
   $blastdb->run;
-  print STDERR "\n";
+  #print STDERR "\n";
   my @features;
   my $dbname = $blastdb->dbname;
   my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
@@ -236,7 +236,7 @@ sub run_blast {
     my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
 							  -program  => 'wutblastn',
 							  -database => $blastdb->dbfile,
-							  -filter => 0,
+							  -filter => 1,
 							 );
     $run->run;
 
