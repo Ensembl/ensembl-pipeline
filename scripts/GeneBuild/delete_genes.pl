@@ -36,7 +36,6 @@ my $port;
 my $dbname;
 my $dbuser;
 my $pass;
-my $help = 0;
 
 &GetOptions( 
 	     'dbhost:s'      => \$host,
@@ -44,16 +43,7 @@ my $help = 0;
 	     'dbname:s'    => \$dbname,
 	     'dbuser:s'    => \$dbuser,
 	     'dbpass:s'      => \$pass,
-	     'help!'      => \$help, 
-	     )or &useage();
-
-
-if(!$host || !$dbuser || !$dbname ){
-  $help = 1;
-}
-
-&useage() if($help);
- 
+	     );
 
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,
@@ -63,27 +53,21 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $host,
 					    -port => $port,
 					   );
 
+my $gene_adaptor = $db->get_GeneAdaptor;
+
 while(<>){
   chomp;
   my $gene_id= $_;
-  print STDERR "about to delete $gene_id\n";
+
   #my $sth = $db->prepare("delete from gene where gene_id = $gene_id");
   #$sth->execute;
   eval{
-    my $gene_adaptor = $db->get_GeneAdaptor;
     my $gene = $gene_adaptor->fetch_by_dbID($gene_id);
     $gene_adaptor->remove($gene);
+    print STDERR "Deleted $gene_id\n";
   };
   if($@){
-    print STDERR "$@ couldn't remove gene\n";
-    my $sth = $db->prepare("delete from gene where gene_id = $gene_id");
-    $sth->execute;
+    print "Couldn't remove gene $gene_id ($@)\n";
   }
 }
 
-
-
-sub useage{
-	exec('perldoc', $0);
-	exit;
-}
