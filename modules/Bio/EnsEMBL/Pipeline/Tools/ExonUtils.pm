@@ -206,8 +206,13 @@ sub _clone_Exon{
   $newexon->sticky_rank($exon->sticky_rank);
   $newexon->seqname    ($exon->seqname);
   
-  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
-    $newexon->add_supporting_features( $evidence );
+   my %evidence_hash;
+  foreach my $sf ( @{$exon->get_all_supporting_features} ){
+    if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+      next;
+    }
+    $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+    $newexon->add_supporting_features( $sf );
   }
   return $newexon;
 }
