@@ -614,8 +614,8 @@ sub run_blastwise {
 
   my @extras  = $self->find_extras (@$features);
   
-  print STDERR "Number of features       = ".scalar(@$features)."\n";
-  print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+  #print STDERR "Number of features       = ".scalar(@$features)."\n";
+  #print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
   
   return unless (scalar(@extras) >= 1);
   
@@ -673,7 +673,7 @@ sub run_blastwise {
       #print STDERR "feature is: ".$f->gffstring."\n";
       #print STDERR "genomics are:\n";
       foreach my $g (@genomics){
-	print STDERR $g->start."-".$g->end."\n";
+	#print STDERR $g->start."-".$g->end."\n";
       }
       next FEAT;
     }
@@ -730,7 +730,11 @@ sub run_blastwise {
     $fset->analysis($analysis_obj);
   }
   
-  push(@{$self->{'_output'}},$fset);
+  if(scalar($fset->sub_SeqFeature) > 0){
+    push(@{$self->{'_output'}},$fset);
+  }else{
+    print STDERR $fset." won't be outputed has ".$fset->sub_SeqFeature." exons\n";
+  }
   
 }
 
@@ -803,6 +807,15 @@ sub output {
     if (!defined($self->{'_output'})) {
 	$self->{'_output'} = [];
     }
+    
+    #print "there are ".@{$self->{'_output'}}." genes\n";
+       foreach my $gene(@{$self->{'_output'}}){
+         #print "gene has ".$gene->sub_SeqFeature." exon\n";
+         foreach my $e($gene->sub_SeqFeature){
+      #print "exon has ".$e->sub_SeqFeature." supporting features\n";
+      }
+    }
+
     return @{$self->{'_output'}};
 }
 
