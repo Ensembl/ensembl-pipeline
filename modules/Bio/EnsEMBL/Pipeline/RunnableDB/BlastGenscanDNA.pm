@@ -18,7 +18,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA
 
 my $db          = Bio::EnsEMBL::DBLoader->new($locator);
 my $genscan     = Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA->new ( 
-                                                    -dbobj      => $db,
+                                                    -db         => $db,
 			                            -input_id   => $input_id
                                                     -analysis   => $analysis );
 
@@ -63,13 +63,13 @@ use vars qw(@ISA);
 =head2 new
 
     Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
+    Usage   :   $self->new(-DB          => $db
                            -INPUT_ID    => $id
                            -ANALYSIS    => $analysis);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+    Args    :   -db:        A Bio::EnsEMBL::DB::Obj, 
                 -input_id:  Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Analysis 
 
