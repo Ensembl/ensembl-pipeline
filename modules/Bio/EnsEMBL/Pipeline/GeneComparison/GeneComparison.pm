@@ -349,7 +349,7 @@ sub cluster_Genes {
   }
   $self->flush_gene_Clusters;
   $self->gene_Clusters(@new_clusters);
-  my @unclustered = $self->unclustered_Genes;
+  #my @unclustered = $self->unclustered_Genes;
   return @new_clusters;
 }
  
@@ -1060,7 +1060,30 @@ sub compare_Exons{
     }        # end of  PAIR  loop      
   }          # end of  GENE  loop
  
-      
+  # get the other unpaired transcripts from the unclustered genes:
+  foreach my $cluster ( $self->unclustered_Genes ){
+    my @genes = $cluster->get_Genes;
+    if ( scalar(@genes)>1 ){
+      $self->throw("something went wrong, a cluster with 2 genes is classified as unclustered!");
+    }
+    my @transcripts = $genes[0]->each_Transcript;
+    my $type = $genes[0]->type;
+    my @annotation;
+    my @prediction;
+    push( @annotation, grep /$type/, @{ $self->{'_annotation_types'} } );
+    push( @prediction, grep /$type/, @{ $self->{'_prediction_types'} } );
+    if ( @annotation && !@prediction ){
+      push ( @total_ann_unpaired, @transcripts );
+    }
+    elsif( !@annotation && @prediction ){
+      push ( @total_pred_unpaired, @transcripts );
+    }
+    else{
+      $self->warn("something is wrong, can't classify gene of type $type");
+      next;
+    }
+  }
+
   # we recover info from this transcript pair comparison
 
   # print out the results
