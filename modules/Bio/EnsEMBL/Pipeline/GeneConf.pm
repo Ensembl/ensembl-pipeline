@@ -107,14 +107,42 @@ my $prefix='COB';
 	     GB_TARGETTED_CDNA_INDEX    => '',
 
 	     # similairity genewise specific parameters
-	     GB_SIMILARITY_TYPE      => 'Swall',
-	     GB_SIMILARITY_THRESHOLD => 200,
-	     GB_EST_TYPE      => 'Full_dbEST',
-	     GB_EST_THRESHOLD => 200,
+	 
+	     GB_EST_DATABASES => [
+				  # fill in one complete hash for each database from which blast 
+				  # features are to be retrieved
+				  {				  
+				   'type'       => '',
+				   'threshold'  => '',
+				   'index'      => ''
+				  },
+		
+				  #					 {
+				  #					  'type'       => 'dbEST', #logic name of analysis type
+				  #					  'threshold'  => '100',
+				  #					  'index'      => '/full/path/to/dbEST'
+				  #					 },
+					],
+	     GB_EST_GENETYPE         => 'est2genome',
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
-
+	     GB_SIMILARITY_DATABASES => [
+					 # fill in one complete hash for each database from which blast 
+					 # features are to be retrieved
+					 {				  
+					  'type'       => '',
+					  'threshold'  => '',
+					  'index'      => ''
+					 },
+# example:
+#					 {
+#					  'type'       => 'swall', #logic_name of analysis type
+#					  'threshold'  => '100',
+#					  'index'      => '/full/path/to/swall'
+#					 },
+					],
+	     GB_SIMILARITY_GENETYPE => 'contig_blastminigenewise',
 	     # Post gene build integrity checking script parameters
 	     GB_MINSHORTINTRONLEN    => 7, 
 	     GB_MAXSHORTINTRONLEN    => 50, 
