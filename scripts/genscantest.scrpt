@@ -29,8 +29,8 @@ $seq = $seqstream->next_seq();
 #create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
 my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
 $genscan->workdir($workdir);
+$genscan->protect('.genscan');
 $genscan->run();
-#$repmask->output_sf();
 
 #view the output
 print "Printing DNA scan\n";
@@ -45,7 +45,6 @@ foreach my $obj (@results)
     }
 }
 
-
 #view the output
 print "Printing exons\n";
 @results = $genscan->output_exons();
@@ -57,7 +56,6 @@ foreach my $obj (@results)
         printf("%10s = $value\n", $method_name);
     }
 }
-
 
 #view the output
 print "Printing genes\n";

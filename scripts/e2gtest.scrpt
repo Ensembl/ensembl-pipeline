@@ -34,6 +34,10 @@ $estseq = $eststream->next_seq();
 #create Est2Genome object    
 my $e2g = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new( -genomic => $genseq,
                                                              -est => $estseq );
+#my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome();
+#$e2g->genomic_sequence($genseq);
+#$e2g->est_sequence($estseq);
+
 #run Est2Genome                                                
 $e2g->run();
 
