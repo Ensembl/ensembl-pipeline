@@ -19,7 +19,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 								 -query_seqs     => \@q_seqs,
                                                              [or -query_file     => $q_file]   
 								 -query_type     => 'dna',
-								 -target_seqs    => '\@t_seqs,
+								 -target_seqs    => \@t_seqs,
                                                              [or -target_file    => $t_file]   
 			                                         -target_type    => 'dna',
                                                                  -exonerate      => $exonerate,
@@ -329,6 +329,7 @@ sub parse_results {
 				    $query{percent},
 				    0,
 				    $target{name});
+
 
 	push @feature_pairs, $feature_pair;
       }
