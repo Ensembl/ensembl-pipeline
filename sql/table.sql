@@ -20,7 +20,7 @@ CREATE TABLE analysis (
   module varchar(80),
   module_version varchar(40),
   gff_source varchar(40),
-  gff_primary varchar(40),
+  gff_feature varchar(40) DEFAULT '' NOT NULL,
   PRIMARY KEY (id)
 );
 
