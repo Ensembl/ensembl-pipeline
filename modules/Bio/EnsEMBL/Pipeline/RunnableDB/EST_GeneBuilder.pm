@@ -69,6 +69,12 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_MIN_EVIDENCE_SIMILARITY
 					EST_MAX_EVIDENCE_DISCONTINUITY
 					EST_GENOMEWISE_GENETYPE
+					USE_cDNA_DB
+					cDNA_DBNAME
+					cDNA_DBHOST
+					cDNA_DBUSER
+					cDNA_DBPASS
+					cDNA_GENETYPE
 				       );
 
 # use new Adaptor to get some extra info from the ESTs
@@ -87,29 +93,42 @@ sub new {
     #}
     # dbobj needs a reference dna database
     my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  -host             => $EST_REFDBHOST,
-						  -user             => $EST_REFDBUSER,
-						  -dbname           => $EST_REFDBNAME,
-						  -pass             => $EST_REFDBPASS,
-						  -perlonlyfeatures => 0,
-						 );
-
+						   -host             => $EST_REFDBHOST,
+						   -user             => $EST_REFDBUSER,
+						   -dbname           => $EST_REFDBNAME,
+						   -pass             => $EST_REFDBPASS,
+						   -perlonlyfeatures => 0,
+						  );
+    
     $self->dbobj->dnadb($refdb);
+    
+    
+   
+    if ( $USE_cDNA_DB ){
+      my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						       -host             => $cDNA_DBHOST,
+						       -user             => $cDNA_DBUSER,
+						       -dbname           => $cDNA_DBNAME,
+						       -pass             => $cDNA_DBPASS,
+						       -dnadb            => $refdb,
+						      );
 
-## check whether the output database is the same as the input database
-#    my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-#						  -host             => $::db_conf{'outdbhost'},
-#						  -user             => $::db_conf{'outdbuser'},
-#						  -dbname           => $::db_conf{'outdbname'},
-#						  -pass             => $::db_conf{'outdbpass'},
-#						  -perlonlyfeatures => 0,
-#						 );
-
-
+      $self->cdna_db($cdna_db);
+    }
 
 
     return $self; 
 }
+
+
+sub cdna_db{
+ my ($self, $cdna_db);
+ if ($cdna_db){
+  $self->{_cdna_db} = $cdna_db;
+ }
+ return $self->cdna_db;
+}
+
 
 =head2 make_seqfetcher
 
@@ -189,9 +208,9 @@ sub write_output {
 	foreach my $tran (@transcripts){
     #  print STDERR "\ntranscript: $tran\n";
     #  print STDERR "exons:\n";
-	    foreach my $exon ($tran->get_all_Exons){
-		print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
-    #  print STDERR "evidence:\n";
+	  foreach my $exon ($tran->get_all_Exons){
+	    print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
+	    #  print STDERR "evidence:\n";
     #  foreach my $sf ( $exon->each_Supporting_Feature ){
     #  $self->print_FeaturePair($sf);
     #  print STDERR "source_tag: ".$sf->source_tag."\n";
@@ -248,8 +267,12 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
+ 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+
+   
+    
     $contig->_chr_name($chrid);
     $self->vcontig($contig);
     print STDERR "got vcontig\n";
@@ -262,7 +285,20 @@ sub fetch_input {
     # get genes
     my @genes  = $contig->get_Genes_by_Type($genetype);
     
-    print STDERR "Number of genes = " . scalar(@genes) . "\n";
+    print STDERR "Number of genes from ests  = " . scalar(@genes) . "\n";
+    
+    my $cdna_contig;
+    if ( $USE_cDNA_DB ){
+      my $cdna_db = $self->cdna_db;
+      
+      my $cdna_sgp = $cdna_db->get_StaticGoldenPathAdaptor();
+      $cdna_contig = $cdna_sgp->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+      my @cdna_genes  = $cdna_contig->get_Genes_by_Type($cDNA_GENETYPE);
+      print STDERR "Number of genes from cdnas = " . scalar(@cdna_genes) . "\n";
+      push (@genes, @cdna_genes);
+
+    }
+
     if(!scalar(@genes)){
       $self->warn("No forward strand genes found");
     }
@@ -278,7 +314,7 @@ GENE:
 	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
 	next GENE;
       }
-
+      
       # Don't skip genes with one exon, potential info for UTRs
       my @exons = $transcripts[0]->get_all_Exons;
       if(scalar(@exons) == 1){
@@ -340,12 +376,22 @@ GENE:
     print STDERR "\n****** reverse strand ******\n\n";
 
     $strand = -1;
+    
     my $revcontig = $contig->invert;
     my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
     my @minus_transcripts;
     
-    print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
-    if(!scalar(@genes)){
+    print STDERR "Number of genes from ests  = " . scalar(@revgenes) . "\n";
+
+    
+    if ( $USE_cDNA_DB ){
+      my $cdna_revcontig = $cdna_contig->invert;
+      my @cdna_revgenes  = $cdna_revcontig->get_Genes_by_Type($cDNA_GENETYPE);
+      print STDERR "Number of genes from cdnas = " . scalar(@cdna_revgenes) . "\n";
+      push ( @revgenes, @cdna_revgenes ); 
+    }
+    
+    if(!scalar(@revgenes)){
       $self->warn("No reverse strand genes found");
     }
 
@@ -1826,8 +1872,10 @@ CLUSTER:
   EXON:
     foreach my $exon ($cluster->sub_SeqFeature){
       
-      # for an end-coord in the middle don't use the exon if it is the last of a transcript
+      # for an end-coord in the middle 
       if ( $position >= 1 && $position < scalar( @exon_clusters ) ){
+	
+	# don't use the exon if it is the last of a transcript
 	if ( $is_last{ $exon } == 1 ){
 	  next EXON;
 	}
@@ -1835,20 +1883,20 @@ CLUSTER:
       $end{$exon->end}++;
     }
     my @ends = sort{ $end{ $b } <=> $end{ $a } } keys( %end );
-
+    
     # take the most common end (note that we do not resolve ambiguities here)
-
+    
     ## test:
     #print STDERR "ends: ";
     #foreach my $e (@ends){
     #  print STDERR $e."\t";
     #}
     #print STDERR "\n";
-
+    
     $new_end = shift( @ends );
     $max_end = $end{ $new_end };
     
-   # if we have too little exons to obtain the end, take the original value
+    # if we have too little exons to obtain the end, take the original value
     if ( $max_end == 0 ){
       print STDERR "In last position, cluster end wins!\n";
       $new_end = $cluster->end;
@@ -1859,19 +1907,19 @@ CLUSTER:
       $new_end = $cluster->end;  
     }
     
-#    print STDERR "new_start: $new_start\n";
-#    print STDERR "start array:\n";
-#    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
-#      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
-#    }
-#    print STDERR "\n";
-#    print STDERR "new_end: $new_end\n";
-#    print STDERR "end array:\n";
-#    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
-#      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
-#    }
-#    print STDERR "\n";
-
+    #    print STDERR "new_start: $new_start\n";
+    #    print STDERR "start array:\n";
+    #    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
+    #      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
+    #    }
+    #    print STDERR "\n";
+    #    print STDERR "new_end: $new_end\n";
+    #    print STDERR "end array:\n";
+    #    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
+    #      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
+    #    }
+    #    print STDERR "\n";
+    
 
     ######  if new_start> new_end change them in turns until we get start < end ######
     # this can happen when there are many exons in a cluster but they vary greatly in size
@@ -2493,7 +2541,7 @@ sub make_genes {
       my $t_length = $transcript-> length;
       print STDERR "Translation length : $length\n";
       print STDERR "Exons length       : $t_length\n";
-
+      
       # 5' UTR is usually shorter than 3' UTR, the latter can be very long compared
       # with the translation length ( 5000 vs. 500 ) see e.g. gene SCL ( aka TAL1)
       my $five_prime  = $transcript->five_prime_utr  or warn "No five prime UTR";
