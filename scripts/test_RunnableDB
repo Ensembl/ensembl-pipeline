@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w 
 
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -14,7 +14,7 @@ my $input_id;
 my $logic_name;
 my $check  = 0;
 my $output_dir;
-my $write = 1;
+my $write = 0;
 my $help = 0; 
 my $verbose = 0;
 my $update = 0;
