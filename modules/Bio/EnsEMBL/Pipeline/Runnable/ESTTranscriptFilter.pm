@@ -240,7 +240,7 @@ sub filter_by_length{
 
       # we consider the genomic extension of the transcripts
       # this will not favour big unspliced ESTs over spliced ones with small exons
-      my $length = $exons[-1]->end - $exons[0] + 1 ;  
+      my $length = $exons[-1]->end - $exons[0]->start + 1 ;  
 	#print STDERR "length: $length\n";
 	push ( @{ $lengths{ $length } }, $est );
 	
