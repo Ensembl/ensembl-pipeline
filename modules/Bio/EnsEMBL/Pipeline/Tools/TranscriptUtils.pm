@@ -98,7 +98,7 @@ sub _check_Transcript{
     }
     
 
-    my @exons = @{$transcript->get_all_Exons};
+    #my @exons = @{$transcript->get_all_Exons};
     
     if (scalar(@exons) > 1 ) {
 
@@ -232,7 +232,7 @@ sub _check_introns{
     }
     
 
-    my @exons = @{$transcript->get_all_Exons};
+    #my @exons = @{$transcript->get_all_Exons};
 
     if(scalar(@exons) == 0)   {
       print STDERR "transcript with no exons\n";
@@ -1279,13 +1279,13 @@ sub set_stop_codon{
 		############################################################
 		# update the exon sequence:	    	    
 		my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
-		my $exon_seq = Bio::Seq->new(
-					     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
-					     -MOLTYPE    => 'dna',
-					     -SEQ        => $seq_string,
-					     );
+		#my $exon_seq = Bio::Seq->new(
+		#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
+		#			     -MOLTYPE    => 'dna',
+		#			     -SEQ        => $seq_string,
+		#			     );
 		
-		$end_exon->seq($exon_seq);
+		#$end_exon->seq($exon_seq);
 		$transcript->translation->end_Exon($end_exon);
 		#print STDERR "After:\n";
 		#$self->_print_Transcript( $transcript );
@@ -1330,13 +1330,13 @@ sub set_stop_codon{
 		############################################################
 		# update the exon sequence:	    	    
 		my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
-		my $exon_seq = Bio::Seq->new(
-					     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
-					     -MOLTYPE    => 'dna',
-					     -SEQ        => $seq_string,
-					     );
+		#my $exon_seq = Bio::Seq->new(
+		#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
+		#			     -MOLTYPE    => 'dna',
+		#			     -SEQ        => $seq_string,
+		#			     );
 		
-		$end_exon->seq($exon_seq);
+		#$end_exon->seq($exon_seq);
 		$transcript->translation->end_Exon( $end_exon );
 		return $transcript;
 	  }
