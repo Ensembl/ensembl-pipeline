@@ -52,7 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Utils::Exception qw(verbose);
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
@@ -93,16 +93,16 @@ sub new {
     $self->{'_parameters'}  = undef;
     $self->{'_analysis'}    = undef;
 
-    $self->throw("No database handle input") unless defined($db);
+    &throw("No database handle input") unless defined($db);
     $self->db($db);
 
-    $self->throw("No input id input")        unless defined($input_id);
+    &throw("No input id input")        unless defined($input_id);
     $self->input_id($input_id);
     
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
-    $self->throw("No analysis object input") unless defined($analysis);
+    &throw("No analysis object input") unless defined($analysis);
     $self->analysis($analysis);
     &verbose('EXCEPTION');
     return $self;
@@ -122,7 +122,7 @@ sub analysis {
     my ($self, $analysis) = @_;
     
     if ($analysis) {
-        $self->throw("Not a Bio::EnsEMBL::Analysis object")
+        &throw("Not a Bio::EnsEMBL::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
         $self->{'_analysis'} = $analysis;
         $self->parameters($analysis->parameters);
@@ -223,7 +223,7 @@ sub db {
 
     if ($value) {
        $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
-         || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
+         || &throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
 
        $self->{'_db'} = $value;
     }
@@ -289,7 +289,7 @@ sub output {
 
     if(@r && scalar(@r)){
       foreach my $r ($self->runnable){
-	push(@{$self->{'_output'}}, $r->output);
+        push(@{$self->{'_output'}}, $r->output);
       }
     }
     return @{$self->{'_output'}};
@@ -310,10 +310,10 @@ sub run {
 
     foreach my $runnable ($self->runnable) {
 
-      $self->throw("Runnable module not set") unless ($runnable);
+      &throw("Runnable module not set") unless ($runnable);
 
       # Not sure about this
-      $self->throw("Input not fetched")       unless ($self->query);
+      &throw("Input not fetched")       unless ($self->query);
 
       $runnable->run();
     }
@@ -342,7 +342,7 @@ sub runnable {
       if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
 	  push(@{$self->{'_runnables'}},$arg);
       } else {
-	  $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
+	  &throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
       }
   }
   
@@ -366,7 +366,7 @@ sub write_output {
     my $db       = $self->db();
     my @features = $self->output();
     my $contig;
-
+    print STDERR "Write output have ".@features." features\n";
     my $sim_adp  = $self->db->get_SimpleFeatureAdaptor;
     my $mf_adp   = $self->db->get_MarkerFeatureAdaptor;
     my $pred_adp = $self->db->get_PredictionTranscriptAdaptor;
@@ -383,7 +383,7 @@ sub write_output {
     };
 
     if ($@) {
-      $self->throw("Can't find contig " . $self->input_id . " . Can't write output");
+      &throw("Can't find contig " . $self->input_id . " . Can't write output");
     }
   
     my %features;
@@ -534,7 +534,37 @@ sub input_is_void {
 }
 
 
+=head failiing_job_status
 
+    Title   :  failing_job_status
+    Useage  :  $self->failing_job_status('OUT OF MEMORY');
+    Function:  Get/Set a status message to go into the job_status
+               table of the pipeline.  
+    Returns :  String or undef
+               N.B. currently only 40 chars are stored in db
+    Args    :  String
+               N.B. currently only 40 chars are stored in db
+    Caller  :  Bio::EnsEMBL::Pipeline::Job::run_module()
+    Why     :  Because neither the runnable nor the runnabledb have
+               enough information to do $job_adap->set_status($job)
+
+               i.e. no jobID. to get a job from the adaptor.
+
+               Ok it could get it using fetch_by_input_id looping through
+               that list until it find the right one. that gets alot of 
+               useless data from the db.  They probably shouldn\'t be doing
+               that anyway.  So this lets the Job->run_module do it when
+               and if the RunnableDB::xyz->run populates $@ (throws/dies)
+    Example :  See RunnableDB::Finished_Blast::run
+
+=cut
+
+sub failing_job_status{
+    my ($self, $error) = @_;
+    $self->{'_error_status'} = $error if $error;
+    #return ($@ ? $self->{'_error_status'} : undef); # not convinced this was sensible
+    return $self->{'_error_status'};
+}
 
 sub fetch_sequence{
   my ($self, $repeat_masking) = @_;

@@ -337,7 +337,7 @@ sub flush_runs {
     
     $batch_job->construct_command_line($cmd);
     eval {
-	print STDERR "Submitting: ", $batch_job->bsub, "\n";
+	#print STDERR "Submitting: ", $batch_job->bsub, "\n";
 	$batch_job->open_command_line();
     };
     if ($@) {
@@ -508,9 +508,13 @@ sub run_module {
 	      $rdb->run;
 	  };
 	  if ($err = $@) {
-	      $self->set_status( "FAILED" );
-	      print (STDERR "RUNNING: Lost the will to live Error\n");
-	      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
+      if(my $err_state = $rdb->failing_job_status){
+        $self->set_status( $err_state );
+      }else{
+        $self->set_status( "FAILED" ); # default to just failed these jobs get retried
+      }
+      print (STDERR "RUNNING: Lost the will to live Error\n");
+      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
 	  }
 	  
 	  # "WRITING"

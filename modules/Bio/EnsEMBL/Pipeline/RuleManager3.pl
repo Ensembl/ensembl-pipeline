@@ -575,7 +575,7 @@ while (1) {
       &job_existance($batch_q_module, $verbose, $job_adaptor);
     }
     if(!$done){
-      print STDERR "Checking whether to shut down\n";
+      print STDERR "Checking whether to shut down\n" if($verbose);
       if(!&check_if_done($db)){
         $done = 1;
       }else{
@@ -704,7 +704,7 @@ sub cleanup_waiting_jobs{
       #print STDERR "have job ".$a_job->dbID."\n";
         $a_job->flush_runs($db->get_JobAdaptor);
     }else{
-      print STDERR "have no jobs to clean up\n";
+      print STDERR "have no jobs to clean up\n" if($verbose);
     } 
 }
 
