@@ -257,4 +257,81 @@ sub get_all_status {
 
 
 
+=head2 stdout_file
+
+  Title   : stdout_file
+  Usage   : my $file = $self->stdout_file
+  Function: Get/set method for stdout.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stdout_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_stdout_file} = $arg;
+    }
+    return $self->{_stdout_file};
+}
+
+=head2 stderr_file
+
+  Title   : stderr_file
+  Usage   : my $file = $self->stderr_file
+  Function: Get/set method for stderr.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stderr_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_stderr_file} = $arg;
+    }
+    return $self->{_stderr_file};
+}
+
+=head2 output_file
+
+  Title   : output_file
+  Usage   : my $file = $self->output_file
+  Function: Get/set method for output
+  Returns : string
+  Args    : string
+
+=cut
+
+sub output_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_output_file} = $arg;
+    }
+    return $self->{_output_file};
+}
+
+
+=head2 input_object_file
+
+  Title   : intput_object_file
+  Usage   : my $file = $self->input_object_file
+  Function: Get/set method for the input object file
+  Returns : string
+  Args    : string
+
+=cut
+
+sub input_object_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_input_object_file} = $arg;
+    }
+    return $self->{_input_object_file};
+}
+
 1;
