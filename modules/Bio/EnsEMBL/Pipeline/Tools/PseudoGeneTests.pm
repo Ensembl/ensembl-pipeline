@@ -74,6 +74,7 @@ sub pseudogene_test{
        $focus_db, $focus_species, 
        $target_db, $target_species,
        $target_db2, $target_species2
+       $threshold
      ) = @_;
   
   my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
@@ -121,7 +122,7 @@ sub pseudogene_test{
 	print STDERR "starts with Methionine: YES\n";
 	$Met = 1;
     }
-    else{
+  else{
 	print STDERR "starts with Methionine: NO\n";
 	$Met = 0;
     }
@@ -150,25 +151,25 @@ sub pseudogene_test{
 	}
     }
     
-    ############################################################
-    # has it got homology in mouse?
+  ############################################################
+  # has it got homology in mouse?
   my $orthologues = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species );
+    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold );
   if ( $orthologues && @{$orthologues} ){
-	$mouse_homology = 1;
-    }
-    else{
-	print STDERR "Could not find any ortholog\n";
-	$mouse_homology = 0;
-      }
+    $mouse_homology = 1;
+  }
+  else{
+    print STDERR "Could not find any ortholog\n";
+    $mouse_homology = 0;
+  }
   
   ############################################################
   # has it got homology in rat?
   my $orthologues2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2 );
-    if ( $orthologues2 && @{$orthologues2} ){
-      $rat_homology = 1;
-    }
+    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold );
+  if ( $orthologues2 && @{$orthologues2} ){
+    $rat_homology = 1;
+  }
   else{
     print STDERR "Could not find any ortholog\n";
     $rat_homology = 0;
@@ -236,9 +237,9 @@ sub has_polyA_track{
   my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
   my $chr_name  =  $exons[0]->contig->chr_name;
   my $end   =  $exons[0]->contig->chr_start + $exons[$#exons]->start - 1;
-
+  
   # we take 20 bases downstream:
-  my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $end + 1, $end + 20 )->seq;
+  my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $end - 5, $end + 10 )->seq;
   print STDERR "20bp downstream: $seq\n";
   my $length = length($seq);
   my $a_count = $seq =~ tr/Aa//;
