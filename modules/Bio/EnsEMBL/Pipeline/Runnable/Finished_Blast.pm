@@ -403,11 +403,12 @@ sub get_db_version{
             my $name = $ver->name();
             my $date = $ver->date();
             unless ($dbv){
-                warn "I know nothing about $db I tried to find out:\n" .
+                $self->throw(
+                    "I know nothing about $db I tried to find out:\n" .
                     " - name <" . $name . ">\n" .
                     " - date <" . $date . ">\n" .
                     " - version <" . $dbv . ">\n" .
-                    " - sanger_version <" . $sgv . ">\n";
+                    " - sanger_version <" . $sgv . ">\n");
             }
             $self->{'_db_version_searched'} = $dbv;
         }else{
