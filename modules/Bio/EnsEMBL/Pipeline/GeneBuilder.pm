@@ -193,12 +193,14 @@ sub build_Genes{
     
     my @predictions = $self->predictions;
     my @features    = $self->features;
-    my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
-										   -predictions => \@predictions,
-										   -features    => \@features,
-										   -annotations => \@annotations,
-										  );
-    @supported_predictions = $genecooker->run;
+    if(@predictions && @features){
+      my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
+										     -predictions => \@predictions,
+										     -features    => \@features,
+										     -annotations => \@annotations,
+										    );
+      @supported_predictions = $genecooker->run;
+    }
   }
   
   # cluster all the transcripts according to mere genomic overlap
@@ -289,7 +291,10 @@ sub get_Genes {
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
-	
+	#foreach my $exon(@{$tran->get_all_Exons}){
+	  #print STDERR "have exon ".$exon."\n";
+	#  print STDERR "have ".@{$exon->get_all_supporting_features}."\n";
+	#}
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $tran ); 
 	# my @valid_transcripts = $self->validate_transcript($t);
 	# next TRANSCRIPT unless scalar(@valid_transcripts);
@@ -497,6 +502,7 @@ sub prune_Transcripts {
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
 	foreach my $exon ( @{$transcript->get_all_Exons} ){
+	  print STDERR "1 transfering supporting evidence\n";
 	  $self->transfer_supporting_evidence($exon, $e);
 	}
       }
@@ -547,7 +553,7 @@ sub prune_Transcripts {
       # get through the check for single exon genes above.
       
     EXONS:
-      for ($i = 0; $i < $#exons; $i++) {
+      for ($i = 0; $i < $#exons; $i++){
 	my $foundpair = 0;
 	my $exon1 = $exons[$i];
 	my $exon2 = $exons[$i+1];
@@ -566,7 +572,7 @@ sub prune_Transcripts {
 	  $foundpair = 1;	# this pair will not be compared with other transcripts
 	} 
 	else {
-	  
+	  print STDERR "have a valid exon pair\n";
 	  # go through the exon pairs already stored in %pairhash. 
 	  # If there is a pair whose exon1 overlaps this exon1, and 
 	  # whose exon2 overlaps this exon2, then these two transcripts are paired
@@ -614,14 +620,16 @@ sub prune_Transcripts {
       
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
-	#print STDERR "found new transcript:\n";
+	print STDERR "found new transcript:\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
-
+	#foreach my $e(@{$tran->get_all_Exons}){
+	#  print STDERR "there are ".@{$e->get_all_supporting_features}." supporting features\n";
+	#}
 	push(@newtran,$tran);
 	@evidence_pairs = ();
       } 
       else {
-	#print STDERR "transcript already seen:\n";
+	print STDERR "transcript already seen:\n";
 	if ( $tran == $transcripts[0] ){
 	  print STDERR "Strange, this is the first transcript in the cluster!\n";
 	}
@@ -636,6 +644,7 @@ sub prune_Transcripts {
 	  my $target_exon = $pair[1];
 	  
 	  #print STDERR "\n";
+	  print STDERR "2 transfering supporting evidence\n";
 	  $self->transfer_supporting_evidence($source_exon, $target_exon)
 	}
       }
@@ -870,10 +879,15 @@ sub cluster_into_Genes{
     # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
     my @sorted_transcripts = $self->_bin_sort_transcripts( @{$cluster} );
     foreach my $transcript( @sorted_transcripts ){
-	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE) {
-	    $gene->add_Transcript($transcript);
-	    #print STDERR "accepting:\n";
-	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE){
+	  #print STDERR "have transcript ".$transcript->dbID."\n";
+	  foreach my $e((@{$transcript->get_all_Exons})){
+	    #print STDERR "have exon ".$e->dbID."\n";
+	    #print STDERR "there are ".@{$e->get_all_supporting_features}." supporting features in the transcript being added to this gene\n";
+	  }
+	  $gene->add_Transcript($transcript);
+	  #print STDERR "accepting:\n";
+	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	}
 	$count++;
     }
@@ -1353,6 +1367,9 @@ sub gene_types {
 sub predictions {
   my ($self,@predictions) = @_;
 
+  if(!$self->{_predictions}){
+    $self->{_predictions} = [];
+  }
   if ( @predictions ) {
      push(@{$self->{_predictions}},@predictions);
   }
@@ -1628,7 +1645,7 @@ sub validate_transcript{
 
 sub transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
-  
+  print "3 transferring supporting evidence ".(caller)."\n";
   my @target_sf = @{$target_exon->get_all_supporting_features};
   #  print "target exon sf: \n";
   #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
@@ -1638,7 +1655,7 @@ sub transfer_supporting_evidence{
   # keep track of features already transferred, so that we do not duplicate
   my %unique_evidence;
   my %hold_evidence;
-
+  
  SOURCE_FEAT:
   foreach my $feat ( @{$source_exon->get_all_supporting_features}){
     next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
