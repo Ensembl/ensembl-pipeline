@@ -414,6 +414,34 @@ sub delete_Job {
     unlink $job->input_object_file;
 }
 
+=head2 get_all_Status {
+
+  Title   : get_all_Status
+  Usage   : my @status_list = $db->get_all_Status()
+  Function: Retrieves list of all status present in jobstatus
+  Returns : array of status present in DB
+  Args    : none
+
+=cut
+
+sub get_all_Status {
+    my ($self) = @_;
+
+    my $query = 'SELECT status from jobstatus group by status ';
+            
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+    
+    my @statuslist;
+    
+    while (my $row = $sth->fetchrow_hashref) 
+    {
+	    push(@statuslist,$row->{'status'});
+    }
+    return @statuslist;
+}
+
+
 sub get_InputIdsByAnalysis {
     my ($self,$analid) = @_;
     
