@@ -122,8 +122,8 @@ sub fetch_input {
 
     my $gadp = $self->dbobj->get_GenomeDBAdaptor();
 
-    my $db1 = $gadp->fetch_by_species_tag($db1)->ensembl_db();
-    my $db2 = $gadp->fetch_by_species_tag($db2)->ensembl_db();
+    $db1 = $gadp->fetch_by_species_tag($db1)->ensembl_db();
+    $db2 = $gadp->fetch_by_species_tag($db2)->ensembl_db();
 
     my $contig1 = $db1->get_Contig($c1);
     my $contig2 = $db2->get_Contig($c2);
@@ -135,7 +135,7 @@ sub fetch_input {
 								   -nocopy => 1,
 								   -seq1 => $seq1,
 								   -seq2 => $seq2,
-								   -score => 0,
+								   -score => $self->min_score,#0,
 								   );
     $self->runnable($cross);
 }
@@ -162,21 +162,20 @@ sub run {
 =head2 output
 
     Title   :   output
-    Usage   :   $self->output()
-    Function:   Returns all output feature pairs
+    Usage   :   $self->output() or $self->output(@)
+    Function:   Push an array of Bio::EnsEMBL::FeaturePairs if Args is given and
+                Returns all output feature pairs
     Returns :   Array of Bio::EnsEMBL::FeaturePairs
-    Args    :   None
+    Args    :   Array of Bio::EnsEMBL::FeaturePairs (optional)
 
 =cut
 
-sub output{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'output'} = $value;
+sub output {
+   my ($self,@args) = @_;
+   if(@args) {
+     push @{$self->{'output'}}, @args;
     }
-    return $obj->{'output'};
-
+    return @{$self->{'output'}};
 }
 
 
@@ -191,15 +190,13 @@ sub output{
 =cut
 
 sub write_output {
-    my($self) = @_;
-
-
+    my ($self) = @_;
 
     my @features = $self->output;
     foreach my $f (@features) {
-        print "Got feature $f\n";
+#        print "Got feature $f\n";
 
-	#print $f->seqname."\t".$f->start."\t".$f->end."\tscore:".$f->score."\t".$f->strand."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
+	print $f->seqname."\t".$f->start."\t".$f->end."\t".$f->strand."\tscore:".$f->score."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
     }
     my $db = $self->dbobj();
     print STDERR "Going to write to ".$db->dbname."\n";
