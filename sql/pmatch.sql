@@ -15,7 +15,7 @@ CREATE TABLE pmatch_feature (
   start int(10) unsigned DEFAULT '0' NOT NULL,
   end int(10) unsigned DEFAULT '0' NOT NULL,
   coverage double(16,4) DEFAULT '0.0000' NOT NULL,
-  analysis_id int(10) unsigned NOT NULL,
+  name varchar(40) DEFAULT '' NOT NULL,
   PRIMARY KEY (feature_internal_id),
 #  UNIQUE protein_internal_id (protein_internal_id,chr_name,start,end), removed this so new pmatch analysis will work
   KEY protein_internal_id_2 (protein_internal_id)
