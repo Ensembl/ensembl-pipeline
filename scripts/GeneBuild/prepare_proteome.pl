@@ -119,7 +119,7 @@ sub parse_refseq {
     # eg >gi|4501893|ref|NP_001094.1| actinin, alpha 2 [Homo sapiens]
     #>AC3.2 CE05132	 UDP-glucuronosyltransferase status:Partially_confirmed
     if(/^>/){
-      if(/if(/^>\w+\|\w+\|\w+\|(\S+)\|/){
+      if(/if(/^>\w+\|\w+\|\w+\|(\S+)\|/)){
 	print OUT ">$1\n";
       }
       else {

@@ -38,10 +38,11 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch;
 
 my @file_info = @$GB_PROTEOME_FILES;
 my $protfile = $GB_PFASTA;
+my $pmatch    = $GB_PMATCH;
 
 my %kill_list;
 %kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
-
+my %ids;
 foreach my $file(@file_info){
   my $file_name = $file->{file_path};
   open (IN, "<$file_name") or die "Can't open $file_name : $!";
@@ -53,6 +54,12 @@ foreach my $file(@file_info){
       #print "have matched ".$_." with ".$file->{header_regex}."\n";
       $killing = 0;
       if($kill_list{$1}){
+	$killing = 1;
+      }
+      if(!$ids{$1}){
+	$ids{$1} = 1;
+      }else{
+	print STDERR "skipping ".$1." it has already appeared\n";
 	$killing = 1;
       }
       if(!$killing){
@@ -70,7 +77,7 @@ foreach my $file(@file_info){
 }
 
 
-
+&test_protfile;
 
 
 sub test_protfile {
@@ -114,3 +121,6 @@ sub get_kill_list {
   close KILL_LIST_FH or die "file error for $kill_list";
   return \%kill_list;
 }
+
+
+
