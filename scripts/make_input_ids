@@ -19,6 +19,7 @@ my $type;
 my $contig;
 my $slice;
 my $input_type;
+my $single;
 
 &GetOptions(
             'host:s'       => \$host,
@@ -31,6 +32,7 @@ my $input_type;
             'slice_size:s' => \$slice_size,
             'logic_name:s' => \$logic_name,
             'input_type:s' => \$input_type,
+	    'single' => \$single,
            );
 
 
@@ -48,15 +50,15 @@ if (!defined($type)) {
     die "No assemby type defined";
 }
 
-if (!defined($contig) && !defined($slice)) {
-  die "Must define input as either contig or slice";
+if (!($contig) && !($slice) && !($single)) {
+  die "Must define input as either contig, slice or single";
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
 
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
-if (!defined($analysis)) {
+if (!($analysis)) {
     $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-logic_name    => $logic_name,
                                                      -input_id_type => $input_type);
 
@@ -73,15 +75,17 @@ my @ids;
 
 if ($slice) {
  
-    $input_type = "SLICE" unless $input_type;
+  $input_type = "SLICE" unless $input_type;
+  
+  @ids = $inputIDFactory->generate_slice_input_ids($slice_size);
+  
+}elsif($contig) {
 
-    @ids = $inputIDFactory->generate_slice_input_ids($slice_size);
-
-} elsif ($contig) {
-
-    $input_type = "CONTIG" unless $input_type;
-    @ids = $inputIDFactory->generate_contig_input_ids;
-
+  $input_type = "CONTIG" unless $input_type;
+  @ids = $inputIDFactory->generate_contig_input_ids;
+  
+}elsif($single){
+  @ids = ('genome');
 }
 print "input id type $input_type\n";
 
