@@ -42,6 +42,20 @@ and other sequence region related tables.
               off with -noverbose
     -help      displays this documentation with PERLDOC
 
+=head1 CONTACT
+
+Modified by Sindhu K. Pillai B<email> sp1@sanger.ac.uk
+
+=head1 APPENDIX
+
+to be added :
+-check for type of input (list vs agp)
+-check if chromosome is already present
+-check if contig is already present
+-supercontigs
+-transactions
+-add loading to otter database parallely
+
 =cut
 
 use strict;
