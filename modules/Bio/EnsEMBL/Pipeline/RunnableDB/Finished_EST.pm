@@ -48,7 +48,7 @@ sub fetch_input {
     my $seq = $masked->seq;
     if( scalar($seq =~ s/([CATG])/$1/g) > 3 ){
         $self->input_is_void(0);
-        $self->check_with_seg($masked);
+        #$self->check_with_seg($masked);
     }else{
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
@@ -133,9 +133,15 @@ sub run {
     
     my $runnable = $self->runnable;
     $runnable || $self->throw("Can't run - no runnable object");
-    
-    $runnable->run;
-    
+    eval{
+        $runnable->run;
+    };
+    if(my $err = $@){
+        chomp $err;
+        $self->failing_job_status($1) 
+            if $err =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
+        $self->throw("$@");
+    }
     my $db_version = $runnable->db_version_searched if $runnable->can('db_version_searched');
     $self->db_version_searched($db_version);
     if ( my @output = $runnable->output ) {

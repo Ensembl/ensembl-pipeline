@@ -93,7 +93,7 @@ sub fetch_input {
     
     if ($seq =~ /[CATG]{3}/) {
         $self->input_is_void(0);
-        $self->check_with_seg($self->query);
+        #$self->check_with_seg($self->query);
     } else {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
@@ -128,9 +128,13 @@ sub check_with_seg{
     my $file = Bio::SeqIO->new(-file   => ">$filename", 
                                -format => 'Fasta') 
         or $self->throw("Can't create Bio::SeqIO $filename $!");
-    $file->write_seq($seqObj_to_test);
-
-    my $seg_cmd = "seg $filename -a";
+    my $translated = $seqObj_to_test->translate;
+    #warn "************************************************************";
+    #warn $translated->seq;
+    #warn "************************************************************";
+    $file->write_seq($translated);
+    
+    my $seg_cmd = "nseg $filename -x";
     my $seg = Bio::SeqIO->new(-file   => "$seg_cmd |",
                               -format => 'Fasta')
         or $self->throw("Can't create Bio::SeqIO $seg_cmd $!");
@@ -142,7 +146,10 @@ sub check_with_seg{
     if($@){
         $self->throw("There was a problem with SEG masking.\nI tried to '$seg_cmd'");
     }
-    if($seq =~ /[CATG]{3}/){
+    #warn "************************************************************";
+    #warn $seq;
+    #warn "************************************************************";
+    if($seq =~ /[CATG]{3}/i){
         $self->input_is_void(0);
     }else{
         $self->input_is_void(1);
@@ -192,8 +199,15 @@ sub run {
         
         # Not sure about this
         $self->throw("Input not fetched")       unless ($self->query);
-        
-        $runnable->run();
+        eval{
+            $runnable->run();
+        };
+        if($@){
+            chomp $@;
+            $self->failing_job_status($1) 
+                if $@ =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
+            $self->throw("$@");
+        }
         my $db_version = $runnable->db_version_searched if $runnable->can('db_version_searched');
         $self->db_version_searched($db_version);
         if ( my @output = $runnable->output ) {
@@ -205,6 +219,9 @@ sub run {
     }
     return 1;
 }
+
+
+
 sub db_version_searched{
     my $self = shift;
     $self->{'_db_version_searched'} = shift if @_;
