@@ -97,7 +97,7 @@ use Bio::EnsEMBL::DBSQL::Utils;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GB_MIN_GENSCAN_EXONS
-					 GB_MAX_INTRON_LENGTH
+					 GB_GENSCAN_MAX_INTRON
 					 );
 use vars qw(@ISA);
 use strict;
@@ -231,8 +231,8 @@ sub get_Genewises {
         # set temporary_id to be dbID
 	$t->{'temporary_id'} = ($t->dbID) unless (defined $t->{'temporary_id'} && $t->{'temporary_id'} ne '');
 
-	my @valid_transcripts = $self->validate_transcript($t);
-	next TRANSCRIPT unless scalar(@valid_transcripts);
+#	my @valid_transcripts = $self->validate_transcript($t);
+#	next TRANSCRIPT unless scalar(@valid_transcripts);
 
         foreach my $exon ($t->get_all_Exons) {
 
@@ -250,11 +250,12 @@ sub get_Genewises {
 						-analysis => $g->analysis,
 						-primary_tag => $g->type,
 						-source_tag => $g->type);
-# not sure this will get remapped properly ...
+# not sure this will get remapped properly ... but it is needed later on for pairing code
 	  $exon->add_Supporting_Feature($ev);
 	}
 
-	push(@genewise, @valid_transcripts);
+#	push(@genewise, @valid_transcripts);
+	push(@genewise, $t);
       } # end TRANSCRIPT
     }
 
@@ -2971,7 +2972,7 @@ sub prune_gene {
 sub split_transcript{
   my ($self, $transcript) = @_;
   $transcript->sort;
-
+print STDERR "splitting!\n";
   my @split_transcripts   = ();
 
   if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
@@ -3017,10 +3018,10 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       $intron = abs($exon->end   - $prev_exon->start + 1);
     }
     
-    if ($intron > 100000) {
-      # set translation end and end_exon of $curr_transcript->translation based on phase of $prev_exon
+    if ($intron > $GB_GENSCAN_MAX_INTRON) {
       $curr_transcript->translation->end_exon($prev_exon);
-      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1);
+      # need to account for end_phase of $prev_exon when setting translation->end
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
       
       # start a new transcript 
       my $t  = new Bio::EnsEMBL::Transcript;
@@ -3040,6 +3041,9 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       } elsif ($exon->phase == 2) {
 	$t->translation->start(2);
       }
+
+      # start exon always has phase 0
+      $exon->phase(0);      
 
       # this new transcript becomes the current transcript
       $curr_transcript = $t;
@@ -3099,6 +3103,9 @@ sub validate_transcript{
   my ($self, $transcript) = @_;
   my @valid_transcripts;
 
+my @e = $transcript->get_all_Exons;
+print STDERR "\nnew transcript with " . scalar(@e) . " exons\n";
+
   my $valid = 1;
   my $split = 0;
 
@@ -3113,7 +3120,9 @@ sub validate_transcript{
 	$intron = abs($exon->end   - $previous_exon->start + 1);
       }
       
-      if ($intron > $GB_MAX_INTRON_LENGTH) {
+print STDERR "intron: $intron\n";
+
+      if ($intron > $GB_GENSCAN_MAX_INTRON) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
 	$split = 1;
 	$valid = 0;
