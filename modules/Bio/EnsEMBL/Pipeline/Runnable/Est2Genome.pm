@@ -249,6 +249,8 @@ sub run {
     
     #extract filenames from args and check/create files and directory
     my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
+
+    #if names not provided, _createfiles will create unique names based on process ID    
     my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
         
     #use appropriate Bio::Seq method to write fasta format files
@@ -275,12 +277,28 @@ sub run {
       #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
       print STDERR "firstline: \t$firstline\n";
+      # typical firstline:  
+      # Note Best alignment is between reversed est and forward genome, and splice  sites imply forward gene
+
       # put the gene on the minus strand iff splice sites imply reversed gene
       if ($firstline =~ /REVERSE/) { print STDERR "***reversed gene***\n"; $estOrientation = -1; }
       else {$estOrientation = 1}
      
       #read output
       while (<ESTGENOME>) {
+	# test
+	#print STDERR $_."\n";
+	# typical output
+	#
+	# Exon       463  99.6  1001  1468 genomic        469     3 BB761478.1    
+	#
+	# Span       463  99.6  1001  1468 genomic        469     3 BB761478.1    
+	#
+	# Segment    339 100.0  1001  1339 genomic        469   131 BB761478.1    
+	#
+	# Segment    126  99.2  1341  1468 genomic        130     3 BB761478.1    
+	#
+	
 	if ($_ =~ /Segmentation fault/) {
 	  $self->warn("Segmentation fault from est_genome\n");
 	  close (ESTGENOME) or $self->warn("problem running est_genome: $!\n");
@@ -317,7 +335,8 @@ sub run {
 	      $f2start =  $elements[7]; 
 	      $f2end = $elements[6];
 	    }              
-	  #create array of featurepairs              
+
+	  #create array of featurepairs and add them to $self->{'_fplist'}
 	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
 				  $f2start, $f2end, $f2id, $f1source, 
 				  $f2source, $f1strand, $f2strand, 
@@ -330,6 +349,8 @@ sub run {
 	return(0);
       }
 
+      # read the features from $self->{'_fplist'} 
+      # and make genes>exons>supp_evidence as featurePairs containing one another
       $self->convert_output;
 
     };
@@ -359,6 +380,7 @@ sub output {
   }
   return @{$self->{'_output'}};
 }
+
 
 sub convert_output {
   my ($self) = @_;
@@ -449,7 +471,7 @@ sub _createfeatures {
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
 
-        push(@{$self->{'_fplist'}}, $fp);
+   push(@{$self->{'_fplist'}}, $fp);
 }
 
 sub _createfiles {
