@@ -189,7 +189,9 @@ sub run {
   
   # get genewise genes
   $self->gw_genes($self->vc->get_Genes_by_Type($GB_SIMILARITY_GENETYPE,'evidence'));
-  print STDERR "got " . scalar($self->gw_genes) . " genewise genes\n";
+  print STDERR "got " . scalar($self->gw_genes) . " similarity genewise genes\n";
+  $self->gw_genes($self->vc->get_Genes_by_Type($GB_TARGETTED_GW_GENETYPE,'evidence'));
+  print STDERR "got " . scalar($self->gw_genes) . " targetted genewise genes\n";
 
   # get e2g genes
   
@@ -474,6 +476,18 @@ sub combine_genes{
     }
   }
 
+  print STDERR "Produced genes:\n";
+  foreach my $gene (@genes){
+    foreach my $tran ( $gene->each_Transcript ){
+      foreach my $exon ( $tran->get_all_Exons ){
+	print STDERR "exon: ".$exon->start."-".$exon->end."\n";
+	foreach my $sf ($exon->each_Supporting_Feature){
+	  print STDERR "evidence: ".$sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
+	}
+      }
+    }
+  }
+
   $self->combined_genes(@genes);
   
 }
@@ -495,6 +509,14 @@ sub match_gw_to_e2g{
 
   my @matching_e2g;
   my @gw_tran = $gw->each_Transcript;
+  print STDERR "\nSearching mRNA for gw: ".$gw->dbID."\n";
+  foreach my $tran ( @gw_tran ){
+    foreach my $exon ($tran->get_all_Exons){
+      print STDERR $exon->start."-".$exon->end."  ";
+    }
+    print STDERR "\n";
+  }
+  
   my @gw_exons = $gw_tran[0]->get_all_Exons;
   
   my $strand   = $gw_exons[0]->strand;
@@ -607,7 +629,16 @@ sub match_gw_to_e2g{
 #      if($fiveprime_match && $threeprime_match){
       if($fiveprime_match || $threeprime_match){
 	  push(@matching_e2g, $e2g);
-      }
+	  
+	  # test
+	  print STDERR "Found mRNA match:".$e2g->dbID."\n";
+	  foreach my $egtran ( $e2g->each_Transcript ){
+	    foreach my $exon ($egtran->get_all_Exons){
+	      print STDERR $exon->start."-".$exon->end."  ";
+	    }
+	    print STDERR "\n";
+	  }
+	}
     }
   }
   return @matching_e2g;
@@ -658,8 +689,15 @@ sub _merge_gw_genes {
 	# combine the two
 	$previous_exon->end($exon->end);
 	$previous_exon->add_sub_SeqFeature($exon,'');
-	foreach my $suppfeat($exon->each_Supporting_Feature){
-	  $previous_exon->add_Supporting_Feature($suppfeat);
+	#print STDERR "in merged gw_gene, adding evidence in merged exon:\n";
+	my %evidence_hash;
+	foreach my $sf($exon->each_Supporting_Feature){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  $previous_exon->add_Supporting_Feature($sf);
 	}
 	next EXON;
       }
@@ -677,8 +715,15 @@ sub _merge_gw_genes {
 	$cloned_exon->attach_seq($self->vc->primary_seq);
 	$cloned_exon->add_sub_SeqFeature($exon,'');
 
-	foreach my $suppfeat($exon->each_Supporting_Feature){
-	  $cloned_exon->add_Supporting_Feature($suppfeat);
+	#print STDERR "in merged gw_gene, adding evidence in cloned exon:\n";
+	my %evidence_hash;
+	foreach my $sf($exon->each_Supporting_Feature){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  $cloned_exon->add_Supporting_Feature($sf);
 	}
 	push(@pred_exons, $cloned_exon);
       }
@@ -1222,7 +1267,14 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase($oldexon->phase);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vc);
+	my %evidence_hash;
+	#print STDERR "adding evidence at 5':\n";
 	foreach my $sf($oldexon->each_Supporting_Feature){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $newexon->add_Supporting_Feature($sf);
 	}
 #	print STDERR "Adding 5prime exon " . $newexon->start . " " . $newexon->end . "\n";
@@ -1280,7 +1332,14 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->phase($oldexon->phase);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vc);
+	#print STDERR "adding evidence in 3':\n";
+	my %evidence_hash;
 	foreach my $sf($oldexon->each_Supporting_Feature){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $newexon->add_Supporting_Feature($sf);
 	}
 #	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
