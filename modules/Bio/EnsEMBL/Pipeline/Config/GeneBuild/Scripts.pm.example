@@ -110,14 +110,22 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 	    # path to swissprot fasta file
 	    GB_SPTR        => '',
 
-	    # path to file where we'll write cleaned up  proteome data for use in pmatch
-	    GB_PFASTA => '',
-	    
-	    # path to pmatch executable
-	    GB_PMATCH      => '',
-	    
-	    # maximum allowable intron length for stitching individual pmatch hits back into a gene region
-	    GB_PMATCH_MAX_INTRON => '50000',
+	    # information about the different protein sources used by new_prepare_proteome.pm
+	    GB_PROTEOME_FILES => [
+				  #{
+				  # file_path => '/data/blastdb/Worms/wormpep97.pep',
+				  # header_regex => '\w+\s+(\w+)',
+				  #>AC3.2 CE05132   UDP-glucuronosyltransferase status:Partially_confirmed
+				  #},
+				  #{
+				  # file_path => 'swall',
+				  # header_regex => '^>\S+\s+\((\S+)\)',
+				  #},
+				  #{
+				  # file_path => 'refseq',
+				  # header_regex => '^>\w+\|\w+\|\w+\|(\S+)\|',
+				  #},
+				 ],
 	    
 	    # path to directory where fpc/chromosomal sequences are 
 	    GB_FPCDIR      => '',
@@ -125,9 +133,24 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 	    # directory to write pmatch results
 	    GB_PM_OUTPUT   => '',	
 
-	    GB_SUBMIT_LOGICNAME => 'SubmitGeneBuild', #logic_name of dummy analysis for input_id_analysis table
+	    
+	    GB_SUBMIT_GENEBUILD_LOGICNAME => 'SubmitGeneBuild', #logic_name of dummy analysis for input_id_analysis table
 
 	    GB_RULEMANAGER_SLEEP => 15,	#how long rulemamnger sleeps for before checking next analysis
+
+	    GB_MAX_JOB_TIME => 86400, # the max number of seconds a job should be spending in CPU time in LSF before being killed
+	    #86400 is 24 hours
+	    GB_KILLED_INPUT_IDS => '', #path to write file for killed input_ids
+	    GB_SPLIT_JOB_SIZE => '', #size input_ids should be split to generally half GB_SIZE
+	    GB_KILLED_OUTPUT_DIR => '', #directory output of killed jobs will be written to
+	    GB_KILLED_RUNNER => 'ensembl-pipeline/scripts/run_split_GeneBuild_jobs.pl', #path to script which will run killed jobs
+
+	    GB_KILLED_BSUB_FILE => '', #file to write the new bsubs lines to
+	    GB_PMATCH_PIPELINE => 0, #this should be set to one if you want populate_ipa.pl to put input_ids for pmatchs into the input_id_analysis table 
+	    GB_SUBMIT_PMATCH_LOGICNAME => 'SubmitPmatch', #dummy analysis object for the pmatches
+	    GB_GENEBUILD_PIPELINE => 0,#this should be set to one if you want populate_ipa.pl to put input_ids for genebuild into the input_id_analysis table 
+	    GB_PMATCH_CHUNKS => 0, # this should be set to one if you want the pmatches to run on chunks rather than whole chromosomes
+	    GB_PMATCH_SIZE => 20000000, #size of chunk
 	   );
 
 sub import {
