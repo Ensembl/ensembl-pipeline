@@ -232,41 +232,42 @@ sub make_miniseq {
 
     my $prevend = 0;
     
-  FEAT: foreach my $exon (@exons) {
-
+  FEAT: 
+    foreach my $exon (@exons) {
+      
       my $start = $exon->start;
       my $end   = $exon->end;
-
+      
       #print STDERR "In make_miniseq(), exon -> start: $start, end: $end\n";
 
       $start = $exon->start - $self->exon_padding;
       $end   = $exon->end   + $self->exon_padding;
       
-      if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
-
-      
       my $gap = ($start - $prevend);
 
       if ($count > 0 && ($gap < $mingap)) {
-	  if ($end < $prevend) { $end = $prevend;}
-	  $genomic_features[$#genomic_features]->end($end);
-	  $prevend = $end;
-      } else {
-	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
-	    
-	    $newfeature->seqname   ('genomic');
-	    $newfeature->start     ($start);
-	    $newfeature->end       ($end);
-	    $newfeature->strand    (1);
-	    $newfeature->attach_seq($self->genomic_sequence);
-
-	    push(@genomic_features,$newfeature);
-	    
-	    $prevend = $end;
+	if ($end < $prevend) { 
+	  $end = $prevend;
 	}
-	$count++;
+	$genomic_features[$#genomic_features]->end($end);
+	$prevend = $end;
+      } 
+      else {
+	my $newfeature = new Bio::EnsEMBL::SeqFeature;
+	
+	$newfeature->seqname   ('genomic');
+	$newfeature->start     ($start);
+	$newfeature->end       ($end);
+	$newfeature->strand    (1);
+	$newfeature->attach_seq($self->genomic_sequence);
+	
+	push(@genomic_features,$newfeature);
+	
+	$prevend = $end;
+      }
+      $count++;
     }
-
+    
     # Now we make the cDNA features
     # but presumably only if we actually HAVE any ... 
     return unless scalar(@genomic_features);
@@ -277,32 +278,33 @@ sub make_miniseq {
     # strand flipping has to be dealt with outside Genomewise/MiniGenomewise 
     # eg see EST_GeneBuilder
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
-
+    
     foreach my $f (@genomic_features) {
-	$f->strand(1);
-	my $cdna_start = $current_coord;
-	my $cdna_end   = $current_coord + ($f->end - $f->start);
-	
-	my $tmp = new Bio::EnsEMBL::SeqFeature(
-					       -seqname => $f->seqname.'.cDNA',
-					       -start => $cdna_start,
-					       -end   => $cdna_end,
-					       -strand => 1);
-	
-	my $fp  = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-						-feature2 => $tmp);
-	
-	$pairaln->addFeaturePair($fp);
-	$current_coord = $cdna_end+1;
+      $f->strand(1);
+      my $cdna_start = $current_coord;
+      my $cdna_end   = $current_coord + ($f->end - $f->start);
+      #print STDERR "cdna_start: $cdna_start - cdna_end: $cdna_end\n";
+
+      my $tmp = new Bio::EnsEMBL::SeqFeature(
+					     -seqname => $f->seqname.'.cDNA',
+					     -start   => $cdna_start,
+					     -end     => $cdna_end,
+					     -strand  => 1);
+      
+      my $fp  = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
+					      -feature2 => $tmp);
+      
+      $pairaln->addFeaturePair($fp);
+      $current_coord = $cdna_end+1;
     }
-	
+    
     #changed id from 'Genomic' to seqname
     my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => 'miniseq',
 						      -pairalign => $pairaln);
-
+    
     $self->miniseq($miniseq);
-
-}
+    
+  }
 
 =head2 minimum_intron
 
