@@ -43,12 +43,13 @@ sub fetch_input{
   my ($self) = @_;
   print STDERR "Fetching input\n";
   $self->make_protlist;
+  print STDERR "Trying to parse ".$self->input_id." with ".$GB_INPUTID_REGEX."\n";
   $self->input_id =~ /$GB_INPUTID_REGEX/;
   my $chrid = $1;
   my $chrstart = $2;
   my $chrend   = $3;
   
-    
+  print STDERR "Fetching ".$chrid." ".$chrstart." ".$chrend."\n";  
   my $sla       = $self->db->get_SliceAdaptor();
   my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   my $genseq;

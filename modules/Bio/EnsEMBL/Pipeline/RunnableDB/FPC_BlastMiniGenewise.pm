@@ -130,7 +130,7 @@ sub new {
     
     $genewise_db->dnadb($self->db);
     $self->genewise_db($genewise_db);
-    $self->output_db($genewise_db);
+    
     
     return $self; 
   }
@@ -149,7 +149,7 @@ sub new {
 sub write_output {
     my($self,@features) = @_;
 
-    my $gene_adaptor = $self->output_db->get_GeneAdaptor;
+    my $gene_adaptor = $self->genewise_db->get_GeneAdaptor;
     my @genes = $self->output;
     print STDERR "have ".@genes." genes\n";
   GENE: foreach my $gene (@genes) {	
@@ -226,7 +226,7 @@ sub write_output {
       print STDERR "Fetching features for " . $database->{'type'} . 
 	" with score above " . $database->{'threshold'}. "\n\n";
       my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-      #print STDERR "Fetching features from db ".$self->db->dbname." on ".$self->db->host."\n";
+      print STDERR "Fetching features from db ".$self->db->dbname." on ".$self->db->host."\n";
       my @features  = @{$pafa->fetch_all_by_Slice_and_score($slice, $database->{'threshold'}, $database->{'type'})};
       print STDERR "have ".@features." \n";
       # lose version numbers - probably temporary till pfetch indices catch up
@@ -245,7 +245,6 @@ sub write_output {
       my %redids;
       my $trancount = 1;
       my %kill_list = %{$self->fill_kill_list};
-
       # check which TargettedGenewise exons overlap similarity features
       foreach my $gene (@genes) {
 	foreach my $tran (@{$gene->get_all_Transcripts}) {
@@ -269,7 +268,7 @@ sub write_output {
       # collect those features which haven't been used by Targetted GeneWise
       # reject them if they appear in the kill list
       foreach my $f (@features) {
-	      #print "Feature : " . $f->gffstring . "\n";
+	    # print "Feature : " . $f->gffstring . "\n";
 
 	if (defined $kill_list{$f->hseqname}){
 	  print STDERR "skipping over " . $f->hseqname . "\n";
@@ -304,7 +303,7 @@ sub write_output {
 
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
-      
+     print STDERR "have ".@ids." ids to pass to BMG\n"; 
       my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
 									     '-ids'      => \@ids,
 									     '-seqfetcher' => $seqfetcher,
@@ -338,7 +337,7 @@ sub run {
     }
     
     $self->convert_output;
-    #print STDERR "HAVE CONVERTED OUTPUT\n";
+    print STDERR "HAVE CONVERTED OUTPUT\n";
 }
 
 =head2 convert_output
@@ -418,7 +417,7 @@ sub make_genes {
       Bio::EnsEMBL::Pipeline::Tools::GeneUtils->SeqFeature_to_Transcript($tmpf, 
 									 $self->query, 
 									 $analysis_obj, 
-									 $self->output_db, 
+									 $self->genewise_db, 
 									 0);
     
     next unless defined ($unchecked_transcript);
@@ -650,28 +649,8 @@ sub get_seqfetcher_by_type{
   }
 }
 
-=head2 output_db
 
- Title   : output_db
- Usage   : needs to be moved to a genebuild base class
- Function: 
-           
- Returns : 
- Args    : 
 
-=cut
-
-sub output_db {
-    my( $self, $output_db ) = @_;
-    
-    if ($output_db) 
-    {
-	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
-	$self->{_output_db} = $output_db;
-    }
-    return $self->{_output_db};
-}
 
 
 =head2 fill_kill_list

@@ -25,7 +25,7 @@ sub fetch_input{
   ############################################################
   # read the query and create Bio::Seqs
   while( my $seq = $seqio->next_seq() ){
-    if (defined($seq) && !($seq->seq eq '') 
+    if ($seq && !($seq->seq eq '') 
 	&& !($seq->display_id eq '') ){
       push( @sequences, $seq );
     }

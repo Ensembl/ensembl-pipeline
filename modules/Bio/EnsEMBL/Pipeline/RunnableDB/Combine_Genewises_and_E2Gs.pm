@@ -121,11 +121,13 @@ sub new {
   $self->genewise_db($genewise_db);
 
   # db with the cdnas
-  my $cdna_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						    '-host'   => $GB_cDNA_DBHOST,
-						    '-user'   => $GB_cDNA_DBUSER,
-						    '-dbname' => $GB_cDNA_DBNAME,
-						    ); 
+  my $cdna_db =  new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     '-host'   => $GB_cDNA_DBHOST,
+     '-user'   => $GB_cDNA_DBUSER,
+     '-dbname' => $GB_cDNA_DBNAME,
+     '-pass' => $GB_cDNA_DBPASS,
+    ); 
   
   $cdna_db->dnadb($self->db);
   $self->cdna_db($cdna_db);
@@ -424,7 +426,10 @@ sub write_output {
   
  GENE: 
   foreach my $gene ($self->output) {	
-    
+    if(!$gene->analysis || 
+       $gene->analysis->logic_name ne $self->analysis->logic_name){
+      $gene->analysis($self->analysis);
+    }
     eval {
       $gene_adaptor->store($gene);
       print STDERR "wrote gene dbID " . $gene->dbID . "\n";
@@ -1811,7 +1816,7 @@ sub remap_genes {
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
       $transcount++;
       $transcript->type( $genecount."_".$transcount );
-      $transcript = Bio::EnsEMBL::Tools::TranscriptUtils->set_stop_codon($transcript);
+      $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($transcript);
       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
     }
 
@@ -1985,7 +1990,7 @@ sub _recalculate_translation{
 =head2 _transfer_evidence
 
   
- Arg[1]: reference to Bio::EnsEMBL::Transcript $combined_transcript
+ Arg[1]: reference to Bio::EnsEMBL::Tanscript $combined_transcript
  Arg[2]: reference to Bio::EnsEMBL::Transcript $cdna_transcript
  Return: Bio::EnsEMBL::Transcript
  Description: transfers cdna evidence to combined transcript

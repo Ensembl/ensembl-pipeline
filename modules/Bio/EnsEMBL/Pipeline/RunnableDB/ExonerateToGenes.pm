@@ -14,6 +14,8 @@
 Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 
 
+
+
 =head1 SYNOPSIS
 
 my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes->new(
@@ -895,7 +897,13 @@ sub output {
   if (@output){
     push( @{$self->{_output} }, @output);
   }
-  return @{$self->{_output}};
+  
+  my @output;
+  if($self->{_output}){
+    @output = @{$self->{_output}};
+  }
+
+  return @output;
 }
 
 ############################################################

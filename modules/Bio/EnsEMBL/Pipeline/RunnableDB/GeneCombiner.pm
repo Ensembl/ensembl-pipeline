@@ -101,18 +101,12 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-   
-  my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  -host             => $REF_DBHOST,
-						  -user             => $REF_DBUSER,
-						  -dbname           => $REF_DBNAME,
-						);
   
   my $ensembl_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						      '-host'   => $ENSEMBL_DBHOST,
 						      '-user'   => $ENSEMBL_DBUSER,
 						      '-dbname' => $ENSEMBL_DBNAME,
-						      '-dnadb' => $refdb,
+						      '-dnadb' => $self->db,
 						     );
   
 
@@ -120,26 +114,23 @@ sub new{
 						      '-host'   => $ESTGENE_DBHOST,
 						      '-user'   => $ESTGENE_DBUSER,
 						      '-dbname' => $ESTGENE_DBNAME,
-						      '-dnadb' => $refdb,
+						      '-dnadb' => $self->db,
 						     ); 
 
   
   # dbobj is read by the parent class RunnableDB and it holds the FINAL_DB database
-  
-  unless( $self->db ){
+ 
 
 
-      my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $FINAL_DBHOST,
-							'-user'   => $FINAL_DBUSER,
-							'-dbname' => $FINAL_DBNAME,
-							'-pass'   => $FINAL_DBPASS,
-							'-dnadb'  => $refdb,
-						   ); 
-      $self->db($final_db);
-    }
+  my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $FINAL_DBHOST,
+						    '-user'   => $FINAL_DBUSER,
+						    '-dbname' => $FINAL_DBNAME,
+						    '-pass'   => $FINAL_DBPASS,
+						    '-dnadb'  => $self->db,
+						   );
   
-  $self->final_db( $self->db ); 
-  $self->final_db->dnadb($refdb);
+  $self->final_db( $final_db ); 
+  $self->final_db->dnadb($self->db);
 
 
   # needs to read from two databases and write into another one (possibly a third?)
@@ -317,7 +308,7 @@ sub run{
   unless ( @est_genes ){
     unless (@ensembl_genes){
 	print STDERR "no genes found, leaving...\n";
-	exit(0);
+	return;
       }
     print STDERR "No estgenes found, writing ensembl genes as they are\n";
     my @transcripts;
@@ -532,7 +523,7 @@ sub run{
   
   unless ( @transcripts ){
     print STDERR "No transcripts created, exiting\n";
-    exit(0);
+    exit;
   }
   # make the genes 
   my @newgenes = $self->_make_Genes(\@transcripts);
@@ -1891,7 +1882,7 @@ sub _make_Genes{
   my @transcripts = @{ $transcripts };
 
   my $genetype = $FINAL_TYPE;
-  my $analysis = $self->_analysis;
+  my $analysis = $self->analysis;
 
   my @selected_transcripts;
   my $count  = 0;
@@ -1944,7 +1935,7 @@ sub _remap_Genes {
  GENE:  
   foreach my $gene (@genes) {
     
-    $gene->analysis($self->_analysis);
+    $gene->analysis($self->analysis);
     $gene->type($genetype);
     my @trans = @{$gene->get_all_Transcripts};
     my $new_gene;
@@ -2208,21 +2199,6 @@ sub prune_Exons {
 }
 
 
-#########################################################################
-
-sub _analysis {
-  my ($self, $analysis) = @_;
-
-  if(defined $analysis){
-    $self->throw("$analysis is not a Bio::EnsEMBL::Analysis") unless $analysis->isa("Bio::EnsEMBL::Analysis");
-    $self->{'_analysis'} = $analysis;
-  }
-
-  return $self->{'_analysis'};
-}
-
-#########################################################################
-
 # writes data into the db specified in ...
 
 
@@ -2232,15 +2208,18 @@ sub write_output {
     @genes = $self->output;
   }
   #print STDERR "about to write ".scalar(@genes)." into the db\n";
-  
+  if(!@genes){
+    print "no genes to write\n";
+    return;
+  }
   # dbobj holds a reference to FINAL_DB
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
-  
+  my $gene_adaptor = $self->final_db->get_GeneAdaptor;
+  print STDERR "writing to ".$self->final_db->dbname."\n";
  GENE: 
   foreach my $gene (@genes) {	
     
     unless ( $gene->analysis ){
-      $gene->analysis( $self->_analysis );
+      $gene->analysis( $self->analysis );
     }
     unless ( $gene->type ){
       $gene->type( $FINAL_TYPE );
