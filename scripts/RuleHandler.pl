@@ -158,7 +158,7 @@ sub insert_rule {
     if exists $checked{$goal};
 
   # make and store the rule
-  my $rule = Bio::EnsEMBL::Pipeline::Rule->new(-goal => $analysis);
+  my $rule = Bio::EnsEMBL::Pipeline::Rule->new(-goalanalysis => $analysis);
   foreach my $condition(keys %checked) {
     $rule->add_condition($condition);
   }
