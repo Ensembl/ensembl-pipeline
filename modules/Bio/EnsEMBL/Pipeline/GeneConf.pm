@@ -125,10 +125,28 @@ my $prefix='COB';
 
 	     # eg TargettedGeneE2G
 	     GB_TARGETTED_RUNNABLES   => [''],
-	     # eg FPC_TargettedGeneE2G
-#	     GB_LENGTH_RUNNABLES      => ['Combine_Genewises_and_E2Gs', 'Gene_Builder'],
-	     GB_LENGTH_RUNNABLES      => ['FPC_BlastMiniGenewise', 'FPC_TargettedGeneWise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
-					  #, 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
+	     
+	     # array of hashes, each has contains the runnable class name and the analysis logic name
+	     GB_LENGTH_RUNNABLES      => [
+					  {
+					   runnable => 'FPC_BlastMiniGenewise', 
+					   analysis => 'TGE_gw',
+					  },
+					  {
+					   runnable => 'FPC_TargettedGeneWise',
+					   analysis => 'similarity_genewise',
+					  },
+					  {
+					   runnable => 'Combine_Genewises_and_E2Gs',
+					   analysis => 'combined_gw_e2g',
+					  },
+					  {
+					   runnable => 'Gene_Builder',
+					   analysis => 'ensembl',
+					  }
+					 ],
+	     
+	     #, 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '1000000',
 
@@ -227,7 +245,7 @@ my $prefix='COB';
 	     GB_MINSHORTINTRONLEN    => 7, 
 	     
 	     # introns between smaller than this is considered too short
-	     GB_MAXSHORTINTRONLEN    => 50, 
+	     GB_MAXSHORTINTRONLEN    => 15, 
 	     
 	     # introns longer than this are too long
 	     GB_MINLONGINTRONLEN     => 10000, 
