@@ -68,9 +68,9 @@ use strict;
 
 sub new {
   my ($class, $db) = @_;
-
+ 
   my $self = $class->SUPER::new($db);
-  
+ 
   #load and cache all of the Analysis objects
   $self->fetch_all;
 
@@ -109,7 +109,8 @@ sub store {
 
 
   my $dbID;
-
+ 
+  
   if( $dbID = $self->exists( $analysis )) {
     $analysis->adaptor( $self );
     $analysis->dbID( $dbID );
@@ -232,7 +233,7 @@ sub store {
 sub _objFromHashref {
   my $self = shift;
   my $rowHash = shift;
-
+  
   my $analysis = Bio::EnsEMBL::Pipeline::Analysis->new
     (
      -id              => $rowHash->{analysis_id},
@@ -259,7 +260,7 @@ sub _objFromHashref {
 
 sub fetch_analysis_input_id_type{
   my ($self, $analysis) = @_;
- 
+  
   my $sql = "select input_id_type from input_id_type_analysis".
     " where analysis_id = ?";
  

@@ -1,8 +1,8 @@
 # Base Class for handling job submission via Load Sharing software
 #
-# Cared for by Laura Clarke <lec@sanger.ac.uk>
+# Cared for by Laura Clarke 
 #
-# Copyright Laura Clarke <lec@sanger.ac.uk>
+# Copyright Laura Clarke 
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -44,6 +44,15 @@ All get/sets and generic methods found here, while specific methods such as
 construct_command_line have to be implemented in the specific child 
 classes Bio::EnsEMBL::Pipeline::BatchSubmission::*
 
+the specific methods which must be implemented are
+
+construct_command_line, a method to build the submission statement
+open_command_line, a method to open the submission statement 
+copy_output ,a method copy the output of a job at to the defined 
+             destination if desired
+delete_output, a method to delete the output from the temporary location
+               that held it
+
 =head1 CONTACT
 
 Post general queries to B<ensembl-dev@ebi.ac.uk>
@@ -78,49 +87,41 @@ sub new{
   $self->{'nodes'} = undef; #must by a space delimited line of nodes
   $self->{'resource'} = undef;
 
-  my($stdout, 
-     $stderr, 
-     $parameters, 
-     $pre_exec, 
-     $command, 
-     $queue, 
-     $jobname,
-     $resource,
-     $nodes) = $self->_rearrange([qw(STDOUT 
-				       STDERR 
-				       PARAMETERS 
-				       PRE_EXEC 
-				       COMMAND 
-				       QUEUE 
-				       JOBNAME
-				       RESOURCE
+  my($stdout, $stderr, $parameters, $pre_exec, $command,$queue, $jobname,$resource, $nodes) = $self->_rearrange([qw(STDOUT 
+                                     STDERR 
+                                     PARAMETERS 
+                                     PRE_EXEC 
+                                     COMMAND 
+                                     QUEUE 
+                                     JOBNAME
+                                     RESOURCE
 				       NODES)],@args);
 
-  if(defined($stdout)){
+  if($stdout){
     $self->stdout_file($stdout);
   }
-  if(defined($stderr)){
+  if($stderr){
     $self->stderr_file($stderr);
   }
-  if(defined($parameters)){
+  if($parameters){
     $self->parameters($parameters);
   }
-  if(defined($pre_exec)){
+  if($pre_exec){
     $self->pre_exec($pre_exec);
   }
-  if(defined($command)){
+  if($command){
     $self->command($command);
   }
-  if(defined($queue)){
+  if($queue){
     $self->queue($queue);
   }
-  if(defined($jobname)){
+  if($jobname){
     $self->jobname($jobname);
   }
-  if(defined($resource)){
+  if($resource){
     $self->resource($resource);
   }
-  if(defined($nodes)){
+  if($nodes){
     $self->nodes($nodes);
   }
 
@@ -134,7 +135,7 @@ sub new{
 sub stdout_file{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'stdout'} = $arg;
    }
 
@@ -146,7 +147,7 @@ sub stdout_file{
 sub stderr_file{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'stderr'} = $arg;
    }
 
@@ -157,7 +158,7 @@ sub stderr_file{
 sub id{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'id'} = $arg;
    }
 
@@ -167,7 +168,7 @@ sub id{
 sub parameters{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'parameters'} = $arg;
    }
 
@@ -177,7 +178,7 @@ sub parameters{
 sub pre_exec{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'pre_exec'} = $arg;
    }
 
@@ -187,7 +188,7 @@ sub pre_exec{
 sub command{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'command'} = $arg;
    }
 
@@ -198,7 +199,7 @@ sub command{
 sub queue{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'queue'} = $arg;
    }
 
@@ -208,7 +209,7 @@ sub queue{
 sub jobname{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'jobname'} = $arg;
    }
 
@@ -218,7 +219,7 @@ sub jobname{
 sub nodes{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'nodes'} = $arg;
    }
 
@@ -228,7 +229,7 @@ sub nodes{
 sub resource{
    my ($self, $arg) = @_;
 
-   if(defined($arg)){
+   if($arg){
      $self->{'resource'} = $arg;
    }
 
@@ -241,17 +242,29 @@ sub resource{
 #############
 
 sub construct_command_line{
-  my($self) = @_;
+  my ($self) = @_;
 
-  $self->throw("this method construct command line must be implemented!\n");
+  $self->throw("this method construct command line must be implemented");
 }
 
 
 sub open_command_line{
   my ($self)= @_;
   
-  $self->throw("open_command_line isn't implemented yet\n");
+  $self->throw("open_command_line isn't implemented yet");
 
+}
+
+sub copy_output{
+  my ($self) = @_;
+
+  $self->throw("this method copy_output must be implemented");
+}
+
+sub delete_output{
+  my ($self) = @_;
+
+  $self->throw("this method delete_output must be implemented");
 }
 
 1;

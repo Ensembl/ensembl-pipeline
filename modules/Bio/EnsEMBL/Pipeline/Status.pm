@@ -62,8 +62,10 @@ sub new {
 			    )],@args);
 
   $jobid   || $self->throw("Can't create a status object with no jobid");
-  $status  || $self->throw("Can't create a status object with no status string");
-  $created || $self->throw("Can't create a status object with no created time");
+  $status  || $self->throw("Can't create a status object for job ".
+			   $jobid." with no status string");
+  $created || $self->throw("Can't create a status object for job ".
+			   $jobid." with no created time");
 
   $self->jobid             ($jobid);
   $self->status            ($status);

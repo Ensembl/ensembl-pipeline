@@ -1,9 +1,9 @@
 # Ensembl Pipeline module for handling job submission via Sun Grid Engine 
 # load sharing software
 #
-# Cared for by Laura Clarke <lec@sanger.ac.uk>
+# Cared for by Steve Searle
 #
-# Copyright Laura Clarke <lec@sanger.ac.uk>
+# Copyright Steve Searle
 #
 # You may distribute this module under the same terms as perl itself
 #

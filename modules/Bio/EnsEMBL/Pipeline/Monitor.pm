@@ -174,7 +174,7 @@ sub show_current_status_summary {
 
 #show running/failed jobs grouped by status
 sub show_finished_summary {
-  my ($self) = @_;
+  my ($self, $no_submit) = @_;
 
   my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_id from input_id_analysis i, analysis  a where a.analysis_id = i.analysis_id group by a.analysis_id");
   
@@ -192,7 +192,9 @@ sub show_finished_summary {
     my $count  = $ref->{'count(*)'};
     my $name = $ref->{'logic_name'};
     my $id = $ref->{'analysis_id'};
-
+    if ($name =~ /Submit/){
+      next if($no_submit);
+    }
     if (length($count) > $maxcount) {
       $maxcount = length($count);
     }
@@ -480,15 +482,15 @@ sub show_jobs_by_status_and_analysis {
 # ==================================================== #
 
 sub rules_cache{
-	my $self = shift;
-	unless($self->{'_rules_cache'}){
-		my $rule_adaptor = $self->dbobj->get_RuleAdaptor();
-		my @rules = $rule_adaptor->fetch_all;
-		foreach my $rule (@rules)  {
-			$self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name;
-		}
-	}
-	return $self->{'_rules_cache'};
+    my $self = shift;
+    unless($self->{'_rules_cache'}){
+            my $rule_adaptor = $self->dbobj->get_RuleAdaptor();
+            my @rules = $rule_adaptor->fetch_all;
+            foreach my $rule (@rules)  {
+                $self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name if ($rule->list_conditions())[0];
+            }
+    }
+    return $self->{'_rules_cache'};
 }
 
 =pod
@@ -525,87 +527,90 @@ did NOT find any hits.
  Returns data structure as above.
  
  get_no_hit_contigs_for_analysis($feature_table, $analysis_id)
-
+'
 =cut
 
 sub get_unfinished_analyses_for_input_id{
-	my ($self, $contig_name, $print, $unfinished) = @_;
-	my $rules_cache = $self->rules_cache();
-	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
-							FROM contig c STRAIGHT_JOIN analysis a 
-							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
-							WHERE i.input_id IS NULL && c.name = ?});
-	$sth->execute($contig_name);
-	while(my $row  = $sth->fetchrow_hashref){
-		push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
-				if $rules_cache->{$row->{'a_id'}};
-	}
-	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
-	return $unfinished;
+    my ($self, $contig_name, $print, $unfinished) = @_;
+    my $rules_cache = $self->rules_cache();
+    my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
+                                                    FROM contig c STRAIGHT_JOIN analysis a 
+                                                    LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
+                                                    WHERE i.input_id IS NULL && c.name = ?});
+    $sth->execute($contig_name);
+    while(my $row  = $sth->fetchrow_hashref){
+            push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+                            if $rules_cache->{$row->{'a_id'}};
+    }
+    map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+    return $unfinished;
 }
 sub get_unfinished_analyses_for_assembly_type{
-	my ($self, $assembly_type, $print, $unfinished) = @_;
-	my $rules_cache = $self->rules_cache();
-	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name, b.type 
-							FROM assembly b, contig c STRAIGHT_JOIN analysis a 
-							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id
-							WHERE i.input_id IS NULL && b.type = ?  && b.contig_id = c.contig_id});
-	$sth->execute($assembly_type);
-	while(my $row  = $sth->fetchrow_hashref){
-		push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
-				if $rules_cache->{$row->{'a_id'}};
-	}
-	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
-	return $unfinished;
+    my ($self, $assembly_type, $print, $unfinished) = @_;
+    my $rules_cache = $self->rules_cache();
+    my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name, b.type 
+                                         FROM assembly b, contig c STRAIGHT_JOIN analysis a 
+                                    LEFT JOIN input_id_analysis i ON c.name = i.input_id
+					   && a.analysis_id = i.analysis_id
+                                        WHERE i.input_id IS NULL 
+					   && b.type = ?
+					   && b.contig_id = c.contig_id});
+    $sth->execute($assembly_type);
+    while(my $row  = $sth->fetchrow_hashref){
+            push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+                            if $rules_cache->{$row->{'a_id'}};
+    }
+    map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+    return $unfinished || [];
 }
 sub get_unfinished_analyses{
-	my ($self, $print, $unfinished) = @_;
-	my $rules_cache = $self->rules_cache();
-	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
-							FROM contig c STRAIGHT_JOIN analysis a 
-							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
-							WHERE i.input_id IS NULL ORDER BY c.name});
-	$sth->execute();
-	while(my $row  = $sth->fetchrow_hashref){
-		push(@$unfinished, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
-				if $rules_cache->{$row->{'a_id'}};
-	}
-	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
-	print "Waiting for " . scalar(@$unfinished) . " to complete.\n" if $print;
-	return $unfinished;
+    my ($self, $print, $unfinished) = @_;
+    my $rules_cache = $self->rules_cache();
+    my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
+                                                    FROM contig c STRAIGHT_JOIN analysis a 
+                                                    LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
+                                                    WHERE i.input_id IS NULL ORDER BY c.name});
+    $sth->execute();
+    while(my $row  = $sth->fetchrow_hashref){
+            push(@$unfinished, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+                            if $rules_cache->{$row->{'a_id'}};
+    }
+    map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+    print "Waiting for " . scalar(@$unfinished) . " to complete.\n" if $print;
+    return $unfinished;
 }
 
 sub get_no_hit_contigs_for_analysis{
-	my $self = shift;
-	my ($feature_table, $analysis_id, $print, $no_hits) = @_;
-	my $sth = $self->dbobj->prepare(qq{SELECT c.contig_id, c.name
-							FROM contig c STRAIGHT_JOIN input_id_analysis i 
-							LEFT JOIN $feature_table f ON f.analysis_id = i.analysis_id && f.contig_id = c.contig_id  
-							WHERE f.contig_id IS NULL && f.analysis_id IS NULL && i.analysis_id = ? && c.name = i.input_id});
-	$sth->execute($analysis_id);
-	$no_hits = [];
-	while(my $row = $sth->fetchrow_hashref){
-		push(@{$no_hits}, [ $row->{'name'}, undef, $analysis_id ] );
-	}
-	map {print join("\t: ", @$_) . "\n"} @$no_hits if $print;
-	return $no_hits;
+    my $self = shift;
+    my ($feature_table, $analysis_id, $print, $no_hits) = @_;
+    my $sth = $self->dbobj->prepare(qq{SELECT c.contig_id, c.name
+                                                    FROM contig c STRAIGHT_JOIN input_id_analysis i 
+                                                    LEFT JOIN $feature_table f ON f.analysis_id = i.analysis_id && f.contig_id = c.contig_id  
+                                                    WHERE f.contig_id IS NULL && f.analysis_id IS NULL && i.analysis_id = ? && c.name = i.input_id});
+    $sth->execute($analysis_id);
+    $no_hits = [];
+    while(my $row = $sth->fetchrow_hashref){
+            push(@{$no_hits}, [ $row->{'name'}, undef, $analysis_id ] );
+    }
+    map {print join("\t: ", @$_) . "\n"} @$no_hits if $print;
+    return $no_hits;
 }
 sub lock_status{
-	my ($self,$print) = @_;
-	my $str = "Locked By USER: %s, HOST: %s, PID: %s, STARTED: %s (%s) \n";
-	my @a = ();
-	my ($dbuser, $dbhost, $dbport, $dbname) = ($self->dbobj->username,
-											   $self->dbobj->host,
-											   $self->dbobj->port,
-											   $self->dbobj->dbname);
-	if (my $lock_str = $self->dbobj->pipeline_lock) {
-		my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
-		$self->print_header("This pipeline is LOCKED") if $print;
-		@a = ($user, $host, $pid, scalar(localtime($started)), $started);
-		printf($str, @a) if $print;
-	}else{
-		$self->print_header("This pipeline is FREE") if $print;
-	}
-	return @a;
+    my ($self,$print) = @_;
+    my $str = "Locked By USER: %s, HOST: %s, PID: %s, STARTED: %s (%s) \n";
+    my @a = ();
+    my ($dbuser, $dbhost, $dbport, $dbname) = ($self->dbobj->username,
+                                               $self->dbobj->host,
+                                               $self->dbobj->port,
+                                               $self->dbobj->dbname);
+    if (my $lock_str = $self->dbobj->pipeline_lock) {
+            my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+            $self->print_header("This pipeline is LOCKED") if $print;
+            @a = ($user, $host, $pid, scalar(localtime($started)), $started);
+            printf($str, @a) if $print;
+    }else{
+            $self->print_header("This pipeline is FREE") if $print;
+    }
+    return @a;
 }
 1;
