@@ -21,11 +21,20 @@
 										 );
     my $seq = $seqfetcher->get_Seq_by_acc($acc);
 
+       where $acc is the primary key on which the index has been made (accession or id)
+
+    my $seq = $seqfetcher->get_Seq_by_secondary($name,$acc);
+
+       where $name is the namespace or identifier for the secondary key, and $acc is the accession or id.
+       Beware that this method can return multiple sequences as the secondary id is not necessarily unique
+
+
 =head1 DESCRIPTION
 
   This is basically a wrapper around the SeqFetcher Bio::DB::Flat::OBDAIndex,
 to use it in Ensembl in the same way as other SeqFetcher. 
- 
+ It reads some configuration info from pipeConf.pl.
+
   Sequences are fetched from a 
 database previously formatted with indicate (made by Steve Searle)
 
@@ -77,6 +86,8 @@ $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARR
       print STDERR "changing $database to $1\n";
       $database = $1;
     }
+
+    $self->index_name( $database);
 
     # get the index name and the index directory out of $database
     my @path = split /\//, $database;
@@ -194,7 +205,51 @@ sub  get_Seq_by_acc {
   }
   if(!defined $seq){
     $self->warn("could not find sequence for $acc");
+
+  FETCHER:
+    foreach my $seqfetcher ( $self->_seqfetcher ){
+      
+      my @secondary_namespaces = $seqfetcher->secondary_namespaces;
+      foreach my $name ( @secondary_namespaces ){
+	$self->warn("seqfetcher $seqfetcher is looking in namespace $name for secondary key $acc\n");
+	
+	my @seqs;
+	eval{
+	  # this returns potentially an array of Bio::Seq
+	  @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
+	};
+	if ( $@ ){
+	  $self->warn("problem fetching sequence for secondary key $acc");
+	}
+	if ( @seqs > 1 ){
+	  $self->warn("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
+	  next;
+	}
+	
+	if ( defined $seqs[0] ){
+	  $seqs[0]->display_id( $acc );
+	  $seqs[0]->accession_number( $acc );
+	  $seqs[0]->desc("");
+	  $seq = $seqs[0];
+	  last FETCHER;
+	}
+      }
+    }
+    unless ($seq){
+      $self->warn("could not find sequence for secondary key $acc");
+    }
   }
+  
+  if ($seq){
+    #print STDERR "found sequence!\n";
+    #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+    #print STDERR "display_id: ".$seq->display_id."\n";
+    #print STDERR $seq->seq."\n";
+  }
+  else{
+    print STDERR "sequence not found. Returning undef\n";
+  }
+
   
   return $seq;
 }
@@ -206,5 +261,65 @@ sub  get_Seq_by_id {
   return undef;
 }
 
+=head2 get_Seq_by_secondary
+
+  Function: Does the sequence retrieval via the OBDAIndex module using the secondary index key
+            An index should have been made prior to this on the two keys.
+  Returns : Bio::Seq
+
+=cut
+
+sub  get_Seq_by_secondary {
+  my ($self, $name, $acc) = @_;
+
+  if (!defined($acc)) {
+    $self->throw("No secondary key input");
+  }  
+  if (!defined($name)){
+    $self->throw("No name space for the secondary key");
+  }
+
+  my @seqs;
+  my @seqfetchers = $self->_seqfetcher;
+
+  foreach my $seqfetcher (@seqfetchers){
+    
+    eval{
+      # this returns potentially an array of Bio::Seq
+      @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
+    };
+    if ( $@ ){
+      $self->warn("problem fetching sequence for $acc");
+    }
+    
+    if ( @seqs > 1 ){
+      $self->warn("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
+      next;
+    }
+    if ( defined $seqs[0] ){
+      $seqs[0]->display_id( $acc );
+      $seqs[0]->accession_number( $acc );
+      $seqs[0]->desc("");
+      last;
+    }
+  }
+  
+  unless (@seqs){
+    $self->warn("OBDAIndexSeqFetcher: could not find sequence for $acc");
+  }
+  
+  #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+  #print STDERR "display_id: ".$seqs[0]->display_id."\n";
+  #print STDERR $seqs[0]->seq."\n";
+  return $seqs[0];
+}
+
+sub index_name{
+  my ($self,$name) = @_;
+  if ($name){
+    $self->{index_name} = $name;
+  }
+  return $self->{index_name};
+}
 
 1;
