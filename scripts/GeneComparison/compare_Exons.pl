@@ -155,6 +155,6 @@ print STDERR scalar(@unclustered1)." genes of type @$type1 left unclustered\n";
 print STDERR scalar(@unclustered2)." genes of type @$type2 left unclustered\n";
 
 
-$gene_comparison->compare_Exons(\@gene_clusters);
+$gene_comparison->compare_Exons(\@gene_clusters,'coding');
 
 
