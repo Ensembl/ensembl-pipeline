@@ -1,123 +1,88 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
-
+use lib 't';
+use strict;
+use Test;
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..4\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 38;} 
 
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-$loaded = 1;
-print "ok 1\n";
+ok(1);
 
-my $seqin = Bio::SeqIO->new( -file => "t/data/human.genomic");
+ok(my $seqin = Bio::SeqIO->new( -file => "t/data/human.genomic"));
+ok(my $gen = $seqin->next_seq());
 
-my $gen = $seqin->next_seq();
+ok(my $run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new);
 
-my $run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new;
-
-$run->seq($gen);
+ok($run->seq($gen));
 
 #exon 1794 1935
 #exon 2084 2180
 
-my $t = Bio::EnsEMBL::Transcript->new();
-my $exon = Bio::EnsEMBL::Exon->new;
+ok(my $t    = Bio::EnsEMBL::Transcript->new());
 
-$exon->start(1787);
-$exon->end  (1935);
-$exon->strand (1);
+ok(my $exon  = Bio::EnsEMBL::Exon->new);
+ok(my $exon2 = Bio::EnsEMBL::Exon->new);
 
-$t->add_Exon($exon);
+ok($exon->start(1787) == 1787);
+ok($exon->end  (1935) == 1935);
+ok($exon->strand (1)  == 1);
 
-$exon = Bio::EnsEMBL::Exon->new;
+ok($exon2->start(2084) == 2084);
+ok($exon2->end   (2180) == 2180);
+ok($exon2->strand (1)   == 1);
 
-$exon->start(2084);
-$exon->end  (2180);
-$exon->strand (1);
+ok($t->add_Exon($exon));
+ok($t->add_Exon($exon2));
 
-$t->add_Exon($exon);
-
-
-$run->add_Transcript($t);
+ok($run->add_Transcript($t));
 
 $run->run;
 
-print "ok 2\n";
+ok(1);
 
-$seen = 0;
-$error = 0;
 foreach $t ( $run->output ) {
-   if( !$t->isa('Bio::EnsEMBL::Transcript') ) {
-      $error = 1;
-   } else {
-     foreach $e ( $t->get_all_Exons ) {
-       #print "Exon ",$e->start," ",$e->end,"\n";
-     }
-     #print "Translation ",$t->translation->start," ",$t->translation->start_exon,"\n";
-     #print "Translation ",$t->translation->end," ",$t->translation->end_exon,"\n";
+   ok($t->isa('Bio::EnsEMBL::Transcript'));
+
+   foreach my $e ( @{$t->get_all_Exons} ) {
+		 ok($e);
+     print "Translation ",$t->translation->start," ",$t->translation->start_Exon,"\n";
+     print "Translation ",$t->translation->end," ",$t->translation->end_Exon,"\n";
    }
-
-   $seen = 1;
-}
-
-if( $seen == 1 ) {
-    print "ok 3\n";
-} else {
-    print "not ok 3\n";
 }
 
 
-$seqin = Bio::SeqIO->new( -file => "t/data/genomewise2.seq");
+ok(my $seqin2 = Bio::SeqIO->new( -file => "t/data/genomewise2.seq"));
 
-$gen = $seqin->next_seq();
+ok(my $gen2 = $seqin2->next_seq());
 
-$run = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new;
+ok(my $run2 = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new);
 
-$run->seq($gen);
-
-
-$t = Bio::EnsEMBL::Transcript->new();
-$exon = Bio::EnsEMBL::Exon->new;
-
-$exon->start(1001);
-$exon->end  (1422);
-$exon->strand (1);
-
-$t->add_Exon($exon);
-
-$exon = Bio::EnsEMBL::Exon->new;
-
-$exon->start(1482);
-$exon->end  (1869);
-$exon->strand (1);
-
-$t->add_Exon($exon);
+ok($run2->seq($gen2));
 
 
-$run->add_Transcript($t);
+ok(my $t2 = Bio::EnsEMBL::Transcript->new());
 
-$run->run;
+ok(my $exon3 = Bio::EnsEMBL::Exon->new);
+ok(my $exon4 = Bio::EnsEMBL::Exon->new);
 
-print "ok 4\n";
+ok($exon3->start(1001) == 1001);
+ok($exon3->end  (1422) == 1422);
+ok($exon3->strand (1)  == 1);
+
+ok($exon4->start(1482) == 1482);
+ok($exon4->end  (1869) == 1869);
+ok($exon4->strand (1)  == 1);
+
+ok($t2->add_Exon($exon3));
+ok($t2->add_Exon($exon4));
+
+ok($run2->add_Transcript($t2));
+
+$run2->run;
+
+ok(1);
 
