@@ -50,14 +50,19 @@ use POSIX;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
-use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
-use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
+#use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
+#use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
-use Bio::Tools::BPlite;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 use FileHandle;
 #use diagnostics;
 
@@ -71,6 +76,9 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_DBPASS
 					EST_SOURCE
 					EST_INDEX
+					EST_MIN_PERCENT_ID
+					EST_MIN_COVERAGE
+					EST_INPUTID_REGEX
 				       );
 
 					#EST_REFDBPASS #not needed, it is a reference db anyway
@@ -97,7 +105,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
     Args    :   -db:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object (required),
-                -analysis:   A Bio::EnsEMBL::Analysis (optional) 
+                -analysis:   A Bio::EnsEMBL::Analysis (optional) ;
 =cut
 
 sub new {
@@ -144,7 +152,7 @@ print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
 	 
 	 
 	 # database where the exonerate est/cdna features are:
-	 my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
+	 my $estdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $estdbhost,		
 								       -user   => $estdbuser,
 									 -dbname => $estdbname,
 								       -pass   => $estpass,
@@ -267,8 +275,7 @@ sub write_exons_as_features {
   my %contig_cache; # keep track of which contig internal_ids we have looked up so far
   my %contig_features;
 
-  my $source_tag   = 'est';
-  my $primary_tag  = 'est';
+
   my $analysis     = $self->get_exon_analysis;
 
   $self->throw("no analysis\n") unless defined $analysis;
@@ -317,8 +324,6 @@ sub write_exons_as_features {
 						     -percent_id  =>   $exon->score, 
 						     -phase       =>   $exon->phase,
 						     -end_phase   =>   $exon->end_phase,
-						     -source_tag  =>   $source_tag,
-						     -primary_tag =>   $primary_tag,
 						     -analysis    =>   $analysis );
 	
 	my $est     = new Bio::EnsEMBL::SeqFeature  (-start       =>   $hstart,
@@ -327,8 +332,6 @@ sub write_exons_as_features {
 						     -strand      =>   '1',
 						     -score       =>   $exon->score,
 						     -percent_id  =>   $exon->score, 
-						     -source_tag  =>   $source_tag,
-						     -primary_tag =>   $primary_tag,
 						     -analysis    =>   $analysis );
 	
 	my $fp      = new Bio::EnsEMBL::FeaturePair (-feature1 => $genomic,
@@ -426,18 +429,18 @@ sub fetch_input {
   $self->throw("No input id") unless defined($self->input_id);
 
   # get virtual contig of input region
-  my $chrid     = $self->input_id;
-     $chrid     =~ s/\.(.*)-(.*)//;
-  my $chrstart  = $1;
-  my $chrend    = $2;
+  $self->input_id  =~ /$EST_INPUTID_REGEX/;
+  my $chrid = $1;
+  my $chrstart  = $2;
+  my $chrend    = $3;
 
   my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-  $contig->_chr_name($chrid);
+  #$contig->_chr_name($chrid);
   $self->vcontig($contig);
 
   # find exonerate features amongst all the other features  
-  my @allfeatures = $contig->get_all_Features();
+  my @allfeatures = $self->estdb->get_DnaAlignFeatureAdaptor->fetch_by_Slice($contig);
 
   print STDERR "got " . scalar(@allfeatures) . " external features\n";
   my @exonerate_features;
@@ -448,7 +451,7 @@ sub fetch_input {
     if (defined($feat->analysis)      && defined($feat->score) && 
 	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
       # only take high scoring ests
-      if($feat->percent_id >= 97){
+      if($feat->percent_id >= $EST_MIN_PERCENT_ID){
       	if(!defined $exonerate_ests{$feat->hseqname}){
 	  push (@{$exonerate_ests{$feat->hseqname}}, $feat);
 	}
@@ -464,7 +467,7 @@ sub fetch_input {
   # empty out massive arrays
   @allfeatures = ();
 
-  print STDERR "exonerate features left with percent_id >= 97 : " . scalar(@exonerate_features) . "\n";
+  print STDERR "exonerate features left with percent_id >= $EST_MIN_PERCENT_ID : " . scalar(@exonerate_features) . "\n";
   print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
   
   unless( @exonerate_features ){
@@ -477,10 +480,10 @@ sub fetch_input {
   
   #my @time1 = times();
   # use coverage 5 for now.
-  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
-								    '-minscore' => 500,
-								    '-prune'    => 1,
-								  );
+  my $filter = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new( '-coverage' => 10,
+								     '-minscore' => 500,
+								     '-prune'    => 1,
+								   );
   my @filteredfeats = $filter->run(@exonerate_features);
   #my @time2 = times();
   #print STDERR "Filter time: user = ".($time2[0] - $time1[0])."\tsystem = ".($time2[1] - $time1[1])."\n";
@@ -559,8 +562,8 @@ sub fetch_input {
     }
     
     my $coverage = ceil(100 * ($hitlength/($estlength)));
-    if($coverage < 90){
-      print STDERR "rejecting $id for insufficient coverage ( < 90 ): $coverage %\n";
+    if($coverage < $EST_MIN_COVERAGE){
+      print STDERR "rejecting $id for insufficient coverage ( < $EST_MIN_COVERAGE ): $coverage %\n";
       if(scalar(@{$final_ests{$id}}) == 1){
 	$single++;
       }
@@ -674,7 +677,9 @@ sub convert_output {
   # make an array of genes for each runnable
   foreach my $runnable ($self->runnable) {
     my @results = $runnable->output;
+    print STDERR "runnable produced ".@results." results\n";
     my @g = $self->make_genes($count, \@results);
+    print STDERR "have made ".@g." genes\n";
     $count++;
     push(@genes, @g);
   }
@@ -739,8 +744,7 @@ sub make_transcript{
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
-  unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
-    {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
+  
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
   $transcript->temporary_id($contig->id . ".$genetype.$count");
@@ -767,15 +771,13 @@ sub make_transcript{
     $exon->end_phase( $exon_pred->end_phase );
     $exon->attach_seq($contig);
     $exon->score($exon_pred->score);
-
+    $exon->adaptor($self->estdb->get_ExonAdaptor);
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
+ 
       $subf->feature1->analysis($self->analysis);
 	
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
+     
       $subf->feature2->analysis($self->analysis);
       
       $exon->add_Supporting_Feature($subf);
@@ -1115,7 +1117,7 @@ sub run_blast {
   print STDERR "$command\n";
   my $status = system( $command );
   
-  my $blast_report = new Bio::Tools::BPlite(-file=>$blastout);
+  my $blast_report = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-file=>$blastout);
 
  HIT:
   while(my $hit = $blast_report->nextSbjct) {
@@ -1136,8 +1138,7 @@ sub run_blast {
 						 -seqname     => $hsp->query->seqname,
 						 -strand      => $hsp->query->strand,
 						 -score       => $hsp->query->score,
-						 -source_tag  => 'blast',
-						 -primary_tag => 'blast',
+					
 						);
       
       my $est = new Bio::EnsEMBL::SeqFeature  ( -start       => $hsp->subject->start,
@@ -1145,8 +1146,7 @@ sub run_blast {
 						-seqname     => $hsp->subject->seqname,
 						-strand      => $hsp->subject->strand,
 						-score       => $hsp->subject->score,
-						-source_tag  => 'blast',
-						-primary_tag => 'blast',
+					
 					      );
 
       # if both genomic and est strands are the same, convention is to set both to be 1
