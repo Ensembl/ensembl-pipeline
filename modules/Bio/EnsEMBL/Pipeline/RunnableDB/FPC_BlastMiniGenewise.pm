@@ -53,7 +53,7 @@ use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
 # config file; parameters searched for here if not passed in as @args
@@ -70,8 +70,6 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-print STDERR "seqfetcher is " . $self->seqfetcher."\n";
-
     my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
     $path = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
@@ -201,7 +199,8 @@ sub fetch_input {
     print STDERR "contig: " . $contig . " \n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200, 0);
+#    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200, 0);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('swall',200, 0);
     
     # lose version numbers - probably temporary till pfetch indices catch up
     foreach my $f(@features) {
@@ -562,7 +561,7 @@ sub make_seqfetcher {
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }

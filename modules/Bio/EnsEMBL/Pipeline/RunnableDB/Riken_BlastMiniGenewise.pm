@@ -59,7 +59,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Data::Dumper;
 
 # config file; parameters searched for here if not passed in as @args
@@ -541,7 +541,7 @@ sub make_seqfetcher{
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }

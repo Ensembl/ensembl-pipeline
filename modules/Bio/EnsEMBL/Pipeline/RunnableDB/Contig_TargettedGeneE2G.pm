@@ -62,7 +62,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
@@ -125,7 +125,7 @@ sub make_seqfetcher{
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }

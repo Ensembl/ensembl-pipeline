@@ -45,7 +45,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 # config file; parameters searched for here if not passed in as @args
 require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
@@ -84,7 +84,7 @@ sub new {
  Title   : make_seqfetcher
  Usage   :
  Function: checks in GB_conf::seqfetch_conf for $indexname; if it exists, 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs, otherwise 
+           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
            returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
  Example :
  Returns : Bio::DB::RandomAccessI
@@ -101,7 +101,7 @@ sub make_seqfetcher {
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }
