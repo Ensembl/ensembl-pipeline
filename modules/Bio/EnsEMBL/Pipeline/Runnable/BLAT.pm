@@ -1,6 +1,5 @@
-#
-# Written by Eduardo Eyras
-#
+
+
 # Copyright GRL/EBI 2002
 #
 # You may distribute this module under the same terms as perl itself
@@ -148,7 +147,7 @@ sub run {
     foreach my $db (@db_list) {
         my $command     = "/acari/work7a/keenan/tools/reformat_headers $db | $blat stdin $gen_query $options" . $self->results;
         print $command, "\n";
-        $self->throw("Failed during blast run $!\n") unless ( system($command) == 0 );
+        $self->throw(qq{COMMAND:\n$command\nFailed during BLAT run $!\n}) unless ( system($command) == 0 );
         $self->parse_results();
     }
 
