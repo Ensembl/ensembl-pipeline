@@ -286,7 +286,7 @@ sub run {
           $self->throw("unstranded feature not much use for gene building\n") 
         }
       }
-      if(@forward){
+      if(scalar(@forward)){
 	my @extras = $self->_find_extras(@forward);
 	#print STDERR "Number of features       = ".scalar(@forward)."\n";
 	#print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
@@ -310,10 +310,11 @@ sub run {
 	}
       }
 
-      if(@reverse){
+      if(scalar(@reverse)){
+	print STDERR "Number of features       = ".scalar(@reverse)."\n";
 	my @extras = $self->_find_extras(@reverse);
-	#print STDERR "Number of features       = ".scalar(@reverse)."\n";
-	#print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+#	print STDERR "Number of features       = ".scalar(@reverse)."\n";
+#	print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
 	if(@extras){
 	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
 									     -genomic => $self->genomic_sequence,
@@ -389,12 +390,11 @@ sub _find_extras {
       next FEAT;
     }      
     
-    foreach my $out (@output) {
-      foreach my $sf ($out->sub_SeqFeature) {
-        $sf->slice($self->genomic_sequence);
-        $sf->seqname($sf->slice->name);
+    foreach my $gene (@output) {
+      foreach my $exon (@{$gene->get_all_Exons}) {
+        $exon->slice($self->genomic_sequence);
         #print STDERR "Comparing ".$sf." to ".$f."\n";
-        if ($f->overlaps($sf)) {
+        if ($f->overlaps($exon)) {
           $found = 1;
         }
       }
