@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
+use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
@@ -177,26 +178,51 @@ sub write_output {
     my ($contig) = keys %$genebuilders;
     my $vc = $genebuilders->{$contig}->contig;
 
-        return unless ($#genes >= 0);
+    return unless ($#genes >= 0);
+
+    # build a GTF Handler
+
+    my $gtf = Bio::EnsEMBL::Utils::GTF_handler->new();
+    open(GTF,">/nfs/disk100/humpub1/gtf_output/".$self->input_id.".gtf") || die "Cannot open gtf file for ".$self->input_id."$!";
+    open(PEP,">/nfs/disk100/humpub1/gtf_output/".$self->input_id.".pep") || die "Cannot open pep file for ".$self->input_id."$!";
+
+    $gtf->dump_genes(\*GTF,@genes);
+   
+ 
+    my $seqout = Bio::SeqIO->new( '-format' => 'fasta' , -fh => \*PEP);
+    foreach my $gene ( @genes ) {
+	foreach my $trans ( $gene->each_Transcript ) {
+	     my $pep = $trans->translate();
+	    $pep->desc("Gene:".$gene->id." trans:".$trans->id," Input id".$self->input_id);
+	    $seqout->write_seq($pep);
+	}
+    }
+    print (GTF "#Done\n"); 
+    close(GTF);
+    close(PEP);
+    return;
 
 
-	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
-	      $sth->execute;
+    foreach my $gene (@genes) {	    
+	my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
+	$sth->execute;
 
-         print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
-	  foreach my $gene (@genes) {
-	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
-		=~ s/$GENE_ID_SUBSCRIPT//;
-	    (my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
-		=~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
-	    (my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
-		=~ s/$PROTEIN_ID_SUBSCRIPT//;
-	    print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
-	    (my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
-		=~ s/$EXON_ID_SUBSCRIPT//;
-	    
+	eval {
+	print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
+	
+	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
+	    =~ s/$GENE_ID_SUBSCRIPT//;
+	(my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
+	    =~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
+	(my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
+	    =~ s/$PROTEIN_ID_SUBSCRIPT//;
+	print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
+	(my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
+	    =~ s/$EXON_ID_SUBSCRIPT//;
+
+
 	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
-
+	    $gcount++;
 	    print (STDERR "Writing gene " . $gene->id . "\n");
 
             # Convert all exon ids and save in a hash
@@ -237,20 +263,22 @@ sub write_output {
 		
 	    }
 
+	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
+	$gene_obj->write($newgene);
 
+    };
+	if ($@) {
+	    $sth = $db->prepare("unlock tables");
+	    $sth->execute;
+
+	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
+	} else {
+	    $sth = $db->prepare("unlock tables");
+	    $sth->execute;
 	}
 
-    # convert genes here...
-    my $rcgenes;
-    foreach my $g (@genes) {
-	my $newgene = $vc->convert_Gene_to_raw_contig($g);
-	#$self->check_gene($newgene);
-	$gene_obj->write($newgene);
-	#push(@rcgenes,$newgene);
     }
-    
-     $sth = $db->prepare("unlock tables");
-     $sth->execute;
+
 
      # Set attribute tag on all contigs
      $db->extension_tables(1);
@@ -259,7 +287,7 @@ sub write_output {
         my @contigs = $vc->get_all_RawContigs;
 
         foreach my $contig (@contigs) {
-            $contig->set_attribute('GENE_BUILD_6',1); 
+            $contig->set_attribute('GENE_BUILD_SEPT20',1); 
         }
      }
 }
@@ -384,11 +412,6 @@ sub run {
         #}
     }
     
-    foreach my $gene (@vcgenes) {
-	foreach my $exon ($gene->each_unique_Exon) {
-	    $exon->{_gsf_seq} = undef;
-	}
-    }
 	    
     push(@{$self->{_output}},@vcgenes);
 }
