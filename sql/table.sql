@@ -29,7 +29,7 @@ CREATE TABLE job (
   # UNIQUE      (taskname, input_id),
   # ^ can't key on two 255-char fields - max key length is 500.
   KEY         (job_name(15), array_index),
-  KEY         (input_id(15)),
+  KEY         (input_id(50)),
   KEY         (taskname(15))
 );
 
