@@ -105,7 +105,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
     $self->{'contig'} = $contig;
@@ -158,7 +158,7 @@ sub write_output {
    my @transcripts = $genscan_runnable->each_Transcript();
    if( ! @transcripts ) { return; }
 
-   my $ptransAdaptor = $self->dbobj()->get_PredictionTranscriptAdaptor();
+   my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
 
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
