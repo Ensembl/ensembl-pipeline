@@ -348,10 +348,9 @@ sub _align_protein {
     
     my $hmm = $self->hmmfile;
     my $genewise = $self->genewise;
-    
     my $command = "$genewise $hmm $genfile " . $self->options() . $self->memory();
-    $command .= " -init endbias -splice flat " if ($self->endbias == 1);
-    $command .= " -trev " if ($self->is_reverse == 1);
+    $command .= " -init endbias -splice flat " if ($self->endbias && $self->endbias == 1);
+    $command .= " -trev "                      if ($self->is_reverse && $self->is_reverse == 1);
     print STDERR "Command is $command\n"; ##########
     
     my $outputfile = $self->hmmfile.".output";
