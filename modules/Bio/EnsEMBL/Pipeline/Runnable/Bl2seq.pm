@@ -93,7 +93,7 @@ sub new {
   $self->{'_alntype'} = "blastn"; # type of alignment "-p" option
   $self->{'_min_score'} = 40; # value for minimum score 
   $self->{'_fplist'} = []; # an array of feature pairs (the output)
-  $self->{'_workdir'} = "/tmp"; # location of temp directory
+  $self->{'_workdir'} = "/tmp"; # location of working directory
   $self->{'_results'} = $self->{'_workdir'}."/results.".$$; # location of result file
   $self->{'_options'} = "";
 
@@ -294,13 +294,12 @@ sub run {
 
 sub run_analysis {
   my ($self,$query,$sbjct) = @_;
-#  my ($g,$W,$G,$E,$X) = qw(T 10 1 2 10);
-#  my ($g,$W,$G,$E,$X) = qw(T 3 1 2 10);
-  print STDERR ("Running bl2seq\n" . $self->program .
+  print STDERR ("Running bl2seq...\n" . $self->program .
 		                     " -i $query" .
 		                     " -j $sbjct " .
 		                     $self->options .
 		                     " -p " . $self->alntype .
+		                     " > ". 
 		                     $self->results. "\n");
 
   $self->throw("Failed during bl2seq run, $!\n") unless (system ($self->program .
@@ -326,8 +325,6 @@ sub parse_results {
 					   '-sname' => $self->seq2->id);
 
   while (my $DnaDnaAlignFeature = $bl2seq_parsing->nextHSP) {
-#    my @ungapped_features = $DnaDnaAlignFeature->ungapped_features;
-#    next unless (scalar @ungapped_features);
     $self->_add_fp($DnaDnaAlignFeature);
   }
 }
