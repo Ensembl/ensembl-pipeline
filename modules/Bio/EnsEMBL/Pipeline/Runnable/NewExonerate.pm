@@ -145,13 +145,18 @@ sub new {
   }
 
   # can choose which exonerate to use
-  $self->exonerate('exonerate') unless $exonerate;
-  $self->exonerate($self->find_executable($exonerate));
   
+  #$self->exonerate('exonerate-0.6.7') unless $exonerate;
+  $self->exonerate($self->find_executable($exonerate));
+  #$self->exonerate('exonerate-0.6.7');
+
   # can add extra options as a string
-  if ($options){
-    $self->options($options);
-  }
+  $self->options("   --exhaustive no --model est2genome --ryo \"RESULT: %S %p %V\\n\" "); 
+  #$self->options("   --exhaustive no --model est2genome  --showvulgar");
+  
+  #if ($options){
+  #  $self->options($options);
+  #}
   return $self;
 }
 
@@ -165,7 +170,7 @@ sub new {
 
 Usage   :   $obj->run($workdir, $args)
 Function:   Runs exonerate script and puts the results into the file $self->results
-            It calls $self->parse_restuls, and results are stored in $self->output
+            It calls $self->parse_results, and results are stored in $self->output
 =cut
   
 sub run {
@@ -213,16 +218,17 @@ sub run {
     $seqout->write_seq($query_seq);
   }
   close( QUERY_SEQ );
-  
-  my $command ="$exonerate ".
-    $self->options." --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
+    
+  my $command ="exonerate-0.6.7 ".
+      $self->options.
+	  " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
   print STDERR "running exonerate: $command\n";
   
   # system calls return 0 (true in Unix) if they succeed
   $self->throw("Error running exonerate\n") if (system ($command));
   
   $self->output( $self->parse_results );
-
+  
   # remove interim files (but do not remove the database if you are using one)
   unlink $query;
   if ( $self->genomic){
@@ -251,7 +257,7 @@ sub parse_results {
   
   if (-e $resfile) {
     if (-z $self->results) {
-      print STDERR "Blat didn't find any matches\n";
+      print STDERR "Exonerate didn't find any matches\n";
       return; 
     } 
     else {
@@ -266,23 +272,111 @@ sub parse_results {
   #extract values
   while (<$filehandle>){
     
-    print $_."\n";
-    
-    # # first split on spaces:
-    #    chomp;  
-    
-    #    my ($matches, $mismatches, $rep_matches, $n_count, $q_num_insert, $q_base_insert,$t_num_insert,$t_base_insert,$strand,$q_name,$q_length,$q_start,$q_end,$t_name,$t_length,$t_start,$t_end,$block_count,$block_sizes,$q_starts,$t_starts) = split;
-    
-#    my $superfeature = Bio::EnsEMBL::SeqFeature->new();
-    
-#    # ignore any preceeding text
-#    unless ( $matches =~/^\d+$/ ){
-#      next;
-#    }
-    
-#    #print $_."n";
+      print $_;
+      
+      # --ryo "RESULT: %S %p %V\n"
+      # 
+      # Shows the alignments in "sugar" + perc_it + "vulgar blocks" format. 
+      #
+      # Sugar contains 9 fields
+      # ( <qy_id> <qy_start> <qy_len> <qy_strand> <tg_id> <tg_start> <tg_len> <tg_strand> <score> ), 
+      # 
+      # The vulgar (Verbose Useful Labelled Gapped Alignment Report) blocks are a series 
+      # of <label, query_length, target_length> triplets. The label may be one of the following: 
+      #
+      # M Match 
+      # G Gap 
+      # C Codon gap 
+      # N Non-equivalenced region 
+      # 5 5' splice site 
+      # 3 3' splice site 
+      # I Intron 
+      #
+      # example:
+      # RESULT: AW793782.1 25 250 + 10_NT_035057.1-141075 104447 126318 + 652 82.88 M 30 30 5 0 2 I 0 21645 3 0 2 M 35 35 G 1 0 M 16 16 G 1 0 M 134 134 G 1 0 M 7 7
+      # 
+      # This gives rise to:
+      # M 30 30  ---> exon
+      # 5 0 2 
+      # I 0 21645 --> intron
+      # 3 0 2 
+      # M 35 35    \
+      # G 1 0      |
+      # M 16 16    |
+      # G 1 0      |-> exon
+      # M 134 134  |
+      # G 1 0      |
+      # M 7 7     /
+      # 
+      chomp;
+      my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $perc_id, @blocks) = split;
+      
+      next unless ( $tag eq 'RESULT:' );
+      
+      my $seq_end   = $seq_start + $seq_length - 1;
+      my $slice_end = $slice_start + $slice_length  - 1;
+      
+      my $superfeature = Bio::EnsEMBL::SeqFeature->new();
+      
 
-#    # create as many features as blocks there are in each output line
+      my (%query, %target);
+      ( $query{score}  , $target{score} )  = ($score,$score);
+      ( $query{percent}, $target{percent}) =  ( $perc_id, $perc_id );
+      ( $query{source} , $target{source} ) = ('exonerate','exonerate');
+      ( $query{start}  , $target{start})   = ( $q_start, $t_start );
+      
+      my ( $exon, $intron ) = (0,0);
+      for( my $i=0; $i<=$#blocks; $i+=3){
+	  
+	  # do not look at splice sites now
+	  if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
+	      next;
+	  }
+	  
+	  # intron
+	  if ( $blocks[$i] eq 'I' ){
+	      # emit the current exon
+	      my $feature_pair = $self->create_FeaturePair(\%feat1, \%feat2);
+	      $superfeature->add_sub_SeqFeature( $feature_pair,'EXPAND');
+
+
+	      # and reset the start
+
+
+
+	  # gap
+	  if ( $blocks[$i] eq 'G' ){
+	      # take the value of the gap
+	      my $gap = $blocks[$i+1] || $blocks[$i+2];
+	      
+	      # add it to the end
+	      if ($exon ){
+		  $query{end}  += $gap;
+		  $target{end} += $gap;
+	      }
+	  }
+	      
+	  # match
+	  if ( $blocks[$i] eq 'M' ){
+	      if ( $exon == 0 ){
+		  $query{end}  = $query{start}  + $blocks[$i+1] - 1;
+		  $target{end} = $target{start} + $blocks[$i+2] - 1;
+	      }
+		  $exon = 1;
+		  $intron = 0;
+	      
+	      
+	  }
+	  elsif( $blocks[$i] eq 'I' ){
+	      $exon = 0;
+	      $intron = 1;
+	  }
+	  
+	  
+      }
+
+
+      # create as many features as blocks there are in each output line
 #    my (%feat1, %feat2);
 #    $feat1{name} = $t_name;
 #    $feat2{name} = $q_name;
