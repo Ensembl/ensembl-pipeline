@@ -44,7 +44,7 @@ use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
 
 
@@ -119,19 +119,31 @@ sub id {
 sub get_id {
     my ($self) = @_;
 
+    my $analysis = $self->_dbobj->write_Analysis($self->analysis);
 
-    my $sth = $self->_dbobj->prepare("insert into job (input_id,analysis,queue) values (NULL," .
-				     $self->analysis->id . "," .
-				     $self->queue        .")");
+    $self->analysis($analysis);
+
+    $self->throw("No analysis object defined") unless $self->analysis;
+    $self->throw("No analysis id input")       unless defined($self->analysis->id);
+
+    my $query =   "insert into job (id,input_id,analysis,queue) values (NULL," .
+				     $self->input_id     . ",".
+				     $self->analysis->id . ",\"" .
+				     $self->queue        ."\")";
+
+    print("query is $query\n");
+    my $sth = $self->_dbobj->prepare($query);
     my $res = $sth->execute();
 
-       $sth = $self->prepare("select last_insert_id()");
+       $sth = $self->_dbobj->prepare("select last_insert_id()");
        $sth->execute;
 
     my $rowhash = $sth->fetchrow_hashref;
     my $id      = $rowhash->{'last_insert_id()'};
 
     $self->id($id);
+
+    my $status  = $self->set_status('CREATED');
 
     return $id;
 }
@@ -296,6 +308,45 @@ sub submission_checks {
     $self->throw("Method submission_checks not implemented");
 }
 
+=head2 set_status
+
+  Title   : set_status
+  Usage   : my $status = $job->set_status
+  Function: Sets the job status
+  Returns : nothing
+  Args    : Bio::EnsEMBL::Pipeline::Status
+
+=cut
+
+sub set_status {
+    my ($self,$arg) = @_;
+
+    $self->throw("No status input" ) unless defined($arg);
+
+
+    my $sth = $self->_dbobj->prepare("insert into jobstatus(id,status,time) values (" .
+				     $self->id . ",\"" .
+				     $arg      . "\"," .
+				     "now())");
+    my $res = $sth->execute();
+
+
+
+    $sth = $self->_dbobj->prepare("select time from jobstatus where id = " . $self->id . 
+				  " and status = \""                       . $arg      . "\"");
+    $res = $sth->execute();
+    
+    my $rowhash = $sth->fetchrow_hashref();
+    my $time    = $rowhash->{'time'};
+
+
+    my $status = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+						    -status  => $arg,
+						    -created => $time,
+						    );
+
+    $self->current_status($status);
+}
 
 
 =head2 current_status
@@ -309,9 +360,17 @@ sub submission_checks {
 =cut
 
 sub current_status {
-    my ($self) = @_;
+    my ($self,$arg) = @_;
 
-    $self->throw("Method current_status not implemented");
+    if (defined($arg)) {
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
+	    $arg->isa("Bio::EnsEMBL::Pipeline::Status");
+
+	$self->{_status} = $arg;
+    } 
+
+    ## Should go to the database here if we don't have a status object
+    return $self->{_status};
 }
 
 =head2 get_all_status
@@ -350,7 +409,7 @@ sub _dbobj {
 
 	$self->{_dbobj} = $arg;
     }
-    return $sefl->{_dbobj};
+    return $self->{_dbobj};
 }
 
 

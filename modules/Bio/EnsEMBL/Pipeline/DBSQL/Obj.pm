@@ -33,7 +33,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::Obj;
+package Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
 
 use vars qw(@ISA);
@@ -43,7 +43,7 @@ use DBI;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
 
 # Inherits from the base bioperl object
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::Root::Object);
 
 sub _initialize {
     my ($self,@args) = @_;
@@ -200,34 +200,40 @@ sub write_Analysis {
     $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
 
-    my ($id,$created) = $self->exists_Analyis($analysis);
+    my ($id,$created) = $self->exists_Analysis($analysis);
 
     if (defined($id)) {
 	$analysis->id     ($id);
 	$analysis->created($created);
-	return;
+	return $analysis;
     }
-
-    my $sth = $self->prepare("insert into analysis(id,created,db,db_version,db_file," .
-			     "program,program_version,program_file," .
+    my $query = 
+	                     "insert into analysis(id,created,db,db_version,db_file," .
+                	     "program,program_version,program_file," .
 			     "parameters,module,module_version," .
 			     "gff_source,gff_feature) " .
-			     " values (" . 
-			     $analysis->id              .   ","   .
+			     " values (NULL," . 
 			     "now()"                    .   ",\"" .
 			     $analysis->db              . "\",\"" .
 			     $analysis->db_version      . "\",\"" .
 			     $analysis->db_file         . "\",\"" .
 			     $analysis->program         . "\",\"" .
 			     $analysis->program_version . "\",\"" .
+			     $analysis->program_file    . "\",\"" .
 			     $analysis->parameters      . "\",\"" .
 			     $analysis->module          . "\",\"" .
 			     $analysis->module_version  . "\",\"" .
 			     $analysis->gff_source      . "\",\"" .
-			     $analysis->gff_feature     . "\")");
+			     $analysis->gff_feature     . "\")";
 
+    my $sth = $self->prepare($query);
     my $res = $sth->execute();
+    
+#    $sth = $self->prepare("select LAST_INSERT_ID()");
+#    $res = $sth->execute();
 
+#    my $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
+    return $analysis;
 }
 
 =head2 exists_Analysis
@@ -252,7 +258,7 @@ sub exists_Analysis {
 	" program_file = \""    . $anal->program_file    . "\" and " .
         " parameters = \""      . $anal->parameters      . "\" and " .
         " module = \""          . $anal->module          . "\" and " .
-        " module_version \""    . $anal->module_version  . "\" and " .
+        " module_version = \""    . $anal->module_version  . "\" and " .
 	" gff_source = \""      . $anal->gff_source      . "\" and" .
 	" gff_feature = \""     . $anal->gff_feature     . "\"";
 
@@ -266,7 +272,7 @@ sub exists_Analysis {
 
 	return ($analid,$created);
     } else {
-	return 0;
+	return;
     }
 }
 
@@ -288,7 +294,7 @@ sub get_Analysis {
     $self->throw("No analysis id input") unless defined($id);
 
     my $query = "select created, " .
-	        "program,program_version,program_file," 
+	        "program,program_version,program_file," .
 	        "db,db_version,db_file," .
 		"module,module_version," .
 		"gff_source,gff_feature,".
@@ -355,4 +361,28 @@ sub prepare{
    }
    
    return $self->_db_handle->prepare($string);
+}
+
+
+
+
+=head2 _db_handle
+
+ Title   : _db_handle
+ Usage   : $sth = $dbobj->_db_handle($dbh);
+ Function: Get/set method for the database handle
+ Example :
+ Returns : A database handle object
+ Args    : a SQL string
+
+
+=cut
+
+sub _db_handle {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_db_handle} = $arg;
+    }
+    return $self->{_db_handle};
 }
