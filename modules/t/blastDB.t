@@ -48,6 +48,7 @@ my $parameters = '-THRESHOLD => 1e-10, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = $ana_adaptor->fetch_by_logic_name('wublastn');
+print STDERR "have ".$ana."\n";
 $ana->db('AI053588.fa');
 $ana->db_file("$pwd/t/data/AI053588.fa");
 
@@ -62,7 +63,7 @@ $ana->db_file("$pwd/t/data/AI053588.fa");
 #                                                    -gff_source     => 'wublastn',
 #                                                    -gff_feature    => 'similarity', 
 #                                                    -parameters     => $parameters,
-#						    -logic_name     => 'blast',
+#						    -logic_name     => 'wublastn',
 #                                                     );
 
 unless ($ana)
