@@ -92,31 +92,26 @@ sub fetch_input {
   # if repeatmasking required, always soft mask for blastz
   my $genseq = (@$PIPELINE_REPEAT_MASKING) 
       ? $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING, 1)
-      : $contig->get_repeatmasked_seq('', 1);
+      : $contig;
 
   my @db;
 
-  if (!defined $contig || !defined($self->analysis->db)) {
-    $self->throw("Can't run blat if no sequence [$contig] or database [" . $self->analysis->db ."] exists");
-  }
+  my $executable =  $self->analysis->program_file;
+  $executable = "$BINDIR/blastz" if not $executable;
 
-  my $executable =  $self->analysis->program_file();
   my $database = $self->analysis->db;
+  $self->throw("RunnableDB/Blastz error: you must define a database in your analysis") if not $database;
   
   if ( -d $database) {
-    print "Found database dir $database\n";
-    
-    #my $files = `ls -1 $db/*.fa`;
     @db = glob("$database/*");
     
-    # if the files have standard names, try to sort them 
-    # for consistency
+    # if the files have standard names, try to sort them for consistency
+
     @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  $o <=> $t } @db;
     
-  }
-  else {
+  } else {
     push(@db,$database);
   }
 
