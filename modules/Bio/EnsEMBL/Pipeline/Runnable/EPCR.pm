@@ -31,8 +31,7 @@ Bio::EnsEMBL::Pipeline::Runnable::EPCR
 
 EPCR takes a Bio::Seq (or Bio::PrimarySeq) object and runs e-PCR on it. The
 resulting .out file is parsed to produce a set of feature pairs.
-Arguments can be passed to e-PCR through the arguments() method. 
-Options can be passed to e-PCR through the options() method. 
+Options are passed to e-PCR through M, W, NMIN, NMAX.
 
 =head2 Methods:
 
@@ -43,10 +42,6 @@ Options can be passed to e-PCR through the options() method.
 =item epcr($path_to_EPCR)
 
 =item workdir($directory_name)
-
-=item arguments($args)
-
-=item options($args)
 
 =item run()
 
@@ -101,18 +96,27 @@ sub new {
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_results'}   = undef; # file to store results of EPCR
-    $self->{'_options'}   = undef; # file to store results of EPCR
+    $self->{'_word_size'} = undef;     # e-PCR 'W' parameter
+    $self->{'_margin'}    = undef;     # e-PCR 'M' parameter
+    $self->{'_min_mismatch'}  = undef;     # e-PCR 'N' parameter
+    $self->{'_max_mismatch'}  = undef;     # e-PCR 'N' parameter
+    $self->{'mismatch'}   = undef;     # e-PCR 'N' parameter
     $self->{'_protected'} = [];    # a list of files protected from deletion
     $self->{'_db'}        = undef;
+    $self->{'_hitlist'}   = {};
     
-    my( $clone, $epcr, $db, $options) = $self->_rearrange([qw(
-	CLONE PCR DB OPTIONS
+    my( $clone, $epcr, $db, $margin, $word_size, $min_mismatch,
+    $max_mismatch) = $self->_rearrange([qw(
+	CLONE PCR DB M W NMIN NMAX
     )], @args);
 
     $epcr = 'e-PCR' unless ($epcr);
 
-    $self->clone  ($clone)   if ($clone);       
-    $self->options($options) if ($options);       
+    $self->clone  ($clone)       if ($clone);       
+    $self->min_mismatch($min_mismatch)   if defined $min_mismatch;       
+    $self->max_mismatch($max_mismatch)   if defined $max_mismatch;       
+    $self->word_size($word_size) if defined $word_size;       
+    $self->margin($margin)       if defined $margin;       
 
     $self->epcr   ($self->find_executable($epcr));
 
@@ -166,40 +170,50 @@ sub epcr {
     return $self->{'_epcr'};
 }
 
-=head2 options
 
-    Title   :   options
-    Usage   :   $obj->options('M=500');
-    Function:   Get/set method for e-PCR options
-    Args    :   File path (optional)
-
-=cut
-
-sub options {
+sub word_size {
     my ($self, $args) = @_;
-    if ($args)
+    if (defined $args)
     {
-        $self->{'_options'} = $args ;
+        $self->{'_word_size'} = $args ;
     }
-    return $self->{'_options'};
+    return $self->{'_word_size'};
 }
 
-=head2 arguments
-
-    Title   :   arguments
-    Usage   :   $obj->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet');
-    Function:   Get/set method for getz arguments arguments
-    Args    :   File path (optional)
-
-=cut
-
-sub arguments {
+sub min_mismatch {
     my ($self, $args) = @_;
-    if ($args)
+    if (defined $args)
     {
-        $self->{'_arguments'} = $args ;
+        $self->{'_min_mismatch'} = $args ;
     }
-    return $self->{'_arguments'};
+    return $self->{'_min_mismatch'};
+}
+
+sub max_mismatch {
+    my ($self, $args) = @_;
+    if (defined $args)
+    {
+        $self->{'_max_mismatch'} = $args ;
+    }
+    return $self->{'_max_mismatch'};
+}
+
+sub mismatch {
+    my ($self, $args) = @_;
+    if (defined $args)
+    {
+        $self->{'mismatch'} = $args ;
+    }
+    return $self->{'mismatch'};
+}
+
+sub margin {
+    my ($self, $args) = @_;
+    if (defined $args)
+    {
+        $self->{'_margin'} = $args ;
+    }
+    return $self->{'_margin'};
 }
 
 sub db {
@@ -227,11 +241,11 @@ sub db {
 
 =cut
 
-sub run {
-    my ($self, $dir, $args) = @_;
+# copes with running with different values of N (primer bp mismatch)
+# for different values of W still need a separate analysis
 
-    #set arguments for epcr
-    $self->arguments($args) if ($args);
+sub run {
+    my ($self, $dir) = @_;
 
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for EPCR\n");
@@ -242,10 +256,29 @@ sub run {
 
     #write sequence to file
     $self->writefile();        
-    $self->run_epcr();
 
-    #parse output of epcr
+    # first run - M = M_MIN
+    $self->mismatch($self->min_mismatch);
+    $self->run_epcr();
     $self->parse_results();
+
+    # successive runs if needed
+    for (my $mm = $self->min_mismatch + 1; $mm <= $self->max_mismatch; $mm++) {
+	my $sts_tmp = $self->workdir . '/' . $self->clonename . "_$mm";
+	$self->_cp_sts_file($self->db, $sts_tmp);
+	$self->mismatch($mm);
+	my $db = $self->db;
+	$self->db($sts_tmp);
+	$self->run_epcr;
+	$self->db($db);  # reset to original STS file
+			 # bit inefficient, better to work from
+			 # current STS file, but this is simpler
+			 # and STS files are normally huge
+	$self->parse_results();
+	$self->_rm_sts_file($sts_tmp);
+    }
+
+    # clean up
     $self->deletefiles();
 }
 
@@ -264,8 +297,17 @@ sub run_epcr {
     my ($self) = @_;
     #run EPCR
 
+    my $mismatch  = $self->mismatch;
+    my $margin    = $self->margin;
+    my $word_size = $self->word_size;
+
+    my $options = "";
+    $options .= " M=$margin " if defined $margin;
+    $options .= " W=$word_size " if defined $word_size;
+    $options .= " N=$mismatch " if defined $mismatch;
+
     my $command = $self->epcr.' '.$self->db.' '.$self->filename.' '.
-     $self->options.' > '.$self->results;
+     $options.' > '.$self->results;
 
     print STDERR "Running EPCR ($command)\n";
     $self->throw("Error running EPCR on ".$self->filename."\n")
@@ -311,6 +353,7 @@ sub parse_results {
 	# nasty hack - escape the "'" - sql barfs with things
 	# like "3'UTR" - should be fixed in FeatureAdaptor...
 	$feat2{name} =~ s{\'}{\\\'};
+	$self->_add_hit($feat2{name});
         my ($start, $end)       = split (/\.\./, $element[1]);
         $feat1 {'start'}        = $start;
         $feat1 {'end'}          = $end;
@@ -353,6 +396,49 @@ sub parse_results {
 sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
+}
+
+# make a temporary copy of the STS file to run against
+# with those markers already hit removed
+
+sub _cp_sts_file {
+    my ($self, $source, $dest) = @_;
+
+    my %hits = $self->_get_hits;
+    eval {
+        open SOURCE, "< $source";
+        open DEST, "> $dest";
+        while (<SOURCE>) {
+	    my $id = (split)[0];
+	    print DEST unless defined $hits{$id};
+        }
+        close DEST;
+        close SOURCE;
+    };
+    if ($@) {
+	$self->throw("Unable to copy STS file");
+    }
+}
+
+sub _add_hit {
+    my ($self, $hit) = @_;
+
+    $self->{'_hitlist'}->{$hit} = 1;
+}
+
+
+# return a hash of hit IDs
+
+sub _get_hits {
+    my ($self) = @_;
+
+    return %{$self->{'_hitlist'}};
+}
+
+sub _rm_sts_file {
+    my ($self, $file) = @_;
+
+    unlink $file;
 }
 
 1;

@@ -125,8 +125,11 @@ sub runnable {
             my @pairs = split (/,/, $parameter_string);
             foreach my $pair (@pairs)
             {
+		# FIXME: must sort out this whitespace issue
 		my ($key, $value) = split (/=>/, $pair);
 		if ($key && $value) {
+                    $value =~ s/^\s+//g;
+                    $value =~ s/\s+$//g;
                     $key =~ s/^\s+//g;
                     $key =~ s/\s+$//g;
 		    $parameters{$key} = $value;
