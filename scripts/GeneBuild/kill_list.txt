@@ -258,3 +258,9 @@ Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
 O70449 Putative retrovirus-related gag1 gene (matches rat - dta)
 Q8BLS1 RIKEN sequence very similar to O70449, which is a retrovirus-like gene (matches rat - dta)
 Q9CRM2 172 Q9CRM2_MOUSE Q9CRM2 Mus musculus 12 days embryo male wolffian duct includes surrounding region cDNA, RIKEN full-length enriched library, clone:6720473M11 product:weakly similar to RETROVIRUS-RELATED GAG POLYPROTEIN (Fragment). from rat retroviral protein
+Q9D9F4 Translation of a L1-like RIKEN sequence (dta).
+NP_082840.1 A seemingly innocent RIKEN sequence, but similar enough to L1 elements to cause 80-odd single exon gene predictions (dta).
+Q9D2T0 Contains integrase and viral capsid homologies (dta).
+Q80YX9 Homologous to integrase domain (dta).
+Q8VDY3 Member of integrase C superfamily (dta).
+
