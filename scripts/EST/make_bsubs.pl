@@ -225,7 +225,7 @@ sub make_filter_bsubs {
 
 =cut
 
-sub make_ESTbuilder_bsubs{
+sub make_EST_GeneBuilder_bsubs{
   my $jobfile    = $::scripts_conf{'EST_GeneBuilder_bsubsfile'};
   my $scratchdir = $::scripts_conf{'tmpdir'};
   my $queue      = $::scripts_conf{'queue'};
