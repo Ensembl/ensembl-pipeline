@@ -74,11 +74,11 @@ sub new {
 				STDERR
 				RETRY_COUNT
 				)],@args);
-    print STDERR "creating job with @args\n";
+#    print STDERR "creating job with @args\n";
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
     $cls     = 'contig' unless defined($cls);
-    print STDERR "retry count is passed in as".$retry_count."\n";
+ #   print STDERR "retry count is passed in as".$retry_count."\n";
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
@@ -721,10 +721,10 @@ sub submission_id {
 sub retry_count {
   my ($self, $arg) = @_;
   if(defined $arg) {
-    print STDERR "setting retry count to ".$arg."\n"; 
+    #print STDERR "setting retry count to ".$arg."\n"; 
     $self->{'_retry_count'} = $arg; 
    }
-  print STDERR "retry count is = ".$self->{'_retry_count'}."\n";;
+  #print STDERR "retry count is = ".$self->{'_retry_count'}."\n";;
   $self->{'_retry_count'};
 }
 
