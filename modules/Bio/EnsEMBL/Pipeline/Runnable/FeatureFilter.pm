@@ -341,7 +341,7 @@ sub _prune_features_by_strand {
    # get the genomic first and last bases covered by any features
    my @sorted_fs = sort{ $a->start <=> $b->start } @input_for_strand;
    my $first_base = $sorted_fs[0]->start;
-   my @sorted_fs = sort{ $a->end <=> $b->end } @input_for_strand;
+   @sorted_fs = sort{ $a->end <=> $b->end } @input_for_strand;
    my $last_base = $sorted_fs[$#sorted_fs]->end;
 
    # fs_per_base: set element i to the number of features covering base i
