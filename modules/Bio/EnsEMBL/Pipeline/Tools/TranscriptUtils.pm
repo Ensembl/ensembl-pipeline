@@ -332,8 +332,8 @@ sub _check_Translation{
 =cut
 	  
 sub _check_low_complexity{
-  my ($transcript,$complexity_threshold) = @_;
-	    
+  my ($self, $transcript,$complexity_threshold) = @_;
+  my $valid = 1;
   my $low_complexity;
   
   eval{
@@ -362,19 +362,20 @@ sub _check_low_complexity{
     
     if($seg->get_low_complexity_length > $complexity_threshold){
       warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
-      return 0;
+      $valid = 0;
     }
-    
-    return 1;
+    $valid = 1;
     
     
   };
   
   if($@){
     print STDERR "problem running seg: \n[$@]\n";
-    return 1;		# let transcript through
+    $valid = 1;		# let transcript through
   }
   
+  return $valid;
+
 }
 
 ############################################################
@@ -403,7 +404,7 @@ sub transcript_id {
 
 ############################################################
 
-=head2 split_transcript
+=head2 split_Transcript
 
   Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
     transcripts that result. 
@@ -502,7 +503,7 @@ sub split_Transcript{
 	}
 	
 	foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig_id);
+	  $sf->seqname($exon->contig->name);
 	}
 	
 	$prev_exon = $exon;
