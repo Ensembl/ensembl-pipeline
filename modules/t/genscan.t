@@ -45,10 +45,11 @@ else
 { print "ok 2\n"; }
 
 #create Genscan object    
+
 my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
     -CLONE => $clone,
-    -GENSCAN => '/usr/local/ensembl/bin/genscan',
-    -MATRIX  => '/usr/local/ensembl/data/HumanIso.smat'
+    -GENSCAN => $::pipeConf{'bindir'}  . '/genscan',
+    -MATRIX  => $::pipeConf{'datadir'} . '/HumanIso.smat'
 );
  
 unless ($genscan)
@@ -82,10 +83,10 @@ else
 #check re-translation of features can be matched within peptides
 my $all_exons_found = 1;
 my @peptides = $genscan->genscan_peptides;
-foreach my $feature (@exons)
-{
-    if ($all_exons_found == 1)
-    {
+foreach my $feature (@exons) {
+
+    if ($all_exons_found == 1) {
+
         $all_exons_found = 0;
         my $exon = Bio::EnsEMBL::Exon->new();
         $exon->id           ($feature->seqname);
@@ -94,15 +95,18 @@ foreach my $feature (@exons)
         $exon->strand       ($feature->strand);
         $exon->phase        ($feature->phase);
         $exon->contig_id    ($clone->id);
-        #$exon->end_phase($feat->end_phase);
         $exon->attach_seq   ($clone);
 
-        foreach my $full_pep (@peptides)
-        {
+        foreach my $full_pep (@peptides) {
+
             my $exon_pep = $exon->translate->seq;
+
             $exon_pep =~ s/^M//i; #remove leading M's
-            if (index ($full_pep, $exon_pep) > -1)
-            {
+	    $exon_pep =~ s/\*$//; # remove strailing tops
+	    $exon_pep =~ s/X$//;  # remove trailing Xs - should track these
+
+            if (index ($full_pep, $exon_pep) > -1) {
+		print STDERR "Found exon\n";
                 $all_exons_found = 1;
                 last;
             }
