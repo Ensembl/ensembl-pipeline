@@ -601,7 +601,7 @@ sub discrete_compare{
     $tran2 = $self->_difuse_small_introns( $tran2 );
   }
   
-  print STDERR "comparing ".$tran1->dbID." and ".$tran2->dbID."\n";
+  #print STDERR "comparing ".$tran1->dbID." and ".$tran2->dbID."\n";
   if ($verbose){
     #print STDERR "comparing ".
     #$tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
