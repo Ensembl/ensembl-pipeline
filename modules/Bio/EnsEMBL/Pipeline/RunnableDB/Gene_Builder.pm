@@ -54,14 +54,15 @@ use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_VCONTIG
+					 GB_GOLDEN_PATH
+					 GB_FINALDBNAME
+					 GB_FINALDBHOST
+					 GB_DBUSER
+					 GB_DBPASS
 					 );
 use Data::Dumper;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -96,20 +97,20 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
+    my( $use_vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
        
-    if (! defined $vcontig) {
-       $vcontig = $::genebuild_conf{'vcontig'};
+    if (! defined $use_vcontig) {
+       $use_vcontig = $GB_VCONTIG;
      }  
     
-    $self->vcontig($vcontig);
+    $self->use_vcontig($use_vcontig);
     
     $self->extend($extend);
 
     # golden path
     if(!defined $path){
-    # look in GB_conf.pl
-    $path = $::db_conf{'golden_path'};
+
+    $path = $GB_GOLDEN_PATH;
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
@@ -181,10 +182,10 @@ sub write_output {
     my($self,@genes) = @_;
 
     # write genes out to a different database from the one we read genewise genes from.
-    my $dbname = $::db_conf{'finaldbname'};
-    my $dbhost = $::db_conf{'finaldbhost'};
-    my $dbuser = $::db_conf{'dbuser'};
-    my $dbpass = $::db_conf{'dbpass'};
+    my $dbname = $GB_FINALDBNAME;
+    my $dbhost = $GB_FINALDBHOST;
+    my $dbuser = $GB_DBUSER;
+    my $dbpass = $GB_DBPASS;
 
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
@@ -196,7 +197,11 @@ sub write_output {
     # sort out analysis
     my $genetype = 'ensembl';
     my $anaAdaptor = $db->get_AnalysisAdaptor;
-    my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+	#use logic name from $self->analysis object is possible, else take $genetype;
+	my $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
+
+    my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     
     my $analysis_obj;
     
@@ -238,7 +243,7 @@ sub write_output {
 	$gene->analysis($analysis_obj);
 	$gene->type($genetype);
 	my $newgene;
-	if ($self->vcontig) {
+	if ($self->use_vcontig) {
 	  $newgene = $vc->convert_Gene_to_raw_contig($gene);
 	}
 	else {
@@ -282,7 +287,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig;
 
-    if ($self->vcontig) {
+    if ($self->use_vcontig) {
       my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
       
       $contigid =~ /(.*)\.(.*)\-(.*)/;
@@ -316,6 +321,16 @@ sub focuscontig {
     }
 
     return $self->{_contig};
+}
+
+sub use_vcontig {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_vcontig} = $arg;
+    }
+
+    return $self->{_vcontig};
 }
 
 sub extend {

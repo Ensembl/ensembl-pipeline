@@ -45,8 +45,11 @@ use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
+					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_TARGETTED_CDNA_INDEX
+					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -75,8 +78,7 @@ sub new {
   # in superclass constructor (RunnableDB.pm)
 
   # golden path
-  my $path = $::db_conf{'golden_path'};
-
+  my $path = $GB_GOLDEN_PATH;
   $path = 'UCSC' unless (defined $path && $path ne '');
   $self->dbobj->static_golden_path_type($path);
 
@@ -87,7 +89,7 @@ sub new {
 
  Title   : make_seqfetcher
  Usage   :
- Function: checks in GB_conf::seqfetch_conf for $indexname; if it exists, 
+ Function: if $index exists, 
            returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
            returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
  Example :
@@ -98,9 +100,8 @@ sub new {
 =cut
 
 sub make_seqfetcher {
-  my ( $self, $indexname, $conf_hash ) = @_;
-  # need to treat contents of $conf_hash as name of hash
-  my $index = $::{$conf_hash}{$indexname};
+  my ( $self, $index ) = @_;
+
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
@@ -151,8 +152,8 @@ sub make_targetted_runnables {
   my ($self) = @_;
 
   # set up seqfetchers
-  my $protein_fetcher = $self->make_seqfetcher("protein_index", "targetted_conf");
-  my $cdna_fetcher    = $self->make_seqfetcher("cdna_index", "targetted_conf");
+  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
+  my $cdna_fetcher    = $self->make_seqfetcher($GB_TARGETTED_CDNA_INDEX);
 
   # we need to find all the proteins that pmatch into this region
   # take a note of those that fall across the ends of the vc? and do what, precisely?
