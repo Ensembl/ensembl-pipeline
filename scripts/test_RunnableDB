@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -45,7 +45,7 @@ if($check ) {
   print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n";
   exit 0;
 }
-
+print STDERR "Write is set to ".$write."\n";
 if(!$dbhost || !$dbuser || !$dbname || !$input_id || !$logic_name){
   $help = 1;
 }
@@ -56,7 +56,7 @@ if(!$write){
   $update = 0;
 }
 
-print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n" if($verbose);
+#print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n" if($verbose);
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
@@ -91,30 +91,34 @@ if(!$analysis){
 my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
-print STDERR "creating runnable ".$file."\n" if($verbose);
+#print STDERR "creating runnable ".$file."\n" if($verbose);
 
 $runnable =~ s/\//::/g;
 my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
 			     );
-print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
-$runobj->fetch_input;
-print STDERR "Fetched input\n" if($verbose);
-$runobj->run;
-print STDERR "Run ".$runobj."\n" if($verbose);
-
+#print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
+&eval_method($runobj, 'fetch_input');
+#print STDERR "Fetched input\n" if($verbose);
+&eval_method($runobj, 'run');
+#print STDERR "Run ".$runobj."\n" if($verbose)
 if($write){
-  $runobj->write_output;
-  print STDERR "written output\n" if($verbose);
+  #print STDERR "Writing output\n";
+  &eval_method($runobj, 'write_output');
+  #print STDERR "written output\n" if($verbose);
 }
 
 my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, created) values( ?, ?, ?, now())";
 
-if($write){
+if($update){
 my $sth = $db->prepare($sql);
-$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID) if($update);
+$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
 }
+
+
+
+print "There is ".$runobj->output." features output\n\n\n";
 
 
 if($verbose){
@@ -124,23 +128,31 @@ if($verbose){
       $runobj->output." or your analysis hasn't produced any output\n";
   }
   print STDERR "have ".@output." results\n";
+  my $exon_count = 0;
+  my $transcript_count = 0;
   foreach my $out (@output) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
       print ($out->gffstring . "\n");
     } elsif ($out->isa("Bio::EnsEMBL::Gene")) {
-      print "\n";
+      #print "\n";
+      my $type = $out->type;
       foreach my $tran (@{$out->get_all_Transcripts}) {
          foreach my $exon (@{$tran->get_all_Exons}) {
-            print "Exon " . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->phase . "\n";
+            print($exon->dbID."\t".$type."\texon\t".$exon->start."\t".
+                  $exon->end."\t300\t".$exon->strand."\t.\t".
+                  $transcript_count." \n");
             foreach my $ev (@{$exon->get_all_supporting_features}) {
-               print "  - " . $ev->gffstring . "\n";
+               print $ev->gffstring . "\n";
             }
+            $exon_count++;
          }
+         $transcript_count++;
       }
     } else {
       print $out->gffstring . "\n";
     }
   }
+  print "have ".$exon_count." exons\n";
 }
 
 
@@ -149,6 +161,18 @@ sub useage{
 	exit;
 }
 
+
+sub eval_method{
+  my ($obj, $method) = @_;
+  eval{
+    $obj->$method;
+  };
+  if($@){
+    print STDERR "Problem calling ".$method." on ".$obj."\n";
+    print "$@\n";
+    exit;
+  }
+}
 
 # POD documentation - main docs before the code
 
