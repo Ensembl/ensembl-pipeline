@@ -7,10 +7,6 @@ use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 
-use constant TASK_OK    =>  1;
-use constant TASK_DONE  =>  2;
-use constant TASK_FATAL => -1;
-
 @ISA = qw(Bio::EnsEMBL::Root);
 
 
@@ -288,11 +284,12 @@ sub run {
       } else {
         my $retcode = $task->run();
 	
-        if($retcode < 0) {
-          #something went wrong!
-          #TBD
-        } elsif ($retcode == TASK_DONE) {
+        if($retcode eq 'TASK_FAILED') {
+          $self->warn('Task [$taskname] failure');
+        } elsif ($retcode eq 'TASK_DONE') {
           $subsystem->flush($taskname);
+        } elsif ($retcode ne 'TASK_OK') {
+          $self->warn('Task [$taskname] returned unknown status $retcode');
         }
       }
 

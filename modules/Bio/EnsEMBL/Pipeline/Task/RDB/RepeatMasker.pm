@@ -28,10 +28,13 @@ sub run{
   my $potential = $self->get_input_ids;
   my $existing = $self->get_TaskStatus->get_existing;
   my $id_set = $potential->not($existing)->subset($self->max_create);
-  $self->create_Jobs($module, 
-		     $id_set, $parameters);
+  $self->create_Jobs($module, $id_set, $parameters);
 
-  return 2; #TASK_DONE
+  if($potential->count == $existing->count) {
+    return 'TASK_DONE';
+  }
+
+  return 'TASK_OK';
 }
 
 sub is_finished{
@@ -41,7 +44,7 @@ sub is_finished{
   my $successful = $self->get_TaskStatus->get_successful;
 
   if(!$potential || !$successful){
-    return undef;
+    return 0;
   }elsif($potential->count == $successful->count){
     return 1;
   }else{
