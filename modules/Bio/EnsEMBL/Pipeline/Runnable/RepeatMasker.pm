@@ -315,6 +315,11 @@ sub parse_results {
 		$strand = -1;
 	    }
 
+	    # RM seems to occasionally report hits
+	    # starting at 0 - fudge by setting to 1
+	    $hit_start = 1 if $hit_start == 0;
+	    $hit_end   = 1 if $hit_end   == 0;
+
 	    my $rc = $self->_get_consensus($repeat_name, $repeat_class);
 
 	    my $rf = Bio::EnsEMBL::RepeatFeature->new;
