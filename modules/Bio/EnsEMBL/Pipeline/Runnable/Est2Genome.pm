@@ -1,9 +1,4 @@
 #
-#
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -74,7 +69,7 @@ use Bio::EnsEMBL::Root;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC       => $genomicseq,
-			   -EST           => $estseq,
+													 -EST           => $estseq,
                            -E2G           => $executable,
                            -ARGS          => $args);
                            
@@ -86,7 +81,6 @@ use Bio::EnsEMBL::Root;
                 -e2g:        Path to Est2Genome executable
                 -args:       Arguments when running est2genome 
 =cut
-
 
 sub new {
     my ($class,@args) = @_;
@@ -102,29 +96,27 @@ sub new {
     $self->{'_protected'}  = [];    # a list of files protected from deletion
     $self->{'_arguments'}  = undef; # arguments for est2genome
     
-    my( $genomic, $est, $est_genome, $arguments ) = 
-        $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
+    my( $genomic, $est, $est_genome, $arguments ) =   $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
 
-    $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
-    $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
+				 $self->genomic_sequence($genomic) if $genomic; 
+				 $self->est_sequence    ($est)     if $est; 
 	 
-    print STDERR "est display_id: ".$est->display_id." accession_number: ".$est->accession_number."\n";
-    if ($est_genome) 
-    {   $self->est_genome($est_genome) ;}
-    else
-    {   
-        eval 
-        { $self->est_genome($self->locate_executable('est2genome')); };
-        if ($@)
-        { $self->est_genome('/usr/local/ensembl/bin/est2genome'); }
-    }
-    if ($arguments) 
-    {   $self->arguments($arguments) ;}
-    else
-    { $self->arguments(' -reverse ') ;      }
+				 print "est display_id: ".$est->display_id." accession_number: ".$est->accession_number."\n";
+
+				 if ($est_genome) {   
+					 $self->est_genome($est_genome) ;
+				 } else  {   
+					 eval 
+						 { $self->est_genome($self->locate_executable('est2genome')); };
+				 }
+				 if ($arguments) {   
+					 $self->arguments($arguments);
+				 } else {
+					 $self->arguments(' -reverse ');
+				 }
     
-    return $self;
-}
+				 return $self;
+				}
 
 #################
 # get/set methods 
@@ -146,7 +138,7 @@ sub genomic_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
         $self->{'_genomic_sequence'} = $value;
-        $self->filename($value->id.".$$.seq");
+                                                                                                                                               $self->filename($value->id.".$$.seq");
         $self->results($self->filename.".est_genome.out");
     }
     return $self->{'_genomic_sequence'};
@@ -243,45 +235,39 @@ sub run {
     # this keeps track of genomic and est strands
     my $est_strand; 
     my $genomic_strand;
-
     
     #check inputs
-    my $genomicseq = $self->genomic_sequence ||
-        $self->throw("Genomic sequence not provided");
-    my $estseq = $self->est_sequence ||
-        $self->throw("EST sequence not provided");
-    my $est_length = $self->est_sequence->length;
-    #extract filenames from args and check/create files and directory
-    my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
+    my $genomicseq = $self->genomic_sequence ||  $self->throw("Genomic sequence not provided");
+    my $estseq = $self->est_sequence         ||  $self->throw("EST sequence not provided");
 
-    #if names not provided, _createfiles will create unique names based on process ID    
+    my $est_length = $self->est_sequence->length;
+
+    my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
     my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
         
-    #use appropriate Bio::Seq method to write fasta format files
-    {
-        my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
+
+		my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
                     or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
-        my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
+		my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
                     or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
 
-        #fill inputs
-        $genOutput->write_seq($self->{'_genomic_sequence'}); 
-        $estOutput->write_seq($self->{'_est_sequence'});
 
-    }
-        
+		$genOutput->write_seq($self->{'_genomic_sequence'}); 
+		$estOutput->write_seq($self->{'_est_sequence'});
+
+          
     #The -reverse switch ensures correct numbering on EST seq in either orientation
 
     # the command to run the beast depends whether we're using est_genome (original version) 
     # or est2genome (emboss version)
-    my $estgenome = $self->est_genome;
+
+  my $estgenome = $self->est_genome;
     my $est_genome_command;
 
     if($estgenome =~ /est_genome/){
       # using est_genome
       $est_genome_command = $self->est_genome . " -reverse -genome $genfile -est $estfile |";
-    }
-    elsif($estgenome =~ /est2genome/){
+    } elsif ($estgenome =~ /est2genome/){
       # emboss version has -reverse behaviour on by default 
       $est_genome_command = $self->est_genome . " -genome $genfile -est $estfile -space 500000 -out stdout | ";
     }
@@ -291,13 +277,13 @@ sub run {
 
 
     eval {
-#      print (STDERR "Running command $est_genome_command\n");
-      open (ESTGENOME, $est_genome_command) 
-	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
+
+      open (ESTGENOME, $est_genome_command) or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
       #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
-      print STDERR "firstline: \t$firstline\n";
+
+      #print STDERR "firstline: \t$firstline\n";
       # the possible first lines are:
       
       # Note Best alignment is between forward est and forward genome, and splice  sites imply forward gene  (1)
@@ -315,38 +301,35 @@ sub run {
       # put the gene on the minus strand if splice sites imply reversed gene
 
       if($firstline =~ /reversed est/){
-	$est_strand = -1;
-      }else {
-	$est_strand = 1;
+				$est_strand = -1;
+      } else {
+				$est_strand = 1;
       }
 
       if ($firstline =~/REVERSE/){
-	$genomic_strand = -1;
+				$genomic_strand = -1;
+      } else {
+				$genomic_strand = 1;
       }
-      else{
-	$genomic_strand = 1;
-      }
-
-    
 
       # This hash is used below for looking up exon scores.
       my %exon_lookup;      
 
       #read output
       while (<ESTGENOME>) {
-	#print STDERR $_."\n";
+				#print STDERR $_."\n";
 
-	# test
-	# typical output
-	#
-	# Exon       463  99.6  1001  1468 genomic        469     3 BB761478.1    
-	#
-	# Span       463  99.6  1001  1468 genomic        469     3 BB761478.1    
-	#
-	# Segment    339 100.0  1001  1339 genomic        469   131 BB761478.1    
-	#
-	# Segment    126  99.2  1341  1468 genomic        130     3 BB761478.1    
-	#
+				# test
+				# typical output
+				#
+				# Exon       463  99.6  1001  1468 genomic        469     3 BB761478.1    
+				#
+				# Span       463  99.6  1001  1468 genomic        469     3 BB761478.1    
+				#
+				# Segment    339 100.0  1001  1339 genomic        469   131 BB761478.1    
+				#
+				# Segment    126  99.2  1341  1468 genomic        130     3 BB761478.1    
+				#
 	
 	if ($_ =~ /Segmentation fault/) {
 	  $self->warn("Segmentation fault from est_genome\n");
@@ -380,8 +363,8 @@ sub run {
 	  if ($_ =~ /^Segment/) {
 	    while (my ($exon_begin, $exon_details) = each %exon_lookup){
 	      if (($elements[6] >= $exon_begin)&&($elements[6] <= $exon_details->{'hend'})){
-		$score = $exon_details->{'score'};
-		$paranoid_toggle = 0;
+					$score = $exon_details->{'score'};
+					$paranoid_toggle = 0;
 	      }
 	    } 
 	    if($paranoid_toggle){$self->throw("Didn\'t manage to assign a exon score to segment.  Bad.");}
@@ -481,6 +464,8 @@ sub convert_output {
 
   # split the different features up
   foreach my $f(@{$self->{'_fplist'}}){
+		print "Feature " . $f->gffstring . "\n";
+
     if ($f->primary_tag eq 'Span'){
       push(@genes, $f);
     }
@@ -499,9 +484,9 @@ sub convert_output {
     
     foreach my $g(@genes){
       if($ex->start >= $g->start  && $ex->end <= $g->end
-	 && $ex->strand == $g->strand && !$added){
-	$g->feature1->add_sub_SeqFeature($ex,'');
-	$added = 1;
+				 && $ex->strand == $g->strand && !$added){
+				$g->feature1->add_sub_SeqFeature($ex,'');
+				$added = 1;
       }
     }
     $self->warn("Exon $ex could not be added to a gene ...\n") unless $added;     
@@ -512,10 +497,12 @@ sub convert_output {
     my $added = 0;
     
     foreach my $e(@exons){
-      if($sf->start >= $e->start  && $sf->end <= $e->end
-	 && $sf->strand == $e->strand && !$added){
-	$e->feature1->add_sub_SeqFeature($sf,'');
-	$added = 1;
+      if($sf->start  >= $e->start  && $sf->end <= $e->end &&
+				 $sf->strand == $e->strand && !$added) {
+
+				$e->feature1->add_sub_SeqFeature($sf,'');
+				$added = 1;
+
       }
     }
     $self->warn("Feature $sf could not be added to an exon ...\n") unless $added;     
