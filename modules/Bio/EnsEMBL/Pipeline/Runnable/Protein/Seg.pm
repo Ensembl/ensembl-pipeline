@@ -131,7 +131,7 @@ sub query {
 	    $self->results ($self->filename.".out");
 	}
 	else {
-	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    print STDERR "SEG WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
 	    $self->{'_sequence'} = $seq ;
 	    $self->filename ("$$.tmp.seq");
 	    
@@ -221,11 +221,9 @@ sub run {
     $self->results ($tmp);
 
 
- eval {
-	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
-	};
-	
-
+    eval {
+	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI");
+    };        
     if (!$@) {
 	#The inputId is a sequence file...got the normal way...
 
@@ -271,7 +269,7 @@ sub run {
 sub run_program {
     my ($self) = @_;
     # run program
-    print STDERR "Running ".$self->program." ".$self->filename." -l > ".$self->results."\n";
+    # print STDERR "Running ".$self->program." ".$self->filename." -l > ".$self->results."\n";
     $self->throw ("Error running ".$self->program." on ".$self->filename) 
         unless ((system ($self->program." ".$self->filename." -l > ".$self->results)) == 0); 
 }
@@ -297,7 +295,7 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
+	    # print STDERR $self->program." didn't find anything\n";
 	    return;
         }       
         else {
@@ -312,7 +310,6 @@ sub parse_results {
     
     # parse
     while (<$filehandle>) {
-      print STDERR;
         chomp;
         next if /^$/;
         if (/^\>/) {
@@ -331,7 +328,7 @@ sub parse_results {
           ($feature{program}) = $self->program =~ /([^\/]+)$/;
           $feature{logic_name} = 'low_complexity';
           $self->create_feature (\%feature);
-          print STDERR "have start ".$start." end ".$end."\n";
+          # print STDERR "have start ".$start." end ".$end."\n";
 	}
     }
     close $filehandle;   
@@ -403,20 +400,25 @@ sub output {
 }
 
 sub get_low_complexity_length {
-	my ($self) = @_;
+    my ($self) = @_;
 
+    if ($self->query->length > 0) {    
 	my $lc_length = 0;
-
+	
 	foreach my $feat ($self->output) {
-    print STDERR "Start ".$feat->start." End ".$feat->end."\n";
-		$lc_length += abs($feat->end - $feat->start) + 1;
+	    #print STDERR "Start ".$feat->start." End ".$feat->end."\n";
+	    $lc_length += abs($feat->end - $feat->start) + 1;
 	}
-    
+	
 	my $low_complexity = ($lc_length)/($self->query->length);
-
+	
 	$low_complexity *= 100;
-
+	
 	return $low_complexity;
+    }
+    else {
+	return 0;
+    }
 }
 
 		
