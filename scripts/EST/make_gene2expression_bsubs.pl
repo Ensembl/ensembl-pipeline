@@ -30,6 +30,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw (
 								      EST_REFDBHOST
 								      EST_REFDBUSER
 								      EST_REFDBNAME
+                                                                      EST_REFDBPORT
 								      EST_QUEUE
 								      EST_TMPDIR
 								      EST_EXPRESSION_RUNNER
@@ -88,6 +89,7 @@ sub get_chrlengths{
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $EST_REFDBHOST,
 					      -user   => $EST_REFDBUSER,
 					      -dbname => $EST_REFDBNAME,
+                                              -port   => $EST_REFDBPORT,
 					     );
 #  my $q = "SELECT c.name, max(a.chr_end) 
 #           FROM   chromosome c, assembly a
