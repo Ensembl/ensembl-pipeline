@@ -51,12 +51,15 @@ unless ($genscan)
 else
 { print "ok 3\n"; }
 
-#run Genscan                                                
+#run Genscan 
+#$genscan->protect('.genscan');                                               
 $genscan->run();
 print "ok 4\n"; # 4th test passed
 
 #get and store the output
 my @results = $genscan->output();
+print STDERR "GENES:\n";
+display (@results);
 
 unless (@results) 
 { print "not ok 5\n"; }
@@ -64,25 +67,25 @@ else
 { print "ok 5\n"; }
 
 my @exons = $genscan->output_exons();
+print STDERR "EXONS:\n";
+display(@exons);
 
 unless (@exons) 
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
 
-my @methods = qw( seqname start end strand);
-#Display output
-foreach my $obj (@exons)
-{
-    print "\n";
-    foreach my $method_name (@methods) {
-        my $value = $obj->$method_name();
-        printf ("%10s = $value\n", $method_name);
+sub display {
+    my @results = @_;
+    #Display output
+    foreach my $obj (@results)
+    {
+       print STDERR ($obj->gffstring . "\n");
     }
 }
 
 sub set_seq {
-#embedded sequence! Because I can't create Bio::PrimarySeqs from files 
+#embedded sequence! Because I can't create Bio::PrimarySeqs from files
 my $seq = 
 'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
 'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.
