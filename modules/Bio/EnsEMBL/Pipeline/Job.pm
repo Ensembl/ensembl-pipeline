@@ -305,8 +305,11 @@ sub flush_runs {
   $nodes =~ s/ +/ /;
   # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
 
-  my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  my $runner = $::pipeConf{'runner'} || undef;
+
+  $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+#  my $runner = __FILE__;
+#  $runner =~ s:/[^/]*$:/runner.pl:; 	
 
   for my $queue ( @queues ) {
 
@@ -453,8 +456,12 @@ sub runRemote {
   my $cmd;
 
   
-  my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  my $runner = $::pipeConf{'runner'} || undef;
+
+  $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+
+#  my $runner = __FILE__;
+#  $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
 #    " -q acarichunky " .
 #    " -R osf1 ".
