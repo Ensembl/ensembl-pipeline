@@ -226,8 +226,8 @@ sub fetch_input {
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
     $contig->_chr_name($chrid);
-    $self->vc($contig);
-    print STDERR "got vc\n";
+    $self->vcontig($contig);
+    print STDERR "got vcontig\n";
     print STDERR "length ".$contig->length."\n";
     
     # forward strand
@@ -776,6 +776,7 @@ sub _cluster_Transcripts{
     print STDERR "cluster $number :\n";
     foreach my $tran ($cluster->get_Transcripts){
       print STDERR "$count:\n";
+      print STDERR "$tran > ";
       foreach my $exon ( $tran->get_all_Exons ){
 	print STDERR $exon->start.":".$exon->end." ";
       }
@@ -837,6 +838,10 @@ sub _merge_Transcripts{
     
     $count++;
     my @merged_transcripts = ();
+    
+    # keep track of the transcripts originatin each newly created one
+    # each $origin_list{$new_transcript} is an array of transcripts
+    my %origin_list;
 
     # get the transcripts in this cluster
     my @transcripts = $cluster->get_Transcripts;
@@ -915,7 +920,9 @@ sub _merge_Transcripts{
       
       # create a new transcript with those merged above
       my $new_transcript = $self->_produce_Transcript( \@current_list, $strand );
-      
+      $origin_list{$new_transcript} = [];
+      push ( @{ $origin_list{$new_transcript} }, @current_list );
+ 
       my $found  = 0;
 
       # for subsequent transcritps iterate through the merged_transcripts to see if it merges to any previous one
@@ -979,6 +986,8 @@ sub _test_for_Merge{
   my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
   my $merge     = 0; # =1 if they merge
 
+  print STDERR "comparing $tran1 and $tran2\n";
+
 EXON1:
   for (my $j=0; $j<=$#exons1; $j++) {
   
@@ -994,7 +1003,7 @@ EXON1:
       #
       if ($foundlink == 1 && $j != 0){
 	if ( $k!= 0 && $exons1[$j]->overlaps($exons2[$k-1]) ){
-	  #print STDERR ($j+1)." <--> ".($k)."\n";
+	  print STDERR ($j+1)." <--> ".($k)."\n";
 	  $overlaps++;
           next EXON1;
 	}
@@ -1002,9 +1011,13 @@ EXON1:
       
       # if texons1[$j] and exons2[$k] overlap go to the next exon1 and  next $exon2
       if ( $exons1[$j]->overlaps($exons2[$k]) ){
-	#print STDERR ($j+1)." <--> ".($k+1)."\n";
+	print STDERR ($j+1)." <--> ".($k+1)."\n";
         $overlaps++;
-	$foundlink = 1;
+	
+        # in order to merge the link always start at the first exon of one of the transcripts
+        if ( $j == 0 || $k == 0 ){
+          $foundlink = 1;
+        }
       }          
       else {  
 	# look at the next exon if you haven't found an overlap yet
@@ -1022,15 +1035,15 @@ EXON1:
       if ( $foundlink == 1 && ( $j == $#exons1 || $k == $#exons2 ) ){
 	
 	### some prints for test ###
-	#print STDERR "\nmerging transcripts $tran1 and $tran2:\n";
-	#foreach my $e1 ( @exons1 ){
-	#  print STDERR $e1->start.":".$e1->end."\t";
-	#}
-	#print STDERR "\n";
-	#foreach my $e2 ( @exons2 ){
-	#  print STDERR $e2->start.":".$e2->end."\t";
-	#}
-	#print STDERR "\n\n";
+	print STDERR "transcripts $tran1 and $tran2 will merge:\n";
+	foreach my $e1 ( @exons1 ){
+	  print STDERR $e1->start.":".$e1->end."\t";
+	}
+	print STDERR "\n";
+	foreach my $e2 ( @exons2 ){
+	  print STDERR $e2->start.":".$e2->end."\t";
+	}
+	print STDERR "\n\n";
 	
 	# and we can leave
         $merge = 1;
@@ -1047,14 +1060,20 @@ EXON1:
 	# 
 	my $addition = 0;
 	while ( $k+1+$addition < scalar(@exons2) && $exons1[$j]->overlaps($exons2[$k+1+$addition]) ){
-	  #print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
+	  print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
 	  $overlaps++;
           $addition++;
 	}      
 	$start = $k+1+$addition;
 	next EXON1;
       }    
+    
     } # end of EXON2 
+  
+    if ($foundlink == 0){
+      $start = 0;
+    }
+ 
   }   # end of EXON1      
 
   # if we haven't returned at this point, they don't merge, thus
@@ -1121,7 +1140,9 @@ sub _produce_Transcript{
     $new_exon->end   ($exon_cluster->end);
     
     ###  dont't set strand yet, genomewise cannot handle that ###
-    
+    # shall we pout it to 1 anyway, so that minigenomewise does not complain?
+    $new_exon->strand(1);
+
     foreach my $exon ( $exon_cluster->sub_SeqFeature ){
       foreach my $evidence ( $exon->each_Supporting_Feature ){
 	$new_exon->add_Supporting_Feature($evidence);
@@ -1129,7 +1150,21 @@ sub _produce_Transcript{
     }
     $transcript->add_Exon($new_exon);
   }
-  
+ 			
+			print STDERR "producing from:\n";
+			foreach my $tran ( @$merged ){
+			  print STDERR "$tran: ";
+			  foreach my $exon ($tran->get_all_Exons){
+			    print STDERR $exon->start.":".$exon->end."  ";
+			  }
+			  print STDERR "\n";
+			}
+			print STDERR "a new transcript: $transcript\n";
+			foreach my $exon ($transcript->get_all_Exons){
+			  print STDERR $exon->start.":".$exon->end."  ";
+			}
+			print STDERR "\n\n";
+
   return $transcript;
 }
 
@@ -1223,6 +1258,7 @@ sub _set_splice_Ends {
   # sort clusters according to their start coord.
   @exon_clusters = sort { $a->start <=> $b->start  } @exon_clusters;
   my $count =  0;
+
   
   #### set first the start-coordinates ####
   my $position = 0;
@@ -1244,6 +1280,7 @@ sub _set_splice_Ends {
       }
       $start{$exon->start}++;
     }
+
     # take the most common start (note that we do not resolve ambiguities here)
     while ( my ($key,$value) = each %start ){
       if ($value > $max_start){
@@ -1259,11 +1296,10 @@ sub _set_splice_Ends {
     # the first cluster is a special case - potential UTRs, take the longest one.
     if( $position == 1) {
       $new_start = $cluster->start;  
-    }   
-    # reset the starts of all the exons in this cluster
-    foreach my $exon ($cluster->sub_SeqFeature) {
-      $exon->start($new_start);
-    } 
+    }
+
+    # reset the cluster start (that's the coordinate used in _produce_Transcript() )
+    $cluster->start($new_start);
   }
 
   #### now set the end coordinate ####
@@ -1294,7 +1330,7 @@ sub _set_splice_Ends {
       }
     }
     # if we have too little exons to obtain the end, take the original value
-    if ( $max_start == 0 ){
+    if ( $max_end == 0 ){
       $new_end = $cluster->end;
     }
 
@@ -1302,10 +1338,10 @@ sub _set_splice_Ends {
     if( $position == 1) {
       $new_end = $cluster->end;  
     }
-    # reset the ends of all the exons in this cluster
-    foreach my $exon ($cluster->sub_SeqFeature) {
-      $exon->end($new_end);
-    } 
+    
+    # reset the cluster end (that's the coordinate used in _produce_Transcript() )
+    $cluster->end($new_end);
+
   }
 
   return $cluster_list;
@@ -1320,7 +1356,7 @@ sub _check_splice_Sites{
   print STDERR "EST_GeneBuilder: checking splice sites in strand $strand...\n";
 
   # get the contig being analysed
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   
   # for reverse strand,  invert the contig, since the exons were retrieved in revcontig
   my $revcontig = $contig->invert;   
@@ -1640,6 +1676,7 @@ sub genetype {
 }
 
 # override method from RunnableDB.pm
+
 sub analysis {
   my ($self, $analysis) = @_;
 
@@ -1651,7 +1688,9 @@ sub analysis {
   return $self->{'_analysis'};
 }
 
-# convert genomewise output into genes
+############################################
+### convert genomewise output into genes ###
+############################################
 
 sub convert_output {
   my ($self, $gwr, $strand) = @_;
@@ -1676,7 +1715,7 @@ sub make_genes {
   my @genes;
 
   my $time  = time; chomp($time);
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
 
   # are we working on the reverse strand?
   if( $strand == -1 ){
@@ -1689,13 +1728,14 @@ sub make_genes {
   foreach my $transcript (@trans) {
   
    ##test
-  #  print STDERR "\nIn EST_GeneBuilder.make_genes\n";
-  #  print STDERR " Transcript        : ".$transcript."\n";
-  #  my $ecount=1;
-  #  foreach my $exon ( $transcript->get_all_Exons ){
-  #    print STDERR "Exon $ecount: ".$exon->start." ".$exon->end."\n";
-  #    $ecount++;
-  #  }
+    print STDERR "\nIn EST_GeneBuilder.make_genes\n";
+    print STDERR " Transcript        : ".$transcript." strand ".$transcript->start_exon->strand."\n";
+    my $ecount=1;
+    foreach my $exon ( $transcript->get_all_Exons ){
+      print STDERR "Exon $ecount: ".$exon->start.":".$exon->end."  ";
+      $ecount++;
+    }
+    print STDERR "\n\n";
 
 #    print STDERR " Translation       : ".$transcript->translation."\n";
 #    print STDERR " translation starts: ".$transcript->translation->start."\n";
@@ -1755,7 +1795,7 @@ sub make_genes {
 
 sub remap_genes {
   my ($self, $genes, $strand) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   if ( $strand == -1 ){
     $contig = $contig->invert;
   }
@@ -1806,29 +1846,30 @@ sub remap_genes {
   return @newf
 }
 
+=head2 vcontig
 
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
+ Function: inherited from RunnableDB, it sets/gets the virtual contig on which the analysis is carried out 
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 
 =cut
 
-sub vc{
+#### in branch 121 this still works with $self->vc(), in the main trunk in updated to work with $self->vcontig
+
+sub vcontig {
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'vc'} = $value;
+      $obj->{'_vc'} = $value;
     }
-    return $obj->{'vc'};
+    return $obj->{'_vc'};
 
 }
 
-# Adapted from Spangle
+#####
 
 =head2 match
 
