@@ -452,27 +452,39 @@ sub check_disk_space {
     }
 }
 
+#takes and array of Seq or PrimarySeq objects and returns valid ones
 sub validate_sequence {
     my ($self, @seq) = @_;
     my @validated;
     foreach my $seq (@seq)
     {
-        print STDERR ("mrna feature $seq is not a Bio::PrimarySeq\n") 
+        print STDERR ("mrna feature $seq is not a Bio::PrimarySeq or Bio::Seq\n") 
                                     unless ($seq->isa("Bio::PrimarySeq") ||
                                             $seq->isa("Bio::Seq"));
-        if ($seq->seq !~ /[^acgtn]/i)
+        my $sequence = $seq->seq;
+        if ($sequence !~ /[^acgtn]/i)
         {
             push (@validated, $seq);
         }
         else 
         {
-            $self->warn($seq->display_id().
-                " contains odd nucleotide codes (type returns "
-                .$seq->moltype().")\n");
+            $_ = $sequence;
+            my $len = length ($_);
+            my $invalidCharCount = tr/mrwsykvhdbxMRWSYKVHDBX/n/;
+            if ($invalidCharCount / $len > 0.05)
+            {
+                $self->warn($seq->display_id().
+                    " contains odd nucleotide codes (type returns "
+                    .$seq->moltype().")\n");
+            }
+            else
+            {
+                print STDERR "Cleaned up ".$seq->display_id."\n";
+                push (@validated, $_);
+            }
         }
     } 
     return @validated;  
-
 }
 
 sub run_blast {
