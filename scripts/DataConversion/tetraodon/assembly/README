@@ -1,0 +1,24 @@
+The Tetraodon assembly (version 7) comprises chromsomes, ultracontigs
+and scaffolds (the last of which are the lowest-level contigs of
+sequence made available). To load it into Ensembl, we need:
+
+(1) a fasta file containing the scaffolds.
+
+(2) An agp describing the relationship between the chromosomes and
+scaffolds.  
+
+(3) An agp describing the relationship between the ultracontigs and
+scaffolds. 
+
+Item (1) is supplied. The information for item (2) is supplied, but
+needs to be formatted into correct 'agp' format for use by the loadinf
+scripts. This can be done with convert_to_agp.pl:
+
+convert_to_agp.pl Genoscope_agp_file > chromosome.agp
+
+Item (3) can now be derived from the chromsome agp using
+extract_ultracontigs.pl: 
+
+extract_ultracontigs.pl chromosome.agp > ultracontigs.agp
+
+You are now ready to load your sequence and assembly into Ensembl.
