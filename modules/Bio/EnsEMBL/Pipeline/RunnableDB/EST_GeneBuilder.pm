@@ -55,7 +55,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 # config file; parameters searched for here if not passed in as @args
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
@@ -129,6 +128,9 @@ sub new {
       $self->cdna_db($cdna_db);
     }
 
+    $self->genetype($EST_GENOMEWISE_GENETYPE);
+
+
 
     return $self; 
 }
@@ -179,24 +181,20 @@ sub write_output {
     
  GENE: 
   foreach my $gene ($self->output) {	
+    eval {
+      $gene_adaptor->store($gene);
+      print STDERR "wrote gene " . $gene->dbID . "\n";
       
-      
-      
-      
-      eval {
-	  $gene_adaptor->store($gene);
-	  print STDERR "wrote gene " . $gene->dbID . "\n";
-	  
-	  my @transcripts = @{ $gene->get_all_Transcripts};
-	  foreach my $tran (@transcripts){
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-	  }
-	  
-	  
-      }; 
-      if( $@ ) {
-	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      my @transcripts = @{ $gene->get_all_Transcripts};
+      foreach my $tran (@transcripts){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
       }
+      
+      
+    }; 
+    if( $@ ) {
+      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+    }
   }
 }
 
@@ -362,7 +360,7 @@ sub fetch_input {
 										);
 	    $self->add_runnable($runnable, $strand);
 	    $runnable->add_Transcript($tran);
-	}
+	  }
     }
 }
 
@@ -411,20 +409,35 @@ sub _process_Transcripts {
  
   my $merge_object 
     = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
-							 -transcripts => \@transcripts,
-							);
+							  -transcripts => \@transcripts,
+							 );
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
+  
+  # before checking the splice sites, reject the single exon transcripts
+  my @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};
 
   # check the splice_sites
   # at the moment we do not modify anything in this method
-  $self->_check_splice_Sites(\@merged_transcripts,$strand);
+  $self->_check_splice_Sites(\@filtered_transcripts,$strand);
   print STDERR scalar(@merged_transcripts)." transcripts returned from _check_splice_Sites\n";
 
   return @merged_transcripts;
 }
 
+############################################################
+
+sub _reject_single_exon_Transcripts{
+  my ($self,@transcripts) = @_;
+  my @filtered_transcripts;
+  foreach my $tran (@transcripts){
+    unless ( scalar(@{$tran->get_all_Exons}) <= 1 ){
+      push( @filtered_transcripts, $tran );
+    }
+  }
+  return \@filtered_transcripts;
+}
 
 ############################################################
 
@@ -1079,6 +1092,8 @@ sub add_runnable{
   }
 }
 
+############################################################
+
 sub each_runnable{
   my ($self, $strand) = @_;
   
@@ -1102,16 +1117,14 @@ sub each_runnable{
   
 }
 
+############################################################
+
+# run genomewise 
+
 sub run {
   my ($self) = @_;
   my $strand;
-
-  my $cc=1;
-  # run genomewise 
-
-  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-  my $genetype = $EST_GENOMEWISE_GENETYPE;
-  
+    
   # sort out analysis here or we will get into trouble with duplicate analyses
   my $analysis = $self->analysis;
 
@@ -1119,13 +1132,13 @@ sub run {
       $self->throw("You need an analysis to run this");
   }
 
-  $self->genetype($genetype);
-
   print STDERR "Analysis is: ".$self->analysis->dbID."\n";
 
-  # plus strand
+  ############### plus strand ##########
   $strand = 1;
   my $tcount=0;
+
+  my @forward_transcripts;
  
  RUN1:
   foreach my $gw_runnable( $self->each_runnable($strand) ){
@@ -1139,15 +1152,26 @@ sub run {
       next RUN1;
     }
 
+    push (@forward_transcripts, $gw_runnable->output);
     # convert_output
-    $self->convert_output($gw_runnable, $strand);
+    #$self->convert_output($gw_runnable, $strand);
   }
   print STDERR $tcount." transcripts run in genomewise (-smell 8) in the forward strand\n";
 
-  # minus strand
+  my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
+  
+  my @forward_genes                 = $self->_cluster_into_Genes(@checked_forward_transcripts);
+  
+  my @forward_remapped              = $self->remap_genes(\@forward_genes, $strand);
+
+  $self->output(@forward_remapped);
+
+
+  ############### minus strand ##########
   $strand = -1;
   my $tcount2=0;
  
+  my @reverse_transcripts;
  RUN2:
   foreach my $gw_runnable( $self->each_runnable($strand)) {
     $tcount2++;
@@ -1160,10 +1184,19 @@ sub run {
       next RUN2;
     }
     
+    push (@reverse_transcripts, $gw_runnable->output );
     # convert_output
-    $self->convert_output($gw_runnable, $strand);
+    #$self->convert_output($gw_runnable, $strand);
   }
   print STDERR $tcount2." transcripts run in genomewise (-smell 8) in the reverse strand\n";
+  
+  my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
+  
+  my @reverse_genes               = $self->_cluster_into_Genes(@checked_reverse_transcripts);
+  
+  my @reverse_remapped            = $self->remap_genes(\@reverse_genes, $strand);
+
+  $self->output(@reverse_remapped);
 
 }
 
@@ -1196,49 +1229,35 @@ sub analysis {
 ### convert genomewise output into genes ###
 ############################################
 
-sub convert_output {
-  my ($self, $gwr, $strand) = @_;
+#sub convert_output {
+#  my ($self, $gwr, $strand) = @_;
 
-  my @genes    = $self->make_genes($gwr, $strand);
+#  my @genes    = $self->make_genes($gwr, $strand);
 
-  my @remapped = $self->remap_genes(\@genes, $strand);
+#  my @remapped = $self->remap_genes(\@genes, $strand);
 
-  # store genes
-  $self->output(@remapped);
-}
+#  # store genes
+#  $self->output(@remapped);
+#}
 
 ############################################################
+# this method set the slice in the exons for each transcript
+# and check the translation
 
-sub make_genes {
+sub _check_Translations {
+  my ($self,$transcripts,$strand) = @_;
+  
+  my @trans = @$transcripts;
+  my @good_transcripts;
 
-  my ($self, $runnable, $strand) = @_;
-  my $genetype = $self->genetype;
-  my $analysis_obj = $self->analysis;
-  my $count = 0;
-  my @genes;
-
-  my $time  = time; chomp($time);
   my $slice = $self->query;
-  
-  
   # are we working on the reverse strand?
   if( $strand == -1 ){
-    $slice = $slice->invert;
+    $slice = $self->revcomp_query;
   }
-  
-  # transcripts come with a translation, that's sorted out in MiniGenomewise and Genomewise
-  my @trans = $runnable->output;
   
  TRANSCRIPT:
   foreach my $transcript (@trans) {
-
-    # create a new gene object out of this transcript
-    my $gene   = new Bio::EnsEMBL::Gene;
-    $gene->type($genetype);
-    $gene->analysis($analysis_obj);
-
-    # add transcript to gene
-    $gene->add_Transcript($transcript);
 
     # sort the exons 
     $transcript->sort;
@@ -1252,32 +1271,23 @@ sub make_genes {
       next TRANSCRIPT;
     }
     
-    #print STDERR "In _make_genes() before translate():\n\n";
   EXON:
     foreach my $exon(@exons){
-      
-      #print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
-      
       $exon->contig($slice);
       $exon->attach_seq($slice);
       
       # if strand = -1 we have inverted the contig, thus
       $exon->strand(1);
+ 
       # when the gene gets stored, the strand is flipped automatically
-  }
-
-    my $translation = $transcript->translation;
-
-    # store only genes that translate ( to check it, we get the Bio::Seq )
-    my $sequence = $transcript->translate;
-
-    print STDERR "In _make_genes() after translate():\n\n";
-  EXON:
-    foreach my $exon(@exons){
       print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
     }
-  
 
+    my $translation = $transcript->translation;
+    
+    # store only genes that translate ( to check it, we get the Bio::Seq )
+    my $sequence = $transcript->translate;
+    
     unless ( $sequence ){
       print STDERR "TRANSCRIPT WITHOUT A TRANSLATION!!\n";
     }
@@ -1292,9 +1302,9 @@ sub make_genes {
       
       # 5' UTR is usually shorter than 3' UTR, the latter can be very long compared
       # with the translation length ( 5000 vs. 500 ) see e.g. gene SCL ( aka TAL1)
-      my $five_prime  = $transcript->five_prime_utr  or warn "No five prime UTR";
-      my $three_prime = $transcript->three_prime_utr or warn "No three prime UTR";
-
+      my $five_prime  = $transcript->five_prime_utr  or print STDERR "No five prime UTR";
+      my $three_prime = $transcript->three_prime_utr or print STDERR "No three prime UTR";
+      
       # UTRs above are Bio::Seq
       if ( $five_prime ){
 	my $length5    = $five_prime->length;
@@ -1304,7 +1314,7 @@ sub make_genes {
 	my $length3    = $three_prime->length;
 	print STDERR "3prime UTR length  : $length3\n";
       }
-
+      
       # only store the genes whose translation has no stop codons
       my $peptide = $sequence->seq;
       #print STDERR "peptide: $peptide\n";
@@ -1312,15 +1322,12 @@ sub make_genes {
 	print STDERR "TRANSLATION HAS STOP CODONS!!\n";
       }
       else{
-	push(@genes,$gene);
+	push(@good_transcripts, $transcript);
       }
-      
-      print STDERR "\n"; # ?!?
-
     }
   } # end of TRANSCRIPT
 
-  return @genes;
+  return @good_transcripts;
   
 }
 
@@ -1476,7 +1483,7 @@ sub match {
 
 sub output{
    my ($self,@genes) = @_;
-
+   
    if (!defined($self->{'_output'})) {
      $self->{'_output'} = [];
    }
@@ -1513,7 +1520,272 @@ sub _print_Transcript{
       " end: ".$transcript->translation->end."\n";
 }
 
-#########################################################################
+
+############################################################
+#
+# METHODS FOR CLUSTERING THE TRANSCRIPTS INTO GENES
+#
+############################################################
+#
+# similar but not the same as the ones in GeneBuilder
+#
+
+=head2 _cluster_into_Genes
+
+    Example :   my @genes = $self->cluster_into_Genes(@transcripts);
+Description :   it clusters transcripts into genes according to exon overlap.
+                It will take care of difficult cases like transcripts within introns.
+                It also unify exons that are shared among transcripts.
+    Returns :   a beautiful list of geen objects
+    Args    :   a list of transcript objects
+
+=cut
+
+sub _cluster_into_Genes{
+  my ($self, @transcripts_unsorted) = @_;
+  
+  my $num_trans = scalar(@transcripts_unsorted);
+  print STDERR "clustering $num_trans transcripts into genes\n";
+
+  
+  # flusold genes
+  #$self->flush_Genes;
+  
+  my @transcripts = sort by_transcript_high @transcripts_unsorted;
+  my @clusters;
+  
+  # clusters transcripts by whether or not any exon overlaps with an exon in 
+  # another transcript (came from original prune in GeneBuilder)
+  foreach my $tran (@transcripts) {
+    my @matching_clusters;
+  CLUSTER: 
+    foreach my $cluster (@clusters) {
+      foreach my $cluster_transcript (@$cluster) {
+        
+        foreach my $exon1 (@{$tran->get_all_Exons}) {
+	  foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
+            if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+              push (@matching_clusters, $cluster);
+              next CLUSTER;
+            }
+          }
+        }
+      }
+    }
+    
+    if (scalar(@matching_clusters) == 0) {
+      my @newcluster;
+      push(@newcluster,$tran);
+      push(@clusters,\@newcluster);
+    } 
+    elsif (scalar(@matching_clusters) == 1) {
+      push @{$matching_clusters[0]}, $tran;
+      
+    } 
+    else {
+      # Merge the matching clusters into a single cluster
+      my @new_clusters;
+      my @merged_cluster;
+      foreach my $clust (@matching_clusters) {
+        push @merged_cluster, @$clust;
+      }
+      push @merged_cluster, $tran;
+      push @new_clusters,\@merged_cluster;
+      # Add back non matching clusters
+      foreach my $clust (@clusters) {
+        my $found = 0;
+      MATCHING: 
+	foreach my $m_clust (@matching_clusters) {
+          if ($clust == $m_clust) {
+            $found = 1;
+            last MATCHING;
+          }
+        }
+        if (!$found) {
+          push @new_clusters,$clust;
+        }
+      }
+      @clusters =  @new_clusters;
+    }
+  }
+  
+  # safety and sanity checks
+  $self->check_Clusters(scalar(@transcripts), \@clusters);
+
+  # make and store genes
+  
+  print STDERR scalar(@clusters)." created, turning them into genes...\n";
+  my @genes;
+  foreach my $cluster(@clusters){
+    my $count = 0;
+    my $gene = new Bio::EnsEMBL::Gene;
+    my $genetype = $self->genetype;
+    my $analysis = $self->analysis;
+    $gene->type($genetype);
+    $gene->analysis($analysis);
+    
+    # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
+    foreach my $transcript( @{$cluster} ){
+      $gene->add_Transcript($transcript);
+    }
+    
+    # prune out duplicate exons
+    my $new_gene = $self->prune_Exons($gene);
+    push( @genes, $new_gene );
+   }
+  
+  #$self->final_genes(@genes);
+  return @genes;
+}
+
+############################################################
+
+sub check_Clusters{
+  my ($self, $num_transcripts, $clusters) = @_;
+  #Safety checks
+  my $ntrans = 0;
+  my %trans_check_hash;
+  foreach my $cluster (@$clusters) {
+    $ntrans += scalar(@$cluster);
+    foreach my $trans (@$cluster) {
+      if (defined($trans_check_hash{$trans})) {
+        $self->throw("Transcript " . $trans->dbID . " added twice to clusters\n");
+      }
+      $trans_check_hash{$trans} = 1;
+    }
+    if (!scalar(@$cluster)) {
+      $self->throw("Empty cluster");
+    }
+  }
+  if ($ntrans != $num_transcripts) {
+    $self->throw("Not all transcripts have been added into clusters $ntrans and " . $num_transcripts. " \n");
+  } 
+  #end safety checks
+  return;
+}
+
+
+############################################################
+
+sub transcript_high{
+  my ($self,$tran) = @_;
+  my $high;
+  $tran->sort;
+  if ( $tran->start_Exon->strand == 1){
+    $high = $tran->end_Exon->end;
+  }
+  else{
+    $high = $tran->start_Exon->end;
+  }
+  return $high;
+}
+
+############################################################
+
+sub transcript_low{
+  my ($self,$tran) = @_;
+  my $low;
+  $tran->sort;
+  if ( $tran->start_Exon->strand == 1){
+    $low = $tran->start_Exon->start;
+  }
+  else{
+    $low = $tran->end_Exon->start;
+  }
+  return $low;
+}
+
+############################################################
+
+sub by_transcript_high {
+  my $alow;
+  my $blow;
+
+  my $ahigh;
+  my $bhigh;
+  
+  # alow and ahigh are the left most and right most coordinates for transcript $a 
+  if ($a->start_Exon->strand == 1) {
+    $alow  = $a->start_Exon->start;
+    $ahigh = $a->end_Exon->end;
+  } 
+  else {
+    $alow  = $a->end_Exon->start;
+    $ahigh = $a->start_Exon->end;
+  }
+
+  # blow and bhigh are the left most and right most coordinates for transcript $b 
+  if ($b->start_Exon->strand == 1) {
+    $blow  = $b->start_Exon->start;
+    $bhigh = $b->end_Exon->end;
+  } 
+  else {
+    $blow  = $b->end_Exon->start;
+    $bhigh = $b->start_Exon->end;
+  }
+
+  # return the ascending comparison of the right-most coordinates if they're different
+  if ($ahigh != $bhigh) {
+    return $ahigh <=> $bhigh;
+  } 
+  # if they'r equal, return the ascending comparison of the left most coordinate
+  else {
+    return $alow <=> $blow;
+  }
+}
+
+
+
+############################################################
+
+sub prune_Exons {
+  my ($self,$gene) = @_;
+  
+  my @unique_Exons; 
+  
+  # keep track of all unique exons found so far to avoid making duplicates
+  # need to be very careful about translation->start_Exon and translation->end_Exon
+  
+  foreach my $tran (@{$gene->get_all_Transcripts}) {
+    my @newexons;
+    foreach my $exon (@{$tran->get_all_Exons}) {
+      my $found;
+      #always empty
+    UNI:foreach my $uni (@unique_Exons) {
+	if ($uni->start  == $exon->start  &&
+	    $uni->end    == $exon->end    &&
+	    $uni->strand == $exon->strand &&
+	    $uni->phase  == $exon->phase  &&
+	    $uni->end_phase == $exon->end_phase
+	   ) {
+	  $found = $uni;
+	  last UNI;
+	}
+      }
+      if (defined($found)) {
+	push(@newexons,$found);
+	if ($exon == $tran->translation->start_Exon){
+	  $tran->translation->start_Exon($found);
+	}
+	if ($exon == $tran->translation->end_Exon){
+	  $tran->translation->end_Exon($found);
+	}
+      } else {
+	push(@newexons,$exon);
+	push(@unique_Exons, $exon);
+      }
+    }          
+    $tran->flush_Exons;
+    foreach my $exon (@newexons) {
+      $tran->add_Exon($exon);
+    }
+  }
+  return $gene;
+}
+
+############################################################
+
+
 1;
 
 
