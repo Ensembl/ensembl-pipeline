@@ -47,26 +47,55 @@ use vars qw( %GeneCompConf );
 
 # Hash containing config info
 %GeneCompConf = (
+		 #DBHOST1    => "ecs1f",
+	         #DBNAME1    => "mouse_Sanger_Nov01_denormalised",
+		 #PATH1      => "CHR",    
+		 #DBUSER1    => "ensro",
+		 #GENETYPES1 => ["ensembl"],
 		 
-		 # database with the annotation/benchmark genes to compare to
-		 DBHOST1    => "",
-	         DBNAME1    => "",
-		 PATH1      => "",    
-		 DBUSER1    => "",
-
-		 # genetypes is an arrayref so that we can include more than one type
-		 GENETYPES1 => [""],
-		 
-
-		 # database with the prediction/test genes to compare with the annotation/benchmark
-		 DBHOST2    => "",                    
-		 DBNAME2    => "",
-		 PATH2      => "",
-		 DBUSER2    => "",
-		 
-		 # genetypes is an arrayref so that we can include more than one type
-		 GENETYPES2 => [""], 
+		 #DBHOST2    => 'ecs1b',                    
+		 #DBNAME2    => 'mouse_Sanger_Nov01_est',
+		 #PATH2      => 'CHR',
+		 #DBUSER2      => 'ensro',
+		 #GENETYPES2 => ["genomewise"], 
 	     
+
+		 ## annotation/benchmark genes
+		 #DBHOST1    => "ecs1e",
+	         #DBNAME1    => "mouse_whitehead_0401_denormalised",
+		 #PATH1      => "CHR",    
+		 #DBUSER1    => "ensro",
+		 #GENETYPES1 => ["ensembl"],
+		 
+		 ## prediction genes
+		 #DBHOST2    => 'ecs1b',                    
+		 #DBNAME2    => 'mouse_whitehead_0401_rikens',
+		 #PATH2      => 'CHR',
+		 #DBUSER2    => 'ensro',
+		 #GENETYPES2 => ["exonerate_e2g"], 
+	     
+		 # mouse_5.3.1
+
+		 # annotation/benchmark genes
+		 DBHOST1    => "ecs1b",
+	         DBNAME1    => "mouse_whitehead_0401_rikens",
+		 PATH1      => "CHR",    
+		 DBUSER1    => "ensro",
+		 GENETYPES1 => ["genomewise"],
+		 
+		 # prediction genes
+		 DBHOST2    => 'ecs1e',                    
+		 DBNAME2    => 'mouse_whitehead_0401_denormalised',
+		 PATH2      => 'CHR',
+		 DBUSER2    => 'ensro',
+		 GENETYPES2 => ["ensembl"], 
+	    
+		 # reference database ( one with common sequence, golden path, contig, etc... )
+		 REF_DBHOST => 'ecs1e',                    
+		 REF_DBNAME => 'mouse_whitehead_0401_denormalised',
+		 REF_PATH   => 'CHR',
+		 REF_DBUSER => 'ensro',
+		   	     
 );
 
 sub import {

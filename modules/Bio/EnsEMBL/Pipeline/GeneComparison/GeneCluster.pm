@@ -231,8 +231,6 @@ sub get_Genes_of_Type() {
   Title   : pair_Transcripts()
   Usage   : my @array_of_pairs = $gene_cluster->pair_Transcripts
   Function: This method make pairs of transcripts according to maximum reciprocal exon overlap. 
-            Transcripts can eventually be repeated because the maximum exon_overlap may coincide 
-            in two different pairs. 
   Example : look for instance in the method find_missing_Exons
   Returns : three arrayrefs =  
             1.- a list of Bio::EnsEMBL::Pipeline::GeneComparison::Transcripts, each holding a pair of transcripts, 
@@ -687,7 +685,7 @@ sub _translateable_exon_length {
 
 sub start{
   my ($self) = @_;
-  my @genes = $selg->get_Genes;
+  my @genes = $self->get_Genes;
   my $start;
   foreach my $gene ( @genes ) {
     my @exons = $gene->get_all_Exons;
@@ -708,7 +706,7 @@ sub start{
 
 sub end{
   my ($self) = @_;
-  my @genes = $selg->get_Genes;
+  my @genes = $self->get_Genes;
   my $end;
   foreach my $gene ( @genes ) {
     my @exons = $gene->get_all_Exons;

@@ -252,9 +252,7 @@ sub cluster_Genes {
 #########################################################################
 
   #### new clustering algorithm, faster than the old one ####
-  #### however, the order of the genes does not guarantee that genes are not skipped, since this algorithm
-  #### only checks the current cluster and sometimes
-
+  
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
   my $cluster_count = 1;
@@ -2215,7 +2213,8 @@ sub exon_Coverage{
       }
     }
   }
-  
+
+  print STDERR "EXON COVERAGE ACCORDING TO EXON-GENOMIC LENGTH\n";
   print STDERR "Total length of prediction: $pred_length\n";
   print STDERR "                annotation: $ann_length\n";
   print STDERR "                   overlap: $overlap_length\n\n";
@@ -2225,6 +2224,32 @@ sub exon_Coverage{
 
   print STDERR "               Sensitivity: $sensitivity\n";
   print STDERR "               Specificity: $specificity\n";
+
+  
+  my %seen_exon;
+  my $count_covered_exons = 0;
+ ANN_EXON:
+  foreach my $ann_exon ( @ann_exons ){
+    if ( $seen_exon{ $ann_exon } ){
+      next ANN_EXON;
+    }
+  PRED_EXON:
+    foreach my $pred_exon ( @pred_exons ){
+      if ( $seen_exon{ $pred_exon } ){
+	next PRED_EXON;
+      }
+      if ( $ann_exon->overlaps( $pred_exon ) ){
+	my $overlap_length = $self->_exon_Overlap($ann_exon, $pred_exon);
+	my $ann_length     = $ann_exon->length;
+	my $perc_overlap   = 100 * ( $overlap_length / $ann_length);
+	if ( $perc_overlap >= 90 ){
+	  $seen_exon{ $ann_exon }  = 1;
+	  $seen_exon{ $pred_exon } = 1;
+	  $count_covered_exons++;
+	}
+      }
+    }
+  }
 
 }  
 
