@@ -311,7 +311,7 @@ sub run{
   my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE, 'evidence' ) };
 
   # if there are no genes, we finish earlier
-  unless ( @estgenes ){
+  unless ( @est_genes ){
     unless (@ensembl_genes){
 	print STDERR "no genes found, leaving...\n";
 	  exit(0);
@@ -2351,11 +2351,11 @@ sub _make_Genes{
 
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
-    $count++;
-    unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->ensembl_vc)
-	    && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
-      print STDERR "skipping this transcript\n";
-      next TRANSCRIPT;
+      $count++;
+      unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->ensembl_vc)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
+	  print STDERR "skipping this transcript\n";
+	  next TRANSCRIPT;
     }
     push(@selected_transcripts,$transcript);
   } 
