@@ -143,6 +143,14 @@ sub query {
     return $self->{'_sequence'};
 }
 
+sub clone{
+  my ( $self, $clone ) = @_;
+  if ($clone){
+    $self->query($clone);
+  }
+  return $self->query;
+}
+
 
 =head2 analysis
 
