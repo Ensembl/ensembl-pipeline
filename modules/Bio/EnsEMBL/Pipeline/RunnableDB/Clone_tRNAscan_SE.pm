@@ -118,6 +118,9 @@ sub write_output {
         }
         elsif (@tRNAs) 
 	  {
+	    foreach my $trna (@tRNAs) {
+	      $trna->analysis($self->analysis);
+	    }
 	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
 	    $feat_adp->store($contig, @tRNAs);
 	  }

@@ -172,7 +172,7 @@ sub run {
 									      -peptide   => $transcript,
 									      -database  => $self->analysis->db,
 									      -program   => $self->analysis->program,
-									      -threshold => 1e-5,
+									      -threshold => $self->threshold,
 									      -threshold_type => 'PVALUE');
 
 	$runnable->run();

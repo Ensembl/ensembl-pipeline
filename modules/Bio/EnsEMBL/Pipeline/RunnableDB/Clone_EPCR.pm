@@ -252,7 +252,8 @@ sub write_output {
 	elsif (@features)
 	{
             foreach my $f (@features) {
-                $f->seqname($contig->internal_id);
+	      $f->analysis($self->analysis);
+	      $f->seqname($contig->internal_id);
             }
 	    print STDERR "Writing features to database\n";
 	    my $feat_adp = Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);

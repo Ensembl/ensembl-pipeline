@@ -104,8 +104,8 @@ sub fetch_input {
     
     foreach my $contig  ($clone->get_all_Contigs())
     {       
-        my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
-        $self->runnable($genseq);
+      my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+      $self->runnable($genseq);
     }
 }
 
@@ -121,23 +121,6 @@ sub runnable {
 	
 	push (@{$self->{'_runnable'}}, $repeatmask);
 
-
-        #extract parameters into a hash
-        #my ($parameter_string) = $self->parameters() ;
-        #my %parameters;
-        #if ($parameter_string)
-        #{
-        #    $parameter_string =~ s/\s+//g;
-        #    my @pairs = split (/,/, $parameter_string);
-        #    foreach my $pair (@pairs)
-        #    {
-        #       my ($key, $value) = split (/=>/, $pair);
-        #        $parameters{$key} = $value;
-        #    }
-        #}
-        #$parameters {'-clone'} = $genseq;
-        #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
-        #push (@{$self->{'_runnable'}}, $runnable->new(%parameters));
     }
     return @{$self->{'_runnable'}};
 }
@@ -227,9 +210,10 @@ sub write_output {
 	        foreach my $repeat (@repeats)
             {
                 print STDERR ($repeat->hseqname()."\t");
+		$repeat->analysis($self->analysis);
             }
             my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	        $feat_adp->write($contig, @repeats);
+	        $feat_adp->store($contig, @repeats);
         }
         return 1;
     } 

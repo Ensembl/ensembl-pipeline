@@ -46,7 +46,7 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::EPCR';
-my $sts_db   = $::pipeConf{'datadir'} . "/mapprimer";
+my $sts_db   = $::pipeConf{'datadir'} . "/UniSTS";
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Analysis->new (   -db_file             => $sts_db,
@@ -65,7 +65,7 @@ unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id ='AB012723.00001';
+my $id ='AB000381.00001';
 $ana_adaptor->exists( $ana );
 my $runobj = "$runnable"->new(  -dbobj      => $db,
                                 -input_id   => $id,

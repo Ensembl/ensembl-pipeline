@@ -96,8 +96,8 @@ sub new {
     $self->input_id($input_id);
     
     $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+    $self->throw("Analysis object is not Bio::EnsEMBL::Analysis")
+                unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
     $self->analysis($analysis);
     
     return $self;
@@ -217,7 +217,11 @@ sub write_output {
     foreach my $runnable ($self->runnable())
     {
 	my $contig;
-	my @features = $self->output();
+	my @features = $runnable->output();
+
+	foreach my $f (@features) {
+	  $f->analysis($self->analysis);
+	}
 	eval                           
 	{                              
 	    $contig = $db->get_Contig($runnable->clone->display_id());

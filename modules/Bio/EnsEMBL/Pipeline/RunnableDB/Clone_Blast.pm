@@ -247,9 +247,10 @@ sub write_output {
 	        foreach my $feature (@features)
             {
                 print STDERR ($feature->hseqname()."\t");
+                $feature->analysis($self->analysis);
             }
             my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	        $feat_Obj->store($contig, @features);
+	        $feat_adp->store($contig, @features);
         }
         return 1;
     } 

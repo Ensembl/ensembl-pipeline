@@ -131,12 +131,6 @@ sub input_id {
 
 sub write_output {
     my($self,@genes) = @_;
-#    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => 'ecs1d',		
-#						-user   => 'ensadmin',
-#						-dbname => 'mouse_gb_aug01',
-#						-pass   => 'ensembl',
-#						-dnadb  => $self->dbobj,
-#					       );
 
     # not ideal, but temporarily write to the same database
     my $db = $self->dbobj;

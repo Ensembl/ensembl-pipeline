@@ -48,7 +48,7 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep';
-my $parameters = '-THRESHOLD => 1, -ARGS => -hspmax 1000 nogap';
+
 my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'swall',
 					  -db_file        => 'swall',
 					  -db_version     => '__NONE__',
@@ -58,7 +58,6 @@ my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'swall',
 					  -module_version => 1,
 					  -gff_source     => 'blastp',
 					  -gff_feature    => 'similarity',
-					  -parameters     => $parameters,
 					  -logic_name     => 'blastgenscanPEP' );
 
 unless ($ana)
@@ -71,10 +70,16 @@ my $id = 'AB015752.00001';
 my $contig = $db->get_Contig($id);
 my @genscan_peptides = $contig->get_genscan_peptides;
 
+foreach my $pep (@genscan_peptides) {
+	print STDERR "PEP " . $pep->translate->seq . "\n";
+}
 
 my $runobj = "$runnable"->new(  -dbobj      => $db,
 				-input_id   => $id,
                                 -analysis   => $ana );
+
+$runobj->threshold(1);
+
 unless ($runobj)
 { print "not ok 4\n"; }
 else
@@ -116,7 +121,7 @@ foreach my $feature (@features)
     {
         $all_features_found = 0;
         my $exon = Bio::EnsEMBL::Exon->new();
-        $exon->id           ($feature->hseqname);
+        $exon->temporary_id           ($feature->hseqname);
         $exon->start        ($feature->start);
         $exon->end          ($feature->end);
         $exon->strand       ($feature->strand);
@@ -131,14 +136,12 @@ foreach my $feature (@features)
             $exon_pep =~ s/^\M//i; #remove leading M's
 	    $exon_pep =~ s/\*$//; 
 	    $exon_pep =~ s/X$//; 
-            print STDERR "PEP: $full_pep\n";
-            print STDERR "SEQ: $exon_pep\n";
             
             if (!defined($exon_pep) || index ($full_pep, $exon_pep) > -1)
             {
                 print STDERR "$count ---------------MATCHED-----------------------\n";
                 print STDERR "$count: Feature: ".$feature->hseqname
-                ." matched in ".$pep->id."\n";
+                ." matched in ".$pep->dbID."\n";
                 print STDERR "$count: PHASE: ".$feature->phase." End ".$feature->end_phase
                                       ." Start ".$feature->start." - ".$feature->end
                                       ."(".$feature->length

@@ -210,6 +210,10 @@ sub write_output {
     {
         my $contig;
         my @islands = $runnable->output();
+
+        foreach my $is (@islands) {
+	  $is->analysis($self->analysis);
+        }
         eval 
         {
 	    $contig = $db->get_Contig($runnable->clone->display_id());

@@ -161,7 +161,7 @@ sub write_output {
     my($self,@features) = @_;
 
     my $db       = $self->dbobj();
-    my $analysis = $db->get_OldAnalysis(8);
+    my $analysis = $self->analysis;
 
     @features || $self->throw("No frozen object passed for the output");
    
@@ -171,11 +171,11 @@ sub write_output {
         print STDERR "Writing feature " . $f->hseqname . "\n";
 	my $contigid = $f->seqname; 
         $f->feature1->analysis($analysis);
-        $f->feature1->source_tag("est2genome");
-        $f->feature1->primary_tag("similarity");
+        $f->feature1->source_tag($analysis->gff_source);
+        $f->feature1->primary_tag($analysis->gff_primary);
         $f->feature2->analysis($analysis);
-        $f->feature2->source_tag("est2genome");
-        $f->feature2->primary_tag("similarity");
+        $f->feature2->source_tag($analysis->gff_source);
+        $f->feature2->primary_tag($analysis->gff_primary);
 
         eval {
           if (! defined($contighash{$contigid})) {

@@ -111,7 +111,9 @@ sub new {
 							      ARGS
 							      REPM)], 
 							  @args);
-    
+
+    $repmask = 'RepeatMasker' unless defined($repmask);
+
     $self->clone($clone) if ($clone);       
 
     my $repmask = $self->find_executable($repmask);

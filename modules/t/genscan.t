@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
+BEGIN { $| = 1; print "1..6\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -113,9 +113,9 @@ foreach my $feature (@results) {
   }
 
 unless ($all_exons_found)
-{ print "not ok 7\n"; }
+{ print "not ok 6\n"; }
 else
-{ print "ok 7\n"; }
+{ print "ok 6\n"; }
 
 sub display {
     my @results = @_;

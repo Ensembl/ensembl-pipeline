@@ -83,10 +83,13 @@ else
 display(@out);
 
 $runobj->write_output();
+
 my $clone = $db->get_Clone($id);
+
 my @features;
+
 foreach my $contig ($clone->get_all_Contigs()) {
-    push @features, $contig->get_all_SimilarityFeatures();
+    push @features, $contig->get_all_PredictionFeatures();
 }
 display(@features);
 

@@ -45,13 +45,14 @@ my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
                                                     -db_version     => '__NONE__',
-                                                    -program        => 'Clone_RepeatMasker',
+                                                    -program        => 'RepeatMasker',
                                                     -program_version=> 1,
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'RepeatMasker',
                                                     -gff_feature    => 'repeat', 
                                                     -parameters     => '',
+						    -logic_name     => 'RepeatMasker'
                                                 );
 
 unless ($ana)
