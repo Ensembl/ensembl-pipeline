@@ -44,7 +44,7 @@ sub fetch_input{
 	  -database   => $EST_GENOMIC,
 	  -query_type => 'dna',
 	  -target_type=> 'dna',
-	  -options    => $EST_EXONERATE_OPTIONS,
+	  -options    => $EST_EXONERATE->{OPTIONS},
 	 );
 
   $self->exonerate_runnabledb($runobj);

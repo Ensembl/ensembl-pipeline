@@ -26,7 +26,7 @@ my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes->new(
 			      -query_type => 'dna',
 			      -target_type=> 'dna',
                               -exonerate  => $exonerate,
-			      -options    => $EST_EXONERATE_OPTIONS,
+			      -options    => $EST_EXONERATE->{OPTIONS},
 			     );
     
 
@@ -129,9 +129,8 @@ sub new {
     $self->query_type('dna');
   }
 
-
   # can choose which exonerate to use
-  $self->exonerate($EST_EXONERATE);
+  $self->exonerate($EST_EXONERATE->{VERSION});
   
   # can add extra options as a string
   if ($options){
@@ -173,7 +172,7 @@ sub fetch_input {
   
   foreach my $database ( @databases ){
     if ( -s $database){
-      
+
       #print STDERR "creating runnable for target: $database\n";
       my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
 	->new(
@@ -183,6 +182,7 @@ sub fetch_input {
 	      -options     => $self->options,
 	      -target_type => $self->target_type,
 	      -query_type  => $self->query_type,
+	      -verbose     => 1
 	     );
       $self->runnables($runnable);
     }
@@ -202,7 +202,7 @@ sub run{
   $self->throw("Can't run - no funnable objects") unless ($self->runnables);
   
   foreach my $runnable ($self->runnables){
-      
+
     # run the funnable
     $runnable->run;  
     
@@ -622,6 +622,7 @@ sub get_chr_names{
   foreach my $chromosome ( @chromosomes ){
     push( @chr_names, $chromosome->chr_name );
   }
+
   print STDERR "retrieved ".scalar(@chr_names)." chromosome names\n";
   return @chr_names;
 }
