@@ -53,7 +53,7 @@ sub _initialize {
   
   my $make = $self->SUPER::_initialize;
 
-  my ($jobid,$status,$created) 
+  my ($jobid,$status,$created)  =
       $self->_rearrange([qw(JOBID
 			    STATUS
 			    CREATED
