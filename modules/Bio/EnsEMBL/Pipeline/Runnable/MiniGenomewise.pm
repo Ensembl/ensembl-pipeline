@@ -462,6 +462,7 @@ sub convert_output{
     foreach my $exon ($transcript->get_all_Exons) {
       $ec++;
    
+      my $end_phase = $exon->end_phase;
       my $phase  = $exon->phase;
       my $strand = $exon->strand;
 
@@ -473,43 +474,58 @@ sub convert_output{
 	# for now, ignore this exon.
 	print STDERR "Warning : miniseq exon converts into > 1 genomic exon " 
 	             . scalar(@genomics) . " ignoring exon $ec\n";
+	
+	# this can screw up the translation as the phases may not be consistent anymore
+	# there is a check for this below
 	next EXON;
       }
       
-    foreach my $f (@genomics) {
-      my $new_exon = new Bio::EnsEMBL::Exon;
-      $new_exon->start($f->start);
-      $new_exon->end($f->end);
-      $new_exon->phase($phase);
-      $new_exon->strand($strand);
-
-      # transfer the supporting evidence!!!
-      foreach my $evi ( @evidence ){
-	$new_exon->add_Supporting_Feature( $evi );
+      foreach my $f (@genomics) {
+	my $new_exon = new Bio::EnsEMBL::Exon;
+	$new_exon->start($f->start);
+	$new_exon->end($f->end);
+	$new_exon->phase($phase);
+	$new_exon->strand($strand);
+	$new_exon->end_phase($end_phase);
+	
+	# transfer the supporting evidence!!!
+	foreach my $evi ( @evidence ){
+	  $new_exon->add_Supporting_Feature( $evi );
+	}
+	
+	#BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+	$new_exon->seqname($exon->seqname);
+	$new_exon->analysis($analysis_obj);
+	#end BUGFIX
+	push(@newexons, $new_exon);    
+	
+	# check whether $exon is the start or end exon
+	if ( $exon->start == $ss && $exon->end == $se ) {
+	  #print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
+	  $translation->start_exon($new_exon);
+	}
+	if ( $exon->start == $es && $exon->end == $ee ) {
+	  #print STDERR " >> end_exon found, converting   ".$exon." into ".$new_exon."\n";
+	  $translation->end_exon($new_exon);
+	}
       }
-
-      #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-      $new_exon->seqname($exon->seqname);
-      $new_exon->analysis($analysis_obj);
-      #end BUGFIX
-      push(@newexons, $new_exon);    
-    
-      # check whether $exon is the start or end exon
-      if ( $exon->start == $ss && $exon->end == $se ) {
-	#print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
-	$translation->start_exon($new_exon);
-      }
-      if ( $exon->start == $es && $exon->end == $ee ) {
-	#print STDERR " >> end_exon found, converting   ".$exon." into ".$new_exon."\n";
-	$translation->end_exon($new_exon);
-      }
-    }
       
       # flush out old exons from transcript and replace them with newly remapped exons
       $transcript->flush_Exon;
       foreach my $exon(@newexons){
 	$transcript->add_Exon($exon);
       }
+    
+      # check the consistency of the phases:
+      my @exons = $transcript->get_all_Exons;
+      for (my $i = 1; $i <= $#exons; $i++) {
+	if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+	  print STDERR "transcript has phase inconsistency, skipping it...\n";
+	  $self->_print_Transcript($transcript);
+	  next TRANSCRIPT;
+	}
+      }
+
     }
     $transcript->sort;
     
@@ -517,8 +533,19 @@ sub convert_output{
     $transcript->translation($translation);
     
     $self->output($transcript);  
+  
+  } # end of TRANSCRIPT
+}
+
+sub _print_Transcript{
+  my ($self,$tran) = @_;
+  $tran->sort;
+  my @exons = $tran->get_all_Exons;
+  foreach my $exon (@exons){
+    print STDERR $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase." strand: ".$exon->strand."\n";
   }
 }
+
 
 =head2 output
 
