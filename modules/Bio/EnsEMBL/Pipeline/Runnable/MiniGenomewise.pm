@@ -67,6 +67,13 @@ sub new {
 									 )],
 								      @args);
     
+    if ($smell){
+      $self->smell($smell);
+    }
+    if ($switch){
+      $self->switch($switch);
+    }
+
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     
