@@ -108,12 +108,14 @@ sub _initialize {
     my( $clone, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
     
     $self->clone($clone) if ($clone);       
-
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
-    else
-    {   $self->repeatmasker($self->locate_executable('RepeatMaskerHum')); }
-    
+    eval {
+	$self->repeatmasker($self->locate_executable('RepeatMaskerHum'));
+    };
+    if ($@) {
+	$self->repeatmasker('/nfs/disk100/humpub/scripts/RepeatMaskerHum');
+    }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
