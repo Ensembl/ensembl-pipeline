@@ -106,7 +106,11 @@ sub _transfer_supporting_evidence{
 =head2 _validate_Exon
 
   Arg [1]   : Bio::EnsEMBL::Exon
-  Function  : check to make sure the coordinates of the exon are sensible 
+ Description: It will return false if for the exon:
+              start < 0, or
+              start > end, or
+              start == end
+            
   Returntype: 1 or 0
   Exceptions: gives warnings if checks are passed
   Caller    : 
@@ -118,22 +122,20 @@ sub _transfer_supporting_evidence{
 sub _validate_Exon{
   my ($self, $exon) = @_;
 
-  if($exon->start < 0){
+  if($exon->start < 0 ){
     my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
     $self->warn($msg);
     return 0;
   }
-  
   elsif($exon->start > $exon->end){
     my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
     $self->warn($msg);
     return 0;
   }
-  
   elsif($exon->start == $exon->end){
-    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - letting it through\n";
+    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - rejecting it\n";
     $self->warn($msg);
-    return 1;
+    return 0;
   }
   return 1;
 }
