@@ -168,7 +168,7 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
-  $use_score = 1;
+  $use_score = 0;
   if ( $use_score ){
       $self->use_score($use_score);
   }
@@ -220,7 +220,7 @@ sub new {
     #print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
   }
   else{
-    $self->_intternal_splice_overlap( 0 );
+    $self->_internal_splice_overlap( 0 );
     #print STDERR "defaulting internal_splice_overlap = 0\n";
   }
 
@@ -1140,7 +1140,10 @@ sub compare{
     return $overlap_matrix{$newtrans}{$trans};
   }
   else{
+    #my $t1 = time;
     $overlap_matrix{$newtrans}{$trans} = $comparator->discrete_compare($newtrans, $trans);
+    #my $t2 = time;
+    #print STDERR "COMPARATOR TIME (".$newtrans->dbID.",".$trans->dbID.") = ".($t2-$t1)."\n";
     $self->matrix( \%overlap_matrix );
     return $overlap_matrix{$newtrans}{$trans};
   }
