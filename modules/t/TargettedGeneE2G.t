@@ -37,9 +37,11 @@ print "ok 1\n";    # 1st test passed.
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
 $ens_test->do_sql_file("t/TargettedGene.dump");
+$ens_test->module("Bio::EnsEMBL::DBSQL::DBAdaptor");
 
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
+
 
 print "ok 2\n";    
 
