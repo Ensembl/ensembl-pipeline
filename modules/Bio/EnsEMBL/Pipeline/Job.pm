@@ -48,11 +48,11 @@ use Bio::EnsEMBL::Root;
   Function  : create a new Job
   Returntype: Bio::EnsEMBL::Pipeline::Job
   Exceptions: throws if not passed an input_id, taskname or module
-  Caller    : 
-  Example   : my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => AC123801.1.1.23493,
-							 -module => Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker,
-							 -taskname => RepeatMasker,
-							 );
+  Caller    :
+  Example   : my $job = Bio::EnsEMBL::Pipeline::Job->new(
+                 -input_id => 'AC123801.1.1.23493',
+							   -module => 'Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker',
+							   -taskname => 'RepeatMasker' );
 
 =cut
 
@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Root;
 sub new{
    my ($class, @args) = @_;
    my $self = bless {}, $class;
-   
+
    $self->{'_dbID'} = undef;
    $self->{'_taskname'} = undef;
    $self->{'_input_id'} = undef;
@@ -73,8 +73,14 @@ sub new{
    $self->{'_stderr_out'} = undef;
    $self->{'_status'} = undef;
    $self->{'_adaptor'} = undef;
+	 $self->{'_job_name'} = undef;
 
-   my ($dbID, $taskname, $input_id, $submission_id, $array_index, $parameters, $module, $stderr_file, $stdout_file, $status, $adaptor) = $self->_rearrange([qw(dbID TASKNAME INPUT_ID SUBMISSION_ID ARRAY_INDEX PARAMETERS MODULE STDERR_FILE STDOUT_FILE STATUS ADAPTOR)], @args);
+   my ($dbID, $taskname, $input_id, $submission_id, $array_index,
+			 $parameters, $module, $stderr_file, $stdout_file, $status,
+			 $adaptor, $job_name) = $self->_rearrange([qw(dbID TASKNAME INPUT_ID
+																				 SUBMISSION_ID ARRAY_INDEX PARAMETERS
+                                         MODULE STDERR_FILE STDOUT_FILE STATUS
+																				 ADAPTOR JOB_NAME)], @args);
 
    $self->dbID($dbID) if($dbID);
    if(!$taskname){
@@ -89,6 +95,7 @@ sub new{
    }
    $self->submission_id($submission_id) if($submission_id);
    $self->array_index($array_index) if($array_index);
+	 $self->job_name($job_name) if($job_name);
    $self->parameters($parameters) if($parameters);
    if(!$module){
      $self->throw("Must define a module when creating a Job : $!");
@@ -107,115 +114,80 @@ sub new{
 
 =head2 accessor methods
 
-  Arg [1]   : a string 
+  Arg [1]   : a string
   Function  : sets the string to the apropriate variable if it is passed 
   in and returns that value of that variable
   Returntype: a string
   Exceptions: none
-  Caller    : 
+  Caller    :
   Example   : my $module = $job->module;
 
 =cut
 
-
-
 sub dbID{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_dbID'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_dbID'} = shift if(@_);
   return $self->{'_dbID'};
 }
 
 sub taskname{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_taskname'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_taskname'} = shift if(@_);
   return $self->{'_taskname'};
 }
 
 sub input_id{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_input_id'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_input_id'} = shift if(@_);
   return $self->{'_input_id'};
 }
 
 sub submission_id{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_submission_id'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_submission_id'} = shift if(@_);
   return $self->{'_submission_id'};
 }
 
-sub array_index{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_array_index'} = $arg;
-  }
+sub job_name {
+	my $self = shift;
+	$self->{'_job_name'} = shift if(@_);
+	return $self->{'_job_name'};
+}
 
+
+sub array_index{
+  my $self = shift;
+	$self->{'_array_index'} = shift if(@_);
   return $self->{'_array_index'};
 }
 
 sub parameters{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_parameters'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_parameters'} = shift if(@_);
   return $self->{'_parameters'};
 }
 
 sub module{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_module'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_module'} = shift if(@_);
   return $self->{'_module'};
 }
 
 sub stderr_file{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_stderr_file'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_stderr_file'} = shift if(@_);
   return $self->{'_stderr_file'};
 }
 
 sub stdout_file{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_stdout_file'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_stdout_file'} = shift if(@_);
   return $self->{'_stdout_file'};
 }
 
 sub status{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_status'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_status'} = shift if(@_);
   return $self->{'_status'};
 }
 
@@ -232,14 +204,9 @@ sub status{
 =cut
 
 
-
 sub adaptor{
-  my ($self, $arg) = @_;
-  
-  if($arg){
-    $self->{'_adaptor'} = $arg;
-  }
-
+  my $self = shift;
+	$self->{'_adaptor'} = shift if(@_);
   return $self->{'_adaptor'};
 }
 
@@ -262,9 +229,11 @@ sub adaptor{
 
 sub set_current_status{
   my ($self, $status) = @_;
- 
+
   if(!$self->adaptor){
-    print STDERR ("Can't update the status of a Job if it doesn't have a jobadaptor and a database connection".$self->dbID.":".$self->taskname.":".$self->input_id." $!");
+    $self->warn("Can't update the status of a Job if it doesn't have" .
+								"a jobadaptor and a database connection" .
+								$self->dbID . ":" . $self->taskname . ":" . $self->input_id);
   }else{
     $self->adaptor->update_status($self, $status);
   }
@@ -289,23 +258,21 @@ sub set_current_status{
 
 sub run{
   my ($self) = @_;
-  
+
   my $rdb;
   my $module = $self->module;
   eval {
     $module =~ s/::/\//g;
     require "${module}.pm";
     $module =~ s/\//::/g;
-    
     $rdb = "${module}"->new
-      ( 
-	-input_id => $self->input_id,
-	-parameters => $self->parameters,);
-    
+      (-input_id => $self->input_id,
+	     -parameters => $self->parameters,);
   };
 
   if($@){
-    print STDERR("Job creation for job ".$self->dbID.":".$self->taskname.":".$self->input_id." failed $@");
+    print STDERR("Job creation for job ".$self->dbID.":".$self->taskname.":".
+								 $self->input_id." failed $@");
     $self->set_current_status('FAILED');
   }
 
@@ -315,7 +282,9 @@ sub run{
   };
 
   if($@){
-    print STDERR("call to fetch_input for module ".$rdb." job ".$self->dbID.":".$self->taskname.":".$self->input_id." failed $@");
+    print STDERR("call to fetch_input for module ".$rdb." job ".
+								 $self->dbID.":".$self->taskname.":".$self->input_id.
+								 " failed $@");
     $self->set_current_status('FAILED');
   }
 
@@ -325,7 +294,8 @@ sub run{
   };
 
   if($@){
-    print STDERR("call to run for module ".$rdb." job ".$self->dbID.":".$self->taskname.":".$self->input_id." failed $@");
+    print STDERR("call to run for module ".$rdb." job ".$self->dbID.":".
+								 $self->taskname.":".$self->input_id." failed $@");
     $self->set_current_status('FAILED');
   }
 
@@ -336,15 +306,12 @@ sub run{
   };
 
   if($@){
-    print STDERR ("call to write output for module ".$rdb." job ".$self->dbID.":".$self->taskname.":".$self->input_id." failed $@");
+    print STDERR ("call to write output for module ".$rdb." job ".
+									$self->dbID.":".$self->taskname.":".$self->input_id.
+									" failed $@");
     $self->set_current_status('FAILED');
   }
-
-  
-  
 }
-
-
 
 
 
