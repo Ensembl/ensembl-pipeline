@@ -36,6 +36,7 @@ database and deletes any existing features
 use strict;
 use Getopt::Long;
 
+use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
@@ -105,7 +106,15 @@ foreach my $cloneid (@cloneids) {
 	foreach my $contig ($fclone->get_all_Contigs) {
 	    push(@contig,$contig);
 
-	    my @features = $contig->get_all_SimilarityFeatures;
+	    my $tcontig  = new Bio::EnsEMBL::Pipeline::DBSQL::Contig(-id    => $contig->id,
+								     -dbobj => $tdb);
+
+	    my @features = $contig->get_all_SeqFeatures;
+
+	    foreach my $f (@features) {
+		$tcontig->add_SimilarityFeature($f);
+	    }
+
 	    my @genes    = $contig->get_all_Genes;
 
 	    foreach my $gene (@genes) {
@@ -113,25 +122,17 @@ foreach my $cloneid (@cloneids) {
 		    $tdb ->write_Exon($exon);
 		    $exon->find_supporting_evidence(\@features);
 		}
-
-		my @pairs = find_exon_pairs($gene);
-
-		my @newpairs;
-
-		foreach my $p (@pairs) {
-		    print("Coverage for " . $p->exon1->id . "\t" . $p->exon2->id . "\t" . $p->coverage . "\n");
-		    if ($p->coverage > 1) {
-			push(@newpairs,$p);
-		    }
-		}
-		    
-		$tdb->write_ExonPairs(@newpairs);
-
+		$tcontig->make_ExonPairs($gene);
 	    }
+
+
+
+	    $tdb->write_ExonPairs($tcontig->get_all_ExonPairs);
+
 	}
-
+	
 	my @pairs = $tdb->get_all_ExonPairs(@contig);
-
+	
 	foreach my $p (@pairs) {
 	    print ($p->exon1->id . "\t" . $p->exon2->id . "\n");
 	}
@@ -142,142 +143,7 @@ foreach my $cloneid (@cloneids) {
     }
 }
 
-sub find_exon_pairs {
-    my ($gene) = @_;
-
-    my $gap = 5;
-
-    my @exons = $gene->each_unique_Exon;
-
-    if ($exons[0]->strand == 1) {
-	@exons = sort {$a->start <=> $b->start} @exons;
-    } else {
-	@exons = sort {$b->start <=> $a->start} @exons;
-    }
-    my @pairs;
-
-    my %pairhash;
-
-    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
-
-	my %idhash;
-	my $exon1 = $exons[$i];
-
-	    for (my $j = $i+1 ; $j < scalar(@exons); $j++) {
-
-		my $exon2 = $exons[$j];
-
-		my %doneidhash;
-
-		foreach my $f1 ($exon1->each_Supporting_Feature) {
-		    
-		    foreach my $f2 ($exon2->each_Supporting_Feature) {
-
-			if ($f1->hseqname eq $f2->hseqname &&
-			    $f1->strand   == $f2->strand   &&
-			    !(defined($idhash{$f1->hseqname})) &&
-			    !(defined($pairhash{$exon1}{$exon2}))) {
-
-			    if ($f1->strand == 1) {
-				if (abs($f2->hstart - $f1->hend) < $gap) {
-				    if (!(defined($doneidhash{$f1->hseqname}))) {
-					eval {
-					    print(STDERR "Making new pair " . $exon1->id . "\t" .  $exon2->id . "\n");
-
-					    my $pair = makePair(\@pairs,$exon1,$exon2);
-
-					    $idhash    {$f1->hseqname} = 1;
-					    $doneidhash{$f1->hseqname} = 1;
-					    if ($pair->coverage > 1) {
-						$pairhash{$exon1}{$exon2}  = 1;
-					    }
-					};
-					if ($@) {
-					    warn("Error making ExonPair from [" . $exon1->id . "][" .$exon2->id ."] $@");
-					}
-				    }
-				}
-			    } elsif ($f1->strand == -1) {
-
-				if (abs($f1->hend - $f2->hstart) < $gap) {
-				    if (!(defined($doneidhash{$f1->hseqname}))) {
-					eval {
-					    print(STDERR "Making new pair " . $exon1->id . "\t" .  $exon2->id . "\n");
-
-					    my $pair = makePair(\@pairs,$exon1,$exon2);
-					    
-					    $idhash    {$f1->hseqname}  = 1;
-					    $doneidhash{$f1->hseqname}  = 1;
-					    if ($pair->coverage > 1) {
-						$pairhash  {$exon1}{$exon2} = 1;
-					    }
-					};
-					if ($@) {
-					    warn("Error making ExonPair from (-1)[" . $exon1->id . "][" .$exon2->id ."] $@");
-					}
-				    }
-
-				}
-			    }
-				
-			}
-		    }
-		}
-	    }
-    }
-    return @pairs;
-}
-
-sub makePair {
-    my ($pairs,$exon1,$exon2) = @_;
-
-    my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
-						       -exon2 => $exon2,
-						       -type  => "ABUTTING",
-						       );
-    my $found = 0;
-
-    foreach my $p (@$pairs) {
-	if ($p->compare($tmppair) == 1) {
-	    $p->add_coverage;
-	    $tmppair = $p;
-	    $found = 1;
-	}
-    }
-
-    if ($found == 0) {
-	push(@$pairs,$tmppair);
-    }
-    return $tmppair;
-}
-
-sub is_Head {
-    my ($db,$exon) = @_;
-    
-    my $sth = $db->prepare("select e1.exon1_id " .
-			   "from exon_pair as e1 " .
-			   "left join exon_pair as e2 on e1.exon1_id = e2.exon2_id " .
-			   "where e2.exon1_id is null");
-
-    my $res = $sth->execute;
-
-    my $rowhash = $sth->fetchrow_hashref;
-
-}
-	
-sub is_Tail {
-    my ($db,$exon) = @_;
-    
-    my $sth = $db->prepare("select e1.exon2_id " .
-			   "from exon_pair as e1 " .
-			   "left join exon_pair as e2 on e1.exon2_id = e2.exon1_id " .
-			   "where e2.exon1_id is null");
-
-    my $res     = $sth->execute;
-    my $rowhash = $sth->fetchrow_hashref;
-
-}
-			   
+	   
 sub read_clones {
     my ($file,@clones) = @_;
 
