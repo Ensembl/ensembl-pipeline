@@ -64,6 +64,8 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::ESTConf;
+use Bio::EnsEMBL::Pipeline::GeneConf;
+
 
 use vars qw(@ISA);
 
@@ -203,15 +205,15 @@ sub run{
     # print out the results:
     foreach my $gene (@genes){
       foreach my $trans (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans);
-	foreach my $exon (@{$trans->get_all_Exons}){
-	  foreach my $evi (@{$exon->get_all_supporting_features}){
-	    print STDERR $evi->hseqname." ".
-	      $evi->start." ".$evi->end." ".
-		$evi->hstart." ".$evi->hend." ".
-		  $evi->primary_tag." ".$evi->source_tag."\n";
-	  }
-	}
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+	#foreach my $exon (@{$trans->get_all_Exons}){
+	#  foreach my $evi (@{$exon->get_all_supporting_features}){
+	#    print STDERR $evi->hseqname." ".
+	#      $evi->start." ".$evi->end." ".
+	#	$evi->hstart." ".$evi->hend." ".
+	#	  $evi->primary_tag." ".$evi->source_tag."\n";
+	#  }
+	#}
       }
     }
     
@@ -335,11 +337,17 @@ sub make_genes{
     my $transcript = Bio::EnsEMBL::Transcript->new();
     my $gene       = Bio::EnsEMBL::Gene->new();
     $gene->analysis($self->analysis);
-
+    
     # the genetype is the logic name
     $gene->type($self->analysis->logic_name);
     
     $gene->add_Transcript($transcript);
+    
+    # get all the features
+    my $prev_feature;
+    my $prev_exon;
+    
+    my @sub_features = sort{ $a->feature1->start <=> $b->feature1->start } $feature->sub_SeqFeature;
     
     foreach my $sub_feature ($feature->sub_SeqFeature){
       # each sub_feature is a feature pair
@@ -347,10 +355,11 @@ sub make_genes{
       # make the exon out of the feature1 (the genomic feature)
       my $exon = Bio::EnsEMBL::Exon->new();
       $exon->seqname($sub_feature->feature1->seqname);
-      $exon->contig($sub_feature->feature1->contig);
+      $exon->contig ($sub_feature->feature1->contig);
       $exon->start  ($sub_feature->feature1->start);
       $exon->end    ($sub_feature->feature1->end);
       $exon->strand ($sub_feature->feature1->strand);
+      my $strand = $exon->strand;
       
       # we haven't set any translations here!!
       $exon->phase    (0);
@@ -361,16 +370,27 @@ sub make_genes{
       
       # what about the supporting evidence?
       my @supp_features = ($sub_feature);
-      my $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
+      my $supp_feature  = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
       $supp_feature->contig     ($exon->contig);
       $supp_feature->seqname    ($sub_feature->feature1->seqname);
+      $supp_feature->hseqname   ($sub_feature->feature2->seqname);
       $supp_feature->score      ($sub_feature->feature2->score);
       $supp_feature->percent_id ($sub_feature->feature2->percent_id);
       $supp_feature->analysis   ($self->analysis );
-      
       $exon->add_supporting_features($supp_feature);
-      $transcript->add_Exon($exon);
+      
+      if ( $prev_exon &&  ( $exon->start - $prev_exon->end ) < 3  ){
+	$prev_exon->end( $exon->end );
+	$prev_exon->add_supporting_features( @{$exon->get_all_supporting_features} );
+      }
+      else{
+	$transcript->add_Exon($exon);
+	$prev_exon = $exon;
+      }
+      
     }
+    #print STDERR "transcript produced:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
     push( @genes, $gene);
   }
   return @genes;
