@@ -274,7 +274,7 @@ sub run {
       
       #Use the first line to get EST orientation
       my $firstline = <ESTGENOME>;
-      if ($firstline =~ /reverse/i) {$estOrientation = -1;}
+      if ($firstline =~ /reverse/i) { $estOrientation = -1; }
       else {$estOrientation = 1}
      
       #read output
@@ -295,10 +295,10 @@ sub run {
 	  my $f2id     = $elements[8];
 	  my $f1source = $source_tag;
 	  my $f2source = $source_tag;
-	  my $f1strand = 1;
-	  #my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
-	  my $f2strand = $estOrientation;
-	  #my $f2strand = 1;
+	  #my $f1strand = 1;
+	  my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
+	  #my $f2strand = $estOrientation;
+	  my $f2strand = 1;
 	  my $f1primary = $elements[0];
 	  my $f2primary = $f1primary;
 	  #ensure start is always less than end
@@ -436,6 +436,7 @@ sub _createfeatures {
                                               -source_tag  =>   $f2source,
                                               -primary_tag =>   $f2primary,
                                               -analysis    =>   $analysis_obj );
+
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
