@@ -82,6 +82,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Root;
@@ -142,8 +143,8 @@ sub new {
 
   ############################################################
   # we are using the latest version: exonerate-0.6.7
-  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
-  #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
+  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
   
   ############################################################
   # options
@@ -241,9 +242,9 @@ sub run {
       " --querytype $query_type --targettype $target_type --query $query --target $target ";
   
   # long cDNA, should use special parameters?
-  if ( $max_length > 60000 ){
-    $command .= " --spanrangeint 12 --spanrangeext 12 --joinrangeext 12 --joinrangeint 12";
-  }
+  #if ( $max_length > 60000 ){
+  #  $command .= " --spanrangeint 12 --spanrangeext 12 --joinrangeext 12 --joinrangeint 12";
+  #}
   
   $command .= " | ";
 
