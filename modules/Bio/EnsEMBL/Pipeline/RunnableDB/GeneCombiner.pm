@@ -141,6 +141,7 @@ sub ensembl_db{
        '-host'   => $ENSEMBL_DBHOST,
        '-user'   => $ENSEMBL_DBUSER,
        '-dbname' => $ENSEMBL_DBNAME,
+       '-pass'   => $ENSEMBL_DBPASS,
        '-dnadb' => $self->db,
       );
     $self->{'_ensembl_db'} = $ensembl_db;
@@ -162,6 +163,7 @@ sub estgene_db{
        '-host'   => $ESTGENE_DBHOST,
        '-user'   => $ESTGENE_DBUSER,
        '-dbname' => $ESTGENE_DBNAME,
+       '-pass'   => $ESTGENE_DBPASS,
        '-dnadb' => $self->db,
       ); 
     $self->{'_estgene_db'} = $estgene_db;
