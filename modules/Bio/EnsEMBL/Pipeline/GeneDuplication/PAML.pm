@@ -126,7 +126,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-  
+
   unlink $self->_config_file if $self->_config_file; 
   unlink $self->_seqfile if $self->_seqfile;
 
@@ -139,6 +139,9 @@ sub DESTROY {
 
   unlink $self->_outfile if $self->_outfile;
 
+  $self->throw("Paml execution resulted in a core file being dumped.")
+    if (unlink $self->work_dir . "/core");
+
   $self->throw("Could not remove working directory [". $self->work_dir ."].\n$!") 
     if (! rmdir $self->work_dir);
 }
@@ -147,11 +150,14 @@ sub DESTROY {
 sub run_codeml {
   my $self = shift;
 
+  # Directory changing shenanigans to make PAML behave!
+
   my $user_dir = cwd();
 
   # Move to our working dir
-  print STDERR $! if (! chdir $self->work_dir);
+  $self->warn($!) if (! chdir $self->work_dir);
 
+  $self->_write_seqs($self->_seqfile);
   $self->_write_config_file;
 
   my $command = $self->_codeml_executable . " " . $self->_config_file;
@@ -161,7 +167,7 @@ sub run_codeml {
     system($command)
   };
 
-  if ($@) {
+  if ($@ or -e $self->work_dir . "/core") {
     $self->throw("Something went wrong when codeml was executed.\n" . $@);
   }
 
@@ -284,25 +290,37 @@ sub work_dir {
 }
 
 
+sub _write_seqs {
+  my ($self, $filename) =  @_;
+
+  $self->throw("No sequences to write.")
+    unless $self->_aligned_seqs;
+
+  system("rm -f $filename");
+
+  open(OUT, ">$filename") or die "Cant write to file [$filename]\n";
+
+  print OUT scalar @{$self->_aligned_seqs} . " " . $self->_aligned_seqs->[0]->length . "\n";
+
+  foreach my $aligned_seq (@{$self->_aligned_seqs}){
+    print OUT $aligned_seq->display_id . "\n" . $aligned_seq->seq . "\n";
+  }
+
+  close(OUT);
+
+  return 1
+}
+
+
 sub _aligned_seqs {
-  my ($self, $aligned_seqs) =  @_;
+  my $self = shift;
 
-  if ($aligned_seqs){
+  if (@_){
+    $self->{_aligned_seqs} = shift;
 
-    my $filename = $self->_seqfile;  #MUST HAVE A PROPER WAY OF DOING THIS.
-
-    system("rm -f $filename");
-
-    open(OUT, ">$filename") or die "Cant write to file [$filename]\n";
-
-    print OUT scalar @$aligned_seqs . " " . $aligned_seqs->[0]->length . "\n";
-
-    foreach my $aligned_seq (@$aligned_seqs){
-      print OUT $aligned_seq->display_id . "\n" . $aligned_seq->seq . "\n";
-    }
-
-    close(OUT);
-
+    $self->throw("No sequences to set.")
+      unless $self->{_aligned_seqs} and 
+	$self->{_aligned_seqs}->[0]->isa("Bio::Seq");
   }
 
   return $self->{_aligned_seqs}
