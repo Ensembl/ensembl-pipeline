@@ -68,6 +68,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Slamconf qw (
                                                             SLAM_ORG2_NAME
                                                             SLAM_BIN
                                                             SLAM_PARS_DIR
+                                                            SLAM_MAX_MEMORY_SIZE
                                                             SLAM_MINLENGTH
                                                             SLAM_MAXLENGTH
                                                             SLAM_COMP_DB_USER
@@ -159,13 +160,23 @@ sub run{
 
       # testing if there are subslices >> $SLAM_MAXLENGTH
       if ( ($end2-$start2 > $SLAM_MAXLENGTH) || ($end1-$start1 > $SLAM_MAXLENGTH) ) {
-        print "\nWARNING: " . ($end2-$start2). " or " . ($end1-$start1) . "are bigger than $SLAM_MAXLENGTH\n";
+        # region is bigger than SLAM_MAXLENGTH ---> we need to re-cut !!!
+        my $lseq1 = $end2-$start2; my $lseq2 = $end1-$start1;
+        my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
+        my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
+
+        # construct input-id for re-analysis
+        print "SlamDB.pm: Warning: Region toooo large... I will not analyse ";
+        my $e1_start = $subslice1->start;    my $e1_end = $subslice1->end;    my $e1_chr = $subslice1->seq_region_name;
+        my $e2_start = $subslice2->start;    my $e2_end = $subslice2->end;    my $e2_chr = $subslice2->seq_region_name;
+
+        print "INPUT $e1_chr-$e1_start-$e1_end---$e2_chr-$e2_start-$e2_end\n";
+      }else{
+        # region fits, so let's get subslices and store them
+        my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
+        my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
+        push @subslices, [$subslice1,$subslice2];
       }
-
-      my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
-      my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
-
-      push @subslices, [$subslice1,$subslice2];
     }
   } else {
     # no cutting
@@ -183,6 +194,8 @@ sub run{
 
   for my $slices (@subslices) {
     $slice_counter++;
+    print "\nSlamDB.pm: Subslice-Nr: $slice_counter\n-------------------------------\n";
+
     ################################ REPEATMASK-STATISTICS ################################
 
     my $subslice1 = ${$slices}[0] ;
@@ -193,22 +206,26 @@ sub run{
     my $maskedNs1 =( $subslice1->get_repeatmasked_seq->seq()) =~tr/N//;
     $maskedNs1 = $maskedNs1-$unknown1;
 
+
     my $length2 =    $subslice2->length;
     my $unknown2 = ( $subslice2->seq() ) =~tr/N//;
     my $maskedNs2 = ($subslice2->get_repeatmasked_seq->seq() ) =~tr/N//;
     $maskedNs2 = $maskedNs2-$unknown2;
 
     print "SlamDB.pm: Length 1st subslice " . $length1 ."\t Length 2st subslice " . $length2 ."\n";
-    $length1 = $length1-($unknown1);
-    $length2 = $length2-($unknown2);
 
-    my $percentage1 = sprintf ( "Percentage of repeats in 1st seq: %1.2f" , (($maskedNs1/$length1)*100) ) ; print $percentage1."%\n";
-    my $percentage2 = sprintf ( "Percentage of repeats in 2nd seq: %1.2f" , (($maskedNs2/$length2)*100) ) ; print $percentage2."%\n";
+    my $rmlength1 = $length1-($unknown1);
+    my $rmlength2 = $length2-($unknown2);
+
+
+    my $percentage1 = sprintf ( "Percentage of repeats in 1st seq: %1.2f" , (($maskedNs1/$rmlength1)*100) ) ; print $percentage1."%\n";
+    my $percentage2 = sprintf ( "Percentage of repeats in 2nd seq: %1.2f" , (($maskedNs2/$rmlength2)*100) ) ; print $percentage2."%\n";
+
 
 
     ################################### RUNNING AVID ON SUBSLICE ########################################
 
-    print "\nSlamDB.pm: Subslice-Nr: $slice_counter\n-------------------------------\n";
+
     print "SlamDB.pm: Running Avid...\n";
 
     my $avid_obj = $self->runavid( $slices );
@@ -233,6 +250,7 @@ sub run{
                                                               -org2          => $SLAM_ORG2_NAME ,
                                                               -slam_bin      => $SLAM_BIN ,
                                                               -slam_pars_dir => $SLAM_PARS_DIR ,
+                                                              -max_memory    => $SLAM_MAX_MEMORY_SIZE,
                                                               -minlength     => $SLAM_MINLENGTH ,
                                                               -debug         => 0 ,
                                                               -verbose       => 0
@@ -241,7 +259,7 @@ sub run{
     # run slam, parse results and set predict. trscpts for both organisms
     print "SlamDB.pm: running Slam\n";
     $slamobj->run;
-
+    print "SlamDB.pm: That was the slam run\n";
     #    # getting reference to array of predicted transcripts  [ ref[arefhumanpt] ref[arefmousept] ]
     my $predtrans = $slamobj ->predtrans; # predtrans = [HPT HPT HPT][HM HM HM] or 2 empty arrays [ [] [] ]
 
@@ -464,7 +482,9 @@ sub runavid{
                                                           -slice1      => ${$sliceref}[0],
                                                           -slice2      => ${$sliceref}[1],
                                                          );
+  print "SlamDB.pm: avid obj created run follows xyx \n";
   $avid->run;
+  print "SlamDB.pm: run is finished xyx\n";
   return $avid;
 }
 
@@ -675,18 +695,17 @@ sub get_repeat_features {
 
 
 
-  my $repeatfilename = "/tmp/db_repeats.out";
-  print "Writing $repeatfilename\n";
-  open(RP,">$repeatfilename") || die "write error $repeatfilename\n";
-  for my $r (@all_rpt) {
-    my @r=@{$r};
-    for (@r) {
-      print RP "\t $_";
-    }
-    print RP "\n";
-  }
-  close(RP);
-
+#  my $repeatfilename = "/tmp/db_repeats.out";
+#  print "Writing $repeatfilename\n";
+#  open(RP,">$repeatfilename") || die "write error $repeatfilename\n";
+#  for my $r (@all_rpt) {
+#    my @r=@{$r};
+#    for (@r) {
+#      print RP "\t $_";
+#    }
+#    print RP "\n";
+#  }
+#  close(RP);
 
   return \@all_rpt;
 }
