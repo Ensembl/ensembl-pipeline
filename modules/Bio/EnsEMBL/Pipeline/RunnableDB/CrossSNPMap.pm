@@ -52,11 +52,12 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::CrossSNPMap;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
+#use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
 
 sub new {
   my($class,@args) = @_;
@@ -72,7 +73,12 @@ sub new {
   if ((!$snpdb) || (!$snpdb->isa('Bio::EnsEMBL::ExternalData::SNPSQL::DBAdaptor'))) {
       $self->throw("You need to provide a snp database adaptor to run CrossSNPMap!");
   }
-  print "this is first $first\n";
+  if ($first) {
+    print "this is the first round through--checking wether we have a hit in current emsembl contig\n";
+  }
+  else {
+    print "this is the second round through--finding a hit from current emsembl contig\n";
+  }
   $self->snp_dbobj($snpdb);
   $self->dbobj($db);
   $self->_score($score);
@@ -80,10 +86,8 @@ sub new {
   $self->_masklevel($masklevel);
   $self->_debug($debug);
   $self->_first($first);
-  $self->_minmatch($minmatch);
   $self->_masklevel($masklevel);
   return $self;
-
 }
 
 
@@ -111,120 +115,171 @@ sub id_generation{
    return $c;
 }
 
-=head2 check_clone_in_GP
-
- Title   : check_clone_in_GP
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
 sub fetch_input{
   
-  my ($self,$start_refnum,$end_refnum,@contigs) = @_;
+  my ($self,@args) = @_;
+  my ($inseq,$start_refnum,$end_refnum,$contigs,$mouse) = $self->_rearrange([qw(INSEQ 
+										START_REFNUM 
+										END_REFNUM 
+										CONTIGS 
+										MOUSE)],@args);
+  my @contigs=@$contigs if $contigs;
+  print "inseq is $inseq start_num is $start_refnum and end is $end_refnum and contigs is @contigs and mouse is $mouse\n";
+
+  my (@infos,$inseq_name,$inseq_seq,%id_hash,@newseq,$clone_seqobj);
   
-  my @infos = $self->snp_dbobj->get_snp_info_between_two_refsnpids($start_refnum,$end_refnum);
-  my (%all_version, %same_version, @diff_version, $no_clone);
-  INFO : foreach my $info (@infos) {
-    $all_version{$info->snpid}=$info;
-    if ($info->score >2) {
-      next INFO;
-    }
-    if ($self->_debug>1) {
-      print STDERR "refsnpid is ",$info->snpid, " acc and version is ",$info->seqname, " strand is ",$info->strand,"\n";
-    }
-    $self->_acc($info->acc);
-    $no_clone = "";
-    my ($newclone, $new_version);
-    eval {
-      $newclone = $self->dbobj->get_Clone($info->acc);
-    };
-    if ($newclone) {
-      print STDERR "here is id ",$newclone->id," and id2 is ",$info->acc," and version ", $newclone->embl_version, " ver2 is ",$info->version, "\n";
-      if ($newclone->id == $info->acc and $newclone->embl_version == $info->version) {
-	$same_version{$info->snpid}=$info;
-      }
-      elsif (@contigs or $newclone->id == $info->acc and $newclone->embl_version != $info->version) {
-	#if it is the first attempt, goto next record to see wether we can pick up same clone with same version. If it is not first attempt, we will map it
-	if ($self->_first) {
-	  next INFO; 
-	}
-	
-	my ($snp_seq,$sub_snp_seq,$snp_pos,@bases,$clone_seq,$snp_clone_seq);
-	my $observed = $info->alleles;
-	$observed =~ s/\/.*//;
-	#print STDERR "seq5 is $seq5 and seq3 is $seq3\n";
-	my $seq5 = $info->upStreamSeq;
-	my $seq3 = $info->dnStreamSeq;
-	if (!$seq5 or !$seq3) {
-	  return ("no flank seqs");
-	}
-	else {
-	  $snp_pos = (length $seq5) +1;
-	  $snp_seq = $seq5.$observed.$seq3;
-	  $snp_seq =~ s/\s+//g;
-	}
-	@bases = split "", $observed ;
-	my $num_bases = @bases;
-	$self->_snp_pos($snp_pos);
-	$self->_num_bases($num_bases);
-	
-	my $snp_seqobj = Bio::PrimarySeq->new( -display_id => $info->snpid, -seq => $snp_seq);
-	
-	if ($newclone) {$new_version = $newclone->embl_version;}
-	$self->_version($new_version);
-	if (!@contigs) {
-	  @contigs = $newclone->get_all_Contigs();
-	}
-	
-	my @newseq;my %id_hash;my $clone_seqobj;
-	foreach my $contig(@contigs ) {
-	  $contig->id =~ /\w+\.(\d+)\.\d+\..*/;
-	  my $version = $1;
-	  my $id = $self->id_generation;
-	  $self->_version($version);
-	  $id_hash{$id}=$contig->id;
-	  
-	  my $seq = Bio::PrimarySeq->new( -display_id => "$id", -seq => $contig->seq);
-	  if ($self->_debug>1) {
-	    print STDERR "Created seq with id $id for ".$id_hash{$id}." contig id ".$contig->id."\n";
-	  }
-	  push(@newseq,$seq);
-	}
-	
-	if ($self->_debug >1) {
-	  print STDERR "Creating crossmatches for clone ".$self->_acc."\n";
-	}
-	foreach my $newseq ( @newseq ) {
-	  my $cross = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( 
-									-nocopy => 1,
-									-seq1 => $snp_seqobj,
-									-seq2 => $newseq,
-									-score => $self->_score(),
-									-minmatch => $self->_minmatch,
-									-masklevel => $self->_masklevel,
-								       );
-	  
-	  push(@{$self->{'_crossmatch'}},$cross);
-	  
-	  $self->idhash(\%id_hash);
-	}
-      }
+  if ($start_refnum =~ /^\d+$/) {
+    if ($self->_first) {
+      @infos = $self->snp_dbobj->get_snp_info_between_two_internalids($start_refnum,$end_refnum,$mouse);
     }
     else {
-      print "no clone ",$info->acc," in database\n";
-      $no_clone=$info;
+      @infos = $self->snp_dbobj->get_snp_info_by_refsnpid($start_refnum,$mouse);
+    }
+    my (%all_version, %same_version, @diff_version, $no_clone, $no_clone_count); 
+    my $infos_count = @infos;
+    print "infos_count is $infos_count\n";
+    INFO : foreach my $info (@infos) {
+      if ($self->_first and !$same_version{$info->snpid} or !$self->_first) {
+	$all_version{$info->snpid}=$info;
+	if ($info->score >2) { ##get rid off mapweight >2##
+	  if ($self->_debug>1) {
+	    print STDERR "refsnpid ",$info->snpid, "has  mapweight >2\n";
+	  }
+	  next INFO;
+	}
+	if ($self->_debug>1) {
+	  #print Dumper($info);
+	  print STDERR "refsnpid is ",$info->snpid, " acc and version is ",$info->seqname, " strand is ",$info->strand,"\n";
+	}
+	$self->_acc($info->acc);
+	$no_clone = "";
+	my ($newclone, $new_version);
+	eval {
+	  $newclone = $self->dbobj->get_Clone($info->acc);
+	};
+	if ($newclone and !@contigs) { ##mainly for first round check to see clone and version are in ensembl
+	  print STDERR "here is id ",$newclone->id," and id2 is ",$info->acc," and version ", $newclone->embl_version, " ver2 is ",$info->version, "\n";
+	  if ($newclone->id == $info->acc and $newclone->embl_version == $info->version) {
+	    print "same acc and version for ",$info->snpid, "\n";
+	    $same_version{$info->snpid}=$info;
+	    next INFO; 
+	  }
+	  elsif ($self->_first) { ##if it is the first round, just go through##
+	    next INFO; 
+	  }
+	  else { ##mainly for we have same clone, diff version
+	    $self->_store_snp_seqobj($info);
+	    $new_version = $newclone->embl_version;
+	    $self->_version($new_version);
+	    
+	    @contigs = $newclone->get_all_Contigs();
+	  }
+	}
+	elsif (@contigs) { ###for having $refsnpid and @contigs (for normal mouse mapping)
+	  $self->_store_snp_seqobj($info);
+	}
+	else {
+	  print ++$no_clone_count," no clone ",$info->acc," or ssaha hits (contigs) in database\n";
+	  $no_clone=$info;
+	}
+      }
     }
     $self->all_version(\%all_version);
     $self->same_version(\%same_version);
+    if ($no_clone) {
+      return ($no_clone);
+    }
+  } ##end of if start_num =~ /^\d+$/
+  elsif ($inseq and @contigs) { ###write for hgbase snp or no refsnpid###
+    ($inseq_name,$inseq_seq) = split /\_/, $inseq;
+    
+    my $inseq_length = length($inseq_seq);
+    my $num_bases = ($inseq_seq =~ tr/[WACTG-\_]//);
+    my ($fseq) = split /[WACTG-\_]+/,$inseq_seq;
+    print "THIS FSEQ $fseq and num_bases is $num_bases\n";
+    my $snp_pos = length($fseq)+1;
+    $self->_snp_pos($snp_pos);
+    $self->_num_bases($num_bases);
+    my $snp_seqobj = Bio::PrimarySeq->new( -display_id =>$inseq_name , -seq => $inseq_seq);
+    $self->_snp_seqobj($snp_seqobj);
+    $self->_snp_seq_length($inseq_length);
+    
   }
-  if ($no_clone) {
-    return ($no_clone);
+  
+  foreach my $contig(@contigs ) {
+    my $version;
+    $contig->id =~ /\w+\.(\d+)\.\d+\..*/;
+    $version = $1;
+    if (!$version) {
+      $version="0";
+    }
+    my $id = $self->id_generation;
+    $self->_version($version);
+    $id_hash{$id}=$contig->id;
+    
+    my $seq = Bio::PrimarySeq->new( -display_id => "$id", -seq => $contig->seq);
+    if ($self->_debug>1) {
+      print STDERR "Created seq with id $id for ".$id_hash{$id}." contig id ".$contig->id."\n";
+    }
+    push(@newseq,$seq);
   }
+  
+  if ($self->_debug >1) {
+    print STDERR "Creating crossmatches for clone ".$self->_acc."\n";
+  }
+  foreach my $newseq ( @newseq ) {
+    my $score; my $cross;
+    #if ($self->_snp_seq_length) {
+    #  $score = $self->_snp_seq_length-int($self->_snp_seq_length*0.05);###equvalent to 95%
+    #}
+    #else {
+      $score = $self->_score;
+    #}
+    #print STDERR "The minscore is $score\n"; 
+    print "newseq is $newseq and snp_seqobj is ",$self->_snp_seqobj,"\n";
+    if ($newseq and $self->_snp_seqobj) {
+      my $cross = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( 
+								    -nocopy => 1,
+								    -seq1 => $self->_snp_seqobj,
+								    -seq2 => $newseq,
+								    -score => $score,
+								    -minmatch => $self->_minmatch,
+								    -masklevel => $self->_masklevel,
+								   );
+      
+      push(@{$self->{'_crossmatch'}},$cross);
+      
+      $self->idhash(\%id_hash);
+    }
+  }
+}
+
+sub _store_snp_seqobj {
+
+  my ($obj,$info) = @_;
+  my ($snp_seq,$snp_seq_length,$sub_snp_seq,$snp_pos,@bases,$clone_seq,$snp_clone_seq);
+  my $observed = $info->alleles;
+  $observed =~ s/\/.*//;
+  my $seq5 = $info->upStreamSeq;
+  my $seq3 = $info->dnStreamSeq;
+  #print STDERR "in _store_snp_seqobj seq5 is $seq5 and seq3 is $seq3\n";
+  if (!$seq5 and !$seq3) {
+    return ("no flank seqs");
+  }
+  else {
+    $snp_pos = (length $seq5) +1;
+    $snp_seq = $seq5.$observed.$seq3;
+    $snp_seq =~ s/\s+|-//g;
+    $snp_seq_length=length($snp_seq);
+  }
+  @bases = split "", $observed ;
+  my $num_bases = @bases;
+  $obj->_snp_pos($snp_pos);
+  $obj->_num_bases($num_bases);
+  $obj->_snp_seq_length($snp_seq_length);
+
+  my $snp_seqobj = Bio::PrimarySeq->new( -display_id => $info->snpid, -seq => $snp_seq);
+  $obj->_snp_seqobj($snp_seqobj);
 }
 
 =head2 idhash
@@ -293,8 +348,7 @@ sub diff_version {
 sub run{
   my ($self) = @_;
    
-  #The feature pair array will represent the matrix of hits between inputs
-  my @fp;
+  my (@fp,@final);
   #Run all the crossmatch runnables created in fetch_input
   if ($self->_debug>1) {
     print STDERR "Running crossmatches for clone ".$self->_acc."\n";
@@ -308,101 +362,28 @@ sub run{
   #Sort the array by score
   my @sorted= sort { $b->score <=> $a->score} @fp;
   
-  my $initial=1;
-  my %looks_ok=();
-  
   print STDERR "Analysing output for clone ".$self->_acc."\n";
-  #The juicy part: look at the matrix, and sort out the mapping
+  
  FP: foreach my $fp (@sorted) {
     if ($self->_debug>1) {
       print "Got feature pair between contig ".$fp->seqname." (".$fp->start."-".$fp->end.") and contig ".$fp->hseqname." (".$fp->hstart."-".$fp->hend.") with score ".$fp->score."\n";
     }
-    #Take the first one as correct, because it hsa the highest score...
-    if ($initial) {
-      #print STDERR "Pushing it to final (first fp)\n";
-      push (@{$looks_ok{$fp->seqname}},$fp);
-      $initial=undef;
-      next FP;
-    }
-       
-    #Check if this feature pair is consistent with the rest
+    my $ref = $self->idhash;
+    my %id_hash = %$ref;
+    my $backid = $id_hash{$fp->hseqname};
+    #my $sn=$self->_acc.".".$backid;
+    my $sn=$fp->seqname;
+    my $hsn;
+    if ($backid) {
+      $hsn=$backid;}
+    else {$hsn=$self->_acc}
     
-    #If seqname already in final map, check other matches
-    
-    if ($looks_ok{$fp->seqname}) {
-      my @ha_match=@{$looks_ok{$fp->seqname}};
-      #print STDERR "Contig already in final map, checking...\n";
-      #sort other matches by start
-      my @s_matches= sort { $a->start <=> $b->start} @ha_match;
-      my $first=$s_matches[0];
-      
-      #Speed up by eliminating the two most obvious cases...
-      #If the match is before the first match on this contig, add to final
-      if ($fp->end < $first->start){
-	#print STDERR "Pushing it to final (before first)\n";
-	push (@{$looks_ok{$fp->seqname}},$fp);
-	next FP;
-      }
-      #If the match is after the last match on this contig, add to final 
-      my $size=scalar(@s_matches);
-      if ($fp->start > $s_matches[$size-1]->end) {
-	#print STDERR "Pushing it to final (after last)\n";
-	push (@{$looks_ok{$fp->seqname}},$fp);
-	next FP;
-      } 
-      
-      #Loop through all the other matches and check if $fp does not
-      #overlap any of them
-      my $add=1;
-      foreach my $match (@s_matches) {
-	#If fp start or end are contained in any match, overlapping...
-	if ((($fp->start > $match->start) && ($fp->start < $match->end)) || (($fp->end < $match->end) && ($fp->end > $match->start))) {
-	  $add=0;
-	}
-      }
-      if ($add) {
-	#print STDERR "Pushing it to final (no overlaps)\n";
-	push (@{$looks_ok{$fp->seqname}},$fp);
-	next FP;
-      } 
-      #In any other case, do not add this feature pair
-      #print STDERR "End of checks for this contig, not added to final\n";
-    }
-    
-    #Else, just add to final map
-    else {
-      #print STDERR "This seqname was not found earlier, add to final map\n";
-      push (@{$looks_ok{$fp->seqname}},$fp);
-    }
+    $sn =~ s/\_/\./g;
+    $hsn =~ s/\_/\./g;
+    $fp->seqname($sn);
+    $fp->hseqname($hsn);
+    push (@final,$fp);
   }
-  my @final=();
-  foreach my $seqname (keys %looks_ok) {
-    foreach my $fp (@{$looks_ok{$seqname}}) {
-      #print "seqname is ",$fp->seqname,"\n";
-      my $ref = $self->idhash;
-      my %id_hash = %$ref;
-      my $backid = $id_hash{$fp->hseqname};
-      #my $sn=$self->_acc.".".$backid;
-      my $sn=$fp->seqname;
-      $backid = $id_hash{$fp->hseqname}; 
-      my $hsn;
-      if ($backid) {
-	$hsn=$backid;}
-      else {$hsn=$self->_acc}
-      
-      $sn =~ s/\_/\./g;
-      $hsn =~ s/\_/\./g;
-      $fp->seqname($sn);
-      $fp->hseqname($hsn);
-      push (@final,$fp);
-    }
-  }
-  %looks_ok=();
-  
-  #foreach my $fp (@final) {
-  #print STDERR "In final, got ".$fp->seqname."-".$fp->hseqname."\n";
-  
-  #}
   push(@{$self->{'_final'}},@final);
 }
 
@@ -424,85 +405,102 @@ sub write_output{
   my ($self) = @_;
   
   my @fp=@{$self->{'_final'}};
-  
-  my %final_lists;
-  
-  foreach my $fp ( @fp ) {
-    my $seqname = $fp->seqname;
-    my $hseqname = $fp->hseqname;
-    my $score = $fp->score;
-    my $version = $self->_version;
-    
-    if ($self->_debug>1) {
-      print "In write_out ",$fp->seqname," ",$fp->hseqname," ",$fp->score," ",$self->_snp_pos," ",$fp->start," ",$fp->end," ",$fp->hstart," ",$fp->hend,"\n";
-    }
-    my ($strand1,$new_start);
-    my $snp_pos = $self->_snp_pos;
+  if (!@fp) {return;}
 
-    if ($snp_pos>=$fp->start and $snp_pos<=$fp->end or $snp_pos>=$fp->end and $snp_pos<=$fp->start) {
-      
-      my $num_bases = $self->_num_bases;
-      if ($fp->strand ==-1 or $fp->hstrand ==-1) {
-	$strand1=-1;
-	$new_start = $fp->hend-($snp_pos-$fp->start);
-      }
-      else {
-	$strand1=1;
-	$new_start = $fp->hstart+($snp_pos-$fp->start);
-      }
-      my $new_end = $new_start+$num_bases-1;
-      push (@{$final_lists{$snp_pos}}, "$seqname\t$hseqname\t$score\t$version\t$new_start\t$new_end\t\tsnp_map\t$strand1");
-      if ($self->_debug>1) {
-	print $fp->seqname,"\t",$fp->hseqname,"\t",$fp->score,"\t",$self->_version,"\t$new_start\t$new_end\tsnp_map\t$strand1\n";
-      }
-    }
-    else {
-      if ($self->_debug>1) {
-	print "snp_pos $snp_pos is not in matching range ",$fp->start, " ", $fp->end, "\n";
-      }
-    }
+  my (%final_lists, @snp_fps, $final_line, $hit_line);
+
+  ##To find matches that cover snp_pos
+  @snp_fps=$self->find_fps_cover_snp("0",@fp);
+  
+  ##if no match cover snp_pos, try take 1 more bp on either side of the matches
+  if (@snp_fps==0) {
+    @snp_fps=$self->find_fps_cover_snp("1",@fp);
   }
-  my $final_line;
-  foreach my $snp_pos (keys % final_lists) {
-    my (@sorted_lists, @a_fields, @b_fields,@last_words);
-    if (@{$final_lists{$snp_pos}}>1) {
-      @sorted_lists = sort {
-	@a_fields = split /\t/, $a; 
-	@b_fields = split /\t/, $b; 
-	$a_fields[2] <=> $b_fields[2];
-      } @{$final_lists{$snp_pos}};
-      #print "again @sorted_lists\n";
-      my $last_line = pop @sorted_lists;
-      my $last_line2 = pop @sorted_lists;
-      my @last_line = split /\t/, $last_line;
-      my @last_line2 = split /\t/, $last_line2;
-      if ($last_line and $last_line[2] != $last_line2[2]) {
-      	print "this is last line $last_line\n";
-	@last_words = split /\t/, $last_line;
-	if ($last_words[1] =~ /\w+\.(\d+)\.\d+\..*/) {
-	  $last_words[3] = $1;
-	}
-	$final_line = join "\t", @last_words[0,1,3..8];
+  if (@snp_fps==0 or @snp_fps >2 ) {
+    if ($self->_debug>1) {
+	print "snp_pos ",$self->_snp_pos," is not in matching range or more than 3 hits with same score\n";
       }
-      else {
-	print "last two hits for $snp_pos have same scores\n";
-      }
-    }
-    else {
-      my $last_line = pop @{$final_lists{$snp_pos}};
-      if ($last_line) {
-	#print "this is last line $last_line\n";
-	@last_words = split /\t/, $last_line;
-	if ($last_words[1] =~ /\w+\.(\d+)\.\d+\..*/) {
-	  $last_words[3] = $1;
-	}
-	$final_line = join "\t", @last_words[0,1,3..8];
-      }
-    }
+    return;
   }
-  return ($final_line);
+  else {
+   foreach my $fp (@snp_fps) {
+     
+     print "score for snp_fps lists ",$fp->score,"\n";
+     
+     if ($fp->hseqname =~ /\w+\.(\d+)\.\d+\..*/) {
+       $self->_version($1);
+     }
+     else {
+       $self->_version ("0");
+     }
+     
+     $final_line = $fp->seqname."\t".$fp->hseqname."\t".$self->_version."\t".$fp->start."\t".$fp->end."\t\tsnp_map\t".$fp->strand,"\t".$fp->score;
+     
+     if (@snp_fps==2) {
+       print "last two hits for snp_pos have same scores\n";
+       print "TWO_HITS $final_line\n";
+       $hit_line .="TWO_HITS $final_line\n";
+      }
+     else {
+       $hit_line = $final_line;
+     }
+   }
+   chomp($hit_line);
+   return ($hit_line);####return if having 1 or 2 hits#####
+ }
 }
 
+
+sub find_fps_cover_snp{
+
+  my ($self, $num, @fp) = @_;
+
+  my @snp_fps;
+  
+  foreach my $fp ( @fp ) {
+    
+    my $snp_pos = $self->_snp_pos;
+
+    if ($self->_debug>1) {
+      print "In write_out ",$fp->seqname," ",$fp->hseqname," ",$fp->score," snp_pos is ",$self->_snp_pos," ",$fp->start," ",$fp->end," ",$fp->hstart," ",$fp->hend,"\n";
+    }
+    
+    if (($snp_pos>=($fp->start-$num) and $snp_pos<=($fp->end+$num) or $snp_pos>=($fp->end-$num) and $snp_pos<=($fp->start+$num)) and $fp->start != $fp->end) {
+      $self->record_snp($fp);
+      push (@snp_fps, $fp);
+    }
+  }
+  return (@snp_fps);
+}
+
+sub record_snp{
+
+  my ($self, $fp) = @_;
+  
+  my $snp_pos = $self->_snp_pos;
+  my ($new_strand, $new_start);
+  my $num_bases = $self->_num_bases;
+  if ($fp->strand ==-1 or $fp->hstrand ==-1) {
+    $new_strand=-1;
+    $new_start = $fp->hstart+($fp->end-($snp_pos+$num_bases-1));
+  }
+  else {
+    $new_strand=1;
+    $new_start = $fp->hstart+($snp_pos-$fp->start);
+  }
+  my $new_end = $new_start+$num_bases-1;
+  
+  $fp->start($new_start);
+  $fp->end($new_end);
+  $fp->strand($new_strand);
+  
+  if ($self->_debug>1) {
+    print $fp->seqname,"\t",$fp->hseqname,"\t",$fp->score,"\t",$self->_version,"\t$new_start\t$new_end\t\tsnp_map\t$new_strand\n";
+  }
+}
+    
+ 
+  
 =head2 dbobj
 
  Title   : dbobj
@@ -592,7 +590,7 @@ sub _debug{
 sub _minmatch{
    my ($self,$value) = @_;
    if( defined $value) {
-      $self->{'_debug'} = $value;
+      $self->{'_minmatch'} = $value;
     }
     return $self->{'_minmatch'};
 
@@ -702,6 +700,22 @@ sub _snp_pos{
       $self->{'_snp_pos'} = $value;
     }
     return $self->{'_snp_pos'};
+}
+
+sub _snp_seq_length{
+  my ($self,$value) = @_;
+  if( defined $value) {
+    $self->{'_snp_seq_length'} = $value;
+  }
+  return $self->{'_snp_seq_length'};
+}
+
+sub _snp_seqobj{
+   my ($self,$value) = @_;
+   if( defined $value) {
+      $self->{'_snp_seqobj'} = $value;
+    }
+    return $self->{'_snp_seqobj'};
 }
 
 =head2 _num_bases
