@@ -2322,18 +2322,6 @@ sub remap_genes {
 
 =cut
 
-#### in branch 121 this still works with $self->vc(), in the main trunk in updated to work with $self->vcontig
-
-sub vcontig {
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_vc'} = $value;
-    }
-    return $obj->{'_vc'};
-
-}
-
 #####
 
 =head2 match
