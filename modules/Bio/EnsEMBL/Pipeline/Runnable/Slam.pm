@@ -8,6 +8,86 @@
 # You may distribute this module under the same terms as perl itself
 
 
+=pod
+
+=head1 NAME
+
+ Bio::EnsEMBL::Pipeline::Runnable::Slam
+
+=head1 SYNOPSIS
+
+ To construct a new Bio::EnsEMBL::Pipeline::Runnable::Slam object use
+
+ $obj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
+                                                      -fasta1        => 'seq1.fasta',
+                                                      -fasta2        => 'seq2.fasta',
+                                                      -approx_align  => 'myaatfile.aat',
+                                                      -org1          => 'H.sapiens',
+                                                      -org2          => 'M.musculus',
+                                                      -slam_bin      => '/nfs/acari/jhv/bin/slam'
+                                                      -slam_pars_dir => '',
+                                                      -minlength     => 250,
+                                                      -debug         => 0,
+                                                      -verbose       => 1
+                                                      );
+
+or
+
+ $obj = Bio::EnsEMBL::Pipeline::Runnable::Slam->new(
+                                                    -fasta1        => 'seq1.fasta',
+                                                    -fasta2        => 'seq2.fasta',
+                                                    -approx_align  => 'myaatfile.aat',
+                                                    );
+
+
+
+ $obj -> run;
+
+
+=head1 DESCRIPTION
+
+Slam takes two Fasta-Sequences and a modified approximate alignment-file
+(see Bio::EnsEMBL::Pipeline::Tools::ApproxAlign). Presently, Slam-runs can
+be performed on 3 diffrent organisms: H.sapiens, M.musculus and R.norvegicus.
+
+
+=head1 OPTIONS
+
+=over
+
+=item  B<-fasta1>        /path/to/fastafile1
+
+=item  B<-fasta2>        /path/to/fastafile2
+
+=item  B<-approx_align>  path+filename of aat-file
+
+=item  B<-org1>          species of first organism (def: H.sapiens)
+
+=item  B<-org1>          species of second organism (def: M.musculus)
+
+=item  B<-slam_bin>      path to slam-binary (def: /nfs/acari/jhv/bin/)
+
+=item  B<-slam_pars_dir> path to slam-libary-directory 
+
+=item  B<-minlength>     minium sequence length (def: 250 bp)
+
+=item  B<-debug>         debug-option for slam-binary (def: 0)
+
+=item  B<-verbose>       verbose-option for slam-run (def: 0)
+
+
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 METHODS
+
+The rest of the documentation details each of the object methods.
+Internal (private) methods are usually preceded with a "_".
+
+=cut
+
 package Bio::EnsEMBL::Pipeline::Runnable::Slam;
 
 use vars qw(@ISA);
@@ -61,6 +141,7 @@ sub new {
 
   $self->fasta1($fasta1);
   $self->fasta2($fasta2);
+
   $self->approx_align($approx_align);
 
   $self->org1($org1);
@@ -83,15 +164,28 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-  $self->deletefiles;
+#  $self->deletefiles;
 }
 
+
+=pod
+
+=head2 run
+
+  Title    : run
+  Usage    : $obj->run
+  Function : runs the slam-algorithm on the two supplied fasta-sequences. The run needs the modified approximate alignemnt 
+             (see Bio::EnsEMBL::Pipeline::Tools::ApproxAlign ).
+  Returns  : none
+  Args     : none
+
+=cut
 
 
 sub run {
   my ($self) = @_;
 
-  my $gcdir  = $self->getgcdir;
+  my $gcdir  = $self->_getgcdir;
   my $fasta1 = $self->fasta1;
   my $fasta2 = $self->fasta2;
 
@@ -99,29 +193,27 @@ sub run {
     " -a ".$self->approx_align .
       " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
         " -org1 ".$self->org1 .
-          " -org2 ".$self->org2 .
-                  " -prefix my_prefix";
+          " -org2 ".$self->org2;
 
   $command .= " -v " if $self->verbose;
   $command .= " -debug " if $self->debug;
 
   print "slam-command; $command\n" if $self->verbose;
 
-#  open( EXO, "$command |" ) || $self->throw("Error running Slam $!");
-#  close(EXO);
-
-  # adding written files to array of files to delete
-  $self->files_to_delete($fasta1);
-  $self->files_to_delete($fasta2);
+  open( EXO, "$command |" ) || $self->throw("Error running Slam $!");
+  close(EXO);
 
 
-  print "workdir;",  $self->workdir;
-  
   $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
 
+  $fasta1=~s/\/tmp//;
+  $fasta2=~s/\/tmp\///;
+
+
   $self->file($fasta1."_".$fasta2.".cns");
-print "cnsfile : ".$fasta1."_".$fasta2.".cns\n";
+
+  print "cns-alignment-file : ".$fasta1."_".$fasta2.".cns\n";
 
   return 1
 }
@@ -137,8 +229,10 @@ sub files_to_delete {
   return;
 }
 
+
+
 #-------------------- START taken from slam.pl --------------------
-sub getgcdir{
+sub _getgcdir{
   my $self = shift;
 
   my $seq1 = $self->fasta1;
@@ -167,17 +261,17 @@ sub getgcdir{
     open(SEQ1,$seq1) || die "Can't open $seq1 for read: $!.\n";
     $seqStream = Bio::SeqIO->new(-fh => \*SEQ1, -format => 'Fasta');
     $seqObj = $seqStream->next_seq();
-    my $gc1 = &gccontent($seqObj);
+    my $gc1 = &_gccontent($seqObj);
     close SEQ1;
 
     open(SEQ2,$seq2) || die "Can't open $seq2 for read: $!.\n";
     $seqStream = Bio::SeqIO->new(-fh => \*SEQ2, -format => 'Fasta');
     $seqObj = $seqStream->next_seq();
-    my $gc2 = &gccontent($seqObj);
+    my $gc2 = &_gccontent($seqObj);
     close SEQ2;
 
-    my $len1 = &seqLen($seq1); ## HERE
-    my $len2 = &seqLen($seq2); ## HERE
+    my $len1 = &_seqlen($seq1); ## HERE
+    my $len2 = &_seqlen($seq2); ## HERE
     my $gc = (($gc1 * $len1) + ($gc2 * $len2)) / ($len1 + $len2);
 
     $gcdir = undef;
@@ -198,7 +292,7 @@ sub getgcdir{
 }
 
 
-sub gccontent{
+sub _gccontent{
   my($seq) = @_;
 
   my $tempSeq = $seq->seq();
@@ -208,7 +302,7 @@ sub gccontent{
   return(100*scalar(@nGC)/$n);
 }
 
-sub seqLen {
+sub _seqlen {
   my($seqFile) = @_;
 
   open(SEQFILE,$seqFile) || die "Can't open $seqFile for read\n";
@@ -220,7 +314,9 @@ sub seqLen {
   return $len;
 }
 
-#-------------------- END taken from slam.pl --------------------
+#-------------------- END ----------------------------------------
+
+
 sub fasta1 {
   my $self = shift;
 
