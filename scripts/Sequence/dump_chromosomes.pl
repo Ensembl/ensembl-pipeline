@@ -82,6 +82,13 @@ foreach my $chromosome (@{$chromosome_adaptor->fetch_all}){
 
   print "Dumping chromosome " . $chromosome->chr_name;
 
+  my $outfile = $outdir . '/' . $chromosome->chr_name . '.fa';
+
+  if (-e $outfile){
+    print " ... output file exists already - skipping\n";
+    next
+  }
+
   if ($chr && $chr ne $chromosome->chr_name){
     print " ... skipping\n";
     next
@@ -90,8 +97,6 @@ foreach my $chromosome (@{$chromosome_adaptor->fetch_all}){
   print "\n";
 
   # Open a Bio::SeqIO output stream
-
-  my $outfile = $outdir . '/' . $chromosome->chr_name . '.fa';
 
   my $seqio = Bio::SeqIO->new(-file   => ">$outfile",
 			      -format => 'Fasta');
