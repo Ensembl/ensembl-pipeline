@@ -216,7 +216,7 @@ sub build_Genes {
     
 
     my @transcripts         = $self->link_ExonPairs(@exons);
-    my @contigs             = $self->order_Contigs (@transcripts);
+    my @contigoverlaps      = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
 
     $self->print_Genes(@genes);
