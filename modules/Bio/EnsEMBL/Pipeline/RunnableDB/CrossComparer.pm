@@ -55,7 +55,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
 
     min_score is an argument for the 'crossmatch' runnable to set the 
     minimum score used in the crossmatch run. In the case of 'bl2seq' runnable 
-    it sets the minimum Eval used in bl2seq run.
+    it sets the minimum Eval used in bl2seq run. bl2seq runnable runs by default
+    a 'blastn' alignment type. Other alignment types ('blastp','blastx','tblastx' 
+    and 'tblastn') are not implemented yet.
 
 =head1 CONTACT
 
@@ -158,6 +160,9 @@ sub fetch_input {
 								       -minmatch => 14,
 								       -masklevel => 80);
     } elsif ($self->alnprog eq 'bl2seq') {
+
+# bl2seq runnable runs by default a 'blastn' alignment type.
+      
       $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(-seq1 => $seq1,
 								   -seq2 => $seq2,
 								   -min_score => 40,
