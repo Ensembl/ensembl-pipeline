@@ -40,18 +40,19 @@ $ens_test->do_sql_file("t/runnabledb.dump");
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
-
+my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS',
-                                                    -db_version     => '1',
-                                                    -program        => 'blastn',
+                                                    -db_file        => 'dbSTS',
+                                                    -db_version     => '1',                  
+                                                    -program        => 'wublastn',
                                                     -program_version=> 1,
                                                     -module         => $runnable,
                                                     -module_version => 1,
-                                                    -gff_source     => 'blastn',
+                                                    -gff_source     => 'wublastn',
                                                     -gff_feature    => 'similarity', 
-                                                    -parameters     => '',
+                                                    -parameters     => $parameters,
                                                      );
 
 unless ($ana)
@@ -76,11 +77,12 @@ unless (@out)
 { print "not ok 5\n"; }
 else
 { print "ok 5\n"; }
-display(@out);
+#display(@out);
+print STDERR "Feature Hits: ".scalar(@out)."\n";
 
 $runobj->write_output();
 my @features = $db->get_Contig($id)->get_all_SimilarityFeatures();
-display(@features);
+#display(@features);
 
 unless (@features)
 { print "not ok 6\n"; }
