@@ -42,7 +42,7 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker';
-
+my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
                                                     -db_version     => '__NONE__',
                                                     -program        => 'Clone_RepeatMasker',
@@ -58,7 +58,7 @@ unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-$db->write_Analysis( $ana );
+$ana_adaptor->exists( $ana );
 my $id = 'AC015914';
 my $runobj = "$runnable"->new(  
                                 -dbobj      => $db,
