@@ -121,10 +121,16 @@ sub new {
 
     $self->epcr   ($self->find_executable($epcr));
 
-    if (defined($sts)) {
-      $self->sts     ($self->find_file($sts));
-    } else {
-      $self->throw("No primer database entered\n");
+    $self->throw("No primer database or list of STSs entered\n") unless $sts;
+
+    if (ref $sts) {
+      $self->sts($sts);
+    }
+    else {
+      my $file = $self->find_file($sts);
+      $self->throw("STS file not found! Check path and name ($sts)\n") 
+       unless -e $file;
+      $self->sts($file);
     }
     
     return $self; 
@@ -232,8 +238,6 @@ sub sts {
     my ($self, $sts) = @_;
     if ($sts)
     {
-        $self->throw("STS file not found! Check path and name ($sts)\n") 
-         unless (-e $sts);
         $self->{'_sts'} = $sts;
     }
     return $self->{'_sts'};
@@ -275,21 +279,29 @@ sub run {
 
     # first run - M = M_MIN
     $self->mismatch($self->min_mismatch);
-    $self->run_epcr();
+
+    if (ref $self->sts) {
+        my $sts_tmp = $self->workdir . '/' . $self->query->id . "_0";
+        $self->_dump_sts_file($sts_tmp);
+        $self->run_epcr($sts_tmp);
+        $self->_rm_sts_file($sts_tmp);
+    }
+    else {
+        $self->run_epcr($self->sts);
+    }
     $self->parse_results();
 
     # successive runs if needed
     for (my $mm = $self->min_mismatch + 1; $mm <= $self->max_mismatch; $mm++) {
 	my $sts_tmp = $self->workdir . '/' . $self->query->id. "_$mm";
-	$self->_cp_sts_file($self->sts, $sts_tmp);
+	if (ref $self->sts) {
+	  $self->_dump_sts_file($sts_tmp);
+	}
+	else {
+	  $self->_cp_sts_file($sts_tmp);
+	}
 	$self->mismatch($mm);
-	my $sts = $self->sts;
-	$self->sts($sts_tmp);
-	$self->run_epcr;
-	$self->sts($sts);  # reset to original STS file
-			   # bit inefficient, better to work from
-			   # current STS file, but this is simpler
-			   # and STS files are normally huge
+	$self->run_epcr($sts_tmp);
 	$self->parse_results();
 	$self->_rm_sts_file($sts_tmp);
     }
@@ -302,7 +314,7 @@ sub run {
 
 
 sub run_epcr {
-    my ($self) = @_;
+    my ($self, $file) = @_;
     #run EPCR
 
     my $mismatch  = $self->mismatch;
@@ -314,7 +326,7 @@ sub run_epcr {
     $options .= " W=$word_size " if defined $word_size;
     $options .= " N=$mismatch " if defined $mismatch;
 
-    my $command = $self->epcr.' '.$self->sts.' '.$self->filename.' '.
+    my $command = $self->epcr.' '.$file.' '.$self->filename.' '.
      $options.' > '.$self->results;
 
     print STDERR "Running EPCR ($command)\n";
@@ -395,9 +407,11 @@ sub output {
 # with those markers already hit removed
 
 sub _cp_sts_file {
-    my ($self, $source, $dest) = @_;
+    my ($self, $dest) = @_;
 
+    my $source = $self->sts;
     my %hits = $self->_get_hits;
+
     eval {
         open SOURCE, "< $source";
         open DEST, "> $dest";
@@ -410,6 +424,32 @@ sub _cp_sts_file {
     };
     if ($@) {
 	$self->throw("Unable to copy STS file");
+    }
+}
+
+
+sub _dump_sts_file {
+    my ($self, $dest) = @_;
+
+    my %hits = $self->_get_hits;
+    eval {
+        open DEST, "> $dest";
+	foreach my $m (@{$self->sts}) {
+	    next if $hits{$m->dbID};
+	    next if $m->max_primer_dist == 0;
+	    next unless length($m->left_primer) > 0;
+	    next unless length($m->right_primer) > 0;
+	    print DEST join("\t",
+		$m->dbID,
+		$m->left_primer,
+		$m->right_primer,
+		join("-", $m->min_primer_dist, $m->max_primer_dist),
+	    ), "\n";
+        }
+        close DEST;
+    };
+    if ($@) {
+	$self->throw("Unable to dump STS file");
     }
 }
 

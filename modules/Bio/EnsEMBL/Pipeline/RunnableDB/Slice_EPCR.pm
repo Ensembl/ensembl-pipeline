@@ -70,6 +70,7 @@ use vars qw(@ISA);
 
 sub fetch_input {
     my($self) = @_;
+    my $sts;
     
     $self->throw("No input id") unless defined($self->input_id);
 
@@ -86,10 +87,19 @@ sub fetch_input {
 
     my %parameters = $self->parameter_hash;
 
+    my $db_file = $self->analysis->db_file;
+    if ($db_file) {
+	$sts = $db_file;
+    }
+    else {
+	$sts = $self->db->get_MarkerAdaptor->fetch_all;
+	$self->throw("No markers in database") unless @{$sts};
+    }
+
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::EPCR(
         -query => $self->query,
         -epcr  => $self->analysis->program_file,
-        -sts   => $self->analysis->db_file,
+        -sts   => $sts,   # either a filename or an array reference
         -nmin  => $parameters{'-NMIN'},
         -nmax  => $parameters{'-NMAX'},
         -w     => $parameters{'-W'},
