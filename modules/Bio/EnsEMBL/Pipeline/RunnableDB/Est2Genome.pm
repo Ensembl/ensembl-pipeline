@@ -123,8 +123,8 @@ sub threshold {
     Title   :   dbobj
     Usage   :   $self->dbobj($obj);
     Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+    Returns :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+     Args    :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 =head2 input_id
 

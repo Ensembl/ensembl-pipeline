@@ -129,9 +129,9 @@ sub threshold {
     Title   :   db
     Usage   :   $self->db($obj);
     Function:   Gets or sets the value of db
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+    Returns :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
                 (which extends Bio::EnsEMBL::DBSQL::DBAdaptor)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+    Args    :   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 =cut
 

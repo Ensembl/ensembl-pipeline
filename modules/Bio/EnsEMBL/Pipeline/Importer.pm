@@ -642,8 +642,8 @@ sub makeClones {
     Title   :   dbobj
     Usage   :   $db = $obj->dbobj
     Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   Bio::EnsEMBL::Pipeline::DB::ObjI
+    Returns :   Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 =cut
 

@@ -49,7 +49,6 @@ use strict;
 use DBI;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::DB::ObjI;
 
 use Bio::EnsEMBL::Root;
 
