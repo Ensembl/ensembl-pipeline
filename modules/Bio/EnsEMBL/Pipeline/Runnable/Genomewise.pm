@@ -349,9 +349,6 @@ sub run{
 	# check just in case
 	if ( $exon_in->overlaps( $exon_out ) ){
 	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-	    #$feature->analysis($self->analysis);
-#	    $feature->source_tag($self->analysis->logic_name);
-	    $feature->contig($exon_out->contig);
 	    $exon_out->add_supporting_features( $feature );
 	  }
 	}
@@ -367,9 +364,6 @@ sub run{
 	foreach my $exon_out( @exons_out ){
 	  if ( $exon_out->overlaps($exon_in) ){
 	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-#	      $feature->analysis($self->analysis);
-#	      $feature->source_tag($self->analysis->logic_name);
-	      $feature->contig($exon_out->contig);
 	      $exon_out->add_supporting_features( $feature );
 	    }
 	  }
@@ -392,9 +386,6 @@ sub run{
 	  foreach my $exon_out( @exons_out ){
 	    if ( $exon_out->overlaps($exon_in) ){
 	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-#		$feature->analysis($self->analysis);
-#		$feature->source_tag($self->analysis->logic_name);
-		$feature->contig($exon_out->contig);
 		$exon_out->add_supporting_features( $feature );
 	      }
 	    }

@@ -473,10 +473,12 @@ sub convert_output{
 	$new_exon->phase($phase);
 	$new_exon->end_phase($end_phase);
 	$new_exon->strand($strand);
-	
+	$new_exon->contig($self->genomic_sequence);
+
 	# transfer the supporting evidence!!!
 	foreach my $evi ( @evidence ){
-	  $evi->contig($new_exon->contig);
+	  print STDERR "MiniGenomewise: passing a ".$self->genomic_sequence." to the evidence\n";
+	  $evi->contig($self->genomic_sequence);
 	  $new_exon->add_supporting_features( $evi );
 	}
 	
@@ -500,10 +502,6 @@ sub convert_output{
       # flush out old exons from transcript and replace them with newly remapped exons
       $transcript->flush_Exon;
       foreach my $exon(@newexons){
-###print STDERR "ADDING " . $exon . "\n";
-#while (my ($k, $v) = each %$exon){
-#print "     $k => $v\n";
-#}
 	$transcript->add_Exon($exon);
       }
     }
