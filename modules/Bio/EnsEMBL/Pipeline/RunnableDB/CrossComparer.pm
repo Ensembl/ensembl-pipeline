@@ -80,13 +80,13 @@ use Data::Dumper;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    my ($score) = $self->_rearrange([qw(MIN_SCORE)],@args);
-    bless $self, $class;
-    $score ||= 100;
-    $self->min_score($score);
-    return $self; 
+  my ($class, @args) = @_;
+  my $self = $class->SUPER::new(@args);
+  my ($score) = $self->_rearrange([qw(MIN_SCORE)],@args);
+  bless $self, $class;
+  $score ||= 100;
+  $self->min_score($score);
+  return $self; 
 }
 
 =head2 fetch_input
@@ -135,7 +135,9 @@ sub fetch_input {
 								   -nocopy => 1,
 								   -seq1 => $seq1,
 								   -seq2 => $seq2,
-								   -score => $self->min_score,#0,
+								   -score => $self->min_score,
+								   -minmatch => 14,
+								   -masklevel => 80
 								   );
     $self->runnable($cross);
 }
