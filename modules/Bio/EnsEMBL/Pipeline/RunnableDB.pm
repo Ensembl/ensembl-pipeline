@@ -52,9 +52,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use vars qw(@ISA);
-@ISA = qw(Bio::Root::RootI);
 
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::RootI);
 
 sub analysis {
     my ($self, $analysis) = @_;
@@ -119,12 +120,13 @@ sub input_id {
 
 sub genseq {
     my ($self, $genseq) = @_;
-    if ($genseq)
-    {
+
+    if (defined($genseq))
+      {
         $self->{'_genseq'} = $genseq;
-    }
+      }
     return $self->{'_genseq'}
-}
+  }
 
 =head2 run
 
