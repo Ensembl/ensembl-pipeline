@@ -76,6 +76,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 TRANSCRIPT_ID_SUBSCRIPT
@@ -114,7 +115,7 @@ sub new {
     $self->{_final_genes} = [];
     $self->{_gene_types}  = [];
     
-    $self->slice($slice);
+    $self->query($slice);
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
@@ -169,7 +170,7 @@ sub build_Genes{
   
   #test
   foreach my $t ( $self->genewise_combined_Transcripts ){
-    $self->_print_Transcript($t);
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
   }
 
 
@@ -209,7 +210,7 @@ sub build_Genes{
     $ccount++;
     print STDERR "* cluster $ccount:\n";
     foreach my $tran ( @{$cluster->get_Transcripts} ){
-      $self->_print_Transcript($tran);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     }
   }
 
@@ -277,7 +278,9 @@ sub get_Genes {
 	# my @valid_transcripts = $self->validate_transcript($t);
 	# next TRANSCRIPT unless scalar(@valid_transcripts);
 	
-	unless ( $self->_check_Transcript( $tran ) && $self->_check_Translation($tran)){
+	unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query ) && 
+		 Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)
+	       ){
 	  next TRANSCRIPT;
 	}
 	$tran->type($type);
@@ -366,7 +369,7 @@ sub _cluster_Transcripts_by_genomic_range{
     #print STDERR "\nIn cluster ".($count+1)."\n";
     #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
     #print STDERR "comparing:\n";
-    #$self->_print_Transcript( $transcripts[$c] );
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcripts[$c] );
     
     if ( !( $transcripts[$c]->end < $cluster_starts[$count] ||
 	    $transcripts[$c]->start > $cluster_ends[$count] ) ){
@@ -457,7 +460,7 @@ sub prune_Transcripts {
       my $tran = shift( @transcripts );
       push (@newtran, $tran);
       print STDERR "found single_exon_transcript\n";
-      $self->_print_Transcript($tran);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       my @es = @{$tran->get_all_Exons};
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
@@ -581,7 +584,7 @@ sub prune_Transcripts {
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
 	print STDERR "found new transcript:\n";
-	$self->_print_Transcript( $tran );
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 
 	push(@newtran,$tran);
 	@evidence_pairs = ();
@@ -591,7 +594,7 @@ sub prune_Transcripts {
 	if ( $tran == $transcripts[0] ){
 	  print STDERR "Strange, this is the first transcript in the cluster!\n";
 	}
-	$self->_print_Transcript( $tran );
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 	
 	## transfer supporting feature data. We transfer it to exons
 	foreach my $pair ( @evidence_pairs ){
@@ -833,7 +836,7 @@ sub cluster_into_Genes{
 	    $gene->add_Transcript($transcript);
 	    print STDERR "accepting:\n";
 	    print STDERR "check this, prune_Transcripts may not be working properly!\n";
-	    $self->_print_Transcript($transcript);
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	}
 	$count++;
     }
@@ -1005,10 +1008,11 @@ Args    : none
 sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
-  foreach my $prediction ( @{ $self->slice->get_all_PredictionTranscripts } ){
-    #unless ( $self->_check_Transcript( $prediction ) ){
-    #  next;
-    #}
+  foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
+    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
+      next;
+    }
+    $prediction->type("ab-initio");
     push ( @checked_predictions, $prediction );
   }
   $self->predictions(@checked_predictions);
@@ -1029,7 +1033,7 @@ sub get_Predictions {
 sub get_Similarities {
   my ($self) = @_;
 
-  my @features = @{ $self->slice->get_all_SimilarityFeatures('',$GB_MIN_FEATURE_SCORE) };
+  my @features = @{ $self->query->get_all_SimilarityFeatures('',$GB_MIN_FEATURE_SCORE) };
   
   my %idhash;
   my @other_features;
@@ -1333,13 +1337,13 @@ sub features {
 
 ############################################################
 
-sub slice {
-    my ($self,$slice) = @_;
-    
-    if (defined($slice)) {
-      $self->{_slice} = $slice;
-    }
-    return $self->{_slice};
+sub query {
+  my ($self,$slice) = @_;
+  
+  if (defined($slice)) {
+    $self->{_query} = $slice;
+  }
+  return $self->{_query};
 }
 
 #############################################################################
@@ -1347,43 +1351,6 @@ sub slice {
 # Printing routines
 #
 #############################################################################
-
-sub print_Exon {
-  my ($self,$exon) = @_;
-  
-  print STDERR 
-    $exon->seqname." ".$exon->start ."-".$exon->end." ".$exon->strand." [".$exon->phase.",".$exon->end_phase."]\n";
-}
-
-############################################################
-  
-sub _print_Transcript{
-  my ($self,$transcript) = @_;
-  my @exons = @{$transcript->get_all_Exons};
-  my $id;
-  if ( $transcript->dbID ){
-    $id = $transcript->dbID;
-  }
-  else{
-    $id = "no id";
-  }
-  print STDERR "transcript id: ".$id."\n";
-  foreach my $exon ( @exons){
-    $self->print_Exon($exon);
-  }
-  #print STDERR "Translation : ".$transcript->translation."\n";
-  if ( $transcript->translation ){
-    print STDERR "translation start exon: ".
-      $transcript->translation->start_Exon->start."-".$transcript->translation->start_Exon->end.
-	" start: ".$transcript->translation->start."\n";
-    print STDERR "translation end exon: ".
-      $transcript->translation->end_Exon->start."-".$transcript->translation->end_Exon->end.
-	  " end: ".$transcript->translation->end."\n";
-    print STDERR "\n";
-  }
-}
-
-############################################################
 
 sub print_ExonPairs {
   my ($self) = @_;
@@ -1398,8 +1365,8 @@ sub print_ExonPairs {
 sub print_ExonPair {
   my ($self,$pair) = @_;
   
-  $self->print_Exon($pair->exon1);
-  $self->print_Exon($pair->exon2);
+  print STDERR $pair->exon1->gffstring."\n";
+  print STDERR $pair->exon2->gffstring."\n";
   
   print(STDERR "\nExon Pair (splice - " . $pair->splice_seq->seq . ")\n");
   
@@ -1598,15 +1565,15 @@ sub validate_transcript{
     $previous_exon = $exon;
   }
   
-       if ($valid) {
-	 push(@valid_transcripts,$transcript);
-       }
-       elsif ($split){
-	 # split the transcript up.
-	 my @split_transcripts = $self->split_transcript($transcript);
+  if ($valid) {
+    push(@valid_transcripts,$transcript);
+  }
+  elsif ($split){
+    # split the transcript up.
+    my @split_transcripts = $self->split_transcript($transcript);
     push(@valid_transcripts, @split_transcripts);
   }
-       return @valid_transcripts;
+  return @valid_transcripts;
 }
 
 ############################################################
@@ -1685,119 +1652,6 @@ sub print_FeaturePair{
 	  $fp->hseqname . " " .
 	    $fp->hstart . " " .
 	      $fp->hend . "\n";
-}
-
-############################################################
-
-sub _check_Transcript{
-  my ($self,$transcript) = @_;
-  my $slice = $self->slice;
-  
-  my $id = $self->transcript_id( $transcript );
-  
-  my $valid = 1;
-
-  # check that transcripts are not completely outside the slice
-  if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-    print STDERR "transcript $id outside the slice\n";
-    $valid = 0;
-  }
-  # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
-  elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-      print STDERR "transcript $id falls off the slice by its lower end\n";
-    $valid = 0;
-  }
-  
-  # sort the exons 
-  $transcript->sort;
-  my @exons = @{$transcript->get_all_Exons};
-  
-  if ($#exons > 0) {
-    for (my $i = 1; $i <= $#exons; $i++) {
-      
-      # check phase consistency:
-      if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-	print STDERR "transcript $id has phase inconsistency\n";
-	$valid = 0;
-	last;
-      }
-      
-      # check for folded transcripts
-      if ($exons[0]->strand == 1) {
-	if ($exons[$i]->start < $exons[$i-1]->end) {
-	  print STDERR "transcript $id folds back on itself\n";
-	  $valid = 0;
-	} 
-      } 
-      elsif ($exons[0]->strand == -1) {
-	if ($exons[$i]->end > $exons[$i-1]->start) {
-	  print STDERR "transcript $id folds back on itself\n";
-	  $valid = 0;
-	} 
-      }
-    }
-  }
-  if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
-  }
-  return $valid;
-}
-
-
-############################################################
-
-sub _check_Translation{
-  my ($self,$transcript) = @_;
-  
-  my $id = $self->transcript_id( $transcript );
-  
-  my $valid = 1;
-  
-  # check that they have a translation
-  my $translation = $transcript->translation;
-  my $sequence;
-  eval{
-    $sequence = $transcript->translate;
-  };
-  unless ( $sequence ){
-    print STDERR "transcript $id has no translation\n";
-    return 0;
-  }
-  if ( $sequence ){
-    my $peptide = $sequence->seq;
-    if ( $peptide =~ /\*/ ){
-      print STDERR "translation of transcript $id has STOP codons\n";
-      $valid = 0;
-    }
-  }
-  if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
-  }
-  return $valid;
-}
-
-
-############################################################
-
-sub transcript_id {
-  my ( $self, $t ) = @_;
-  my $id;
-  if ( $t->stable_id ){
-    $id = $t->stable_id;
-  }
-  elsif( $t->dbID ){
-    $id = $t->dbID;
-  }
-  elsif( $t->temporary_id ){
-    $id = $t->temporary_id;
-  }
-  else{
-    $id = 'no-id';
-  }
-  if ($t->type){
-    $id .= " ".$t->type;
-  }
-  return $id;
 }
 
 ############################################################
