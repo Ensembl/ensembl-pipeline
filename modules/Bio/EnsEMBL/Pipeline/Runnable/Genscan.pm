@@ -483,14 +483,16 @@ sub calculate_and_set_phases_new {
         my $x = 0;
         while (($x = index($temp_tran, 'X', $x)) != -1) {
           #print STDERR "Found an 'X' at ", $i + 1, "\n";
-          substr($peptide, $x, 1) = 'X';
+          substr($peptide, $x, 1) = 'X'
+           if length($peptide) >= length($temp_tran);
           $x++;
         }
 
         $x = 0;
         while (($x = index($peptide, 'X', $x)) != -1) {
           #print STDERR "Found an 'X' at ", $i + 1, "\n";
-          substr($temp_tran, $x, 1) = 'X';
+          substr($temp_tran, $x, 1) = 'X'
+           if length($temp_tran) >= length($peptide);
           $x++;
         }
     
