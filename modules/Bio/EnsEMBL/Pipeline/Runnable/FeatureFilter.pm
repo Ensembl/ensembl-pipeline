@@ -37,8 +37,8 @@ features, to ensure no genomic base is covered to more than the
 specified depth per strand.
 
 Feature score is assumed to be meaningful and comparable between
-features. Hence, only features. Only features resulting from the
-same database search should be filtered together.
+features. Hence, only features resulting from the same database
+search should be filtered together.
 
 Coverage filtering is compulsory and is intended to reduce excessive
 coverage of each strand of the query. In detail, coverage filtering
@@ -82,7 +82,8 @@ each hit-sequence-accession, but does not prevent deep overall
 coverage by many different hit-sequence-accessions.
 
 The option hardprune is off by default. If on, allows only a maximum
-number of features per strand per genomic base. This is achieved by a
+number of features per strand per genomic base, this number also being
+specified by the coverage parameter. Hard pruning is achieved by a
 prune-like step in which all features are considered together,
 irrespective of hit-sequence-accession. This is more severe than
 the above prune step and provides a hard limit on the depth of
