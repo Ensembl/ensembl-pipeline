@@ -441,11 +441,14 @@ sub parse_results {
   HSP: while (my $hsp = $sbjct->nextHSP) {
       
       if ($self->threshold_type eq "PID") {
-	next HSP if ($hsp->percent < $self->threshold);
+	next HSP
+	  if defined $self->threshold and ($hsp->percent < $self->threshold);
       } elsif ($self->threshold_type eq "SCORE") {
-	next HSP if ($hsp->score < $self->threshold);
+	next HSP
+	  if defined($self->threshold) and ($hsp->score < $self->threshold);
       } elsif ($self->threshold_type eq "PVALUE") {
-	next HSP if ($hsp->P > $self->threshold);
+	next HSP
+	  if defined($self->threshold) and ($hsp->P > $self->threshold);
       }
       # Each HSP is a gapped alignment.
       # This method splits the gapped alignment into
@@ -534,11 +537,14 @@ sub filter_hits {
       my $name = $hsp->subject->seqname ;
 
       if ($self->threshold_type eq "PID") {
-        next HSP if ($hsp->percent < $self->threshold);
+        next HSP
+	  if defined $self->threshold and ($hsp->percent < $self->threshold);
       } elsif ($self->threshold_type eq "SCORE") {
-        next HSP if ($hsp->score < $self->threshold);
+        next HSP
+	  if defined $self->threshold and ($hsp->score < $self->threshold);
       } elsif ($self->threshold_type eq "PVALUE") {
-        next HSP if ($hsp->P > $self->threshold);
+        next HSP
+	  if defined $self->threshold and ($hsp->P > $self->threshold);
       } 
       
       my $qstart = $hsp->query->start();
