@@ -35,10 +35,10 @@ use strict;
 use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
-                                        EST_DBNAME
-                                        EST_DBUSER
-                                        EST_DBPASS
-                                        EST_DBHOST
+                                        EST_E2G_DBNAME
+                                        EST_E2G_DBUSER
+                                        EST_E2G_DBPASS
+                                        EST_E2G_DBHOST
                                        );
 
 
@@ -46,10 +46,10 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $port   = undef;
-my $dbname = $EST_DBNAME;
-my $dbuser = $EST_DBUSER;
-my $dbpass = $EST_DBPASS;
-my $host   = $EST_DBHOST;
+my $dbname = $EST_E2G_DBNAME;
+my $dbuser = $EST_E2G_DBUSER;
+my $dbpass = $EST_E2G_DBPASS;
+my $host   = $EST_E2G_DBHOST;
 
 
 my $runnable;
@@ -105,7 +105,8 @@ if (defined $params){
   }
 }
 
-my $runobj = "$runnable"->new(-db    => $db,
+
+my $runobj = "$runnable"->new(-dbobj    => $db,
 			      -input_id => $input_id,
 			      %hparams,
 			     );
