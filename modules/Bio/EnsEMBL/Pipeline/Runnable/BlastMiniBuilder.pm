@@ -38,9 +38,9 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_INPUTID_REGEX
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
+						   GB_INPUTID_REGEX
+						  );
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
