@@ -16,11 +16,17 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlatToGenes;
 
 =head1 SYNOPSIS
 
-my $blat2genes = Bio::EnsEMBL::Pipeline::RunnableDB::BlatSSAHA->new(
-    -dbobj      => $db,
-    -input_id   => $input_id
-    -analysis   => $analysis
-);
+my $blat2genes = Bio::EnsEMBL::Pipeline::RunnableDB::BlatToGenes->new(
+                              -db         => $db,
+			      -input_id   => \@sequences,
+			      -rna_seqs   => \@sequences,
+			      -analysis   => $analysis_obj,
+			      -database   => $EST_BLAT_GENOMIC,
+			      -query_type => 'rna',
+			      -target_type=> 'dna',
+			      -options    => $EST_BLAT_OPTIONS,
+			     );
+    
 
 $blat2genes->fetch_input();
 $blat2genes->run();

@@ -15,24 +15,22 @@ Bio::EnsEMBL::Pipeline::Runnable::Blat
 
 =head1 SYNOPSIS
 
-#create and fill Bio::Seq object
+  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blat->new(
+								 -database    => $database,
+								 -query_seqs  => \@sequences,
+								 -query_type  => $self->query_type,
+								 -target_type => $self->target_type,
+								 -blat        => $self->blat,
+								 -options     => $self->options,
+								);
 
-my $clonefile = '/path/to/seq.fa';
-my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
-$seq = $seqstream->next_seq();
-
-#create Bio::EnsEMBL::Pipeline::Runnable::Blat object
-
-my $blat = Bio::EnsEMBL::Pipeline::Runnable::Blat->new(
-    -CLONE => $seq,
-    -DB    => 'mydb.fa'
-
-);
-
-#$ssaha->workdir($workdir);
-$blat->run();
-my @results = $blat->output();
-
+ $runnable->run; #create and fill Bio::Seq object
+ my @results = $runnable->output;
+ 
+ where @results is an array of SeqFeatures, each one representing an aligment (e.g. a transcript), 
+ and each feature contains a list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
+ in fact feature pairs.
+ 
 =head1 DESCRIPTION
 
 Blat takes a Bio::Seq (or Bio::PrimarySeq) object and runs Blat
