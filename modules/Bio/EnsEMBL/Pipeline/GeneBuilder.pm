@@ -190,18 +190,19 @@ sub build_Genes{
   
   if ($GB_USE_ABINITIO ){
     # process PredictionTranscripts using the features and the annotations:
-    
-    my @predictions = $self->predictions;
-    my @features    = $self->features;
-    if(@predictions && @features){
-      my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
-										     -predictions => \@predictions,
-										     -features    => \@features,
-										     -annotations => \@annotations,
-										    );
       
-      @supported_predictions = $genecooker->run;
-    }
+      my @predictions = $self->predictions;
+      my @features    = $self->features;
+      if(@predictions && @features){
+	  my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
+											 -predictions => \@predictions,
+											 -features    => \@features,
+											 -annotations => \@annotations,
+											 );
+	  
+	  $genecooker->query($self->query);
+	  @supported_predictions = $genecooker->run;
+      }
   }
   
   # cluster all the transcripts according to mere genomic overlap
@@ -1049,8 +1050,8 @@ sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
   foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
-    $prediction->type("ab-initio");
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
+      $prediction->type("ab-initio");
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
       $self->warn("We let in a prediction with wrong phases!");
     }
