@@ -81,7 +81,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 				       );
 
 # use new Adaptor to get some extra info from the ESTs
-use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
+#use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -150,6 +150,15 @@ sub cdna_db{
  }
  return $self->cdna_db;
 }
+
+sub revcomp_query{
+    my ($self,$slice) = @_;
+    if ($slice){
+	$self->{_revcomp_query} = $slice;
+    }
+    return $self->{_revcomp_query};
+}
+
 
 ############################################################
 =head2 RunnableDB methods
@@ -286,7 +295,7 @@ sub fetch_input {
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    my $genes  = $slice->get_all_Genes_by_type($genetype,'evidence');
+    my $genes  = $slice->get_all_Genes_by_type($genetype);
     
     print STDERR "Number of genes from ests  = " . scalar(@$genes) . "\n";
     
@@ -296,7 +305,7 @@ sub fetch_input {
       
       my $cdna_sa = $cdna_db->get_SliceAdaptor();
       $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-      my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE,'evidence');
+      my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
       print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
       push (@$genes, @$cdna_genes);
 
@@ -364,7 +373,7 @@ GENE:
 									   );
 	
 	$self->add_runnable($runnable,$strand);
-	$runnable->add_Transcript($tran);
+      	$runnable->add_Transcript($tran);
 	
 	#my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 	#$runnable->seq($slice);
@@ -382,7 +391,8 @@ GENE:
     
     # this will return a slice which corresponds to the reversed complement of $slice:
     my $rev_slice = $slice->invert;
-    my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype,'evidence');
+    $self->revcomp_query($rev_slice);
+    my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
     my @minus_transcripts;
     
     print STDERR "Number of genes from ests  = " . scalar(@$revgenes) . "\n";
@@ -390,7 +400,7 @@ GENE:
     
     if ( $USE_cDNA_DB ){
       my $cdna_revslice = $cdna_slice->invert;
-      my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE,'evidence');
+      my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
       print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
       push ( @$revgenes, @$cdna_revgenes ); 
     }
@@ -486,10 +496,10 @@ sub _process_Transcripts {
   }
  
   my $merge_object 
-      = Bio::EnsEMBL::Pipeline::Runnable::CusterMerge->new(
-							   -transcripts => \@transcripts,
-							   );
-								
+    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
+							 -transcripts => \@transcripts,
+							);
+  
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
 
@@ -501,11 +511,11 @@ sub _process_Transcripts {
   return @merged_transcripts;
 }
 
+
 ############################################################
 
 =head2 _check_Transcripts
-
-    Title   :   _check_Transcripts
+    
     Usage   :   @transcripts = $self->_check_Transcripts(@transcripts)
     Function:   checks transcripts obtained from EST2Genome for consistency among exons
                 in strand, hit_name (hid), exon content,
@@ -536,289 +546,128 @@ sub _check_Transcripts {
   my %hid_trans;
   my $exon_adaptor    = $self->db->get_ExonAdaptor;
   my $total_rejected        = 0;
-  
+
+  my $slice;
+  if ( $strand == +1 ){
+      $slice = $self->query;
+  }
+  else{
+      $slice = $self->revcomp_query;
+  }
+
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
-    $transcript->sort;
-    my $exons = $transcript->get_all_Exons;
-    #print STDERR "Transcript with ".scalar(@$exons)." exons\n";
-    my $hid;
-    my $this_strand;
-    my @accepted_exons; # here we hold the good exons in this transcript
-    my $rejected = 0;
-    my $exon_count = 0;
-    my $seqname;
-    
-    my $previous_exon;
-  EXON:
-    foreach my $exon (@$exons){
-      $exon_count++;
-
-      # we don't really want to neglect any exon at this point
-      my $hstart;
-      my $hend;
-      #print STDERR " --- Exon $exon_count ---\n";
-
-      # check contig consistency
-      unless ($seqname){
-	$seqname = $exon->seqname;
-      }
-      if ( !( $exon->seqname eq $seqname ) ){
-	print STDERR "transcript ".$transcript->dbID." is partly".
-		    " outside the slice, skipping it...\n";
-	next TRANSCRIPT;
-      }
-
-      # check strand consistency
-      if(!defined $this_strand) { 
-	$this_strand = $exon->strand; 
-      }
-      if($this_strand ne $exon->strand){
-	$self->warn("strand not consistent among exons for " . $transcript->dbID . " - skipping it\n");
-	next TRANSCRIPT;
-      }
-
-     
-      # get the supporting_evidence for each exon
-      # no need to use ExonAdaptor, this should have been already handled by slice->get_all_Genes_by_type
-
-      my $nonsorted_sf = $exon->get_all_supporting_features;      
-      my @sf = sort { $a->hstart <=> $b->hstart } @$nonsorted_sf;
-           
-      # check that you get suporting_evidence at all
-      if ( scalar( @sf ) == 0 ){
-	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
-		    "exon_id =".$exon->dbID."\n");
-      }
       
-      ####### check the gap with the evidence of the next exon
-      # if the ESTs are of good quality, this should not reject any
-      if ( $exon_count > 1 ){
-	my $est_gap = 0;
-		
-	# $exon_adaptor->fetch_evidence_by_Exon( $exon2 );
-	my $prev_nonsorted_sf = $previous_exon->get_all_supporting_features; 
-	my @previous_sf = sort { $a->hstart <=> $b->hstart } @$prev_nonsorted_sf;
-
-	if ( scalar( @previous_sf ) != 0 ){
-
-	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
-	  if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
-	    $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
-	  }
-	  # if hstart decreases that means that the EST runs in the opposite direction
-	  elsif (  $previous_sf[0]->hstart > $sf[0]->hstart ){
-	    $est_gap = abs( $previous_sf[0]->hstart - $sf[$#sf]->hend) - 1;
-	  }
-	  # else, same EST piece is hitting two exons, not good!
-	  else{
-	    print STDERR "same bit of evidence is hitting two exons!\n";
-	  }
-	  # test:
-	  #print STDERR "EST evidence with gap: $est_gap\n";
-	  #print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
-	  #print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
-	  
-	  # check the evidence gap between both exons, do not reject anything yet
-	  if ( $est_gap > $max_est_gap ){
-	    print STDERR "EST evidence with gap too large: $est_gap\n";
-	    print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
-	    print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
-	    # print STDERR "EST with too large gaps skipping it\n";
-	    # next TRANSCRIPT;
-	  }
-	}
-      }
-     
-      # reject transcript with too large intron length
-      my $intron_length;
-
-      # 100000 bases is quite tight, we better keep it low for ESTs
-      my $max_intron_length = 100000;
-      if ($exon_count > 1 ){
-	my ( $s, $e, $intron_length);
-	if ($this_strand == 1){
-	  $s             = $previous_exon->end;
-	  $e             = $exon->start;
-	  $intron_length = $e - $s - 1;
-	}
-	elsif ( $this_strand == -1 ){
-	  $s             = $previous_exon->start;
-	  $e             = $exon->end;
-	  $intron_length = $s - $e - 1;
-	}
-	#print STDERR "this_strand: $this_strand\n";
-	#print STDERR " $s  - $e  - 1 = $intron_length\n";
-
-	if ( $intron_length > $max_intron_length ){
-	  print STDERR "Rejecting transcript $transcript for having intron too long: $intron_length\n";
+      # reject the transcripts that fall off the slice at the lower end
+      unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$slice) ){
 	  next TRANSCRIPT;
-	}
       }
+      
+      $transcript->sort;
+      my $exons = $transcript->get_all_Exons;
+      #print STDERR "Transcript with ".scalar(@$exons)." exons\n";
+      my $hid;
+      my $this_strand;
+      my @accepted_exons; # here we hold the good exons in this transcript
+      my $rejected = 0;
+      my $exon_count = 0;
+      my $seqname;
+      
+      my $previous_exon;
+    EXON:
+      foreach my $exon (@$exons){
+	  $exon_count++;
 
-
-      $previous_exon = $exon;
-
-
-
-######## some of the checks are commented out, maybe resurrected later when we switch to pure exonerate
-
-
-######## check consitency of supporting evidence
-#      my $total_length;
-#      my $numerator;
-#      my $total_evidence_length;
-#      my $gap  = 0;
-#      my $total_hgap   = 0;
-#      my $exon_length  = $exon->length;
-#      my $feature_count = 0;
-    
-#    EVIDENCE:
-#      foreach my $feature ( @sf ) {
-#	$feature_count++;
-
-#	# because we get all the supporting features indiscriminately...
-#	next EVIDENCE unless $feature->source_tag eq $evidence_tag;
-	
-#	# this might sound weird, but sometimes features are repeated, don't know yet why
-#	if ( $feature_count != $#sf+1 ){
-#	  if ( $sf[$feature_count]->hstart == $feature->hstart &&
-#	       $sf[$feature_count]->hend   == $feature->hend ){
-#	    #print STDERR "feature is repeated!, skipping it\n";
-#	    next EVIDENCE;
-#	  }
-#	}
-#	# check that all exons have the same feature
-#	if(!defined $hid) { 
-#	  $hid = $feature->hseqname; 
-#	}
-#	if($hid ne $feature->hseqname){
-#	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
-#	  next TRANSCRIPT;
-#	}
-	
-########## calculate percentage identity with respect to the alignment length
-#	#
-#	#  ESTs -->   ACGTACGT-ACGT --> 3 EST pieces
-#	#  exon -->   ACG-ACGTGACGT
-#	#             ^^^ ^^^^ ^^^^--> evidence_length
-#	#  alignment length = evidence_length + gaps
-#	#
-	
-#	my $length              = $feature->end - $feature->start + 1;
-#	my $score               = $feature->score;
-#	my $hgap                = 0;
-#	$numerator             += $length * $score;
-#	$total_evidence_length += $length;
-
-#	if ( $feature_count != $#sf+1 ){
-#	  if ( $sf[$feature_count]->hstart > $feature->hend ){
-#	    $hgap = $sf[$feature_count]->hstart - $feature->hend - 1;
-#	  }
-#	  elsif 
-#	    ( $sf[$feature_count]->hstart <= $feature->hend && !($sf[$feature_count]->overlaps($feature))){
-#	    $hgap = $feature->hstart - $sf[$feature_count]->hend-1;
-#	  }
-#	  else{
-#	    $hgap = 0;
-#	  }
-#	  if ( $sf[$feature_count]->overlaps( $feature )){
-#	    print STDERR "features are overlapping!\n";
-#	  }
-#	  $total_hgap   += $hgap;
-#	}
+	  my $hstart;
+	  my $hend;
+	  #print STDERR " --- Exon $exon_count ---\n";
+	  print STDERR "strand = ".$exon->strand."\n";
+	  # get the supporting_evidence for each exon
+	  my @sf = sort { $a->hstart <=> $b->hstart } @{$exon->get_all_supporting_features};
+	  
+	  # check that you get suporting_evidence at all
+	  if ( scalar( @sf ) == 0 ){
+	      $self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
+			  "exon_id =".$exon->dbID." transcript_id = ".$transcript->dbID."\n");
+	  }
+	  
+	  ####### check the gap with the evidence of the next exon
+	  # if the ESTs are of good quality, this should not reject any
+	  if ( $exon_count > 1 ){
+	      my $est_gap = 0;
 	      
-#      } # end of EVIDENCE 
+	      my @previous_sf = sort { $a->hstart <=> $b->hstart } @{$previous_exon->get_all_supporting_features};
+	      
+	      if ( scalar( @previous_sf ) != 0 ){
+		  
+		  # if the hstart increases per exon, the EST runs in the same direction of the gene 
+		  if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
+		      $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
+		  }
+		  # if hstart decreases that means that the EST runs in the opposite direction
+		  elsif (  $previous_sf[0]->hstart > $sf[0]->hstart ){
+		      $est_gap = abs( $previous_sf[0]->hstart - $sf[$#sf]->hend) - 1;
+		  }
+		  # else, same EST piece is hitting two exons, not good!
+		  else{
+		      print STDERR "same bit of evidence is hitting two exons!\n";
+		  }
+		  # test:
+		  #print STDERR "EST evidence with gap: $est_gap\n";
+		  #print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
+		  #print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
+		  
+		  # check the evidence gap between both exons, do not reject anything yet
+		  if ( $est_gap > $max_est_gap ){
+		      print STDERR "EST evidence with gap too large: $est_gap\n";
+		      print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
+		      print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
+		      # print STDERR "EST with too large gaps skipping it\n";
+		      # next TRANSCRIPT;
+		  }
+	      }
+	  }
+     
+	  # reject transcript with too large intron length
+	  my $intron_length;
+	  
+	  # 100000 bases is quite tight, we better keep it low for ESTs
+	  my $max_intron_length = 100000;
+	  if ($exon_count > 1 ){
+	      my ( $s, $e, $intron_length);
+	      #if ($strand == 1){
+		  $s             = $previous_exon->end;
+		  $e             = $exon->start;
+		  $intron_length = $e - $s - 1;
+	      #}
+	      #elsif ( $strand == -1 ){
+	#	  $s             = $previous_exon->start;
+	#	  $e             = $exon->end;
+	#	  $intron_length = $s - $e - 1;
+	#      }
+	      #print STDERR "strand: $strand\n";
+	      #print STDERR " $s  - $e  - 1 = $intron_length\n";
+	      
+	      if ( $intron_length > $max_intron_length ){
+		  print STDERR "Rejecting transcript $transcript for having intron too long: $intron_length\n";
+		  next TRANSCRIPT;
+	      }
+	  }
+	  
+	  
+	  $previous_exon = $exon;
 
 
-####### calculate alignment length and the similarity score (exon_score)
-	
-#      $gap           = $exon_length - $total_evidence_length;
-#      $total_length  = $total_evidence_length + $gap + $total_hgap;
-#      my $exon_score = $numerator / $total_length;
-      
-#      # round it up
-#      my $number   = 100 * $exon_score;
-#      my $decimals = $number % 100;
-#      my $addition = int( $decimals / 50 );  # gives 1 ( or 0 ) if $decimals > ( or < ) 50
-#      $exon_score  = int( $exon_score ) + $addition;
-      
-#      # reject EXONS with perc_identity below $min_similarity = $EST_MIN_EVIDENCE_SIMILARITY
-#      if ($min_similarity > $exon_score ){
-#	print STDERR "rejecting Exon due to low percentage identity = $exon_score\n";
-#	$rejected++;
-#	$total_rejected++;
 
-#	# if we have rejected all exons in this transcript, forget about the transcript
-#	if ( $rejected == scalar(@exons) ){
-#	  print STDERR "all exons rejected in this transcript, rejecting transcript\n";
-#	  next TRANSCRIPT;
-#	}
-	
-#	next EXON;
-#      }
-#      else{
-#	push (@accepted_exons, $exon);
-#      }
- 
+	  
+      } # end of EXON
 
 
-####### alternatively we can get the percentage identity from the feature table (VERY SLOW)
-
-#      # get the percentage identity for the est_hit on this exon from the feature table
-#      my $exon_contig = $exon->contig;
-      
-#      # get the features by hid
-#      my @hid_features = $feature_adaptor->fetch_by_hid($hid); 
-
-#      # keep only the features corresponding to the current exon_contig
-#      my @selected_features;
-#      foreach my $f ( @hid_features ){
-	
-#	# feature->start/end is returned in vc coordinates
-#	  print STDERR "from feature percentage identity: ".$f->percent_id.
-#	    " seq_start: ".$f->start." seq_end: ".$f->end."\n";
-#	if ($f->start == $exon->start && $f->end == $exon->end ){
-#	#  print STDERR "from feature percentage identity: ".$f->percent_id.
-#	#    " seq_start: ".$f->start." seq_end: ".$f->end."\n";
-#	  print STDERR "chosen!\n";
-#	}
-#      }
-
-
-    } # end of EXON
-
-
-
-#    # put the accepted exons into this transcript
-#    $transcript->flush_Exons;
-#    foreach my $exon (@accepted_exons){
-#      $transcript->add_Exon($exon);
-#    }
-
-#    push(@allexons, @accepted_exons);
-    
-#    # finally check the one-to-one correspondance between ESTs and input_transcripts
-#    if(defined $hid && defined $hid_trans{$hid}) { 
-#      $self->warn("$hid is being used by more than one transcript!\n"); 
-#    }
-#    # we hold which transcript is associated with each hit
-#    $hid_trans{$hid} = $transcript;
-
-#    # if the transcript made it to this point, keep it
-#    push (@alltranscripts, $transcript);
-#  }
-#  print STDERR $total_rejected." exons rejected due to low similarity score\n";
-
-
-## short-cut added ##
-
-
-    # if the transcript made it to this point, keep it
-    push (@alltranscripts, $transcript);
+      # if the transcript made it to this point, keep it
+      push (@alltranscripts, $transcript);
   }
   return @alltranscripts;
-
+  
 }
 
 ############################################################
@@ -1529,7 +1378,7 @@ sub make_genes {
       
       #print STDERR "Exon ".$exon->start."-".$exon->end." phase: ".$exon->phase." end phase: ".$exon->end_phase."\n";
       
-      $exon->contig_id($slice->id);
+      $exon->contig($slice);
       $exon->attach_seq($slice);
       
       # if strand = -1 we have inverted the contig, thus
