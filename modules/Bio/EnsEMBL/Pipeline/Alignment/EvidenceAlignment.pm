@@ -1578,11 +1578,17 @@ sub _build_evidence_seq {
   my @cigar_instructions = $self->_cigar_reader($cigar);
 
 
-    # Take care of unusual situation where genomic strand gets turned around.
+  # Take care of unusual situation where genomic strand gets turned around.
   if (($self->_strand != $base_align_feature->strand)){
       # Force the hstrand around
     $hstrand = $hstrand * -1;
       # Reverse the order of things in the cigar
+    @cigar_instructions = reverse @cigar_instructions;
+  }
+
+  # Turn the cigar line around if the slice is on the
+  # reverse strand.
+  if ($self->_slice->strand == -1){
     @cigar_instructions = reverse @cigar_instructions;
   }
 
