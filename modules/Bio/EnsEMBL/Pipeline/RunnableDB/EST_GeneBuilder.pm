@@ -61,11 +61,13 @@ use Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_INPUTID_REGEX
 									 EST_GENE_DBHOST
+									 EST_GENE_DBPORT
 									 EST_GENE_DBUSER
 									 EST_GENE_DBPASS
 									 EST_GENE_DBNAME
 									 EST_DBNAME
 									 EST_DBHOST
+									 EST_DBPORT
 									 EST_DBUSER
 									 EST_DBPASS     
 									 EST_GENOMIC
@@ -80,6 +82,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 USE_cDNA_DB
 									 cDNA_DBNAME
 									 cDNA_DBHOST
+									 cDNA_DBPORT
 									 cDNA_DBUSER
 									 cDNA_DBPASS
 									 cDNA_GENETYPE
@@ -109,6 +112,7 @@ sub new {
   
   my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host             => $EST_GENE_DBHOST,
+						     -port             => $EST_GENE_DBPORT,
 						     -user             => $EST_GENE_DBUSER,
 						     -dbname           => $EST_GENE_DBNAME,
 						     -pass             => $EST_GENE_DBPASS,
@@ -116,6 +120,7 @@ sub new {
   
   my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						  -host             => $EST_DBHOST,
+						  -port             => $EST_DBPORT,
 						  -user             => $EST_DBUSER,
 						  -dbname           => $EST_DBNAME,
 						  -pass             => $EST_DBPASS,
@@ -129,6 +134,7 @@ sub new {
   if ( $USE_cDNA_DB ){
     my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host             => $cDNA_DBHOST,
+						     -port             => $cDNA_DBPORT,
 						       -user             => $cDNA_DBUSER,
 						       -dbname           => $cDNA_DBNAME,
 						       -pass             => $cDNA_DBPASS,
