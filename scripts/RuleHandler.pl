@@ -50,7 +50,7 @@ use strict;
 use Getopt::Long;
 
 use Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Pipeline::Analysis;
@@ -90,7 +90,7 @@ if ($help) {
     exec('perldoc', $0);
 }
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   ( -host   => $host,
     -dbname => $dbname,
     -user   => $dbuser,
@@ -236,7 +236,8 @@ sub show_rules {
 
   scalar(@existing_rules) or die "There are no rules in the database\n";
   print "\nConditions must be fulfilled before the goal analysis can be completed\n\n";
-  foreach my $rule(@existing_rules) {
+  my @sorted = sort {$a->dbID <=> $b->dbID} @existing_rules;
+  foreach my $rule(@sorted) {
     print "Rule ID:", $rule->dbID(), "\n",
     "    conditions:\t";
     my @conditions = $rule->list_conditions();

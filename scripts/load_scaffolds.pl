@@ -25,7 +25,6 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
     -help      displays this documentation with PERLDOC
 =cut
 
-
 use strict;
 use vars qw($USER $PASS $DB $HOST $DSN);
 use Bio::EnsEMBL::DBLoader;
@@ -55,7 +54,7 @@ my $verbose = 0;
 	     'dbpass:s'   => \$dbpass,
 	     'module:s'   => \$module,
              'pipe'       => \$pipe,
-	     'verbose'    => $verbose,
+	     'verbose'    => \$verbose,
 	     'h|help'     => \$help
 	     );
 if ($help) {
@@ -63,8 +62,13 @@ if ($help) {
 }
 
 $SIG{INT} = sub {my $sig=shift;die "exited after SIG$sig";};
-
-my $locator = "$module/host=$host;port=;dbname=$dbname;user=$dbuser;pass=$dbpass";
+my $locator;
+if ($dbpass) {
+   $locator = "$module/host=$host;port=;dbname=$dbname;user=$dbuser;pass=$dbpass";
+}
+else {
+   $locator = "$module/host=$host;port=;dbname=$dbname;user=$dbuser;pass=";
+}
 my $db =  Bio::EnsEMBL::DBLoader->new($locator);
 
 my ($seqfile) = @ARGV;
@@ -88,12 +92,14 @@ while ( my $seq = $seqio->next_seq ) {
     $clone->add_Contig($contig);
     eval { 
        $db->write_Clone($clone);
-       $verbose && print STDERR "Written $clone scaffold into db\n";
+       $verbose && print STDERR "Written ".$clone->id." scaffold into db\n";
     };
     if( $@ ) {
       print STDERR "Could not write clone into database, error was $@\n";
     }
-    elsif ($pipe) {
-      $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values(".$contigid.",contig,1,now())");
+    if ($pipe) {
+      my $sth = $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values('".$contigid."','contig',1,now())");
+      $sth->execute;
+      $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
     }
 }
