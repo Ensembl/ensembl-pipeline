@@ -373,7 +373,7 @@ sub put_Transcripts {
 
   # check strand consistency among transcripts
   foreach my $transcript (@new_transcripts){
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
     unless ( $self->strand ){
       $self->strand( $exons[0]->strand );
     }
@@ -430,7 +430,7 @@ sub to_String {
   my $self = shift @_;
   my $data='';
   foreach my $tran ( @{ $self->{'_transcript_array'} } ){
-    my @exons = $tran->get_all_Exons;
+    my @exons = @{$tran->get_all_Exons};
     my $id;
     if ( $tran->stable_id ){
       $id = $tran->stable_id;
@@ -457,7 +457,7 @@ sub exon_Density{
   my ($self, $transcript) = @_;  
   my $density;
   my $exon_span;
-  my @exons = $transcript->get_all_Exons;
+  my @exons = @{$transcript->get_all_Exons};
   @exons = sort { $a->start <=> $b->start } @exons;
   my $transcript_length = $exons[$#exons]->end - $exons[0]->start;
   foreach my $exon ( @exons ){
