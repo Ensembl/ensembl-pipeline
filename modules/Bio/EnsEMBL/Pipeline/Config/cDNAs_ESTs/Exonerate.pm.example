@@ -46,7 +46,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::ESTConf;
+package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
 
 use strict;
 use vars qw( %Exonerate );
