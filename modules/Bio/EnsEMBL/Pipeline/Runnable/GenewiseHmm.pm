@@ -147,7 +147,7 @@ sub _align_protein {
   my $genewise = $self->genewise;
 
   my $hmm = $self->hmmfile;
-  my $command = "$genewise -hmmer $hmm $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
+  my $command = "genewise -hmmer $hmm $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
@@ -187,6 +187,7 @@ sub _align_protein {
 
     elsif($f[0] eq 'Exon'){
       #      make a new "exon"
+	print STDERR "Making new exon\n";
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->genomic->id);
       $curr_exon->id        ($hmmname);
