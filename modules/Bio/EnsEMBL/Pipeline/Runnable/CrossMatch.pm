@@ -54,7 +54,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeatureFactory;
-
+use Bio::SeqIO;
 # no need to 'use CrossMatch' as we embed the relevant pacakges here
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);

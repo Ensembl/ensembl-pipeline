@@ -237,13 +237,14 @@ sub do_sql_file {
         open SQL, $file or die "Can't read SQL file '$file' : $!";
         while (<SQL>) {
             s/(#|--).*//;       # Remove comments
-            next unless /\S/;   # Skip lines which are all space
-            $sql .= $_;
-            $sql .= ' ';
-        }
-        close SQL;
-        
-        foreach my $s (grep /\S/, split /;/, $sql) {
+	       next unless /\S/;   # Skip lines which are all space
+	       $sql .= $_;
+	       $sql .= ' ';
+	}
+	close SQL;
+	#Modified split statement, only semicolumns before end of line,
+        #so we can have them inside a string in the statement
+	foreach my $s (grep /\S/, split /;\n/, $sql) {
             $self->validate_sql($s);
             $dbh->do($s);
             $i++

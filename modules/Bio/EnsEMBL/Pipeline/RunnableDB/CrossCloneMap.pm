@@ -93,7 +93,7 @@ sub fetch_input{
    my $newclone = $new->get_Clone($input_id);
    my $oldclone = $old->get_Clone($input_id);
 
-   if( $newclone->version == $oldclone->version ) {
+   if( $newclone->embl_version == $oldclone->embl_version ) {
        $self->throw("Input $input_id has identical versioned clones in each database");
    }
 
@@ -104,25 +104,23 @@ sub fetch_input{
    my @oldseq;
 
    foreach my $contig ( @newcontigs ) {
-       my ($acc,$number) = split(/\./,$contig->id);
-       my $version = $newclone->version;
-
+       $contig->id =~ /\S+\.(\d+)/;
+       my $number = $1;
+       my $version = $newclone->embl_version;
        my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
        push(@newseq,$seq);
    }
 
    foreach my $contig ( @oldcontigs ) {
-       my ($acc,$number) = split(/\./,$contig->id);
-       my $version = $oldclone->version;
-
+       $contig->id =~ /\S+\.(\d+)/;
+       my $number = $1;
+       my $version = $oldclone->embl_version;
        my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
        push(@oldseq,$seq);
    }
-
-
+   print STDERR "Creating crossmatches for clone ".$self->_acc."\n";
    foreach my $newseq ( @newseq ) {
        foreach my $oldseq ( @oldseq ) {
-	   #print STDERR "Creating crossmatch with new seq id ".$newseq->id.", sequence:\n".$newseq->seq."\n and old seq id ".$oldseq->id.", sequence:\n".$oldseq->seq."\n";
 	   my $cross = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( 
 									  -nocopy => 1,
 									  -seq1 => $newseq,
@@ -156,8 +154,9 @@ sub run{
    #The feature pair array will represent the matrix of hits between inputs
    my @fp;
    #Run all the crossmatch runnables created in fetch_input
+   print STDERR "Running crossmatches for clone ".$self->_acc."\n";
    foreach my $crossmatch (@{$self->{'_crossmatch'}}) {
-       
+       #print STDERR "Running crossmatch on clone ".$self->_acc." between new seq id ".$crossmatch->seq1->id." and old seq id ".$crossmatch->seq2->id."\n";
        $crossmatch->run();
        #Push all the feature pairs into the array
        push (@fp,$crossmatch->output);
@@ -169,6 +168,7 @@ sub run{
    my $initial=1;
    my %looks_ok=();
 
+   print STDERR "Analysing output for clone ".$self->_acc."\n";
    #The juicy part: look at the matrix, and sort out the mapping
    FP: foreach my $fp (@sorted) {
        #print STDERR "Got feature pair between contig ".$fp->seqname." (".$fp->start."-".$fp->end.") and contig ".$fp->hseqname." (".$fp->hstart."-".$fp->hend.") with score ".$fp->score."\n";
@@ -266,6 +266,7 @@ sub run{
 sub write_output{
    my ($self,@args) = @_;
 
+   print STDERR "Writing output for clone ".$self->_acc."\n";
    my @fp=@{$self->{'_final'}};
    my $fc=$self->dbobj->get_SymmetricContigFeatureContainer;
    $fc->write_FeaturePair_List(@fp);
