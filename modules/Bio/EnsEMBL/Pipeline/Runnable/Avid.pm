@@ -15,25 +15,31 @@
 Bio::EnsEMBL::Pipeline::Runnable::Avid
 
 =head1 SYNOPSIS
-@sequences   = an array Bio::Seq objects,
-$avid        = an optional string which specifies the location of the used avid binary
-$options     = an optional string with  options (default: binary output (.mout-file))
-$workdir     = an optional string containing the location of the working-directory (def: /tmp:)
-$file_prefix = an optional array of strings used as file_prefixes for the temporarily written output-files
+$slice1       = the first Bio::Seq object,
+$slice2       = the second Bio::Seq object,
+$avid         = an optional string which specifies the location of the used avid binary
+$avid_options = an optional string with  options (default: binary output (.mout-file))
+$workdir      = an optional string containing the location of the working-directory (def: /tmp:)
+$file_prefix  = an optional array of strings used as file_prefixes for the temporarily written output-files
+$slam_output  = an optional string to convert the binary output to a text-file
+
 
 my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
-                                                      -query_seqs    => \@sequences,
+                                                      -slice1        => $slice1,
+                                                      -slice2        => $slice2,
                                                       -avid          => $avid,
-                                                      -options       => $options,
+                                                      -avid_options  => $avid_options,
                                                       -workdir       => $workdir,
-                                                      -file_prefix   => \@file_prefix
+                                                      -file_prefix   => \@file_prefix,
+                                                      -slam_output   => $slam_output
                                                      );
 
 or
 
-  my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
-                                                        -query_seqs    => \@sequences,
-                                                       );
+my $obj = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
+                                                      -slice1        => $slice1,
+                                                      -slice2        => $slice2,
+                                                     );
 
 
 $obj->run;
@@ -58,7 +64,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Runnable::Avid;
+  package Bio::EnsEMBL::Pipeline::Runnable::Avid;
 use vars qw(@ISA);
 use strict;
 
@@ -82,44 +88,53 @@ sub new {
   bless $self,$class;
 
   my (
-      $query_seqs,
+      $slice1,
+      $slice2,
       $avid,
-      $options,
+      $avid_options,
       $workdir,
-      $file_prefix ) = $self->_rearrange([qw(
-                                             QUERY_SEQUENCES
+      $file_prefix,
+      $slam_output ) = $self->_rearrange([qw(
+                                             SLICE1
+                                             SLICE_2
                                              AVID
-                                             OPTIONS
+                                             AVID_OPTIONS
                                              WORKDIR
                                              FILE_PREFIX
+                                             SLAM_OUTPUT
                                             )
                                          ], @args);
   $self->{_verbose} = 1 ;
 
 
+
   ########### TESTING TYPES OF PASSED OBJECTS ###########
-  $self->query_sequences($query_seqs);
+  $self->query_sequences($slice1,$slice2);
 
 
   ########### LOCATION OF BINARY default av9d-2.1b0 #####
   $self->avid_binary($avid);
 
 
-  ########### PASSED OPTIONS ############################
-  $self->options( $options );
+  ########### PASSED AVID_OPTIONS #######################
+  $self->avid_options( $avid_options );
 
 
-  ########## FILE_PREFIX ####################
+  ########## FILE_PREFIX ################################
   $self->file_prefix ($file_prefix);
 
 
-  ########## SETTING WORKDIR ####################
+  ########## WRITING SLAM OUTPUT ########################
+  defined $slam_output ? $self->slam_output($slam_output) : $self->slam_output("False");
+
+
+  ########## SETTING WORKDIR ############################
   defined $workdir ? $self->workdir($workdir) : $self->workdir('/tmp/');
 
+
+  $self->checkdir;
   return $self;
 }
-
-
 
 
 sub DESTROY {
@@ -128,7 +143,7 @@ sub DESTROY {
 }
 
 
-################ RUN METHOD ###########################################
+################ RUN METHOD ############################
 
 =head2 run
 
@@ -146,11 +161,11 @@ sub run {
 
 
   # names of fasta files on which avid runs on (there must also be a .masked-file)
-  my $fa_first =  @{$self->run_avid_on_files}[0];
-  my $fa_secnd =  @{$self->run_avid_on_files}[1];
+  my $fa_first = @{$self->run_avid_on_files}[0];
+  my $fa_secnd = @{$self->run_avid_on_files}[1];
 
 
-  my $command  = $self->avid_binary  . " " .$self->options;
+  my $command = $self->avid_binary  . " " .$self->avid_options;
   $command .=  " " . $fa_first    . " ";
   $command .=  " " . $fa_secnd         ;
 
@@ -159,8 +174,10 @@ sub run {
   open( AVID, "$command |" ) || $self->throw("Error running avid $!");
   close(AVID);
 
+  # write output for slam 
+  $self->write_slam_output if ($self->slam_output);
 
-  # add the files written by avid to the @file-array for deletion
+  # store written filenames for deletion
   $self->files_to_delete($fa_first,$fa_secnd);
 
   return 1
@@ -170,50 +187,43 @@ sub run {
 ############################################################
 
 sub files_to_delete {
-  my ($self,$ff,$sf) =  @_;
-  my @temp;
+  my ($self,$ff,$sf) = @_;
 
   my $workdir        =  $self->workdir;
 
-  # substitution of workdir-prefix and .fasta-suffix to get filenames
+  # substitution of workdir-prefix and .fasta-suffix to get filenames written by avid
   $ff             =~s/$workdir(.+)\.fasta/$1/;
   $sf             =~s/$workdir(.+)\.fasta/$1/;
+  my $basename = $ff."_".$sf;
 
-
-  # option -opsl writes out: .info .out .psl
+  # option -opsl writes out: .minfo .info .out .psl
   # option -obin writes out: .minfo .mout
 
-  if ($self->options =~ /obin/) {
-    #    @temp     = qw ( .minfo );                            # add .mout
-    $self->results( $ff . "_" . $sf . ".mout" );
-  }
-  if ($self->options =~ /opsl/) {
-    #    @temp     = qw ( .minfo .info .out );                 # add .psl
-    $self->results( $ff . "_" . $sf . ".psl" );
+  $self->file   ( $basename . ".minfo"); #adding to list of files to delete
+
+  if ($self->avid_options =~ /obin/) {
+    $self->results ( $basename . ".mout" );
+    $self->file ( $basename . ".mout" )
   }
 
-
-
-  # adding the filenames to delete to @file-Array
-  for (@temp) {
-    $self->file( $ff."_". $sf . $_ );
+  if ($self->avid_options =~ /opsl/) {
+    $self->results( $basename  . ".psl"  );
+    $self->file   ( $basename . ".info" );
+    $self->file   ( $basename . ".out"  );
   }
 }
 
 
 
 sub query_sequences {
-  my ($self,$seq_ref) = @_;
+  my ($self,$slice1,$slice2) = @_;
 
-  if ($seq_ref) {
-    if (ref($seq_ref) ne "ARRAY") {
-      $self->throw("[$seq_ref] is not a reference to an Array\n");
-    } else {
-      foreach (@{$seq_ref}) {
-        $self->throw("[$_] is not a Bio::PrimarySeqI") unless $_->isa("Bio::PrimarySeqI");
-      }
+  if (defined $slice1 && defined $slice2 ) {
+    unless ($slice1->isa("Bio::PrimarySeqI") || $slice2->isa("Bio::PrimarySeqI")) {
+      $self->throw("Submitted Sequence is not a Bio::PrimarySeqI");
     }
-    my @seqs                 = @{$seq_ref};
+    my  @seqs;
+    push @seqs, $slice1, $slice2;
     $self->{_query_sequences} = \@seqs;
   }
   return @{$self->{_query_sequences}};
@@ -237,14 +247,23 @@ sub avid_binary {
 
 ############################################################
 
-sub options {
+sub avid_options {
   my ($self,$opt) =  @_;
 
-  $self->{_options} = $opt if (defined $opt);
-  $self->{_options} = '-obin' if ( ( !defined $opt) && ( !defined  $self->{_options}));
-  return $self->{_options};
+  $self->{_avid_options} = $opt if (defined $opt);
+  $self->{_avid_options} = '-obin' if ( ( !defined $opt) && ( !defined  $self->{_avid_options}));
+  return $self->{_avid_options};
 }
 
+############################################################
+
+sub slam_output {
+  my ($self,$out) =  @_;
+
+  $self->{_slam_output} = "1" if (defined $out);
+  $self->{_slam_output} = 'FALSE' if ( ( !defined $out) && ( !defined  $self->{_slam_output}));
+  return $self->{_slam_output};
+}
 
 ############################################################
 # writing out 4 files for avid-input : 2 fasta-files and 2 repeatmasked fastas
@@ -284,7 +303,68 @@ sub write_sequences {
   }
 }
 
+############################################################
 
+sub write_slam_output {
+  my ($self) =  @_;
+
+  $self->checkdir;
+  my $wdir = $self->workdir;
+
+  #getting name of binary slam outputfile
+  (my $ff = @{$self->run_avid_on_files}[0]) =~s/$wdir(.+)\.fasta/$1/;
+  (my $sf = @{$self->run_avid_on_files}[1]) =~s/$wdir(.+)\.fasta/$1/;
+
+  my $binfile = $ff."_".$sf.".mout";
+  my $outfile = $ff."_".$sf."_slam_input.txt";
+
+  ####### START PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
+  if (-e $binfile) {
+
+    my $lInd = -1;
+    my $rInd = -1;
+    my $byte;
+    my @x;
+
+    open(FH,"<$binfile") || $self->throw("Could not open Avid's binary output-file: $binfile\n");
+    while (read(FH,$byte,1)) {
+      my $intByte = unpack("C",$byte);
+      my($lHalf,$rHalf) = ( ($intByte >> 4), ($intByte & 0xF) );
+      $lInd++ if($lHalf>0);
+      $rInd++ if($rHalf>0);
+      $x[$lInd] = $rInd if($lHalf > 0);
+    }
+    close(FH);
+
+    my $lLen = $lInd+1;
+    my $rLen = $rInd+1;
+
+    my $halfWin = 1;
+    my($i,$min,$max);
+    my $lastMax = -1;
+    open(OUT,">$outfile") || $self->throw("Could not write to output-file $outfile\n");
+    for ($i=0; $i < $lLen-1; $i++) {
+      $min = $x[$i] - $halfWin;
+      $min = 0 if($min < 0);
+      $min = $lastMax+1 if($min > ($lastMax+1));
+      $max = $x[$i] + $halfWin;
+      $max = $rLen-1 if($max >= $rLen);
+      print OUT  join("\t",$i,$min,$max) . "\n";
+      $lastMax = $max;
+    }
+    $min = $x[$i] - $halfWin;
+    $min = 0 if($min < 0);
+    $min = $lastMax+1 if($min > ($lastMax+1));
+    $max = $rLen-1;
+
+    print OUT join("\t",$i,$min,$max) . "\n";
+    close(OUT);
+  }
+  ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
+
+  $self->file($outfile);
+  return $outfile;
+}
 
 ########### STORING FILENAMES FOR AVID RUN ###########
 
@@ -299,7 +379,6 @@ sub run_avid_on_files {
   }
   return $self->{_run_avid_on_files} ;
 }
-
 
 
 sub verbose {
