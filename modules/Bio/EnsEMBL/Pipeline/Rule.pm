@@ -165,6 +165,7 @@ sub goalAnalysis {
            $goalAnalysis if it should be done
 =cut
 
+
 sub check_for_analysis {
   my $self = shift;
   my ($analist, $input_id_type, $completed_accumulator_href, $verbose) = @_;
@@ -178,7 +179,8 @@ sub check_for_analysis {
 #This id isn't of the right type so doesn't satify goal
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
-    print STDERR " failed input_id_type check\n" if($verbose);
+    print STDERR " failed input_id_type check as goal input_id type ".
+      "isn't the same as the input_id type\n" if($verbose);
     $return += 1;
   }
 
@@ -190,7 +192,8 @@ sub check_for_analysis {
     $anaHash{$analysis->logic_name} = $analysis;
     if( $goal == $analysis->dbID ) {
       # already done
-      print STDERR " already done\n" if($verbose);
+      print STDERR $self->goalAnalysis->logic_name." already done\n" 
+	if($verbose);
       $return += 2;
     }
   }
