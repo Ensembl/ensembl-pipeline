@@ -97,50 +97,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw(
 
 ######################################################################
 
-sub new{
-  my ($class,@args) = @_;
-  my $self = $class->SUPER::new(@args);
-  
-  
-  my $ensembl_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						      '-host'   => $ENSEMBL_DBHOST,
-						      '-user'   => $ENSEMBL_DBUSER,
-						      '-dbname' => $ENSEMBL_DBNAME,
-						      '-dnadb' => $self->db,
-						     );
-  
 
-  my $estgene_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						      '-host'   => $ESTGENE_DBHOST,
-						      '-user'   => $ESTGENE_DBUSER,
-						      '-dbname' => $ESTGENE_DBNAME,
-						      '-dnadb' => $self->db,
-						     ); 
-
-  
-  # dbobj is read by the parent class RunnableDB and it holds the FINAL_DB database
- 
-
-
-  my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $FINAL_DBHOST,
-						    '-user'   => $FINAL_DBUSER,
-						    '-dbname' => $FINAL_DBNAME,
-						    '-pass'   => $FINAL_DBPASS,
-						    '-dnadb'  => $self->db,
-						   );
-  
-  $self->final_db( $final_db ); 
-  $self->final_db->dnadb($self->db);
-
-
-  # needs to read from two databases and write into another one (possibly a third?)
-  
-  $self->ensembl_db( $ensembl_db );
-  $self->estgene_db( $estgene_db );
-  
-  return $self;
-  
-}
 
 #########################################################################
 #
@@ -153,6 +110,17 @@ sub final_db{
   if ( $db ){
     $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
     $self->{_final_db} = $db;
+  }
+  if(!$self->{_final_db}){
+    my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      ('-host'   => $FINAL_DBHOST,
+       '-user'   => $FINAL_DBUSER,
+       '-dbname' => $FINAL_DBNAME,
+       '-pass'   => $FINAL_DBPASS,
+       '-dnadb'  => $self->db,
+      );
+    
+    $self->{_final_db} = $final_db;
   }
   return $self->{_final_db};
 }
@@ -167,6 +135,16 @@ sub ensembl_db{
     $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
     $self->{'_ensembl_db'} = $db;
   }
+  if(!$self->{'_ensembl_db'}){
+    my $ensembl_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      (
+       '-host'   => $ENSEMBL_DBHOST,
+       '-user'   => $ENSEMBL_DBUSER,
+       '-dbname' => $ENSEMBL_DBNAME,
+       '-dnadb' => $self->db,
+      );
+    $self->{'_ensembl_db'} = $ensembl_db;
+  }
   return $self->{'_ensembl_db'};
 }
 
@@ -177,6 +155,16 @@ sub estgene_db{
   if ( $db ){
     $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
     $self->{'_estgene_db'} = $db;
+  }
+  if(!$self->{'_estgene_db'}){
+    my $estgene_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      (
+       '-host'   => $ESTGENE_DBHOST,
+       '-user'   => $ESTGENE_DBUSER,
+       '-dbname' => $ESTGENE_DBNAME,
+       '-dnadb' => $self->db,
+      ); 
+    $self->{'_estgene_db'} = $estgene_db;
   }
   return $self->{'_estgene_db'};
 }
