@@ -265,13 +265,18 @@ sub check_existance{
 
 
 
-sub job_stats{
+sub job_stats {
   my ($self, $verbose) = @_;
-    my $command = "bjobs";
-  open(BJOB, "$command 2>&1 |") or 
-    throw("couldn't open pipe to bjobs");
+  my $command = "bjobs";
+
+  # Need to sleep to make sure lsf is displaying correct info
+  sleep(20);
+
+  open(BJOB, "$command 2>&1 |") or throw("couldn't open pipe to bjobs");
+
   my %jobs;
- LINE:while(<BJOB>){
+ LINE:
+  while(<BJOB>){
     chomp;
     if ($_ =~ /No unfinished job found/) {
       last LINE;

@@ -51,7 +51,8 @@ sub dbobj {
 sub print_header {
   my ($self,$str) = @_;
   unless($self->{'_header'}){
-  	$self->{'_header'} = sprintf("[%s:%s %s]\n\n", $self->dbobj->host, $self->dbobj->port, $self->dbobj->dbname);
+  	$self->{'_header'} = sprintf("[%s:%s %s]\n\n", $self->dbobj->dbc->host, $self->dbobj->dbc->port, 
+                                                       $self->dbobj->dbc->dbname);
   }
   print "\n$str " . $self->{'_header'};
 }
@@ -599,10 +600,10 @@ sub lock_status{
     my ($self,$print) = @_;
     my $str = "Locked By USER: %s, HOST: %s, PID: %s, STARTED: %s (%s) \n";
     my @a = ();
-    my ($dbuser, $dbhost, $dbport, $dbname) = ($self->dbobj->username,
-                                               $self->dbobj->host,
-                                               $self->dbobj->port,
-                                               $self->dbobj->dbname);
+    my ($dbuser, $dbhost, $dbport, $dbname) = ($self->dbobj->dbc->username,
+                                               $self->dbobj->dbc->host,
+                                               $self->dbobj->dbc->port,
+                                               $self->dbobj->dbc->dbname);
     if (my $lock_str = $self->dbobj->pipeline_lock) {
             my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
             $self->print_header("This pipeline is LOCKED") if $print;

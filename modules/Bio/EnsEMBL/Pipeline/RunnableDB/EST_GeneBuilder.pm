@@ -329,7 +329,7 @@ sub fetch_input {
       ($self->input_id);
     my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
     push (@$genes, @$cdna_genes);
-    $self->cdna_db->disconnect_when_inactive(1); 
+    $self->cdna_db->dbc->disconnect_when_inactive(1); 
   }
   
   my @forward_transcripts;

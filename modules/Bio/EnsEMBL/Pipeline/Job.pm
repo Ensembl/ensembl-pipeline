@@ -263,12 +263,12 @@ sub flush_runs {
   
   local *FILE;
 
-  my $db       = $adaptor->db;
-  my $host     = $db->host;
-  my $username = $db->username;
-  my $dbname   = $db->dbname;
-  my $pass     = $db->password;
-  my $port     = $db->port;
+  my $dbc      = $adaptor->db->dbc;
+  my $host     = $dbc->host;
+  my $username = $dbc->username;
+  my $dbname   = $dbc->dbname;
+  my $pass     = $dbc->password;
+  my $port     = $dbc->port;
 
   # runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
   # then in same directory as Job.pm,
@@ -286,20 +286,21 @@ sub flush_runs {
 
   # $anal is a logic_name
  
- ANAL:for my $anal (@analyses) {
-   
+ ANAL:
+  for my $anal (@analyses) {
     my $queue = $BATCH_QUEUES{$anal};
     
     my @job_ids = @{$queue->{'jobs'}};
     if(!@job_ids){
       next ANAL;
     }
+
     my $this_runner = $queue->{'runner'};
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
    
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
     
-    if( ! $lastjob ) {
+    if ( ! $lastjob) {
       $self->throw( "Last batch job not in db" );
     }
     
@@ -316,8 +317,10 @@ sub flush_runs {
        -NODES      => $queue->{'nodes'},
        -RESOURCE   => $queue->{'resource'}
       );
+
     my $cmd;
-    if(!$self->cleanup){
+
+    if (!$self->cleanup) {
       $batch_job->stderr_file($lastjob->stderr_file);
     }
     
@@ -325,10 +328,10 @@ sub flush_runs {
     # check if the password has been defined, and write the
     # "connect" command line accordingly otherwise -pass gets the
     # first job id as password, instead of remaining undef
+
     if ($pass) {
       $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
-    }
-    else {
+    } else {
       $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
     }
     $cmd .= " -output_dir ".$self->output_dir;
@@ -339,44 +342,48 @@ sub flush_runs {
     $cmd .= " @job_ids";
     
     $batch_job->construct_command_line($cmd);
+
     eval {
-      #print STDERR "Submitting: ", $batch_job->command_line, "\n";
+      # SMJS LSF Specific for debugging
+      # print STDERR "Submitting: ", $batch_job->bsub, "\n";
       $batch_job->open_command_line();
     };
+
     if ($@) {
-	print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
-	foreach my $job_id (@job_ids) {
-	    my $job = $adaptor->fetch_by_dbID($job_id);
-	    $job->set_status( "FAILED" );
-	}
-    } 
-    else {
-	#print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
-	#."\n";
-	my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
-	foreach my $job (@jobs) {
-    if( $job->retry_count > 0 ) {
-      for ( $job->stdout_file, $job->stderr_file ) {
-		    open( FILE, ">".$_ ); close( FILE );
+      print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
+      foreach my $job_id (@job_ids) {
+        my $job = $adaptor->fetch_by_dbID($job_id);
+        $job->set_status( "FAILED" );
       }
-    }
-    #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
-    if ($batch_job->id) {
-      $job->submission_id( $batch_job->id );
+
     } else {
-      # submission seems to have succeeded, but we didnt
-      # get a job ID. Safest NOT to raise an error here,
-      # (a warning would have already issued) but flag
-      print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
-      $job->submission_id( 0 );		
-    }
-	    
-	    $job->retry_count( $job->retry_count + 1 );
-	    $job->set_status( "SUBMITTED" );
-	    $job->stdout_file($lastjob->stdout_file);
-	    $job->stderr_file($lastjob->stderr_file);
-	}
-	$adaptor->update(@jobs);
+      #print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
+      #."\n";
+      my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
+      foreach my $job (@jobs) {
+
+        if( $job->retry_count > 0 ) {
+          for ( $job->stdout_file, $job->stderr_file ) {
+            open( FILE, ">".$_ ); close( FILE );
+          }
+        }
+
+        #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
+        if ($batch_job->id) {
+          $job->submission_id( $batch_job->id );
+        } else {
+          # submission seems to have succeeded, but we didnt
+          # get a job ID. Safest NOT to raise an error here,
+          # (a warning would have already issued) but flag
+          print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
+          $job->submission_id( 0 );		
+        }
+        $job->retry_count( $job->retry_count + 1 );
+        $job->set_status( "SUBMITTED" );
+        $job->stdout_file($lastjob->stdout_file);
+        $job->stderr_file($lastjob->stderr_file);
+      }
+      $adaptor->update(@jobs);
     }
     $queue->{'jobs'} = [];
     $queue->{'last_flushed'} = time;
@@ -528,9 +535,9 @@ sub run_module {
       # "RUNNING"
       eval {
 	      $self->set_status( "RUNNING" );
-	      $rdb->db->disconnect_when_inactive(1); 
+	      $rdb->db->dbc->disconnect_when_inactive(1); 
         $rdb->run;
-        $rdb->db->disconnect_when_inactive(0); 
+        $rdb->db->dbc->disconnect_when_inactive(0); 
       };
       if ($err = $@) {
         

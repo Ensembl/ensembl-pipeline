@@ -57,13 +57,15 @@ use Bio::EnsEMBL::Root;
 
 sub new{
   my ($class,@args) = @_;
+
   my $self = $class->SUPER::new(@args);
+
   &verbose('WARNING');
+
   my ($db, $input_ids, $rules, $queue_manager,
       $awol_mark, $rename, $max_sleep,
       $min_sleep, $base_sleep, $verbose,
-      $runner, $output_dir, $job_limit) = rearrange
-        (
+      $runner, $output_dir, $job_limit) = rearrange (
          ['DB', 
           'INPUT_IDS', 
           'RULES', 
@@ -78,47 +80,59 @@ sub new{
           'OUTPUT_DIR',
           'JOB_LIMIT',
          ],@args);
+
   if(!$db){
     throw("Can't run the RuleManager without a dbadaptor");
   }
+
   $self->db($db);
   $self->is_locked;
   $self->create_lock;
+
   if(!$queue_manager){
     $queue_manager = $QUEUE_MANAGER; #found in BatchQueue.pm
   }
-  my $batch_q_module = 
-    "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
+
+  my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
   my $file = "$batch_q_module.pm";
   $file =~ s{::}{/}g;
+
   eval {
     require "$file";
   };
-  if($@){
+
+  if ($@) {
     throw("Can't find $file [$@]");
   }
-  if(!defined($awol_mark)){
+
+  if (!defined($awol_mark)) {
     $awol_mark = $MARK_AWOL_JOBS; #found in BatchQueue.pm;
   }
-  if(!defined($rename)){
+
+  if (!defined($rename)) {
     $rename = $RENAME_ON_RETRY; #found in General.pm;
   }
-  if(!defined($max_sleep)){
+
+  if (!defined($max_sleep)) {
     $max_sleep = $MAX_JOB_SLEEP; #found in BatchQueue.pm
   }
-  if(!defined($min_sleep)){
+
+  if (!defined($min_sleep)) {
     $min_sleep = $MIN_JOB_SLEEP;
   }
-  if(!defined($base_sleep)){
+
+  if (!defined($base_sleep)) {
     $base_sleep = $SLEEP_PER_JOB;
   }
-  if(!defined($job_limit)){
+  if (!defined($job_limit)) {
     $job_limit = $JOB_LIMIT;
   }
-  if(!$runner){
+
+  if (!$runner) {
     $runner = $PIPELINE_RUNNER_SCRIPT;
   }
+
   $self->batch_q_module($batch_q_module);
   $self->input_ids($input_ids) if($input_ids);
   $self->rules($rules) if($rules);
@@ -154,8 +168,8 @@ sub new{
 sub db{
   my ($self, $db) = @_;
 
-  if($db){
-    if(!$db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
+  if ($db) {
+    if (!$db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')) {
       throw("Can't run the RuleManager with $db you need a ".
             "Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
     }
@@ -179,10 +193,11 @@ sub db{
 sub job_adaptor{
   my ($self, $adaptor) = @_;
 
-  if($adaptor){
+  if ($adaptor) {
     $self->{'job_adaptor'} = $adaptor;
   }
-  if(!$self->{'job_adaptor'}){
+
+  if (!$self->{'job_adaptor'}) {
     my $job_adaptor = $self->db->get_JobAdaptor;
     $self->{'job_adaptor'} = $job_adaptor;
   }
@@ -195,7 +210,7 @@ sub analysis_adaptor{
 
   $self->{'analysis_adaptor'} = $adaptor;
 
-  if(!$self->{'analysis_adaptor'}){
+  if (!$self->{'analysis_adaptor'}) {
     $self->{'analysis_adaptor'} = $self->db->get_AnalysisAdaptor;
   }
   return $self->{'analysis_adaptor'};
@@ -204,10 +219,10 @@ sub analysis_adaptor{
 sub rule_adaptor{
   my ($self, $adaptor) = @_;
 
-  if($adaptor){
+  if ($adaptor) {
     $self->{'rule_adaptor'} = $adaptor;
   }
-  if(!$self->{'rule_adaptor'}){
+  if (!$self->{'rule_adaptor'}) {
     my $rule_adaptor = $self->db->get_RuleAdaptor;
     $self->{'rule_adaptor'} = $rule_adaptor;
   }
@@ -218,17 +233,15 @@ sub rule_adaptor{
 sub stateinfocontainer{
   my ($self, $adaptor) = @_;
 
-  if($adaptor){
+  if ($adaptor) {
     $self->{'stateinfocontainer'} = $adaptor;
   }
-  if(!$self->{'stateinfocontainer'}){
+  if (!$self->{'stateinfocontainer'}) {
     my $stateinfocontainer = $self->db->get_StateInfoContainer;
     $self->{'stateinfocontainer'} = $stateinfocontainer;
   }
   return $self->{'stateinfocontainer'};
 }
-
-
 
 =head2 input_ids
 
@@ -240,17 +253,17 @@ sub stateinfocontainer{
 
 =cut
 
-
 sub input_ids{
   my ($self, $input_ids) = @_;
-  if($input_ids){
+
+  if ($input_ids) {
     throw("Must have a hash ref of input_ids not a $input_ids ") 
       unless(ref($input_ids) eq 'HASH');
     $self->{'input_ids'} = $input_ids;
   }
-  if(!$self->{'input_ids'}){
-    $self->{'input_ids'} = $self->stateinfocontainer->
-      get_all_input_id_analysis_sets;
+
+  if (!$self->{'input_ids'}) {
+    $self->{'input_ids'} = $self->stateinfocontainer->get_all_input_id_analysis_sets;
   }
   return $self->{'input_ids'};
 }
@@ -275,23 +288,23 @@ sub empty_input_ids{
 
 sub rules{
   my ($self, $rules) = @_;
-  if($rules){
+  if ($rules) {
     throw("Must has an array ref of rules not a $rules ") 
       unless(ref($rules) eq 'ARRAY');
     $self->{'rules'} = $rules;
   }
-  if(!$self->{'rules'}){
+  if (!$self->{'rules'}) {
     my @rules = $self->rule_adaptor->fetch_all;
     $self->{'rules'} = \@rules;
   }
   return $self->{'rules'};
 }
 
-
 sub empty_rules{
-  my($self) = @_;
+  my ($self) = @_;
   $self->{'rules'} = undef;
 }
+
 =head2 boolean toggles 
 
   Arg [1]   : int
@@ -306,13 +319,16 @@ sub empty_rules{
 #whether to rename job's output files when retried
 sub rename_on_retry{
   my $self = shift;
-  $self->{'rename_on_retry'} = shift if(@_);
+
+  $self->{'rename_on_retry'} = shift if (@_);
   return $self->{'rename_on_retry'};
 }
+
 #whether to mark jobs which have disappeared from the submission system
 sub mark_awol_jobs{
   my $self = shift;
-  $self->{'mark_awol_jobs'} = shift if(@_);
+
+  $self->{'mark_awol_jobs'} = shift if (@_);
   return $self->{'mark_awol_jobs'};
 }
 
@@ -329,7 +345,8 @@ sub mark_awol_jobs{
 
 sub batch_q_module{
   my $self = shift;
-  $self->{'batch_q_module'} = shift if(@_);
+
+  $self->{'batch_q_module'} = shift if (@_);
   return $self->{'batch_q_module'};
 }
 
@@ -349,29 +366,30 @@ sub batch_q_module{
 
 sub max_job_sleep{
   my $self = shift;
-  $self->{'max_job_sleep'} = shift if(@_);
+  $self->{'max_job_sleep'} = shift if (@_);
   return $self->{'max_job_sleep'};
 }
 
 sub min_job_sleep{
   my $self = shift;
-  $self->{'min_job_sleep'} = shift if(@_);
+
+  $self->{'min_job_sleep'} = shift if (@_);
   return $self->{'min_job_sleep'};
 }
 
 sub sleep_per_job{
   my $self = shift;
-  $self->{'sleep_per_job'} = shift if(@_);
+
+  $self->{'sleep_per_job'} = shift if (@_);
   return $self->{'sleep_per_job'};
 }
 
 sub job_limit{
   my $self = shift;
-  $self->{'job_limit'} = shift if(@_);
+
+  $self->{'job_limit'} = shift if (@_);
   return $self->{'job_limit'};
 }
-
-
 
 =head2 runner/output_dir
 
@@ -384,16 +402,17 @@ sub job_limit{
   from the BatchQueue.pm configuration
 =cut
 
-
 sub runner{
   my $self = shift;
-  $self->{'runner'} = shift if(@_);
+
+  $self->{'runner'} = shift if (@_);
   return $self->{'runner'};
 }
 
 sub output_dir{
   my $self = shift;
-  $self->{'output_dir'} = shift if(@_);
+
+  $self->{'output_dir'} = shift if (@_);
   return $self->{'output_dir'};
 }
 
@@ -414,7 +433,8 @@ sub output_dir{
 #Bio::EnsEMBL::Utils::Exception::verbose
 sub be_verbose{
   my $self = shift;
-  $self->{'verbose'} = shift if(@_);
+
+  $self->{'verbose'} = shift if (@_);
   return $self->{'verbose'};
 } 
 
@@ -435,7 +455,6 @@ sub be_verbose{
 
 =cut
 
-
 sub read_id_file{
   my ($self, $file) = @_;
 
@@ -443,8 +462,8 @@ sub read_id_file{
   open IDS, "< $file" or throw("Can't open $file");
   while (<IDS>) {
     chomp;
-    my($id, $type) = split;
-    if(!$type){
+    my ($id, $type) = split;
+    if (!$type) {
       throw(" id ".$id ." type ".$type."\n need to know what type the ".
             "input ids in the file are  format should be input_id type\n");
     }
@@ -464,14 +483,13 @@ sub read_id_file{
 
 =cut
 
-
 sub process_types{
   my ($self, $types) = @_;
 
-  throw("Can't process $types if not array ref") unless(ref($types) eq
-                                                        'ARRAY');
+  throw("Can't process $types if not array ref") unless(ref($types) eq 'ARRAY');
+
   my %types;
-  foreach my $type(@$types){
+  foreach my $type (@$types){
     $types{$type} = 1;
   }
   return \%types;
@@ -494,26 +512,18 @@ sub process_types{
 sub starts_from_input_ids{
   my ($self, $analyses) = @_;
 
-  throw("Can't process $analyses if not array ref") unless(ref($analyses) 
-                                                           eq 'ARRAY');
+  throw("Can't process $analyses if not array ref") unless(ref($analyses) eq 'ARRAY');
 
   my %ids;
-  foreach my $analysis(@$analyses){
-    my @ids = @{$self->stateinfocontainer
-                  ->list_input_ids_by_analysis($analysis)};
-    foreach my $id(@ids){
+  foreach my $analysis (@$analyses) {
+    my @ids = @{$self->stateinfocontainer->list_input_ids_by_analysis($analysis)};
+
+    foreach my $id (@ids){
       $ids{$analysis->input_id_type}{$id} = 1;
     }
   }
   return \%ids;
 }
-
-
-
-
-
-
-
 
 =head2 create_and_store_job
 
@@ -535,8 +545,6 @@ sub starts_from_input_ids{
 
 =cut
 
-
-
 sub create_and_store_job{
   my ($self, $input_id, $analysis) = @_;
 
@@ -551,15 +559,17 @@ sub create_and_store_job{
      -output_dir => $self->output_dir,
      -runner => $self->runner,
     );
+
   eval{
     $self->job_adaptor->store($job);
   };
-  if($@){
+
+  if ($@) {
     throw("Failed to store job ".$job->input_id." ".
           $job->analysis->logic_name);
-  }else{
+  } else {
     print "Stored ".$job->dbID." ".$job->input_id." ".
-      $job->analysis->logic_name."\n" if($self->be_verbose);
+      $job->analysis->logic_name."\n" if ($self->be_verbose);
   }
   return $job;
 }
@@ -571,39 +581,45 @@ sub create_and_store_job{
   Arg [3]   : string, directory path  (optional)
   Arg [4]   : string, runner script path (optional)
   Arg [5]   : int, for a boolean flag to mark verbosity (optional)
-  Function  : Check if a job can be created for an input_id an analysis
-  If a job already exists check if it needs to be retried
+  Function  : Check if a job can be created for an input_id and analysis
+              If a job already exists check if it needs to be retried
   Returntype: int
   Exceptions: throws if not passed an input_id or an analysis object and
-  if fails to submit the job 
+              if fails to submit the job 
   Example   : $rulemanager->can_run_job('filename', $analysis
                                         'path/to/dir', 
                                         'path/to/runner', 1);
 
 =cut
+
 sub can_job_run{
-  my ($self, $input_id, $analysis) = @_;
-  if(!$input_id || !$analysis){
+  my ($self, $input_id, $analysis,$current_jobs) = @_;
+
+  if (!$input_id || !$analysis) {
     throw("Can't create job without an input_id $input_id or analysis ".
           "$analysis");
   }
+
   my $job;
-  my %current_jobs = %{$self->job_adaptor->fetch_hash_by_input_id
-                         ($input_id)};
-  if($current_jobs{$analysis->dbID}){
-    my $cj = $current_jobs{$analysis->dbID};
+
+  if ($current_jobs->{$analysis->dbID}) {
+    my $cj = $current_jobs->{$analysis->dbID};
     my $status = $cj->current_status->status;
+
     if(($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry){
+      print "\nRetrying job with status $status!!!!\n" if $self->be_verbose;
+
       if($self->rename_on_retry){
         $self->rename_files($cj);
       }
       $cj->set_status('CREATED');
       $job = $cj;
     }
-  }else{
+  } else {
     $job = $self->create_and_store_job($input_id, $analysis);
   }
-  if($job){
+
+  if ($job) {
     eval {
       print "\tBatch running job\n" if $self->be_verbose;
       $job->batch_runRemote;
@@ -614,6 +630,7 @@ sub can_job_run{
     }
     return 1;
   }
+
   return 0;
 }
 
@@ -633,14 +650,15 @@ sub can_job_run{
 sub rename_files{
   my ($self, $job) = @_;
   
-  if(!$job || !$job->isa("Bio::EnsEMBL::Pipeline::Job")){
-    throw("Need a job object ".$job." to rename its files\n");
+  if (!$job || !$job->isa("Bio::EnsEMBL::Pipeline::Job")) {
+    throw("Need a job object " . $job . " to rename its files\n");
   }
   eval{
     move($job->stdout_file, $job->stdout_file.'.retry'.$job->retry_count);
     move($job->stderr_file, $job->stderr_file.'.retry'.$job->retry_count);
   };
-  if($@){
+
+  if ($@) {
     throw("Couldn't rename job ".$job->id."'s output files $@ ");
   }
   return 1;
@@ -668,40 +686,42 @@ sub rename_files{
 sub job_stats{
   my ($self, $job_limit, $jobs) = @_;
 
-  if(!$job_limit){
+  if (!$job_limit) {
     $job_limit = $self->job_limit;
   }
+
   my @jobs;
-  if(!$jobs){
+  if (!$jobs) {
     @jobs = $self->job_adaptor->fetch_all;
-  }else{
+  } else {
     @jobs = @$jobs;
   }
-  if(!$self->batch_q_module->can('job_stats')){
+
+  if (!$self->batch_q_module->can('job_stats')) {
     throw($self->batch_q_module." doesn't have the job_stats method");
   }
   my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in
-  #BatchQueue.pm
+                                                                #BatchQueue.pm
   my %job_stats = %{$self->batch_q_module->job_stats};
   my @awol_jobs;
   my $job_count = 0;
-  JOB:foreach my $job(@jobs){
-    if(!$job_stats{$job->submission_id}){
+  JOB:foreach my $job (@jobs) {
+    if (!$job_stats{$job->submission_id}) {
       push(@awol_jobs, $job);
       next JOB;
     }
-    if($statuses_to_count{$job_stats{$job->submission_id}}){
+    if ($statuses_to_count{$job_stats{$job->submission_id}}) {
       $job_count++;
     }
   }
-  if($self->mark_awol_jobs){
-    foreach my $awol(@awol_jobs){
-      if($self->valid_statuses_for_awol->{$awol->current_status->status}){
+  if ($self->mark_awol_jobs) {
+    foreach my $awol (@awol_jobs){
+      if ($self->valid_statuses_for_awol->{$awol->current_status->status}) {
         $awol->set_status('AWOL');
       }
     }
   }
-  if($job_count >= $job_limit){
+  if ($job_count >= $job_limit) {
     $self->sleep($job_count, $job_limit);
   }
   return 1;
@@ -712,34 +732,36 @@ sub job_stats{
 sub job_limit_check{
   my ($self, $job_limit, $jobs) = @_;
   
-  if(!$job_limit){
+  if (!$job_limit) {
     $job_limit = $self->job_limit;
   }
+
   my @jobs;
-  if(!$jobs){
+  if (!$jobs) {
     @jobs = $self->job_adaptor->fetch_all;
-  }else{
+  } else {
     @jobs = @$jobs;
   }
-  if(!$self->batch_q_module->can('job_stats')){
+
+  if (!$self->batch_q_module->can('job_stats')) {
     throw($self->batch_q_module." doesn't have the job_stats method");
   }
   my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in
-  #BatchQueue.pm
+                                                                #BatchQueue.pm
   my %job_stats = %{$self->batch_q_module->job_stats};
   my $job_count = 0;
-  JOB:foreach my $job(@jobs){
-    if($statuses_to_count{$job_stats{$job->submission_id}}){
+
+  JOB:foreach my $job (@jobs) {
+    if ($statuses_to_count{$job_stats{$job->submission_id}}) {
       $job_count++;
     }
   }
-  if($job_count >= $job_limit){
+
+  if ($job_count >= $job_limit) {
     $self->sleep($job_count, $job_limit);
   }
   return 1;
 }
-
-
 
 =head2 valid_statuses_for_awol/kill
 
@@ -753,11 +775,9 @@ sub job_limit_check{
 
 =cut
 
-
-
-sub valid_statuses_for_awol{
+sub valid_statuses_for_awol {
   my ($self)  = @_;
-  if(!$self->{'status_for_awol'}){
+  if(!$self->{'status_for_awol'}) {
     my %statuses = map{$_, 1} ('SUBMITTED', 'RUNNING', 'READING',
                                'WRITING', 'WAITING');
       $self->{'status_for_awol'} = \%statuses;
@@ -767,7 +787,8 @@ sub valid_statuses_for_awol{
 
 sub valid_statuses_for_kill{
   my ($self)  = @_;
-  if(!$self->{'status_for_kill'}){
+
+  if (!$self->{'status_for_kill'}) {
     my %statuses = map{$_, 1} ('RUNNING', 'WAITING');
       $self->{'status_for_kill'} = \%statuses;
   }
@@ -788,17 +809,17 @@ sub valid_statuses_for_kill{
 
 =cut
 
-
-
 sub sleep{
   my ($self, $job_number, $job_limit) = @_;
   
   my $extra_jobs = $job_number - $job_limit;
-  my $sleep = $extra_jobs * $self->sleep_per_job;
-  $sleep = $self->max_job_sleep if($sleep > $self->max_job_sleep);
-  $sleep = $self->min_job_sleep if($sleep < $self->min_job_sleep);
+  my $sleep      = $extra_jobs * $self->sleep_per_job;
+
+  $sleep = $self->max_job_sleep if ($sleep > $self->max_job_sleep);
+  $sleep = $self->min_job_sleep if ($sleep < $self->min_job_sleep);
  
   sleep($sleep);
+
   return $sleep;
 }
 
@@ -822,7 +843,9 @@ sub create_lock{
   my $host = $self->qualify_hostname(hostname());
   my $user = scalar getpwuid($<);
   my $lock_str = join ":", "$user\@$host", $$, time();
+
   $self->db->pipeline_lock($lock_str);
+
   return $lock_str;
 }
 
@@ -862,12 +885,15 @@ sub qualify_hostname{
 
 sub is_locked{
   my ($self) = @_;
-  if(my $lock_str = $self->db->pipeline_lock){
-    my($user, $host, $pid, $started) = 
-      $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+
+  if (my $lock_str = $self->db->pipeline_lock) {
+    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+
     $started = scalar localtime $started;
+
     my $dbname = $self->db->dbname;
     my $dbhost = $self->db->host;
+
     my $error_str = ("Error: this pipeline appears to be running!\n\n".
                      "\tdb       $dbname\@$dbhost\n".
                      "\tpid      $pid on ".
@@ -884,11 +910,6 @@ sub is_locked{
   return 1;
 }
 
-
-
-
-
-
 =head2 fetch_complete_accumulators
 
   Arg [1]   : none
@@ -901,18 +922,18 @@ sub is_locked{
 
 =cut
 
-
 sub fetch_complete_accumulators{
   my ($self) = @_;
   
   $self->{'complete_accumulators'} = {};
-  my @accumulators = @{$self->stateinfocontainer->
-    fetch_analysis_by_input_id('ACCUMULATOR')};
-  foreach my $analysis(@accumulators){
-    if($analysis->input_id_type eq 'ACCUMULATOR'){
+
+  my @accumulators = @{$self->stateinfocontainer->fetch_analysis_by_input_id('ACCUMULATOR')};
+
+  foreach my $analysis (@accumulators) {
+    if ($analysis->input_id_type eq 'ACCUMULATOR') {
       $self->{'complete_accumulators'}->{$analysis->logic_name} = 1;
-    }else{
-      warn(" analysis ".$analysis->logic_name." must have input id ".
+    } else {
+      warn(" analysis " . $analysis->logic_name . " must have input id " .
            "type ACCUMULATOR");
     }
   }
@@ -924,20 +945,21 @@ sub fetch_complete_accumulators{
 
   Arg [1]   : none
   Function  : ensures any jobs which are sat waiting to be run at the end of
-  a pipeline get left unrun
+              a pipeline get left unrun
   Returntype: 
   Exceptions: 
   Example   : 
 
 =cut
 
-
 sub cleanup_waiting_jobs{
   my ($self) = @_;
+
   my ($a_job) = $self->job_adaptor->fetch_by_Status("CREATED");
+
   if ($a_job) {
     $a_job->flush_runs($self->job_adaptor);
-  }else{
+  } else {
     print STDERR "have no jobs to clean up\n" if($self->verbose);
   } 
 }
@@ -954,16 +976,15 @@ sub cleanup_waiting_jobs{
 
 =cut
 
-
 sub add_created_jobs_back{
   my ($self) = @_;
   my @created_jobs = $self->job_adaptor->fetch_by_Status("CREATED");
-  foreach my $j(@created_jobs){
+
+  foreach my $j (@created_jobs) {
     $j->batch_runRemote;
   }
   return 1;
 }
-
 
 =head2 rules_setup
 
@@ -973,37 +994,36 @@ sub add_created_jobs_back{
   Arg [4]   : hashref of all accumulator analyses
   Arg [5]   : hashref of incomplete accumulators
   Function  : to setup the rules array on the basis of specified analyses
-  to either run or skip
+              to either run or skip
   Returntype: arrayref
   Exceptions: throws if no rules are produces at the end
   Example   : 
 
 =cut
 
-
 sub rules_setup{
   my ($self, $analyses_to_run, $analyses_to_skip, $all_rules,
      $accumulator_analyses, $incomplete_accumulators) =@_;
   my @rules;
-  if(keys(%$analyses_to_run)){
-    foreach my $rule(@$all_rules){
-      if(exists($analyses_to_run->{$rule->goalAnalysis->dbID})){
+
+  if (keys(%$analyses_to_run)) {
+    foreach my $rule (@$all_rules) {
+      if (exists($analyses_to_run->{$rule->goalAnalysis->dbID})) {
         push (@rules, $rule);
-      }elsif($accumulator_analyses->{$rule->goalAnalysis->logic_name}){
-        $incomplete_accumulators->{$rule->goalAnalysis->logic_name}
-          = 1;
+      } elsif ($accumulator_analyses->{$rule->goalAnalysis->logic_name}) {
+        $incomplete_accumulators->{$rule->goalAnalysis->logic_name} = 1;
       }
     }
-  }elsif(keys(%$analyses_to_skip)){
-    foreach my $rule(@$all_rules){
-      if(!exists($analyses_to_skip->{$rule->goalAnalysis->dbID})){
+  } elsif (keys(%$analyses_to_skip)) {
+    foreach my $rule (@$all_rules) {
+      if (!exists($analyses_to_skip->{$rule->goalAnalysis->dbID})) {
         push (@rules, $rule);
       }
     }
-  }else{
+  } else {
     @rules = @$all_rules;
   }
-  if(scalar(@rules) == 0){
+  if (scalar(@rules) == 0) {
     throw("Something is wrong with the code or your commandline setup ".
           "rules_setup has returned no rules");
   }
@@ -1023,7 +1043,6 @@ sub rules_setup{
   Example   : 
 
 =cut
-
 
 sub logic_name2dbID {
   my ($self, $analyses) = @_;
@@ -1063,36 +1082,44 @@ sub input_id_setup{
   my ($self, $ids_to_run, $ids_to_skip, 
       $types_to_run, $types_to_skip, $starts_from) = @_;
   my $id_hash;
+
   $self->empty_input_ids;
-  if($ids_to_run){
+
+  if ($ids_to_run) {
     $id_hash = $self->read_id_file($ids_to_run);
-  }elsif(@$starts_from){
+
+  } elsif (@$starts_from) {
     my @analyses;
+
     foreach my $logic_name(@$starts_from){
       my $analysis = $self->analysisadaptor->
         fetch_by_logic_name($logic_name);
       push(@analyses, $analysis);
     }
     $id_hash = $self->starts_from_input_ids(\@analyses);
-  }else{
+  } else {
     $id_hash = $self->input_ids;
   }
-  if($ids_to_skip){
+
+  if ($ids_to_skip) {
     my $skip_id_hash = $self->read_id_file($ids_to_skip);
+
     foreach my $type (keys(%$skip_id_hash)){
       foreach my $id (keys(%{$skip_id_hash->{$type}})){
         delete($skip_id_hash->{$type}->{$id});
       }
     }
   }
-  if(@$types_to_run){
+
+  if (@$types_to_run) {
     my %types_to_run = map{$_, 1} @$types_to_run;
-    foreach my $type (keys(%$id_hash)){
-      if(!$types_to_run{$type}){
+    foreach my $type (keys(%$id_hash)) {
+      if (!$types_to_run{$type}) {
         delete($id_hash->{$type});
       }
     }
   }
+
   if(@$types_to_skip){
     my %types_to_skip = map{$_, 1} @$types_to_skip;
     foreach my $type (keys(%$id_hash)){
@@ -1101,17 +1128,16 @@ sub input_id_setup{
       }
     }
   }
+
   if(keys(%$id_hash) == 0){
     throw("Something is wrong with the code or the commandline ".
           "input_ids_setup has produced no ids\n");
   }
+
   $self->input_ids($id_hash);
+
   return $id_hash;
 }
-
-
-
-
 
 =head2 check_if_done
 
@@ -1123,22 +1149,23 @@ sub input_id_setup{
 
 =cut
 
-
 sub check_if_done{
   my ($self) = @_;
   my @jobs = $self->job_adaptor->fetch_all;
   my $continue;
- JOB:foreach my $job(@jobs){
+
+ JOB: foreach my $job (@jobs){
     my $status = $job->current_status->status;
-    if($status eq 'KILLED' || $status eq 'SUCCESSFUL'){
+
+    if ($status eq 'KILLED' || $status eq 'SUCCESSFUL') {
       next JOB;
-    }elsif($status eq 'FAILED' || $status eq 'AWOL'){
-      if(!$job->can_retry){
+    } elsif ($status eq 'FAILED' || $status eq 'AWOL') {
+      if (!$job->can_retry) {
         next JOB;
-      }else{
+      } else {
         return 1;
       }
-    }else{
+    } else {
       return 1;
     }
   }

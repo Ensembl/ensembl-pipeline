@@ -222,8 +222,8 @@ sub db {
     my( $self, $value ) = @_;
 
     if ($value) {
-       $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
-         || &throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
+       $value->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+         || &throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
 
        $self->{'_db'} = $value;
     }

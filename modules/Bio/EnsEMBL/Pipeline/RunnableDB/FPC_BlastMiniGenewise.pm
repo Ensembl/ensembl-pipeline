@@ -359,11 +359,11 @@ sub fetch_input {
 sub run {
   my ($self) = @_;
   
-  $self->genewise_db->disconnect_when_inactive(1);
+  $self->genewise_db->dbc->disconnect_when_inactive(1);
   foreach my $runnable ($self->runnable) {
     $runnable->run;
   }
-  $self->genewise_db->disconnect_when_inactive(0);
+  $self->genewise_db->dbc->disconnect_when_inactive(0);
   
   $self->convert_output;
 }

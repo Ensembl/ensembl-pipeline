@@ -190,31 +190,36 @@ sub check_for_analysis {
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
     print "In check_for_analysis failed input_id_type check as goal input_id type ".
-      "isn't the same as the input_id type\n" if($verbose);
+      "isn't the same as the input_id type\n" if ($verbose);
     $return += 1;
   }
 
 
-  print "My goal is " . $goal_anal->logic_name . "\n" if($verbose);
+  print " My goal is " . $goal_anal->logic_name . "\n" if($verbose);
+  print " Completed anals on this id:\n" if ($verbose);
 
   for my $analysis ( @$analist ) {
 
-    print " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n" if($verbose);
+    print "  Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n" if($verbose);
     $anaHash{$analysis->logic_name} = $analysis;
 
     if ($goal == $analysis->dbID) {
       # already done
-      print $goal_anal->logic_name." already done\n" if($verbose);
+      print $goal_anal->logic_name." already done\n" if ($verbose);
       $return += 2;
     }
   }
 
 #the completed_accumulator_href contains input_id_type ACCUMULATOR anals that have completed
+  print " Checking conditions:\n" if ($verbose);
   for my $cond ( @{$self->{'_conditions'}} ) {
     if ( ! exists $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
-      print " failed condition check for $cond\n" if($verbose);
+      print "   failed condition check for $cond\n" if ($verbose);
       $return += 4;
     }
+  }
+  if ($return < 4) {
+    print "  All conditions satisfied\n" if ($verbose);
   }
 
   return $return if $return;

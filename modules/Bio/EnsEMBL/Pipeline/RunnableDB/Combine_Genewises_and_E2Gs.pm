@@ -151,9 +151,9 @@ sub fetch_input{
   my $newcdna = $self->_filter_cdnas(\@cdna);
   $self->cdna_genes($newcdna);
   print STDERR "got " . scalar(@{$self->cdna_genes}) . " cdnas after filtering\n";
-  $self->genewise_db->disconnect_when_inactive(1);
-  $self->cdna_db->disconnect_when_inactive(1);
-  $self->blessed_db->disconnect_when_inactive(1);
+  $self->genewise_db->dbc->disconnect_when_inactive(1);
+  $self->cdna_db->dbc->disconnect_when_inactive(1);
+  $self->blessed_db->dbc->disconnect_when_inactive(1);
 }
 
 sub run {
