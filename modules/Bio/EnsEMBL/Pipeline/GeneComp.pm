@@ -704,6 +704,7 @@ sub map_temp_Genes_to_real_Genes{
 	    $newg{$newgeneid}->modified($now);
 	    push (@final_genes,$newg{$newgeneid});
 	}
+
 	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
 	    $has_moved_old{$oldgeneid} = 1;
 	    if( $oldgeneid ne $largest ) {

@@ -42,30 +42,55 @@ use strict;
 
 # Object preamble - inheriets from Bio::Root::RootI
 
-use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::Root::RootI;
+use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
 
 sub new {
   my($class,@args) = @_;
 
-  my $self = $class->SUPER::new(@args);
-
+  my $self = {};
+ 
   $self->{'_final'} = [];
   $self->{'_crossmatch'} = [];
-
+  bless $self,$class;
+  $self->id_generation('start');
   my ($cross_db,$score) = $self->_rearrange([qw(CROSSDB SCORE)],@args);
 
-  if ((!$cross_db) || 
-      (!$cross_db->isa('Bio::EnsEMBL::DBSQL::CrossMatchDBAdaptor'))) {
+  if ((!$cross_db) || (!$cross_db->isa('Bio::EnsEMBL::DBSQL::CrossMatchDBAdaptor'))) {
       $self->throw("You need to provide a CrossMatch database adaptor to run CrossCloneMap!");
   }
+  $self->dbobj($cross_db);
   $self->_score($score);
 
   return $self;
 }
 
+
+=head2 id_generation;
+
+ Title   : id_generation;
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub id_generation{
+   my ($self,$start) = @_;
+
+   if ($start) {
+       $self->{'id'}=0; 
+   }
+   my $c = $self->{'id'};
+   $self->{'id'}=$c+1;
+   return $c;
+}
 
 =head2 fetch_input
 
@@ -81,7 +106,7 @@ sub new {
 
 sub fetch_input{
    my ($self,$input_id) = @_;
-
+   
    $self->_acc($input_id);
    # connects to donor and acceptor database for this clone
    #This is a crossmatch DB adaptor
@@ -100,12 +125,15 @@ sub fetch_input{
    
    my @newseq;
    my @oldseq;
-
+   my %id_hash;
    foreach my $contig ( @newcontigs ) {
-       $contig->id =~ /\S+\.(\d+)/;
+       $contig->id =~ /\w+\.(\d+\..*)/;
        my $number = $1;
+       my $id = $self->id_generation;
        my $version = $newclone->embl_version;
-       my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
+       $id_hash{$id}=$version.".".$number;
+       my $seq = Bio::PrimarySeq->new( -display_id => "$id", -seq => $contig->seq);
+       print STDERR "Created seq with id $id for ".$id_hash{$id}." 9contig id ".$contig->id."\n";
        push(@newseq,$seq);
    }
 
@@ -114,6 +142,7 @@ sub fetch_input{
        my $number = $1;
        my $version = $oldclone->embl_version;
        my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
+       print STDERR "Created seq with id $version\_$number\n";
        push(@oldseq,$seq);
    }
    print STDERR "Creating crossmatches for clone ".$self->_acc."\n";
@@ -129,9 +158,30 @@ sub fetch_input{
 	   push(@{$self->{'_crossmatch'}},$cross);
        }
    }
+   $self->idhash(\%id_hash);
    return;
 }
 
+=head2 idhash
+
+ Title   : idhash
+ Usage   : $obj->idhash($newval)
+ Function: Getset for idhash value
+ Returns : value of idhash
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub idhash{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'idhash'} = $value;
+    }
+    return $obj->{'idhash'};
+
+}
 
 
 =head2 run
@@ -231,7 +281,11 @@ sub run{
    my @final=();
    foreach my $seqname (keys %looks_ok) {
        foreach my $fp (@{$looks_ok{$seqname}}) {
-	   my $sn=$self->_acc.".".$fp->seqname;
+	   my $ref = $self->idhash;
+	   my %id_hash = %$ref;
+	   my $backid = $id_hash{$fp->seqname};
+	   my $sn=$self->_acc.".".$backid;
+           #my $sn=$self->_acc.".".$fp->seqname;
 	   my $hsn=$self->_acc.".".$fp->hseqname;
 	   $sn =~ s/\_/\./g;
 	   $hsn =~ s/\_/\./g;
@@ -280,6 +334,18 @@ sub write_output{
  Returns : value of dbobj
  Args    : newvalue (optional)
 
+
+=cut
+
+sub dbobj{
+   my ($self,$value) = @_;
+   if( defined $value) {
+      $self->{'_dbobj'} = $value;
+    }
+    return $self->{'_dbobj'};
+
+}
+
 =head2 score
 
  Title   : score
@@ -322,5 +388,3 @@ sub _acc{
     return $self->{'_acc'};
 
 }
-
-1;
