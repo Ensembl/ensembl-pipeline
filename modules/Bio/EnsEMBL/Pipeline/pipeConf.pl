@@ -22,6 +22,7 @@ package main;
 %pipeConf = ( 
     'nfstmp.dir' => '/work1/scp/out',
                                # working directory for err/outfiles
+    'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
     'DBI.driver' => 'mysql',
     'dbhost'     => 'ecs1e',
     'dbname'     => 'simon_test',
