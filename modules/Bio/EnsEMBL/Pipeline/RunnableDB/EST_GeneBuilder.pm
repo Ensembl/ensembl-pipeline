@@ -190,7 +190,9 @@ sub write_output {
 
 sub fetch_input {
     my( $self) = @_;
-  
+
+    print STDERR "IN THE 120 BRANCH\n";
+
     # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
     my $genetype =  $::est_genome_conf{'genetype'};
 
@@ -255,7 +257,8 @@ GENE:
 	next GENE;
       }
     }
-    print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
+    print STDERR "In EST_GeneBuilder.fetch_input(): ".scalar(@plus_transcripts) . " forward strand genes\n";
+    print STDERR "($single single exon genes thrown away)\n";
 
     # cluster each strand
     if(scalar(@plus_transcripts)){
@@ -332,6 +335,7 @@ GENE:
 
       my @exons = $transcripts[0]->get_all_Exons;
       
+      # throw away single-exon genes
       if(scalar(@exons) == 1){
 	$single++;
 	next REVGENE;
@@ -344,12 +348,11 @@ GENE:
 	next REVGENE;
       }
     }
-    print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes, and $single single exon genes\n";
+    print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@minus_transcripts) . " reverse strand genes\n";
+    print STDERR "($single single exon genes thrown away)\n";
     
     if(scalar(@minus_transcripts)){
       
-      
-
       $self->_flush_Transcripts;  # this empties out the array $self->{'_transcripts'}
       
 #      # test
@@ -417,7 +420,6 @@ sub _flush_Transcripts {
   return;
 }
 
-
 =head2 cluster_transcripts
 
     Title   :   cluster_transcripts
@@ -428,15 +430,18 @@ sub _flush_Transcripts {
 
 =cut
 
-# borrows very heavily from Spangle
 sub cluster_transcripts {
   my ($self, $alltranscripts, $reverse) = @_;
 
   # need all the exons - we're going to cluster them; while we're at it, check consistency of hid & strand
   my %est2transcript;  # relate transcript to est id
   my %exon2est;        # relate exon to est id
-  my @exons = $self->check_transcripts(\%est2transcript, \%exon2est, @$alltranscripts);
- 
+  
+  my ($ref_transcripts,$ref_exons) = $self->check_transcripts(\%est2transcript, \%exon2est, @$alltranscripts);
+  
+  my @exons = @{ $ref_exons };
+  $self->_filtered_Transcripts( @{ $ref_transcripts } );
+
   # store references to the exon and transcript hashes
   $self->{'_est2transcript'} = \%est2transcript;
   $self->{'_exon2est'}       = \%exon2est;
@@ -460,6 +465,28 @@ sub cluster_transcripts {
 
 }
 
+=head2
+  
+   Title   : _filtered_Transcripts
+   Function: this method gets/sets an array of Bio::EnsEMBL::Transcript objects which have been filtered
+             previously in the method 'check_Transcripts'
+
+=cut
+
+sub _filtered_Transcripts {
+   my ($self, @filtered_transcripts) = @_;
+   unless ( $self->{'_filtered_transcripts'} ){
+     $self->{'_filtered_transcripts'} = [];
+   }
+   if ( @filtered_transcripts ){
+     unless ( $filtered_transcripts[0]->isa('Bio::EnsEMBL::Transcript') ){
+       $self->throw('Must pass a Bio::EnsEMBL::Transcript object');
+     }
+     push( @{ $self->{'_filtered_transcripts'} }, @filtered_transcripts );
+   }
+   return @{ $self->{'_filtered_transcripts'} }
+}
+
 =head2 check_transcripts
 
     Title   :   check_transcripts
@@ -473,7 +500,8 @@ sub cluster_transcripts {
 
 sub check_transcripts {
   my ($self, $hid_trans, $exon_hid, @transcripts) = @_;
-  my @allexons;  # here we'll put all exons that pass the check
+  my @allexons;       # here we'll put all exons that pass the check
+  my @alltranscripts; # here we'll put all the transcripts that pass the check
   my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
 
   TRANS: 
@@ -535,9 +563,10 @@ sub check_transcripts {
     }
 #    print STDERR "hid: ".$hid."\ttranscript: ".$transcript."\n";
     $$hid_trans{$hid} = $transcript;
+    push (@alltranscripts, $transcript);
   }
 
-  return @allexons;
+  return (\@alltranscripts,\@allexons);
 }
 
 
@@ -548,7 +577,7 @@ sub make_clusters {
   my $main_cluster = new Bio::EnsEMBL::SeqFeature; # main cluster feature - holds all subclusters
   @exons = sort { $a->start <=> $b->start } @exons;
 
-  return unless @exons >= 0; # no point if there are no exons!
+  return unless ( scalar( @exons) > 0 ); # no point if there are no exons!
   
   # Create the first cluster object
   my $subcluster = new Bio::EnsEMBL::SeqFeature;
@@ -597,15 +626,31 @@ sub make_clusters {
   
 ## we allow clusters with cDNA (or mRNA) evidence if they have 
 ## one or more exons, hence in this case 'strict_lower_bound' = 0, but we don't allow 
-## single-exon clusters with only ESTs as supporting evidence, hence in this case 'strict_lower_boundt' = 1
+## single-exon clusters with only ESTs as supporting evidence, hence in this case 'strict_lower_bound' = 1
 
   my $strict_lower_bound = $::evidence_conf{'strict_lower_bound'};
   
   # empty out the list of clusters
   $main_cluster->flush_sub_SeqFeature;
-  print STDERR "Keeping clusters with ".($strict_lower_bound+1)." or more exons...\n";
+  print STDERR "keeping clusters with ".($strict_lower_bound+1)." or more exons...\n";
 
-  #my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
+  # store cluster and transcript in which each exon lives:
+  my %exon_in_cluster;
+  my %exon_in_transcript;
+  
+  foreach my $exon_cluster ( @exon_clusters ){
+    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
+      $exon_in_cluster{ $exon } = $exon_cluster;
+    }
+  }
+  my @transcripts   = $self->_filtered_Transcripts; # transcripts filtered in 'check_Transcripts'
+  foreach my $tran ( @transcripts ){
+    foreach my $exon ($tran->get_all_Exons ){
+      $exon_in_transcript{$exon} = $tran;
+    }
+  }
+
+  # prune the exon clusters
  EXON_CLUSTER:
   foreach my $exon_cluster (@exon_clusters) {
     my @exons = $exon_cluster->sub_SeqFeature;
@@ -614,33 +659,12 @@ sub make_clusters {
     if ( scalar(@exons) == 0 ){
       next EXON_CLUSTER;
     }
-    
-    #$exon_adaptor->fetch_evidence_by_Exon($exons[0]);
-    #my @sf = $exons[0]->each_Supporting_Feature;      
-    
-    # throw away clusters with too little exons (this should be set in Bio::EnsEMBL::Pipeline::EST_conf.pl)
-    unless ( scalar(@exons) > $strict_lower_bound ){
-	next EXON_CLUSTER; 
-    }
-    
-    # keep the rest
-    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
-  }
-  
-#  ################################################################################
-#  # NOTE THAT WHAT FOLLOWS IS A HACK TO MAKE IT WORK IN DROSOPHILA BECAUSE cDNAs and ESTs
-#  # WHERE MIXED IN THE SAME DATABASE, IT IS RECOMMENDED TO RUN THESE INDEPENDENTLY
-#  ################################################################################
-# EXON_CLUSTER:
-#  foreach my $exon_cluster (@exon_clusters) {
-#    my @exons = $exon_cluster->sub_SeqFeature;
-#    if ( scalar(@exons) == 0 ){
-#      next EXON_CLUSTER;
-#    }
-#    if ( scalar(@exons) == 1 ){
-#      my $found_est  = 0;
-#      my $found_cdna = 0;
-#      foreach my $feature ( $exons[0]->each_Supporting_Feature ){
+
+    # in drosophila ESTs and cDNAs are together, so we need to differentiate
+   # my $found_est  = 0;
+#    my $found_cdna = 0;
+#    foreach my $exon ( @exons ){
+#      foreach my $feature ( $exon->each_Supporting_Feature ){
 #	my $hid = $feature->hseqname;
 #	if ( $hid =~ /\./g ){  # ESTs have labels like AT19106.5prime or like LD23056.contig.5_3prime
 #	  $found_est = 1;
@@ -649,18 +673,56 @@ sub make_clusters {
 #	  $found_cdna = 1;
 #	}
 #      }
-#      if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
-#	next EXON_CLUSTER; 
-#      }
 #    }
-#    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
-#  }
+#    if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
+#       $strict_lower_bound = 1;
+#    }
+#    else{
+#       $strict_lower_bound = 0;
+#     }
+
+    # throw away clusters with too little exons (this should be set in Bio::EnsEMBL::Pipeline::EST_conf.pl)
+    unless ( scalar(@exons) > $strict_lower_bound ){
+
+      # but allow for sister clusters, i.e. if the exon is part of a transcript...
+      my $transcript = $exon_in_transcript{ $exons[0] };
+
+      # ...with exons which are in clusters with more than one exon
+      my @clusters;
+      foreach my $exon ( $transcript->get_all_Exons ){
+	push ( @clusters, $exon_in_cluster{$exon} );
+      }
+      # my threshold
+      my $howmany=1;
+
+      # count how many clusters there are with more than $howmany exon
+      my $count = 0;
+      foreach my $cluster ( @clusters ){
+	my @exons = $cluster->sub_SeqFeature;
+	if ( scalar(@exons) > $howmany ){
+	  $count++;
+	}
+      }
+      
+      # throw away this cluster unless there is at least $somany sister-cluster with more than one exon
+      my $somany=1;
+      unless ( $count >= $somany ){
+	next EXON_CLUSTER; 
+      }
+    }
+    
+    # keep the rest
+    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
+  }
   
   @exon_clusters = $main_cluster->sub_SeqFeature;
   print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters kept\n";
       
   return $main_cluster;
 }
+
+
+ 
 
 =head2 find_common_ends
 
@@ -913,12 +975,17 @@ sub link_clusters{
     my $cluster1 = $clusters[$c1];             
     my @exons1   = $cluster1->sub_SeqFeature; 
     my $c2       = $c1 + 1;
-    my $limit    = 2; # how many exons away we look to find a link, 2 is the limit used by sub make_ExonPairs 
-                      # in GeneBuilder.pm
+    my $limit    = 2;  # how many exons away we look to find a link, 2 is the limit used by sub make_ExonPairs 
+                       # in GeneBuilder.pm
+    
+    # NOTE!!!!
+    # Maybe put this definition inside CLUSTER2 loop ?????
+    my %used_evidence; # we keep track of the evidence that have been used to make links
     
     # Now look (in each exon ) in the next $limit clusters to find a link
   CLUSTER2:    
     while ( $c2 <= ( $c1 + $limit ) && $c2 <= $#clusters ) {
+      # print STDERR "...trying to link clusters $c1 and $c2...\n";
       my $cluster2 = $clusters[$c2];      
       my @exons2   = $cluster2->sub_SeqFeature;
       
@@ -935,45 +1002,49 @@ sub link_clusters{
 	  
 	EXON2:
 	  foreach my $exon2 (@exons2){ 
+
+	    # if we have the same id in two clusters then...
 	    if ($$exon_hid{$exon2}{'hid'} eq $hid1){
 	      $exon_link = $exon2;
-	      # we've found a link, we can stop searching
-	      last EXON2;
-	    }
-	  } #end of EXON2
-
-	  # If we have the same id in two clusters then...
-	  if ( defined $exon_link ) {
-	    #print("  Found ids in two clusters: " . $exon1->dbID . " " . $exon_link->dbID  . "\n");
-	    
-	    # Check the strand is the same and only allow a $tol discontinuity in the h-sequence
-	    my $tol1 = abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'});
-	    my $tol2 = abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'});
-
-	    if ( $exon1->strand == $exon_link->strand && ( $tol1 < $tol || $tol2 < $tol ) ) {
-	      $foundlink = 1;
-	      push(@{ $cluster1->{'_forward'} } ,$cluster2);
-	      print STDERR "*** linking cluster $c1 to cluster $c2 ***\n";
-	      # just announcing alternative splicing
-	      if ( $c2 >= $c1+$limit ){
-	       print STDERR " -------------- Alternative Splicing ----------------\n";
-	       print STDERR "hid1 : ".$hid1." hid2 : ".$$exon_hid{$exon_link}{'hid'}."\n";
-	      # print STDERR "exons in cluster $c1: ".scalar( @exons1 )."\n";
-	      # print STDERR "exons in cluster $c2: ".scalar( @exons2 )."\n";
+	      if ( $used_evidence{$hid1} && $used_evidence{$hid1} == 1 ){
+		# print STDERR $hid1." used already, searching further...\n";
+		next EXON2;
 	      }
-	      $c2++;
-	      next CLUSTER2;
+	      
+	      # Check the strand is the same and only allow a $tol discontinuity in the h-sequence
+	      my $tol1 = abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'});
+	      my $tol2 = abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'});
+
+	      if ( $exon1->strand == $exon_link->strand && ( $tol1 < $tol || $tol2 < $tol ) ) {
+		push(@{ $cluster1->{'_forward'} } ,$cluster2);
+		print STDERR "*** linking cluster $c1 to cluster $c2 ***";
+		# print STDERR "hid1 : ".$hid1." hid2 : ".$$exon_hid{$exon_link}{'hid'}."\n";
+		
+		# just announcing alternative splicing
+		if ( $c2 >= $c1+$limit && scalar( @{ $cluster1->{'_forward'} } ) ==2 ){
+		  print STDERR " -------------- Alternative Splicing ---------------\n";
+		}
+
+		# we've found a link, we can stop searching in this cluster
+		$used_evidence{$hid1} = 1;
+		$c2++;
+		next CLUSTER2;		
+	      }
+	      # else we search further in the cluster
+	      else{
+		print STDERR "cannot make link: tol1 = $tol1, tol2 = $tol2\n";
+		next EXON2;
+	      }
 	    }
-	
-	  } # end of if ( defined $exon_link )
-	  
+
+	  } # end of EXON2
+
 	}   # end of EXON1
-	
-	if ($foundlink != 1){
-	  # print STDERR "not going to be able to link cluster $c1 and $c2\n";
-	}
-	
+
       }     # end of if ($cluster2->start > $cluster1->end)
+
+      # if we are here that means that no link was found with cluster2
+      # print STDERR "couldn't find link between cluster $c1 and cluster $c2\n";
       $c2++;
     }       # end of CLUSTER2
 
