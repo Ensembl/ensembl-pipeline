@@ -34,6 +34,7 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
@@ -45,7 +46,7 @@ use vars qw(@ISA);
 my $dbtype = 'rdb';
 my $host   = 'localhost';
 my $port   = '410000';
-my $dbname = 'ensembl_freeze24';
+my $dbname = 'ensembl_freeze15_tim';
 my $dbuser = 'root';
 my $pass   = undef;
 my $runnable;

@@ -1,10 +1,10 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-06");
-}
+#BEGIN {
+#  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
+#  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
+#  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-06");
+#}
 
 =head1 NAME
 
