@@ -160,11 +160,12 @@ my $batch_q_module =
 
 my $file = "$batch_q_module.pm";
 $file =~ s{::}{/}g;
+
 eval {
     require "$file";
 };
 if ($@) {
-    print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
+    print STDERR "$@\nError trying to load $batch_q_module;\ncan't find $file\n";
     exit 1;
 }
 
@@ -630,7 +631,7 @@ sub run_if_new {
           
           print "Retrying job\n" if $verbose;
         }else {
-          print "\nJob already in pipeline with status : " . $status->status . "\n" if $verbose ;
+          print "\nJob already in pipeline with status : " . $status . "\n" if $verbose ;
         }
         $retFlag = 1;
       }
