@@ -118,15 +118,22 @@ my %mouse_cdna_seqs;
 
 HUMAN:
 foreach my $humanNM ( @human_cdnas ){
-  my $humanNM_seq = $seqfetcher->get_Seq_by_acc($humanNM);
+  $humanNM =~/(\S+)\.\d*/;
+  my $cdna_id = $1;
+  my $humanNM_seq = $seqfetcher->get_Seq_by_acc($cdna_id);
+  $humanNM_seq->display_id( $humanNM );
   unless ( $humanNM_seq ){
     print STDERR "Failed to find sequence $humanNM\n";
     next HUMAN;
   }
   push ( @human_cdna_seqs, $humanNM_seq );
   $human_cdna_seqs{ $humanNM } = $humanNM_seq;
+
   my $humanNP = $human_cdna2protein{$humanNM};
-  my $humanNP_seq = $seqfetcher->get_Seq_by_acc($humanNP);
+  $humanNP =~/(\S+)\.\d*/;
+  my $prot_id = $1;
+  my $humanNP_seq = $seqfetcher->get_Seq_by_acc($prot_id);
+  $humanNP_seq->display_id( $humanNP );
   unless ( $humanNP_seq ){
     print STDERR "Failed to find sequence $humanNP\n";
     next HUMAN;
@@ -136,7 +143,10 @@ foreach my $humanNM ( @human_cdnas ){
 
 MOUSE:
 foreach my $mouseNM ( @mouse_cdnas ){
-  my $mouseNM_seq = $seqfetcher->get_Seq_by_acc($mouseNM);
+  $mouseNM =~/(\S+)\.\d*/;
+  my $cdna_id = $1;
+  my $mouseNM_seq = $seqfetcher->get_Seq_by_acc($cdna_id);
+  $mouseNM_seq->display_id($mouseNM);
   unless ( $mouseNM_seq ){
     print STDERR "Failed to find sequence $mouseNM\n";
     next MOUSE;
@@ -144,7 +154,10 @@ foreach my $mouseNM ( @mouse_cdnas ){
   push ( @mouse_cdna_seqs, $mouseNM_seq );
   $mouse_cdna_seqs{ $mouseNM } = $mouseNM_seq;
   my $mouseNP = $mouse_cdna2protein{$mouseNM};
-  my $mouseNP_seq = $seqfetcher->get_Seq_by_acc($mouseNP);
+  $mouseNP =~/(\S+)\.\d*/;
+  my $prot_id = $1;
+  my $mouseNP_seq = $seqfetcher->get_Seq_by_acc($prot_id);
+  $mouseNP_seq->display_id( $mouseNP );
   unless ( $mouseNP_seq ){
     print STDERR "Failed to find sequence $mouseNP\n";
     next MOUSE;
