@@ -38,15 +38,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Root;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					);
 
@@ -62,7 +60,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object,
                 -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
@@ -73,13 +71,8 @@ sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  # dbobj, input_id, seqfetcher, and analysis objects are all set in
+  # db, input_id, seqfetcher, and analysis objects are all set in
   # in superclass constructor (RunnableDB.pm)
-
-  # golden path
-  my $path = $GB_GOLDEN_PATH;
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->static_golden_path_type($path);
 
   return $self;
 }
@@ -89,8 +82,7 @@ sub new {
  Title   : make_seqfetcher
  Usage   :
  Function: if $index exists, 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
+           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise throws
  Example :
  Returns : Bio::DB::RandomAccessI
  Args    : $indexname - string
@@ -102,16 +94,17 @@ sub make_seqfetcher {
   my ( $self, $index ) = @_;
 
   my $seqfetcher;
-
+  #print STDERR "index is ".$index."\n";
   if(defined $index && $index ne ''){
+   # print STDERR "index is ".$index."\n";
     my @db = ( $index );
+    #print "array of indexes are @db\n";
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
 								  '-db' => \@db,
 								 );
   }
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw("can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -158,27 +151,29 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
 
-  my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->dbobj );
+  my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->db );
   my $input_id = $self->input_id;
   my $msg = "input_id $input_id has invalid format - expecting chrname.start-end";
-  $self->throw($msg) unless $input_id =~ /(\w+)\.(\d+)-(\d+)/;
+  $self->throw($msg) unless $input_id =~ /(^\w+)\.(\d+)-(\d+)/;
   
   my $chrname = $1;
   my $start   = $2;
   my $end     = $3;
 
-print STDERR "fetching features for $chrname $start $end\n";
-
+  #print STDERR "fetching features for $chrname $start $end\n";
+  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chrname, $start, $end);
+  #print STDERR "have ".@features." to run with\n";
   foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chrname, $start, $end)){
+    
     my $input = $feat->chr_name   . ":" . 
                 $feat->start      . "," . 
                 $feat->end        . ":" . 
                 $feat->protein_id . ":" ;
 
-    print STDERR "TGW input: $input\n";
+    #print STDERR "TGW input: $input\n";
 
     my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise(
-								       -dbobj         => $self->dbobj,
+								       -db         => $self->db,
 								       -input_id      => $input,
 								       -seqfetcher    => $protein_fetcher,
 #								       -analysis => $analysis,
@@ -233,7 +228,7 @@ sub targetted_runnable{
 sub run {
   my ($self) = @_;
 
-  print STDERR "***Running targetted build***\n";
+  #print STDERR "***Running targetted build***\n";
  TGE:   
   foreach my $tge($self->targetted_runnable){
     
