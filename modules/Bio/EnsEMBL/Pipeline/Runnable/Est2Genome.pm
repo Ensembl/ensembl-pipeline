@@ -98,7 +98,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
+        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -119,7 +119,7 @@ sub est_sequence {
     
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
+        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{'_est_sequence'} = $value;
     }
     return $self->{'_est_sequence'};
@@ -192,7 +192,7 @@ sub run {
               #split on whitespace
               my @elements = split;
               #extract values from output line
-              my $f1score  = $elements[1];
+              my $f1score  = $elements[2];
               my $f1start  = $elements[3];
               my $f1end    = $elements[4];
               my $f1id     = $elements[5];
@@ -256,6 +256,8 @@ sub _createfeatures {
                                  -gff_source      => $f1source,
                                  -gff_feature     => $f1primary,);
     
+    print STDERR $analysis_obj . "\n";
+
     #create features
     my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
                                               -end =>     $f1end,

@@ -82,7 +82,7 @@ sub _initialize {
 						   'FEATURES'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeq") unless $genomic->isa("Bio::PrimarySeq");
+    $self->throw("[$genomic] is not a Bio::Seq") unless $genomic->isa("Bio::Seq");
 
     $self->genomic_sequence($genomic) if $genomic; 
 
@@ -122,7 +122,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
+        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -269,11 +269,12 @@ sub make_miniseq {
     my $mingap = $self->minimum_intron;
 
     my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
+
     my @genomic_features;
 
     my $prevend     = 0;
     my $prevcdnaend = 0;
-
+    
     foreach my $f (@features) {
 	print STDERR "Found feature - " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n";
 
@@ -284,23 +285,19 @@ sub make_miniseq {
 	my $start = $f->start;
 	my $end   = $f->end;
 
-	#if ($start > $end) {
-	#    my $tmp = $end;
-	#    $f->end  ($start);
-	#    $f->start($tmp);;
-	#}
-	
 	$start = $f->start - $self->exon_padding;
 	$end   = $f->end   + $self->exon_padding;
 
-	my $gap = ($start - $prevend);
+	my $gap     = ($start - $prevend);
 	my $cdnagap = abs($f->hstart - $prevcdnaend);
+
 	print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
 	print STDERR "Padding feature - new start end are $start $end ($cdnagap)\n";
 
-
 	print STDERR "Count is $count : $mingap " . $gap  . "\n";
-	if ($count > 0 && (($gap <  $mingap) || ($cdnagap > 20))) {
+
+#	if ($count > 0 && (($gap <  $mingap) || ($cdnagap > 20))) {
+	if ($count > 0 && ($gap < $mingap)) {
 	    print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
 	    $genomic_features[$#genomic_features]->end($end);
@@ -428,7 +425,7 @@ ID:    foreach my $id (@id) {
 	my $newid = $self->parse_Header($id);
 
 	next ID unless defined($newid);
-	print(STDERR "New id is $newid [$id]\n");
+	print(STDERR "New id :  is $newid [$id]\n");
 
 	open(IN,"pfetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
 
@@ -449,12 +446,12 @@ ID:    foreach my $id (@id) {
 		$seq .= $_;
 	    }
 	}
-	
+
 	if (!defined($seq)) {
 	    $self->throw("Couldn't find sequence for $newid [$id]");
 	}
     
-	my $seq = new Bio::PrimarySeq(-id  => $newid,
+	my $seq = new Bio::Seq(-id  => $newid,
 				      -seq => $seq);
 	
 	$self->{_seq_cache}{$id} = $seq;
@@ -485,7 +482,7 @@ sub get_all_Sequences {
 	my $seq = <IN>;
 	chomp($seq);
 	if ($seq ne "no match") {
-	    $self->{_seq_cache}{$id} = new Bio::PrimarySeq(-seq => $seq,
+	    $self->{_seq_cache}{$id} = new Bio::Seq(-seq => $seq,
 							   -id  => $newid[$count]);
 	}
 	$count++;
@@ -516,7 +513,7 @@ sub get_all_Sequences {
 	    $self->warn("Couldn't find sequence for $newid [$id]");
 	}
 	
-	my $seq = new Bio::PrimarySeq(-id  => $newid,
+	my $seq = new Bio::Seq(-id  => $newid,
 				      -seq => $seq);
 
 	print("Found seq for $id  $seq\n");
@@ -558,7 +555,7 @@ sub run {
 
 	my @f = $eg->output;
 	foreach my $f (@f) {
-	    print("Aligned output is " . $f->id . "\t" . $f->start . "\t" . $f->end . "\n");
+	    print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
 	}
 	push(@{$self->{_output}},@f);
 
@@ -570,8 +567,8 @@ sub minirun {
 
     my $idhash = $self->get_all_FeaturesById;
     my @ids    = keys %$idhash;
-
-#    $self->get_all_Sequences(@ids);
+    print ("here\n");
+   # $self->get_all_Sequences(@ids);
 
     ID: foreach my $id (@ids) {
 
@@ -585,8 +582,9 @@ sub minirun {
 
 	eval {
 	    my $miniseq = $self->make_miniseq(@$features);
+	    
 	    my $hseq    = $self->get_Sequence($id);
-	    print("Hseq $id " . $hseq->seq . "\n");
+#	    print("Hseq $id " . $hseq->seq . "\n");
 	    if (!defined($hseq)) {
 		$self->throw("Can't fetch sequence for id [$id]\n");
 	    }
@@ -601,13 +599,13 @@ sub minirun {
 	    
 	    foreach my $f (@f) {
 		print(STDERR "Aligned output is " . $f->id    . "\t" . 
-		      $f->start . "\t" . 
-		      $f->end   . "\t(" . 
-		      $f->strand . ")\t" .
-		      $f->hseqname  . "\t" . 
-		      $f->hstart   . "\t" . 
-		      $f->hend     . "\t(" .
-		      $f->hstrand  . ")\n");
+		      $f->start      . "\t" . 
+		      $f->end        . "\t(" . 
+		      $f->strand     . ")\t" .
+		      $f->hseqname   . "\t" . 
+		      $f->hstart     . "\t" . 
+		      $f->hend       . "\t(" .
+		      $f->hstrand    . ")\n");
 		
 		my @newfeatures = $miniseq->convert_FeaturePair($f);
 		
