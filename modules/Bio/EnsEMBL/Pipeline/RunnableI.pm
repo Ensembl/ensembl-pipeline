@@ -333,6 +333,8 @@ sub create_FeaturePair {
     print "Feature pair " . $fp->gffstring . "\n";
 
     $self->growfplist($fp);                             
+
+    return $fp;
 }
 
 sub create_Repeat {
@@ -348,8 +350,7 @@ sub create_Repeat {
                             -gff_feature     => $feat2->{primary},
                             -logic_name      => $feat2->{logic_name});
     
-    #create and fill Bio::EnsEMBL::Seqfeature objects
-    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
+    my $rc = Bio::EnsEMBL::RepeatConsensus->new
                         (   -seqname        => $feat1->{name},
                             -start          => $feat1->{start},
                             -end            => $feat1->{end},
@@ -361,7 +362,7 @@ sub create_Repeat {
                             -p_value        => $feat1->{p},
                             -analysis       => $analysis_obj);
     
-    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
+    my $f = new Bio::EnsEMBL::RepeatFeature
                         (   -seqname        => $feat2->{name},
                             -start          => $feat2->{start},
                             -end            => $feat2->{end},
@@ -373,8 +374,8 @@ sub create_Repeat {
                             -p_value        => $feat2->{p},
                             -analysis       => $analysis_obj);
     #create featurepair
-    my $fp = Bio::EnsEMBL::Repeat->new  (  -feature1 => $seqfeature1,
-                                           -feature2 => $seqfeature2 ) ;
+    # my $fp = Bio::EnsEMBL::Repeat->new  (  -feature1 => $seqfeature1,
+                                           # -feature2 => $seqfeature2 ) ;
 
     $self->growfplist($fp);                             
 
@@ -446,6 +447,47 @@ sub options {
         $self->{'_options'} = $args ;
     }
     return $self->{'_options'};
+}
+
+
+=head2 create_SimpleFeature
+
+=cut
+
+sub create_SimpleFeature {
+    my ($self, $feat) = @_;
+
+    my $analysis_obj = Bio::EnsEMBL::Analysis->new(
+        -db              => undef,
+        -db_version      => undef,
+        -program         => $feat->{'program'},
+        -program_version => $feat->{'program_version'},
+        -gff_source      => $feat->{'source'},
+        -gff_feature     => $feat->{'primary'}
+    );
+
+    my $sf = Bio::EnsEMBL::SimpleFeature->new(
+        -seqname     => $feat->{'name'},
+        -start       => $feat->{'start'},
+        -end         => $feat->{'end'},
+        -strand      => $feat->{'strand'},
+        -score       => $feat->{'score'},
+        -source_tag  => $feat->{'source'},
+        -primary_tag => $feat->{'primary'},
+        -analysis    => $analysis_obj
+    );  
+
+    # display_label must be a null string, and not undef
+    # can't be set above as it is not known to SeqFeature
+    # (SimpleFeature->new uses SeqFeature->new)
+    $sf->display_label($feat->{'hit'});
+
+    if ($sf) {
+	$sf->validate();
+
+	# add to _sflist
+	push(@{$self->{'_sflist'}}, $sf);
+    }
 }
 
 
