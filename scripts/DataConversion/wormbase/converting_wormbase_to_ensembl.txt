@@ -86,15 +86,17 @@ path to index to be used to get wormbase sequences by clone name
 
 this is an anonymous array as the constructors for both the suggested seqfetchers take array refs to index locations
 
-WB_GAPS
-
-some places in the agp don't have embl accessions we treat these are gaps and as such won't store the genes which lie on those pieces
-
-(Note not yet implemented) 
-
 WB_LOGIC_NAME
 
 the logic name in your analysis table to be used for wormbase genes
+
+WB_DEBUG
+
+if you want debug on
+
+WB_SEQ_IDS, WB_NON_TRANSFORM, WB_NON_TRANSLATE
+
+files to write problem areas info to 
 
 ---
 
@@ -152,17 +154,23 @@ once the exons have been created they are pieced together into transcripts
 
 the transcripts are then collected together into genes
 
-the genes translations are checked and and transformed into raw contig coordinates
+the genes are transformed into raw contig coordinates
 
-all the genes which translate and transform are then stored
+any genes which don't transform their ids are written to a file
+
+all the genes which transform are then stored
+
+once all the genes have been stored the genes translations are checked
 
 the genes which don't translate
 
-the sequence of the clone they are on is compared to the sequence of that wormbase have for that clone name
+the sequence of the clone they are on is got from the wormbase sequence index and loaded into the database
 
-if there sequences are different the clone is deleted and reloaded and the assembly table changed accordingly
+the location of the exons and the assembly is changed to reflect the new contig
 
-for now genes which don't transform are being ignored in future this may change
+the translation is checked again if it still doesn't translate the id is written to a file so it can be further investigated
+
+
 
 
 

@@ -1,3 +1,30 @@
+#
+# You may distribute this module under the same terms as perl itself
+#
+# POD documentation - main docs before the code
+
+=pod 
+
+=head1 NAME
+
+WormBase
+
+=head1 SYNOPSIS
+
+the methods are all used by wormbase_to_ensembl.pl script which should be in the same directory
+
+=head1 DESCRIPTION
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk about code issues
+wormbase-hel@wormbase.org about data issues
+
+=head1 APPENDIX
+
+=cut
+
+
 package WormBase;
 require Exporter;
 
@@ -11,6 +38,21 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 
+
+
+=head2 get_seq_ids
+
+  Arg [1]   : filehandle to an agp file
+  Function  : retrives sequence ids from an agp file
+  Returntype: array ref of seq ids and array ref of ides which don't fit the format'
+  Exceptions: non
+  Caller    : 
+  Example   : &get_seq_ids($fh);
+
+=cut
+
+
+
 sub get_seq_ids{
   my ($fh) = @_;
 
@@ -23,12 +65,6 @@ sub get_seq_ids{
    #print "\n";
    my ($status, $contig) =
     (split)[4, 5];
-   if($status eq 'N'){
-     next;
-   }
-   if($contig eq '.'){
-     next;
-   }
    if(!$contig =~ /\S+\.\d+/){
      push(@non_ids, $contig);
      next;
@@ -37,6 +73,20 @@ sub get_seq_ids{
   }
   return \@seq_ids, \@non_ids;
 }
+
+
+=head2 get_sequences_pfetch
+
+  Arg [1]   : array ref of sequence ids which will be recognised by pfetch
+  Arg [2]   : a Bio::EnsEMBL::Pipeline::Seqfetcher::Pfetch object
+  Function  : gets sequences for the ids passed to it using pfetch
+  Returntype: hash keyed on seq id containing Bio::Seq object
+  Exceptions: throws if seqfetcher passed to it isn't pfetch'
+  Caller    : 
+  Example   : %get_sequences_pfetch($seq_ids, $seqfetcher);
+
+=cut
+
 
 
 sub get_sequences_pfetch{
@@ -63,6 +113,21 @@ sub get_sequences_pfetch{
   }
   return(\%seqs);
 }
+
+
+=head2 agp_parse
+
+  Arg [1]   : filehandle to an agp file
+  Arg [2]   : chromosome id from chromsome table
+  Arg [3]   : agp type for assembly table
+  Function  : parses an agp file into a suitable format for inserting into the assembly table
+  Returntype: hash ref, keyed on contig id, each hash element is itself a hash which contains all the info needed for the assembly table
+  Exceptions: dies if the same contig id is found twice
+  Caller    : 
+  Example   : 
+
+=cut
+
 
 
 sub agp_parse{
@@ -120,6 +185,21 @@ sub agp_parse{
 
 
 
+=head2 parse_gff
+
+  Arg [1]   : filename of gff file
+  Arg [2]   : Bio::Seq object
+  Arg [3]   : Bio::EnsEMBL::Analysis object
+  Function  : parses gff file given into genes
+  Returntype: array ref of Bio::EnEMBL::Genes
+  Exceptions: dies if can't open file or seq isn't a Bio::Seq 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
 
 sub parse_gff{
   my ($file, $seq, $analysis) = @_;
@@ -152,6 +232,19 @@ sub parse_gff{
   return \@genes;
 }
 
+
+
+
+=head2 process_file
+
+  Arg [1]   : filehandle pointing to a gff file
+  Function  : parses out lines for exons
+  Returntype: hash keyed on transcript id each containig array of lines for that transcript
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 
@@ -191,6 +284,21 @@ sub process_file{
 }
 
 
+=head2 process_transcripts
+
+  Arg [1]   : hash ref (the hash is the one returned by process_file)
+  Arg [2]   : Bio::EnsEMBL::Slice
+  Arg [3]   : Bio::EnsEMBL::Analysis
+  Function  : takes line representing a transcript and creates an exon for each one
+  Returntype: hash ref hash keyed on transcript id containing an array of exons
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
 sub process_transcripts{
   my ($transcripts, $slice, $analysis) = @_;
   
@@ -210,8 +318,8 @@ sub process_transcripts{
       }
      
       my $exon = new Bio::EnsEMBL::Exon;
-      my $phase = (3 - $frame)%3;
-      #print "have ".$phase." phase\n";
+      my $phase = (3 - $frame)%3; # wormbase gff cotains frame which is effectively the opposite of phase 
+                                  # for a good explaination of phase see the Bio::EnsEMBL::Exon documentation
       $exon->start($start);
       $exon->end($end);
       $exon->analysis($analysis);
@@ -232,26 +340,34 @@ sub process_transcripts{
     }else{
       @exons = sort{$a->start <=> $b->start} @exons;
     }
-    #print STDERR $name." transcript\n";
+   
     my $phase = 0;
     foreach my $e(@exons){
-      #print "phase ".$phase."\n";
-      #$e->phase($phase);
-      #my $end_phase = ($phase + ($e->end-$e->start) + 1)%3;
-      #$e->end_phase($end_phase);
-      #print "end phase ".$end_phase."\n";
-      #$phase = $end_phase;
       push(@{$transcripts{$name}}, $e);
     }
   }
-  #print STDERR "FINISHED PROCESSING TRANSCRIPTS\n";
+  
   return \%transcripts;
 
 }
 
+
+
+=head2 create_transcripts
+
+  Arg [1]   : hash ref from process transcripts
+  Function  : creates actually transcript objects from the arrays of exons
+  Returntype: hash ref keyed on gene id containg an array of transcripts
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
 sub create_transcripts{
   my ($transcripts) = @_;
-  #print STDERR "CREATING TRANSCRIPTS\n";
+ 
   my %transcripts = %$transcripts;
   my @non_translate;
   my %genes;
@@ -259,18 +375,14 @@ sub create_transcripts{
   my $transcript_id;
   foreach my $transcript(keys(%transcripts)){
     my $time = time;
-    #print STDERR "transcript ".$transcript." \n" if($transcript =~ /C07F11\.1/);
     my @exons = @{$transcripts{$transcript}};
     if($transcript =~ /\w+\.\d+[a-z A-Z]/){
-      #print STDERR "parsing gene name\n";
      ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]/;
      $transcript_id = $transcript;
     }else{
-      #print STDERR "taking gene name as is\n";
       $gene_name = $transcript;
       $transcript_id = $transcript;
     }
-    #print STDERR "have gene name ".$gene_name." and transcript id ".$transcript_id."\n" if($transcript =~ /C07F11\.1/);
     my $transcript = new Bio::EnsEMBL::Transcript;
     my $translation = new Bio::EnsEMBL::Translation;
     my @sorted_exons;
@@ -286,10 +398,6 @@ sub create_transcripts{
       $exon->modified($time);
       $exon->version(1);
       $exon->stable_id($transcript_id.".".$exon_count);
-      #$exon->phase($phase);
-      #my $end_phase = ($phase + ($end-$start) + 1)%3; 
-      #$exon->end_phase($end_phase);
-      #$phase = $end_phase;
       $exon_count++;
       $transcript->add_Exon($exon);
     }
@@ -304,22 +412,10 @@ sub create_transcripts{
       $translation->start(2);
     }
     $translation->end  ($sorted_exons[$#sorted_exons]->end - $sorted_exons[$#sorted_exons]->start + 1);
-#    $translation->version(1);
     $translation->stable_id($transcript_id);
     $transcript->translation($translation);
     $transcript->version(1);
     $transcript->stable_id($transcript_id);
-   # my $mrna = $transcript->translateable_seq;
-#    my $last_codon = substr($mrna, -3);
-#    if($last_codon eq 'TAG' || $last_codon eq 'TGA' || $last_codon eq 'TAA'){
-#      my $translation_end =   ($sorted_exons[$#sorted_exons]->end - $sorted_exons[$#sorted_exons]->start + 1)-3;
-#      if($translation_end <= 0){
-#	my $exon_number = $#sorted_exons
-#      }
-#      $translation->end  (($sorted_exons[$#sorted_exons]->end - $sorted_exons[$#sorted_exons]->start + 1)-3); 
-#    }
-    my $peptide = $transcript->translate->seq;
-    
     if(!$genes{$gene_name}){
       $genes{$gene_name} = [];
       push(@{$genes{$gene_name}}, $transcript);
@@ -327,17 +423,27 @@ sub create_transcripts{
       push(@{$genes{$gene_name}}, $transcript);
     }
   }
-
-  
-  #print STDERR "FINISHED CREATEING TRANSCRIPTS\n";
   return \%genes;
 
 }
 
 
+
+=head2 create_gene
+
+  Arg [1]   : array ref of Bio::EnsEMBL::Transcript
+  Arg [2]   : name to be used as stable_id
+  Function  : take an array of transcripts and create a gene
+  Returntype: Bio::EnsEMBL::Gene
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
 sub create_gene{
   my ($transcripts, $name) = @_;
-  #print STDERR "CREATING GENE\n";
   my $time = time;
   my $gene = new Bio::EnsEMBL::Gene; 
   my $exons = $transcripts->[0]->get_all_Exons;
@@ -354,6 +460,19 @@ sub create_gene{
   
   return $gene;
 }
+
+
+
+=head2 prune_Exons
+
+  Arg [1]   : Bio::EnsEMBL::Gene
+  Function  : remove duplicate exons between two transcripts
+  Returntype: Bio::EnsEMBL::Gene
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 sub prune_Exons {
@@ -403,10 +522,24 @@ sub prune_Exons {
 
 
 
+
+=head2 write_genes
+
+  Arg [1]   : array ref of Bio::EnsEMBL::Genes
+  Arg [2]   : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Function  : transforms genes into raw conti coords then writes them to the db provided
+  Returntype: hash ref of genes keyed on clone name which wouldn't transform
+  Exceptions: dies if a gene could't be stored
+  Caller    : 
+  Example   : 
+
+=cut
+
+
 sub write_genes{
   my ($genes, $db) = @_;
 
-  #print "WRITE GENES there are ".@$genes." genes\n";
+  
   my %non_translating;
   my %non_transforming;
   
@@ -417,9 +550,8 @@ sub write_genes{
     if($@){
       warn("gene ".$gene->stable_id." wouldn't transform ".$@);
       my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
-      if(!$non_transforming{$clone_name}){
-	$non_transforming{$clone_name} = [];
-	push(@{$non_transforming{$clone_name}}, $gene);
+      if(!$non_transforming{$gene->stable_id}){
+	$non_transforming{$gene->stable_id} = 1;
 	next GENE;
       }else{
 	push(@{$non_transforming{$clone_name}}, $gene);
@@ -440,10 +572,23 @@ sub write_genes{
   return \%non_transforming;
 }
 
+
+=head2 translation_check
+
+  Arg [1]   : Bio::EnsEMBL::Gene
+  Function  : checks if the gene translates
+  Returntype: Bio::EnsEMBL::Gene if translates undef if doesn't'
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
 sub translation_check{
   my ($gene) = @_;
   
-  #print STDERR "checking translation of ".$gene->stable_id."\n";
+ 
   my @transcripts = @{$gene->get_all_Transcripts};
   foreach my $t(@transcripts){
     my $pep = $t->translate->seq;
@@ -455,6 +600,21 @@ sub translation_check{
   return $gene;
   
 }
+
+
+=head2 make_Contig
+
+  Arg [1]   : name of contig
+  Arg [2]   : sequence of contig
+  Arg [3]   : length of sequence
+  Function  : makes a Bio::EnsEMBL::RawContig object from information provided
+  Returntype: Bio::EnsEMBL::RawContig
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
 
 sub make_Contig{
   my ($name, $seq, $length) = @_;
@@ -468,6 +628,19 @@ sub make_Contig{
   return $contig;
   
 }
+
+
+=head2 make_Clone
+
+  Arg [1]   : args are all strings providing info about clone
+  Function  : making a Bio::EnsEMBL::Clone
+  Returntype: Bio::EnsEMBL::Clone
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
 
 sub make_Clone{
   my ($name, $version, $embl_acc, $embl_version, $htg_phase, $contig, $created, $modified) = @_;
@@ -486,6 +659,20 @@ sub make_Clone{
   
 }
 
+
+=head2 insert_agp_line
+
+  Arg [1]   : the first 12 args are info for the assembly table
+  Arg [2]   : Bio::EnsEMBL::DBSQL::DBAdaptor pointing to db where you want toe assembly loaded
+  Function  : load the provided info into the assembly table
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
+
 sub insert_agp_line{
   my ($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type, $db) = @_;
 
@@ -493,6 +680,19 @@ sub insert_agp_line{
   my $sth = $db->prepare($sql);
   $sth->execute($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type); 
 }
+
+
+
+=head2 display_exons
+
+  Arg [1]   : array of Bio::EnsEMBL::Exons
+  Function  : displays the array of exons provided for debug purposes put here for safe keeping
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 sub display_exons{
@@ -507,6 +707,19 @@ sub display_exons{
     }
   
 }
+
+
+=head2 non_translate
+
+  Arg [1]   : array of Bio::EnsEMBL::Transcripts
+  Function  : displays the three frame translation of each exon here for safe keeping and debug purposes
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
 
 sub non_translate{
   my (@transcripts) = @_;

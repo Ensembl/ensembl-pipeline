@@ -101,8 +101,9 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
   my $non_transforming =  &write_genes($genes, $db);
 
   open(TRANSFORM, "+>>".$WB_NON_TRANSFORM) or die "couldn't open ".$WB_NON_TRANSFORM." $!";
-  foreach my $id(@$non_transforming){
+  foreach my $id(keys(%$non_transforming)){
     print TRANSFORM $id." gene wouldn't transform on chromsome ".$chromosome_info->{'chr_name'}."\n";
+    
   }
   my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
 
