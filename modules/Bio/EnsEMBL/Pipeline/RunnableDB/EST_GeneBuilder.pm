@@ -67,6 +67,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_DBPASS     
 									 EST_GENEBUILDER_INPUT_GENETYPE
 									 EST_MIN_INTRON_SIZE
+									 BRIDGE_OVER_SMALL_INTRONS
 									 EST_MAX_INTRON_SIZE
 									 EST_MAX_EVIDENCE_DISCONTINUITY
 									 EST_GENEBUILDER_INTRON_MISMATCH
@@ -521,8 +522,10 @@ sub _check_Transcripts {
 	  ############################################################
 	  my $size = $exon->end - $exon->start + 1;
 	  if ( $size  < $EST_MIN_EXON_SIZE ){
-	      $self->warn("rejecting very small exon: size=$size");
-	      next EXON;
+	    print STDERR "rejecting transcript with very small exon size = $size\n";
+	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	    #$self->warn("rejecting very small exon: size=$size");
+	    next TRANSCRIPT;
 	  }
 	  ############################################################
 	  # check the gap with the evidence of the next exon
@@ -576,13 +579,21 @@ sub _check_Transcripts {
 	  # bridge over small introns
 	  ############################################################
 	  if ( $EST_MIN_INTRON_SIZE && $exon_count>1 ){
-	      if ( $exon->start - $previous_exon->end - 1 <=  $EST_MIN_INTRON_SIZE ){
-		  $previous_exon->end( $exon->end );
-		  next EXON;
+	    if ( $exon->start - $previous_exon->end - 1 <=  $EST_MIN_INTRON_SIZE ){
+	      if ( $BRIDGE_OVER_SMALL_INTRONS ){
+		$previous_exon->end( $exon->end );
+		next EXON;
 	      }
+	      else{
+		print STDERR "Rejecting transcript with small intron size =  ".
+		  ($exon->start - $previous_exon->end - 1)."\n";
+		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+		next TRANSCRIPT;
+	      }
+	    }
 	  }
-	  
-      	  $previous_exon = $exon;
+      	  
+	  $previous_exon = $exon;
 	  $new_transcript->add_Exon( $previous_exon );
 	  $exon_count++;
 	  
@@ -1225,12 +1236,12 @@ sub run {
   # cluster them again into genes
   my @selected_reverse_genes       = $self->_cluster_into_Genes( @selected_reverse_transcripts );
 
-   # important: make shared exons unique
+  # important: make shared exons unique
   my @ready_reverse_genes          = $self->_make_shared_exons_unique( @selected_reverse_genes );
   
   # map them to raw contig coordinates
   my @reverse_remapped             = $self->remap_genes(\@ready_reverse_genes, $strand);
-
+  
   $self->output(@reverse_remapped);
 
   foreach my $gene ( $self->output ){
