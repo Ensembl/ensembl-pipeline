@@ -89,6 +89,16 @@ use vars qw(%Config);
       cleanup    => 'yes',        
     },
     {
+      logic_name => 'Fgenesh',        
+      batch_size => 10,
+      resource   => 'select[model==IBMBC2800]',
+      retries    => 1,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'normal',
+      cleanup    => 'yes',        
+    },
+    {
       logic_name => 'Swall',        
       batch_size => 1,
       resource   => 'select[model==IBMBC2800]',
