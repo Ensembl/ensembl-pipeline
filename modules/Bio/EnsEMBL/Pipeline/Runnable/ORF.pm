@@ -66,6 +66,7 @@ sub new {
 
     $self->seq($seq);
     $self->length($length);
+
     $self->{'_output_array'}     = [];
     return $self;
 }
@@ -96,93 +97,158 @@ sub run{
    my $seq0 = $seq->translate(undef,undef,0)->seq;
    my $seq1 = $seq->translate(undef,undef,1)->seq;
    my $seq2 = $seq->translate(undef,undef,2)->seq;
-   my $olen = $self->length;
+   my $olen = length($seq0);
 
+   my $start0 = 0;
+   my $start1 = 0;
+   my $start2 = 0;
 
-  
-   while( $seq0 =~ /([^\*]{$olen,})[\*\s]/g ) {
-       my $match = $1;
-       # print STDERR "Got a $match ",length($match)," $olen \n";
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
-       my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->start(length($prestring)*3+1);
-       $sf->end((length($prestring)+length($match))*3+1);
-       $sf->strand(1);
-       $sf->{'_peptide'} = $match;
-       $self->add_output($sf);
+   while ($seq0 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
        
-   }
-   
-   while( $seq1 =~ /([^\*]{$olen,})[\*\s]/g ) {
        my $match = $1;
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
+       
+       my $prestring = $&;
+
+       $prestring =~ s/\*//;
+       
        my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->start(length($prestring)*3+2);
-       $sf->end((length($prestring)+length($match))*3+2);
+       $sf->start($start0*3+1);
+       $sf->end((length($prestring)+$start0)*3+1);
        $sf->strand(1);
        $sf->{'_peptide'} = $match;
        $self->add_output($sf);
+       $start0 = $start0 + length($prestring);
+
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq0 =~ s/$prestring\*//g;
+       
    }
 	  
-   while( $seq2 =~ /([^\*]{$olen,})[\*\s]/g ) {
+   while ($seq1 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+       
        my $match = $1;
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
+       
+       my $prestring = $&;
+
+       $prestring =~ s/\*//;
+       
        my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->start(length($prestring)*3+3);
-       $sf->end((length($prestring)+length($match))*3+3);
+       $sf->start($start1*3+1);
+       $sf->end((length($prestring)+$start1)*3+1);
        $sf->strand(1);
        $sf->{'_peptide'} = $match;
        $self->add_output($sf);
+       $start1 = $start1 + length($prestring);
+
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq1 =~ s/$prestring\*//g;
        
    }
+	  
+   while ($seq2 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+       
+       my $match = $1;
+       
+       my $prestring = $&;
+
+       $prestring =~ s/\*//;
+       
+       my $sf = Bio::EnsEMBL::SeqFeature->new();
+       $sf->start($start2*3+1);
+       $sf->end((length($prestring)+$start2)*3+1);
+       $sf->strand(1);
+       $sf->{'_peptide'} = $match;
+       $self->add_output($sf);
+       $start2 = $start2 + length($prestring);
+
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq2 =~ s/$prestring\*//g;
+       
+   } 
 
    my $rev = $seq->revcom();
 
    $seq0 = $rev->translate(undef,undef,0)->seq;
    $seq1 = $rev->translate(undef,undef,1)->seq;
    $seq2 = $rev->translate(undef,undef,2)->seq;
+
+   $start0 = 0;
+   $start1 = 0;
+   $start2 = 0;
    
+   #print STDERR "SEQS: $seq0\t$seq1\t$seq2\n"; 
+
    my $len = $seq->length();
+ while ($seq0 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+       
+       my $match = $1;
+       
+       my $prestring = $&;
 
-   while( $seq0 =~ /([^\*]{$olen,})[\*s\s]/g ) {
-       my $match = $1;
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
+       $prestring =~ s/\*//;
+       
        my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->end($len - length($prestring)*3);
-       $sf->start($len - (length($prestring)+length($match))*3);
+       $sf->start($len - $start0*3+1);
+       $sf->end($len - (length($prestring)+$start0)*3+1);
        $sf->strand(-1);
        $sf->{'_peptide'} = $match;
        $self->add_output($sf);
-   }
+       $start0 = $start0 + length($prestring);
 
-   while( $seq1 =~ /([^\*]{$olen,})[\*\s]/g ) {
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq0 =~ s/$prestring\*//g;
+       
+   }
+	  
+   while ($seq1 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+       
        my $match = $1;
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
+       
+       my $prestring = $&;
+
+       $prestring =~ s/\*//;
+       
        my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->end($len - length($prestring)*3);
-       $sf->start($len - (length($prestring)+length($match))*3);
+       $sf->start($len - $start1*3+1);
+       $sf->end($len - (length($prestring)+$start1)*3+1);
        $sf->strand(-1);
        $sf->{'_peptide'} = $match;
        $self->add_output($sf);
+       $start1 = $start1 + length($prestring);
+
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq1 =~ s/$prestring\*//g;
+       
    }
-  
-   while( $seq2 =~ /([^\*]{$olen,})[\*\s]/g ) {
+	  
+   while ($seq2 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+       
        my $match = $1;
-       # deal with coordinate to the left - $`
-       my $prestring = $`;
+       
+       my $prestring = $&;
+
+       $prestring =~ s/\*//;
+       
        my $sf = Bio::EnsEMBL::SeqFeature->new();
-       $sf->end($len - length($prestring)*3);
-       $sf->start($len - (length($prestring)+length($match))*3);
+       $sf->start($len - $start2*3+1);
+       $sf->end(($len - length($prestring)+$start2)*3+1);
        $sf->strand(-1);
        $sf->{'_peptide'} = $match;
        $self->add_output($sf);
-   }
-   
+       $start2 = $start2 + length($prestring);
+
+       #print STDERR $sf->start."\n";
+       #print STDERR $sf->end."\n";
+       $seq2 =~ s/$prestring\*//g;
+       
+   } 
+
+    
 }
 
 
