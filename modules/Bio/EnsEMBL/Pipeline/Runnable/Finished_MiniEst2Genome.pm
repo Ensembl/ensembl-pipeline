@@ -1,4 +1,7 @@
 
+my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
+
+
 ### Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome
 
 package Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
@@ -29,12 +32,14 @@ sub run_blaste2g {
         if (@converted > 1) {
             warn "feature converts into '" . scalar(@converted) . "' > 1 features - ignoring\n";
         } else {            
-            # convert_FeaturePair zaps strand and hseqname,
+            # convert_FeaturePair zaps strand and hseqname,0
             # so we put them back here.
             my $new = $converted[0];
+            $new->seqname($fp->hseqname);
             $new->strand($fp->strand);
             $new->hseqname($fp->hseqname);
-            
+            $new->source_tag('Est2Genome');
+            $new->primary_tag('I_am_valid');
             $self->add_output(@converted);
         }
     }
