@@ -4,7 +4,7 @@ use warnings;
 
 BEGIN { $| = 1;
 	use Test ;
-	plan tests => 15;
+	plan tests => 17;
 }
 
 
@@ -145,3 +145,8 @@ ok($value);
 
 my $number = $one->count;
 ok($number==6);
+
+my $four = $one->subset(3);
+
+ok($four);
+ok($four->count == 3);
