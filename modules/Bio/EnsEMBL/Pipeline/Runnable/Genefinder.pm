@@ -677,7 +677,7 @@ sub output {
 
   
   foreach my $transcript ($self->each_Transcript) {
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
 
     if ($exons[0]->strand == 1) {
       @exons = sort {$a->start <=> $b->start } @exons;
