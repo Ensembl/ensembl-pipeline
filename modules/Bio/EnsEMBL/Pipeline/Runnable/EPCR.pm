@@ -422,6 +422,7 @@ sub _cp_sts_file {
         close DEST;
         close SOURCE;
     };
+
     if ($@) {
 	$self->throw("Unable to copy STS file");
     }
@@ -432,25 +433,23 @@ sub _dump_sts_file {
     my ($self, $dest) = @_;
 
     my %hits = $self->_get_hits;
-    eval {
-        open DEST, "> $dest";
-	foreach my $m (@{$self->sts}) {
-	    next if $hits{$m->dbID};
-	    next if $m->max_primer_dist == 0;
-	    next unless length($m->left_primer) > 0;
-	    next unless length($m->right_primer) > 0;
-	    print DEST join("\t",
-		$m->dbID,
-		$m->left_primer,
-		$m->right_primer,
-		join("-", $m->min_primer_dist, $m->max_primer_dist),
-	    ), "\n";
-        }
-        close DEST;
-    };
-    if ($@) {
-	$self->throw("Unable to dump STS file");
+    open DEST, "> $dest";
+    foreach my $m (@{$self->sts}) {
+	unless (ref $m && $m->isa("Bio::EnsEMBL::Map::Marker")) {
+	    $self->throw("Object not a Bio::EnsEMBL::Map::Marker: [$m]");
+	}
+	next if $hits{$m->dbID};
+	next if $m->max_primer_dist == 0;
+	next unless length($m->left_primer) > 0;
+	next unless length($m->right_primer) > 0;
+	print DEST join("\t",
+	    $m->dbID,
+	    $m->left_primer,
+	    $m->right_primer,
+	    join("-", $m->min_primer_dist, $m->max_primer_dist),
+	), "\n";
     }
+    close DEST;
 }
 
 
