@@ -37,7 +37,8 @@ package Bio::EnsEMBL::Pipeline::GeneBuilder;
 
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::MappedExon;
+use Bio::EnsEMBL::Gene;
 
 use vars qw(@ISA);
 use strict;
@@ -148,7 +149,6 @@ sub build_Genes {
     my @pairs               = $self->make_ExonPairs(@exons);
 
     foreach my $pair ($self->get_all_ExonPairs) {
-	print STDERR "\nMade pair\n";
 	$self->print_Exon($pair->exon1);
 	$self->print_Exon($pair->exon2);
     }
@@ -156,15 +156,23 @@ sub build_Genes {
 
     my @transcripts         = $self->link_ExonPairs(@exons);
 
-    foreach my $tran (@transcripts) {
-	print STDERR "\nTranscript\n";
-	foreach my $exon ($tran->each_Exon) {
-	    $self->print_Exon($exon);
-	}
-    }
 
     my @contigs             = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
+
+    foreach my $gene (@genes) {
+	print(STDERR "\nNew gene - " . $gene->id . "\n");
+
+	foreach my $tran ($gene->each_Transcript) {
+	    print STDERR "\nTranscript - " . $tran->id . "\n";
+	    foreach my $exon ($tran->each_Exon) {
+		$self->print_Exon($exon);
+	    }
+	}
+    }
+
+    # Now we pass these on to Ewan's gene and exon comparison module to find the proper ids
+    # and versions and any deleted exons/genes/transcripts.
 
 }
 
@@ -228,20 +236,20 @@ sub make_Exons {
 
 	my $excount    = 1;
 	my $contigid   = $gs->seqname;
-	
 	foreach my $f ($gs->sub_SeqFeature) {
-	    my $exon  = new Bio::EnsEMBL::Exon;
-	    $exon->id       ($contigid . "$gscount.$excount");
-	    $exon->seqname  ($contigid);
+	    my $exon  = new Bio::EnsEMBL::MappedExon;
+	    $exon->id       ($contigid . ".$gscount.$excount");
+	    $exon->seqname  ($contigid . ".$gscount.$excount");
 	    $exon->contig_id($contigid);
 	    $exon->start    ($f->start);
 	    $exon->end      ($f->end  );
 	    $exon->strand   ($f->strand);
-	    
+	    print("Exon id " . $exon->id . "\n"); 
 	    push(@exons,$exon);
 	    $excount++;
 	    
 	}
+	$gscount++;
     }
     
     foreach my $ex (@exons) {
@@ -310,16 +318,16 @@ sub  make_ExonPairs {
 
     my %pairhash;
 
-#    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
-    for (my $i = 0; $i < 5; $i++) {
+    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
 
 	my %idhash;
 	my $exon1 = $exons[$i];
 
 
-#	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
-	J: for (my $j = 0 ; $j < 5; $j++) {
+	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
 	    next J if ($i == $j);
+            next J if ($exons[$i]->strand != $exons[$j]->strand);
+	    next J if ($exons[$i]->id     eq $exons[$j]->id);
 
 	    my $exon2 = $exons[$j];
 
@@ -329,7 +337,6 @@ sub  make_ExonPairs {
 		    
 	    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
 		my @pairs = $self->get_all_ExonPairs;
-		return @pairs if $#pairs > 4;
 
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
 		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePair")));
@@ -378,11 +385,14 @@ sub  make_ExonPairs {
 			    
 			    print(STDERR "Making new pair " . $exon1->id . "\t" .  $exon2->id . "\n");
 			    
-			    my $pair = $self->makePair($exon1,$exon2);
+			    my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
 			    
 			    $idhash    {$f1->hseqname} = 1;
 			    $doneidhash{$f1->hseqname} = 1;
-			    
+
+			    $pair->add_Evidence($f1);
+			    $pair->add_Evidence($f2);
+
 			    if ($pair->coverage > 1) {
 				$pairhash{$exon1}{$exon2}  = 1;
 			    }
@@ -413,7 +423,7 @@ sub  make_ExonPairs {
 =cut
 
 sub makePair {
-    my ($self,$exon1,$exon2) = @_;
+    my ($self,$exon1,$exon2,$type) = @_;
 
     if (!defined($exon1) || !defined($exon2)) {
 	$self->throw("Wrong number of arguments [$exon1][$exon2] to makePair");
@@ -424,7 +434,7 @@ sub makePair {
 
     my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
 						       -exon2 => $exon2,
-						       -type  => "ABUTTING",
+						       -type  => $type,
 						       );
     my $found = 0;
 
@@ -514,7 +524,7 @@ sub link_ExonPairs {
     foreach my $exon (@exons) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
 
-	if ($self->isHead($exon)) {
+	if ($self->isHead($exon) == 1) {
 	    print STDERR "Found new transcript start [" . $exon->id . "]\n";
 
 	    my $transcript = new Bio::EnsEMBL::Transcript;
@@ -556,12 +566,12 @@ sub _recurseTranscript {
     my %exonhash;
 
     foreach my $exon ($tran->each_Exon) {
-	$exonhash{$exon}++;
+	$exonhash{$exon->id}++;
     }
 
     foreach my $exon (keys %exonhash) {
 	if ($exonhash{$exon} > 1) {
-	    $self->warn("Eeeek! Found exon " . $exon->id . " more than once in the same gene. Bailing out");
+	    $self->warn("Eeeek! Found exon " . $exon . " more than once in the same gene. Bailing out");
 
 	    $tran = undef;
 
@@ -577,8 +587,9 @@ sub _recurseTranscript {
     }
 
     my $count = 0;
+    my @pairs = $self->_getPairs($exon);
 
-    foreach my $pair ($self->_getPairs($exon)) {
+    foreach my $pair (@pairs) {
 
 	if ($count > 0) {
 	    my $newtran = new Bio::EnsEMBL::Transcript;
@@ -591,8 +602,10 @@ sub _recurseTranscript {
 	    $newtran->add_Exon($pair->exon2);
 	    $self->_recurseTranscript($pair->exon2,$newtran);
 	} else {
+	    $tran->add_Exon($pair->exon2);
 	    $self->_recurseTranscript($pair->exon2,$tran);
 	}
+	$count++;
     }
 }
 
@@ -665,7 +678,8 @@ sub _getPairs {
     $self->throw("Input must be Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
 
     foreach my $pair ($self->get_all_ExonPairs) {
-	if ($pair->exon1 == $exon && $pair->coverage > $minimum_coverage) {
+
+	if (($pair->exon1->id eq $exon->id) && ($pair->coverage >= $minimum_coverage)) {
 	    push(@pairs,$pair);
 	}
     }
@@ -679,7 +693,7 @@ sub _getPairs {
  Title   : isHead
  Usage   : my $foundhead = $self->isHead($exon)
  Function: checks through all ExonPairs to see whether this
-           exon is connected to a precedingexon.
+           exon is connected to a preceding exon.
  Example : 
  Returns : 0,1
  Args    : Bio::EnsEMBL::Exon
@@ -692,19 +706,14 @@ sub isHead {
     my $minimum_coverage = 2;
 
     foreach my $pair ($self->get_all_ExonPairs) {
-	print("\nPair\n");
-	$self->print_Exon($pair->exon1);
-	$self->print_Exon($pair->exon2);
+
 	my $exon2 = $pair->exon2;
 
-	print("[$exon][$exon2] " . $exon->id . "\t" . $pair->exon2->id . "\n");
-	
-
-	if ($exon == $exon2 && $pair->coverage >= $minimum_coverage) {
+	if (($exon->id  eq $exon2->id) && ($pair->coverage >= $minimum_coverage)) {
 	    return 0;
 	}
     }
-    
+
     return 1;
 }
 
@@ -748,12 +757,11 @@ sub isTail {
 
 =cut
 
-sub  order_Contigs {
-    my ($self,@exons) = @_;
+sub order_Contigs {
+    my ($self,@contigs) = @_;
 
+    return @contigs;
 }
-
-
 
 =head2 make_Genes
 
@@ -769,7 +777,51 @@ sub  order_Contigs {
 
 sub make_Genes {
     my ($self,@transcripts) = @_;
+    
+    my @genes;
+    
+    my $trancount = 1;
+    my $genecount = 1;
 
+    foreach my $tran (@transcripts) {
+	my $tranid = "DummyTranscript.$trancount";
+
+	$tran->id($tranid);
+	$trancount++;
+	
+	my $found = undef;
+
+      GENE: foreach my $gene (@genes) {
+
+	  EXON: foreach my $gene_exon ($gene->each_unique_Exon) {
+
+	      foreach my $exon ($tran->each_Exon) {
+		  next EXON if ($exon->contig_id ne $gene_exon->contig_id);
+
+		  if ($exon->overlaps($gene_exon) && $exon->strand == $gene_exon->strand) {
+		      $self->print_Exon($exon);
+		      $self->print_Exon($gene_exon);
+		      $found = $gene;
+		      last GENE;
+		  }
+	      }
+	  }
+	}
+
+	if (defined($found)) {
+	    $found->add_Transcript($tran);
+	} else {
+	    my $gene = new Bio::EnsEMBL::Gene;
+	    my $geneid = "DummyGeneId.$genecount";
+	    $gene->id($geneid);
+
+	    $genecount++;
+	    $gene->add_Transcript($tran);
+	    push(@genes,$gene);
+	}
+    }
+
+    return @genes;
 }
 
 1;
