@@ -44,7 +44,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
+#use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
 use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General;
 
@@ -87,7 +87,7 @@ sub new {
 
 sub fetch_input {
   my ($self) = @_;
-  my $proteinAdaptor = $self->db->get_ProteinAdaptor;
+  my $translationAdaptor = $self->db->get_TranslationAdaptor;
   my $prot;
   my $peptide;
   
@@ -102,7 +102,7 @@ sub fetch_input {
   }else{
 
     eval {
-	$prot = $proteinAdaptor->fetch_by_translation_id ($self->input_id);
+	$prot = $translationAdaptor->fetch_by_dbID ($self->input_id);
     };
     if(($@) || (!$prot)){
       $self->throw($self->input_id." either isn't a transcript dbID or doesn't exist in the database : $@\n");
