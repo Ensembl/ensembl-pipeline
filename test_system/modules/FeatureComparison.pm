@@ -91,6 +91,16 @@ sub target{
   return $self->{'target'};
 }
 
+sub tables_to_compare{
+  my ($self, $target) = @_;
+  if($target){
+    throw("tables to compare must be an array ref not a ".$target) 
+      unless(ref($target) eq 'ARRAY');
+    $self->{'tables'} = $target;
+  }
+  return $self->{'tables'};
+}
+
 =head2 fast_sort
 
   Arg [1]   : FeatureComparison
@@ -194,4 +204,65 @@ sub feature_info{
     $name = $f->analysis->logic_name if(!$name);
     print $f->start." ".$f->end." ".$f->strand."\n";
   }
+}
+
+
+
+sub pipeline_compare{
+  my($self, $table_names, $query_db, $ref_db) = @_;
+  if(!$table_names){
+    $table_names = $self->tables_to_compare;
+  }
+  $self->db_type_check($query_db);
+  $self->db_type_check($ref_db);
+  if(@$table_names == 0){
+    print "FeatureComparison:pipeline_compare you passed in no tables ".
+      "we can't make any comparisons\n";
+    return;
+  }
+  my $query_numbers = {};
+  my $ref_numbers = {};
+  my $sql = "select logic_name, count(*) from analysis, ";
+  foreach my $table(@$table_names){
+    $sql .= $table." where analysis.analysis_id=".$table.".analysis_id ".
+      "group by logic_name\n";
+    $query_numbers = $self->run_query($sql, $query_db, $query_numbers);
+    $ref_numbers = $self->run_query($sql, $ref_db, $query_numbers);
+  }
+  print "There are ".keys(%$query_numbers)." analysis in the query database ".
+    $query_db->dbname." and ".keys(%$ref_numbers)." analysis in the reference ".
+      "database ".$ref_db->dbname." all from ".@$table_names." tables\n";
+  printf("%-15s %-15s\n", 'logic_name', 'query_count', 'ref_count');
+  printf("%-15s %-15s\n", '----------', '-----------', '---------');
+  foreach my $logic_name(keys(%$query_numbers)){
+    printf("%-15s %-15s\n", $logic_name, $query_numbers->{$logic_name},
+           $ref_numbers->{$logic_name});
+  }
+}
+
+
+sub db_type_check{
+  my ($self, $db) = @_;
+  if(!$db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
+    throw("Can't run the RuleManager with $db you need a ".
+          "Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
+  }
+  return;
+}
+
+
+
+sub run_query{
+  my ($self, $sql, $db, $hash) = @_;
+  my $sth = $db->prepare($sql);
+  $sth->execute;
+  while(my($logic_name, $count) = $sth->fetchrow){
+    if(!$hash->{$logic_name}){
+      $hash->{$logic_name} = $count;
+    }else{
+      throw($logic_name." already appears in ".$hash." with count ".
+            $hash->{$logic_name});
+    }
+  }
+  return $hash;
 }

@@ -136,7 +136,7 @@ use vars qw(%Config);
                              },
             }
            ],
-           AB_INITIO_LOGICNAME => 'Genscan',
+           BLAST_AB_INITIO_LOGICNAME => 'Genscan',
           );
 
 sub import {
