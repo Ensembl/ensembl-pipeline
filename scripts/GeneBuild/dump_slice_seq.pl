@@ -114,7 +114,7 @@ if($masked){
 
 else {
 #  my $did = $chrname . "." . $start . "-" . $end;
-  $vc->primary_seq->display_id($did);
+  $vc->display_id($did);
   print STDERR "about to write sequence to $outfile\n";
-  $seqout->write_seq($vc->primary_seq);
+  $seqout->write_seq($vc);
 }

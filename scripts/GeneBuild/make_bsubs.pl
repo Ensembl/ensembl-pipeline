@@ -6,7 +6,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (GB_RUNNER
 					 GB_DBHOST
 					 GB_DBUSER
 					 GB_DBPASS
-					 GB_GOLDEN_PATH
 					 GB_QUEUE
 					 GB_TMPDIR
 					 GB_LENGTH_RUNNABLES
@@ -32,8 +31,7 @@ foreach my $arg($GB_RUNNER, $GB_DBNAME, $GB_DBHOST, $GB_DBUSER, $GB_QUEUE, $GB_T
 	"dbuser      => $GB_DBUSER\n" .
 	"dbpass      => $GB_DBPASS\n" .
 	"queue       => $GB_QUEUE\n" .
-	"tmpdir      => $GB_TMPDIR\n" .
-	"golden_path => $GB_GOLDEN_PATH ( empty string will use UCSC )\n" ;
+	"tmpdir      => $GB_TMPDIR\n" ;
 
       exit(1);
     }
@@ -62,7 +60,7 @@ sub get_chrlengths{
 					      -dbname => $GB_DBNAME,
 					     );
 
-  my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
+  my $q = "select c.name, max(a.chr_end) from chromosome c, assembly a where c.chromosome_id = a.chromosome_id group by c.name";
 
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
   my $res = $sth->execute || $db->throw("can't execute: $q");
@@ -82,12 +80,10 @@ sub make_tbsubs {
   my $dbuser      = $GB_DBUSER;
   my $dbpass      = $GB_DBPASS;
   my $queue       = $GB_QUEUE;
-  my $golden_path = $GB_GOLDEN_PATH;
   my $dir         = $GB_TMPDIR . "/$runnable";
   my $pm_out      = $GB_PM_OUTPUT;
 
   $pm_out     .= "pm_best.out";
-  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
   # check them!
   foreach my $arg($pm_out){
     if ($arg eq '' ){
@@ -139,8 +135,8 @@ sub make_tbsubs {
     my $errfile  = $resdir . "/$input_id.err";
     my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable\"";
 
-    $command .= "  $runner ";
-    $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
+    $command .= "  $runner  ";
+    $command .= "  -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
     $command .= " -input_id $input_id -write";      
     print OUTF "$command\n";
     
@@ -160,12 +156,10 @@ sub make_lbsubs {
   my $dbhost      = $GB_DBHOST;
   my $dbuser      = $GB_DBUSER;
   my $dbpass      = $GB_DBPASS;
-  my $golden_path = $GB_GOLDEN_PATH;
   my $queue       = $GB_QUEUE;
   my $size        = $GB_SIZE;
   my $dir         = $GB_TMPDIR . "/$runnable";
   
-  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
 
   # check them!
   foreach my $arg($size, $GB_TMPDIR){

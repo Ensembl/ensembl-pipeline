@@ -65,23 +65,25 @@ BEGIN {
     
 =cut
 
-
 use strict;
 use pmatch_modules; 
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
+use FileHandle;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-                                          GB_PFASTA
-	                                  GB_PMATCH
-	                                  GB_PM_OUTPUT
-	                                  GB_FPCDIR
-	                                  GB_TMPDIR  
+					 GB_PFASTA
+					 GB_PMATCH
+					 GB_PM_OUTPUT
+					 GB_FPCDIR
+					 GB_TMPDIR  
                                         );
+$| = 1;
 
 # global vars
 my %plengths; # stores lengths of all proteins in $protfile 
+
 my @hits;     # stores the hits from pmatch runs
 my $protfile = $GB_PFASTA;
 my $outdir   = $GB_PM_OUTPUT;
@@ -89,13 +91,18 @@ my $fpcdir   = $GB_FPCDIR;
 my $pmatch   = $GB_PMATCH;
 my $tmpdir   = $GB_TMPDIR;
 my $check    = 0;
-my $outfile  = '';
+my $outfile;
 my $chrname;
+my $run_pmatch = 1; # 1 to run pmatch, 0 if pmatch already run
+my $pmatchfile; # can provide a pmatch results file - will be sorted by both protein id and chr_start
+                # gets ignored if run_pmatch is set
 
 &GetOptions( 
-	    'check'      => \$check,
-	    'chr:s'      => \$chrname,
-	    'protfile:s' => \$protfile
+	    'check'         => \$check,
+	    'chr:s'         => \$chrname,
+	    'protfile:s'    => \$protfile,
+	    'run_pmatch'    => \$run_pmatch,
+	    'pmatchfile:s'  => \$pmatchfile,
 	   );
 
 if ($check) {
@@ -114,16 +121,10 @@ if(!defined($chrname)) {
   exit (0);
 } 
 
-#$outfile = "$chrname.$protfile.pm.out";
 $outfile = "$chrname.pm.out";
 if (defined ($outdir) && $outdir ne '') {
   $outfile = $outdir . "/" . $outfile;
 }
-
-# HACK
-#$protfile = '/work2/vac//Mouse/Dec01/mouse_proteome/' . $protfile;
-#open (OUT, ">$outfile") or die "Can't open $outfile for output: $!\n";
-open (OUT, ">>$outfile") or die "Can't open $outfile for output: $!\n";
 
 ### MAIN
 
@@ -138,40 +139,114 @@ foreach my $file(@files){
 }
 
 # populate %plengths
-   &make_protlist;
-   
- # run pmatch on each fpc contig
- foreach my $fpcfile(@files){
-   next if $fpcfile =~ /contigFa.zip/;
+&make_protlist;
 
-   print STDERR "processing $fpcfile\n";
-
-  # now make the first round filterers  
-  my $pmf1 = new First_PMF(-plengths => \%plengths,
-			   -protfile => $protfile,
-			   -pmatch => $pmatch,
-			   -tmpdir => $tmpdir,
-			   -fpcfile  => $fpcfile);
+foreach my $fpcfile(@files){
+  next if $fpcfile =~ /contigFa.zip/;
   
-  $pmf1->run;
-  foreach my $hit($pmf1->output) {
-   print OUT $hit->query  . ":" . 
-     $hit->qstart . "," . 
-     $hit->qend   . ":" . 
-     $hit->target . ":" .
-     $hit->tstart . "," .
-     $hit->tend   . " " .
-     $hit->coverage . "\n";
- }
-#  push (@hits, $pmf1->output);
+  print STDERR "processing $fpcfile\n";
+
+  if($run_pmatch){
+    # generate pmatchfile
+    $pmatchfile = "/tmp/$chrname.pmatch";
+    my $pmatch = $GB_PMATCH;
+
+    # run pmatch -D
+    print "command = ".$pmatch." -D ".$protfile." ".$fpcfile." > ".$pmatchfile."\n";
+    system("$pmatch -D $protfile $fpcfile > $pmatchfile");
+  }
+  elsif(defined $pmatchfile){
+    # use a different outfile
+    $outfile = $outdir . "/" . $pmatchfile . ".pm.out";
+  }
+  elsif(!defined $pmatchfile){
+    die "you need to either tell me to run_pmatch, or you need to give me a pmatch results file\n";
+  }
+
+  &process_pmatches($fpcfile);
+
+  # tidy up files we have created
+  #unlink $pmatchfile unless !$run_pmatch;
+
+}
+
+### END MAIN
+### SUBROUTINES
+
+sub process_pmatches{
+  my($fpcfile) = @_;
+  # sort pmatch results file
+  system("sort -k6,6 -k3,3n $pmatchfile > $pmatchfile.tmp");
+  rename "$pmatchfile.tmp", $pmatchfile;
+
+  open (OUT, ">>$outfile") or die "Can't open $outfile for output: $!\n";
+  OUT->autoflush(1);
+
+  open(PMATCHES, "<$pmatchfile") or die "can't open [$pmatchfile]\n";  
+  my $prot_id;
+  my $current_pmf = new First_PMF(
+				  -plengths => \%plengths,
+				  -protfile => $protfile,
+				  -pmatch   => $pmatch,
+				  -tmpdir   => $tmpdir,
+				  -fpcfile  => $fpcfile,
+				  -maxintronlen => 2500000,
+				 );
+  
+ PMATCH:  
+  while(<PMATCHES>){
+    my @cols = split;
+    # dump out line to file just in case this turns into a problem
+    
+    if(!defined $prot_id || $cols[5] ne $prot_id){
+	# process current_pmf
+	foreach my $hit($current_pmf->merge_hits) {
+	  print  OUT $hit->query  . ":" . 
+	         $hit->qstart . "," . 
+	         $hit->qend   . ":" . 
+	         $hit->target . ":" .
+	         $hit->tstart . "," .
+	         $hit->tend   . " " .
+	         $hit->coverage . "\n";
+	}
+
+      # start a new PMF
+      $current_pmf = new First_PMF(
+				   -plengths => \%plengths,
+				   -protfile => $protfile,
+				   -pmatch   => $pmatch,
+				   -tmpdir   => $tmpdir,
+				   -fpcfile  => $fpcfile,
+				   -maxintronlen => 2500000,
+				  );
+      $prot_id = $cols[5];
+      $current_pmf->make_coord_pair($_);
+    }
+    else{
+      # add this hit into current PMF
+      $current_pmf->make_coord_pair($_);
+    }
+  }
+
+  # make sure we at least try to proces the last one!
+  foreach my $hit($current_pmf->merge_hits) {
+    print  OUT $hit->query  . ":" . 
+               $hit->qstart . "," . 
+	       $hit->qend   . ":" . 
+	       $hit->target . ":" .
+	       $hit->tstart . "," .
+	       $hit->tend   . " " .
+	       $hit->coverage . "\n";
+  }
+
+
+
+  close (OUT) or die "Can't close $outfile: $!\n";
+  close (PMATCHES) or die "can't close pmatchfile: $!\n";
+
 }
 
 
-
-
-close (OUT) or die "Can't close $outfile: $!\n";
-
-### END MAIN
 
 ### SUBROUTINES
 
@@ -210,7 +285,7 @@ sub make_protlist{
     }
     
     $bs->seq($seq);
-    
+    #print STDERR $bs->display_id ." = ".$bs->length."\n";
     $plengths{$bs->display_id} = $bs->length;
   }
 
@@ -218,3 +293,4 @@ sub make_protlist{
   $/ = "\n";
   close INFILE;
 }
+

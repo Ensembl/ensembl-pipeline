@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                                          GB_DBNAME
 					 GB_DBHOST
 					 GB_DBUSER
-                                         GB_GOLDEN_PATH
+                                         GB_DBPASS
 					);
 
 # global vars
@@ -171,14 +171,13 @@ close (OUT) or die "Can't close $outfile:$!\n";
  ### END MAIN
 
 sub get_static_golden_path_adaptor {
-  my $dbuser = "ensro";
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $GB_DBHOST,
     -user             => $GB_DBUSER,
     -dbname           => $GB_DBNAME,
+    -pass             => $GB_DBPASS,
 );
 
-  $db->static_golden_path_type($GB_GOLDEN_PATH);
   my $sgpa = $db->get_StaticGoldenPathAdaptor();
   return $sgpa;
 }
