@@ -351,7 +351,9 @@ sub show_Rules {
 sub show_Rules_and_Conditions {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select a.logic_name,rg.rule_id,rc.condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id");
+  my $sql = "select a.logic_name,rg.rule_id,rc.condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id";
+  
+  my $sth = $self->dbobj->prepare($sql);
 
   my $res = $sth->execute;
 
@@ -366,7 +368,7 @@ sub show_Rules_and_Conditions {
   while (my $ref = $sth->fetchrow_hashref) {
     my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
-    my $cond = $ref->{'conditionLiteral'};
+    my $cond = $ref->{'condition'};
 
     if (length($id) > $maxid) { $maxid = length($id);}
     if (length($name) > $maxname) {$maxname = length($name);}
@@ -403,7 +405,7 @@ sub show_jobs_by_status_and_analysis {
   if (!defined($status) || !defined($analysis)) {
     $self->throw("No status and/or analysis input\n");
   }
-	       
+  #print STDE
 
   my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_id = job.analysis_id and job.job_id = js.job_id and js.status = '$status' and a.logic_name = '$analysis'");
 
