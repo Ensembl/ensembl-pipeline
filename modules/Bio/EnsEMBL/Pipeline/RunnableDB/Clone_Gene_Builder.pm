@@ -53,9 +53,7 @@ use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
-					 );
+
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -66,7 +64,6 @@ use Data::Dumper;
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
-			   -GOLDEN_PATH => $path,
                            -ANALYSIS    => $analysis);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
@@ -83,21 +80,12 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
+    my( $vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
        
     $vcontig = 1 unless defined($vcontig);
     
     $self->vcontig($vcontig);
     $self->extend($extend);
-
-    # golden path
-    if(!defined $path){
-      $path = $GB_GOLDEN_PATH;
-    }
-
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->assembly_type($path);
-
 
     return $self;
 }
