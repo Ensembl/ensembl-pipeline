@@ -107,6 +107,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -146,7 +147,7 @@ sub new{
   }
   
   if( defined $restrict_external_splice_site ){
-      $self->restrict_external_splice($restrict_external_splice_site);
+    $self->restrict_external_splice_site($restrict_external_splice_site);
   }
 
   $self->verbose(0);
@@ -845,6 +846,13 @@ sub _process_comparison{
     # if it is a single-exon transcript overlap: if it matches 
     # to the first or the last, we leave the open end unconstrained
     ############################################################
+    #print STDERR "exon1: $list1[0] - exon2: $list2[0]\n";
+    #print STDERR "is_last{exont1} = $is_last{ $list1[0] }\n";
+    #print STDERR "is_last{exont2} = $is_last{ $list2[0] }\n";
+    #print STDERR "is_first{exont1} = $is_first{ $list1[0] }\n";
+    #print STDERR "is_first{exont2} = $is_first{ $list2[0] }\n";
+
+
     if( (  $is_first{ $list1[0] } && $is_last{ $list1[0] } 
 	   &&
 	   $is_first{ $list2[0] }
@@ -888,13 +896,13 @@ sub _process_comparison{
 	   ||
 	   (  $is_first{ $list2[0] } && $is_last{ $list2[0] } 
 	      &&
-	      $self->_check_high_site( $list2[0], $list1[2], $tran1 )
+	      $self->_check_high_site( $list2[0], $list1[0], $tran1 )
 	      &&
 	      $self->_check_low_site(  $list2[0], $list1[0], $tran1 )
 	   )
 	 ){
-      print STDERR "list2[0]: ".$list2[0]->start."-".$list2[0]->end." is_first: ".$is_first{ $list2[0] }." is_last: ".$is_last{ $list2[0] }."\n";
-      print STDERR "list1[0]: ".$list1[0]->start."-".$list1[0]->end." is_first: ".$is_first{ $list1[0] }." is_last: ".$is_last{ $list1[0] }."\n";
+      #print STDERR "list2[0]: ".$list2[0]->start."-".$list2[0]->end." is_first: ".$is_first{ $list2[0] }." is_last: ".$is_last{ $list2[0] }."\n";
+      #print STDERR "list1[0]: ".$list1[0]->start."-".$list1[0]->end." is_first: ".$is_first{ $list1[0] }." is_last: ".$is_last{ $list1[0] }."\n";
       
       print STDERR "here 2 --- merge ---\n" if $verbose;
       $merge = 1 ;
@@ -993,6 +1001,11 @@ sub _process_comparison{
     ############################################################
     elsif (  $is_last{ $exon1 } || $is_last{ $exon2 } ){ 
       
+      #print STDERR "exon1: $exon1 - exon2: $exon2\n";
+      #print STDERR "is_last{exont1} = $is_last{ $exon1 }\n";
+      #print STDERR "is_last{exont2} = $is_last{ $exon2 }\n";
+      
+
       if ( ( $is_last{ $exon1 } 
 	     &&
 	     $self->_check_high_site( $exon1, $exon2, $tran2 )
