@@ -550,7 +550,7 @@ sub _compute_identity {
       $noncovered = $exon_length if $noncovered > $exon_length;
 
       my $this_match_coverage = (1 - ($noncovered/$exon_length))*100;
-print "Coverage : $this_match_coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
+#print "Coverage : $this_match_coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
       if ($this_match_identity > $highest_identity) {
 	$highest_identity = $this_match_identity;
 	$associated_coverage = $this_match_coverage;
@@ -1089,27 +1089,24 @@ sub _fiddly_bits {
   # the feature starts or ends outside of our slice.
 
   my $genomic_start;  # Feature insertion point
-
   if ($self->_strand == 1) {
     $genomic_start = $base_align_feature->start - 1;
   } elsif ($self->_strand == -1) {
-#    $genomic_start = $self->_slice->length - $base_align_feature->end - 1;
     $genomic_start = $self->_slice->length - $base_align_feature->end;
   }
 
   
   # This little section of code handles any sequence that
-  # overshoots the end of our slice.  Chop.
+  # overshoots the beginning of our slice.  Chop.
 
   if ($genomic_start < 0) {
-$self->warn("Erk, unimplemented code!!!  Feature start lies off the end of the slice.");
-#    warn("Feature extends past the ends of genomic slice.  Don\'t worry, truncating it to fit.");
-    
-#    $genomic_start = 0;
-    
-#    my $overshoot = $base_align_feature->start * -1;      
-    
-#    splice (@fetched_seq, 0, $overshoot);
+    $self->warn("Feature extends past the ends of genomic slice.  Truncating it to fit.");
+
+    my $overshoot = $genomic_start * -1;      
+        
+    $genomic_start = 0;
+
+    splice (@fetched_seq, 0, $overshoot);
   }
   
   # Here we are actually building the sequence that will
