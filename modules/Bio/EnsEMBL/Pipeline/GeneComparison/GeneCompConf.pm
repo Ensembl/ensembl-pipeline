@@ -47,8 +47,37 @@ use vars qw( %GeneCompConf );
 
 # Hash containing config info
 %GeneCompConf = (
-		 # mouse_5.3.1
+		 # to run exonerate to compare two sets of cDNAs:
+		 
+		 # module to be called, wrapped around Exonerate.pm
+		 COMP_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::GeneComparison::cDNA_Comparison',
+		 
+		 # where the cDNA chunks are, and how many there are
+		 COMP_cDNA_CHUNKDIR               => '/ecs2/work1/eae/japan_cdnas/chunks',
+		 COMP_cDNA_CHUNKNUMBER            => 3000,
+		 
 
+		 # transcript set to compare to the cdnas
+		 COMP_TRANSCRIPTS            => '/ecs2/work1/eae/japan_cdnas/ensembl_genes/ensembl_transcripts',
+
+		 # file with the cdnas you want to compare with
+		 COMP_cDNA_FILE              => '/ecs2/work1/eae/japan_cdnas/japan_human_cDNAs.fa',
+		 # (japan_human_cDNAs.fa contains refseqs as well)
+                 
+		 # where the results will go
+		 COMP_TMPDIR                 => '/ecs2/work1/eae/NCBI_30/cdnas/jobs_dir/cdna_ensembl_mapping_TEST',
+		 # where the job-file with the bsub lines will go:
+		 COMP_EXONERATE_BSUBS         => '/ecs2/work1/eae/NCBI_30/cdnas/jobs_dir/cdna_ensembl_mapping_TEST/compare_exonerate_cDNA.jobs',
+
+		 # queue where the jobs will be run
+		 COMP_QUEUE                   => 'acari',
+		 
+		 # path to ensembl-pipeline/scripts/GeneComparison/
+		 COMP_SCRIPTDIR               => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/GeneComparison/',
+		 
+		 
+
+		 # mouse_5.3.1
 		 # annotation/benchmark genes
 		 #DBHOST1    => "ecs1b",
 	         #DBNAME1    => "mouse_whitehead_0401_rikens",
