@@ -391,7 +391,7 @@ sub run{
   
   # let's try to make it fast:
   if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
-      my $consecutive_overlap = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->_test_for_Simple_Merge($trans_in[0], $trans_out[0]);
+      my ($consecutive_overlap, $overlaps ) = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->_test_for_Simple_Merge($trans_in[0], $trans_out[0]);
       my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
       my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
 
