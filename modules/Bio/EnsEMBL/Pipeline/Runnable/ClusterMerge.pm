@@ -17,8 +17,7 @@ Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
 
     my $cluster_merge = Bio::EnsEMBL::Pipeline::Runnable::CusterMerge->new(
 									   -transcripts => \@transcripts,
-									   -exact_merge => $value,
-									  );
+									   );
     $cluster_merge->run;
 
     one can retrieve the lists of transcripts that can merge:
@@ -38,6 +37,10 @@ exact, so that exon boundaries must match exactily, or fuzzy where
 exon boundaries do not necessarily coincide. The latter case could be useful for
 ests, whereas the former case is advisable with full length cdnas.
 The output is given in the form of the resulting transcripts.
+
+=head1 AUTHOR
+
+eae@sanger.ac.uk
 
 =head1 CONTACT
 
@@ -61,10 +64,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-
-# config file; parameters searched for here if not passed in as @args
-use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf;
-#use Bio::EnsEMBL::Pipeline::ESTConf;
+use Bio::EnsEMBL::Pipeline::Node;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -72,47 +72,584 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my( $transcripts, $exact_merge ) = $self->_rearrange([qw(
-							   TRANSCRIPTS
-							   EXACT_MERGE
-							  )], 
-						       @args);
-  
+  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match) 
+      = $self->_rearrange([qw(
+			      TRANSCRIPTS
+			      COMPARISON_LEVEL
+			      SPLICE_MISMATCH
+			      INTRON_MISMATCH
+			      EXON_MATCH
+			      )], 
+			  @args);
   
   unless( $transcripts ){
     $self->warn("No transcripts passed it. We cannot go further");
     exit(0);
   }
-
-  print STDERR "we've passed ".scalar(@$transcripts)." trans to ClusterMerge\n";
   $self->input_transcripts(@{$transcripts});
   
-  if (defined($exact_merge)){
-    $self->exact_merge($exact_merge);
-  }
-  
-  if ( $EST_GENEBUILDER_COMPARISON_LEVEL ){
-    $self->_comparison_level($EST_GENEBUILDER_COMPARISON_LEVEL);
+  # default values are
+  # $comparison_level = 4,
+  # $splice_mismatch  = 10,
+  # $intron_mismatch  = 7,
+  # $exon_match       = 0,
+
+
+  # to get some blah,blah
+  $self->verbose(1);
+
+
+  if ( $comparison_level ){
+    $self->_comparison_level($comparison_level);
   }
   else{
-    $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_COMPARISON_LEVEL for your ests/cdnas to be compared!")
+    print STDERR "defaulting comparison_level to ".$self->_comparison_level."\n";
   }
-  
 
-  if ( $EST_GENEBUILDER_SPLICE_MISMATCH ){
-    $self->_splice_mismatch( $EST_GENEBUILDER_SPLICE_MISMATCH);
+  if ( $splice_mismatch ){
+    $self->_splice_mismatch( $splice_mismatch);
     print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
   }
-  if ( $EST_GENEBUILDER_INTRON_MISMATCH ){
-    $self->_intron_mismatch( $EST_GENEBUILDER_INTRON_MISMATCH );
+  else{
+    $self->_splice_mismach( 10 );
+    print STDERR "defaulting splice mismatch to ".$self->_splice_mismatch."\n";
+  }
+
+  if ( $intron_mismatch ){
+    $self->_intron_mismatch( $intron_mismatch );
     print STDERR "intron mismatch ".$self->_intron_mismatch."\n";
   }
-  if ( defined $EST_GENEBUILDER_EXON_MATCH ){
-    $self->_exon_match( $EST_GENEBUILDER_EXON_MATCH );
+  else{
+    $self->_intron_mismatch( 7 );
+    print STDERR "defaulting intron mismatch to ".$self->_intron_mismatch."\n";
+  }
+
+  if ( defined $exon_match ){
+    $self->_exon_match( $exon_match );
     print STDERR "exon match ".$self->_exon_match."\n";
+  }
+  else{
+    $self->_exon_match( 0 );
+    print STDERR "defaulting exon match to ".$self->_exon_match."\n";
   }
   
   return $self;
+}
+
+
+############################################################
+#
+# METHODS FOR COLLECTING ALL THE NON-REDUNDANT LISTS
+#
+############################################################
+
+
+sub solutions{
+  my ($self,$node) = @_;
+  my @all_solutions;
+  
+  # if node has extension parents
+  if ( @{$node->extension_parents} ){
+    
+    foreach my $extension_parent ( @{$node->extension_parents} ){
+      my $solutions = $self->solutions( $extension_parent );
+      
+      foreach my $solution ( @$solutions ){
+	# add itself to the list
+	push ( @$solution, $node );
+      }
+      
+      # if the node $node has inclusion children
+      if ( @{$node->inclusion_children} ){
+	foreach my $inclusion_child ( @{$node->inclusion_children} ){
+	  
+	  ############################################################
+	  # add every the inclusion children recursively
+	  # from this child unless this is included as well in the extension parent
+	  # We only need checking in the first generation
+          ############################################################
+          unless ( $self->compare( $inclusion_child, $extension_parent) eq 'inclusion' ){
+	    my $list = [];
+	    $self->collect_inclusion_children( $inclusion_child , $list);
+	    foreach my $solution ( @$solutions ){
+	      push ( @$solution, @$list );
+	    }
+	  }
+	}
+      }
+      
+      push (@all_solutions, @$solutions);
+    }
+  }
+  else{
+    print STDERR "no ext-parent - collecting inclusion-children and itself\n";
+    my $list = [];
+    $self->collect_inclusion_children($node,$list);
+    return [$list];
+  }
+
+
+  if ( @all_solutions ){
+    return \@all_solutions;
+  }
+  else{
+    my $list = [ $node ];
+    return [ $list ];
+  }
+}
+
+############################################################
+
+sub collect_inclusion_children{
+  my ($self, $node, $list) = @_;
+  print STDERR "collecting inclusion tree from node ".$node->transcript->dbID."\n";
+  my $generation = 1;
+  if ( @{$node->inclusion_children} ){
+    my @next_generation = @{$node->inclusion_children};
+    while( @next_generation ){
+      #print STDERR "generation $generation: @next_generation\n";
+      $generation++;
+      my @new_generation = ();
+      foreach my $child (@next_generation){
+	if ( @{$child->inclusion_children} ){
+	  push( @new_generation, @{$child->inclusion_children} );
+	}
+      }
+      push( @$list, @next_generation);
+      @next_generation = @new_generation;
+      @new_generation = ();
+    }
+  }
+  push ( @$list, $node );
+  return;
+}			       
+############################################################
+
+
+############################################################
+#
+# LINKING ALGORITHM
+#
+############################################################
+
+sub link_Transcripts{
+  my ($self,$transcript_clusters) = @_;
+  
+  my @all_solutions;  
+
+  my $verbose  = 1;
+  
+  # look in each cluster
+ CLUSTER:
+  foreach my $cluster ( @{ $transcript_clusters} ){
+    
+    print STDERR "~~~ CLUSTER ~~~\n";
+    my %overlap_matrix;
+    $self->matrix(\%overlap_matrix);
+    
+    # get the transcripts in this cluster
+    my @transcripts = @{$cluster->get_Transcripts};
+    
+    ############################################################
+    # sort the transcripts by the left most coordinate in ascending order
+    # for equal value, order by the right most coordinate in descending order
+    ############################################################
+    @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+			  if ($result){
+			    return $result;
+			  }
+			  else{
+			    return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+			  }
+			} @transcripts;
+    
+
+    ############################################################
+    # search all the trees
+    ############################################################
+    my $all_the_leaves;  
+  TRANSCRIPT:
+    foreach my $transcript ( @transcripts ){
+
+      # put this in a node
+      my $newnode = Bio::EnsEMBL::Pipeline::Node->new();
+      $newnode->transcript($transcript);
+      print STDERR "newnode: ".$newnode->transcript->dbID."\n";
+
+      # initialize the tags
+      $self->flush_visited_tags;
+      
+      # the first element is always a new leaf
+      unless ($all_the_leaves){
+	push ( @$all_the_leaves, $newnode );
+	next TRANSCRIPT;
+      }
+      
+      # check the node against all the leaves
+      my $result = $self->check_tree($newnode,$all_the_leaves);
+      unless ( $result eq 'placed'){
+	push( @$all_the_leaves, $newnode);
+      }
+    }
+
+    # check #   
+    #if ($verbose){
+#      foreach my $leaf ( @$all_the_leaves ){
+#	print STDERR "leaf:\n";
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($leaf->transcript);
+#	foreach my $parent ( @{$leaf->extension_parents} ){
+#	  print STDERR "extension parent:\n";
+#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($parent->transcript);
+#	}
+#      }
+#    }
+
+
+    ############################################################
+    # recover the lists from the trees in this cluster:
+    ############################################################
+    my @solutions;
+    my @t = map {$_->transcript->dbID} @$all_the_leaves;
+    print STDERR "**************   ALL THE LEAVES  *********************\n";
+    print STDERR "@t\n";
+    print STDERR "******************************************************\n";
+
+    foreach my $leaf ( @$all_the_leaves ){
+      print STDERR "finding solutions from leaf ".$leaf->transcript->dbID."\n";
+      push (@solutions, @{$self->solutions($leaf)} );
+    }
+    # @solutions is a list of listrefs holding the different non-redundant lists
+    push ( @all_solutions, @solutions );
+    
+    # clean up some memory
+    @solutions = ();
+    
+  } # end of CLUSTER  
+  
+  
+  ############################################################
+  # convert the Bio::EnsEMBL::Pipeline::Node objects
+  # back into Bio::EnsEMBL::Transcript objects
+  ############################################################
+  my @lists;
+  foreach my $solution ( @all_solutions ){
+      my @tmp = map { $_->transcript } @$solution;
+      push (@lists, \@tmp );
+  }  
+  return @lists;
+}
+
+############################################################
+
+sub check_tree{
+  my ($self, $newnode, $tree ) = @_;
+
+  my $verbose = $self->verbose;
+  
+  # tree is a ref to a list of leaves
+  my @ids = map { $_->transcript->dbID } @$tree;
+  print STDERR "checking tree @ids:\n";
+  my @nodes_to_check = @$tree;
+
+  # as we check we regenerate the leaves as needed
+  my $newleaves;
+
+  # keep track of which ones are leaves 
+  my %is_leaf;
+  foreach my $node (@nodes_to_check){
+    $is_leaf{$node} = 1;
+  }
+  
+  # and which ones are added to the re-generated list of leaves
+  my %added;
+  
+  # keep track whether the new element has been placed at all or not
+  my $placed=0;
+  
+  
+ NODE:
+  while( @nodes_to_check ){
+    my $node = shift @nodes_to_check;
+    
+    ############################################################
+    # skip if the node has been tagged as visited
+    ############################################################
+    if ( $self->is_visited($node) ){
+      if ( $is_leaf{$node} && !$added{$node} ){
+	push( @$newleaves, $node );
+      }
+      next NODE;
+    }
+
+    print STDERR "check_tree(): node = ".$node->transcript->dbID."\n" if $verbose;
+    my $result = $self->check_node($newnode,$node);
+    
+    ############################################################
+    # place here if it extends a node. 
+    # 'Delete' leaf and add new leaf.
+    # Tag all the extension parents
+    ############################################################
+    if ($result eq 'extension'){
+      # place here
+	print STDERR "adding extension parent\n" if $verbose;
+	$newnode->add_extension_parent($node);
+	$node->is_extended(1);
+
+	# check
+	print STDERR "this node has now ".scalar(@{$newnode->extension_parents})."\n";
+
+	# this is a new leaf
+	unless ( $added{$newnode} ){
+	    print STDERR "adding newnode as leaf\n" if $verbose;
+	    push(@$newleaves,$newnode);
+	    $added{$newnode} = 1;
+	}
+	# tag this node and all the extension ancestors recursively
+	$self->tag_extension_ancestors($node);
+	$placed++;
+	next NODE;
+    }
+
+    ############################################################
+    # if there is a clash, do breadth-first on the extension parents
+    ############################################################
+    elsif ( $result eq 'clash' ){
+      
+      # recover the leaf if it hasn't been added before
+      if ( $is_leaf{$node} &&  !$added{$node} ){
+	push(@$newleaves,$node);
+	$added{$node} = 1;
+      }	  
+      if ( @{$node->extension_parents} ){
+	my @parents = map { $_->transcript->dbID }  @{$node->extension_parents};
+	print STDERR "adding extension parents ( @parents) to the list to check\n";
+      }
+      push( @nodes_to_check, @{$node->extension_parents} );
+    }
+    elsif ( $result eq 'placed' ){
+      print STDERR "PLACED\n";
+      $placed++;
+      if ( $is_leaf{ $node } && !$added{$node} ){
+	push(@$newleaves,$node);
+	$added{$node} = 1;
+      }
+    }
+    else{
+      # only add to the newleaves if it was already a leaf before
+      if ( $is_leaf{ $node } && !$added{$node} ){
+	push(@$newleaves,$node);
+	$added{$node} = 1;
+      }	  
+    }
+  }
+  # this is our new tree
+  @$tree = @$newleaves;
+  $newleaves = [];
+
+  if ($placed){
+    return 'placed';
+  }
+  else{
+    return 'continue';
+  }
+}
+
+############################################################
+
+sub check_node{
+  my ($self,$newnode,$node) = @_;
+
+  #test#
+  if ( $newnode == $node || $newnode->transcript == $node->transcript ){
+      $self->throw( "<<<<<< Comparing node with its self - something has gone wrong - exiting >>>>>");
+  }
+  my $verbose = $self->verbose;
+
+  #print STDERR "check_node(): newnode: $newnode, node: $node\n" if $verbose;
+  my $result = $self->compare( $newnode, $node );
+  print STDERR "check_node(); result = $result\n";
+
+  ############################################################
+  # if there is no overlap we want to skip it
+  ############################################################
+  if ( $result eq 'no-overlap' ){
+      return 'no-overlap';
+  }
+
+  ############################################################
+  # extension is picked-up as soon as it happens
+  ############################################################
+  elsif( $result eq 'extension' ){
+      return 'extension';
+  }
+
+  ############################################################
+  # if clash, we check first the inclusion tree if any 
+  # else simply return 'clash', the check_tree method will of the breadth-first search
+  # if it extends any other leave redundant with an extension parent of this node
+  # that parent will be tagged before being checked.
+  ############################################################
+  elsif( $result eq 'clash' ){
+    if ( $node->inclusion_tree ){
+      return $self->check_tree( $newnode, $node->inclusion_tree );
+    }
+    else{
+      return 'clash'
+    }
+  }
+  
+  ############################################################
+  # inclusion is recursive in the extension tree
+  ############################################################
+  elsif( $result eq 'inclusion' ){
+      
+    # recurse along the extension branch if there is any
+    if ( @{$node->extension_parents} ){
+      print STDERR "inclusion -> go to extension parent\n";
+      my $placed = 0;
+    PARENT:
+      foreach my $parent_node ( @{$node->extension_parents} ){
+	
+	# skip if already visited (extended)
+	if ( $self->is_visited($parent_node) ){
+	    print STDERR "skipping this node - already visited\n";
+	    next PARENT;
+	}
+	
+	my $result2 = $self->check_node( $newnode, $parent_node );
+	if ( $result2 eq 'extension' || $result2 eq 'no-overlap' ){
+	    
+	    #print STDERR "is there an inclusion tree on this node: ".$node->transcript->dbID."\n" if $verbose;
+	  # if there is an inclusion tree and is valid, then check
+	  if ( defined $node->inclusion_tree ){
+		my @tree = map { $_->transcript->dbID } @{$node->inclusion_tree};
+	      print STDERR "checking the inclusion tree : @tree\n" if $verbose;
+	      my $result3 = $self->check_tree( $newnode, $node->inclusion_tree );
+	      print STDERR "result = $result3\n" if $verbose;
+	      if ( $result3 eq 'placed' ){
+		  $placed++;
+	      }
+	  }
+	  # we do nothing here!
+	  #elsif( $node->inclusion_children && !$node->inclusion_tree ){
+	  #  return;
+	  #}
+	  else{
+	      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n";
+	      $node->add_inclusion_child( $newnode );
+	      $self->tag_extension_ancestors($node);
+	      if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
+		  print STDERR "adding extension of ".
+		      $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n";
+		  $newnode->add_extension_parent($parent_node);
+		  $parent_node->is_extended(1);
+		  $self->tag_extension_ancestors($parent_node);
+	      }
+	      $placed++;
+	  }
+      }
+	elsif ( $result2 eq 'placed' ){
+	    $placed++;
+	}
+      }
+      if ($placed){
+	return 'placed';
+      }
+      else{
+	return 'continue';
+      }
+    }
+    # else, check the inclusion branch if any
+    elsif ( $node->inclusion_tree ){
+      print STDERR "inclusion -> go to inclusion tree\n";
+      return $self->check_tree( $newnode, $node->inclusion_tree );
+    }
+    elsif( @{$node->inclusion_children} && !$node->inclusion_tree ){
+      my @list = @{$node->inclusion_children};
+      print STDERR "inclusion children = @list\n";
+      print STDERR "non-valid inclusion tree -> continue\n";
+      return 'continue';
+    }
+    elsif( !@{$node->inclusion_children} ){
+      
+      # place here
+      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n";
+      $node->add_inclusion_child( $newnode );
+      $self->tag_extension_ancestors($node);
+      return 'placed';
+    }
+    else{
+      print STDERR "here???\n";
+    }
+  }
+  return 'continue';
+}
+
+############################################################
+
+=head2 compare
+
+  Function: encapsulates the comparison method between two transcripts.
+
+=cut
+
+sub compare{
+    my ($self,$newnode,$node) = @_;
+    my $newtrans = $newnode->transcript;
+    my $trans    = $node->transcript;
+    my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
+										       -comparison_level         => $self->_comparison_level, 
+										       -exon_match               => $self->_exon_match,
+										       -splice_mismatch          => $self->_splice_mismatch,
+										       -intron_mismatch          => $self->_intron_mismatch,
+										       );
+    
+    my %overlap_matrix = %{$self->matrix};
+    
+    if ( defined( $overlap_matrix{$newtrans}{$trans} ) ){
+	return $overlap_matrix{$newtrans}{$trans};
+    }
+    else{
+	$overlap_matrix{$newtrans}{$trans} = $comparator->discrete_compare($newtrans, $trans);
+	return $overlap_matrix{$newtrans}{$trans};
+    }
+}
+  
+
+############################################################
+
+sub tag_extension_ancestors{
+    my ($self,$node) = @_;
+    unless ( $self->is_visited($node ) ){
+	$self->is_visited( $node, 1 );
+    }
+    foreach my $parent (@{$node->extension_parents} ){
+	unless ( $self->is_visited($parent) ){
+	    $self->tag_extension_ancestors($parent);
+	} 
+    }
+}
+
+############################################################
+
+sub is_visited{
+  my ($self,$node,$boolean) = @_;
+  #unless( $self->{_visited} ){
+  #  $self->{_visited} = {};
+  #}
+  if ( $node && defined $boolean){
+    $self->{_visited}{$node} = $boolean;
+    print STDERR "tagging node ".$node->transcript->dbID." as visited (".$self->{_visited}{$node}.")\n";
+    return $self->{_visited}{$node};
+  }
+  return $self->{_visited}{$node};
+}
+
+############################################################
+
+sub flush_visited_tags{
+  my ($self) = @_;
+  delete $self->{_visited};
 }
 
 ############################################################
@@ -120,13 +657,6 @@ sub new {
 # RUN METHOD
 #
 ############################################################
-
-=head2 run
-
- Function:   main magic and witchcraft on the transcripts. 
-  it fills up the holder $self->output with transcript objects
-  
-=cut
 
 sub run {
   my $self = shift;
@@ -140,32 +670,16 @@ sub run {
   my @lists = $self->link_Transcripts( \@transcript_clusters );
   print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
 
-	 # merge each list into a putative transcript
-	 my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
-	 #print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
-	 
-	 ############################################################
-	 # repeat the process. The representation we use is still not satisfactory
-	 # and there are still things that can be merge:
-	 ############################################################
-
-	 # cluster the transcripts
-	 my @more_transcript_clusters = $self->_cluster_Transcripts(@merged_transcripts);
-	 print STDERR scalar(@transcript_clusters)." clusters returned from second call _cluster_Transcripts\n";
-	 my @more_lists = $self->link_Transcripts( \@more_transcript_clusters );
-	 print STDERR scalar(@more_lists)." lists returned from second call link_Transcripts\n";
-	 
-	 # merge each list into a putative transcript
-	 my @more_merged_transcripts  = $self->_merge_Transcripts(\@more_lists);
-	 print STDERR scalar(@more_merged_transcripts)." transcripts returned from second call _merge_Transcripts\n";
-	 
-	 #foreach my $tran ( @more_merged_transcripts ){
-	 #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
-	 #}
-	 
-	 $self->output(@more_merged_transcripts);
-	}
-
+  # merge each list into a putative transcript
+  my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
+  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
+  
+  #foreach my $tran ( @more_merged_transcripts ){
+  #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+  #}
+  
+  $self->output(@merged_transcripts);
+}
 
 
 ############################################################
@@ -309,11 +823,11 @@ Description:  it returns the comparison ( $a <=> $b ) of the right-most coordina
 
 sub by_transcript_high {
     my $alow;
-  my $blow;
-
-  my $ahigh;
-  my $bhigh;
-  
+    my $blow;
+    
+    my $ahigh;
+    my $bhigh;
+    
   # alow and ahigh are the left most and right most coordinates for transcript $a 
   if ($a->start_Exon->strand == 1) {
     $alow  = $a->start_Exon->start;
@@ -385,397 +899,6 @@ sub transcript_low{
   return $low;
 }
 
-
-############################################################
-#
-# CLUSTERING OF TRANSCRIPTS BY CONSECUTIVE EXON OVERLAP
-#
-############################################################
-
-=head2 link_Transcripts
-
- description: reads all the transcripts per cluster and merges those that
-              are redundant with each other, producing brand new transcripts from that,
-              see below the description of the algorithm
-
- Algorithm:
-
-    pre-processing: cluster transcripts by genomic extent overlap (rough clustering), 
-                    done in _cluster_Transcripts_by_genomic_range
-
-    for each cluster of transcripts C
-
-      pre-processing: sort the transcripts in C in ascending order by their start coordinate. If this coincides
-                      we sort desc by the end coordinate.
-
-      L = { all the lists that we are going to create }
-
-      for each transcript t_i in C {
-
-        start list list(i)(0) with t_i
-	list(i)(a) represents every list that begins with t_i
- 
-        for each t_j in C, j>i {
- 
-	  It is possible that we must sort list(i)(a), a = 0...N in
-	  descending order by the number of elements, so that if t_j
-	  links with a proper sublist, we make sure it is also the
-	  largest possible proper sublist. Otherwise it might link to
-	  a smaller one. See example of presentation, where we add a
-	  EST number 7, which could merge with 1,2 and 6. If it is
-	  compared first with 1->2->3 we could conclude that it merges
-          with 1->2, but we would miss 1->2->6 
-  
-	  But if the available lists are al of the same size
-	  there will be no way to distinguish them, so we are in
-	  trouble. We should test every list(i)(a) for a given t_j and
-	  then choose the best in this priority: a complete list >>
-	  the longer proper sublist
-
-          Note: it may seem that ESTs that have been used as internal previously are bound
-	  to give us lists that are embedded in previous lists and that will get
-	  rejected anyway later one. This is not true. Consider this:
-
-	  1    #####-----#####-------######-------####----------#####
-	  2              #####-------####
-	  3                           #####-------####
-	  4                                       ####--####---####
-	  In this case we would have 1->2->3 and 2->3->4,
-	  so being 2 a middle link, does not imply that all lists starting
-	  in 2 are necessarily embedded in previous lists.
-
-  
-	  for each list(i)(a), a = 0,...,N {
-  
-            compare t_j with every element t_k in list(i)(a)  
-	  }
-	  there are 3 possibilities: 
-	      
-	  1. if t_j merges with at least one element in list(i)(a) and
-	     with those that do not merge, it does even not overlap,
-	     ==> add t_j to the end of list(i)(a)
-	         go to the next t_j
-		
-	  2. if t_j has the properties as in 1) but with a proper sub-list of list(i)(a)
-             ==> create a new list list(i)(a_max + 1) = sublist of list(i)(a) and add t_j at the end
-                 go to the next t_j
-  
-          3. if not 1. and not 2. ==> go to the next list list(i)(a+1)
-	}
-
-        put the lists list(i)(a) a=0,...,N in L	
-        go to the next t_i
-      }
-
-      remove lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
-      sort the lists in L descending by the number of elements
-      accept the first list list_0
-      for each list_m in L m>0 {   
-        if list_m is not included in (or equal to) list_n for n = 0,...,m-1 ==> accept list_m
-      }
-   
-=cut
-
-############################################################
-
-sub link_Transcripts{
-    my ($self,$transcript_clusters) = @_;
-    
-    my @final_lists;  
-    
-    # look in each cluster
-  CLUSTER:
-    foreach my $cluster ( @{ $transcript_clusters} ){
-	
-        #print STDERR "~~~ CLUSTER ~~~\n";
-	my %overlap_matrix;
-	$self->matrix(\%overlap_matrix);
-	
-	# keep track of all the lists
-	my @lists;
-	
-	# keep track of every list starting in each transcript:
-	my %lists;
-	
-	# get the transcripts in this cluster
-	my @transcripts = @{$cluster->get_Transcripts};
-	
-        ############################################################
-	# sort the transcripts by the left most coordinate in ascending order
-	# for equal value, order by the right most coordinate in descending order
-        ############################################################
-	@transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-			      if ($result){
-	             return $result;
-			      }
-			      else{
-				  return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-	     	      }
-			  } @transcripts;
-	
-        # the other way around does not work either:
-        #@transcripts = sort { my $result = (  $self->transcript_high($b) <=> $self->transcript_high($a) );
-	#		      if ($result){
-	#      		       return $result;
-	#		      }
-	#		      else{
-	#			  return ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-	#     	      }
-	#		  } @transcripts;
-	
-        ############################################################
-        # trying to sort them by genomic length does not work
-        #@transcripts = sort { $self->genomic_length($b) <=> $self->genomic_length($a) } @transcripts;
-        #@transcripts = sort { $self->exonic_length($b) <=> $self->exonic_length($a) } @transcripts;
-
-
-	#print STDERR "Cluster: (sorted transcripts)\n";
-	#foreach my $t ( @transcripts ){
-	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-	#}
-	
-	# for each transcript
-	# try to find al the linked lists that start in this transcript
-      TRAN1:
-	for (my $i=0; $i<scalar(@transcripts); $i++){
-	    
-	    # store this one in the first list
-	    my @first_list = ();
-	    push (@first_list, $transcripts[$i]);
-	    
-	    # store all the lists created started in this transcript:
-	    my @current_lists = ();
-	    push (@current_lists, \@first_list );
-	    
-	    # go over the rest
-	  TRAN2:
-	    for (my $j=$i+1; $j<scalar(@transcripts); $j++){
-		
-		my @complete_lists = ();
-		my @sublists       = (); 
-		
-		# loop over all the lists{i}
-		# we store all the potential links
-	      LIST:
-		foreach my $list ( @current_lists ){
-		    
-		    # test
-                    #print STDERR "-- comparing: ".Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$j] );
-                    #print STDERR "with list:\n";
-                    #$self->_print_List($list);
-
-                    # check whether this trans can be linked to this list or to a proper sublist
-		    my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
-		    
-		    # maybe it does not link to this one
-		    unless ( $new_list ){
-			next LIST;
-		    }
-		    
-		    # if it returns the same list, then add it to the set of complete_lists
-		    if ( $new_list == $list ){
-			push ( @complete_lists, $new_list );
-			
-			## add the it to the current list:
-			#push( @$list, $transcripts[$j] );
-			#next TRAN2;
-		    }
-		    # if it returns a proper sublist, add it to the set of sublists
-		    elsif( $new_list != $list ){
-			push ( @sublists, $new_list );
-		    }
-		}    # end of LIST
-		
-		# if we have complete lists, we add $transcripts[$j] to the end of all of them
-		if ( @complete_lists ){
-		    foreach my $list ( @complete_lists ){
-		       #print STDERR "ADDING transcript to complete list:\n";
-                       #$self->_print_List($list);
-                       push ( @$list, $transcripts[$j] );
-		    }
-		    next TRAN2;
-		}
-		# if we only have sublists, we add $transcripts[$k] to the longest one
-		elsif( @sublists ){
-		    my @sorted_sublists = sort { scalar( @$b ) <=> scalar( @$a ) } @sublists;
-		    
-		    # add it to the longest sublist:
-		    my $longest_sublist  = shift( @sorted_sublists );
-		    push ( @$longest_sublist , $transcripts[$j] );
-		    #print STDERR "ADDING transcript to complete list:\n";
-                    #$self->_print_List($longest_sublist);
-
-		    # add this new list to the set $lists{$i}
-		    push ( @current_lists, $longest_sublist );
-		    
-                    my $max = scalar( @$longest_sublist);
-                    my $next_sublist = shift( @sorted_sublists); 
-                    while( defined $next_sublist && scalar(@$next_sublist) == $max ){
-                      push ( @$next_sublist , $transcripts[$j] );
-		      #print STDERR "ADDING transcript to sub list:\n";
-                      #$self->_print_List($next_sublist);
-
-		      # add this new list to the set $lists{$i}
-		      push ( @current_lists, $next_sublist );
-                    }
-                  next TRAN2;
-		}
-		
-	    }   # end of TRAN2
-	    
-	    #put @current_lists in @lists
-	    push ( @lists, @current_lists );
-	    
-	    #print STDERR "current lists:\n";
-	    #foreach my $list ( @current_lists ){
-	#	foreach my $t (@$list){
-	#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-	#	}
-	#    }
-	    
-	}  
-	
-	# remove 'properly' lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
-	
-	# sort the lists in descending by the number of elements
-	print STDERR scalar(@lists)." lists created\n";
-        my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
-		print STDERR scalar(@lists)." sorted lists\n";
-	my @accepted_lists;
-	
-	# accept the longest list
-	push ( @accepted_lists, shift @sorted_lists );
-	
-         
-   
-	# check the rest
-      LIST:
-	while ( @sorted_lists ){
-	    my $list = shift @sorted_lists;
-	    my $found_embedding = 0;
-	    
-	  ACCEPTED_LIST:
-	    foreach my $accepted_list ( @accepted_lists ){
-		if ( $self->_check_embedding( $list, $accepted_list ) ){
-		    next LIST;
-		}
-	    }
-	    
-	    # if we get to this point, it means that this list is genuine
-	    push( @accepted_lists, $list );
-	}
-	
-	# store the lists for this cluster into the big final list:
-	push (@final_lists, @accepted_lists);
-	print STDERR scalar( @accepted_lists )." lists accepted in this cluster\n";
-        #my $count = 0;
-        #foreach my $list (@accepted_lists){
-	#$count++;
-	#print STDERR "list $count:\n";
-	#foreach my $t ( @$list ){
-	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
-	#}
-    
-    } # end of CLUSTER
-    
-    
-    # @final_lists contain a list of listrefs, 
-    # each one containing the transcripts that can merge with each other		      
-    
-    
-    $self->sub_clusters( @final_lists );
-    
-#    print STDERR "final lists:\n";
-#    my $count = 0;
-#    foreach my $list (@final_lists){	
-#$count++;
-#	print STDERR "list $count\n";
-#	foreach my $t ( @$list ){
-#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
-#	}
-#    }
-
-    return @final_lists;	      
-}
-
-############################################################
-
-=head2 _test_for_link
-
-description: this method computes the largest proper sublist in $list 
-             starting in the same element as $list
-             to which $transcript can be linked
-             
-     Arg[1]: a listref with the list elements
-     Arg[2]: a transcript object
-     Return: it can return $list, a sub_list, or undef
-
-=cut
-    
-sub _test_for_link{
-  my ($self, $list, $transcript) = @_;
-  
-  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new( -comparison_level         => $self->_comparison_level, 
-										      -exon_match               => $self->_exon_match,
-										      -splice_mismatch          => $self->_splice_mismatch,
-										      -intron_mismatch          => $self->_intron_mismatch,
-										    );
-  my $sublist;
-  my $can_merge = 0;
-  
-  my %overlap_matrix = %{$self->matrix};
-
- LINK:
-  foreach my $trans_link ( @$list ){
-    my ($merge,$overlaps);
-    
-    if ( defined( $overlap_matrix{$transcript}{$trans_link} ) ){
-	($merge,$overlaps) = @{$overlap_matrix{$transcript}{$trans_link}};
-	#print STDERR "using cached matrix for comparing ".
-	#    $transcript->dbID."-".$trans_link->dbID ." ( ".
-	#	$trans_link->dbID."-".$transcript->dbID ." ) = ( $merge,$overlaps )\n";
-    }
-    else{
-	($merge,$overlaps) = $comparator->compare($trans_link, $transcript);
-	$overlap_matrix{$transcript}{$trans_link} = [$merge,$overlaps];
-	#print STDERR "calculating matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
-    }
-    
-    if ($merge == 1 ){
-      $can_merge = 1;
-    }
-    # the transcript can be appended to this list if
-    # it merges to at least one member of the list
-    # and it does not overlap with those member with which
-    # it cannot merge
-    if ( $merge == 1 || $overlaps == 0 ){
-      
-      # it links to this one
-      push ( @{$sublist}, $trans_link );
-    }
-    else{
-      # stop searching as soon as we find an element to which it does not link
-      last LINK;
-    }
-  }
-  
-  # update the overlap matrix
-  $self->matrix(\%overlap_matrix);
- 
-  if ( $can_merge == 0 || scalar( @$sublist ) == 0 ){
-    return undef;
-  }
-  elsif ( scalar( @$sublist ) > 0 &&  scalar( @$sublist ) < scalar( @$list ) ){
-    return $sublist;
-  }
-  elsif ( scalar( @$sublist ) == scalar( @$list ) ){
-    return $list;
-  }
-  else{
-    $self->throw("I didn't expect to be here!!");
-  }
-}
-
 ############################################################
 
 sub matrix{
@@ -788,200 +911,10 @@ sub matrix{
 
 ############################################################
 
-=head2 _check_embedding
-
-     Arg[1]: a listref of transcripts
-     Arg[2]: a listref of transcripts which potentially contains Arg[1]
-description: this method checks whether Arg[1] is included in Arg[2], in the following sense
-             if list2 = ( 1,3,4,6 ) and list1 = ( 3,4) ==> list2 includes list1. 
-             It mimics the idea of the Boyer-Moore algorithm
-
-=cut
-
-sub _check_embedding{
-  my ( $self, $list, $bigger_list ) = @_;
-  
-  my @list = @$list;
-  my @bigger_list = @$bigger_list;
-  unless ( scalar(@list) <= scalar( @bigger_list ) ){
-      $self->throw("problem with the sorting, please check!");
-  }
-  
-  # with a bit of preprocessing this can be made pretty quick
-  
-  # last element in list:
-  my $last_in_list = $list[$#list];
-
-  # store the positions where this element occurs in bigger_list starting from the right
-  my @positions;
-  for (my $k= $#bigger_list; $k>=0; $k-- ){
-      if ( $bigger_list[$k] == $last_in_list ){
-	  push( @positions, $k);
-	  last;
-      }
-  }
-
-  # if it does not occur in bigger_list, return false
-  unless (@positions){
-      return 0;
-  }
-
-  # else, start matching from that position:
-  my $i = $#list;  
-  my $j = shift @positions;
-
-  while ( $j >=0 ){
-            
-      while ( $list[$i] == $bigger_list[$j] && $i >=0 && $j >= 0){
-	  $i--;
-	  $j--;
-      }
-
-      if ( $i == -1 ){
-	  # list is embedded in bigger_list
-	  return 1;
-      }
-      elsif ( @positions ){
-	  # start looking from the next occurrence of $last_in_list in @bigger_list
-	  $j = shift @positions;
-	  $i = $#list;
-      }
-      else{
-	  # no more occurrences
-	  return 0;
-      }
-  }
-  
-  # sorry, we got to the end of bigger_list, and no match was found
-  return 0;
-}
-
-############################################################
-
-sub genomic_length{
-  my ($self,$t) = @_;
-  my @exons = sort{ $a->start <=> $b->start } @{$t->get_all_Exons};
-  return $exons[$#exons]->end - $exons[0]->start + 1;
-}
-
-sub exonic_length{
-  my ($self,$t) = @_;
-  my $length = 0;
-  foreach my $exon ( @{$t->get_all_Exons} ){
-  $length += ( $exon->end - $exon->start + 1 );
-  }
-  return $length;
-}
-
-############################################################
-
-=head2 _test_for_Merge
- Function: this function is called from link_Transcripts and actually checks whether two transcripts
-           inputs merge.
- Returns : It returns two numbers ($merge,$overlaps), where
-           $merge = 1 (0) when they do (do not) merge,
-           and $overlaps is the number of exon-overlaps.
-
-=cut
-
-sub _test_for_Merge{
-  my ($self,$tran1,$tran2) = @_;
-  my @exons1 = @{$tran1->get_all_Exons};
-  my @exons2 = @{$tran2->get_all_Exons};	
- 
-  my $foundlink = 0; # flag that gets set when starting to link exons
-  my $start     = 0; # start looking at the first one
-  my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
-  my $merge     = 0; # =1 if they merge
-
-  #print STDERR "comparing ".$tran1->dbID." ($tran1)  and ".$tran2->dbID." ($tran2)\n";
-
-
-EXON1:
-  for (my $j=0; $j<=$#exons1; $j++) {
-  
-  EXON2:
-    for (my $k=$start; $k<=$#exons2; $k++){
-    #print STDERR "comparing ".($j+1)." and ".($k+1)."\n";
-	    
-      # if exon 1 is not the first, check first whether it matches the previous exon2 as well, i.e.
-      #                        ____     ____        
-      #              exons1 --|____|---|____|------ etc... $j
-      #                        ____________  
-      #              exons2 --|____________|------ etc...  $k
-      #
-      if ($foundlink == 1 && $j != 0){
-	if ( $k != 0 && $exons1[$j]->overlaps($exons2[$k-1]) ){
-	  #print STDERR ($j+1)." <--> ".($k)."\n";
-	  $overlaps++;
-          next EXON1;
-	}
-      }
-      
-      # if texons1[$j] and exons2[$k] overlap go to the next exon1 and  next $exon2
-      if ( $exons1[$j]->overlaps($exons2[$k]) ){
-	#print STDERR ($j+1)." <--> ".($k+1)."\n";
-        $overlaps++;
-	
-        # in order to merge the link always start at the first exon of one of the transcripts
-        if ( $j == 0 || $k == 0 ){
-          $foundlink = 1;
-        }
-      }          
-      else {  
-	# if you haven't found an overlap yet, look at the next exon 
-	if ( $foundlink == 0 ){
-	  next EXON2;
-	}
-	# leave if we stop finding links between exons before the end of transcripts
-	if ( $foundlink == 1 ){
-	  $merge = 0;
-	  last EXON1;
-	}
-      }
-      
-      # if foundlink = 1 and we get to the end of either transcript, we merge them!
-      if ( $foundlink == 1 && ( $j == $#exons1 || $k == $#exons2 ) ){
-	
-	# and we can leave
-        $merge = 1;
-	last EXON1;
-      }
-      # if foundlink = 1 but we're not yet at the end, go to the next exon 
-      if ( $foundlink == 1 ){
-	
-	# but first check whether in exons2 there are further exons overlapping exon1, i.e.
-        #                       ____________        
-	#             exons1 --|____________|------ etc...
-	#                       ____     ___  
-	#             exons2 --|____|---|___|------ etc...
-	# 
-	my $addition = 0;
-	while ( $k+1+$addition < scalar(@exons2) && $exons1[$j]->overlaps($exons2[$k+1+$addition]) ){
-	  #print STDERR ($j+1)." <--> ".($k+2+$addition)."\n";
-	  $overlaps++;
-          $addition++;
-	}      
-	$start = $k+1+$addition;
-	next EXON1;
-      }    
-    
-    } # end of EXON2 
-  
-    if ($foundlink == 0){
-      $start = 0;
-    }
- 
-  }   # end of EXON1      
-
-  # if we haven't returned at this point, they don't merge, thus
-  return ($merge,$overlaps);
-}
-
 
 ############################################################
 #
-# MERGE TRANSCRIPTS
+# METHODS TO MERGE TRANSCRIPTS
 #
 ############################################################
 
@@ -998,7 +931,7 @@ sub _merge_Transcripts{
     my ($self,$lists) = @_;
     print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
-    my $verbose = 1;
+    my $verbose = $self->verbose;
 
     # $list is an arrayref of the ests/cdnas that we can merge
     my @merged_transcripts;
@@ -1205,7 +1138,6 @@ sub _set_splice_Ends {
  CLUSTERS:		      
  foreach my $cluster ( @exon_clusters ){
    $position_is++;
-   my $fused  = 0;
    
    # keep track of the transcripts used in this cluster
    my %seen_transcript;
@@ -1224,11 +1156,9 @@ sub _set_splice_Ends {
      $seen_transcript{ $exon2transcript{ $exon } } = 1;
    } # end of exon loop
    
-   # if it is not fused, simply collect the exons
-   if ( $fused != 1 ){
-     push( @exon_list, $cluster->sub_SeqFeature);
-   }    
-   
+   # isimply collect the exons
+   push( @exon_list, $cluster->sub_SeqFeature);
+      
    ## we don't check any more for fusion. Whether one wants to allow fusion or not should happen during
    ## the comparison between transcripts.
    
@@ -1295,7 +1225,7 @@ CLUSTER:
     $position++;
     my %start;
     my $new_start;
-    my $max_start = 0;
+    my $max_start;
     
   #### set first the start-coordinates ####
   
@@ -1326,13 +1256,14 @@ CLUSTER:
     #print STDERR "\n";
 
     $new_start = shift( @starts );
-    $max_start = $start{ $new_start };
-
-    # if we have too little exons to obtain the start, take the original value
-    if ( $max_start == 0 ){
-      $new_start = $cluster->start;
+    if ( defined $new_start ){
+	$max_start = $start{ $new_start };
     }
-
+    # if we have too little exons to obtain the start, take the original value
+    if ( !defined $max_start ){
+	$new_start = $cluster->start;
+    }
+    
     # the first cluster is a special case - potential UTRs, take the longest one.
     if( $position == 1) {
       $new_start = $cluster->start;  
@@ -1544,6 +1475,8 @@ sub _splice_mismatch{
   return $self->{_splice_mismatch};
 }
 
+############################################################
+
 sub _exon_match{
   my ($self,$exon_match) =@_;
        if ( defined $exon_match){
@@ -1570,16 +1503,6 @@ sub _mismatch_allowed{
     $self->{_mismatch_allowed} = $mismatch;
   }
   return $self->{_mismatch_allowed};
-}
-
-############################################################
-
-sub exact_merge{
- my ($self, $value);
- if (defined($value)){
-     $self->{_exact_merge} = $value;
- }
- return $self->{_exact_merge};
 }
 
 ############################################################
@@ -1617,5 +1540,13 @@ sub sub_clusters {
 
 ############################################################
 
+sub verbose{
+  my ($self,$verbose) = @_;
+  if ( $verbose ){
+    $self->{_verbose} = $verbose;
+  }
+  return $self->{_verbose};
+}
+############################################################
 
 1;
