@@ -100,7 +100,7 @@ while( my $cdna = $seqin->next_seq ){
   my $polyA_clipper = Bio::EnsEMBL::Utils::PolyA->new();
   my $new_cdna;
   if ($clip){
-    print STDERR "going to pass a $cdna\n";
+#    print STDERR "going to pass a $cdna\n";
     $new_cdna = $polyA_clipper->clip($cdna);
   }
   elsif( $softmask ){
