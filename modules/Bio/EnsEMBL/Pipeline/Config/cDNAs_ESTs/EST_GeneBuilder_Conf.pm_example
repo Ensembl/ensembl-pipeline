@@ -88,7 +88,16 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    EST_GENEBUILDER_INPUT_GENETYPE => 'human_est',
 	    EST_GENOMEWISE_GENETYPE        => 'genomewise',
 	    			 
+			 # if this is set to TRUE it will reject ests that do not
+			 # have all splice sites correct
 			 CHECK_SPLICE_SITES => 1,
+
+			 # if set to a number, it will reject single exon ests that are shorter that this
+			 FILTER_ON_SINGLETON_SIZE => 200,
+
+			 # if set to a number, it will reject single exon ests that have score smaller than this
+			 RAISE_SINGLETON_COVERAGE => 95,
+
 
 	                 ## you must choose one type of merging for cdnas/ests: 2 and 3 are the common ones
 			 EST_GENEBUILDER_COMPARISON_LEVEL => 4,
@@ -132,6 +141,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # number of ESTs/cDNAs that must be 'included' into a
 			 # final transcript
 			 CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 1,
+
 			 
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
@@ -154,8 +164,10 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # this is in general the database where we read the mapped ests/cdnas
 	    # from, in order to use them for the EST_GeneBuilder
 			 
-	    EST_DBNAME                  => 'ens_NCBI_31_est',
-	    EST_DBHOST                  => 'ecs2f',
+	    #EST_DBNAME                  => 'ens_NCBI_31_est',
+	    #EST_DBHOST                  => 'ecs2f',
+			 EST_DBNAME                  => 'homo_sapiens_est_12_31',
+			 EST_DBHOST                  => 'ecs2d',
 	    EST_DBUSER                  => 'ensro',
 	    EST_DBPASS                  => '',
 
