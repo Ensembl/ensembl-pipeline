@@ -86,6 +86,7 @@ sub _check_Transcript{
     # one end, the 'higher' end of the slice
     ############################################################
     if ( $slice ){
+
 	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
 	    print STDERR "check: transcript $id outside the slice\n";
 	    $valid = 0;
@@ -1058,12 +1059,14 @@ sub _real_introns{
 
 ############################################################
 # this method cehcks whether the splice sites are canonical
-# it returns 1 if all splice sites are canonical.
+# it returns the numb er of canonical splice sites
 # It returns zero if the transcrip has only 1 exon, or some of the splice sites
 # are non-canonical
 
 sub check_splice_sites{
   my ($self, $transcript) = @_;
+
+  $self->throw("no transcript passed in") unless defined $transcript;
   $transcript->sort;
   
   my $strand = $transcript->start_Exon->strand;
@@ -1190,9 +1193,149 @@ print STDERR "check_splice_sites: upstream ".
 }
 
 ############################################################
+# this method checks whether the splice sites are canonical
+# it returns 1 if all splice sites are canonical
+# It returns zero if the transcrip has only 1 exon, or some of the splice sites
+# are non-canonical
+
+sub check_canonical_splice_sites{
+  my ($self, $transcript) = @_;
+
+  $self->throw("no transcript passed in") unless defined $transcript;
+  $transcript->sort;
+
+  my $strand = $transcript->start_Exon->strand;
+  my @exons  = @{$transcript->get_all_Exons};
+
+  my $introns  = scalar(@exons) - 1 ; 
+  if ( $introns <= 0 ){
+    return 0;
+  }
+
+  my $correct  = 0;
+  my $wrong    = 0;
+  my $other    = 0;
+
+  # all exons in the transcripts are in the same seqname coordinate system:
+  my $slice = $transcript->start_Exon->contig;
+
+  if ($strand == 1 ){
+
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+      my $upstream_site;
+      my $downstream_site;
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i+1]->start - $exons[$i]->end - 1 );
+
+      next if $intron_length <=9;
+
+      eval{
+	$upstream_site = 
+	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+	$downstream_site = 
+	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+      };
+      unless ( $upstream_site && $downstream_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+
+print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
+      ## good pairs of upstream-downstream intron sites:
+      ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
+
+      ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
+      ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+	return 0;
+      }
+      else{
+	$other++;
+	return 0;
+      }
+    } # end of INTRON
+  }
+  elsif ( $strand == -1 ){
+
+    #  example:
+    #                                  ------CT...AC---... 
+    #  transcript in reverse strand -> ######GA...TG###... 
+    # we calculate AC in the slice and the revcomp to get GT == good site
+
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i]->start - $exons[$i+1]->end - 1 );
+      #print STDERR "intron length: $intron_length\n";
+      next if $intron_length <=9;
+
+      my $upstream_site;
+      my $downstream_site;
+      my $up_site;
+      my $down_site;
+      eval{
+	$up_site = 
+	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+	$down_site = 
+	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+      };
+      unless ( $up_site && $down_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      
+      print STDERR "check_splice_sites: upstream ".
+	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
+	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+	return 0;
+      }
+      else{
+	$other++;
+	return 0;
+      }
+      
+    } # end of INTRON
+  }
+  return 1;
+}
+
+
+############################################################
 # method for putting the stop codon at the end of the translation
 # if it is not already there. If the codon next to the last one is not a stop codon
-# we leav it un-touched.
+# we leave it un-touched.
 
 sub set_stop_codon{
     my ( $self, $transcript ) = @_;
@@ -1814,14 +1957,11 @@ sub _get_ORF_coverage {
   my ($self, $transcript) = @_;
   my $orf_coverage;
   my $transcript_length = $transcript->length;
-print STDERR "transcript length: $transcript_length\n";
-
 
   my $translateable = $transcript->translateable_seq;
   my $translateable_length = length($translateable);
-print STDERR "translateable length: $translateable_length\n";
   $orf_coverage = 100 * ($translateable_length/$transcript_length);
-  print STDERR "orf coverage: $orf_coverage\n";
+
   return $orf_coverage;
 
 }
