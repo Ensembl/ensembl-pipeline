@@ -78,57 +78,63 @@ sub pseudogene_test{
   
   my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
     
-    ############################################################
-    # is it spliced?
-    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($transcript) ){
-      print STDERR "Spliced:\tYES\n";
-    }
-    else{
-      print STDERR "Spliced:\tNO\n";
-    }
+  ############################################################
+  # is it spliced?
+  print STDERR "\n--- testing for splicing ---\n";
+  if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($transcript) ){
+    print STDERR "Spliced:\tYES\n";
+  }
+  else{
+    print STDERR "Spliced:\tNO\n";
+  }
   
   ############################################################
   # does it have frameshifts?
+  print STDERR "\n--- testing for frameshifts ---\n";
   if ( !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($transcript) 
        && 
        scalar( @{$transcript->get_all_Exons} > 1) 
-       ){
-      print STDERR "Frameshifts:\tYES\n";
-      $frameshift = 1;
+     ){
+    print STDERR "Frameshifts:\tYES\n";
+    $frameshift = 1;
   }
   else{
-      print STDERR "Frameshifts:\tNO\n";
-      $frameshift = 0;
+    print STDERR "Frameshifts:\tNO\n";
+    $frameshift = 0;
   }
   
   ############################################################
-    # does it have an in-frame stop codon?
-    
-    ############################################################
-    # has polyA?
-    if ( $self->has_polyA_track( $transcript, $db )){
-	print STDERR "polyA track:\tYES\n";
-	$polyA = 1;
-    }
-    else{
-	print STDERR "polyA track:\tNO\n";
-	$polyA = 0;
-    }
-    
-    ############################################################
-    # starts with Methionine?
-    if ($self->starts_with_Methionine( $transcript ) ){
-	print STDERR "starts with Methionine: YES\n";
-	$Met = 1;
-    }
+  # does it have an in-frame stop codon?
+  
+  ############################################################
+  # has polyA?
+  print STDERR "\n--- testing for polyA ---\n";
+  if ( $self->has_polyA_track( $transcript, $db )){
+    print STDERR "polyA track:\tYES\n";
+    $polyA = 1;
+  }
   else{
-	print STDERR "starts with Methionine: NO\n";
-	$Met = 0;
-    }
+    print STDERR "polyA track:\tNO\n";
+    $polyA = 0;
+  }
+  
+  ############################################################
+  # starts with Methionine?
+  print STDERR "\n--- testing for Met ---\n";
+  if ($self->starts_with_Methionine( $transcript ) ){
+    print STDERR "starts with Methionine: YES\n";
+    $Met = 1;
+  }
+  else{
+    print STDERR "starts with Methionine: NO\n";
+    $Met = 0;
+  }
   
   ############################################################
   # is the evidence spliced elsewhere in the genome?
-  $spliced_elsewhere = $self->check_for_gene_spliced_elsewhere( $transcript, $db );
+  print STDERR "\n--- testing for evidence spliced elsewhere in the genome ---\n";
+  
+  $spliced_elsewhere = $self->check_for_gene_spliced_elsewhere( $transcript, $db , $transcript->type);
   #if ( $spliced_ones && @$spliced_ones ){
   #  print STDERR "Evidence is spliced elsewhere: YES\n";
   #  $spliced_elsewhere = 1;
@@ -152,27 +158,15 @@ sub pseudogene_test{
   
   ############################################################
   # has it got homology in mouse
- $mouse_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
-  # if ( $orthologues && @{$orthologues} ){
-  #     $mouse_homology = 1;
-  # }
-  # else{
-  #     print STDERR "Could not find any ortholog\n";
-  #     $mouse_homology = 0;
-  # }
+  $mouse_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
   
+ 
   ############################################################
   # has it got homology in rat?
- $rat_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
-  # if ( $orthologues2 && @{$orthologues2} ){
-  #   $rat_homology = 1;
-  # }
-  # else{
-  #   print STDERR "Could not find any ortholog\n";
-  #   $rat_homology = 0;
-  # }
+  $rat_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
+  
   
 #  ############################################################
 #  # Does it break synteny in mouse?
@@ -404,63 +398,62 @@ sub overlap_repeats{
 # in the genome (provided by a database $db )
 
 sub check_for_gene_spliced_elsewhere{
-    my ($self,$transcript,$db) = @_;
+    my ($self,$transcript,$db,$type) = @_;
     
     #print STDERR " --- paralogs for ".$transcript->stable_id."\n";
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
     
-
     # get the evidence split by dna and protein align features:
     my ($prot_ids, $cdna_ids) = $self->_get_split_evidence($transcript); 
     
     # we take only one spliced transcript per evidence (if there is any)
     my @spliced_transcripts;
     if ( $prot_ids ){
-	foreach my $id ( @$prot_ids ){
-	    my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-		->find_transcripts_by_protein_evidence($id,$db);
-	    
-	    print STDERR scalar(@trans)." found with protein evidence $id\n";
-	    if ( @trans ){
-		my @selected;
-		foreach my $tran ( @trans ){
-		    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
-			 && !$self->overlap($transcript, $tran ) ) { 
-			push ( @selected, $tran );
-		    } 
-		}
-		if ( @selected ){
-		    my @sorted = 
-			sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected;
-		    push ( @spliced_transcripts, $sorted[0] );
-		}
-	    }
+      foreach my $id ( @$prot_ids ){
+	my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+	  ->find_transcripts_by_protein_evidence($id,$db,$type);
+	
+	print STDERR scalar(@trans)." found with protein evidence $id\n";
+	if ( @trans ){
+	  my @selected;
+	  foreach my $tran ( @trans ){
+	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+	    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+		 && !$self->overlap($transcript, $tran ) ) { 
+	      push ( @selected, $tran );
+	    } 
+	  }
+	  if ( @selected ){
+	    my @sorted = 
+	      sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected;
+	    push ( @spliced_transcripts, $sorted[0] );
+	  }
 	}
+      }
     }
     
     if ( $cdna_ids ){
-	foreach my $id ( @$cdna_ids ){
-	    my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-		->find_transcripts_by_dna_evidence($id,$db);
-	    print STDERR scalar(@trans)." found with cdna evidence $id\n";
-	    
-	    if ( @trans ){
-		my @selected; 
-		foreach my $tran ( @trans ){ 
-		    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
-			 && !$self->overlap($transcript, $tran ) ) {  
-			push ( @selected, $tran ); 
-		    }  
-		} 
-		if (@selected){
-		    my @sorted =  
-			sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected; 
-		    push ( @spliced_transcripts, $sorted[0] ); 
-		}
-	    }
+      foreach my $id ( @$cdna_ids ){
+	my @trans =  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+	  ->find_transcripts_by_dna_evidence($id,$db,$type);
+	print STDERR scalar(@trans)." found with cdna evidence $id\n";
+	
+	if ( @trans ){
+	  my @selected; 
+	  foreach my $tran ( @trans ){ 
+	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+	    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+		 && !$self->overlap($transcript, $tran ) ) {  
+	      push ( @selected, $tran ); 
+	    }  
+	  } 
+	  if (@selected){
+	    my @sorted =  
+	      sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected; 
+	    push ( @spliced_transcripts, $sorted[0] ); 
+	  }
 	}
+      }
     }
     #if ( @spliced_transcripts ){
 #	foreach my $transcript ( @spliced_transcripts ){
