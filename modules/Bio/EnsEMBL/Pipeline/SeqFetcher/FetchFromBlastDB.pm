@@ -42,7 +42,14 @@ sub _fetch {
     if (/^>/){
       $id_line = $_;
       $id_line =~ s/^>//;
-      $id_line =~ s/([\w\_\.]+).*\n/$1/;
+
+      if ($self->db->index_type =~ /wu/){
+	$id_line =~ s/([\w\_\.]+).*\n/$1/;
+      }
+      if ($self->db->index_type eq 'ncbi'){
+	$id_line =~ s/[^\|]+\|([\w\_\.]+).*\n/$1/;
+      }
+
       next
     }
 
