@@ -18,17 +18,17 @@ use Getopt::Long;
 
 my $file = 'ensembl_cdnas';
 
-my $dbhost    = 'ecs2d';
+my $dbhost    = 'ecs1e';
 my $dbuser    = 'ensro';
-my $dbname    = 'homo_sapiens_core_8_30';
+my $dbname    = 'mouse_whitehead_0401_denormalised';
 my $dbpass    = undef;
 
-my $dnadbhost = 'ecs2d';
+my $dnadbhost = 'ecs1e';
 my $dnadbuser = 'ensro';
-my $dnadbname = 'homo_sapiens_core_8_30';
+my $dnadbname = 'mouse_whitehead_0401_denormalised';
 my $dnadbpass = undef;
 
-my $genetype = "ensembl"; # default genetype
+my $genetype;
 
 
 &GetOptions(
@@ -37,12 +37,13 @@ my $genetype = "ensembl"; # default genetype
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
 	    'cdna_file:s'  => \$file,
+	    'genetype:s'   => \$genetype,
 	   );
 
 unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
-  print STDERR "script to dump all the translations from the transcripts in a database\n";
+  print STDERR "script to dump all the cdnas from the transcripts in a database\n";
  
-  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost -cdna_file \n";
+  print STDERR "Usage: $0 -genetype -dbname -dbhost -dnadbname -dnadbhost -cdna_file \n";
   exit(0);
 }
 
