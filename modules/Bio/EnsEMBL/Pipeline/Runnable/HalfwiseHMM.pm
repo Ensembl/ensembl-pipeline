@@ -100,10 +100,7 @@ sub new {
 
     $self->{'_genomic_seq'} = undef;
     $self->{'_input_features'} = [];
-    $self->{'_forward_features'} = [];
-    $self->{'_reverse_features'} = [];
     $self->{'_output_features'} = [];
-    $self->{'_pfam_ids') = [];
     $self->{'_hmmfetch'} = undef;
     $self->{'_uniquepfamids'} = [];
     $self->{'_hmmdb'} = undef;
@@ -128,8 +125,6 @@ sub new {
 	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensemb/Pfam');
 	
     }
-    
-    $self->sort_input_features();
 
     return $self; # success - we hope!
 }
@@ -166,9 +161,9 @@ sub add_input_features{
     my ($self, $features) = @_;
     
     if (ref($features) eq "ARRAY") {
-      push(@{$self->{'_input_features'}},@$ids);
+      push(@{$self->{'_input_features'}},@$features);
     } else {
-      $self->throw("[$ids] is not an array ref.");
+      $self->throw("[$features] is not an array ref.");
     }
       
 
@@ -184,30 +179,51 @@ sub all_input_features{
 }
 
 
-sub sort_input_features{
+#methods that probably won't be needed
 
-  my ($self) = @_;
+#sub sort_input_features{
 
-  @features = $self->all_input_features();
+#  my ($self) = @_;
 
+#  @features = $self->all_input_features();
+
+#  foreach my $f(@features){
+
+#   if($f->strand == 1){
+#     $self->forward_features($f);
+#   }elsif($f->strand == -1){
+#     $self->reverse_features($f);
+#   }else{
+#     $self->throw("feature has no strand : $!");
+#   } 
+
+#  }
+
+#}
+
+#sub forward_features{
   
-
-}
-
-sub forward_features{
-}
-
-sub reverse_features{
-
-  my ($self, $f) = @_;
+#  my ($self, $f) = @_;
  
-  if (defined($f))
-    {
-	push(@{$self->{'_reverse_features'}}, $f);
-    }
+#  if (defined($f))
+#    {
+#	push(@{$self->{'_forward_features'}}, $f);
+#    }
 
-  return @{$self->{'_reverse_features'}};
-}
+#  return @{$self->{'_forward_features'}};
+#}
+
+#sub reverse_features{
+
+#  my ($self, $f) = @_;
+ 
+#  if (defined($f))
+#    {
+#	push(@{$self->{'_reverse_features'}}, $f);
+#    }
+
+#  return @{$self->{'_reverse_features'}};
+#}
 
 =head2 hmmfetch 
 
@@ -269,25 +285,7 @@ sub hmmfilename {
 }
 
 
-=head2  errorfile
 
- Title    : errorfile
- Usage    : $self->errorfile($filename);
- Function : gets and sets the name of the hmmdb file
- Returns  : the name of the hmmdb file
- Args     : the name of the hmmdb file
-
-=cut
-
-sub errorfile {
-    my ($self, $args) = @_;
-    if (defined ($args)){
-	$self->{'_errorfile'} = $args;
-    }
-
-    return $self->{'_errorfile'};
-
-}
 
 
 
@@ -309,12 +307,44 @@ sub errorfile {
 sub run {
 
     my ($self) = @_;
-    
 
+    my %swissprot_ids = $self->get_swissprot_ids();
     
+    my @keys = keys(%swissprot_ids);
+
+    foreach my $key (@keys){
+      print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
+    }
 }
 
 
+sub get_swissprot_ids{
+
+  my ($self) = @_;
+
+  my @features = $self->all_input_features();
+  my %swissprot_ids;
+  foreach my $f(@features){
+
+    if(!$swissprot_ids{$f->hseqname}){
+     
+      $swissprot_ids{$f->hseqname} = $f->strand;
+    
+    }elsif(defined$swissprot_ids{$f->hseqname}){
+      
+      if($swissprot_ids{$f->hseqname} != $f->strand){
+	$swissprot_ids{$f->hseqname} = 0;
+      }else{
+	$swissprot_ids{$f->hseqname} = $f->strand;
+      }
+
+    }
+    
+  }
+
+  return %swissprot_ids;
+    
+}
 
 
 
@@ -499,7 +529,7 @@ sub output {
   
 
  
-  }
+  
   
   
   return @feat;
