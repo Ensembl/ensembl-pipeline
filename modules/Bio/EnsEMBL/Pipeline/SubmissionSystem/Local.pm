@@ -10,7 +10,6 @@ use POSIX;
 @ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
 
 my $children = 0;
-my @_queue;
 
 =head2 new
 
@@ -30,6 +29,8 @@ sub new {
   my $class = ref($caller) || $caller;
 
   my $self = bless {}, $class;
+
+  $self->{'_queue'} = [];
 
   $SIG{CHLD} = \&sig_chld;
 
@@ -61,15 +62,17 @@ sub submit {
 
   my $config = $self->get_Config();
   my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
+
   print "submit: max_jobs = $max_jobs\n";
-  # if there aren't too many jobs executing take one off the start of the queue and run it
+
+  #put the just received job onto the end of the queue
+  push @{$self->{'_queue'}}, $job;
+
+  # if there aren't too many jobs executing take one off the start of the
+  # queue and run it
   if ($children < $max_jobs) {
 
-    $self->_start_job($job);
-
-  } else { # put it on the end of the queue
-
-    unshift @_queue, $job;
+    $self->_start_job(shift @{$self->{'_queue'}});
 
   }
 
@@ -162,10 +165,10 @@ sub flush {
   my $config = $self->get_Config();
   my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
 
-  if (scalar(@_queue) > 0) {
+  if (scalar(@{$self->{'_queue'}}) > 0) {
 
     if ($children < $max_jobs) {
-      my $job = shift @_queue;
+      my $job = shift @{$self->{'_queue'}};
       $self->_start_job($job);
     }
 
@@ -224,18 +227,21 @@ sub _start_job {
     # PARENT
     $children++;
     print "Size of children is now " . $children . "; " . 
-      scalar(@_queue) . " jobs left in queue\n";
+      scalar(@{$self->{'_queue'}}) . " jobs left in queue\n";
 	
   } else {
     #CHILD
 
     my $file_prefix = $self->_generate_filename_prefix($job);
 
-    # redirect stdout/stderr to files
-    # read stdin from /dev/null
+
     $job->stdout_file("${file_prefix}.out");
     $job->stderr_file("${file_prefix}.err");
+
     POSIX::setsid();		# make session leader, and effectively a daemon
+
+    # redirect stdout/stderr to files
+    # read stdin from /dev/null
     close(STDERR);
     close(STDOUT);
     close(STDIN);
