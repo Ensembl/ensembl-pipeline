@@ -28,7 +28,7 @@ my $alignment = $alignment_tool->retrieve_alignment('-type' => 'all');
                              # Type can be 'all', 'nucleotide' or 'protein'
 
 foreach my $align_seq (@$alignment){
-  print $sequence->seq . "\n";
+  print $align_seq->seq . "\n";
 }
 
 
@@ -36,9 +36,10 @@ foreach my $align_seq (@$alignment){
 # regions of the alignment can make it _very_ big.  Introns
 # can be truncated thusly:
 
-my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
-						'-remove_introns' => 1,
-						'-padding'        => 10);
+my $alignment = $align_tool->retrieve_alignment('-type'            => 'all',
+						'-remove_introns'  => 1,
+						'-padding'         => 10,
+                                                '-merge_sequences' => 1);
 
 # The '-padding' option specifies the amount of tailing
 # sequence left attached to each 'exon'.  If you set this
@@ -63,6 +64,19 @@ my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
 # you are also trimming the intron sequences be careful that 
 # you aren't unwittingly throwing these intronic fragments
 # away.  A warning is raised if this happens.
+
+# It is possible to align a transcript to a set of external supporting
+# features.  In this case, the supporting features attached to
+# the transcript and ignored and the external set used instead.  It
+# usually helps if the external supporting features actually overlap
+# the transcript sequence.  This option is used by passing in 
+# supporting features at the time of object creation.
+
+my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
+                           '-dbadaptor'           => $db,
+			   '-seqfetcher'          => $seqfetcher,
+			   '-transcript'          => $transcript,
+                           '-supporting_features' => \@supporting_features);
 
 
 # A few features of the actual alignment can be controled.
@@ -186,13 +200,15 @@ sub new {
       $seqfetcher, 
       $padding, 
       $fasta_line_length, 
-      $evidence_identity_cutoff) = $self->_rearrange([qw(DBADAPTOR
-							 TRANSCRIPT
-							 SEQFETCHER
-							 PADDING
-							 FASTA_LINE_LENGTH
-							 IDENTITY_CUTOFF
-							)],@args);
+      $evidence_identity_cutoff,
+      $supporting_features) = $self->_rearrange([qw(DBADAPTOR
+						    TRANSCRIPT
+						    SEQFETCHER
+						    PADDING
+						    FASTA_LINE_LENGTH
+						    IDENTITY_CUTOFF
+						    SUPPORTING_FEATURES
+						   )],@args);
   
 
   # Throw an error if any of the below are undefined or
@@ -249,6 +265,12 @@ sub new {
     $self->_translatable(0);
   }
 
+  # When an external set of features are used, over-ride the
+  # features from the transcript
+
+  if (defined $supporting_features) {
+    $self->_all_supporting_features($supporting_features)
+  }
 
 
   # The line length in the fasta alignment is set to a default
@@ -420,13 +442,13 @@ sub _align {
 
   my $genomic_sequence         = $self->_genomic_sequence;
   my $exon_nucleotide_sequence = $self->_exon_nucleotide_sequence;
-  
+
   my $exon_protein_sequence;
   if (($self->_translatable)
       &&(($type eq 'protein')||($type eq 'all'))){
     $exon_protein_sequence = $self->_exon_protein_translation;
   }
-  
+
   my $evidence_sequences = $self->_corroborating_sequences($type);
 
   # Use information about 'deletions' (originally from the
@@ -740,15 +762,11 @@ sub _compute_evidence_coverage {
   my %coordinates_hash;
   my @evidence_coverage_stats;
 
-  foreach my $exon (@{$self->_transcript->get_all_Exons}){
-
-    foreach my $supporting_feature (@{$exon->get_all_supporting_features}){
-      push (@{$coordinates_hash{$supporting_feature->hseqname}}, 
-	    [$supporting_feature->hstart, $supporting_feature->hend, 
-	     $supporting_feature->start, $supporting_feature->end]);
-    }
-
-  }  
+  foreach my $supporting_feature (@{$self->_all_supporting_features}){
+    push (@{$coordinates_hash{$supporting_feature->hseqname}}, 
+	  [$supporting_feature->hstart, $supporting_feature->hend, 
+	   $supporting_feature->start, $supporting_feature->end]);
+  }
 
  SEQUENCE:
   foreach my $sequence_identifier (keys %coordinates_hash) {
@@ -1231,7 +1249,7 @@ sub _working_alignment {
 
     return $slot_resident;
 
-  } 
+  }
 
   return 0;
 }
@@ -1422,103 +1440,69 @@ sub _seq_fetcher {
 sub _corroborating_sequences {
   my ($self, $type) = @_;
 
-  # Possibly, it might be good to install some way of caching
-  # these results, if ever there was a possibility that this
-  # method could be called more than once per instantiation.
+  # Work through supporting features and create a sequence for each.
 
-  # For each exon attached to our transcript, work through
-  # each attached DnaXXXAlignFeature and create a sequence
-  # for it.
-  
-  my $exons = $self->_transcript->get_all_Exons;
-
-  # Put protein features separately, purely to keep the
-  # nucleotide and protein parts of our alignment as
-  # distinct blocks later.
   my @protein_features;
 
   my $exon_placemarker = 0;
 
-  # We have to check whether our evidence is on the reverse
-  # strand.  This happens with cDNA and EST evidence.
+  # Work through each item of supporting evidence attached to our exon.
 
-  my %evidence_hash;
-
-  foreach my $exon (@{$exons}) {
-    foreach my $base_align_feature (@{$exon->get_all_supporting_features}) {
-      push (@{$evidence_hash{$base_align_feature->hseqname}}, 
-	    [$base_align_feature->hstart, $base_align_feature->hend]);
+ FEATURE:
+  foreach my $base_align_feature (@{$self->_all_supporting_features}){
+    if ((($type eq 'nucleotide')
+	 &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
+	||(($type eq 'protein')
+	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")))){
+      next FEATURE;
     }
-  }
 
-  my %strand_lookup;
-
-  foreach my $seq_id (keys %evidence_hash) {
-    # If the order of features is reversed we assume reverse strand.
-    # Soon, it should be possible to just derive this information
-    # from the base_align_feature, and hence avoid this hack.
-    if ($evidence_hash{$seq_id}->[0]->[0] > $evidence_hash{$seq_id}->[-1]->[0]) {
-      $strand_lookup{$seq_id} = -1;
-    } else {
-      $strand_lookup{$seq_id} = 1;
+    if ((defined $base_align_feature->percent_id)
+	&&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
+      next FEATURE;
     }
-  }
 
+    if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
+      my $align_seq = $self->_fiddly_bits($base_align_feature, 
+					    $base_align_feature->hstrand);
+      next FEATURE unless $align_seq;
 
-  foreach my $exon (@{$exons}){
-    # Work through each item of supporting evidence attached to our exon.
+      $align_seq->exon($exon_placemarker);
+      $align_seq->type('nucleotide');
 
-  FEATURE:
-    foreach my $base_align_feature (@{$exon->get_all_supporting_features}){
-
-      if ((($type eq 'nucleotide')
-	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
-	  ||(($type eq 'protein')
-	     &&($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")))){
-	next FEATURE;
-      }
-
-      if ((defined $base_align_feature->percent_id)
-	  &&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
-	next FEATURE;
-      }
-
-      if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
-	my $align_seq = $self->_fiddly_bits($base_align_feature, 
-					    $strand_lookup{$base_align_feature->hseqname});
-	next FEATURE unless $align_seq;
-
-	$align_seq->exon($exon_placemarker);
-	$align_seq->type('nucleotide');
-
-	push (@{$self->{'_corroborating_sequences'}}, $align_seq);
-	next FEATURE;
-      }
+      push (@{$self->{'_corroborating_sequences'}}, $align_seq);
+      next FEATURE;
+    }
       
-      if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
+    if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 
-	if ($strand_lookup{$base_align_feature->{hseqname}} == -1) {
-	  $self->warn("Zoicks!  Surely we can't have a reverse" .
-		      " complimented protein sequence.");
-	}
-
-	my $align_seq = $self->_fiddly_bits($base_align_feature);
-	next FEATURE unless $align_seq;
-
-	$align_seq->exon($exon_placemarker);
-	$align_seq->type('protein');
-	push (@protein_features, $align_seq);
+      if ($base_align_feature->hstrand == -1) {
+	$self->warn("Zoicks!  Surely we can't have a reverse" .
+		    " complimented protein sequence.");
       }
+
+      my $align_seq = $self->_fiddly_bits($base_align_feature);
+      next FEATURE unless $align_seq;
+
+      $align_seq->exon($exon_placemarker);
+      $align_seq->type('protein');
+      push (@protein_features, $align_seq);
     }
 
     $exon_placemarker++;
 
   }
+
   # The order in which we add things to our array effects the order
   # in the final alignment.  Here, if they exist, protein features 
   # are added separately so that they are all together in the final 
   # alignment.  There could be a better way to do this, of course.
   push (@{$self->{'_corroborating_sequences'}}, @protein_features);
+
+  $self->warn("There are no displayable supporting features for this transcript.  " .
+	      "Try setting the -type attribute to 'all', instead of just " . 
+	      "'protein' or 'nucleotide'.") 
+    unless scalar @{$self->{'_corroborating_sequences'}} > 0;
 
   return $self->{'_corroborating_sequences'};
 }
@@ -1564,10 +1548,9 @@ sub _fiddly_bits {
   if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
     my $padded_aa_seq;
     ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
-    
+
     my @full_seq = split //, $padded_aa_seq;
-    
-  
+
     # Splice out the matched region of our feature sequence
     my $first_aa = ($hstart - 1) * 3;
     my $last_aa = ($hend * 3) - 1;
@@ -1601,7 +1584,7 @@ sub _fiddly_bits {
       }
 
       my $backwards_seq = Bio::Seq->new('-seq' => $wrong_way_around_exon);
-      
+
       my $forwards_seq = $backwards_seq->revcom;
 
       @fetched_seq = split //, $forwards_seq->seq;
@@ -1619,36 +1602,38 @@ sub _fiddly_bits {
   # done in $self->_align.
 
   my @cigar_instructions = $self->_cigar_reader($base_align_feature->cigar_string);
-  
+
   my $added_gaps = 0;
-  my $hit_sequence_position = $base_align_feature->start;
+  my $hit_sequence_position = $base_align_feature->start > 0 ? $base_align_feature->start : 1;
   my @deletion_sequence;
   my $deletions;
 
   foreach my $instruction (@cigar_instructions) {
-
     if ($instruction->{'type'} eq 'I') {
       my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
-      
-      splice(@fetched_seq, $hit_sequence_position, 0, @gap);
-      
+
+      $self->warn("Sequence manipulations fall outside sequence bounds.") 
+	if $hit_sequence_position > scalar @fetched_seq;
+
+      splice(@fetched_seq, $hit_sequence_position, 0, @gap)
+	unless $hit_sequence_position > scalar @fetched_seq;
+
       $hit_sequence_position += $instruction->{'length'};
-      
+
     } elsif ($instruction->{'type'} eq 'M') {
-      
+
       $hit_sequence_position += $instruction->{'length'};
-      
+
     } elsif ($instruction->{'type'} eq 'D') {
 
       $deletions++;
 
-      for (my $i = $hit_sequence_position; $i < ($hit_sequence_position + $instruction->{'length'});$i++){
+      for (my $i = $hit_sequence_position; $i < ($hit_sequence_position + $instruction->{'length'}); $i++){
 	$deletion_sequence[$i] = 'D';
       }
-      
+
     }
-    
   }
 
   if ($deletions) {
@@ -1960,6 +1945,53 @@ sub _exon_protein_translation {
   return $self->{'_exon_protein_translation'};
 }
 
+=head2 _all_supporting_features
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _all_supporting_features {
+  my $self = shift;
+
+  # If there is a set of supporting features that are to be used
+  # that are not already attached to the gene/transcript, they can
+  # be added here.
+
+  if (@_) {
+    my $bafs = shift;
+
+    foreach my $baf (@$bafs){
+      $self->throw("Evidence provided does not consist " . 
+		   "of Bio::EnsEMBL::BaseAlignFeature")
+	unless $baf->isa("Bio::EnsEMBL::BaseAlignFeature");
+
+      $baf->transform($self->_slice);
+
+      push @{$self->{_all_supporting_features}}, $baf;
+    }
+
+  }
+
+  # If there is not a set of external supporting features,
+  # these can be yanked from the gene/transcript.
+
+  unless ($self->{_all_supporting_features}){
+    foreach my $exon (@{$self->_transcript->get_all_Exons}){
+      push @{$self->{_all_supporting_features}}, 
+	       @{$exon->get_all_supporting_features};
+    }
+  }
+
+  return $self->{_all_supporting_features}
+}
+
+
 ##### Methods that take care of sequence fetching and caching #####
 
 =head2 _build_sequence_cache
@@ -1980,13 +2012,9 @@ sub _build_sequence_cache {
 
   my %hash_of_accessions;
 
-  foreach my $exon (@{$self->_transcript->get_all_Exons}){
-
-    foreach my $supporting_feature (@{$exon->get_all_supporting_features}){
-      $hash_of_accessions{$supporting_feature->hseqname}++;
-    }
-
-  }  
+  foreach my $supporting_feature (@{$self->_all_supporting_features}){
+    $hash_of_accessions{$supporting_feature->hseqname}++;
+  }
 
   my @array_of_accessions = keys %hash_of_accessions;
 
@@ -2160,13 +2188,15 @@ sub _cigar_reader {
 
   my $current_digits;
 
-  while (my $next_char = shift @cigar_array) {
+  while (scalar @cigar_array) {
+
+    my $next_char = shift @cigar_array;
 
     if ($next_char =~ /[MDI]/) {
 
       my %enduring_hash;
       $enduring_hash{'type'} = $next_char;
-      $enduring_hash{'length'} = $current_digits;
+      $enduring_hash{'length'} = $current_digits ? $current_digits : 1;
 
       push (@cigar_elements, \%enduring_hash);
 
