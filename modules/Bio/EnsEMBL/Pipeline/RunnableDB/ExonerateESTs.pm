@@ -20,6 +20,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
 					     -dbobj     => $db,
 					     -input_id  => $id,
 					     -estfile   => $estfile,
+					     -exonerate => $exonerate,
 					     -exonerate_args => $exargs
                                              );
     $obj->fetch_input
@@ -68,6 +69,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                            -INPUT_ID    => $id,
                            -ANALYSIS    => $analysis,
                            -ESTFILE     => $estfile,
+			   -EXONERATE   => $exonerate,
 			   -EXONERATE_ARGS => $exargs);
                            
     Function:   creates a 
@@ -79,6 +81,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                 -input_id:   Contig input id (required), or filename
                 -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional)
                 -estfile:    filename
+                -exonerate:  path to exonerate executable (optional)
                 -exonerate_args : string (optional) 
 =cut
 
@@ -89,12 +92,17 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-    my( $estfile, $exargs ) = $self->_rearrange([qw(ESTFILE
-                                                    EXONERATE_ARGS)], @args);
+    my( $estfile, $exonerate, $exargs ) = $self->_rearrange([qw(ESTFILE
+								EXONERATE
+								EXONERATE_ARGS)], @args);
 
     $self->throw("No est file specified") unless defined($estfile);
     $self->estfile($estfile);
 
+    $self->exonerate($exonerate) if defined $exonerate;
+
+    # ought not to hard code
+    $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 " unless defined $exargs;
     $self->exonerate_args($exargs) if defined $exargs;
 
     return $self;
@@ -119,6 +127,32 @@ sub estfile {
     return $self->{'_estfile'};
 
 }
+
+=head2 exonerate
+
+ Title   : exonerate
+ Usage   : $obj->exonerate($exonerate)
+ Function: get/set for exonerate
+ Returns : path to exonerate
+ Args    : exonerate (optional)
+
+
+=cut
+
+sub exonerate {
+   my ($self, $exonerate) = @_;
+
+   if (!defined $self->{'_exonerate'}){
+      $self->{'_exonerate'} = "";
+   }
+
+   if( defined $exonerate ) {
+      $self->{'_exonerate'} = $exonerate;
+    }
+    return $self->{'_exonerate'};
+
+}
+
 
 =head2 exonerate_args
 
@@ -197,6 +231,7 @@ sub fetch_input {
   
     $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs('-genomic'        => $genseq, 
 								     '-ests'           => $self->estfile,
+								     '-exonerate'      => $self->exonerate,
 								     '-exonerate_args' => $self->exonerate_args);
     $self->vc($contig);
   }
@@ -206,6 +241,7 @@ sub fetch_input {
     $self->throw("$chrid cannot be parsed and is not a file\n") unless -e $chrid;
     $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs('-genomic'        => $chrid, 
 								     '-ests'           => $self->estfile,
+								     '-exonerate'      => $self->exonerate,
 								     '-exonerate_args' => $self->exonerate_args);
   }
 
