@@ -1,0 +1,128 @@
+PIPEVIEW
+=================
+
+This is a tool that will read the ensembl pipeline's control tables and produce a
+directed graph (using the jgraph package) in response. It has been produced for two
+reasons:
+
+0. As an attempt to create a small, self-contained gadget that might be useful to someone.
+1. As a testbed for my own crackpot ideas as to How To Fix All That is Wrong with 
+Fat Client Architectures. 
+
+It is not even remotely finished. Nothing is ever finished, but this is REALLY not finished.
+It does run, however, in a neutered form, right now. Publishing might well be the best
+pressure I can exert to make it useful (see aim 0, I'm also dealing with aim 1 in 
+a piecemeal fashion). 
+
+Requirements
+================
+
+To run the binary code:
+
+An installation of the java runtime environment, version 1.4 or above. You can find out
+whether you have one of these by bringing up a command prompt and typing 'java -version'.
+If you don't know what I'm talking about, then ask a java-savvy friend. Or visit java.sun.com
+if you've got a little time to kill.
+
+To compile the source (why, oh why would you want to do this?).
+
+1. The j2sdk, version 1.4 or above.
+2. A binary distribution of ant, (I use version 1.5, but I'm not clear on the actual version requirement).
+
+Running
+================
+
+1. You have probably received this distribution as a result of checking out the ensembl-pipeline code.
+This means that there's a directory in the ensembl-pipeline module that looks like this:
+
+<ENSEMBL_HOME>/ensembl-pipeline/java/pipeview/
+
+2. Change into this directory. Type " ./run.sh ". This should bring up the little gui which is pipeview.
+If you have the main directory somewhere else, then the instructions are the same, wherever that
+directory is.
+
+3. Try File->Read New Pipeline DB. This will present you with a dialogue, which expects to you type in the
+following:
+Host: (e.g. "ecs1c.sanger.ac.uk")
+Port: (e.g. "3306")
+User: (e.g. "ensro")
+Password: (You get the idea. Leave blank if there isn't one).
+
+Now hit the 'FIND' button next to the dropdown on the next line.
+
+Ensembl Database Name:
+A dropdown. The contents are populated by pushing the 'FIND' button next to it). Try it! 
+If you have problems reading from the host you specified, you'll see a message on the 
+message bar of the main window. If you can successfully read from the mysql instance you've
+specified then you'll see a list of all mysql databases on the instance. Choose the
+pipeline database of interest using the dropdown.
+
+4. Push the 'Read DB' button.
+
+5. Watch the graph of the steps in the pipeline, and their dependencies, being drawn, laid
+out really badly, and inadequately adjusted. You can drag the individual graph nodes around
+to make the layout nicer to see.
+
+6. You can play with the layout-algorith parameters using the File->Set New Layout Configuration
+menu item. If you do this on an already-laid out graph, it will not re-read the pipeline
+database to get the nodes, but it will attempt a new layout of the existing nodes - 
+you prompt for this by hitting the 'Refresh' button on the bottom right hand corner of 
+the display.
+
+
+======== STOP, THAT'S ALL. THE REST IS CULTURAL HOOPLA ==
+
+Configuration files and other things in the root directory.
+----------------------------------------------------------
+
+The application root directory contains the following files:
+
+build.xml: 
+If you have ant, and feel masochistic, then you can actually run things via ant, using the 'run' target. This file also has targets for compiling the source (in particular 'compile' and 'dist') . 
+
+logging.properties.example: 
+If this file is renamed to logging.properties, then the code
+will detect this (on restart) and create a set of java-loggers (via the java.util.logging package)
+and use those loggers instead of just doing System.out.println's to the console. The
+loggers are configured using this properties file, but 
+
+pathsteps.conf: 
+In the absence of history, these are some initial values for the various
+elements of the application dialogs.
+
+pathsteps.history: 
+This contains the information on the stuff you last typed into the dialogue fields.
+
+pipeview.jar
+All the application java class files.
+
+run.sh
+Shell script to start the application (which you can also do by typing "ant run", should you wish to). 
+
+test.conf.example
+Currently this file is empty. However,
+if this file is renamed to test.conf, then it will switch the application into 'test' mode,
+which _should_ grab all the tests in the pathsteps/test directory and execute them. This
+is underdeveloped - currently there's only one test in there, but the structure is the
+one I intend to stick to (as part of the grand plan - see point 1 above). 
+
+The testing is an attempt to test a graphical system in a non-graphical way, and follows
+the philosophy of the 'Humble Dialog' approach presented by Michael Feathers from ObjectMentor.
+
+Compiling the code
+------------------
+The code will be in flux. I have included an ant build-file (build.xml) in the root
+directory which the following interesting targets:
+
+compile:
+Compiles the source (stored in the pipeview/src/ directory) into the ant-build directory,
+including the jars resident in the jar/ directory in the classpath (currently these are
+the jgraph and the mysql connector jar).
+
+dist:
+Combines the classfiles under ant-build/ along with all the classfiles in the jar files
+in the jars/ directory, into one big classfile called 'dist/lib/pipeview.jar'.
+
+run:
+Runs the code in the pipeview.jar distribution. Note, however, that once you've run the
+'dist' target, that running is more direct and just as easy via the 'run.sh' shell script.

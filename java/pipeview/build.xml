@@ -1,0 +1,51 @@
+<project name="pipeview" default="compile" basedir=".">
+
+  <property name="src" value="src"/>
+  <property name="build" value="ant-build"/>
+  <property name="jars" value="jars"/>
+  <property name="dist" value="dist"/>
+
+  <target name="prepare">
+     <mkdir dir="${build}"/>
+  </target>
+
+  <target name="compile" depends="prepare">
+     <javac srcdir="${src}" destdir="${build}">
+     <classpath>
+        <fileset dir="${jars}">
+           <include name="*.jar"/>
+        </fileset>
+     </classpath>
+     </javac>
+  </target>
+
+  <target name="dist" depends="compile" description="generate the distribution as a single jar file" >
+
+    <unjar dest="${build}">
+       <fileset dir="${jars}">
+         <include name="**/*.jar"/>
+       </fileset>
+    </unjar>
+
+    <jar jarfile="pipeview.jar" basedir="${build}"/>
+  </target>
+
+  <target name="clean" description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+
+  <target name="run" depends="dist" description="run from the distribution jar file">
+    <java 
+       classname="pathsteps.common.Application" 
+       fork="true"
+       failonerror="true"
+    >
+       <jvmarg value="-DPIPELINE_TOOL_ROOT=${basedir}"/> 
+       <classpath>
+         <pathelement location="pipeview.jar"/>
+       </classpath>
+    </java>
+  </target>
+</project>
