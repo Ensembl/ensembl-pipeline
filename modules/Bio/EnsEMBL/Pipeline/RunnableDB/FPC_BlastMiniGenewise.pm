@@ -240,15 +240,15 @@ sub fetch_input {
 
     print STDERR "Contig id = $contigid , number $contignum\n";
 
-    $self->dbobj->static_golden_path_type('UCSC');
+    $self->dbobj->static_golden_path_type('SANGER');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 
-    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
-
-    my $contig    = $contig[$contignum];
-
+    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end('chr20',1000000,2000000);
+    #my $contig    = $contig[$contignum];
+    $contig->_chr_name('chr20');
     print STDERR "Analysing contig " . $contig->id . " " . $contignum . "\n";
+
     foreach my $rc ($contig->_vmap->each_MapContig) {
 	my $strand = "+";
 	if ($rc->orientation == -1) {
@@ -260,7 +260,7 @@ sub fetch_input {
     my $genseq    = $contig->primary_seq;
 
     print STDERR "Length is " . $genseq->length . "\n";
-    print STDERR "Fetching features\n";
+    print STDERR "Fetching features " . $contig . "\n";
 
     my @features  = $contig->get_all_SimilarityFeatures_above_score('swir',200);
 
@@ -269,7 +269,8 @@ sub fetch_input {
     my %idhash;
     
     foreach my $f (@features) {
-	if (defined($f->hseqname)) {
+        print "Feature " . $f . "\n";
+	if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)) {
 	    $idhash{$f->hseqname} = 1;
 	}
     }
@@ -331,7 +332,7 @@ sub convert_output {
 
     # This BAD! Shouldn't be using internal ids.
     # <sigh> no time to change it now
-    my $analysis = $self->dbobj->get_OldAnalysis(10);
+    my $analysis = $self->dbobj->get_OldAnalysis(7);
     my $trancount = 1;
     foreach my $runnable ($self->get_Runnables) {
 	my $contig = $self->{$runnable};
