@@ -52,7 +52,7 @@ use FreezeThaw qw(freeze thaw);
 
 # Inherits from the base bioperl object
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI  Bio::EnsEMBL::DBSQL::Obj Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI  Bio::EnsEMBL::DBSQL::Obj);
 
 sub _initialize {
     my ($self,@args) = @_;
@@ -61,72 +61,6 @@ sub _initialize {
 
     return $make; # success - we hope!
 
-}
-
-=head2 get_TimClone
-
- Title   : get_Clone
- Usage   : $db->get_Clone($disk_id)
- Function: Gets a Clone object with disk_id as its disk_id
- Example : $db->get_Clone($disk_id)
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::Clone object 
- Args    : disk_id
-
-
-=cut
-
-sub get_TimClone{
-   my ($self,$disk_id) = @_;
-
-   $disk_id || $self->throw("Trying to delete a clone without a disk id!");
-
-   my $sth = $self->prepare("select disk_id from clone where disk_id = \"$disk_id\";");
-   my $res = $sth ->execute();
-   my $rv  = $sth ->rows;
-
-   if( ! $rv ) {
-       # make sure we deallocate sth - keeps DBI happy!
-       $sth = undef;
-       $self->throw("Clone $disk_id does not seem to occur in the database!");
-   }
-
-   my $clone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone( -disk_id    => $disk_id,
-							 -dbobj      => $self );
-
-   return $clone;
-}
-
-=head2 create_Clone
-
- Title   : create_Clone
- Usage   : $db->create_Clone($disk_id,$clone_group,$chromosome)
- Function: writes a new clone in the database
- Example : $db->create_Clone('dummy','SU','22')
- Returns : nothing
- Args    : disk_id,clone group,chromosome
-
-
-=cut
-
-sub create_Clone {
-   my ($self,$disk_id,$clone_group,$chromosome) = @_;
-
-   $disk_id || $self->throw("Trying to create a clone without a disk id!\n");
-   $clone_group || $self->throw("Trying to create a clone without a clone group!");
-   $chromosome || $self->throw("Trying to create a clone without a chromosome id!");
-   
-   my @sql;
-
-   push(@sql,"lock tables clone write");
-   push(@sql,"insert into clone(disk_id,clone_group,chromosome,last_check,created,modified) values('$disk_id','$clone_group','$chromosome',now(),now(),now())");
-   push(@sql,"unlock tables");   
-
-   foreach my $sql (@sql) {
-     my $sth =  $self->prepare($sql);
-     #print STDERR "Executing $sql\n";
-     my $rv  =  $sth->execute();
-     $self->throw("Failed to insert clone $disk_id") unless $rv;
-   }
 }
 
 =head2 get_Job 
@@ -145,12 +79,19 @@ sub get_Job {
     my ($self,$id) = @_;
 
     $self->throw("No input id for get_Job") unless defined($id);
-
-    my $sth = $self->prepare("select id,input_id,analysis,LSF_id,machine,object,queue " . 
+    print (STDERR "Getting job $id\n");
+    my $query = "select id,input_id,analysis,LSF_id,machine,object,queue," .
+                             " stdout_file,stderr_file,input_object_file,status_file,output_file " .
 			     "from job " . 
-			     "where id = $id");
+			     "where id = $id";
+
+    my $sth = $self->prepare($query); 
     my $res = $sth->execute();
     my $row = $sth->fetchrow_hashref;
+
+    if ($sth->rows == 0) {
+	$self->throw("No job found with id [$id]");
+    }
 
     my $input_id    = $row->{input_id};
     my $analysis_id = $row->{analysis};
@@ -159,36 +100,45 @@ sub get_Job {
     my $object      = $row->{object};
     my $queue       = $row->{queue};
 
+    my $stdoutfile  = $row->{stdout_file};
+    my $stderrfile  = $row->{stderr_file};
+    my $statusfile  = $row->{status_file};
+    my $outputfile  = $row->{output_file};
+
+    my $input_object_file  = $row->{input_object_file};
+
     my $analysis    = $self->get_Analysis($analysis_id);
 
     my $job;
 
-    if (defined($object)) 
-    {
-	    print(STDERR "Recreating job object from stored version\n");
-	    ($job)  = FreezeThaw::thaw($object);
+    if (defined($object)) {
+	print(STDERR "Recreating job object from stored version\n");
+	
+	($job)  = FreezeThaw::thaw($object);
 
-        if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) 
-        {
-	        $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
-        }
-        
-	    $job->_dbobj($self);
-    } 
-    else 
-    {
-        print(STDERR "Creating new job object - no stored version\n");
+	if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) {
+	    $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
+	}
 
-        $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(
-                                  -dbobj    => $self,
-                                  -id       => $id,
-						          -input_id => $input_id,
-						          -analysis => $analysis,
-						          -LSF_id   => $LSF_id,
-						          -machine  => $machine,
-						          -queue    => $queue,
-						          );
-        #$job->_dbobj($self);
+	$job->_dbobj($self);
+
+    } else {
+	print(STDERR "Creating new job object - no stored version\n");
+	
+	$job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-id => $id,
+						      -input_id => $input_id,
+						      -analysis => $analysis,
+						      -LSF_id   => $LSF_id,
+						      -machine  => $machine,
+						      -queue    => $queue,
+                                                      -dbobj    => $self,
+						      );
+       $job->stdout_file($stdoutfile);
+       $job->stderr_file($stderrfile);
+       $job->status_file($statusfile);
+       $job->output_file($outputfile);
+
+       $job->input_object_file($input_object_file);
     }
     
     return $job;
@@ -218,7 +168,7 @@ sub get_JobsByInputId {
 	",stdout_file,stderr_file,input_object_file,output_file,status_file " .
         "from job " . 
 	"where input_id = \"$id\"";
-    
+
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
     
@@ -492,11 +442,10 @@ sub write_Analysis {
 
     my ($id,$created) = $self->exists_Analysis($analysis);
 
-    if (defined($id)) 
-    {
-	    $analysis->id     ($id);
-	    $analysis->created($created);
-	    return $analysis;
+    if (defined($id)) {
+	$analysis->id     ($id);
+	$analysis->created($created);
+	return $analysis;
     }
     my $query = 
 	                     "insert into analysisprocess(id,created,db,db_version,db_file," .
@@ -523,7 +472,7 @@ sub write_Analysis {
     $sth = $self->prepare("select LAST_INSERT_ID()");
     $res = $sth->execute();
 
-    $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
+    my $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
 
     $analysis->id($id);
 
@@ -571,6 +520,12 @@ sub exists_Analysis {
     }
 }
 
+sub get_OldAnalysis {
+	my ($self,$id) = @_;
+
+	return $self->SUPER::get_Analysis($id);
+}
+
 =head2 get_Analysis {
 
   Title   : get_Analysis
@@ -612,9 +567,7 @@ sub get_Analysis {
 	my $module          = $rowhash->{'module'};
 	my $module_version  = $rowhash->{'module_version'};
 	my $parameters      = $rowhash->{'parameters'};
-    my $gff_source      = $rowhash->{'gff_source'};
-    my $gff_feature     = $rowhash->{'gff_feature'};
-    
+
 	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id => $id,
 							    -created         => $created,
 							    -program         => $program,
@@ -625,10 +578,8 @@ sub get_Analysis {
 							    -db_file         => $db_file,
 							    -module          => $module,
 							    -module_version  => $module_version,
-                                -gff_source      => $gff_source,
-						        -gff_feature     => $gff_feature,
 							    -parameters      => $parameters,
-                                );
+							    );
 
 
 	return ($analysis);
@@ -729,50 +680,6 @@ sub get_AnalysisSummary {
     }
     return %summary;
 }
-
-=head2 prepare
-
- Title   : prepare
- Usage   : $sth = $dbobj->prepare("select * from job where id = $id");
- Function: prepares a SQL statement on the DBI handle
- Example :
- Returns : A DBI statement handle object
- Args    : a SQL string
-
-
-=cut
-
-sub prepare{
-   my ($self,$string) = @_;
-
-   if( ! $string ) {
-       $self->throw("Attempting to prepare an empty SQL query!");
-   }
-   
-   return $self->_db_handle->prepare($string);
-}
-
-=head2 _db_handle
-
- Title   : _db_handle
- Usage   : $sth = $dbobj->_db_handle($dbh);
- Function: Get/set method for the database handle
- Example :
- Returns : A database handle object
- Args    : A database handle object
-
-
-=cut
-
-sub _db_handle {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-	$self->{_db_handle} = $arg;
-    }
-    return $self->{_db_handle};
-}
-
 
 =head2 get_all_ExonPairs
 
@@ -909,223 +816,4 @@ sub delete_ExonPairs {
     }
 }
 
-=head2 write_Exon
-
- Title   : write_Exon
- Usage   : $obj->write_Exon($exon)
- Function: writes a particular exon into the database
- Example :
- Returns : 
- Args    :
-
-=cut
-
-sub write_Exon{
-   my ($self,$exon) = @_;
-   my $old_exon;
-   
-   if( ! $exon->isa('Bio::EnsEMBL::Exon') ) {
-       $self->throw("$exon is not a EnsEMBL exon - not dumping!");
-   }
-
-   eval {
-       $old_exon = $self->get_Exon($exon->id);
-
-       $self->warn("Exon [" . $exon->id . "] already exists in database. Not writing");
-
-       
-   };
-   
-   if  ( $@ || ($exon->version > $old_exon->version)) {
-       my $exonst = "insert into exon (id,version,contig,created,modified," .
-	   "seq_start,seq_end,strand,phase,stored,end_phase) values ('" .
-	       $exon->id()         . "'," .
-               $exon->version()    . ",'".
-	       $exon->contig_id()  . "', FROM_UNIXTIME(" .
-	       $exon->created()    . "), FROM_UNIXTIME(" .
-	       $exon->modified()   . ")," .
-	       $exon->start        . ",".
-	       $exon->end          . ",".
-	       $exon->strand       . ",".
-	       $exon->phase        . ",now(),".
-	       $exon->end_phase    . ")";
-
-       my $sth = $self->prepare($exonst);
-       $sth->execute();
-   }
-}
-
-
-=head2 delete_Exon
-
- Title   : delete_Exon
- Usage   : $obj->delete_Exon($exon_id)
- Function: Deletes exon, including exon_transcript rows
- Example : $obj->delete_Exon(ENSE000034)
- Returns : nothing
- Args    : $exon_id
-
-
-=cut
-
-sub delete_Exon{
-    my ($self,$exon_id) = @_;
-
-    $exon_id || $self->throw ("Trying to delete an exon without an exon_id\n");
-    
-    #Delete exon_transcript rows
-#    my $sth = $self->prepare("delete from exon_transcript where transcript = '".$exon_id."'");
-#    my $res = $sth ->execute;
-
-    #Delete exon rows
-    my $sth = $self->prepare("delete from exon where id = '".$exon_id."'");
-    my $res = $sth->execute;
-
- #   $self->delete_Supporting_Evidence($exon_id);
-
-}
-
-=head2 _lock_tables
-
- Title   : _lock_tables
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub _lock_tables{
-   my ($self,@tables) = @_;
-   
-   my $state;
-   foreach my $table ( @tables ) {
-       if( $self->{'_lock_table_hash'}->{$table} == 1 ) {
-	   $self->warn("$table already locked. Relock request ignored");
-       } else {
-	   if( $state ) { $state .= ","; } 
-	   $state .= "$table write";
-	   $self->{'_lock_table_hash'}->{$table} = 1;
-       }
-   }
-
-   my $sth = $self->prepare("lock tables $state");
-   my $rv = $sth->execute();
-   $self->throw("Failed to lock tables $state") unless $rv;
-
-}
-
-=head2 _unlock_tables
-
- Title   : _unlock_tables
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-=cut
-
-sub _unlock_tables{
-   my ($self,@tables) = @_;
-
-   my $sth = $self->prepare("unlock tables");
-   my $rv  = $sth->execute();
-   $self->throw("Failed to unlock tables") unless $rv;
-   %{$self->{'_lock_table_hash'}} = ();
-}
-
-
-=head2 get_Exon
-
- Title   : get_Exon
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-=cut
-
-sub get_Exon{
-   my ($self,$exonid) = @_;
-
-   my $exon = Bio::EnsEMBL::Exon->new();
-
-   my $sth     = $self->prepare("select id,version,contig,UNIX_TIMESTAMP(created)," . 
-				"UNIX_TIMESTAMP(modified),seq_start,seq_end,strand," . 
-				"phase from exon where id = '$exonid'");
-   my $res     = $sth->execute;
-   my $rowhash = $sth->fetchrow_hashref;
-
-   if( ! defined $rowhash ) {
-       $self->throw("No exon of this id $exonid");
-   }
-
-   $exon->contig_id($rowhash->{'contig'});
-   $exon->version  ($rowhash->{'version'});
-
-   my $contig_id = $exon->contig_id();
-
-   # we have to make another trip to the database to get out the contig to clone mapping.
-#   my $sth2     = $self->prepare("select clone from contig where id = '$contig_id'");
-#   my $res2     = $sth2->execute;
-#   my $rowhash2 = $sth2->fetchrow_hashref;
-
-#   $exon->clone_id($rowhash2->{'clone'});
-
-   # rest of the attributes
-   $exon->id      ($rowhash->{'id'});
-   $exon->created ($rowhash->{'UNIX_TIMESTAMP(created)'});
-   $exon->modified($rowhash->{'UNIX_TIMESTAMP(modified)'});
-   $exon->start   ($rowhash->{'seq_start'});
-   $exon->end     ($rowhash->{'seq_end'});
-   $exon->strand  ($rowhash->{'strand'});
-   $exon->phase   ($rowhash->{'phase'});
-   
-   # we need to attach this to a sequence. For the moment, do it the stupid
-   # way perhaps?
-
-#   my $seq;
-
-#   if( $self->_contig_seq_cache($exon->contig_id) ) {
-#       $seq = $self->_contig_seq_cache($exon->contig_id);
-#   } else {
-#       my $contig = $self->get_Contig($exon->contig_id());
-#       $seq = $contig->seq();
-#       $self->_contig_seq_cache($exon->contig_id,$seq);
-#   }
-
-#   $exon->attach_seq($seq);
-
-   return $exon;
-}
-
-
-=head2
- Title   : DESTROY
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-=cut
-
-
-sub DESTROY{
-   my ($obj) = @_;
-
-   $obj->_unlock_tables();
-
-   if( $obj->{'_db_handle'} ) {
-       $obj->{'_db_handle'}->disconnect;
-       $obj->{'_db_handle'} = undef;
-   }
-}
-
-
-
-
+1;
