@@ -81,6 +81,8 @@ CREATE TABLE input_id_analysis (
   input_id_type     enum("CONTIG" ,"SLICE", "ALL") not null,
   analysis_id       smallint(10) unsigned NOT NULL,
   created           datetime NOT NULL,
+  runhost           varchar(20) NOT NULL,
+  db_version        varchar(40) NOT NULL,
   result            smallint(10) unsigned NOT NULL,
 
   PRIMARY KEY       (analysis_id, input_id),
@@ -101,6 +103,6 @@ CREATE TABLE input_id_analysis (
 
 
 CREATE table input_id_type_analysis (
-  analysis_id       smallint(10) unsigned not null,
-  input_id_type     enum("CONTIG" ,"SLICE", "ALL") not null
+  analysis_id       smallint(10) unsigned NOT NULL,
+  input_id_type     enum("CONTIG" ,"SLICE", "ALL") NOT NULL
 );
