@@ -292,8 +292,6 @@ sub run {
 	    if (!defined($idhash{$f->hseqname})) { 
 		    push(@mrnafeatures,$f);
 		    $idhash{$f->hseqname} =1;
-	    } else {
-		print STDERR ("Ignoring feature " . $f->hseqname . "\n");
 	    }
 	}
     }
@@ -530,6 +528,9 @@ sub run_blast {
     unlink $blastout;
     unlink $seqfile;
     unlink $db;
+    unlink "$db.csq";
+    unlink "$db.nhd";
+    unlink "$db.ntb";
 
     my @pairs = $msp->each_Homol;
 

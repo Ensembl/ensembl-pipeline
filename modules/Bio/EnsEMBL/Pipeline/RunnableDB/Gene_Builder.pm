@@ -279,7 +279,7 @@ sub fetch_input {
 						      -left          => $self->extend,
 						      -right         => $self->extend);
 
-	$contig = $contig->extend_maximally;
+#	$contig = $contig->extend_maximally;
 
 	print(STDERR "Contig length is " . $contig->length . "\n");
 
@@ -292,7 +292,7 @@ sub fetch_input {
     $contig->_dump_map(\*STDOUT);
     $contig->primary_seq;
 
-    print STDERR "Length of primary seq is",$contig->primary_seq->length,"\n";
+    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
 
     my $analysis = $self->dbobj->get_OldAnalysis(8);
            
