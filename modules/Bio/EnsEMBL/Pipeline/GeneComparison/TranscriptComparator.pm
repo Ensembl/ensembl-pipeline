@@ -68,6 +68,13 @@ comparison_level = INT ----------> There are currently 4 comparison levels:
                  ################----#######
        #####-----######----####------#####
 
+  
+   5 ---> loose match. It allows intron mismatches if so desired. There is no limitation on
+          the number of mismatches at the splice-sites.
+
+                 ################----#######
+       #####-----######----####------#####
+
 
 =head1 AUTHOR - Eduardo Eyras
 
@@ -102,13 +109,13 @@ sub new{
 			  EXON_MATCH
 			  SPLICE_MISMATCH
 			  INTRON_MISMATCH
-			 )],
+			  )],
 		      @args);
   
   if (defined $comparison_level){
-    #print STDERR "############### comparison level $comparison_level ###################\n";
+      #print STDERR "############### comparison level $comparison_level ###################\n";
     $self->comparison_level($comparison_level);
-  }
+ }
   else{
     $self->throw("you must define a comparison_level. See documentation for more info");
   }
@@ -1532,6 +1539,401 @@ sub _test_for_merge{
   return (1,scalar(@list1));
 }
 
+
 ########################################################################
+
+=head2 discrete_compare
+    
+    This method compares two transcripts (tran1,tran2) and returns a discrete value which is
+    the relation of tran1 with respect to tran2:
+    'extension' if tran1 extends tran2
+    'inclusion' if tran1 is included in tran2
+    'clash'     if tran1 and tran2 have incompatible splicing structure
+    'no-overap' if tran1 and tran2 do not overlap
+    This method is only used by the algorithm ClusterMerge.
+    It assumes that the transcripts are ordered as specified in that module.
+
+=cut
+
+sub discrete_compare{
+    my ($self, $tran1, $tran2 ) = @_;
+
+    my $verbose   = 0;
+    
+    if ( ( 4 == $self->comparison_level || 5 == $self->comparison_level )
+	 && $self->intron_mismatch > 0 ){
+	$tran1 = $self->_difuse_small_introns( $tran1 );
+	$tran2 = $self->_difuse_small_introns( $tran2 );
+    }
+
+    if ($verbose){
+	print STDERR "comparing ".
+	    $tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
+    }
+    my @exons1 = sort { $a->start <=> $b->start } @{$tran1->get_all_Exons};
+    my @exons2 = sort { $a->start <=> $b->start } @{$tran2->get_all_Exons};	
+
+
+    #######################
+    # check for no-overlap
+    #######################
+    if ( $exons1[0]->start > $exons2[$#exons2]->end 
+	 ||
+	 $exons2[0]->start > $exons1[$#exons1]->end 
+	 ){
+	print STDERR "transcript genomic regions do not overlap\n" if $verbose;
+	return 'no-overlap';
+    }
+  
+    ############################################################
+    # the simplest case is with two single-exon transcripts:
+    ############################################################
+    if ( scalar(@exons1) == 1 && scalar(@exons2) == 1 ){
+	if ( $exons1[0]->overlaps($exons2[0] )){
+	    
+	    if ( $exons1[0]->end > $exons2[0]->end ){
+		return 'extension';
+	    }
+	    elsif( $exons1[0]->end <= $exons2[0]->end ){
+		return 'inclusion';
+	    }
+	}
+	else{
+	    return 'no-overlap';
+	}
+    }
+
+    # an ObjectMap holds an application between any two sets of objects
+    my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+    
+    my $splice_mismatch = $self->splice_mismatch;
+    my $foundlink = 0; # flag that gets set when starting to link exons
+    my $start     = 0; # start looking at this one
+    my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
+    my $merge     = 0; # =1 if they merge
+    
+    my %is_first;
+    my %is_last;
+
+    # we follow a greedy aproach to try to match all the exons
+    # we jump out as soon as we find a problem with the matching
+    
+  EXON1:
+    for (my $j=0; $j<=$#exons1; $j++) {
+	
+	# index the first and last position
+	if ( $j==0 ){
+	    $is_first{ $exons1[$j] } = 1;
+	}
+	else{
+	    $is_first{ $exons1[$j] } = 0;
+	}
+	if ( $j == $#exons1 ){
+	    $is_last{ $exons1[$j] } = 1;
+	}
+	else{
+	    $is_last{ $exons1[$j] } = 0;
+	}
+	
+      EXON2:
+	for (my $k=$start; $k<=$#exons2; $k++){
+	    
+	    # index the first and last position
+	    if ( $k==0 ){
+		$is_first{ $exons2[$k] } = 1;
+	    }
+	    else{
+		$is_first{ $exons2[$k] } = 0;
+	    }
+	    if ( $k == $#exons2 ){
+		$is_last{ $exons2[$k] } = 1;
+	    }
+	    else{
+		$is_last{ $exons2[$k] } = 0;
+	    }
+	    
+	    if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k])) ){
+		print STDERR "go to next exon2\n" if $verbose;
+		$foundlink = 0;
+		next EXON2;
+	    }
+	    elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k])) ){
+		print STDERR "link is broken, not merging\n" if $verbose;
+		$foundlink = 0;
+		$merge = 0;
+		last EXON1;
+	    }
+	    elsif ( $exons1[$j]->overlaps($exons2[$k]) ){
+		if ( $j == $#exons1 || $k == $#exons2 ){
+		    #if ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] )
+		    #     ||
+		    #     $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] )
+		    #     ){
+		    #    print STDERR "terminal exon overlaps two exons. Not merging\n" if $verbose;
+		    #    $merge = 0;
+		    #    last EXON1;
+		    #}
+		    #else{
+		    print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+		    $object_map->match( $exons1[$j], $exons2[$k] );
+		    print STDERR "end of transcripts - there is potential merge|\n" if $verbose;
+		    $merge = 1;
+		    $overlaps++;
+		    $foundlink = 1;
+		    last EXON1;
+		    #}
+		}
+		else{
+		    print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+		    $object_map->match( $exons1[$j], $exons2[$k] );
+		    $overlaps++;
+		    $foundlink = 1;
+		    $start++;
+		    next EXON1;
+		}
+	    }
+	    
+	} # end of EXON2 
+	
+	# if you haven't found any match for this exon1, start again from the first exon2:
+	if ($foundlink == 0){
+	    $start = 0;
+	}
+	
+    }   # end of EXON1      
+    
+    unless ( $merge ){
+	print STDERR "No merge\n" if $verbose;
+	return 'clash';
+    }
+    
+    ############################################################
+    # if we are in loose mode, we can return already as we have checked
+    # for consecutive exon overlap, regardless of the splice mismatches
+    ############################################################
+    if ( $self->comparison_level == 5 && $merge ){
+	print STDERR "Loose mode merge\n" if $verbose;
+	if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
+	    return 'extension';
+	}
+	elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
+	    return 'inclusion';
+	}
+    }
+
+    ############################################################
+    # else, check splice site mismatches
+    ############################################################
+    # exons mapped from tran1:
+    my @list1 = $object_map->list1();
+    
+    # exons mapped from tran2:
+    my @list2 = $object_map->list2();
+    
+    #print STDERR scalar(@list1)." elements in list 1\n";
+    #print STDERR scalar(@list2)." elements in list 2\n";
+    
+    ############################################################
+    # the simplest case: when they match over one exon only:
+    ############################################################
+    if ( scalar(@list1)==1 && scalar(@list2)==1 ){
+	
+	my $merge = 0;
+	############################################################
+	# if it is a single-exon transcript overlap: if it matches 
+	# to the first or the last, we leave the open end unconstrained
+	############################################################
+	if( (  $is_first{ $list1[0] } && $is_last{ $list1[0] } 
+	       &&
+	       $is_first{ $list2[0] }
+	       &&
+	       $list1[0]->end - $list2[0]->end <=$splice_mismatch 
+	       )
+	    ||
+	    (  $is_first{ $list1[0] } && $is_last{ $list1[0] } 
+	       &&
+	       $is_last{ $list2[0] }
+	       &&
+	       $list2[0]->start - $list1[0]->start <=$splice_mismatch 
+	       )
+	    ||
+	    (  $is_first{ $list2[0] } && $is_last{ $list2[0] } 
+	       &&
+	       $is_first{ $list1[0] }
+	       &&
+	       $list2[0]->end - $list1[0]->end <=$splice_mismatch 
+	       )
+	    ||
+	    (  $is_first{ $list2[0] } && $is_last{ $list2[0] } 
+	       &&
+	       $is_last{ $list1[0] }
+	       &&
+	       $list1[0]->start - $list2[0]->start <=$splice_mismatch 
+	       )
+	    ){
+	    print STDERR "here 1 --- merge ---\n" if $verbose;
+	    $merge = 1;
+	}
+	############################################################
+	# else, it is a single-exon overlap to an 'internal' exon
+	############################################################
+	elsif( (  $is_first{ $list1[0] } && $is_last{ $list1[0] } 
+		  &&
+		  $list1[0]->end   - $list2[0]->end   <= $splice_mismatch 
+		  &&
+		  $list2[0]->start - $list1[0]->start <=$splice_mismatch 
+		  )
+	       ||
+	       (  $is_first{ $list2[0] } && $is_last{ $list2[0] } 
+		  &&
+		  $list2[0]->end   - $list1[0]->end   <= $splice_mismatch 
+		  &&
+		  $list1[0]->start - $list2[0]->start <=$splice_mismatch 
+		  )
+	       ){
+	    print STDERR "here 2 --- merge ---\n" if $verbose;
+	    $merge = 1 ;
+	}
+	############################################################
+	# if the first overlaps with the last:
+	############################################################
+	elsif ( ( $is_first{ $list1[0] } && !$is_last{ $list1[0] } 
+		  &&
+		  $is_last{ $list2[0] }  && !$is_first{$list2[0] }
+		)
+		||
+		( $is_first{ $list2[0] } && !$is_last{ $list2[0] }  
+		  && 
+		  $is_last{ $list1[0] }  && !$is_first{$list1[0] }
+		  )
+		){
+	    print STDERR "here 3 --- merge ---\n" if $verbose;
+	    $merge = 1;
+	}
+	############################################################
+	# we have already dealt with single-exon against single-exon overlap
+	############################################################
+	else{
+	    print STDERR "No merge\n" if $verbose;
+	    $merge = 0;
+	}
+	
+	if ( $merge == 1 ){
+	    if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
+		return 'extension';
+	    }
+	    elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
+		return 'inclusion';
+	    }
+	}
+	else{
+	    return 'clash';
+	}
+    }
+    
+    ############################################################
+    # go over each pair stored in the object map
+    ############################################################
+  PAIR:
+    foreach my $exon1 ( @list1 ){
+	my @partners = $object_map->partners( $exon1 );
+	if ( scalar( @partners ) > 1 ){
+	    $self->warn("One exon has been matched to two exons");
+	}
+	my $exon2 = shift ( @partners );
+	
+	############################################################
+	# exon1 and exon2 are a pair, they overlap, we need to check that
+	# they actually overlap as we want
+	############################################################
+	
+	############################################################
+	# both of them could be the first one
+	############################################################
+	if ( $is_first{ $exon1} && $is_first{ $exon2 }
+	     &&
+	     abs( $exon2->end - $exon1->end ) <= $splice_mismatch
+	     ){
+	    next PAIR;
+	}
+	############################################################
+	# one of them could be the first one
+	############################################################
+	elsif ( ( $is_first{ $exon1 } 
+		  &&
+		  $exon2->start - $exon1->start <= $splice_mismatch
+		  &&
+		  abs( $exon2->end - $exon1->end ) <= $splice_mismatch
+		  )
+		||
+		( $is_first{ $exon2 }
+		  &&
+		  $exon1->start - $exon2->start <= $splice_mismatch
+		  &&
+		  abs( $exon1->end - $exon2->end ) <= $splice_mismatch
+		  )
+		){
+	    next PAIR;
+	}
+	############################################################
+	# both could be the last one
+	############################################################
+	elsif ( $is_last{ $exon1} && $is_last{ $exon2 }
+		&&
+		abs( $exon2->start - $exon1->start ) <= $splice_mismatch
+		){
+	    next PAIR;
+	}
+	############################################################
+	# one of them could be the last one
+	############################################################
+	elsif ( ( $is_last{ $exon1 } 
+		  &&
+		  $exon1->end - $exon2->end <= $splice_mismatch
+		  &&
+		  abs( $exon2->start - $exon1->start ) <= $splice_mismatch
+		  )
+		||
+		( $is_last{ $exon2 }
+		  &&
+		  $exon2->end - $exon1->end <= $splice_mismatch
+		  &&
+		  abs( $exon1->start - $exon2->start ) <= $splice_mismatch
+		      )
+		){
+	    next PAIR;
+	}
+	############################################################
+	# we have already covered the case: first overlaps last
+	############################################################
+	elsif( abs( $exon1->start - $exon2->start ) <= $splice_mismatch
+	       &&
+	       abs( $exon1->end - $exon2->end ) <= $splice_mismatch
+	       ){
+	    next PAIR;
+	}
+	else{
+	    print STDERR "Failed to find a proper match. Not merging\n" if $verbose;
+	    return 'clash';
+	}
+    } # end of PAIR
+    
+    print STDERR "--- merge ---\n" if $verbose;
+    if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
+	return 'extension';
+    }
+    elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
+	return 'inclusion';
+    }
+}
+
+
+
+
+
+
+
 
 1;
