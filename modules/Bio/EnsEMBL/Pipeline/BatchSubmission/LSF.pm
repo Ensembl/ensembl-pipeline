@@ -115,7 +115,7 @@ sub construct_command_line{
     $bsub_line .= " -m '".$nodes."' ";
   }
   if(my $res = $self->resource){
-    $res = qq{-R $res} unless $res =~ /^-R/;
+    $res = qq{-R '$res'} unless $res =~ /^-R/;
     $bsub_line .= " $res ";
   }
   $bsub_line .= " -q ".$self->queue    if $self->queue;
