@@ -55,12 +55,10 @@ BEGIN {
   require "GB_conf.pl";
 }
 
-# global variables
-my %pairs;
+$| = 1; # disable buffering
 
 &parse_refseq();
 &parse_sptr();
-&write_output();
 
 ### END MAIN
 
@@ -68,21 +66,34 @@ my %pairs;
 
 sub parse_refseq {
   my %rfe_pairs = identify_rf_embl_pairs();
-  
+
   while( my ($prot, $value) = each %rfe_pairs){
+  my $cdna;
     foreach my $emid(@$value){
-      check_embl($emid, $prot);
+      my $seq = check_embl($emid, $prot);
+      if(defined $seq && $seq->isa("Bio::Seq")) {
+        $cdna = $seq unless defined $cdna;
+        $cdna = $seq if $cdna->length < $seq->length;
+      }
     }
-  }  
+  write_output($prot, $cdna);  
+  }
+
 }
 
 sub parse_sptr {
   my %spe_pairs = identify_sp_embl_pairs();
   
   while( my ($prot, $value) = each %spe_pairs){
+  my $cdna;
     foreach my $emid(@$value){
-      check_embl($emid, $prot);
+      my $seq = check_embl($emid, $prot);
+      if(defined $seq && $seq->isa("Bio::Seq")) {
+        $cdna = $seq unless defined $cdna;
+        $cdna = $seq if $cdna->length < $seq->length;
+      }
     }
+  write_output($prot, $cdna);  
   }
 }
 
@@ -201,21 +212,22 @@ sub check_embl {
     next if (/join/);
   }
 
-  # is $seq the longest cDNA so far for $prot?
-  if($validseq) {
-    $pairs{$prot} = $seq unless defined($pairs{$prot});
-    if(($pairs{$prot}->length) < ($seq->length)) { 
-      $pairs{$prot} = $seq;
-    }
-  }
+  # return Bio::Seq or undef
+  if($validseq) { return $seq; }
+  else { return; }
 
 }
 
 sub write_output {
+  my ($prot, $cdna) = @_;
   my $outfile = $::GB_conf{'cdna_pairs'};
-  open (OUT, ">$outfile") or die "Can't open [$outfile]\n";
-  foreach my $prot(keys %pairs) {
-     print OUT "$prot : " . $pairs{$prot}->accession . "\n";
+  {
+    open (OUT, ">>$outfile") or die "Can't open [$outfile]\n";
+    print OUT "$prot : ";
+    if (defined $cdna && $cdna->isa("Bio::Seq")){
+      print OUT $cdna->accession;
+    }
+    print OUT "\n";
+    close OUT;
   }
-  close OUT;
 }
