@@ -2,9 +2,9 @@
 
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -14,7 +14,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::AlignFeature
+Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome
 
 =head1 SYNOPSIS
 
@@ -45,7 +45,9 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
 use vars qw(@ISA);
 use strict;
 
@@ -53,16 +55,18 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
-           
+
+sub new {
+    my ($class,@args) = @_;
+    my $self = bless {}, $class;
+
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
-						 'INPUT_ID'], @args);
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input")           unless defined($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::Pipeline::DB::ObjI");
@@ -71,16 +75,13 @@ sub _initialize {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
+    if(!defined $seqfetcher) {
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    }
+
+    $self->seqfetcher($seqfetcher);
+
     return $self; # success - we hope!
-}
-sub input_id {
-	my ($self,$arg) = @_;
-
-   if (defined($arg)) {
-      $self->{_input_id} = $arg;
-   }
-
-   return $self->{_input_id};
 }
 
 =head2 dbobj
@@ -174,8 +175,9 @@ sub fetch_input {
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq   = $contig->primary_seq;
     my @features = $contig->get_all_SimilarityFeatures;
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature(-genomic  => $genseq,
-							    -features => \@features);
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'    => $genseq,
+								      '-features'   => \@features,
+								      '-seqfetcher' => $self->seqfetcher);
 
     $self->runnable($runnable);
 }

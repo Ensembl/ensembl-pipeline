@@ -2,9 +2,9 @@
 
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -14,7 +14,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::AlignFeature
+Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome
 
 =head1 SYNOPSIS
 
@@ -49,25 +49,27 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::SeqIO;
 use Bio::Tools::Blast;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI );
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+my ($class,@args) = @_;
+    my $self = bless {}, $class;
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						      'INPUT_ID'], @args);
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input")           unless defined($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
@@ -76,6 +78,12 @@ sub _initialize {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
+    if(!defined $seqfetcher) {
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    }
+
+    $self->seqfetcher($seqfetcher);
+
     return $self; # success - we hope!
 }
 
@@ -225,8 +233,9 @@ sub fetch_input {
     my @contigs  = $clone->get_all_Contigs;
 
     foreach my $contig (@contigs) {
-	my $runnable = new Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome(-dbobj    => $self->dbobj,
-									       -input_id => $contig->id);
+	my $runnable = new Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome('-dbobj'      => $self->dbobj,
+									       '-input_id'   => $contig->id,
+									       '-seqfetcher' => $self->seqfetcher);
 	$runnable->fetch_input;
 	$self->add_ContigRunnable($runnable);
     }

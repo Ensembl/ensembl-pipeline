@@ -2,9 +2,9 @@
 
 #
 #
-# Cared for by Val Curwen (vac@sanger.ac.uk)
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Val Curwen
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -54,21 +54,30 @@ use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Gene;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
+@ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
 sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
            
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID'], @args);
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input") unless defined($dbobj);
     $self->dbobj($dbobj);
 
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
+
+    
+    if(!defined $seqfetcher) {
+      # will look for pfetch in $PATH - change this once PipeConf up to date
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    }
+    $self->seqfetcher($seqfetcher);
     
     return $self; # success - we hope!
 }
@@ -84,9 +93,6 @@ sub new {
 =cut
 
 sub write_output {
-
-# alter this so it writes features, not genes!
-
 
   my($self) = @_;
   
@@ -514,8 +520,9 @@ sub _prepare_runnables {
   
   if( scalar(@plusfeat) ) {
     print STDERR scalar(@plusfeat) . "features on plus strand\n";
-    my $prunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
-								       '-features' => \@plusfeat);
+    my $prunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'    => $genseq,
+								       '-features'   => \@plusfeat,
+								       '-seqfetcher' => $self->seqfetcher);
    
 #    $self->add_Runnable($prunnable);
     $self->runnable($prunnable);
@@ -525,8 +532,9 @@ sub _prepare_runnables {
 
   if( scalar  (@minusfeat) ) {
     print STDERR scalar(@minusfeat) . "features on minus strand\n";
-    my $mrunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
-								       '-features' => \@minusfeat);
+    my $mrunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'    => $genseq,
+								       '-features'   => \@minusfeat,
+								       '-seqfetcher' => $self->seqfetcher);
     
     $self->runnable($mrunnable);
     $self->{$mrunnable} = $contig;
@@ -585,13 +593,14 @@ sub get_Sequence {
     return $self->{_seq_cache}{$id};
   } 
 
-  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+  my $seqfetcher = $self->seqfetcher;
   my $seq;
 
-  # seq fetching choices: efetch, then getz
-  $seq = $seqfetcher->run_efetch($id);
-  if(!defined $seq){
-    $seq = $seqfetcher->run_getz($id,'embl emblnew');
+  eval {
+    $seq = $seqfetcher->get_Seq_by_acc($id);
+  };
+  if ($@) {
+    $self->throw("Problem fetching seqeucne for [$id]: '[$@]\n");
   }
 
   if(!defined $seq){

@@ -2,9 +2,9 @@
 
 #
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Michele Clamp
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -51,7 +51,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Gene;
@@ -68,8 +68,9 @@ sub new {
   
   $self->{'_fplist'} = []; #create key to an array of feature pairs
   
-  my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
-					       'INPUT_ID'], @args);
+  my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							    'INPUT_ID',
+							    'SEQFETCHER'], @args);
   
   $self->throw("No database handle input")           
     unless defined($dbobj);
@@ -81,6 +82,12 @@ sub new {
   $self->throw("No input id input") 
     unless defined($input_id);
   $self->input_id($input_id);
+  
+  if(!defined $seqfetcher) {
+    # will look for pfetch in $PATH - change this once PipeConf up to date
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+  }
+  $self->seqfetcher($seqfetcher);
   
   return $self; # success - we hope!
 }
@@ -720,18 +727,20 @@ sub get_Sequence {
     return $self->{_seq_cache}{$id};
   } 
   
-  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
-  my $seq = $seqfetcher->run_efetch($id);
-  
-  if(!defined $seq) {
-    $seq = $seqfetcher->run_getz($id, 'embl');
+  my $seq;
+
+  eval {
+    $seq = $self->seqfetcher->get_Seq_by_acc($id);
+  };
+  if ($@) {
+    $self->throw("Problem fetching seqeucne for [$id]: '[$@]\n");
   }
-  
+
   if(!defined $seq) {
     $self->throw("Couldn't find sequence for [$id]");
   }
 
-  print (STDERR "Found sequence for $newid [" . $seq->length() . "]\n");
+  print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
   $self->{_seq_cache}{$id} = $seq;
   
   return $seq;
