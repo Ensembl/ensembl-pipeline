@@ -352,13 +352,13 @@ sub index_type {
 
     if ($value =~ /wu/i) {
 
-      if (($value =~ /new/i)&&($self->molecule_type eq 'DNA')) {
+      if (($value =~ /new/i)&&($self->molecule_type =~ /DNA/i)) {
 	$self->format_command('xdformat -n -I');
 	$self->seqfetch_command(['xdget -n' , 'blastdb' , 'seqid']);
 	$seqfetch_cmd_ok = 1;
 	$self->{_index_type} = 'new_wu';
 	
-      } elsif (($value =~ /new/i)&&($self->molecule_type eq 'PROTEIN')) {
+      } elsif (($value =~ /new/i)&&($self->molecule_type =~ /PROTEIN/i)) {
 	$self->format_command('xdformat -p -I');
 	$self->seqfetch_command(['xdget -p' , 'blastdb' , 'seqid']);
 	$seqfetch_cmd_ok = 1;
