@@ -35,19 +35,35 @@ my $dnadbname = $::db_conf{'dnadbname'};
 
 #Get the DB handler
 
-my $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-        -user   => 'ensro',
-        -dbname => $dnadbname,
-        -host   => $dnadbhost,
-        );
+my $dnadb;
+my $db;
 
-my $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					     -host             => $dbhost,
-					     -user             => $dbuser,
-					     -dbname           => $dbname,
-					     -pass             => $dbpass,
-					     -dnadb            => $dnadb,
-					    );
+if ($dnadbname =~ /\w/) {
+    
+    
+    $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+						 -user   => 'ensro',
+						 -dbname => $dnadbname,
+						 -host   => $dnadbhost,
+						 );
+    
+    $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      -host             => $dbhost,
+					      -user             => $dbuser,
+					      -dbname           => $dbname,
+					      -pass             => $dbpass,
+					      -dnadb            => $dnadb,
+					      );
+}
+
+else {
+    $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      -host             => $dbhost,
+					      -user             => $dbuser,
+					      -dbname           => $dbname,
+					      -pass             => $dbpass,
+					      );
+}
 
 #Get the location of the peptide file
 my $pep_file = $::scripts_conf{'pep_file'};
