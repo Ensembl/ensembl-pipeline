@@ -407,9 +407,13 @@ sub get_Sequence {
       return $self->{_seq_cache}{$id};
     } 
     
-    # try pfetch
-    $seq = $seqfetcher->run_pfetch($id);
+    # for riken proteins; pfetch will get the nucleotide sequence from embl doh!
+    $seq = $seqfetcher->run_bp_search($id,'/data/blastdb/riken_prot.inx','Fasta');
     
+    if (!defined($seq)) {
+      # try pfetch
+      $seq = $seqfetcher->run_pfetch($id);
+    }
     
     if (!defined($seq)) {
       # try efetch
@@ -521,6 +525,8 @@ sub minirun {
     @ids = @{$self->{_forder}};
   }
  
+# VAC FIXME - this is messed up for the Rikens as the same acc no is given for both
+# NA and protein seqs ... 
   $self->get_all_Sequences(@ids);
 
   my $analysis_obj    = new Bio::EnsEMBL::Analysis
@@ -609,78 +615,105 @@ sub run_blastwise {
 							    -protein => $hseq,
 							    -memory  => 400000,
 							    "-reverse" => $reverse,
-							    -endbias  => $endbias);
+							    "-endbias"  => $endbias);
   
   $eg->run;
-  
+
+  # output is a list of FeaturePairs (one per exon) where feature1 = genomic and feature2 = protein
+  # plus sub_SeqFeatures on the genomic feature (feature1)
+  # (representing the ungapped sub alignments for each exon
   my @f = $eg->output;
-  my @newf;
+
+  print STDERR "number of exons: " . scalar(@f)  . "\n";
   
+  my @newf;
+
   my $strand = 1;
   if ($reverse == 1) {
     $strand = -1;
   }
+
   foreach my $f (@f) {
-    $f->strand(1);
-    $f->hstrand($strand);
-    
-    print(STDERR "Aligned output is " . $f->id    . "\t" . 
-	  $f->start      . "\t" . 
-	  $f->end        . "\t(" . 
-	  $f->strand     . ")\t" .
-	  $f->hseqname   . "\t" . 
-	  $f->hstart     . "\t" . 
-	  $f->hend       . "\t(" .
-	  $f->hstrand    . ")\t" .
-	  $f->feature1->{_phase}   . "\n");
+    # $f is a genomic:protein FP
+    $f->strand($strand); # genomic
+    $f->hstrand(1);      # protein
     
     my $phase = $f->feature1->{_phase};
 
-    # VC $f->feature2->{_phase} is not set
-    #    print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
-
-    #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
-
-    # need to conv rt back to genomic coordinates
+    # need to convert whole exon back to genomic coordinates
     my @newfeatures = $miniseq->convert_PepFeaturePair($f);         
-
+    
     if ($#newfeatures > 0) {
+      # all hell will break loose as the sub alignments will probably not map cheerfully 
+      # onto the first one ...
       print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
+      }
+  
+    
+  my @genomics;
+  foreach my $nf(@newfeatures) {
+      push(@genomics, $nf->feature1);
     }
 
-    push(@newf,@newfeatures);
+    # also need to convert each of the sub alignments back to genomic coordinates
+    foreach my $aln($f->feature1->sub_SeqFeature) {
+      my @alns = $miniseq->convert_PepFeaturePair($aln);
+
+      if ($#alns > 0) {
+	# we're in for fun
+	print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
+      }
+      foreach my $a(@alns) {
+	my $added = 0;
+	$a->strand($strand); # genomic
+	$a->hstrand(1);      # protein
+
+	$a->seqname($aln->seqname);
+	$a->hseqname($aln->hseqname);
+	# shouldn't need to expand ... as long as we choose the right parent feature to add to!
+	foreach my $g(@genomics){
+	  if($a->start >= $g->start && $a->end <=$g->end && !$added){
+	    $g->add_sub_SeqFeature($a,'');
+	    $added = 1;
+	  }
+	}
+	$self->warn("Sub align feature could not be added ...\n") unless $added;
+      }
+    }
+
+    push(@newf,@genomics);
     
-    foreach my $nf (@newfeatures) {
-      $nf->feature1->{_phase} = $phase;
-      $nf->feature2->{_phase} = $phase;
-      
+    foreach my $nf (@genomics) {
+      $nf->{_phase} = $phase;
+      $nf->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $nf->seqname($f->seqname);
-      $nf->hseqname($id);
       $nf->score   (100);
       $nf->analysis($analysis_obj);
       #end BUGFIX
     }
     
   }
-  
+ 
+  # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
+  # sub_SeqFeatures representing ungapped alignments making up the exon:protein alignment
   my $fset = new Bio::EnsEMBL::SeqFeature();
   
   foreach my $nf (@newf) {
     $fset->add_sub_SeqFeature($nf,'EXPAND');
     $fset->seqname($nf->seqname);
     $fset->analysis($analysis_obj);
-    $nf->strand($nf->hstrand);
-    print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
-	  $nf->start     . "\t" . 
-	  $nf->end       . "\t(" . 
-	  $nf->strand    . ")\t" .
-	  $nf->hseqname  . "\t" . 
-	  $nf->hstart    . "\t" . 
-	  $nf->hend      . "\t(" .
-	  $nf->hstrand   . ")\t:" .
-	  $nf->feature1->{_phase} . ":\t:" . 
-	  $nf->feature2->{_phase} . ":\n");
+ #   $nf->strand($nf->hstrand);
+#    print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
+#	  $nf->start     . "\t" . 
+#	  $nf->end       . "\t(" . 
+#	  $nf->strand    . ")\t" .
+#	  $nf->hseqname  . "\t" . 
+#	  $nf->hstart    . "\t" . 
+#	  $nf->hend      . "\t(" .
+#	  $nf->hstrand   . ")\t:" .
+#	  $nf->feature1->{_phase} . ":\t:" . 
+#	  $nf->feature2->{_phase} . ":\n");
   }
   
   push(@{$self->{_output}},$fset);
