@@ -67,7 +67,21 @@ sub new {
 	$self->throw("Need the list of transcript predictions");
     }
     $self->transcripts($transcripts);
+    
+    $self->verbose(0);
+
     return $self;
+    
+}
+
+############################################################
+
+sub verbose{
+  my ($self, $boolean) = @_;
+  if ( defined $boolean ){
+    $self->{_verbose} = $boolean;
+  }
+  return $self->{_verbose};
 }
 
 ############################################################
@@ -105,6 +119,8 @@ sub transcripts{
 
 sub score_Transcripts{
   my ($self) = @_;
+
+  my $verbose = $self->verbose;
   
   ############################################################
   # first need  to estimate how many sites of 
@@ -117,12 +133,27 @@ sub score_Transcripts{
   
   ############################################################
   # get the sites of alt-splicing on each transcript cluster
+ CLUSTER:
   foreach my $cluster ( @clusters ){
+    
+    my @trans = @{ $cluster->get_Transcripts };
+    print STDERR "Looking at cluster:\n";
+    foreach my $tran ( @trans ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+    }
+    
+    if (scalar(@trans)==1 ){
+      print STDERR "1 transcript-> all exon get 100 as score\n" if $verbose;
+      foreach my $exon ( @{$trans[0]->get_all_Exons} ){
+	$exon->score( 100 );
+      }
+      next CLUSTER;
+    }
+
     
     my @sites = $self->get_alternative_sites( $cluster );
     
-    my @trans = @{ $cluster->get_Transcripts };
-    
+       
     ############################################################
     # now get the sites of alternative splicing
     # contained in each transcript
@@ -130,8 +161,13 @@ sub score_Transcripts{
     # those sites and the lengths
     # of the list of ESTs making up the transcript
     # and compare them!
+  TRAN:
     foreach my $tran ( @trans ){
       
+      print STDERR "finding sites in transcript: " if $verbose;
+      if ($verbose ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
+      }
       ############################################################
       # which sites does this transcript have?
       # $site is a SeqFeature with exons as sub_SeqFeatures 
@@ -156,7 +192,7 @@ sub score_Transcripts{
 	}
       }
       else{
-	print STDERR "transcript with ".scalar( @these_sites )." sites\n";
+	print STDERR "transcript with ".scalar( @these_sites )." sites\n" if $verbose;
       }
       
       ############################################################
@@ -171,35 +207,38 @@ sub score_Transcripts{
 	foreach my $est ( @list ){
 	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
 	  
+	  ############################################################
 	  # a pair is covered if there is at least an est overlapping
 	  # with both features defining the site pair
 	  if ( $est->start <= $pair->[0]->end 
 	       &&
-	       $est->end > $pair->[0]->end
+	       $est->end   >  $pair->[0]->end
 	       &&
-	       $est->end >= $pair->[1]->start
+	       $est->end   >= $pair->[1]->start
 	       &&
-	       $est->start < $pair->[1]->start
+	       $est->start <  $pair->[1]->start
 	     ){
 	    $covered = 1;
 	    $pair_coverage{ $pair }++;
-	    push( @covered_sites, $pair );
+	    unless ( $pair_coverage{ $pair } > 1 ){
+	      push( @covered_sites, $pair );
+	    }
 	  }
 	}
       }
       
-      print STDERR "number of site-pairs: ".scalar(@site_pairs)."\n";
-      print STDERR "number of covered site-pairs: ".scalar( @covered_sites )."\n";
+      print STDERR "number of site-pairs: ".scalar(@site_pairs)."\n" if $verbose;
+      print STDERR "number of covered site-pairs: ".scalar( @covered_sites )."\n" if $verbose;
       
       my $score = 100;
       # score of a transcript is calculated as the fraction of 
       # pairs of sites of alternative splicing which are covered by ests
       if ( @site_pairs ){
+	print STDERR "score: $score\n" if $verbose;
 	$score = sprintf "%.2f", 100*scalar( @covered_sites )/scalar( @site_pairs );
-	print STDERR "score: $score\n";
       }
       else{
-	print STDERR "No site-pairs --> score = $score\n";
+	print STDERR "No site-pairs --> score = $score\n" if $verbose;
       }
       
       ############################################################
@@ -207,8 +246,9 @@ sub score_Transcripts{
       foreach my $exon ( @{$tran->get_all_Exons} ){
 	$exon->score( $score );
       }
-    }
-  }
+    } # end of TRAN
+  }   # end of CLUSTER
+  return @{$self->transcripts};
 }
 
 ############################################################
@@ -231,6 +271,9 @@ sub score_Transcripts{
 sub get_alternative_sites{
   my ($self, $cluster ) = @_;
 
+  my $verbose = $self->verbose;
+
+  print STDERR "finding alternative sites\n" if $verbose;
   my @trans = @{ $cluster->get_Transcripts };
   my %exon2transcript;
   my @all_exons;
@@ -250,52 +293,68 @@ sub get_alternative_sites{
   # get the sites of alternative splicing:
   my @sites;
   my %added;
+  my $exon_cluster_pos = 0;
  EXON_CLUSTER:
   foreach my $exon_cluster ( @clusters ){
+    $exon_cluster_pos++;
     my @exons = $exon_cluster->sub_SeqFeature;
     my $previous_exon;
-    my @transcripts = @trans;
     my %seen_transcript;
     
+    print STDERR "cluster with ".scalar(@exons)." exons\n" if $verbose;
   EXON:
     while ( @exons ){
       my $exon = shift @exons;
       my $found = 0;
-      while ( $found == 0 ){
-	my $t = shift @transcripts;
-	last if ( $seen_transcript{$t} );
+      
+    TRAN:
+      foreach my $t ( @trans ){
+	#print STDERR "exon2trans: ".$exon2transcript{ $exon }." looking at trans: $t\n";
 	if ( $t == $exon2transcript{ $exon } ){
-	  $found = 1;
 	  $seen_transcript{$t} = 1;
-	}
-	else{
-	  push ( @transcripts, $t );
+	  #print STDERR "transcript found\n";
+	  last TRAN;
 	}
       }
-    
+      
       ############################################################
       # unless all exons have the same splice coordinates
       # we have a case of alternative splicing: alterantive 3'/5' site, intron retention
       if ( $previous_exon ){
 	unless ( $previous_exon->start == $exon->start && $previous_exon->end == $exon->end ){
 	  unless ( $added{$exon_cluster} ){
+	    if ( $exon_cluster_pos == 1 || $exon_cluster_pos == $#clusters ){
+	      print STDERR "Alternative terminal exon: " if $verbose;
+	    }
+	    else{
+	      print STDERR "Alternative site: previous_exon: " if $verbose;
+	    }
+	    print STDERR $previous_exon->start."-".$previous_exon->end." ".
+	      "exon: ".
+		$exon->start."-".$exon->end."\n" if $verbose;
+	    $added{ $exon_cluster }++;
 	    push( @sites, $exon_cluster );
 	  }
 	}
       }
       $previous_exon = $exon;
-    
+      
     } # end of EXON
     ############################################################
     # if there are transcripts that had no exons in this cluster
     # we have a case of exon skipping:
-    if ( @transcripts  ){
+    if ( scalar( @trans ) != scalar ( keys %seen_transcript ) ){
       unless ( $added{$exon_cluster} ){
+	print STDERR "Exon skipping: ".$exon_cluster->start."-".$exon_cluster->end."\n" if $verbose;
+	print STDERR "cluster with ".scalar(@trans)." transcripts\n" if $verbose;
+	foreach my $tran ( @trans ){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+	}	
 	push( @sites, $exon_cluster );
       }
     }
   }   # end of EXON_CLUSTER
-
+  
   ############################################################
   # sites of alternative splicing are described by a cluster of exons 
   # which has genomic coordinates
