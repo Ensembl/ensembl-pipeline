@@ -28,6 +28,7 @@
                                                       -org2          => 'M.musculus',
                                                       -slam_bin      => '/nfs/acari/jhv/bin/slam'
                                                       -slam_pars_dir => '',
+                                                      -max_memory    => 1572864,
                                                       -minlength     => 250,
                                                       -debug         => 0,
                                                       -verbose       => 0
@@ -75,7 +76,9 @@ be performed on 3 diffrent organisms: H.sapiens, M.musculus and R.norvegicus.
 
 =item  B<-slam_bin>      path to slam-binary (def: /nfs/acari/jhv/bin/)
 
-=item  B<-slam_pars_dir> path to slam-libary-directory 
+=item  B<-slam_pars_dir> path to slam-libary-directory
+
+=item  B<-max_memory>    maximum memory size of slam-process (default 1.5 Gb)
 
 =item  B<-minlength>     minium sequence length (def: 250 bp)
 
@@ -133,6 +136,7 @@ sub new {
       $org2,                    # name 2nd organism (H.sapiens M.musculus R.norvegicus)
       $slam_bin,                # location slam_binary
       $slam_pars_dir,           # location of Pars-dir
+      $max_memory,              # max. memory the slam-process is allowed to use, default 1.5 Gb
       $minlength,               # min seq length
       $workdir,                 # opt. work-directory
       $debug,                   # opt. debug-option for slam
@@ -147,6 +151,7 @@ sub new {
                                ORG2
                                SLAM_BIN
                                SLAM_PARS_DIR
+                               MAX_MEMORY
                                MINLENGTH
                                WORKDIR
                                DEBUG
@@ -157,6 +162,7 @@ sub new {
 
   # setting slices
   $self->slices($slice1,$slice2);
+  $self->max_memory_size(1572864);
 
   #setting fasta-filenames
   $self->fasta($fasta1,$fasta2);
@@ -165,7 +171,7 @@ sub new {
 
   $self->slam_bin($slam_bin);
   $self->slam_pars_dir($slam_pars_dir);
-
+  $self->max_memory_size($max_memory);
   $self->minlength($minlength);
 
   $self->workdir($workdir);
@@ -173,6 +179,7 @@ sub new {
   $self->verbose($verbose);
 
   $self->printvars if ($self->verbose);
+
   return $self;
 }
 
@@ -180,7 +187,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-  #  $self->deletefiles;
+     $self->deletefiles;
 }
 
 =pod
@@ -390,7 +397,16 @@ sub run {
     open(GFF, ">$gff2") ||  die "$0: $gff2: $!\n";
     close (GFF);
   } else {
-    eval ( system (" $command"));     # all ok, run slam
+    print "Slam.pm: try to evalute / run Slam\n";
+    my $pstat;
+#    eval {  $pstat = system ("ulimit -v 1572864 -c 0 ; $command")    };
+    eval {  $pstat = system ("ulimit -v   100  -c 0 ; $command")    };
+    unless ($pstat ne "0") {
+      print "WARNING\t SLAM RUN NEEDED LOTS OF MEM\t BROKE UP\n" ;
+      print "Slam.pm: Slam run seems to be buggy\n";
+    }
+    print "pstat $pstat\n";
+
   }
     # add cns-file to list of tempfiles
     my $wdir = $self->workdir;
@@ -400,8 +416,7 @@ sub run {
 
   # parse results if resultfiles are written
     if ( (-e $gff1) &&( -e $gff2 )) {
-      print "\nTwo gff-files exist. $gff1 $gff2\tI parse them\n";
-      $self->parse_results;
+      $self->parse_results;  # parse existing gff's
   }else{
     # error-message, evtl re-analysis
     my $e1_start = $slice1->start;    my $e1_end = $slice1->end;    my $e1_chr = $slice1->seq_region_name;
@@ -414,6 +429,8 @@ sub run {
     $self->predtrans($aref,$aref);
   }
 
+  $self->files_to_delete(${$self->fasta}[0]);
+  $self->files_to_delete(${$self->fasta}[1]);
   return 1;
 }
 
@@ -515,7 +532,7 @@ sub _seqlen {
 
 =pod
 
-=head2 fasta
+=head2 fasta ( filename )
 
   Title    : fasta
   Usage    : $obj->fasta
@@ -534,7 +551,7 @@ sub fasta {
 }
 
 
-=head2 predtrans
+=head2 predtrans (ref1,ref2)
 
   Title    : predtrans
   Usage    : $obj->predtrans
@@ -554,6 +571,24 @@ sub predtrans{
   return $self->{_ref_predtrans};
 }
 
+
+=head2 max_memory_size (int)
+
+  Title    : max_memory_size
+  Usage    : $obj->max_memory_size( value )
+  Function : Sets/gets the maximum memory size which the slam process is allowed to allocate
+  Returns  : integer
+  Args     : integer
+
+=cut
+
+
+sub max_memory_size {
+  my ($self,$mem) = @_;
+
+  $self->{_max_memory} = $mem if defined $mem;
+  return $self->{_max_memory}
+}
 
 
 sub approx_align {
