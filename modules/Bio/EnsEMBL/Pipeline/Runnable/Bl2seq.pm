@@ -77,6 +77,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Runnable::Bl2seq;
 
 use strict;
+use Bio::EnsEMBL::Pipeline::RunnableI;
 use vars qw(@ISA);
 
 # Object preamble - inherits from Bio::EnsEMBL::Root;
