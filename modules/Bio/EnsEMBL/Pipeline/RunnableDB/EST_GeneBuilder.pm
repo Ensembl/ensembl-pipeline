@@ -268,26 +268,26 @@ sub fetch_input {
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
  
-    my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
-    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+    my $slice_adaptor = $self->db->get_SliceAdaptor();
+    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
 
    
     
     $contig->_chr_name($chrid);
-    $self->vcontig($contig);
-    print STDERR "got vcontig\n";
-    print STDERR "length ".$contig->length."\n";
+    $self->slice(slice);
+    print STDERR "got slice\n";
+    print STDERR "length ".$slice->length."\n";
     
     # forward strand
     $strand = 1;
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    my @genes  = $contig->get_Genes_by_Type($genetype);
+    my @genes  = $slice->get_Genes_by_Type($genetype);
     
     print STDERR "Number of genes from ests  = " . scalar(@genes) . "\n";
     
-    my $cdna_contig;
+    my $cdna_slice;
     if ( $USE_cDNA_DB ){
       my $cdna_db = $self->cdna_db;
       
@@ -356,7 +356,7 @@ GENE:
 	
 	# use MiniSeq
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic  => $contig->primary_seq,
+									    -genomic  => $slice,
 									    -analysis => $self->analysis,
 									   );
 	
@@ -377,7 +377,8 @@ GENE:
 
     $strand = -1;
     
-    my $revcontig = $contig->invert;
+    # this will return a slice which corresponds to the reversed complement of $slice:
+    my $revslice = $slice->invert;
     my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
     my @minus_transcripts;
     
@@ -385,8 +386,8 @@ GENE:
 
     
     if ( $USE_cDNA_DB ){
-      my $cdna_revcontig = $cdna_contig->invert;
-      my @cdna_revgenes  = $cdna_revcontig->get_Genes_by_Type($cDNA_GENETYPE);
+      my $cdna_revslice = $cdna_slice->invert;
+      my @cdna_revgenes  = $cdna_revslice->get_Genes_by_type($cDNA_GENETYPE);
       print STDERR "Number of genes from cdnas = " . scalar(@cdna_revgenes) . "\n";
       push ( @revgenes, @cdna_revgenes ); 
     }
@@ -429,7 +430,7 @@ GENE:
       foreach my $tran (@transcripts) {
 	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic  => $revcontig->primary_seq,
+									    -genomic  => $revslice,
 									    -analysis => $self->analysis,
 									   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
