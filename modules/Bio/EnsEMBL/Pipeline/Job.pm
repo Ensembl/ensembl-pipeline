@@ -94,7 +94,6 @@ sub new {
     $self->dbID($dbID);
     $self->adaptor($adaptor);
     $self->input_id($input_id);
-    $self->class($cls);
     $self->analysis($analysis);
     $self->stdout_file($stdout);
     $self->stderr_file($stderr);
@@ -117,13 +116,12 @@ sub new {
 =cut
 
 sub create_by_analysis_input_id {
-  my ($dummy, $analysis, $inputId, $class) = @_;
+  my ($dummy, $analysis, $inputId) = @_;
 
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
       -input_id    => $inputId,
       -analysis    => $analysis,
-      -retry_count => 0,
-      -class       => $class
+      -retry_count => 0
   );
   $job->make_filenames;
   return $job;
@@ -188,27 +186,6 @@ sub input_id {
 	$self->{'_input_id'} = $arg;
     }
     return $self->{'_input_id'};
-}
-
-
-=head2 class
-
-  Title   : class
-  Usage   : $self->class($class)
-  Function: Get/set method for the class of the input to the job
-            typically contig/clone
-  Returns : string
-  Args    : string
-
-=cut
-
-sub class {
-    my ($self, $arg) = @_;
-
-    if (defined($arg)) {
-	$self->{'_class'} = $arg;
-    }
-    return $self->{'_class'};
 }
 
 
@@ -507,9 +484,8 @@ sub runInLSF {
   if ($autoupdate) {
     eval {
       my $sic = $self->adaptor->db->get_StateInfoContainer;
-      $sic->store_input_id_class_analysis(
+      $sic->store_input_id_analysis(
         $self->input_id,
-        $self->class,
         $self->analysis
       );
     };

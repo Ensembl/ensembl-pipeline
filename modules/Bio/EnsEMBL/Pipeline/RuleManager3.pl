@@ -28,7 +28,6 @@ unless (&config_sanity_check) {
 # It looks for failed jobs as well and restarts them.
 
 # signal parameters
-my $gotsig   =  0;
 my $term_sig =  0;
 my $alarm    =  0;
 my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
@@ -74,27 +73,29 @@ my $chunksize    = 1000000;   # How many Input_ids to fetch at one time
 my $currentStart = 0;       # Running total of job ids
 my $completeRead = 0;       # Have we got all the input ids yet?
 my $local        = 0;       # Run failed jobs locally
-my @analysis;               # Only run this analysis ids
-my %analysis;
+my @analyses;               # Only run this analysis ids
 my $submitted;
 my $idlist;
 my ($done, $once);
 my $runner;
 my $shuffle;
 my $output_dir;
+my @start_from;
+my %analyses;
 
 GetOptions(
-    'host=s'      => \$dbhost,
-    'dbname=s'    => \$dbname,
-    'dbuser=s'    => \$dbuser,
-    'dbpass=s'    => \$dbpass,
-    'local'       => \$local,
-    'idlist=s'    => \$idlist,
-    'runner=s'    => \$runner,
-    'output_dir=s' => \$output_dir,
-    'once!'       => \$once,
-    'shuffle!'    => \$shuffle,
-    'analysis=s@' => \@analysis
+    'host=s'        => \$dbhost,
+    'dbname=s'      => \$dbname,
+    'dbuser=s'      => \$dbuser,
+    'dbpass=s'      => \$dbpass,
+    'local'         => \$local,
+    'idlist=s'      => \$idlist,
+    'runner=s'      => \$runner,
+    'output_dir=s'  => \$output_dir,
+    'once!'         => \$once,
+    'shuffle!'      => \$shuffle,
+    'start_from=s@' => \@start_from,
+    'analysis=s@'   => \@analyses
 )
 or die ("Couldn't get options");
 
@@ -127,21 +128,14 @@ my $sic          = $db->get_StateInfoContainer;
 
 # analysis options are either logic names or analysis dbID's
 
-foreach my $ana (@analysis) {
-    if ($ana =~ /^\d+$/) {
-        $analysis{$ana} = 1;
-    }
-    else {
-	my $id = $ana_adaptor->fetch_by_logic_name($ana)->dbID;
-	if ($id) {
-            $analysis{$id} = 1;
-	}
-	else {
-	    print STDERR "Could not find analysis $ana\n";
-	}
-    }
+unless (@start_from) {
+    print "Need to specify at least 1 analysis to start from with -start_from\n";
+    exit 1;
 }
 
+%analyses   = logic_name2dbID($ana_adaptor, @analyses);
+my %tmp = logic_name2dbID($ana_adaptor, @start_from);
+@start_from = keys %tmp;
 
 if ($idlist && ! -e $idlist) {
     die "Must be able to read $idlist";
@@ -216,9 +210,9 @@ while (1) {
         open IDS, "< $idlist" or die "Can't open $idlist";
         while (<IDS>) {
             chomp;
-            my($id, $class) = split;
-            ($id && $class) or die "Invalid id/class $_";
-            push @idList, [ $id, $class ];
+            my($id) = split;
+            ($id) or die "Invalid id $_";
+            push @idList, [ $id ];
         }
         close IDS;
     }
@@ -231,17 +225,12 @@ while (1) {
 
         if (!$completeRead) {
             print "Reading IDs ... ";
-            my @tmp = $sic->list_input_id_class_by_start_count($currentStart, $chunksize);
 
-            print "got ", scalar(@tmp), "\n";
+	    foreach my $a (@start_from) {
+		push @idList, $sic->list_input_id_by_Analysis($a);
+	    }
 
-            push(@idList,@tmp);
-
-            $currentStart += scalar(@tmp);
-
-            if (scalar(@tmp) < $chunksize) {
-                $completeRead = 1;
-            }
+            $completeRead = 1;
         }
     }
 
@@ -269,7 +258,7 @@ while (1) {
             $alarm = 0;
 
             # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-            while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS && $gotsig == 0) {
+            while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
                 sleep 300;
             }
             alarm $wakeup;
@@ -280,7 +269,7 @@ while (1) {
 	    last JOBID;
 	}
 
-        my @anals = $sic->fetch_analysis_by_input_id_class($id->[0], $id->[1]);
+        my @anals = $sic->fetch_analysis_by_input_id($id->[0]);
 
         my %analHash;
 
@@ -289,7 +278,7 @@ while (1) {
         my @current_jobs = $job_adaptor->fetch_by_input_id($id->[0]);
 
         RULE: for my $rule (@rules)  {
-            if (keys %analysis && ! defined $analysis{$rule->goalAnalysis->dbID}) {
+            if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
             print "Check ",$rule->goalAnalysis->logic_name, " - " . $id->[0];
@@ -345,7 +334,7 @@ while (1) {
                 next JOBID;
               }
 
-            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id($anal, $id->[0], $id->[1]);
+            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id($anal, $id->[0]);
 
 
             print "Store ", $id->[0], " - ", $anal->logic_name, "\n";
@@ -517,4 +506,26 @@ sub config_sanity_check {
     }
 
     return $ok;
+}
+
+
+sub logic_name2dbID {
+    my ($ana_adaptor, @analyses) = @_;
+    my %analyses;
+
+    foreach my $ana (@analyses) {
+        if ($ana =~ /^\d+$/) {
+            $analyses{$ana} = 1;
+        }
+        else {
+	    my $id = $ana_adaptor->fetch_by_logic_name($ana)->dbID;
+	    if ($id) {
+                $analyses{$id} = 1;
+	    }
+	    else {
+	        print STDERR "Could not find analysis $ana\n";
+	    }
+        }
+    }
+    return %analyses;
 }

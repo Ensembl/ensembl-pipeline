@@ -78,17 +78,17 @@ sub new {
 }
 
 
-=head2 fetch_analysis_by_input_id_class
+=head2 fetch_analysis_by_input_id
 
 Fetches all analyses
 which have been completed on a specific input ID
-and class. Takes two strings - input and class
+Takes one string - input ID
 and returns a list of Bio::EnsEMBL::Analysis.
 
 =cut
 
-sub fetch_analysis_by_input_id_class {
-  my ($self,$inputId, $class) = @_;
+sub fetch_analysis_by_input_id {
+  my ($self, $inputId) = @_;
 
   my @result;
   my @row;
@@ -98,9 +98,8 @@ sub fetch_analysis_by_input_id_class {
   my $sth = $self->prepare( q {
     SELECT analysis_id
       FROM input_id_analysis
-     WHERE input_id = ?
-       AND class = ? } );
-  $sth->execute( $inputId, $class );
+     WHERE input_id = ? } );
+  $sth->execute($inputId);
 
   while( my @row = $sth->fetchrow_array ) {
     my $analysis = $anaAd->fetch_by_dbID( $row[0] );
@@ -113,7 +112,7 @@ sub fetch_analysis_by_input_id_class {
 }
 
 
-=head2 store_input_id_class_analysis
+=head2 store_input_id_analysis
 
 Stores an input ID, class and analysis.
 Takes an input ID, class (as strings)
@@ -122,8 +121,8 @@ exception if any of the inputs are invalid.
 
 =cut
 
-sub store_input_id_class_analysis {
-  my ($self, $inputId, $class, $analysis ) = @_;
+sub store_input_id_analysis {
+  my ($self, $inputId, $analysis ) = @_;
 
   $self->throw("[$analysis] is not a Bio::EnsEMBL::Analysis object")
    unless $analysis->isa("Bio::EnsEMBL::Analysis");
@@ -133,15 +132,12 @@ sub store_input_id_class_analysis {
 
   # do we want to use a default class here?
 
-  $self->throw("Invalid class [$class]")
-   unless $class;
-
   my $sth = $self->prepare(qq{
     INSERT INTO input_id_analysis
-                (input_id, class, analysis_id, created)
-                values (?, ?, ?, now())
+                (input_id, analysis_id, created)
+                values (?, ?, now())
   });
-  $sth->execute($inputId, $class, $analysis->dbID);
+  $sth->execute($inputId, $analysis->dbID);
 }
 
 
@@ -207,7 +203,7 @@ sub list_input_id_created_by_analysis {
 }
 
 
-=head2 list_input_id_class_by_Analysis
+=head2 list_input_id_by_Analysis
 
 Returns a list of all input_id and class
 for this analysis type
@@ -220,7 +216,7 @@ for this analysis type
 
 =cut
 
-sub list_input_id_class_by_Analysis {
+sub list_input_id_by_Analysis {
   my ($self, $analysis) = @_;
 
   if (ref $analysis && $analysis->isa("Bio::EnsEMBL::Analysis")) {
@@ -230,7 +226,7 @@ sub list_input_id_class_by_Analysis {
   my @result;
 
   my $sth = $self->prepare(qq{
-    SELECT input_id, class
+    SELECT input_id
       FROM input_id_analysis
      WHERE analysis_id = ?
   });
@@ -287,7 +283,7 @@ sub list_input_id_class_by_start_count {
 }
 
 
-=head2 delete_input_id_class
+=head2 delete_input_id
 
 Takes an input ID and class (as strings) and
 removes all matching entries from the pipeline
@@ -296,15 +292,14 @@ delete_input_id() and delete_input_id_analysis().
 
 =cut
 
-sub delete_input_id_class {
+sub delete_input_id {
   my $self = shift;
-  my ($inputId, $class) = @_;
+  my ($inputId) = @_;
 
   my $sth = $self->prepare( qq{
     DELETE FROM input_id_analysis
-    WHERE  input_id = ?
-    AND    class = ?} );
-  $sth->execute($inputId, $class);
+    WHERE  input_id = ? } );
+  $sth->execute($inputId);
 }
 
 
