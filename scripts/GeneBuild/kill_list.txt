@@ -165,3 +165,42 @@ Q8NB08 Line element
 Q9P074 hypothetical gene fragment that contains repeats - dta
 Q8NF61 protein fragment - dta 
 NP_775842 hypothetical protein - dta
+Q7TNC3 Hypothetical protein	 - multiple pmatches vac
+NP_899143.1 hypothetical protein - multiple pmatches vac
+Q8C0W2 Mus musculus adult male testis cDNA - multiple pmatches vac
+NP_035152.1 ovary testis transcribed - multiple pmatches vac
+Q62012 Ott protein. - multiple pmatches vac
+Q7M6U6 Pro protein (Fragment). - multiple pmatches vac
+Q62478 XMR protein (Hypothetical protein) - multiple pmatches vac
+Q80SV3 Envelope polyprotein. - multiple pmatches vac
+O70313 VSAG protein. - multiple pmatches vac
+Q62460 (clone BALB3N) - multiple pmatches vac
+Q811N4 Envelope polyprotein. - multiple pmatches vac
+P10404 Retrovirus-related ENV polyprotein - multiple pmatches vac
+Q7M6U5 Pol protein (Fragment). - multiple pmatches vac
+Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase - multiple pmatches vac
+Q8C2B1 retrovirus-related pol polyprotein homolog. - multiple pmatches vac
+Q810S6 Hypothetical protein. - multiple pmatches vac
+Q62461 Q62461 (clone BALB10N). - multiple pmatches vac
+Q8R1L5 Similar to RIKEN cDNA 9030624G23 gene. - multiple pmatches vac
+Q61590 M.musculus p12 GAG gene homologue (Fragment). - multiple pmatches vac
+Q7TQ39 Gag protein. - multiple pmatches vac
+Q62458 (clone BALB14N). - multiple pmatches vac
+Q8CCG8 similar to retrovirus-related reverse transcriptase homolog. - multiple pmatches vac
+Q9D9T3 hypothetical Spindlin - multiple pmatches vac
+Q99K18 BC062922 protein (Fragment). - multiple pmatches vac
+Q8BMX1 GAG PROTEIN homolog (Fragment). - multiple pmatches vac
+Q63840 Fas antigen (Fragment). - multiple pmatches vac
+Q99JK9 0610011I04Rik protein. - multiple pmatches vac
+Q8BTS2 ANTIGEN LEC-A homolog (Fragment). - multiple pmatches vac
+Q8C4B3 hypothetical protein, full insert sequence. - multiple pmatches vac
+Q8R1U0 Hypothetical protein. - multiple pmatches vac
+Q8C0A8 hypothetical Metallo- dependent hydrolases structure containing protein - multiple pmatches vac
+Q61785 ORF2; 5' end undetermined. (Fragment). - multiple pmatches vac
+Q8CDH6 hypothetical protein - multiple pmatches vac
+Q9QUJ6 L1 element - multiple pmatches vac
+Q9R225 Mus musculus L1 retrotransposon - multiple pmatches vac
+Q9QUR4 Mus musculus L1 retrotransposon - multiple pmatches vac
+
+
+
