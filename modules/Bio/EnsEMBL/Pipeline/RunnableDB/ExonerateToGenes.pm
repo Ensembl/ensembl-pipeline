@@ -37,7 +37,7 @@ $exonerate2genes->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
-This object wraps Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
+This object wraps Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 It is meant to provide the interface for mapping ESTs to the genome
 sequence and writing the results as genes. By the way Exonerate is run
 we do not cluster transcripts into genes and only write one transcript per gene.
@@ -62,7 +62,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
+use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
@@ -175,7 +175,7 @@ sub fetch_input {
     if ( -s $database){
       
       #print STDERR "creating runnable for target: $database\n";
-      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
+      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 	->new(
 	      -database    => $database,
 	      -query_seqs  => \@sequences,
