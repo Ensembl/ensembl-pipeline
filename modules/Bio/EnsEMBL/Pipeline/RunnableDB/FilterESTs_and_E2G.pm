@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::Tools::BPlite;
 use FileHandle;
 #use diagnostics;
@@ -1211,6 +1212,10 @@ sub make_seqfetcher {
     
     #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex('-db' => \@db,);
+
+    ## SeqFetcher to be used with 'indicate' indexing:
+    # $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
+
   }
   #if(defined $index && $index ne ''){
   #  my @db = ( $index );
