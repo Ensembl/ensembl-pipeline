@@ -14,6 +14,7 @@
 # outline of the algorithm
 
 use strict;
+use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
@@ -27,10 +28,19 @@ my $dbuser = $::pipeConf{'dbuser'};
 
 $| = 1;
 
-my $chunksize    = 620;                 # How many InputIds to fetch at one time
+my $chunksize    = 5000;                # How many InputIds to fetch at one time
 my $currentStart = 0;                   # Running total of job ids
 my $completeRead = 0;                   # Have we got all the input ids yet?
 my $flushsize    = 50;                  # How many jobs to store up before we submit to LSF
+my $local        = 0;                   # Run failed jobs locally
+
+
+GetOptions(     'host=s'     => \$dbhost,
+                'dbname=s'   => \$dbname,
+                'dbuser=s'   => \$dbuser,
+                'local'      => \$local,
+                ) or die ("Couldn't get options");
+
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new ( -host   => $dbhost,
 						   -dbname => $dbname,
@@ -126,7 +136,7 @@ while( 1 ) {
 			   $cj->current_status->status . " " . 
 			   $anal->dbID . "\n");
 		    
-		    if ($cj->analysis->dbID == $anal->dbID) {
+		    if ($cj->analysis->dbID == $anal->dbID && $cj->current_status->status ne "FAILED") {
 			print ("\nJob already in pipeline with status : " . $cj->current_status->status . "\n");
 			next JOBID;
 		    }
@@ -144,8 +154,18 @@ while( 1 ) {
 	    print "\n\tStoring job\n";
 	    $jobAdaptor->store( $job );
 
-	    print "\tBatch running job\n";
-	    $job->batch_runRemote('ultra_blast_farm');
+            if ($local) {
+                print "Running job locally\n";
+                eval {
+                  $job->runLocally;
+                };
+                if ($@) {
+                   print STDERR "ERROR running job " . $job->dbID .  " "  . $job->stderr_file . "[$@]\n";
+                }
+            } else {
+	        print "\tBatch running job\n";
+	        $job->batch_runRemote('ultra_blast_farm');
+            }
 
 	}
 	
@@ -158,6 +178,7 @@ while( 1 ) {
     }
     sleep( 30 );
     $completeRead = 0;
+    $currentStart = 0;
     @idList = ();
     print( "Waking up and run again!\n" );
 	
