@@ -80,6 +80,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
@@ -151,8 +152,7 @@ sub new {
   #$self->exonerate('exonerate-0.6.7');
 
   # can add extra options as a string
-  $self->options("   --exhaustive no --model est2genome --ryo \"RESULT: %S %p %V\\n\" "); 
-  #$self->options("   --exhaustive no --model est2genome  --showvulgar");
+  $self->options("   --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "); 
   
   #if ($options){
   #  $self->options($options);
@@ -214,11 +214,14 @@ sub run {
 			       '-fh'     => \*QUERY_SEQ);
   
   # we write each Bio::Seq sequence in the fasta file $query
+  my %length;
   foreach my $query_seq ( @query_seqs ){
-    $seqout->write_seq($query_seq);
+      #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
+      $length{ $query_seq->display_id} = $query_seq->length;
+      $seqout->write_seq($query_seq);
   }
   close( QUERY_SEQ );
-    
+  
   my $command ="exonerate-0.6.7 ".
       $self->options.
 	  " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
@@ -227,7 +230,7 @@ sub run {
   # system calls return 0 (true in Unix) if they succeed
   $self->throw("Error running exonerate\n") if (system ($command));
   
-  $self->output( $self->parse_results );
+  $self->output( $self->parse_results( \%length ));
   
   # remove interim files (but do not remove the database if you are using one)
   unlink $query;
@@ -249,8 +252,10 @@ sub run {
 =cut
 
 sub parse_results {
-  my ($self,$filehandle) = @_;
+  my ($self, $length) = @_;
   
+  my $filehandle;
+  my %length = %$length;
   my @features_within_features;
   
   my $resfile = $self->results();
@@ -269,14 +274,22 @@ sub parse_results {
     $filehandle = $resfile;
   }
   
-  #extract values
+  ############################################################
+  # store each alignment as a transcript with supporting features
+  my @transcripts;
+
+  ############################################################
+  # extract values
   while (<$filehandle>){
-    
+      
       print $_;
       
+      ############################################################
+      # the output is of the format:
+      #
       # --ryo "RESULT: %S %p %V\n"
       # 
-      # Shows the alignments in "sugar" + perc_it + "vulgar blocks" format. 
+      # It shows the alignments in "sugar" + percent_id + "vulgar blocks" format. 
       #
       # Sugar contains 9 fields
       # ( <qy_id> <qy_start> <qy_len> <qy_strand> <tg_id> <tg_start> <tg_len> <tg_strand> <score> ), 
@@ -309,146 +322,174 @@ sub parse_results {
       # M 7 7     /
       # 
       chomp;
-      my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $perc_id, @blocks) = split;
+      my ( $tag, $q_id, $q_start, $q_length, $q_strand, $t_id, $t_start, $t_length, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
       
-      next unless ( $tag eq 'RESULT:' );
-      
-      my $seq_end   = $seq_start + $seq_length - 1;
-      my $slice_end = $slice_start + $slice_length  - 1;
-      
-      my $superfeature = Bio::EnsEMBL::SeqFeature->new();
-      
+      # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
+      $q_start++;
+      $t_start++;
 
+      next unless ( $tag && $tag eq 'RESULT:' );
+      
+      ############################################################
+      # initialize the feature
       my (%query, %target);
       ( $query{score}  , $target{score} )  = ($score,$score);
-      ( $query{percent}, $target{percent}) =  ( $perc_id, $perc_id );
+      ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
       ( $query{source} , $target{source} ) = ('exonerate','exonerate');
       ( $query{start}  , $target{start})   = ( $q_start, $t_start );
+      ( $query{name}   , $target{name})    = ( $q_id, $t_id);
+      if ( $q_strand eq '+' ){ $q_strand = 1; }
+      else{ $q_strand = -1; }
+      if ( $t_strand eq '+' ){ $t_strand = 1; }
+      else{ $t_strand = -1; }
+
+      if ( $gene_orientation eq '+' ){ $gene_orientation = 1 }
+      elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
+      else{ $gene_orientation = 0 }
+
+      ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
       
-      my ( $exon, $intron ) = (0,0);
+      
+
+      my $transcript = Bio::EnsEMBL::Transcript->new();      
+      my $exon = Bio::EnsEMBL::Exon->new();
+      my @features;
+      my $in_exon = 0;
+      my $target_gap_length = 0;
+      
+      ############################################################
+      # exons are delimited by M - I
+      # supporting features are delimited by M - G  and  M - I
+    TRIAD:
       for( my $i=0; $i<=$#blocks; $i+=3){
 	  
 	  # do not look at splice sites now
 	  if ( $blocks[$i] eq '5' || $blocks[$i] eq '3' ){
-	      next;
+	      next TRIAD;
 	  }
-	  
-	  # intron
-	  if ( $blocks[$i] eq 'I' ){
-	      # emit the current exon
-	      my $feature_pair = $self->create_FeaturePair(\%feat1, \%feat2);
-	      $superfeature->add_sub_SeqFeature( $feature_pair,'EXPAND');
 
-
-	      # and reset the start
-
-
-
-	  # gap
-	  if ( $blocks[$i] eq 'G' ){
-	      # take the value of the gap
-	      my $gap = $blocks[$i+1] || $blocks[$i+2];
-	      
-	      # add it to the end
-	      if ($exon ){
-		  $query{end}  += $gap;
-		  $target{end} += $gap;
-	      }
-	  }
-	      
+	  ############################################################
 	  # match
 	  if ( $blocks[$i] eq 'M' ){
-	      if ( $exon == 0 ){
-		  $query{end}  = $query{start}  + $blocks[$i+1] - 1;
-		  $target{end} = $target{start} + $blocks[$i+2] - 1;
+	      if ( $in_exon == 0 ){
+		  $in_exon = 1;
+		  
+		  # start a new exon
+		  $exon = Bio::EnsEMBL::Exon->new();
+		  $exon->seqname( $t_id );
+		  $exon->start( $target{start} );
+		  $exon->end( $exon->start +  $blocks[$i+2] - 1 );
+		  $exon->strand( $t_strand );
+		  $exon->phase( 0 );
+		  $exon->end_phase( 0 );
 	      }
-		  $exon = 1;
-		  $intron = 0;
 	      
+	      # start a new feature pair
+	      $query{end}  = $query{start}  + $blocks[$i+1] - 1;
+	      $target{end} = $target{start} + $blocks[$i+2] - 1;
+	      print STDERR "query : $query{start} -  $query{end}\n";
+	      print STDERR "target: $target{start} -  $target{end}\n";
 	      
+	      my $feature_pair = $self->create_FeaturePair(\%target, \%query);
+	      push( @features, $feature_pair);
+	      
+	      # re-set the start:
+	      $query{start}  = $query{end}  + 1;
+	      $target{start} = $target{end} + 1;
 	  }
-	  elsif( $blocks[$i] eq 'I' ){
-	      $exon = 0;
-	      $intron = 1;
+	  ############################################################
+	  # gap 
+	  if ( $blocks[$i] eq 'G' ){
+	      if ( $in_exon ){
+		  # keep the same exon
+		  
+		  # if the gap is in the query, we move the target
+		  if ( $blocks[$i+2] ){
+		      $target{start} += $blocks[$i+2];
+		      # also move the exon:
+		      $exon->end( $exon->end + $blocks[$i+2]); 
+		  }
+		  # if the gap is in the target, we move the query
+		  if ( $blocks[$i+1] ){
+		      $query{start} += $blocks[$i+1];
+		      $target_gap_length += $blocks[$i+1]
+		  }
+	      }
 	  }
-	  
-	  
+	  ############################################################
+	  # intron
+	  if( $blocks[$i] eq 'I' ){
+	      if ( $in_exon ){
+		  # emit the current exon
+		  $transcript->add_Exon($exon);
+		  
+		  # add the supporting features
+		  my $supp_feature;
+		  eval{
+		      $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+		  };
+		  print STDERR "intron: adding evidence : ".$supp_feature->cigar_string."\n";
+		  $exon->add_supporting_features( $supp_feature );
+		  
+		  $in_exon = 0;
+		  
+		  @features = ();
+		  		  
+		  # reset the start in the target only
+		  my $intron_length = $blocks[$i+2];
+		  $target{start} += $intron_length + 1;
+	      }
+	  }
+      } # end of TRIAD
+      
+      ############################################################
+      # emit the last exon and the last set of supporting features
+      # and add the supporting features
+      #print STDERR "created features:\n";
+      #foreach my $f (@features){
+      #print STDERR $f->gffstring."\n";
+      #}
+
+      my $supp_feature;
+      eval{
+	  $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+      };
+      print STDERR "outside: adding evidence : ".$supp_feature->cigar_string."\n";
+      $exon->add_supporting_features( $supp_feature );
+      $transcript->add_Exon($exon);
+      
+      my $coverage = sprintf "%.2f", ( $q_length - $target_gap_length ) / $length{$q_id};
+      print STDERR "coverage: $coverage\n";
+      
+      foreach my $exon ( @{$transcript->get_all_Exons} ){
+	  foreach my $evidence ( @{$exon->get_all_supporting_features} ){
+	      $evidence->score($coverage);
+	  }
       }
 
-
-      # create as many features as blocks there are in each output line
-#    my (%feat1, %feat2);
-#    $feat1{name} = $t_name;
-#    $feat2{name} = $q_name;
-    
-#    $feat2{strand} = 1;
-#    $feat1{strand} = $strand;
-    
-#    # all the block sizes add up to $matches + $mismatches + $rep_matches
-    
-#    # percentage identity =  ( matches not in repeats + matches in repeats ) / ( alignment length )
-#    #print STDERR "calculating percent_id and score:\n";
-#    #print STDERR "matches: $matches, rep_matches: $rep_matches, mismatches: $mismatches, q_length: $q_length\n";
-#    #print STDERR "percent_id = 100x".($matches + $rep_matches)."/".( $matches + $mismatches + $rep_matches )."\n";
-#    my $percent_id = sprintf "%.2f", ( 100 * ($matches + $rep_matches)/( $matches + $mismatches + $rep_matches ) );
-    
-#    # or is it ...?
-#    ## percentage identity =  ( matches not in repeats + matches in repeats ) / query length
-#    #my $percent_id = sprintf "%.2d", (100 * ($matches + $rep_matches)/$q_length );
-    
-#    # we put basically score = coverage = ( $matches + $mismatches + $rep_matches ) / $q_length
-#    #print STDERR "score = 100x".($matches + $mismatches + $rep_matches)."/".( $q_length )."\n";
-    
-#    my $score   = sprintf "%.2f", ( 100 * ( $matches + $mismatches + $rep_matches ) / $q_length );
-    
-#    # size of each block of alignment (inclusive)
-#    my @block_sizes     = split ",",$block_sizes;
-    
-#    # start position of each block (you must add 1 as psl output is off by one in the start coordinate)
-#    my @q_start_positions = split ",",$q_starts;
-#    my @t_start_positions = split ",",$t_starts;
-    
-#    $superfeature->seqname($q_name);
-#    $superfeature->score( $score );
-#    $superfeature->percent_id( $percent_id );
-
-#    # each line of output represents one possible entire aligment of the query (feat1) and the target(feat2)
-#    for (my $i=0; $i<$block_count; $i++ ){
+      # test
+      print STDERR "produced transcript:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
       
-#      $feat2 {start} = $q_start_positions[$i] + 1;
-#      $feat2 {end}   = $feat2{start} + $block_sizes[$i] - 1;
+      ############################################################
+      # reject single-exon alignments which cover less than half the cdna/est:
+      if ( scalar( @{$transcript->get_all_Exons} ) ){
+	  my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
+	  if ( $mapped_length <= $length{$q_id}/2 ){
+	      next;
+	  }
+      }
       
-#      $feat1 {start} = $t_start_positions[$i] + 1;
-#      $feat1 {end}   = $feat1{start} + $block_sizes[$i] - 1;
+      push( @transcripts, $transcript );
       
-#      # we put all the features with the same score and percent_id
-#      $feat2 {score}   = $score;
-#      $feat1 {score}   = $feat2 {score};
-#      $feat2 {percent} = $percent_id;
-#      $feat1 {percent} = $feat2 {percent};
-      
-#      # other stuff:
-#      $feat1 {db}         = undef;
-#      $feat1 {db_version} = undef;
-#      $feat1 {program}    = 'blat';
-#      $feat1 {p_version}  = '1';
-#      $feat1 {source}     = 'blat';
-#      $feat1 {primary}    = 'similarity';
-#      $feat2 {source}     = 'blat';
-#      $feat2 {primary}    = 'similarity';
-      
-#      my $feature_pair = $self->create_FeaturePair(\%feat1, \%feat2);
-#      $superfeature->add_sub_SeqFeature( $feature_pair,'EXPAND');
-#    }
-#    push(@features_within_features, $superfeature);
+  } # end of while loop
   
-  } # CLOSE WHILE LOOP
   close $filehandle;
   
   #get rid of the results file
   unlink $self->results;
   
-  return @features_within_features;
+  return @transcripts;
 }
 
 ############################################################
@@ -505,12 +546,12 @@ sub options {
 ############################################################
 
 sub output {
-  my ($self, @output) = @_;
+    my ($self, @output) = @_;
   if (@output) {
-    unless( $self->{_output} ){
-      $self->{_output} = [];
-    }
-    push( @{$self->{_output}}, @output );
+      unless( $self->{_output} ){
+	  $self->{_output} = [];
+      }
+      push( @{$self->{_output}}, @output );
   }
   return @{$self->{_output}};
 }
