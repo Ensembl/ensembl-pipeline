@@ -382,10 +382,10 @@ sub split_HSP {
     my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
-    print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
-    print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
+    #print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
+    #print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
 
-    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
+#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
 
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
@@ -525,7 +525,7 @@ sub _convert2FeaturePair {
 	$tmphend   = $tmp;
     }
     
-    print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";
+    #print "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
 
     my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
 				     $hsp->percent,$hsp->P,$name,$analysis);

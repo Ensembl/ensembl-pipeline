@@ -50,6 +50,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pep_SeqFeature;
@@ -165,8 +166,12 @@ sub run {
 							       -database  => $self->database,
 							       -threshold => $self->threshold,
 							       -options   => $self->options,);
+   my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new(
+                                               -runnable => $runnable
+    );
 
-  $runnable->run();
+  $search->run;
+  #$runnable->run();
   
   $self->align_hits_to_contig($runnable->output);
 #  $self->check_features($transcript->translate->seq,$self->featurepairs);
@@ -281,7 +286,7 @@ sub create_peptide_featurepairs {
     my ($self, $fp, @aligned_exons) = @_;
     #create featurepairs
     
-    print "Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
+    #print "Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
 
     foreach my $ex_align (@aligned_exons)
     {
@@ -425,7 +430,7 @@ sub get_Sequence {
     
 
     if (!defined($seqstr) || $seqstr eq "no match") {
-	$self->warn("Couldn't find sequence for [$id]");
+        print("Couldn't find sequence for [$id]");
 	return;
     }
 
