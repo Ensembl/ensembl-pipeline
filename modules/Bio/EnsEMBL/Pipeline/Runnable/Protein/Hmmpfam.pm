@@ -87,10 +87,8 @@ sub new {
                                                              OPTIONS)],        
                                                           @args);
 
-    my ($query, $analysis) = $self->_rearrange([qw(QUERY 
-						   ANALYSIS)], 
-					       @args);
 
+    
     $self->query ($query) if ($query);       
     $self->analysis ($analysis) if ($analysis);
 	
@@ -134,17 +132,18 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->query->id);
-	    $self->filename ($self->query->id.".$$.seq");
-	    $self->results ($self->filename.".out");
+	    $self->queryname ($self->query);
+	    $self->filename ($self->query.".$$.seq");
+	    $self->lsresults ($self->filename.".lsout");
+	    $self->fsresults ($self->filename.".fsout");
 	}
 	else {
 	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
 	    $self->{'_sequence'} = $seq ;
 	    $self->filename ("$$.tmp.seq");
 	    
-	    $self->results ("prints.$$.out");
-	    
+	    $self->lsresults ("hmm.$$.lsout");
+	     $self->fsresults ("hmm.$$.fsout");
 	}
     }
     return $self->{'_sequence'};
@@ -266,18 +265,21 @@ sub run {
     $self->checkdir;
 
     # reset filename and results as necessary (adding the directory path)
-    my $tmp = $self->workdir;
-    my $input = $tmp."/".$self->filename;
+    my $tmp1 = $self->workdir;
+    my $tmp2 = $self->workdir;
+ my $input = $tmp1."/".$self->filename;
     $self->filename ($input);
-    $tmp .= "/".$self->results;
-    $self->results ($tmp);
+    $tmp1 .= "/".$self->lsresults;
+    $self->lsresults ($tmp1);
+    $tmp2 .= "/".$self->fsresults;
+    $self->fsresults ($tmp2);
 
 
  eval {
-	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
-	};
+     $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+     };
 	
-
+	
     if (!$@) {
 	#The inputId is a sequence file...got the normal way...
 
@@ -285,7 +287,7 @@ sub run {
 	$self->writefile;        
 
 	# run program
-	$self->run_programm;
+	$self->run_program;
 
 	# parse output
 	$self->parse_results;
@@ -297,9 +299,10 @@ sub run {
 	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
 
 	$self->filename($self->query);
-
+	
+	
 	# run program
-	$self->run_analysis;
+	$self->run_program;
 
 	# parse output
 	$self->parse_results;
@@ -327,7 +330,7 @@ sub run_program {
 
     # some of these options require HMMER 2.2g (August 2001)
     
-    @dbfiles = split(/;/,$analysis->db_file);
+    my @dbfiles = split(/;/,$self->analysis->db_file);
 
     if ($dbfiles[0] =~ /ls/) {
 	 
@@ -346,7 +349,7 @@ sub run_program {
 	die || "ls pfam file has not been provided";
     }
 
-   if ($dbfiles[0] =~ /fs/) { 
+   if ($dbfiles[1] =~ /fs/) { 
        
 	my $cmd = $self->program .' '.
 	        '--acc --cut_ga --cpu 1 '.
@@ -355,8 +358,8 @@ sub run_program {
 	        $self->filename.' > '.
 		$self->fsresults;
 	print STDERR "$cmd\n";   
-    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[1]) 
-        unless ((system ($cmd)) == 0);
+	$self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[1]) 
+	    unless ((system ($cmd)) == 0);
     }
     else {
 	die || "fs pfam file has not been provided";
@@ -378,10 +381,16 @@ sub run_program {
 
 sub parse_results {
     my ($self) = @_;
+
     my $filehandle;
     my $fshandle;
+    my $id;
     my $resfile = $self->lsresults;
     my $fsfile  = $self->fsresults;
+
+    #$resfile = "/tmp/hmm.4063364.lsout";
+    #$fsfile = "/tmp/hmm.4063364.fsout";
+		
 
     if (-e $resfile) {
         # it's a filename
@@ -390,30 +399,37 @@ sub parse_results {
             return;
         }       
         else {
+	    print STDERR "RESFILE: $resfile\n";
             open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
             $filehandle = \*OUT;
-	    close (OUT);
-	    open (OUT, "<$fsfile")  or $self->throw ("Error opening $fsfile");
-	    $fshandle = \*OUT;
-	    close (OUT);
-      }
+	
+
+	    print STDERR "FSFILE: $fsfile\n";
+	    open (OUT1, "<$fsfile")  or $self->throw ("Error opening $fsfile");
+	    $fshandle = \*OUT1;
+	}
     }
     else {
         # it'a a filehandle
         $filehandle = $resfile;
 	$fshandle = $fsfile;
     }
-    
-#First parse what comes from the ls mode matches. Every match in that case is take
+   
+
+
+#First parse what comes from the ls mode matches. Every match in that case is taken
     while (<$filehandle>) {
-	my $id;
+        print STDERR "PARSING1...\n";
         chomp;
         last if /^Alignments of top-scoring domains/;
         next if (/^Model/ || /^\-/ || /^$/);
         if (/^Query sequence:\s+(\S+)/) {
             $id = $1;
+	    print STDERR "ID : $id\n";
         }
+	
         if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+	
             my %feature;
             ($feature{name}) = $id;
             $feature{score} = $score;
@@ -431,20 +447,24 @@ sub parse_results {
             $self->create_feature (\%feature);
 	}
     }
-    close $filehandle; 
+    close FILEHANDLE; 
 
 #Then read all of the fs mode matches. If a match does not overlap with any ls match thus its taken
     while (<$fshandle>) {
-	my $id;
-        chomp;
+	my ($hid, $start, $end, $hstart, $hend, $score, $evalue);
+	my $overlap = undef;
+        
+	chomp;
+	
         last if /^Alignments of top-scoring domains/;
         next if (/^Model/ || /^\-/ || /^$/);
         if (/^Query sequence:\s+(\S+)/) {
             $id = $1;
         }
-        if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
-	    my $overlap = undef;
-	    foreach ($featpair($self->'_flist')) {
+	if (($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+	   
+	
+	    foreach my $featpair(@{$self->{'_flist'}}) {
 		my $lsstart = $featpair->feature1->start;
 		my $lsend = $featpair->feature1->end;
 		if ((($start >= $lsstart) && ($start <= $lsend)) || (($end >= $lsstart) && ($end <= $lsend))) {
@@ -472,7 +492,7 @@ sub parse_results {
 	    }
 	}
     }
-    close $fshandle;
+    close (FS);
 }
 
 
