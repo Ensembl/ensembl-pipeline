@@ -117,6 +117,11 @@ use vars qw( %ESTConf );
 
 	    # FilterESTs_and_E2G options
 	    EST_FILTER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
+	        # Coverage setting for FeatureFilter
+	    EST_FEATFILT_COVERAGE       => 10,    
+	        # Minimum score cut-off for FeatureFilter    
+	    EST_FEATFILT_MINSCORE       => 500,                                   
+	    EST_GENETYPE                =>'exonerate_e2g',
 
 	    # new index, path where the directory of the index is
 	    EST_INDEX                   => '/data/blastdb/Worms/worm_mRNAs',
@@ -146,7 +151,10 @@ use vars qw( %ESTConf );
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
 	    # not on the same mysql instance 
-	    # database contention arises from having tomanny db conections open to the same databas if you have more than a couple of hundread jobs contacting the same database at the same time you will need multiple database but ifyou only have a few jobs you will probably beable to get away with only 1 database
+	    # database contention arises from having too many db conections open to the same database
+            # if you have more than a couple of hundred jobs contacting the same database at the same 
+            # time you will need multiple database but ifyou only have a few jobs you will probably be 
+	    # able to get away with only 1 database.
 	    # ref_db - holds the static golden path, contig and dna information
 	    EST_REFDBNAME               => 'briggsae_newschema',
 	    EST_REFDBHOST               => 'ecs1b',
@@ -162,7 +170,8 @@ use vars qw( %ESTConf );
 	    EST_DBPASS                  => 'ensembl',
 	    
 	    # est_e2g_db = where we write the genes we produce from the exonerate features
-	    EST_E2G_DBNAME                  => 'briggsae_est_newschema', # this should be in a different place from the one above
+	         # this should be in a different place from the one above
+	    EST_E2G_DBNAME                  => 'briggsae_est_newschema', 
 	    EST_E2G_DBHOST                  => 'ecs1c',
 	    EST_E2G_DBUSER                  => 'ensadmin',
 	    EST_E2G_DBPASS                  => 'ensembl',
