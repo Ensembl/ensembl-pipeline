@@ -1,33 +1,11 @@
 
+### Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST;
 
-use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::SeqFeature;
-use vars qw(@ISA);
-use strict;
-
-use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
-
-
-
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-
-=head2 new
-
-  Arg [1]   : 
-  Function  : makes a new Finished_Est2Genome object with varibles defined from parameters hash 
-  Returntype: $self 
-  Exceptions: none
-  Caller    : 
-  Example   : 
-
-=cut
-
 
 sub new {
     my ($new,@args) = @_;
@@ -35,90 +13,35 @@ sub new {
            
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
-
-    $self->{'_fplist'} = []; #create key to an array of feature pairs
   	
     return $self;
 }
 
-
-
-=head2 fetch_input
-
-  Arg [1]   : none
-  Function  : fetches contig and feature information from the database and creates sts_gss runnable
-  Returntype: none
-  Exceptions: throws if not given a contig inputId
-  Caller    : 
-  
-  
-  Example   : 
-
-=cut
-
-
 sub fetch_input {
-  my( $self) = @_;
-  
-  my @fps;
- 
-  $self->throw("No input id") unless defined($self->input_id);
-  
-  my $contigid  = $self->input_id;
-  my $contig    = $self->dbobj->get_Contig($contigid);
-  my $genseq   = $contig->primary_seq;
-  my $repeat_masked = undef;
-  my @features;
-  my $type = $self->analysis->db; #### Type needs to be set for $contig->get_all_SimilarityFeatures_above_score. 
-                                       ### This is set as db in the analsysis process table.   
-  my $percent_id =  50;
-  my $filter;
-  my $percent_filter;
-  my $no_blast = 1;
-  
-  #make seqfetcher
-  my $index = '';
-  my $seqfetcher = $self->make_seqfetcher($index);
-  $self->seqfetcher($seqfetcher);
-  
-  ###get raw hits from feature table
-  my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200);
-  
-  ###check features
-  foreach my $f (@features) {
-    if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)){
-            
-      push(@fps, $f);
-    }
-  }
-  
-  
-  
-  print "have ".scalar(@fps)." features\n";
-  
-            
-  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_EST->new(   '-unmasked' => $genseq,
-                                                                        '-seqfetcher' => $self->seqfetcher,
-                                                                        '-percent_filter' => $percent_filter,
-                                                                        '-percent_id' => $percent_id,
-                                                                        '-features' => \@fps    );
-  
-      
-  $self->runnable($runnable);
-         
+    my( $self) = @_;
+
+    my @fps;
+
+    $self->throw("No input id") unless defined($self->input_id);
+
+    my $contigid  = $self->input_id;
+    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $genseq    = $contig->primary_seq;
+    my $masked    = $contig->get_repeatmasked_seq->seq;
+
+    # Make seqfetcher
+    my $seqfetcher = $self->make_seqfetcher;
+    $self->seqfetcher($seqfetcher);
+
+    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_EST->new(
+        '-query'        => $masked,
+        '-unmasked'     => $genseq,
+        '-seqfetcher'   => $seqfetcher,
+        '-analysis'     => $self->analysis,
+        );
+
+    $self->runnable($runnable);
 }
-        
- 
-=head2 runnable
-
-  Arg [1]   : runnable object
-  Function  : sets runnable varible to runnable passed
-  Returntype: runnable object
-  Exceptions: if arg passed isn't a runnableI object'
-  Caller    : 
-  Example   : 
-
-=cut
    
 sub runnable {
     my ($self,$arg) = @_;
@@ -132,19 +55,6 @@ sub runnable {
     return $self->{_runnable};
 }
 
-
-=head2 run
-
-  Arg [1]   : none 
-  Function  : runs runnable and pushes output onto output array
-  Returntype: none
-  Exceptions: throws if hasn't got a runnable'
-  Caller    : 
-  Example   : 
-
-=cut
-
-
 sub run {
     my ($self) = @_;
 
@@ -152,34 +62,15 @@ sub run {
     $runnable || $self->throw("Can't run - no runnable object");
    
     $runnable->run;
-    #push (@{$self->{'_output'}}, $runnable->output);
-#    foreach my $f(@{$self->{'_output'}}){
-#      $f->source_tag($self->analysis->db);
-#      $f->primary_tag($self->analysis->db);
-#    }
 }
 
-
-=head2 output
-
-  Arg [1]   : none
-  Function  : returns output array
-  Returntype: 
-  Exceptions: none
-  Caller    : 
-  Example   : 
-
-=cut
-
-
 sub output {
-
     my ($self) = @_;
 
     my @runnable = $self->runnable;
     my @results;
     
-    foreach my $runnable(@runnable){
+    foreach my $runnable (@runnable){
       print STDERR "runnable = ".$runnable[0]."\n";
       push(@results, $runnable->output);
     }
@@ -187,36 +78,28 @@ sub output {
 }
 
 
-
-=head2 make_seqfetcher
-
-  Arg [1]   :  none
-  Function  : makes a seqfetcher object. If a index db is defined a getseqs obj is made otherwise a pfetch obj is made
-  Returntype: seqfetcher object
-  Exceptions: none
-  Caller    : 
-  Example   : 
-
-=cut
-
-
 sub make_seqfetcher {
-  my ( $self ) = @_;
-   
-  my $index   = $ENV{BLASTDB}."/".$self->analysis->db_file; 
-  my $seqfetcher;
-  if(defined $index && $self->analysis->db_file ne ''){
-    my @db = ( $index );
-    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => \@db,);
-  }
-  else{
-    # default to Pfetch
-   
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-  }
-  return $seqfetcher;
+    my ( $self, $index ) = @_;
 
+    my( $seqfetcher );
+    if (my $dbf = $self->analysis->db_file) {
+        my $index = "$ENV{BLASTDB}/$dbf";
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => [$index]);
+    } else {
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
+    }
+    return $seqfetcher;
 }
 
 
+
 1;
+
+__END__
+
+=head1 NAME - Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST
+
+=head1 AUTHOR
+
+James Gilbert B<email> jgrg@sanger.ac.uk
+
