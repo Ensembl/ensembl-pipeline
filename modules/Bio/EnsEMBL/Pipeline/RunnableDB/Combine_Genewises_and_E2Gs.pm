@@ -86,13 +86,13 @@ sub new {
 						   '-pass'   => $GB_DBPASS,
 						   '-dbname' => $GB_DBNAME,
 						  );
-
+  
   my $cdnadb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => $EST_DBHOST,
-						   '-user'   => $EST_REFDBUSER,
-						   '-dbname' => $EST_DBNAME,
-						   '-dnadb'  => $genedb,
-						  ); 
+  						   '-host'   => $EST_DBHOST,
+  						   '-user'   => $EST_REFDBUSER,
+  						   '-dbname' => $EST_DBNAME,
+  						   '-dnadb'  => $genedb,
+  						  ); 
   
   $self->dbobj($genedb);
   $self->cdnadb($cdnadb);
@@ -188,13 +188,13 @@ sub run {
   my ($self,@args) = @_;
   
   # get genewise genes
-  $self->gw_genes( $self->vc->get_Genes_by_Type($GB_TARGETTED_GW_GENETYPE,'evidence'));
   $self->gw_genes($self->vc->get_Genes_by_Type($GB_SIMILARITY_GENETYPE,'evidence'));
   print STDERR "got " . scalar($self->gw_genes) . " genewise genes\n";
 
   # get e2g genes
   
   my @e2g = $self->cdna_vc->get_Genes_by_Type('exonerate_e2g','evidence');
+
   print STDERR "got " . scalar(@e2g) . " exonerate_e2g genes\n";
   my @newe2g;
 
@@ -207,7 +207,11 @@ sub run {
 
       for ($i = 1; $i <= $#exons; $i++) {
 	my $intron = $exons[$i]->start - $exons[$i-1]->end + 1;
-	if ($intron > 50000) {
+
+
+	# this is a very low threshold ... we were losing a lot of good matches this way
+#	if ($intron > 50000) {
+	if ($intron > 100000) {
 	  $found = 1;
 	  
 	}
@@ -225,7 +229,6 @@ sub run {
 
   # find which gw matches which e2gs
   my @merged_gw_genes = $self->_merge_gw_genes;
-
   print STDERR "got " . scalar(@merged_gw_genes) . " merged gw geness\n";  
 
  GENEWISE:
@@ -241,6 +244,7 @@ sub run {
     }
     
     my @matching_e2gs = $self->match_gw_to_e2g($gw);
+
     next GENEWISE unless scalar(@matching_e2gs);
 
     # pick longest gene match for each gw (exon length - though this may not be the best way)
@@ -257,10 +261,11 @@ sub run {
       }
     }
     print STDERR "combining : " . $gw->dbID . " with " . $chosen_e2g->dbID . "\n";
-
+    
     # build combined genes
     $self->combine_genes($gw, $chosen_e2g);
   }
+
   
   # remap to raw contig coords
   my @remapped = $self->remap_genes();
@@ -541,10 +546,11 @@ sub match_gw_to_e2g{
 	}
 	
       }
-      if($fiveprime_match && $threeprime_match){
+#      if($fiveprime_match && $threeprime_match){
+      # can match either end, or both
+      if($fiveprime_match || $threeprime_match){
 	push(@matching_e2g, $e2g);
       }
-      
       # Now the multi exon genewises
     } else {
       foreach my $current_exon (@eg_exons) {
@@ -584,7 +590,7 @@ sub match_gw_to_e2g{
 	       # or there are UTR exons to be added
 	       (abs($current_exon->end - $gw_exons[0]->end) <= $exon_slop &&
 	       $current_exon != $eg_exons[0]))){
-
+	    print STDERR "fiveprime reverse match\n";
 	    $fiveprime_match = 1;
 	  }
 	  elsif ($gw_exons[$#gw_exons]->end == $current_exon->end &&
@@ -593,13 +599,14 @@ sub match_gw_to_e2g{
 		  # or there are UTR exons to be added
 		  (abs($current_exon->start - $gw_exons[$#gw_exons]->start) <= $exon_slop &&
 		  $current_exon != $eg_exons[$#eg_exons]))){
-
+	    print STDERR "threeprime reverse match\n";
 	    $threeprime_match = 1;
 	  }
 	}
       }
-      if($fiveprime_match && $threeprime_match){
-	push(@matching_e2g, $e2g);
+#      if($fiveprime_match && $threeprime_match){
+      if($fiveprime_match || $threeprime_match){
+	  push(@matching_e2g, $e2g);
       }
     }
   }
