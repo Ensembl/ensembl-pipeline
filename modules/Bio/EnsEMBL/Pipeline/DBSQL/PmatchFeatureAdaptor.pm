@@ -67,6 +67,8 @@ sub write_PmatchFeatures {
 
 sub write_protein {
   my ($self,$protein_id,$cdna_id) = @_;
+  if(!defined $protein_id){ $protein_id = ''; }
+  if(!defined $cdna_id){ $cdna_id = ''; }
 
   my $tmpcdna = $self->get_cdna_id($protein_id);
 
