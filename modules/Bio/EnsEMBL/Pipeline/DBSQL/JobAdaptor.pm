@@ -552,7 +552,7 @@ sub list_jobId_by_status {
   my @result;
   my @row;
 
-  my $sth = $self->preprare( qq{
+  my $sth = $self->prepare( qq{
     SELECT j.jobId
       FROM job j, current_status c
      WHERE j.jobId = c.jobId

@@ -441,7 +441,10 @@ sub make_filenames {
   my ($self) = @_;
   
   my @files = $self->get_files( $self->input_id,,"obj","out","err" );
-  
+  for (@files) {
+    open( FILE, ">".$_ ); close( FILE );
+  }
+ 
   $self->input_object_file($files[0]);
   $self->stdout_file($files[1]);
   $self->stderr_file($files[2]);
@@ -464,8 +467,12 @@ sub get_files {
     }
     opendir( DIR, $dir );
     @files = readdir( DIR );
-    if(( scalar( @files ) > 10000 ) ||( $count++ > 10 )) {
-      $self->throw("10000 files in directory. Can't make a new file");
+    if( scalar( @files ) > 10000 ) {
+      if( $count++ > 10 ) {
+	$self->throw("10000 files in directory. Can't make a new file");
+      } else {
+	next;
+      }
     } else {
       last;
     }

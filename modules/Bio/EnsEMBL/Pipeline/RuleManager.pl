@@ -94,7 +94,7 @@ while( 1 ) {
       $sic->store_inputId_class_analysis
 	( $job->input_id, resolve_class( $job->analysis ), 
 	  $job->analysis );
-      
+      $job->remove;
     } else {
       push( @newHot, $job );
     }
