@@ -275,7 +275,8 @@ sub _hit_chooser {
 		     -regex_query_species    => $self->_regex_query_species,
 		     -regex_outgroup_species => $self->_regex_outgroup_species,
 		     -identity_cutoff        => $self->_identity_cutoff,
-		     -coverage_cutoff        => $self->_coverage_cutoff)
+		     -coverage_cutoff        => $self->_coverage_cutoff,
+		     -genetic_code           => $self->_genetic_code)
   }
 
   return $self->{_hit_chooser}
