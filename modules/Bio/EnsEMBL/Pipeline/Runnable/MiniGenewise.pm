@@ -53,11 +53,14 @@ sub new {
            
     $self->{'_features'} = [];
     
-    my( $genomic, $protein, $features,$endbias, $minimum_intron, $terminal_padding, $exon_padding)
+    my( $genomic, $protein, $features,$endbias, $gap, $extension, $matrix, $minimum_intron, $terminal_padding, $exon_padding)
       = $self->_rearrange([qw(GENOMIC
 			      PROTEIN
 			      FEATURES
 			      ENDBIAS
+			      GAP
+			      EXTENSION
+			      MATRIX
 			      MINIMUM_INTRON
 			      TERMINAL_PADDING
 			      EXON_PADDING
@@ -75,6 +78,9 @@ sub new {
     $self->genomic_sequence($genomic)             if defined($genomic);
     $self->protein_sequence($protein)             if defined($protein);
     $self->endbias($endbias)                      if defined($endbias);
+    $self->gap($gap)                          if defined($gap);
+    $self->extension($extension)                    if defined($extension);
+    $self->matrix($matrix)                       if defined($matrix);
     $self->features($features)                    if defined($features);
     $self->_minimum_intron($minimum_intron)       if defined($minimum_intron); 
     $self->_exon_padding($exon_padding)           if defined($exon_padding);
@@ -210,11 +216,14 @@ sub run {
   my $miniseq = $self->make_MiniSeq;
 	my $minigen = $miniseq->get_cDNA_sequence;
 
-  my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice   => $self->genomic_sequence,
-							    -genomic => $minigen,
-							    -protein => $self->protein_sequence,
-							    -reverse => $self->_is_reversed,
-							    -endbias => $self->endbias);
+  my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice    => $self->genomic_sequence,
+							    -genomic  => $minigen,
+							    -protein  => $self->protein_sequence,
+							    -reverse  => $self->_is_reversed,
+							    -gap      => $self->gap,
+							    -extension=> $self->extension,
+							    -matrix   => $self->matrix,
+							    -endbias  => $self->endbias);
 
   eval{
     $gw->run;
@@ -484,5 +493,70 @@ sub endbias {
   return $self->{'_endbias'};
   }
 
+=head2 gap
+
+    Title   :   gap
+    Usage   :   $self->gap($gap)
+    Function:   Get/set method for gap
+    Returns :   
+    Args    :   
+
+=cut
+
+sub gap {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_gap'} = $arg;
+  }
+  if (!defined($self->{'_gap'})) {
+    $self->{'_gap'} = 0;
+  }
+  return $self->{'_gap'};
+  }
+
+=head2 extension
+
+    Title   :   extension
+    Usage   :   $self->extension($extension)
+    Function:   Get/set method for extension
+    Returns :   
+    Args    :   
+
+=cut
+
+sub extension {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_extension'} = $arg;
+  }
+  if (!defined($self->{'_extension'})) {
+    $self->{'_extension'} = 0;
+  }
+  return $self->{'_extension'};
+  }
+
+=head2 matrix
+
+    Title   :   matrix
+    Usage   :   $self->matrix($matrix)
+    Function:   Get/set method for matrix
+    Returns :   
+    Args    :   
+
+=cut
+
+sub matrix {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_matrix'} = $arg;
+  }
+  if (!defined($self->{'_matrix'})) {
+    $self->{'_matrix'} = 0;
+  }
+  return $self->{'_matrix'};
+  }
 
 1;

@@ -54,7 +54,7 @@ sub new {
   my $self = $class->SUPER::new(@args);
   
   my ($genomic, $protein, $slice, $memory,$reverse,$endbias,$genewise,$gap, 
-      $ext, $subs, $options) = $self->_rearrange([qw(GENOMIC 
+      $ext, $subs, $matrix, $options) = $self->_rearrange([qw(GENOMIC 
 						     PROTEIN 
 						     SLICE
 						     MEMORY 
@@ -64,6 +64,7 @@ sub new {
 						     GAP 
 						     EXTENSION 
 						     SUBS 
+						     MATRIX
 						     OPTIONS)], @args);
   
   $genewise = $GB_GENEWISE_EXE unless defined($genewise);
@@ -84,6 +85,8 @@ sub new {
   $self->extension($ext);
   $subs = $GB_GENEWISE_SUBS unless($subs);
   $self->subs($subs);
+  $matrix = $GB_GENEWISE_MATRIX unless($matrix);
+  $self->matrix($matrix);
   $options = $GB_GENEWISE_OPTIONS unless($options);
   $self->options($options);
   #print STDERR "Have genomic of length ".$self->genomic->length."\n";
@@ -129,6 +132,7 @@ sub align_protein {
   my $gap = $self->gap;
   my $ext = $self->extension;
   my $subs = $self->subs;
+  my $matrix = $self->matrix;
   my $options = $self->options;
   my $results_file  = $self->get_tmp_file('/tmp/',$self->protein->id,
                                           ".gen.fa");
@@ -136,10 +140,13 @@ sub align_protein {
   my $genfile = $self->write_sequence_to_file($self->genomic);
   my $pepfile = $self->write_sequence_to_file($self->protein);
 
-  my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
+  my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs -m $matrix $options";
 
 
   if ($self->endbias == 1) {
+    $command =~ s/-init endbias//;
+    $command =~ s/-splice flat//;
+
     $command .= " -init endbias -splice flat ";
   }
 
@@ -422,9 +429,18 @@ sub subs{
     return $self->{'_subs'} || 0.0000001;
 }
 
+sub matrix{
+    my ($self,$arg) = @_;
 
+    if(!$self->{'_matrix'}){
+      $self->{'_matrix'} = undef;
+    }
+    if (defined($arg)) {
+      $self->{'_matrix'} = $arg;
+    }
 
-
+    return $self->{'_matrix'};
+}
 
 sub genomic {
     my ($self,$arg) = @_;
