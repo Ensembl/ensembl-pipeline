@@ -375,11 +375,6 @@ sub align_hits_to_contig {
 	  }
 	}
 
-	if($gstart >= $gend) {
-	  warn("$gstart >= $gend, [" .$gcoord->start .'-'. $gcoord->end ."]\n");
-	}
-	     
-
 	if( $cdna_end <= $cdna_start ) {
 	  next;
 	}
