@@ -1,9 +1,5 @@
 package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
 
-BEGIN {
-  require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
-
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
 use strict;
