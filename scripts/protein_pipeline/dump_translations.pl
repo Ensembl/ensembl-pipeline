@@ -35,6 +35,7 @@ my $dbport    = 3306;
 my $stable_id;
 my $db_id;
 my $file;
+my $genetype;
 
 GetOptions(
 	   'dbhost=s'    => \$dbhost,
@@ -46,11 +47,11 @@ GetOptions(
 	   'dnadbname=s'    => \$dnadbname,
 	   'dnadbuser=s'    => \$dnadbuser,
 	   'dnadbpass=s'    => \$dnadbpass,
-	   'stable_id=s' => \$stable_id,
-	   'db_id=s' => \$db_id,
+	   'stable_id!' => \$stable_id,
+	   'db_id!' => \$db_id,
+	   'genetype=s' => \$genetype,
 	   'file=s' => \$file,
-)
-or die ("Couldn't get options");
+	  )or die ("Couldn't get options");
 
 if(!$dbhost || !$dbuser || !$dbname){
   die ("need to pass database settings in on the commandline -dbhost -dbuser -dbname -dbpass");
@@ -63,6 +64,7 @@ if(!$stable_id && !$db_id){
 }elsif($stable_id && $db_id){
   print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
 }
+
 
 my $dnadb;
  
@@ -89,6 +91,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 print STDERR "connected to $dbname : $dbhost\n";
 
 my $fh;
+#print STDERR "have file ".$file."\n" if($file);
 if($file){
   open (FH, '>'.$file) or die "couldn't open file ".$file." $!";
   $fh = \*FH;
@@ -100,10 +103,15 @@ if($file){
 
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => $fh ) ;
 
-foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
+GENE: foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
   
   eval {
     my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
+    if($genetype){
+      #print STDERR "Skipping ".$gene_id." wrong type\n" 
+	if($gene->type ne $genetype);
+      next GENE if($gene->type ne $genetype);
+    }
     my $gene_id = $gene->dbID();
     
     foreach my $trans ( @{$gene->get_all_Transcripts}) {

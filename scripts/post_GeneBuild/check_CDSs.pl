@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 =head1 NAME
 
@@ -17,7 +17,6 @@ use Bio::SeqIO;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
-my $file = 'ensembl_CDSs';
 
 my $dbhost;
 my $dbuser    = 'ensro';
@@ -31,31 +30,47 @@ my $dnadbpass = undef;
 
 my $genetype;
 
+my $filter;
 
 &GetOptions(
 	    'dbname:s'    => \$dbname,
 	    'dbhost:s'    => \$dbhost,
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
-	    'file:s'  => \$file,
+	    'filter:s'    =>  \$filter,
 	    'genetype:s'   => \$genetype,
 	   );
 
-unless ( $dbname && $dbhost && $dnadbname && $dnadbhost ){
+unless ( $dbname && $dbhost ){
   print STDERR "script to check whether CDSs starts with ATG and end with stop (TAA|TGA|TAG)\n";
  
   print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost\n";
-  print STDERR "Optional: -genetype -file (defaulted to ensembl_cdnas)\n";
+  print STDERR "Optional: -genetype\n";
   exit(0);
 }
 
+my %filter_gene;
+if ( $filter ){
+  open ( IN, "<$filter" ) or die("cannot open file $filter");
+  
+  while(<IN>){
+    chomp;
+    my @entries = split;
+    $filter_gene{ $entries[0] } = $entries[0];
+  }
+}
 
-my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       '-host'   => $dnadbhost,
-					       '-user'   => $dnadbuser,
-					       '-dbname' => $dnadbname,
-					       '-pass'   => $dnadbpass,
-					      );
+my $dnadb;
+if($dnadbhost && $dnadbuser){
+  $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      '-host'   => $dnadbhost,
+					      '-user'   => $dbuser,
+					      '-dbname' => $dnadbname,
+					      '-pass'   => $dbpass,
+					     );
+}
+
+
 
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -63,15 +78,13 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    '-dnadb'  => $dnadb,
 					   );
 
-
+$db->dnadb($dnadb) if($dnadb);
 print STDERR "connected to $dbname : $dbhost\n";
+print STDERR "dnadb not defined are you sure your database contains dna\n";
 
-open (OUT,">$file") or die("unable to open file $file");
 
-my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*OUT ) ;
 
 my  @ids = @{$db->get_GeneAdaptor->list_geneIds};
 
@@ -86,27 +99,44 @@ foreach my $gene_id(@ids) {
   if ($genetype){
     next GENE unless ( $gene->type eq $genetype );
   }
+  
+  if ($filter){
+    if ( $filter_gene{$gene->stable_id} ){
+      print STDERR "filtering out ".$gene->stable_id."\n";
+      next GENE;
+    }
+  }
 
-
-  my $gene_id = $gene->dbID();
   my $chr = $gene->chr_name;
 
  TRANS:
   foreach my $trans ( @{$gene->get_all_Transcripts} ) {
     my $gene_id = $gene->stable_id || $gene->dbID;
     my $tran_id = $trans->stable_id || $trans->dbID;
-    my @evidence = &get_evidence($trans);
     
     my $strand = $trans->start_Exon->strand;
     my ($start,$end);
     my @exons;
+    
     if ( $strand == 1 ){
-      @exons = sort {$a->start <=> $b->end} @{$trans->get_all_translateable_Exons};
+      eval{
+	@exons = sort {$a->start <=> $b->end} @{$trans->get_all_translateable_Exons};
+      };
+      if ( $@ ){
+	print STDERR "$@\n";
+      }
+      next TRANS unless ( @exons );
       $start = $exons[0]->start;
       $end   = $exons[$#exons]->end;
     }
     else{
-      @exons = sort {$b->start <=> $a->end} @{$trans->get_all_translateable_Exons};
+      eval{
+	@exons = sort {$b->start <=> $a->end} @{$trans->get_all_translateable_Exons};
+      };
+      if ( $@ ){
+	print STDERR "$@\n";
+      }
+      next TRANS unless ( @exons );
       $start = $exons[0]->end;
       $end   = $exons[$#exons]->start;
     }
@@ -117,8 +147,8 @@ foreach my $gene_id(@ids) {
 	$seq .= $exon->seq->seq;
       }
       my $first_codon = substr( $seq, 0, 3 );
-      my $last_codon = substr( $seq, -3 );
-
+      my $last_codon  = substr( $seq, -3 );
+      
       my $start = 0;
       my $end   = 0;
       if ( uc($first_codon) eq 'ATG' ){
@@ -133,7 +163,7 @@ foreach my $gene_id(@ids) {
 	$both_correct++;
       }
       
-      print "Gene:$gene_id Transcript:$tran_id start:$start stop:$end\n";
+      print "$gene_id $tran_id start:$start stop:$end\n";
       
       #my $tseq = $trans->translate();
       #if ( $tseq->seq =~ /\*/ ) {
@@ -158,8 +188,13 @@ print "stop codons correct : $stop_correct\n";
 print "both correct        : $both_correct\n";
 
 
+
 close (OUT);
 
+
+
+=======
+>>>>>>> 1.2
 sub get_evidence{
   my ($trans) = @_;
   my %evi;

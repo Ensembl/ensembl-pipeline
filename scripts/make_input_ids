@@ -77,9 +77,9 @@ my $dir;
 my $regex;
 my $single;
 my $verbose;
-my $help;
-
-
+my $help = 0;
+my $translation_id;
+my $name = 'genome';
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -96,7 +96,9 @@ my $help;
 	    'dir:s'        => \$dir,
 	    'file_regex:s' => \$regex,
 	    'single'       => \$single,
+            'single_name:s'=> \$name,
             'verbose'      => \$verbose,
+            'translation_id' => \$translation_id,
             'h|help'            => \$help,
            );
 
@@ -118,8 +120,9 @@ if (!($type)) {
     die "No assemby type defined";
 }
 
-if (!($contig) && !($slice) && !($single) && !($file)) {
-  die "Must define input as either contig, slice file or single";
+if (!($contig) && !($slice) && !($single) && !($file) && !($translation_id)) {
+  die "Must define input as either contig, slice, file, translation_id ".
+  "or single";
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
@@ -128,9 +131,10 @@ my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
 
 
-if( ($slice + $contig + $single + $file) > 1){
-  die "must only define one of these options on the commandline ".
-    "-slice $slice -contig $contig -single $single -file $file";
+if( ($slice + $contig + $single + $file + $translation_id) > 1){
+  #die "must only define one of these options on the commandline ".
+  #  "-slice $slice -contig $contig -single $single -file $file ".
+  #  " -translation_id $translation_id";
 }
 
 my @ids;
@@ -148,7 +152,7 @@ if ($slice) {
   
 }elsif($single){
   $input_type = 'GENOME' unless $input_type;
-  @ids = ('genome');
+  @ids = ($name);
 }elsif($file){
   $input_type = 'FILENAME' unless $input_type;
   if(!$dir){
@@ -156,6 +160,8 @@ if ($slice) {
       " a directory to get them from"; 
   }
   @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
+}elsif($translation_id){
+  @ids = $inputIDFactory->generate_translation_id_input_ids;
 }else{
     exec('perldoc', $0);
 }
