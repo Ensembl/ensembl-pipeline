@@ -23,23 +23,15 @@ use Getopt::Long;
 use Bio::SeqIO;
 
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
-							      EST_DBNAME
-							      EST_DBUSER
-							      EST_DBPASS
-							      EST_DBHOST
+							      EST_REFDBNAME
+							      EST_REFDBUSER
+							      EST_REFDBHOST
 							      EST_GENOMIC
 							      EST_EXONERATE_OPTIONS
 							     );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-
-# this is the db where the resulting genes will be written
-my $dbname = $EST_DBNAME;
-my $dbuser = $EST_DBUSER;
-my $dbpass = $EST_DBPASS;
-my $host   = $EST_DBHOST;
-
 
 my $runnable;
 my $input_id;
@@ -69,20 +61,25 @@ if ($check) {
    exit(0);
 }
 
-print STDERR "args: $host : $dbuser : $dbpass : $dbname\n";
+print STDERR "REFDB: $EST_REFDBHOST : $EST_REFDBUSER : $EST_REFDBNAME\n";
 
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					    -host             => $host,
-					    -user             => $dbuser,
-					    -dbname           => $dbname,
-					    -pass             => $dbpass,
-					   );
+############################################################
+# this is just a refdb where we get dna/assembly/chromosomes from
+my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					       -host             => $EST_REFDBHOST,
+					       -user             => $EST_REFDBUSER,
+					       -dbname           => $EST_REFDBNAME,
+					       );
 
-my $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
+############################################################
+# I should have the correct analysis in the refdb analysis table
+my $analysis_obj = $refdb->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
 
+
+die "Need ana analysis object" unless( defined $analysis_obj );
 die "No input entered" unless( defined ($query_seq));
 
-
+############################################################
 # convert the multiple fasta file with query est/rna sequences into an array of seq features
 my @sequences;
 my $seqio= Bio::SeqIO->new(
@@ -90,6 +87,7 @@ my $seqio= Bio::SeqIO->new(
 			   -file   => "$query_seq",
 			  );
 
+############################################################
 # read the query and create Bio::Seqs
 while( my $seq = $seqio->next_seq() ){
   if (defined($seq) && !($seq->seq eq '') && !($seq->display_id eq '') ){
@@ -102,8 +100,9 @@ while( my $seq = $seqio->next_seq() ){
 #print STDERR "got ".scalar(@sequences)." sequence objects\n";
 
 
+############################################################
 # create runnableDB
-my $runobj = "$runnable"->new(-db         => $db,
+my $runobj = "$runnable"->new(-db         => $refdb,
 			      -input_id   => \@sequences,
 			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
@@ -116,8 +115,27 @@ my $runobj = "$runnable"->new(-db         => $db,
 $runobj->fetch_input;
 $runobj->run;
  
+
 my @out = $runobj->output;
 
 if ($write) {
   $runobj->write_output;
 }
+
+############################################################
+# do this if the file is local
+#if ( $query_seq =~ /\/tmp\/\S+/ ){
+#    unlink( $query_seq );
+#}
+
+
+
+
+
+
+
+
+
+
+
+
