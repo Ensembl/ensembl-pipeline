@@ -272,7 +272,7 @@ sub run {
   # finally we run the beast.
 
   $self->results($self->workdir()."/".$self->results());
-  my $exonerate_command = $self->exonerate() . " -n true -A false --cdna $estfile --genomic $genfile >" . $self->results();
+  my $exonerate_command = $self->exonerate() . " -w 14 -t 65 -H 100 -D 15 -m 768 -n yes -A false --cdna $estfile --genomic $genfile >" . $self->results();
   
   eval {
     # better to do this as a pipe?
