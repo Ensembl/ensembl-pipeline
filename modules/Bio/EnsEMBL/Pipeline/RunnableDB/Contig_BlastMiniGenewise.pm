@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 
 use vars qw(@ISA);
 use strict;
-
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Exon;
@@ -55,6 +55,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
 use Data::Dumper;
 # config file; parameters searched for here if not passed in as @args
 require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
@@ -64,16 +65,16 @@ require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
-        
-    if(!defined $self->seqfetcher) {
-      my $seqfetcher =  $self->make_seqfetcher();
-      $self->seqfetcher($seqfetcher);
+    if (! $::genebuild_conf{'bioperldb'}) {    
+      if(!defined $self->seqfetcher) {
+	my $seqfetcher =  $self->make_seqfetcher();
+	$self->seqfetcher($seqfetcher);
+      }
     }
-       
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
     $path = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
-
+    
     if(!defined $type || $type eq ''){
       $type = $::similarity_conf{'type'};
     }
@@ -213,32 +214,63 @@ sub fetch_input {
 
     print STDERR "contig: " . $contig . " \n";
 
-    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
+    my @features;
+    if ($::genebuild_conf{'bioperldb'}) {
+      my $bpDBAdaptor = $self->bpDBAdaptor;
+      my (@bioperldbs) = split / /,$::genebuild_conf{'supporting_databases'};
+      foreach my $bioperldb (@bioperldbs){
+	print STDERR "Fetching features with analysis_type: $bioperldb\n";
+	my @features  = $contig->get_all_SimilarityFeatures_above_score($bioperldb,85);
+	print STDERR "Number of features fetched : ".scalar(@features)."\n";
+	my %idhash;
     
-    print STDERR "Number of features = " . scalar(@features) . "\n";
+    	foreach my $f (@features) {
+	  #print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
+	  if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)) {
+	    $idhash{$f->hseqname} = 1;
+	  }
+	}
+    
+    	my @ids = keys %idhash;
+	$bioperldb='nr_parsed';
+	$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
+	
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+									       '-ids'        => \@ids,
+									       '-seqfetcher' => $self->seqfetcher,
+									       '-trim'       => 1);
+	
+	
+    	$self->runnable($runnable);
+      }
 
-    my %idhash;
-    
-    foreach my $f (@features) {
-        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
-      if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-	  defined($f->hseqname)) {
-      $idhash{$f->hseqname} = 1;
-      
     }
-  }
+    else {
+      @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
+      
+      print STDERR "Number of features = " . scalar(@features) . "\n";
+      
+      my %idhash;
+      
+      foreach my $f (@features) {
+	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+	    defined($f->hseqname)) {
+	  $idhash{$f->hseqname} = 1;
+	}
+      }
     
-    my @ids = keys %idhash;
-
-    print STDERR "Feature ids are @ids\n";
-
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
-									   '-ids'        => \@ids,
-									   '-seqfetcher' => $self->seqfetcher,
-									   '-trim'       => 1);
-    
-    
-    $self->runnable($runnable);
+      my @ids = keys %idhash;
+      
+      print STDERR "Feature ids are @ids\n";
+      
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+									     '-ids'        => \@ids,
+									     '-seqfetcher' => $self->seqfetcher,
+									     '-trim'       => 1);
+      
+      
+      $self->runnable($runnable);
+    }
     # at present, we'll only ever have one ...
     $self->vc($contig);
 }     
@@ -256,9 +288,9 @@ sub fetch_input {
 sub run {
     my ($self) = @_;
 
-    # is there ever going to be more than one?
+    #Now there is more than one...
     foreach my $runnable ($self->runnable) {
-	$runnable->run;
+      $runnable->run;
     }
     
     $self->convert_output;
@@ -479,7 +511,7 @@ sub output{
 }
 
 sub make_seqfetcher {
-  my ( $self ) = @_;
+  my ($self) = @_;
   my $index = $::seqfetch_conf{'protein_index'};
   my $seqfetcher;
 
@@ -494,7 +526,46 @@ sub make_seqfetcher {
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   }
 
+  $self->seqfetcher($seqfetcher);
+
   return $seqfetcher;
+}
+
+=head2 bpDBAdaptor
+
+  Title   : bpDBAdaptor
+  Usage   : $self->bpDBAdaptor($bpDBAdaptor)
+  Function: get set the DBAdaptor used by SeqFetcher
+  Returns : Bio::DB::SQL::DBAdaptor
+  Args    : Bio::DB::SQL::DBAdaptor
+
+=cut
+
+
+sub bpDBAdaptor {
+  my ($self) = @_;
+  
+  if (defined( $self->{'_bpDBAdaptor'})) {
+    print STDERR "Returning a ".$self->{'_bpDBAdaptor'}."\n";
+    return $self->{'_bpDBAdaptor'};   
+  }
+  
+  else{
+    my $bpname      = $::genebuild_conf{'bpname'} || undef;
+    my $bpuser      = $::genebuild_conf{'bpuser'} || undef;
+    my $dbhost      = $::db_conf{'dbhost'} || undef;
+    my $DBI_driver  = $::genebuild_conf{'DBI.driver'} || undef;
+    my $dbad        = Bio::DB::SQL::DBAdaptor->new(
+						   -user => $bpuser,
+						   -dbname => $bpname,
+						   -host => $dbhost,
+						   -driver => $DBI_driver,
+						  );
+    $self->{'_bpDBAdaptor'}=$dbad->get_BioDatabaseAdaptor();
+    print STDERR "Creating a ".$self->{'_bpDBAdaptor'}."\n";
+    
+  }
+  return $self->{'_bpDBAdaptor'};
 
 }
 
