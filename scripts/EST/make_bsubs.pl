@@ -196,7 +196,7 @@ sub make_filter_bsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G\" $filter_e2g -input_id $input_id";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G\" $filter_e2g -input_id $input_id";
       print OUT "$command\n";
       
       $count = $count + $size;
