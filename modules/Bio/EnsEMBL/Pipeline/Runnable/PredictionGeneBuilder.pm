@@ -147,7 +147,7 @@ sub run{
   # check the generated transcripts:
   my @checked_predictions;
   foreach my $prediction ( @linked_predictions ){
-      next unless ( $self->_check_Transcript($prediction) && $self->_check_Translation($prediction) );
+      next unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($prediction,$self->query) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($prediction) );
       push( @checked_predictions, $prediction );
   }
   
@@ -1106,100 +1106,20 @@ sub validate_transcript{
 }
 
 ############################################################
-
-
-sub _check_Transcript{
-  my ($self,$transcript) = @_;
-  my $slice = $self->slice;
-  
-  my $id = $self->transcript_id( $transcript );
-  
-  my $valid = 1;
-
-  # check that transcripts are not completely outside the slice
-  if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-    print STDERR "transcript $id outside the slice\n";
-    $valid = 0;
-  }
-  # allow transcripts that fall partially off the slice only at one end, the 'higher' end of the slice
-  elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-      print STDERR "transcript $id falls off the slice by its lower end\n";
-    $valid = 0;
-  }
-  
-  # sort the exons 
-  $transcript->sort;
-  my @exons = @{$transcript->get_all_Exons};
-  
-  if ($#exons > 0) {
-    for (my $i = 1; $i <= $#exons; $i++) {
-      
-      # check phase consistency:
-      if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-	print STDERR "transcript $id has phase inconsistency\n";
-	$valid = 0;
-	last;
-      }
-      
-      # check for folded transcripts
-      if ($exons[0]->strand == 1) {
-	if ($exons[$i]->start < $exons[$i-1]->end) {
-	  print STDERR "transcript $id folds back on itself\n";
-	  $valid = 0;
-	} 
-      } 
-      elsif ($exons[0]->strand == -1) {
-	if ($exons[$i]->end > $exons[$i-1]->start) {
-	  print STDERR "transcript $id folds back on itself\n";
-	  $valid = 0;
-	} 
-      }
-    }
-  }
-  if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
-  }
-  return $valid;
-}
-
-
-############################################################
-
-sub _check_Translation{
-  my ($self,$transcript) = @_;
-  
-  my $id = $self->transcript_id( $transcript );
-  
-  my $valid = 1;
-  
-  # check that they have a translation
-  my $translation = $transcript->translation;
-  my $sequence;
-  eval{
-    $sequence = $transcript->translate;
-  };
-  unless ( $sequence ){
-    print STDERR "transcript $id has no translation\n";
-    return 0;
-  }
-  if ( $sequence ){
-    my $peptide = $sequence->seq;
-    if ( $peptide =~ /\*/ ){
-      print STDERR "translation of transcript $id has STOP codons\n";
-      $valid = 0;
-    }
-  }
-  if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
-  }
-  return $valid;
-}
-
-############################################################
 #
 # GETSET METHODS
 #
 ############################################################
+
+sub query{
+    my ($self,$query) = @_;
+
+    if ( $query ){
+	$self->{_query} = $query;
+    }
+    return $self->{_query};
+}
+
 
 =head2 linked_predictions
 
