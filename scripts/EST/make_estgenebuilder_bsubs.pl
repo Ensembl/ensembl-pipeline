@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/ensembl/bin/perl -w
 
 =head1 NAME
 
@@ -34,22 +34,25 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 					EST_GENEBUILDER_BSUBS
 					EST_GENEBUILDER_CHUNKSIZE
 									 EST_GENE_RUNNER
-					MAP_GENES_TO_ESTS
-					EST_EXPRESSION_RUNNER
-					EST_EXPRESSION_CHUNKSIZE
-					EST_EXPRESSION_BSUBS
+			
 									 EST_GENEBUILDER_RUNNABLE
 					EST_GENEBUILDER_ANALYSIS
-					EST_EXPRESSION_RUNNABLE
-					EST_EXPRESSION_ANALYSIS    
 									);
+
+use Getopt::Long;
+my $slice_file;
+
+&GetOptions(
+	        'slice_file:s'      => \$slice_file,
+	       );
+
 
 my %chrhash;
 
 # declare these here so we can refer to them later
 
 my $est_genebuilder_dir   = "est_genebuilder";
-my $gene2expression_dir   = "gene2ests";
+
 
 # get chr info from the database where you have contig, clone and static_golden_path
 &get_chrlengths();
@@ -59,11 +62,6 @@ my $gene2expression_dir   = "gene2ests";
 
 # create jobs file for EST_GeneBuilder
 &make_EST_GeneBuilder_bsubs();
-
-# create jobs file MapGeneToExpression 
-if ( $MAP_GENES_TO_ESTS ){
-  &make_MapGeneToExpression_bsubs();
-}
 
 =head2 make_directories
 
@@ -85,17 +83,6 @@ sub make_directories {
   foreach my $chr(keys %chrhash){
     my $chrdir = $estbuilder_path . $chr . "/";
     makedir($chrdir);
-  }
-  
-  # MapGeneToExpression directories
-  if ( $MAP_GENES_TO_ESTS ){
-    my $gene2expression_path = $scratchdir . "/" . $gene2expression_dir . "/";
-    makedir($gene2expression_path);
-    
-    foreach my $chr (keys %chrhash){
-      my $chrdir = $gene2expression_path . $chr . "/";
-      makedir($chrdir);
-    }
   }
 }
 
@@ -151,58 +138,26 @@ sub make_EST_GeneBuilder_bsubs{
   my $runnable = $EST_GENEBUILDER_RUNNABLE;
   my $analysis = $EST_GENEBUILDER_ANALYSIS;
 
-  foreach my $chr(keys %chrhash) {
-    my $length = $chrhash{$chr};
-    
-    my $chrdir = $filter . "$chr";
-    my $count = 1;
+  my $command1 = "bsub -q $queue -R'rlx' -C0 "; 
+  my $command2 = " -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis ";
 
-    while($count < $length) {
-      my $start = $count;
-      my $end   = $count + $size -1;
-      
-      if ($end > $length) {
-	$end = $length;
-      }
-      
-      my $input_id = $chr . "." . $start . "-" .  $end;
+  if ( $slice_file ){
+    open (SLICE,"<$slice_file") or die("cannot open file $slice_file");
+    
+    while(<SLICE>){
+      chomp;
+      my @entries = split;
+      my $input_id = $entries[0];
+      $input_id =~/(\S+)\.(\d+-\d+)/;
+      my $chrdir = $filter . $1;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-     
-
-      # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -R\"select[myecs2b < 440 && myecs2c < 440] rusage[myecs2b=10:duration=2:decay=1:myecs2c=10:duration=2:decay=1]\" -o $outfile -e $errfile -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
-      print OUT "$command\n";
-      
-      $count = $count + $size;
+      my $command = $command1." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
+      print OUT "$command\n"; 
     }
+    close(SLICE);
   }
 
-  close (OUT) or die (" Error closing $jobfile: $!");
-}
-
-=head2 make_MapGeneToExpression_bsubs
-
-    Function: makes bsubs to run MapGeneToExpression
-
-=cut
-
-sub make_MapGeneToExpression_bsubs{
-  my $jobfile    = $EST_EXPRESSION_BSUBS;
-  my $scratchdir = $EST_TMPDIR;
-  my $queue      = $EST_QUEUE;
-    
-  my $runnable   = $EST_EXPRESSION_RUNNABLE;
-  my $analysis   = $EST_EXPRESSION_ANALYSIS;
-  
-  open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
-  
-  # where out and err files go
-  my $filter = $scratchdir . "/" .  $gene2expression_dir . "/";
-  
-  # genomic size for each job
-  my $size   = $EST_EXPRESSION_CHUNKSIZE;
-  my $runner = $EST_EXPRESSION_RUNNER;
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
@@ -222,10 +177,9 @@ sub make_MapGeneToExpression_bsubs{
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
 
-      # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
+      my $command = $command1." -o $outfile -e $errfile  ".$command2."  -input_id $input_id -write";
       print OUT "$command\n";
-
+      
       $count = $count + $size;
     }
   }
