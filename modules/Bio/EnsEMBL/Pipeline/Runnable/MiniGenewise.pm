@@ -208,7 +208,7 @@ sub run {
 
   # if this failed, no point in going on!
   if($@){
-    $self->warn("Genewise run failed - getting out of here\n");
+    $self->warn("Genewise run failed - getting out of here:[$@]\n");
     return;
   }
 
