@@ -625,6 +625,8 @@ sub run_blaste2g {
 
                 # make sure we don't lose the score ...
                 $nf->score( $ex->score );
+                
+                
                 push ( @genomic_exons, $nf->feature1 );
             }
 
