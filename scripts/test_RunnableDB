@@ -37,20 +37,27 @@ test_RunnableDB
 
     -runnable  The name of the runnable module we want to run
 
+    -analysis  The number of the analysisprocess we want to run
 =cut
 
 use strict;
 use Getopt::Long;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $host   = 'ecs1c';
 my $port   = undef;
 my $dbname = 'ensembl080';
 my $dbuser = 'ensro';
-my $pass   = undef;
+my $dbpass = undef;
 my $runnable;
 my $input_id;
 my $analysisid;
@@ -64,7 +71,7 @@ my $pepfile;
 	     'port:n'      => \$port,
 	     'dbname:s'    => \$dbname,
 	     'dbuser:s'    => \$dbuser,
-	     'pass:s'      => \$pass,
+	     'dbpass:s'    => \$pass,
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,
@@ -87,10 +94,18 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
     -host             => $host,
     -user             => $dbuser,
     -dbname           => $dbname,
-    -pass             => $pass,
+    -dbpass           => $pass,
     -perlonlyfeatures => 0
 );
 
+my $sf;
+
+if (defined ($::pipeConf{'seqfetcher'})) {
+    my $sfname = $::pipeConf{'seqfetcher'};
+    $sf = "$sfname"->new;
+} else {
+    $sf = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+}
 
 die "No input id entered" unless defined ($input_id);
 
@@ -111,6 +126,7 @@ foreach my $p(split /,/, $params){
 my $runobj = "$runnable"->new(-dbobj    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
+			      -seqfetcher => $sf,
 			      %hparams,
 			     );
 
