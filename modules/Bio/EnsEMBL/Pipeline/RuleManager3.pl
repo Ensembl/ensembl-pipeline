@@ -378,7 +378,10 @@ while (1) {
 sub shut_down {
     my ($db) = @_;
 
-    Bio::EnsEMBL::Pipeline::Job->flush_runs($db->get_JobAdaptor);
+    my ($a_job) = $db->get_JobAdaptor->fetch_by_Status("CREATED");
+    if ($a_job) {
+        $a_job->flush_runs($db->get_JobAdaptor);
+    }
     $db->pipeline_unlock;
     exit 0;
 }
