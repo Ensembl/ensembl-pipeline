@@ -302,9 +302,9 @@ sub parse_results {
 
 	# Watch for the ends of our Exon.
 	$exon_end = $target{end}
-	  if $target{end} > $exon_end;
+	  if (!defined $exon_end || $target{end} > $exon_end);
 	$exon_start = $target{start}
-	  if (($target{start} < $exon_start)||(! $exon_start));
+	  if (!defined $exon_start || $target{start} < $exon_start);
 
 	# Build the query feature for our feature pair
 	my %query = (name    => $q_id,
