@@ -142,21 +142,41 @@ sub run {
             if $err =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
         $self->throw("$@");
     }
-    my $db_version = $runnable->db_version_searched if $runnable->can('db_version_searched');
-    $self->db_version_searched($db_version);
+    my $db_version = $runnable->get_db_version if $runnable->can('get_db_version');
+    $self->db_version_searched($db_version); # make sure we set this here
     if ( my @output = $runnable->output ) {
-	        my $dbobj      = $self->db;
-	        my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
-	        my %ids        = map { $_->hseqname, 1 } @output;
-	        $seqfetcher->write_descriptions( $dbobj, keys(%ids) );        
+        my $dbobj      = $self->db;
+        my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
+        my %ids        = map { $_->hseqname, 1 } @output;
+        $seqfetcher->write_descriptions( $dbobj, keys(%ids) );        
     }
     
     return 1;
     
 }
+
+=head2 db_version_searched
+
+    Title   :  db_version_searched
+               [ distinguished from Runnable::*::get_db_version() ]
+    Useage  :  $self->db_version_searched('version string')
+               $obj->db_version_searched()
+    Function:  Get/Set a blast database version that was searched
+               The actual look up is done in Runnable::Finished_Blast
+               This is just a holding place for the string in this
+               module
+    Returns :  String or undef
+    Args    :  String
+    Caller  :  $self::run()
+               Job::run_module()
+
+=cut
+
 sub db_version_searched{
-    my $self = shift;
-    $self->{'_db_version_searched'} = shift if @_;
+    my ($self, $arg) = @_;
+    
+    $self->{'_db_version_searched'} = $arg if $arg;
+
     return $self->{'_db_version_searched'};
 }
 
