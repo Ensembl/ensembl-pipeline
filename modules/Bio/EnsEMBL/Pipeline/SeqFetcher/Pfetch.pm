@@ -332,7 +332,7 @@ sub write_descriptions {
 
             my $sth = $dbobj->prepare( qq{ 
                                 INSERT DELAYED INTO 
-                                hit_descriptions_test.hit_description
+                                hit_descriptions.hit_description
                                 VALUES ('$hid','$hit_db_prefix','$l','$desc')}
             );
 
