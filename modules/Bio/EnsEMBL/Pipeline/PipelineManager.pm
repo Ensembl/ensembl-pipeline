@@ -418,7 +418,7 @@ sub run {
       }
     }
 
-    sleep(2); #save some CPU when endlessly looping
+    sleep(1); #save some CPU when endlessly looping
 
   } #end of MAIN LOOP
 
@@ -494,7 +494,7 @@ sub _update_task_status {
 
   my %task_status;
   my %timeout_values;
-  my %cleanup;
+
   #
   # clean the current task status objects
   #
@@ -502,15 +502,14 @@ sub _update_task_status {
     $task->get_TaskStatus()->clean();
     $timeout_values{$task->name()} =
       $config->get_parameter($task->name(), 'timeout');
-    $cleanup{$task->name()} = 
-      $config->get_parameter($task->name(), 'cleanup');
   }
 
   #
   # Place the jobs into task and status groups
   #
   foreach my $current_status (@$current_status_list) {
-    my ($job_id, $taskname, $input_id, $status, $timestamp) = @$current_status;
+    my ($job_id, $taskname, $input_id, $status, $timestamp,
+       $stderr, $stdout) = @$current_status;
 
     $task_status{$taskname}->{'EXISTING'} ||= [];
 
@@ -523,11 +522,6 @@ sub _update_task_status {
     }
 
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
-
-    if($status eq 'SUCCESSFUL' && $cleanup{$taskname}){
-      my $job = $job_adaptor->fetch_by_dbID($job_id);
-      $job->cleanup;
-    }
 
     #check if this is still running but has timed out
     if($status ne 'SUCCESSFUL' && $status ne 'FAILED'  &&

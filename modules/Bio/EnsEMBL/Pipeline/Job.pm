@@ -332,17 +332,5 @@ sub run{
 }
 
 
-sub cleanup{
-  my $self = shift;
-  
-  if( -e $self->stdout_file ){ 
-    unlink( $self->stdout_file ); 
-  }
-  if( -e $self->stderr_file ){ 
-    unlink( $self->stderr_file ); 
-  }
-
-}
-
 
 1;
