@@ -375,10 +375,7 @@ sub parse_results {
              $name = $1;
          }
       }
-      elsif ($name =~ /\|emb\|(\S+)/) {
-	  $name = $1;
-      }
-      elsif ($name =~ /SWISSNEW:(\S+)/) {
+      elsif ($name =~ /\S+\|(\S+)\|\S+/) {
 	  $name = $1;
       }
       elsif ($name =~ /^(\S+) (\S+)/) {
