@@ -304,7 +304,7 @@ sub fetch_databases {
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
 
-    if (-e $fulldbname) {
+    if (-e $fulldbname && !(-d $fulldbname) ) {
         push(@databases,$self->database);
     } else {
         my $count = 1;
