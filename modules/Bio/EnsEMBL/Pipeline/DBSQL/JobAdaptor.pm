@@ -287,6 +287,7 @@ sub remove {
   $sth->execute;
 }
 
+
 =head2 remove_by_dbID
 
   Title   : remove_by_dbID
@@ -563,26 +564,24 @@ sub get_all_status {
 
   Title   : get_last_status
   Usage   : my @status = $job->get_all_status
- Function: Get most recent status object associated with this job
+  Function: Get most recent status object associated with this job
   Returns : Bio::EnsEMBL::Pipeline::Status
   Args    : Bio::EnsEMBL::Pipeline::Job, status string
 
 =cut
 
 sub get_last_status {
-  my ($self, $job, $status) = @_;
+  my ($self, $job) = @_;
 
   $self->throw("Can't get status if id not defined")
     unless defined($job->dbID);
 
-  # $self->throw("Can't get status without suppling status string")
-  #   unless defined($status);
-
   my $sth = $self->prepare (qq{
-    SELECT jobId, status, UNIX_TIMESTAMP(time)
-      FROM jobstatus
-     WHERE jobId = ?
-     ORDER by time desc} );
+    SELECT js.jobId, cs.status, UNIX_TIMESTAMP(time)
+      FROM jobstatus js, current_status cs
+     WHERE js.jobId = cs.jobId
+       AND js.status = cs.status
+       AND js.jobId = ?} );
 
   my $res = $sth->execute($job->dbID);
   my $rowHashRef = $sth->fetchrow_hashref();
@@ -591,7 +590,7 @@ sub get_last_status {
   }
 
   my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
-  $status    = $rowHashRef->{'status'};
+  my $status    = $rowHashRef->{'status'};
   my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
 						     -status  => $status,
 						     -created => $time,
