@@ -112,7 +112,7 @@ sub _initialize {
  Function: 
  Example : 
  Returns : nothing
- Args    : Bio::EnsEMBL::DB::RawContigI
+ Args    : Bio::EnsEMBL::DB::ContigI
            
 
 
@@ -122,10 +122,10 @@ sub contig {
     my ($self,$contig) = @_;
     
     if (defined($contig)) {
-	if ($contig->isa("Bio::EnsEMBL::DB::RawContigI")) {
+	if ($contig->isa("Bio::EnsEMBL::DB::ContigI")) {
 	    $self->{_contig} = $contig;
 	} else {
-	    $self->throw("[$contig] is not a Bio::EnsEMBL::DB::RawContigI");
+	    $self->throw("[$contig] is not a Bio::EnsEMBL::DB::ContigI");
 
 	}
     }
@@ -819,7 +819,7 @@ sub isTail {
  Function: Orders contigs based on exon order in transcripts
  Example : 
  Returns : Array of Bio::EnsEMBL::Transcript
- Args    : Array of Bio::EnsEMBL::DB::RawContigI
+ Args    : Array of Bio::EnsEMBL::DB::ContigI
 
 =cut
 
