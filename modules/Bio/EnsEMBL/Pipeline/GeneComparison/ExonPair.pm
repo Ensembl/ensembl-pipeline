@@ -108,8 +108,8 @@ sub blast_Exons{
   }
 
   #print STDERR "word: $word\n";
-  #print STDERR "comparing $id1: ".$seq1->seq."\n";
-  #print STDERR "      and $id2: ".$seq2->seq."\n";
+  #print STDERR "comparing $id1:\t".$seq1->seq."\n";
+  #print STDERR "      and $id2:\t".$seq2->seq."\n";
 
 
   ############################################################
@@ -130,7 +130,7 @@ sub blast_Exons{
   # Ian's parameters:
   #my $options = "W=$word M=1 N=-1 Q=3 R=3 S2=8"; 
   #my $options = "W=5";
-  my $options = "W=$word";
+  my $options = "W=$word -warnings";
   
   # tblastx options:
   #my $options = 'altscore="* any na" altscore="any * na" S2=12';
@@ -140,7 +140,7 @@ sub blast_Exons{
   
   #print STDERR "options: $options\n";
   
- #my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
+  #my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
   #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
