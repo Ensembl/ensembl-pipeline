@@ -77,7 +77,7 @@ sub pseudogene_test{
      ) = @_;
   
   my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $splice_sites_correct, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
-    
+    #print STDERR "dealing with transcript ".$transcript->type."\n";
   ############################################################
   # is it spliced?
   print STDERR "\n--- testing for splicing ---\n";
@@ -146,6 +146,7 @@ sub pseudogene_test{
   
   ############################################################
   # if is spliced, has it got canonical splice sites?
+  $splice_sites_correct = -1;
   print STDERR "\n--- testing for canonical splice sites ---\n";
 
   # single-exon transcripts get a label '-1'

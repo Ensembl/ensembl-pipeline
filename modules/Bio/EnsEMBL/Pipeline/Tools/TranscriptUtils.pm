@@ -922,7 +922,7 @@ sub find_transcripts_by_protein_evidence{
 	"sf.exon_id=e.exon_id and sf.feature_type= 'protein_align_feature' ";
     $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
     
-    print STDERR $transcript_sql."\n";
+    #print STDERR $transcript_sql."\n";
     my $transcript_sth = $db->prepare($transcript_sql);
     
     $transcript_sth->execute;
@@ -930,6 +930,7 @@ sub find_transcripts_by_protein_evidence{
     my $transcript_id;
     
     $transcript_sth->bind_columns(\$transcript_id);
+
     
     while($transcript_sth->fetch){
       push(@tranz, $transcript_id);
@@ -943,7 +944,7 @@ sub find_transcripts_by_protein_evidence{
   ############################################################
   # create transcripts in slice coordinates
   my @transcripts;
-  print STDERR "have ".@tranz." transcript ids\n";
+  #print STDERR "have ".@tranz." transcript ids\n";
   foreach my $t_id ( @tranz ){
     my $tran     = $t_adaptor->fetch_by_dbID($t_id);
     my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
