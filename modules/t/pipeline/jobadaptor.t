@@ -4,7 +4,7 @@ use warnings;
 
 BEGIN { $| = 1;
 	use Test ;
-	plan tests => 14;
+	plan tests => 18;
 }
 
 use TestUtils qw(debug test_getter_setter);
@@ -52,6 +52,20 @@ ok($job);
 my $jobs = $job_adaptor->fetch_all_by_dbID_list([1, 2, 3]);
 ok(grep({$_->dbID =~ /[1-3]/} @$jobs) == 3);
 
+
+#
+# test fetch_all_by_job_name method
+#
+$jobs = $job_adaptor->fetch_all_by_job_name('jobname1');
+ok(@$jobs == 2);
+
+$jobs = $job_adaptor->fetch_all_by_job_name('jobname1', 1);
+ok(@$jobs == 1);
+($job) = @$jobs;
+ok($job->job_name eq 'jobname1');
+ok($job->array_index == 1);
+
+
 $multi_test_db->save('pipeline', 'job', 'job_status');
 
 ok($job_adaptor->store($job));
@@ -82,13 +96,13 @@ if($verbose) {
 # Test that the update method works
 #
 $job->job_name('new_test');
-$job->submission_id('test');
+$job->submission_id(10422);
 
 $job_adaptor->update($job);
 
 $job = $job_adaptor->fetch_by_dbID($job->dbID);
 ok($job->job_name eq 'new_test');
-ok($job->submission_id eq 'test');
+ok($job->submission_id == 10422);
 
 
 $multi_test_db->restore('pipeline');
