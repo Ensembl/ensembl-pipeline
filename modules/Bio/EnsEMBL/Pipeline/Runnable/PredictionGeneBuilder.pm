@@ -588,10 +588,14 @@ sub link_ExonPairs {
   # validate the transcripts
   foreach my $transcript (@t){
       my @valid = $self->validate_transcript($transcript);
-      foreach my $vt (@valid){
-	  @tmpexons = @{$vt->get_all_Exons};
-	  if(scalar (@tmpexons) >= $GB_MIN_GENSCAN_EXONS){
-	      $self->linked_predictions($vt);
+      if ( @valid ){
+	  foreach my $vt (@valid){
+	      if ( defined $vt ){
+		  @tmpexons = @{$vt->get_all_Exons};
+		  if(scalar (@tmpexons) >= $GB_MIN_GENSCAN_EXONS){
+		      $self->linked_predictions($vt);
+		  }
+	      }
 	  }
       }
   }
@@ -625,15 +629,15 @@ sub _recurseTranscript {
   my %exonhash;
   
   foreach my $exon (@{$tran->get_all_Exons}) {
-    $exonhash{$exon->{'temporary_id'}}++;
+      $exonhash{$exon}++;
   }
   
   foreach my $exon (keys %exonhash) {
-    if ($exonhash{$exon} > 1) {
-      $self->warn("Eeeek! Found exon " . $exon . " more than once in the same gene. Bailing out");
-      $tran = undef;
-      return;
-    }
+      if ($exonhash{$exon} > 1) {
+	  $self->warn("Eeeek! Found exon " . $exon . " more than once in the same transcript. Bailing out");
+	  $tran = undef;
+	  return;
+      }
   }
   
   # First copy all the exons into a new transcript
@@ -699,21 +703,22 @@ sub _recurseTranscript {
 =cut
 
 sub _getPairs {
-  my ($self,$exon) = @_;
-  
-  my $minimum_coverage = 1;
-  my @pairs;
-  
-  $self->throw("No exon input") unless defined($exon);
-  $self->throw("Input must be Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
-  
-  foreach my $pair ($self->get_all_ExonPairs) {
-    if (($pair->exon1->{'temporary_id'} eq $exon->{'temporary_id'}) && ($pair->is_Covered == 1)) {
-      push(@pairs,$pair);
-    }
-  } 
-  @pairs = sort { $a->exon2->start <=> $b->exon2->start} @pairs;
-  return @pairs;
+    my ($self,$exon) = @_;
+    
+    my $minimum_coverage = 1;
+    my @pairs;
+    
+    $self->throw("No exon input") unless defined($exon);
+    $self->throw("Input must be Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
+    
+    foreach my $pair ($self->get_all_ExonPairs) {
+	if ($pair->exon1 == $exon  && $pair->is_Covered == 1) {
+	    push(@pairs,$pair);
+	}
+    } 
+    @pairs = sort { $a->exon2->start <=> $b->exon2->start} @pairs;
+    
+    return @pairs;
 }
 
 ############################################################	
@@ -1015,14 +1020,13 @@ EXON:
   my @t = ();
   my $count = 1;
   
-  foreach my $st(@split_transcripts){
-    $st->sort;
-    my @ex = @{$st->get_all_Exons};
-    if(scalar(@ex) > 1){
-      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
-      $count++;
-      push(@t, $st);
-    }
+  foreach my $st (@split_transcripts){
+      $st->sort;
+      my @ex = @{$st->get_all_Exons};
+      if(scalar(@ex) > 1){
+	  $count++;
+	  push(@t, $st);
+      }
   }
 
   return @t;
@@ -1052,12 +1056,13 @@ sub validate_transcript{
   my @exons = @{$transcript->get_all_Exons};
   $transcript->sort;
   for (my $i=0; $i<(scalar(@exons-1)); $i++){
-    my $end_phase = $exons[$i]->end_phase;
-    my $phase    = $exons[$i+1]->phase;
-    if ( $phase != $end_phase ){
-      $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
-      return undef;
-    }
+      my $end_phase = $exons[$i]->end_phase;
+      my $phase    =  $exons[$i+1]->phase;
+      if ( $phase != $end_phase ){
+	  $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	  return undef;
+      }
   }
   
 
