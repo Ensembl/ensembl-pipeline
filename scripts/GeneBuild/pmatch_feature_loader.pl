@@ -68,6 +68,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -pass             => $pass,
 );
 
+$db->assembly_type($path);
 my $sgpa = $db->get_StaticGoldenPathAdaptor;
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 

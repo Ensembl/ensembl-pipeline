@@ -84,7 +84,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print STDERR "connected to $dbname : $dbhost\n";
-$db->static_golden_path_type($path);
+$db->assembly_type($path);
 my $sa = $db->get_StaticGoldenPathAdaptor();
 
 
