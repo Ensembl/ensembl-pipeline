@@ -34,19 +34,22 @@ run_EST_RunnableDB
 use strict;
 use Getopt::Long;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
-}
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+                                        EST_DBNAME
+                                        EST_DBUSER
+                                        EST_DBPASS
+                                        EST_DBHOST
+                                       );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $port   = undef;
-my $dbname = $::db_conf{'estdbname'};
-my $dbuser = $::db_conf{'estdbuser'};
-my $dbpass = $::db_conf{'estdbpass'};
-my $host   = $::db_conf{'estdbhost'};
+my $dbname = $EST_DBNAME;
+my $dbuser = $EST_DBUSER;
+my $dbpass = $EST_DBPASS;
+my $host   = $EST_DBHOST;
 
 
 my $runnable;
@@ -58,11 +61,11 @@ my $pepfile;
 
 # can override db options on command line
 &GetOptions( 
-	     'input_id:s'  => \$input_id,
-	     'runnable:s'  => \$runnable,
-	     'write'       => \$write,
-             'check'       => \$check,
-             'parameters:s'=> \$params,
+	     'input_id:s'    => \$input_id,
+	     'runnable:s'    => \$runnable,
+	     'write'         => \$write,
+             'check'         => \$check,
+             'parameters:s'  => \$params,
              'dbname:s'      => \$dbname,
              'dbhost:s'      => \$host,
              'dbuser:s'      => \$dbuser,
