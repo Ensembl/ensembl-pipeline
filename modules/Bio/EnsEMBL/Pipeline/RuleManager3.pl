@@ -1,3 +1,7 @@
+$ENV{'BLASTDB'} = '/usr/local/ensembl/data/blastdb/Ensembl';
+$ENV{'BLASTMAT'} = '/usr/local/ensembl/data/blastmat';
+$ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
+
 # Script for operating the analysis pipeline
 
 #
@@ -49,7 +53,7 @@ use Bio::EnsEMBL::Pipeline::LSF;
 # signal parameters
 my $gotsig   =  0;
 my $alarm    =  0;
-my $wakeup   =  120;   # period to check LSF queues; set to 0 to disable
+my $wakeup   =  60;   # period to check LSF queues; set to 0 to disable
 my $EXIT     = \1;
 my $NEWRULES = \2;
 my $NEWINPUT = \3;
@@ -72,12 +76,9 @@ my $nodes     = $::pipeConf{'usenodes'};
 my $workdir   = $::pipeConf{'nfstmp.dir'};
 my $flushsize = $::pipeConf{'batchsize'};
 my $retry     = $::pipeConf{'retry'} || 3;
-my $max_jobs  = $::pipeConf{'maxjobs'} || 1000; # max number of (pend) jobs
+my $max_jobs  = $::pipeConf{'maxjobs'} || 10000; # max number of (pend) jobs
 my $jobname   = $::pipeConf{'jobname'};
-                            # Meaningful name displayed by bjobs
-                            # aka "bsub -J <name>"
-                            # maybe this should be compulsory, as
-                            # the default jobname really isn't any use
+zz
 
 $| = 1;
 
@@ -508,7 +509,7 @@ sub retry_failed_jobs {
     my ($ja, $retry, $LSF_params) = @_;
 
     my @failed_jobs = $ja->list_jobId_by_status('FAILED');
-    $LSF_params->{'nodes'} = 'ecs1d';
+    $LSF_params->{'nodes'} = 'ecs2d';
 
     foreach my $jobId (@failed_jobs) {
         my $job = $ja->fetch_by_dbID($jobId);
