@@ -232,9 +232,22 @@ sub write_output {
 	    $gene_obj->write($gene);
 
 	}
-	      $sth = $db->prepare("unlock tables");
-	      $sth->execute;
 
+     $sth = $db->prepare("unlock tables");
+     $sth->execute;
+
+     # Set attribute tag on all contigs
+     my $genebuilders = $self->get_genebuilders;
+     $db->extension_tables(1);
+
+     foreach my $contig (keys %$genebuilders) {
+        my $vc = $genebuilders->{$contig}->contig;
+        my @contigs = $vc->get_all_RawContigs;
+
+        foreach my $contig (@contigs) {
+            $contig->set_attribute('GENE_BUILD_6',1); 
+        }
+     }
 }
 
 =head2 fetch_input
@@ -371,8 +384,6 @@ sub run {
            #$self->check_gene($newgene);
 	   push(@gene,$newgene);
         }
-         $vc = undef;
-         $genebuilders->{$contig} = undef;
     }
     
     foreach my $gene (@gene) {
