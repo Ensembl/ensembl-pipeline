@@ -134,12 +134,12 @@ sub parse_results {
     
     if ($line =~ s/^1TBH//) {
       my  ($id) = $line =~ /^\s*(\w+)/;
-      my ($ac) = $line =~ /(PR\w+)\s*$/;
+      my ($ac) = $line =~ /(PR\w+);?\s*$/;
       $printsac{$id} = $ac;
     }
     
     if ($line =~ s/^3TB//) {
-	    if ($line =~ s/^[HN]//) {
+      if ($line =~ s/^[HN]//) {
         my ($num,$temp1,$tot1) = "";
         # Grab these lines
         #       1433ZETA        1  of  6  88.19   1328    1.00e-16  ELTVEERNLLSVAYKNVIGARRASWRIITS                          30   35   36   48
