@@ -634,7 +634,7 @@ sub parse_blastn {
   foreach my $ungapped_block (@blocks) {
     my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits,$perc_id) = ($ungapped_block->qstart,$ungapped_block->qend,$ungapped_block->qstrand,$ungapped_block->sstart,$ungapped_block->send,$ungapped_block->sstrand,$ungapped_block->bits,$ungapped_block->identity);
 
-    my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
+    my $fp = Bio::EnsEMBL::FeaturePair->new();
 
     $fp->start($qstart);
     $fp->end($qend);
