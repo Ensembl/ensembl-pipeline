@@ -88,7 +88,7 @@ prune-like step in which all features are considered together,
 irrespective of hit-sequence-accession. This is more severe than
 the above prune step and provides a hard limit on the depth of
 coverage of genomic sequence. Hardprune can be performed with or
-without prune. The hardprune step is the final stage of filtering.
+without prune. The hardprune step is the final stage of filtering.'
 
 =head1 CONTACT
 
@@ -157,13 +157,13 @@ sub new {
 
 sub run{
   my ($self,@input) = @_;
-
+  #print STDERR "Have ".@input." features to filter\n";
   my ($minscore,$maxevalue,$coverage);
-  
+  my $starts = 0;
+  my $ends = 0;
   $minscore  = $self->minscore;
   $maxevalue = $self->maxevalue;
   $coverage  = $self->coverage;
-  
   my %validhit;
   my %hitarray;
   
@@ -179,6 +179,7 @@ sub run{
   # valid hits are stored in a hash of arrays
   # we sort by score to know that the first score for a hseqname is its best  
   @input = sort { $b->score <=> $a->score } @input;
+  ##print STDERR "Have ".@input." features to filter\n";
   foreach my $f ( @input ) {
 
     if( $f->score > $minscore ) {
@@ -221,7 +222,12 @@ sub run{
     }
     
   }
-
+  my $total_count = 0;
+  foreach my $id(keys(%hitarray)){
+    $total_count += @{$hitarray{$id}};
+  }
+  #print STDERR "After filtering on score have ".$total_count." features ".
+    " on ".keys(%hitarray)." hit ids\n";
   @input = ();	# free some memory?
   
   # sort the HID list by highest score per feature, then by highest
@@ -237,7 +243,7 @@ sub run{
   my %accepted_hids;
 
   my @strands = ( +1, -1 );
-
+  my %coverage_skip;
   foreach my $strand (@strands) {
 
     # coverage vector, Perl will automatically extend this array
@@ -246,53 +252,73 @@ sub run{
  
     # we accept all feature pairs which are: (1) on the strand being
     # considered, (2) valid, and (3) meet coverage criteria
+    ##print STDERR "Coverage is ".$coverage."\n";
     FEATURE :
     foreach my $hseqname ( @inputids ) {
-
+      #my ($name) = $hseqname =~ /(\w+)\s+\w+/;
+      #print $name."\n";
       my $hole = 0;
 
       foreach my $f ( @{$hitarray{$hseqname}} ) {
-
+        
         next if $f->strand != $strand;
-
-	# only mark if this feature is valid
-	if( $f->score > $minscore || ($f->can('evalue')
-	    && defined $f->evalue && $f->evalue < $maxevalue ) )
-	{
-	  for my $i ( $f->start .. $f->end ) {
-	    unless( $list[$i] ){
-	      $list[$i] = 0;
-	    }
-	    if( $list[$i] < $coverage ) {
-	      # accept!
-	      $hole = 1;
-	      last;
-	    }
-	  }
-	}
+        
+        # only mark if this feature is valid
+        if( (($f->score > $minscore) || ($f->can('evalue'))
+             && defined $f->evalue && $f->evalue < $maxevalue ) ){
+          for my $i ( $f->start .. $f->end ) {
+            unless( $list[$i] ){
+              $list[$i] = 0;
+            }
+            if( $list[$i] < $coverage ) {
+              # accept!
+              $hole = 1;
+              last;
+            }
+          }
+        }
       }
-      
+    
       if( $hole == 0 ) { 
-	# all f's for HID completely covered at a depth >= $coverage
-	next;
+        if(!$accepted_hids{$hseqname}){
+          $coverage_skip{$hseqname} = 1;
+        }
+        my ($name) = $hseqname =~ /(\w+)\s+\w+/;
+        #print STDERR "Skipping ".$name."\n";
+        # all f's for HID completely covered at a depth >= $coverage
+        next;
       }
       
       $accepted_hids{$hseqname} = 1;
       foreach my $f ( @{$hitarray{$hseqname}} ) {
-
+        
         if ($f->strand == $strand) {
           for my $i ( $f->start .. $f->end ) {
-	    $list[$i]++; 
-	  }
+            $list[$i]++; 
+          }
         }
       }
     }
   }
-  
+  my $skipped = 0;
+  foreach my $name(keys(%coverage_skip)){
+    if(!$accepted_hids{$name}){
+      $skipped++;
+    }
+  }
+  ##print STDERR "have skipped ".$skipped." ids entirely\n";
+  $total_count = 0;
+  foreach my $id(keys(%accepted_hids)){
+    $total_count += @{$hitarray{$id}};
+  }
+  #print STDERR "After filtering on coverage have ".$total_count.
+    " features on ".keys(%accepted_hids)." hit ids\n";
   my @accepted_features = ();
   if ($self->prune) {
     foreach my $hid ( keys %accepted_hids ) {
+      $starts += @{$hitarray{$hid}};
       my @tmp = $self->prune_features(@{$hitarray{$hid}});
+      $ends += @tmp;
       push(@accepted_features, @tmp);
     }
   } else {
@@ -309,7 +335,17 @@ sub run{
     # prune all together taking the first '$self->coverage' according to score 
     @accepted_features = $self->prune_features( @accepted_features );
   }
-
+  ##print STDERR "Started with ".$starts." features. Filtering left ".$ends.
+  #  " features\n";
+  my %hit_ids;
+  foreach my $f(@accepted_features){
+    if(!$hit_ids{$f->hseqname}){
+      $hit_ids{$f->hseqname} = 1;
+    }
+  }
+  #print STDERR "Returning ".@accepted_features." after prune across ".
+    keys(%hit_ids)." hit ids\n";
+  
   return @accepted_features;
     
   1;
@@ -362,20 +398,21 @@ sub prune {
            $self->coverage features on each strand, by
 	   removing low-scoring features as necessary.
  Returns : array of features
- Args    : array of features
+ Args    : array of features'
 
 =cut
 
 sub prune_features {
   my ($self, @input) = @_;
   $self->throw('interface fault') if @_ < 1;	# @input optional
-
-    my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
-    my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
-    @input = ();
-    push @input, @plus_strand_fs;
-    push @input, @minus_strand_fs;
-    return @input;
+  #print STDERR "Prune:Have ".@input." features to prune\n";
+  my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
+  my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
+  @input = ();
+  push @input, @plus_strand_fs;
+  push @input, @minus_strand_fs;
+  #print STDERR "Prune:Have ".@input." features to return\n";
+  return @input;
 }
 
 =head2 _prune_features_by_strand
