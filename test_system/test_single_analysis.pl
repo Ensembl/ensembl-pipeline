@@ -47,6 +47,7 @@ my $help;
 if(@tables_to_load == 0){
   @tables_to_load = @{table_groups($logic_name)};
 }
+print "Tables to load are @tables_to_load\n";
 perldoc() if($help);
 if(!$logic_name || !$feature_table){
   throw("Must specific which analysis you wish to run and what table its ".
@@ -98,7 +99,7 @@ sub table_groups{
   $tables{'unigene'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus', 'prediction_exon',
                         'prediction_transcript'];
-  $tables{'first_ef'} = ['core', 'pipeline', 'repeat_feature',
+  $tables{'firstef'} = ['core', 'pipeline', 'repeat_feature',
                          'repeat_consensus'];
   if($tables{$logic_name}){
     return $tables{$logic_name};

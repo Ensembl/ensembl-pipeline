@@ -727,7 +727,7 @@ sub compare_repeat_feature{
   my ($analysis, $ref_ana, $input_ids) = $self->
     get_analyses_and_input_ids($ref_db, $logic_name);
   my $data_dir = $self->testdb->curr_dir."/".$self->testdb->species;
-  $ref_db->load_tables(['prediction_exon'], $data_dir);
+  $ref_db->load_tables(['repeat_consensus'], $data_dir);
   my $test_id = $input_ids->[0];
   my $method;
   my $query_fs;
