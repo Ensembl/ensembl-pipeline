@@ -50,10 +50,13 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 
 # Object preamble - inheriets from Bio::Root::RootI
 
-use Bio::Root::RootI;
 
+use Bio::Root::Object;
+use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI);
+BEGIN { print STDERR "\n\n***I'm here!***\n"; };
+
+@ISA = qw(Bio::Root::Object Bio::EnsEMBL::Pipeline::RunnableDBI );
 
 sub _initialize {
     my ($self,@args) = @_;
@@ -67,12 +70,13 @@ sub _initialize {
     $self->throw("No database handle input")           unless defined($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::Pipeline::DB::ObjI");
     $self->dbobj($dbobj);
-
+    $dbobj->static_golden_path_type('UCSC');
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
     return $self; # success - we hope!
 }
+
 
 
 =head2 fetch_input
@@ -109,13 +113,7 @@ sub fetch_input{
    my $vc = $self->dbobj->get_StaticGoldenPathAdaptor->fetch_VirtualContig_by_fpc_name($fpc);
    $self->vc($vc);
 
-   if( $end > $vc->length ) { 
-       $end = $vc->length; 
-   }
-
-   my $trunc = $vc->trunc($start,$end);
-
-   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGeneWise->new( -genomic => $trunc,-ids => \@fp);
+   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( -genomic => $vc->primary_seq,-ids => \@fp);
 
    $self->runnable($r);
 
@@ -200,11 +198,15 @@ sub write_output {
 
     my $vc = $self->vc;
     my @newgenes;
-
+    my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
     foreach my $gene (@genes) { 
 	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
 	push(@newgenes,$newgene);
 	$newgene->_dump(\*STDERR);
+	
+	foreach my $trans ( $newgene->each_Transcript ) {
+	    $seqio->write_seq($trans->translate);
+	}
     }
 
     
@@ -284,6 +286,7 @@ sub convert_output {
     my @genes;
     my $count = 1;
     my $time  = time; chomp($time);
+    my $vc = $self->vc();
 
     foreach my $tmpf (@tmpf) {
 	my $gene   = new Bio::EnsEMBL::Gene;
@@ -319,7 +322,8 @@ sub convert_output {
 	    $exon->created($time);
 	    $exon->modified($time);
 	    $exon->version(1);
-
+	    $exon->contig_id($vc->id);
+	    $exon->seqname($vc->id);
 	    $exon->start($subf->start);
 	    $exon->end  ($subf->end);
 	    $exon->strand($subf->strand);
@@ -342,11 +346,45 @@ sub convert_output {
 	}
 
 	$transl->start_exon_id($exons[0]->id);
+	if( $exons[0]->strand == 1 ) {
+	    $transl->start($exons[0]->start);
+	} else {
+	    $transl->start($exons[0]->end);
+	} 
+	
+
 	$transl->end_exon_id  ($exons[$#exons]->id);
+
+	if( $exons[$#exons]->strand == 1 ) {
+	    $transl->end($exons[$#exons]->end);
+	} else {
+	    $transl->end($exons[$#exons]->start);
+	} 
 
     }
 
     $self->{'_output'} = \@genes;
+
+}
+
+=head2 input_id
+
+ Title   : input_id
+ Usage   : $obj->input_id($newval)
+ Function: 
+ Returns : value of input_id
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub input_id{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'input_id'} = $value;
+    }
+    return $obj->{'input_id'};
 
 }
 
@@ -391,3 +429,5 @@ sub vc{
     return $obj->{'vc'};
 
 }
+
+1;
