@@ -32,7 +32,6 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
 							      EST_REFDBNAME
 							      LSF_OPTIONS
 							      EST_SCRIPTDIR
-							      EST_TMPDIR
 							      EST_RUNNER
 							      EST_EXONERATE_BSUBS
 							      EST_EXONERATE_RUNNABLE
@@ -82,7 +81,7 @@ sub make_exonerate_bsubs {
   my $bsuberr       = $EST_TMPDIR . "/" . $exonerate_bsubdir . "/stderr/";
   my $bsubout       = $EST_TMPDIR . "/" . $exonerate_bsubdir . "/stdout/";
   my $runnable_db   = $EST_EXONERATE_RUNNABLE;
-  my $analysis      = $EST_EXONERTAE_ANALYSIS;
+  my $analysis      = $EST_EXONERATE_ANALYSIS;
   
   my $estfile = $EST_FILE; # may be a full path
   my @path = split /\//, $estfile;
