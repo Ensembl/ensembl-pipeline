@@ -157,7 +157,7 @@ sub _align_protein {
     $command .= " -trev ";
   }
   
-  print STDERR "Command is $command\n";
+  #print STDERR "Command is $command\n";
   
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 
@@ -168,11 +168,11 @@ sub _align_protein {
 
   # making assumption of only 1 gene prediction ... this will change once we start using hmms
 
-  print STDERR "################# GENEWISE ####################\n";
+  #print STDERR "################# GENEWISE ####################\n";
  GENESF: 
   while (<GW>) {
     
-    print STDERR "$_";
+    #print STDERR "$_";
    
     chomp;
     my @f = split;
@@ -232,7 +232,7 @@ sub _align_protein {
       $self->addExon($curr_exon);
       push(@genesf_exons, $curr_exon);
     
-      print STDERR "Exon: ".$start."-".$end." phase: ".$phase." end_phase: ".$end_phase." str: ".$strand."\n";
+      #print STDERR "Exon: ".$start."-".$end." phase: ".$phase." end_phase: ".$end_phase." str: ".$strand."\n";
     }
     
     elsif($f[0] eq 'Supporting'){
