@@ -169,7 +169,7 @@ sub run {
   $runnable->run();
   
   $self->align_hits_to_contig($runnable->output);
-  $self->check_features($transcript->translate->seq,$self->featurepairs);
+#  $self->check_features($transcript->translate->seq,$self->featurepairs);
   
 }
 
