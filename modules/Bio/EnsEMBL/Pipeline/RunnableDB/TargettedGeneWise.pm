@@ -153,7 +153,7 @@ sub fetch_input{
   my $protein_id; 
 
   # chr12:10602496,10603128:Q9UGV6:
-  print STDERR $entry."\n";
+  #print STDERR $entry."\n";
   if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
 #  if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
       $self->throw("Not a valid input id... $entry");
@@ -457,6 +457,7 @@ sub validate_transcript {
   
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
+  #print "there are ".@exons." exons\n";
   $transcript->sort;
   for (my $i=0;$i<(scalar(@exons-1));$i++){
     my $end_phase = $exons[$i]->end_phase;
@@ -572,14 +573,14 @@ sub remap_genes {
   my $contig = $self->vcontig;
 
   my @genes = $self->gw_genes;
-
+ # print STDERR "REMAPPING GENES\n";
 GENE:  foreach my $gene (@genes) {
 
     my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
-
+    #print STDERR "gene has ".@t." transcripts\n";
     # check that it translates
-    if($gene->type eq 'TGE_gw'){
+    if($gene->type eq $GB_TARGETTED_GW_GENETYPE){
       
       my $translates = $self->check_translation($tran);
       if(!$translates){
@@ -598,9 +599,11 @@ GENE:  foreach my $gene (@genes) {
 
       # sort out supporting feature coordinates
       foreach my $tran ($newgene->get_all_Transcripts) {
+	#print STDERR "transcript has ".$tran->get_all_Exons." exons\n";
 	foreach my $exon($tran->get_all_Exons) {
+#	  print STDERR "exon has ".$exon->each_Supporting_Feature." supporting features\n";
 	  foreach my $sf($exon->each_Supporting_Feature) {
-	   # print STDERR "have ".$sf."\n";
+#	   print STDERR "have ".$sf."\n";
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
 	      my $tmp = $sf->start;
@@ -614,7 +617,8 @@ GENE:  foreach my $gene (@genes) {
 
     # did we throw exceptions?
     if ($@) {
-      print STDERR "Couldn't reverse map gene:  [$@]\n";
+      #print STDERR "Couldn't reverse map gene:  [$@]\n";
+      $self->throw("couldn't reverse map gene $@");
     }
   }
 
@@ -760,7 +764,7 @@ sub make_transcript{
 
   my $excount = 1;
   my @exons;
-    
+  #print "have ".scalar($gene->sub_SeqFeature)." exons\n";
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
     my $exon = Bio::EnsEMBL::Exon->new;
@@ -779,18 +783,18 @@ sub make_transcript{
     
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
+    if(@sf){
+      my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
     
-    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
-    
-    $align->seqname($contig->dbID);
-    $align->contig($contig);
-    my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
-    $align->adaptor($prot_adp);
-    $align->score(100);
-    $align->analysis($analysis_obj);
-    
-    $exon->add_Supporting_Feature($align);
-  
+      $align->seqname($contig->dbID);
+      $align->attach_seq($contig);
+      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
+      $align->adaptor($prot_adp);
+      $align->score(100);
+      $align->analysis($analysis_obj);
+      
+      $exon->add_Supporting_Feature($align);
+    }
     
     push(@exons,$exon);
     

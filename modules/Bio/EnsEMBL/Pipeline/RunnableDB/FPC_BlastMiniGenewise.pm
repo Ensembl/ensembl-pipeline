@@ -391,17 +391,18 @@ sub _make_transcript{
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
     
-    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
-    
-    $align->seqname($contig->dbID);
-    $align->contig($contig);
-    my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
-    $align->adaptor($prot_adp);
-    $align->score(100);
-    $align->analysis($analysis_obj);
-    
-    $exon->add_Supporting_Feature($align);
-  
+    if(@sf){
+      my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
+      
+      $align->seqname($contig->dbID);
+      $align->contig($contig);
+      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
+      $align->adaptor($prot_adp);
+      $align->score(100);
+      $align->analysis($analysis_obj);
+      
+      $exon->add_Supporting_Feature($align);
+    }
     
     push(@exons,$exon);
     
