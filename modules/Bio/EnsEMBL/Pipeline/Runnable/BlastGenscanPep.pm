@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pep_SeqFeature;
 use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 #use Data::Dumper;
 
 use vars qw(@ISA);
@@ -431,26 +432,40 @@ sub get_Sequence {
     next ID unless defined($id);
 
     print(STDERR "Sequence id :  is [$id]\n");
-
-    open(IN,"pfetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
+    my $seq;
+    if ($::genebuild_conf{'bioperldb'}) {
+      
+      my $bpDBAdaptor = $self->bpDBAdaptor;
+      my $seqfetcher = $bpDBAdaptor->fetch_BioSeqDatabase_by_name($self->database);
+      eval {
+	$seq = $seqfetcher->get_Seq_by_acc($id);
+      };
+      if ($@) {
+	print STDERR ("Couldn't find sequence for [$id] in BlastGenscanPep");
+	return;
+      }
+      
+    }
+    else {
+      open(IN,"pfetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
 	
-    my $seqstr;
+      my $seqstr;
 	
-    while (<IN>) {
+      while (<IN>) {
 	chomp;
 	$seqstr .= $_;
-    }
+      }
     
     
 
-    if (!defined($seqstr) || $seqstr eq "no match") {
-        print("Couldn't find sequence for [$id]");
+      if (!defined($seqstr) || $seqstr eq "no match") {
+        print STDERR ("Couldn't find sequence for [$id] in BlastGenscanPep");
 	return;
+      }
+      
+      $seq = new Bio::Seq(-id  => $id,
+			     -seq => $seqstr);
     }
-
-    my $seq = new Bio::Seq(-id  => $id,
-			   -seq => $seqstr);
-    
 
     print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
