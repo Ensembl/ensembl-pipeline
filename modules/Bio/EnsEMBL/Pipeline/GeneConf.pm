@@ -209,13 +209,17 @@ my $prefix='COB';
 	     GB_ABINITIO_SUPPORTED_TYPE => 'ab_initio_supported',
 
 	     # lower bound in the 'base align features' retireved in the genebuilder
-	     GB_MIN_FEATURE_SCORE    => 50,
-	     GB_MIN_FEATURE_LENGTH   => 15,
-	     GB_VCONTIG              => 1,
-	     GB_SKIP_BMG             => 0,
-	     GB_MIN_GENSCAN_EXONS    => 4,
-	     GB_GENSCAN_MAX_INTRON   => 15000,
-	     GB_FINAL_GENETYPE       => 'ensembl',
+	     GB_MIN_FEATURE_SCORE        => 50,
+	     GB_MIN_FEATURE_LENGTH       => 15,
+	     GB_VCONTIG                  => 1,
+	     GB_SKIP_BMG                 => 0,
+	     GB_MIN_GENSCAN_EXONS        => 4,
+	     GB_GENSCAN_MAX_INTRON       => 15000,
+	     GB_FINAL_GENETYPE           => 'ensembl',
+	     
+	     # maximum number of transcripts per gene
+	     GB_MAX_TRANSCRIPTS_PER_GENE => 10,
+
 
 	     # Other parameters of the GeneBuild, also used in the post genebuild checks
 	     
