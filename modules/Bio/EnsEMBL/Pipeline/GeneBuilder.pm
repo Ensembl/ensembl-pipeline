@@ -121,7 +121,7 @@ sub new {
 
     $self->genewise_types('combined_gw_e2g');
     $self->genewise_types('TGE_gw');
-#    $self->genewise_types('riken_genewise');
+    $self->genewise_types('riken_genewise');
     $self->genewise_types('similarity_genewise');
 
     $self->input_id($input_id);
@@ -190,7 +190,7 @@ sub get_Genewises {
     my @gw;
 
     foreach my $type ($self->genewise_types) {
-      push(@gw,$self->contig->get_Genes_by_Type($type));
+      push(@gw,$self->contig->get_Genes_by_Type($type,'evidence'));
     }
 
     $self->print_Genes(@gw);
@@ -251,8 +251,12 @@ sub get_Predictions {
 
     my @tmp;
     
-    my @preds = Bio::EnsEMBL::Virtual::Contig::get_all_PredictionFeatures($self->contig);
-
+   my @preds;
+   if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
+     @preds = $self->contig->get_all_PredictionFeatures;
+   } else {
+     @preds = Bio::EnsEMBL::Virtual::Contig::get_all_PredictionFeatures($self->contig);
+   }
     my @genscan;
 
     foreach my $f (@preds) {
@@ -278,8 +282,13 @@ sub get_Predictions {
 sub get_Similarities {
   my ($self) = @_;
 
-    my @tmp2 = $self->contig->get_all_SimilarityFeatures_above_pid(50);
-	
+  my @tmp2;
+   if ($self->contig->isa("Bio::EnsEMBL::DBSQL::RawContig")) {
+     @tmp2 = $self->contig->get_all_SimilarityFeatures;
+   } else {
+     @tmp2 = $self->contig->get_all_SimilarityFeatures_above_pid(50);
+   }
+
     my %idhash;
     my @sf;
 	
