@@ -387,7 +387,7 @@ sub _has_repeat_in_intron{
     my $intron_strand = $exons[$i]->strand;
     my $intron_length = $intron_end - $intron_start + 1;
 
-    print STDERR "intron: $intron_start-$intron_end $intron_strand\n";
+    #print STDERR "intron: $intron_start-$intron_end $intron_strand\n";
     next INTRON unless ( $intron_length > 9 );
 
     ############################################################
@@ -400,7 +400,7 @@ sub _has_repeat_in_intron{
       my $repeat_end    = $cluster->end   + $slice_start - 1;
       my $repeat_strand = $cluster->strand;
       
-      print STDERR "repeat: $repeat_start-$repeat_end $repeat_strand\n";
+      #print STDERR "repeat: $repeat_start-$repeat_end $repeat_strand\n";
       next FEAT unless ( $repeat_strand == $intron_strand );
       next FEAT if ( $repeat_start > $intron_end || $repeat_end < $intron_start );
       
