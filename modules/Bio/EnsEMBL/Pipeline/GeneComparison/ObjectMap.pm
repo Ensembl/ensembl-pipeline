@@ -65,7 +65,7 @@ sub new{
 ############################################################
 
 sub match{
-    my ($self, $obj1, $obj2 );
+    my ($self, $obj1, $obj2 ) = @_;
     $self->add_to_list1( $obj1 );
     $self->add_to_list2( $obj2 );
     $self->partners( $obj1, $obj2 );
