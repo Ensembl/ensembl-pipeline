@@ -61,7 +61,10 @@ use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_TBLASTN
+					);
+
 require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -312,7 +315,7 @@ sub run_blast {
 
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
-    my $tblastn = $::scripts_conf{'tblastn'};
+    my $tblastn = $GB_TBLASTN;
     # default to tblastn
     if(!defined $tblastn || $tblastn eq ''){
       $tblastn = 'tblastn';
@@ -329,13 +332,13 @@ sub run_blast {
     while(my $sbjct = $report->nextSbjct){
       while(my $hsp = $sbjct->nextHSP){
 
-
+	
         # strands
         my $strand = 1;
         if($hsp->subject->strand != $hsp->query->strand){
           $strand = -1;
         }
-
+	
         my $genomic = new Bio::EnsEMBL::SeqFeature(
                                                    -start   => $hsp->subject->start,
                                                    -end     => $hsp->subject->end,
