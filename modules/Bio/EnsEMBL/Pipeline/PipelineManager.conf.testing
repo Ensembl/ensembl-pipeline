@@ -1,8 +1,8 @@
 [DEFAULT_DATABASE]
-host=ecs1g
+host=127.0.0.1
 user=ensadmin
 pass=ensembl
-port=3306
+port=5000
 
 #
 # Database where pipeline config is stored
@@ -20,7 +20,7 @@ dbname = mcvicker_test_briggsae
 [LSF]
 output_dir = /tmp
 path = /usr/local/lsfv42/4.2/alpha5/bin/
-
+runner = /tmp_mnt/net_nfs6/vol1/homes/mcvicker/src/ensembl-pipeline-experimental/modules/Bio/EnsEMBL/Pipeline/runner.pl
 [LOCAL]
 output_dir = /tmp
 
@@ -40,7 +40,7 @@ repeatmasker_task = Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMasker
 ensdb = ensembl_database
 dnadb = dna_database
 where = 
-batchsize = 500
+batchsize = 1
 #timeout in seconds 86400 = 24hours
 timeout = 86400
 retries	= 0
