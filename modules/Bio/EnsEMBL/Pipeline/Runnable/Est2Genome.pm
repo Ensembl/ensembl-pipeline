@@ -76,26 +76,26 @@ sub _initialize {
     my $make = $self->SUPER::_initialize(@_);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_est_genome} = undef;    #location of est2genome
-    $self->{_workdir}   = undef;     #location of temp directory
-    $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_estfilename} = undef    #file to store EST Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of analysis
-    $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for est2genome
+    $self->{'_clone'}  = undef;        #location of Bio::Seq object
+    $self->{'_est_genome'} = undef;    #location of est2genome
+    $self->{'_workdir'}   = undef;     #location of temp directory
+    $self->{'_filename'}  =undef;      #file to store Bio::Seq object
+    $self->{'_estfilename'} = undef    #file to store EST Bio::Seq object
+    $self->{'_results'}   =undef;      #file to store results of analysis
+    $self->{'_protected'} =[];         #a list of files protected from deletion
+    $self->{'_arguments'} =undef;      #arguments for est2genome
     
-    my( $genomic, $est, $est_genome. $arguments ) = 
+    my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange(['GENOMIC','EST', 'E2G', 'ARGS'], @args);
        
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
-    if ($est2genome) 
+    if ($est_genome) 
     {   $self->est_genome($est_genome) ;}
     else
     {   
         eval 
-        { $self->est_genome($self->locate_executable('est_genome')); };
+        { $self->est_genome( $self->locate_executable ('est_genome')); };
         if ($@)
         { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
     }
@@ -156,7 +156,7 @@ sub est_sequence {
 }
 
 sub estfilename {
-    my ($self, est$filename) = @_;
+    my ($self, $estfilename) = @_;
     $self->{_estfilename} = $estfilename if ($estfilename);
     return $self->{_estfilename};
 }
@@ -178,6 +178,26 @@ sub estfilename {
     Args    :   File path (optional)
 
 =cut
+
+=head2 est_genome
+
+    Title   :   est_genome
+    Usage   :   $obj->est_genome('~humpub/scripts/est_genomeHum');
+    Function:   Get/set method for the location of est_genomeHum script
+    Args    :   File path (optional)
+
+=cut
+
+sub est_genome {
+    my ($self, $location) = @_;
+    if ($location)
+    {
+        $self->throw("est_genome not found at $location: $!\n") 
+                                                    unless (-e $location);
+        $self->{_est_genome} = $location ;
+    }
+    return $self->{_est_genome};
+}
 
 =head2 arguments
 
@@ -201,116 +221,109 @@ sub arguments {
 # Analysis methods
 ##########
 
+## UPDATING: need to do some careful rearranging here to avoid breaking module 
+
 =head2 run
 
   Title   : run
   Usage   : $self->run()
             or
-            $self->run("genomic.seq", "est.seq")
+            $self->run("genomic.seq", "est.seq", 'tmp')
   Function: Runs est2genome and stores results as FeaturePairs
-  Returns : TRUE on success, FALSE on failure.
-  Args    : Temporary filenames for genomic and est sequences
+  Returns : none
+  Args    : Temporary filenames for genomic and est sequences and working directory
 
 =cut
 
 sub run {
     my ($self, @args) = @_;
-    
-    # some constant strings
-    my $source_tag  = "est2genome";
-    my $primary_tag = "similarity";
-    my $dirname     = "/tmp";
-
-    #flag for est strand orientation
-    my $estOrientation; 
-    
-    #check inputs
-    my $genomicseq = $self->genomic_sequence ||
-        $self->throw("Genomic sequence not provided");
-    my $estseq = $self->est_sequence ||
-        $self->throw("EST sequence not provided");
-    
-    #extract filenames from args and check/create files and directory
-    my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
-    my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
-        
-    #use appropriate Bio::Seq method to write fasta format files
-    {
-        my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
-                    or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
-        my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
-                    or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
-
-        #fill inputs
-        $genOutput->write_seq($self->{'_genomic_sequence'}); 
-        $estOutput->write_seq($self->{'_est_sequence'});
-
-    }
-        
+    my ($genname, $estname, $dir) = $self->_rearrange(['genomic', 'est', 'dir'], @args);
+    #check clone
+    my $seq = $self->clone() || $self->throw("Clone required for Genscan\n");
+    #set directory if provided
+    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->checkdir();
+    #write sequences to file - pass method names required for access to Bio::Seq's
+    $self->writefile('genomic_sequence', 'filename');
+    $self->writefile('est_sequence', 'estfilename');
+    #run genscan       
+    $self->run_est_genome();
+    #parse output and create features
+    $self->parse_results();
+    $self->deletefiles();
+}
+ 
+sub run_est_genome {
+    my ($self) = @_;        
     #run est_genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
 
-    eval {
-      print (STDERR "Running command $est_genome_command\n");
-      open (ESTGENOME, $est_genome_command) 
-	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
-      
+    print (STDERR "Running est_genome\n");
+    system ($self->est_genome." ".$self->arguments
+                      ." -genome ".$self->filename." -est "
+                      .$self->estfilename. " > ".$self->results)
+	or $self->throw("Failed running from est_genome : $!");
+}
+
+sub parse_results {
+      my ($self) = @_;
       #Use the first line to get EST orientation
+      open (ESTGENOME, '<'.$self->results) 
+            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
       my $firstline = <ESTGENOME>;
+      
+      my $estOrientation;
       if ($firstline =~ /reverse/i) {$estOrientation = -1;}
       else {$estOrientation = 1}
       
       #read output
       while (<ESTGENOME>) {
 
-	if ($_ =~ /^Segment/) {
+	  if ($_ =~ /^Segment/) {
 
 	  print STDERR "$_";
 	  #split on whitespace
 	  my @elements = split;
       
+      my (%feat1, %feat2);
 	  #extract values from output line
-	  my $f1score  = $elements[2];
-	  my $f1start  = $elements[3];
-	  my $f1end    = $elements[4];
-	  my $f1id     = $elements[5];
-	  my ($f2start, $f2end);
-	  my $f2id     = $elements[8];
-	  my $f1source = $source_tag;
-	  my $f2source = $source_tag;
-	  my $f1strand = 1;
-	  my $f2strand = $estOrientation;
-	  my $f1primary = $primary_tag;
-	  my $f2primary = $primary_tag;
+	  $feat1 {score}  = $elements[2];
+      $feat2 {score}  = $feat1 {score};
+	  $feat1 {start}  = $elements[3];
+	  $feat1 {end}    = $elements[4];
+	  $feat1 {name}   = $elements[5];
+	  $feat2 {name}   = $elements[8];
+	  $feat1 {source} = 'est_genome';
+	  $feat2 {source} = 'est_genome';
+	  $feat1 {strand} = 1;
+	  $feat2 {strand} = $estOrientation;
+	  $feat1 {primary} = 'similarity';
+	  $feat2 {primary} = 'similarity';
 	  #ensure start is always less than end
 	  if ($elements[6] < $elements[7])
-	    {
-	      $f2start =  $elements[6]; 
-	      $f2end = $elements[7];
-	    }
+	      {
+	        $feat2 {start} =  $elements[6];
+	        $feat2 {end} = $elements[7];
+	      }
 	  else
-	    {
-	      $f2start =  $elements[7]; 
-	      $f2end = $elements[6];
-	    }              
+	      {
+	        $feat2 {start} =  $elements[7];
+	        $feat2 {end} = $elements[6];
+	      }
+      $feat2 {db} = undef;
+      $feat2 {db_version} = undef;
+      $feat2 {program} = 'est_genome';
+      $feat2 {p_version} = 'unknown';
 	  #create array of featurepairs              
-	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
-				  $f2start, $f2end, $f2id, $f1source, 
-				  $f2source, $f1strand, $f2strand, 
-				  $f1primary, $f2primary);
+	  $self->createfeaturepair (\%feat1, \%feat2);
         }    
       }
       close(ESTGENOME);
-    };
-    #clean up temp files
-    $self->_deletefiles($genfile, $estfile);
-    if ($@) {
-        $self->throw("Error running est_genome [$@]\n");
-    } else {
-        return 1;
-    }
 }
+
+##############
+# input/output methods
+#############
 
 =head2 output
 
@@ -326,117 +339,3 @@ sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
 }
-
-sub _createfeatures {
-    my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
-    
-    #create analysis object
-    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => undef,
-                                 -db_version      => undef,
-                                 -program         => "est_genome",
-                                 -program_version => "unknown",
-                                 -gff_source      => $f1source,
-                                 -gff_feature     => $f1primary,);
-    
-
-    #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>   $f1start,
-                                              -end =>      $f1end,
-                                              -seqname =>  $f1id,
-                                              -strand =>   $f1strand,
-                                              -score =>    $f1score,
-                                              -source_tag =>   $f1source,
-                                              -primary_tag =>  $f1primary,
-                                              -analysis => $analysis_obj );
-     
-   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
-                                                -end =>      $f2end,
-                                                -seqname =>  $f2id,
-                                                -strand =>   $f2strand,
-                                                -score =>    $f1score,
-                                                -source_tag =>   $f2source,
-                                                -primary_tag =>  $f2primary,
-                                                -analysis => $analysis_obj );
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-                                             -feature2 => $feat2) ;
-
-    $self->_growfplist($fp); 
-}
-
-sub _growfplist {
-    my ($self, $fp) =@_;
-    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
-}
-
-sub _createfiles {
-    my ($self, $genfile, $estfile, $dirname)= @_;
-    
-    #check for diskspace
-    my $spacelimit = 0.01; # 0.01Gb or about 10 MB
-    my $dir ="./";
-    unless ($self->_diskspace($dir, $spacelimit)) 
-    {
-        $self->throw("Not enough disk space ($spacelimit Gb required)");
-    }
-            
-    #if names not provided create unique names based on process ID    
-    $genfile = $self->_getname("genfile") unless ($genfile);
-    $estfile = $self->_getname("estfile") unless ($estfile);    
-    
-    # Should check we can write to this directory 
-    $self->throw("No directory $dirname") unless -e $dirname;
-
-    #chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
-    return ($genfile, $estfile);
-}
-    
-sub _getname {
-    my ($self, $typename) = @_;
-    return  $typename."_".$$.".fn"; 
-}
-
-sub _diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!");
-}
-
-sub _deletefiles {
-    my ($self, @files) = @_;
-    
-    my $unlinked = unlink(@files);
-
-    if ($unlinked == @files) {
-        return 1;
-    } else {
-        my @fails = grep -e, @files;
-        $self->throw("Failed to remove @fails : $!\n");
-    }
-}
-
-
-
-
