@@ -273,7 +273,7 @@ sub fetch_input {
 
   foreach my $feat(@$allfeatures){
     unless(defined($feat->analysis) && 
-           defined($feat->score) && 
+           defined($feat->score) &&
            defined($feat->analysis->db) && 
            $feat->analysis->db eq $est_source) {
       $self->warn( "FilterESTs_and_E2G: something went wrong:\n" .
@@ -513,6 +513,7 @@ sub make_genes {
   my @genes;
   
   foreach my $tmpf(@$results) {
+
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
@@ -526,6 +527,7 @@ sub make_genes {
     # and store it
     push(@genes,$gene);
   }
+
   return @genes;
 
 }
@@ -571,8 +573,7 @@ sub make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->temporary_id($slice->id . ".$genetype.$count.$excount");
-    $exon->contig_id   ($slice->id);
+    $exon->temporary_id($slice->name . ".$genetype.$count.$excount");
     $exon->start       ($exon_pred->start);
     $exon->end         ($exon_pred->end);
     $exon->strand      ($exon_pred->strand);
