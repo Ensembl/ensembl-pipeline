@@ -21,6 +21,14 @@ public class ModelElement{
   public static String X = "X";
   public static String Y = "Y";
   
+  public static String ANALYSIS_STATUS_COUNT = "ANALYSIS_STATUS_COUNT";
+  public static String FINISHED_COUNT = "FINISHED_COUNT";
+  public static String CREATED = "FINISHED_COUNT";
+  public static String FAILED = "FINISHED_COUNT";
+  public static String READING = "FINISHED_COUNT";
+  public static String RUNNING = "FINISHED_COUNT";
+  public static String SUBMITTED = "FINISHED_COUNT";
+  
   public ModelElement(String key){
     this.key = key;
   }
@@ -38,7 +46,7 @@ public class ModelElement{
     return childElements;
   }
   
-  protected HashMap getProperties(){
+  public HashMap getProperties(){
     return properties;
   }
   

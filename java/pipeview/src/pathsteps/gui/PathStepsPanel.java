@@ -1,4 +1,5 @@
 package pathsteps.gui;
+import pathsteps.gui.graph.PipeViewGraph;
 import pathsteps.model.*;
 import pathsteps.common.*;
 import javax.swing.*;
@@ -20,7 +21,7 @@ public class PathStepsPanel extends JPanel{
   public static int ROW_SPACING = 100; //pixels
   public static int COLUMN_SPACING = 100; //pixels
   public static int RECTANGLE_WIDTH = 125;
-  public static int RECTANGLE_HEIGHT = 25;
+  public static int RECTANGLE_HEIGHT = 75;
   //stores the maps of modelelementKey -> (x-y) position of each analysis name
   private HashMap keyToPositionMap = new HashMap();
   
@@ -70,7 +71,7 @@ public class PathStepsPanel extends JPanel{
     this.view = view;
     setLayout(new GridBagLayout());
     setGraphModel(new DefaultGraphModel());
-    setGraph(new JGraph(getGraphModel()));
+    setGraph(new PipeViewGraph(getGraphModel()));
     setScrollPane(new JScrollPane(getGraph()));
     getScrollPane().setPreferredSize(new Dimension(700, 700));
     getScrollPane().setMinimumSize(new Dimension(700, 700));
@@ -380,10 +381,20 @@ public class PathStepsPanel extends JPanel{
     int row;
     ArrayList list = new ArrayList();
     Comparator inverseChildNumber = new PathStepsPanel.InverseChildNumberComparator();
+    Map elementMap = (Map)graphRoot.getProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES_MAP);
+    String finalLabel = "";
+    String minimumString = "SubmitSlice";
+    int minimumWidth = getFontMetrics().stringWidth(minimumString)+15;
     
     for(int i=0; i<nodes.length; i++){
+      
       width = getFontMetrics().stringWidth(nodePositionsAndLabels[i].lbl)+15;
+      if(width < minimumWidth){
+        width = minimumWidth;
+      }
+      
       drawRectangle(
+        (ModelElement)elementMap.get(nodePositionsAndLabels[i].lbl),
         (new Long(Math.round(nodes[i].x))).intValue(), 
         (new Long(Math.round(nodes[i].y))).intValue(), 
         width, 
@@ -407,7 +418,7 @@ public class PathStepsPanel extends JPanel{
   
   private void recreateGraph(){
     remove(getScrollPane());
-    setGraph(new JGraph(getGraphModel()));
+    setGraph(new PipeViewGraph(getGraphModel()));
     //getView().connectToSelectionEventRouter(getGraph(), getView().SELECT_GRAPH_NODE_PARENTS_KEY);
     GridBagConstraints constraints = new GridBagConstraints();
     constraints.gridx = 0;
@@ -464,42 +475,6 @@ public class PathStepsPanel extends JPanel{
    * Draw a row of rectangles, one for each element of the list, at the
    * indicated row
   **/
-  private void drawRectangles(ArrayList list, int iterate){
-    ModelElement element = null;
-    ModelElement parent = null;
-    Iterator parents = null;
-    int width = 0;
-    Dyad dyad = null;
-    int row;
-    int column;
-    
-    //setGraphModel(new DefaultGraphModel());
-    
-    for(int counter=0; counter<list.size(); counter++){
-      element = (ModelElement)list.get(counter);
-      dyad = (Dyad)getKeyToPositionMap().get(element.getKey());
-      column = dyad.x;
-      row = dyad.y;
-      width = getFontMetrics().stringWidth(element.getKey())+15;
-
-      if(!getDrawnSet().contains(element.getKey())){
-        drawRectangle(
-          column*COLUMN_SPACING, 
-          row*ROW_SPACING, 
-          width, 
-          RECTANGLE_HEIGHT, 
-          element.getKey()
-        );
-        
-        getDrawnSet().add(element.getKey());
-      }
-      
-      if(getView().getLogger().isLoggingHigh()){
-        getView().getLogger().logHigh("Created graph cell "+element.getKey()+" at "+row+","+column);
-      }
-    }
-  }
-
   private ArrayList recordEdges(int iterate, java.util.List list){
     Iterator elements = list.iterator();
     ModelElement element;
@@ -545,7 +520,7 @@ public class PathStepsPanel extends JPanel{
         }//end while
       }//end if
     }//end for
-  }//end drawRectangles
+  }
   
   private void drawLineBetween(ModelElement parent, ModelElement child){
     DefaultEdge edge = new DefaultEdge();
@@ -565,6 +540,7 @@ public class PathStepsPanel extends JPanel{
   }
   
   private void drawRectangle(
+    ModelElement element,
     int x, 
     int y, 
     int width, 
@@ -576,6 +552,11 @@ public class PathStepsPanel extends JPanel{
     GraphConstants.setBounds(cellMap, new Rectangle(x, y, width,height));
     GraphConstants.setBorderColor(cellMap, Color.black);
     GraphConstants.setOpaque(cellMap, true);
+    
+    //copy over all the properties of this cell node in the model into 
+    //the properties of the graph model's node.
+    cellMap.putAll(element.getProperties());
+    
     DefaultPort port;
     HashMap cellToAttributesMap = new HashMap();
     
@@ -587,7 +568,6 @@ public class PathStepsPanel extends JPanel{
     getElementPortMap().put(elementKey, port);
     getGraphAttributeMap().put(elementKey, cellMap);
     getCellMap().put(elementKey, cell);
-    System.out.println(" >>>> created key "+elementKey+" with cell: "+cell.hashCode()+" with bounds: "+x+" "+y);
   }
   
   public void update(PathStepsModel model){
