@@ -76,24 +76,7 @@ sub validate_Transcript {
   return undef unless defined $coverage;
 
   # Do we really need to do this? Can we just take out the dbID adaptor stuff
-  # make a new transcript that's a copy of all the important parts of the old one
-  # but without all the db specific gubbins
-  
-  my $newtranscript  = new Bio::EnsEMBL::Transcript;
-  my $newtranslation = new Bio::EnsEMBL::Translation;
-  
-  $newtranscript->translation($newtranslation);
-  $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
-  $newtranscript->translation->end_Exon($transcript->translation->end_Exon);
-  $newtranscript->translation->start($transcript->translation->start);
-  $newtranscript->translation->end($transcript->translation->end);
-  
-  foreach my $exon(@{$transcript->get_all_Exons}){
-    $newtranscript->add_Exon($exon);
-    foreach my $sf(@{$exon->get_all_supporting_features}){
-      $sf->seqname($exon->contig->name);
-    }
-  }
+  my $newtranscript  = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($transcript);
 
   # split transcript if necessary - at present in practice all Similarity transcripts 
   # will be run through split_transcripts but very good Targetted predictions having 
