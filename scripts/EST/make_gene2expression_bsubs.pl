@@ -25,19 +25,19 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToEpression qw (
-								     EST_TMPDIR
-								     EST_REFDBHOST
-								     EST_REFDBUSER
-								     EST_REFDBNAME
-								     EST_QUEUE
-								     EST_TMPDIR
-								     EST_EXPRESSION_RUNNER
-								     EST_EXPRESSION_CHUNKSIZE
-								     EST_EXPRESSION_BSUBS
-								     EST_EXPRESSION_RUNNABLE
-								     EST_EXPRESSION_ANALYSIS    
-								    );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw (
+								      EST_TMPDIR
+								      EST_REFDBHOST
+								      EST_REFDBUSER
+								      EST_REFDBNAME
+								      EST_QUEUE
+								      EST_TMPDIR
+								      EST_EXPRESSION_RUNNER
+								      EST_EXPRESSION_CHUNKSIZE
+								      EST_EXPRESSION_BSUBS
+								      EST_EXPRESSION_RUNNABLE
+								      EST_EXPRESSION_ANALYSIS    
+								     );
 
 my %chrhash;
 
@@ -64,15 +64,7 @@ my $gene2expression_dir   = "gene2ests";
 =cut
 
 sub make_directories {
-  my $scratchdir =  $EST_TMPDIR ;
-
-  # bsub output directories
-  my $bsubdir = $scratchdir . "/" . $blat_bsubdir . "/";
-  my $bsuberr = $bsubdir . "stderr/";
-  my $bsubout = $bsubdir . "stdout/";
-  makedir($bsubdir);
-  makedir($bsuberr);
-  makedir($bsubout);
+  my $scratchdir =  $EST_TMPDIR;
 
   # MapGeneToExpression directories
   my $gene2expression_path = $scratchdir . "/" . $gene2expression_dir . "/";
@@ -153,7 +145,7 @@ sub make_MapGeneToExpression_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
 
       # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$script -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$script -check -runnable $runnable -analysis $analysis\" $script -runnable $runnable -analysis $analysis -input_id $input_id -write";
       print OUT "$command\n";
       
       $count = $count + $size;
