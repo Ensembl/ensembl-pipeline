@@ -239,18 +239,18 @@ sub compare{
       
   }
   elsif( $self->comparison_level == 1 ){
-      ($merge, $overlaps) = $self->_test_for_strict_merge(     $tran1, $tran2 );
+    ($merge, $overlaps) = $self->_test_for_strict_merge( $tran1, $tran2 );
   }
   elsif( $self->comparison_level == 5 ){
-      # this will not check any differences in the splice sites
-      if ( defined $self->intron_mismatch ){
-	  ($merge, $overlaps) = $self->_test_for_Merge_allow_small_introns( $tran1, $tran2 );
-      }
-      else{
-	  ($merge, $overlaps) = $self->_test_for_merge(     $tran1, $tran2 );
-      }
+    # this will not check any differences in the splice sites
+    if ( defined $self->intron_mismatch ){
+      ($merge, $overlaps) = $self->_test_for_Merge_allow_small_introns( $tran1, $tran2 );
+    }
+    else{
+      ($merge, $overlaps) = $self->_test_for_merge(     $tran1, $tran2 );
+    }
   }
-
+  
   return ($merge,$overlaps);
 }
   
@@ -259,6 +259,26 @@ sub compare{
 # METHODS CALLED BY 'COMPARE' - DOING THE ACTUAL COMPARISON, ETC...
 #
 ############################################################
+
+
+
+sub _test_for_strict_merge{
+  my ( $self, $tran1, $tran2 ) = @_;
+  my @exons1 = sort { $a->start <=> $b->start } @{$tran1->get_all_Exons};
+  my @exons2 = sort { $a->start <=> $b->start } @{$tran2->get_all_Exons};	
+  
+  unless ( scalar(@exons1) == scalar(@exons2) ){
+    return 0;
+  }
+
+  for ( my $i=0; $i<=$#exons1; $i++ ){
+    unless ( $exons1[$i]->start == $exons2[$i]->start && $exons1[$i]->end == $exons2[$i]->end ){
+      return 0;
+    }
+  }
+  return 1;
+}
+      
 
 
 =head2 _test_for_Merge_allow_small_introns
