@@ -11,8 +11,8 @@ ok(1);
 
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
-$ens_test->do_sql_file("t/chr12_snippet.dump");
-$ens_test->do_sql_file("t/slice_eponine.dump");
+$ens_test->do_sql_file("t/dumps/chr12_snippet.dump");
+$ens_test->do_sql_file("t/dumps/slice_eponine.dump");
     
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
