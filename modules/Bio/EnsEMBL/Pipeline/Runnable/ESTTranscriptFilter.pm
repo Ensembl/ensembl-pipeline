@@ -196,8 +196,8 @@ sub filter {
  
   if ( $verbose ){
     foreach my $est ( @filtered_by_length ){
-      print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n" ;
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
+      #print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n" ;
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
     }
   }
   
@@ -213,9 +213,12 @@ sub filter {
     
     if ( $self->depth_threshold ){
       foreach my $exon ( @{$t->get_all_Exons} ){
-	
-	$exon2est{$exon} = $t;
-	push( @accepted_exons, $exon );
+        if ($verbose){
+          #print STDERR "taking: ";
+          #$self->_print_EST($t);
+        }
+        $exon2est{$exon} = $t;
+        push( @accepted_exons, $exon );
 	
       }
     }
@@ -231,10 +234,10 @@ sub filter {
     my @accepted_ests = $self->depth_filter( \@accepted_exons, \%exon2est );
     
     if ($verbose){
-      print STDERR "final list:\n";
+      #print STDERR "final list:\n";
       foreach my $est ( @accepted_ests ){ 
-	print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n"; 
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est); 
+	#print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n"; 
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est); 
       } 
     }
     
@@ -272,12 +275,13 @@ sub filter_by_length{
     my $median = 0;
     my $strand = 1;
     foreach my $est ( @$ests ){
-	#print STDERR "est is a $est\n";
+      #print STDERR "est is a $est\n";
 	#print STDERR "exons: ".scalar( @{$est->get_all_Exons} )."\n";
       my @exons = sort { $a->start <=> $b->start } @{$est->get_all_Exons};
       $strand = -1 if $exons[0]->strand == -1;
       # we consider the genomic extension of the transcripts
       # this will not favour big unspliced ESTs over spliced ones with small exons
+      #print STDERR "end ".$exons[-1]->end." start ".$exons[0]->start."\n";
       my $length = $exons[-1]->end - $exons[0]->start + 1 ;  
       push( @length_list, $length );
       push( @{ $lengths{ 10*int($length/10 + 1) } }, $est );
@@ -285,33 +289,36 @@ sub filter_by_length{
     }
     $mean /= scalar( @$ests );
     print STDERR "mean length = $mean\n" if $verbose;
-    if ( scalar(@length_list)>2 ){
-      if ( scalar(@length_list)%2 == 0 ){
-	my $i1 = scalar(@length_list)/2;
-	my $i2 = $i1 - 1;
-	$median = ($length_list[$i1] + $length_list[$i2])/2;
+    print STDERR "number of exon lengths ".@length_list."\n";
+    my @sorted_lengths = sort{$a <=> $b} @length_list;
+    if ( scalar(@sorted_lengths)>2 ){
+      print @sorted_lengths."\n";
+      if ( scalar(@sorted_lengths)%2 == 0 ){
+        my $i1 = scalar(@sorted_lengths)/2;
+        my $i2 = $i1 - 1;
+        $median = ($sorted_lengths[$i1] + $sorted_lengths[$i2])/2;
+      }else{
+        my $i = ( scalar(@sorted_lengths) -1 )/2;
+        $median = $sorted_lengths[$i];
       }
-      else{
-	my $i = ( scalar(@length_list) -1 )/2;
-	$median = $length_list[$i];
-      }
-    }
-    else{
+      print STDERR $median."\n";
+    }else{
       $median = $mean;
     }
-    print STDERR "median length = $median\n" if $verbose;
+    #print STDERR "median length = $median\n" if $verbose;
 
     #test
     if ($verbose && $strand == 1){
       foreach my $key ( sort { $a <=> $b } keys %lengths ){
-	print STDERR "$key\t".scalar( @{ $lengths{$key} })."\n";
+        #print STDERR "$key\t".scalar( @{ $lengths{$key} })."\n";
       }
     }
   
     my @selected;
     foreach my $key ( keys %lengths ){
-      next unless $key >= int($median);
-      push( @selected, @{ $lengths{$key} });
+      if($key >= int($median)){
+        push( @selected, @{ $lengths{$key} });
+      }
     }
     return @selected;
 }
@@ -406,8 +413,8 @@ sub depth_filter {
       if ( $count >= $depth ){
 	$banned{$est} = 1 ;
 	if ($verbose){
-	  print STDERR "rejecting: ";
-	  $self->_print_EST($est);
+	  #print STDERR "rejecting: ";
+	  #$self->_print_EST($est);
 	}
       }
       
@@ -416,8 +423,8 @@ sub depth_filter {
 	  push( @accepted_ests, $est );
 	  $taken{$est} = 1;
 	  if ($verbose){
-	    print STDERR "taking: ";
-	    $self->_print_EST($est);
+	    #print STDERR "taking: ";
+	    #$self->_print_EST($est);
 	  }
 	}
 	$count++;
@@ -428,8 +435,8 @@ sub depth_filter {
   if ($verbose){
     print STDERR "returning ".scalar(@accepted_ests)." ests after scores and depth filtering\n";
     foreach my $est ( @accepted_ests ){
-      print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
+      #print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
     }
   }
   return @accepted_ests;
