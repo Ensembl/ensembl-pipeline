@@ -236,7 +236,7 @@ sub get_analysis{
   my $anaAdaptor = $db->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
-  my $db = $::est_genome_conf{'est_source'};
+  my $dbest = $::est_genome_conf{'est_source'};
 
   if(scalar(@analyses) > 1){
     die("panic! > 1 analysis for $logicname\n");
@@ -247,7 +247,7 @@ sub get_analysis{
   else{
 # only need to insert ONCE.
     $analysis = new Bio::EnsEMBL::Analysis(
-					   -db              => $db,
+					   -db              => $dbest,
 					   -db_version      => 1,
 					   -program         => 'exonerate',
 					   -program_version => 3,
