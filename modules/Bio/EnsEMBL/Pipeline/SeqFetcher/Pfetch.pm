@@ -51,12 +51,16 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my($exe) = $self->_rearrange(['EXECUTABLE'], @args);
+  my ($exe, $options) = $self->_rearrange(['EXECUTABLE', 'OPTIONS'], @args);
 
   if (!defined $exe) {
     $exe = 'pfetch';
   }
   $self->executable($exe);
+
+  if (defined $options) {
+    $self->options($options);
+  }
   
   return $self; # success - we hope!
 }
@@ -80,6 +84,26 @@ sub executable {
   return $self->{'_exe'};  
 }
 
+=head2 options
+
+  Title   : options
+  Usage   : $self->options('tc');
+  Function: Get/set for options to pfetch
+  Returns : string
+  Args    : string
+
+=cut
+
+sub options {
+
+  my ($self, $options) = @_;
+  if ($options)
+    {
+      $self->{'_options'} = $options;
+    }
+  return $self->{'_options'};  
+
+}
 
 =head2 get_Seq_by_acc
 
@@ -101,8 +125,10 @@ sub  get_Seq_by_acc {
   my $seqstr;
   my $seq;
   my $pfetch = $self->executable;
-  
-  open(IN,"$pfetch -q $acc |") or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
+  my $options = $self->options;
+  $options = '-' . $options unless $options =~ /^-/;
+
+  open(IN,"$pfetch -q $options $acc |") or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
   close IN;
   
