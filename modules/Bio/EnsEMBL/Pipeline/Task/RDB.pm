@@ -173,7 +173,7 @@ sub parameter_strings{
     my $dbport = $config->get_parameter($dbheader, 'port');
 
     my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:";
-    foreach my $l(@{$self->logic_names}){
+    foreach my $l($self->logic_names){
       my $params = $string.$l;
       push(@{$self->{'parameter_strings'}}, $params);
     }
