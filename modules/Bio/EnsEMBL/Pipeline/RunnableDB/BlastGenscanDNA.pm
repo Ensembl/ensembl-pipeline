@@ -106,7 +106,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    #print STDERR "Fetching contig $contigid\n";
+    print STDERR "Fetching contig $contigid\n";
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
     my $genseq    = $contig
@@ -114,11 +114,10 @@ sub fetch_input {
 
     $self->genseq($genseq);
     my @genscan_peps = 
-      $self->db->get_PredictionTranscriptAdaptor->fetch_by_Contig($contig, 
-								  'Genscan');
+      @{$self->db->get_PredictionTranscriptAdaptor->fetch_all_by_RawContig($contig,'Genscan')};
     #need to get features predicted by genscan
     $self->transcripts(@genscan_peps);
-    #print STDERR "Got genscan peptides\n";
+    print STDERR "Got genscan peptides @genscan_peps\n";
    
 }
 
@@ -195,7 +194,7 @@ sub run {
             }
         }
     }
-
+		
     my @databases = split ',', ($self->analysis->db_file);
 
     $parameters{'-genomic'} = $self->genseq;
