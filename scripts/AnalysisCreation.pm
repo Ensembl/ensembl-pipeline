@@ -212,8 +212,8 @@ sub write_into_db{
 	  $sth->execute($analysis_id);
 	  my ($type) = $sth->fetchrow;
 	  if($type){
-	    die("need ".$type." to be the same as ".$a->type) 
-	      unless($type eq $a->type);
+	    die("need ".$type." to be the same as ".$a->input_id_type) 
+	      unless($type eq $a->input_id_type);
 	  }else{
 	    my $stored_sql = "insert into input_id_type_analysis ".
 	      "(analysis_id, input_id_type) values(?, ?)";
