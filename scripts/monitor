@@ -9,9 +9,9 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 use Data::Dumper;
 
-my $host   = 'ecs2a';
+my $host   = '';
 my $port   = '3306';
-my $dbname = 'rat_Nov02';
+my $dbname = '';
 my $user   = 'ensro';
 my $pass   = undef;
 my $help            = 0;
@@ -45,10 +45,27 @@ my $lock            = 0;
 	    'nohits=s'          => \$ft_ana_id,
 	    'assembly=s'        => \$assembly_type,
 	    'input_id=s'        => \$input_id,
-	    'help'				=> \$help,
+	    'h|help'				=> \$help,
 	    'lock'              => \$lock
 	   ) or useage();
+
+if(!$host || !$dbname){
+  print STDERR " you must provide a host and a database name for you db ".
+    "connection\n";
+  $help = 1;
+}
+
+if(!$current || !$current_summary || !$finished || !$analysis || !$rules
+   || !$conditions || !$status_analysis || !$unfin || !$ft_ana_id || 
+   !$assembly_type || !$input_id || !$lock){
+  print STDERR "you must provide at least one display option\n";
+  $help = 1;
+}
+
 useage() if $help;
+
+
+
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 						      -user   => $user,
@@ -129,16 +146,20 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head2 [DISPLAY OPTIONS]
 
-   -current               calls the show_current_status method of Monitor.pm
-   -current_summary       calls the show_current_summary method of Monitor.pm
+   -current               shows the jobs currently in the database, 
+   the data is grouped by both analyses and status
+   -current_summary       shows the jobs in the database grouped by status
    -finished              shows the finished jobs summary
    -analysis              shows the analysis table
    -rules                 shows the rule_goal table
    -conditions            shows the rule_conditions table
    -status_analysis S:LN  shows the jobs with Status:Logic_Name
-   -unfinished            shows the unfinished input_ids & analyses in the database.
-   -nohits FT:ANAID       shows clones with no hits in:with Feature_Table:ANAlysis_ID
-   -assembly TYPE         shows unfinished input_ids & analyses in the assembly of TYPE
+   -unfinished            shows the unfinished input_ids & analyses in the 
+   database.
+   -nohits FT:ANAID       shows clones with no hits in:with 
+   Feature_Table:ANAlysis_ID
+   -assembly TYPE         shows unfinished input_ids & analyses in the 
+   assembly of TYPE
    -input_id INPUT_ID     shows unfinished analyses for INPUT_ID
    -lock                  prints information about the pipeline.lock
    
@@ -163,6 +184,6 @@ analysis with ID 20 I<(like Oates, It may be some time)>
 
 =head1 SEE ALSO
 
-Bio::EnsEMBL::Pipeline::Monitor.pm(3)
+Bio::EnsEMBL::Pipeline::Monitor.pm
 
 =cut
