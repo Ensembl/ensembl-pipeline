@@ -144,7 +144,13 @@ sub new {
   ############################################################
   # we are using the latest version: exonerate-0.6.7
   #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
-  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  # $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  if ($exonerate) {
+      $self->exonerate($exonerate);
+  }
+  else {
+      $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  }
   
   ############################################################
   # options
@@ -312,7 +318,7 @@ sub run {
     $t_start++;
     
     next unless ( $tag && $tag eq 'RESULT:' );
-    
+
     ############################################################
     # initialize the feature
     my (%query, %target);
