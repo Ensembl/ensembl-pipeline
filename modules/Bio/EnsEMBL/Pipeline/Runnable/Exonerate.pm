@@ -158,11 +158,9 @@ sub genomic_sequence {
 sub est_sequence {
   my( $self, $value ) = @_;
 
-  print STDERR $value."\n";
   if ($value) {
     if (ref($value) eq 'ARRAY') {
       foreach my $est(@$value) {
-	print STDERR "have a ".$est."\n";
 	$est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
       }
       $self->{'_est_sequences'} = $value;
