@@ -58,9 +58,9 @@ if( scalar(@fp) != 3 ) {
   print "ok 4\n";
 }
 
-foreach $s ( @fp ) {
-	print STDERR "got $s ",$s->start,":",$s->end,"\n";
-	}
+#foreach $s ( @fp ) {
+#	print STDERR "got $s ",$s->start,":",$s->end,"\n";
+#	}
 
 
 
