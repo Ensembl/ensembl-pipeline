@@ -307,7 +307,7 @@ sub run {
   
   close(EXO) or $self->throw("couldn't close pipe ");  
   
-  $self->_store_affy_features(@pro_features);
+  $self->_make_affy_features(@pro_features);
 
   #$self->output_match_count(\%match);
   ############################################################
@@ -319,23 +319,30 @@ sub run {
   }
 }
 
-sub _store_affy_features {
+sub _make_affy_features {
   
   
   my ($self,@h) = @_;
   
   ###to make MiscFeature, we need to make slice_obj###
-  
+  ###need to watch out for target fasta sequence title for seq_region_name ###
   foreach my $h (@h) {
     my ($coord_system_name,$seq_region_name,$slice) ;
     
-    if ($h->{'t_id'} =~/Zebrafish/i) {
+    if ($h->{'q_id'} =~/Zebrafish/i) {
       $coord_system_name = undef;
-      ($seq_region_name) = $h->{'t_id'} =~ /^Contig\:(\S+)\..*$/;
     }
     else {
       $coord_system_name = "chromosome";
-      ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
+    }
+    
+    if ($h->{'t_id'} =~ /^(\S+)\-1\-.*$/) {
+      $seq_region_name = $1;
+      $seq_region_name =~ s/\-1$//;
+      #print "seq_region_name is $seq_region_name\n";
+    }
+    elsif ($h->{'t_id'} =~ /^(\S+)\..*$/) {
+      $seq_region_name = $1;
     }
     
     $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name);
@@ -372,12 +379,6 @@ sub _store_affy_features {
       								)
       				 );
     
-    #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeSetName",
-    #								 -NAME   => "Probeset name",
-    #								 -DESCRIPTION => "the name of the probe set",
-    #								 -VALUE  => $probeset_name,
-    #								)
-    #				 );
     
     $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
 								-CODE   => "probeLength",
@@ -390,11 +391,10 @@ sub _store_affy_features {
     $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
 								-CODE   => "matchLength",
 								-NAME   => "Match length",
-								-DESCRIPTION => "number of base matched",
+								-DESCRIPTION => "number of base in matched alignment",
 								-VALUE  => $h->{'matching_length'},
 							       )
 				);
-    
     
     
     $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
