@@ -49,6 +49,7 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::Object;
+use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::SeqIO;

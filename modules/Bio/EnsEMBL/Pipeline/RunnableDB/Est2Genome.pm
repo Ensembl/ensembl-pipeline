@@ -45,6 +45,7 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
+use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use vars qw(@ISA);
 use strict;
 
