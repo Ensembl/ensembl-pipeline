@@ -179,7 +179,14 @@ use vars qw( %ESTConf );
 	    cDNA_DBPASS                  => '',
 	    cDNA_GENETYPE                => '',	  
 
-	   	   
+	    # if you want to map expression data to a set of genes via ESTs, 
+	    # ( see Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression )
+	    # you can specify here the database where those genes are
+	    EST_TARGET_DBNAME            => 'homo_sapiens_core_8_30',
+	    EST_TARGET_DBHOST            => 'ecs2d',
+	    EST_TARGET_DBUSER            => 'ensro',
+	    EST_TARGET_DBPASS            => '',
+	    EST_TARGET_GENETYPE          => 'ensembl',	   
 	   );
 
 sub import {
