@@ -87,6 +87,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
+use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -341,7 +342,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 
   my $verbose = 0;
   
-  print STDERR "=========== comparing ================\n";
+  #print STDERR "=========== comparing ================\n";
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran ) if $verbose;
   
@@ -723,10 +724,10 @@ sub _difuse_small_introns{
       }
     }
     if ($modified){
-      print STDERR "difused transcript:\n";
-      print STDERR "before:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($newtran);
+      #print STDERR "difused transcript:\n";
+      #print STDERR "before:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($newtran);
       return $newtran;
     }
     else{
@@ -1294,12 +1295,12 @@ sub _test_for_merge{
 	  }
       
 	  if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k])) ){
-	      print STDERR "go to next exon2\n";
+	      print STDERR "go to next exon2\n" if $verbose;
 	      $foundlink = 0;
 	      next EXON2;
 	  }
 	  elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k])) ){
-	      print STDERR "link is broken, not merging\n";
+	      print STDERR "link is broken, not merging\n" if $verbose;
 	      $foundlink = 0;
 	      $merge = 0;
 	      last EXON1;
@@ -1317,7 +1318,7 @@ sub _test_for_merge{
 		  #else{
 		  print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
 		  $object_map->match( $exons1[$j], $exons2[$k] );
-		  print STDERR "end of transcripts - there is potential merge|\n";
+		  print STDERR "end of transcripts - there is potential merge|\n" if $verbose;
 		  $merge = 1;
 		  $overlaps++;
 		  $foundlink = 1;
@@ -1351,8 +1352,8 @@ sub _test_for_merge{
   my @list1 = $object_map->list1();
   my @list2 = $object_map->list2();
   
-  print STDERR scalar(@list1)." elements in list 1\n";
-  print STDERR scalar(@list2)." elements in list 2\n";
+  #print STDERR scalar(@list1)." elements in list 1\n";
+  #print STDERR scalar(@list2)." elements in list 2\n";
   
   ############################################################
   # the simplest case: when they match over one exon only:
@@ -1410,7 +1411,7 @@ sub _test_for_merge{
 		&&
 		$list1[0]->start - $list2[0]->start <=$splice_mismatch 
 		)
-	     ){
+	   ){
 	  print STDERR "here 2 --- merge ---\n" if $verbose;
 	  return (1,1);
       }
