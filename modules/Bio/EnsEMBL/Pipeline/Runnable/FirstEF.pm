@@ -266,6 +266,7 @@ sub _firstef {
 
     my $hosttype = <HOSTTYPE>;
     chomp $hosttype;
+    $hosttype = lc $hosttype;
     
     close (HOSTTYPE);
 
