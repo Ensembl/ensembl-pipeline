@@ -16,8 +16,8 @@ my $outdir;
 	    'outdir:s'        => \$outdir,
 	    );
 
-unless ( $dbhost && $dbname ){
-    print  "Usage: $0 [-dbname -dbhost ]\n";
+unless ( $dbhost && $dbname && $outdir ){
+    print  "Usage: $0 -dbname -dbhost -outdir\n";
     exit(0);
 }
 
