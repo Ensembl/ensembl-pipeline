@@ -222,6 +222,7 @@ sub _align_protein {
       $curr_gff->id ($self->protein->id . ".$count"); 
       
       $count++;
+
     }
     else {
       
@@ -288,7 +289,8 @@ sub _align_protein {
       
       elsif ( $f[2] eq '"INSERT_STATE"' ) {
 	$exon_pos += 3 unless ($prev_state eq 'INTRON' || $prev_state eq 'SEQINDEL');
-	$exon_pos += 1 if ($prev_state eq 'INTRON');
+	$exon_pos += $albphase if ($prev_state eq 'INTRON');
+
 	$prev_state = 'INSERT';
       }
       
@@ -372,13 +374,22 @@ sub _align_protein {
       
       my $nfp = new Bio::EnsEMBL::FeaturePair( -feature1 => $aln->feature2,
 					       -feature2 => $aln->feature1);
-#      print STDERR "\npair->feature1\n";
-#      print STDERR $pair->feature1->start . " " . $pair->feature1->end . " " . $pair->feature1->strand. "\n";
-#      print STDERR "nfp\n";
-#      print STDERR $nfp->feature1->start . " " . $nfp->feature1->end . " " . $nfp->feature1->strand. "\n";
-#      print STDERR $nfp->feature2->start . " " . $nfp->feature2->end . " " . $nfp->feature2->strand. "\n";
 
-      $pair->feature1->add_sub_SeqFeature($nfp,'');
+      # final screening out of off by one errors
+      if($nfp->feature1->start  >= $pair->feature1->start &&
+	 $nfp->feature1->end    <= $pair->feature1->end    &&
+	 $nfp->feature1->strand == $pair->feature1->strand){
+
+	$pair->feature1->add_sub_SeqFeature($nfp,'');
+      }
+      
+      else{
+	print STDERR "\n***double rats: coordinate mismatch; can't write supporting_features\n"; 
+	print STDERR "\tpair->feature1\n";
+	print STDERR "\t" . $pair->feature1->start . " " . $pair->feature1->end . " " . $pair->feature1->strand. "\n";
+	print STDERR "\tnfp\n";
+	print STDERR "\t" . $nfp->feature1->start . " " . $nfp->feature1->end . " " . $nfp->feature1->strand. "\n";
+      }
     }
     
     # and flush feature2
