@@ -393,13 +393,12 @@ sub write_output {
       $f->analysis($self->analysis);
 
       unless ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
-        print $f->gffstring . "\n";
-        $f->attach_seq($contig);
+        $f->slice($contig);
       }
 
       if ($f->isa("Bio::EnsEMBL::PredictionTranscript")) {
 	foreach my $exon (@{$f->get_all_Exons}) {
-	  $exon->contig($contig);
+	  $exon->slice($contig);
 	}
 
 	if (!defined($features{prediction})) {
@@ -453,7 +452,7 @@ sub write_output {
       } elsif ($f->isa("Bio::EnsEMBL:Gene")) {
 
 	  foreach my $exon (@{$f->get_all_Exons}) {
-	    $exon->contig($contig);
+	    $exon->slice($contig);
 	  }
 	  if (!defined($features{gene})) {
 	    $features{gene} = [];
