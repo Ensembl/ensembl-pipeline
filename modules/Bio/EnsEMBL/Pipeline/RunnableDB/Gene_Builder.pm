@@ -97,13 +97,13 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
+    my( $use_vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
        
-    if (! defined $vcontig) {
-       $GB_VCONTIG;
+    if (! defined $use_vcontig) {
+       $use_vcontig = $GB_VCONTIG;
      }  
     
-    $self->vcontig($vcontig);
+    $self->use_vcontig($use_vcontig);
     
     $self->extend($extend);
 
@@ -243,7 +243,7 @@ sub write_output {
 	$gene->analysis($analysis_obj);
 	$gene->type($genetype);
 	my $newgene;
-	if ($self->vcontig) {
+	if ($self->use_vcontig) {
 	  $newgene = $vc->convert_Gene_to_raw_contig($gene);
 	}
 	else {
@@ -287,7 +287,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig;
 
-    if ($self->vcontig) {
+    if ($self->use_vcontig) {
       my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
       
       $contigid =~ /(.*)\.(.*)\-(.*)/;
@@ -323,7 +323,7 @@ sub focuscontig {
     return $self->{_contig};
 }
 
-sub vcontig {
+sub use_vcontig {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
