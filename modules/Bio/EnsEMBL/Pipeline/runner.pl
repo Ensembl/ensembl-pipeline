@@ -40,7 +40,7 @@ or die ("Couldn't get options");
 if( defined $check ) {
   my $host = hostname();
   if ( ! -e $output_dir ) {
-    die "no nfs connection";
+    die "output dir $output_dir doesn't exist according to host $host";
   }
   my $deadhostfile = "$output_dir/deadhosts";
   open( FILE, $deadhostfile ) or exit 0;
