@@ -205,7 +205,7 @@ sub flush {
 			
       #add the job name and array index
       push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
-      $command = "$runner -jobname $lsf_job_name -index %I $dbargs";
+      $command = "$runner -jobname $lsf_job_name -index $dbargs";
     }
 
     #execute the bsub to submit the job or job_array

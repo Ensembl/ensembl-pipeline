@@ -34,7 +34,7 @@ GetOptions(
     'dbname=s'     => \$dbname,
     'dbuser=s'     => \$dbuser,
     'pass=s'       => \$pass,
-    'index=n'        => \$index,
+    'index'        => \$index,
     'jobname=s'      => \$jobname,
     'check!'       => \$check,
     'output_dir=s' => \$output_dir
@@ -69,7 +69,8 @@ print STDERR "Fetching job [$jobname] index [$index]\n";
 my $jobs;
 
 if($index) {
-  $jobs = $job_adaptor->fetch_all_by_job_name($jobname, $index);
+  my $array_index = $ENV{LSB_JOBINDEX};
+  $jobs = $job_adaptor->fetch_all_by_job_name($jobname, $array_index);
 } else {
   $jobs = $job_adaptor->fetch_all_by_job_name($jobname);
 }

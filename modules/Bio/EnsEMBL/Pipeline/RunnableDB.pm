@@ -101,6 +101,9 @@ sub new {
                  -port => $port);
       my $ana_adp = $db->get_AnalysisAdaptor;
       $analysis = $ana_adp->fetch_by_logic_name($logic_name);
+      if(!$analysis){
+	$self->throw("logic name ".$logic_name." didn't get an analysis object from the analysis table are you sure it exists $!");
+      }
     }
     $self->throw("No database handle input") unless defined($db);
     $self->db($db);

@@ -85,10 +85,26 @@ sub input_id_factory{
 =cut
 
 
-sub logic_name{
+sub logic_names{
   my ($self) = @_;
+  
+  if(!$self->{'logic_names'}){
+     my $config = $self->get_Config;
 
-  $self->throw("logic_name should be implemented by subclass $!");
+    if(!$config){
+      $self->throw("PipelineManager ".$self->get_PipelineManager.
+                   " seems to be missing its config $!");
+    }
+     my $logic_names = $config->get_parameter($self->name, 'logic_names');
+     my @logic_names = split /:/, $logic_names;
+     if(@logic_names == 0){
+       $self->throw($self->name." has no logic names defined for it in config $!");
+     }
+     $self->{'logic_names'} = \@logic_names;
+  }
+  
+  return $self->{'logic_names'};
+  
 }
 
 sub module{
@@ -129,24 +145,25 @@ sub get_input_ids{
  return $self->{'input_ids'}; 
 }
 
-=head2 parameter_string
+=head2 parameter_strisng
 
   Arg [1]   : none
   Function  : returns a string which contains information about
   database connection and analysis type required by RunnableDBs
-  Returntype: string
+  Returntype: arrayref
   Exceptions: throws if PipelineManager has no config object
   Caller    : 
-  Example   : my $parameters = $self->parameter_string
+  Example   : my @parameters = @{$self->parameter_strings}
 
 =cut
 
 
-sub parameter_string{
+sub parameter_strings{
   my ($self) = @_;
 
 
-  if(!$self->{'parameter_string'}){
+  if(!$self->{'parameter_strings'}){
+    $self->{'parameter_strings'} = [];
     my $config = $self->get_Config;
 
     if(!$config){
@@ -159,14 +176,15 @@ sub parameter_string{
     my $dbpass = $config->get_parameter($dbheader, 'pass');
     my $dbname = $config->get_parameter($dbheader, 'dbname');
     my $dbport = $config->get_parameter($dbheader, 'port');
-    my $logic_name = $self->logic_name;
 
-    my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:$logic_name";
-    $self->{'parameter_string'} = $string;
-    return $self->{'parameter_string'};
+    my $string = "$dbhost:$dbport:$dbuser:$dbpass:$dbname:";
+    foreach my $l(@{$self->logic_names}){
+      my $params = $string.$l;
+      push(@{$self->{'parameter_strings'}}, $params);
+    }
   }
 
-  return $self->{'parameter_string'};
+  return $self->{'parameter_strings'};
 }
 
 
@@ -284,23 +302,26 @@ sub get_Config{
 
 sub start{
   my $self = shift;
-  my $parameters = $self->parameter_string;
+  my @parameters = @{$self->parameter_strings};
   my $module = $self->module;
   my $potential = $self->input_ids_to_start;
   my $existing = $self->get_TaskStatus->get_existing;
   my $id_set = $potential->not($existing)->subset($self->max_create);
-  eval{
-    $self->create_Jobs($module, 
-		       $id_set, $parameters);
-  };
+  foreach my $parameters(@parameters){
+    eval{
+      $self->create_Jobs($module, 
+			 $id_set, $parameters);
+    };
 
-  if($@){
-    print STDERR "Creation of jobs for ".$self->name." failed $@\n";
-    return 'TASK_FAILED';
+    if($@){
+      print STDERR "Creation of jobs for ".$self->name." failed $@\n";
+      return 'TASK_FAILED';
+    }
   }
 
   return 'TASK_OK'; 
   
 }
+
 
 1;
