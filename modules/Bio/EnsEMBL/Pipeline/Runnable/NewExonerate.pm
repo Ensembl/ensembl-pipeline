@@ -158,13 +158,13 @@ sub new {
 
   ############################################################
   # options
-  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
+  my $basic_options = "--ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
 
   # can add extra options as a string
   if ($options){
     $basic_options .= " ".$options;
   }
-  $self->options( $basic_options);
+  $self->options($basic_options);
 
   return $self;
 }
@@ -211,7 +211,7 @@ sub run {
 
   # Execute command and parse results
 
-  print STDERR "Exonerate command : $command\n" 
+  print STDERR "Exonerate command : $command\n"
     if $self->_verbose;
 
   open( EXO, "$command |" ) || $self->throw("Error running exonerate $!");
@@ -226,332 +226,236 @@ sub run {
 sub parse_results {
   my ($self, $fh) = @_;
 
+  my %strand_lookup = ('+' => 1, '-' => -1, '.' => 0);
+
   # Each alignment will be stored as a transcript with 
-  # supporting features
+  # exons and supporting features.  Initialise our
+  # transcript.
 
   my @transcripts;
 
-  # Begin parsing exonerate output
+  # Parse output looking for lines beginning with 'RESULT:'.
+  # Each line represents a distinct match to one sequence
+  # containing multiple 'exons'.
 
+ TRANSCRIPT:
   while (<$fh>){
 
     print STDERR $_ if $self->_verbose;
-
-      ############################################################
-      # the output is of the format:
-      #
-      # --ryo "RESULT: %S %pi %ql %g %V\n"
-      # 
-      # It shows the alignments in "sugar" + percent_id + gene orientation + "vulgar blocks" format. 
-      #
-      # Sugar contains 9 fields
-      # ( <qy_id> <qy_start> <qy_len> <qy_strand> <tg_id> <tg_start> <tg_len> <tg_strand> <score> ), 
-      # 
-      # The vulgar (Verbose Useful Labelled Gapped Alignment Report) blocks are a series 
-      # of <label, query_length, target_length> triplets. The label may be one of the following: 
-      #
-      # M    Match 
-      # G    Gap 
-      # C    Codon gap 
-      # N    Non-equivalenced region 
-      # 5/F  5' splice site 
-      # 3/T  3' splice site 
-      # I    Intron 
-      #
-      # example:
-      # RESULT: AW793782.1 25 250 + 10_NT_035057.1-141075 104447 126318 + 652 82.88 M 30 30 5 0 2 I 0 21645 3 0 2 M 35 35 G 1 0 M 16 16 G 1 0 M 134 134 G 1 0 M 7 7
-      # 
-      # This gives rise to:
-      # M 30 30  ---> exon
-      # 5 0 2 
-      # I 0 21645 --> intron
-      # 3 0 2 
-      # M 35 35    \
-      # G 1 0      |
-      # M 16 16    |
-      # G 1 0      |-> exon
-      # M 134 134  |
-      # G 1 0      |
-      # M 7 7     /
-      # 
 
     next unless /^RESULT:/;
 
     chomp;
 
-    my ($tag, $q_id, $q_start, $q_end,
-	$q_strand, $t_id, $t_start, $t_end, 
-	$t_strand, $score, $perc_id, $q_length,
-	$gene_orientation, @blocks) = split;
+    my ($tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end,
+	$t_strand, $score, $perc_id, $q_length, $gene_orientation,
+	@align_components) = split;
 
-    # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
-    $q_start++;
-    $t_start++;
+    # Increment all our start coordinates.  Exonerate has a 
+    # coordinate scheme that counts _between_ nucleotides.
 
-    ############################################################
-    # initialize the feature
-    my (%query, %target);
-    my (%rev_query, %rev_target);
+    $q_start++; $t_start++;
 
-    ( $query{score}  , $target{score} )  = ($score,$score);
-    ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
-    ( $query{source} , $target{source} ) = ('exonerate','exonerate');
-    ( $query{name}   , $target{name})    = ( $q_id, $t_id);
+    unless ($t_strand eq '+'){
+      $self->warn("Target strand is not positive [$t_strand].  Was " . 
+		  " not expecting this.");
+      next TRANSCRIPT
+    }
 
-    if ( $q_strand eq '+' ){ $q_strand = 1; }
-    else{ $q_strand = -1; }
-    if ( $t_strand eq '+' ){ $t_strand = 1; }
-    else{ $t_strand = -1; }
+    # Start building our pair of features.
+    my %target = (percent => $perc_id,
+		  source  => 'exonerate',
+		  name    => $t_id,
+		  strand  => $strand_lookup{$t_strand},);
 
-    ( $query{strand} , $target{strand})  = ( $q_strand, $t_strand );
+    # Hmm, what to do with the gene orientation?  Nothing for now.
+    $gene_orientation = $strand_lookup{$gene_orientation};
 
-    ############################################################
-    # coordinates are corrected later according to strand
-    $query{start}  = $q_start;
-    $target{start} = $t_start;
-
-    ############################################################
-    # orientation is not used at the moment
-
-    print STDERR "gene_orientation: $gene_orientation\n" if $self->_verbose;
-
-    if ( $gene_orientation eq '+' ){   $gene_orientation = 1 }
-    elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
-    else{ $gene_orientation = 0 }
-
+    # Initialise the transcript feature that we are about to 
+    # populate with exons.
     my $transcript = Bio::EnsEMBL::Transcript->new();
-    my $exon = Bio::EnsEMBL::Exon->new();
-    my @features;
-    my $in_exon = 0;
-    my $target_gap_length = 0;
 
-    ############################################################
-    # exons are delimited by M - I
-    # supporting features are delimited by M - G  and  M - I
-  TRIAD:
-    for( my $i=0; $i<=$#blocks; $i+=3){
+    # Read vulgar information and extract exon regions.
 
-      # do not look at splice sites now
-      if ( $blocks[$i] eq '5' || $blocks[$i] eq 'F' 
-	   || 
-	   $blocks[$i] eq '3' || $blocks[$i] eq 'T'
-	 ){
-	
-	# the re-set of the coordinates is done in the intron triad
-	next TRIAD;
+    my $q_coord = $q_strand eq '+' ? $q_start : $q_end;
+
+    my $proto_exons = $self->_extract_distinct_exons($t_start, 
+						     $q_coord, 
+						     $q_strand,
+						     \@align_components);
+
+    # Build FeaturePairs for each region of query aligned to a single
+    # Exon.  Create a DnaDnaAlignFeature from these FeaturePairs and then
+    # attach this to our Exon.
+
+    my $target_gaps = 0;
+
+    foreach my $proto_exon (@$proto_exons){
+      my @feature_pairs;
+      my $exon_end    = undef; # Where the overall exon end is tallied.
+      my $exon_start  = undef; # Where the overall exon start is tallied.
+      my $prev_end; # This is used to count gaps in the target/genomic sequence.
+
+      foreach my $exon_frag (@$proto_exon){
+	$target{start} = $exon_frag->{target_start};
+	$target{end}   = $exon_frag->{target_end};
+
+	# Account for genomic sequence gaps.
+	$target_gaps += $exon_frag->{target_start} - $prev_end - 1
+	  if defined $prev_end;
+	$prev_end = $target{end};
+
+	# Watch for the ends of our Exon.
+	$exon_end = $target{end}
+	  if $target{end} > $exon_end;
+	$exon_start = $target{start}
+	  if (($target{start} < $exon_start)||(! $exon_start));
+
+	# Build the query feature for our feature pair
+	my %query = (name    => $q_id,
+		     start   => $exon_frag->{query_start},
+		     end     => $exon_frag->{query_end},
+		     strand  => $strand_lookup{$q_strand},
+		     percent => $perc_id,
+		     source  => 'exonerate',);
+
+	$self->throw("Hit coordinate < 1.")
+	  if (($query{start} < 1) || ($query{end} < 1));
+
+	my $feature_pair = 
+	  $self->create_FeaturePair($target{start}, 
+				    $target{end}, 
+				    $target{strand},
+				    $query{start},
+				    $query{end},
+				    $query{strand},
+				    $query{name},
+				    $query{score},
+				    $query{percent},
+				    0,
+				    $target{name});
+
+	push @feature_pairs, $feature_pair;
       }
 
-      ############################################################
-      # match
-      if ( $blocks[$i] eq 'M' ){
-	if ( $in_exon == 0 ){
-	  $in_exon = 1;
-	
-	  # start a new exon
-	  $exon = Bio::EnsEMBL::Exon->new();
-	  $exon->seqname( $t_id );
-	  $exon->start( $target{start} );
-	  $exon->strand( $t_strand );
-	  $exon->phase( 0 );
-	  $exon->end_phase( 0 );
-	}
-	# for every match we increase the end coordinate of the current exon
-	
-	if ( $exon->end ){
-	  #print STDERR "shifting exon end to ". ($exon->end +  $blocks[$i+2] )."\n";
-	  $exon->end( $exon->end +  $blocks[$i+2] );
-	}
-	else{
-	  #print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
-	  $exon->end( $exon->start +  $blocks[$i+2] - 1 );
-	}
-	#start a new feature pair
-	$query{end}  = $query{start}  + $blocks[$i+1] - 1;
-	$target{end} = $target{start} + $blocks[$i+2] - 1;
-	
-	if ($self->_verbose){
-	  print STDERR "FEATURE:\n";
-	  print STDERR "query length: ".$q_length."\n";
-	  print STDERR "query : $query{start} -  $query{end}\n";
-	  print STDERR "target: $target{start} -  $target{end}\n";
-	}
-	
-	############################################################
-	# if the query has been inverted we count from the end and
-	# invert start and end to inforce start < end
-	
-	%rev_query  = %query;
-	%rev_target = %target;
-
-	if ( $q_strand == -1 ){
-
-	  $rev_query{end}   = $q_length - $query{start} + 1;
-	  $rev_query{start} = $q_length - $query{end} + 1;
-
-	  print STDERR "rev_query{end}   = ".($q_length)." - ".$query{start}." + 1\n" 
-	    if $self->_verbose;
-	  print STDERR "rev_query{start} = ".($q_length)." - ".$query{start}." + 1\n" 
-	    if $self->_verbose;
-
-	  my $feature_pair = $self->create_FeaturePair($rev_target{start}, 
-                                                 $rev_target{end}, 
-                                                 $rev_target{strand},
-                                                 $rev_query{start},
-                                                 $rev_query{end},
-                                                 $rev_query{strand},
-                                                 $rev_query{name},
-                                                 $rev_query{score},
-                                                 $rev_query{percent},
-                                                 0,
-                                                 $rev_target{name});
-
-	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
-
-	  push( @features, $feature_pair);
-	}
-	else{
-	  my $feature_pair = $self->create_FeaturePair($target{start}, 
-                                                 $target{end}, 
-                                                 $target{strand},
-                                                 $query{start},
-                                                 $query{end},
-                                                 $query{strand},
-                                                 $query{name},
-                                                 $query{score},
-                                                 $query{percent},
-                                                 0,
-                                                 $target{name});
-
-	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
-
-	  push( @features, $feature_pair);
-	}
-		
-	
-	# re-set the start:
-	$query{start}  = $query{end}  + 1;
-	$target{start} = $target{end} + 1;
-
+      unless (@feature_pairs){
+	$self->warn("Found an exonerate match that didn't " . 
+		    "have any exonic regions.");
+	next TRANSCRIPT
       }
-      ############################################################
-      # gap
-      if ( $blocks[$i] eq 'G' ){
-	print STDERR "in_exon: $in_exon GAP: $blocks[$i+1] $blocks[$i+2]\n" if $self->_verbose;
-	if ( $in_exon ){
-	  # keep the same exon
-	
-	  # if the gap is in the query, we move the target
-	  if ( $blocks[$i+2] ){
-	    $target{start} += $blocks[$i+2];
-	    # also move the exon:
-	    print STDERR "moving exon end from ". $exon->end. " to ". ( $exon->end + $blocks[$i+2] )."\n" if $self->_verbose;
-	    $exon->end( $exon->end + $blocks[$i+2]); 
-	  }
-	  # if the gap is in the target, we move the query
-	  if ( $blocks[$i+1] ){
-	    $query{start} += $blocks[$i+1];
-	    $target_gap_length += $blocks[$i+1]
-	  }
-	}
-      }
-      ############################################################
-      # intron
-      if( $blocks[$i] eq 'I' ){
-	if ( $in_exon ){
-	  # emit the current exon
-	  if ($self->_verbose){
-	    print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
-	  }
-	
-	  $transcript->add_Exon($exon);
-	
-	  # add the supporting features
-	  my $supp_feature;
-	  eval{
-	    $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
-	  };
-	  print STDERR "intron: adding evidence : ".$supp_feature->gffstring."\n" if $self->_verbose;
-	  $exon->add_supporting_features( $supp_feature );
-	
-	  $in_exon = 0;
-	
-	  @features = ();
-	
-	  # reset the start in the target only
-	  my $intron_length = $blocks[$i+2];
-	  if ( $i>=3 && 
-	       ( $blocks[$i-3] eq '3' || $blocks[$i-3] eq 'T' )
-	       || 
-	       ( $blocks[$i-3] eq '5' || $blocks[$i-3] eq 'F' ) 
-	     ){
-	    $intron_length += 2;
-	  }
-	  if ( ( $blocks[$i+3] eq '5' || $blocks[$i+3] eq 'F' )
-	       || 
-	       ( $blocks[$i+3] eq '3' || $blocks[$i+3] eq 'T' )
-	     ){
-	    $intron_length += 2;
-	  }
 
-	  #print STDERR "intron length = $intron_length\n" if $self->_verbose;
-	  $target{start} += $intron_length;
-	  print STDERR "new target starts at $target{start}\n" if $self->_verbose;
-	}
-      }
-    } # end of TRIAD
+      # Build our exon and set its key values.
+      my $exon = Bio::EnsEMBL::Exon->new();
 
-    ############################################################
-    # emit the last exon and the last set of supporting features
-    # and add the supporting features
-    #print STDERR "created features:\n";
-    #foreach my $f (@features){
-    #print STDERR $f->gffstring."\n";
-    #}
+      $exon->seqname($t_id);
+      $exon->start($exon_start);
+      $exon->end($exon_end);
+      $exon->strand($strand_lookup{$t_strand});
+      $exon->phase(0);
+      $exon->end_phase(0);
 
-    if ($self->_verbose){
-      print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
-    }
-    if ( scalar(@features) ){
+
+      # Use our feature pairs for this exon to create a single 
+      # supporting feature (with cigar line).
       my $supp_feature;
+
       eval{
-	$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
+	$supp_feature =
+	  Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@feature_pairs);
       };
+
       if ($@){
-	print STDERR $@."\n";
+	$self->warn($@);
+	next TRANSCRIPT;
       }
-      #print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $self->_verbose;
-      $exon->add_supporting_features( $supp_feature );
+
+      $exon->add_supporting_features($supp_feature);
+
+      # Finally, add Exon to growing transcript.
+      $transcript->add_Exon($exon);
     }
 
-    $transcript->add_Exon($exon);
+    # Calculate query coverage, now that we have seen all matches.
+    my $coverage = sprintf "%.2f",
+	100 * ($q_end - $q_start + 1 - $target_gaps) / $q_length;
 
-
-    ############################################################
-    # compute coverage
-    # q_start reported by the sugar/cigar lines is one less 
-    # as exonerate counts between lines
-    my $aligned_length = $q_end - ($q_start + 1) + 1;
-
-    my $coverage = sprintf "%.2f", 
-      100 * ( $aligned_length - $target_gap_length ) / $q_length;
-
-    print STDERR "coverage = ( $aligned_length - $target_gap_length ) / " . 
-      $q_length ." =  $coverage\n" 
-	if $self->_verbose;
-
+    # Retrospectively set the coverage for each item of 
+    # supporting evidence.
     foreach my $exon ( @{$transcript->get_all_Exons} ){
       foreach my $evidence ( @{$exon->get_all_supporting_features} ){
 	$evidence->score($coverage);
       }
     }
 
-    push( @transcripts, $transcript );
+    push @transcripts, $transcript 
+      if scalar @{$transcript->get_all_Exons};
+  }
 
-  } # end of while loop
-
-  $self->output( @transcripts );
+  $self->output(@transcripts);
 
   return 1
+}
+
+sub _extract_distinct_exons {
+  my ($self, $target_start, $query_coord, 
+      $query_strand, $vulgar_components) = @_;
+
+  # This method works along the length of a vulgar line 
+  # exon-by-exon.  Matches that comprise an exon are 
+  # grouped and an array of 'proto-exons' is returned.
+  # Coordinates from the vulgar line are extrapolated 
+  # to actual genomic/query coordinates.
+
+  my @exons;
+  my $exon_number = 0;
+  my $cumulative_query_coord  = $query_coord;
+  my $cumulative_target_coord = $target_start;
+
+  while (@$vulgar_components){
+    $self->throw("Something funny has happened to the input vulgar string." .
+		 "  Expecting components in multiples of three, but only have [" .
+		 scalar @$vulgar_components . "] items left to process.")
+      unless scalar @$vulgar_components >= 3;
+
+    my $type          = shift @$vulgar_components;
+    my $query_length  = shift @$vulgar_components;
+    my $target_length = shift @$vulgar_components;
+
+    $self->throw("Vulgar string does not start with a match.  Was not " . 
+		 "expecting this.")
+      if ((scalar @exons == 0) && ($type ne 'M'));
+
+    if ($type eq 'M'){
+      my %hash;
+
+      $hash{type}         = $type;
+      $hash{target_start} = $cumulative_target_coord;
+      $hash{target_end}   = $cumulative_target_coord + $target_length - 1;
+
+      if ($query_strand ne '-') {
+	$hash{query_start} = $cumulative_query_coord;
+	$hash{query_end}   = $cumulative_query_coord  + $query_length - 1;
+      } else {
+	$hash{query_start} = $cumulative_query_coord - $query_length + 1;
+	$hash{query_end}   = $cumulative_query_coord;
+      }
+
+      push @{$exons[$exon_number]}, \%hash;
+    }
+
+    $cumulative_target_coord += $target_length;
+
+    if ($query_strand ne '-') {
+      $cumulative_query_coord  += $query_length;
+    } else {
+      $cumulative_query_coord  -= $query_length;
+    }
+
+    $exon_number++ 
+      if $type eq 'I';
+  }
+
+  return \@exons;
 }
 
 
