@@ -42,15 +42,15 @@ $ens_test->do_sql_file("t/TargettedGene.dump");
 my $db = $ens_test->get_DBSQL_Obj;
 
 print "ok 2\n";    
+my @id = ('16:13850772,13850951:HBA_HUMAN:');
+#my @id = ('16:13803276,13853729:HBA_HUMAN:');
 
-my @id=('ctg22fin4:17398358,17400418:O60755:1,368');
-
-my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise';
 
-my $tgw = "$runnable"->new(-dbobj    => $db,
-                           -input_id => \@id,
+my $tgw = "$runnable"->new(-db         => $db,
+                           -input_id   => @id,
 			   -seqfetcher => $fetcher);	
 
 unless ($tgw)
@@ -61,8 +61,15 @@ else
 $tgw->fetch_input();
 $tgw->run();
 
+print "ok 4\n";
+
 my @genes = $tgw->output();
-print STDERR "found " . scalar(@genes) . " genes\n";
+#print STDERR "found " . scalar(@genes) . " genes\n";
+unless (@genes)
+{ print "not ok 5\n"; }
+else
+{ print "ok 5\n"; }
+
 
 # check those genes
 my $count=0;
@@ -70,7 +77,7 @@ foreach my $gene(@genes){
    $count++;
    my $ecount = 0;
    print STDERR "gene $count\n";
-     foreach my $exon ( $gene->each_unique_Exon() ) {
+     foreach my $exon ( $gene->get_all_Exons() ) {
        $ecount++;
        print STDERR 	"exon $ecount\t" .
 			$exon->contig_id . "\t" . 
