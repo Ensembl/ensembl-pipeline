@@ -66,8 +66,7 @@ my $prefix='COB';
 	    GENE_ID_SUBSCRIPT => $prefix.'G',
 	    GENE_ID_DIGITS => 11,
 	    PROTEIN_ID_SUBSCRIPT => $prefix.'P',
-	    PROTEIN_ID_DIGITS => 11, 
-	    SUPPORTING_DATABASES => 'nr_parsed ipi_parsed spens'
+	    PROTEIN_ID_DIGITS => 11 
 	    );
 
 sub import {
