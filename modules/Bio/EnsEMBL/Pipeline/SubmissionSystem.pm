@@ -1,3 +1,68 @@
+#
+# SubmissionSystem.pm - A common submission system interface
+#
+# 
+# You may distribute this module under the same terms as perl itself
+#
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::SubmissionSystem - A common submission system interface
+
+=head1 SYNOPSIS
+
+  use Bio::EnsEMBL::Pipeline::SubmissionSystem;
+
+  package Bio::EnsEMBL::Pipeline::SubmissionSystem::MySubSystem;
+
+  @ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem;
+
+  sub create_Job { 
+     #implementation here
+     ...
+  }
+
+  sub submit {
+    #implementation here
+    ...
+  }
+
+  sub kill {
+    #implementation here
+    ...
+  }
+
+  sub flush {
+    #implementation here
+  }
+
+  1;
+
+=head1 DESCRIPTION
+
+This is an abstract base class which defines a common interface (facade) to
+different submission systems used by the pipeline.  Submission systems which
+are implemented are expected to be found in the SubmissionSystem subdir and
+should implement the create_Job, submit, kill, and flush methods.
+
+Examples of implemented SubmissionSystems include the LSF submission system and
+the Local submission system.  Further descriptions of the methods which need
+to be implemented follow.
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
+
 use strict;
 use warnings;
 
@@ -49,9 +114,9 @@ sub new {
 =cut
 
 sub get_Config {
-	my $self = shift;
+  my $self = shift;
 
-	return $self->{'config'};
+  return $self->{'config'};
 }
 
 
@@ -73,9 +138,9 @@ sub get_Config {
 =cut
 
 sub flush {
-	my $self = shift;
+  my $self = shift;
 
-	return;
+  return;
 }
 
 
@@ -92,10 +157,10 @@ sub flush {
 =cut
 
 sub submit {
-	my $self = shift;
-	my $job  = shift;
+  my $self = shift;
+  my $job  = shift;
 
-	$self->throw('Abstract method should have been implemented by subclass');
+  $self->throw('Abstract method should have been implemented by subclass');
 }
 
 
@@ -117,9 +182,9 @@ sub submit {
 =cut
 
 sub create_Job {
-	my $self = shift;
+  my $self = shift;
 
-	$self->throw('Abstract method should have been implemented by subclass');
+  $self->throw('Abstract method should have been implemented by subclass');
 }
 
 
@@ -138,8 +203,8 @@ sub create_Job {
 =cut
 
 sub kill {
-	my $self = shift;
-	my $job = shift;
+  my $self = shift;
+  my $job = shift;
 }
 
 

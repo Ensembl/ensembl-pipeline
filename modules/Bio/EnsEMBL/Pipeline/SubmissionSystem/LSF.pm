@@ -1,3 +1,61 @@
+#
+# LSF.pm - Implementation of the submission system interface for LSF
+#
+# 
+# You may distribute this module under the same terms as perl itself
+#
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF - Implementation of the 
+submission system interface for LSF
+
+=head1 SYNOPSIS
+
+  use Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF;
+  ...
+
+  $ss = Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF->new(-config => $conf);
+  ...
+
+  #create a job for LSF
+  $job = $ss->create_Job($taskname, $module, $input_id, $parameter_string);
+  if(!$job) {
+    warn('LSF has too many pending jobs already');
+  }
+  ...
+
+  #submit the job (may be stored in internal queue)
+  $ss->submit($job);
+  ...
+
+  #force submission of jobs which are internally queued
+  $ss->flush($taskname);
+  ...
+
+  #kill a job which is running
+  $ss->kill($job);
+
+=head1 DESCRIPTION
+
+This is an implmentation of the common submission system interface which is 
+used by the PipelineManager.  See Bio::EnsEMBL::Pipeline::SubmissionSystem
+for further details.
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
+
 use strict;
 use warnings;
 
@@ -42,9 +100,9 @@ sub kill {
 
   my $arg;
   if($array_idx) {
-    $arg = '"' . $job_id . "[$array_idx]" . '"';
+    $arg = '"' . $sub_id . "[$array_idx]" . '"';
   } else {
-    $arg = $job_id;
+    $arg = $sub_id;
   }
 
   my $path = $self->get_Config->get_parameter('LSF', 'path');
@@ -56,7 +114,7 @@ sub kill {
     return;
   }
 
-  $job->update_status('KILLED');
+  $job->set_current_status('KILLED');
 }
 
 

@@ -1,3 +1,91 @@
+#
+# Config.pm - Object which reads and stores configuration information
+#
+# 
+# You may distribute this module under the same terms as perl itself
+#
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config - Reads and stores configuration information
+
+=head1 SYNOPSIS
+
+  use Bio::EnsEMBL::Pipeline::Pipeline::Config;
+
+  #
+  # Read config from files and store it in the db (as specified in files)
+  #
+  my $config = Bio::EnsEMBL::Pipeline::Config->new(-files => \@_);
+
+  #print out the configuration 
+  foreach my $header ($config->get_headers) {
+    print "[$header]\n";
+    foreach my $key ($config->get_keys) {
+      print "$key = ", $config->get_parameter($key), "\n";
+    }
+  }
+  
+  # Read config which has been stored in the database
+  $config = Bio:EnsEMBL::Pipeline::Config->new
+    (-dbname => 'pipedb',
+     -host   => 'ecs1g',
+     -user   => 'ensadmin',
+     -pass   => 'ensembl');
+
+=head1 DESCRIPTION
+
+This module reads a configuration when instantiated, either from a set of 
+files or from a database.  
+
+If read from files the configuration is then stored in the database specified 
+within the configuration file.  A required header in the configuration file is
+therefore [PIPELINE_DATABASE].  If the config table in the database pointed to 
+by the files is already populated with data the constructor will throw an 
+exception and will not load the new configuration or alter the existing 
+configuration in the database.
+
+Configuration information can be retrieved from a configuration object via the 
+accessor methods get_headers, get_keys, get_parameter.
+
+Configuration files have the following structure:
+
+  [DEFAULT_DATABSE]
+  user = ensadmin
+  host=ecs1g
+  user=ensadmin
+  pass=ensembl
+  port=3306
+
+  [PIPELINE_DATABASE]
+  dbname = mcvicker_test_briggsae
+
+  #comment
+  [DEFAULT_HEADER]
+  key1 = value
+  key2 = value
+
+  [MY_HEADER]
+  key1 = another value
+  key3 = test #not a comment
+
+The headers which begin with DEFAULT_ are special headers and their keys and
+values are propogated to all subsequent headers with the same postfix.  Default
+keys may be overridden, however.  
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
 use strict;
 use warnings;
 
@@ -32,19 +120,18 @@ sub new {
 
   my $self = bless {}, $class;
 
-  $self->{'config'} = {};   # hash of hashes that will hold config as we build it up
+ 
+  $self->{'config'} = {};  #hash of hashes - will hold config as we build it up
 
   my ($files, $db) = $self->_rearrange([qw( FILES DB )], @_);
 
   # Files and DB should not be defined
-  if (defined $files && defined $db) {
+  if ($files && @$files && $db) {
     $self->throw("Cannot read config from files and db at the same time.");
   }
 
-  if ($files) {
-    my @files = split(/ /, $files);
-
-    $self->_parse_files(@files);
+  if($files && @$files) {
+    $self->_parse_files(@$files);
 
   } elsif($db) {
     # store the DB
@@ -104,12 +191,12 @@ sub _write_config_to_db {
   }
 
   # create the DBAdaptor
-  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
-                 '-host'   => $params{'host'},
-							   '-port'   => $params{'port'},
-							   '-dbname' => $params{'dbname'},
-							   '-user'   => $params{'user'},
-							   '-pass'   => $params{'pass'});
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+    ( '-host'   => $params{'host'},
+      '-port'   => $params{'port'},
+      '-dbname' => $params{'dbname'},
+      '-user'   => $params{'user'},
+      '-pass'   => $params{'pass'});
 
   # check if there is any existing config and throw if there is
   my $stmt = $dbobj->prepare("SELECT count(*) FROM config");
@@ -252,7 +339,6 @@ sub _update_single_header_defaults {
       if (!grep /^$key$/, @current_keys) {
 	my $value = $self->get_parameter($default_header, $key);
 	$self->{'config'}->{$header}->{$key} = $value;
-	#print "added default value of $value (from $default_header) for $key in $header\n";
       }
     }
 
@@ -279,7 +365,7 @@ sub get_parameter {
   my $key    = lc(shift);
 
   if (!exists($self->{'config'}->{$header}->{$key})) {
-    $self->warn("Config key $key is not defined in header $header");
+    $self->warn("Config key [$key] is not defined in header [$header]");
     return undef;
   }
   return $self->{'config'}->{$header}->{$key};
