@@ -105,7 +105,6 @@ sub fetch_input {
 
     $self->genseq($peptide);
 
-
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq;
 }
@@ -126,23 +125,6 @@ sub runnable {
     return $self->{'_runnable'};
 }
 
-=head2 run
-
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->run()
-    Returns :   none
-    Args    :   none
-
-=cut
-
-sub run {
-    my ($self,$dir) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched")      unless ($self->genseq());
-
-    $self->runnable->run($dir);
-}
 
 =head2 write_output
 
@@ -158,8 +140,6 @@ sub write_output {
     my($self) = @_;
 
     my @features = $self->output();
-
-    #print STDERR "ARRAY: @features\n";
 
      my $feat_Obj= $self->dbobj->get_Protfeat_Adaptor;
 

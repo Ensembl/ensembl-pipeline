@@ -130,23 +130,6 @@ sub runnable {
     return $self->{'_runnable'};
 }
 
-=head2 run
-
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->run()
-    Returns :   none
-    Args    :   none
-
-=cut
-
-sub run {
-    my ($self,$dir) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched")      unless ($self->genseq());
-
-    $self->runnable->run($dir);
-}
 
 =head2 write_output
 
