@@ -29,7 +29,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBNAME
 					EST_REFDBHOST
 					EST_REFDBUSER
-					EST_GOLDEN_PATH
 				       );
 
 $| = 1;
@@ -44,7 +43,6 @@ my $outfile    = 'out.fa';
 $dbname  = $EST_REFDBNAME;
 $dbuser  = $EST_REFDBUSER;
 $dbhost  = $EST_REFDBHOST;
-$path    = $EST_GOLDEN_PATH;
 
 # otherwise get them from the command line
 &GetOptions( 
@@ -72,7 +70,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    -user   => $dbuser,
 					   );
 
-my $query = "select c.id from static_golden_path sgp, contig c where sgp.raw_id=c.internal_id and type = '" . $path . "'";
+my $query = "select c.id from static_golden_path sgp, contig c, meta m where sgp.raw_id=c.internal_id and sgp.type = m.meta_value and m.meta_key='assembly.default'";
 
 my $sth = $db->prepare($query);
 my $res = $sth->execute;

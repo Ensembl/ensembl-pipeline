@@ -23,7 +23,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBHOST
 					EST_REFDBUSER
 					EST_REFDBNAME
-					EST_GOLDEN_PATH
 				       );
 
 
@@ -33,7 +32,7 @@ my %cids;
 my $analysis = 1; # from ens_UCSC_0801_est
 my $name ='exonerate';
 
-&fetch_golden_contigs;
+&get_golden_contigs;
 
 while(<>){
   # AC004073.1.1.79612      75445   76005   2293.00 89      1       gi|12779912|emb|AL516419.1|AL516419     296     861     1
@@ -81,7 +80,7 @@ sub get_golden_contigs{
 					      -dbname => $EST_REFDBNAME,
 					     )
     
-    my $query = "select contig.id, contig.internal_id from contig, static_golden_path where contig.internal_id=static_golden_path.raw_id and static_golden_path.type=$EST_GOLDEN_PATH";
+    my $query = "select contig.id, contig.internal_id from contig, static_golden_path, meta where contig.internal_id=static_golden_path.raw_id and static_golden_path.type= meta.meta_value and meta.meta_key='assembly.default'";
   
   my $sth = $db->prepare($query) || $db->throw("can't prepare: $query");
   my $res = $sth->execute        || $db->throw("can't execute: $query");
