@@ -53,7 +53,9 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pep_SeqFeature;
 use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
+					      BIOPERLDB
+					     );
 #use Data::Dumper;
 
 use vars qw(@ISA);
@@ -433,7 +435,7 @@ sub get_Sequence {
 
     print(STDERR "Sequence id :  is [$id]\n");
     my $seq;
-    if ($::genebuild_conf{'bioperldb'}) {
+    if ($BIOPERLDB) {
       
       my $bpDBAdaptor = $self->bpDBAdaptor;
       my $seqfetcher = $bpDBAdaptor->fetch_BioSeqDatabase_by_name($self->database);
