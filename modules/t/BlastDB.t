@@ -38,8 +38,8 @@ while (my $seq = $seqio2->next_seq) {
 close(IN1);
 close(IN2);
 
-ok(my $db1 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-sequences => \@sequences1,
-							   -type      => 'PROTEIN'));
+ok(my $db1 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-sequences    => \@sequences1,
+							   -type         => 'PROTEIN'));
 
 ok($db1->type eq 'PROTEIN');
 ok(scalar($db1->sequences) == 2);
@@ -52,8 +52,10 @@ ok(my $dbname1 = $db1->dbname);
 ok($db1->remove_index_files);
 
 
+
 ok(my $db2 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-sequences => \@sequences2,
-							   -type      => 'DNA'));
+							   -type      => 'DNA',
+                                                           -index_method => 'wu new'));
 
 ok($db2->type eq 'DNA');
 ok(scalar($db2->sequences) == 2);
@@ -65,8 +67,9 @@ ok(my $dbname2 = $db2->dbname);
 
 ok($db2->remove_index_files);
 
-ok(my $db3 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-dbfile    => $pepfile,
-							   -type      => 'PROTEIN'));
+ok(my $db3 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-dbfile     => $pepfile,
+							   -type       => 'PROTEIN',
+                                                           -index_type => 'wu old'));
 
 ok($db3->type eq 'PROTEIN');
 
@@ -77,8 +80,9 @@ ok($db3->dbname eq 'testpep.fa.safe');
 
 ok($db3->remove_index_files);
 
-ok(my $db4 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-dbfile    => $estfile,
-							   -type      => 'DNA'));
+ok(my $db4 = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(-dbfile     => $estfile,
+							   -type       => 'DNA',
+                                                           -index_type => 'ncbi'));
 
 ok($db4->type eq 'DNA');
 
