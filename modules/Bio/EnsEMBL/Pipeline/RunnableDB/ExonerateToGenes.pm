@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 =head1 SYNOPSIS
 
 my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes->new(
-                              -db         => $db,
+                              -db         => $refdb,
 			      -input_id   => \@sequences,
 			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
@@ -39,9 +39,15 @@ $exonerate2genes->write_output(); #writes to DB
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
 It is meant to provide the interface for mapping ESTs to the genome
 sequence and writing the results as genes. By the way Exonerate is run
-we do not cluster transcripts into
-genes and only write one transcript per gene.
-A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database storage.
+we do not cluster transcripts into genes and only write one transcript per gene.
+A refdb (Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor) is required
+for splice-site checking and the conversion of
+coordinates. When the gene is going to be written 
+we then create a dbadaptor for the target database. These parameters are
+read from the config file use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
+This hopefully avoids some database contention
+
+
 
 =head1 CONTACT
 
@@ -74,6 +80,10 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
+  ############################################################
+  # SUPER::new(@args) has put the refdb in $self->db()
+  #
+
   my ($database, $rna_seqs, $query_type, $target_type, $exonerate, $options) =  
       $self->_rearrange([qw(
 			    DATABASE 
@@ -86,22 +96,22 @@ sub new {
   
   # must have a query sequence
   unless( @{$rna_seqs} ){
-    $self->throw("ExonerateToGenes needs a query: @{$rna_seqs}");
+      $self->throw("ExonerateToGenes needs a query: @{$rna_seqs}");
   }
   $self->rna_seqs(@{$rna_seqs});
   
   # you can pass a sequence object for the target or a database (multiple fasta file);
   if( $database ){
-    $self->database( $database );
+      $self->database( $database );
   }
   else{
-    $self->throw("ExonerateToGenes needs a target - database: $database");
+      $self->throw("ExonerateToGenes needs a target - database: $database");
   }
   
   # Target type: dna  - DNA sequence
   #              protein - protein sequence
   if ($target_type){
-    $self->target_type($target_type);
+      $self->target_type($target_type);
   }
   else{
     print STDERR "Defaulting target type to dna\n";
@@ -172,17 +182,17 @@ sub run{
   my @results;
   
   # get the funnable
-  $self->throw("Can't run - no runnable objects") unless ($self->runnables);
+  $self->throw("Can't run - no funnable objects") unless ($self->runnables);
   
   foreach my $runnable ($self->runnables){
-
-    # run the funnable
-    $runnable->run;  
-    
-    # store the results
-    print STDERR scalar(@results)." matches found\n";
-    push ( @results, $runnable->output );
-    
+      
+      # run the funnable
+      $runnable->run;  
+      
+      # store the results
+      push ( @results, $runnable->output );
+      print STDERR scalar(@results)." matches found\n";
+      
   }
   
   ############################################################
@@ -232,7 +242,7 @@ sub filter_output{
   my %selected_matches;
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
-      @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->coverage($a) } @{$matches{$rna_id}};
+      @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->_coverage($a) } @{$matches{$rna_id}};
       
       my $max_score;
       print STDERR "matches for $rna_id:\n";
@@ -242,15 +252,17 @@ sub filter_output{
 	      $max_score = $self->_coverage($transcript);
 	  }
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($transcript);
-	  my $score = $self->_coverage($transcript);
+	  my $score   = $self->_coverage($transcript);
+	  my $perc_id = $self->_percent_id($transcript);
+	  print STDERR "coverage: $score perc_id: $perc_id\n";
 	  
 	  ############################################################
 	  # we keep anything which is 
-	  # within the 2% fo the best score
+	  # within the 2% of the best score
 	  # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
 	  if ( $score >= (0.98*$max_score) && 
 	       $score >= $EST_MIN_COVERAGE && 
-	       $self->_percent_id($transcript) >= $EST_MIN_PERCENT_ID ){
+	       $perc_id >= $EST_MIN_PERCENT_ID ){
 	      
 	      print STDERR "Accept!\n";
 	      push( @good_matches, $transcript);
@@ -296,23 +308,32 @@ sub _percent_id{
 sub write_output{
   my ($self,@output) = @_;
   
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
+  ############################################################
+  # here is the only place where we need to create a db adaptor
+  # for the database where we want to write the genes
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      -host             => $EST_DBHOST,
+					      -user             => $EST_DBUSER,
+					      -dbname           => $EST_DBNAME,
+					      -pass             => $EST_DBPASS,
+					      );
+  my $gene_adaptor = $db->get_GeneAdaptor;
 
   unless (@output){
-    @output = $self->output;
+      @output = $self->output;
   }
   foreach my $gene (@output){
-    print STDERR "gene is a $gene\n";
-    print STDERR "about to store gene ".$gene->type." $gene\n";
-    foreach my $tran (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-    }
-    eval{
-      $gene_adaptor->store($gene);
-    };
-    if ($@){
-      $self->warn("Unable to store gene!!\n$@");
-    }
+      print STDERR "gene is a $gene\n";
+      print STDERR "about to store gene ".$gene->type." $gene\n";
+      foreach my $tran (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+      }
+      eval{
+	  $gene_adaptor->store($gene);
+      };
+      if ($@){
+	  $self->warn("Unable to store gene!!\n$@");
+      }
   }
 }
 
