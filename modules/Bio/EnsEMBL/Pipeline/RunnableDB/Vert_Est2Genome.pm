@@ -201,7 +201,7 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     my $contig    = $self->db2->get_Contig($contigid);
-    my $genseq   = $contig->seq;
+    my $genseq   = $contig->primary_seq;
     my @features = $contig->get_all_SimilarityFeatures;
     $self->{_genseq} = $genseq;
     $self->{_features} = [];
@@ -406,7 +406,7 @@ sub run_blast {
 
     my $seqio = Bio::SeqIO->new(-format => 'Fasta',
 			       -file   => ">$seqfile");
-    print("Filehandle is " . $seqio->_filehandle . "\n");
+
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
 
@@ -417,15 +417,17 @@ sub run_blast {
 
     print("Exit status of blast is $status\n");
 
-    unlink $blastout;
-    unlink $seqfile;
-    unlink $db;
 
     my $msp = new Bio::EnsEMBL::Analysis::MSPcrunch(-file => $blastout,
 						    -type => 'DNA-DNA',
 						    -source_tag => 'vert_eg',
 						    -contig_id => $self->input_id,
 						    );
+
+    unlink $blastout;
+    unlink $seqfile;
+    unlink $db;
+
     my @pairs = $msp->each_Homol;
 
     foreach my $pair (@pairs) {

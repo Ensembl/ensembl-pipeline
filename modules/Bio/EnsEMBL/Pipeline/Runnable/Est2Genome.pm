@@ -63,7 +63,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
-use Bio::Seq;
+use Bio::PrimarySeq;
 use Bio::SeqIO;
 
 use Data::Dumper;
@@ -98,7 +98,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -119,7 +119,7 @@ sub est_sequence {
     
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_est_sequence'} = $value;
     }
     return $self->{'_est_sequence'};

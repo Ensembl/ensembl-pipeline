@@ -584,7 +584,7 @@ sub make_filenames {
 sub get_file {
     my ($self,$stub,$ext) = @_;
 
-    my $dir = "/nfs/disk100/humpub1a/michele/out/";
+    my $dir = "/nfs/disk100/humpub1/michele/est2genome/";
 
     my $num = int(rand(10));
     $dir = $dir . "$num/";

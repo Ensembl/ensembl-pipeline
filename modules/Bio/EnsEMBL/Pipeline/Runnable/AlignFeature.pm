@@ -65,7 +65,7 @@ use Bio::EnsEMBL::Analysis;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome pfetch); 
-use Bio::Seq;
+use Bio::PrimarySeq;
 use Bio::SeqIO;
 
 use Data::Dumper;
@@ -82,7 +82,7 @@ sub _initialize {
 						   'FEATURES'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::Seq") unless $genomic->isa("Bio::Seq");
+    $self->throw("[$genomic] is not a Bio::PrimarySeq") unless $genomic->isa("Bio::PrimarySeq");
 
     $self->genomic_sequence($genomic) if $genomic; 
 
@@ -122,7 +122,7 @@ sub genomic_sequence {
     my( $self, $value ) = @_;    
     if ($value) {
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -451,7 +451,7 @@ ID:    foreach my $id (@id) {
 	    $self->throw("Couldn't find sequence for $newid [$id]");
 	}
     
-	my $seq = new Bio::Seq(-id  => $newid,
+	my $seq = new Bio::PrimarySeq(-id  => $newid,
 				      -seq => $seq);
 	
 	$self->{_seq_cache}{$id} = $seq;
@@ -482,7 +482,7 @@ sub get_all_Sequences {
 	my $seq = <IN>;
 	chomp($seq);
 	if ($seq ne "no match") {
-	    $self->{_seq_cache}{$id} = new Bio::Seq(-seq => $seq,
+	    $self->{_seq_cache}{$id} = new Bio::PrimarySeq(-seq => $seq,
 							   -id  => $newid[$count]);
 	}
 	$count++;
@@ -513,7 +513,7 @@ sub get_all_Sequences {
 	    $self->warn("Couldn't find sequence for $newid [$id]");
 	}
 	
-	my $seq = new Bio::Seq(-id  => $newid,
+	my $seq = new Bio::PrimarySeq(-id  => $newid,
 				      -seq => $seq);
 
 	print("Found seq for $id  $seq\n");
