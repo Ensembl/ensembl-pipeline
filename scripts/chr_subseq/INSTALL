@@ -1,0 +1,18 @@
+Compilation and installation instructions
+=========================================
+
+1)  Set the CC and CFLAGS environment variables to something sensible.
+    The following should work on most systems:
+
+    setenv CC cc
+    setenv CFLAGS -O2
+
+    or if you're using a bourne shell:
+
+    CC=cc; CFLAGS=-O2; export CC CFLAGS
+
+2)  make
+
+3)  Copy the chr_subseq binary to a location on your PATH, so that the
+    Ensembl pipeline code can find it.
+
