@@ -97,7 +97,7 @@ sub new {
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
+    $self->dbobj->assembly_type($path);
 
 
     return $self;

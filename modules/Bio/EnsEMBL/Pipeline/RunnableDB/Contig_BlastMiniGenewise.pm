@@ -91,7 +91,7 @@ sub new {
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
 
    
-    $self->dbobj->static_golden_path_type($path);
+    $self->dbobj->assembly_type($path);
 
     $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});

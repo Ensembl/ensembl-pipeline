@@ -107,7 +107,7 @@ sub fetch_input {
     my $vc_str = $self->input_id;
     my ($chr, $start, $end, $sgp) = $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
-    $self->dbobj->static_golden_path_type($sgp) if $sgp;
+    $self->dbobj->assembly_type($sgp) if $sgp;
 
     my $vc = $self->dbobj->get_StaticGoldenPathAdaptor->
      fetch_VirtualContig_by_chr_start_end($chr, $start, $end);

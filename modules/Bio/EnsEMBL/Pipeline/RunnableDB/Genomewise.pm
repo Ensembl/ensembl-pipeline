@@ -194,7 +194,7 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
-    $self->dbobj->static_golden_path_type('UCSC');
+    $self->dbobj->assembly_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
