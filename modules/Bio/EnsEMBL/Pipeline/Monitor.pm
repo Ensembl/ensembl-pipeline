@@ -6,6 +6,8 @@ use vars qw(@ISA);
 
 @ISA = qw (Bio::EnsEMBL::Root);
 
+=pod
+
 =head2 new
 
     Title   :   new
@@ -48,8 +50,10 @@ sub dbobj {
 
 sub print_header {
   my ($self,$str) = @_;
-
-  print "\n$str [" . $self->dbobj->host . " " . $self->dbobj->dbname . "]\n\n";
+  unless($self->{'_header'}){
+  	$self->{'_header'} = sprintf("[%s:%s %s]\n\n", $self->dbobj->host, $self->dbobj->port, $self->dbobj->dbname);
+  }
+  print "\n$str " . $self->{'_header'};
 }
 
 sub show_current_status {
@@ -405,10 +409,15 @@ sub show_jobs_by_status_and_analysis {
   if (!defined($status) || !defined($analysis)) {
     $self->throw("No status and/or analysis input\n");
   }
-  #print STDE
 
-  my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_id = job.analysis_id and job.job_id = js.job_id and js.status = '$status' and a.logic_name = '$analysis'");
-
+#  my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_id = job.analysis_id and job.job_id = js.job_id and js.status = '$status' and a.logic_name = '$analysis'");
+  my $sth = $self->dbobj->prepare("
+  	SELECT job.* FROM job_status js,job,analysis a 
+  	WHERE a.analysis_id = job.analysis_id 
+  		&& job.job_id = js.job_id 
+  		&& js.status = '$status' 
+  		&& a.logic_name = '$analysis'
+  		&& js.is_current = 'y'");
   my $res = $sth->execute;
 
   my @jobIds;
@@ -482,20 +491,32 @@ sub rules_cache{
 	return $self->{'_rules_cache'};
 }
 
+=pod
+
 =head2 get_unfinished_analyses***
 
-The following methods return an anonymous list of arrays, with the following data spec:
+The following methods return an anonymous list of arrays:
+ get_unfinished_analyses_for_input_id( $input_id )
+ get_unfinished_analyses_for_assembly_type( $assembly_type )
+ get_unfinished_analyses
+
+with the following data spec:
  [
    [ input_id, logic_name, analysis_id ]
    [ input_id, logic_name, analysis_id ]
    ...
  ]
  
- get_unfinished_analyses_for_input_id( $input_id )
- get_unfinished_analyses_for_assembly_type( $assembly_type )
- get_unfinished_analyses
+They all take an optional $print (Boolean) which prints the arrays for you.
  
- They all take an optional print (Boolean) which prints the arrays for you.
+You can grow you're own look up hash to see if a $input_id, $logic_name combination has
+finished by doing.
+ 
+ my $unfin = $monitor_obj->get_unfinished_analyses_for_assembly_type($assembly_type);
+ my $hash;
+ map { $hash->{$_->[0]}->{$_->[1]} = $_->[2] } @$unfin;
+ 
+Now B<$hash-E<gt>{$input_id}-E<gt>{$logic_name} = $analysis_id>.
 
 =head2 get_no_hit_contigs_for_analysis
 
@@ -568,5 +589,23 @@ sub get_no_hit_contigs_for_analysis{
 	}
 	map {print join("\t: ", @$_) . "\n"} @$no_hits if $print;
 	return $no_hits;
+}
+sub lock_status{
+	my ($self,$print) = @_;
+	my $str = "Locked By USER: %s, HOST: %s, PID: %s, STARTED: %s (%s) \n";
+	my @a = ();
+	my ($dbuser, $dbhost, $dbport, $dbname) = ($self->dbobj->username,
+											   $self->dbobj->host,
+											   $self->dbobj->port,
+											   $self->dbobj->dbname);
+	if (my $lock_str = $self->dbobj->pipeline_lock) {
+		my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+		$self->print_header("This pipeline is LOCKED") if $print;
+		@a = ($user, $host, $pid, scalar(localtime($started)), $started);
+		printf($str, @a) if $print;
+	}else{
+		$self->print_header("This pipeline is FREE") if $print;
+	}
+	return @a;
 }
 1;
