@@ -183,6 +183,27 @@ sub gene_Types {
 
 #########################################################################
 
+=head2 get_Genes_of_Type()
+
+  We can get the genes in each cluster of one type. 
+  We pass one string identifying the genetype.
+  The difference with get_Genes_by_Type is that that as an arrayref as argument.
+
+=cut
+  
+sub get_Genes_of_Type() {
+    my ($self,$type) = @_;
+    unless ($type){
+      $self->throw( "must provide a type");
+    }
+    my @genes = $self->get_Genes;  # this should give them in order, but we check anyway
+    my @selected_genes;
+    push ( @selected_genes, grep { $_->type eq $type } @genes );
+    return @selected_genes;
+  }
+
+#########################################################################
+
 =head2 get_Genes_by_Type()
 
   We can get the genes in each cluster of a given type. 
@@ -660,5 +681,52 @@ sub _translateable_exon_length {
     return $length;
 
 }
+
+# method to get the start of the cluster, which we take to be the left_most exon_coordinate 
+# i.e. the start coordinate of the first exon ordered as { $a->start <=> $b->start }, regardless of the strand
+
+sub start{
+  my ($self) = @_;
+  my @genes = $selg->get_Genes;
+  my $start;
+  foreach my $gene ( @genes ) {
+    my @exons = $gene->get_all_Exons;
+    @exons = sort { $a->start <=> $b->start } @exons;
+    my $this_start = $exons[0]->start;
+    unless ( $start ){
+      $start = $this_start;
+    }
+    if ( $this_start < $start ){
+      $start = $this_start;
+    }
+  }
+  return $start;
+}
+      
+# method to get the end of the cluster, which we take to be the right_most exon_coordinate
+# this being the end coordinate of the first exon ordered as { $b->end <=> $a->end }, regardless of the strand
+
+sub end{
+  my ($self) = @_;
+  my @genes = $selg->get_Genes;
+  my $end;
+  foreach my $gene ( @genes ) {
+    my @exons = $gene->get_all_Exons;
+    @exons = sort { $b->end <=> $a->end } @exons;
+    
+    # this is the largest end of all exons
+    my $this_end = $exons[0]->end;
+    unless ( $end ){
+      $end = $this_end;
+    }
+    if ( $this_end > $end ){
+      $end = $this_end;
+    }
+  }
+  return $end;
+}
+      
+
+
 
 1;
