@@ -56,7 +56,7 @@ sub new {
 			    WORK_DIR)],@args);
 
   $self->throw("Blast database must be a Bio::EnsEMBL::Pipeline::Runnable::BlastDB.") 
-    unless (blastdb && $blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
+    unless ($blastdb && $blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
 
   $self->throw("Blast database does not appear to be formatted.") 
     unless ($blastdb->db_formatted);

@@ -317,8 +317,8 @@ sub _calculate_pairwise_distance {
 sub _pairwise_align {
   my ($self, $seqs) = @_;
 
-  $self=>throw("Pairwise alignment was only expecting two sequences.")
-    unless scalar @$seqs == 2;
+  $self->throw("Pairwise alignment was only expecting two sequences.")
+    unless ((scalar @$seqs) == 2);
 
   my $cba 
     = Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
