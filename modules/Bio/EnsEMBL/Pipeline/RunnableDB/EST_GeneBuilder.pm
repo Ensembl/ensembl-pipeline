@@ -64,7 +64,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBUSER
 					EST_REFDBNAME
 					EST_REFDBPASS
-					EST_GOLDEN_PATH	
 					EST_INDEX
 					EST_GENEBUILDER_INPUT_GENETYPE
 					EST_EVIDENCE_TAG
@@ -109,10 +108,6 @@ sub new {
 
 
 
-
-    my $path = $EST_GOLDEN_PATH;
-    $path    = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
 
     return $self; 
 }

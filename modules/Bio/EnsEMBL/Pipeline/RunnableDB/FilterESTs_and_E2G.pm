@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 									  -dbobj       => $db,
 									  -input_id    => $id,
 									  -seq_index   => $index,
-									  -golden_path => $gp,
 									 );
     $obj->fetch_input
     $obj->run
@@ -62,7 +61,6 @@ use FileHandle;
 #use diagnostics;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_GOLDEN_PATH
 					EST_REFDBHOST
 					EST_REFDBNAME
 					EST_REFDBUSER
@@ -111,8 +109,7 @@ sub new {
      my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
 										       REFDBHOST
 										       REFDBUSER
-										       REFPASS
-										       GOLDEN_PATH)],
+										       REFPASS)],
 										   @args);
 
 	 # we force it to use BioIndex SeqFetcher
@@ -126,13 +123,7 @@ sub new {
     #  
     #}
 
-    $path = $EST_GOLDEN_PATH;
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    #print STDERR "path: $path\n";
-    $self->dbobj->static_golden_path_type($path);
-
-#print STDERR "refdb: $refdbname $refdbhost $refdbuser (refdb pass no needed really)\n";
-
+#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
     $refdbname = $EST_REFDBNAME unless (defined $refdbname && $refdbname ne '');
     $refdbuser = $EST_REFDBUSER unless (defined $refdbuser && $refdbuser ne '');
     $refdbhost = $EST_REFDBHOST unless (defined $refdbhost && $refdbhost ne '');
@@ -156,7 +147,6 @@ sub new {
 						     -pass   => $refpass,
 						    );
 
-   $refdb->static_golden_path_type($path);
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
@@ -169,7 +159,6 @@ my $est_ext_feature_factory = $estdb->get_EstAdaptor();
       
       $refdb->add_ExternalFeatureFactory($est_ext_feature_factory);
       $self->estdb($refdb);
-      $self->estdb->static_golden_path_type($path);
 
       # need to have an ordinary adaptor to the est database for gene writes
       $self->dbobj->dnadb($refdb);
