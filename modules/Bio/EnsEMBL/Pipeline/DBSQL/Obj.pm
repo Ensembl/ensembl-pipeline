@@ -293,8 +293,6 @@ sub get_JobsByCurrentStatus {
 		" from job as j, current_status as cs where cs.id = j.id and cs.status = \"" . 
 		    $status . "\""; 
     
-    print("query is $query\n");
-
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
 

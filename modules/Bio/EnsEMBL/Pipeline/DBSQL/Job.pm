@@ -223,7 +223,7 @@ sub write_object_file {
 
     if (defined($arg)) {
 	my $str = FreezeThaw::freeze($arg);
-	open(OUT,">" . $self->input_object_file);
+	open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
 	print(OUT $str);
 	close(OUT);
     }
@@ -331,40 +331,34 @@ sub submit {
 sub store {
     my ($self,$obj) = @_;
 
-    eval {
-	$self->throw("Not connected to database") unless defined($self->_dbobj);
 
-	my $tmpdb = $obj->_dbobj;
-
-	$obj->{_dbobj} = undef;
-	
-	my ($jobstr) = FreezeThaw::freeze($obj);
-	
-	my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue," .
-		     "input_object_file,stdout_file,stderr_file,output_file) " .
-		     "values( " . $obj->id .   ",\"" .
-		     $obj->input_id        .   "\"," .
-		     $obj->analysis->id    .   "," .
-		     $obj->LSF_id          .   ",\"" .
-		     $obj->machine         .   "\",\"".
-		     $jobstr               .   "\",\"".
-		     $obj->queue           .   "\",\"" .
-		     $obj->input_object_file . "\",\"".
-		     $obj->stdout_file     .   "\",\"".
-		     $obj->stderr_file     .   "\",\"" .
-		     $obj->output_file     .   "\")");
-	
-	my $sth = $tmpdb->prepare($query);
-	my $res = $sth->execute();
-
-	$obj->_dbobj($tmpdb);
-
-
-    };
-
-    if ($@) {
-	$self->warn("No database connection. Can't store object [$@]");
-    }
+    $self->throw("Not connected to database") unless defined($obj->_dbobj);
+    
+    my $tmpdb = $obj->_dbobj;
+    
+    $obj->{_dbobj} = undef;
+    
+    my ($jobstr) = FreezeThaw::freeze($obj);
+    
+    my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue," .
+		 "input_object_file,stdout_file,stderr_file,output_file) " .
+		 "values( " . $obj->id .   ",\"" .
+		 $obj->input_id        .   "\"," .
+		 $obj->analysis->id    .   "," .
+		 $obj->LSF_id          .   ",\"" .
+		 $obj->machine         .   "\",\"".
+		 $jobstr               .   "\",\"".
+		 $obj->queue           .   "\",\"" .
+		 $obj->input_object_file . "\",\"".
+		 $obj->stdout_file     .   "\",\"".
+		 $obj->stderr_file     .   "\",\"" .
+		 $obj->output_file     .   "\")");
+    
+    my $sth = $tmpdb->prepare($query);
+    my $res = $sth->execute();
+    
+    $obj->_dbobj($tmpdb);
+    
 }
 
 
@@ -403,6 +397,12 @@ sub set_status {
 
     $self->throw("No status input" ) unless defined($arg);
 
+    
+    if (!(defined($self->_dbobj))) {
+	$self->warn("No database connection.  Can't set status to $arg");
+	return;
+    }
+
     my $status;
 
     eval {	
@@ -438,7 +438,7 @@ sub set_status {
     };
 
     if ($@) {
-	$self->warn("No db connection. Can't set status to $arg");
+	$self->warn("Error setting status to $arg");
     } else {
 	return $status;
     }
@@ -533,7 +533,7 @@ sub _dbobj {
 }
 
 
-sub make_files {
+sub make_filenames {
     my ($self) = @_;
 
     my $input_object_file = $self->get_file("job","obj");
@@ -545,6 +545,7 @@ sub make_files {
     $self->stdout_file      ($stdout_file);
     $self->stderr_file      ($stderr_file);
     $self->output_file      ($output_file);
+
 }
 
 

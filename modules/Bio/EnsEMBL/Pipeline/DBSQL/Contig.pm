@@ -122,16 +122,9 @@ sub get_all_SimilarityFeatures {
 }
     
 sub make_ExonPairs {
-    my ($self,$gene) = @_;
+    my ($self,@exons) = @_;
 
-    my @features = $self->get_all_SimilarityFeatures;
-    my @exons    = $gene->each_unique_Exon;
-    
     my $gap = 5;
-
-    foreach my $e (@exons) {
-	$e->find_supporting_evidence(\@features);
-    }
 
     if ($exons[0]->strand == 1) {
 	@exons = sort {$a->start <=> $b->start} @exons;
