@@ -341,10 +341,10 @@ sub run_gapped {
   
   #clean up temp files
   if(ref($estseq) eq 'ARRAY'){
-#    $self->_deletefiles($genfile, $estfile, $resfile);
+    $self->_deletefiles($genfile, $estfile, $resfile);
   }
   else {
-#    $self->_deletefiles($genfile, $resfile);
+    $self->_deletefiles($genfile, $resfile);
   }
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
