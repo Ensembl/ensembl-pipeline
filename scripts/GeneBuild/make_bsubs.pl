@@ -31,6 +31,7 @@ foreach my $tr(@{$gbc{'targetted_runnables'}}) {
 sub get_chrlengths{
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $gbc{'dbhost'},
 					      -user   => $gbc{'dbuser'},
+					      -pass   => $gbc{'dbpass'};
 					      -dbname => $gbc{'dbname'},
 					     );
   my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
@@ -51,6 +52,7 @@ sub make_tbsubs {
   my $dbname = $gbc{'dbname'};
   my $dbhost = $gbc{'dbhost'};
   my $dbuser = $gbc{'dbuser'};
+  my $dbpass = $gbc{'dbpass'};
   my $queue  = $gbc{'queue'};
   my $dir    = $gbc{'tmpdir'} . "/$runnable";
   my $pm_out = $gbc{'pm_output'};
@@ -114,7 +116,7 @@ sub make_tbsubs {
     my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \"";
     $command .= "  $runner ";
     $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
-    $command .= " -dbuser $dbuser -dbname $dbname -host $dbhost ";
+    $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
     $command .= " -input_id $input_id -write";      
     print OUTF "$command\n";
     
@@ -133,6 +135,7 @@ sub make_lbsubs {
   my $dbname = $gbc{'dbname'};
   my $dbhost = $gbc{'dbhost'};
   my $dbuser = $gbc{'dbuser'};
+  my $dbpass = $gbc{'dbpass'};
   my $queue  = $gbc{'queue'};
   my $size   = $gbc{'size'};
   my $dir    = $gbc{'tmpdir'} . "/$runnable";
@@ -169,7 +172,7 @@ sub make_lbsubs {
       my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \"";
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
-      $command .= " -dbuser $dbuser -dbname $dbname -host $dbhost ";
+      $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
       $command .= " -input_id $input_id -write";      
       print OUTF "$command\n";
       
