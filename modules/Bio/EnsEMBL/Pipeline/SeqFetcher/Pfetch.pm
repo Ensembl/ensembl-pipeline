@@ -126,19 +126,25 @@ sub  get_Seq_by_acc {
   my $seq;
   my $pfetch = $self->executable;
   my $options = $self->options;
-  $options = '-' . $options unless $options =~ /^-/;
+  if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
 
   open(IN,"$pfetch -q $options $acc |") or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
   close IN;
   
   chomp($seqstr);
-  if(defined $seqstr && $seqstr ne "no match") {
-    $seq = new Bio::Seq('-seq'               => $seqstr,
-			'-accession_number'  => $acc,
-			'-display_id'        => $acc);
-  }
+  eval{
+    if(defined $seqstr && $seqstr ne "no match") {
+      $seq = new Bio::Seq('-seq'               => $seqstr,
+			  '-accession_number'  => $acc,
+			  '-display_id'        => $acc);
+    }
+  };
 
+  if($@){
+    print STDERR "$@\n";
+  }
+  
   $self->throw("Could not pfetch sequence for [$acc]\n") unless defined $seq;
 
   return $seq;
