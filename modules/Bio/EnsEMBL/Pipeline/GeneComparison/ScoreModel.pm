@@ -42,7 +42,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-
+use Bio::EnsEMBL::Feature;
 @ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
@@ -538,7 +538,7 @@ sub get_alternative_sites{
  
  Function: it cluster exons according to overlap,
            it returns a Bio::EnsEMBL::SeqFeature, where the sub_SeqFeatures
-           are exon_clusters, which are at the same time Bio::EnsEMBL::SeqFeatures,
+           are exon_clusters, which are at the same time Bio::EnsEMBL::Features,
            whose sub_SeqFeatures are exons
 =cut
 
@@ -552,13 +552,13 @@ sub _cluster_Exons{
   my %exon2cluster;
   
   # main cluster feature - holds all clusters
-  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  my $cluster_list = new Bio::EnsEMBL::Feature; 
   
   # sort exons by start coordinate
   @exons = sort { $a->start <=> $b->start } @exons;
 
   # Create the first exon_cluster
-  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  my $exon_cluster = new Bio::EnsEMBL::Feature;
   
   # Start off the cluster with the first exon
   $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
@@ -578,7 +578,7 @@ sub _cluster_Exons{
       }  
       else {
 	# Start a new cluster
-	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	$exon_cluster = new Bio::EnsEMBL::Feature;
 	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
 	$exon_cluster->strand($exon->strand);
 	
