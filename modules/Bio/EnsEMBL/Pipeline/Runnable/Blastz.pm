@@ -16,8 +16,8 @@ Bio::EnsEMBL::Pipeline::Runnable::Blastz
 
   # To run a blastz job from scratch do the following.
 
-  my $query = new Bio::Seq(-file   => 'somefile.fa',
-                           -format => 'fasta');
+  my $query = new Bio::SeqIO(-file   => 'somefile.fa',
+                           -format => 'fasta')->next_seq;
 
   my $database = 'multifastafile.fa';
 
@@ -125,6 +125,7 @@ sub new {
     if ($options) {
        $self->options($options);
     } 
+    # $options ||= ' C=2 ';
     
     return $self; # success - we hope!
 }
@@ -168,6 +169,7 @@ sub run_analysis {
 								 $self->database . " " .
 								 $self->options . " > " .
 								 $self->results) == 0);
+  $self->file($self->results);
 }  
   
 sub parse_results { 
