@@ -199,9 +199,9 @@ sub run {
   $self->output( $self->parse_results );
 
   # remove interim files (but do not remove the database if you are using one)
-  #unlink $query;
+  unlink $query;
   if ( $self->genomic){
-    #unlink $target;
+    unlink $target;
   }
 }
 
