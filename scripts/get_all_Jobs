@@ -8,7 +8,8 @@ unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
 use Bio::EnsEMBL::Pipeline::LSF;
 
 
-my $lsf = new Bio::EnsEMBL::Pipeline::LSF(-user => "humpub");
+my $lsf = new Bio::EnsEMBL::Pipeline::LSF(-user  => "humpub",
+                                          -queue => "fast_blast_farm");
 
 
 my @jobs = $lsf->get_all_jobs;
