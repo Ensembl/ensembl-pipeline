@@ -40,18 +40,17 @@ sub fetch_input {
   $self->throw("No input id") unless defined($self->input_id);
   
   my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+  $self->query($contig);
   
+  my $genseq = $contig;
   if (@$PIPELINE_REPEAT_MASKING) {
-    $contig = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING);
+    $genseq = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING);
   }
 
-  $self->query($contig);
-
-  my %parameters;
-  $parameters{-query} = $self->query;
+  my %parameters = $self->parameter_hash;
+  $parameters{-query} = $genseq;
   $parameters{-database} = $self->analysis->db_file;
   $parameters{-program} = $self->analysis->program_file;
-  $parameters{-options} = $self->analysis->parameters;
 
   my $run = Bio::EnsEMBL::Pipeline::Runnable::Exofish->new(%parameters);
   $self->runnable($run);

@@ -39,7 +39,6 @@ sub new {
       $self->_rearrange([qw(QUERY 
                             PROGRAM 
                             DATABASE 
-                            OPTIONS
                             DONOTPROJECT)],
                         @args);
   
@@ -58,14 +57,13 @@ sub new {
   
   $program = "wutblastx" if not $program;
   $self->program($self->find_executable($program));
-  
-  my $core_options = "-cpus 1 -compat1.4 -lcfilter -matrix EXOFISH -sort_by_highscore W=5 X=25 T=75 S=89 S2=89";  
-  $core_options .= $options;
-  $self->options($core_options);
 
   if (defined($do_not_project)) {
     $self->do_not_project($do_not_project);
   }
+  
+  my $core_options = "-cpus 1 -compat1.4 -lcfilter -matrix EXOFISH -sort_by_highscore W=5 X=25 T=75 S=89 S2=89";  
+  $self->options($core_options);
 
   return $self; # success - we hope!
 }
