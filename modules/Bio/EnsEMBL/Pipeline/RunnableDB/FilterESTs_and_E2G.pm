@@ -68,9 +68,9 @@ require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
     Usage   :   $self->new(-DBOBJ       => $db
                            -INPUT_ID    => $id
                            -ANALYSIS      => $analysis
-			   -ESTDBNAME     => $estdbname
-			   -ESTDBHOST     => $estdbhost
-			   -ESTDBUSER     => $estdbuser
+			   -REFDBNAME     => $refdbname
+			   -REFDBHOST     => $refdbhost
+			   -REFDBUSER     => $refdbuser
 			   -SEQ_INDEX     => $seq_index
 );
                            
@@ -92,10 +92,10 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-     my( $estdbname, $estdbhost, $estdbuser, $estpass, $path ) = $self->_rearrange([qw(ESTDBNAME
-										       ESTDBHOST
-										       ESTDBUSER
-										       ESTPASS
+     my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
+										       REFDBHOST
+										       REFDBUSER
+										       REFPASS
 										       GOLDEN_PATH)],
 										   @args);
 
@@ -111,31 +111,46 @@ sub new {
     $path = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
 
-    $estdbname = $::db_conf{'estdbname'} unless (defined $estdbname && $estdbname ne '');
-    $estdbuser = $::db_conf{'estdbuser'} unless (defined $estdbuser && $estdbuser ne '');
-    $estdbhost = $::db_conf{'estdbhost'} unless (defined $estdbhost && $estdbhost ne '');
-    $estpass   = $::db_conf{'estdbpass'} unless (defined $estpass && $estpass ne '');
+    $refdbname = $::db_conf{'refdbname'} unless (defined $refdbname && $refdbname ne '');
+    $refdbuser = $::db_conf{'refdbuser'} unless (defined $refdbuser && $refdbuser ne '');
+    $refdbhost = $::db_conf{'refdbhost'} unless (defined $refdbhost && $refdbhost ne '');
+    $refpass   = $::db_conf{'refdbpass'} unless (defined $refpass   && $refpass   ne '');
+
+print "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
+
+    my $estdbname = $::db_conf{'estdbname'};
+    my $estdbuser = $::db_conf{'estdbuser'};
+    my $estdbhost = $::db_conf{'estdbhost'};
+    my $estpass   = $::db_conf{'estdbpass'};
 
 
-    # if we have all the parameters for a estdb, make one
-    # otherwise, assume the estdb must be the same as the dbobj
-    if(defined $estdbname & defined $estdbhost && defined $estdbuser){
+    # if we have all the parameters for a refdb, make one
+
+    # otherwise, assume the refdb must be the same as the dbobj
+    if(defined $refdbname & defined $refdbhost && defined $refdbuser){
+      my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $refdbhost,		
+						     -user   => $refdbuser,
+						     -dbname => $refdbname,
+						     -pass   => $refpass,
+						    );
+
+
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
 								    -pass   => $estpass,
 								   );
       my $est_ext_feature_factory = $estdb->get_EstAdaptor();
-      $self->dbobj->add_ExternalFeatureFactory($est_ext_feature_factory);
+
+      print "exff: $est_ext_feature_factory\n";
+      
+      $refdb->add_ExternalFeatureFactory($est_ext_feature_factory);
+      $self->estdb($refdb);
+      $self->estdb->static_golden_path_type($path);
 
       # need to have an ordinary adaptor to the est database for gene writes
-      my $edba = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $estdbhost,		
-						    -user   => $estdbuser,
-						    -dbname => $estdbname,
-						    -pass   => $estpass,
-						    -dnadb  => $self->dbobj,
-						   );
-      $self->estdb($edba);
+      $self->dbobj->dnadb($refdb);
+
     }
     else { $self->throw("expecting exonerate data in an external feature factory\n"); };
 
@@ -148,7 +163,9 @@ sub new {
 
     Title   :   estdb
     Usage   :   $self->estdb($obj);
-    Function:   Gets or sets the value of estdb
+    Function:   Gets or sets the value of estdb. This is a handle to a database 
+                containing dna (contig, sequence) information with the database containing 
+                exonerate features as an ExternalFeatureFactory.
     Returns :   A Bio::EnsEMBL::DBSQL::DBAdaptor compliant object
     Args    :   A Bio::EnsEMBL::DBSQL::DBAdaptor compliant object
 
@@ -161,9 +178,9 @@ sub estdb {
     {
         $value->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
             || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
-        $self->{'_estdb'} = $value;
+        $self->{'_est_db'} = $value;
     }
-    return $self->{'_estdb'};
+    return $self->{'_est_db'};
 }
 
 
@@ -183,14 +200,14 @@ sub write_output {
     
     #    $self->throw("exiting before write");
     
-    my $estdb = $self->estdb;
+    my $estdb = $self->dbobj;
 
     if( !defined $estdb ) {
       $self->throw("unable to make write db");
     }
     
-    $self->write_genes();
-#    $self->write_exons_as_features();
+#    $self->write_genes();
+    $self->write_exons_as_features();
 }
 
 =head2 write_genes
@@ -205,7 +222,7 @@ sub write_output {
 
 sub write_genes {
   my ($self) = @_;
-  my $gene_adaptor = $self->estdb->get_GeneAdaptor;
+  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
  GENE: foreach my $gene ($self->output) {	
     eval {
@@ -235,8 +252,11 @@ sub write_exons_as_features {
   my ($self) = @_;
   
   # for writing features
-  my $feat_adaptor = $self->estdb->get_FeatureAdaptor;
+  my $feat_adaptor = $self->dbobj->get_FeatureAdaptor;
+  my $contig_adaptor = $self->dbobj->get_RawContigAdaptor;
+  my %contig_cache; # keep track of which contig internal_ids we have looked up so far
   my %contig_features;
+
   my $source_tag   = 'est';
   my $primary_tag  = 'est';
   my $analysis     = $self->get_exon_analysis;
@@ -252,7 +272,7 @@ sub write_exons_as_features {
   foreach my $gene(@genes){
     foreach my $transcript($gene->each_Transcript){
     EXON:
-      foreach my $exon($transcript->each_Exon){
+      foreach my $exon($transcript->get_all_Exons){
 	my $hstart;
 	my $hend;
 	my $hid;
@@ -304,19 +324,25 @@ sub write_exons_as_features {
 	my $fp      = new Bio::EnsEMBL::FeaturePair (-feature1 => $genomic,
 						     -feature2 => $est) ;
 	
-	push(@{$contig_features{$exon->contig_id}}, $fp);
+	my $cid = $contig_cache{$exon->contig_id};
+	if(!defined $cid){
+	  $cid = $contig_adaptor->get_id_by_internal_id($exon->contig_id);
+	  if (defined $cid){ $contig_cache{$exon->contig_id} = $cid; }
+	}
+	if(defined $cid){ push(@{$contig_features{$cid}}, $fp); }
       }
     }
   }
   
   # write the features
-  foreach my $contig_id( keys %contig_features){
+CONTIG:  foreach my $contig_id( keys %contig_features){
     my $contig;
     eval{
       $contig =   $self->dbobj->get_Contig($contig_id);
     };
     if($@){
       print STDERR "No contig for $contig_id part 1\n$@\n";
+      next CONTIG;
     }
 
     # lock db only once per contig - may still be too slow.
@@ -343,8 +369,8 @@ sub get_exon_analysis{
 
   my ($self) = @_;
 
-  my $logicname  = 'ex_e2g_feat';
-  my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
+  my $logicname  = 'est';
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
   my $est_source = $::est_genome_conf{'est_source'};
@@ -394,7 +420,8 @@ sub fetch_input {
   my $chrstart  = $1;
   my $chrend    = $2;
 
-  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+#  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+  my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
   $self->vc($contig);
@@ -479,29 +506,6 @@ sub fetch_input {
       }
     }
 
-#    my $analysis_obj;    
-#    my $logicname = 'MiniEst2Genome';
-#    # get the appropriate analysis from the AnalysisAdaptor
-#    my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
-#    my @analyses = $anaAdaptor->fetch_by_logic_name($logicname);
-#    
-#    my $analysis;
-#    if(scalar(@analyses) > 1){
-#      $self->throw("panic! > 1 analysis for $logicname\n");
-#    }
-#    elsif(scalar(@analyses) == 1){
-#      $analysis = $analyses[0];
-#    }
-#    else{
-#      $analysis = new Bio::EnsEMBL::Analysis
-#	(-db              => undef,
-#	 -db_version      => undef,
-#	 -program         => "est2genome",
-#	 -program_version => 1,
-#	 -gff_source      => 'est2genome',
-#	 -gff_feature     => 'similarity',
-#	 -logic_name      => $logicname);
-#    }
     # make MiniEst2Genome runnables
     # to repmask or not to repmask?    
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->vc->get_repeatmasked_seq,
@@ -551,7 +555,6 @@ sub run {
 sub convert_output {
   my ($self) = @_;
   my $count  = 1;
-  my $time   = time; chomp($time);
   my @genes;
 
   # make an array of genes for each runnable
@@ -624,9 +627,6 @@ sub make_transcript{
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
   unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
     {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
-
-  my $time  = time; 
-  chomp($time);
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
   $transcript->temporary_id($contig->id . ".$genetype.$count");
@@ -1099,7 +1099,7 @@ sub make_analysis {
   my ($self) = @_;
   
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($self->genetype);
   
   my $analysis_obj;
