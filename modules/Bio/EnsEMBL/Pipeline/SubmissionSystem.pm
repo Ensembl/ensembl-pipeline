@@ -117,5 +117,24 @@ sub create_Job {
 }
 
 
+=head2 kill
+
+  Arg [1]    : job
+  Example    : $submission_system->kill($job);
+  Description: Attempts to kill a job that has been submitted to this
+               submission system. This base class implementation does nothing,
+               and the method should be overridden by all submission
+               system subclasses that have the ability to kill a submitted job.
+  Returntype : none
+  Exceptions : none
+  Caller     : PipelineManager
+
+=cut
+
+sub kill {
+	my $self = shift;
+	my $job = shift;
+}
+
 
 1;
