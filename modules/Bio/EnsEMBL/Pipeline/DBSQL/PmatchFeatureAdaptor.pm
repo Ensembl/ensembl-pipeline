@@ -187,12 +187,20 @@ sub get_PmatchFeatures_by_protein_id {
 
 sub get_PmatchFeatures_by_chr_start_end {
   my ($self, $chr_name, $chrstart, $chrend, $logic_name) = @_;
+  my $analysis;
+  
+  if($logic_name){
+    $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+  }
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
               "AND pmf.chr_name = '$chr_name' " .
 	      "AND pmf.start >= $chrstart " .
 	      "AND pmf.end <= $chrend ";
-
+  if($analysis){
+    $query .= " and analysis_id = ".$analysis->dbID;
+  }
+  print $query." ".$self->db->dbname."\n";
   my $sth = $self->prepare($query);
   my $res = $sth->execute;
 
