@@ -1173,7 +1173,12 @@ sub make_Genes {
   foreach  my $tran (@transcripts) {
     eval{
       if ($tran->translate->seq !~ /\*/) {
+	print STDERR $tran->{'temporary_id'} . " translates!\n";
 	$valid = 1;
+      }
+      else{
+	print STDERR $tran->{'temporary_id'} . " does not translate!\n";
+	$valid = 0;
       }
     };
     if ($@) {
@@ -1181,7 +1186,7 @@ sub make_Genes {
       $valid = 0;
       next TRANSCRIPT;
     }
-    
+ 
     # if we get here, the transcript should be fine
     next TRANSCRIPT unless $valid;
     
