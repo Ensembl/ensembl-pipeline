@@ -23,16 +23,16 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
-									 FEF_TMPDIR
-									 FEF_REFDBHOST
-									 FEF_REFDBUSER
-									 FEF_REFDBNAME
-									 FEF_BSUB_FILE
-									 FEF_LSFQUEUE
-									 FEF_CHUNKSIZE
-									 FEF_RUN_SCRIPT
-									);
+use Bio::EnsEMBL::Pipeline::Config::FirstEF qw (
+						FEF_TMPDIR
+						FEF_REFDBHOST
+						FEF_REFDBUSER
+						FEF_REFDBNAME
+						FEF_BSUB_FILE
+						FEF_QUEUE
+						FEF_CHUNKSIZE
+						FEF_RUN_SCRIPT
+					       );
 
 my %chrhash;
 
@@ -95,7 +95,7 @@ sub get_chrlengths{
 
 =head2 make_firstef_bsubs
 
-  Function: makes bsubs to run EST_GeneBuilder
+  Function: makes bsubs to run firstef
 
 =cut
 
@@ -104,7 +104,7 @@ sub make_firstef_bsubs{
   open (OUT, ">$FEF_BSUB_FILE") or die ("Can't open $FEF_BSUB_FILE for writing bsub commands: $!");
 
   # Name of the script that runs the analysis for each slice.
-  my $runner   = $FEF_RUNNER;
+  my $runner   = $FEF_RUN_SCRIPT;
 
   foreach my $chr (keys %chrhash) {
     my $length = $chrhash{$chr};
@@ -125,7 +125,7 @@ sub make_firstef_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
      
 
-      my $command = "bsub -q $FEF_LSFQUEUE -C0 -o $outfile -e $errfile $FEF_RUNNER -input_id $input_id -write";
+      my $command = "bsub -q $FEF_QUEUE -C0 -o $outfile -e $errfile $FEF_RUN_SCRIPT -input_id $input_id -write";
       print OUT "$command\n";
       
       $count = $count + $FEF_CHUNKSIZE;
