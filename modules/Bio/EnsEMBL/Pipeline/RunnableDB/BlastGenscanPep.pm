@@ -108,7 +108,7 @@ sub new {
     }
     else
     {
-        $self->threshold(1e-6);
+        $self->threshold(1e-99);
     }   
     return $self;
 }
@@ -331,10 +331,10 @@ sub align_hit_to_contig {
         push (@exon_aligns, \%ex_align);
         
         $dna_align {'exon_dna_limit'} += $exon->length;   
-        print "Exon: ".$ex_align {'name'}
-                ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
-                ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
-                ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
+        #print "Exon: ".$ex_align {'name'}
+        #        ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
+        #        ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
+        #        ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
     }
     
     $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
@@ -351,10 +351,10 @@ sub align_hit_to_contig {
         my (@aligned_exons);
         foreach my $ex_align (@exon_aligns)
         {
-            if ($$ex_align{'pep_end'} >= $fp->start)
+            if ($ex_align->{'pep_end'} >= $fp->start)
             {
                 push (@aligned_exons, $ex_align);
-                last if ($$ex_align{'pep_end'} >= $fp->end);
+                last if ($ex_align->{'pep_end'} >= $fp->end);
             }
         }
         #create sets of featurepairs mapping peptide features to exons
@@ -373,11 +373,11 @@ sub create_peptide_featurepairs {
     {
         my ($ex_start, $ex_end, $pep_start, $pep_end, $start_phase, $end_phase);
         #This splits features across multiple exons and records phases
-        if ($$ex_align{'pep_start'}  < $fp->start)
+        if ($ex_align->{'pep_start'}  < $fp->start)
         {
             #feature starts inside current exon
-            $ex_start   = $$ex_align{'gen_start'}
-                            + (($fp->start - $$ex_align{'pep_start'})*3);
+            $ex_start   = $ex_align->{'gen_start'}
+                            + (($fp->start - $ex_align->{'pep_start'})*3);
             $start_phase= 0;
             $pep_start  = $fp->hstart;
             #print "Start inside exon - "
@@ -385,17 +385,17 @@ sub create_peptide_featurepairs {
         else
         {
             #feature starts in a previous exon or absolute start of current exon
-            $ex_start   = $$ex_align{'gen_start'};
-            $start_phase= $$ex_align{'phase'};
-            $pep_start  = $fp->hstart + ($$ex_align{'pep_start'} - $fp->start);
+            $ex_start   = $ex_align->{'gen_start'};
+            $start_phase= $ex_align->{'phase'};
+            $pep_start  = $fp->hstart + ($ex_align->{'pep_start'} - $fp->start);
             #print "Start outside or equal to exon -"
         }
         
         if ($$ex_align{'pep_end'}    > $fp->end)
         {
             #feature ends in current exon
-            $ex_end     = $$ex_align{'gen_start'}
-                            + (($fp->end -  $$ex_align{'pep_start'})*3)+2;
+            $ex_end     = $ex_align->{'gen_start'}
+                            + (($fp->end -  $ex_align->{'pep_start'})*3)+2;
             $end_phase  = 0;
             $pep_end    = $fp->hend;
             #print "End inside exon\n";
@@ -403,20 +403,20 @@ sub create_peptide_featurepairs {
         else
         {
             #feature ends in a later exon or absolute end of current exon
-            $ex_end     = $$ex_align{'gen_end'};
-            $end_phase  = $$ex_align{'end_phase'};
-            $pep_end    = $fp->hstart + ($$ex_align{'pep_end'} - $fp->start);
+            $ex_end     = $ex_align->{'gen_end'};
+            $end_phase  = $ex_align->{'end_phase'};
+            $pep_end    = $fp->hstart + ($ex_align->{'pep_end'} - $fp->start);
             #print "End outside or equal to exon\n";
         }
         
-        my $start_frac = $$ex_align{'phase'} + 1;
+        my $start_frac = $ex_align->{'phase'} + 1;
         my $end_frac   = (( 3 - $$ex_align{'end_phase'})%3) + 1;
         
         my $dna_feat = Bio::EnsEMBL::SeqFeature->new (
-                                -seqname    =>  $$ex_align{'name'},
+                                -seqname    =>  $ex_align->{'name'},
                                 -start      =>  $ex_start, 
                                 -end        =>  $ex_end,
-                                -strand     =>  $$ex_align{'strand'},
+                                -strand     =>  $ex_align->{'strand'},
                                 -score      =>  $fp->score,
                                 -p_value    =>  $fp->p_value,
                                 -percent_id =>  $fp->percent_id,

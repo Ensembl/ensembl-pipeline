@@ -130,8 +130,6 @@ sub align_hit_to_contig {
         $ex_align {'end_phase'} = $exon->end_phase;
         $ex_align {'cdna_start'}= index($mrna, $ex_seq) +1;
         $ex_align {'cdna_end'}  = ($ex_align {'cdna_start'} + length($ex_seq)) -1;   
-        #print STDERR "Ex ".$ex_align{'cdna_start'}." - ".$ex_align{'cdna_end'}
-        #             ."\tGen ".$ex_align{'gen_start'}." - ".$ex_align{'gen_end'}."\n";
         push (@exon_aligns, \%ex_align);
     }
     
@@ -200,12 +198,19 @@ my  ($self, $fp, @aligned_exons) = @_;
             $end_phase = $ex->{'end_phase'};
         }
         
+        #print STDERR "NAME: ".$fp->hseqname
+        #             ."\tEx: ".($ex->{'cdna_end'} - $ex->{'cdna_start'})
+        #             ."\tF1: ".($fp->end - $fp->start +1)
+        #             ."\tf2: ".($fp->hend - $fp->hstart +1)
+        #             ."\th1: ".($end - $start + 1)
+        #             ."\th2: ".($hend - $hstart +1)."\n";
+        
         #print STDERR "Ex ".$ex->{'cdna_start'}." - ".$ex->{'cdna_end'}
         #             ." Feat ".$fp->start." - ".$fp->end
         #             ." Feat2 ".$fp->hstart." - ".$fp->hend
         #             ." H1 $start - $end H2 $hstart - $hend"
         #             ." Ex ".$ex->{'gen_start'}." - ".$ex->{'gen_end'}."\n";
-        
+                     
         my $contig_feat = Bio::EnsEMBL::SeqFeature->new (
                                 -seqname    =>  $ex->{'name'},
                                 -start      =>  $start, 
