@@ -43,6 +43,7 @@ use strict;
 use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
+use Bio::SeqIO;
 
 use vars qw(@ISA);
 
@@ -189,6 +190,34 @@ sub  get_Seq_by_id {
   $seq->accession_number($id);
 
   return $seq;
+}
+
+=head2 batch_fetch
+
+  Title   : batch_fetch
+  Usage   : $self->batch_fetch(@accs);
+  Function: Retrieves batches of sequences
+  Returns : listref of Bio::Seq
+  Args    : 
+
+=cut
+
+# This method is not yet couth.  getz can retrieve multiple sequences at
+# once - this method should be reimplemented to do things this way, rather
+# than this five-for-the-price-of-five approach.
+
+sub batch_fetch {
+  my ($self, @accs) = @_;
+
+  my @seqs;
+
+  while (@accs){
+
+    push @seqs, $self->get_Seq_by_acc(shift @accs);
+
+  }
+
+  return \@seqs
 }
 
 
