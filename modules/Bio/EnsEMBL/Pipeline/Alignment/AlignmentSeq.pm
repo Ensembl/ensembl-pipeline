@@ -173,7 +173,7 @@ sub insert_gap {
 
   my $seq = $self->seq;
   my $new_seq = substr($seq, 0, $insert_position - 1) . 
-    $gap . substr($seq, $insert_position);
+    $gap . substr($seq, $insert_position - 1);
 
   $self->seq($new_seq);
 
