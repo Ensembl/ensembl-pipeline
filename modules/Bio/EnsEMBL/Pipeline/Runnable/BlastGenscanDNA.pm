@@ -334,7 +334,7 @@ sub align_hits_to_contig {
       my $cdna_total = 1;
       foreach my $gcoord ( @split ) {
 	if($gcoord->isa('Bio::EnsEMBL::Mapper::Gap')) {
-	  $cdna_total += $gcoord->length;
+	  $cdna_total += $gcoord->end - $gcoord->start + 1;
 	  next;
 	}
 
