@@ -59,6 +59,45 @@ sub new{
   return $self;  
 }
 
+############################################################
+
+=head2 compare
+  Arg[1] and Arg[2] : 2 transcript objects to compare
+  Arg[3]: the mode ( a string of text). Possible modes:
+
+      semiexact_merge = test for exact exon matches, except for possible mismatches in the extremal exons
+
+fuzzy_semiexact_merge = this function checks whether two transcripts merge
+                        with fuzzy exon matches: there is consecutive exon overlap 
+                        but there are mismatches of $allowed_mismatches bases allowed at the edges of any exon pair
+
+         simple_merge = this function checks whether two transcripts merge
+                        according to consecutive exon overlap (just overlap, without looking at the 
+                        exon positions) and it only considers 1-to-1 matches
+
+      merge_with_gaps = this function checks whether two transcripts merge
+                        according to consecutive exon overlap allowing for 1-to-many ot many-to-1 matches
+
+=cut 
+
+sub compare{
+
+  my ($self, $tran1, $tran2, $mode, $parameter ) = @_;
+
+  if ( $mode eq 'semiexact_merge' ){
+    $self->_test_for_semiexact_Merge( $tran1, $tran2,$parameter );
+  } 
+  elsif( $mode eq 'fuzzy_semiexact_merge' ){
+    $self->_test_for_fuzzy_semiexact_Merge( $tran1, $tran2,$parameter );
+  }
+  elsif( $mode eq 'simple_merge' ){
+    $self->_test_for_Simple_Merge( $tran1, $tran2,$parameter );
+  }
+  elsif( $mode eq 'merge_with_gaps' ){
+    $self->_test_for_Merge_with_gaps( $tran1, $tran2,$parameter );
+  }
+}
+
 #########################################################################
 # this function checks whether two transcripts merge
 # with exact exon matches, except for
@@ -167,16 +206,20 @@ sub _test_for_semiexact_Merge{
 #########################################################################
 # this function checks whether two transcripts merge
 # with fuzzy exon matches: there is consecutive exon overlap 
-# but there are mismatches of 2 base allowed at the edges of any exon pair
+# but there are mismatches of $allowed_mismatches bases allowed at the edges of any exon pair
 #
-# Why 2 bases: 2 bases is perhaps not meaningful enough to be considered
+# This is defauleted to 2 bases: 2 bases is perhaps not meaningful enough to be considered
 # a biological difference, and it is possibly an artifact of any of the
 # analysis previously run: genomewise, est2genome,... it is more likely to
 # happen 
 
 sub _test_for_fuzzy_semiexact_Merge{
-  my ($self,$est_tran,$ens_tran) = @_;
+  my ($self,$est_tran,$ens_tran, $allowed_mismatch) = @_;
   
+  unless ($allowed_mismatch){
+    $allowed_mismatch = 2;
+  }
+
   my @exons1 = @{$est_tran->get_all_Exons};
   my @exons2 = @{$ens_tran->get_all_Exons};	
   
@@ -214,15 +257,15 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  }	
 	  
 	  # the first exon can have a mismatch ( any number of bases) in the start
-	  # and a 2base mismatch at the end
-	  if ( ($k == 0 || $j == 0) && abs($exons1[$j]->end - $exons2[$k]->end)<3 ){
+	  # and $allowed_mismatch bases mismatch at the end
+	  if ( ($k == 0 || $j == 0) && abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
 	      
 	      # but if it is also the last exon
 	      if ( ( ( $k == 0 && $k == $#exons2 )   || 
 		     ( $j == 0 && $j == $#exons1 ) ) ){
 		  
-		  # we force it to match the start (with a mismatch of 2bases allowed)
-		  if ( abs($exons1[$j]->start - $exons2[$k]->start)< 3 ){
+		  # we force it to match the start (with a mismatch of $allowed_mismatch bases allowed)
+		  if ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ){
 		      $foundlink  = 1;
 		      $merge      = 1;
 		      #print STDERR "merged single exon transcript\n";
@@ -245,10 +288,10 @@ sub _test_for_fuzzy_semiexact_Merge{
 	      }
 	  }
 	  # the last one can have any mismatch on the end
-	  # but must have a match at the start (wiht 2bases mismatch allowed)
+	  # but must have a match at the start (with $allowed_mismatch mismatches allowed)
 	  elsif ( ( $k == $#exons2 || $j == $#exons1 ) &&
 		  ( $foundlink == 1 )                  &&
-		  ( abs($exons1[$j]->start - $exons2[$k]->start)<3 ) 
+		  ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatches ) 
 		  ){
 	      #print STDERR "link completed, merged transcripts\n";
 	      $merge = 1;
@@ -289,7 +332,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 #
 # are considered a mismatch
 
-sub _test_for_Merge{
+sub _test_for_Simple_Merge{
   my ($self,$tran1,$tran2) = @_;
   my @exons1 = @{$tran1->get_all_Exons};
   my @exons2 = @{$tran2->get_all_Exons};	
