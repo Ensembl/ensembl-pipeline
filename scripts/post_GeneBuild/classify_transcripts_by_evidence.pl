@@ -74,6 +74,7 @@ foreach my $gene_id ( @gene_ids){
   my $all_protein = 0;
   my $all_cdna    = 0;
   my $all_genscan = 0;
+  my $all_other_protein = 0;
   
   my %transcripts;
 
@@ -82,18 +83,21 @@ foreach my $gene_id ( @gene_ids){
     
     my $tran_id   = $trans->stable_id || $trans->dbID;
     
-    my ($protein,$cdna,$genscan) = &get_evidence($trans);
+    my ($protein,$other_protein,$cdna,$genscan) = &get_evidence($trans);
     if ($protein){
       push ( @{ $transcripts{protein} }, $trans );
     }
     if ($cdna){
       push ( @{ $transcripts{cdna} }, $trans );
     }
+    if ( $other_protein ){
+      push ( @{ $transcripts{other_protein} }, $trans );
+    }
     if( $genscan ){
       push( @{ $transcripts{genscan} }, $trans );
     }
     
-    print "TRAN:\t$gene_id\t$tran_id\tprotein:$protein\tcdna:$cdna\tgenscan:$genscan\n";
+    print "TRAN:\t$gene_id\t$tran_id\tprotein:$protein\tother_protein:$other_protein\tcdna:$cdna\tgenscan:$genscan\n";
   }
   if ( $transcripts{protein} ){
     $all_protein = 1;
@@ -101,11 +105,14 @@ foreach my $gene_id ( @gene_ids){
   if ( $transcripts{cdna} ){
     $all_cdna = 1;
   }
+  if ( $transcripts{other_protein} ){
+    $all_other_protein = 1;
+  }
   if ( $transcripts{genscan} ){
     $all_genscan = 1;
   }
   
-  print "GENE:\t$gene_id\tprotein:$all_protein\tcdna:$all_cdna\tgenscan:$all_genscan\n";
+  print "GENE:\t$gene_id\tprotein:$all_protein\tother_protein:$all_other_protein\tcdna:$all_cdna\tgenscan:$all_genscan\n";
 }
 
 ############################################################
@@ -117,7 +124,8 @@ sub get_evidence{
   
   my %cdna_evidence;
   my %protein_evidence;
-  my %genscan_evidence;
+  my %swall_evidence;
+  my %other_evidence;
 
   foreach my $exon ( @exons ){
     foreach my $feature ( @{$exon->get_all_supporting_features}){
@@ -129,7 +137,7 @@ sub get_evidence{
 	}
 	elsif( $feature->analysis->logic_name =~/Vertrna/i 
 	       || $feature->analysis->logic_name =~/Unigene/i ){
-	  $genscan_evidence{$feature->hseqname}++;
+	  $other_evidence{$feature->hseqname}++;
 	}
       }
       elsif (  $feature->isa('Bio::EnsEMBL::DnaPepAlignFeature') ){
@@ -138,25 +146,29 @@ sub get_evidence{
 	  $protein_evidence{$feature->hseqname}++;
 	}
 	elsif( $feature->analysis->logic_name =~/Swall/i ){
-	  $genscan_evidence{$feature->hseqname}++;
+	  $swall_evidence{$feature->hseqname}++;
 	}
       }
     }
   }
-  my @cdnas    = keys %cdna_evidence;
-  my @proteins = keys %protein_evidence;
-  my @genscans = keys %genscan_evidence;
-
-  my ($cdna,$protein,$genscan) = (0,0,0);
+  my @cdnas          = keys %cdna_evidence;
+  my @proteins       = keys %protein_evidence;
+  my @swall_evidence = keys %swall_evidence;
+  my @other_evidence = keys %other_evidence;
+  
+  my ($cdna,$protein,$other_protein,$genscan) = (0,0,0,0);
   if ( @cdnas ){
     $cdna = 1;
   }
   if ( @proteins ){
     $protein = 1;
   }
-  if ( @genscans ){
+  if ( @swall_evidence && !@other_evidence ){
+    $other_protein = 1;
+  }
+  if ( @other_evidence ){
     $genscan = 1;
   }
-  return ($protein,$cdna,$genscan);
+  return ($protein,$other_protein,$cdna,$genscan);
 }
   
