@@ -65,7 +65,6 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
-use Bio::EnsEMBL::Pipeline::SubseqFetcher;
 use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
@@ -489,28 +488,6 @@ sub make_genes{
   
   my @genes;
   my $slice_adaptor = $self->db->get_SliceAdaptor;
-
-  #############################################################
-  # Sort transcripts by chromosome to make subsequent 
-  # sequence fetching faster.
-
-    # Create a chromosome number lookup 
-  my %transcript_lookup;
-  foreach my $transcript (@transcripts){
-    my $seqname = $transcript->start_Exon->seqname;
-    $seqname =~ /([^\.]+)/;
-
-    if ($1 > 0){ # If the chromosome number is not numeric.
-      $transcript_lookup{$seqname} = $1;
-    } else {
-      $transcript_lookup{$seqname} = 12345; # Some bogus number.
-    }
-  }
-   # Sort by chromosome
-  @transcripts = sort {$transcript_lookup{$a->start_Exon->seqname} <=> 
-			 $transcript_lookup{$b->start_Exon->seqname}} 
-                      @transcripts;
-
   my $gene;
   my $checked_transcript;
   foreach my $tran ( @transcripts ){
@@ -529,7 +506,7 @@ sub make_genes{
       $chr_name  = $1;
       $chr_start = $2;
       $chr_end   = $3;
-      print STDERR "chr: $chr_name start: $chr_start end: $chr_end\n";
+      #print STDERR "chr: $chr_name start: $chr_start end: $chr_end\n";
     }
     else{
       $self->warn("It cannot read a slice id from exon->seqname. Please check.");
@@ -658,8 +635,7 @@ we need to do it ourselves. Exonerate will do this work for you.
 
 sub check_splice_sites{
   my ($self,$transcript) = @_;
-  $transcript->sort;
-  
+    
   #print STDERR "checking splice sites in transcript:\n";
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
@@ -683,9 +659,6 @@ sub check_splice_sites{
   
   # all exons in the transcripts are in the same seqname coordinate system:
   my $slice = $transcript->start_Exon->contig;
-
-  # Use a SubseqFetcher to retrieve splice site nucleotides
-  my $chr_seqfetcher = $self->_get_SubseqFetcher($slice);
   
   if ($strand == 1 ){
     
@@ -693,30 +666,19 @@ sub check_splice_sites{
     for (my $i=0; $i<$#exons; $i++ ){
       my $upstream_exon   = $exons[$i];
       my $downstream_exon = $exons[$i+1];
-      my $upstream_site;
-      my $downstream_site;
-
-      # New way using SubseqFetcher...
-      eval{
-	$upstream_site = 
-	  $chr_seqfetcher->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-	$downstream_site = 
-	  $chr_seqfetcher->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-      };
-
-      # Old  way using database...
-      #eval {
-      #	$upstream_site = 
-      #	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-      #	$downstream_site = 
-      #	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-      #};
-
-      unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites\n$@";
-	next INTRON;
-      }
       
+      my $upstream_start = ($upstream_exon->end     + 1);
+      my $upstream_end   = ($upstream_exon->end     + 2);      
+      my $downstream_start = $downstream_exon->start - 2;
+      my $downstream_end   = $downstream_exon->start - 1;
+
+      #eval{
+#	$upstream_site = 
+#	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+#	$downstream_site = 
+#	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+#      };
+            
       #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
@@ -724,10 +686,29 @@ sub check_splice_sites{
       ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
       ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
       
-      #print STDERR "strand: + upstream (".
-      #($upstream_exon->end + 1)."-".($upstream_exon->end + 2 ).") = $upstream_site, downstream ".
-      #($downstream_exon->start - 2)."-".($downstream_exon->start - 1).") = $downstream_site\n";
+      # print STDERR "From database:\n";
+#      print STDERR "strand: + upstream (".
+#	($upstream_exon->end + 1)."-".($upstream_exon->end + 2 ).") = $upstream_site, downstream ".
+#	  ($downstream_exon->start - 2)."-".($downstream_exon->start - 1).") = $downstream_site\n";
       
+      ############################################################
+      # use chr_subseq from Tim Cutts
+      
+      my $upstream_site   = 
+	$self->get_chr_subseq($slice->chr_name, $upstream_start, $upstream_end, $strand );
+      my $downstream_site = 
+	$self->get_chr_subseq($slice->chr_name, $downstream_start, $downstream_end, $strand );
+      
+      unless ( $upstream_site && $downstream_site ){
+	print STDERR "problems retrieving sequence for splice sites\n";
+	next INTRON;
+      }
+
+      print STDERR "Tim's script:\n";
+      print STDERR "strand: + upstream (".
+      	($upstream_start)."-".($upstream_end).") = $upstream_site, downstream ".
+        ($downstream_start)."-".($downstream_end).") = $downstream_site\n";
+
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -754,34 +735,46 @@ sub check_splice_sites{
     for (my $i=0; $i<$#exons; $i++ ){
       my $upstream_exon   = $exons[$i];
       my $downstream_exon = $exons[$i+1];
-      my $upstream_site;
-      my $downstream_site;
       my $up_site;
       my $down_site;
+      
+      my $up_start   = $upstream_exon->start - 2;
+      my $up_end     = $upstream_exon->start - 1;
+      my $down_start = $downstream_exon->end + 1;
+      my $down_end   = $downstream_exon->end + 2;
 
-      # New way using SubseqFetcher...
-      eval{	
-	$up_site = 
-	  $chr_seqfetcher->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
-	$down_site = 
-	  $chr_seqfetcher->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
-      };
-
-      # Old  way using database...
-      #eval {
-      #  $up_site = 
-      #    $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
-      #  $down_site = 
-      #    $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
-      #};
-
-
-      unless ( $up_site && $down_site ){
-	print STDERR "problems retrieving sequence for splice sites\n$@";
+      #eval{
+#	$up_site = 
+#	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+#	$down_site = 
+#	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+#      };
+       
+#      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
+#      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      	  
+#      print STDERR "From database:\n";
+#      print STDERR "strand: + ".
+#	"upstream ($up_start-$up_end) = $upstream_site,".
+#	  "downstream ($down_start-$down_end) = $downstream_site\n";
+      
+      ############################################################
+      # use chr_subseq from Tim Cutts
+      my $upstream_site   = 
+	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
+      my $downstream_site = 
+	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
+ 
+      unless ( $upstream_site && $downstream_site ){
+	print STDERR "problems retrieving sequence for splice sites\n";
 	next INTRON;
       }
-      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
-      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+
+      print STDERR "Tim's script:\n";
+      print STDERR "strand: + upstream (".
+	($up_start)."-".($up_end).") = $upstream_site, downstream ".
+	  ($down_start)."-".($down_end).") = $downstream_site\n";
+
       
       #print STDERR "strand: - upstream $upstream_site, downstream: $downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
@@ -814,6 +807,32 @@ sub check_splice_sites{
 
 ############################################################
 
+sub get_chr_subseq{
+  my ( $self, $chr_name, $start, $end, $strand ) = @_;
+
+  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+  my $command = "chr_subseq $chr_file $start $end |";
+ 
+  #print STDERR "command: $command\n";
+  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+  my $seq = uc <SEQ>;
+  chomp $seq;
+  close( SEQ );
+  
+  if ( length($seq) != 2 ){
+    print STDERR "WRONG: asking for chr_subseq $chr_file $start $end and got = $seq\n";
+  }
+  if ( $strand == 1 ){
+    return $seq;
+  }
+  else{
+    ( my $revcomp_seq = reverse( $seq ) ) =~ tr/ACGTacgt/TGCAtgca/;
+    return $revcomp_seq;
+  }
+}
+
+
+############################################################
 =head2 change_strand
 
     this method changes the strand of the exons
@@ -855,7 +874,7 @@ sub _get_SubseqFetcher {
     
     $self->{'_current_chr_name'} = $slice->chr_name;
     my $chr_filename = $EST_GENOMIC . "/" . $slice->chr_name . "\.fa";
-    
+
     $self->{'_chr_subseqfetcher'} = Bio::EnsEMBL::Pipeline::SubseqFetcher->new($chr_filename);
   }
 }
