@@ -93,7 +93,7 @@ my $fh;
 if($file){
   open (FH, '>'.$file) or die "couldn't open file ".$file." $!";
   $fh = \*FH;
-}else{
+} else{
   $fh = \*STDOUT;
 }
 
@@ -101,50 +101,36 @@ if($file){
 
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => $fh ) ;
 
-foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
-  
-  eval {
-    my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
-    my $gene_id = $gene->dbID();
-    
-    foreach my $trans ( @{$gene->get_all_Transcripts}) {
-      
-      if ($trans->translation) {
-        # get out first exon. Tag it to clone and gene on this basis
-        my @exon = @{$trans->get_all_Exons};
-        my $fe = $exon[0];
-        
+my $gene_adaptor = $db->get_GeneAdaptor();
+my $gene_ids = $gene_adaptor->list_dbIDs();
 
+foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
+  my $gene_id = $gene->dbID();
 
-       
-        my $identifier;
-        if($db_id){
-          $identifier = $trans->translation->dbID;
-        }
-        if($stable_id){
-          if(!$db_id){
-            $identifier = $trans->stable_id;
-          }else{
-            $identifier .= ".".$trans->stable_id;
-          }
-        }
-        my $tseq = $trans->translate();
-        if ( $tseq->seq =~ /\*.+/ ) {
-          print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->slice->dbID .")\n";
-          next;
-        }
-	my $seq = $tseq->seq;
-        $seq =~ s/\*$//;
-	$tseq->seq($seq);
-        $tseq->display_id($identifier);
-        $tseq->desc("Translation id ".$identifier." gene $gene_id");
-        $seqio->write_seq($tseq);
+  foreach my $trans ( @{$gene->get_all_Transcripts}) {
+    next if (!$trans->translation);
+
+    my $identifier;
+    if($db_id){
+      $identifier = $trans->translation->dbID;
+    }
+    if($stable_id){
+      if(!$db_id){
+        $identifier = $trans->stable_id;
+      } else {
+        $identifier .= ".".$trans->stable_id;
       }
     }
-  };
-  
-  if( $@ ) {
-    print STDERR "unable to process $gene_id, due to \n$@\n";
+    my $tseq = $trans->translate();
+    if ( $tseq->seq =~ /\*/ ) {
+      print STDERR "Translation of $identifier has stop codons ",
+        "- Skipping! (in ",$trans->slice->name(),")\n";
+      next;
+    }
+
+    $tseq->display_id($identifier);
+    $tseq->desc("Translation id $identifier gene $gene_id");
+    $seqio->write_seq($tseq);
   }
 }
 close($fh);
