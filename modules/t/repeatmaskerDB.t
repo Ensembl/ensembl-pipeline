@@ -42,18 +42,20 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'RepeatMasker',
-                                                    -program_version=> 1,
-                                                    -program_file   => 'RepeatMasker',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'RepeatMasker',
-                                                    -gff_feature    => 'repeat', 
-						    -logic_name     => 'RepeatMasker',
-                                                    -parameters     => '',
-                                                     );
+my $ana = $ana_adaptor->fetch_by_logic_name('RepeatMasker');
+
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
+#                                                    -db_version     => '__NONE__',
+#                                                    -program        => 'RepeatMasker',
+#                                                    -program_version=> 1,
+#                                                    -program_file   => 'RepeatMasker',
+#                                                    -module         => $runnable,
+#                                                    -module_version => 1,
+#                                                    -gff_source     => 'RepeatMasker',
+#                                                    -gff_feature    => 'repeat', 
+#						    -logic_name     => 'RepeatMasker',
+#                                                    -parameters     => '',
+#                                                     );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -61,7 +63,7 @@ else
 { print "ok 3\n"; }
 $ana_adaptor->exists( $ana );
 my $id = 'AB012723.00001';
-my $runobj = "$runnable"->new(-dbobj      => $db,
+my $runobj = "$runnable"->new(-db      => $db,
 			      -input_id   => $id,
                               -analysis   => $ana );
 unless ($runobj)
@@ -80,7 +82,7 @@ else
 display(@out);
 
 $runobj->write_output();
-my @repeats = $db->get_Contig($id)->get_all_RepeatFeatures();
+my @repeats = $db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_RepeatFeatures();
 display(@repeats);
 
 unless (@repeats)
