@@ -238,7 +238,9 @@ sub blast_isoforms{
     
     $blast->add_regex($file,'(\S+)');
     $blast->run();
-    
+
+    unlink ( $database );
+
     my @featurepairs = $blast->output();
     
     #foreach my $fp (sort {$a->hstart <=> $b->hstart} @featurepairs) {
@@ -357,7 +359,7 @@ sub process_target{
 	    #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
 	    if ( $gap >= $min_exon_length ){
 		$is_spliced = 1;
-		print STDERR "is spliced\n";
+		#print STDERR "is spliced\n";
 	    }
 	}
     }
@@ -493,24 +495,12 @@ sub compare_Exons{
   my ($self,$human_t, $mouse_t, $gap_penalty ) = @_;
 
   # get the exons 5' to 3'
-  my @human_exons;
-  if ( $human_t->start_Exon->strand == 1 ){
-      @human_exons = sort {$a->start <=> $b->start} @{$human_t->get_all_Exons};
-  }
-  else{
-      @human_exons = sort {$b->start <=> $a->start} @{$human_t->get_all_Exons};
-  }
-  my @mouse_exons;
-  if ( $mouse_t->start_Exon->strand == 1 ){
-      @mouse_exons = sort {$a->start <=> $b->start} @{$mouse_t->get_all_Exons};
-  }
-  else{
-      @mouse_exons = sort {$b->start <=> $a->start} @{$mouse_t->get_all_Exons};
-  }
+  my @human_exons = @{$self->get_Exons($human_t)};
+  my @mouse_exons = @{$self->get_Exons($mouse_t)};
   
   my @score_matrix;
   my %comparison_score;
-  
+
   my $human_length = scalar(@human_exons);
   my $mouse_length = scalar(@mouse_exons);
   
@@ -637,6 +627,38 @@ sub compare_Exons{
     $all_conserved = 1;
   }
   return ($missing_terminal_exons, $exon_skipping, $all_conserved);
+}
+
+############################################################
+
+sub get_Exons{
+  my ( $self, $trans ) = @_;
+  my @exons;
+  my @newexons;
+  my $strand = $trans->start_Exon->strand;
+  if ( $strand == 1 ){
+    @exons = sort {$a->start <=> $b->start} @{$trans->get_all_Exons};
+  }
+  else{
+    @exons = sort {$b->start <=> $a->start} @{$trans->get_all_Exons};
+  }
+  for (my $i=0; $i< scalar(@exons); $i++ ){
+    if ( $i>0 && $strand == 1 ){
+      if ( $exons[$i]->start - $exons[$i-1]->end - 1 < 10 ){
+	$exons[$i-1]->end($exons[$i]->end);
+	next;
+      }
+    }
+    if ( $i>0 && $strand == -1 ){
+      if ( $exons[$i-1]->start - $exons[$i]->end - 1 < 10 ){
+	$exons[$i-1]->start($exons[$i]->start);
+	next;
+      }
+    }
+    push (@newexons, $exons[$i] );
+  }
+  
+  return \@newexons;
 }
 
 ############################################################
@@ -781,6 +803,18 @@ sub blast_Exons{
     $seq2->display_id($id2);
   }
   
+  my $min_length = $length1;
+  if ( $length2 < $length1 ){
+    $min_length = $length2;
+  }
+  my $word = 5;
+  if ( 3*$word > $min_length ){
+    $word = int($min_length/3) - 1;
+  }
+  if ( $word < 2 ){
+    return 0;
+  }
+
   ############################################################
   # create database
   my $file = 'seq_'.$$.'.fa';
@@ -796,7 +830,7 @@ sub blast_Exons{
   system("pressdb $database > /dev/null 2>&1");
   
   ############################################################
-  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=9 E=0.01 E2=0.01 -nogap';
+  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
   #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
@@ -811,6 +845,8 @@ sub blast_Exons{
   
   $blast->add_regex($file,'(\S+)');
   $blast->run();
+
+  unlink( $database );
   
   my @featurepairs = $blast->output();
 
