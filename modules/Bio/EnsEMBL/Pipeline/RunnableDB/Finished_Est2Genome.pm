@@ -6,12 +6,13 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::SeqFeature;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
+use Bio::EnsEMBL::Pipeline::Runnable::STS_GSS;
 
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -37,12 +38,16 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    my $seqfetcher = $self->make_seqfetcher($self->analysis->db);
-    #print $seqfetcher."\n"; 
+    $self->{'_conf'} = undef;
+    
+    my $index = $self->analysis->parameters; 
+    my $seqfetcher = $self->make_seqfetcher($index);
+    print "seqfetcher ".$seqfetcher."\n"; 
     $self->seqfetcher($seqfetcher);
 	
     return $self;
 }
+
 
 
 =head2 fetch_input
@@ -62,42 +67,52 @@ sub fetch_input {
   my( $self) = @_;
   
   my @fps;
-  my %ests;
-  my @estseqs;
+ 
   $self->throw("No input id") unless defined($self->input_id);
   
   my $contigid  = $self->input_id;
   my $contig    = $self->dbobj->get_Contig($contigid);
- 
   my $genseq   = $contig->primary_seq;
-  my $type = $self->analysis->parameters;
+  my $repeat_masked = undef;
+  my @features;
+  my $type = $self->analysis->db;
+  #print "type = ".$type."\n";
+  my $percent_id =  50;
+  my $filter;
+  #print "percent_id ".$percent_id."\n";
+  my $no_blast = undef;
+  my $percent_filter;
+  my $tandem =  1;
+  my $no_blast = 1;
+  #print "getting features\n";
   my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200, 0);
- 
-  
+   
   foreach my $f (@features) {
-    if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-	defined($f->hseqname))  {
+    if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)){
       push(@fps, $f);
     }
   }
-  
-   
-  my $filter;
   my $feat = $fps[0];
+  print $feat."\n";
   if($feat->percent_id){
-    $filter = 1;
+    $percent_filter = 1;
   }else{
-    $filter = undef;
+    $percent_filter = undef;
   }
-  my $tandem = 1;
+  
+  
+  
+  
+  
  
-  my $no_blast = 1;
+  #print $genseq." ".$self->seqfetcher." ".$percent_filter." ".$percent_id." ".$tandem." ".$no_blast." \n";
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new('-unmasked' => $genseq,
-								'-features' => \@fps,
 								'-seqfetcher' => $self->seqfetcher,
+								'-percent_filter' => $percent_filter,
+								'-percent_id' => $percent_id,
+								'-tandem_check' => $tandem,
 								'-no_blast' => $no_blast,
-								'-percent_filter' => $filter
-								'-tandem_check' => $tandem);
+								'-features' => \@fps);
   
   $self->runnable($runnable);
  
@@ -105,6 +120,9 @@ sub fetch_input {
   
 }
     
+  
+  
+
     
  
 =head2 runnable
@@ -195,7 +213,7 @@ sub output {
 sub make_seqfetcher {
   my ( $self, $index_name ) = @_;
   my $index = undef;
-  if(defined $index_name && ne ''){
+  if(defined $index_name && $index_name ne ''){
     $index   = $ENV{BLASTDB}."/".$index_name;
   }
   my $seqfetcher;
