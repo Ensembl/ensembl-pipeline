@@ -46,7 +46,7 @@ my $id=('chr1.75000-100000');
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise';
 my $fbmg = "$runnable"->new(-dbobj    => $db,
-                           -input_id => $id);	
+			    -input_id => $id);	
 
 unless ($fbmg)
 { print "not ok 3\n"; }

@@ -60,10 +60,9 @@ else
 { print "ok 3\n"; }
 $ana_adaptor->exists( $ana );
 my $id = 'AC015914';
-my $runobj = "$runnable"->new(  
-                                -dbobj      => $db,
-			                    -input_id   => $id,
-                                -analysis   => $ana );
+my $runobj = "$runnable"->new(-dbobj      => $db,
+			      -input_id   => $id,
+			      -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
 else

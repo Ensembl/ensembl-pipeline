@@ -33,23 +33,25 @@ print "ok 1\n";    # 1st test passed.
 my $pwd = `pwd`;
 chomp($pwd);
 
-my $dnaseqio = new Bio::SeqIO(-file => "$pwd/t/data/AP000074.fa",  -format => 'fasta');
+my $dnaseqio = new Bio::SeqIO('-file' => "$pwd/t/data/AP000074.fa", 
+			      '-format' => 'fasta');
 my $dnaseq   = $dnaseqio->next_seq->seq;
-my $clone    =  Bio::PrimarySeq->new(  -seq         => $dnaseq,
-				       -id          => 'AP000074',
-				       -accession   => 'AP000074',
-				       -moltype     => 'protein');
+my $clone    =  Bio::PrimarySeq->new(  '-seq'         => $dnaseq,
+				       '-id'          => 'AP000074',
+				       '-accession'   => 'AP000074',
+				       '-moltype'     => 'protein');
 unless ($clone) 
 { print "not ok 2\n"; }
 else
 { print "ok 2\n"; }
 
-my $pepseqio = new Bio::SeqIO(-file => "$pwd/t/data/AP000074.pep",  -format => 'fasta');
+my $pepseqio = new Bio::SeqIO('-file' => "$pwd/t/data/AP000074.pep",  
+			      '-format' => 'fasta');
 my $pepseq   = $pepseqio->next_seq->seq;
-my $peptide  =  Bio::PrimarySeq->new(  -seq         => $pepseq,
-				       -id          => 'AP000074',
-				       -accession   => 'AP000074',
-				       -moltype     => 'protein');
+my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
+				       '-id'          => 'AP000074',
+				       '-accession'   => 'AP000074',
+				       '-moltype'     => 'protein');
 
 unless ($peptide) 
 { print "not ok 3\n"; }
@@ -57,11 +59,12 @@ else
 { print "ok 3\n"; }
 
 # First lets test the dna-dna blast
-my $blastn = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-query    => $clone,
-							   -program  => 'wublastn',
-							   -database => "$pwd/t/data/AI053588.fa",
-							   -threshold => 1e-6,
-							   );
+my $blastn = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
+    ('-query'    => $clone,
+     '-program'  => 'wublastn',
+     '-database' => "$pwd/t/data/AI053588.fa",
+     '-threshold' => 1e-6,
+     );
 
 unless ($blastn)
 { print "not ok 4\n"; }
@@ -87,11 +90,12 @@ foreach my $out ($blastn->output) {
 print "ok 6\n";
 
 # Now the dna-pep blast
-my $blastx = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-query    => $clone,
-							   -program  => 'wublastx',
-							   -database => "$pwd/t/data/AP000074.pep",
-							   -threshold => 1e-6,
-							   );
+my $blastx = Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
+    ('-query'    => $clone,
+     '-program'  => 'wublastx',
+     '-database' => "$pwd/t/data/AP000074.pep",
+     '-threshold' => 1e-6,
+     );
 
 unless ($blastx)
 { print "not ok 7\n"; }
@@ -118,11 +122,12 @@ print "ok 9\n";
 
 # Now the pep-dna blast
 
-my $tblastn = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-query    => $peptide,
-							    -program  => 'wutblastn',
-							    -database => "$pwd/t/data/AI053588.fa",
-							    -threshold => 1e-6,
-							   );
+my $tblastn = Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
+    ('-query'    => $peptide,
+     '-program'  => 'wutblastn',
+     '-database' => "$pwd/t/data/AI053588.fa",
+     '-threshold' => 1e-6,
+     );
 
 unless ($tblastn)
 { print "not ok 10\n"; }

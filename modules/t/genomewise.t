@@ -50,7 +50,7 @@ $exon->strand (1);
 
 $t->add_Exon($exon);
 
-my $exon = Bio::EnsEMBL::Exon->new;
+$exon = Bio::EnsEMBL::Exon->new;
 
 $exon->start(2084);
 $exon->end  (2180);
