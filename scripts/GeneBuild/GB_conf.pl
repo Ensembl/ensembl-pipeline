@@ -27,6 +27,9 @@ package main;
 #	    'dbuser'      => 'ensadmin',
 	    'dbuser'      => '',
 
+#	    'dbuser'      => 'ensembl',
+	    'dbpass'      => '',
+
 #	    'queue'       => 'acarilong',
 	    'queue'       => '',
 
