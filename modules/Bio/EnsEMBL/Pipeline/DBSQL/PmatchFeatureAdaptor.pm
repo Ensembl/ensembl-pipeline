@@ -71,7 +71,14 @@ sub write_protein {
   my $tmpcdna = $self->get_cdna_id($protein_id);
 
   if (defined ($tmpcdna)) {
-    if ($tmpcdna ne $cdna_id) {
+    if ($tmpcdna eq ''){
+      my $query = "UPDATE protein SET cdna_id='$cdna_id' WHERE protein_id='$protein_id'";
+      print STDERR "$query\n";
+      my $sth = $self->prepare($query);
+      my $res = $sth->execute;
+    }
+
+    elsif ($tmpcdna ne $cdna_id) {
       $self->throw("ERROR: Protein $protein_id already exists with different cdna $tmpcdna : $cdna_id\n");
     }
 
