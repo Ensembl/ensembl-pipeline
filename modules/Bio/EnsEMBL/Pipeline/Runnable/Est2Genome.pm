@@ -214,12 +214,12 @@ sub arguments {
 
 =cut
 
+# this is a MESS
 sub run {
     my ($self, @args) = @_;
     
     # some constant strings
     my $source_tag  = "est2genome";
-    my $primary_tag = "similarity";
     my $dirname     = "/tmp";
 
     #flag for est strand orientation
@@ -264,13 +264,13 @@ sub run {
       
       #read output
       while (<ESTGENOME>) {
-
-	if ($_ =~ /^Segment/) {
-
-	  print STDERR "$_";
+	
+	if ($_ =~ /^(Segment|Exon|Span)/) {
+	  
+#	  print STDERR "$_";
 	  #split on whitespace
 	  my @elements = split;
-      
+	  
 	  #extract values from output line
 	  my $f1score  = $elements[2];
 	  my $f1start  = $elements[3];
@@ -281,9 +281,11 @@ sub run {
 	  my $f1source = $source_tag;
 	  my $f2source = $source_tag;
 	  my $f1strand = 1;
+	  #my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
 	  my $f2strand = $estOrientation;
-	  my $f1primary = $primary_tag;
-	  my $f2primary = $primary_tag;
+	  #my $f2strand = 1;
+	  my $f1primary = $elements[0];
+	  my $f2primary = $f1primary;
 	  #ensure start is always less than end
 	  if ($elements[6] < $elements[7])
 	    {
@@ -302,7 +304,11 @@ sub run {
 				  $f1primary, $f2primary);
         }    
       }
+
       close(ESTGENOME);
+
+      $self->convert_output;
+
     };
     #clean up temp files
     $self->_deletefiles($genfile, $estfile);
@@ -325,7 +331,60 @@ sub run {
 
 sub output {
     my ($self) = @_;
-    return @{$self->{'_fplist'}};
+    return @{$self->{'_output'}};
+}
+
+sub convert_output {
+
+  my ($self) = @_;
+  my @genes;
+  my @exons;
+  my @supp_feat;
+
+  # split the different features up
+  foreach my $f(@{$self->{'_fplist'}}){
+    if ($f->primary_tag eq 'Span'){
+      push(@genes, $f->feature1);
+    }
+    elsif($f->primary_tag eq 'Exon'){
+      push(@exons, $f->feature1);
+    }
+    elsif($f->primary_tag eq 'Segment'){
+      push(@supp_feat, $f);
+    }
+  }
+  
+  # now reassemble them
+  # add exons to genes
+  foreach my $ex(@exons){
+    my $added = 0;
+    
+    foreach my $g(@genes){
+      if($ex->start >= $g->start  && $ex->end <= $g->end
+	 && $ex->strand == $g->strand && !$added){
+	$g->add_sub_SeqFeature($ex,'');
+	$added = 1;
+      }
+    }
+    $self->warn("Exon $ex could not be added to a gene ...\n") unless $added;     
+  }
+
+  # add supporting features to exons
+  foreach my $sf(@supp_feat){
+    my $added = 0;
+    
+    foreach my $e(@exons){
+      if($sf->start >= $e->start  && $sf->end <= $e->end
+	 && $sf->strand == $e->strand && !$added){
+	$e->add_sub_SeqFeature($sf,'');
+	$added = 1;
+      }
+    }
+    $self->warn("Feature $sf could not be added to an exon ...\n") unless $added;     
+  }
+  
+  push(@{$self->{'_output'}},@genes);
+
 }
 
 sub _createfeatures {
@@ -333,17 +392,6 @@ sub _createfeatures {
         $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
     
 
-    #create analysis object
-#VAC this analysis object is causing no end of trouble bevause of its attributes ...
-
-#    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-#                                (-db              => undef,
-#                                 -db_version      => undef,
-#                                 -program         => "est_genome",
-#                                 -program_version => "unknown",
-#                                 -gff_source      => $f1source,
-#                                 -gff_feature     => $f1primary,);
- 
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
                                 (-db              => "none",
                                  -db_version      => "none",
@@ -351,8 +399,6 @@ sub _createfeatures {
                                  -program_version => "none",
                                  -gff_source      => $f1source,
                                  -gff_feature     => $f1primary,);
-    
-
     #create features
     my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
                                               -end         =>   $f1end,
@@ -377,14 +423,7 @@ sub _createfeatures {
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
 
-    $self->_growfplist($fp); 
-}
-
-sub _growfplist {
-    my ($self, $fp) =@_;
-    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
+        push(@{$self->{'_fplist'}}, $fp);
 }
 
 sub _createfiles {
@@ -447,7 +486,8 @@ sub _deletefiles {
         return 1;
     } else {
         my @fails = grep -e, @files;
-        $self->throw("Failed to remove @fails : $!\n");
+#        $self->throw("Failed to remove @fails : $!\n");
+        $self->warn("Failed to remove @fails : $!\n");
     }
 }
 
