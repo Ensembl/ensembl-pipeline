@@ -596,12 +596,12 @@ public class PathStepsSwingView implements AView
     );
   }
   
-  void connectToSelectionEventRouter(
+  void connectToMouseLeftClickRouter(
     JGraph graph,
     String key
   ){
-    graph.addGraphSelectionListener(
-      new GraphSelectionEventRouter(
+    graph.addMouseListener(
+      new MouseLeftClickEventRouter(
         getApplication(),
         key
       )

@@ -312,7 +312,7 @@ public class PathStepsPanel extends JPanel{
           
         }else{
 
-          //applyEditsFromChangedModelToGraphModel();
+          applyEditsFromChangedModelToGraphModel();
           
         }
         
@@ -425,7 +425,7 @@ public class PathStepsPanel extends JPanel{
   private void recreateGraph(){
     remove(getScrollPane());
     setGraph(new PipeViewGraph(getGraphModel()));
-    //getView().connectToSelectionEventRouter(getGraph(), getView().SELECT_GRAPH_NODE_PARENTS_KEY);
+    //getView().connectToMouseLeftClickRouter(getGraph(), getView().SELECT_GRAPH_NODE_PARENTS_KEY);
     GridBagConstraints constraints = new GridBagConstraints();
     constraints.gridx = 0;
     constraints.gridy = 0;
