@@ -74,10 +74,10 @@ use Bio::EnsEMBL::Pipeline::ESTConf;
 use Getopt::Long;
 
 # ref db holds the exonerate_e2g or genomewise gene/exon/supporting feature data
-my $refdbname    = $EST_DBNAME;
-my $refuser      = $EST_DBUSER;
-my $refhost      = $EST_DBHOST;
-my $refpass      = $EST_DBPASS;
+my $refdbname    = $EST_GENE_DBNAME;
+my $refuser      = $EST_GENE_DBUSER;
+my $refhost      = $EST_GENE_DBHOST;
+my $refpass      = $EST_GENE_DBPASS;
 
 # supp_evidence holds the supp_evidence ids to be converted
 my $supp_evidence;
