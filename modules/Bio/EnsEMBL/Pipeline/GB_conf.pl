@@ -68,6 +68,9 @@ package main;
 #	    'pmatch'      => '/work2/vac/rd-utils/pmatch',
 	    'pmatch'      => '',
 
+#           'tblastn'     => 'tblast2n',
+	    'tblastn'     => '',
+
 #	    'pm_output'   => '/work2/vac/GeneBuild/script-test/',
 	    'pm_output'   => '',
 
@@ -101,7 +104,7 @@ package main;
 #           'size'        => '5000000',
             'size'        => '5000000',
 
-	   );
+);
 
 # seqfetch parameters - location of getseqs indices used by the RunnableDBs
 %seqfetch_conf = (
@@ -144,8 +147,14 @@ package main;
 
 # GeneBuild parameters
 %genebuild_conf = (
-	  
+		   'vcontig' => 0, #set to choose vc/rc building
+		   'bioperldb' => 0, #set to use/not bioperl-db to fetch seq
+		   'bpname'     => '', #bioperl-db database name
+		   'bpuser'     => '', #bioperl-db database user
+		   'bpbiodb_id' => '', #bioperl-db biodatabase_id
+		   'supporting_databases' => '', #dbs for supp evidence
 );
+
 }
 
 1;
