@@ -176,7 +176,7 @@ sub get_genes_by_Slice_and_type {
   my $chr_end = $slice->chr_end;
 
   my $sql = q{SELECT dg.denorm_gene_dump_id, dgd.dumped_gene, gdg.gene_id
-	      FROM denorm_gene dg, denorm_gene_dump dgd 
+	      FROM denormalised_gene dg, denormalised_gene_dump dgd 
 	      LEFT JOIN  gene_dumpedgene gdg 
 	      ON dgd.denorm_gene_dump_id = gdg.denorm_gene_dump_id
 	      WHERE dg.chr_name = ?
