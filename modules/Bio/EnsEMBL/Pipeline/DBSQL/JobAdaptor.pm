@@ -835,7 +835,7 @@ sub deleteObj {
 sub lock_tables{
   my ($self) = @_;
   
-  my $sql = "LOCK TABLES job WRITE, job_status WRITE";
+  my $sql = "LOCK TABLES job READ, job_status READ";
 
   my $sth = $self->db->prepare($sql);
 
