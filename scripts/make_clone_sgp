@@ -3,7 +3,7 @@
 use strict;
 use Getopt::Long;
 
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 
 use vars qw(@ISA);
@@ -28,7 +28,7 @@ my $fpcstub = 'ctg.';
 
 $| = 1;
 
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => $host,
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host => $host,
 						-user => $dbuser,
 						-dbname => $dbname,
 					       );

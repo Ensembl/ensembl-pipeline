@@ -32,7 +32,7 @@ test_Runnable
 use strict;
 use Getopt::Long;
 
-use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
@@ -63,7 +63,7 @@ my $input_id;
 
 $| = 1;
 
-my $module  = "Bio::EnsEMBL::DBSQL::Obj";
+my $module  = "Bio::EnsEMBL::DBSQL::DBAdaptor";
 
 my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
 
