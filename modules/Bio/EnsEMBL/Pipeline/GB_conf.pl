@@ -155,6 +155,20 @@ package main;
 		   'supporting_databases' => '', #dbs for supp evidence
 );
 
+# Post gene build integrity checking script parameters
+%verify_conf = (
+		   'minshortintronlen'  => 7, 
+		   'maxshortintronlen'  => 50, 
+		   'minlongintronlen'   => 100000, 
+		   'minshortexonlen'    => 3, 
+		   'maxshortexonlen'    => 10, 
+		   'minlongexonlen'     => 50000, 
+                   'mintranslationlen'  => 10, 
+		   'maxexonstranscript' => 150, 
+		   'maxtranscripts'     => 10, 
+                   'ignorewarnings'     => 1 
+);
+
 }
 
 1;
