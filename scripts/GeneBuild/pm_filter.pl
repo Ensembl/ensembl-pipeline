@@ -59,7 +59,7 @@ BEGIN {
 =cut
 
 use strict;
-use Bio::EnsEMBL::Pipeline::Pmatch::First_PMF; 
+use Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF; 
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
