@@ -297,6 +297,29 @@ sub kill_job{
   system($command);
 }
 
+
+=head2 stdout_file and stderr_file
+
+Unless explicitly set, these default to the file
+B</dev/zero>.  Thus bsub is given the arguments:
+
+  -o /dev/zero -e /dev/zero
+
+when the job is submitted.  We copy the stderr
+and stdout output to the designated output files
+after the job has finished with the
+B<copy_output> method which uses B<lsrcp> (to
+avoid the use of NFS).  bsub then copies the
+files to /dev/zero, which (on most systems)
+allows writes and will discard any input.
+
+We cannot use B</dev/null> as the arguments to -e
+and -o, because LSF will notice this and send
+data directly to /dev/null instead of creating
+the output files in /tmp.
+
+=cut
+
 sub stdout_file{
    my ($self, $arg) = @_;
 
@@ -371,47 +394,50 @@ sub lsf_user{
   return $self->{'_lsf_user'};
 }
 
+=head2 copy_output
 
-sub copy_output{
-  my ($self, $stderr_file, $stdout_file) = @_;
+copy_output is used to copy the job's STDOUT and
+STDERR files using B<lsrcp>.  This avoids using NFS.
 
-  $stderr_file = $self->stderr_file if(!$stderr_file);
-  $stdout_file = $self->stdout_file if(!$stdout_file);
-  my $err_file = $self->temp_errfile;
-  my $out_file  = $self->temp_outfile;
+=cut
 
-  if(!$self->temp_filename){
-    my ($p, $f, $l) = caller;
-    $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
-                " we can't copy the output files which don't exist $f:$l");
-    return;
-  }
-  my $command = $self->copy_command;
-  if(-e $err_file){
-    
-    my $err_copy = $command." ".$err_file." ".$self->lsf_user."@".$self->submission_host.":".$stderr_file." 2>&1 ";
-   
-    #print STDOUT " copying error file with ".$err_copy."\n";
-    if(system($err_copy)){
-      $self->throw("Couldn't execute ".$err_copy);
+sub copy_output {
+    my ($self, $dest_err, $dest_out) = @_;
+
+    $dest_err ||= $self->stderr_file;
+    $dest_out ||= $self->stdout_file;
+
+    if (! $self->temp_filename) {
+        my ($p, $f, $l) = caller;
+        $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
+                    " we can't copy the output files which don't exist $f:$l");
+        return;
     }
-  }else{
-    print STDOUT " error file ".$err_file." doesn't exist\n";
-  }
-  if(-e $out_file){
     
-    my $out_copy = $command." ".$out_file." ".$self->lsf_user."@".$self->submission_host.":".$stdout_file." 2>&1";
-    #print STDOUT " copying out file with ".$out_copy."\n";
-    if(system($out_copy)){
-      $self->throw("Couldn't execute ".$out_copy);
-    }
-   
-  }else{
-    print STDERR " out file ".$out_file." doesn't exist\n";
-  }
+    # Unbuffer STDOUT so that data gets flushed to file
+    # (It is OK to leave it unbuffered because this method
+    # gets called after the job is finished.)
+    my $old_fh = select(STDOUT);
+    $| = 1;
+    select($old_fh);
+    
+    my $temp_err = $self->temp_errfile;
+    my $temp_out = $self->temp_outfile;
 
+    my $command = $self->copy_command;
+    my $remote = $self->lsf_user . '@' . $self->submission_host;
+    foreach my $set ([$temp_out, $dest_out], [$temp_err, $dest_err]) {
+        my( $temp, $dest ) = @$set;
+        if (-e $temp) {
+            my $err_copy = "$command $temp $remote:$dest";
+            unless (system($err_copy) == 0) {
+                warn "Error: copy '$err_copy' failed exit($?)";
+            }
+        } else {
+            warn "No such file '$temp' to copy\n";
+        }
+    }
 }
-
 
 sub delete_output{
   my ($self) = @_;
