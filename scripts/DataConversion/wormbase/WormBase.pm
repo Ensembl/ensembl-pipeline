@@ -296,7 +296,7 @@ sub process_file{
 	die("not sure what to do with this ".$gene." utr info\n");
       }
 	next LOOP;
-    }elsif($line ne 'curated CDS'){
+    }elsif($line ne 'curated coding_exon'){
       next LOOP;
     }
     $gene =~ s/\"//g;
@@ -609,27 +609,29 @@ sub prune_Exons {
       my $found;
       #always empty
     UNI:foreach my $uni (@unique_Exons) {
-	if ($uni->start  == $exon->start  &&
-	    $uni->end    == $exon->end    &&
-	    $uni->strand == $exon->strand &&
-	    $uni->phase  == $exon->phase  &&
-	    $uni->end_phase == $exon->end_phase
-	   ) {
-	  $found = $uni;
-	  last UNI;
-	}
+        if ($uni->start  == $exon->start  &&
+            $uni->end    == $exon->end    &&
+            $uni->strand == $exon->strand &&
+            $uni->phase  == $exon->phase  &&
+            $uni->end_phase == $exon->end_phase
+           ) {
+          $found = $uni;
+          last UNI;
+        }
       }
       if (defined($found)) {
-	push(@newexons,$found);
-	if ($exon == $tran->translation->start_Exon){
-	  $tran->translation->start_Exon($found);
-	}
-	if ($exon == $tran->translation->end_Exon){
-	  $tran->translation->end_Exon($found);
-	}
+        push(@newexons,$found);
+        if($tran->translation){
+          if ($exon == $tran->translation->start_Exon){
+            $tran->translation->start_Exon($found);
+          }
+          if ($exon == $tran->translation->end_Exon){
+            $tran->translation->end_Exon($found);
+          }
+        }
       } else {
-	push(@newexons,$exon);
-	push(@unique_Exons, $exon);
+        push(@newexons,$exon);
+        push(@unique_Exons, $exon);
       }
     }          
     $tran->flush_Exons;

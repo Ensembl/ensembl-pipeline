@@ -51,27 +51,11 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
   seek($fh, 0, 0); #resetting the fh to the start of the agp file 
   my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
   
-  my $obda = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(-db => $WB_CLONE_INDEX);
+ 
 
   my %seqs = %{&get_sequences_pfetch($seq_ids, $pfetch)};
   my %chr_hash = %{&agp_parse($fh, $chromosome->dbID, $WB_AGP_TYPE)};
-  
-  foreach my $id(keys(%seqs)){
-    my $seq = $seqs{$id};
-    if($seq->length < $chr_hash{$id}->{contig_end}){
-      my ($acc) = $id =~ /(\S+)\.\d+/;
-      my $clone_name = $WB_ACC_2_CLONE->{$acc};
-      my $clone_seq = $obda->get_Seq_by_acc($clone_name);
-      $clone_seq->id($id);
-      $clone_seq->desc('');
-      if($clone_seq->length > $chr_hash{$id}->{contig_end}){
-	warn "sequence ".$clone_name." ".$id." id the wrong length in both the embl accession and the wormbase data not much i can do\n";
-	delete($seqs{$id});
-      }else{
-	$seqs{$id} = $clone_seq;
-      }
-    }
-  }
+
   my %contig_id;
   foreach my $id(keys(%seqs)){
     my $seq = $seqs{$id};
@@ -89,9 +73,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
     }
     $contig_id{$id} = $contig->dbID;
     if(!$WB_RAW_COMPUTES){
-      my $sql = "insert into input_id_analysis(input_id, analysis_id,  created) values('$contig_id', $WB_SUBMIT_CONTIG_ID, now())";
-      my $sth = $db->prepare($sql);
-      $sth->execute($contig_id, $WB_SUBMIT_CONTIG_ID);
+    
     }
   }
 
