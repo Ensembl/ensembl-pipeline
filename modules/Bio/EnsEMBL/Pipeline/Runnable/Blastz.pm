@@ -100,6 +100,8 @@ sub new {
     $self->{'_workdir'}   = "/tmp";     # location of temp directory
     $self->{'_results'}   = $self->{'_workdir'}."/results.".$$; # location of result file
     $self->{'_results_to_tmp_file'} = 0;  # switch on whether to use pipe or /tmp file
+    $self->{'_delete_results'} = 1;       # switch on whether to delete /tmp/results file or not
+    $self->{'_verbose_debug'} = 0;
     
     # Now parse the input options and store them in the object
     my($program,$query,$database,$options) = $self->_rearrange([qw(PROGRAM
@@ -165,17 +167,19 @@ sub run_analysis {
               
   if($self->{'_results_to_tmp_file'}) {
     $cmd .=  " > ". $self->results;
-    #print STDERR "Running blastz...\n$cmd\n";
+    print STDERR "Running blastz...\n$cmd\n" if($self->{'_verbose_debug'});
     $self->throw("Error runing blastz cmd\n$cmd\n." .
                  " Returned error $? BLAST EXIT: '" .
                  ($? >> 8) . "'," ." SIGNAL '" . ($? & 127) .
                  "', There was " . ($? & 128 ? 'a' : 'no') .
                  " core dump") unless(system($cmd) == 0);
     #$self->throw("Failed during blastz run, $!\n") unless (system ($cmd));
-    $self->file($self->results);
+    if($self->{'_delete_results'}) {
+      $self->file($self->results);
+    }
     $BlastzParser = Bio::EnsEMBL::Pipeline::Tools::Blastz->new('-file' => $self->results);
   } else {
-    #print STDERR "Running blastz to pipe...\n$cmd\n";
+    print STDERR "Running blastz to pipe...\n$cmd\n" if($self->{'_verbose_debug'});
     open($blastz_output_pipe, "$cmd |") ||
       $self->throw("Error opening Blasts cmd <$cmd>." .
                    " Returned error $? BLAST EXIT: '" .
