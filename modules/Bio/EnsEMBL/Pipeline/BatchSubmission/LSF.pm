@@ -230,34 +230,62 @@ sub get_job_time{
   return \%id_times;
 }
 
-
-
 sub check_existance{
-  my ($self, $id, $verbose) = @_;
-  if(!$id){
-    die("Can't run without an LSF id");
-  }
-  my $command = "bjobs ".$id."\n";
-  #print STDERR "Running ".$command."\n";
-  my $flag = 0; 
-  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
-  while(<BJOB>){
-    # print STDERR if($verbose);
+  
+  my ($self, $id_hash, $verbose) = @_;
+  
+  my %job_submission_ids = %$id_hash;
+  my $command = "bjobs";
+  open(BJOB, "$command 2>&1 |") or 
+    $self->throw("couldn't open pipe to bjobs");
+  my %existing_ids;
+  LINE:while(<BJOB>){
+    print STDERR if($verbose);
     chomp;
     if ($_ =~ /No unfinished job found/) {
-      #print "Set flag\n";
-      $flag = 1;
-    } 
+      last LINE;
+    }
     my @values = split;
     if($values[0] =~ /\d+/){
-      return $values[0];
+      $existing_ids{$values[0]} = 1;
     }
   }
-  close(BJOB);
-
-  print STDERR "Have lost ".$id."\n" if($verbose);
-  return undef;
+  my @awol_jobs;
+  foreach my $job_id(keys(%job_submission_ids)){
+    if(!$existing_ids{$job_id}){
+      push(@awol_jobs, @{$job_submission_ids{$job_id}});
+    }
+  }
+  close(BJOB) or $self->throw("Can't close pipe to bjobs");
+  return \@awol_jobs;
 }
+
+
+#sub check_existance{
+#  my ($self, $id, $verbose) = @_;
+#  if(!$id){
+#    die("Can't run without an LSF id");
+#  }
+#  my $command = "bjobs ".$id."\n";
+#  #print STDERR "Running ".$command."\n";
+#  my $flag = 0; 
+#  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
+#  while(<BJOB>){
+#    print STDERR if($verbose);
+#    chomp;
+#    if ($_ =~ /No unfinished job found/) {
+#      #print "Set flag\n";
+#      $flag = 1;
+#    } 
+#    my @values = split;
+#    if($values[0] =~ /\d+/){
+#      return $values[0];
+#    }
+#  }
+#  close(BJOB);
+#  print STDERR "Have lost ".$id."\n" if($verbose);
+#  return undef;
+#}
 
 
 sub kill_job{
