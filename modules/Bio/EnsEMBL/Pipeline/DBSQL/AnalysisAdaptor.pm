@@ -360,6 +360,41 @@ sub _objFromHashref {
   return $analysis;
 }
 
+sub removeInputId {
+  my ($self,$inputid,$class,$analysis) = @_;
+
+  if (!defined($inputid)) {
+    $self->throw("No input id defined");
+  }
+  if (!defined($analysis)) {
+    $self->throw("Analysis not defined");
+  }
+
+  my $query = "delete from InputIdAnalysis where inputId = '$inputid' and analysisId = " . $analysis->dbID . " and class = '" . $class . "'";
+
+  my $sth = $self->prepare($query);
+  my $rv  = $sth->execute();
+}
+
+sub submitInputId {
+  my ($self,$inputid,$class,$analysis) = @_;
+
+  if (!defined($inputid)) {
+    $self->throw("No input id defined");
+  }
+  if (!defined($class)) {
+    $self->throw("No class defined");
+  }
+  if (!defined($analysis)) {
+    $self->throw("Analysis not defined");
+  }
+
+  my $query = "insert into InputIdAnalysis (inputId,class,analysisId,created) values(\'$inputid\',\'$class\', ". $analysis->dbID . ",now())";
+
+  my $sth = $self->prepare($query);
+  my $rv  = $sth->execute();
+}
+
 sub db {
   my ( $self, $arg )  = @_;
   ( defined $arg ) &&
