@@ -60,9 +60,10 @@ sub new {
 
   my $self = $class->SUPER::new(@args);  
 
-  my($minscore,$maxevalue,$coverage) = $self->_rearrange([qw(MINSCORE
-							     MAXEVALUE
-							     COVERAGE
+  my($minscore,$maxevalue,$coverage,$prune) = $self->_rearrange([qw(MINSCORE
+								    MAXEVALUE
+								    COVERAGE
+								    PRUNE
 							     )],
 							 @args);
 
@@ -71,11 +72,13 @@ sub new {
   $minscore  = -100000 if !defined $minscore;
   $maxevalue = 0.1     if !defined $maxevalue;
   $coverage  = 10      if !defined $coverage;
+  $prune     = 0       if !defined $prune;
 
   $self->minscore($minscore);
   $self->maxevalue($maxevalue);
   $self->coverage($coverage);
-
+  $self->prune   ($prune);
+  
   $self->{'_output'} = [];
 
   return $self;
@@ -192,19 +195,133 @@ sub run{
        }
 
        foreach my $f ( @{$hitarray{$hseqname}} ) {
-	   push(@accepted,$f);
-	   for my $i ( $f->start .. $f->end ) {
-	       $list[$i]++; 
-	   }
+	 push(@accepted,$f);
+	 for my $i ( $f->start .. $f->end ) {
+	   $list[$i]++; 
+	 }
        }
+     }
 
+
+   if ($self->prune) {
+
+     my %hit;
+
+     foreach my $f (@accepted) {
+       if (!defined($hit{$f->hseqname})) {
+	 $hit{$f->hseqname} = [];
+       }
+       push(@{$hit{$f->hseqname}},$f);
+     }
+     
+     my @new;
+
+     foreach my $hseqname (keys %hit) {
+       print STDERR "Pruning $hseqname\n";
+       my @tmp = $self->prune_features(@{$hit{$hseqname}});
+       push(@new,@tmp);
+       push(@{$self->{'_output'}},@tmp);
+     }
+     return @new;
+   } else {
+     push(@{$self->{'_output'}},@accepted);
+     return @accepted;
    }
 
-   push(@{$self->{'_output'}},@accepted);
-
-   return @accepted;
-
 }
+
+sub prune {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_prune} = $arg;
+  }
+  return $self->{_prune};
+}
+
+sub prune_features {
+  my ($self,@input) = @_;
+
+  my @new;
+  my $depth = 5;
+
+  my @clusters;
+  my @cluster_starts;
+  my @cluster_ends;
+
+  print STDERR "Before " . scalar(@input) . "\n";
+
+  @input = sort {$a->start <=> $b->start} @input;
+
+  FEAT: foreach my $f (@input) {
+      #print STDERR "Processing feature " . $f->gffstring . "\n";
+    my $found = 0;
+
+    my $count = 0;
+    CLUS: foreach my $clus (@clusters) {
+      my @clusf = @$clus;
+
+      if ($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count]) {
+#	print STDERR "Skipping cluster\n";
+
+	next CLUS;
+      }
+      if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {
+	
+	#foreach my $f2 (@clusf) {
+	#if ($f->overlaps($f2)) {
+#	print STDERR "Found existing cluster\n";
+	$found = 1;
+	push(@$clus,$f);
+	
+	if ($f->start < $cluster_starts[$count]) {
+	  $cluster_starts[$count] = $f->start;
+	}
+	if ($f->end   < $cluster_ends[$count]) {
+	  $cluster_ends[$count] = $f->end;
+	}
+
+	next FEAT;
+      }
+      #      }
+      $count++;
+    }
+    if ($found == 0) {
+#      print STDERR "found new cluster\n";
+      my $newclus = [];
+      push (@$newclus,$f);
+      push(@clusters,$newclus);
+
+      $cluster_starts[$count] = $f->start;
+      $cluster_ends[$count] = $f->end;
+
+    }
+  }
+
+
+  foreach my $clus (@clusters) {
+    my $count = 0;
+
+    my @tmp = @$clus;
+
+    @tmp = sort {$b->score <=> $a->score} @tmp;
+
+    while ($count < 5 && $#tmp >= 0) {
+      push(@new,shift @tmp);
+      $count++;
+    }
+    if ($#tmp >= 0) {
+      print STDERR "Removing " . scalar(@tmp) . " features\n";
+    }
+  }
+
+  print STDERR "After " . scalar(@new) . "\n";
+  
+  return @new;
+}
+
+  
+
 
 =head2 output
 
