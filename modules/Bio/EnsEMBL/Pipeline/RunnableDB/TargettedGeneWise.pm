@@ -209,10 +209,12 @@ sub fetch_input{
   print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
   my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
+  
+    
   $self->query($slice);
   my $seq;
   if(@$GB_TARGETTED_MASKING){
-    my $seq = $slice->get_repeatmasked_seq($GB_TARGETTED_MASKING, $GB_TARGETTED_SOFTMASK);
+    $seq = $slice->get_repeatmasked_seq($GB_TARGETTED_MASKING, $GB_TARGETTED_SOFTMASK);
   }else{
     $seq = $slice;
   }
@@ -220,12 +222,13 @@ sub fetch_input{
   #print STDERR $protein_id."\n";
   print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
   # check slice seq
-#  print ">slice\n" . $slice->seq . "\n";
-  #print "trying to fetch $chr_name.$new_start-$new_end\n";
+  #print STDERR ">slice\n" . $slice->seq . "\n";
+  #print STDERR "trying to fetch $chr_name.$new_start-$new_end\n";
 
   # genewise runnable
   # repmasking?
 
+  
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
 								    '-ids'            => [ $protein_id ] ,
 								    '-seqfetcher'     => $self->seqfetcher,
