@@ -52,6 +52,11 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
+use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
+					 TRANSCRIPT_ID_SUBSCRIPT
+					 GENE_ID_SUBSCRIPT
+					 PROTEIN_ID_SUBSCRIPT
+					 );
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::Object );
@@ -169,22 +174,26 @@ sub write_output {
         return unless ($#genes >= 0);
 
 
-	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write, dna read, contig read, clone read, analysis read, supporting_feature write");
+	      my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
 	      $sth->execute;
 
 	  foreach my $gene (@genes) {
-	    (my $gcount = $gene_obj->get_new_GeneID("F24G"))        =~ s/F24G//;
-	    (my $tcount = $gene_obj->get_new_TranscriptID("F24T"))  =~ s/F24T//;
-	    (my $pcount = $gene_obj->get_new_TranslationID("F24P")) =~ s/F24P//;
-	    (my $ecount = $gene_obj->get_new_ExonID("F24E"))        =~ s/F24E//;
+	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
+		=~ s/$GENE_ID_SUBSCRIPT//;
+	    (my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
+		=~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
+	    (my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
+		=~ s/$PROTEIN_ID_SUBSCRIPT//;
+	    (my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
+		=~ s/$EXON_ID_SUBSCRIPT//;
 	    
-	    $gene->id("F24G" . $gcount);
+	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
 
 	    print (STDERR "Writing gene " . $gene->id . "\n");
 	    print (STDERR "Transcripts are\n");
 	    foreach my $tran ($gene->each_Transcript) {
-		$tran->id             ("F24T" . $tcount);
-		$tran->translation->id("F24P" . $pcount);
+		$tran->id             ($TRANSCRIPT_ID_SUBSCRIPT . $tcount);
+		$tran->translation->id($PROTEIN_ID_SUBSCRIPT . $pcount);
 
 		my $translation = $tran->translation;
 
@@ -197,16 +206,16 @@ sub write_output {
                     my @sf = $ex->each_Supporting_Feature;
                     print STDERR "Supporting features are " . scalar(@sf) . "\n";
 
-		    if ($ex->id !~ /F24E/) {
+		    if ($ex->id !~ /$EXON_ID_SUBSCRIPT/) {
 			my $tmpid = $ex->id;
-			$ex->id("F24E".$ecount);
+			$ex->id($EXON_ID_SUBSCRIPT.$ecount);
 
 			if ($translation->start_exon_id eq $tmpid) {
-			    $translation->start_exon_id("F24E".$ecount);
+			    $translation->start_exon_id($EXON_ID_SUBSCRIPT.$ecount);
 			}
 
 			if ($translation->end_exon_id eq $tmpid) {
-			    $translation->end_exon_id("F24E".$ecount);
+			    $translation->end_exon_id($EXON_ID_SUBSCRIPT.$ecount);
 			}
 			$ecount++;
 			print(STDERR "Exon         " . $ex->id . "\n");

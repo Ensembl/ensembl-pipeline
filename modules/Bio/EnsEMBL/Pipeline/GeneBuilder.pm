@@ -81,7 +81,11 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::MappedExon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
-
+use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
+					 TRANSCRIPT_ID_SUBSCRIPT
+					 GENE_ID_SUBSCRIPT
+					 PROTEIN_ID_SUBSCRIPT
+					 );
 use FreezeThaw;
 
 use vars qw(@ISA);
@@ -742,7 +746,7 @@ sub link_ExonPairs {
     }
     my $count = 1;
     foreach my $tran ($self->get_all_Transcripts) {
-	$tran->id ("F24T" . $contigid.$count);
+	$tran->id ($TRANSCRIPT_ID_SUBSCRIPT . $contigid.$count);
 	$tran->version(1);
 	$self->make_Translation($tran,$count);
 	$count++;
