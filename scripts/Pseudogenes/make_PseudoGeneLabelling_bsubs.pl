@@ -56,12 +56,14 @@ my @gene_ids = &get_gene_ids();
 ############################################################
 
 sub get_gene_ids{
+  
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 					       '-host'   => $LABEL_DBHOST,
 					       '-user'   => 'ensro',
 					       '-dbname' => $LABEL_DBNAME,
 					      );
   if ( $gene_type ){
+    print STDERR "Getting genes by ".$gene_type."\n";
     my @ids = &get_genes_by_type($db,$gene_type);
     return @ids;
   }
@@ -97,8 +99,13 @@ sub make_pseudogene_bsubs {
   my $bsubdir       = $TMPDIR . "/" . $pseudogene_bsubdir . "/";
   
   foreach my $id (@$gene_ids){
-    my $outfile   = $bsubdir . $id. "_out";
-    my $errfile   = $bsubdir . $id. "_err";
+    my $num = int(rand(10));
+    my $dir = $bsubdir."/".$num."/";
+    if( ! -e $dir ) {
+      system( "mkdir $dir" );
+    }
+    my $outfile   = $dir . $id. "_out";
+    my $errfile   = $dir . $id. "_err";
     
     my $command = 
       "bsub $lsf_options -o $outfile -e $errfile -E \"$check \" $pseudogene -gene_id  $id";
