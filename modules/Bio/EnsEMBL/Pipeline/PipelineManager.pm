@@ -488,9 +488,10 @@ sub _update_task_status {
 
   my $job_adaptor = $config->get_DBAdaptor()->get_JobAdaptor;
 
+  print STDERR "DB status fetch begin\n";
   my $current_status_list = $job_adaptor->list_current_status();
   my $current_time = time();
-
+  print STDERR "DB status fetch end\n";
 
   my %task_status;
   my %timeout_values;
@@ -507,6 +508,8 @@ sub _update_task_status {
   #
   # Place the jobs into task and status groups
   #
+
+  my @delete_list;
   foreach my $current_status (@$current_status_list) {
     my ($job_id, $taskname, $input_id, $status, $timestamp,
        $stderr, $stdout) = @$current_status;
@@ -517,7 +520,7 @@ sub _update_task_status {
     # created again
     if($flush_created && ($status eq 'CREATED' || $status eq 'RETRIED')) {
       #delete the job from the database, don't and add it to the status
-      $job_adaptor->remove($job_adaptor->fetch_by_dbID($job_id));
+      push @delete_list, $job_id;
       next;
     }
 
@@ -541,6 +544,14 @@ sub _update_task_status {
         $task_status{$taskname}->{$status} ||= [];
         push(@{$task_status{$taskname}->{$status}}, $input_id);
       }
+  }
+
+  #
+  # delete 'CREATED' and 'RETRIED' jobs so they are recreated
+  # on pipeline restart
+  #
+  if($flush_created && @delete_list) {
+    $job_adaptor->remove_by_id_list(\@delete_list);
   }
 
   #
