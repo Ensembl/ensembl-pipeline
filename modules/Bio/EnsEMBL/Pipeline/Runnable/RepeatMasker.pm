@@ -247,8 +247,8 @@ sub createfeaturepair {
                             -end     => $feat1->{end},
                             -strand  => $feat1->{strand},
                             -score   => $feat1->{score},
-                            -source  => $source,
-                            -primary => $primary,
+                            -source_tag  => $source,
+                            -primary_tag => $primary,
                             -analysis => $analysis_obj);
     
     my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
@@ -257,8 +257,8 @@ sub createfeaturepair {
                             -end     => $feat2->{end},
                             -strand  => $feat2->{strand},
                             -score   => $feat2->{score},
-                            -source  => $source,
-                            -primary => $primary,
+                            -source_tag  => $source,
+                            -primary_tag => $primary,
                             -analysis => $analysis_obj);
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $seqfeature1,
