@@ -46,7 +46,7 @@ foreach my $clone (@clones) {
       my $errfile  = $outdir . $input_id . ".err";
 
 
-      my $command  = "bsub -q $queue -o $outfile -e $errfile -E \"$script -check \"";
+      my $command  = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$script -check \"";
       $command .= "  $script ";
       $command .= " -runnable $module ";
       $command .= " -input_id $input_id -write";
