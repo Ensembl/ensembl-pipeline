@@ -217,10 +217,11 @@ sub align_hits_to_contig {
     # Each exon is trimmed at either end so it has a whole number
     # of residues
 
+    my $pep = $trans->translate->seq;
+
     foreach my $exon ($trans->each_Exon) {
 
         my %ex_align;
-        my $pep = $trans->translate->seq;
 
 #	print STDERR "\tGenscan exon " . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->phase . "\n";
 	my $strand = "+";
@@ -230,6 +231,10 @@ sub align_hits_to_contig {
 #	print STDERR "exon\tgenscan\tsimilarity\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand ."\t" . $exon->phase . "\t" . $trans->id . "\n";
 
         my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
+	if ($expep =~ s/x$//i) {
+	    print STDERR "Removed terminal 'X' from exon @{[$exon->id]}\n";
+	}
+
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
 
