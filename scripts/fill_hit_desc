@@ -10,11 +10,11 @@ use Data::Dumper;
 
 {
     my $help   = 0;
-    my $dbhost = undef;
-    my $dbname = undef;
-    my $dbuser = 'ensro';
-    my $dbpass = undef;
-    my $dbport = 3306;
+    my $dbhost = 'otterpipe1';
+    my $dbname = 'human_finished';
+    my $dbuser = 'ottadmin';
+    my $dbpass = 'lutralutra';
+    my $dbport = 3302;
     my $table  = 'dna';
     my $query  = undef;
     my $left   = 0;
@@ -78,7 +78,7 @@ use Data::Dumper;
 
     while(my @first = first_of_cache($cached)){
         print STDERR map "$_\n", @first;
-        $seqfetcher->write_descriptions( $db, @first );
+        $seqfetcher->write_descriptions( $db, [@first] );
     }
 }
 
