@@ -82,11 +82,11 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    # dbobj input_id mandatory and read in by BlastableDB
-    if (!defined $self->seqfetcher) {
-      my $seqfetcher = $self->make_seqfetcher();
-      $self->seqfetcher($seqfetcher);
-    }
+    ## dbobj input_id mandatory and read in by BlastableDB
+    #if (!defined $self->seqfetcher) {
+    #  my $seqfetcher = $self->make_seqfetcher();
+    #  $self->seqfetcher($seqfetcher);
+    #}
     # dbobj needs a reference dna database
     my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						  -host             => $EST_REFDBHOST,
@@ -132,24 +132,24 @@ sub new {
 
 =cut
 
-sub make_seqfetcher {
-  my ( $self ) = @_;
-  my $index   = $EST_INDEX;
+#sub make_seqfetcher {
+#  my ( $self ) = @_;
+#  my $index   = $EST_INDEX;
 
-  my $seqfetcher;
+#  my $seqfetcher;
 
-  if(defined $index && $index ne ''){
-    my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-  }
-  else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-  }
+#  if(defined $index && $index ne ''){
+#    my @db = ( $index );
+#    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+#  }
+#  else{
+#    # default to Pfetch
+#    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+#  }
 
-  return $seqfetcher;
+#  return $seqfetcher;
 
-}
+#}
 
 
 =head2 RunnableDB methods
@@ -489,6 +489,7 @@ sub _check_Transcripts {
   
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
+    $transcript->sort;
     my @exons = $transcript->get_all_Exons;
     #print STDERR "Transcript with ".scalar(@exons)." exons\n";
     my $hid;
@@ -498,8 +499,10 @@ sub _check_Transcripts {
     my $exon_count = 0;
     my $seqname;
     
+    my $previous_exon;
   EXON:
     foreach my $exon (@exons){
+      $exon_count++;
 
       # we don't really want to neglect any exon at this point
       my $hstart;
@@ -511,7 +514,7 @@ sub _check_Transcripts {
 	$seqname = $exon->seqname;
       }
       if ( !( $exon->seqname eq $seqname ) ){
-	print STDERR "transcript ".$transcript->stable_id." (".$transcript->dbID.") is partly".
+	print STDERR "transcript ".$transcript->dbID." is partly".
 		    " outside the contig, skipping it...\n";
 	next TRANSCRIPT;
       }
@@ -525,6 +528,32 @@ sub _check_Transcripts {
 	next TRANSCRIPT;
       }
 
+      # reject transcript with too large intron length
+      my $intron_length;
+
+      # 100000 bases is quite tight, we better keep it low for ESTs
+      my $max_intron_length = 100000;
+      if ($exon_count > 1 ){
+	my ( $s, $e, $intron_length);
+	if ($this_strand == 1){
+	  $s             = $previous_exon->end;
+	  $e             = $exon->start;
+	  $intron_length = $e - $s - 1;
+	}
+	elsif ( $this_strand == -1 ){
+	  $s             = $previous_exon->start;
+	  $e             = $exon->end;
+	  $intron_length = $s - $e - 1;
+	}
+	#print STDERR "this_strand: $this_strand\n";
+	#print STDERR " $s  - $e  - 1 = $intron_length\n";
+
+	if ( $intron_length > $max_intron_length ){
+	  print STDERR "Rejecting transcript $transcript for having inton too long: $intron_length\n";
+	  next TRANSCRIPT;
+	}
+      }
+	
       # get the supporting_evidence for each exon
       # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
 
@@ -536,6 +565,10 @@ sub _check_Transcripts {
 	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
 		    "exon_id =".$exon->dbID."\n");
       }
+      
+      $previous_exon = $exon;
+
+
 
 ######## some of the checks are commented out, maybe resurrected later when we switch to pure exonerate
 
@@ -695,7 +728,6 @@ sub _check_Transcripts {
 #	  }
 #	}
 #      }
-#       $exon_count++;
      
 
     } # end of EXON
@@ -773,16 +805,22 @@ sub _cluster_Transcripts{
   my $cluster = Bio::EnsEMBL::Utils::TranscriptCluster->new();
   my $cluster_count = 1;
 
-  # put the first transcript into these cluster
+  # put the first transcript into this cluster
   $cluster->put_Transcripts( $sorted_transcripts[0] );
   push( @clusters, $cluster );
     
   # keep track of the edges of the cluster, useful for a negative check
   my %start;
   my %end;
-  $sorted_transcripts->sort;
-  $start{ $cluster } = $sorted_transcripts[0]->start_exon->start
-  $end{ $cluster }   = $sorted_transcripts[0]->end_exon->end
+  $sorted_transcripts[0]->sort;
+  $start{ $cluster } = $sorted_transcripts[0]->start_exon->start;
+  $end{ $cluster }   = $sorted_transcripts[0]->end_exon->end;
+
+  ## just a test to see whether we can trust start_exon() and end_exon()
+  #print STDERR "start from transcript: ".$start{ $cluster }."\n";
+  #print STDERR "      from method    : ".$self->_get_start_of_Transcript( $sorted_transcripts[0] )."\n";
+  #print STDERR "end from transcript  : ". $end{ $cluster }."\n";
+  #print STDERR "    from method      : ".$self->_get_end_of_Transcript( $sorted_transcripts[0] )."\n";
 
   # loop over the rest of the genes
  LOOP1:
@@ -795,8 +833,10 @@ sub _cluster_Transcripts{
     my $this_end   = $sorted_transcripts[$c]->end_exon->end;
     
     # only look if they potentially overlap
-    if ( !( $end{ $cluster } < $this_start || $this_end < $start{ $cluster } ) ){
-      
+    #print STDERR "1:comparing transcript ".$sorted_transcripts[$c]->dbID." [ $this_start , $this_end ] with cluster $cluster [ $start{$cluster} , $end{ $cluster } ]\n";
+    if ( !( $this_start > $end{ $cluster } || $this_end < $start{ $cluster } ) ){
+      #print STDERR "  inside!\n";
+
       # compare with the transcripts in this cluster
     LOOP2:
       foreach my $t_in_cluster ( $cluster->get_Transcripts ){       
@@ -805,7 +845,7 @@ sub _cluster_Transcripts{
 	  $found=1;
 	  
 	  # reset start/end if necessary
-	  if ( $this_start < $start{ $cluster} ){
+	  if ( $this_start < $start{$cluster} ){
 	    $start{ $cluster } = $this_start;
 	  }
 	  if ( $this_end   > $end{ $cluster }  ){
@@ -821,6 +861,7 @@ sub _cluster_Transcripts{
     # set my $limit = 6; (for example) and include in the while the following condition
     # while ( !(...)  && !($lookup > $limit) )
 
+    #print STDERR "  found = $found\n";
     if ( $found == 0 && $cluster_count > 1 ) {
       my $lookup = 1;
       
@@ -830,8 +871,9 @@ sub _cluster_Transcripts{
 	my $previous_cluster = $clusters[ $cluster_count - 1 - $lookup ];
 	
 	# only look if it is potentially overlapping
-	if ( !( $end{ $previous_cluster } < $this_start || $this_end < $start{ $previous_cluster } ) ){
-
+	#print STDERR "2:comparing transcript ".$sorted_transcripts[$c]->dbID." [ $this_start , $this_end ] with cluster $previous_cluster [ $start{$previous_cluster} , $end{ $previous_cluster } ]\n";
+	if ( !(  $this_start > $end{ $previous_cluster } || $this_end < $start{ $previous_cluster } ) ){
+	  #print STDERR "  inside!\n";
 	  # loop over the transcripts in this previous cluster
 	  foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
 	    if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
@@ -839,11 +881,11 @@ sub _cluster_Transcripts{
 	      $found=1;
 	      
 	      # reset start/end if necessary
-	      if ( $this_start < $start{ $cluster} ){
-		$start{ $cluster } = $this_start;
+	      if ( $this_start < $start{ $previous_cluster} ){
+		$start{ $previous_cluster } = $this_start;
 	      }
-	      if ( $this_end   > $end{ $cluster }  ){
-		$end{ $cluster } = $this_end;
+	      if ( $this_end   > $end{ $previous_cluster }  ){
+		$end{ $previous_cluster } = $this_end;
 	      }
 	      next LOOP1;
 	    }
@@ -853,35 +895,60 @@ sub _cluster_Transcripts{
       }
     }
     # if not-clustered create a new TranscriptCluster
+    #print STDERR "  found = $found\n";
     if ( $found == 0 ){  
       $cluster = new Bio::EnsEMBL::Utils::TranscriptCluster; 
       $cluster->put_Transcripts( $sorted_transcripts[$c] );
       $start{ $cluster } = $sorted_transcripts[$c]->start_exon->start;
       $end{ $cluster }   = $sorted_transcripts[$c]->end_exon->end;
+      #print STDERR "  creating a new cluster $cluster [ $start{ $cluster }, $end{ $cluster } ]\n";
       push( @clusters, $cluster );
       $cluster_count++;
     }
   }
 
-  ## print out the clusters
-  my $number  = 1;
-  foreach my $cluster (@clusters){
-    my $count = 1;
-    print STDERR "cluster $number :\n";
-    foreach my $tran ($cluster->get_Transcripts){
-      print STDERR "$count:\n";
-      print STDERR $tran->dbID." >";
-      foreach my $exon ( $tran->get_all_Exons ){
-  	print STDERR $exon->start.":".$exon->end." ";
-      }
-      print STDERR "\n";
-      $count++;
-    }
-    $number++;
-  }		
+#  ## print out the clusters
+#  my $number  = 1;
+#  foreach my $cluster (@clusters){
+#    my $count = 1;
+#    print STDERR "cluster $number :\n";
+#    foreach my $tran ($cluster->get_Transcripts){
+#      print STDERR "$count:\n";
+#      print STDERR $tran->dbID." >";
+#      foreach my $exon ( $tran->get_all_Exons ){
+#  	print STDERR $exon->start.":".$exon->end." ";
+#      }
+#      print STDERR "\n";
+#      $count++;
+#    }
+#    $number++;
+#  }		
   
   return @clusters;
 }
+############################################################
+
+sub _get_start_of_Transcript{        
+  my ($self,$transcript) = @_;
+  my @exons = $transcript->get_all_Exons;
+  my @sorted_exons = sort { $a->start <=> $b->start } @exons;
+  my $start = $sorted_exons[0]->start;
+  return $start;
+}    
+
+sub _get_end_of_Transcript {        
+  my ($self,$transcript) = @_;
+  my @exons = $transcript->get_all_Exons;
+  my $end = 0;
+  my $this_end;
+  foreach my $exon (@exons){
+   $this_end = $exon->end;
+   if ( $this_end > $end ){
+     $end = $this_end;
+   }
+  }
+  return $this_end;
+}    
 
 ############################################################
 
@@ -1081,14 +1148,18 @@ sub _merge_Transcripts{
     # We put here yet another check, to make sure that we really get rid of redundant things
     
     # if we have produce more than one transcript, check again
-    my @merged_transcripts2;
-    if ( scalar( @merged_transcripts ) > 1 ){
-      @merged_transcripts2 = $self->_check_for_residual_Merge(\@merged_transcripts,$strand);
-    } 
     
+    if ( scalar( @merged_transcripts ) > 1 ){
+	my @merged_transcripts2 = $self->_check_for_residual_Merge(\@merged_transcripts,$strand);
+	
+	# replace then the previous list by this new one:
+	@merged_transcripts = ();
+	push ( @merged_transcripts, @merged_transcripts2);
+      } 
+  
     # check for the single exon transcripts ( dandruff ), they are no good
     my @final_merged_transcripts;
-    foreach my $tran ( @merged_transcripts2 ){
+    foreach my $tran ( @merged_transcripts ){
       if ( scalar ( $tran->get_all_Exons ) == 1 ){
 	next;
       }
@@ -1102,7 +1173,6 @@ sub _merge_Transcripts{
     
     # empty arrays to save memory
     @merged_transcripts       = ();
-    @merged_transcripts2      = ();
     @final_merged_transcripts = ();
     
   }     # end of CLUSTER		       
@@ -1158,17 +1228,17 @@ sub _check_for_residual_Merge{
 	# take each new_transcript
 	my $new_tran = $new_transcripts{ $k };
 	
-	# test for merge
-	print STDERR "comparing\n";
-	print STDERR $new_tran.":";
-	foreach my $e1 ( $new_tran->get_all_Exons ){
-	  print STDERR $e1->start.":".$e1->end."\t";
-	}
-	print STDERR "\n".$tran.":";
-	foreach my $e1 ( $tran->get_all_Exons ){
-	  print STDERR $e1->start.":".$e1->end."\t";
-	}
-	print STDERR "\n";
+#	# test for merge
+#	print STDERR "comparing\n";
+#	print STDERR $new_tran.":";
+#	foreach my $e1 ( $new_tran->get_all_Exons ){
+#	  print STDERR $e1->start.":".$e1->end."\t";
+#	}
+#	print STDERR "\n".$tran.":";
+#	foreach my $e1 ( $tran->get_all_Exons ){
+#	  print STDERR $e1->start.":".$e1->end."\t";
+#	}
+#	print STDERR "\n";
       
 	my ($merge,$overlaps) = $self->_test_for_Merge( $new_tran, $tran );
 
@@ -1176,11 +1246,11 @@ sub _check_for_residual_Merge{
 	if ( $merge == 1 ){
 	  $found = 1;
 	  my @list = ( $new_tran, $tran );
-	  print STDERR "They MERGE,\n";
-	  print STDERR "adding it to new_transcripts[ $label ] = $new_transcripts{ $label }\n";
+	  #print STDERR "They MERGE,\n";
+	  #print STDERR "adding it to new_transcripts[ $label ] = $new_transcripts{ $label }\n";
 	  my $new_transcript = $self->_produce_Transcript( \@list, $strand );
 	  $new_transcripts{ $label } = $new_transcript;
-	  print STDERR "producing a new  new_transcripts[ $label ] = $new_transcripts{ $label }\n\n";
+	  #print STDERR "producing a new  new_transcripts[ $label ] = $new_transcripts{ $label }\n\n";
 	  next TRAN;
 	}
 	else{
@@ -1201,15 +1271,15 @@ sub _check_for_residual_Merge{
 
     my @merged_transcripts = values( %new_transcripts );
 
-    ### print out the results
-    print STDERR "Transcripts created:\n";
-    foreach my $tran ( @merged_transcripts ){
-      print STDERR "tran ".$tran.":";
-      foreach my $e1 ( $tran->get_all_Exons ){
-	print STDERR $e1->start.":".$e1->end."\t";
-      }
-      print STDERR "\n";
-    }
+   # ### print out the results
+#    print STDERR "Transcripts created:\n";
+#    foreach my $tran ( @merged_transcripts ){
+#      print STDERR "tran ".$tran.":";
+#      foreach my $e1 ( $tran->get_all_Exons ){
+#	print STDERR $e1->start.":".$e1->end."\t";
+#      }
+#      print STDERR "\n";
+#    }
 
   return @merged_transcripts;
 }
@@ -1685,7 +1755,6 @@ CLUSTER:
     #}
     #print STDERR "\n";
 
-
     $new_end = shift( @ends );
     $max_end = $end{ $new_end };
     
@@ -1715,30 +1784,59 @@ CLUSTER:
 
 
     ######  if new_start> new_end change them in turns until we get start < end ######
+    # this can happen when there are many exons in a cluster but they vary greatly in size
     my $other_start = $new_start;
     my $other_end   = $new_end;
     my $trouble     = 0;
+    my $stop_start  = 0;
+    my $stop_end    = 0;
 
     while ( $other_start >= $other_end ){
-      #print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+      print STDERR "*** Trouble: $new_start >= $new_end ***\n";
       $trouble = 1;
 
       # take the next one
-      $other_start = shift( @starts );
+      if ( $stop_start == 0 ){
+	my $re_start = shift( @starts );
+	if ( $re_start ){
+	  $other_start = $re_start;
+	}
+	else{
+	  $stop_start = 1;
+	}
+      }
       if ( $other_start >= $other_end ){
-	$other_end = shift( @ends );
+	if ( $stop_end == 0 ){
+	  my $re_end = shift( @ends );
+	  if ( $re_end ){
+	    $other_end = $re_end;
+	  }
+	  else{
+	    $stop_end = 1;
+	  }
+	}
+      }
+      if ( $stop_start == 1 && $stop_end ==1 ){
+	last;
       }
     }
 
     if ($trouble == 1 ){
-      if ($other_end && $other_start){
+      if ($other_end && $other_start && $other_start < $other_end ){
 	$new_start = $other_start;
 	$new_end   = $other_end;
-	#print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
       }
       else{
 	## ok, you tried to change, but you got nothing, what can we do about it?
-	#print STDERR "Could not reset the start and end coordinates\n";
+	print STDERR "Could not reset the start and end coordinates\n";
+	if ( $other_end <= $other_start ){
+	  print STDERR "Sorry will have to put the end= ens of cluster\n";
+	  $new_end   = $cluster->end;
+	  if ( $new_start >= $new_end ){
+	    print STDERR "Last resort: I'm afraid we'll also have to put start = start of cluster, good luck\n";
+	  }
+	}
       }
     }
 
