@@ -96,14 +96,14 @@ sub new {
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
     $self->analysis($analysis);
     
-    if ($threshold)
-    {
-        $self->threshold($threshold);
-    }
-    else
-    {
-        $self->threshold(1e-6);
-    }
+#    if ($threshold)
+#    {
+#        $self->threshold($threshold);
+#    }
+#    else
+#    {
+#        $self->threshold(1e-6);
+#    }
     return $self;
 }
 
@@ -206,7 +206,7 @@ sub run {
     $self->throw("Runnable modules not set") unless ($self->runnable());
     foreach my $runnable ($self->runnable)
     {
-        $runnable->threshold($self->threshold);
+#        $runnable->threshold($self->threshold);
         $runnable->run();
     }
 }
