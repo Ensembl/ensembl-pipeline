@@ -106,10 +106,10 @@ sub new {
     $self->seqfetcher($seqfetcher) if defined($seqfetcher);
 
     if(defined $threshold){
-      $self->blast_threshold($threshold);
+      $self->blast_P_value_threshold($threshold);
     }
     else{
-      $self->blast_threshold(10e-60);
+      $self->blast_P_value_threshold(1e-3);
     } 
 
     return $self; 
@@ -135,22 +135,22 @@ sub genomic_sequence {
     return $self->{'_genomic_sequence'};
 }
 
-=head2 blast_threshold
+=head2 blast_P_value_threshold
 
-    Title   :   blast_threshold
-    Usage   :   $self->blast_threshold($num)
-    Function:   Get/set method for blast_threshold
-    Returns :   numerical value
-    Args    :   numerical value
+    $self->blast_P_value_threshold($num)
+
+This module filters out hits which are less
+significant than this threshold.  It defaults to
+1e-3.
 
 =cut
 
-sub blast_threshold {
+sub blast_P_value_threshold {
     my( $self, $value ) = @_;    
     if ($value) {
-        $self->{'_blast_threshold'} = $value;
+        $self->{'_blast_P_value_threshold'} = $value;
     }
-    return $self->{'_blast_threshold'};
+    return $self->{'_blast_P_value_threshold'};
 }
 
 
@@ -249,27 +249,40 @@ sub run {
     
     my %blast_ests;
     my @feat;
-    foreach my $res(@blast_res ) {
+    foreach my $res (@blast_res) {
       my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
       # will this break for cDNAs with sensible names?
-      $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
+      if ($seqname =~ /[^\|]+\|([^\|]+)\|/) {
+        $seqname = $1;
+      } else {
+        $self->throw("Can't parse '$seqname' - unexpected EST name format?");
+      }
       $res->hseqname($seqname);
 
-      # may move this out of here.
-      #print "p value = ".$res->p_value." threshold = ".$self->blast_threshold."\n";
-      if($res->p_value > $self->blast_threshold || defined $blast_ests{$seqname}) {
-	push(@{$blast_ests{$seqname}}, $res);
-      }
+      push(@{$blast_ests{$seqname}}, $res);
     }
 
-  ID:    
-    foreach my $est(keys %blast_ests) {
-      my @features = @{$blast_ests{$est}};
+    my $threshold = $self->blast_P_value_threshold;
+    warn "Threshold = '$threshold'\n";
+    
+    while (my ($est, $features) = each %blast_ests) {
+      
+      # Is there a match below the P value threshold?
+      my $good_match = 0;
+      foreach my $res (@$features) {
+        if ($res->p_value <= $threshold) {
+            $good_match = 1;
+            last;
+        }
+      }
+      
+      # Skip EST matches that don't have a match below the threshold
+      next unless $good_match;
  
       # make MiniEst2Genome runnables
       
       my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->genomic_sequence,
-								     '-features' => \@features,
+								     '-features' => $features,
 								     '-seqfetcher' => $self->seqfetcher);
 
       # run runnable
@@ -336,7 +349,7 @@ sub parse_blast_report{
       }
 
       # only keep good hits!
-      next HSP unless $hsp->P >= $self->blast_threshold;
+      next HSP unless $hsp->P <= $self->blast_P_value_threshold;
 
       my $genomic = new Bio::EnsEMBL::SeqFeature(
 						 -start   => $hsp->query->start,
