@@ -121,11 +121,17 @@ sub parse_results {
       chomp $line;
       #print STDERR "$line\n";
       my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
-      
-      my $fp = $self->create_protein_feature($from, $to, $confirmed, $id,
-                                             0, 0, $hid, $self->analysis,
-                                             0, 0);
-      $self->add_to_output($fp);
+      if($id){
+        if ($confirmed eq "?") {
+          $confirmed = 0;
+        }else {
+          $confirmed = 1;
+        }
+        my $fp = $self->create_protein_feature($from, $to, $confirmed, $id,
+                                               0, 0, $hid, $self->analysis,
+                                               0, 0);
+        $self->add_to_output($fp);
+      }
     }
     
      
