@@ -64,8 +64,6 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
-#compile time check for executable - won't work till centrally installed ...
-#use Bio::EnsEMBL::Analysis::Programs qw(exonerate); 
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
@@ -86,7 +84,11 @@ sub new {
   $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
   $self->est_sequence($est) if defined $est; 
 
-  $self->exonerate($self->find_executable('exonerate')); 
+  if(defined $exonerate){
+    $self->exonerate($exonerate);
+  } else {
+    $self->exonerate($self->find_executable('exonerate')); 
+  }
 
   if (defined $arguments) {   
     $self->arguments($arguments);
@@ -441,6 +443,7 @@ sub parse_results {
 					     $genomic_source, $est_source, 
 					     $genomic_strand, $est_strand, 
 					     $genomic_primary, $est_primary);
+
       $self->output($pair);
     }    
   }
@@ -575,15 +578,34 @@ sub run_ungapped {
 	  $est_strand = -1;
 	}
 
+	# convention: if strands are different, genomic strand set to -1; if they're the 
+	# same, genomic strand set to +1. est_strand always +1
+
+	if($genomic_strand == $est_strand){
+	  $genomic_strand = 1;
+	  $est_strand     = 1;
+	}
+	else{
+	  $genomic_strand = -1;
+	  $est_strand     = 1
+	}
+
 	my $genomic_primary = $primary_tag;
 	my $est_primary     = $primary_tag;
 
-	my $pair = $self->_create_featurepair ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
-					       $est_start, $est_end, $est_id, 
+#	my $pair = $self->_create_featurepair ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
+#					       $est_start, $est_end, $est_id, 
+#					       $genomic_source, $est_source, 
+#					       $genomic_strand, $est_strand, 
+#					       $genomic_primary, $est_primary);
+
+	my $pair = $self->_create_featurepair ($genomic_score, $genomic_id, $genomic_start, $genomic_end, 
+					       $est_id, $est_start, $est_end,
 					       $genomic_source, $est_source, 
 					       $genomic_strand, $est_strand, 
-					       $genomic_primary, $est_primary);
-
+					       $genomic_primary, $est_primary,
+					       $pid);
+	
 	$self->output($pair);
 
 	if($self->print_results) {
@@ -734,7 +756,7 @@ sub output {
 =head2 _create_featurepair
 
   Title   : _create_featurepair
-  Usage   : $self->_create_featurepair($f1score, $f1pid$f1start, $f1end, $f1id, 
+  Usage   : $self->_create_featurepair($f1score, $f1pid, $f1start, $f1end, $f1id, 
 				    $f2start, $f2end, $f2id, $f1source, 
 				    $f2source, $f1strand, $f2strand, 
 				    $f1primary, $f2primary)
@@ -749,7 +771,7 @@ sub output {
 
 sub _create_featurepair {
   my ($self, $f1score,  $f1id, $f1start, $f1end, $f2id, $f2start, $f2end,
-      $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
+      $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary, $f1pid) = @_;
 
   #create analysis object
   my $analysis_obj    = new Bio::EnsEMBL::Analysis
@@ -760,7 +782,7 @@ sub _create_featurepair {
      -gff_source      => $f1source,
      -gff_feature     => $f1primary,);
   
-  my $f1pid = 0;
+  $f1pid = 0 unless defined $f1pid;
 
   #create features
   my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
