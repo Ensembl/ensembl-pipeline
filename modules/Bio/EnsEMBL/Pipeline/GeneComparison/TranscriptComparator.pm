@@ -338,7 +338,7 @@ sub _test_for_fuzzy_semiexact_Merge{
     $allowed_mismatch =  $self->splice_mismatch;
   }
 
-  my $verbose = 1;
+  my $verbose = 0;
   
   #print STDERR "=========== comparing ================\n";
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
