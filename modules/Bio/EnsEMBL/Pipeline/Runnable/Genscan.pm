@@ -119,8 +119,8 @@ sub new {
     $self->clone($clonefile) if ($clonefile);
 
 
-    $genscan = 'genscan'       unless defined($genscan);
-    $matrix  = 'HumanIso.smat' unless defined($matrix);
+    $genscan = 'genscan'       unless ($genscan);
+    $matrix  = 'HumanIso.smat' unless ($matrix);
 
     $self->genscan($self->find_executable($genscan));
     $self->matrix ($self->find_file($matrix));
