@@ -391,7 +391,7 @@ while (1) {
 	
 	# check all rules, which jobs can be started
 	
-	my @current_jobs = $job_adaptor->fetch_by_input_id($id);
+
 	
       RULE: for my $rule (@rules)  {
 	  if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
@@ -432,14 +432,16 @@ while (1) {
 	# number of jobs created. When $flushsize jobs have been stored
 	# send to LSF.
 	
-      ANAL: for my $anal (values %analHash) {
+  my %current_jobs = $job_adaptor->fetch_hash_by_input_id($id);
+ ANAL: for my $anal (values %analHash) {
+    
 	  my $result_flag = run_if_new($id,
-				       $anal,
-				       \@current_jobs,
-				       $local,
-				       $verbose,
-				       $output_dir,
-				       $job_adaptor);
+                                 $anal,
+                                 \%current_jobs,
+                                 $local,
+                                 $verbose,
+                                 $output_dir,
+                                 $job_adaptor);
 	  
 	  if ($result_flag == -1) {
 	    next JOBID;
@@ -457,23 +459,25 @@ while (1) {
 	#checks if you don't want them checked or they don't need to be
 	#checked, it is on as standard
 	#$verbose = 1;
-        my @current_jobs = $job_adaptor->fetch_by_input_id('ACCUMULATOR');
+       
         foreach my $accumulator_logic_name (keys %accumulator_analyses) {
             print "Checking accumulator type analysis $accumulator_logic_name\n" if $verbose;
             if (!exists($incomplete_accumulator_analyses{$accumulator_logic_name}) &&
                 !exists($completed_accumulator_analyses{$accumulator_logic_name})) {
-                my $result_flag = run_if_new('ACCUMULATOR',
-                                             $accumulator_analyses{$accumulator_logic_name},
-                                             \@current_jobs,
-                                             $local,
-                                             $verbose,
-                                             $output_dir,
-                                             $job_adaptor);
-                if ($result_flag == 1 && $verbose) { 
-		  print "Started accumulator type job for anal ".
-		    "$accumulator_logic_name\n" if($verbose); 
-		   $submitted++; 
-		}
+              my %current_jobs
+ = $job_adaptor->fetch_hash_by_input_id('ACCUMULATOR');
+              my $result_flag = run_if_new('ACCUMULATOR',
+                                           $accumulator_analyses{$accumulator_logic_name},
+                                           \%current_jobs,
+                                           $local,
+                                           $verbose,
+                                           $output_dir,
+                                           $job_adaptor);
+              if ($result_flag == 1 && $verbose) { 
+                print "Started accumulator type job for anal ".
+                  "$accumulator_logic_name\n" if($verbose); 
+                $submitted++; 
+              }
     
             } elsif (exists($incomplete_accumulator_analyses{$accumulator_logic_name})) {
                 print "Accumulator type analysis $accumulator_logic_name conditions unsatisfied\n" if $verbose;
@@ -535,87 +539,83 @@ while (1) {
 sub run_if_new {
     my ($id, $anal, $current_jobs, $local, $verbose, $output_dir, $job_adaptor) = @_;
 
-    print "Checking analysis " . $anal->dbID . "\n\n" if $verbose;
+    print "Checking analysis " . $anal->dbID . " ".$anal->logic_name."\n\n" if $verbose;
     # Check whether it is already running in the current_status table?
-
+    my %current_jobs = %$current_jobs;
     my $retFlag=0;
     eval {
-        foreach my $cj (@$current_jobs) {
-
-             print "Comparing to current_job " . $cj->input_id . " " .
-                  $cj->analysis->dbID . " " .
-                  $cj->current_status->status . " " .
-                  $anal->dbID . "\n" if $verbose;
-
-            if ($cj->analysis->dbID == $anal->dbID) {
-	      my $status = $cj->current_status;
-                if (($status eq 'FAILED' || $status eq 'AWOL')
-		    && $cj->can_retry) {
-		  if($rename_on_retry){
-		    if( -e $cj->stdout_file ) { 
-		      my $cmd = "mv ".$cj->stdout_file." ".$cj->stdout_file.
-			".retry.".$cj->retry_count;
-		      system($cmd);
- 
-		    }
-		    if( -e $cj->stderr_file ) {
-		      my $cmd = "mv ".$cj->stderr_file." ".$cj->stderr_file.
-			".retry.".$cj->retry_count;
-		      system($cmd);
-		    }
-		  }
-                    $cj->batch_runRemote;
-                    print "Retrying job\n" if $verbose;
-                }
-                else {
-                    print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n" if $verbose ;
-                }
-                $retFlag = 1;
+      if($current_jobs{$anal->dbID}){
+        my $cj = $current_jobs{$anal->dbID};
+        # print "Comparing to current_job " . $cj->input_id . " " .
+        #                  $cj->analysis->dbID . " " .
+        #                  $cj->current_status->status . " " .
+        #                  $anal->dbID . "\n" if $verbose;
+        #             print STDERR "comparing ".$anal->dbID." to ".$cj->analysis->dbID."\n";
+        my $status = $cj->current_status->status;
+        if (($status eq 'FAILED' || $status eq 'AWOL')
+            && $cj->can_retry) {
+          if($rename_on_retry){
+            if( -e $cj->stdout_file ) { 
+              my $cmd = "mv ".$cj->stdout_file." ".$cj->stdout_file.
+                ".retry.".$cj->retry_count;
+              system($cmd);
             }
+            if( -e $cj->stderr_file ) {
+              my $cmd = "mv ".$cj->stderr_file." ".$cj->stderr_file.
+                ".retry.".$cj->retry_count;
+              system($cmd);
+            }
+          }
+          $cj->batch_runRemote;
+          print "Retrying job\n" if $verbose;
+        }else {
+          print "\nJob already in pipeline with status : " . $status->status . "\n" if $verbose ;
         }
+        $retFlag = 1;
+      }
     };
 
 
     if ($@) {
-        print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
-        return -1;
+      print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
+      return -1;
     } elsif ($retFlag) {
-        return 0;
+      return 0;
     }
     #print STDERR "creating job with ".$PIPELINE_RUNNER_SCRIPT."\n";
     my $job = Bio::EnsEMBL::Pipeline::Job->new(-input_id => $id,
                                                -analysis => $anal,
                                                -output_dir => $output_dir,
                                                -runner => $PIPELINE_RUNNER_SCRIPT);
-
-
+    
+    
     print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
     $job_adaptor->store($job);
-
+    
     if ($local) {
-        print "Running job locally\n" if $verbose;
-        eval {
-          $job->runLocally;
-        };
-        if ($@) {
-           print STDERR "ERROR running job " . $job->dbID .  " "  . $job->stderr_file . "[$@]\n";
-        }
+      print "Running job locally\n" if $verbose;
+      eval {
+        $job->runLocally;
+      };
+      if ($@) {
+        print STDERR "ERROR running job " . $job->dbID .  " "  . $job->stderr_file . "[$@]\n";
+      }
     } else {
-        eval {
-            print "\tBatch running job\n" if $verbose;
-            $job->batch_runRemote;
-        };
-        if ($@) {
-            print STDERR "ERROR running job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
-        }
+      eval {
+        print "\tBatch running job\n" if $verbose;
+        $job->batch_runRemote;
+      };
+      if ($@) {
+        print STDERR "ERROR running job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
+      }
     }
     return 1;
-}
+  }
 
 # remove 'lock'
 sub shut_down {
     my ($db) = @_;
-
+    print STDERR "Shutting down\n";
     my ($a_job) = $db->get_JobAdaptor->fetch_by_Status("CREATED");
     if ($a_job) {
         $a_job->flush_runs($db->get_JobAdaptor);
@@ -701,7 +701,7 @@ sub check_if_done{
     if(!$j){
       next JOB;
     }
-    my $status = $j->current_status;
+    my $status = $j->current_status->status;
     #print STDERR "Job ".$id." has status ".$status."\n";
     if($status eq 'KILLED'){
       next JOB;
@@ -822,7 +822,8 @@ sub job_time_check{
 sub job_existance{
   my ($batch_q_module, $verbose, $job_hash) = @_;
   my @ids = keys(%$job_hash);
-
+  $verbose = 1;
+  print STDERR "Checking for the existance of jobs \n";
   my $lost_ids = $batch_q_module->check_existance(\@ids, $verbose);
   ID:foreach my $lost_id(@$lost_ids){
     my $job = $job_hash->{$lost_id};
@@ -834,6 +835,7 @@ sub job_existance{
     $job->set_status('AWOL');
     print STDERR "Job ".$job->dbID." has lost its LSF job\n" if($verbose);
   }
+  $verbose = 0;
 }
 
 
