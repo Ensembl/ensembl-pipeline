@@ -86,18 +86,57 @@ sub new {
     # my $params = $self->parameters;  # we don't have to read the parameters column from the database
                                        # in this case; no parameters are passed on to the Runnable 
 
-    my $params;
-    if ($params ne "") { $params .= ","; }
+#    my $params;
+#    if ($params ne "") { $params .= ","; }
     # get the path to the binaries from the Analysis object (analysisprocess table)
-    print STDERR "PROGR0: ".$self->analysis->program."\n";
-    $params .= "-program=>".$self->analysis->program.",";
-    # get the analysisId from the Analysis object (analysisprocess table)
-    $params .= "-analysisid=>".$self->analysis->dbID;
-    $self->parameters($params);
+#    $params .= "-analysis=>".$self->analysis."\n";
 
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp');
+#    print STDERR "PROGR0: ".$self->analysis->program."\n";
+    #$params .= "-program=>".$self->analysis->program.",";
+    # get the analysisId from the Analysis object (analysisprocess table)
+    #$params .= "-analysisid=>".$self->analysis->dbID;
+    
+#    $self->parameters($params);
+
+#    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp');
     return $self;
 }
+
+
+sub runnable {
+    my ($self) = @_;
+    
+    if (!defined($self->{'_runnable'})) {
+	print STDERR "CLONE: ".$self->genseq."\n";
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-clone     => $self->genseq,
+									-analysis  => $self->analysis	);
+ 
+           
+      $self->{'_runnable'} = $run;
+    }
+    
+    return $self->{'_runnable'};
+}
+
+=head2 run
+
+    Title   :   run
+    Usage   :   $self->run();
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile->run()
+    Returns :   none
+    Args    :   none
+
+=cut
+
+sub run {
+    my ($self,$dir) = @_;
+    $self->throw("Runnable module not set") unless ($self->runnable());
+    $self->throw("Input not fetched")      unless ($self->genseq());
+
+    $self->runnable->run($dir);
+}
+
+
 
 # IO methods
 
@@ -173,37 +212,6 @@ sub write_output {
 
 # runnable method
 
-=head2 runnable
 
- Title    :  runnable
- Usage    :  $self->runnable($arg)
- Function :  sets a runnable for this RunnableDB
- Example  :
- Returns  :  Bio::EnsEMBL::Pipeline::RunnableI
- Args     :  Bio::EnsEMBL::Pipeline::RunnableI
- Throws   :
-
-=cut
-
-sub runnable {
-    my ($self, $runnable) = @_;
-    
-    if ($runnable) {
-        # extract parameters into a hash
-        my ($parameter_string) = $self->parameters;
-        my %parameters;
-        if ($parameter_string) {
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs) {
-                my ($key, $value) = split (/=>/, $pair);
-		$key =~ s/\s+//g;
-                $value =~ s/\s+//g;
-                $parameters{$key} = $value;
-            }
-        }
-        $self->{'_runnable'} = $runnable->new (%parameters);
-    }
-    return $self->{'_runnable'};
-}
 
 1;
