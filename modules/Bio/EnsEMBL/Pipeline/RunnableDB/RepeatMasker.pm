@@ -143,6 +143,7 @@ sub runnable {
             }
         }
         $parameters{'-repm'} = $self->analysis->program_file;
+        $parameters{'-args'} = $self->parameters;
         #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
         $self->{'_runnable'} = $runnable->new(%parameters);;
     }
