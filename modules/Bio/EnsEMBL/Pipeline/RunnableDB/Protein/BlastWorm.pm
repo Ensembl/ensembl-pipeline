@@ -10,7 +10,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::Protein::BlastWorm
+  Bio::EnsEMBL::Pipeline::RunnableDB::Protein::BlastWorm
 
 =head1 SYNOPSIS
 

@@ -67,9 +67,6 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
-use Bio::PrimarySeq; 
-use Bio::Seq;
-use Bio::SeqIO;
 use Bio::Tools::BPlite;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -116,20 +113,7 @@ sub new {
   
     $self->clone ($clone) if ($clone);       
     $self->analysisid ($analysisid) if ($analysisid);
-  
-    my $bindir = $::pipeConf{'bindir'} || undef;
-
-    if (-x $program) {
-        # passed from RunnableDB (full path assumed)   
-        $self->program ($program); 
-    }
-    elsif (defined $bindir && -x ($program = "$bindir/$program")) {
-        $self->program ($program);
-    }
-    else {   
-        # search shell $PATH
-        $self->program ($self->locate_executable($program));
-    }
+    $self->program ($self->find_executable ($program));
   
     if ($database) {
         $self->database($database);
@@ -569,27 +553,23 @@ sub parse_results {
   	    my @align_coordinates = $self->split_HSP($hsp);
 
             my %feature;
-            ($feature {name}) = $parser->query =~ /^(\S+)/;
-            $feature {score} = $hsp->score;
-            $feature {p_value} = sprintf ("%.3e", $hsp->P);
-            $feature {percent_id} = $hsp->percent;
-            $feature {start} = $hsp->query->start;
-            $feature {end} = $hsp->query->end;
-            $feature {strand} = $strand;
-            ($feature {hname}) = $sbjct->name =~ /^(\S+)/;
-            $feature {hstart} = $hsp->subject->start;
-            $feature {hend} = $hsp->subject->end;
-            $feature {hstrand} = $hstrand;
-            ($feature {source}) = $self->program =~ /\/?([^\/]+)$/;
-            $feature {primary} = 'similarity';
-            ($feature {program}) = $self->program =~ /\/?([^\/]+)$/;
-            $feature {program_version} = 1;
-            ($feature {db}) = $self->database =~ /\/?([^\/]+)$/;
-            $feature {db_version} = 1;
-
-            $feature {program} = $self->program;
+            ($feature{name}) = $parser->query =~ /^(\S+)/;
+            $feature{score} = $hsp->score;
+            $feature{p_value} = sprintf ("%.3e", $hsp->P);
+            $feature{percent_id} = $hsp->percent;
+            $feature{start} = $hsp->query->start;
+            $feature{end} = $hsp->query->end;
+            $feature{strand} = $strand;
+            ($feature{hname}) = $sbjct->name =~ /^(\S+)/;
+            $feature{hstart} = $hsp->subject->start;
+            $feature{hend} = $hsp->subject->end;
+            $feature{hstrand} = $hstrand;
+            ($feature{source}) = $self->program =~ /([^\/]+)$/;
+            $feature{primary} = 'similarity';
+            ($feature{program}) = $self->program =~ /([^\/]+)$/;
+            ($feature{db}) = $self->database =~ /([^\/]+)$/;
+            ($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
             $feature {align_coor} = \@align_coordinates;
-
             $self->create_feature (\%feature);
         }
     }
@@ -861,11 +841,10 @@ sub create_feature {
     # create analysis object (will end up in the analysis table)
     my $analysis = Bio::EnsEMBL::Analysis->new ();
     $analysis->db ($feat->{db});
-    $analysis->db_version ($feat->{db_version});
     $analysis->program ($feat->{program});
-    $analysis->program_version ($feat->{program_version});
     $analysis->gff_source ($feat->{source});
     $analysis->gff_feature ($feat->{primary});
+    $analysis->logic_name ($feat->{logic_name});
 
     # create featurepair object
     my $feature1 = Bio::EnsEMBL::SeqFeature->new ();
@@ -880,7 +859,6 @@ sub create_feature {
     $feature1->primary_tag ($feat->{primary});
     $feature1->analysis ($analysis);
 
-    $feature1->add_tag_value ('analysisid', $self->analysisid);
     $feature1->add_tag_value ('align_coor', $feat->{align_coor});
 
     my $feature2 = Bio::EnsEMBL::SeqFeature->new ();
