@@ -1,10 +1,6 @@
 #
 # Interface for running programs
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -39,11 +35,10 @@ package Bio::EnsEMBL::Pipeline::RunnableI;
 
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Analysis::Programs;
-use Bio::SeqIO;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Analysis::Programs;
 use Bio::EnsEMBL::Root;
+use Bio::SeqIO;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -84,31 +79,20 @@ sub run {
 sub output {
     my ($self) = @_;
 
-    $self->throw("output not implemented");
-}
+		if (!defined($self->{_output})) {
+			$self->{_output} = [];
+		}
 
-#########################
-# Added by MAQ 
-# functions used by Runnable modules mirroring hp.pl functions
-# These aren't really interfaces, more to do with background jobs.
-#########################
+		return @{$self->{_output}};
+}
 
 sub locate_executable {
     my ($self, $binary) = @_;
-    if ($binary)
-    {
+
+    if ($binary) {
         Bio::EnsEMBL::Analysis::Programs->import($binary);
         return $Bio::EnsEMBL::Analysis::Programs::Program_Paths { $binary };
     }
-}
-
-#disk io methods
-
-#parsefile is a public method
-sub parsefile {
-    my ($self, $filename) = @_;
-    $self->results($filename) if ($filename);
-    $self->parse_results();
 }
 
 sub filename {
@@ -177,7 +161,7 @@ sub threshold_type {
     my($self, $value) = @_;
 
     if (defined($value)) {
-	$self->{'_threshold_type'} = $value;
+			$self->{'_threshold_type'} = $value;
     }
 
     return $self->{'_threshold_type'};
@@ -187,7 +171,7 @@ sub threshold_type {
 =head2 workdir
 
     Title   :   workdir
-    Usage   :   $obj->wordir('~humpub/temp');
+    Usage   :   $obj->workdir('~humpub/temp');
     Function:   Get/set method for the location of a directory to contain temp files
     Args    :   File path (optional)
 
@@ -195,55 +179,83 @@ sub threshold_type {
 
 sub workdir {
     my ($self, $directory) = @_;
-    if ($directory)
-    {
-        mkdir ($directory, '777') unless (-d $directory);
-        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
-        $self->{_workdir} = $directory;
-    }
-	elsif ($::pipeConf{'workdir'})
-	{
-		$self->{_workdir}= $::pipeConf{'workdir'};
-	}
+		
+		if (!defined($self->{_workdir})) {
+			if ($directory) {
+				mkdir ($directory, '777') unless (-d $directory);
+				$self->throw ("$directory doesn't exist\n") unless (-d $directory);
+				$self->{_workdir} = $directory;
+			}	elsif ($::pipeConf{'workdir'})	{
+				$self->{_workdir}= $::pipeConf{'workdir'};
+			} else {
+				$self->{_workdir} = '/tmp';
+			}
+		}
     return $self->{_workdir};
   }
 
-sub writefile {
-    my ($self, $seqobj, $seqfilename) = @_;
+
+sub get_tmp_file {
+    my ($self,$dir,$stub,$ext) = @_;
+
+   
+    if ($dir !~ /\/$/) {
+        $dir = $dir . "/";
+    }
+
+		# This is not good
+
+    my $num = int(rand(10000));
+    my $file = $dir . $stub . "." . $num . "." . $ext;
+
+    while (-e $file) {
+        $num = int(rand(10000));
+        $file = $stub . "." . $num . "." . $ext;
+    }
+
+    return $file;
+}
+   
+
+sub write_sequence_to_file {
+    my ($self, $seqobj) = @_;
   
-  if (defined($seqobj)) {
-    $seqfilename = 'filename' unless ($seqfilename);
-    #print "Writing sequence to ".$self->$seqfilename()."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
+		if (!defined($seqobj)) {
+			$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
+		}
+		if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeq")) {
+			$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file. Currently [$seqobj]");
+		}
+
+		my $file      = $self->get_tmp_file($self->workdir,"seq",".fa");
+		my $clone_out = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
       
-      or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
+		$clone_out->write_seq($seqobj);
 
-    $clone_out->write_seq($self->$seqobj()) 
-      or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
+		$self->file($file);
+         return $file;
+	}
 
+sub file {
+	my ($self,$arg) = @_;
 
-  } else {
-    #print "Writing sequence to ".$self->filename."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-      or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-
-    # This is bad.  The subclass has the query method not this interface.
-    $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
-
-  }
+	if (!defined($self->{_files})) {
+		$self->{_files} = [];
+	}
+	if (defined($arg)) {
+		push(@{$self->{_files}},$arg);
+	}
+	return @{$self->{_files}};
 }
 
 sub deletefiles {
     my ($self) = @_;
-    #delete all analysis files 
-    my @list = glob($self->filename."*");
-    foreach my $result (@list)
-    {
+
+    foreach my $result ($self->file) {
+
         my $protected = undef; #flag for match found in $protected
-        foreach my $suffix ($self->protect)
-        {        
+
+        foreach my $suffix ($self->protect) {
             $protected = 'true' if ($result eq $self->filename.$suffix);
         }
         unless ($protected)
@@ -255,14 +267,16 @@ sub deletefiles {
 
 sub checkdir {
     my ($self) = @_;
-    #check for disk space
+
     my $spacelimit = 0.01;
-    my $dir = $self->workdir();
+
+    my $dir = $self->workdir;
+
     $self->throw("Not enough disk space ($spacelimit required):$!\n") 
                         unless ($self->diskspace($dir, $spacelimit));
+
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-   # open (PWD, 'pwd|');
-    #print STDERR "Working directory set to: ".<PWD>;
+
 }
 
 sub diskspace {
@@ -270,26 +284,26 @@ sub diskspace {
     my $block_size; #could be used where block size != 512 ?
     my $Gb = 1024 ** 3;
     
+
     open DF, "df $dir |" or $self->throw ("Can't open 'df' pipe ($!)\n");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
+
+    while (<DF>) {
+			if ($block_size)  {
+				my @L = split;
+				my $space_in_Gb = $L[3] * 512 / $Gb;
+				return 0 if ($space_in_Gb < $limit);
+				return 1;
+			} else {
+				($block_size) = /(\d+).+blocks/i
+					|| $self->throw ("Can't determine block size from:\n$_");
+			}
     }
     close DF || $self->throw("Error from 'df' : $!\n");
 }
 
+
 # FeaturePair methods:
+
 sub create_FeaturePair {
     my ($self, $feat1, $feat2) = @_;
     #create analysis object
@@ -387,6 +401,7 @@ sub shrinkfplist {
     return pop(@{$self->{'_fplist'}});
 }
 
+
 sub find_executable {
   my ($self,$name) = @_;
 
@@ -404,6 +419,33 @@ sub find_executable {
       $self->throw("Can't find executable [$name]");
     }
     return $name;
+  }
+}
+
+sub writefile {
+    my ($self, $seqobj, $seqfilename) = @_;
+ 
+  if (defined($seqobj)) {
+    $seqfilename = 'filename' unless ($seqfilename);
+    #print "Writing sequence to ".$self->$seqfilename()."\n";
+    #create Bio::SeqIO object and save to file
+    my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
+
+      or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
+
+    $clone_out->write_seq($self->$seqobj())
+      or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
+
+
+  } else {
+    #print "Writing sequence to ".$self->filename."\n";
+    #create Bio::SeqIO object and save to file
+    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
+      or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
+
+    # This is bad.  The subclass has the query method not this interface.
+    $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+
   }
 }
 
