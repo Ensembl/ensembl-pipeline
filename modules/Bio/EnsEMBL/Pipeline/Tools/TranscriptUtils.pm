@@ -107,7 +107,7 @@ sub _check_Transcript{
 	  ##############################
 	  # check exon length
 	  ##############################
-	  my $length = $exons[$i]->end - $exons[$i] + 1;
+	  my $length = $exons[$i]->end - $exons[$i]->start + 1;
 	  if ( $length > $MAX_EXON_LENGTH ){
 	    print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 	    $valid = 0;
@@ -182,7 +182,7 @@ sub _check_Transcript{
 	$valid = 0;
     }
     if ($valid == 0 ){
-	$self->_print_Transcript($transcript);
+#	$self->_print_Transcript($transcript);
     }
     return $valid;
 }
@@ -299,9 +299,9 @@ sub _check_rawcontig_Transcript{
 	    ##############################
 	    # check exon length
 	    ##############################
-	    my $length = $exons[$i]->end - $exons[$i] + 1;
+	    my $length = $exons[$i]->end - $exons[$i]->start + 1;
 	    if ( $length > $MAX_EXON_LENGTH ){
-		print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+		print STDERR "exon too long(" . $exons[$i]->dbID . "): length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 		$valid = 0;
 		last EXON;
 	    }
