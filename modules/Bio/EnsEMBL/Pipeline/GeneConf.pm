@@ -111,6 +111,8 @@ my $prefix='COB';
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
+	     GB_MIN_GENSCAN_EXONS    => 4,
+	     GB_MAX_INTRON_LENGTH    => 150000,
 
 	     # Post gene build integrity checking script parameters
 	     GB_MINSHORTINTRONLEN    => 7, 
