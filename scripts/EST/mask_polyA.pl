@@ -13,19 +13,20 @@ local $/ = '>';
 my $rnafile;
 my $seqoutfile;
 my $clip;
-
+my $softmask;
 
 &GetOptions( 
 	    'mRNAfile:s'    => \$rnafile,
 	    'outfile:s'     => \$seqoutfile,
 	    'clip'          => \$clip,
+	    'softmask'      => \$softmask,
 	   );
 
 # usage
 if(!defined $rnafile    ||
    !defined $seqoutfile 
   ){
-  print  "USAGE: $0 -mRNAfile rnafile -outfile outfile -clip\n";
+  print  "USAGE: $0 -mRNAfile rnafile -outfile outfile -clip [ -softmask ]\n";
   print  "the default will be to parse the headers\n";
   exit(1);
 }
@@ -123,7 +124,13 @@ while (<RNA>){
 	  $length_to_mask++;
 	}
 	my $clipped_seq = substr( $seq, 0, $length - $length_to_mask );
-	my $mask        = "N" x ($length_to_mask);
+	my $mask;
+        if ($softmask){
+	  $mask = lc substr( $seq, ( $length - $length_to_mask ) );
+	}
+	else{
+	  $mask = "N" x ($length_to_mask);
+	}
 	$masked_seq     = $clipped_seq . $mask;
       }
        else{
@@ -165,7 +172,13 @@ while (<RNA>){
 	  $length_to_mask++;
 	}
 	my $clipped_seq = substr( $seq, $length_to_mask + 3);
-	my $mask        = "N" x ($length_to_mask+3);
+	my $mask;
+	if ($softmask){
+	  $mask = lc substr( $seq, 0, ($length_to_mask + 3) );
+	}
+	else{
+	  $mask        = "N" x ($length_to_mask+3);
+	}
 	$masked_seq     = $mask.$clipped_seq;
       }
       else{
