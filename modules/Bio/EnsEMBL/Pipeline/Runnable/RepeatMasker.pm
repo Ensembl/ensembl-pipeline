@@ -109,10 +109,12 @@ sub _initialize {
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
     else
-    {  
-        $self->repeatmasker('/tmp_mnt/nfs/disk100/humpub/scripts/RepeatMaskerHum');
+    {   
+        eval 
+        { $self->repeatmasker($self->locate_runnable('RepeatMaskerHum')); };
+        if ($@)
+        { $self->repeatmasker('~humpub/scripts/RepeatMaskerHum'); }
     }
-    
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
@@ -136,18 +138,6 @@ sub clone {
     return $self->{_clone};
 }
 
-sub filename {
-    my ($self, $filename) = @_;
-    $self->{_filename} = $filename if ($filename);
-    return $self->{_filename};
-}
-
-sub results {
-    my ($self, $results) = @_;
-    $self->{_results} = $results if ($results);
-    return $self->{_results};
-}
-
 =head2 protect
 
     Title   :   protect
@@ -156,12 +146,6 @@ sub results {
     Args    :   File suffixes
 
 =cut
-
-sub protect {
-    my ($self, @filename) =@_;
-    push (@{$self->{_protected}}, @filename) if (@filename);
-    return @{$self->{_protected}};
-}
 
 =head2 repeatmasker
 
@@ -191,17 +175,6 @@ sub repeatmasker {
     Args    :   File path (optional)
 
 =cut
-
-sub workdir {
-    my ($self, $directory) = @_;
-    if ($directory)
-    {
-        mkdir ($directory, '777') unless (-d $directory);
-        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
-        $self->{_workdir} = $directory;
-    }
-    return $self->{_workdir};
-}
 
 =head2 arguments
 
@@ -247,7 +220,7 @@ sub run {
     $self->writefile();        
     $self->run_repeatmasker();
     #parse output of repeat masker 
-    $self->parse_repmask();
+    $self->parse_results();
     $self->deletefiles();
 }
 
@@ -261,12 +234,6 @@ sub run {
 
 =cut
 
-sub parsefile {
-    my ($self, $filename) = @_;
-    $self->results($filename) if ($filename);
-    $self->parse_repmask();
-}
-
 sub run_repeatmasker {
     my ($self) = @_;
     #run RepeatMaskerHum
@@ -279,7 +246,7 @@ sub run_repeatmasker {
     close REPOUT;
 }
 
-sub parse_repmask {
+sub parse_results {
     my ($self) = @_;
     print "Parsing output\n";
     open (REPOUT, "<".$self->results)
@@ -318,56 +285,19 @@ sub parse_repmask {
         $feat2 {name} = $element[10];
         $feat2 {score} = $element[1];
         $feat1 {strand} = 1;
+        #misc
+        $feat2 {db} = undef;
+        $feat2 {db_version} = undef;
+        $feat2 {program} = 'RepeatMaskerHum';
+        $feat2 {p_version}='unknown';
+        $feat2 {source}= 'ReapeatMaskerHum';
+        $feat2 {primary}= 'similarity';
+        $feat1 {source}= 'RepearMaskerHum';
+        $feat1 {primary}= 'similarity';
+        
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
     close REPOUT;   
-}
-
-sub createfeaturepair {
-    my ($self, $feat1, $feat2) = @_;
-    #some contant strings
-    my $source = 'RepeatMaskerHum';
-    my $primary = 'similarity';
-    
-    #create analysis object
-    my $analysis_obj = new Bio::EnsEMBL::Analysis
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => $source,
-                            -program_version => "unknown",
-                            -gff_source      => $source,
-                            -gff_feature     => $primary,);
-    
-    #create and fill Bio::EnsEMBL::Seqfeature objects
-    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat1->{name},
-                            -start   => $feat1->{start},
-                            -end     => $feat1->{end},
-                            -strand  => $feat1->{strand},
-                            -score   => $feat1->{score},
-                            -source_tag  => $source,
-                            -primary_tag => $primary,
-                            -analysis => $analysis_obj);
-    
-    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat2->{name},
-                            -start   => $feat2->{start},
-                            -end     => $feat2->{end},
-                            -strand  => $feat2->{strand},
-                            -score   => $feat2->{score},
-                            -source_tag  => $source,
-                            -primary_tag => $primary,
-                            -analysis => $analysis_obj);
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $seqfeature1,
-                                             -feature2 => $seqfeature2) ;
-    $self->growfplist($fp);                             
-}
-
-sub growfplist {
-    my ($self, $fp) =@_;    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
 }
 
 ##############
@@ -389,65 +319,3 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
-
-sub writefile {
-    my ($self) = @_;
-    print "Writing sequence to ".$self->filename."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-            or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-    $clone_out->write_seq($self->clone) 
-            or $self->throw("Couldn't write to file ".$self->filename.":$!");
-}
-
-sub deletefiles {
-    my ($self) = @_;
-    #delete all analysis files 
-    my @list = glob($self->filename."*");
-    foreach my $result (@list)
-    {
-        my $protected = undef; #flag for match found in $protected
-        foreach my $suffix ($self->protect)
-        {        
-            $protected = 'true' if ($result eq $self->filename.$suffix);
-        }
-        unless ($protected)
-        {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
-        }
-    }
-}
-
-sub checkdir {
-    my ($self) = @_;
-    #check for disk space
-    my $spacelimit = 0.01;
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
-                        unless ($self->diskspace('./', $spacelimit));
-    my $dir = $self->workdir();
-    chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-}
-
-sub diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe ($!)\n");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!\n");
-}

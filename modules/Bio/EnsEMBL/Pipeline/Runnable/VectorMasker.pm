@@ -106,11 +106,21 @@ sub _initialize {
     if ($blastn) 
     {   $self->blastn($blastn) ;}
     else
-    {   $self->blastn('/usr/local/pubseq/bin/blastn');   }
+    {   
+        eval 
+        { $self->blastn($self->locate_runnable('blastn'));  }; 
+        if ($@) 
+        { $self->blastn('/usr/local/pubseq/bin/blastn'); }  
+    }
     if ($msp) 
     {   $self->mspcrunch($msp) ;}
     else
-    {   $self->mspcrunch('/usr/local/pubseq/bin/MSPcrunch');   }
+    {   
+        eval 
+        { $self->mspcrunch($self->locate_runnable('MSPcrunch')); }; 
+        if ($@)
+        { $self->mspcrunch('/usr/local/pubseq/bin/MSPcrunch'); }  
+    }
     if ($vector) 
     {   $self->vector($vector) ;}
     else
@@ -138,17 +148,6 @@ sub clone {
     return $self->{_clone};
 }
 
-sub filename {
-    my ($self, $filename) = @_;
-    $self->{_filename} = $filename if ($filename);
-    return $self->{_filename};
-}
-
-sub results {
-    my ($self, $results) = @_;
-    $self->{_results} = $results if ($results);
-    return $self->{_results};
-}
 
 =head2 protect
 
@@ -158,12 +157,6 @@ sub results {
     Args    :   File suffixes
 
 =cut
-
-sub protect {
-    my ($self, @filename) =@_;
-    push (@{$self->{_protected}}, @filename) if (@filename);
-    return @{$self->{_protected}};
-}
 
 =head2 blastn
 
@@ -179,7 +172,7 @@ sub blastn {
     if ($location)
     {
         $self->throw("blastn not found at $location: $!\n") 
-                                                    unless (-e $location);
+                                                    unless (-e $location && -x $location);
         $self->{_blastn} = $location ;
     }
     return $self->{_blastn};
@@ -199,7 +192,7 @@ sub mspcrunch {
     if ($location)
     {
         $self->throw("MSPcrunch not found at $location: $!\n") 
-                                                    unless (-e $location);
+                                                    unless (-e $location && -x $location);
         $self->{_mspcrunch} = $location ;
     }
     return $self->{_mspcrunch};
@@ -233,17 +226,6 @@ sub vector {
     Args    :   File path (optional)
 
 =cut
-
-sub workdir {
-    my ($self, $directory) = @_;
-    if ($directory)
-    {
-        mkdir ($directory, '777') unless (-d $directory);
-        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
-        $self->{_workdir} = $directory;
-    }
-    return $self->{_workdir};
-}
 
 =head2 arguments
 
@@ -289,7 +271,7 @@ sub run {
     #run genscan       
     $self->run_analysis();
     #parse output and create features
-    $self->parse_analysis();
+    $self->parse_results();
     $self->deletefiles();
 }
 
@@ -302,12 +284,6 @@ sub run {
     Args    :   optional filename
 
 =cut
-
-sub parsefile {
-    my ($self, $filename) = @_;
-    $self->results($filename) if ($filename);
-    $self->parse_repmask();
-}
 
 sub run_analysis {
     my ($self) = @_;
@@ -322,7 +298,7 @@ sub run_analysis {
     close RESULTS;
 }
 
-sub parse_analysis {
+sub parse_results {
     my ($self) = @_;
     open (VECTOR, "<".$self->results)
         or $self->throw ("Couldn't open file ".$self->results.": $!\n");
@@ -372,50 +348,7 @@ sub parse_analysis {
     close VECTOR;       
 }
 
-sub createfeaturepair {
-    my ($self, $feat1, $feat2) = @_;
-    #some contant strings
-    
-    #create analysis object
-    my $analysis_obj = new Bio::EnsEMBL::Analysis
-                        (   -db              => $feat2->{db},
-                            -db_version      => $feat2->{db_version},
-                            -program         => $feat2->{program},
-                            -program_version => $feat2->{p_version},
-                            -gff_source      => $feat2->{source},
-                            -gff_feature     => $feat2->{primary});
-    
-    #create and fill Bio::EnsEMBL::Seqfeature objects
-    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat1->{name},
-                            -start   => $feat1->{start},
-                            -end     => $feat1->{end},
-                            -strand  => $feat1->{strand},
-                            -score   => $feat1->{score},
-                            -source_tag  => $feat1->{source},
-                            -primary_tag => $feat1->{primary},
-                            -analysis => $analysis_obj);
-    
-    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat2->{name},
-                            -start   => $feat2->{start},
-                            -end     => $feat2->{end},
-                            -strand  => $feat2->{strand},
-                            -score   => $feat2->{score},
-                            -source_tag  => $feat2->{source},
-                            -primary_tag => $feat2->{primary},
-                            -analysis => $analysis_obj);
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $seqfeature1,
-                                             -feature2 => $seqfeature2) ;
-    $self->growfplist($fp);                             
-}
 
-sub growfplist {
-    my ($self, $fp) =@_;    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
-}
 
 ##############
 # input/output methods
@@ -435,64 +368,3 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
-sub writefile {
-    my ($self) = @_;
-    print "Writing sequence to ".$self->filename."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-            or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-    $clone_out->write_seq($self->clone) 
-            or $self->throw("Couldn't write to file ".$self->filename.":$!");
-}
-
-sub deletefiles {
-    my ($self) = @_;
-    #delete all analysis files 
-    my @list = glob($self->filename."*");
-    foreach my $result (@list)
-    {
-        my $protected = undef; #flag for match found in $protected
-        foreach my $suffix ($self->protect)
-        {        
-            $protected = 'true' if ($result eq $self->filename.$suffix);
-        }
-        unless ($protected)
-        {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
-        }
-    }
-}
-
-sub checkdir {
-    my ($self) = @_;
-    #check for disk space
-    my $spacelimit = 0.01;
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
-                        unless ($self->diskspace('./', $spacelimit));
-    my $dir = $self->workdir();
-    chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-}
-
-sub diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe ($!)\n");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!\n");
-}

@@ -111,10 +111,19 @@ sub _initialize {
     my($clonefile, $genscan, $parameters) = $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM'], @args);
     
     $self->clone($clonefile) if ($clonefile);
-    if ($genscan)       {$self->genscan($genscan) ;}
-    else                { $self->genscan('/nfs/disk100/humpub/OSFbin/genscan'); }
-    if ($parameters)    {$self->clone($parameters) ; }
-    else                {$self->parameters('/nfs/disk100/humpub/OSFbin/HumanIso.smat'); }     
+    if ($genscan)       
+    {$self->genscan($genscan) ;}
+    else                
+    { 
+        eval 
+        {  $self->genscan($self->locate_runnable('genscan')); }; 
+        if ($@) 
+        {  $self->genscan('/nfs/disk100/humpub/OSFbin/genscan'); }
+    }
+    if ($parameters)    
+    { $self->clone($parameters) ; }
+    else                
+    {$self->parameters('/nfs/disk100/humpub/OSFbin/HumanIso.smat'); }     
     return $self; # success - we hope!
 }
 
@@ -166,18 +175,6 @@ sub seqfeature {
     return $self->{_seqfeature};
 }
 
-sub filename {
-    my ($self, $filename) = @_;
-    $self->{_filename} = $filename if ($filename);
-    return $self->{_filename};
-}
-
-sub results {
-    my ($self, $results) = @_;
-    $self->{_results} = $results if ($results);
-    return $self->{_results};
-}
-
 =head2 protect
 
     Title   :   protect
@@ -186,12 +183,6 @@ sub results {
     Args    :   File suffixes
 
 =cut
-
-sub protect {
-    my ($self, @filename) =@_;
-    push (@{$self->{_protected}}, @filename) if (@filename);
-    return @{$self->{_protected}};
-}
 
 =head2 genscan
 
@@ -242,17 +233,6 @@ sub parameters {
 
 =cut
 
-sub workdir {
-    my ($self, $directory) = @_;
-    if ($directory)
-    {
-        mkdir ($directory, '777') unless (-d $directory);
-        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
-        $self->{_workdir} = $directory;
-    }
-    return $self->{_workdir};
-}
-
 sub add_exon {
     my ($self, $exon) =@_;
     if ($exon)
@@ -298,7 +278,7 @@ sub run {
     #run genscan       
     $self->run_genscan();
     #parse output and create features
-    $self->parse_genscan();
+    $self->parse_results();
     $self->deletefiles();
 }
 
@@ -324,13 +304,8 @@ sub run_genscan {
 
 =cut
 
-sub parsefile {
-    my ($self, $filename) = @_;
-    $self->results($filename) if ($filename);
-    $self->parse_genscan();
-}
 
-sub parse_genscan {
+sub parse_results {
     my ($self) = @_;
     my %exon_type = ('Sngl', 'Single Exon',
                      'Init', 'Initial Exon',
@@ -519,66 +494,4 @@ sub output_genes {
     #Decided to create genes here to save uneccesary storage - genes are just reorganised exons
     $self->create_genes();
     return @{$self->{'_genes'}};
-}
-
-sub writefile {
-    my ($self) = @_;
-    print "Writing sequence to ".$self->filename."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-            or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-    $clone_out->write_seq($self->clone) 
-            or $self->throw("Couldn't write to file ".$self->filename.":$!");
-}
-
-sub deletefiles {
-    my ($self) = @_;
-    #delete all analysis files 
-    my @list = glob($self->filename."*");
-    foreach my $result (@list)
-    {
-        my $protected = undef; #flag for match found in $protected
-        foreach my $suffix ($self->protect)
-        {        
-            $protected = 'true' if ($result eq $self->filename.$suffix);
-        }
-        unless ($protected)
-        {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
-        }
-    }
-}
-
-sub checkdir {
-    my ($self) = @_;
-    #check for disk space
-    my $spacelimit = 0.01;
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
-                        unless ($self->diskspace('./', $spacelimit));
-    my $dir = $self->workdir();
-    chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-}
-
-sub diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe ($!)\n");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!\n");
 }

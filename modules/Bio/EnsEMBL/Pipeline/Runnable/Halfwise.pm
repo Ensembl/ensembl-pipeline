@@ -92,10 +92,19 @@ sub _initialize {
             = $self->_rearrange(['CLONE', 'HALFW', 'ARGS'], @args);
     
     $self->clone($clonefile) if ($clonefile);
-    if ($halfwise)      {$self->halfwise($halfwise) ;}
-    else                {$self->halfwise('/usr/local/pubseq/scripts/halfwise'); }
-    if ($parameters)    {$self->clone($parameters) ; }
-    else                {$self->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet'); }     
+    if ($halfwise)      
+    {$self->halfwise($halfwise) ;}
+    else                
+    {   
+        eval 
+        { $self->halfwise($self->locate_runnable('halfwise')); };
+        if ($@)
+        {  $self->halfwise ('/nfs/disk100/humpub/OSFbin/halfwise'); }
+    }
+    if ($parameters)    
+    {$self->clone($parameters) ; }
+    else                
+    {$self->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet'); }     
     return $self; # success - we hope!
 }
 
@@ -116,18 +125,6 @@ sub clone {
     return $self->{_clone};
 }
 
-sub filename {
-    my ($self, $filename) = @_;
-    $self->{_filename} = $filename if ($filename);
-    return $self->{_filename};
-}
-
-sub results {
-    my ($self, $results) = @_;
-    $self->{_results} = $results if ($results);
-    return $self->{_results};
-}
-
 =head2 protect
 
     Title   :   protect
@@ -136,12 +133,6 @@ sub results {
     Args    :   File suffixes
 
 =cut
-
-sub protect {
-    my ($self, @filename) =@_;
-    push (@{$self->{_protected}}, @filename) if (@filename);
-    return @{$self->{_protected}};
-}
 
 =head2 halfwise
 
@@ -190,23 +181,6 @@ sub arguments {
 
 =cut
 
-sub workdir {
-    my ($self, $directory) = @_;
-    if ($directory)
-    {
-        mkdir ($directory, '777') unless (-d $directory);
-        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
-        $self->{_workdir} = $directory;
-    }
-    return $self->{_workdir};
-}
-
-sub growfplist {
-    my ($self, $fp) =@_;    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
-}
-
 ###########
 # Analysis methods
 ##########
@@ -233,7 +207,7 @@ sub run {
     #run genscan       
     $self->run_halfwise();
     #parse output and create features
-    $self->parse_halfwise();
+    $self->parse_results();
     $self->deletefiles();
 }
 
@@ -259,13 +233,7 @@ sub run_halfwise {
 
 =cut
 
-sub parsefile {
-    my ($self, $filename) = @_;
-    $self->results($filename) if ($filename);
-    $self->parse_halfwise();
-}
-
-sub parse_halfwise {
+sub parse_results {
     my ($self) = @_;
     #file is in ace format. 
     open (HALFWISE, "<".$self->results)
@@ -323,6 +291,9 @@ sub parse_halfwise {
                         $feat1 {source} = 'Halfwise';
                         $feat1 {primary} = 'similarity';
                         $feat2 {source} = 'Halfwise';
+                        $feat2 {primary} = 'similarity';
+                        $feat2 {db} = 'unknown';
+                        $feat2 {db_version} = 'unknown';
                     } 
                     #Should have fully defined feat1 and feat2 at his point 
                     $self->createfeaturepair(\%feat1, \%feat2); 
@@ -365,43 +336,6 @@ sub parse_halfwise {
     }
 }
 
-sub createfeaturepair {
-    my ($self, $feat1, $feat2) = @_;
-    #create analysis object
-    my $analysis_obj = new Bio::EnsEMBL::Analysis
-                        (   -db              => $feat2->{db},
-                            -db_version      => $feat2->{db_version},
-                            -program         => $feat1->{source},
-                            -program_version => 'unknown',
-                            -gff_source      => $feat1->{source},
-                            -gff_feature     => $feat1->{primary});
-    
-    #create and fill Bio::EnsEMBL::Seqfeature objects
-    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat1->{name},
-                            -start   => $feat1->{start},
-                            -end     => $feat1->{end},
-                            -strand  => $feat1->{strand},
-                            -score   => $feat1->{score},
-                            -source_tag  => $feat1->{source},
-                            -primary_tag => $feat1->{primary},
-                            -analysis => $analysis_obj);
-    
-    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname => $feat2->{name},
-                            -start   => $feat2->{start},
-                            -end     => $feat2->{end},
-                            -strand  => $feat2->{strand},
-                            -score   => $feat2->{score},
-                            -source_tag  => $feat2->{source},
-                            -primary_tag => $feat2->{primary},
-                            -analysis => $analysis_obj);
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $seqfeature1,
-                                             -feature2 => $seqfeature2) ;
-    $self->growfplist($fp);                             
-}
-
 ##############
 # input/output methods
 #############
@@ -419,66 +353,4 @@ sub createfeaturepair {
 sub output {
 my ($self) = @_;
     return @{$self->{'_fplist'}};
-}
-
-sub writefile {
-    my ($self) = @_;
-    print "Writing sequence to ".$self->filename."\n";
-    #create Bio::SeqIO object and save to file
-    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-            or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-    $clone_out->write_seq($self->clone) 
-            or $self->throw("Couldn't write to file ".$self->filename.":$!");
-}
-
-sub deletefiles {
-    my ($self) = @_;
-    #delete all analysis files 
-    my @list = glob($self->filename."*");
-    foreach my $result (@list)
-    {
-        my $protected = undef; #flag for match found in $protected
-        foreach my $suffix ($self->protect)
-        {        
-            $protected = 'true' if ($result eq $self->filename.$suffix);
-        }
-        unless ($protected)
-        {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");    
-        }
-    }
-}
-
-sub checkdir {
-    my ($self) = @_;
-    #check for disk space
-    my $spacelimit = 0.01;
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
-                        unless ($self->diskspace('./', $spacelimit));
-    my $dir = $self->workdir();
-    chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-}
-
-sub diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe ($!)\n");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!\n");
 }
