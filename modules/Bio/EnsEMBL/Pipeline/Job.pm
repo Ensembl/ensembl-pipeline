@@ -71,7 +71,8 @@ sub new{
 			       ADAPTOR JOB_NAME RETRY_COUNT)],@args);
 
    $taskname || $self->throw("Must define a taskname when creating a Job");
-   $input_id || $self->throw("Must define an input_id when creating a Job");
+   defined($input_id) || 
+     $self->throw("Must define an input_id when creating a Job");
    $module   || $self->throw("Must define a module when creating a Job");
    
    $self->{'_dbID'}          = $dbID;
