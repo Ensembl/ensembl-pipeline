@@ -77,7 +77,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
@@ -86,7 +86,7 @@ use Bio::PrimarySeq;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+#use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -94,12 +94,14 @@ use Data::Dumper;
 sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-  my ($score, $alnprog) = $self->_rearrange([qw(MIN_SCORE ALNPROG)],@args);
+  my ($score, $alnprog, $masked) = $self->_rearrange([qw(MIN_SCORE ALNPROG MASKED)],@args);
   bless $self, $class;
   $score ||= 100;
+  $masked = 0 unless (defined $masked);
   $self->min_score($score);
   $alnprog ||= 'crossmatch';
   $self->alnprog($alnprog);
+  $self->masked($masked);
   return $self; 
 }
 
@@ -125,30 +127,54 @@ sub fetch_input {
 
     my $input_id  = $self->input_id;
 
-    my ($db1,$db2,$c1,$c2);
-    if ($input_id =~ /(\S+):(\S+)::(\S+):(\S+)/ ) {
+    my ($db1,$db2,$contig_type1,$contig_type2,$c1,$c2);
+    if ($input_id =~ /(\S+):(\S+):(\S+)::(\S+):(\S+):(\S+)/ ) {
 	$db1 = $1;
-	$c1 = $2;
-	$db2 = $3;
-	$c2 = $4;
+	$contig_type1 = $2;
+	$c1 = $3;
+	$db2 = $4;
+	$contig_type2 = $5;
+	$c2 = $6;
     }
     else {
 	$self->throw("Input id not in correct format: got $input_id, should be parsable by (\w+)\:(\S+)\/(\w+)\:(\S+)");
     }
 
-    $self->_c1_id($c1);
-    $self->_c2_id($c2);
+#    $self->_c1_id($c1);
+#    $self->_c2_id($c2);
 
     my $gadp = $self->dbobj->get_GenomeDBAdaptor();
 
     $db1 = $gadp->fetch_by_species_tag($db1);
     $db2 = $gadp->fetch_by_species_tag($db2);
+    
+    my ($contig1,$contig2);
+    
+    if ($contig_type1 eq "raw") {
+      $contig1 = $db1->get_Contig($c1,'RawContig');
+    } elsif ($contig_type1 eq "vc") {
+      my ($chr,$start,$end) = split /\./, $c1;
+      $contig1 = $db1->get_VC_by_start_end("$chr","Chromosome",$start,$end)
+    }
 
-    my $contig1 = $db1->get_Contig($c1,'RawContig');
-    my $contig2 = $db2->get_Contig($c2,'RawContig');
+    if ($contig_type2 eq "raw") {
+      $contig2 = $db2->get_Contig($c2,'RawContig');
+    } elsif ($contig_type2 eq "vc") {
+      my ($chr,$start,$end) = split /\./, $c2;
+      $contig2 = $db2->get_VC_by_start_end("$chr","Chromosome",$start,$end)
+    }
+    
+    my ($seq1,$seq2);
 
-    my $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
-    my $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
+    if ($self->masked) {
+      $seq1 = $contig1->get_repeatmasked_seq;
+      $seq2 = $contig2->get_repeatmasked_seq;
+      $seq1->display_id("seq1");
+      $seq2->display_id("seq2");
+    } else {
+      $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
+      $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
+    }
     
     my $alnrunnable;
 
@@ -168,9 +194,11 @@ sub fetch_input {
 								   -min_score => 40,
 								   -min_eval => $self->min_score);
     } elsif ($self->alnprog eq 'exonerate') {
-      $self->throw("exonarate aligment runnable not implemented yet");
-#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
-#								      -est => [$seq1]);
+#      $self->throw("exonarate aligment runnable not implemented yet");
+      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-exonerate => "/usr/local/ensembl/bin/exonerate",
+								      -genomic => $seq2,
+								      -est => [$seq1],
+								      -args => "-a 400 -p no -n -w 14 -t 65 -H 150 -D 5 -m 768");
     } 
     
     $self->runnable($alnrunnable);
@@ -234,21 +262,22 @@ sub output {
 =cut
 
 sub _greedy_filter {
-  my (@features) = @_;
+  my (@DnaDnaAlignFeatures) = @_;
 
-  @features = sort {$b->score <=> $a->score} @features;
-
-  my @features_filtered;
+  @DnaDnaAlignFeatures = sort {$b->score <=> $a->score} @DnaDnaAlignFeatures;
+  
+  my @DnaDnaAlignFeatures_filtered;
   my $ref_strand;
-  foreach my $fp (@features) {
-    if (! scalar @features_filtered) {
-        push @features_filtered, $fp;
+
+  foreach my $fp (@DnaDnaAlignFeatures) {
+    if (! scalar @DnaDnaAlignFeatures_filtered) {
+        push @DnaDnaAlignFeatures_filtered, $fp;
 	$ref_strand = $fp->hstrand;
         next;
     }
     next if ($fp->hstrand != $ref_strand);
     my $add_fp = 1;
-    foreach my $feature_filtered (@features_filtered) {
+    foreach my $feature_filtered (@DnaDnaAlignFeatures_filtered) {
       my ($start,$end,$hstart,$hend) = ($feature_filtered->start,$feature_filtered->end,$feature_filtered->hstart,$feature_filtered->hend);
       if (($fp->start >= $start && $fp->start <= $end) ||
 	  ($fp->end >= $start && $fp->end <= $end) ||
@@ -261,20 +290,20 @@ sub _greedy_filter {
 	unless (($fp->start > $end && $fp->hstart > $hend) ||
 		($fp->end < $start && $fp->hend < $hend)) {
 	  $add_fp = 0;
-	  last
+	  last;
 	}
       } elsif ($ref_strand == -1) {
 	unless (($fp->start > $end && $fp->hstart < $hend) ||
 		($fp->end < $start && $fp->hend > $hend)) {
 	  $add_fp = 0;
-	  last
+	  last;
 	}
       }
     }
-    push @features_filtered, $fp if ($add_fp);
+    push @DnaDnaAlignFeatures_filtered, $fp if ($add_fp);
   }
 
-  return @features_filtered;
+  return @DnaDnaAlignFeatures_filtered;
 }
 
 =head2 write_output
@@ -291,87 +320,55 @@ sub write_output {
   my ($self) = @_;
 
   if (! scalar($self->output)) {
+#    print "OK1\n";
       return 1;
   } 
-
-  my @features = _greedy_filter($self->output);
-
+#  foreach my $f ($self->output) {
+#    print $f,"\n";
+#  }
+#  exit 0;
+  my @DnaDnaAlignFeatures = _greedy_filter($self->output);
+  
   my $db = $self->dbobj();
   my $gadb = $db->get_GenomeDBAdaptor();
   $db->get_DnaFragAdaptor();
 
   my $input_id = $self->input_id();
-  my ($species_tag1,$contig_id1,$species_tag2,$contig_id2);
+  my ($species_tag1,$contig_type1,$contig_id1,$species_tag2,$contig_type2,$contig_id2);
 
-  if ($input_id =~ /^(\S+):(\S+)::(\S+):(\S+)$/) {
-    ($species_tag1,$contig_id1,$species_tag2,$contig_id2) = ($1,$2,$3,$4);
+  if ($input_id =~ /^(\S+):(\S+):(\S+)::(\S+):(\S+):(\S+)$/) {
+    ($species_tag1,$contig_type1,$contig_id1,$species_tag2,$contig_type2,$contig_id2) = ($1,$2,$3,$4,$5,$6);
   } else {
-    die "\$input_id should be dbname1:contig_id1::dbname2:contig_id2 in CrossComparer.pm\n";
+    die "\$input_id should be dbname1:contig_type1:contig_id1::dbname2:contig_type1:contig_id2 in CrossComparer.pm\n";
   }
   
-  # Using $contig_id1 as reference sequence for the reference AlignBlockSet
+  # Using $contig_id1 as consensus sequence for the reference align_id
 
-  my $gdb = $gadb->fetch_by_species_tag($species_tag1);
-  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
-  $dnafrag->name($contig_id1);
-  $dnafrag->genomedb($gdb);
+  my $galn = $db->get_GenomicAlignAdaptor();
+  my $align_id = $galn->fetch_align_id_by_align_name($contig_id1);
 
-  # Sorting @feature from maxend to minend of reference sequence
-  # and defining the offset_max for the reference AlignBlockSet
-  
-  @features = sort {$b->end <=> $a->end} @features;
-  my $offset_max = $features[0]->end;
-
-  # sorting @feature from minstart to maxstart of reference sequence
-  # and defining the offset_min for the reference AlignBlockSet
-  
-  @features = sort {$a->start <=> $b->start} @features;
-  my $offset_min = $features[0]->start;
-
-  # Defining the align_row_id for the reference sequence;
+  # Defining the align_row_id
 
   my $current_align_row_id = 1;
 
-  # We know that reference AlignBlockSet only has one AlignBlock
-  
-  my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
-  my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
-  my $align_start = 1;
-  my $align_end = $offset_max - $offset_min + 1;
-  $ab->align_start($align_start);
-  $ab->align_end($align_end);
-  
-  $ab->start($offset_min);
-  $ab->end($offset_max);
-  $ab->strand(1);
-  $ab->dnafrag($dnafrag);
-    
-  $abs->add_AlignBlock($ab);
-  
-  # Defining an alignement and adding the reference AlignBlockSet
+  # Defining an alignement
 
   my $aln = Bio::EnsEMBL::Compara::GenomicAlign->new();
-  $aln->add_AlignBlockSet($current_align_row_id,$abs);
   
-  # Defining the align_row_id for the query sequence;
+  # Using $contig_id2 as query sequence
 
-  $current_align_row_id++;
-  
-  # Using $contig_id2 as query sequence for the query AlignBlockSet
-
-  $gdb = $gadb->fetch_by_species_tag($species_tag2);
-  $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+  my $gdb = $gadb->fetch_by_species_tag($species_tag2);
+  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
   $dnafrag->name($contig_id2);
   $dnafrag->genomedb($gdb);
+  $dnafrag->type('RawContig');
   
-  $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
+  my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
   
-  foreach my $f (@features) {
+  foreach my $f (@DnaDnaAlignFeatures) {
     my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
-    my $align_start = $f->start - $offset_min + 1;
-    my $align_end = $f->end - $offset_min + 1;
-    $ab->align_start($align_start);
-    $ab->align_end($align_end);
+    $ab->align_start($f->start);
+    $ab->align_end($f->end);
     $ab->start($f->hstart);
     $ab->end($f->hend);
     if ($f->strand == 1) {
@@ -379,6 +376,9 @@ sub write_output {
     } elsif ($f->strand == -1) {
       $ab->strand(- $f->hstrand);
     }
+    $ab->score($f->score);
+    $ab->perc_id($f->percent_id);
+    $ab->cigar_string($f->cigar_string);
     $ab->dnafrag($dnafrag);
     
     $abs->add_AlignBlock($ab);
@@ -388,10 +388,10 @@ sub write_output {
 
   $aln->add_AlignBlockSet($current_align_row_id,$abs);
 
-  # Storing alignment in the corresponding database
+  # Storing alignment in the corresponding database with the relevant align_id
 
   my $galnad = $db->get_GenomicAlignAdaptor();
-  $galnad->store($aln);
+  $galnad->store($aln,$align_id);
 
   return 1;
 }
@@ -436,6 +436,26 @@ sub min_score{
     }
     return $obj->{'min_score'};
 
+}
+
+=head2 masked
+
+ Title   : masked
+ Usage   : $obj->masked($boolean)
+ Function: Get/set the  value
+ Returns : value of masked
+ Args    : boolean, 0 or 1
+
+
+=cut
+
+sub masked {
+   my ($self,@args) = @_;
+   if (@args) {
+      my ($value) = @args;
+      $self->{'masked'} = $value;
+    }
+    return $self->{'masked'};
 }
 
 =head2 alnprog
