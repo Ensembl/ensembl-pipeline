@@ -811,14 +811,14 @@ sub find_transcripts_by_protein_evidence{
   # create transcripts in slice coordinates
   my @transcripts;
   foreach my $t_id ( @tranz ){
-    my $tran     = $t_adaptor->fetch_by_dbID($t_id);
-    my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
-    my $fakegene = Bio::EnsEMBL::Gene->new();
-    $fakegene->add_Transcript( $tran );
-    my $tmp_gene = $fakegene->transform( $big_slice );
-    my @trans = @{$tmp_gene->get_all_Transcripts};
-    push ( @transcripts, $trans[0] );
+      my $tran     = $t_adaptor->fetch_by_dbID($t_id);
+      my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
+      my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
+      my $fakegene = Bio::EnsEMBL::Gene->new();
+      $fakegene->add_Transcript( $tran );
+      my $tmp_gene = $fakegene->transform( $big_slice );
+      my @trans = @{$tmp_gene->get_all_Transcripts};
+      push ( @transcripts, $trans[0] );
   }
   
   return @transcripts;
@@ -864,15 +864,15 @@ sub find_transcripts_by_dna_evidence{
   # create transcripts in slice coordinates
   my @transcripts;
   foreach my $t_id ( @tranz ){
-      print STDERR "found $t_id\n";
+      #print STDERR "found $t_id\n";
       my $tran     = $t_adaptor->fetch_by_dbID($t_id);
-    my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name );
-    my $fakegene = Bio::EnsEMBL::Gene->new();
-    $fakegene->add_Transcript( $tran );
-    my $tmp_gene = $fakegene->transform( $big_slice );
-    my @trans = @{$tmp_gene->get_all_Transcripts};
-    push ( @transcripts, $trans[0] );
+      my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
+      my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name );
+      my $fakegene = Bio::EnsEMBL::Gene->new();
+      $fakegene->add_Transcript( $tran );
+      my $tmp_gene = $fakegene->transform( $big_slice );
+      my @trans = @{$tmp_gene->get_all_Transcripts};
+      push ( @transcripts, $trans[0] );
   }
   
   return @transcripts;
@@ -887,19 +887,19 @@ sub is_spliced{
     return 0;
   }
   elsif( scalar (@exons) > 1 ){
-    
-    # check that there are not funky frame shifts
-    @exons = sort{ $a->start <=> $b->start } @exons;
-    for(my $i=0; $i<$#exons; $i++){
-      my $intron = $exons[$i+1]->start - $exons[$i]->end - 1;
-      if ( $intron > 9 ){
-	return 1;
+      
+      # check that there are not funky frame shifts
+      @exons = sort{ $a->start <=> $b->start } @exons;
+      for(my $i=0; $i<$#exons; $i++){
+	  my $intron = $exons[$i+1]->start - $exons[$i]->end - 1;
+	  if ( $intron > 9 ){
+	      return 1;
+	  }
       }
-    }
-    return 0;
+      return 0;
   }
   else{
-    return 0;
+      return 0;
   }
 }
 
@@ -1059,7 +1059,7 @@ sub set_stop_codon{
       my $previous_exon = $self->get_previous_Exon( $transcript, $end_exon );
       if ($previous_exon ){
 	my $donor_seq =  
-	  $previous_exon->seq->subseq( $previous_exon->end - $previous_exon->start + 1 - $end + 1, $previous_exon->end - $previous_exon->start + 1 );
+	  $previous_exon->seq->subseq( $previous_exon->end - $previous_exon->start + 1 - $donor + 1, $previous_exon->end - $previous_exon->start + 1 );
 	my $acceptor_seq = 
 	  $end_exon->seq->subseq( 1, $end );
 	
