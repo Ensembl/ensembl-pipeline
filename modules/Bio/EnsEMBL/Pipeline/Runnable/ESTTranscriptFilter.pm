@@ -172,7 +172,7 @@ sub filter {
 
   print STDERR "filter input: ".scalar( @$transcripts )."\n";
   my @filtered_by_length = $self->filter_by_length( $transcripts );
-  print STDERR "after filter by length: ".scalar( @$transcripts )."\n";
+  print STDERR "after filter by length: ".scalar( @filtered_by_length )."\n";
 
 
   my $min_coverage = $self->coverage_threshold;
