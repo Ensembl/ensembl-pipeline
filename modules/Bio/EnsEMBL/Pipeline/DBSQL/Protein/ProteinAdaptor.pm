@@ -141,6 +141,24 @@ sub fetch_Protein_by_dbid {
    $self->fetch_Peptide_by_dbid ($id);
 } 
 
+=head2 fetch_Protein_ligth
+
+ Title    : fetch_Protein_ligth
+ Usage    : $self->fetch_Protein_ligth
+ Function : an alias for a function called by Emmanual in Hmmpfam.pm,
+            get a Protein from the peptide table, building a PrimarySeq object
+ Example  : 
+ Returns  : a Bio::PrimarySeq object
+ Args     : id
+ Throws   :
+
+=cut
+
+sub fetch_Protein_ligth {
+   my ($self, $id) = @_;
+   $self->fetch_Peptide_by_dbid ($id);
+} 
+
 
 =head2 fetch_PepSeq_by_dbid
 
