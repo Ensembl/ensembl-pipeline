@@ -13,8 +13,13 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '/nfs/disk21/stabenau/tmp',
-    'DBI.driver' => 'mysql',
+    'nfstmp.dir'  => '/nfs/disk100/humpub3/pipeline',
+    'DBI.driver'  => 'mysql',
+    'dbhost'      => 'ensrv3',
+    'dbname'      => 'chr20',
+    'dbuser'      => 'ensadmin',
+    'queue'       => 'ultra_blast_farm',
+    'batchsize'   => 1,
 );
 }
 
