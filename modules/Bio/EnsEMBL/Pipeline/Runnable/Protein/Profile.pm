@@ -366,8 +366,8 @@ sub create_feature {
 					       -percent_id => 'NULL',
 					       -p_value => 'NULL');
     
-    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => $f[3],
-					      -end => $hto,
+    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
+					      -end => 0,
 					      -analysis => $self->analysis,
 					      -seqname => $f[0]);
     
