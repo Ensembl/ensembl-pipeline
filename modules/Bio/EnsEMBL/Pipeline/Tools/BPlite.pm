@@ -1,4 +1,4 @@
-# $Id: BPlite.pm,v 1.1 2002-07-01 15:33:13 lec Exp $
+# $Id: BPlite.pm,v 1.2 2003-06-20 15:40:19 jgrg Exp $
 ##############################################################################
 # Bioperl module Bio::Tools::BPlite
 ##############################################################################
@@ -9,6 +9,7 @@
 # You may distribute this module under the same terms as perl itself
 
 # this is a port of BPlite from bioperl 0.7 into ensembl
+
 =head1 NAME
 
 Bio::EnsEMBL::Pipeline::Tools::BPlite - Lightweight BLAST parser
