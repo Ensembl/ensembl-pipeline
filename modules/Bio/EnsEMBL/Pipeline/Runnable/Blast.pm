@@ -452,7 +452,7 @@ sub parse_results {
     unless ($name) {
         $self->throw("Error getting a valid accession from \"" .
         $fasta_header .
-        "\"; check your Blast_conf and / or blast headers");
+        "\"; check your blast config and / or blast headers");
     }
 
     # print STDERR "Name " . $fasta_header . "\n";
