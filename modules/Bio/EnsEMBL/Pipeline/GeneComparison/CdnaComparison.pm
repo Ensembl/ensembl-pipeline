@@ -51,10 +51,13 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
     Returns :   A CdnaComparison object
     Args    :   Reference to array of PrimarySeq objects
                 representing transcripts (-TRANSCRIPTS);
-		name of Blast cDNA database (-CDNA_DATABASE)
+		name of Blast cDNA database (-CDNA_DATABASE);
+		minimum percent identity of a FeaturePair for it
+		to be considered (-PERCENT_ID);
 		minimum threshold for coverage of the transcript
-		by FeaturePairs, given as total percentage of the
-		transcript involved in any FeaturePairs
+		by FeaturePairs (each of at least PERCENT_ID
+		percent identity), given as total percentage of
+		the transcript involved in such FeaturePairs
 		(-TRANSCRIPT_PERCENT_COVERAGE, defaults to 97)
 
 =cut
@@ -65,10 +68,12 @@ sub new {
 
   my ($transcript_arrayref,
       $cdna_database,
-      $transcript_percent_coverage)
+      $transcript_percent_coverage,
+      $percent_id)
     = $self->_rearrange([qw(TRANSCRIPT_ARRAYREF
                             CDNA_DATABASE
-			    TRANSCRIPT_PERCENT_COVERAGE)],
+			    TRANSCRIPT_PERCENT_COVERAGE
+			    PERCENT_ID)],
 		        @args);
 
   $self->transcript_arrayref($transcript_arrayref);
@@ -76,6 +81,9 @@ sub new {
   $transcript_percent_coverage = 97
     unless defined $transcript_percent_coverage;
   $self->transcript_percent_coverage($transcript_percent_coverage);
+  $percent_id = 97
+    unless defined $percent_id;
+  $self->percent_id($percent_id);
 
   return $self; # success - we hope!
 }
@@ -141,6 +149,8 @@ sub get_transcript_mapping {
     Usage   :   $cdna_comp->transcript_percent_coverage(97.5);
     Function:   get/set for minimum acceptable percentage of a
                 transcript involved in FeaturePairs with a cDNA
+		(considering only those FeaturePairs with
+		percent_id >= percent_id)
     Returns :   floating point value in the range [1..100]
     Args    :   optional floating point value in the range
                 [1..100]
@@ -156,6 +166,29 @@ sub transcript_percent_coverage {
     $self->{_cdna_comparison_transcript_percent_coverage} = $value;
   }
   return $self->{_cdna_comparison_transcript_percent_coverage};
+}
+
+=head2 percent_id
+
+    Title   :   percent_id
+    Usage   :   $cdna_comp->percent_id(97.5);
+    Function:   get/set for minimum acceptable percentage of a
+                transcript involved in FeaturePairs with a cDNA
+    Returns :   floating point value in the range [1..100]
+    Args    :   optional floating point value in the range
+                [1..100]
+
+=cut
+
+sub percent_id {
+  my $self = shift;
+  if( @_ ) {
+    my $value = shift;
+    $self->throw("expected a number in the range 1 to 100")
+      if ($value < 1 or $value > 100);
+    $self->{_cdna_comparison_percent_id} = $value;
+  }
+  return $self->{_cdna_comparison_percent_id};
 }
 
 =head2 run_transcript_mapping
@@ -260,8 +293,9 @@ sub _get_min_p {
     Usage   :
     Function:   Calculates percentage of a transcript covered by
                 FeaturePairs involving one or more hit sequences,
-		considering only same-strand FeaturePairs. Each
-		hit sequence may be involved in one or more
+		considering only same-strand FeaturePairs with
+		percent IDs of at least percent_id. Each hit
+		sequence may be involved in one or more
 		FeaturePairs. Must be supplied with precisely all
 		the FeaturePairs for a single transcript, across
 		the cDNA database in use.  Results will not be
@@ -281,8 +315,21 @@ sub _get_min_p {
 =cut
 
 sub _get_coverage {
-  my ( $self, $cdna_length, @featurepairs ) = @_;
+  my ( $self, $cdna_length, @original_featurepairs ) = @_;
   $self->throw('interface fault') if (@_ < 3);
+
+  # ignore FeaturePairs of too-low percent ID
+  my @featurepairs;
+  foreach my $featurepair (@original_featurepairs) {
+    if ($featurepair->percent_id >= $self->percent_id) {
+      print STDERR "XXX _get_coverage: using feature of percent_id ",
+        $featurepair->percent_id, "\n";
+      push @featurepairs, $featurepair;
+    } else {
+      print STDERR "XXX _get_coverage: ignoring feature of percent_id ",
+        $featurepair->percent_id, "\n";
+    }
+  }
 
   my %hit_hash;	# keys: hit names
                 # values: refs to coverage vectors (in which undef
