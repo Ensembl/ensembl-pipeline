@@ -14,20 +14,17 @@
 Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 
 =head1 SYNOPSIS
-$database  = a full path location for the directory containing 
-             the target (genomic usually) sequence,
-@sequences = a list of Bio::Seq objects,
-$exonerate = a location for the binary,
-$options   = a string with options ,
 
-  my $runnable = 
-    Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
-		     -database      => $database,
-		     -query_seqs    => \@sequences,
-		     -query_type    => 'dna',
-		     -target_type   => 'dna',
-		     -exonerate     => $exonerate,
-		     -options       => $options);
+  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
+								 -query_seqs     => \@q_seqs,
+                                                             [or -query_file     => $q_file]   
+								 -query_type     => 'dna',
+								 -target_seqs    => '\@t_seqs,
+                                                             [or -target_file    => $t_file]   
+			                                         -target_type    => 'dna',
+                                                                 -exonerate      => $exonerate,
+								 -options        => $options,
+								);
 
  $runnable->run; #create and fill Bio::Seq object
  my @results = $runnable->output;
@@ -95,39 +92,43 @@ use Bio::EnsEMBL::Root;
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-
-  my ($database,
-      $query_seqs,
-      $query_type,
-      $target_type,
-      $exonerate,
-      $options,
-      $verbose) = $self->_rearrange([qw(
-					DATABASE
-					QUERY_SEQS
-					QUERY_TYPE
-					TARGET_TYPE
-					EXONERATE
-					OPTIONS
-					VERBOSE
-				       )
-				    ], @args);
-
+  
+  my ($query_file, $query_seqs, $query_type,
+      $target_file, $target_seqs, $target_type,
+      $exonerate, $options, $verbose) = 
+          $self->_rearrange([qw(
+                                QUERY_FILE
+                                QUERY_SEQS
+                                QUERY_TYPE
+                                TARGET_FILE
+                                TARGET_SEQS
+                                TARGET_TYPE
+                                EXONERATE
+                                OPTIONS
+                                VERBOSE
+			   )
+			 ], @args);
   $self->_verbose($verbose) if $verbose;
-
   $self->{_output} = [];
-  # must have a target and a query sequences
-  unless( $query_seqs ){
-    $self->throw("Exonerate needs a query_seqs: $query_seqs");
-  }
-  $self->query_seqs(@{$query_seqs});
 
-  # you can pass a sequence object for the target or a database (multiple fasta file);
-  if( $database ){
-    $self->database( $database );
+  if (defined($query_seqs)) {     
+    $self->throw("You must supply an array reference with -query_seqs") 
+        if ref($query_seqs) ne "ARRAY";
+    $self->query_seqs($query_seqs);
   }
-  else{
-    $self->throw("Exonerate needs a target - database: $database");
+  elsif (defined $query_file) {
+    $self->throw("The given query file does not exist") if ! -e $query_file;
+    $self->query_file($query_file);
+  }
+  
+  if (defined($target_seqs)) {     
+    $self->throw("You must supply an array reference with -target_seqs") 
+        if ref($target_seqs) ne "ARRAY";
+    $self->target_seqs($target_seqs);
+  }
+  elsif (defined $target_file) {
+    $self->throw("The given database does not exist") if ! -e $target_file;
+    $self->target_file($target_file);
   }
 
   ############################################################
@@ -153,14 +154,14 @@ sub new {
   ############################################################
   # We default exonerate-0.6.7
   if ($exonerate) {
-      $self->exonerate($exonerate);
+    $self->exonerate($exonerate);
   } else {
-      $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+    $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
   }
 
   ############################################################
   # options
-  my $basic_options = "--ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
+  my $basic_options = "--ryo \"RESULT: %S %pi %ql %tl %g %V\\n\" "; 
 
   # can add extra options as a string
   if ($options){
@@ -169,12 +170,6 @@ sub new {
   $self->options($basic_options);
 
   return $self;
-}
-
-sub DESTROY {
-  my $self = shift;
-
-  unlink $self->_query_file;
 }
 
 
@@ -198,18 +193,17 @@ sub run {
   # Set name of results file
   $self->results($self->workdir . "/results.$$");
 
-  # Write query sequences to file
-
+  # Write query sequences to file if necessary
   $self->_write_sequences;
 
   # Build exonerate command
 
   my $command =$self->exonerate . " " .$self->options .
       " --querytype " . $self->query_type .
-	" --targettype " . $self->target_type .
-	  " --query " . $self->_query_file .
-	    " --target " . $self->database;
-
+      " --targettype " . $self->target_type .
+      " --query " . $self->query_file .
+      " --target " . $self->target_file;
+  
 
   # Execute command and parse results
 
@@ -250,62 +244,61 @@ sub parse_results {
     chomp;
 
     my ($tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end,
-	$t_strand, $score, $perc_id, $q_length, $gene_orientation,
+	$t_strand, $score, $perc_id, $q_length, $t_length, $gene_orientation,
 	@align_components) = split;
-
+    
     # Increment all our start coordinates.  Exonerate has a 
     # coordinate scheme that counts _between_ nucleotides.
-
+    
     $q_start++; $t_start++;
 
-    unless ($t_strand eq '+'){
-      $self->warn("Target strand is not positive [$t_strand].  Was " . 
-		  " not expecting this.");
-      next TRANSCRIPT
+    $t_strand = $strand_lookup{$t_strand};
+    $q_strand = $strand_lookup{$q_strand};
+    $gene_orientation = $strand_lookup{$gene_orientation};
+
+    # Read vulgar information and extract exon regions.
+    my $proto_exons = $self->_extract_distinct_exons($t_start,
+                                                     $t_strand,
+                                                     $t_length,
+						     $q_start, 
+						     $q_strand,
+                                                     $q_length,
+						     \@align_components);
+
+    # now we have extracted the exons and the coordinates are with 
+    # reference to the forward strand of the query and target, we can 
+    # use the gene_orienation to flip the strands if necessary
+    if ($gene_orientation == -1 and $t_strand == 1) {
+      $t_strand *= -1;
+      $q_strand *= -1;
     }
 
     # Start building our pair of features.
     my %target = (percent => $perc_id,
 		  source  => 'exonerate',
 		  name    => $t_id,
-		  strand  => $strand_lookup{$t_strand},);
+		  strand  => $t_strand);
 
-    # Hmm, what to do with the gene orientation?  Nothing for now.
-    $gene_orientation = $strand_lookup{$gene_orientation};
-
-    # Initialise the transcript feature that we are about to 
-    # populate with exons.
     my $transcript = Bio::EnsEMBL::Transcript->new();
-
-    # Read vulgar information and extract exon regions.
-
-    my $q_coord = $q_strand eq '+' ? $q_start : $q_end;
-
-    my $proto_exons = $self->_extract_distinct_exons($t_start, 
-						     $q_coord, 
-						     $q_strand,
-						     \@align_components);
 
     # Build FeaturePairs for each region of query aligned to a single
     # Exon.  Create a DnaDnaAlignFeature from these FeaturePairs and then
     # attach this to our Exon.
 
-    my $target_gaps = 0;
+    my $aligned_query_residues = 0;
 
     foreach my $proto_exon (@$proto_exons){
       my @feature_pairs;
       my $exon_end    = undef; # Where the overall exon end is tallied.
       my $exon_start  = undef; # Where the overall exon start is tallied.
-      my $prev_end; # This is used to count gaps in the target/genomic sequence.
+      my $exon_phase      = $proto_exon->[0]->{phase}; 
+      my $exon_end_phase  = $proto_exon->[0]->{end_phase}; 
 
       foreach my $exon_frag (@$proto_exon){
 	$target{start} = $exon_frag->{target_start};
 	$target{end}   = $exon_frag->{target_end};
 
-	# Account for genomic sequence gaps.
-	$target_gaps += $exon_frag->{target_start} - $prev_end - 1
-	  if defined $prev_end;
-	$prev_end = $target{end};
+        $aligned_query_residues += $exon_frag->{query_end} - $exon_frag->{query_start} + 1;
 
 	# Watch for the ends of our Exon.
 	$exon_end = $target{end}
@@ -317,7 +310,7 @@ sub parse_results {
 	my %query = (name    => $q_id,
 		     start   => $exon_frag->{query_start},
 		     end     => $exon_frag->{query_end},
-		     strand  => $strand_lookup{$q_strand},
+		     strand  => $q_strand,
 		     percent => $perc_id,
 		     source  => 'exonerate',);
 
@@ -352,10 +345,9 @@ sub parse_results {
       $exon->seqname($t_id);
       $exon->start($exon_start);
       $exon->end($exon_end);
-      $exon->strand($strand_lookup{$t_strand});
-      $exon->phase(0);
-      $exon->end_phase(0);
-
+      $exon->phase($exon_phase);
+      $exon->end_phase($exon_end_phase);
+      $exon->strand($target{strand});
 
       # Use our feature pairs for this exon to create a single 
       # supporting feature (with cigar line).
@@ -379,7 +371,7 @@ sub parse_results {
 
     # Calculate query coverage, now that we have seen all matches.
     my $coverage = sprintf "%.2f",
-	100 * ($q_end - $q_start + 1 - $target_gaps) / $q_length;
+	100 * ($aligned_query_residues) / $q_length;
 
     # Retrospectively set the coverage for each item of 
     # supporting evidence.
@@ -395,12 +387,14 @@ sub parse_results {
 
   $self->output(@transcripts);
 
-  return 1
+  return 1;
 }
 
 sub _extract_distinct_exons {
-  my ($self, $target_start, $query_coord, 
-      $query_strand, $vulgar_components) = @_;
+  my ($self, 
+      $target_coord, $target_strand, $target_length,
+      $query_coord,  $query_strand, $query_length,
+      $vulgar_components) = @_;
 
   # This method works along the length of a vulgar line 
   # exon-by-exon.  Matches that comprise an exon are 
@@ -411,8 +405,9 @@ sub _extract_distinct_exons {
   my @exons;
   my $exon_number = 0;
   my $cumulative_query_coord  = $query_coord;
-  my $cumulative_target_coord = $target_start;
+  my $cumulative_target_coord = $target_coord;
 
+  my @last_vulgar_component;
   while (@$vulgar_components){
     $self->throw("Something funny has happened to the input vulgar string." .
 		 "  Expecting components in multiples of three, but only have [" .
@@ -420,46 +415,105 @@ sub _extract_distinct_exons {
       unless scalar @$vulgar_components >= 3;
 
     my $type          = shift @$vulgar_components;
-    my $query_length  = shift @$vulgar_components;
-    my $target_length = shift @$vulgar_components;
+    my $query_match_length  = shift @$vulgar_components;
+    my $target_match_length = shift @$vulgar_components;
 
     $self->throw("Vulgar string does not start with a match.  Was not " . 
 		 "expecting this.")
       if ((scalar @exons == 0) && ($type ne 'M'));
 
+    next if $type eq "S"; 
+    # partial codon; these will be dealt with by "M" case
+
     if ($type eq 'M'){
       my %hash;
 
       $hash{type}         = $type;
-      $hash{target_start} = $cumulative_target_coord;
-      $hash{target_end}   = $cumulative_target_coord + $target_length - 1;
+      $hash{phase}        = 0;
+      $hash{end_phase}    = 0;
+      
+      # adjust for split codons
+      if (@last_vulgar_component and $last_vulgar_component[0] eq "S") {
+        $query_match_length  += $last_vulgar_component[1];
+        $target_match_length += $last_vulgar_component[2];
+        # the "3 -" is necessary to convert to ensembl phase convention
+        $hash{phase} = 3 - $last_vulgar_component[1];
+      }
+      if (@$vulgar_components and $vulgar_components->[0] eq "S") {
+        $query_match_length  += $vulgar_components->[1];
+        $target_match_length += $vulgar_components->[2];        
+        # luckily, this one already fits into ensembl phase convention
+        $hash{end_phase} = $vulgar_components->[1];
+      }
 
-      if ($query_strand ne '-') {
-	$hash{query_start} = $cumulative_query_coord;
-	$hash{query_end}   = $cumulative_query_coord  + $query_length - 1;
+      if ($target_strand != -1) {
+        $hash{target_start} = $cumulative_target_coord;
+        $hash{target_end}   = $cumulative_target_coord + $target_match_length - 1;
       } else {
-	$hash{query_start} = $cumulative_query_coord - $query_length + 1;
-	$hash{query_end}   = $cumulative_query_coord;
+        $hash{target_end}   = $target_length - $cumulative_target_coord + 1;
+        $hash{target_start} = $hash{target_end} - $target_match_length + 1;
+      }
+
+      if ($query_strand != -1) {
+	$hash{query_start} = $cumulative_query_coord;
+	$hash{query_end}   = $cumulative_query_coord + $query_match_length - 1;
+      } else {
+	$hash{query_end}   = $query_length - $cumulative_query_coord + 1;
+	$hash{query_start} = $hash{query_end} - $query_match_length + 1;
       }
 
       push @{$exons[$exon_number]}, \%hash;
     }
 
-    $cumulative_target_coord += $target_length;
+    $cumulative_target_coord += $target_match_length;
+    $cumulative_query_coord += $query_match_length;
 
-    if ($query_strand ne '-') {
-      $cumulative_query_coord  += $query_length;
-    } else {
-      $cumulative_query_coord  -= $query_length;
+    # in protein mode, any insertion on the genomic side should be treated as 
+    # an intron
+    if ($type eq "I" or
+        $type eq "F" or
+        ($type eq "G" and 
+         $target_match_length > 0 and
+         $self->target_type eq "dna" and 
+         $self->query_type eq "protein")) {
+      $exon_number++;
     }
 
-    $exon_number++ 
-      if $type eq 'I';
+    @last_vulgar_component = ($type, $query_match_length, $target_match_length);
   }
 
   return \@exons;
 }
 
+
+sub _write_sequences {
+  my ($self) = @_;
+
+  if ($self->query_seqs) {
+    my $query_file = $self->workdir . "/exonerate_q.$$";
+    my $seqout = Bio::SeqIO->new('-format' => 'fasta',
+                                 '-file'     => ">$query_file");   
+    foreach my $seq ( @{$self->query_seqs} ) {
+      $seqout->write_seq($seq);
+    }
+    # register the file for deletion
+    $self->file($query_file);
+    $self->query_file($query_file);
+  }
+
+  if ($self->target_seqs) {
+    my $target_file = $self->workdir . "/exonerate_t.$$";
+    my $seqout = Bio::SeqIO->new('-format' => 'fasta',
+                                 '-file'   => ">$target_file");   
+    foreach my $seq ( @{$self->target_seqs} ) {
+      $seqout->write_seq($seq);
+    }
+    # register the file for later deletion
+    $self->file($target_file);
+    $self->target_file($target_file);
+  } 
+
+}
 
 ############################################################
 #
@@ -468,28 +522,51 @@ sub _extract_distinct_exons {
 ############################################################
 
 sub query_seqs {
-  my ($self, @seqs) = @_;
-  if (@seqs){
-    unless ($seqs[0]->isa("Bio::PrimarySeqI") || $seqs[0]->isa("Bio::SeqI")){
+  my ($self, $seqs) = @_;
+  if ($seqs){
+    unless ($seqs->[0]->isa("Bio::PrimarySeqI") || $seqs->[0]->isa("Bio::SeqI")){
       $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
     }
-    push(@{$self->{_query_seqs}}, @seqs) ;
+    $self->{_query_seqs} = $seqs;
   }
-  return @{$self->{_query_seqs}};
+  return $self->{_query_seqs};
 }
 
 ############################################################
 
-sub genomic {
-  my ($self, $seq) = @_;
-  if ($seq){
-    unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")){
+sub target_seqs {
+  my ($self, $seqs) = @_;
+  if ($seqs){
+    unless ($seqs->[0]->isa("Bio::PrimarySeqI") || $seqs->[0]->isa("Bio::SeqI")){
       $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
     }
-    $self->{_genomic} = $seq ;
+    $self->{_target_seqs} = $seqs;
   }
-  return $self->{_genomic};
+  return $self->{_target_seqs};
 }
+
+############################################################
+
+sub query_file {
+    my ($self, $file) = @_;
+
+    if ($file) {
+	$self->{_query_file} = $file;
+    }
+    return $self->{_query_file};
+}
+
+############################################################
+
+sub target_file {
+    my ($self, $file) = @_;
+
+    if ($file) {
+	$self->{_target_file} = $file;
+    }
+    return $self->{_target_file};
+}
+
 
 ############################################################
 
@@ -526,23 +603,8 @@ sub output {
   return @{$self->{_output}};
 }
 
-############################################################
 
-sub database {
-  my ($self, $database) = @_;
 
-  if ($database) {
-    $self->{_database} = $database;
-    $self->throw("Genomic sequence database file [" . 
-		 $self->{_database} . "] does not exist.")
-      unless -e $self->{_database};
-  }
-
-  $self->throw("No genomic sequence database provided for Exonerate.")
-    unless $self->{_database};
-
-  return $self->{_database};
-}
 ############################################################
 
 sub query_type {
@@ -574,39 +636,13 @@ sub target_type {
 ############################################################
 
 
-sub _write_sequences {
-  my $self = shift;
-
-  my $seqout = Bio::SeqIO->new('-file'   => ">" . $self->_query_file,
-			       '-format' => 'Fasta',
-			      );
-
-  foreach my $query_seq ( $self->query_seqs ){
-    $seqout->write_seq($query_seq);
-  }
-}
-
-sub _query_file {
-  my $self = shift;
-
-  if (@_) {
-    $self->{_query_file} = shift;
-  }
-
-  unless ($self->{_query_file}){
-    $self->{_query_file} = $self->workdir . "/query_seqs.$$"
-  }
-
-  return $self->{_query_file};
-}
-
 sub _verbose {
   my $self = shift;
-
+  
   if (@_){
     $self->{_verbose} = shift;
   }
-
+  
   return $self->{_verbose}
 }
 

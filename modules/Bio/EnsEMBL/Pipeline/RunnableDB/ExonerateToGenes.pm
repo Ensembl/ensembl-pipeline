@@ -177,12 +177,12 @@ sub fetch_input {
       #print STDERR "creating runnable for target: $database\n";
       my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 	->new(
-	      -database    => $database,
-	      -query_seqs  => \@sequences,
-	      -exonerate   => $self->exonerate,
-	      -options     => $self->options,
-	      -target_type => $self->target_type,
-	      -query_type  => $self->query_type,
+	      -target_file    => $database,
+	      -query_seqs     => \@sequences,
+	      -exonerate      => $self->exonerate,
+	      -options        => $self->options,
+	      -target_type    => $self->target_type,
+	      -query_type     => $self->query_type,
 	     );
       $self->runnables($runnable);
     }else{
