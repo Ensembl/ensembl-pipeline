@@ -55,7 +55,6 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
-use FreezeThaw;
 
 my $anahost     = 'ensrv3.sanger.ac.uk';
 my $anaport     = '410000';
@@ -80,7 +79,7 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -pass   => $anapass);
 
 
-my @jobs = $anadb->get_JobsByCurrentStatus('SUBMITTED');
+my @jobs = $anadb->get_JobsByCurrentStatus('SUCCESSFUL');
 
 foreach my $job (@jobs) {
     $job->_dbobj($anadb);
@@ -90,25 +89,34 @@ foreach my $job (@jobs) {
     my $stdout=$job->stdout_file();
     print STDERR "STDOUT file is $stdout\n";
     
-    open(STDOUT,'<$stdout') || die ("Could not open $stdout\n");
+    open(OUT,"<$stdout") || die ("Could not open $stdout\n");
     my $failed = 1;
-    while(<STDOUT>){
-	print STDERR $_;
+    while(<OUT>){
 	if(/Successfully/){
 	    $failed=0;
-	    #$job->set_status('SUCCESSFUL');
+	    $job->set_status('SUCCESSFUL');
 	    print STDERR "Successful job!\n";  
+	}
+	if(/Read file <(\S+)> for stderr output/){
+	    $job->stderr_file($1);
 	}
     }
     if ($failed == 1) {
-	#$job->set_status('FAILED');
-	print STDERR "Failed job!\n";
-	#Look in error file - not yet done!
+	$job->set_status('FAILED');
+	print STDERR "Failed job! STDERR file".$job->stderr_file()."\n";
     }
+    my $output= $job->output_file();
+    print STDERR "Got output file $output\n\n";
+
+    my $object;
+    open (IN,"<$output");
+    while (<IN>) {
+	$object .= $_;
+    }
+    close(IN);
+
+    my ($obj) = FreezeThaw::thaw($object);
+    print STDERR "Got an ".$obj->id."\n";
+    
 }
-		
-    #my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
-							  #-runnable => $runnable,
-							  #);
-#}
 
