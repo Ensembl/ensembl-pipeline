@@ -113,46 +113,39 @@ sub new {
 sub run{
   my ($self) = shift;
 
-  print "running SlamDB.pm...lucky guy\n";
-
   my @subslices;
   my %alltranscripts;
   ####################### IF SEQLENGTH > SLAM_MAXLENGTH WE SPLIT #############################
 
   if ( (${$self->slices}[0]->length  || ${$self->slices}[0]->length ) > $SLAM_MAXLENGTH) {
-    # run avid on uncutted slices and cut the seqs
-    print "Hurrah! I will cut the seqs and run avid, Master !!\n";
+    # run avid to cut seqs
 
     my $avid = $self->runavid( $self->slices);
-
-    # run ApproxAlign on org slices
-    print "And now, I run aat for yo\n";
+    print "SlamDB.pm: ".$avid->fasta_filename1."\t".$avid->fasta_filename2."\n";
 
     my $approx_obj = $self->approx_align( $avid->parsed_binary_filename, $avid->fasta_filename1, $avid->fasta_filename2 );
+
+    #    print "SlamDB.pm:" .  $avid->fasta_filename1."\n";   print "SlamDB.pm:" .  $avid->fasta_filename2."\n";
 
     # cut the first seq according to the positions of the repeats
     # and than try to find equal positions in the second seq by
     # using the aat-file
 
-    print "...and now I will calculate the cutting for you, Master\n";
-
     my @cuts = @{ $self->calculate_cutting ( $approx_obj ) } ;
 
     print "SlamDB.pm: CALCULATED CUTTING using the repeats out of db:\n";
 
-  for(@cuts){
-      my @bla =@$_;
-      foreach(@bla){ print "$_\t"; }
-      print "\n";
+    for (@cuts) {               # contains the 4 offsets for cutting 1 290.000 1 299.000
+      my @cut_offset = @$_;
+      my $start1 = $cut_offset[0];
+      my $end1 = $cut_offset[1];
+      my $length1 = $end1 - $start1;
+      my $start2 = $cut_offset[2];
+      my $end2 = $cut_offset[3];
+      my $length2 =$end2 - $start2;
+      print "$start1\t$end1\t=$length1\t\t" . "$start2\t$end2\t=$length2\n";
     }
     print "\n\n";
-
-
-
-    
-    my $bug_f1  = "/tmp/". $avid->_filename1.".fasta";
-    my $bug_f2  = "/tmp/". $avid->_filename2.".fasta";
-    my $bug_rmf = "/tmp/db_repeats.out";
 
     #  perl test_slam_cutting.pl /tmp/fasta1.fasta /tmp/fasta2.fasta /tmp/aatfile.aat /tmp/rempeatmsk.out 
 
@@ -163,12 +156,19 @@ sub run{
       # store the subslices in 2nd array of arrays
       my ($start1, $end1) = @{$subseqs}[0,1];
       my ($start2, $end2) = @{$subseqs}[2,3];
+
+      # testing if there are subslices >> $SLAM_MAXLENGTH
+      if ( ($end2-$start2 > $SLAM_MAXLENGTH) || ($end1-$start1 > $SLAM_MAXLENGTH) ) {
+        print "\nWARNING: " . ($end2-$start2). " or " . ($end1-$start1) . "are bigger than $SLAM_MAXLENGTH\n";
+      }
+
       my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
       my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
+
       push @subslices, [$subslice1,$subslice2];
     }
-  } else {                      # no cutting
-    print "ok.. your choice.. no cutting\n";
+  } else {
+    # no cutting
     push @subslices, $self->slices;
   }
 
@@ -178,42 +178,74 @@ sub run{
   $alltranscripts{$SLAM_ORG2_NAME} = ();
 
   ####################### RUN AVID APPROXALIGN and SLAM on each SUBSLICE #############################
+  my $slice_counter=0;
 
-for my $slices (@subslices) {
 
-  my $avid_obj = $self->runavid( $slices );
-  print "SlamDB.pm:   Length 1st subslice " . ${$slices}[0]->length;
-  print "\nSlamDB.pm: Length 2st subslice " . ${$slices}[1]->length;
-  print "\n";
+  for my $slices (@subslices) {
+    $slice_counter++;
+    ################################ REPEATMASK-STATISTICS ################################
 
-    # run ApproxAlign on subslice
-    my $approx = $self->approx_align($avid_obj->parsed_binary_filename,$avid_obj->fasta_filename1,$avid_obj->fasta_filename2);
-    print "SlamDB.pm: approx_align gelaufen!.. now trying to run slam\n";
+    my $subslice1 = ${$slices}[0] ;
+    my $subslice2 = ${$slices}[1] ;
+
+    my $length1 =    $subslice1->length;
+    my $unknown1 = ( $subslice1->seq() ) =~tr/N//; # count all occurences of N in the sequence
+    my $maskedNs1 =( $subslice1->get_repeatmasked_seq->seq()) =~tr/N//;
+    $maskedNs1 = $maskedNs1-$unknown1;
+
+    my $length2 =    $subslice2->length;
+    my $unknown2 = ( $subslice2->seq() ) =~tr/N//;
+    my $maskedNs2 = ($subslice2->get_repeatmasked_seq->seq() ) =~tr/N//;
+    $maskedNs2 = $maskedNs2-$unknown2;
+
+    print "SlamDB.pm: Length 1st subslice " . $length1 ."\t Length 2st subslice " . $length2 ."\n";
+    $length1 = $length1-($unknown1);
+    $length2 = $length2-($unknown2);
+
+    my $percentage1 = sprintf ( "Percentage of repeats in 1st seq: %1.2f" , (($maskedNs1/$length1)*100) ) ; print $percentage1."%\n";
+    my $percentage2 = sprintf ( "Percentage of repeats in 2nd seq: %1.2f" , (($maskedNs2/$length2)*100) ) ; print $percentage2."%\n";
+
+
+    ################################### RUNNING AVID ON SUBSLICE ########################################
+
+    print "\nSlamDB.pm: Subslice-Nr: $slice_counter\n-------------------------------\n";
+    print "SlamDB.pm: Running Avid...\n";
+
+    my $avid_obj = $self->runavid( $slices );
+
+    print "SlamDB.pm: running ApproxAlign\n";
+    my $approx = $self->approx_align( $avid_obj->parsed_binary_filename, $avid_obj->fasta_filename1, $avid_obj->fasta_filename2 );
+
+
+    my $e1_start = $subslice1->start;    my $e1_end = $subslice1->end;    my $e1_chr = $subslice1->seq_region_name;
+    my $e2_start = $subslice2->start;    my $e2_end = $subslice2->end;    my $e2_chr = $subslice2->seq_region_name;
+
+    print "   Region1NEW: $e1_chr-$e1_start-$e1_end \n   Region2NEW: $e2_chr-$e2_start-$e2_end\n";
 
     # make new slam-run with subslice
     my $slamobj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
-                                                              -slice1        => ${$self->slices}[0],
-                                                              -slice2        => ${$self->slices}[1],
-                                                              -fasta1        => $avid_obj->fasta_filename1,
-                                                              -fasta2        => $avid_obj->fasta_filename2,
-                                                              -approx_align  => $approx->aatfile,
-                                                              -org1          => $SLAM_ORG1_NAME,
-                                                              -org2          => $SLAM_ORG2_NAME,
-                                                              -slam_bin      => $SLAM_BIN,
-                                                              -slam_pars_dir => $SLAM_PARS_DIR,
-                                                              -minlength     => $SLAM_MINLENGTH,
-                                                              -debug         => 0,
+                                                              -slice1        =>  $subslice1 ,
+                                                              -slice2        =>  $subslice2 ,
+                                                              -fasta1        => $avid_obj->fasta_filename1 ,
+                                                              -fasta2        => $avid_obj->fasta_filename2 ,
+                                                              -approx_align  => $approx->aatfile ,
+                                                              -org1          => $SLAM_ORG1_NAME ,
+                                                              -org2          => $SLAM_ORG2_NAME ,
+                                                              -slam_bin      => $SLAM_BIN ,
+                                                              -slam_pars_dir => $SLAM_PARS_DIR ,
+                                                              -minlength     => $SLAM_MINLENGTH ,
+                                                              -debug         => 0 ,
                                                               -verbose       => 0
                                                              );
+
     # run slam, parse results and set predict. trscpts for both organisms
+    print "SlamDB.pm: running Slam\n";
     $slamobj->run;
 
-    # getting reference to array of predicted transcripts  [ ref[arefhumanpt] ref[arefmousept] ]
-    my $predtrans = $slamobj ->predtrans;
+    #    # getting reference to array of predicted transcripts  [ ref[arefhumanpt] ref[arefmousept] ]
+    my $predtrans = $slamobj ->predtrans; # predtrans = [HPT HPT HPT][HM HM HM] or 2 empty arrays [ [] [] ]
 
-
-    # predtrans = [HPT HPT HPT][HM HM HM] or 2 empty arrays [ [] [] ]
-    # testing the length of the predicted transcr
+    #    # testing the length of the predicted transcr
     my @tmp_arrayrefs = @{$predtrans};
 
     my $aref1 = $tmp_arrayrefs[0];
@@ -223,42 +255,35 @@ for my $slices (@subslices) {
     my @array2 = @{$aref1};
 
     if (scalar (@array1) >0) {
-      print "I'll put a refernce to the array in the hash\n";
+      # only store defined values
       push (@{$alltranscripts{$SLAM_ORG1_NAME}}, $aref1 ); # [HPT]
-    }else { 
-      print "WARNING ! \n I received an undefined reference. I dont store it\n";
     }
 
     if (scalar (@array2) >0) {
-      print "I'll put a refernce to the array in the hash\n";
       push (@{$alltranscripts{$SLAM_ORG2_NAME}}, $aref2 ); # [MUS]
-    }else{
-      print "I received an undefined reference. I dont store it\n";
     }
   }
   print "SlamDB: finished all subslices\n";
 
 
-
-# lets check the length of the two stored arrays
-#  print "checking if storage worked\n";
-#  foreach my $key(keys    %alltranscripts) {
-#    my $stored_arrayref = $alltranscripts{$key};
-#    my @stor_array = @{$stored_arrayref};
-#    for my $item (@stor_array){
-#      my @refs2pt = @{$item};
-#      for my $defpt (@refs2pt){
-#      }
-#    }
-#  }
-
-
+  # lets check the length of the two stored arrays
+  #  print "checking if storage worked\n";   #debug
+  #  foreach my $key(keys    %alltranscripts) {
+  #    my $stored_arrayref = $alltranscripts{$key};
+  #    my @stor_array = @{$stored_arrayref};
+  #    for my $item (@stor_array){
+  #      my @refs2pt = @{$item};
+  #      for my $defpt (@refs2pt){
+  #      }
+  #    }
+  #  }
   $self->predtrans_both_org (\%alltranscripts);
 }
 
 
-                               # eor
+
 ################################################################################
+# checks if the array ref is defined and stores it if necessary in db
 sub write_dbresults {
   my ($self,$db,$slice,$org,$apt,$analysis) = @_;
 
@@ -275,20 +300,20 @@ sub write_dbresults {
 
   my $aref_all_aref_prediTrans = $allpredtrans{$org};
 
-  my @all_aref_prediTrans = @{ $aref_all_aref_prediTrans};     # [HPT HPT HPT HPT HPT]  here is the error ! why do we have only 1 ELEMENT ?????
- # print "length pred_trans " .scalar(@pred_trans_refs) . "\n";
+  # test if there are any prediction transcripts defined (if so, put'em in db)
+  if (defined $allpredtrans{$org}) {
 
-  foreach my $aref_prediTrans (@all_aref_prediTrans) {
-
-    my @prediTrans = @{$aref_prediTrans} ;
-    for my $pT (@prediTrans) {
-      # here are the prediction transcripts we like to process
-      $pT->analysis($analysis);
+    my @all_aref_prediTrans = @{ $aref_all_aref_prediTrans}; # [HPT HPT HPT HPT HPT]  here is the error ! why do we have only 1 ELEMENT ?????
+    foreach my $aref_prediTrans (@all_aref_prediTrans) {
+      my @prediTrans = @{$aref_prediTrans} ;
+      for my $pT (@prediTrans) {
+        # here are the prediction transcripts we like to process
+        $pT->analysis($analysis);
+      }
+      $pred_adp->store(@prediTrans);
     }
-    $pred_adp->store(@prediTrans);
   }
 }
-
 
 
 
@@ -319,11 +344,8 @@ sub write_dbresults {
 #   8        853        889
 #   9        856        898
 
-
 sub calculate_cutting{
   my ($self,$ApproxAlign) = @_;
-
-print "SlamdB: ApprixAlign: $ApproxAlign\n";
 
   # getting attributes of object
   my @slices  = @{$self->slices};
@@ -332,8 +354,7 @@ print "SlamdB: ApprixAlign: $ApproxAlign\n";
 
   my $len1 = $slices[0]->length;
 
-  print "Length1: $len1\n";
-  print "MaxLen : $SLAM_MAXLENGTH\n";
+  print "MaxLen : $SLAM_MAXLENGTH\n"; #debug
 
   my @cuts1 = (1);
   my $targetcut = $SLAM_MAXLENGTH;
@@ -345,13 +366,11 @@ print "SlamdB: ApprixAlign: $ApproxAlign\n";
 
       if ((@all_repeats==0) || ($all_repeats[0]->[0] > $targetcut)) {
 
-        # No repeats or startpos of first repeat is bigger than targetcut
-        # so there are no repeats before target-cuttingposition, so cut
+        # No repeats or startpos of first repeat is bigger than targetcut, there are no repeats before target-cuttingposition, so cut
         last;
 
       } elsif ($all_repeats[0]->[1] >= $targetcut) {
-        # end of repeat is "bigger" than targetcut
-        # repeat spans target (cool), see example1 above
+        # end of repeat is "bigger" than targetcut (repeat spans target, cool, see example1 above)
         $cut = $targetcut;
         last;
 
@@ -374,6 +393,8 @@ print "SlamdB: ApprixAlign: $ApproxAlign\n";
   # now we got cutting-positions for the first sequence
 
   push(@cuts1,$len1) if($cuts1[$#cuts1] < $len1);
+
+
   ################################################################################
   # Make array of matching cuts in other sequence using the approximate alignment
   #
@@ -383,8 +404,8 @@ print "SlamdB: ApprixAlign: $ApproxAlign\n";
   my @cuts2 = (1+$ApproxAlign->lowerBound($cuts1[0]-1));
 
   for (my $i=1; $i < (scalar(@cuts1)-1); $i++) {
-    print "pushing in cuts2:";
-    print "ApproxAlign->lowerBound: " . ($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1)/2.0) . "\n";
+    #    print "pushing in cuts2:";   #debug
+    #    print "ApproxAlign->lowerBound: " . ($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1)/2.0) . "\n";
     push(@cuts2,sprintf("%d",($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1))/2.0));
   }
 
@@ -397,30 +418,31 @@ print "SlamdB: ApprixAlign: $ApproxAlign\n";
 
   ## look at content of cuts1
   ## the error/diffrent values are in the @cuts2-arrray !!!! 
-#  print "------------\n";
-#  foreach(@cuts1){
-#      print "cuts1: $_\n";
-#  }
-#  print "------------\n\n";
+  #  print "------------\n";
+  #  foreach(@cuts1){
+  #      print "cuts1: $_\n";
+  #  }
+  #  print "------------\n\n";
 
 
-  print "------------\n";
-  foreach(@cuts2){
-      print "cuts2: $_\n";
-  }
-  print "------------\n\n";
+  #  print "------------\n";
+  #  foreach(@cuts2){
+  #      print "cuts2: $_\n";
+  #  }
+  #  print "------------\n\n";
 
-print "################################################################################\n";
+  print "################################################################################\n";
 
   for (my $i=0; $i < (scalar(@cuts1)-1); $i++) {
     if ($cuts2[$i]+1 > $cuts2[$i+1]) {
       # skip if we have an insertion in the base seqeunce.
       next;
     } else {
-                    # cuts in the first seq   # cuts in the second seq
-      ##      push(@splits,[sprintf("%s.%d","mycutfile_dir",$cutCount),$cuts1[$i]+1,$cuts1[$i+1],$cuts2[$i]+1,$cuts2[$i+1]]);
+      # cuts in the first seq     cuts in the second seq
       push(@splits,[ $cuts1[$i]+1, $cuts1[$i+1], $cuts2[$i]+1, $cuts2[$i+1] ] );
-      print "cut1: $cuts1[$i]+1 \tcut2: $cuts1[$i+1]\tcut1b: $cuts2[$i]+1\tcut2b: $cuts2[$i+1]\n";
+
+      ##      print "cut1: $cuts1[$i]+1 \tcut2: $cuts1[$i+1]\tcut1b: $cuts2[$i]+1\tcut2b: $cuts2[$i+1]\n";
+
 
       # Format of cutfile:
       # human_contig.fasta_mice_contig.fasta.cut.1      1       100500  1       93943
@@ -433,8 +455,8 @@ print "#########################################################################
 
 
 
-# gets a reference to an array of slices to run avid on
-# returns reference to an avid-object
+# gets a reference to an array of slices to run avid on, and returns a reference to an avid-object
+
 sub runavid{
   my ($self,$sliceref) = @_;
 
@@ -560,7 +582,7 @@ sub db_org2 {
 
   Title    : predtrans
   Usage    : $obj->predtrans
-  Function : Sets/gets a hash of predicted transcripts for both organismas
+  Function : Sets/gets a hash of predicted transcripts for both organismas (key=species)
   Returns  : Ref. to an hash (keys: org1 org2) with 2 arrays of predicted transcripts
   Args     : References to a hash || none
 
@@ -578,7 +600,7 @@ sub predtrans_both_org{
 
 sub write_output {
   my ($self) = @_;
-  #writing output for both organisms to diffrent databases
+  #writing output for both organisms to different databases
   $self->write_dbresults ( $self->db,      ${$self->slices}[0], $SLAM_ORG1_NAME , $self->predtrans_both_org, $self->analysis );
   $self->write_dbresults ( $self->db_org2, ${$self->slices}[1], $SLAM_ORG2_NAME , $self->predtrans_both_org, $self->analysis );
 }
@@ -602,7 +624,7 @@ sub write_output {
 # ex1:  ..._repeat_repeat_repeat_CUTTINGPOSITION_repeat_repeat_repeat_...
 #
 # ex2:  ..._
-# 
+#
 # gets the repeat features for the first silce !
 
 sub get_repeat_features {
@@ -616,12 +638,6 @@ sub get_repeat_features {
   my @repeats =('LTRs','Type I Transposons/LINE','Type I Transposons/SINE');
   my @all;
 
-  # only for testing purpose start
-  my $repeatfilename = "/tmp/db_repeats.out";
-  # only for testing purpose end
-
-
-
   # get all repeats of the given types (above) and write them in @array
   for my $arpt (@repeats) {
     for my $rpt ( @{$slice->get_all_RepeatFeatures(undef,"$arpt")}) {
@@ -634,42 +650,41 @@ sub get_repeat_features {
     }
   }
 
-  # sort the @array
-  # writingout a outffile to compare with slam run
+  #   for (@all){
+  #      my @r = @{$_};
+  #      @r = sort(@r);
+  #      for(@r){
+  #        print "\t $_";
+  #      }
+  #      print "\n";
+  #    }
 
-#   for (@all){
-#      my @r = @{$_};
-#      @r = sort(@r);
-#      for(@r){
-#        print "\t $_";
-#      }
-#      print "\n";
-#    }
-
-#  # routine of comparing repeats of db with repeats from repeatmasker-run
-#    for (@all){
-#      my @r = @{$_};
-#      @r = sort(@r);
-#      for(@r){
-#        print "\t $_";
-#      }
-#      print "\n";
-#    }
+  #  # routine of comparing repeats of db with repeats from repeatmasker-run
+  #    for (@all){
+  #      my @r = @{$_};
+  #      @r = sort(@r);
+  #      for(@r){
+  #        print "\t $_";
+  #      }
+  #      print "\n";
+  #    }
 
 
   # sort startpos of rpt ascending order
   @all_rpt = sort { $a->[0] <=> $b->[0] } @all_rpt;
-  # check the sorting
-  print "Writing $repeatfilename\n";
 
+
+
+  my $repeatfilename = "/tmp/db_repeats.out";
+  print "Writing $repeatfilename\n";
   open(RP,">$repeatfilename") || die "write error $repeatfilename\n";
-    for my $r (@all_rpt){
-      my @r=@{$r};
-      for(@r){
-        print RP "\t $_";
-      }
-      print RP "\n";
+  for my $r (@all_rpt) {
+    my @r=@{$r};
+    for (@r) {
+      print RP "\t $_";
     }
+    print RP "\n";
+  }
   close(RP);
 
 
