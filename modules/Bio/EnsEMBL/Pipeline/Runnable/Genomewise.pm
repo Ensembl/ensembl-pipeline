@@ -123,7 +123,6 @@ sub run{
 #  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
 #  open(GW,"</tmp/test.out");
   
-
 # in acari, genomewise is in '/nfs/acari/birney/prog/wise2/src/bin/'
 # or in '/usr/local/ensembl/bin/genomewise'
 
@@ -133,8 +132,7 @@ sub run{
 
 #### Steve's version (fixed)
 
-  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
-
+  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
   
   # we try now without -smell 4
 
