@@ -21,7 +21,11 @@ package main;
 
 %fasta_header_re = (
 		    'embl_vertrna'   => '\w+\s+(\w+)',
+		    'embl_vertrna-1'   => '\w+\s+(\w+)',
+		    'mini_mrna.fa'   => '\w+\s+(\w+)',
 		    'swall'          => '^\w+\s+(\w+)',
+		    'swall-1'          => '^\w+\s+(\w+)',
+		    'mini_protein.fa'          => '^\w+\s+(\w+)',
 		    'dbHUMAN-EST'    => '^\w+\|\w+\|\w+\|([\w\.]+)',
 		    'dbMOUSE-EST'    => '^\w+\|\w+\|\w+\|([\w\.]+)',
 		    'dbOTHERS-EST'   => '^\w+\|\w+\|\w+\|([\w\.]+)',
