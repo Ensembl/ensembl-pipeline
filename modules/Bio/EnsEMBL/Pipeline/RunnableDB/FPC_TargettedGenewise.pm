@@ -1,5 +1,5 @@
 
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise.pm
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
@@ -11,13 +11,13 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise
+Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise
 
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
 
-Runs all the TargettedGeneWise jobs needed for a chunk of genomic sequence
+Runs all the TargettedGenewise jobs needed for a chunk of genomic sequence
 
 =head1 CONTACT
 
@@ -33,38 +33,49 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise;
+package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise;
 
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBNAME
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
+                   GB_GW_DBPORT                                          
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
-							     GB_PROTEIN_INDEX
-							     GB_PROTEIN_SEQFETCHER
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences 
+  qw (
+      GB_PROTEIN_INDEX
+      GB_PROTEIN_SEQFETCHER
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
-							     GB_INPUTID_REGEX
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   
+  qw (
+      GB_INPUTID_REGEX
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
-							     GB_KILL_LIST
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    
+  qw (
+      GB_KILL_LIST
+     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    qw (
-							     GB_FINAL_PMATCH_LOGICNAME
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    
+  qw (
+      GB_FINAL_PMATCH_LOGICNAME
+     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw 
+  (
+   GB_TARGETTED_MASKING
+   GB_TARGETTED_SOFTMASK
+  );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -172,52 +183,56 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-dbname => $self->db->dbname,
-								-user => $self->db->username,
-								-pass => $self->db->password,
-								-host => $self->db->host);
-  my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
-  #print STDERR "have ".$pmfa." adaptor\n";
-  my $input_id = $self->input_id;
-  my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
-  $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
   
-  my $chr_name = $1;
-  my $start   = $2;
-  my $end     = $3;
-
-  #print STDERR "fetching features for $chr_name $start $end\n";
-  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end);
+  my $pmfa = $self->db->get_PmatchFeatureAdaptor();
+ 
+  $self->fetch_sequence($GB_TARGETTED_MASKING);
+  my @features = $pmfa->get_PmatchFeatures_by_chr_start_end
+    ($self->query->seq_region_name, $self->query->start, 
+     $self->query->end, $GB_FINAL_PMATCH_LOGICNAME );
   #print STDERR "have ".@features." pmatch features to run with\n";
-  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						       '-host'   => $GB_GW_DBHOST,
-						       '-user'   => $GB_GW_DBUSER,
-						       '-pass'   => $GB_GW_DBPASS,
-						       '-dbname' => $GB_GW_DBNAME,
-						      );
+  print STDERR "Trying to connect to ".$GB_GW_DBHOST." ".$GB_GW_DBNAME.
+    " ".$GB_GW_DBPORT."\n";
+  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     '-host'   => $GB_GW_DBHOST,
+     '-user'   => $GB_GW_DBUSER,
+     '-pass'   => $GB_GW_DBPASS,
+     '-dbname' => $GB_GW_DBNAME,
+     '-port' => $GB_GW_DBPORT,
+    );
   
   
   $genewise_db->dnadb($self->db);
   $self->output_db($genewise_db);
   my %kill_list = %{$self->fill_kill_list};
 
-  foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end, $GB_FINAL_PMATCH_LOGICNAME)){
-
+  foreach my $feat(@features){
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
       print STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
+    
+    my ($start, $end);
+    if($feat->start < $feat->end){
+      $start = $feat->end;
+      $end = $feat->start;
+    }else{
+      $start = $feat->start;
+      $end = $feat->end;
+    }
 
+    my $input = ($self->query->coord_system->name.":".
+                 $self->query->coord_system->version.":".
+                 $self->query->seq_region_name.":".
+                 $start.":".$end.":".
+                 $self->query->strand."|".
+                 $$feat->protein_id);
 
-    my $input = $feat->chr_name   . ":" . 
-                $feat->start      . "," . 
-                $feat->end        . ":" . 
-                $feat->protein_id . ":" ;
+    print STDERR "TGW input: $input\n";
 
-    #print STDERR "TGW input: $input\n";
-
-    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise(
+    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise(
 									-db => $self->db,
 									-input_id => $input,
 									-seqfetcher => $protein_fetcher,
@@ -283,7 +298,7 @@ sub run {
     };
     
     if($@){
-      $self->warn("problems fetching input for TargettedGeneWise: [$@]\n");
+      $self->warn("problems fetching input for TargettedGenewise: [$@]\n");
       next TGE;
     }
 
@@ -292,7 +307,7 @@ sub run {
     };
 
     if($@){
-      $self->warn("problems running TargettedGeneWise: [$@]\n");
+      $self->warn("problems running TargettedGenewise: [$@]\n");
       next TGE;
     }
     
@@ -303,7 +318,7 @@ sub run {
     };
 
     if($@){
-      $self->warn("problems writing output for TargettedGeneWise: [$@]\n");
+      $self->warn("problems writing output for TargettedGenewise: [$@]\n");
       next TGE;
     }
   }

@@ -1,5 +1,5 @@
 #
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise.pm
 #
 # Cared for by Ensembl <ensembl-dev@ebi.ac.uk>
 #
@@ -11,11 +11,11 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm - Targetted genewise Runnable DB
+Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise.pm - Targetted genewise Runnable DB
 
 =head1 SYNOPSIS
 
-my $tgw = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise
+my $tgw = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise
     (  -db => $db,
        -input_id => $input_id);
 
@@ -42,7 +42,7 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
+package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise;
 
 use vars qw(@ISA);
 use strict;
@@ -80,6 +80,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
 							     GB_GW_DBNAME
+                   GB_GW_DBPORT                                          
 							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -91,12 +92,14 @@ sub new {
   my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
 
   # makes it easier to run standalone if required
-  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  '-host'   => $GB_GW_DBHOST,
-						  '-user'   => $GB_GW_DBUSER,
-						  '-pass'   => $GB_GW_DBPASS,
-						  '-dbname' => $GB_GW_DBNAME,
-						 ) if(!$output_db);
+  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     '-host'   => $GB_GW_DBHOST,
+     '-user'   => $GB_GW_DBUSER,
+     '-pass'   => $GB_GW_DBPASS,
+     '-dbname' => $GB_GW_DBNAME,
+     '-port' => $GB_GW_DBPORT,
+    ) if(!$output_db);
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
@@ -181,34 +184,29 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my $chr_name;
-  my $start;
-  my $end;
+  my $name;
   my $protein_id; 
 
   # chr12:10602496,10603128:Q9UGV6:
-#  print STDERR $entry."\n";
-  if( !($entry =~ /([^\:]+):(\d+),(\d+):([^\:]+):/)) {
-      $self->throw("Not a valid input id... $entry");
+  #  print STDERR $entry."\n";
+  ($name, $protein_id) = split /\|/, $self->input_id;
+  
+  my @array = split(/:/,$name);
+
+  if(@array != 6) {
+    throw("Malformed slice name [$name].  Format is " .
+          "coord_system:version:start:end:strand");
   }
   
-  $chr_name    = $1;
-  $protein_id = $4;
-  $start   = $2;
-  $end     = $3;
-  if ($2 > $3) { # let blast sort it out
-      $start  = $3;
-      $end    = $2;
-  }
- print STDERR "Parsed input id name ".$chr_name." start ".$start." end ".$end."\n";
-  
+  my ($cs_name, $cs_version, $seq_region, $start, $end, $strand) = @array;
   # we want to give genewise a bit more genomic than the one found by pmatch, 
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
-  
-  print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
+ 
+  print STDERR "fetching slice ".$seq_region." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
-  my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
+  my $slice = $sliceadp->fetch_by_region($cs_name,$seq_region, $new_start,
+                                         $new_end, $strand, $cs_version);
   
     
   $self->query($slice);
@@ -415,7 +413,7 @@ sub convert_gw_output {
        -gff_source      => $genetype,
        -gff_feature     => 'gene',
        -logic_name      => $genetype,
-       -module          => 'TargettedGeneWise',
+       -module          => 'TargettedGenewise',
       );
   }
 
@@ -631,14 +629,14 @@ GENE:  foreach my $gene (@genes) {
       
       my $translates = $self->check_translation($tran);
       if(!$translates){
-	my $msg = "discarding gene - translation has stop codons\n";
-	$self->warn($msg);
-	next GENE;
+        my $msg = "discarding gene - translation has stop codons\n";
+        $self->warn($msg);
+        next GENE;
       }
-  }
+    }
     eval {
       my $genetype = $gene->type;
-      $gene->transform;
+      #$gene->transform;
       # need to explicitly add back genetype and analysis.
       #$newgene->type($genetype);
       #$newgene->analysis($gene->analysis);
@@ -833,7 +831,7 @@ sub make_transcript{
     
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
-    #print STDERR "Making Supporting Features in TargettedGeneWise\n";
+    #print STDERR "Making Supporting Features in TargettedGenewise\n";
     #foreach my $f(@sf){
     #  print STDERR "supporting feature ".$f->gffstring."\n";
     #}
