@@ -469,8 +469,6 @@ sub _align {
     # Add a gap to the genomic and exonic sequence
 
     $self->_genomic_sequence->insert_gap($deletion_coord, 1);
-my $genomic_deletions = $self->_genomic_sequence->deletions;
-print STDERR "Inserted genomic gap at coord $deletion_coord. Now have " . scalar @$genomic_deletions . " total gaps.\n"; 
     $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, 1);
     $self->_exon_protein_translation->insert_gap($deletion_coord, 1);
 
@@ -979,7 +977,7 @@ sub _truncate_introns {
 
   push (@sequences, $self->_working_alignment('genomic_sequence'));
   push (@sequences, $self->_working_alignment('exon_nucleotide'));
-print STDERR "Type is : " . $self->_type . "\n";
+
   if (($self->_type eq 'all')||($self->_type eq 'protein')){
     push (@sequences, $self->_working_alignment('exon_protein'));
   }
@@ -1012,14 +1010,12 @@ print STDERR "Type is : " . $self->_type . "\n";
   # Get locations of gaps in genomic sequence.
 
   my $genomic_gaps = $self->_genomic_sequence->all_gaps;
-print STDERR "Have " . scalar @$genomic_gaps . " genomic gaps.\n";
 
   # Work through the list of genomic gaps and increment all
   # coordinates that are greater than a gap position.
 
   foreach my $gap_coord (@$genomic_gaps) {
     for (my $i = 0; $i < scalar @coordinates; $i++) {
-print STDERR "Incrementing intron boundary coordinate [".$coordinates[$i]."] because it lies downstream of a gap at [$gap_coord].\n";
       $coordinates[$i]++ if $coordinates[$i] >= $gap_coord;
     }
   }
@@ -1692,7 +1688,6 @@ sub _fiddly_bits {
 	next unless $slice_position + $i >= 0;
 	$partially_aligned->add_deletion($slice_position + $i);
 	my $thing = $slice_position + $i;
-	print STDERR "Inserting deletion at position : $thing\n";
       }
 
       $hit_position   += $instruction->{'length'};
@@ -1732,7 +1727,7 @@ print STDERR "Case 1.\n";
       if ($base_align_feature->end > $self->_slice->length) {
 print STDERR "Case 2.\n";
 	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
-	splice (@fetched_seq, $base_align_feature->end - $start_overshoot - 1, $end_overshoot);
+	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
       }
     } elsif ($self->_strand == -1) {
       my $start_overshoot = 0;
@@ -1744,7 +1739,7 @@ print STDERR "Case 3.\n";
       if ($base_align_feature->start > $self->_slice->length) {
 print STDERR "Case 4.\n";
 	my $end_overshoot = $base_align_feature->start - $self->_slice->length - 1;
-	splice (@fetched_seq, $base_align_feature->start - $start_overshoot - 1, $end_overshoot);
+	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
       }
     }
   }
@@ -1767,7 +1762,6 @@ print STDERR "Case 4.\n";
     if ($self->_strand == -1){
       $genomic_start = scalar @feature_sequence - $genomic_start - 1;
     }
-print STDERR "Inserting sequence : " . $base_align_feature->hseqname . " (feat start) " . $base_align_feature->start . " (insert at) " . $genomic_start . "\n";
     splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
   } else {
     $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
@@ -1866,7 +1860,7 @@ sub _genomic_sequence {
     if ($self->_strand == 1) {
       $genomic_sequence = $self->_slice->seq;
     } elsif ($self->_strand == -1) {
-print STDERR "Reverse complimenting genomic sequence.\n";
+      print STDERR "Reverse complimenting genomic sequence.\n";
       $genomic_sequence = $self->_slice->revcom->seq;
     }
 

@@ -163,15 +163,13 @@ sub fetch_base_at_position {
 sub insert_gap {
   my ($self, $insert_position, $gap_length) = @_;  
 
-  print STDERR "--------------------------Inserting gap-----------------------\n";
-
   unless ($insert_position && $gap_length){
     $self->throw("Need to specify gap insertion position [$insert_position] and length [$gap_length]");
   }
 
   $insert_position--;
 
-  my $gap = '*' x $gap_length;
+  my $gap = '-' x $gap_length;
   my @gap = split //, $gap;
 
   # Stick the gap in the sequence
@@ -186,9 +184,7 @@ sub insert_gap {
     $self->increment_deletions_above($insert_position+$i)
   }
 
-#print STDERR ">SEQUENCE\n" . $self->seq_with_newlines . "\n";
-
-  return 1;
+  return 1
 }
 
 sub all_gaps {
@@ -198,7 +194,7 @@ sub all_gaps {
   my @gap_coordinates;
 
   for (my $i = 0; $i < scalar @$sequence_array; $i++) {
-    push @gap_coordinates, $i+1 if $sequence_array->[$i] eq '*'
+    push @gap_coordinates, $i+1 if $sequence_array->[$i] eq '-'
   }
 
   return \@gap_coordinates
@@ -225,13 +221,9 @@ sub add_deletion {
       if (ref($position) ne '');
 
     $self->_deletion_hash->{$position}++;
-#print STDERR "Adding deletion in sequence " . $self->name . " at position $position\n";
+
   }
-#print STDERR "Now have deletions at positions : ";
-#  foreach my $coord (keys %{$self->_deletion_hash}){
-#    print STDERR $coord . " ";
-#  }
-#print STDERR "\n";
+
   return 1
 }
 
@@ -250,7 +242,6 @@ sub is_a_deletion {
 sub increment_deletions_above {
   my ($self, $coord) = @_;
 
-print STDERR "Increment above this coord : " . $coord . "\n";
   my @coords = keys %{$self->_deletion_hash};
 
   for (my $i = 0; $i < scalar @coords; $i++) {
