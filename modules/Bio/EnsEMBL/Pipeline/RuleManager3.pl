@@ -294,7 +294,12 @@ foreach my $rule (@all_rules) {
                         \%accumulator_analyses, 
                         \%always_incomplete_accumulators)};
 
-$sanity->rule_type_sanity(\@rules, $rules_die) if($rules_sanity);
+if(scalar(@rules) == 0){
+  throw("Something is wrong with the code or your commandline setup ".
+        "rules_setup has returned no rules");
+}
+
+$sanity->rule_type_sanity(\@rules, $verbose, $rules_die) if($rules_sanity);
 
 
 
@@ -921,13 +926,13 @@ sub job_time_check{
 sub job_existance{
   my ($batch_q_module, $verbose, $job_adaptor) = @_;
   my @jobs = $job_adaptor->fetch_all;
+  my @valid_status = qw(SUBMITTED RUNNING READING WRITING WAITING);
+  my %valid_status = map { $_ => 1 } @valid_status;
   my %job_submission_ids;
   #$job_adaptor->lock_tables;
   JOB:foreach my $job(@jobs){
     my $status = $job->current_status->status;
-    if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
-       $status eq 'READING' ||$status eq 'WRITING' ||
-       $status eq 'WAITING'){
+    if($valid_status{$status}){
       if(!$job->submission_id){
         if($status eq 'SUBMITTED'){
           next JOB;
@@ -948,7 +953,9 @@ sub job_existance{
                  (\%job_submission_ids, $verbose)};
   
   foreach my $job(@jobs){
-    $job->set_status('AWOL');
+    if($valid_status{$job->current_status->status}){
+      $job->set_status('AWOL');
+    }
   }
   #$job_adaptor->unlock_tables;
 }
@@ -1003,7 +1010,7 @@ sub job_existance{
 sub check_if_sleep{
   my ($get_pending_jobs, $max_pending_jobs, $sleep_per_job,
       $min_sleep, $max_sleep) = @_;
-  if(&$get_pend_jobs >= $max_pending_jobs){
+  if((&$get_pend_jobs) >= $max_pending_jobs){
     return time_to_sleep((&$get_pend_jobs - $max_pending_jobs), 
                          $sleep_per_job, $base_sleep, $max_sleep);
   }else{
@@ -1027,7 +1034,7 @@ sub rules_setup{
   my @rules;
   if(keys(%$analyses_to_run)){
     foreach my $rule(@$all_rules){
-      if(exists($analyses_to_run->{$rule->goalAnalysis})){
+      if(exists($analyses_to_run->{$rule->goalAnalysis->dbID})){
         push (@rules, $rule);
       }elsif($accumulator_analyses->{$rule->goalAnalysis->logic_name}){
         $incomplete_accumulators->{$rule->goalAnalysis->logic_name}
@@ -1036,7 +1043,7 @@ sub rules_setup{
     }
   }elsif(keys(%$analyses_to_skip)){
     foreach my $rule(@$all_rules){
-      if(!exists($analyses_to_skip->{$rule->goalAnalysis})){
+      if(!exists($analyses_to_skip->{$rule->goalAnalysis->dbID})){
         push (@rules, $rule);
       }
     }

@@ -103,8 +103,8 @@ sub fetch_analysis_by_input_id {
      WHERE input_id = ? } );
   $sth->execute($inputId);
 
-  while( my @row = $sth->fetchrow_array ) {
-    my $analysis = $anaAd->fetch_by_dbID( $row[0] );
+  while( my $row = $sth->fetchrow_arrayref ) {
+    my $analysis = $anaAd->fetch_by_dbID( $row->[0] );
     if($analysis ) {
       push( @result, $analysis );
     }

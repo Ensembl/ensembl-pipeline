@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
@@ -106,7 +106,7 @@ sub new {
     my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
     $self->seqfetcher($seqfetcher);
   }
-  $self->throw("no output database defined can't store results $!") unless($output_db);
+  throw("no output database defined can't store results $!") unless($output_db);
   $self->output_db($output_db);
   # IMPORTANT
   # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
@@ -142,7 +142,7 @@ sub make_seqfetcher{
     $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
-    $self->throw("Can't make seqfetcher\n");
+    throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -268,7 +268,12 @@ sub run {
    my ($self,@args) = @_;
 
    #print STDERR "run runnable\n";
-   $self->runnable->run();
+   eval{
+     $self->runnable->run();
+   };
+   if($@){
+     $throw("Error in BlastMiniGenewise run: \n[$@]\n");
+   }
    
    $self->convert_gw_output;
    #print STDERR "converted output\n";
@@ -413,7 +418,6 @@ sub convert_gw_output {
   # Throw here if zero results? Suggests something v. bad has happened 
   # - usually corrupt sequence file means sequences not fetched. We should 
   # never fail to fetch sequences ina a targetted run!
-  #$self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
   if(!@results){
     $self->warn("BMG didn't produce any results for ".$self->input_id." ".
                $self->protein_id);
@@ -483,7 +487,7 @@ sub make_genes {
   my $contig = $self->query;
   my @genes;
   ##print STDERR "making genes\n";
-  $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
+  throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
   #print STDERR "have ".@$results." transcript\n";
  MAKE_GENE:  foreach my $tmpf (@$results) {
@@ -808,10 +812,10 @@ sub check_coverage{
     $seq = $self->seqfetcher->get_Seq_by_acc($protname);
   };
   if ($@) {
-    $self->throw("Error fetching sequence for [$protname]: [$@]\n");
+    throw("Error fetching sequence for [$protname]: [$@]\n");
   }
   
-  $self->throw("No sequence fetched for [$protname]\n") unless defined $seq;
+  throw("No sequence fetched for [$protname]\n") unless defined $seq;
   
   $plength = $seq->length;
 
@@ -883,8 +887,6 @@ sub make_transcript{
     
       $align->seqname($contig->seq_region_name);
       $align->slice($contig);
-#      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
-#      $align->adaptor($prot_adp);
       $align->score(100);
       $align->analysis($analysis_obj);
       #print STDERR "adding ".$align." to exon\n";
@@ -1130,7 +1132,7 @@ sub output_db {
     if ($output_db) 
     {
 	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	    || throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
 	$self->{_output_db} = $output_db;
     }
     return $self->{_output_db};

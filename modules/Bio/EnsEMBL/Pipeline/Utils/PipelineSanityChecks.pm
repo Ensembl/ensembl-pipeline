@@ -135,7 +135,7 @@ sub accumulator_sanity_check{
 
 
 sub rule_type_sanity{
-  my ($self, $rules, $die) = @_;
+  my ($self, $rules, $verbose,  $die) = @_;
 
   my $aa = $self->db->get_AnalysisAdaptor;
  RULE:foreach my $rule(@$rules){
@@ -154,7 +154,7 @@ sub rule_type_sanity{
         }
       }
       if($condition->input_id_type eq 'ACCUMULATOR'){
-        print STDERR "Skipping ".$name." is an accumulator\n";
+        print STDERR "Skipping ".$name." is an accumulator\n" if($verbose);
         next CONDITION;
       }
       if($condition->input_id_type ne $type){

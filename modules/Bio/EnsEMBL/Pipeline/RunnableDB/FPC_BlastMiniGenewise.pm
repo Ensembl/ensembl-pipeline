@@ -180,143 +180,154 @@ sub write_output {
 =cut
 
 sub fetch_input {
-    my( $self) = @_;
+  my( $self) = @_;
     
-    print STDERR "Fetching input id : " . $self->input_id. " \n";
-
-    &throw("No input id") unless defined($self->input_id);
-    $self->fetch_sequence($GB_SIMILARITY_MASKING);
+  print STDERR "Fetching input id : " . $self->input_id. " \n";
+  
+  &throw("No input id") unless defined($self->input_id);
+  $self->fetch_sequence($GB_SIMILARITY_MASKING, $self->genewise_db);
+  
+  
+  # No similarity genes will be build overlapping the gene type put in 
+  # the list 'GB_SIMILARITY_GENETYPEMASKED'. If nothing is put, the default 
+  # will be to take Targetted genewise genes
+  
+  my @genes;
+  
+  if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+    foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+      print STDERR "FETCHING GENE TYPE : $type\n";
+      foreach my $mask_genes (@{$self->query
+                                  ->get_all_Genes_by_type($type)}) {
+        push (@genes,$mask_genes);
+      }
+    }
+  } else {
+    print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
+    @genes = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+  }
+  my $database_count = 0;
+ DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
     
+    printf(STDERR "Fetching features for %s with score above %d from ".
+           "%s\@%s...", $database->{'type'}, 
+           $database->{'threshold'}, 
+           $self->db->dbname, 
+           $self->db->host);
     
-    # No similarity genes will be build overlapping the gene type put in 
-    # the list 'GB_SIMILARITY_GENETYPEMASKED'. If nothing is put, the default 
-    # will be to take Targetted genewise genes
-
-    my @genes;
-
-    if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-      foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-        print STDERR "FETCHING GENE TYPE : $type\n";
-        foreach my $mask_genes (@{$self->query->get_all_Genes_by_type($type)}) {
-          push (@genes,$mask_genes);
+    my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
+    my @features  = @{$pafa->fetch_all_by_Slice_and_score
+                        ($self->query, 
+                         $database->{'threshold'}, 
+                         $database->{'type'}
+                        )};
+    print STDERR "got " . @features." \n";
+    next DATABASE if not @features;
+    
+    foreach my $f(@features) {
+      my $name = $f->hseqname;
+      if ($name =~ /(\S+)\.\d+/) { 
+        $f->hseqname($1);
+      }
+    }
+    
+    # check which TargettedGenewise exons overlap similarity features
+    
+    my @all_exons;
+    foreach my $gene (@genes) {
+      foreach my $tran (@{$gene->get_all_Transcripts}) {
+        foreach my $exon (@{$tran->get_all_Exons}) {
+          if ($exon->seqname eq $self->query->id) {
+            push @all_exons, $exon;
+          }
         }
       }
     }
-    else {
-      print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
-      @genes = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+    @all_exons = sort {$a->start <=> $b->start} @all_exons;
+    
+    my %redids;
+    my $ex_idx = 0;
+    
+  FEAT: foreach my $f (sort {$a->start <=> $b->start} @features) {
+      for( ; $ex_idx < @all_exons; ) {
+        my $exon = $all_exons[$ex_idx];
+        if ($exon->overlaps($f)) {
+          $redids{$f->hseqname} = 1;
+          next FEAT;
+        }
+        elsif ($exon->start > $f->end) {
+          # no exons will overlap this feature
+          next FEAT;
+        }
+        else {
+          $ex_idx++;
+        }
+      }
     }
     
-  DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+    # collect those features which haven't been used by 
+    #Targetted Genewise
+    my (%idhash);
+    # reject them if they appear in the kill list
+    my %kill_list = %{$self->fill_kill_list};
+    
+    foreach my $f (@features) {
+      # print "Feature : " . $f->gffstring . "\n";
       
-      printf(STDERR "Fetching features for %s with score above %d from ".
-             "%s\@%s...", $database->{'type'}, 
-             $database->{'threshold'}, 
-             $self->db->dbname, 
-             $self->db->host);
+      if (defined $kill_list{$f->hseqname}){
+        print STDERR "skipping over " . $f->hseqname . 
+          " : in kill list\n";
+        next;
+      }	
       
-      my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-      my @features  = @{$pafa->fetch_all_by_Slice_and_score
-                          ($self->query, 
-                           $database->{'threshold'}, 
-                           $database->{'type'}
-                          )};
-      print STDERR "got " . @features." \n";
-      next DATABASE if not @features;
       
-      foreach my $f(@features) {
-        my $name = $f->hseqname;
-        if ($name =~ /(\S+)\.\d+/) { 
-          $f->hseqname($1);
-        }
-      }
-      
-      # check which TargettedGenewise exons overlap similarity features
-      
-      my @all_exons;
-      foreach my $gene (@genes) {
-        foreach my $tran (@{$gene->get_all_Transcripts}) {
-          foreach my $exon (@{$tran->get_all_Exons}) {
-            if ($exon->seqname eq $self->query->id) {
-              push @all_exons, $exon;
-            }
-          }
-        }
-      }
-      @all_exons = sort {$a->start <=> $b->start} @all_exons;
-      
-      my %redids;
-      my $ex_idx = 0;
-      
-    FEAT: foreach my $f (sort {$a->start <=> $b->start} @features) {
-        for( ; $ex_idx < @all_exons; ) {
-          my $exon = $all_exons[$ex_idx];
-          
-          if ($exon->overlaps($f)) {
-            $redids{$f->hseqname} = 1;
-            next FEAT;
-          }
-          elsif ($exon->start > $f->end) {
-            # no exons will overlap this feature
-            next FEAT;
-          }
-          else {
-            $ex_idx++;
-          }
-        }
-      }
-
-      # collect those features which haven't been used by 
-      #Targetted Genewise
-      my (%idhash);
-      # reject them if they appear in the kill list
-      my %kill_list = %{$self->fill_kill_list};
-      
-      foreach my $f (@features) {
-        # print "Feature : " . $f->gffstring . "\n";
+      if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+          defined($f->hseqname) &&
+          !$redids{$f->hseqname}) {
         
-        if (defined $kill_list{$f->hseqname}){
-          print STDERR "skipping over " . $f->hseqname . 
-            " : in kill list\n";
-          next;
-        }	
-        
-        if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-            defined($f->hseqname) &&
-            $redids{$f->hseqname} != 1) {
-          
-          push(@{$idhash{$f->hseqname}},$f);
-        }
+        push(@{$idhash{$f->hseqname}},$f);
       }
+    }
+    
+    my @ids = keys %idhash;
+    
+    if ($GB_SIMILARITY_BLAST_FILTER) {
+      print STDERR "Performing Anopheles-stle filtering...\n";
+      print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
       
-      my @ids = keys %idhash;
-      
-      if ($GB_SIMILARITY_BLAST_FILTER) {
-        print STDERR "Performing Anopheles-stle filtering...\n";
-        print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
-        
-        my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
-        my @newids = $self->prune_features($self->query,\@sortedids,\%idhash);
+      my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
+      my @newids = $self->prune_features($self->query,\@sortedids,\%idhash);
 	    
 	    print "  No. IDS AFTER FILTER: ".scalar(@newids)."\n"; 
 	    
 	    @ids = @newids;
-	}
-
-	my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
-	#print STDERR "Feature ids are @ids\n";
-	print STDERR "have ".@ids." ids to pass to BMG\n"; 
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
-    ('-genomic'  => $self->query,
-     '-ids'      => \@ids,
-     '-seqfetcher' => $seqfetcher,
-     '-trim'     => 1);
-      
-	$self->runnable($runnable);	
-	# at present, we'll only ever have one ...       	
     }
+    
+    my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+    #print STDERR "Feature ids are @ids\n";
+    #print STDERR "have ".@ids." ids to pass to BMG\n";
+    if(!@ids){
+      print STDERR $database->{'type'}." has no features to put into ".
+        "BlastMiniGenewise\n";
+      next DATABASE;
+    }else{
+      $database_count++;
+    }
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
+      ('-genomic'  => $self->query,
+       '-ids'      => \@ids,
+       '-seqfetcher' => $seqfetcher,
+       '-trim'     => 1);
+    
+    $self->runnable($runnable);	
+    # at present, we'll only ever have one ...       	
+  }
+  if(!$database_count){
+    print $self->input_id." had no features to pass into BMG is this ".
+      " correct?\n";
+  }
 }    
-  
+
 
 =head2 run
 

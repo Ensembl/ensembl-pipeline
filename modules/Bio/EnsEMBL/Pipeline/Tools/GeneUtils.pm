@@ -209,12 +209,6 @@ sub SeqFeature_to_Transcript {
   my $translation  = new Bio::EnsEMBL::Translation;    
   $transcript->translation($translation);
   
-  
-  my $ea;
-  if ($db ne "" && defined($db)) {
-    $ea = $db->get_ExonAdaptor;
-  }
-  
   my @pred = $gene->sub_SeqFeature;
   if ($pred[0]->strand ==1 ) {
     @pred = sort {$a->start <=> $b->start} @pred;
@@ -243,24 +237,18 @@ sub SeqFeature_to_Transcript {
     }
     
     $exon->slice   ($contig); 
-    $exon->adaptor  ($ea);
+   
     
     # sort out supporting evidence for this exon prediction
     # Now these should be made in the correct type to start with
     
     my @sf = $exon_pred->sub_SeqFeature;
-    my $prot_adp;
-    
-    if ($db ne "" && defined($db)) {
-      $prot_adp = $db->get_ProteinAlignFeatureAdaptor;    
-    }
     
     if(@sf){
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
       
       $align->seqname($contig->dbID);
       $align->slice($contig);
-      $align->adaptor($prot_adp);
       $align->score(100); # Hmm!!!!
       $align->analysis($analysis_obj);
       

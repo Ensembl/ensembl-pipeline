@@ -1416,7 +1416,7 @@ sub set_stop_codon{
 	    if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
 		print STDERR "reverse-strand: next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
 		#print STDERR "extending end_exon from start = ".$end_exon->start." to ".
-		    (  $end_exon->start - $acceptor_bases_count )."\n";
+    #(  $end_exon->start - $acceptor_bases_count )."\n";
 		$end_exon->start( $end_exon->start - $acceptor_bases_count);
 		$transcript->translation->end( $end + 3 );
 		
@@ -1704,11 +1704,11 @@ sub set_start_codon{
       $codon_start = $pepgenend + 1;
       $codon_end   = $pepgenend + 3;
     }
-
+    
     my $seq_adaptor = $start_exon->slice->adaptor->db->get_SequenceAdaptor;
-    my $codonseq      = uc($seq_adaptor->fetch_by_Slice_start_end_strand
-                           ($start_exon->start, $codon_start,$codon_end,
-                            $strand));
+    my $codonseq      = uc(${$seq_adaptor->fetch_by_Slice_start_end_strand
+                           ($start_exon->slice, $codon_start,$codon_end, 
+                            $strand)});
     
     print "Got codon seq " . $codonseq . "\n";
     if ($codonseq ne "ATG") {

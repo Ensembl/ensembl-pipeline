@@ -566,11 +566,36 @@ sub failing_job_status{
     return $self->{'_error_status'};
 }
 
-sub fetch_sequence{
-  my ($self, $repeat_masking) = @_;
 
+=head fetch_sequence
+
+    Title   :  failing_job_status
+    Useage  :  $self->fetch_sequence
+    Function:  fetch a slice out of a specified database  
+    Returns :  Bio::EnsEMBL::Slice, which is also placed in $self->query
+    Args    :  array ref, to an array specifying what repeats are to be masked
+               if any. If there is no ref no repeats with be masked if the 
+               array exists but is empty e.g [''] all repeats will be masked
+               if the array has entries repeats of those logic_names will be
+               masked e.g ['RepeatMask']
+               Bio::EnsEMBL::DBAdaptor to allow slices to be fetched from 
+               a database not specified by $self->db
+    Caller  :  Bio::EnsEMBL::Pipeline::RunnableDB::module->fetch_input
+    Why     :  In this schema sequence is always fetched in the same way
+               provided the name matched the format specified in 
+               Bio::EnsEMBL::Slice::name 
+    Example :  See RunnableDB::Blast::fetch_input
+
+=cut
+
+sub fetch_sequence{
+  my ($self, $repeat_masking, $db) = @_;
+
+  if(!$db){
+    $db = $self->db;
+  }
   #print STDERR "Fetching sequence from ".$self->db->dbname."\n";
-  my $sa = $self->db->get_SliceAdaptor;
+  my $sa = $db->get_SliceAdaptor;
 #print STDERR "Have input_id ".$self->input_id."\n";
   my $slice = $sa->fetch_by_name($self->input_id);
   $repeat_masking = [] unless($repeat_masking);

@@ -242,11 +242,11 @@ sub print_gff{
     $score = 100;
   }
   my $str = $id."\t";
-  my $str .= "feature\t";
-  my $str .= $feature->start."\t";
-  my $str .= $feature->end."\t";
-  my $str .= $score."\t";
-  my $str .= $feature->strand."\t";
+  $str .= "feature\t";
+  $str .= $feature->start."\t";
+  $str .= $feature->end."\t";
+  $str .= $score."\t";
+  $str .= $feature->strand."\t";
   
   print STDERR $str."\n";
 }
