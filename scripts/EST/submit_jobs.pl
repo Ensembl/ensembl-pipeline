@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/ensembl/bin/perl -w
 
 use strict;
 use Getopt::Long;
@@ -16,13 +16,13 @@ use Env;
 ####################
 
 # how many jobs we submit at once
-my $jobs     = 400;
+my $jobs     = 100;
 
 # how many seconds we sleep between every <$jobs> jobs
-my $sleep    = 300;
+my $sleep    = 150;
 
 # how many jobs we allow to be in the queue before we panic and go to sleep again
-my $slowdown = 2000; 
+my $slowdown = 200; 
 
 # how many jobs we allow in the queue before we STOP the whole thing to prevent the farm to melt
 my $panic    = 10000;
@@ -73,12 +73,15 @@ while( <FILE> ) {
     print "sleeping for $sleep seconds ( $minutes minute(s) )\n";
     system("sleep $sleep");
     
-    # wake up and check howmany jobs are left to run
-    system("bjobs -u $ENV{'USER'} -q acari | wc -l > number_file");
+    ## wake up and check howmany jobs are left to run
+    #system("bjobs -w -u eae -q acari | wc -l > number_file");
+    system("busers | grep eae > number_file");
     open(IN,"<number_file");
     my $result;
     while(<IN>){
-      $result = $_;
+      chomp;
+      my @entry = split;
+      $result = $entry[3];
     }
     close(IN);
     
@@ -98,13 +101,15 @@ while( <FILE> ) {
       my $minutes = $slow/60;
       print "sleeping for another $slow seconds ( $minutes minute(s) )\n";
       system("sleep $slow");
-      system("bjobs -u eae -q acari | wc -l > number_file");
-      open(LOOP,"<number_file");
-      while(<LOOP>){
-	$result = $_;
-      }
+      system("busers | grep eae > number_file"); 
+      open(IN,"<number_file"); 
+      while(<IN>){ 
+	chomp; 
+	my @entry = split; 
+	$result = $entry[3]; 
+      } 
+      close(IN); 
       print "jobs still running (or pending) in the farm: $result\n";
-      close(LOOP);
     }
   } 
   $counter++; 
