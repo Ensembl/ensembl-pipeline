@@ -152,7 +152,7 @@ sub new {
   #$self->exonerate('exonerate-0.6.7');
 
   # can add extra options as a string
-  my $basic_options = "  --softmasktarget --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
+  my $basic_options = "  --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
   
   if ($options){
     $basic_options .= $options;
