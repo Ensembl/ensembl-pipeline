@@ -864,7 +864,7 @@ sub _find_est_id{
   my ($self, $est) = @_;
   my %is_evidence;
   foreach my $exon (@{$est->get_all_Exons}){
-    foreach my $evidence ( @{$exon->get_all_SupportingFeatures} ){
+    foreach my $evidence ( @{$exon->get_all_supporting_features} ){
       $is_evidence{ $evidence->hseqname } = 1;
     }
   }
