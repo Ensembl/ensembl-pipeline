@@ -37,12 +37,13 @@ print "ok 1\n";    # 1st test passed.
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
 $ens_test->do_sql_file("t/BlastMiniGenewise.dump");
+$ens_test->module("Bio::EnsEMBL::DBSQL::DBAdaptor");
 
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
-my $id=('chr1.75000-100000');
+my $id='chr1.75000-100000';
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise';
 my $fbmg = "$runnable"->new(-dbobj    => $db,
@@ -85,7 +86,6 @@ foreach my $gene(@genes){
      }
 }
 
-# not working yet ...
 $fbmg->write_output();
 
 
