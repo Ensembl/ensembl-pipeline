@@ -34,7 +34,7 @@ my @command_args = @ARGV;
             'dbpass=s'      => \$dbpass,
             'dbport=s'      => \$dbport,
             'input_id:s'  => \$input_id,
-            'logic_name:s'  => \$logic_name,
+            'analysis|logic_name:s'  => \$logic_name,
             'check'       => \$check,
             'write!' => \$write,
             'help!' => \$help,
