@@ -87,11 +87,12 @@ sub new {
     $self->throw("No blast db specified") unless defined($blastdb);
     $self->blastdb($blastdb);
 
-    if(!defined $seqfetcher) {
+    if(!defined $self->seqfetcher) {
       # will look for pfetch in $PATH - change this once PipeConf up to date
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+      my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+      $self->seqfetcher($seqfetcher);
     }
-    $self->seqfetcher($seqfetcher);
+
 
     return $self;
 }
