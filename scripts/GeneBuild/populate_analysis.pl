@@ -100,6 +100,7 @@ use Bio::EnsEMBL::Pipeline::GeneCombinerConf             qw (
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts   qw (
 							     GB_LENGTH_RUNNABLES
+							     GB_PMATCH_RUNNABLES
 							    );
 
 
@@ -117,13 +118,14 @@ my $insert_postfix = ");";
 
 # get input options
 &GetOptions( 
-	    'insert'         => \$insert,
+	    'insert' => \$insert,
 	   );
 
 # do something useful
+
 &analyses_from_pipeline;
 &analyses_from_config;
-print @analyses;
+print "@analyses\n";;
 
 if($insert){ &insert; }
 
@@ -168,7 +170,7 @@ sub analyses_from_pipeline {
     
     $analysis =~ s/,$//; # remove trailing comma
     $analysis .= $insert_postfix;
-
+    #print STDERR $analysis."\n";
     push (@analyses, $analysis);
   }
   
@@ -180,44 +182,74 @@ sub analyses_from_config{
   my %logic_names;
   
   # from genebuild configs
-  foreach my $runnable_hash(@{$GB_LENGTH_RUNNABLES}){
-    my $entry = $insert_prefix;
-    my $analysis = $runnable_hash->{analysis};
-    my $runnable = $runnable_hash->{runnable};
-
-    if(defined $logic_names{$analysis}){
-      print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
-      exit(0);
+  
+    #print STDERR "genebuild analysis\n";
+    foreach my $runnable_hash(@{$GB_LENGTH_RUNNABLES}){
+      my $entry = $insert_prefix;
+      my $analysis = $runnable_hash->{analysis};
+      my $runnable = $runnable_hash->{runnable};
+      #print STDERR "running with ".$analysis." ".$runnable."\n";
+      if(defined $logic_names{$analysis}){
+	my ($p, $f, $l) = caller;
+	#print STDERR $f.":".$l."\n";
+	print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
+	exit(0);
+      }
+      #print STDERR "adding ".$runnable." with key ".$analysis."\n";
+      $logic_names{$analysis} = $runnable;
+      
+      
+      $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
+      $entry .= $insert_postfix;
+      
+      push (@analyses, $entry);
     }
-    $logic_names{$analysis} = $runnable;
+ 
     
-
-    $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
-    $entry .= $insert_postfix;
-
-    push (@analyses, $entry);
-
-  }
-    
-
-  # from genecombiner config
-  foreach my $runnable_hash(@{$GENECOMBINER_RUNNABLES}){
-    my $entry = $insert_prefix;
-    my $analysis = $runnable_hash->{analysis};
-    my $runnable = $runnable_hash->{runnable};
-
-    if(defined $logic_names{$analysis}){
-      print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
-      exit(0);
+ 
+    #print STDERR "genecombiner analysis\n";
+    # from genecombiner config
+    foreach my $runnable_hash(@{$GENECOMBINER_RUNNABLES}){
+      my $entry = $insert_prefix;
+      my $analysis = $runnable_hash->{analysis};
+      my $runnable = $runnable_hash->{runnable};
+      #print STDERR "running with ".$analysis." ".$runnable."\n";
+      if(defined $logic_names{$analysis}){
+	my ($p, $f, $l) = caller;
+	#print STDERR $f.":".$l."\n";
+	print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} ."); please fix this in the config file and rerun the script!\n";
+	exit(0);
+      }
+      $logic_names{$analysis} = $runnable;
+      
+      $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
+      $entry .= $insert_postfix;
+      
+      push (@analyses, $entry);
+      
     }
-    $logic_names{$analysis} = $runnable;
-
-    $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
-    $entry .= $insert_postfix;
-
-    push (@analyses, $entry);
-
-  }
+  
+    #print STDERR "pmatch analysis\n";
+    foreach my $runnable_hash(@{$GB_PMATCH_RUNNABLES}){
+      my $entry = $insert_prefix;
+      my $analysis = $runnable_hash->{analysis};
+      my $runnable = $runnable_hash->{runnable};
+      #insert into analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature ) values (
+      if(defined $logic_names{$analysis}){
+	my ($p, $f, $l) = caller;
+	#print STDERR $f.":".$l."\n";
+	print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
+	exit(0);
+      }
+      $logic_names{$analysis} = $runnable;
+      
+      $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'feature'";
+      $entry .= $insert_postfix;
+      
+      push (@analyses, $entry);
+      
+    }
+  
 }
 
 sub insert {
@@ -229,8 +261,9 @@ sub insert {
 
   # GB_DB
   $dbs{$GB_DBNAME} = $GB_DBHOST;
-
+  
   # GB_GWDB
+  #print STDERR "inserting into genewise db\n";
   if(   (!defined $dbs{$GB_GW_DBNAME}) || 
 	(defined $dbs{$GB_GW_DBNAME} && $dbs{$GB_GW_DBNAME} ne $GB_GW_DBHOST)){
     $dbs{$GB_GW_DBNAME} = $GB_GW_DBHOST;
@@ -238,12 +271,13 @@ sub insert {
   }
   
   # GB_COMB_DB
+  #print STDERR "inserting into gb comb db\n";
   if(   (!defined $dbs{$GB_COMB_DBNAME}) || 
 	(defined $dbs{GB_COMB_DBNAME} && $dbs{$GB_COMB_DBNAME} ne $GB_COMB_DBHOST)){
     $dbs{$GB_COMB_DBNAME} = $GB_COMB_DBHOST;
     &insert_into_db($GB_COMB_DBNAME, $GB_COMB_DBHOST, $GB_COMB_DBUSER, $GB_COMB_DBPASS);
   }
-  
+  #print STDERR "inserting into cdna db\n";
   # GB_cDNA_DB - don;t think we need to populate this analysis table ...
   if(   (!defined $dbs{$GB_cDNA_DBNAME}) || 
 	(defined $dbs{$GB_cDNA_DBNAME} && $dbs{$GB_cDNA_DBNAME} ne $GB_cDNA_DBHOST)){
@@ -252,6 +286,7 @@ sub insert {
   }
 
   # GB_FINALDB
+  #print STDERR "inserting into finaldb\n";
   if(   (!defined $dbs{$GB_FINALDBNAME}) || 
 	(defined $dbs{$GB_FINALDBNAME} && $dbs{$GB_FINALDBNAME} ne $GB_FINALDBHOST)){
     $dbs{$GB_FINALDBNAME} = $GB_FINALDBHOST;
@@ -259,6 +294,7 @@ sub insert {
   }
   
   # Now GeneCombiner
+  #print STDERR "Inserting into GeneCombiner db\n";
   if(   (!defined $dbs{$FINAL_DBNAME}) || 
 	(defined $dbs{$FINAL_DBNAME} && $dbs{$FINAL_DBNAME} ne $FINAL_DBHOST)){
     $dbs{$FINAL_DBNAME} = $FINAL_DBHOST;
@@ -273,7 +309,7 @@ sub insert_into_db{
     print "can't insert into db unless we have name[$name], host[$host] & user[$user] details\n";
     return;
   }
-
+  
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					      '-host'   => $host,
 					      '-user'   => $user,
@@ -281,7 +317,7 @@ sub insert_into_db{
 					      '-dbname' => $name,
 					     );
 
-  print "inserting into $name @ $host\n";  
+  #print "inserting into $name @ $host\n";  
   foreach my $analysis(@analyses){
     my $sth = $db->prepare($analysis);
     $sth->execute;
