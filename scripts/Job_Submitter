@@ -39,10 +39,10 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
-
+use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use FreezeThaw;
 
-my $anahost     = 'obi-wan';
+my $anahost     = 'localhost';
 my $anaport     = '410000';
 my $anadbname   = 'pipeline',
 my $anadbuser   = 'root';
@@ -66,14 +66,17 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 
 
 my @jobs = $anadb->get_JobsByCurrentStatus('CREATED');
-
+my $count = 0;
 foreach my $job (@jobs) {
-    
+    $job->_dbobj($anadb);
+    exit(0) if $count > 1; 
+    $count++;
     print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
     my $module   = $job->analysis->module;
     my $runnable = "$module"->new(-input_id => $job->input_id,
 				  -dbobj    => $anadb);
 
+    $runnable->fetch_input;
 
     my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
 							  -runnable => $runnable,
@@ -82,26 +85,5 @@ foreach my $job (@jobs) {
     $simplejob->submit;
     $simplejob->store;
     
-}
-
-
-sub make_clone  {
-    my ($db,$cloneid) = @_;
-
-    my $clone = $db->get_Clone($cloneid);
-
-    foreach my $contig ($clone->get_all_Contigs) {
-        my @genes    = $contig->get_all_Genes;
-        my @features = $contig->get_all_SimilarityFeatures;
-
-        foreach my $gene (@genes) {
-
-            foreach my $exon ($gene->each_unique_Exon) {
-                $exon->find_supporting_evidence(\@features);
-            }
-
-        }
-    }
-   return $clone;
 }
 

@@ -38,12 +38,12 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 
-my $host     = 'obi-wan';
+my $host     = 'localhost';
 my $port     = '410000';
 my $dbname   = 'pipeline';
 my $dbuser   = 'root';
 my $pass     =  undef;
-my $queue    = 'blast_farm';
+my $queue    = 'fast_blast_farm';
 
 my $analysis_id;
 my @input_ids;

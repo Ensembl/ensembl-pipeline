@@ -1,10 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/croc/michele/bioperl-live");
-  unshift (@INC,"/nfs/croc/michele/pogdir/ensembl/modules");
-  unshift (@INC,"/nfs/croc/michele/pogdir/ensembl/ensembl-pipeline/modules");
-}
 
 =head1 NAME
 
@@ -49,7 +44,7 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::Object);
 
-my $host   = 'obi-wan';
+my $host   = 'localhost';
 my $port   = '410000';
 my $dbname = 'pipeline';
 my $dbuser = 'root';
