@@ -71,6 +71,10 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use FileHandle;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
 
 sub new {
@@ -87,7 +91,17 @@ sub new {
   $self->throw("no est sequence given\n") unless defined $est;
   $self->est_sequence($est) if defined $est; 
 
-  if ($exonerate) {   
+  my $bindir = $::pipeConf{'bindir'} || undef;
+  my $datadir = $::pipeConf{'datadir'} || undef;
+
+  if (-x $exonerate) {
+    # passed from RunnableDB (full path assumed)
+    $self->exonerate($exonerate);
+  }
+  elsif ($::pipeConf{'bin_Exonerate'} && -x ($exonerate = "$::pipeConf{'bin_Exonerate'}")) {
+    $self->exonerate($exonerate);
+  }
+  elsif ($bindir && -x ($exonerate = "$bindir/" . $exonerate)) {
     $self->exonerate($exonerate);
   }
   else {   
