@@ -120,6 +120,8 @@ sub run{
 
    # valid hits are stored in a hash of arrays
    # sort by score to know that the first score for a hseqname is its best
+
+   @input = sort { $b->score <=> $a->score } @input;
    
    foreach my $f ( @input ) {
 
@@ -243,7 +245,7 @@ sub prune_features {
   my ($self,@input) = @_;
 
   my @new;
-  my $depth = 5;
+  my $depth = $self->coverage;
 
   my @clusters;
   my @cluster_starts;
