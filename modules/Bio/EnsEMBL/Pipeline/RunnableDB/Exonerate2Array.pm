@@ -148,18 +148,29 @@ sub run {
   $self->throw("Can't run - no runnable objects") unless defined($self->runnable);
   
   $self->runnable->run();
-
+  
+  my @out = $self->runnable->output();
+  $self->output(@out);
 }
 
 =head2 output
 
     Title   :   output
     Usage   :   $self->output()
-    Function:   Returns the contents of $self->{_output}, which holds predicted genes.
+    Function:   Returns the contents of $self->{_output}, which holds predicted features.
     Returns :   Array of Bio::EnsEMBL::DnaDnaAlignFeature
     Args    :   None
 
 =cut
+
+sub output {
+
+  my ($self, @output) = @_;
+  if (@output){
+    push(@{$self->{_output}}, @output);
+  }
+  return @{$self->{_output}};
+}
 
 =head2 write_output
 
@@ -175,7 +186,7 @@ sub write_output {
 
   my($self) = @_;
   
-  my @features = $self->output();
+  my @features = $self->output(); 
   my $db = $self->db();
   my $feat_adp = $db->get_DnaAlignFeatureAdaptor;
   
@@ -183,7 +194,7 @@ sub write_output {
 
   #$feat_adp->store(@features);
   foreach my $feat (@features) {
-    #print "seqname is ",$feat->seqname," seq_start is ",$feat->start," seq_end is ",$feat->end, " strand is ",$feat->strand," hseqname is ",$feat->hseqname," percent_id is ",$feat->percent_id,"\n";
+    #print "seq_start is ",$feat->start," seq_end is ",$feat->end, " strand is ",$feat->strand," hseqname is ",$feat->hseqname," percent_id is ",$feat->percent_id,"\n";
     $count++;
     $done{$feat->hseqname}=1;
     if ($feat->percent_id == 100 and ($feat->end - $feat->start +1) ==25) {
