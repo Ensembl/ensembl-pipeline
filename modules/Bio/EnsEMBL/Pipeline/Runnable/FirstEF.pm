@@ -43,9 +43,9 @@ use Bio::EnsEMBL::Root;
 
 sub new {
   my ($class,@args) = @_;
-  
+
   my $self = $class->SUPER::new(@args);    
-  
+
   my( $query_seq,
       $repeatmask,
       $firstef_bin,
@@ -62,7 +62,7 @@ sub new {
   $firstef_bin = 'firstef' unless ($firstef_bin);
 
   $self->_firstef_bin($self->find_executable($firstef_bin));
-print STDERR "Executable was found at : " . $self->_firstef_bin . "\n";
+
   $self->_query_seq($query_seq)       if $query_seq;
   $self->_param_dir($param_dir)       if $param_dir;
   $self->_parse_script($parse_script) if $parse_script;
