@@ -78,7 +78,7 @@ sub new {
 }
 
 
-=head2 fetch_analysis_by_inputId_class
+=head2 fetch_analysis_by_input_id_class
 
 Fetches all analyses
 which have been completed on a specific input ID
@@ -87,7 +87,7 @@ and returns a list of Bio::EnsEMBL::Analysis.
 
 =cut
 
-sub fetch_analysis_by_inputId_class {
+sub fetch_analysis_by_input_id_class {
   my ($self,$inputId, $class) = @_;
 
   my @result;
@@ -113,7 +113,7 @@ sub fetch_analysis_by_inputId_class {
 }
 
 
-=head2 store_inputId_class_analysis
+=head2 store_input_id_class_analysis
 
 Stores an input ID, class and analysis.
 Takes an input ID, class (as strings)
@@ -122,7 +122,7 @@ exception if any of the inputs are invalid.
 
 =cut
 
-sub store_inputId_class_analysis {
+sub store_input_id_class_analysis {
   my ($self, $inputId, $class, $analysis ) = @_;
 
   $self->throw("[$analysis] is not a Bio::EnsEMBL::Analysis object")
@@ -145,7 +145,7 @@ sub store_inputId_class_analysis {
 }
 
 
-=head2 list_inputId_by_analysis
+=head2 list_input_id_by_analysis
 
 Takes a Bio::EnsEMBL::Analysis object and
 returns a list of input IDs which have had
@@ -153,7 +153,7 @@ that analysis performed on them.
 
 =cut
 
-sub list_inputId_by_analysis {
+sub list_input_id_by_analysis {
   my $self = shift;
   my $analysis = shift;
   my @result;
@@ -173,21 +173,21 @@ sub list_inputId_by_analysis {
 }
 
 
-=head2 list_inputId_created_by_analysis
+=head2 list_input_id_created_by_analysis
 
-As list_inputId_by_analysis() but
+As list_input_id_by_analysis() but
 also returns the time the analysis was
 created. Returns an list of (anonymous)
 arrays.
 
-  foreach my $id_time ($sic->list_inputId_created_by_analysis) {
+  foreach my $id_time ($sic->list_input_id_created_by_analysis) {
     my $id      = $id_time->[0];
     my $created = $id_time->[1];
   }
 
 =cut
 
-sub list_inputId_created_by_analysis {
+sub list_input_id_created_by_analysis {
   my $self = shift;
   my $analysis = shift;
   my @result;
@@ -207,14 +207,14 @@ sub list_inputId_created_by_analysis {
 }
 
 
-=head2 list_inputId_class_by_start_count
+=head2 list_input_id_class_by_start_count
 
-Returns a list of all inputId and class,
+Returns a list of all input_id and class,
 with an optional start and end limit.
 
   # get 1st 100 entries from list
 
-  foreach my $idlist ($sic->list_inputId_class_by_start_count(0, 100)) {
+  foreach my $idlist ($sic->list_input_id_class_by_start_count(0, 100)) {
     my $id    = $idlist->[0];
     my $class = $idlist->[1];
   }
@@ -222,7 +222,7 @@ with an optional start and end limit.
 
 =cut
 
-sub list_inputId_class_by_start_count {
+sub list_input_id_class_by_start_count {
   my $self = shift;
   my ($start,$count) = @_;
   my @result;
@@ -247,16 +247,16 @@ sub list_inputId_class_by_start_count {
 }
 
 
-=head2 delete_inputId_class
+=head2 delete_input_id_class
 
 Takes an input ID and class (as strings) and
 removes all matching entries from the pipeline
 database. See also
-delete_inputId() and delete_inputId_analysis().
+delete_input_id() and delete_input_id_analysis().
 
 =cut
 
-sub delete_inputId_class {
+sub delete_input_id_class {
   my $self = shift;
   my ($inputId, $class) = @_;
 
@@ -268,16 +268,16 @@ sub delete_inputId_class {
 }
 
 
-=head2 delete_inputId
+=head2 delete_input_id
 
 Takes an input ID (as a string) and removes
 all matching entries from the pipeline
-database. See also delete_inputId_class()
-and delete_inputId_analysis().
+database. See also delete_input_id_class()
+and delete_input_id_analysis().
 
 =cut
 
-sub delete_inputId {
+sub delete_input_id {
   my $self = shift;
   my ($inputId) = shift;
 
@@ -288,18 +288,18 @@ sub delete_inputId {
 }
 
 
-=head2 delete_inputId_analysis
+=head2 delete_input_id_analysis
 
 Takes an input ID (as a string) and an
 analysis internal ID or Bio::EnsEMBL::Analysis
 and removes
 all matching entries from the pipeline
-database. See also delete_inputId()
-and delete_inputId_class().
+database. See also delete_input_id()
+and delete_input_id_class().
 
 =cut
 
-sub delete_inputId_analysis {
+sub delete_input_id_analysis {
   my ($self, $inputId, $analysis) = @_;
   my $analysisId;
 
@@ -365,34 +365,5 @@ sub deleteObj {
   }
 }
 
-
-=head2 create_tables
-
-Create table needed by
-Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
-
-=cut
-
-sub create_tables {
-  my $self = shift;
-  my $sth;
-
-  $sth = $self->prepare("drop table if exists input_id_analysis");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE input_id_analysis (
-    input_id     varchar(40) not null,
-    class        enum("clone","contig","vc","gene") not null,
-    analysis_id  int not null,
-    created      datetime not null,
-
-    PRIMARY KEY (analysis_id, input_id, class),
-    KEY input_id_created (input_id, created),
-    KEY input_id_class   (input_id, class)
-    );
-  });
-  $sth->execute();
-}
 
 1;

@@ -176,10 +176,10 @@ sub fetch_by_Status_Analysis {
 }
 
 
-=head2 fetch_by_Age {
+=head2 fetch_by_age {
 
-  Title   : fetch_by_Age
-  Usage   : my @jobs = $db->fetch_by_Age($duration)
+  Title   : fetch_by_age
+  Usage   : my @jobs = $db->fetch_by_age($duration)
   Function: Retrieves all jobs in the database
             that are older than than a certain duration given in minutes.
   Returns : @Bio::EnsEMBL::Pipeline::Job
@@ -187,7 +187,7 @@ sub fetch_by_Status_Analysis {
 
 =cut
 
-sub fetch_by_Age {
+sub fetch_by_age {
     my ($self,$age) = @_;
 
     $self->throw("No input status for get_JobsByAge")
@@ -217,10 +217,10 @@ sub fetch_by_Age {
 }
 
 
-=head2 fetch_by_inputId
+=head2 fetch_by_input_id
 
-  Title   : fetch_by_inputId
-  Usage   : my @job = $adaptor->fetch_by_inputId
+  Title   : fetch_by_input_id
+  Usage   : my @job = $adaptor->fetch_by_input_id
   Function: Retrieves all jobs from adaptor with certain input id
   Returns : list of job objects
             throws exception when something goes wrong.
@@ -228,7 +228,7 @@ sub fetch_by_Age {
 
 =cut
 
-sub fetch_by_inputId {
+sub fetch_by_input_id {
   my $self = shift;
   my $inputid = shift;
   my @result;
@@ -718,50 +718,5 @@ sub deleteObj {
   }
 }
 
-# creates all tables for this adaptor - job and job_status
-# if they exist they are dropped and newly created
-sub create_tables {
-  my $self = shift;
-  my $sth;
-
-  $sth = $self->prepare("drop table if exists job");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE job (
-      job_id        int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
-      input_id      varchar(40) NOT NULL,
-      class         enum("clone", "contig", "vc", "gene") not null,
-      analysis_id   smallint(5) unsigned NOT NULL,
-      submission_id mediumint(10) unsigned NOT NULL,
-      stdout_file   varchar(100) NOT NULL,
-      stderr_file   varchar(100) NOT NULL,
-      retry_count   tinyint(2) unsigned default 0,
-
-      PRIMARY KEY (job_id),
-      KEY (input_id),
-      KEY (analysis_id)
-    );
-  });
-  $sth->execute();
-
-  $sth = $self->prepare("drop table if exists job_status");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE job_status (
-      job_id            int(10) unsigned NOT NULL,
-      status            varchar(40) DEFAULT 'CREATED' NOT NULL,
-      time              datetime NOT NULL,
-      is_current        enum('n', 'y') DEFAULT 'n',
-
-      KEY (job_id),
-      KEY (status),
-      KEY (is_current)
-    );
-  });
-  $sth->execute();
-  $sth->finish;
-}
 
 1;
