@@ -61,6 +61,7 @@ if(!defined $estfile    ||
   print STDERR "\n";
   print STDERR "USAGE: get_human_ests.pl -estfile estfile -outfile outfile\n";
   print STDERR "                         -clip (clips polyA/T) -clip_ends n (clips n bases from both ends)\n";
+  print STDERR "                                                             default = 0, 20 seems to be ok\n";
   print STDERR "                         -softmask ( softmask the polyA/T )\n";
   print STDERR "                         -min_length ( min_est_length )\n";
   exit(0);
