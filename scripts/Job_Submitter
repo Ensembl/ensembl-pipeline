@@ -3,7 +3,7 @@
 BEGIN {
   unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
   unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-live");
+  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-06");
 }
 
 =head1 NAME
@@ -43,16 +43,23 @@ use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome;
 
 use FreezeThaw;
 
+$| = 1;
+
 my $anahost     = 'localhost';
 my $anaport     = '410000';
-my $anadbname   = 'pipeline',
+my $anadbname   = 'ensembl_freeze15',
 my $anadbuser   = 'root';
 my $anapass     =  undef;
 my $jobchunk    =  20;
+my $infile;
+my $analysis;
+my $useDB = 0;
+my $runlocal;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -61,6 +68,10 @@ my $jobchunk    =  20;
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
             'jobchunk:s'    => \$jobchunk,
+            'infile:s'      => \$infile,
+            'analysis:s'    => \$analysis,
+            'useDB'         => \$useDB,
+            'runlocal'      => \$runlocal,
 	    );
 
 
@@ -69,37 +80,98 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -port   => $anaport,
 						    -dbname => $anadbname,
 						    -user   => $anadbuser,
-						    -pass   => $anapass);
+						    -pass   => $anapass,
+                                                    -perlonlyfeatures  => 1,
+						    -perlonlysequences => 1);
 
-my $ensdb  = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'localhost',
-                                          -dbname => 'ensembl07',
-                                          -user   => 'ensro',
-                                         );
+my @jobids   = input_jobs($infile,@ARGV);
 
-my @jobs = $anadb->get_JobsByCurrentStatus('CREATED');
-my $count = 0;
+my $count  = 0;
 
-foreach my $job (@jobs) {
-    eval {
-    $job->_dbobj($anadb);
-    exit(0) if $count >= $jobchunk; 
-    $count++;
-    print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
-    my $module   = $job->analysis->module;
-    my $runnable = "$module"->new(-input_id => $job->input_id,
-                                  -db2      => $ensdb,
-				  -dbobj    => $anadb);
+ JOB: foreach my $jobid (@jobids) {
 
-    $runnable->fetch_input;
+     eval {
 
-    my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
-							  -runnable => $runnable,);
-    $simplejob->submit;
-    $simplejob->store;
-   };
+	 my $job = $anadb->get_Job($jobid);
 
-   if ($@) {
+	 print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\t" . $job->current_status->status . "\n");
+	 
+	 next JOB if ($analysis && $job->analysis->id != $analysis); 
+#	 next JOB if ($job->current_status->status ne 'CREATED' && $job->current_status->status ne 'FAILED');
+	
+	 $job->_dbobj($anadb);
+
+
+	 # Create the runnable module contained in the analysis object
+
+	 my $module   = $job->analysis->module;
+	 my $runnable = "$module"->new(-input_id => $job->input_id,
+				       -dbobj    => $anadb);
+	 
+	 
+	 # Either fetch input data or tell the object
+	 # to use the database access on the blast farm
+	 
+	 if ($useDB) {
+	     print STDERR "Using blast farm DB access\n";
+	     $job->useDB(1);
+	 } else {
+	     print STDERR "Fetching input\n";
+	     $runnable->fetch_input;
+	 }
+	 
+	 if ($runlocal) {
+	     print STDERR "Running job locally\n";
+	     $job->runlocally(1);
+	 } else {
+	     print STDERR "Running job on blast farm\n";
+	     $job->runlocally(0);
+	 }
+	 
+	 # Now combine the runnable and job into one object
+	 
+	 my $simplejob = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
+							       -runnable => $runnable,);
+
+	 # And finally submit (if runlocal is true the command is run locally)
+
+	 print STDERR "Submitting/running job\n";
+
+	 $simplejob->submit;
+	 $simplejob->store;
+
+	 $count++;	
+
+	 exit(0) if $count >= $jobchunk; 
+    };
+    
+    if ($@) {
 	print STDERR "Error submitting job. Error was [$@]\n";
-   } 
+    } 
+}
+
+
+sub input_jobs {
+    my ($infile) = @_;
+
+    my @jobs;
+    
+    if (defined($infile)) {
+	
+	open (IN,"<$infile") || die "Couldn't open $infile";
+	
+	while (<IN>) {
+	    chomp;
+	    if (/^(\d+)/) {
+		push(@jobs,$1);
+	    }
+	}
+	close(IN);
+    } else {
+	# Get all job ids with status created
+    }
+
+    return @jobs;
+    
 }
 
