@@ -1,0 +1,40 @@
+#!/bin/ksh
+
+# Must edit the config files in Bio/EnsEMBL/Pipeline/Config first
+# Need to configure things like blast header regexp parsing
+# Output directories/paths etc
+
+echo "create database " $1 | mysql -u ensadmin -pensembl -h ecs2b
+
+mysql -u ensadmin -pensembl -h ecs2b $1 < ../../ensembl/sql/table.sql
+mysql -u ensadmin -pensembl -h ecs2b $1  < ../sql/table.sql
+
+#./dump_fasta -host1 ecs1b -dbname1 human_chr13_fin -host2 ecs2b -dbname2 $1
+./fasta2otter -host ecs2b -dbname $1 -fastafile $2 -chr $3 -type $3
+
+./init_Pipeline -host ecs2b -dbname $1
+
+./add_Analysis -host ecs2b -dbname $1 -logic_name RepeatMasker -program RepeatMasker -module RepeatMasker -gff_source repeat -gff_feature similarity
+./add_Analysis -host ecs2b -dbname $1 -logic_name MouseBlastz -database /data/blastdb/Ensembl/Mouse_30 -module Blastz_m -gff_source mouse_blastz -gff_feature similarity
+./add_Analysis -host ecs2b -dbname $1 -logic_name RatBlastz -database /data/blastdb/Ensembl/Rat_genome -module Blastz_m -gff_source rat_blastz -gff_feature similarity
+./add_Analysis -host ecs2b -dbname $1 -logic_name ZfinBlatx -database /data/blastdb/Ensembl/michele_compara/zfin -module Blat -gff_source zfin_blatx -gff_feature similarity -parameters \"-tileSize=4 -t=dnax -q=dnax\"
+./add_Analysis -host ecs2b -dbname $1 -logic_name FuguBlatx -database /data/blastdb/Ensembl/fugu.masked.dust.soft.fa -module Blat -gff_source fugu_blatx -gff_feature similarity -parameters \"-tileSize=4 -t=dnax -q=dnax\"
+
+# Testing runnables
+
+#./test_RunnableDB -input_id AL845154.5.1.26737 -runnable Bio::EnsEMBL::Pipeline::RunnableDB::Blat -analysis 6 -dbname $1 -host ecs2b > & blat.out &
+#./test_RunnableDB -input_id AL845154.5.1.26737 -runnable Bio::EnsEMBL::Pipeline::RunnableDB::Blastz_m -analysis 4 -dbname $1 -host ecs2b > & blastz.out &
+
+./add_to_Pipeline -logic_name RepeatMasker -dependents SubmitContig -host ecs2b -dbname $1
+./add_to_Pipeline -logic_name MouseBlastz -dependents RepeatMasker -host ecs2b -dbname $1
+./add_to_Pipeline -logic_name RatBlastz -dependents RepeatMasker -host ecs2b -dbname $1
+./add_to_Pipeline -logic_name FuguBlatx -dependents RepeatMasker -host ecs2b -dbname $1
+#./add_to_Pipeline -logic_name ZfinBlatx -dependents RepeatMasker -host ecs2b -dbname $1
+
+cd ../modules/Bio/EnsEMBL/Pipeline/
+
+perl RuleManager3.pl -dbhost ecs2b -dbname $1 -dbuser ensadmin -dbpass ensembl -output_dir /ecs2/scratch1/michele/chr6/out -start_from SubmitContig > & rule.$1.out &
+
+cd ../../../../scripts/
+
+./monitor -host ecs2b -dbname $1
