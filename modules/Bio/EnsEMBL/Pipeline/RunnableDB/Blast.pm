@@ -120,7 +120,7 @@ sub fetch_input {
        -ungapped       => $ungapped,
        $self->parameter_hash, 
       );
-    
+
     $self->runnable($run);
     
     return 1;
@@ -148,6 +148,8 @@ sub run {
       }
       push (@{$self->{'_output'}}, $runnable->output);
     }
+    
+    1;
 }
 
 1;
