@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 =head1 NAME
 
@@ -306,7 +306,6 @@ sub check_duplications {
     next RULE unless ($goal eq $old_rule->goalAnalysis()->logic_name());   
     
     # check the conditions lists
-    my %count;
     foreach my $cond(@{$new_rule->list_conditions()}, @{$old_rule->list_conditions()}) {
       $count{$cond}++;
     }
