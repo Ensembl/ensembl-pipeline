@@ -157,7 +157,6 @@ sub read_record {
 
   my $id;
   my $fileid;
-  my $pos;
   my $length;
     
   sysread($fh,$id,    $field_width[0]);
@@ -199,15 +198,15 @@ sub get_Seq_by_id {
 
     print "File size is $filesize $end " . $self->{_start_pos} . "\n";
 
-    my ($id,$fileid,$fpos,$length) = $self->find_entry($indexfh,$recsize,0,$end,$id);
+    my ($id2,$fileid,$fpos,$length) = $self->find_entry($indexfh,$recsize,0,$end,$id);
 
-    $id      =~ s/ //g;
+    $id2      =~ s/ //g;
     $fileid  =~ s/ //g;
     $fpos    =~ s/ //g;
     $length  =~ s/ //g;
     $length  =~ s/ +$//;
 
-    if (!defined($id)) {
+    if (!defined($id2)) {
       return;
     }
 
@@ -286,7 +285,7 @@ sub make_index {
 
   my ($self,$dbname,$format,@files) = @_;;
     
-  if (!defined(@files)) {
+  unless (@files) {
     $self->throw("Must enter an array of filenames to index");
   }
 
