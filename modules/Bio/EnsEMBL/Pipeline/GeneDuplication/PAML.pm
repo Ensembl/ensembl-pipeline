@@ -17,6 +17,8 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::Tools::Phylo::PAML;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
+use Bio::EnsEMBL::Utils::Exception qw(warning throw);
 use Cwd;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -54,37 +56,37 @@ sub new {
       $clock,
       $getse,
       $rateancestor,
-      $small_diff) = $self->_rearrange([qw(EXECUTABLE
-					   WORK_DIR
-					   ALIGNED_SEQS
-					   SEQFILE
-					   TREEFILE
-					   OUTFILE
-					   NOISY
-					   VERBOSE
-					   RUNMODE
-					   SEQTYPE
-					   CODONFREQ
-					   AADIST
-					   AARATEFILE
-					   MODEL
-					   NSSITES
-					   ICODE
-					   MGENE
-					   FIX_KAPPA
-					   KAPPA
-					   FIX_OMEGA
-					   OMEGA
-					   FIX_ALPHA
-					   ALPHA
-					   MALPHA
-					   NCATG
-					   CLOCK
-					   GETSE
-					   RATEANCESTOR
-					   SMALL_DIFF)],@args);
+      $small_diff) = rearrange([qw(EXECUTABLE
+				   WORK_DIR
+				   ALIGNED_SEQS
+				   SEQFILE
+				   TREEFILE
+				   OUTFILE
+				   NOISY
+				   VERBOSE
+				   RUNMODE
+				   SEQTYPE
+				   CODONFREQ
+				   AADIST
+				   AARATEFILE
+				   MODEL
+				   NSSITES
+				   ICODE
+				   MGENE
+				   FIX_KAPPA
+				   KAPPA
+				   FIX_OMEGA
+				   OMEGA
+				   FIX_ALPHA
+				   ALPHA
+				   MALPHA
+				   NCATG
+				   CLOCK
+				   GETSE
+				   RATEANCESTOR
+				   SMALL_DIFF)],@args);
 
-  $self->throw("Have sequence input and input file - which do I use?") 
+  throw ("Have sequence input and input file - which do I use?") 
     if (defined $aligned_seqs && defined $seqfile);
   
   $self->_aligned_seqs($aligned_seqs) if $aligned_seqs;
@@ -139,10 +141,10 @@ sub DESTROY {
 
   unlink $self->_outfile if $self->_outfile;
 
-  $self->throw("Paml execution resulted in a core file being dumped.")
+  warning ("Paml execution resulted in a core file being dumped.")
     if (unlink $self->work_dir . "/core");
 
-  $self->throw("Could not remove working directory [". $self->work_dir ."].\n$!") 
+  warning ("Could not remove working directory [". $self->work_dir ."].\n$!") 
     if (! rmdir $self->work_dir);
 }
 
@@ -155,20 +157,20 @@ sub run_codeml {
   my $user_dir = cwd();
 
   # Move to our working dir
-  $self->warn($!) if (! chdir $self->work_dir);
+  warning ($!) if (! chdir $self->work_dir);
 
   $self->_write_seqs($self->_seqfile);
   $self->_write_config_file;
 
   my $command = $self->_codeml_executable . " " . $self->_config_file;
-  #print STDERR $command . "\n";
+  print STDERR $command . "\n";
 
   eval {
     system($command)
   };
 
   if ($@ or -e $self->work_dir . "/core") {
-    $self->throw("Something went wrong when codeml was executed.\n" . $@);
+    throw ("Something went wrong when codeml was executed.\n" . $@);
   }
 
   # Move back to original dir
@@ -293,7 +295,7 @@ sub work_dir {
 sub _write_seqs {
   my ($self, $filename) =  @_;
 
-  $self->throw("No sequences to write.")
+  throw ("No sequences to write.")
     unless $self->_aligned_seqs;
 
   system("rm -f $filename");
@@ -318,7 +320,7 @@ sub _aligned_seqs {
   if (@_){
     $self->{_aligned_seqs} = shift;
 
-    $self->throw("No sequences to set.")
+    throw ("No sequences to set.")
       unless $self->{_aligned_seqs} and 
 	$self->{_aligned_seqs}->[0]->isa("Bio::Seq");
   }
@@ -366,7 +368,7 @@ sub _treefile {
   }
 
   if (!$self->{_treefile} && $self->_runmode == 0) {
-    $self->throw("Input tree file has not been defined.");
+    throw ("Input tree file has not been defined.");
   }
 
   if (!$self->{_treefile}) {
@@ -429,7 +431,7 @@ sub _runmode {
   }
 
   unless (defined $self->{_runmode}){
-    $self->throw("Runmode has not been set.");
+    throw ("Runmode has not been set.");
   } 
 
   return $self->{_runmode} - 1 # Remember to remove one to return correct option.
@@ -445,7 +447,7 @@ sub _seqtype {
   }
 
   unless (defined $self->{_seqtype}){
-    $self->throw("Seqtype has not been set.");
+    throw ("Seqtype has not been set.");
   } 
 
   return $self->{_seqtype}
@@ -460,7 +462,7 @@ sub _codonfreq {
   }
 
   if ($self->_seqtype == 2 && !defined $self->{_codonfreq}){
-#    $self->warn("Codonfreq not set.  Defaulting to option 2: F3X4 frequencies.");
+#    warning ("Codonfreq not set.  Defaulting to option 2: F3X4 frequencies.");
     return 2;
   } 
 
@@ -480,7 +482,7 @@ sub _aadist {
   }
 
   unless (defined $self->{_aadist}){
-#    $self->warn("Aadist not set.  Defaulting to option 1: equal distances.");
+#    warning ("Aadist not set.  Defaulting to option 1: equal distances.");
     return 0;
   } 
 
@@ -497,7 +499,7 @@ sub _aaratefile {
 
   if (!defined $self->{_aaratefile}){
     if ($self->_seqtype == 2 && $self->_model > 1) {
-#      $self->warn("Aaratefile not set.  Defaulting to file wag.dat.");
+#      warning ("Aaratefile not set.  Defaulting to file wag.dat.");
     }
     return 'wag.dat';
   } 
@@ -514,7 +516,7 @@ sub _model {
   }
 
   unless (defined $self->{_model}){
-    $self->throw("Model has not been set.");
+    throw ("Model has not been set.");
   } 
 
   return $self->{_model} - 1 # Remove one to obtain correct value.
@@ -528,7 +530,7 @@ sub _nssites {
   }
 
   unless (defined $self->{_nssites}){
-#    $self->warn("NSsites has not been set.  Defaulting to 0.");
+#    warning ("NSsites has not been set.  Defaulting to 0.");
   } 
 
   return $self->{_nssites}
@@ -543,7 +545,7 @@ sub _icode {
   }
 
   unless (defined $self->{_icode}){
-    $self->warn("PAML: Defaulting to Universal Genetic Code.\n");
+    warning ("PAML: Defaulting to Universal Genetic Code.\n");
     return 0 # Universal code
   } 
 
@@ -591,7 +593,7 @@ sub _kappa {
   }
 
   if ($self->_fix_kappa != 0 && !defined $self->{_kappa}){
-    $self->throw("Youve asked for kappa to be fixed, but\n" .
+    throw ("Youve asked for kappa to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
 		 "fixed to.  Try setting '-kappa' => x or\n" . 
 		 "whatever");
@@ -628,7 +630,7 @@ sub _omega {
   }
 
   if ($self->_fix_omega != 0 && !defined $self->{_omega}){
-    $self->throw("Youve asked for omega to be fixed, but\n" .
+    throw ("Youve asked for omega to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
 		 "fixed to.  Try setting '-omega' => x or\n" . 
 		 "whatever");
@@ -666,7 +668,7 @@ sub _alpha {
   }
 
   if ($self->_fix_alpha != 0 && !defined $self->{_alpha}){
-    $self->throw("Youve asked for alpha to be fixed, but\n" .
+    throw ("Youve asked for alpha to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
 		 "fixed to.  Try setting '-alpha' => x or\n" . 
 		 "whatever");
@@ -721,7 +723,7 @@ sub _clock {
 
   if (!defined $self->{_clock}){
     # What other parameters are set with clock - should check these before throwing a warning.
-#    $self->warn("Clock parameter not set.  Defaulting to option 0: no clock.");
+#    warning ("Clock parameter not set.  Defaulting to option 0: no clock.");
     return 0
   } 
 
