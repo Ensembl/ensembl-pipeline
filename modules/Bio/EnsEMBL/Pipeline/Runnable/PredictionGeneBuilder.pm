@@ -84,9 +84,7 @@ use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Obsolete    qw (
-							       TRANSCRIPT_ID_SUBSCRIPT
-							      );
+
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 							       GB_INPUTID_REGEX
