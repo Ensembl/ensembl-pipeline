@@ -41,14 +41,16 @@ sub new {
     $self->throw("Cannot read config from files and dbadaptor at the same time.");
   }
 
+  # ... but at least one should be
+  if (!defined $files && !defined $db) {
+    $self->throw("One of -FILES or -DB should be defined in call to constructor of Config.pm.");
+  }
+
   if (defined $files ) {
 
     my @files = split(/ /, $files);
 
     $self->_parse_files(@files);
-
-    # Store contents of $self->{'config'} in database
-    $self->_write_config_to_db();
 
   }
 
@@ -58,11 +60,17 @@ sub new {
     $self->{'_dbobj'} = $db;
 
     my $config_rows = $self->_read_db($db);
-    #print "Read $config_rows rows from database.\n";
 
   }
 
   $self->_update_all_defaults();
+
+  # if using a file, write the contents to the database
+  # note this needs to be done *after* the call to _update_all_defaults
+   if (defined $files ) {
+     # Store contents of $self->{'config'} in database
+    $self->_write_config_to_db();
+   }
 
   return $self;
 
@@ -136,6 +144,7 @@ sub _write_config_to_db {
   }
 
   $stmt->finish();
+
 }
 
 
@@ -216,7 +225,6 @@ sub _update_all_defaults {
   my $self = shift;
 
   my @headers = $self->get_headers();
-
   foreach my $header (@headers) {
 
     next if lc($header) =~ "^default";
