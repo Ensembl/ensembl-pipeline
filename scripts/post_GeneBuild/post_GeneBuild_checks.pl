@@ -19,10 +19,19 @@ For mouse denormalised contigs: in order to know the size of the chromosomes,
 you must have a file with the internal_ids and raw_contig ids.
 For standard contigs this should be changed. 
 
-It ought to read the database parameters from GeneConf but it all depends on whether your final genes
-are in the same database as the one you put GeneConf.
+It ought to read the database parameters from the GeneBuild config
+files but it all depends on whether your final genes are in the same
+database as the one you put in the config files.
 
 =head1 OPTIONS
+
+These are to be set in the GeneBuild config files:
+GeneBuild::Databases::GB_FINALDBHOST
+GeneBuild::Databases::GB_FINALDBNAME
+GeneBuild::Databases::GB_DBHOST
+GeneBuild::Databases::GB_DBNAME
+
+GeneBuild::GeneBuilder::GB_FINAL_GENETYPE
 
 =cut
 
@@ -31,13 +40,16 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_FINALDBHOST
-					 GB_FINALDBNAME
-					 GB_DBHOST
-					 GB_DBNAME
-					 GB_FINAL_GENETYPE
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_FINALDBHOST
+							     GB_FINALDBNAME
+							     GB_DBHOST
+							     GB_DBNAME
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+							       GB_FINAL_GENETYPE
+							      );
 
 
 

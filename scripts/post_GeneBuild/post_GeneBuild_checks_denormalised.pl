@@ -18,10 +18,18 @@ For mouse denormalised contigs: in order to know the size of the chromosomes,
 you must have a file with the internal_ids and raw_contig ids.
 For standard contigs this should be changed. 
 
-It ought to read the database parameters from GeneConf but it all depends on whether your final genes
-are in the same database as the one you put GeneConf.
+It ought to read the database parameters from GeneBuild config files
+but it all depends on whether your final genes are in the same
+database as the one you put in the config files.
 
 =head1 OPTIONS
+
+These are to be set in the GeneBuild config files:
+
+GeneBuild::Databases::GB_FINALDBHOST
+GeneBuild::Databases::GB_FINALDBNAME
+GeneBuild::Databases::GB_DBHOST
+GeneBuild::Databases::GB_DBNAME
 
 =cut
 
@@ -29,13 +37,12 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_FINALDBHOST
-					 GB_FINALDBNAME
-					 GB_DBHOST
-					 GB_DBNAME
-					 GB_GOLDEN_PATH
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_FINALDBHOST
+							     GB_FINALDBNAME
+							     GB_DBHOST
+							     GB_DBNAME
+							    );
 
 
 
@@ -47,7 +54,7 @@ use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
 #my $dbname    = $GB_FINALDBNAME;
 #my $dbpass    = undef;
 
-my $path      = $GB_GOLDEN_PATH;
+#my $path      = $GB_GOLDEN_PATH;
 
 my $dnadbhost = $GB_DBHOST;
 my $dnadbuser = 'ensro';
@@ -84,7 +91,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print STDERR "connected to $dbname : $dbhost\n";
-$db->assembly_type($path);
+#$db->assembly_type($path);
 my $sa = $db->get_StaticGoldenPathAdaptor();
 
 
