@@ -40,6 +40,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
+
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G;
@@ -56,6 +57,7 @@ use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::Tools::BPlite;
 use FileHandle;
 
@@ -1146,10 +1148,17 @@ sub make_seqfetcher {
   if(defined $index && $index ne ''){
     my @db = ( $index );
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    
+    ## SeqFetcher to be used with 'indicate' indexing:
+    # $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
   }
-  else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  # it should not default to pfetch as that would bring down LSF
+  #else{
+  #  # default to Pfetch
+  #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  #}
+   else{
+    $self->throw( "cannot create a seqfetcher from $index");
   }
 
   return $seqfetcher;
