@@ -86,7 +86,7 @@ foreach my $gene(@genes){
 }
 
 # not working yet ...
-#$fbmg->write_output();
+$fbmg->write_output();
 
 
 
