@@ -40,7 +40,7 @@ my $min_length = 60;
 	    'outfile:s'     => \$seqoutfile,
 	    'clip'          => \$clip,
 	    'softmask'      => \$softmask,
-	    'min_length'    => \$min_length,
+	    'min_length:s'    => \$min_length,
 	   );
 
 # usage
@@ -59,7 +59,6 @@ my $seqin  = new Bio::SeqIO(-file   => "<$estfile",
 my $seqout = new Bio::SeqIO(-file   => ">$seqoutfile", 
 			    -format => "Fasta"
 			   );
-
 
 SEQFETCH:
 while( my $cdna = $seqin->next_seq ){
