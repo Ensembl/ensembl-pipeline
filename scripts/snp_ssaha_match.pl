@@ -15,20 +15,21 @@ use Bio::SeqIO;
 
 #use Getopt::Long;
 
-my $host   = 'ecs2';
+my $host   = 'ecs2f';
 my $host_snp = 'ecs1e';
-my $port       = '3310';
+#my $port       = '3310';
 my $user   = 'ensro';
 my $dbname_snp = 'hum_snp_116';
-my $dbname     = 'otter_merged_end_jul';
+#my $dbname     = 'otter_merged_end_jul';
 #my $dbname     = 'fish_zv3_core';
 #my $dbname     = 'human_ncbi34_raw';
 #my $dbname     = 'homo_sapiens_core_18_34';
 #my $dbname     = 'anopheles_research_core_10_2';
+my $dbname     = 'rattus_norvegicus_core_20_3a';
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(-host =>$host,
 					     -user  =>$user,
-		                             -port => $port,
+		                             #-port => $port,
 					     -dbname=>$dbname);
 
 #$db->assembly_type('VEGA');
@@ -422,7 +423,7 @@ FIND : foreach my $refsnpid (keys %input_id) { ##only table id from input file n
 	    my $slice;
 	    my ($chr, $start, $end) = split /\-/, $contig;
 	    my $start_slice = $start-$flank_base;
-	    $start_slice = 0 if ($start_slice <0);
+	    $start_slice = 1 if ($start_slice <0);
 	    $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start_slice, $end+$flank_base);
 	    #$slice->name($contig); ####slice will have a name defined for me like : 13.31482005-31483556
 	    push (@raw_contigs, $slice);
