@@ -36,31 +36,35 @@ use Getopt::Long;
 
 # this script connects to the db it is going to write to
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
-						     EST_GENE_DBNAME
-						     EST_GENE_DBUSER
-						     EST_GENE_DBPASS
+						     EST_REFDBNAME
+						     EST_REFDBUSER
+						     EST_REFDBPASS
+						     EST_REFDBHOST
 						     EST_GENE_DBHOST
-						     );
+						     EST_GENE_DBUSER
+						     EST_GENE_DBNAME
+						     EST_GENE_DBPASS
+                                                      );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $port   = undef;
-my $dbname = $EST_GENE_DBNAME;
-my $dbuser = $EST_GENE_DBUSER;
-my $dbpass = $EST_GENE_DBPASS;
-my $host   = $EST_GENE_DBHOST;
+my $dbname = $EST_REFDBNAME;
+my $dbuser = $EST_REFDBUSER;
+my $dbpass = $EST_REFDBPASS;
+my $host   = $EST_REFDBHOST;
 
 
 my $runnable;
 my $input_id;
 my $write  = 0;
 my $check  = 0;
-my $params;
 my $pepfile;
 my $acc;
 my $analysis;
+my $use_label;
 
 # can override db options on command line
 &GetOptions( 
@@ -69,12 +73,12 @@ my $analysis;
              'analysis:s'    => \$analysis,
 	     'write'         => \$write,
              'check'         => \$check,
-             'parameters:s'  => \$params,
              'dbname:s'      => \$dbname,
              'dbhost:s'      => \$host,
              'dbuser:s'      => \$dbuser,
              'dbpass:s'      => \$dbpass,
-	     );
+	     'use_label'     => \$use_label,
+           );
 
 $| = 1;
 
@@ -88,41 +92,47 @@ if ($check) {
 
 print STDERR "args: $host : $dbuser : $dbpass : $dbname\n";
 
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+die "No input id entered" unless defined ($input_id);
+
+my $analysis_obj;
+my $runobj;
+{
+ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $dbpass,
     );
 
-die "No input id entered" unless defined ($input_id);
+ eval{
+   $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
+ };
+ unless( $analysis_obj ){
+   my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						     -host             => $EST_GENE_DBHOST,
+						     -user             => $EST_GENE_DBUSER,
+						     -dbname           => $EST_GENE_DBNAME,
+						     -pass             => $EST_GENE_DBPASS,
+						    );
 
+   $analysis_obj = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
+ }
 
-my $analysis_obj = $db->get_AnalysisAdaptor->fetch_by_logic_name($analysis);
-
-my %hparams;
-# eg -parameters param1=value1,param2=value2
-if (defined $params){
-  foreach my $p(split /,/, $params){
-    my @sp = split /=/, $p;
-    $sp[0] = '-' . $sp[0];
-    $hparams{$sp[0]} =  $sp[1];
-  }
-}
-
-
-my $runobj = "$runnable"->new(-db       => $db,
+  $runobj = "$runnable"->new(-db       => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis_obj,
-                              %hparams,
-			     );
+        			     );
 
+} # the db should go out of scope here?
+
+if ($use_label){
+ $runobj->_label($input_id);
+}
 
 $runobj->fetch_input;
 $runobj->run;
 
- 
-my @out = $runobj->output;
+ my @out = $runobj->output;
 
 if ($write) {
   $runobj->write_output;
