@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
+  Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
 
 =head1 SYNOPSIS
 
@@ -517,7 +517,7 @@ sub parse_results {
     my %ids;
 
     if ($self->filter) {
-        print STDERR "\n filtering hits\n";
+        print STDERR "filtering hits: ";
         %ids = $self->filter_hits($parser);
 
         close $filehandle;
@@ -672,7 +672,7 @@ sub filter_hits {
                                                                       );
     my @newfeatures = $search->run(@features);
 
-    print STDERR "There were ".@features." HSP's before, and ".@newfeatures." after filtering\n";
+    print STDERR "there were ".@features." HSP's before, and ".@newfeatures." after\n\n";
 
     foreach my $f (@newfeatures) {
         my $id = $f->hseqname;
