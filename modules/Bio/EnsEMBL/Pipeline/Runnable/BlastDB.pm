@@ -57,13 +57,13 @@ sub new {
       $type,
       $workdir,
       $copy,
-      $index_method,
+      $index_type,
       $make_fetchable_index) = $self->_rearrange([qw(SEQUENCES
 						     DBFILE
 						     TYPE
 						     WORKDIR
 						     COPY
-						     INDEX_METHOD
+						     INDEX_TYPE
 						     MAKE_FETCHABLE_INDEX
 						    )], @args);
   
@@ -78,7 +78,7 @@ sub new {
   $self->sequences($sequences)       if defined($sequences);
   $self->type($type)                 if defined($type);
   $self->workdir($workdir)           if defined($workdir);
-  $self->index_method($index_method);
+  $self->index_type($index_type);
   $self->make_fetchable_index($make_fetchable_index) 
     if defined($make_fetchable_index);
 
@@ -90,6 +90,12 @@ print "COPYING DATABASE.\n";
   }
 
   return $self;
+}
+
+sub DESTROY {
+  my $self = shift;
+
+  $self->remove_index_files;
 }
 
 sub sequences {
@@ -124,7 +130,6 @@ sub run {
   }
  
   my $command = $self->format_command . " " . $seqfile;
-
   my $exit_status = system($command);
 
   if ($exit_status) {
@@ -273,49 +278,60 @@ sub copied_dbfile {
 }
 
 
-sub index_method {
+sub index_type {
   my $self = shift;
   
-  my $value = shift;
-  
-  # Default to new wu blast.
-  $value = 'new wu' 
-    unless $value;
+  if (@_ || (($self->{_index_type} !=~ /ncbi/i)
+	     &&($self->{_index_type} !=~ /wu/i))) {
 
-  if ($value =~ /wu/i) {
+    my $value = shift;
     
-    if (($value =~ /new/i)&&($self->type eq 'DNA')) {
-      $self->{_format_command}   = 'xdformat -n -I';
-      $self->{_seqfetch_command} = ['xdget -n' , 'blastdb' , 'seqid'];
+    # Default to new wu blast.
+    $value = 'new wu' 
+      unless $value;
+    
+    if ($value =~ /wu/i) {
       
-    } elsif (($value =~ /new/i)&&($self->type eq 'PROTEIN')) {
-      $self->{_format_command}   = 'xdformat -p -I';
-      $self->{_seqfetch_command} = ['xdget -p' , 'blastdb' , 'seqid'];
-      
-    } elsif ($value =~ /old/i) {
-      
-      if ($self->type eq 'DNA') {
-	$self->{_format_command}   = 'pressdb';
+      if (($value =~ /new/i)&&($self->type eq 'DNA')) {
+	$self->{_format_command}   = 'xdformat -n -I';
+	$self->{_seqfetch_command} = ['xdget -n' , 'blastdb' , 'seqid'];
+	$self->{_index_type} = 'new_wu';
+	
+      } elsif (($value =~ /new/i)&&($self->type eq 'PROTEIN')) {
+	$self->{_format_command}   = 'xdformat -p -I';
+	$self->{_seqfetch_command} = ['xdget -p' , 'blastdb' , 'seqid'];
+	$self->{_index_type} = 'new_wu';
+	
+      } elsif ($value =~ /old/i) {
+	
+	$self->{_index_type} = 'old_wu';
+	
+	if ($self->type eq 'DNA') {
+	  $self->{_format_command}   = 'pressdb';
 ### Can this be fixed?
-	$self->{_seqfetch_command} = 'throw';
-
-      } elsif ($self->type eq 'PROTEIN') {
-	$self->{_format_command}   = 'setdb';
+	  $self->{_seqfetch_command} = 'throw';
+	  
+	} elsif ($self->type eq 'PROTEIN') {
+	  $self->{_format_command}   = 'setdb';
 ### Can this be fixed?
-	$self->{_seqfetch_command} = 'throw';
+	  $self->{_seqfetch_command} = 'throw';
+	}
       }
-    }
+      
+    } elsif ($value =~ /ncbi/i) {
+      $self->{_format_command}   = 'formatdb -o T -i ';
+      $self->{_seqfetch_command} = ['fastacmd -d' , 'blastdb' , '-s', 'seqid'];
+      $self->{_index_type} = 'ncbi';
+      
+    } 
     
-  } elsif ($value =~ /ncbi/i) {
-    $self->{_format_command}   = 'formatdb -o T -i ';
-    $self->{_seqfetch_command} = ['fastacmd -d' , 'blastdb' , '-s', 'seqid'];
-  } 
+    $self->throw("Database indexing method [$value] not recognised.")
+      unless ($self->{_format_command} 
+	      && $self->{_seqfetch_command});
+    
+  }
   
-  $self->throw("Database indexing method [$value] not recognised.")
-    unless ($self->{_format_command} 
-	    && $self->{_seqfetch_command});
-
-  return 1
+  return $self->{_index_type}
 }
 
 sub format_command {
@@ -395,5 +411,14 @@ sub blastdb_dir {
 
   return $self->{_blastdb_dir};
 }
+
+# Database (including full path). 
+
+sub db {
+  my $self = shift;
+
+  return $self->blastdb_dir . '/' . $self->dbname;
+}
+
 
 1;
