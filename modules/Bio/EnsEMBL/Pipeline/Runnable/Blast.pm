@@ -146,16 +146,15 @@ sub new {
     }
     
     if ($options) {
-#this option varies the number of HSP displayed proportionally to the query contig length
 	  if ($::pipeConf{'B_factor'}){
 		my $b_factor = $::pipeConf{'B_factor'};
 		my $b_value = int ($query->length / 1000 * $b_factor); 
-		if ($::pipeCong{'blast'} eq 'ncbi'){
-			$options .= " -b $b_value" unless ($b_value < 250);
-		}
-		else {
-			$options .= " B=$b_value" unless ($b_value < 250); 
-		}
+		 if ($::pipeConf{'blast'} eq 'ncbi'){
+            $options .= " -b $b_value" unless ($b_value < 250);
+        }
+        else {
+            $options .= " B=$b_value" unless ($b_value < 250);
+        }
 	  } 
       $self->options($options);
     } else {
@@ -228,7 +227,7 @@ sub run_analysis {
     my @databases = $self->fetch_databases;
 
     foreach my $database (@databases) {
-#allow system call to adapt to using ncbi blastall. defaults to WU blast.	
+	
 	my $command = $self->program ;
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
@@ -401,9 +400,6 @@ sub parse_results {
 
     }
   } 
-
-
-# Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
   if ($::pipeConf{'filter_blast'}){
   # re-filter, with pruning - rewrote to use a local select_feature function instead of FeatureFilter 
