@@ -56,12 +56,18 @@ if($analysis){
     $analysis_adaptor->store($a);
   }
 
-  my $sql = "insert into analysis(logic_name, created) values(?, now())";
-
-  my $sth = $db->prepare($sql);
-  $sth->execute($PA_SINGLE_DUMMY);
-  $sth->execute($PA_CHUNK_DUMMY);
-  $sth->execute($PA_PROTEOME_DUMMY);
+  my $single = Bio::EnsEMBL::Pipeline::Analysis->new();
+  $single->logic_name($PA_SINGLE_DUMMY);
+  $single->input_id_type($PA_SINGLE_TYPE);
+  $analysis_adaptor->store($single);
+  my $chunk = Bio::EnsEMBL::Pipeline::Analysis->new();
+  $chunk->logic_name($PA_CHUNK_DUMMY);
+  $chunk->input_id_type($PA_CHUNK_TYPE);
+  $analysis_adaptor->store($chunk);
+  my $proteome = Bio::EnsEMBL::Pipeline::Analysis->new();
+  $proteome->logic_name($PA_PROTEOME_DUMMY);
+  $proteome->input_id_type($PA_PROTEOME_TYPE);
+  $analysis_adaptor->store($proteome);
 }
 
 if($rules){
