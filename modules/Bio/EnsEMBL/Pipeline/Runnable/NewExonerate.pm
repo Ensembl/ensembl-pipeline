@@ -541,12 +541,12 @@ sub parse_results {
     
     ############################################################
     # reject single-exon alignments which cover less than half the cdna/est:
-    if ( scalar( @{$transcript->get_all_Exons} ) ){
-      my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
-      if ( $mapped_length <= $length{$q_id}/2 ){
-	next;
-      }
-    }
+    #if ( scalar( @{$transcript->get_all_Exons} ) ){
+    #  my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
+    #  if ( $mapped_length <= $length{$q_id}/2 ){
+#	next;
+#      }
+#    }
     
     push( @transcripts, $transcript );
       
