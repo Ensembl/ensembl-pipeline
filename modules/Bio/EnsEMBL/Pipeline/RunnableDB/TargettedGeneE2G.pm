@@ -106,7 +106,7 @@ sub fetch_input{
 
   # input format: chr22:10602496,10603128:Q9UGV6:AC00012
   # or chr22:10602496,10603128:Q9UGV6 if no cDNA
-  if( !(($entry =~ /(\S+):(\d+),(\d+):(\S+):(\S+)/) || ($entry =~ /(\S+):(\d+),(\d+):(\S+)/))) {
+  if( !(($entry =~ /(\S+):(\d+),(\d+):(\S+):(\S+)/) || ($entry =~ /(\S+):(\d+),(\d+):(\S+):/))) {
       $self->throw("Not a valid input id... $entry");
   }
   
