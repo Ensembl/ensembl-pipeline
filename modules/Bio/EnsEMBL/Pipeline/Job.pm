@@ -45,11 +45,13 @@ use strict;
 
 # use FreezeThaw qw(freeze thaw);
 
+# Object preamble - inherits from Bio::Root::Object;
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-use Bio::Root::RootI;
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
 
@@ -60,33 +62,11 @@ use Bio::Root::RootI;
 my %batched_jobs;
 my %batched_jobs_runtime;
 
-=head2 new
-
- Title   : new
- Usage   : my $job = new Bio::EnsEMBL::Pipeline::Job(%params);
- Function: object for representing jobs in pipeline ids are stored in 
-           pipeline db
- Example :
- Returns : 
- Args    : -adaptor:   Bio::EnsEMBL::DBAdaptor object
-           -id:        DB Job id
-           -lsf_id:    LSF id for job
-           -input_id:  input id (mandatory)
-           -class:     Class of job (default 'contig')
-           -analysis:  Analysis object (mandatory)
-           -stdout:    file where program STDOUT is written
-           -stderr:    file where program STDERR is written
-           -input_object_file: File where object can be serialized
-           -retry_count: Number retries on this job
-
-=cut
-
 sub new {
     my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
+    my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$lsfid,$input_id,$cls,
-	$analysis,$stdout,$stderr,$input, $retry_count ) 
+    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count ) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				LSF_ID
@@ -221,8 +201,8 @@ sub input_id {
 
   Title   : class
   Usage   : $self->class($class)
-  Function: Get/set method for the class of the input ID
-            typically contig or clone
+  Function: Get/set method for the class of the input to the job
+            typically contig/clone
   Returns : string
   Args    : string
 
@@ -278,6 +258,7 @@ sub flush_runs {
 
   my $adaptor = shift;
   my $queue = shift;
+  my $LSF_params = shift;
   my @queues;
   
   if( !defined $adaptor ) {
@@ -305,11 +286,17 @@ sub flush_runs {
   $nodes =~ s/ +/ /;
   # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
 
-  my $runner = $::pipeConf{'runner'} || undef;
+  # runner.pl: first look in same directory as Job.pm
+  # if it's not here use file defined in pipeConf.pl
+  # otherwise fail
 
-  $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
-#  my $runner = __FILE__;
-#  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  my $runner = __FILE__;
+  $runner =~ s:/[^/]*$:/runner.pl:; 	
+
+  unless (-x $runner) {
+    $runner = $::pipeConf{'runner'} || undef;
+    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+  }
 
   for my $queue ( @queues ) {
 
@@ -323,8 +310,6 @@ sub flush_runs {
       $self->throw( "Last batch job not in db" );
     }
   
-
-
     my $cmd;
   
     $cmd = "bsub -o ".$lastjob->stdout_file;
@@ -434,7 +419,7 @@ sub runLocally {
     $self->set_status( "FAILED" );
     return;
   }
-  print STDERR "Running inLSF\n"; 
+       print STDERR "Running inLSF\n"; 
   $self->runInLSF();
 }
 
@@ -456,13 +441,18 @@ sub runRemote {
   my $dbname = $db->dbname;
   my $cmd;
 
-  
-  my $runner = $::pipeConf{'runner'} || undef;
+  # runner.pl: first look in same directory as Job.pm
+  # if it's not here use file defined in pipeConf.pl
+  # otherwise fail
 
-  $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+  my $runner = __FILE__;
+  $runner =~ s:/[^/]*$:/runner.pl:; 	
 
-#  my $runner = __FILE__;
-#  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  unless (-x $runner) {
+    $runner = $::pipeConf{'runner'} || undef;
+    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+  }
+
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
 #    " -q acarichunky " .
 #    " -R osf1 ".
@@ -526,15 +516,15 @@ sub runInLSF {
 	  $module =~ s/::/\//g;
 	  require "${module}.pm";
 	  $rdb = "${module}"->new
-	      ( '-analysis' => $self->analysis,
-		'-input_id' => $self->input_id,
-		'-dbobj' => $self->adaptor->db );
+	      ( -analysis => $self->analysis,
+		-input_id => $self->input_id,
+		-dbobj => $self->adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-	      ( '-analysis' => $self->analysis,
-		'-input_id' => $self->input_id,
-		'-dbobj' => $self->adaptor->db );
+	      ( -analysis => $self->analysis,
+		-input_id => $self->input_id,
+		-dbobj => $self->adaptor->db );
       }
   };
   if ($err = $@) {
@@ -728,9 +718,18 @@ sub make_filenames {
     system( "mkdir $dir" );
   }
 
+# scp - one set of out files per job (even if batching together)
+# this is a bit messy! added '.0' to $stub. This will be the master
+# file containing LSF output. In runner.pl before each job is run
+# replace 0 with the job ID to get one output file per $job.
+# Change also Job::remove to do a glob on all these files. Yep it's
+# nasty but it seems to work...
+
+
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
   $stub .= time().".".int(rand(1000));
+#   $stub .= time().".".int(rand(1000)) . '.0';
 
 #  my @files = $self->get_files( $self->input_id,"obj","out","err" );
 #  for (@files) {
