@@ -310,16 +310,20 @@ sub parse_results {
     
     # parse
     while (<$filehandle>) {
+	print STDERR;
         chomp;
         next if /^$/;
         if (/^\>/) {
           #>(110-122) complexity=2.20 (12/2.20/2.50)
-            #/^\>\s*(\S+)\s*\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
-          /^\>\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
-          my $start = $1;
-          my $end = $2;
-          my $score = $3;
+          /^\>(\S?)\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+
+	  my $tid = $1;
+          my $start = $2;
+          my $end = $3;
+          my $score = $4;
+
           my (%feature);
+	  $feature{name} = $tid;
           $feature{score} = $score;
           $feature{start} = $start;
           $feature{end} = $end;
