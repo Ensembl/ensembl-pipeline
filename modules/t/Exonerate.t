@@ -2,9 +2,9 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN { $| = 1; plan test => 5;}
+BEGIN { $| = 1; plan test => 6;}
 
-use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
+use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::SeqIO;
 
 ok(1);
@@ -18,17 +18,15 @@ while (my $seq = $estseqio->next_seq) {
   push(@estseqs,$seq);
 }
 
-ok(my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
+ok(my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
    -query_seqs  => \@estseqs,
    -query_type  => 'DNA',
-   -database    => 't/data/AC099340.fa.masked', #$genseq,
+   -database    => 't/data/AC099340.fa.masked',
    -target_type => 'DNA',
-   -exonerate   => '/usr/local/ensembl/bin/exonerate-0.6.7',
-#   -exonerate   => '/usr/local/ensembl/bin/exonerate-0.8.2',
-#   -options     => ' --dnahspthreshold 30 --forcegtag TRUE --maxintron 500000'
+   -exonerate   => '/usr/local/ensembl/bin/exonerate-0.8.2',
+   -verbose     => 1,
+   -options     => '--exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --showalignment FALSE --showvulgar FALSE --percent 90'
    ));
-
-$exonerate->_verbose(0);
 
 ok($exonerate->run);
 
@@ -44,11 +42,10 @@ sub display {
     my $dafs = $exons->[0]->get_all_supporting_features;
 
     print "Match : (hseqname) " . 
-    $dafs->[0]->hseqname . "\t" .
+    $dafs->[0]->hseqname . "\t" . 
     "(length) " . $transcript->length . "\t" . 
     "(exons) " . scalar @$exons . "\t" . 
-    "(strand) " . $transcript->strand . "\t" . 
-     "\n";
+    "\n";
   }
 
   return 1
