@@ -454,17 +454,19 @@ sub parse_results {
                         my $score = sprintf("%.2f", 2*($match-$mismatch)-$block_score);
                         my $pid = int(100*($match/($match+$mismatch+$qBaseInsert+$tBaseInsert)));
                         # adjust coordinates depending on strand 
+			my $tmp_substart;
+			my $tmp_subend;
                         if ($strand == -1){
                             my $tmp = $substart;
-                            $substart = $subend;
-                            $subend = $tmp;
+                            $tmp_substart = $subend;
+                            $tmp_subend = $tmp;
 		        }
                         # build the featurepair
                         my %feature;
                         $feature{name} = $self->clone->id;
                         $feature{percent_id} = $pid;
-                        $feature{start} = $substart;
-                        $feature{end} = $subend;
+                        $feature{start} = $tmp_substart;
+                        $feature{end} = $tmp_subend;
                         $feature{score} = $score;
                         $feature{strand} = $strand;
                         $feature{hname} = $hid;
