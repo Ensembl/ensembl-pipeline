@@ -17,7 +17,7 @@ ok($ens_test->do_sql_file("t/dumps/runnabledb.dump"));
 
 ok(my $db = $ens_test->get_DBSQL_Obj);
 
-ok(my $runnablei   = 'Bio::EnsEMBL::Pipeline::RunnableDB::EponineTSS');
+ok(my $runnable     = 'Bio::EnsEMBL::Pipeline::RunnableDB::EponineTSS');
 ok(my $ana_adaptor = $db->get_AnalysisAdaptor());
 ok(my $ana         = $ana_adaptor->fetch_by_logic_name('Eponine'));
 
