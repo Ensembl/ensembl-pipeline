@@ -99,7 +99,7 @@ Internal (private) methods are usually preceded with a "_".
 package Bio::EnsEMBL::Pipeline::Runnable::Slam;
 
 use vars qw(@ISA);
-use strict;
+#use strict;
 use Bio::EnsEMBL::PredictionTranscript;
 use Bio::EnsEMBL::PredictionExon;
 
@@ -109,6 +109,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
+use diagnostics;
 
 
 
@@ -236,86 +237,107 @@ sub DESTROY {
 sub parse_results {
   my $self = shift;
 
+  # parsing results of first organism
   my $arrayref1 = $self->_parser( $self->slice1,$self->fasta1 ) ;
-  my $arrayref2 = $self->_parser( $self->slice2,$self->fasta2 );
-
   $self->predtrans1( $arrayref1 );
+
+  my $arrayref2 = $self->_parser( $self->slice2,$self->fasta2 );
   $self->predtrans2( $arrayref2 );
 }
 
 
 
-
-
 # parsing the results and adding predicted exons to container of PredictionTranscripts
+# only the coding sequences are stored (CDS).
+# returns an array-reference to a PredictionTranscript with stored PredictionExons
 
 sub _parser {
   my ($self,$slice,$gff) = @_;
+  my (%transcripts);
 
-  $gff=~s/(\..+$)/\.gff/; # subst. file-suffix (all after last dot to end)
-  my $tran;
-  my @transcripts;
+  $gff=~s/(\.fasta)/\.gff/;     # subst. .fasta-suffix with .gff-suffix
+  print "Gfffile: $gff\n";
 
-  # what to do if resultfile contains no data ?
-  $gff  = "/tmp/seq1.38047.gff";
-
-  # we will walk through the file
-  # if a line has a gene_id we will store the gene-id as hashkey (we get a unique key for every predicted transcripts)
-  # next we store the first two parts (s.a) of the line in another hash
-
-  my (%genes,%predex);
+  # processing the written gff-file
   open(IN,"$gff") || die "could not read file $gff";
   while (<IN>) {
     chomp;
     my $aline = $_;
-    if ($aline =~m/gene_id/) {
+    if ($aline =~m/gene_id/) { 
+      #if the line contains a CDS
+
       if ( $aline !~/start_codon/  &&  $aline !~/stop_codon/) {
-        my @line = split /;/; # split line in 3 parts, bcs only the attributes 0-9 are stable
+        # if the line is no start-or stopcodon
+
+        my @line = split /;/;   # split line in 3 parts, bcs only the attributes 0-9 are stable
 
         my @attributes = split /\s+/,$line[0];
         my @transc_id =  split /\s+/,$line[1];
 
+        # building a unique key for each transcript
         my $key = "$attributes[8] $attributes[9]"; # key: -->gene_id "001"<--
-        $genes{$key}=();
+
+        # we concatenate the first and second part of the line
         push (@attributes, @transc_id);
-        $predex{$aline}=\@attributes;
+        my $attr_ref = \@attributes;
+
+        # we store the refernce to the line with the attributes of the exon using the unique transcript-key as key
+        # an HASH of ARRAYS of ARRAYS
+        push (@{ $transcripts{$key}}, $attr_ref );
       }
     }
   }
   close(IN);
 
-  my ($gene,$predict);
-  foreach(sort (keys %genes)) {
 
-    # construct new predictionTranscript
-    $tran = new Bio::EnsEMBL::PredictionTranscript();
 
-    # add predicted exons to transcript
-    foreach(keys %predex){
-      my @attr = @{$predex{$_}};        # dereference the array !
+  my @all_predicted_transcripts;
+  my $pred_trans;
 
-      my ($start,$end,$strand) = @attr[3,4,6]; # extracting startbp, endbp and strand
+  # for every predicted transcript
+  for my $transkey (sort(keys %transcripts)) {
+
+    $pred_trans = new Bio::EnsEMBL::PredictionTranscript();
+
+    # get all the exons of the predicted transcript
+    my @exon_refs = @{$transcripts{$transkey}};
+
+    # process every predicted exon which belongs to the transcript
+    for my $exons (@exon_refs) {
+
+      my  @attributes = @{$exons}; # @attributes contains all items of a gff-fileline (with CDS)
+
+      # extracting startbp, endbp strand and phase
+      my ($start,$end,$strand,$phase) = @attributes[3,4,6,7];
+
+      print "st $start ed $end str $strand ph $phase\n";
 
       $strand = 1 if ($strand eq "+");
       $strand = -1 if ($strand eq "-");
       $strand = 0 if ($strand eq ".");
 
       my $pred_exon = new Bio::EnsEMBL::PredictionExon(
-                                                -START     => $start,
-                                                -END       => $end,
-                                                -STRAND    => $strand, #valid values (Feature.pm: 1,-1,0)
-                                                -SLICE     => $slice,
-                                                -DBID      => 100, # EDIT!
-                                                -P_VALUE   => 0,
-                                                -SCORE     => 0
-                                               );
-      $tran->add_Exon( $pred_exon );
+                                                       -START     => $start,
+                                                       -END       => $end,
+                                                       -STRAND    => $strand, # valid values (Feature.pm: 1,-1,0)
+                                                       -SLICE     => $slice,
+                                                       -P_VALUE   => 0,
+                                                       -PHASE     => $phase , # same as frame ?
+                                                       -SCORE     => 0
+                                                      );
+
+
+      # add predicted exon to the transcript-container (Bio::EnsEMBL::Feature)
+      $pred_trans->add_Exon( $pred_exon );
     }
-    #storing refrence of predicted transcript-obj
-    push @transcripts, $tran;
-  } #1st foreach
-  return \@transcripts;
+    push @all_predicted_transcripts, $pred_trans;
+    print "---------\n";
+  }
+  return \@all_predicted_transcripts;
 }
+
+
+
 
 
 
@@ -345,15 +367,53 @@ sub run {
       " -p ".$gcdir . " ".$fasta1 . " " . $fasta2 .
         " -org1 ".$self->org1 .
           " -org2 ".$self->org2;
-
   $command .= " -v " if $self->verbose;
   $command .= " -debug " if $self->debug;
 
   print "slam-command; $command\n" if $self->verbose;
+################################################################################
+# testing if the files exist:
 
-  open( EXO, "$command |" ) || $self->throw("Error running Slam $!");
-  close(EXO);
+  if( -e $self->slam_bin){ print "slam_bin ok\n"; }else{ print "ERROR slam-binary file missing\n"; }
+  if( -e $self->approx_align){ print "aat-file ok\n"; }else{ print "ERROR aat-file missing\n"; }
+  if( -e $fasta1){ print "fasta-file1ok\n"; }else{ print "ERROR fasta-file 1 missing\n"; }
+  if( -e $fasta2){ print "fasta-file2 ok\n"; }else{ print "ERROR fasta-file 2 missing\n"; }
 
+  if( -e $fasta1.".masked"){ print "fasta.masked-file1ok\n"; }else{ print "ERROR fasta.masked-file 1 missing\n"; }
+  if( -e $fasta2.".masked"){ print "fasta.masked-file2 ok\n"; }else{ print "ERROR fasta.masked-file 2 missing\n"; }
+  if( -e $gcdir){ print "gcdir ok\n"; }else{ print "ERROR gcdir missing\n"; }
+
+
+################################################################################
+    $rc = 0xffff & system @args;
+    printf "system(%s) returned %#04x: ", "@args", $rc;
+    if ($rc == 0) {
+        print "ran with normal exit\n";
+    }
+    elsif ($rc == 0xff00) {
+        print "command failed: $!\n";
+    }
+    elsif ($rc > 0x80) {
+        $rc >>= 8;
+        print "ran with non-zero exit status $rc\n";
+    }
+    else {
+        print "ran with ";
+        if ($rc &   0x80) {
+            $rc &= ~0x80;
+            print "core dump from ";
+        }
+        print "signal $rc\n"
+    }
+    $ok = ($rc != 0);
+################################################################################
+
+ my  $status =  system (" $command ");
+ print "EXIT-STATUS $status\n";
+
+ die "programm exits funny\n" unless $status==0;
+
+# die "\n\nSeems that slam crashed $? " unless $status == 0;
 
   $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
@@ -363,10 +423,9 @@ sub run {
   $fasta1=~s/$wdir\///;         # get rid of workdir-prefix (/tmp/)
   $fasta2=~s/$wdir\///;         # get rid of workdir-prefix 
 
-
-
   $self->file($fasta1."_".$fasta2.".cns");
 
+  # parses the two resultfiles
   $self->parse_results;
   return 1;
 }
