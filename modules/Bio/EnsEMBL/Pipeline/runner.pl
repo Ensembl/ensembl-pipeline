@@ -124,5 +124,3 @@ while( $job_id = shift ) {
 }
 print STDERR "Leaving runner\n";
 
-$db->{'_db_handle'}->DESTROY();
-
