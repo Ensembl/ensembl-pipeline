@@ -76,11 +76,7 @@ sub get_variables {
 	     );
 
   # get analyses and runnables
-  my @entries = @$EST_RUNNABLES;
-  my %runnable_hash;
-  foreach my $entry ( @entries ){
-    $runnable_hash{$entry->{analysis}} = $entry->{runnable};
-  }
+
   $runnable   = $EST_FILTER_RUNNABLE;
   $analysis   = $EST_FILTER_ANALYSIS;
   $runner     = $EST_RUNNER;
