@@ -98,7 +98,7 @@ sub build_runnables {
   # the minigenomic sequence we switch to the
   # special case algorithm.  When this happens we cluster the 
   # likely exons into groups of similar exons, which we then
-  # use make a set of distinct genes.  For each likely gene
+  # use to make a set of distinct genes.  For each likely gene
   # a minigenomic sequence is made that tightly spans the 
   # likely location of the gene - and most probably excludes
   # any similar genes nearby.  With these smaller minigenomic
@@ -111,7 +111,7 @@ sub build_runnables {
 
     # Imporantly, the features are filtered for low identity matches.
     # This is just for the clustering process.  The full set of features
-    # are still passed to the runnable.
+    # are still passed to the runnable at the end.
     if($raw_feat->percent_id >= 80){
 	    push (@{$partitioned_features{$raw_feat->hseqname}}, $raw_feat);
     }
@@ -147,7 +147,7 @@ sub build_runnables {
     # where a non-repeated gene has exons that are very 
     # similar to one another.  If the flag $clusters_seem_real
     # is not set to 1, the the analysis will default to the  
-    # non-repeated gene way of doing things.
+    # simplest, non-repeated gene way of doing things.
 
     my $clusters_seem_real = 0;
 
@@ -172,9 +172,13 @@ sub build_runnables {
     
     if ((@$clustered_features)&&($clusters_seem_real > 0)) {
 
-      print STDERR "Minigenomic sequence could contain a number "
-	. "of highly similar genes.  Fragmenting the minigenomic "
-	  . "sequence to try to resolve these genes individually.\n";
+# Write to logfile
+
+print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGenomic region is " . $self->genomic_sequence->id . "\tLength " . $self->genomic_sequence->length . "\n";
+
+#      print STDERR "Minigenomic sequence could contain a number "
+#	. "of highly similar genes.  Fragmenting the minigenomic "
+#	  . "sequence to try to resolve these genes individually.\n";
 
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
 
@@ -226,6 +230,8 @@ sub build_runnables {
 	my $string_seq = ('N' x ($cluster_start - 1)) . 
 	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
 		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
+
+print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
 
 	my $genomic_subseq = Bio::Seq->new(-seq => $string_seq,
 					   -id  => $self->genomic_sequence->id );
