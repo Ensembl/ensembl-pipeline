@@ -543,8 +543,14 @@ sub _compute_identity {
       }
 
       my $this_match_identity = (1 - ($mismatches/$exon_length))*100;
-      my $this_match_coverage = (1 - ($noncovered/$exon_length))*100;
 
+      # The hack below gets around the problem of exons not always
+      # being a whole number of codons.  There can be cases where
+      # there are more non-covered bases than there are in an exon.
+      $noncovered = $exon_length if $noncovered > $exon_length;
+
+      my $this_match_coverage = (1 - ($noncovered/$exon_length))*100;
+print "Coverage : $this_match_coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
       if ($this_match_identity > $highest_identity) {
 	$highest_identity = $this_match_identity;
 	$associated_coverage = $this_match_coverage;
