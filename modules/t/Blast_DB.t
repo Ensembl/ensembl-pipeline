@@ -10,10 +10,11 @@ use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Analysis;
 
 ok(1);
-    
+
 ok(my $ens_test = EnsTestDB->new());
 
 ok($ens_test->do_sql_file("t/dumps/analysis.dump"));
+
 ok($ens_test->do_sql_file("t/dumps/dna.dump"));
 
 ok(my $db = $ens_test->get_DBSQL_Obj);
@@ -28,7 +29,8 @@ ok(my $ana = $ana_adaptor->fetch_by_logic_name('wublastx'));
 
 ok($ana_adaptor->exists( $ana ));
 
-my $id = 'AC099340';
+my $id = 'test:1:AC099340:1:1000000:1';
+my $contig_id = 'AC099340';
 my $pwd = `pwd`; chomp $pwd;
 my $dbfile = "$pwd/t/data/testpep.fa";
 
@@ -39,7 +41,6 @@ $blastdb->run;
 
 $ana->db_file($dbfile);
 
-
 $::fasta_header_re{'testpep.fa'} = '^(\w+)\s+';
 
 ok(my $runobj = "$runnable"->new(-db         => $db,
@@ -48,6 +49,8 @@ ok(my $runobj = "$runnable"->new(-db         => $db,
 
 
 ok($runobj->fetch_input);
+my @runnables = $runobj->runnable;
+$runnables[0]->add_regex("$pwd/t/data/testpep.fa",'^(\w+)\s+');
 
 ok($runobj->run);
 
@@ -57,10 +60,9 @@ ok(display(@out));
 
 ok($runobj->write_output());
 
-ok(my @features = @{$db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_SimilarityFeatures()});
+ok(my @features = @{$db->get_RawContigAdaptor()->fetch_by_name($contig_id)->get_all_SimilarityFeatures()});
 
 ok(display(@features));
-
 
 sub display {
   my @results = @_;
@@ -71,7 +73,7 @@ sub display {
     if ($obj->sub_SeqFeature) {
 
       foreach my $exon ($obj->sub_SeqFeature) {
-	print STDERR "Sub: ".$exon->gffstring."\n";
+        print STDERR "Sub: ".$exon->gffstring."\n";
       }
 
     }
