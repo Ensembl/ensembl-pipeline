@@ -1107,6 +1107,13 @@ sub check_splice_sites{
       my $downstream_exon = $exons[$i+1];
       my $upstream_site;
       my $downstream_site;
+      
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i+1]->start - $exons[$i]->end - 1 );
+      #print STDERR "intron length: $intron_length\n";
+      next if $intron_length <=9;
+
       eval{
 	$upstream_site = 
 	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
@@ -1154,6 +1161,13 @@ print STDERR "check_splice_sites: upstream ".
     for (my $i=0; $i<$#exons; $i++ ){
       my $upstream_exon   = $exons[$i];
       my $downstream_exon = $exons[$i+1];
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i]->start - $exons[$i+1]->end - 1 );
+      #print STDERR "intron length: $intron_length\n";
+      next if $intron_length <=9;
+      
       my $upstream_site;
       my $downstream_site;
       my $up_site;
@@ -1190,12 +1204,7 @@ print STDERR "check_splice_sites: upstream ".
       
     } # end of INTRON
   }
-  if ( $correct == $introns ){
-    return 1;
-  }
-  else{
-    return 0;
-  }
+  return $correct;
 }
 
 ############################################################
