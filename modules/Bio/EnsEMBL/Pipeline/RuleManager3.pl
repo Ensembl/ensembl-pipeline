@@ -48,7 +48,7 @@ eval {
     require "$file";
 };
 if ($@) {
-    print STDERR "Can't find $file\n";
+    print STDERR "Error trying to load $batch_q_module;\ncan't find $file\n";
     exit 1;
 }
 
@@ -124,14 +124,16 @@ my $ana_adaptor  = $db->get_AnalysisAdaptor;
 my $sic          = $db->get_StateInfoContainer;
 
 
+# analysis options are either logic names or analysis dbID's
+
 foreach my $ana (@analysis) {
     if ($ana =~ /^\d+$/) {
         $analysis{$ana} = 1;
     }
     else {
-	$ana_adaptor->fetch_by_logic_name($ana)->dbID;
-	if ($db) {
-            $analysis{$db};
+	my $id = $ana_adaptor->fetch_by_logic_name($ana)->dbID;
+	if ($id) {
+            $analysis{$id};
 	}
 	else {
 	    print STDERR "Could not find analysis $ana\n";
@@ -176,6 +178,8 @@ EOF
 
     exit 1;
 }
+
+# create lock
 
 my $host = &qualify_hostname(hostname());
 my $user = scalar getpwuid($<);
@@ -398,36 +402,6 @@ sub shut_down {
 sub alarmhandler {
     $alarm = 1;
     $SIG{ALRM} = \&alarmhandler;
-}
-
-
-# create lock file in home directory
-sub create_lock {
-    my ($dir, $host, $pid) = @_;
-    my %db;
-
-    mkdir $dir, 0775 or die "Can't make lock directory";
-
-    dbmopen %db, "$dir/db", 0666;
-    $db{'subhost'} = $host;
-    $db{'pid'}     = $pid;
-    $db{'started'} = time();
-    dbmclose %db;
-}
-
-
-# running pipelines should have lock files in ~/ens-pipe.*
-sub running_pipeline {
-    my ($dir) = @_;
-    my %db;
-
-    dbmopen %db, "$dir/db", undef;
-    my $host = $db{'subhost'};
-    my $name = $db{'pid'};
-    my $time = $db{'started'};
-    dbmclose %db;
-
-    return $host, $name, $time;
 }
 
 
