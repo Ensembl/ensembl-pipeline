@@ -53,6 +53,7 @@ ensembl-dev@ebi.ac.uk
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder;
+
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Exon;
@@ -82,23 +83,23 @@ use strict;
 ############################################################
 
 sub new {
-    my ($class,@args) = @_;
-
-    my $self = $class->SUPER::new(@args);
-    
-    my ($predictions,$features,$annotations) = $self->_rearrange([qw(PREDICTIONS FEATURES ANNOTATIONS)],
-						    @args);
-
-    unless ( @$predictions && @$features ){
-      $self->throw("Must input predictions and features to PredictionGeneBuilder");
-    }
-    
-    $self->predictions(@{$predictions});
-    $self->features(@{$features});
-    if ( @$annotations ){
-      $self->annotations( @$annotations );
-    }
-    return $self;
+  my ($class,@args) = @_;
+  
+  my $self = $class->SUPER::new(@args);
+  
+  my ($predictions,$features,$annotations) = $self->_rearrange([qw(PREDICTIONS FEATURES ANNOTATIONS)],
+							       @args);
+  
+  unless ( @$predictions && @$features ){
+    $self->throw("Must input predictions and features to PredictionGeneBuilder");
+  }
+  
+  $self->predictions(@{$predictions});
+  $self->features(@{$features});
+  if ( @$annotations ){
+    $self->annotations( @$annotations );
+  }
+  return $self;
 }
 
 ############################################################
@@ -1018,11 +1019,25 @@ sub features {
   if (!defined($self->{_feature})) {
     $self->{_feature} = [];
   }
-  if ( scalar @features ) {
+  if ( @features ) {
     push(@{$self->{_feature}},@features);
   }
   return @{$self->{_feature}};
 }
+
+############################################################
+
+sub annotations{
+  my ($self,@annotations) = @_;
+  if (!defined($self->{_annotations})){
+    $self->{_annotations};
+  }
+  if (@annotations){
+    push( @{$self->{_annotations}}, @annotations);
+  }
+  return @{$self->{_annotations}};
+}
+
 
 ############################################################
 
@@ -1032,7 +1047,7 @@ sub supported_exons {
     if (!defined($self->{'_supported_exons'})) {
 	$self->{'_supported_exons'} = [];
     }
-    if (scalar @exons > 0) {
+    if (@exons ) {
 	push(@{$self->{'_supported_exons'}},@exons);
     }
     return @{$self->{'_supported_exons'}};
@@ -1080,5 +1095,6 @@ sub threshold {
 
 
 ############################################################
+
 
 1;
