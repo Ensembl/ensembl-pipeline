@@ -147,11 +147,10 @@ sub runnable {
         }
         $parameters {'-db'}      = $self->analysis->db_file();  
         $parameters {'-clone'}   = $genseq;
-        #creates empty Bio::EnsEMBL::Runnable::Blast object
         my $runnable = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters);
-        push @{$self->{'_runnable'}}, $runnable;
+        push (@{$self->{'_runnable'}}, $runnable);
     }
-    return $self->{'_runnable'};
+    return @{$self->{'_runnable'}};
 }
 
 =head2 run
@@ -169,7 +168,6 @@ sub run {
     $self->throw("Runnable modules not set") unless ($self->runnable());
     foreach my $runnable ($self->runnable())
     {
-
         $runnable->run();                   
     }                    
 }
@@ -261,7 +259,7 @@ sub write_output {
 	my @features = $self->output();
 	eval 
 	{
-          $contig = $db->get_Contig($self->input_id);
+          $contig = $db->get_Contig($runnable->clone->display_id());
 	};
 	if ($@)
 	{
