@@ -65,9 +65,10 @@ else
 { print "ok 2\n"; }
 
 #create Exonerate object    
-my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
-								  -GENOMIC   => \@genomics);
- 
+my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new 
+    (-EST       => \@ests, 
+     -GENOMIC   => $genseq);
+ 	
 unless ($exonerate)
 { print "not ok 3\n"; }
 else
@@ -90,9 +91,9 @@ sub display {
   my @results = @_;
 
   foreach my $obj (@results)
-    {
+  {
       print STDERR $obj->gffstring() . "\n";
-    }
+  }
 }
 
 sub set_est1 {
