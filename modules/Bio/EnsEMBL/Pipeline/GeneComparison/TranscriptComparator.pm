@@ -457,8 +457,8 @@ sub _test_for_fuzzy_semiexact_Merge{
 
 sub _test_for_Simple_Merge{
   my ($self,$tran1,$tran2) = @_;
-  my @exons1 = @{$tran1->get_all_Exons};
-  my @exons2 = @{$tran2->get_all_Exons};	
+  my @exons1 = sort { $a->start <=> $b->start } @{$tran1->get_all_Exons};
+  my @exons2 = sort { $a->start <=> $b->start } @{$tran2->get_all_Exons};	
  
   my $foundlink = 0; # flag that gets set when starting to link exons
   my $start     = 0; # start looking at the first one
