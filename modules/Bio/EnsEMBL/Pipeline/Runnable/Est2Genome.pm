@@ -56,7 +56,8 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 #compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
+use Bio::EnsEMBL::Analysis::Programs qw(est2genome); 
+
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
@@ -108,6 +109,7 @@ sub new {
 	 } else  {   
 	   eval 
 	     { $self->est_genome($self->locate_executable('est2genome')); };
+	   $self->throw("Can't find executable") if $@;
 	 }
 	 if ($arguments) {   
 	   $self->arguments($arguments);
