@@ -635,6 +635,8 @@ we need to do it ourselves. Exonerate will do this work for you.
 
 sub check_splice_sites{
   my ($self,$transcript) = @_;
+
+  my $verbose = 0;
     
   #print STDERR "checking splice sites in transcript:\n";
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
@@ -704,10 +706,10 @@ sub check_splice_sites{
 	next INTRON;
       }
 
-      print STDERR "Tim's script:\n";
+      print STDERR "Tim's script:\n" if $verbose;
       print STDERR "strand: + upstream (".
       	($upstream_start)."-".($upstream_end).") = $upstream_site, downstream ".
-        ($downstream_start)."-".($downstream_end).") = $downstream_site\n";
+        ($downstream_start)."-".($downstream_end).") = $downstream_site\n" if $verbose;
 
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
@@ -769,11 +771,11 @@ sub check_splice_sites{
 	print STDERR "problems retrieving sequence for splice sites\n";
 	next INTRON;
       }
-
-      print STDERR "Tim's script:\n";
+      
+      print STDERR "Tim's script:\n" if $verbose;
       print STDERR "strand: + upstream (".
 	($up_start)."-".($up_end).") = $upstream_site, downstream ".
-	  ($down_start)."-".($down_end).") = $downstream_site\n";
+	  ($down_start)."-".($down_end).") = $downstream_site\n" if $verbose;
 
       
       #print STDERR "strand: - upstream $upstream_site, downstream: $downstream_site\n";
@@ -797,7 +799,7 @@ sub check_splice_sites{
     print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
   }
   if ( $wrong > $correct ){
-    print STDERR "changing strand\n";
+    print STDERR "changing strand\n" if $verbose;
     return  $self->change_strand($transcript);
   }
   else{
