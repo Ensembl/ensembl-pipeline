@@ -85,7 +85,7 @@ sub analysis {
 }
 
 sub default_blast_parameters {
-    my( $self ) = @_;
+    my( $self, $ana ) = @_;
 
     return (
         '-query'            => $self->query,
@@ -101,8 +101,8 @@ sub _make_blast_parameters {
     my( $self ) = @_;
     
     # Set parameters from analysis object, or use defaults
-    my %param = $self->default_parameters;
     my $ana = $self->analysis or $self->throw('analysis not set');
+    my %param = $self->default_blast_parameters($ana);
     
     my( $arguments );
     foreach my $ele (split /\s*,\s*/, $ana->parameters) {
