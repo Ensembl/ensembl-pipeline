@@ -15,9 +15,6 @@ use vars qw(@ISA);
 
 $ENV{BLASTDB} = '/data/blastdb/Ensembl';
 
-BEGIN {
-    print "\nUSING " . __PACKAGE__ . "\n\n";
-}
 
 my %FASTA_HEADER;
 my %BLAST_FLAVOUR;
