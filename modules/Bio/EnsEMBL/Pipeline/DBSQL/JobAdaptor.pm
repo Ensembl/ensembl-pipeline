@@ -192,8 +192,8 @@ sub fetch_by_age {
         unless defined($age);
     #convert age from minutes to seconds
 
-    my $sth = $self->prepare(q{
-	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id
+    my $sth = $self->prepare(qq{
+	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id,
                j.stdout_file, j.stderr_file,
                j.retry_count
 	FROM   job j, job_status js
