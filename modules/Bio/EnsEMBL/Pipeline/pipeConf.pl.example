@@ -29,7 +29,7 @@ package main;
     'dbpass'     => '', #Database passwd for pipeline db
     'queue'      => '', #farm queue
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bsub_opt'   => '-CO',     # additional args to give to bsub
+    'bsub_opt'   => '-C0',     # additional args to give to bsub
     'bindir'     => '',
     'datadir'    => '',
     'usenodes'   => '',        # farm nodes to use (default all)
