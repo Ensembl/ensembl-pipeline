@@ -71,6 +71,9 @@ sub parse_results {
             elsif ( $name =~ /^\S+\s+(\S+)/ ) {
                 $name = $1;
             }
+            elsif ( $name =~ /^>(\S+)$/ ) {
+                $name = $1;
+            }
             else {
                 $self->throw("Can't parse name '$name'");
             }
