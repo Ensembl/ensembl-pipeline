@@ -215,7 +215,7 @@ while(1){
   }
   my $id_hash = $rulemanager->input_ids;
  INPUT_ID_TYPE:foreach my $type(keys(%$id_hash)){
-    next INPUT_ID_TYPE if ($input_id_type eq 'ACCUMULATOR');
+    next INPUT_ID_TYPE if ($type eq 'ACCUMULATOR');
     my @id_list = keys(%{$id_hash->{$type}});
     @id_list = shuffle(@id_list) if $shuffle;
    INPUT_ID:foreach my $input_id(@id_list){
