@@ -400,16 +400,12 @@ sub run_program {
         my $cmd = $self->program .' '. 
 	   	  $database      .' '.
 		  $self->filename.' '.
-		  $self->options . ' > ' . 
-		  $self->results."\n";
+		  $self->options . ' >> '. 
+		  $self->results;
         print STDERR "$cmd\n";   
 
         $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$self->database) 
-            unless ((system ($self->program .' '. 
-	   		     $database      .' '.
-			     $self->filename.' '.
-			     $self->options . ' > ' . 
-			     $self->results)) == 0) ;
+            unless ((system ($cmd)) == 0);
     }
 }
 
