@@ -62,14 +62,15 @@ use vars qw(@ISA);
 
 =head2 new
 
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
+ Title   : new
+ Usage   : $self->new(-DBOBJ       => $db,
+                      -INPUT_ID    => $id,
+                      -ANALYSIS    => $analysis
+	   );
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
-    Args    :   -db   :     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
+ Function: creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
+ Returns : Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS
+ Args    :      -db      :     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  A virtual contig ('chr_name.start.end')
                 -analysis:  A Bio::EnsEMBL::Analysis
 
@@ -105,13 +106,16 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $vc_str = $self->input_id;
-    my ($chr, $start, $end, $sgp) = $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
+    my ($chr, $start, $end, $sgp) =
+     $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
     $self->db->assembly_type($sgp) if $sgp;
 
-    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end);
+    my $slice = $self->db->get_SliceAdaptor->
+     fetch_by_chr_start_end($chr, $start, $end);
 
-    my $genseq = $slice->primary_seq() or $self->throw("Unable to fetch virtual contig");
+    my $genseq = $slice->primary_seq() or
+     $self->throw("Unable to fetch virtual contig");
 
     $self->vcontig($slice);
     $self->genseq($genseq);
@@ -120,6 +124,7 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;
+
     if ($runnable)
     {
         #extract parameters into a hash
@@ -138,11 +143,11 @@ sub runnable {
         }
         $parameters{'-java'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::EponineTSS object
-        $self->{'_runnable'} = $runnable->new
-	    ( '-threshold' => $parameters{'-threshold'},
-	      '-epojar' => $parameters{'-epojar'},
-	      '-java' => $parameters{'-java'},
-	      );
+        $self->{'_runnable'} = $runnable->new(
+	      '-threshold' => $parameters{'-threshold'},
+	      '-epojar'    => $parameters{'-epojar'},
+	      '-java'      => $parameters{'-java'}
+	);
     }
     return $self->{'_runnable'};
 }
@@ -150,54 +155,33 @@ sub runnable {
 
 sub write_output {
     my($self) = @_;
-    my $start;
     my $contig;
-    my ($raw_start, $raw_end);
 
-    my $db=$self->db();
-    my @features = $self->output();
-    my %feat_by_contig;
-  
+    my $db  = $self->db;
+    my $sfa = $db->get_SimpleFeatureAdaptor;
+
     my $vc = $self->vcontig;
+    my @mapped_features;
 
-    foreach my $f (@features) {
+    foreach my $f ($self->output) {
+
 	$f->analysis($self->analysis);
-	$start  = $f->start;
-	my ($raw, $raw_pos) = $vc->raw_contig_position($start);
-	if ($raw && $raw_pos) {
-	    if ($raw->static_golden_ori == 1) {
-		$raw_start = $raw_pos;
-		$raw_end = $f->end + $raw_start - $start;
-	    }
-	    else {
-		$raw_end = $raw_pos;
-		$raw_start = $start - $f->end + $raw_end;
-	    }
-	    my $raw_end = $f->end + $raw_start - $start;
-	    $feat_by_contig{$raw->id} = [] unless defined $feat_by_contig{$raw->id};
-	    $f->start($raw_start);
-	    $f->end($raw_end);
-	    push @{$feat_by_contig{$raw->id}}, $f;
+	$f->contig($vc);
+
+	my (@mapped) = $f->transform;
+
+	unless (@mapped == 1) {
+	    print STDERR "Warning: can't map $f";
+	    next;
 	}
+
+	push @mapped_features, $mapped[0];
+
+	my $contig_id = $f->contig->dbID;
     }
 
-    foreach my $contig_id (keys %feat_by_contig) {
-	eval {
-	    $contig = $db->get_Contig($contig_id);
-	};
-	print $contig, "\n";
-	print length($@), "\n";
+    $sfa->store(@mapped_features);
 
-	if ($@) {
-	    print STDERR "Contig not found, skipping writing output to db: $@\n";
-	}
-	elsif (@features = @{$feat_by_contig{$contig_id}}) {
-	    print STDERR "Writing features to database\n";
-	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	    $feat_adp->store($contig, @features);
-	}
-
-    }
     return 1;
 }
 
