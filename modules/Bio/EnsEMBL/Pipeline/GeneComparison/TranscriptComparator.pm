@@ -45,16 +45,19 @@ intron_mismatch = INT -----------> Maximum number of bases that we consider for 
                                    The reason for this is that we do not expect very very small intron to be
                                    real
 
-restrict_external_splice_site ---> TRUE if we want to restrict how much can exceed
+restrict_internal_splice_overlap ---> value if we want to restrict how much can exceed
                                    an external exon an internal splice site:
     
                                                     |--d--|
                                     ######-------##########
                                    #######-------####-------------#######
     
-                                   If TRUE 'd' must be <= splice_mismatch, else 'd' can be anything
-                                   The difference 'd' could be due to a true splice site, but with
-                                   ESTs it is most likely to be an artifact
+                                   If defined and not 0,  'd' must be <= value, 
+                                   If defined but = 0, then we do not allow the exon to overlap the other intron.
+                                   If it is not defined, 'd' is allowed to be anything
+                                   The difference 'd' could be due to an alternative 3prime end. 
+                                   I could be also due to an alternative splice site, but with
+                                   ESTs it is difficult to tell.
     
 
 comparison_level = INT ----------> There are currently 5 comparison levels:
@@ -117,12 +120,12 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ( $comparison_level, $exon_match, $splice_mismatch, $intron_mismatch, $restrict_external_splice_site ) = 
+  my ( $comparison_level, $exon_match, $splice_mismatch, $intron_mismatch, $restrict_internal_splice_overlap ) = 
     $self->_rearrange([qw(COMPARISON_LEVEL
 			  EXON_MATCH
 			  SPLICE_MISMATCH
 			  INTRON_MISMATCH
-			  RESTRICT_EXTERNAL_SPLICE_SITE
+			  RESTRICT_INTERNAL_SPLICE_OVERLAP
 			  )],
 		      @args);
   
@@ -146,8 +149,8 @@ sub new{
       $self->intron_mismatch($intron_mismatch);
   }
   
-  if( defined $restrict_external_splice_site ){
-    $self->restrict_external_splice_site($restrict_external_splice_site);
+  if( defined $restrict_internal_splice_overlap ){
+    $self->restrict_internal_splice_overlap($restrict_internal_splice_overlap);
   }
 
   $self->verbose(0);
@@ -193,12 +196,12 @@ sub splice_mismatch{
   return $self->{_splice_mismatch};
 }
 
-sub restrict_external_splice_site{
-    my ($self, $boolean) = @_;
-    if ( defined $boolean ){ 
-	$self->{_restrict_external_splice_site} = $boolean;
+sub restrict_internal_splice_overlap{
+    my ($self, $int) = @_;
+    if ( defined $int ){ 
+	$self->{_restrict_internal_splice_overlap} = $int;
     }
-    return $self->{_restrict_external_splice_site};
+    return $self->{_restrict_internal_splice_overlap};
 }
 
 sub intron_mismatch{
@@ -688,7 +691,7 @@ sub discrete_compare{
       print STDERR "INCLUSION\n" if $verbose;
       return 'inclusion';
     }
-    }
+  }
   else{
     print STDERR "here2: CLASH\n" if $verbose;
     return 'clash';
@@ -1084,8 +1087,8 @@ sub _check_high_site{
 	# if we restrict external splice sites, 
 	# we simply check that they do not exceed the splice_mismatch
 	############################################################
-	if ( $self->restrict_external_splice_site ){
-	  if ($last_exon->end - $middle_exon->end <= $self->splice_mismatch ){
+	if ( defined $self->restrict_internal_splice_overlap ){
+	  if ($last_exon->end - $middle_exon->end <= $self->restrict_internal_splice_overlap ){
 	    return 1;
 	  }
 	  else{
@@ -1136,8 +1139,8 @@ sub _check_low_site{
 	# if we restrict external splice sites, 
 	# we simply check that they do not exceed the splice_mismatch
 	############################################################
-	if ( $self->restrict_external_splice_site ){
-	  if ($middle_exon->start - $first_exon->start <= $self->splice_mismatch ){
+	if ( defined $self->restrict_internal_splice_overlap ){
+	  if ($middle_exon->start - $first_exon->start <= $self->restrict_internal_splice_overlap ){
 	    return 1;
 	  }
 	  else{
