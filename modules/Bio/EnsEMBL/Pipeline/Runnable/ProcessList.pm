@@ -72,7 +72,7 @@ sub _initialize {
 sub run {
     my ($self) = @_;
 
-    open(IN,"ps -elf --no-heading|");
+    open(IN,"ps -ealf |");
 
     my @proc;
     my $count = 0;
