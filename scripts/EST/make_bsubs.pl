@@ -135,7 +135,7 @@ sub make_exonerate_bsubs {
   my $estfile = $::scripts_conf{'estfile'}; # may be a full path
   my @path = split /\//, $estfile;
   $estfile = $path[$#path];
-  $estfile .= "_reruns_chunk_";
+  $estfile .= "_chunk_";
 
   my $numchunks = $::scripts_conf{'estchunknumber'};
 
@@ -149,7 +149,7 @@ sub make_exonerate_bsubs {
     my $outfile   = $bsubout . $chunk;
     my $errfile   = $bsuberr . $chunk;
     
-    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$check $chunk\" $exonerate_est -chunkname $chunk";
+    my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$check $chunk\" $exonerate_est -chunkname $chunk";
     print OUT "$command\n";
   }
   
