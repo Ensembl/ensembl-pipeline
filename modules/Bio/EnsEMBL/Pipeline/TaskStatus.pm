@@ -135,25 +135,25 @@ sub _check{
 
 sub add_created{
     my ($self, $arg) = @_;
-   
+
     my $idset = $self->_check($arg);
     if(!$self->{'_created'}){
       $self->{'_created'} = $idset;
     }else{
-      my $total = $self->{'_created'}->or($idset);
-      $self->{'_created'} = $total;
+      $self->{'_created'} = ($self->{'_created'}) ?
+        $self->{'_created'}->or($idset) : $idset;
     }
 }
 
 sub add_submitted{
     my ($self, $arg) = @_;
-   
+
     my $idset = $self->_check($arg);
     if(!$self->{'_submitted'}){
       $self->{'_submitted'} = $idset;
     }else{
-      my $total = $self->{'_submitted'}->or($idset);
-      $self->{'_submitted'} = $total;
+      $self->{'_submitted'} = ($self->{'_submitted'}) ?
+        $self->{'_submitted'}->or($idset) : $idset;
     }
 }
 
@@ -164,8 +164,8 @@ sub add_reading{
     if(!$self->{'_reading'}){
       $self->{'_reading'} = $idset;
     }else{
-      my $total = $self->{'_reading'}->or($idset);
-      $self->{'_reading'} = $total;
+      $self->{'_reading'} = ($self->{'_reading'}) ?
+        $self->{'_reading'}->or($idset) : $idset;
     }
 }
 
@@ -176,23 +176,23 @@ sub add_running{
     if(!$self->{'_running'}){
       $self->{'_running'} = $idset;
     }else{
-      my $total = $self->{'_running'}->or($idset);
-      $self->{'_running'} = $total;
+    $self->{'_running'} = ($self->{'_running'}) ?
+      $self->{'_running'}->or($idset) : $idset;
     }
 }
 
 
 
 sub add_successful{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
 
-    my $idset = $self->_check($arg);
-    if(!$self->{'_successful'}){
-      $self->{'_successful'} = $idset;
-    }else{
-      my $total = $self->{'_successful'}->or($idset);
-      $self->{'_successful'} = $total;
-    }
+  my $idset = $self->_check($arg);
+  if(!$self->{'_successful'}){
+    $self->{'_successful'} = $idset;
+  }else{
+    $self->{'_successful'} = ($self->{'_successful'}) ?
+      $self->{'_successful'}->or($idset) : $idset;
+  }
 }
 
 sub add_writing{
@@ -202,8 +202,8 @@ sub add_writing{
     if(!$self->{'_writing'}){
       $self->{'_writing'} = $idset;
     }else{
-      my $total = $self->{'_writing'}->or($idset);
-      $self->{'_writing'} = $total;
+      $self->{'_writing'} = ($self->{'_writing'}) ?
+        $self->{'_writing'}->or($idset) : $idset;
     }
 }
 
@@ -214,8 +214,8 @@ sub add_failed{
     if(!$self->{'_failed'}){
       $self->{'_failed'} = $idset;
     }else{
-      my $total = $self->{'_failed'}->or($idset);
-      $self->{'_failed'} = $total;
+      $self->{'_failed'} = ($self->{'_failed'}) ?
+        $self->{'_failed'}->or($idset) : $idset;
     }
 }
 
@@ -227,8 +227,8 @@ sub add_fatal{
     if(!$self->{'_fatal'}){
       $self->{'_fatal'} = $idset;
     }else{
-      my $total = $self->{'_fatal'}->or($idset);
-      $self->{'_fatal'} = $total;
+      $self->{'_fatal'} = ($self->{'_fatal'}) ?
+        $self->{'_fatal'}->or($idset) : $idset;
     }
 }
 
@@ -239,8 +239,8 @@ sub add_killed{
     if(!$self->{'_killed'}){
       $self->{'_killed'} = $idset;
     }else{
-      my $total = $self->{'_killed'}->or($idset);
-      $self->{'_killed'} = $total;
+      $self->{'_killed'} = ($self->{'_killed'}) ?
+        $self->{'_killed'}->or($idset) : $idset;
     }
 }
 
@@ -250,8 +250,8 @@ sub add_existing{
     if(!$self->{'_existing'}){
       $self->{'_existing'} = $idset;
     }else{
-      my $total = $self->{'_exisiting'}->or($idset);
-      $self->{'_existing'} = $total;
+      $self->{'_existing'} = ($self->{'_existing'}) ?
+        $self->{'_existing'}->or($idset) : $idset;
     }
 }
 
