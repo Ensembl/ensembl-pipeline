@@ -87,7 +87,6 @@ use vars qw( %Databases );
 	      PSEUDO_DBUSER              => '',
 	      PSEUDO_DBPASS              => '',
               PSEUDO_DBPORT              => '',
-	     );
 	      # this db needs to have clone & contig & static_golden_path tables populated
 	      GB_FINALDBHOST             => '',
 	      GB_FINALDBNAME             => '',
