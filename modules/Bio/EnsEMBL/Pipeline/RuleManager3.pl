@@ -78,6 +78,7 @@ my $jobname   = $::pipeConf{'jobname'};
                             # aka "bsub -J <name>"
                             # maybe this should be compulsory, as
                             # the default jobname really isn't any use
+my $bsub      = $::pipeConf{'bsub_opt'};
 
 $| = 1;
 
@@ -190,10 +191,11 @@ my $sic         = $db->get_StateInfoContainer;
 
 my $LSF_params = {};
 
-$LSF_params->{'queue'}     = $queue if defined $queue;
-$LSF_params->{'nodes'}     = $nodes if $nodes;
+$LSF_params->{'queue'}     = $queue     if defined $queue;
+$LSF_params->{'nodes'}     = $nodes     if $nodes;
 $LSF_params->{'flushsize'} = $flushsize if defined $flushsize;
-$LSF_params->{'jobname'}   = $jobname if defined $jobname;
+$LSF_params->{'jobname'}   = $jobname   if defined $jobname;
+$LSF_params->{'bsub'}      = $bsub      if defined $bsub;
 
 # Fetch all the analysis rules.  These contain details of all the
 # analyses we want to run and the dependences between them. e.g. the

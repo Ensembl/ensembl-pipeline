@@ -35,6 +35,7 @@ package main;
 
     
     'batchsize'  => 1,         # no of jobs to send to LSF together
+    'bsub_opt'   => '-C0',
     'bindir'     => '/usr/local/ensembl/bin',
     'datadir'    => '/usr/local/ensembl/data',
     'usenodes'   => '',        # farm nodes to use (default all)
