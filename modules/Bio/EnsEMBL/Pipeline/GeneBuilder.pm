@@ -333,7 +333,7 @@ sub get_Similarities {
       }
     }
 
-#    print STDERR "Found " . scalar(@newfeatures) . " similarity features\n";
+    print STDERR "Found " . scalar(@newfeatures) . " similarity features\n";
     
     my @tmp;
 
@@ -504,7 +504,7 @@ sub  make_ExonPairs {
 	my $jend   = $i + 2;  if ($jend >= scalar(@exons)) {$jend    = scalar(@exons) - 1;}
 
 	J: for (my $j = $jstart ; $j <= $jend; $j++) {
-	    print ("Finding link to exon $j\n");
+#	    print ("Finding link to exon $j\n");
 	    next J if ($i == $j);
             next J if ($exons[$i]->strand != $exons[$j]->strand);
 	    next J if ($exons[$i]->{'temporary_id'}     eq $exons[$j]->{'temporary_id'});
@@ -513,8 +513,8 @@ sub  make_ExonPairs {
 
 	    my %doneidhash;
 
-	    print ("EXONS : " . $exon1->{'temporary_id'} . "\t" . $exon1->start . "\t" . $exon1->end . "\t" . $exon1->strand . "\n");
-	    print ("EXONS : " . $exon2->{'temporary_id'} . "\t" . $exon2->start . "\t" . $exon2->end . "\t" . $exon2->strand . "\n");
+#	    print ("EXONS : " . $exon1->{'temporary_id'} . "\t" . $exon1->start . "\t" . $exon1->end . "\t" . $exon1->strand . "\n");
+#	    print ("EXONS : " . $exon2->{'temporary_id'} . "\t" . $exon2->start . "\t" . $exon2->end . "\t" . $exon2->strand . "\n");
 
 	    # For the two exons we compare all of their supporting features.
 	    # If any of the supporting features of the two exons
@@ -1166,13 +1166,12 @@ sub make_Genes {
 	}
     }
 
-
-    foreach my $gene (@genes) {
-        $self->prune_Exons($gene);
-
-    }
-
     my @newgenes = $self->prune(@genes);
+
+    # deal with shared exons
+    foreach my $gene (@newgenes) {
+        $self->prune_Exons($gene);
+    }
 
     foreach my $gene (@newgenes) {
 	$self->add_Gene($gene);
@@ -1203,30 +1202,47 @@ sub each_Gene {
 
     return (@{$self->{'_genes'}});
 }
+
 sub prune_Exons {
     my ($self,$gene) = @_;
 
     my @unique_Exons; 
 
+
+    # keep track of all unique exons found so far to avoid making duplicates
+    # need to be very careful about translation->start_exon and translation->end_exon
+
     foreach my $tran ($gene->each_Transcript) {
        my @newexons;
-
        foreach my $exon ($tran->get_all_Exons) {
            my $found;
-           foreach my $uni (@unique_Exons) {
-              if ($uni->start  == $exon->start &&
-                  $uni->end    == $exon->end   &&
-                  $uni->strand == $exon->strand ) {
+	   #always empty
+           UNI:foreach my $uni (@unique_Exons) {
+              if ($uni->start  == $exon->start  &&
+                  $uni->end    == $exon->end    &&
+                  $uni->strand == $exon->strand &&
+		  $uni->phase  == $exon->phase  &&
+		  $uni->end_phase == $exon->end_phase
+		 ) {
                   $found = $uni;
-                  last $uni;
+                  last UNI;
               }
            }
            if (defined($found)) {
               push(@newexons,$found);
+	      if ($exon == $tran->translation->start_exon){
+		$tran->translation->start_exon($found);
+	      }
+	      if ($exon == $tran->translation->end_exon){
+		$tran->translation->end_exon($found);
+	      }
            } else {
               push(@newexons,$exon);
+	      push(@unique_Exons, $exon);
            }
-                 
+	   
+
+
          }          
       $tran->flush_Exon;
       foreach my $exon (@newexons) {
