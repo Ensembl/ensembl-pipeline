@@ -472,7 +472,7 @@ sub convert_output{
 
       # transfer the supporting evidence!!!
       foreach my $evi ( @evidence ){
-	$new_exon->add_Supporting_Feature( $evi );
+	$new_exon->add_supporting_features( $evi );
       }
 
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
