@@ -92,6 +92,40 @@ sub fetch_by_dbID {
   return $self->_objFromHashref( $rowHashRef );
 }
 
+
+=head2 fetch_by_dbID_list
+
+  Title   : fetch_by_dbID_list
+  Usage   : my $job = $adaptor->fetch_by_dbID_list
+  Function: Retrieves jobs from database by internal id
+  Returns : throws exception when something goes wrong.
+            undef if the id is not in the db.
+  Args    :
+
+=cut
+
+sub fetch_by_dbID_list {
+  my ($self, @id) = @_;
+
+  return undef unless @id;
+  my @jobs;
+  local $" = ',';   # are you local?
+
+  my $sth = $self->prepare( qq{
+    SELECT job_id, input_id, class, analysis_id, LSF_id, object_file,
+      stdout_file, stderr_file, retry_count
+    FROM job
+    WHERE job_id in (@id) } );
+
+  $sth->execute();
+  while (my $row = $sth->fetchrow_hashref) {
+    my $job = $self->_objFromHashref($row);
+    push(@jobs,$job);
+  }
+  return @jobs or undef;
+}
+
+
 =head2 fetch_by_Status_Analysis {
 
   Title   : fetch_by_Status_Analysis
