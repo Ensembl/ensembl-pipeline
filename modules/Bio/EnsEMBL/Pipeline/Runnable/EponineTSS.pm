@@ -148,8 +148,7 @@ sub new {
 #################
 # get/set methods 
 #################
-# really ough to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
-# to do!
+
 sub query {
   my ($self, $seq) = @_;
   if ($seq)
@@ -217,13 +216,6 @@ sub epojar {
 
 =cut
 
-sub threshold {
-    my ($self, $threshold) = @_;
-    if (defined $threshold) {
-      $self->{'_threshold'} = $threshold ;
-    }
-    return $self->{'_threshold'};
-}
 
 ###########
 # Analysis methods

@@ -172,6 +172,18 @@ sub threshold {
   return  $self->{'_threshold'};
 }
 
+
+sub threshold_type {
+    my($self, $value) = @_;
+
+    if (defined($value)) {
+	$self->{'_threshold_type'} = $value;
+    }
+
+    return $self->{'_threshold_type'};
+}
+
+
 =head2 workdir
 
     Title   :   workdir

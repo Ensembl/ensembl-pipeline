@@ -731,25 +731,6 @@ sub database {
 
 =cut
 
-sub threshold {
-    my($self,$arg) = @_;
-    
-    if (defined($arg)) {
-      $self->{'_threshold'} = $arg;
-    }
-
-    return $self->{'_threshold'};
-}
-
-sub threshold_type {
-    my($self,$arg) = @_;
-    
-    if (defined($arg)) {
-      $self->{'_threshold_type'} = $arg;
-    }
-
-    return $self->{'_threshold_type'};
-}
 
 =head2 options
 

@@ -97,8 +97,7 @@ sub new {
 #################
 # get/set methods 
 #################
-# really ought to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
-# to do!
+
 sub query {
     my ($self, $seq) = @_;
     if ($seq)
