@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder->new(
-					     -dbobj     => $db,
+					     -db     => $db,
 					     -input_id  => $id
                                              );
     $obj->fetch_input
@@ -60,7 +60,12 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_DBUSER
 					 GB_DBPASS
 					 GB_FINAL_GENETYPE
-					 );
+					 GB_INPUTID_REGEX
+					 GB_COMB_DBHOST
+					 GB_COMB_DBNAME
+					 GB_COMB_DBUSER
+					 GB_COMB_DBPASS
+					);
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -228,7 +233,7 @@ sub write_output {
     # this now assummes that we are building on a single VC.
     my $genebuilders = $self->get_genebuilders;
     my ($contig)     = keys %$genebuilders;
-    my $vc = $genebuilders->{$contig}->contig;
+    my $vc = $genebuilders->{$contig}->slice;
 
     @genes = $genebuilders->{$contig}->each_Gene;
 
@@ -275,38 +280,48 @@ sub write_output {
 
 sub fetch_input {
     my( $self) = @_;
-
+    
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig;
+    my $slice;
 
     if ($self->use_vcontig) {
-      my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
+      my $slice_adaptor = $self->db->get_SliceAdaptor();
       
-      $contigid =~ /(.*)\.(.*)\-(.*)/;
+      $contigid =~/$GB_INPUTID_REGEX/;
       
       my $chr   = $1;
       my $start = $2;
       my $end   = $3;
-    
-      #    print STDERR "Chr $chr - $start : $end\n";
-      $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
-
-      $contig->primary_seq;
-
-      #    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
+      print STDERR "Chr $chr - $start : $end\n";
+      $slice   = $slice_adaptor->fetch_by_chr_start_end($chr,$start,$end);
     }
     else {
-      $contig = $self->db->get_Contig($contigid);
+      $slice = $self->db->get_Contig($contigid);
     }
+    # database where all the genewise and combined genes are:
+    my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						      '-host'   => $GB_COMB_DBHOST,
+						      '-user'   => $GB_COMB_DBUSER,
+						      '-dbname' => $GB_COMB_DBNAME,
+						      '-pass'   => $GB_COMB_DBPASS,
+						      '-dnadb'  => $self->db,
+						     );
+    print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
+    
+    
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
-							      '-contig'   => $contig,
+							      '-slice'   => $slice,
 							      '-input_id' => $self->input_id,
-							      );
-    $self->addgenebuilder($genebuilder,$contig);
-
+							     );
+    $genebuilder->genes_db($genes_db);
+    $self->addgenebuilder($genebuilder,$slice);
+    
 }
+
+############################################################
+
 sub focuscontig {
     my ($self,$arg) = @_;
     
@@ -337,6 +352,7 @@ sub extend {
     return $self->{_extend} || 400000;
 }
 
+
 sub addgenebuilder {
     my ($self,$arg,$contig) = @_;
 
@@ -356,7 +372,7 @@ sub get_genebuilders {
 sub check_gene {
    my ($self,$gene) = @_;
 
-   foreach my $tran ($gene->get_all_Transcripts) {
+   foreach my $tran (@{$gene->get_all_Transcripts}) {
       my $seq = $tran->translate->seq;
 
       if ($seq =~ /\*/) {
@@ -364,34 +380,40 @@ sub check_gene {
       }
    }
 }
+
+############################################################
 	
 sub run {
-    my ($self) = @_;
-
-    my $genebuilders = $self->get_genebuilders;
-    #my @gene;
-
-    $self->{'_output'} = [];
+  my ($self) = @_;
+  
+  my $genebuilders = $self->get_genebuilders;
+  
+  #my @gene;
+  
+  $self->{'_output'} = [];
+  
+  my @vcgenes;
+  foreach my $contig (keys %{ $genebuilders } ) {
+    my $vc = $genebuilders->{$contig}->slice;
+    print(STDERR "Building for $contig\n");
     
-    my @vcgenes;
-    foreach my $contig (keys %$genebuilders) {
-        my $vc = $genebuilders->{$contig}->contig;
-#	print(STDERR "Building for $contig\n");
-	$genebuilders->{$contig}->build_Genes;
-	@vcgenes = @{$genebuilders->{$contig}{_genes}};
-#       print STDERR "Genes before conversion\n";
-#	$vc->_dump_map(\*STDERR);
-#        $genebuilders->{$contig}->print_Genes(@vcgenes);
-#        print STDERR "Converting coordinates\n";
-        #foreach my $g (@vcgenes) {
-        #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
-           #$self->check_gene($newgene);
-	#   push(@gene,$newgene);
-        #}
-    }
+    $genebuilders->{$contig}->build_Genes;
+    @vcgenes = @{$genebuilders->{$contig}{_genes}};
     
-	    
-    push(@{$self->{'_output'}},@vcgenes);
+    #       print STDERR "Genes before conversion\n";
+    #	$vc->_dump_map(\*STDERR);
+    #        $genebuilders->{$contig}->print_Genes(@vcgenes);
+    #        print STDERR "Converting coordinates\n";
+    #foreach my $g (@vcgenes) {
+    #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
+    #$self->check_gene($newgene);
+    #   push(@gene,$newgene);
+    #}
+  }
+    
+  
+  push(@{$self->{'_output'}},@vcgenes);
 }
+
 
 1;
