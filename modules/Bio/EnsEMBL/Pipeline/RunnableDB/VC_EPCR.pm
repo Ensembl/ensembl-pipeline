@@ -159,88 +159,39 @@ sub runnable {
 
 sub write_output {
     my($self) = @_;
-    my $start;
-    my $contig;
-    my ($raw_start, $raw_end);
-    my ($hit_start, $hit_end);
-    my $max_walk = 15;   # max bp to walk until start of raw contig
 
-    my $db=$self->db();
-    my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
+    my $db  = $self->db;
+    my $sfa = $self->db->get_SimpleFeatureAdaptor;
     
-    my @features = $self->output();
-    my %feat_by_contig;
+    my @mapped_features;
   
     my $vc = $self->slice;
 
-    foreach my $f (@features) {
+    foreach my $f ($self->output) {
+
 	$f->analysis($self->analysis);
-	$hit_start = $f->start;
-	$hit_end   = $f->end;
-	my ($raw1, $raw1_pos);  # contig with hit start
-	my ($raw2, $raw2_pos);  # contig with hit end
-	my $raw;
+	$f->contig($vc);
+	my @mapped = $f->transform;
 
-	# if a primer has N's at the 5' end, the start of the STS as
-	# reported may be in a gap region. need to walk along until
-	# a raw contig is found.
-
-	# get raw ctg/pos correspondong to start of STS
-	# walk along until we can map the STS start to a raw contig
-	my $walkies = 0;
-	while ($walkies < $max_walk and ! ref $raw1) {
-	    ($raw1, $raw1_pos) = $vc->raw_contig_position($hit_start);
-	    $hit_start++;
-	}
-	$hit_start--;
-
-	$walkies = 0;
-	# get raw ctg/pos correspondong to end of STS
-	# walk along until we can map the STS end to a raw contig
-	while ($walkies < $max_walk and ! ref $raw2) {
-	    ($raw2, $raw2_pos) = $vc->raw_contig_position($hit_end);
-	    $hit_end--;
-	}
-	$hit_end++;
-
-	# exclude 'sticky' markers - spanning two raw contigs
-	# we should deal with this somehow ...
-	unless ($raw1->id eq $raw2->id) {
-	    # yikes - sticky marker
-	    print STDERR "Ignoring marker spanning two raw contigs: ";
-	    print STDERR $raw1->id, " ", $raw2->id, "\n";
+        if (@mapped == 0) {
+	    $self->warn("Couldn't map $f - skipping");
 	    next;
-	}
-	$raw       = $raw1;
-	$raw_start = $raw1_pos;
-	$raw_end   = $raw2_pos;
+        }
+        if (@mapped == 1 && $mapped[0]->isa("Bio::EnsEMBL::Maper::Gap")) {
+	    $self->warn("$f seems to be on a gap - something bad has happened ...");
+	    next;
+        }
 
-	if ($raw->static_golden_ori != 1) {
-	    ($raw_start, $raw_end) = ($raw_end, $raw_start);
-	}
+	# if a primer has N's at the 5' end, the reported start of
+	# the STS may be in a gap region. ignoring these cases.
+	# if this happens, the best solution is probably to edit
+	# the primer
 
-	$feat_by_contig{$raw->id} = [] unless defined $feat_by_contig{$raw->id};
-	$f->start($raw_start);
-	$f->end($raw_end);
-	push @{$feat_by_contig{$raw->id}}, $f;
-    }
-
-    foreach my $contig_id (keys %feat_by_contig) {
-	eval {
-	    $contig = $db->get_RawContigAdaptor->fetch_by_name($contig_id);
-	};
-
-	if ($@) {
-	    print STDERR "Contig not found, skipping writing output to db: $@\n";
-	}
-	elsif (@features = @{$feat_by_contig{$contig_id}}) {
-	  foreach my $f(@features){
-	    $f->analysis($self->analysis);
-	    $simple_f_a->store($contig->dbID, $f);
-	  }
-	}
+	push @mapped_features, $mapped[0];
 
     }
+    $sfa->store(@mapped_features);
+
     return 1;
 }
 
