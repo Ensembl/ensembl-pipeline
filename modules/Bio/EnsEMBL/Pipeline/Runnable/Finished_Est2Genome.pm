@@ -1,8 +1,8 @@
 #
 #
-# 
+# Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
-# Copyright GRL
+# Copyright Michele Clamp
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -12,31 +12,34 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome
+Bio::EnsEMBL::Pipeline::Runnable::Est2Genome
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome->new(
-									 -genomic => $genseq,
-									 -est     => $estseq 
-									);
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new(
+                                             -genomic => $genseq,
+                                             -est     => $estseq 
+                                             );
     or
     
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome->new()
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new()
 
 =head1 DESCRIPTION
 
-needs to parse and output the data differenty to the standard est2genome so implements only methods where this has changed
+Object to store the details of an est2genome run.
+Stores the est2genome matches as an array of Bio::EnsEMBL::FeaturePair
 
 =head2 Methods:
 
-run
-_createfeature
-convert_output
+ new,
+ genomic_sequence,
+ est_sequence,
+ run,
+ output.
 
 =head1 CONTACT
 
-ensembl-dev <ensembl-dev@ebi.ac.uk>
+Describe contact details here
 
 =head1 APPENDIX
 
@@ -80,11 +83,11 @@ use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 sub run {
     my ($self, @args) = @_;
     
-   
+    # some constant strings
     my $source_tag  = "est2genome";
     my $dirname     = "/tmp/";
     
-    
+    #flag for est strand orientation
     my $estOrientation; 
     
     #check inputs
@@ -92,7 +95,8 @@ sub run {
         $self->throw("Genomic sequence not provided");
     my $estseq = $self->est_sequence ||
         $self->throw("EST sequence not provided");
-    
+    #print "running est2genome\n";
+    #extract filenames from args and check/create files and directory
     my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
     my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
     my $output_file = $estfile.".output";    
@@ -110,9 +114,9 @@ sub run {
     }
         
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-    #my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile | tee -a $output_file | "; 
-    #debug line so ouput of est2genome can be looked at
+    # my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
+    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile | tee -a $output_file | "; 
+    #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
       #print (STDERR "Running command $est_genome_command\n");
       open (ESTGENOME, $est_genome_command) 
@@ -120,7 +124,7 @@ sub run {
       
       #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
-  
+      #print STDERR "firstline: \t$firstline\n";
       # put the gene on the minus strand iff splice sites imply reversed gene
       if ($firstline =~ /REVERSE/) { 
 	#print STDERR "***reversed gene***\n"; 
@@ -184,7 +188,7 @@ sub run {
                     $est_strand *= -1;
                 }
             }
-            
+            #print "results score ",$score," percent_id ", $percent_id," start ",$gen_start," end ",$gen_end," id ", $gen_id," hstart ",$est_start," hend ", $est_end," hid ", $est_id,"\n";
 	    $source_tag, 
 	    $gen_strand, $est_strand,
  	    $self->_createfeatures ($score, $percent_id,
@@ -204,8 +208,8 @@ sub run {
       $self->convert_output;
 
     };
-    $self->_deletefiles($genfile, $estfile);
-    #$self->_deletefiles($genfile, $estfile, $output_file);
+    #$self->_deletefiles($genfile, $estfile);
+    $self->_deletefiles($genfile, $estfile, $output_file);
     if ($@) {
         $self->throw("Error running est_genome [$@]\n");
     } else {
@@ -215,24 +219,12 @@ sub run {
 
 
 
-=head2 _createfeatures
-
-  Args   : $self, 
-  Function  : create a feature pair using the data provided abouyt the two features
-  Returntype: feature pair
-  Exceptions: none
-  Caller    : 
-  Example   : 
-
-=cut
-
-
 
 
 sub _createfeatures {
     my ($self, $f1score, $f1percent_id, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id, $f1source, $f1strand, $f2strand, $f1primary) = @_;
     
-   
+    #print "creating feature pair ".$f1primary." ".$f1source." \n";
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
                                 (-db              => "none",
                                  -db_version      => "none",
@@ -268,19 +260,6 @@ sub _createfeatures {
     push(@{$self->{'_fplist'}}, $fp);
     #print "the new fp has ".$fp->source_tag." ".$fp->primary_tag."\n";
 }
-
-
-
-=head2 convert_output
-
-  Arg [1]   : self 
-  Function  : splits the feature pair list in to spans, exons and segments and returns an array of segments
-  Returntype: array of featurepairs
-  Exceptions: none
-  Caller    : 
-  Example   : 
-
-=cut
 
 
 sub convert_output {

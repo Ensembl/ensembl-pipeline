@@ -119,7 +119,7 @@ sub new {
     if($no_blast == 0){
       #print $no_blast."\n";
       if ($query) {
-	$self->query($query);
+	$self->clone($query);
       } else {
 	if(!$no_blast){
 	  $self->throw("No query sequence input.");
@@ -192,12 +192,12 @@ sub new {
   Returntype: the varible to be set
   Exceptions: some throw exceptions if not passed the correct varible
   Caller    : $self
-  Example   : $query = $self->query;
+  Example   : $clone = $self->clone;
 
 =cut
 
 
-sub query {
+sub clone {
     my ($self, $seq) = @_;
     if ($seq) {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
@@ -434,7 +434,7 @@ sub run {
     @blast_output = $self->features;
     
   }else{
-    my $seq = $self->query || $self->throw("Query seq required for blast\n");
+    my $seq = $self->clone || $self->throw("Query seq required for blast\n");
     
     
     @blast_output = $self->run_blasts();
@@ -475,7 +475,7 @@ sub run_blasts {
    
   my ($self) = @_;
   #print "running blasts\n";
-  my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query => $self->query,
+  my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query => $self->clone,
 							   -program => $self->program,
 							   -database => $self->database,
 							   -threshold => $self->threshold,
@@ -565,42 +565,7 @@ sub expand_and_merge_features {
       my $genomic_end   = $feature->end;
       my $hstart        = $feature->hstart;
       my $hend          = $feature->hend;
-      
-      # hopefully this will explain the cooridnate changes done in the code
-      # hit is on the forward strand
-      #          genomic  10    15
-      #          hit       6    11
-      #  hit               ||||||
-      #           1                      24
-      #  genomic  ------------------------
-      #               1          12
-      #  est          ++++++++++++
-      #
-      # the padding here will be 2
-      # the code below will extend the genomic coorordinates of the hit to include enough sequence so the entire est should be covered plus some padding
-      #
-      # this is the transform which would be done on the example above
-      # $feature->start($genomic_start - ($hstart + $padding));
-      # $feature->start(10             - (6       +  2)      ) = 2
-      # $feature->end($genomic_end + ($hid_len - $hend) + $padding);
-      # $feature->end (15          + ((12      - 11   ) + 2)      ) = 18 
-      #
-      #
-      # in the end the match would look like this
-      #   genomic 2               18
-      #   hit       1    6     12
-      # hit       |||||||||||||||||
-      #            
-      # genomic  ------------------------
-      #          1                      24
-      #             1          12
-      # est         ++++++++++++
-      #
-      #if start is ever extneded beyond the start of teh sequence or end beyond the end the values are set to the start and end of the sequence
-      #e.g if $feature->end($genomic_end + ($hid_len - $hend) + $padding) = 27 in this case it would then be set back too 24 or if 
-      #$feature->start produce -4 it would be set back too 1;
-      
-      if ($feature->strand == 1) { 
+      if ($feature->strand == 1) {
 	$feature->start($genomic_start - ($hstart + $padding));
 	if ($feature->start < 1) {
 	  $feature->start(1);
@@ -667,14 +632,10 @@ sub expand_and_merge_features {
 sub fuse_overlapping_features {
     my ($self, $features) = @_;
 
-    #this code merges overlapping and abutting features taking the lesser start and teh greater end for the final feature features must be sorted by start
-    #cooridinates and separated by strand for this to work properly
     for (my $i = 1; $i < @$features;) {
         my $f_a = $features->[$i - 1];
         my $f_b = $features->[$i];
-        if($f_a->strand != $f_b->strand){
-	  $self->throw("strands don't match ".$f_a->strand." != ".$f_b->strand."\n");
-	}
+        
         # If coordinates overlap or abut
         if ($f_a->end + 1 >= $f_b->start) {
             # Transfer the end of b to a if b ends beyond a
