@@ -11,35 +11,37 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
+Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 
 =head1 SYNOPSIS
-$database  = a full path location for the directory containing the target (genomic usually) sequence,
+$database  = a full path location for the directory containing 
+             the target (genomic usually) sequence,
 @sequences = a list of Bio::Seq objects,
 $exonerate = a location for the binary,
 $options   = a string with options ,
 
-  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
-								 -database      => $database,
-								 -query_seqs    => \@sequences,
-								 -query_type    => 'dna',
-			                                         -target_type   => 'dna',
-                                                                 -exonerate     => $exonerate,
-								 -options       => $options,
-								);
+  my $runnable = 
+    Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
+		     -database      => $database,
+		     -query_seqs    => \@sequences,
+		     -query_type    => 'dna',
+		     -target_type   => 'dna',
+		     -exonerate     => $exonerate,
+		     -options       => $options);
 
  $runnable->run; #create and fill Bio::Seq object
  my @results = $runnable->output;
  
- where @results is an array of SeqFeatures, each one representing an alignment (e.g. a transcript), 
- and each feature contains a list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
+ where @results is an array of SeqFeatures, each one representing 
+ an alignment (e.g. a transcript), and each feature contains a 
+ list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
  in fact feature pairs.
  
 =head1 DESCRIPTION
 
-NewExonerate takes a Bio::Seq (or Bio::PrimarySeq) object and runs Exonerate
-against a set of sequences.  The resulting output file is parsed
-to produce a set of features.
+Exonerate takes a Bio::Seq (or Bio::PrimarySeq) object and runs 
+Exonerate against a set of sequences.  The resulting output file 
+is parsed to produce a set of features.
 
  here are a few examples of what it can do at this stage:
 
@@ -74,7 +76,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
+package Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
 use vars qw(@ISA);
 use strict;
