@@ -51,12 +51,6 @@ use vars qw( %General );
 	    # chrname.start-end would be matched by (\S+)\.(\d+)-(\d+)
 	    GB_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
 
-	    # specify the repeat analysis logicname you want when
-	    # retrieving repeatmasked sequence eg RepeatMask, tandem
-	    # repeats, low complexity repeats (presently only
-	    # RepeatMask repeats are available)
-	    GB_REPEAT_MASKING => ['RepeatMask'],
-
 	    # skip blastminigenewise stage? Only relevant for Contig_BMG
 	    GB_SKIP_BMG   =>  0,
 	    GB_BMG_FILTER => 0,  #whether to filter blast hits from blast on score

@@ -74,7 +74,10 @@ use vars qw( %Similarity );
 
 	       # gene type for FPC_BlastMiniGenewise
 	       GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
-	       
+	       GB_SIMILARITY_MASKING => ['RepeatMask'],
+	     #the above setting will lead to RepeatMasker features being masked out, if [] is used no masking will take place, if [''] is used all repeats in the table will be masked out
+	     #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
+	       GB_SIMILARITY_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
 	   );
 
 sub import {
