@@ -191,6 +191,9 @@ sub find_exact_matches{
   
   my @human_transcripts = @{$human_gene->get_all_Transcripts};
   my @mouse_transcripts = @{$mouse_gene->get_all_Transcripts};
+
+  my $gene_id1 = $human_gene->stable_id || $human_gene->dbID;
+  my $gene_id2 = $mouse_gene->stable_id || $mouse_gene->dbID;
   
   ############################################################
   # we make a pair only if the transcripts align with gaps 
@@ -238,31 +241,60 @@ sub find_exact_matches{
   ############################################################
   # check with te genomic alignment that the exons are
   # really overlapping each other:
+  my $conserved_count        = 0;
+  my $skipped_exons_count    = 0;
+  my $terminal_missing_count = 0;
+  my $all_conserved_count    = 0;
 
- GENE:
+ HUMAN:
   foreach my $human_t ( $best_pairs_object->list1 ){
-    
-  MOUSE:
-    foreach my $mouse_t ( $best_pairs_object->partners( $human_t ) ){
       
-      ############################################################
-      # blastz genomic extent of transcripts
-      my $id1 = $human_t->stable_id || $human_t->dbID;
-      my $id2 = $mouse_t->stable_id || $mouse_t->dbID;
-      print STDERR "comparing genomic extent of $id1 and $id2:\n";
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($human_t);
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($mouse_t);
-      
-      my ($missing_terminal_exons, $exon_skipping, $all_conserved) = $self->blast_genomic_isoforms( $human_t, $mouse_t, $coding_exons );
-      
-      #if ( $all_exons_match ){
-      #    $object_map->match($human_t, $mouse_t, 1); 
-      #    print STDERR "Pair ( $id1 , $id2 ) all exons match\n";
-      #    $exon_pairs{$human_t} = $exon_pairs;
-      #    next HUMAN;
-      #}
-    } 
+    MOUSE:
+      foreach my $mouse_t ( $best_pairs_object->partners( $human_t ) ){
+	  
+	  ############################################################
+	  # blastz genomic extent of transcripts
+	  my $id1 = $human_t->stable_id || $human_t->dbID;
+	  my $id2 = $mouse_t->stable_id || $mouse_t->dbID;
+	  print STDERR "comparing genomic extent of $id1 and $id2:\n";
+	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($human_t);
+	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($mouse_t);
+	  
+	  my ($missing_terminal_exons, $exon_skipping, $all_conserved) = $self->blast_genomic_isoforms( $human_t, $mouse_t, $coding_exons, $gene_id1, $gene_id2);
+	  
+	  if ($exon_skipping ){
+	      $skipped_exons_count++;
+	  }
+	  if ($missing_terminal_exons){
+	      $terminal_missing_count++;
+	  }
+	  unless ( $exon_skipping || $missing_terminal_exons ){
+	      $conserved_count++;
+	  }
+	  if ( $all_conserved ){
+	      $all_conserved++;
+	  }
+	  
+	  #$self->print_alignment( $element1, $partner, \@score_matrix);
+	  
+      }
   }
+  
+  my $human_id = $gene_id1;
+  my $mouse_id = $gene_id2;
+  my $human_trans_count = scalar(@human_transcripts);
+  my $mouse_trans_count = scalar(@mouse_transcripts);
+  print STDERR "BLASTZ_GENEPAIR\t".
+      "$human_id\thuman_trans_count:$human_trans_count\t".
+	  "$mouse_id\tmouse_trans_count:$mouse_trans_count\t".
+	    "pairs:$pair_count\t".
+		  "conserved:$conserved_count\t".
+		      "with_skipped_exons:$skipped_exons_count\t".
+			  "with_missing_terminals:$terminal_missing_count\n";
+  
+
+
+  
 }
 
 
@@ -276,9 +308,9 @@ sub find_exact_matches{
 
 
 sub blast_genomic_isoforms{
-  my ( $self,$tran1,$tran2, $coding_exons , $padding) = @_;
+  my ( $self,$tran1, $tran2, $coding_exons , $gene_id1, $gene_id2) = @_;
   
-  $padding = 500;
+  my $padding = 500;
   # query
   my $id1;
   if ( $tran1->dbID ){
@@ -390,7 +422,7 @@ sub blast_genomic_isoforms{
   my $transcript2 = $self->map_to_slice( $copy2,$seq2 );
   
   my @exon_pairs;
-  my ($exon_object_map, $exon_map) = $self->get_exon_pairs( $transcript1, $transcript2, \@featurepairs ,$coding_exons);
+  my ($exon_object_map, $exon_map) = $self->get_exon_pairs( $transcript1, $transcript2, \@featurepairs ,$coding_exons, $gene_id1, $gene_id2);
   
   return ($exon_object_map, $exon_map);
 }
@@ -410,7 +442,7 @@ sub map_to_slice{
 ############################################################
 
 sub get_exon_pairs{
-  my ($self, $tran1, $tran2, $features, $coding ) = @_;
+    my ($self, $tran1, $tran2, $features, $coding , $gene_id1, $gene_id2) = @_;
     
   my @features = @$features;
   my @exons1 = @{$self->get_Exons( $tran1,$coding)};
@@ -483,11 +515,12 @@ sub get_exon_pairs{
 		      my $pos1 = 0;
 		      my $pos2 = 0;
 		      my @sub_blocks;
-		
-		      # flag when we are in an exon-match
+		      
 		      my $in_exon1 = 0;
 		      my $in_exon2 = 0;
-
+		      my $seen_exon1 = 0;
+		      my $seen_exon2 = 0;
+		      
 		      ############################################################
 		      # coordinates of the blocks on the sequences system:
 		      # (s1,e1) is on the seq1 system
@@ -514,6 +547,15 @@ sub get_exon_pairs{
 			      $e2 = $s2 + $length - 1;
 			      print STDERR "block: $block\t\t\t\tfeat2: $s2-$e2\n" if $verbose;
 			  }
+			
+
+			  if ( ( $seen_exon1 == 1 && $in_exon2 == 0 && $seen_exon2 == 0 )
+			       ||
+			       ( $seen_exon2 == 2 && $in_exon1 == 0 && $seen_exon1 == 0 )
+			       ){
+			      print STDERR "exons do not overlap - skipping\n" if $verbose;
+			      next EXON2;
+			  }
 			  
 			  ############################################################
 			  # match state
@@ -521,7 +563,7 @@ sub get_exon_pairs{
 			  if ( $block =~ /M$/ ){
 			      my ($start1,$end1,$start2,$end2);
 			      if ( $exon1->start >= $s1 && $exon1->start <= $e1 ){
-				$start1 = $exon1->start - $s1 + 1;
+				  $start1 = $exon1->start - $s1 + 1;
 				  print STDERR "exon1 starts at pos $start1\n" if $verbose;
 			      }
 			      if ( $exon1->end >= $s1 && $exon1->end <= $e1 ){
@@ -542,6 +584,21 @@ sub get_exon_pairs{
 				
 			      }
 			      
+			      $seen_exon1 = 1 if ( $end1 );
+			      $seen_exon2 = 1 if ( $end2 );
+
+
+			      ############################################################
+			      # do they overlap?
+			      if ( ( $start1 && $end2 && $start1 > $end2 )
+				   || 
+				   ( $start2 && $end1 && $end1 < $start2 )
+				   ){
+				  print STDERR "they do not overlap - skipping\n" if $verbose;
+				  next EXON2;
+			      }
+			      
+
 			      ############################################################
 			      # check if they fall entirely on the M state
 			      if ( $start1 && $start2 && $end1 && $end2 ){
@@ -692,14 +749,19 @@ sub get_exon_pairs{
 				      $exon_map{$i}{$j} .=      $mismatch."I" if $right>0;
 				      $exon_map{$i}{$j} .= abs($mismatch)."D" if $right<0;
 				    }
-				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
-				  $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
+				  
+				  
+				  if ( $exon_map{$i}{$j} ){
+				      $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
+				      print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+				  }
+				  
 				  $in_exon1 = 1 unless ( $end1 );
 				  $in_exon2 = 1 unless ( $end2 );
 				  $in_exon1 = 0 if ( $end1 );
 				  $in_exon2 = 0 if ( $end2 );
-
-				}
+				  
+			      }
 			      ############################################################
 			      # if both have the end outside the feature block
 			      # or they are at the last feature
@@ -729,7 +791,7 @@ sub get_exon_pairs{
 				  $in_exon2 = 1 unless ( $end2 );
 				}
 			      ############################################################
-			      # if only on ends here
+			      # if only one ends here
 			      elsif ( ( $end1 && !($start1 || $start2 || $end2 ) )
 				      ||
 				      ( $end2 && !($start1 || $start2 || $end1 ) )
@@ -742,13 +804,17 @@ sub get_exon_pairs{
 				  $mismatch = ($exon2->end - $s2 + 1)."D";
 				}
 				$exon_map{$i}{$j} .= $mismatch;
-				$exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
-				print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+				
+				
+				if ( $exon_map{$i}{$j} ){
+				    $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
+				    print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+				}
 				$in_exon1 = 0 if ( $end1 );
 				$in_exon2 = 0 if ( $end2 );
 			      }
 			      ############################################################
-			      # if only on starts here
+			      # if only one starts here
 			      elsif ( ( $start1 && !($end1 || $start2 || $end2 ) )
 				      ||
 				      ( $start2 && !($start1 || $end1 || $end2 ) )
@@ -819,7 +885,9 @@ sub get_exon_pairs{
 				  $end1 = $exon1->end - $s1 + 1;
 				  print STDERR "exon1 ends at pos $end1 in I-state\n" if $verbose;
 			      }
-			      
+
+			      $seen_exon1 = 1 if $end1;
+
 			      if ( !($start1 || $end1 ) && $in_exon1 ){
 				  $exon_map{$i}{$j} .= ($e1 - $s1 + 1)."I";
 				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
@@ -843,14 +911,16 @@ sub get_exon_pairs{
 			  if ( $block =~ /D$/ ){
 			    my ($start2,$end2);
 			    if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
-			      $start2 = $exon2->start - $s2 + 1;
+				$start2 = $exon2->start - $s2 + 1;
 			      print STDERR "exon2 starts at pos $start2 in D-state\n" if $verbose;
-			    }
+			  }
 			    if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
 			      $end2 = $exon2->end - $s2 + 1;
 			      print STDERR "exon2 ends at pos $end2 in D-state\n" if $verbose;
 			    }
 			    
+			    $seen_exon2 = 1 if $end2;
+
 			      if ( !($start2 || $end2 ) && $in_exon2 ){
 				$exon_map{$i}{$j} .= ($e2 - $s2 + 1)."D";
 				print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
@@ -868,12 +938,29 @@ sub get_exon_pairs{
 			      if ( $exon_map{$i}{$j} ){
 				$exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
 			      }
-			    }
+			}
+		      }
+		      
+		      print STDERR "finished looking at i=$i j=$j\n";
+		      if ( $exon_map{$i}{$j} ){
+			  my $s = $exon_map{$i}{$j};
+			  print STDERR "checking exon_map($i)($j) for matches: ".$s."\n";
+			  my $matches    = ( $s =~ /M/g );
+			  print STDERR "$matches matches found\n";
+			  unless ( $matches ){
+			      print STDERR "rejecting exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+			      delete $exon_map{$i}{$j};
+			      
+			  }
+		      }
+		      
+		      if ( $exon_map{$i}{$j} ){
+			  $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
 		      }
 		  }
 	      } # end of EXON2
 	  }
-      }         # end of EXON1
+    }         # end of EXON1
       
   }             # end of FEATURE
   
@@ -1004,9 +1091,9 @@ sub get_exon_pairs{
   ############################################################
   # summary line
   print STDERR "TRANS_PAIR\t".
-      "$human_id\thuman_exons:$human_count\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
+      "$gene_id1\t$human_id\thuman_exons:$human_count\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
 	  "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
-	      "$mouse_id\tmouse_exons:$mouse_count\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing $alignment\n";
+	      "$gene_id2\t$mouse_id\tmouse_exons:$mouse_count\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing $alignment\n";
   
   ############################################################
   # summary line for exact matches
@@ -1018,9 +1105,9 @@ sub get_exon_pairs{
 	  }
       }
       print STDERR "TRANS_EXACT_MATCH\t".
-	  "$human_id\thuman_exons:$human_count\t".
+	  "$gene_id1\t$human_id\thuman_exons:$human_count\t".
 	      "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
-		  "$mouse_id\tmouse_exons:$mouse_count\t".$alignment."\n";
+		  "$gene_id2\t$mouse_id\tmouse_exons:$mouse_count\t".$alignment."\n";
   }
   ############################################################
   # summary line for semi_exact matches
@@ -1032,9 +1119,9 @@ sub get_exon_pairs{
 	  }
       }
       print STDERR "TRANS_SEMI_MATCH\t".
-	  "$human_id\thuman_exons:$human_count\t".
+	  "$gene_id1\t$human_id\thuman_exons:$human_count\t".
 	      "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
-		  "$mouse_id\tmouse_exons:$mouse_count\t".$alignment."\n";
+		  "$gene_id2\t$mouse_id\tmouse_exons:$mouse_count\t".$alignment."\n";
   }
   
   my $missing_terminal_exons = 0;
@@ -1055,9 +1142,14 @@ sub get_exon_pairs{
 
 sub get_exon_pair_alignment{
   my ($self,$human_list, $mouse_list, $exon_map, $exon_pointer_map ) = @_;
+
+  my $verbose = 0;
   my %exon_map = %$exon_map;
   my @human_list = @$human_list;
   my @mouse_list = @$mouse_list;
+  
+  print STDERR "human_list: ".$self->list_string(\@human_list)."\n" if $verbose;
+  print STDERR "mouse_list: ".$self->list_string(\@mouse_list)."\n" if $verbose;
   
   my $human_length = scalar( @human_list );
   my $mouse_length = scalar( @mouse_list );
@@ -1078,16 +1170,21 @@ sub get_exon_pair_alignment{
   my $human_last = $human_list[-1];
   my $mouse_last = $mouse_list[-1];
   
+  print STDERR "before checking: exon_map[$human_length-1][$mouse_length-1] = ".$exon_map{$human_length-1}{$mouse_length-1}."\n" if $verbose;
+  print STDERR "before checking: ".keys( %{ $exon_map{$human_length-1} } )."\n" if $verbose;
+  
   ############################################################
   # last exons 
   if ( defined( $exon_map{$human_length-1}{$mouse_length-1} ) &&
        $exon_map{$human_length-1}{$mouse_length-1} ){
    
-    print STDERR "exon_map[$human_length-1][$mouse_length-1] = ".$exon_map{$human_length-1}{$mouse_length-1}."\n";
+      print STDERR "exon_map[$human_length-1][$mouse_length-1] = ".$exon_map{$human_length-1}{$mouse_length-1}."\n" if $verbose;
     pop @human_list;
     pop @mouse_list;
     my ( $human_list2, $mouse_list2) = 
       $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+    print STDERR "case1: human_list2: ".$self->list_string($human_list2).
+	" mouse_list2: ".$self->list_string($mouse_list2)."\n" if $verbose;
     push ( @{$human_list2}, $human_last );
     push ( @{$mouse_list2}, $mouse_last );
     return ( $human_list2, $mouse_list2 );
@@ -1095,15 +1192,17 @@ sub get_exon_pair_alignment{
   ############################################################
   # last exon of the first list is paired-up with a gap
   elsif( !defined( $exon_map{$human_length-1}{$mouse_length-1} ) &&
-	 !( keys %{ $exon_map{$human_length-1} } )
+	 !( keys( %{ $exon_map{$human_length-1} } ) )
        ){
     
     if ( defined $exon_map{$human_length-2}{$mouse_length-1} ){
-      print STDERR "exon_map[$human_length-2][$mouse_length-1] = ".$exon_map{$human_length-2}{$mouse_length-1}."\n";
+      print STDERR "exon_map[$human_length-2][$mouse_length-1] = ".$exon_map{$human_length-2}{$mouse_length-1}."\n" if $verbose;
     }
     pop @human_list;
     my ( $human_list2, $mouse_list2) =
       $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+    print STDERR "case2: human_list2: ".$self->list_string($human_list2).
+	" mouse_list2: ".$self->list_string($mouse_list2)."\n" if $verbose;
     push ( @{$human_list2}, $human_last );
     push ( @{$mouse_list2}, "gap" );
     return ( $human_list2, $mouse_list2 );
@@ -1120,6 +1219,8 @@ sub get_exon_pair_alignment{
     pop @mouse_list;
     my ( $human_list2, $mouse_list2) =
       $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+    print STDERR "case3: human_list2: ".$self->list_string($human_list2).
+	" mouse_list2: ".$self->list_string($mouse_list2)."\n" if $verbose;
     push ( @{$human_list2}, "gap" );
     push ( @{$mouse_list2}, $mouse_last );
     return ( $human_list2, $mouse_list2 );
@@ -1128,16 +1229,32 @@ sub get_exon_pair_alignment{
 
 ############################################################
 
+sub list_string{
+    my ($self,$list) = @_;
+    my $string;
+    foreach my $l ( @$list ){
+	if ( $l->isa('Bio::EnsEMBL::Exon' ) ){
+	    $string .= $l->length."-";
+	}
+	else{
+	    $string .= "gap-";
+	}
+    }
+    return $string;
+}
+
 sub mouse_exon_has_human_match{
   my ($self,$map,$mouse_pos) = @_;
   my %exon_map = %$map;
   foreach my $i ( keys %exon_map ){
     foreach my $j ( keys %{$exon_map{$i}} ){
-      if ( $j == $mouse_pos && defined( $exon_map{$i}{$mouse_pos} ) && $exon_map{$i}{$mouse_pos} ){
-	return 1;
-      }
+	print STDERR "mouse_pos=$mouse_pos, j=$j\n"; 
+	if ( $j == $mouse_pos && defined( $exon_map{$i}{$mouse_pos} ) && $exon_map{$i}{$mouse_pos} ){
+	    print STDERR "exon_map($i)($mouse_pos) = ".$exon_map{$i}{$mouse_pos}."\n";
+	    return 1;
+	}
     }
-  }
+}
   return 0;
 }
 
