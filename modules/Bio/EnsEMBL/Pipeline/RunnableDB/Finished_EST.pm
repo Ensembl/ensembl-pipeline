@@ -11,7 +11,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -37,7 +37,16 @@ sub fetch_input {
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->primary_seq;
     my $masked    = $contig->get_repeatmasked_seq;
-
+        
+    my $seq = $masked->seq;
+    if ( $seq =~ /[CATG]{3}/ ) {
+        $self->input_is_void(0);
+    }
+    else {
+        $self->input_is_void(1);
+        $self->warn("Need at least 3 nucleotides");
+    }
+    
     # Make seqfetcher
     my $seqfetcher = $self->make_seqfetcher;
     $self->seqfetcher($seqfetcher);
@@ -91,19 +100,19 @@ sub make_seqfetcher {
     my ( $self, $index ) = @_;
 
     my( $seqfetcher );
-    if (my $dbf = $self->analysis->db_file) {
-        
-        my $db ='/data/blastdb/Ensembl/dbEST';
-        my @dbs = $db;
-        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
-        -db     => \@dbs,
-        );
-     
-        #my $index = "$ENV{BLASTDB}/$dbf";
-        #$seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => [$index]);
-    } else {
+    #if (my $dbf = $self->analysis->db_file) {
+#        
+#        my $db ='/data/blastdb/Ensembl/dbEST';
+#        my @dbs = $db;
+#        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
+#        -db     => \@dbs,
+#        );
+#     
+#        #my $index = "$ENV{BLASTDB}/$dbf";
+#        #$seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => [$index]);
+#    } else {
         $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
-    }
+    #}
     return $seqfetcher;
 }
 
