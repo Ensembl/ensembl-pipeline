@@ -149,11 +149,15 @@ sub new{
       $self->restrict_external_splice($restrict_external_splice_site);
   }
 
-  $self->verbose(0);
+  $self->verbose(1);
 
   return $self;  
 }
 
+############################################################
+#
+# PARAMETRIZATION
+#
 ############################################################
 
 sub  verbose{
@@ -164,8 +168,6 @@ sub  verbose{
   return $self->{_verbose};
 }
 
-############################################################
-
 sub comparison_level{
   my ($self, $level) = @_;
   if ( defined $level ){
@@ -173,8 +175,6 @@ sub comparison_level{
   }
   return $self->{_comparison_level};
 }
-
-############################################################
 
 sub exon_match{
   my ($self, $boolean) = @_;
@@ -208,6 +208,10 @@ sub intron_mismatch{
   return $self->{_intron_mismatch};
 }
 
+############################################################
+#
+# PUBLIC COMPARE METHOD
+#
 ############################################################
 
 =head2 compare
@@ -251,6 +255,11 @@ sub compare{
 }
   
 ############################################################
+#
+# METHODS CALLED BY 'COMPARE' - DOING THE ACTUAL COMPARISON, ETC...
+#
+############################################################
+
 
 =head2 _test_for_Merge_allow_small_introns
  Function: this function is called at the level 4 comparison
@@ -734,34 +743,40 @@ sub _fast_compare{
 	last EXON1;
       }
       elsif ( $exons1[$j]->overlaps($exons2[$k]) ){
-	if ( $j == $#exons1 || $k == $#exons2 ){
+	  
+	  ############################################################
+	  # check there is no 2-to-1 overlap
 	  if ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] )
 	       ||
 	       $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] )
 	       ){
-	      print STDERR "terminal exon overlaps two exons. Not merging\n" if $verbose;
+	      print STDERR "exon overlaps two exons. Not merging\n" if $verbose;
+	      $merge = 0;
+	      last EXON1;
+	  }	
+	  elsif ( $foundlink == 0 && $j != 0 && $k != 0 ){
+	      print STDERR "there is overlap - but it is not consecutive - no merge\n" if $verbose;
 	      $merge = 0;
 	      last EXON1;
 	  }
-	  else{
-	    print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
-	    $object_map->match( $exons1[$j], $exons2[$k] );
-	    print STDERR "end of transcripts - there is potential merge|\n" if $verbose;
-	    $merge = 1;
-	    $overlaps++;
-	    $foundlink = 1;
-	    last EXON1;
+	  elsif ( $j == $#exons1 || $k == $#exons2 ){
+	      print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+	      $object_map->match( $exons1[$j], $exons2[$k] );
+	      print STDERR "end of transcripts - there is potential merge!\n" if $verbose;
+	      $merge = 1;
+	      $overlaps++;
+	      $foundlink = 1;
+	      last EXON1;
 	  }
-	}
-	else{
-	  print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
-	  $object_map->match( $exons1[$j], $exons2[$k] );
-	  $overlaps++;
-	  $foundlink = 1;
-	  $start = $k + 1;
-	  next EXON1;
-	}
-	}
+	  else{
+	      print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+	      $object_map->match( $exons1[$j], $exons2[$k] );
+	      $overlaps++;
+	      $foundlink = 1;
+	      $start = $k + 1;
+	      next EXON1;
+	  }
+      }
       
     } # end of EXON2 
     
