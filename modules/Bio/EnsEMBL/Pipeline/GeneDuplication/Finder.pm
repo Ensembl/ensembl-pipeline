@@ -14,7 +14,7 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication::Result;
 
 my $DEFAULT_DISTANCE_METHOD  = 'NeiGojobori';
 my $DEFAULT_BLAST_PROGRAM    = 'wublastn';
-my $DEFAULT_DISTANCE_CUTOFF  = 1;
+my $DEFAULT_DISTANCE_CUTOFF  = 1.000;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -170,6 +170,8 @@ sub run {
 
   my $aligned_seqs = $cba->run_alignment;
 
+  $self->alignment($aligned_seqs);
+
   # Run PAML with these aligned sequences.
 
   my $parser = $self->_run_pairwise_paml($aligned_seqs);
@@ -188,6 +190,7 @@ sub run {
     if $@;
 
   unless (@results) {
+print $@;
     print "Duplications not found for this gene.\n";
     return 0
   }
@@ -364,6 +367,7 @@ sub _process_for_same_species_duplicates {
   # Accept all query species hits with a distance less than
   # the distance to the most related outgroup species.
 
+  $self->outgroup_distance($self->_distance_cutoff);
   my $closest_outgroup_distance = $self->_distance_cutoff;
 
   foreach my $regex (@{$self->_regex_outgroup_species}){
@@ -372,11 +376,14 @@ sub _process_for_same_species_duplicates {
 
     if (defined $sorted_species_hits{$regex}->[0]->name && 
 	defined $hit_distance{$sorted_species_hits{$regex}->[0]->name} &&
-	$hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance){
+	$hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance) && 
+	  $hit_distance{$sorted_species_hits{$regex}->[0]->name} > 0) {
 
       $closest_outgroup_distance = $hit_distance{$sorted_species_hits{$regex}->[0]->name};
     }
   }
+
+  $self->outgroup_distance($closest_outgroup_distance);
 
   my @accepted_ids;
 
@@ -422,7 +429,14 @@ sub _run_pairwise_paml {
 			     '-icode'        => ($self->_genetic_code) - 1
 			    );
 
-  my $parser = $paml->run_codeml;
+  my $parser;
+
+  eval{
+    $parser = $paml->run_codeml
+  };
+
+  $self->throw("Paml execution failed.\n$@")
+    if $@;
 
   return $parser;
 }
@@ -608,7 +622,10 @@ sub _extract_results {
       $result_obj->add_match($otus[$i]->display_id,
 			     $otus[$j]->display_id,
 			     $matrix->[$i]->[$j]->{'dN'},
-			     $matrix->[$i]->[$j]->{'dS'});
+			     $matrix->[$i]->[$j]->{'dS'},
+			     $matrix->[$i]->[$j]->{'N'} ? $matrix->[$i]->[$j]->{'N'} : 0,
+			     $matrix->[$i]->[$j]->{'S'} ? $matrix->[$i]->[$j]->{'S'} : 0,
+			     $matrix->[$i]->[$j]->{'lnL'} ? $matrix->[$i]->[$j]->{'lnL'} : 0);
     }
   }
 
@@ -674,6 +691,50 @@ sub _hit_identity{
   }
 
   return 0
+}
+
+
+=head2 alignment
+
+  Args[1]    :
+  Example    :
+  Description:
+  Returntype :
+  Exceptions :
+  Caller     :
+
+=cut
+
+sub alignment {
+  my $self = shift; 
+
+  if (@_) {
+    $self->{_alignment} = shift;
+  }
+
+  return $self->{_alignment};
+}
+
+
+=head2 outgroup_distance
+
+  Args[1]    :
+  Example    :
+  Description:
+  Returntype :
+  Exceptions :
+  Caller     :
+
+=cut
+
+sub outgroup_distance {
+  my $self = shift; 
+
+  if (@_) {
+    $self->{_outgroup_distance} = shift;
+  }
+
+  return $self->{_outgroup_distance};
 }
 
 
