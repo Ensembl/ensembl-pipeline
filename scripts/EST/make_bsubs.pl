@@ -291,7 +291,7 @@ sub make_EST_GeneBuilder_bsubs{
   # genomic size for each job
   my $size   = $EST_GENEBUILDER_CHUNKSIZE;
   
-  my $runner   = $EST_RUNNER;
+  my $runner   = $EST_GENE_RUNNER;
   my $runnable = $EST_GENEBUILDER_RUNNABLE;
   my $analysis = $EST_GENEBUILDER_ANALYSIS;
 
