@@ -1,0 +1,20 @@
+#!/usr/local/bin/perl
+
+use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::GeneBuilder;
+
+
+my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'obi-wan',
+				      -user   => 'ensro',
+				      -dbname => 'ens500',
+				      );
+
+$| = 1;
+
+die ("No clone input") unless $#ARGV >= 0;
+
+my $clone       = $db->get_Clone($ARGV[0]);
+my @contigs     = $clone->get_all_Contigs;
+
+my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contigs => \@contigs);
+   $genebuilder->build_Genes;
