@@ -111,25 +111,35 @@ sub new {
 			  INPUT_ID
 			  GFF_FILE)],
 		      @args);
-  unless (  $annotation_db && $prediction_db && $annotation_genes && $prediction_genes && $input_id ){
-    $self->throw("need to specify all these values:\n
-     annotation_db: $annotation_db\n
-     prediction_db: $prediction_db\n
+  unless (  $annotation_genes && $prediction_genes && $input_id ){
+    $self->throw("to do the comparison I need at least these values:\n
   annotation_genes: $annotation_genes\n
   prediction_genes: $prediction_genes\n 
-         $input_id: $input_id\n");
+          input_id: $input_id\n");
   }
-  
-  $self->annotation_db($annotation_db);
-  $self->prediction_db($prediction_db);
+  if ( $gff_file || $annotation_db || $prediction_db ){
+    unless (  $annotation_db && $prediction_db && $annotation_genes && $prediction_genes && $input_id ){
+      $self->throw("to dump gff data you need to specify these values:\n
+     annotation_db: $annotation_db\n
+     prediction_db: $prediction_db\n
+          gff_file: $gff_file\n");
+    }
+  }
+
+  $self->annotation_db($annotation_db) if $annotation_db;
+  $self->prediction_db($prediction_db) if $prediction_db;
+  $self->gff_file($gff_file) if $gff_file;
+
+  unless ( @$annotation_genes && @$prediction_genes ){
+    $self->throw("One of the gene arrays is empty, cannot carry out comparison:\n"
+		 .scalar(@$annotation_genes)." annotation genes\n"
+		 .scalar(@$prediction_genes)." prediction genes\n");
+  }
+
   $self->annotation_Genes(@$annotation_genes);
   $self->prediction_Genes(@$prediction_genes);
   $self->input_id($input_id);
-
-  if ( $gff_file ){
-    $self->gff_file($gff_file);
-  }
-
+  
   $self->{'_unclustered_genes'}= [];
   $self->{'_gene_clusters'}= [];
 
@@ -2556,15 +2566,19 @@ sub toGFF{
   my ($self,$transcript,$gene_type,$label) = @_;
   
   unless( $self->gff_file ){
-    print STDERR "Can't print to gff_file if you don't specify one in gff_file()\n";
+    print STDERR " *** Can't print to gff_file if you don't specify one in gff_file()\n";
     return;
   }
   unless( $self->input_id ){
-    print STDERR "need to specify the virtual contig in vc()\n";
+    print STDERR " *** need to specify the virtual contig in vc()\n";
+    return;
+  }
+  unless( $self->annotation_db && $self->prediction_db ){
+    print STDERR " *** sorry but also need annotation and prediction databases in order to print out stable_ids in GFF\n";
     return;
   }
 
-  my ( $chrname,$chrstart,$chrend ) = $self->input_id;
+  my ( $chrname,$chrstart,$chrend ) =( $self->chr_name, $self->chr_start, $self->chr_end );
   
   my $filename = $self->gff_file;
   
@@ -2610,6 +2624,7 @@ sub toGFF{
   
   #print STDERR "gene: $gene_type, type: $genetype, transcript_id: $id\n";
   
+ EXON:
   foreach my $exon ( $transcript->get_all_Exons ){
     my $strand_label;
     if ( $exon->strand == 1 ){
@@ -2639,14 +2654,14 @@ sub toGFF{
     print OUTFILE $exon_id
       ."\t".$genetype
 	."\texon" 
-	  ."\t".($chrstart+$exon->start)
-	    ."\t".($chrstart+$exon->end) 
+	  ."\t".  ($chrstart + ($exon->start) - 1)
+	    ."\t".($chrstart + ($exon->end  ) - 1) 
 	      ."\t100"
 		."\t".$strand_label
 		  ."\t".$exon->phase 
 		    ."\t". $trans_id
 		      ."\n";
-  }
+  } # end of EXON
   close(OUTFILE);
 }
 
