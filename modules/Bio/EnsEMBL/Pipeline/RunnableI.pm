@@ -375,7 +375,7 @@ sub growfplist {
 }
 
 sub shrinkfplist {
-    my ($self, $fp) =@_;    
+    my ($self) =@_;    
     #load fp onto array using command _grow_fplist
     return pop(@{$self->{'_fplist'}});
 }

@@ -6,6 +6,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST;
 use strict;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 
 sub new {
     my ($new,@args) = @_;

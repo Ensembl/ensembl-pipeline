@@ -759,8 +759,11 @@ sub _convert2FeaturePair {
     
     #print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
 
-    my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
-                                     $hsp->percent,$hsp->P,$name,$analysis);
+    my $fp = $self->_makeFeaturePair(
+        $tmpqstart, $tmpqend, $qstrand,
+        $tmphstart, $tmphend, $hstrand,
+        $hsp->score, $hsp->percent, $hsp->P,
+        $name, $analysis);
 
     return $fp;
 }
@@ -777,7 +780,11 @@ sub _convert2FeaturePair {
 =cut
 
 sub _makeFeaturePair {
-    my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$score,$pid,$evalue,$name,$analysis)  = @_;
+    my ($self,
+        $qstart, $qend, $qstrand,
+        $hstart, $hend, $hstrand,
+        $score, $pid, $evalue,
+        $name, $analysis)  = @_;
 
     my $source = $self->program;             
     $source =~ s/\/.*\/(.*)/$1/;

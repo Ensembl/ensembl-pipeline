@@ -10,7 +10,7 @@ use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
-use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
 @ISA = ('Bio::EnsEMBL::Pipeline::RunnableI');
 
@@ -121,7 +121,7 @@ sub run {
     my( $self ) = @_;
     
     my $seq = $self->query;
-    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast
+    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast
         ->new($self->_make_blast_paramters);
     $blast->run;
     my $features = [$blast->output];
@@ -161,7 +161,7 @@ sub run_est_genome_on_strand {
     }
     
     while (my ($hid, $flist) = each %$hit_features) {
-        #print STDERR "$hid\n";
+        print STDERR "$hid\n";
         #next unless $hid =~ /BF965645/;
     
         # Sort features by start/end in genomic
@@ -181,7 +181,7 @@ sub run_est_genome_on_strand {
             }
         }
         
-        #print STDERR "Made ", scalar(@sets), " sets\n";
+        print STDERR "Made ", scalar(@sets), " sets\n";
         
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
@@ -199,16 +199,16 @@ sub do_mini_est_genome {
         );
     $e2g->run;
     
-    #print STDERR "\n";
-    #foreach my $lin (@$linear) {
-    #    printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
-    #        $lin->start, $lin->end, $lin->hstart, $lin->hend;
-    #}
+    print STDERR "\n";
+    foreach my $lin (@$linear) {
+        printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
+            $lin->start, $lin->end, $lin->hstart, $lin->hend;
+    }
 
     foreach my $fp ($e2g->output) {
 
-        #printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
-        #    $fp->start, $fp->end, $fp->hstart, $fp->hend;
+        printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
+            $fp->start, $fp->end, $fp->hstart, $fp->hend;
 
         # source_tag and primary_tag have to be set to
         # something, or validate method in FeaturePair
