@@ -29,11 +29,13 @@ use strict;
      GB_SPTR        location of swissprot file in fasta format
      GB_PFASTA      where to write the clean fasta file
      GB_PMATCH      location of the pmatch executable
+     GB_KILL_LIST   location of text file listing Swissprot IDs to ignore
 
      eg.
 	    GB_REFSEQ      => '/work2/vac/GeneBuild/rf.fa',
 	    GB_SPTR        => '/work2/vac/GeneBuild/sptr.fa',
 	    GB_PFASTA      => '/work2/vac/GeneBuild/human_proteome.fa',
+	    GB_KILL_LIST   => '/work2/vac/GeneBuild/kill_list.txt',
 	    GB_PMATCH      => '/work2/vac/rd-utils/pmatch',
   
 =cut
@@ -42,14 +44,15 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                                          GB_REFSEQ
                                          GB_SPTR
                                          GB_PFASTA
+					 GB_KILL_LIST
                                          GB_PMATCH
                                         );
 
-
-my $refseq   = $GB_REFSEQ;
-my $sptr     = $GB_SPTR;
-my $protfile = $GB_PFASTA;
-my $pmatch   = $GB_PMATCH;
+my $refseq    = $GB_REFSEQ;
+my $sptr      = $GB_SPTR;
+my $protfile  = $GB_PFASTA;
+my $kill_list = $GB_KILL_LIST;
+my $pmatch    = $GB_PMATCH;
 
 if( defined $refseq && -e $refseq ) { &parse_refseq; }
 if( defined $sptr   && -e $sptr )   { &parse_sptr; }
@@ -58,26 +61,56 @@ if( defined $sptr   && -e $sptr )   { &parse_sptr; }
 
 ### END MAIN
 
+sub get_kill_list {
+  my @kill_list = ();
+  open KILL_LIST_FH, $kill_list or die "can't open $kill_list";
+  while (<KILL_LIST_FH>) {
+    my @element = split;
+    if (scalar(@element) == 0) {	# blank or empty line
+      next;
+    }
+    if (scalar(@element) != 1) {
+      die "kill list format wrong"
+    } else {
+      push @kill_list, $element[0];
+    }
+  }
+  close KILL_LIST_FH or die "file error for $kill_list";
+  return \@kill_list;
+}
+
 sub parse_sptr {
 print STDERR "here\n";
+
+  my $kill_list = get_kill_list();
   open (IN, "<$sptr") or die "Can't open $sptr\n";
   open (OUT, ">>$protfile") or die "Can't open $protfile\n";
   
+  my $killing = 0;	# nonzero if we're killing the current entry
   while(<IN>){
     # eg >143G_HUMAN (Q9UN99) 14-3-3 protein gamma
     if(/^>\S+\s+\((\S+)\)/){
-
-      if($1 eq 'P17013'){
-	die("DYING: $sptr still contains P17013. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
+      $killing = 0;
+      foreach my $id_to_kill (@$kill_list) {
+        if ($1 eq $id_to_kill){
+          print STDERR "INFO: ignoring kill list entry $1\n";
+	  $killing = 1;
+	}
       }
-	
-      if($1 eq 'Q99784'){
-	die("DYING: $sptr still contains Q99784. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
+      if(! $killing){
+        if($1 eq 'P17013'){
+  	  die("DYING: $sptr still contains P17013. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
+        }
+        if($1 eq 'Q99784'){
+	  die("DYING: $sptr still contains Q99784. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
+        }
+        print OUT ">$1\n";
       }
-      print OUT ">$1\n";
     }
-    else {
-      print OUT $_;
+    else{	# not a header line
+      if (! $killing) {
+        print OUT $_;
+      }
     }
   }
   
