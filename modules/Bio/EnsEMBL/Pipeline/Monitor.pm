@@ -193,7 +193,7 @@ sub show_finished_summary {
     my $name = $ref->{'logic_name'};
     my $id = $ref->{'analysis_id'};
     if ($name =~ /Submit/){
-      next;
+      next if($no_submit);
     }
     if (length($count) > $maxcount) {
       $maxcount = length($count);
@@ -527,7 +527,7 @@ did NOT find any hits.
  Returns data structure as above.
  
  get_no_hit_contigs_for_analysis($feature_table, $analysis_id)
-
+'
 =cut
 
 sub get_unfinished_analyses_for_input_id{
