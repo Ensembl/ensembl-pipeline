@@ -310,6 +310,9 @@ sub run{
 	  if( $seen_cds == 0 ) {
 	    $trans->start_Exon($exon);
 	    $trans->start($cds_start-$start+1);
+	    if ( $trans->start == 1 && $trans->start_Exon->phase == 0 ){
+		$trans->start_Exon->phase(-1);
+	    }
 	  }
 	  $seen_cds = 1;
 	  $prev = $exon;
