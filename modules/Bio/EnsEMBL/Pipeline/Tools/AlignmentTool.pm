@@ -471,102 +471,157 @@ sub _compute_identity {
 
   my $evidence = $self->_working_alignment('evidence');
 
-  my $tally_mismatches;
-  my $tally_length;
-
   my @exon_identities;
-
   my %by_exon;
 
-  foreach my $evidence_bit (@$evidence) {
-    push (@{$by_exon{$evidence_bit->{'exon'}}}, $evidence_bit);
+  foreach my $evidence_item (@$evidence) {
+    push (@{$by_exon{$evidence_item->{'exon'}}}, $evidence_item);
   }
 
   my $exon_placemarker = 0;
 
   foreach my $exon (@{$self->_transcript->get_all_Exons}){
 
-    my $exon_length = $exon->end - $exon->start;
-    my $highest_identity = 0;
-    my $associated_coverage = 0;
+    my $highest_nucleotide_identity = 0;
+    my $associated_nucleotide_coverage = 0;
+    my $highest_protein_identity = 0;
+    my $associated_protein_coverage = 0;
 
   EVIDENCE_ITEM:
     foreach my $evidence_item (@{$by_exon{$exon_placemarker}}){
-      my $match_sequence = $evidence_item->{'seq'};
+      
+      my $identity;
+      my $coverage;
 
-      my $mismatches = 0;
-      my $noncovered = 0;
+      # Here we are fetching the precent identity and coverage for
+      # each evidence alignment.
 
-      if ($evidence_item->{'type'} eq 'protein') {
+      # We update the highest identity scores if the score just
+      # calculated is higher AND has better than 80%
+      # coverage OR better coverage than the present top identity 
+      # match.
 
-	next EVIDENCE_ITEM if ($self->_type eq 'nucleotide');
+      # The top identities are grouped according to whether
+      # they are protein or nucleotide sequences.
 
-	# With our protein sequences, have to be careful about
-	# not running off the end of the translation when the
-	# final exon contains 3-prime UTR
+      if (($evidence_item->{'type'} eq 'protein')
+	  &&($self->_type ne 'nucleotide')){
+	($identity, $coverage) = $self->_compare_to_reference($exon, 
+							      $evidence_item, 
+							      $exon_protein_sequence);
 
-	for (my $i = $exon->start - 1; $i < $exon->end; $i++) {
-
-	  unless (defined ($match_sequence->[$i]) &&
-		  defined ($exon_protein_sequence->[$i]) &&
-		  (($exon_protein_sequence->[$i] eq $match_sequence->[$i])||
-		   (($exon_protein_sequence->[$i] eq '-')
-		    ||($match_sequence->[$i] eq '-')))) {
-	    $mismatches += 3;
-	  }
-	  if (($exon_protein_sequence->[$i] ne '-')
-		    &&($match_sequence->[$i] eq '-')) {
-	    $noncovered += 3;
-	  }
-	}
-
-      }
-
-      if ($evidence_item->{'type'} eq 'nucleotide') {
-	
-	next EVIDENCE_ITEM if ($self->_type eq 'protein');
-
-	for (my $i = $exon->start - 1; $i < $exon->end; $i++) {
-
-	  unless (defined ($genomic_sequence->[$i]) &&
-		  defined ($match_sequence->[$i]) && 
-		  (($genomic_sequence->[$i] eq $match_sequence->[$i])||
-		  (($genomic_sequence->[$i] eq '-')
-		   ||($match_sequence->[$i] eq '-')))) {
-	    $mismatches += 1;
-	  }
-	  if (($genomic_sequence->[$i] ne '-')
-		    &&($match_sequence->[$i] eq '-')) {
-	    $noncovered += 1;
-	  }
+	if (($identity >= $highest_protein_identity)
+	    &&(($coverage >= 80)
+	       ||($coverage >= $associated_protein_coverage))) {
+	  $highest_protein_identity = $identity;
+	  $associated_protein_coverage = $coverage;
 	}
       }
 
-      my $this_match_identity = (1 - ($mismatches/$exon_length))*100;
+      elsif (($evidence_item->{'type'} eq 'nucleotide')
+	     &&($self->_type ne 'protein')){
+	($identity, $coverage) = $self->_compare_to_reference($exon, 
+							      $evidence_item, 
+							      $genomic_sequence);
 
-      # The hack below gets around the problem of exons not always
-      # being a whole number of codons.  There can be cases where
-      # there are more non-covered bases than there are in an exon.
-      $noncovered = $exon_length if $noncovered > $exon_length;
-
-      my $this_match_coverage = (1 - ($noncovered/$exon_length))*100;
-#print "Coverage : $this_match_coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
-      if ($this_match_identity > $highest_identity) {
-	$highest_identity = $this_match_identity;
-	$associated_coverage = $this_match_coverage;
-	$tally_mismatches += $mismatches;
+      if (($identity >= $highest_nucleotide_identity)
+	  &&(($coverage >= 80)
+	     ||($coverage >= $associated_nucleotide_coverage))) {
+	$highest_nucleotide_identity = $identity;
+	$associated_nucleotide_coverage = $coverage;
       }
+
+      } else {
+	next EVIDENCE_ITEM;
+      }
+
     }
 
-    $tally_length += $exon_length;
+    # Purely for neatness, some rounding
+    $highest_nucleotide_identity    = sprintf("%.1f", $highest_nucleotide_identity);
+    $associated_nucleotide_coverage = sprintf("%.1f", $associated_nucleotide_coverage);
+    $highest_protein_identity       = sprintf("%.1f", $highest_protein_identity);
+    $associated_protein_coverage    = sprintf("%.1f", $associated_protein_coverage);
 
-    push (@exon_identities, [$highest_identity, $associated_coverage]);
+    push (@exon_identities, [$highest_nucleotide_identity, 
+			     $associated_nucleotide_coverage, 
+			     $highest_protein_identity, 
+			     $associated_protein_coverage]);
 
     $exon_placemarker++;
   }
 
   return \@exon_identities;
 
+}
+
+=head2 _compare_to_reference
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _compare_to_reference { 
+  my ($self, $exon, $evidence_item, $reference_sequence) = @_;
+
+  # For nucleotide alignments each mismatch is counted
+  # once.
+  my $align_unit = 1;
+
+  # If we are dealing this protein alignments we have to
+  # multiply this by three.
+  $align_unit *= 3 if ($evidence_item->{'type'} eq 'protein');
+
+  my $match_sequence = $evidence_item->{'seq'};
+  
+  my $mismatches = 0;
+  my $noncovered = 0;
+  
+  my $exon_start = $exon->start;
+  my $exon_end = $exon->end;
+  my $exon_length = $exon_end - $exon_start;
+
+  if ($self->_strand == -1){
+    $exon_start = $self->_slice->length - $exon_end + 1;
+    $exon_end = $exon_start + $exon_length - 1;
+  }
+
+#print STDERR "Exon start : " . $exon_start . "\tExon end: " . $exon_end . "\n"; 
+  for (my $i = $exon_start - 1; $i < $exon_end; $i++) {
+#print STDERR $i . " " . $reference_sequence->[$i] . " " . $match_sequence->[$i] . "\n";
+    unless (defined ($match_sequence->[$i]) &&
+	    defined ($reference_sequence->[$i]) &&
+	    (($reference_sequence->[$i] eq $match_sequence->[$i])||
+	     (($reference_sequence->[$i] eq '-')
+	      ||($match_sequence->[$i] eq '-')))) {
+#print STDERR "MISMATCH\n";
+      $mismatches += $align_unit;
+    }
+    
+    if (($reference_sequence->[$i] ne '-')
+	&&($match_sequence->[$i] eq '-')) {
+#print STDERR "NONCOVERED\n";
+      $noncovered += $align_unit;
+    }
+  }
+  
+  my $identity = (1 - ($mismatches/$exon_length))*100;
+  
+  # The next line gets around the problem of exon length not always
+  # being a whole number of codons.  There can be cases where
+  # there are more non-covered bases than there are bases in an exon.
+  $noncovered = $exon_length if $noncovered > $exon_length;
+  
+  my $coverage = (1 - ($noncovered/$exon_length))*100;
+  
+#print STDERR "Identity : $identity\tCoverage : $coverage\tNoncovered : $noncovered\tExon length : $exon_length\n";
+  
+  return ($identity, $coverage);
 }
 
 
@@ -1019,7 +1074,7 @@ sub _fiddly_bits {
 
   if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
     my $padded_aa_seq;
-    ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\*\*/g;
+    ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
     
     my @full_seq = split //, $padded_aa_seq;
     
