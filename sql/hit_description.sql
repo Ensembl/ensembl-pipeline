@@ -12,7 +12,7 @@ CREATE TABLE hit_description (
   hit_length int(10) unsigned,
   hit_description text,
   hit_taxon int(10) unsigned,
-  hit_db enum('EMBL','Swissprot','TrEMBL','Pfam') DEFAULT 'EMBL' NOT NULL,
+  hit_db enum('EMBL','Swissprot','TrEMBL','Pfam') NOT NULL DEFAULT 'EMBL',
   PRIMARY KEY (hit_name),
   KEY hit_db (hit_db)
 );
