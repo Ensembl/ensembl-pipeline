@@ -107,69 +107,66 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-     my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
-										       REFDBHOST
-										       REFDBUSER
-										       REFPASS)],
-										   @args);
-
+	 #my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
+	 #										   REFDBHOST
+	 #										   REFDBUSER
+	 #										   REFPASS)],
+	 #									       @args);
+	 
 	 # we force it to use BioIndex SeqFetcher
 	 my $seqfetcher = $self->make_seqfetcher();
 	 $self->seqfetcher($seqfetcher);
+	 
+	 # check options in EST_conf.pl 
+	 #if(!defined $self->seqfetcher) {
+	 #  my $seqfetcher = $self->make_seqfetcher();
+	 #  $self->seqfetcher($seqfetcher);
+	 #  
+	 #}
 
-    # check options in EST_conf.pl 
-    #if(!defined $self->seqfetcher) {
-    #  my $seqfetcher = $self->make_seqfetcher();
-    #  $self->seqfetcher($seqfetcher);
-    #  
-    #}
+    my $refdbname = $EST_REFDBNAME;
+    my $refdbuser = $EST_REFDBUSER;
+    my $refdbhost = $EST_REFDBHOST;
 
-#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
-    $refdbname = $EST_REFDBNAME unless (defined $refdbname && $refdbname ne '');
-    $refdbuser = $EST_REFDBUSER unless (defined $refdbuser && $refdbuser ne '');
-    $refdbhost = $EST_REFDBHOST unless (defined $refdbhost && $refdbhost ne '');
-    #$refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
+print STDERR "refdb: $refdbname $refdbhost $refdbuser\n";
+	 my $estdbname = $EST_DBNAME;
+	 my $estdbuser = $EST_DBUSER;
+	 my $estdbhost = $EST_DBHOST;
+	 my $estpass   = $EST_DBPASS;
 
-#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
+print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
+	 
+	 # database with the dna:
+	 my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $refdbhost,		
+							-user   => $refdbuser,
+							-dbname => $refdbname,
+						       );
+	 
+	 
+	 # database where the exonerate est/cdna features are:
+	 my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
+								       -user   => $estdbuser,
+									 -dbname => $estdbname,
+								       -pass   => $estpass,
+								      );
+	 
+	 $self->estdb($estdb);
+	 $self->estdb->dnadb($refdb);
+	 
+	 # need to have an ordinary adaptor to the est database for gene writes
+	 $self->db->dnadb($refdb);
 
-    my $estdbname = $EST_DBNAME;
-    my $estdbuser = $EST_DBUSER;
-    my $estdbhost = $EST_DBHOST;
-    my $estpass   = $EST_DBPASS;
-
-#print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
-    # if we have all the parameters for a refdb, make one
-
-    # otherwise, assume the refdb must be the same as the dbobj
-    if(defined $refdbname & defined $refdbhost && defined $refdbuser){
-      my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $refdbhost,		
-						     -user   => $refdbuser,
-						     -dbname => $refdbname,
-						     -pass   => $refpass,
-						    );
-
-      my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
-								    -user   => $estdbuser,
-								    -dbname => $estdbname,
-								    -pass   => $estpass,
-								   );
-     
-my $est_ext_feature_factory = $estdb->get_EstAdaptor();
-
-      print "exff: $est_ext_feature_factory\n";
-      
-      $refdb->add_ExternalFeatureFactory($est_ext_feature_factory);
-      $self->estdb($refdb);
-
-      # need to have an ordinary adaptor to the est database for gene writes
-      $self->dbobj->dnadb($refdb);
-
-    }
-    else { $self->throw("expecting exonerate data in an external feature factory\n"); };
-
-    if(!defined $self->analysis){ $self->make_analysis; }
-
-    return $self;
+	 #my $est_ext_feature_factory = $estdb->get_EstAdaptor();
+	 
+	 #print "exff: $est_ext_feature_factory\n";
+	 
+	 #$refdb->add_ExternalFeatureFactory($est_ext_feature_factory);
+	 
+	 
+	
+	 if(!defined $self->analysis){ $self->make_analysis; }
+	 
+	 return $self;
 }
 
 =head2 estdb
@@ -440,7 +437,7 @@ sub fetch_input {
   $self->vc($contig);
 
   # find exonerate features amongst all the other features  
-  my @allfeatures = $contig->get_all_ExternalFeatures();
+  my @allfeatures = $contig->get_all_Features();
 
   print STDERR "got " . scalar(@allfeatures) . " external features\n";
   my @exonerate_features;
