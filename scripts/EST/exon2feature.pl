@@ -25,13 +25,14 @@
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::ESTConf;
 use Getopt::Long;
 
 # ref db holds the exonerate_e2g gene/exon/supporting feature data
-my $refdbname    = 'mouse_sanger_Oct01_est';
-my $refuser      = 'ensro';
-my $refhost      = 'ecs1f';
-my $refpass      = '';
+my $refdbname    = $EST_DBNAME;
+my $refuser      = $EST_DBUSER;
+my $refhost      = $EST_DBHOST;
+my $refpass      = $EST_DBPASS;
 
 # exonfile holds a list of exons to be converted
 # select exon_id from exon into outfile
