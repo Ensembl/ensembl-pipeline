@@ -1,3 +1,4 @@
+
 #
 # BioPerl module for Bio::EnsEMBL::Analysis::ESTConf;
 #
@@ -53,68 +54,78 @@ use vars qw( %ESTConf );
 
 # Hash containing config info
 %ESTConf = (
-	    # general options for scripts
+            # general options for scripts
 
-	    EST_RUNNER                  => '', 	    # path to run_ESTRunnableDB
-	    EST_SCRIPTDIR               => '', 	    # path to ensembl-pipeline/scripts/EST
-	    EST_TMPDIR                  => '',
-	    EST_QUEUE                   => '',
+            EST_RUNNER                  => '',             # path to run_ESTRunnableDB
+            EST_SCRIPTDIR               => '',             # path to ensembl-pipeline/scripts/EST
+            EST_TMPDIR                  => '',
+            EST_QUEUE                   => '',
 
-	    # make_bsubs.pl options
-	    EST_EXONERATE_BSUBS         => '',
-	    EST_FILTER_BSUBS            => '',
-	    EST_GENEBUILDER_BSUBS       => '',
+            # make_bsubs.pl options
+            EST_EXONERATE_BSUBS         => '',
+            EST_FILTER_BSUBS            => '',
+            EST_GENEBUILDER_BSUBS       => '',
 
-	    # for prepare_ests.pl
-	    EST_FILESPLITTER            => '', 	    # path to executable for chunking seqeuncefiles eg fastasplit
-	    EST_FILE                    => '', 	    # path to file containign ALL ESTs/cDNAs
-	    EST_CHUNKDIR                => '', 	    # path to directory where EST chunks live
-	    EST_CHUNKNUMBER             => '', 	    # how many chunks?
-	    EST_MAKESEQINDEX            => '', 	    # path to makeseqindex executable
-	    
-	    # for exonerate_ests.pl
-	    EST_GENOMIC                 => '',      # path to file with repeatmasked dusted genomic sequences
-	                                            # NB this file is huge - distribute it across the farm or 
+            # for prepare_ests.pl
+            EST_FILESPLITTER            => '',             # path to executable for chunking seqeuncefiles eg fastasplit
+            EST_FILE                    => '',             # path to file containign ALL ESTs/cDNAs
+            EST_CHUNKDIR                => '',             # path to directory where EST chunks live
+            EST_CHUNKNUMBER             => '',             # how many chunks?
+            EST_MAKESEQINDEX            => '',             # path to makeseqindex executable
+            
+            # for exonerate_ests.pl
+            EST_GENOMIC                 => '',      # path to file with repeatmasked dusted genomic sequences
+                                                    # NB this file is huge - distribute it across the farm or 
                                                     # be prepared to face the wrath of systems when the network 
                                                     # seizes up!
-	    # for filter_and_e2g.pl
-	    EST_FILTERCHUNKSIZE         => '',      #  we use 1000000 (ie 1MB) chunks
-	    
-	    # ExonerateESTs options
-	    EST_EXONERATE               => '',      # path to executable
-	    EST_EXONERATE_ARGS          => '',
-	    EST_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs',      
+            # for filter_and_e2g.pl
+            EST_FILTERCHUNKSIZE         => '',      #  we use 1000000 (ie 1MB) chunks
+            
+            # ExonerateESTs options
+            EST_EXONERATE               => '',      # path to executable
+            EST_EXONERATE_ARGS          => '',
+            EST_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs',      
 
-	    # FilterESTs_and_E2G options
-	    EST_FILTER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
-	    EST_INDEX                   => '',      # name of EST file that has been indexed and is 
-	                                            # accessible across the farm
-	    EST_SOURCE                  => '',      # for analysis(process)
-	    
+            # FilterESTs_and_E2G options
+            EST_FILTER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
+            EST_INDEX                   => '',      # name of EST file that has been indexed and is 
+                                                    # accessible across the farm
+            EST_SOURCE                  => '',      # for analysis(process)
+            
 
-	    # for EST_GeneBuilder
-	    EST_GENEBUILDER_CHUNKSIZE   => '',      #  we use 1000000 (ie 1MB) chunks
-	    EST_GENEBUILDER_INPUT_GENETYPE => 'exonerate_e2g',   #
-	    EST_GENOMEWISE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::Genomewise',
-	    EST_GENOMEWISE_GENETYPE     => 'genomewise',
-	    EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
-	    EST_EVIDENCE_TAG            => 'exonerate_e2g',
-	    EST_MIN_EVIDENCE_SIMILARITY => '',
-	    EST_MAX_EVIDENCE_DISCONTINUITY => '',
+            # for EST_GeneBuilder
+            EST_GENEBUILDER_CHUNKSIZE   => '',      #  we use 1000000 (ie 1MB) chunks
+            EST_GENEBUILDER_INPUT_GENETYPE => 'exonerate_e2g',   #
+            EST_GENOMEWISE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::Genomewise',
+            EST_GENOMEWISE_GENETYPE     => 'genomewise',
+            EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
+            EST_EVIDENCE_TAG            => 'exonerate_e2g',
+            EST_MIN_EVIDENCE_SIMILARITY => '',
+            EST_MAX_EVIDENCE_DISCONTINUITY => '',
 
-	    # database config
-	    # ref_db - holds the static golden path, contig and dna information
-	    # est_db = where we load up exonerate results into the feature table and build genes
-	    EST_REFDBHOST               => '',
-	    EST_REFDBNAME               => '',
-	    EST_REFDBUSER               => '',
-	    EST_REFDBPASS               => '',
-	    EST_DBNAME                  => '',
-	    EST_DBHOST                  => '',
-	    EST_DBUSER                  => '',
-	    EST_DBPASS                  => '',
-	    EST_GOLDEN_PATH             => '',
-	   );
+            # database config
+            # ref_db - holds the static golden path, contig and dna information
+            # est_db = where we load up exonerate results into the feature table and build genes
+            EST_REFDBHOST               => '',
+            EST_REFDBNAME               => '',
+            EST_REFDBUSER               => '',
+            EST_REFDBPASS               => '',
+
+            EST_DBNAME                  => '',
+            EST_DBHOST                  => '',
+            EST_DBUSER                  => '',
+            EST_DBPASS                  => '',
+
+            # you can also choose to use cdnas for est_genebuilder
+            # this is to read them from a different database:
+            USE_cDNA_DB                  => '',  # set it to a def/undef value if you do/don't want to use it
+            
+            cDNA_DBNAME                  => '',
+            cDNA_DBHOST                  => '',
+            cDNA_DBUSER                  => '',
+            cDNA_DBPASS                  => '',
+	    cDNA_GENETYPE => '',
+           );
 
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
@@ -132,15 +143,15 @@ sub import {
 
 
     foreach (@vars) {
-	if ( defined $ESTConf{ $_ } ) {
+        if ( defined $ESTConf{ $_ } ) {
             no strict 'refs';
-	    # Exporter does a similar job to the following
-	    # statement, but for function names, not
-	    # scalar variables:
-	    *{"${callpack}::$_"} = \$ESTConf{ $_ };
-	} else {
-	    die "Error: ESTConf: $_ not known\n";
-	}
+            # Exporter does a similar job to the following
+            # statement, but for function names, not
+            # scalar variables:
+            *{"${callpack}::$_"} = \$ESTConf{ $_ };
+        } else {
+            die "Error: ESTConf: $_ not known\n";
+        }
     }
 }
 
