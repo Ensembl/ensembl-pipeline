@@ -47,7 +47,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $gap, $extension, $matrix, $minimum_intron, $exon_padding, $minimum_feature_length) = 
+    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $gap, $extension, $matrix, $exon_padding, $minimum_feature_length) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
@@ -58,7 +58,6 @@ sub new {
                             GAP  
                             EXTENSION  
                             MATRIX  
-                            MINIMUM_INTRON
                             EXON_PADDING
                             MINIMUM_FEATURE_LENGTH
 			   )],
