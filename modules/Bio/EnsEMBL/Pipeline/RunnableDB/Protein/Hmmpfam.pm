@@ -89,7 +89,7 @@ sub new {
 
     $self->parameters($params);
 
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam');
+   
     return $self;
 }
 
@@ -138,6 +138,7 @@ sub fetch_input {
     
     $self->genseq($peptide);
 
+ 
 }
 
 
@@ -178,10 +179,12 @@ sub write_output {
 
 sub runnable {
 my ($self) = @_;
+
+print STDERR "GENESEQ0: ".$self->genseq."\n";
     
     if (!defined($self->{'_runnable'})) {
 	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::HmmPfam->new(-query     => $self->genseq,
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-query     => $self->genseq,
 									  -analysis  => $self->analysis	);
 	
 	
@@ -205,6 +208,7 @@ my ($self) = @_;
 
 sub run {
     my ($self,$dir) = @_;
+    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam');
     $self->throw("Runnable module not set") unless ($self->runnable());
     $self->throw("Input not fetched")      unless ($self->genseq());
 
