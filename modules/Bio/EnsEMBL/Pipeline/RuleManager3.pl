@@ -386,7 +386,7 @@ while (1) {
 		
                 my $anal = $rule->check_for_analysis (\@anals, $input_id_type, \%completed_accumulator_analyses, $verbose);
 		
-                if ($anal) {
+		if(UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')){
                     print " fullfilled.\n" if $verbose;
                     if ($rule->goalAnalysis->input_id_type ne 'ACCUMULATOR') {
                       $analHash{$anal->dbID} = $anal;
