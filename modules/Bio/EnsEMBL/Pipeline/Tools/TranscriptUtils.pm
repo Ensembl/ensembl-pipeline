@@ -55,6 +55,7 @@ use Bio::EnsEMBL::PredictionTranscript;
 # parameter slice is optional. It makes sense to use it when working on fixed length slices.
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
+# note - intron lengths now checked separately using _check_introns
 
 sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
@@ -68,7 +69,8 @@ sub _check_Transcript{
     my $valid = 1;
     
     my $strand;
-    
+
+    $transcript->sort;    
     my @exons = @{$transcript->get_all_Exons};
     eval {
       $strand =  $exons[0]->strand;
@@ -77,7 +79,6 @@ sub _check_Transcript{
 	$self->throw;
     }
 
-    $transcript->sort;
     
     ############################################################
     # check that transcripts are not completely outside the slice
@@ -96,7 +97,7 @@ sub _check_Transcript{
     }
     
 
-    #my @exons = @{$transcript->get_all_Exons};
+#    my @exons = @{$transcript->get_all_Exons};
     
     if (scalar(@exons) > 1 ) {
 
@@ -137,25 +138,6 @@ sub _check_Transcript{
 	    
 
 	    
-		##############################
-		# check intron length
-		##############################
-		if ( $strand == 1 ){
-		    my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
-		elsif( $strand == -1 ){
-		    my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
 		
 		##############################
 		# check for folded transcripts
@@ -221,7 +203,7 @@ sub _check_introns{
 
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
-    
+    $transcript->sort;    
     my @exons = @{$transcript->get_all_Exons};
     
     my $strand;
@@ -230,12 +212,9 @@ sub _check_introns{
     $strand =  $exons[0]->strand;
 };
     if ($@) {
-	$self->throw;
+	$self->throw("Can't get strand\n");
     }
 
-    #my $strand =  $transcript->start_Exon->strand;
-
-    $transcript->sort;
     
     ############################################################
     # check that transcripts are not completely outside the slice
@@ -254,7 +233,7 @@ sub _check_introns{
     }
     
 
-    #my @exons = @{$transcript->get_all_Exons};
+#    my @exons = @{$transcript->get_all_Exons};
 
     if(scalar(@exons) == 0)   {
       print STDERR "transcript with no exons\n";
@@ -552,6 +531,11 @@ sub split_Transcript{
       
       push(@split_transcripts, $curr_transcript);
       next EXON;
+    }
+
+    if ($exon->strand != $prev_exon->strand){
+      print STDERR "strand mismatch - cannot split\n";
+      return ($transcript); # original transcript
     }
     
     # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
@@ -1517,12 +1501,12 @@ sub _get_ORF_coverage {
   my ($self, $transcript) = @_;
   my $orf_coverage;
   my $transcript_length = $transcript->length;
-#print STDERR "transcript length: $transcript_length\n";
+print STDERR "transcript length: $transcript_length\n";
 
 
   my $translateable = $transcript->translateable_seq;
   my $translateable_length = length($translateable);
-#print STDERR "translateable length: $translateable_length\n";
+print STDERR "translateable length: $translateable_length\n";
   $orf_coverage = 100 * ($translateable_length/$transcript_length);
   print STDERR "orf coverage: $orf_coverage\n";
   return $orf_coverage;
