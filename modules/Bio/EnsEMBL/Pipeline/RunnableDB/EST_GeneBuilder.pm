@@ -244,6 +244,9 @@ sub write_output {
  	foreach my $exon ( @{$tran->get_all_Exons} ){
 	  $exon_count++;
 	  $exon->stable_id( $tran_id."_".$exon_count );
+	  $exon->created(1);
+	  $exon->version(1);
+	  $exon->modified(1);
 	  print STDERR "exon: ".$exon->stable_id."\n";
 	}
 	if ( $tran->translation ){
