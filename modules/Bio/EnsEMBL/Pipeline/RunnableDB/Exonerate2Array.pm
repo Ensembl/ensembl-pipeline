@@ -188,33 +188,33 @@ sub write_output {
   my($self) = @_;
   
   my @misc_features = $self->output(); 
-  my $match = $self->output_match_count;
+  #my $match = $self->output_match_count;
   
   my $mfa = $self->db->get_MiscFeatureAdaptor();
   $mfa->store( @misc_features );
   
-  my ($tot_pass_ids,$only_25,$only_24,$both,$total_query_seq,%done);
+  #my ($tot_pass_ids,$only_25,$only_24,$both,$total_query_seq,%done);
 
-  foreach my $q_id (keys %{$match}) {
-    $tot_pass_ids++;
-    if ($match->{$q_id}->{'full_match_count'} and !$match->{$q_id}->{'mis_match_count'}) {
-      $only_25 += $match->{$q_id}->{'full_match_count'};
-    }
-    elsif ($match->{$q_id}->{'full_match_count'} and $match->{$q_id}->{'mis_match_count'}) {
-      $both +=$match->{$q_id}->{'full_match_count'};
-      $both +=$match->{$q_id}->{'mis_match_count'};
-    }
-    elsif ($match->{$q_id}->{'mis_match_count'} and !$match->{$q_id}->{'fullmatch_count'}) {
-      $only_24 += $match->{$q_id}->{'mis_match_count'};
-    }
-  }
+  #foreach my $q_id (keys %{$match}) {
+  #  $tot_pass_ids++;
+  #  if ($match->{$q_id}->{'full_match_count'} and !$match->{$q_id}->{'mis_match_count'}) {
+  #    $only_25 += $match->{$q_id}->{'full_match_count'};
+  #  }
+  #  elsif ($match->{$q_id}->{'full_match_count'} and $match->{$q_id}->{'mis_match_count'}) {
+  #    $both +=$match->{$q_id}->{'full_match_count'};
+  #    $both +=$match->{$q_id}->{'mis_match_count'};
+  #  }
+  #  elsif ($match->{$q_id}->{'mis_match_count'} and !$match->{$q_id}->{'fullmatch_count'}) {
+  #    $only_24 += $match->{$q_id}->{'mis_match_count'};
+  #  }
+  #}
   
   
-  my $ratio_25 = $only_25/$tot_pass_ids;
-  my $ratio_24 = $only_24/$tot_pass_ids;
-  my $ratio_both = $both/$tot_pass_ids;
-  $total_query_seq += $self->total_query_seq;
-  printf "total_query_seq is $total_query_seq, total pass ids is $tot_pass_ids, with 25 bases exact match is $only_25 (%.2f), with 24 bases exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
+  #my $ratio_25 = $only_25/$tot_pass_ids;
+  #my $ratio_24 = $only_24/$tot_pass_ids;
+  #my $ratio_both = $both/$tot_pass_ids;
+  #$total_query_seq += $self->total_query_seq;
+  #printf "total_query_seq is $total_query_seq, total pass ids is $tot_pass_ids, with 25 bases exact match is $only_25 (%.2f), with 24 bases exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
   
   return 1;
 }

@@ -287,7 +287,7 @@ sub run {
       if ($h->{'matching_length'} == $h->{'probe_length'}-1 and $h->{'percent_id'}==100) {
 	#print "24 $_\n";
 	$h->{'match_status'} = "Mismatch";
-	$match{$h->{'q_id'}}{'mis_match_count'}++;
+	#$match{$h->{'q_id'}}{'mis_match_count'}++;
 	push @pro_features, $h;
       } 
       #elsif ($h->{'matching_length'} ==25 and $h->{'percent_id'}>=96) {
@@ -295,11 +295,11 @@ sub run {
 	#print "25 $_\n";
 	if ($h->{'percent_id'} == 100) {
 	  $h->{'match_status'} = "Fullmatch";
-	  $match{$h->{'q_id'}}{'full_match_count'}++;
+	  #$match{$h->{'q_id'}}{'full_match_count'}++;
 	}
 	else {
 	  $h->{'match_status'} = "Mismatch";
-	  $match{$h->{'q_id'}}{'mis_match_count'}++;
+	  #$match{$h->{'q_id'}}{'mis_match_count'}++;
 	}
 	push @pro_features, $h;
       }
@@ -311,7 +311,7 @@ sub run {
   
   $self->_store_affy_features(@pro_features);
 
-  $self->output_match_count(\%match);
+  #$self->output_match_count(\%match);
   ############################################################
   
 # remove interim files (but do not remove the database if you are using one)
