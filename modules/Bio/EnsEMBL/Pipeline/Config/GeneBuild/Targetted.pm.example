@@ -58,6 +58,12 @@ use vars qw( %Targetted );
 	      # minimum coverage required to prevent splitting on long introns - keep it high!
 	      GB_TARGETTED_MIN_SPLIT_COVERAGE       => '95',
 
+	      # parameters for use in building genomic and miniseqs - don't touch these 
+	      # unless you're sure you know what you're doing.
+	      GB_TARGETTED_TERMINAL_PADDING                   => '20000',
+	      GB_TARGETTED_EXON_PADDING                       => '200',
+	      GB_TARGETTED_MINIMUM_INTRON                     => '1000',
+
 	      # genetype for Targetted_GeneWise
 	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   
 	      GB_TARGETTED_MASKING => [],
