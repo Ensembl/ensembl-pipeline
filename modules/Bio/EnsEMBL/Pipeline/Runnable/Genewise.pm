@@ -1,5 +1,3 @@
-
-
 =pod
 
 =head1 NAME
@@ -36,14 +34,14 @@ package Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use strict;  
 use vars   qw(@ISA);
 
-# Object preamble - inherits from Bio::EnsEMBL::Root
+# Object preamble - inherits from Bio::Root::RootI
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Analysis::Programs qw(genewise); 
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
-
+use Bio::SeqIO;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 sub new {
@@ -159,7 +157,7 @@ sub _align_protein {
     $command .= " -trev ";
   }
   
-#  print STDERR "Command is $command\n";
+  print STDERR "Command is $command\n";
   
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 
@@ -169,14 +167,27 @@ sub _align_protein {
   my $curr_gene;
 
   # making assumption of only 1 gene prediction ... this will change once we start using hmms
- GENESF: while (<GW>) {
+
+  print STDERR "################# GENEWISE ####################\n";
+ GENESF: 
+  while (<GW>) {
+    
+    print STDERR "$_";
+   
     chomp;
     my @f = split;
-
+   
+    #if ( $f[0] =~/Protein/ ){
+    #  print STDERR $_."\n";
+    #}
+ 
     next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting'));
     
+    #print STDERR $_."\n";
     if($f[0] eq 'Gene'){
       # flag a frameshift - ultimately we will do something clever here but for now ...
+      
+      # frameshift is here defined as two or more genes produced by Genewise from a single protein
       if (/^(Gene\s+\d+)$/){
 	if(!defined($curr_gene)){
 	  $curr_gene = $1;
@@ -186,16 +197,19 @@ sub _align_protein {
 	}
       }
     }
-
+    
     elsif($f[0] eq 'Exon'){
       #      make a new "exon"
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->genomic->id);
       $curr_exon->id        ($self->protein->id);
+      $curr_exon->source_tag('genewise');
+      $curr_exon->primary_tag('similarity');
+
+      #print STDERR "setting phase to $f[4]\n";
+      my $phase = $f[4];
+      $curr_exon->phase($phase);
       
-
-      $curr_exon->phase($f[4]);
-
       my $start  = $f[1];
       my $end    = $f[2];
       my $strand = 1;
@@ -204,17 +218,25 @@ sub _align_protein {
 	$start  = $f[2];
 	$end    = $f[1];
       }
-      
+      # end phase is the number of bases at the end of the exon which do not 
+      # fall in a codon and it coincides with the phase of the following exon.
+      my $exon_length = $end - $start + 1;
+      my $end_phase   = ( $exon_length + $curr_exon->phase ) %3;
+      #print STDERR "setting end_phase to $end_phase\n";
+      $curr_exon->end_phase($end_phase);
+
       $curr_exon->start($start);
       $curr_exon->end($end);
       $curr_exon->strand($strand);
 
       $self->addExon($curr_exon);
       push(@genesf_exons, $curr_exon);
+    
+      print STDERR "Exon: ".$start."-".$end." phase: ".$phase." end_phase: ".$end_phase." str: ".$strand."\n";
     }
     
     elsif($f[0] eq 'Supporting'){
-
+      
       my $gstart = $f[1];
       my $gend   = $f[2];
       my $strand = 1;
@@ -236,27 +258,29 @@ sub _align_protein {
 	$self->warn("Protein start greater than end! Skipping this suppfeat\n");
 	next GENESF;
       }
-
+      
       # start a new "alignment"
-	  my $pf = new Bio::EnsEMBL::SeqFeature( -start   => $pstart,
-						 -end     => $pend,
-						 -seqname => $self->protein->id,
-						 -strand  => 1
-					       ); 
-	  my $gf  = new Bio::EnsEMBL::SeqFeature( -start   => $gstart,
-						  -end     => $gend,
-						  -seqname => 'genomic',
-						  -strand  => $strand,
-						);
-	  my $fp = new Bio::EnsEMBL::FeaturePair( -feature2 => $pf,
-						  -feature1 => $gf);
-	  $curr_exon->add_sub_SeqFeature($fp,'');
+      my $pf = new Bio::EnsEMBL::SeqFeature( -start   => $pstart,
+					     -end     => $pend,
+					     -seqname => $self->protein->id,
+					     -strand  => 1
+					   ); 
+      my $gf  = new Bio::EnsEMBL::SeqFeature( -start   => $gstart,
+					      -end     => $gend,
+					      -seqname => 'genomic',
+					      -strand  => $strand,
+					    );
+      my $fp = new Bio::EnsEMBL::FeaturePair( -feature2 => $pf,
+					      -feature1 => $gf);
+      $curr_exon->add_sub_SeqFeature($fp,'');
     }
-
+    
   } 
   
   close(GW) or $self->throw("Error running genewise:$!\n");
   
+  
+
   unlink $genfile;
   unlink $protfile;
   unlink $gwfile;
