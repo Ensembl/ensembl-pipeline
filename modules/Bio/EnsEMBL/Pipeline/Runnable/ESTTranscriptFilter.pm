@@ -368,35 +368,37 @@ sub depth_filter {
     my @exons = sort { $self->_exon_score($b) <=> $self->_exon_score($a)
 			 or
 			   $self->_exon_perc_id($b) <=> $self->_exon_perc_id($a) 
-			 } 
+			     or
+			       $self->_length( $exon2est{$a} ) <=> $self->_length( $exon2est{$b} ) 
+			     } 
     $cluster->sub_SeqFeature;
+    
+    my $count = 0;
+    while ( @exons ){
+      my $exon = shift @exons;
+      my $est  = $exon2est{$exon};
+      if ( $count >= $depth ){
+	$banned{$est} = 1 ;
+	if ($verbose){
+	  print STDERR "rejecting: ";
+	  $self->_print_EST($est);
+	}
+      }
       
-      my $count = 0;
-      while ( @exons ){
-	my $exon = shift @exons;
-	my $est  = $exon2est{$exon};
-	if ( $count >= $depth ){
-	  $banned{$est} = 1 ;
+      unless ( $banned{$est} ){
+	unless ( $taken{$est} ){
+	  push( @accepted_ests, $est );
+	  $taken{$est} = 1;
 	  if ($verbose){
-	    print STDERR "rejecting: ";
+	    print STDERR "taking: ";
 	    $self->_print_EST($est);
 	  }
 	}
-	
-	unless ( $banned{$est} ){
-	  unless ( $taken{$est} ){
-	    push( @accepted_ests, $est );
-	    $taken{$est} = 1;
-	    if ($verbose){
-	      print STDERR "taking: ";
-	      $self->_print_EST($est);
-	    }
-	  }
-	  $count++;
-	}
+	$count++;
       }
+    }
   }
-
+  
   if ($verbose){
     print STDERR "returning ".scalar(@accepted_ests)." ests after scores and depth filtering\n";
     foreach my $est ( @accepted_ests ){
@@ -484,9 +486,17 @@ sub _print_EST{
   my $id      = $self->_id($t);
   my $score   = $self->_coverage($t);
   my $perc_id = $self->_perc_id($t);
+  my $length  = $self->_length($t);
+  print STDERR "$id coverage:$score perc_id:$perc_id length:$length\n";
+}
+
+############################################################
+
+sub _length{
+  my ($self,$t) = @_;
   my @exons = sort{ $a->start <=> $b->start } @{$t->get_all_Exons};
   my $length = $exons[-1]->end - $exons[0]->start + 1;
-  print STDERR "$id coverage:$score perc_id:$perc_id length:$length\n";
+  return $length;
 }
 
 ############################################################
