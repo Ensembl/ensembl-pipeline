@@ -70,26 +70,6 @@ sub new {
 }
 
 
-=head2 DESTROY
-
-  Args[1]    :
-  Example    :
-  Description:
-  Returntype :
-  Exceptions :
-  Caller     :
-
-=cut
-
-sub DESTROY {
-  my $self = shift;
-
-  print "Cleaning up.\n";
-
-  $self->_seq_fetcher->db->remove_index_files;  
-}
-
-
 =head2 find_recent_duplications
 
   Args[1]    : Bio::Seq query sequence
@@ -117,7 +97,7 @@ sub find_recent_duplications {
 }
 
 
-=head2 _process_for_same_species_duplicates 
+=head2 _process_for_same_species_duplicates
 
   Args[1]    :
   Example    :
@@ -133,6 +113,7 @@ sub _process_for_same_species_duplicates {
 
   # Process our blast report.  For each blast hit to our query sequence:
   #   * throw away self matches (if any)
+  #   * filter by identity
   #   * filter by coverage
   #   * calculate genetic distance between each subject and the query
   #   * add subject sequence to correct species hash
@@ -142,34 +123,54 @@ sub _process_for_same_species_duplicates {
   my $have_an_outgroup = 0;
   my $report_empty = 1;
 
-
  PARTITION_HITS:
   while (my $sbjct = $bplite_report->nextSbjct){
 
-    # Mangle the BPLite::Sbjct object for its own good.
+    $report_empty = 0; # Hits have been found.
+
+    # Mangle the BPLite::Sbjct object for its own good.  Quite 
+    # often the hit ids parsed by BPLite include the whole 
+    # Fasta header description line.  This is problematic if 
+    # sequence ids need to be compared or a hash is keyed on 
+    # this sequence id.  Here we simply lop the description
+    # from each Sbjct->name, if there is one.
     $sbjct = $self->_fix_sbjct($sbjct);
 
-    $report_empty = 0;
+    # It appears that the BPLite::Sbjct object only allows 
+    # HSPs to be accessed once (as this process is closely 
+    # tied to the parsing of the Blast report).  Hence, here
+    # we loop through them all here and store them in an 
+    # array.
+
+    my @hsps;
+
+    while (my $hsp = $sbjct->nextHSP) {
+      push (@hsps, $hsp);
+    }
 
     # Skip hit if it is a match to self.
 
-    my $sbjct_id = $sbjct->name;
-    $sbjct_id =~ s/\W*(\w+).*/$1/;
+    next PARTITION_HITS
+      if ($self->_query_seq->display_id eq $sbjct->name);
 
-    next PARTITION_HITS 
-      if ($self->_query_seq->display_id eq $sbjct_id);
+    # First, filter by identity
 
-    # First, filter by coverage
+    my $hit_identity = $self->_hit_identity(\@hsps);
 
-    next PARTITION_HITS 
-      unless ($self->_appraise_hit_coverage($sbjct));
+    next PARTITION_HITS
+      unless ($hit_identity >= $self->_identity_cutoff);
 
-    # Second, filter by genetic distance.
+    # Second, filter by coverage
 
-    $hit_distance{$sbjct_id} 
+    next PARTITION_HITS
+      unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
+
+    # Third, filter by genetic distance.
+
+    $hit_distance{$sbjct->name} 
       = $self->_calculate_pairwise_distance(
             $self->_query_seq->display_id, 
-	    $sbjct_id,
+	    $sbjct->name,
 	    'synonymous');
 
     # Third, partition hits according to their species.  The species
@@ -178,7 +179,7 @@ sub _process_for_same_species_duplicates {
 
     my $query_regex = $self->_regex_query_species;
 
-    if ($sbjct_id =~ /$query_regex/) {
+    if ($sbjct->name =~ /$query_regex/) {
 
       push(@{$species_hash{$self->_regex_query_species}}, $sbjct);
 
@@ -186,7 +187,7 @@ sub _process_for_same_species_duplicates {
     } else {
 
       foreach my $regex (@{$self->{_regex_outgroup_species}}) {
-	if ($sbjct_id =~ /$regex/){
+	if ($sbjct->name =~ /$regex/){
 	  $have_an_outgroup = 1;
 	  push (@{$species_hash{$regex}}, $sbjct);
 	  next PARTITION_HITS;
@@ -195,11 +196,15 @@ sub _process_for_same_species_duplicates {
 
     }
 
-    $self->throw("Didnt match hit id to any regex [$sbjct_id].");
+    $self->throw("Didnt match hit id to any regex [".$sbjct->name."].");
   }
 
-  $self->throw("Did not find any hits to query sequence.")
-    if $report_empty;
+
+  # Make a comment and return if the blast report contained no hits. 
+  if ($report_empty) {
+    print "Did not find hits to query sequence.\n";
+    return [] 
+  }
 
   # Sort our hits by their distance to the query sequence.
 
@@ -210,7 +215,6 @@ sub _process_for_same_species_duplicates {
     my @sorted_hits 
       = sort {$hit_distance{$a->name} <=> $hit_distance{$b->name}} 
 	@{$species_hash{$species}};
-
     $sorted_species_hits{$species} = \@sorted_hits;
   }
 
@@ -220,6 +224,9 @@ sub _process_for_same_species_duplicates {
   my $closest_outgroup_distance = $self->_distance_cutoff;
 
   foreach my $regex (@{$self->_regex_outgroup_species}){
+      next
+        unless $sorted_species_hits{$regex};
+
     if (defined $sorted_species_hits{$regex}->[0]->name && 
 	defined $hit_distance{$sorted_species_hits{$regex}->[0]->name} &&
 	$hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance){
@@ -289,12 +296,12 @@ sub _fix_sbjct {
 sub _calculate_pairwise_distance {
   my ($self, $input_id_1, $input_id_2, $distance_measure) = @_;
 
+  # Default to using the synonymous genetic distance, unless the
+  # user has deliberately set this.
   $distance_measure = 'synonymous' unless $distance_measure;
 
   my @seqs = ($self->_fetch_seq($input_id_1), 
 	      $self->_fetch_seq($input_id_2));
-
-  return 0 if ($seqs[0]->display_id eq $seqs[1]->display_id);
 
   $self->throw("Didnt correctly obtain two sequences for alignment.")
     unless scalar @seqs == 2;
@@ -308,9 +315,7 @@ sub _calculate_pairwise_distance {
   };
 
   if ($@){
-    $self->throw("Pairwise use of PAML FAILED!\n$@");
-    my $fh = $self->{_filehandle};
-    print $fh "Error encountered while analysing $input_id_1 versus $input_id_2\n";
+    $self->throw("Pairwise use of PAML failed [$input_id_1]vs[$input_id_2].\n$@");
     return 0
   }
 
@@ -324,14 +329,9 @@ sub _calculate_pairwise_distance {
 
   if ($@){
     $self->warn("PAML failed to give a file that could be parsed.  No doubt PAML threw an error!\n$@");
-
-    my $fh = $self->{_filehandle};
-    print $fh "Couldnt derive matrix from PAML run for  $input_id_1 versus $input_id_2\n";
     return 0
   }
   
-#print "Synonymous distance is : " . $NGmatrix->[0]->[1]->{dS} . "\n";
-
   return $NGmatrix->[0]->[1]->{dN} if $distance_measure eq 'nonsynonymous';
   return $NGmatrix->[0]->[1]->{dS} if $distance_measure eq 'synonymous';
   return 0;
@@ -409,7 +409,7 @@ sub _run_pairwise_paml {
 =cut
 
 sub _appraise_hit_coverage{
-  my ($self, $sbjct) = @_;
+  my ($self, $sbjct, $hsps) = @_;
 
   # First, throw out hits that are way longer than
   # the query.
@@ -426,7 +426,7 @@ sub _appraise_hit_coverage{
 
   my @query_coverage;
 
-  while (my $hsp = $sbjct->nextHSP) {
+  foreach my $hsp (@$hsps) {
 
     for (my $base_position = $hsp->query->start; 
 	 $base_position <= $hsp->query->end;
@@ -444,11 +444,40 @@ sub _appraise_hit_coverage{
   # Return true if good coverage exists.
 
   return 1 if ($covered_bases >= $self->_coverage_cutoff * $self->_query_seq->length);
-
+  
   # Otherwise return false.
   return 0;
 }
 
+
+=head2 _appraise_hit_identity
+
+  Args[1]    :
+  Example    :
+  Description:
+  Returntype : 
+  Exceptions :
+  Caller     :
+
+=cut
+
+sub _hit_identity{
+  my ($self, $hsps) = @_;
+
+  my $tally_query_length = 0;
+  my $tally_matched_bases = 0;
+
+  foreach my $hsp (@$hsps) {
+    $tally_query_length  += length($hsp->querySeq);
+    $tally_matched_bases += $hsp->positive;
+  }
+
+  if ($tally_matched_bases && $tally_query_length){
+    return $tally_matched_bases/$tally_query_length;
+  }
+
+  return 0
+}
 
 =head2 _blast_obj
 
@@ -573,6 +602,9 @@ sub _fetch_seq {
   }
 
   my $seq = $self->_seq_fetcher->fetch($id);
+
+  $self->throw("Sequence fetch failed for id [$id].")
+    unless ($seq && $seq->isa("Bio::Seq"));
 
   $self->{_cache}->{$seq->display_id} = $seq;
 
