@@ -146,7 +146,7 @@ sub _initialize {
     if ($options) {
       $self->options($options);
     } else {
-      $self->options(' ');  
+      $self->options(' -p1 ');  
     }
     
     if (defined($threshold)) {
@@ -204,7 +204,7 @@ sub run {
 
 sub run_analysis {
     my ($self) = @_;
-    
+
     print STDERR ("Running blast and BPlite:\n " . $self->program  . ' ' .
                   		                   $self->database . ' ' . 
 		                                   $self->filename . ' ' .
@@ -355,25 +355,24 @@ sub parse_results {
 	  next NAME;
       }
 	  
+      my ($ug) = $name =~ m{/ug=(.*?)\ };
       $name =~ s/^>(\S+).*/$1/;
-# need to remove this line as well (see below)
 
       if ($name =~ /\|UG\|(\S+)/) {
-         $name = $1;
-#
-# scp - to be tested. for correct parsing of unigene IDs
-# the identifier we actually want is towards the end of the header
-# (err?!) prefixed by "/ug="
-#
-# instead of "$name = $1", need something like...
-#        ($name) = $name =~ m{/ug=(.*?)\ };
-#
+# scp - unigene ID 'patch'
+# there must be a better way of doing this...
+         if (length $ug > 0) { # just in case "/ug=" not in header
+             $name = $ug;
+         }
+         else {
+             $name = $1;
+         }
       } elsif ($name =~ /\S+\|\S+\|(\S+)/) {
          $name = $1;
       }
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	next HSP if ($hsp->P > $self->threshold);
+	next HSP if ($hsp->percent < $self->threshold);
 	
 	# Each HSP is a gapped alignment.
 	# This method splits the gapped alignment into
@@ -398,7 +397,7 @@ sub filter_hits {
       my $name = $sbjct->name ;
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	next HSP if ($hsp->P > $self->threshold);
+	next HSP if ($hsp->percent < $self->threshold);
 	
 	my $qstart = $hsp->queryBegin;      
 	my $hstart = $hsp->sbjctBegin;      
