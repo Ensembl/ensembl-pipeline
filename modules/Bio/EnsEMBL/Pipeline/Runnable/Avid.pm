@@ -26,7 +26,6 @@
                                                       -avid          => '/path/to/avid',
                                                       -avid_options  => '-obin' or '-opsl',
                                                       -workdir       => 'path/to/workdir',
-                                                      -slam_output   => 'true' or 'false'
                                                      );
 
 or
@@ -65,8 +64,6 @@ and avid = '/nfs/acari/jhv/bin/avid').
 =item  B<-avid_options>   format of avid-output (-obin || -opsl, default:-obin)
 
 =item  B<-workdir>        optional working-directory (default: /tmp/)
-
-=item  B<-slam_output>    parse binary file and write aat-file (true or false)
 
 
 
@@ -111,19 +108,19 @@ sub new {
       $slice2,
       $avid,
       $avid_options,
-      $workdir,
-      $slam_output ) = $self->_rearrange([qw(
+      $workdir
+               ) = $self->_rearrange([qw(
                                              SLICE1
                                              SLICE2
                                              AVID
                                              AVID_OPTIONS
                                              WORKDIR
-                                             SLAM_OUTPUT
                                             )
                                          ], @args);
   $self->{_verbose} = 0 ;
 
-  # location of avid-binary avid-2.1b0
+ 
+ # location of avid-binary avid-2.1b0
   $self->_avid_binary($avid);
 
   # storing slices
@@ -136,9 +133,6 @@ sub new {
   # set names of fasta-files
   $self->_filename1;
   $self->_filename2;
-
-  # should the binary-file be parsed for a slam-run?
-  $self->_slam_output_opt($slam_output);
 
   $self->workdir($workdir);
   $self->checkdir;
@@ -180,13 +174,13 @@ sub run {
   $command .=  " " . $fa_first    . " ";
   $command .=  " " . $fa_secnd         ;
 
-  print STDERR "avid-command : $command\n"  if $self->_verbose;
+  print STDERR "avid-command : $command\n" ; # if $self->_verbose;
 
   open( AVID, "$command |" ) || $self->throw("Error running avid $!");
   close(AVID);
 
   # parse binary output for slam-run
-  $self->_parse_binary if ($self->_slam_output_opt);
+   $self->_parse_binary ; 
 
   # register files written by avid (mout,psl,...)
   $self->_avid_files;
@@ -274,20 +268,6 @@ sub _avid_options {
   $self->{_avid_options} = '-obin' if ( ( !defined $opt) && ( !defined  $self->{_avid_options}));
 
   return $self->{_avid_options};
-}
-
-
-sub _slam_output_opt {
-  my ($self,$out) =  @_;
-
-  if (defined $out) {
-    if ($out eq "1" || $out=~m/(true|t)/i) {
-      $self->{_slam_output} = '1';
-    } else {
-      $self->{_slam_output} = '0' if ( ( !defined $out) && ( !defined  $self->{_slam_output}));
-    }
-  }
-  return $self->{_slam_output};
 }
 
 
@@ -485,7 +465,7 @@ sub _verbose {
 
   Title    : parsed_binary_filename
   Usage    : $obj->parsed_binary_filename
-  Function : returns the path+name of the parsed binary output (if option -slam_output => true)
+  Function : returns the path+name of the parsed binary output 
   Returns  : String
   Args     : String
 
