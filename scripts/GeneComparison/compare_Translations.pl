@@ -149,9 +149,24 @@ foreach my $type ( @{ $type2 } ){
 }
 
 # get a GeneComparison object 
-my $gene_comparison = Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(\@genes1, \@genes2);
-# as convention, we put first the annotated (or benchmark) genes and second the predicted genes
-# and the comparison methods refer to the second list with respect to the first one
+
+
+
+my $gene_comparison = 
+  Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(
+      
+		      '-annotation_genes' => \@genes1,
+							      
+							      
+	             '-prediction_genes' => \@genes2,
+							      
+		      '-input_id'        => $input_id,
+
+									       
+									       
+										     );
+										     
+
 
 
 #########################################################
