@@ -151,7 +151,7 @@ sub fetch_input {
     {       
         my $genseq = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 	print STDERR "Passing in genseq $genseq\n";
-        $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast', $genseq);
+        $self->runnable($genseq);
     }
 }
 
@@ -166,8 +166,8 @@ sub fetch_input {
 =cut
 
 sub runnable {
-    my ($self, $runnable, $genseq) = @_;
-    if ($runnable && $genseq)    {
+    my ($self, $genseq) = @_;
+    if ($genseq)    {
 	my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   
 					-query    => $genseq,
 					-program  => $self->analysis->program,

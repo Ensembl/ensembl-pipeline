@@ -1,3 +1,4 @@
+
 #!/usr/local/bin/perl -w
 
 #
@@ -99,16 +100,6 @@ sub new {
     return $self;
 }
 
-=head2 parameters
-
-    Title   :   parameters
-    Usage   :   $self->parameters($param);
-    Function:   Gets or sets the value of parameters
-    Returns :   A string containing parameters for Bio::EnsEMBL::Runnable run
-    Args    :   A string containing parameters for Bio::EnsEMBL::Runnable run
-
-=cut
-
 =head2 dbobj
 
     Title   :   dbobj
@@ -144,32 +135,39 @@ sub fetch_input {
     {       
         my $genseq
             = $contig->primary_seq() or $self->throw("Unable to fetch contig");
-        $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker', $genseq);
+        $self->runnable($genseq);
     }
 }
 
 #get/set for runnable and args
 
 sub runnable {
-    my ($self, $runnable, $genseq) = @_;
-    if ($runnable && $genseq)
+    my ($self, $genseq) = @_;
+    if ($genseq)
     {
+	my $repeatmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (
+   						 -clone    => $genseq,
+									      );
+	
+	push (@{$self->{'_runnable'}}, $repeatmask);
+
+
         #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
-            }
-        }
-        $parameters {'-clone'} = $genseq;
+        #my ($parameter_string) = $self->parameters() ;
+        #my %parameters;
+        #if ($parameter_string)
+        #{
+        #    $parameter_string =~ s/\s+//g;
+        #    my @pairs = split (/,/, $parameter_string);
+        #    foreach my $pair (@pairs)
+        #    {
+        #       my ($key, $value) = split (/=>/, $pair);
+        #        $parameters{$key} = $value;
+        #    }
+        #}
+        #$parameters {'-clone'} = $genseq;
         #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
-        push (@{$self->{'_runnable'}}, $runnable->new(%parameters));
+        #push (@{$self->{'_runnable'}}, $runnable->new(%parameters));
     }
     return @{$self->{'_runnable'}};
 }
