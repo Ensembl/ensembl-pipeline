@@ -58,6 +58,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
 # config file; parameters searched for here if not passed in as @args
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_INPUTID_REGEX
 					EST_REFDBHOST
 					EST_REFDBUSER
 					EST_REFDBNAME
@@ -260,20 +261,22 @@ sub fetch_input {
 
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
-
+    
     # get genomic region 
-    my $chrid    = $self->input_id;
-#    $chrid       =~ s/\.(.*)-(.*)//;
-    $chrid       =~ s/\.([\d]*)-([\d]*)//;
-    my $chrstart = $1;
-    my $chrend   = $2;
+    my $input_id    = $self->input_id;
+    unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
+      $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
+    }
+    my $chrname  = $1;
+    my $chrstart = $2;
+    my $chrend   = $3;
 
-    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
+    print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
  
     my $slice_adaptor = $self->db->get_SliceAdaptor();
-    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);    
-    $slice->chr_name($chrid);
+    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrname,$chrstart,$chrend);    
+    $slice->chr_name($chrname);
     $self->query($slice);
     print STDERR "got slice\n";
     print STDERR "length ".$slice->length."\n";
@@ -292,7 +295,7 @@ sub fetch_input {
       my $cdna_db = $self->cdna_db;
       
       my $cdna_sa = $cdna_db->get_SliceAdaptor();
-      $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+      $cdna_slice = $cdna_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
       my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE,'evidence');
       print STDERR "Number of genes from cdnas = " . scalar(@$cdna_genes) . "\n";
       push (@$genes, @$cdna_genes);
