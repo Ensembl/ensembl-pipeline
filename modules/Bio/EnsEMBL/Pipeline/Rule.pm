@@ -49,7 +49,7 @@ use strict;
   Usage   : ...Rule->new($analysis);
   Function: Constructor for Rule object
   Returns : Bio::EnsEMBL::Pipeline::Rule
-  Args    : A Pipeline::Analysis object. Conditions are added later,
+  Args    : A Bio::EnsEMBL::Analysis object. Conditions are added later,
             adaptor and dbid only used from the adaptor.
 
 =cut
@@ -65,7 +65,7 @@ sub new {
 			      DBID
 			     ) ], @args );
   $self->throw( "Wrong parameter" ) unless
-    $goal->isa( "Bio::EnsEMBL::Pipeline::Analysis" );
+    $goal->isa( "Bio::EnsEMBL::Analysis" );
   $self->dbID( $dbID );
   $self->goalAnalysis( $goal );
   $self->adaptor( $adaptor );
@@ -119,8 +119,8 @@ sub list_conditions {
   Title   : goalAnalysis
   Usage   : $self->goalAnalysis($anal);
   Function: Get/set method for the goal analysis object of this rule.
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
+  Args    : Bio::EnsEMBL::Analysis
 
 =cut
 
