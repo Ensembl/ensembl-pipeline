@@ -67,6 +67,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use FileHandle;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Root );
@@ -157,9 +158,11 @@ sub genomic_sequence {
 sub est_sequence {
   my( $self, $value ) = @_;
 
+  print STDERR $value."\n";
   if ($value) {
     if (ref($value) eq 'ARRAY') {
       foreach my $est(@$value) {
+	print STDERR "have a ".$est."\n";
 	$est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
       }
       $self->{'_est_sequences'} = $value;
@@ -175,6 +178,7 @@ sub est_sequence {
       
     }
     else {
+      print STDERR $value." must be a filename checking\n";
       # it's a filename - check the file exists
       $self->throw("[$value] : file does not exist\n") unless -e $value;
       $self->estfilename($value);
@@ -539,83 +543,47 @@ sub run_ungapped {
 	
 	$prevstate = 'cigar';
 
-	my @elements = split;
-	next unless $elements[0] eq 'cigar:';
-	
-	my $primary_tag    = 'exonerate';
-	my $source_tag     = 'exonerate';
-	my $genomic_start  = $elements[6];
-	my $genomic_end    = $elements[7];
-	my $genomic_id     = $elements[5];
-	my $est_id         = $elements[1];
-	my $est_start      = $elements[2];
-	my $est_end        = $elements[3];
-	
-	# can we continue?
-	$self->throw("$estname(gff) and $est_id(cigar) do not match!") unless $estname eq $est_id;
 
-	# find percent id from %gff
-	my $querystr = $genomic_start . "-" . $genomic_end . "-" . $elements[8];
-	my $pid = $gff{$querystr};
+	my ($cig, $hit, $query, $score, $cigar) = $_ =~ /^(cigar):\s+(\S+\s+\d+\s+\d+\s+[\+|-])\s+(\S+\s+\d+\s+\d+\s+[\+|-])\s+(\d+\.\d+)\s+(.+)/;
+	next unless $cig eq 'cigar';
 
-	# not every cigar prediction has a corresponding gff exon
-	if(!defined($pid)) { $pid = -1; }
-
-	# est seqname
-	my $genomic_score  = $elements[9];
-	if ($genomic_score eq ".") { $genomic_score = 0; } 
-	my $est_score = $genomic_score;
-	
-	my $genomic_source = $source_tag;
-	my $est_source = $source_tag;
-	
-	my $genomic_strand = 1;
-	if ($elements[8] eq '-') {
-	  $genomic_strand = -1;
+	my($qid, $qstart, $qend, $qstrand) = split / /, $query;
+	my($hid, $hstart, $hend, $hstrand) = split / /, $hit;
+	my $querystr = $qstart . "-" . $qend . "-" . $qstrand;
+        my $pid = $gff{$querystr};
+	if($qstrand eq "-"){
+	  $qstrand = -1;
+	}else{
+	  $qstrand = 1;
 	}
-	my $est_strand = 1;
-	if ($elements[4] eq '-') {
-	  $est_strand = -1;
+	if($hstrand eq "-"){
+	  $hstrand = -1;
+	}else{
+	  $hstrand = 1;
+	}
+	my @cigars = split / /, $cigar;
+	my $length = @cigars;
+	if(!$length%2 == 1){
+	  die("there are ".@cigars." elements in the cigar array very odd\n");
+	}
+	my $db_cigar;
+	while(@cigars){
+	  my $state = shift @cigars;
+	  my $number = shift @cigars;
+	  $db_cigar .= $number.$state;
 	}
 
-	# convention: if strands are different, genomic strand set to -1; if they're the 
-	# same, genomic strand set to +1. est_strand always +1
-
-	if($genomic_strand == $est_strand){
-	  $genomic_strand = 1;
-	  $est_strand     = 1;
-	}
-	else{
-	  $genomic_strand = -1;
-	  $est_strand     = 1
-	}
-
-	my $genomic_primary = $primary_tag;
-	my $est_primary     = $primary_tag;
-
-#	my $pair = $self->_create_featurepair ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
-#					       $est_start, $est_end, $est_id, 
-#					       $genomic_source, $est_source, 
-#					       $genomic_strand, $est_strand, 
-#					       $genomic_primary, $est_primary);
-
-	my $pair = $self->_create_featurepair ($genomic_score, $genomic_id, $genomic_start, $genomic_end, 
-					       $est_id, $est_start, $est_end,
-					       $genomic_source, $est_source, 
-					       $genomic_strand, $est_strand, 
-					       $genomic_primary, $est_primary,
-					       $pid);
-	
-	$self->output($pair);
-
+	$self->throw("$estname(gff) and $hid(cigar) do not match!") unless $estname eq $hid;
+	my $pair = $self->_create_alignfeature($score, $qid, $qstart, $qend, $hid, $hstart, $hend, $qstrand, $hstrand, $pid, $db_cigar, 'exonerate', 'exonerate'); 
 	if($self->print_results) {
 	  print $pair->seqname  . "\t" . $pair->start        . "\t" . $pair->end    . "\t" . 
 	        $pair->score    . "\t" . $pair->percent_id   . "\t" . $pair->strand . "\t" . 
 	        $pair->hseqname . "\t" . $pair->hstart       . "\t" . $pair->hend   . "\t" . 
-                $pair->hstrand  . "\n";
+                $pair->hstrand  . "\t". $pair->cigar_string."\n";
 	}
-	
-      }    
+	$self->output($pair);
+      }
+     
     }
     
     
@@ -807,6 +775,52 @@ sub _create_featurepair {
   #create featurepair
   my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
 					   -feature2 => $feat2) ;
+  
+  if ($fp) {
+    $self->throw("Can't validate") unless $fp->validate();
+#    push(@{$self->{'_fplist'}}, $fp);
+  }
+  return $fp;
+}
+
+sub _create_alignfeature {
+  my ($self, $f1score,  $f1id, $f1start, $f1end, $f2id, $f2start, $f2end, $f1strand, $f2strand, $f1pid, $cigar, $gff_source, $gff_feature) = @_;
+  
+  #print "feature 1 ".$f1id." ".$f1start." ".$f1end." ".$f1strand." ".$f1pid." ".$f1score." \n";
+  #print "feature 2 ".$f2id." ".$f2start." ".$f2end." ".$f2strand." ".$f1pid." ".$f1score." \n";
+  #print "others ".$cigar." ".$gff_source." ".$gff_feature."\n";
+  #create analysis object
+  my $analysis_obj    = new Bio::EnsEMBL::Analysis
+    (-db              => "none",
+     -db_version      => "none",
+     -program         => "exonerate",
+     -program_version => "1",
+     -gff_source      => $gff_source,
+     -gff_feature     => $gff_feature);
+  
+  $f1pid = 0 unless defined $f1pid;
+
+  #create features
+  my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
+					     -end         =>   $f1end,
+					     -seqname     =>   $f1id,
+					     -strand      =>   $f1strand,
+					     -score       =>   $f1score,
+					     -percent_id  =>   $f1pid, 
+					     -analysis    =>   $analysis_obj );
+  
+  my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
+					     -end         =>   $f2end,
+					     -seqname     =>   $f2id,
+					     -strand      =>   $f2strand,
+					     -score       =>   $f1score,
+					     -percent_id  =>   $f1pid, 
+					     -analysis    =>   $analysis_obj );
+  #create featurepair
+  my $fp = new Bio::EnsEMBL::DnaDnaAlignFeature  (-feature1 => $feat1,
+						  -feature2 => $feat2,
+						  -cigar_string => $cigar,
+						 );
   
   if ($fp) {
     $self->throw("Can't validate") unless $fp->validate();
