@@ -5,12 +5,14 @@ use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::VirtualContig;
 
 use Getopt::Long;
+use strict;
 
 my $infile;
+my $vcontig = 0;
 
 &GetOptions('infile:s' => \$infile,
+            'vcontig'  => \$vcontig,
 	    );
-
 
 my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'ensrv3',
 				      -user   => 'ensro',
@@ -22,22 +24,27 @@ $| = 1;
 
 my @contigs = get_contigs($infile,@ARGV);
 
-foreach my $contigid (@contigss) {
+foreach my $contigid (@contigs) {
     eval {
 	
 	my $contig = $db->get_Contig($contigid);
-	
-	my $vc     = new Bio::EnsEMBL::DB::VirtualContig(-focuscontig   => $contig,
+        my $genebuilder;
+
+        if ($vcontig) {	
+	  my $vc     = new Bio::EnsEMBL::DB::VirtualContig(-focuscontig   => $contig,
 							 -focusposition => 1,
 							 -ori           => 1,
-							 -left          => 200000,
-							 -right         => 200000);
+							 -left          => 50000,
+							 -right         => 50000);
     
-	my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $vc);
+	  $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $vc);
+        } else {
+	  $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $contig);
+        }
 	$genebuilder->build_Genes;
     };
     if ($@) {
-	print STDERR "Error building genes on : $cloneid [$@]\n";
+	print STDERR "Error building genes on : $contigid [$@]\n";
     }
 }
 
@@ -57,8 +64,8 @@ sub get_contigs {
 	
     }
     
-    push(@contigss,@args);
+    push(@contigs,@args);
     
-    return @contigss;
+    return @contigs;
 }
 
