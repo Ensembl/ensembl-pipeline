@@ -38,7 +38,7 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->{'_conf'} = undef;
+   
     
     my $index = $self->analysis->parameters; 
     my $seqfetcher = $self->make_seqfetcher($index);
@@ -86,20 +86,23 @@ sub fetch_input {
   my $no_blast = 1;
   #print "getting features\n";
   my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200, 0);
-   
+  
+  print "have ".scalar(@features)." features\n";
   foreach my $f (@features) {
     if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)){
       push(@fps, $f);
     }
   }
-  my $feat = $fps[0];
-  print $feat."\n";
-  if($feat->percent_id){
-    $percent_filter = 1;
-  }else{
-    $percent_filter = undef;
-  }
   
+  if(scalar(@fps) != 0){
+    my $feat = $fps[0];
+    print STDERR $feat."\n";
+    if($feat->percent_id){
+      $percent_filter = 1;
+    }else{
+      $percent_filter = undef;
+    }
+  }
   
   
   

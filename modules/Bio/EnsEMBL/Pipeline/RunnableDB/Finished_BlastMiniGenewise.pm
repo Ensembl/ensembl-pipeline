@@ -131,14 +131,20 @@ sub write_output {
     my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
     #print "there are ".scalar($self->output). "genes\n";
   GENE: foreach my $gene ($self->output) {      
-      # do a per gene eval...
-      eval {
-        $gene_adaptor->store($gene);
-        #print STDERR "wrote gene " . $gene->dbID . "\n";
-      }; 
-      if( $@ ) {
-          print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-      }
+      # do a per gene eval..
+      my @transcripts = $gene->each_Transcript;
+      if(!$transcripts[1]){
+	print STDERR "Gene doesn't have any transcript\n";
+	next GENE;
+      }else{ 
+	eval {
+	  $gene_adaptor->store($gene);
+	  #print STDERR "wrote gene " . $gene->dbID . "\n";
+	}; 
+	if( $@ ) {
+	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+	}
+    }
             
   }
    
