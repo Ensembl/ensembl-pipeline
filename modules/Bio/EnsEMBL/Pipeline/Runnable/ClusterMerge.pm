@@ -329,22 +329,26 @@ sub solutions{
 sub collect_inclusion_children{
   my ($self, $node, $list) = @_;
 
-  my $verbose = $self->verbose;
-
+  my $verbose = 1;
+  my %seen;
   print STDERR "collecting inclusion tree from node ".$node->transcript->dbID."\n" if $verbose;
   my $generation = 1;
   if ( @{$node->inclusion_children} ){
     my @next_generation = @{$node->inclusion_children};
+    
     while( @next_generation ){
-      #print STDERR "generation $generation: @next_generation\n";
+      push( @$list, @next_generation);
+      print STDERR "generation $generation: ".scalar(@next_generation)."\n";
       $generation++;
       my @new_generation = ();
-      foreach my $child (@next_generation){
+      while( @next_generation ){
+	my $child = shift @next_generation;
+	next if $seen{$child};
+	$seen{$child} = 1;
 	if ( @{$child->inclusion_children} ){
 	  push( @new_generation, @{$child->inclusion_children} );
 	}
       }
-      push( @$list, @next_generation);
       @next_generation = @new_generation;
       @new_generation = ();
     }
@@ -354,6 +358,16 @@ sub collect_inclusion_children{
 }			       
 ############################################################
 
+sub get_transcript_string{
+  my ($self, $t) = @_;
+  my $string;
+  my @exons = sort { $a->start <=> $b->start } @{$t->get_all_Exons};
+  while (@exons){
+    my $exon = shift @exons;
+    $string .= $exon->start."_".$exon->end."_";
+  }
+  return $string;
+}
 
 ############################################################
 #
@@ -367,7 +381,8 @@ sub link_Transcripts{
   my @all_solutions;  
 
   my $verbose  = $self->verbose;
-  
+  my %seen_transcripts;
+
   # look in each cluster
  CLUSTER:
   foreach my $cluster ( @{ $transcript_clusters} ){
@@ -414,6 +429,15 @@ sub link_Transcripts{
   TRANSCRIPT:
     foreach my $transcript ( @transcripts ){
 	
+      if ( $self->_speed_up ){
+	my $string = $self->get_transcript_string($transcript);
+	if ( $seen_transcripts{$string} ){
+	  print STDERR "seen string $string\n";
+	  next TRANSCRIPT;
+	}
+	$seen_transcripts{ $string } = 1;
+      }
+      
 	# put this in a node
 	my $newnode = Bio::EnsEMBL::Pipeline::Node->new();
 	$newnode->transcript($transcript);
@@ -1211,7 +1235,7 @@ sub run {
 	
   ############################################################
   # cluster the transcripts
-  my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
+  my @transcript_clusters = $self->_cluster_Transcripts(\@transcripts);
   print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
   ############################################################
@@ -1297,30 +1321,31 @@ sub _filter_clusters{
 =cut
 
 sub _cluster_Transcripts {
-  my ($self,@transcripts) = @_;
+  my ($self,$transcripts) = @_;
  
-  my @forward_transcripts;
-  my @reverse_transcripts;
+  my $forward_transcripts;
+  my $reverse_transcripts;
  
-  foreach my $transcript (@transcripts){
+  while ( @$transcripts){
+    my $transcript = shift @$transcripts;
     my @exons = @{ $transcript->get_all_Exons };
     if ( $exons[0]->strand == 1 ){
-      push( @forward_transcripts, $transcript );
+      push( @$forward_transcripts, $transcript );
     }
     else{
-      push( @reverse_transcripts, $transcript );
+      push( @$reverse_transcripts, $transcript );
     }
   }
   my @clusters;
-  if ( @forward_transcripts ){
-    my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
+  if ( $forward_transcripts && @$forward_transcripts ){
+    my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( $forward_transcripts );
     if ( @forward_clusters){
       print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
       push( @clusters, @forward_clusters);
     }
   }
-  if ( @reverse_transcripts ){
-    my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
+  if ( $reverse_transcripts && @$reverse_transcripts ){
+    my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( $reverse_transcripts );
     if ( @reverse_clusters ){
       print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
       push( @clusters, @reverse_clusters);
@@ -1340,9 +1365,9 @@ sub _cluster_Transcripts {
 =cut
 
 sub _cluster_Transcripts_by_genomic_range{
-  my ($self,@mytranscripts) = @_;
+  my ($self,$mytranscripts) = @_;
 
-  unless (@mytranscripts){
+  unless (@$mytranscripts){
     return;
   }
 
@@ -1366,8 +1391,9 @@ sub _cluster_Transcripts_by_genomic_range{
 			else{
 			  return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
 			}
-		      } @mytranscripts;
+		      } @$mytranscripts;
   
+  @$mytranscripts = ();
   print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
   
   # create a new cluster 
