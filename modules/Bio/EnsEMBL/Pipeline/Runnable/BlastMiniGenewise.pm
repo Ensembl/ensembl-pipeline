@@ -307,6 +307,10 @@ sub run_blast {
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
     my $tblastn = $::scripts_conf{'tblastn'};
+    # default to tblastn
+    if(!defined $tblastn || $tblastn eq ''){
+      $tblastn = 'tblastn';
+    }
     my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 > $blastout";
 
    print (STDERR "Running command $command\n");
