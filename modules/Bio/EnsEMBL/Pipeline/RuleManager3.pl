@@ -29,11 +29,12 @@ unless (&config_sanity_check) {
 
 # signal parameters
 my $term_sig =  0;
+my $rst_sig  =  0;
 my $alarm    =  0;
 my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
-# $SIG{USR1} = \&sighandler;
+$SIG{USR1} = \&sighandler;
 $SIG{ALRM} = \&alarmhandler;
 $SIG{TERM} = \&termhandler;
 $SIG{INT} = \&termhandler;
@@ -70,9 +71,6 @@ my $dbpass    = $ENV{'ENS_DBPASS'};
 
 $| = 1;
 
-my $chunksize    = 1000000;   # How many Input_ids to fetch at one time
-my $currentStart = 0;       # Running total of job ids
-my $completeRead = 0;       # Have we got all the input ids yet?
 my $local        = 0;       # Run failed jobs locally
 my @analyses;               # Only run this analysis ids
 my $submitted;
@@ -83,6 +81,9 @@ my $shuffle;
 my $output_dir;
 my @start_from;
 my %analyses;
+my $verbose;
+my $rerun_sleep = 3600;
+my $overload_sleep = 300;
 
 GetOptions(
     'dbhost=s'        => \$dbhost,
@@ -96,7 +97,8 @@ GetOptions(
     'once!'         => \$once,
     'shuffle!'      => \$shuffle,
     'start_from=s@' => \@start_from,
-    'analysis=s@'   => \@analyses
+    'analysis=s@'   => \@analyses,
+    'v!'            => \$verbose
 )
 or die ("Couldn't get options");
 
@@ -105,11 +107,7 @@ unless ($dbhost && $dbname && $dbuser) {
     exit 1;
 }
 
-
 my $RUNNER_SCRIPT = $PIPELINE_RUNNER_SCRIPT || $runner;
-
-
-
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
@@ -222,15 +220,11 @@ while (1) {
         # NB It's almost as much work to get one ID as the whole lot, so setting
         # the 'chunksize' variable to a small number doesn't really achieve much.
 
-        if (!$completeRead) {
-            print "Reading IDs ... ";
+        print "Reading IDs ... ";
 
-	    foreach my $a (@start_from) {
-		push @id_list, @{$sic->list_input_id_by_Analysis($a)};
-	    }
-
-            $completeRead = 1;
-        }
+        foreach my $a (@start_from) {
+	    push @id_list, @{$sic->list_input_id_by_Analysis($a)};
+	}
     }
 
     @id_list = &shuffle(@id_list) if $shuffle;
@@ -258,13 +252,19 @@ while (1) {
 
             # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
             while ($get_pend_jobs && !$term_sig && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
-                sleep 300;
+                sleep $overload_sleep;
             }
             alarm $wakeup;
         }
 
 	if ($term_sig) {
 	    $done = 1;
+	    last JOBID;
+	}
+
+	if ($rst_sig) {
+	    $done = 0;
+            @rules = $rule_adaptor->fetch_all;
 	    last JOBID;
 	}
 
@@ -280,16 +280,16 @@ while (1) {
             if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
-            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id;
+            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
 
             my $anal = $rule->check_for_analysis (@anals);
 
             if ($anal) {
 
-                print " fullfilled.\n";
+                print " fullfilled.\n" if $verbose;
                 $analHash{$anal->dbID} = $anal;
             } else {
-                print " not fullfilled.\n";
+                print " not fullfilled.\n" if $verbose;
             }
         }
 
@@ -338,12 +338,12 @@ while (1) {
 						      -output_dir => $output_dir);
 
 
-            print "Store ", $id, " - ", $anal->logic_name, "\n";
+            print "Store ", $id, " - ", $anal->logic_name, "\n" if $verbose;
             $submitted++;
             $job_adaptor->store($job);
 
             if ($local) {
-                print "Running job locally\n";
+                print "Running job locally\n" if $verbose;
                 eval {
                   $job->runLocally;
                 };
@@ -352,7 +352,7 @@ while (1) {
                 }
             } else {
               eval {
-                print "\tBatch running job\n";
+                print "\tBatch running job\n" if $verbose;
                 $job->batch_runRemote;
               };
               if ($@) {
@@ -363,15 +363,11 @@ while (1) {
         }
 
     }
-    &shut_down($db) if $done || $once;
-    if ($completeRead == 1) {
-        sleep(3600) if $submitted == 0;
-        $completeRead = 0;
-        $currentStart = 0;
-        @id_list = ();
-        print "Waking up and run again!\n";
-    }
 
+    &shut_down($db) if $done || $once;
+    sleep($rerun_sleep) if $submitted == 0;
+    @id_list = ();
+    print "Waking up and run again!\n" if $verbose;
 }
 
 
@@ -395,12 +391,11 @@ sub termhandler {
 
 
 # handler for SIGUSR1
-# sub sighandler {
+sub sighandler {
 
-    # SIG: {
-    # }
-    # $SIG{SIG1} = \&sighandler;
-# };
+    $rst_sig = 1;
+    $SIG{SIG1} = \&sighandler;
+};
 
 
 # handler for SIGALRM
