@@ -175,14 +175,6 @@ sub epcr {
 
 =cut
 
-sub options {
-    my ($self, $args) = @_;
-    if ($args)
-    {
-        $self->{'_options'} = $args ;
-    }
-    return $self->{'_options'};
-}
 
 =head2 arguments
 
@@ -248,17 +240,6 @@ sub run {
     $self->parse_results();
     $self->deletefiles();
 }
-
-=head2 parsefile
-
-    Title   :  parsefile
-    Usage   :   $obj->parsefile($filename)
-    Function:   Parses EPCR output to give a set of feature pairs
-                parsefile can accept filenames, filehandles or pipes (\*STDIN)
-    Returns :   none
-    Args    :   optional filename
-
-=cut
 
 sub run_epcr {
     my ($self) = @_;

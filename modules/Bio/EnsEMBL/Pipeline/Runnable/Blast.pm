@@ -954,15 +954,6 @@ sub database {
 
 =cut
 
-sub options {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_options'} = $args ;
-  }
-  return $self->{'_options'};
-}
-
 sub filter {
     my ($self,$args) = @_;
 

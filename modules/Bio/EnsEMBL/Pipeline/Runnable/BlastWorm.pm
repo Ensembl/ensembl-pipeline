@@ -268,14 +268,6 @@ sub threshold_type {
 
 =cut
 
-sub options {
-    my $self = shift;
-    if (@_) {
-        $self->{'_options'} = shift;
-    }
-    return $self->{'_options'};
-} 
-
 
 =head2 filter
 

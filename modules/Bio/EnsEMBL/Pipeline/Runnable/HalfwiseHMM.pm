@@ -286,15 +286,6 @@ sub genewise_loc {
 
 =cut
 
-sub options {
-  my ($self, $args) = @_;
-  
-  if (defined($args)) {
-    $self->{'_options'} = $args ;
-  }
-  return $self->{'_options'};
-}
-
 
 =head2 hmmfetch 
 

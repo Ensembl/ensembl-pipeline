@@ -761,16 +761,6 @@ sub threshold_type {
 
 =cut
 
-sub options {
-    my($self,$arg) = @_;
-    
-    if (defined($arg)) {
-      $self->{'_options'} = $arg;
-    }
-
-    return $self->{'_options'};
-}
-
 
 sub featurepairs {
     my ($self, $fp) = @_;
