@@ -260,13 +260,13 @@ sub get_JobsByAge {
     my $ageinseconds = $age * 60;
     my $query = 'SELECT j.id, j.input_id, j.analysis, j.LSF_id, j.machine, '
                     .'j.queue, j.stdout_file, j.stderr_file, j.input_object_file, '
-                    .'j.output_file, j.status_file, js.status '
+                    .'j.output_file, j.status_file, cs.status '
                 .'FROM job as j, jobstatus as js, current_status as cs ' 
-                .'WHERE cs.id = j.id '
-                    .'AND cs.id = js.id '
+                .'WHERE cs.id = js.id '
                     .'AND cs.status = js.status '
+                    .'AND cs.id = j.id '
                     .'AND Unix_TIMESTAMP(js.time) > Unix_TIMESTAMP()-'.$ageinseconds;
-    
+            
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
     
@@ -347,7 +347,7 @@ sub delete_Job {
     my ($self,$id) = @_;
 
     $self->throw("No job id for delete_Job") unless defined($id);
-
+    my $job = $self->get_Job($id);
     my $query = "delete from job where id = $id";
     my $sth   = $self->prepare($query);
     my $res   = $sth ->execute;
@@ -359,6 +359,11 @@ sub delete_Job {
     $query = "delete from current_status where id = $id";
     $sth  = $self->prepare($query);
     $res  = $sth->execute;
+    
+    unlink $job->status_file;
+    unlink $job->stdout_file;
+    unlink $job->stderr_file;
+    unlink $job->input_object_file;
 }
 
 sub get_InputIdsByAnalysis {
