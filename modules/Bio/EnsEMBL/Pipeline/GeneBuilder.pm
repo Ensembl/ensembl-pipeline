@@ -660,14 +660,9 @@ sub cluster_Transcripts {
 sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
   # first sort the transcripts
-  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-				 if ($result){
-				     return $result;
-				 }
-				 else{
-				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-				 }
-			     } @mytranscripts;
+
+  my @transcripts = sort { $a->start <=> $b->start ? $a->start <=> $b->start : $b->end <=> $a->end } @mytranscripts;
+
 
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
@@ -679,8 +674,8 @@ sub _cluster_Transcripts_by_genomic_range{
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
 
-  $cluster_starts[$count] = $self->transcript_low($transcripts[0]);
-  $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
+  $cluster_starts[$count] = $transcripts[0]->start;
+  $cluster_ends[$count]   = $transcripts[0]->end;
   
   # store the list of clusters
   push( @clusters, $cluster );
@@ -698,11 +693,11 @@ sub _cluster_Transcripts_by_genomic_range{
       $cluster->put_Transcripts( $transcripts[$c] );
       
       # re-adjust size of cluster
-      if ($self->transcript_low($transcripts[$c]) < $cluster_starts[$count]) {
-	$cluster_starts[$count] = $self->transcript_low($transcripts[$c]);
+      if ($transcripts[$c]->start < $cluster_starts[$count]) {
+	$cluster_starts[$count] = $transcripts[$c]->start;
       }
-      if ( $self->transcript_high($transcripts[$c]) > $cluster_ends[$count]) {
-	$cluster_ends[$count] =   $self->transcript_high($transcripts[$c]);
+      if ( $transcripts[$c]->end > $cluster_ends[$count]) {
+	$cluster_ends[$count] =  $transcripts[$c]->end;
       }
     }
     else{
@@ -710,8 +705,8 @@ sub _cluster_Transcripts_by_genomic_range{
       $count++;
       $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
       $cluster->put_Transcripts( $transcripts[$c] );
-      $cluster_starts[$count] = $self->transcript_low( $transcripts[$c]);
-      $cluster_ends[$count]   = $self->transcript_high($transcripts[$c]);
+      $cluster_starts[$count] = $transcripts[$c]->start;
+      $cluster_ends[$count]   = $transcripts[$c]->end;
       
       # store it in the list of clusters
       push(@clusters,$cluster);
