@@ -159,11 +159,11 @@ sub blast_isoforms{
 
     my @featurepairs = $blast->output();
 
-
- #    my $blastz =  Bio::EnsEMBL::Pipeline::Runnable::Blastz->new ('-query'     => $seq1,
-#								  '-database'  => $database,
-#								  '-options'   => 'B=0 C=2 K=2200',
-#								 );
+    
+    #    my $blastz =  Bio::EnsEMBL::Pipeline::Runnable::Blastz->new ('-query'     => $seq1,
+    #								  '-database'  => $database,
+    #								  '-options'   => 'B=0 C=2 K=2200',
+    #								 );
     
 #    $blastz->run();
     
@@ -345,9 +345,9 @@ sub process_target{
       # compute the size of the 'gaps'
       my @gaps;
       $is_spliced = 0;
-      for(my $i=0; $i<$#clusters-1; $i++){
+      for(my $i=0; $i<$#clusters-; $i++){
 	my $gap = $cluster_starts[$i+1] - $cluster_ends[$i] - 1;
-	#print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+	print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
 	if ( $gap >= $min_exon_length ){
 	  $is_spliced = 1;
 	  #print STDERR "is spliced\n";
@@ -359,11 +359,11 @@ sub process_target{
     # calculate the coverage of the transcript
     my $feature_length = 0;
     for(my $i=0; $i<=$#clusters; $i++){
-      print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
+      #print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
       $feature_length += $cluster_ends[$i] - $cluster_starts[$i] + 1;
     }
-    print STDERR "feature length   : $feature_length\n";
-    print STDERR "transcript length: $transcript_length\n";
+    #print STDERR "feature length   : $feature_length\n";
+    #print STDERR "transcript length: $transcript_length\n";
     my $coverage = sprintf "%.2f", 100*$feature_length/$transcript_length;
     #$self->print_exons_in_transcript($tran);
     return ($coverage,$is_spliced);
@@ -455,9 +455,9 @@ sub process_query{
    # compute the size of the 'gaps'
    my @gaps;
    $is_spliced = 0;
-   for(my $i=0; $i<$#clusters-1; $i++){
+   for(my $i=0; $i<$#clusters; $i++){
      my $gap = $cluster_hstarts[$i+1] - $cluster_hends[$i] - 1;
-     #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+     print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
      if ( $gap >= $min_exon_length ){
        $is_spliced = 1;
        #print STDERR "is spliced\n";
@@ -2228,7 +2228,9 @@ sub blast_unmapped_transcripts{
   my $id2 = $seq2->display_id;
   my $length1 = $seq1->length;
   my $length2 = $seq2->length;
-    
+  #print STDERR "\tquery : $id1 length = $length1\n";
+  #print STDERR "\ttarget: $id2 length = $length2\n";
+  
   ############################################################
   # create database
   my $file = 'seq_'.$$.'.fa';
@@ -2265,8 +2267,8 @@ sub blast_unmapped_transcripts{
   my @featurepairs = $blast->output();
   unlink ( $database );
         
-  #print STDERR "\t$id1 length = $length1\n";
-  #print STDERR "\t$id2 length = $length2\n";
+  print STDERR "\t$id1 length = $length1\n";
+  print STDERR "\t$id2 length = $length2\n";
   
   ############################################################
   # separate by strands
@@ -2305,8 +2307,8 @@ sub blast_unmapped_transcripts{
   my $coverage = 0;
   my $spliced = 0;
   my $perc_id=0;
-  my ($query_coverage, $query_spliced);
-  my ($target_coverage, $target_spliced);
+  my ($query_coverage, $query_spliced, $max_query_gap);
+  my ($target_coverage, $target_spliced, $max_target_gap);
   
 
   ############################################################
@@ -2316,9 +2318,9 @@ sub blast_unmapped_transcripts{
     ############################################################
     # calculate coverage
     # we use query/target as in feature pairs the target=seqname and query=hseqname
-    ($query_coverage,  $query_spliced)  = 
+    ($query_coverage,  $query_spliced, $max_query_gap)  = 
       $self->process_unmapped_query( $best_features, $seq2);
-    ($target_coverage, $target_spliced) = 
+    ($target_coverage, $target_spliced, $max_target_gap) = 
       $self->process_unmapped_target( $best_features, $seq1);
     $coverage = ( $query_coverage + $target_coverage )/2;
     
@@ -2338,14 +2340,14 @@ sub blast_unmapped_transcripts{
     }
     $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
     
-    print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
-    print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+    print STDERR "\tquery:$id2 coverage:$query_coverage spliced:$query_spliced\n";
+    print STDERR "\ttarget:$id1 coverage:$target_coverage spliced:$target_spliced\n";
     print STDERR "\taveraged percent id: $perc_id\n";
     $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
   }
   
   $best_score = 0 if $spliced;
-  return ( $best_score, $best_features, $target_coverage, $query_coverage, $perc_id );
+  return ( $best_score, $best_features, $target_coverage, $max_target_gap, $query_coverage, $max_query_gap, $perc_id );
 }
 
 
@@ -2355,7 +2357,8 @@ sub blast_unmapped_transcripts{
 
 sub process_unmapped_target{
     my ($self,$feat, $seq, $coding_exons, $protein) = @_;
-    my $transcript_length = $seq->length;
+    print STDERR "target is: ".$seq->display_id."\n";
+    my $length = $seq->length;
     my $min_exon_length = 50;
     if ( $protein ){
       $min_exon_length = 16;
@@ -2383,6 +2386,9 @@ sub process_unmapped_target{
     # loop over the rest of the features
   FEATURE:
     foreach my $f ( @features ){
+      #print STDERR "feature: ".$f->start."-".$f->end."\n";
+      #print STDERR "cluster: ".$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
+      
       if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {      
 	push(@$cluster,$f);
 	
@@ -2393,7 +2399,8 @@ sub process_unmapped_target{
 	if ($f->end  > $cluster_ends[$count]) {
 	  $cluster_ends[$count]   = $f->end;
 	}
-	  }
+	#print STDERR "added - reset cluster: ".$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
+      }
       else{
 	# else, start create a new cluster with this feature
 	$count++;
@@ -2401,27 +2408,36 @@ sub process_unmapped_target{
 	push (@$cluster, $f);
 	$cluster_starts[$count] = $f->start;
 	$cluster_ends[  $count] = $f->end;
+	#print STDERR "create new cluster:".$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
 	
 	# store it in the list of clusters
 	push(@clusters,$cluster);
       }
     }
     
+    my $max_gap = 0;
     ############################################################
     # check whether the transcript has one or more exons unaligned
+    print STDERR "In process_unmapped_target(): number of clusters: ".scalar( @clusters )."\n";
     if ( scalar( @clusters ) == 1 ){
+      print STDERR "only one cluster\n";
       $is_spliced = 0;
     }
     else{
       # compute the size of the 'gaps'
       my @gaps;
       $is_spliced = 0;
-      for(my $i=0; $i<$#clusters-1; $i++){
+      for (my $i=0; $i<$#clusters; $i++){
+	#print STDERR "cluster[$i]  : ".$cluster_starts[$i]."-".$cluster_ends[$i]."\n";
+	#print STDERR "cluster[$i+1]: ".$cluster_starts[$i+1]."-".$cluster_ends[$i+1]."\n";
 	my $gap = $cluster_starts[$i+1] - $cluster_ends[$i] - 1;
-	#print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+	print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
 	if ( $gap >= $min_exon_length ){
 	  $is_spliced = 1;
-	  #print STDERR "is spliced\n";
+	  print STDERR "is spliced\n";
+	}
+	if ($gap > $max_gap ){
+	  $max_gap = $gap;
 	}
       }
     }
@@ -2430,14 +2446,15 @@ sub process_unmapped_target{
     # calculate the coverage of the transcript
     my $feature_length = 0;
     for(my $i=0; $i<=$#clusters; $i++){
-      print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i]\n";
+      #print STDERR "target cluster $i: $cluster_starts[$i] - $cluster_ends[$i] (".( $cluster_ends[$i] - $cluster_starts[$i] + 1).")\n";
       $feature_length += $cluster_ends[$i] - $cluster_starts[$i] + 1;
+      #print STDERR "feature length: $feature_length\n";
     }
     print STDERR "feature length   : $feature_length\n";
-    print STDERR "transcript length: $transcript_length\n";
-    my $coverage = sprintf "%.2f", 100*$feature_length/$transcript_length;
+    print STDERR "transcript length: $length\n";
+    my $coverage = sprintf "%.2f", 100*$feature_length/$length;
     #$self->print_exons_in_transcript($tran);
-    return ($coverage,$is_spliced);
+    return ($coverage,$is_spliced,$max_gap);
 }
 
 ############################################################
@@ -2445,7 +2462,7 @@ sub process_unmapped_target{
 ############################################################
 sub process_unmapped_query{
   my ($self,$feat, $seq, $coding_exons, $protein) = @_;
-
+  print STDERR "query is: ".$seq->display_id."\n";
   my $transcript_length = $seq->length;
   my $min_exon_length = 50;
   if ( $protein ){
@@ -2475,9 +2492,10 @@ sub process_unmapped_query{
   # loop over the rest of the features
  FEATURE:
   foreach my $f ( @features ){
+    
     if (!($f->hend < $cluster_hstarts[$count] || $f->hstart > $cluster_hends[$count])) {      
       push(@$cluster,$f);
-	 
+      
 	 # re-adjust size of cluster
 	 if ($f->hstart < $cluster_hstarts[$count]) {
 	     $cluster_hstarts[$count] = $f->hstart;
@@ -2497,26 +2515,30 @@ sub process_unmapped_query{
 	 # store it in the list of clusters
 	 push(@clusters,$cluster);
      }
- }
-
+  }
+  
+  my $max_gap = 0;
   ############################################################
   # check whether the transcript has one or more exons unaligned
   if ( scalar( @clusters ) == 1 ){
+    #print STDERR "only one cluster\n";
     $is_spliced = 0;
   }
   else{
     # compute the size of the 'gaps'
-    my @gaps;
     $is_spliced = 0;
-    for(my $i=0; $i<$#clusters-1; $i++){
+    for(my $i=0; $i<$#clusters; $i++){
       my $gap = $cluster_hstarts[$i+1] - $cluster_hends[$i] - 1;
-      #print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
+      print STDERR "gap: $gap, min_exon_length = $min_exon_length\n";
       if ( $gap >= $min_exon_length ){
 	$is_spliced = 1;
 	#print STDERR "is spliced\n";
       }
+      if ( $gap > $max_gap ){
+	$max_gap = $gap;
+      }
     }
- }
+  }
   
   ############################################################
   # calculate the coverage of the transcript
@@ -2530,7 +2552,7 @@ sub process_unmapped_query{
   
   #$self->print_exons_in_transcript($qtran);
   
-  return ($coverage,$is_spliced);
+  return ($coverage,$is_spliced, $max_gap);
 }
 
 ############################################################
@@ -2570,7 +2592,7 @@ sub blast_unmapped_proteins{
     
     system("setdb $database > /dev/null 2>&1");
     
-    my $options = "W=5 -warnings";
+    my $options = " -warnings";
     my $blast =  
       Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						    '-program'        => 'wublastp',
@@ -2630,17 +2652,17 @@ sub blast_unmapped_proteins{
     my $coverage = 0;
     my $spliced = 0;
     my $perc_id=0;
-    my ($query_coverage, $query_spliced);
-    my ($target_coverage, $target_spliced);
+    my ($query_coverage, $query_spliced, $max_query_gap);
+    my ($target_coverage, $target_spliced, $max_target_gap);
     if ( $best_features ){
       
       ############################################################
       # calculate coverage
       # we use query/target as in feature pairs the target=seqname and query=hseqname
       my $coding_exons = 1;
-      ($query_coverage,  $query_spliced)  = 
+      ($query_coverage,  $query_spliced, $max_query_gap)  = 
 	$self->process_unmapped_query( $best_features, $seq2 , $coding_exons,1);
-      ($target_coverage, $target_spliced) = 
+      ($target_coverage, $target_spliced, $max_target_gap) = 
 	$self->process_unmapped_target( $best_features, $seq1, $coding_exons,1);
       $coverage = ( $query_coverage + $target_coverage )/2;
       
@@ -2658,8 +2680,8 @@ sub blast_unmapped_proteins{
       }
       $perc_id = sprintf "%.2f", ( $perc_id/scalar(@$best_features) );
       
-      print STDERR "\tquery:$id1 coverage:$query_coverage spliced:$query_spliced\n";
-      print STDERR "\ttarget:$id2 coverage:$target_coverage spliced:$target_spliced\n";
+      print STDERR "\ttarget:$id1 coverage:$target_coverage spliced:$query_spliced\n";
+      print STDERR "\tquery :$id2 coverage:$query_coverage spliced:$target_spliced\n";
       print STDERR "\taveraged percent id: $perc_id\n";
       
       $best_score = 0 if ( $target_coverage + $query_coverage < 100 );
@@ -2667,7 +2689,7 @@ sub blast_unmapped_proteins{
     
     $best_score = 0 if $spliced;
     
-    return ( $best_score, $best_features, $target_coverage, $query_coverage, $perc_id );
+    return ( $best_score, $best_features, $target_coverage, $max_target_gap, $query_coverage, $max_query_gap, $perc_id );
   }
 
 ############################################################
