@@ -55,6 +55,10 @@ use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 use Data::Dumper;
 
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_EXONERATE
+				       );
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
@@ -356,7 +360,7 @@ sub run_exonerate {
   }
 
   my $exr = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
-							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
+							    '-exonerate' => $EST_EXONERATE,
 							    '-genomic'   => $self->genomic_sequence,
 							    '-est'       => $self->queryfilename
 							   );
