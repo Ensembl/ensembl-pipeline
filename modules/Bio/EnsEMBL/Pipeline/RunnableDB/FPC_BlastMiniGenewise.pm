@@ -101,8 +101,9 @@ sub write_output {
     my($self,@features) = @_;
 
     my $gene_adaptor = $self->db->get_GeneAdaptor;
-
-  GENE: foreach my $gene ($self->output) {	
+    my @genes = $self->output;
+    #print STDERR "have ".@genes."\n";
+  GENE: foreach my $gene (@genes) {	
       # do a per gene eval...
       eval {
 	$gene_adaptor->store($gene);
@@ -152,18 +153,19 @@ sub write_output {
     #print STDERR "Contig        : " . $slice->id . " \n";
     #print STDERR "Length is     : " . $genseq->length . "\n\n";
     
-    my @genes     = $slice->get_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
+    my @genes     = @{$slice->get_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
     #print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
 
     foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       
       print STDERR "Fetching features for " . $database->{'type'} . 
 	" with score above " . $database->{'threshold'}. "\n\n";
-      
-      my @features  = $slice->get_all_SimilarityFeatures_above_score($database->{'type'}, $database->{'threshold'});
-
+      my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
+      my @features  = @{$pafa->fetch_by_Slice_and_score($slice, $database->{'threshold'}, $database->{'type'})};
+      print STDERR "have ".@features." \n";
       # lose version numbers - probably temporary till pfetch indices catch up
       foreach my $f(@features) {
+	#print STDERR "have ".$f." from the feature table\n";
 	my $name = $f->hseqname;
 	if ($name =~ /(\S+)\.\d+/) { 
 	  $f->hseqname($1);
@@ -176,8 +178,8 @@ sub write_output {
       
       # check which TargettedGenewise exons overlap similarity features
       foreach my $gene (@genes) {
-	foreach my $tran ($gene->get_all_Transcripts) {
-	  foreach my $exon ($tran->get_all_Exons) {
+	foreach my $tran (@{$gene->get_all_Transcripts}) {
+	  foreach my $exon (@{$tran->get_all_Exons}) {
 	    if ($exon->seqname eq $slice->id) {
 	      
 	    FEAT: foreach my $f (@features) {
@@ -196,7 +198,7 @@ sub write_output {
       
       # collect those features which haven't been used by Targetted GeneWise
       foreach my $f (@features) {
-	      print "Feature : " . $f->gffstring . "\n";
+	      #print "Feature : " . $f->gffstring . "\n";
 	
 	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	    defined($f->hseqname) &&
@@ -244,7 +246,7 @@ sub run {
     }
     
     $self->convert_output;
-
+    #print STDERR "HAVE CONVERTED OUTPUT\n";
 }
 
 =head2 convert_output
@@ -261,7 +263,7 @@ sub convert_output {
   my ($self) =@_;
   my $trancount = 1;
   my $genetype = $GB_SIMILARITY_GENETYPE;
-
+  #print STDERR "in CONVERT OUTPUT\n";
   foreach my $runnable ($self->runnable) {
     $self->throw("I don't know what to do with $runnable") unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
 										 
@@ -292,9 +294,9 @@ sub convert_output {
     my @results = $runnable->output;
     my $genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
-    my $remapped = $self->remap_genes($genes);
-
-    $self->output(@$remapped);
+    my @remapped = @{$self->remap_genes($genes)};
+    #print STDERR "HAVE ".@remapped." remapped genes\n";
+    $self->output(@remapped);
 
   }
 }
@@ -321,7 +323,7 @@ sub make_genes {
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
-  foreach my $tmpf (@$results) {
+  foreach my $tmpf (@{$results}) {
     my $unchecked_transcript = $self->_make_transcript($tmpf, $self->vcontig, $genetype, $analysis_obj);
     
     next unless defined ($unchecked_transcript);
@@ -331,6 +333,7 @@ sub make_genes {
     
     # make genes from valid transcripts
     foreach my $checked_transcript(@$valid_transcripts){
+      #print "have ".$checked_transcript." as a transcript\n";
       my $gene = new Bio::EnsEMBL::Gene;
       $gene->type($genetype);
       $gene->analysis($analysis_obj);
@@ -362,7 +365,7 @@ sub make_genes {
 sub _make_transcript{
   my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
   $genetype = 'similarity_genewise' unless defined ($genetype);
-
+  #print "have ".$gene." as a gene\n";
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
 #  unless ($contig->isa ("Bio::PrimarySeq"))
@@ -427,8 +430,8 @@ sub _make_transcript{
       $transcript->add_Exon($exon);
     }
     
-    $translation->start_exon($exons[0]);
-    $translation->end_exon  ($exons[$#exons]);
+    $translation->start_Exon($exons[0]);
+    $translation->end_Exon  ($exons[$#exons]);
     
     if ($exons[0]->phase == 0) {
       $translation->start(1);
@@ -488,7 +491,7 @@ sub validate_transcript {
   }
 
   my $previous_exon;
-  foreach my $exon($transcript->get_all_Exons){
+  foreach my $exon(@{$transcript->get_all_Exons}){
     if (defined($previous_exon)) {
       my $intron;
       
@@ -530,14 +533,14 @@ sub validate_transcript {
     my $newtranslation = new Bio::EnsEMBL::Translation;
 
     $newtranscript->translation($newtranslation);
-    $newtranscript->translation->start_exon($transcript->translation->start_exon);
-    $newtranscript->translation->end_exon($transcript->translation->end_exon);
+    $newtranscript->translation->start_Exon($transcript->translation->start_Exon);
+    $newtranscript->translation->end_Exon($transcript->translation->end_Exon);
     $newtranscript->translation->start($transcript->translation->start);
     $newtranscript->translation->end($transcript->translation->end);
-    foreach my $exon($transcript->get_all_Exons){
+    foreach my $exon(@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
-      foreach my $sf($exon->get_all_supporting_features){
-	  $sf->feature1->seqname($exon->contig_id);
+      foreach my $sf(@{$exon->get_all_supporting_features}){
+	  $sf->seqname($exon->contig_id);
       }
     }
 
@@ -581,19 +584,19 @@ sub split_transcript{
   my $translation     = new Bio::EnsEMBL::Translation;
   $curr_transcript->translation($translation);
 
-EXON:   foreach my $exon($transcript->get_all_Exons){
+EXON:   foreach my $exon(@{$transcript->get_all_Exons}){
 
 
     $exon_added = 0;
       # is this the very first exon?
-    if($exon == $transcript->start_exon){
+    if($exon == $transcript->start_Exon){
 
       $prev_exon = $exon;
       
-      # set $curr_transcript->translation start and start_exon
+      # set $curr_transcript->translation start and start_Exon
       $curr_transcript->add_Exon($exon);
       $exon_added = 1;
-      $curr_transcript->translation->start_exon($exon);
+      $curr_transcript->translation->start_Exon($exon);
       $curr_transcript->translation->start($transcript->translation->start);
       push(@split_transcripts, $curr_transcript);
       next EXON;
@@ -612,7 +615,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
     }
     
     if ($intron > $GB_SIMILARITY_MAX_INTRON) {
-      $curr_transcript->translation->end_exon($prev_exon);
+      $curr_transcript->translation->end_Exon($prev_exon);
       # need to account for end_phase of $prev_exon when setting translation->end
       $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
       
@@ -621,11 +624,11 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       my $tr = new Bio::EnsEMBL::Translation;
       $t->translation($tr);
 
-      # add exon unless already added, and set translation start and start_exon
+      # add exon unless already added, and set translation start and start_Exon
       $t->add_Exon($exon) unless $exon_added;
       $exon_added = 1;
 
-      $t->translation->start_exon($exon);
+      $t->translation->start_Exon($exon);
 
       if ($exon->phase == 0) {
 	$t->translation->start(1);
@@ -644,13 +647,13 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       push(@split_transcripts, $curr_transcript);
     }
 
-    if($exon == $transcript->end_exon){
+    if($exon == $transcript->end_Exon){
       # add it unless already added
       $curr_transcript->add_Exon($exon) unless $exon_added;
       $exon_added = 1;
 
-      # set $curr_transcript end_exon and end
-      $curr_transcript->translation->end_exon($exon);
+      # set $curr_transcript end_Exon and end
+      $curr_transcript->translation->end_Exon($exon);
       $curr_transcript->translation->end($transcript->translation->end);
     }
 
@@ -658,8 +661,8 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       # just add the exon
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
-    foreach my $sf($exon->get_all_supporting_features){
-	  $sf->feature1->seqname($exon->contig_id);
+    foreach my $sf(@{$exon->get_all_supporting_features}){
+	  $sf->seqname($exon->contig_id);
 
       }
     # this exon becomes $prev_exon for the next one
@@ -673,7 +676,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
   
   foreach my $st(@split_transcripts){
     $st->sort;
-    my @ex = $st->get_all_Exons;
+    my @ex = @{$st->get_all_Exons};
     if(scalar(@ex) > 1){
       $st->{'temporary_id'} = $transcript->dbID . "." . $count;
       $count++;
@@ -742,11 +745,11 @@ sub check_coverage{
 
   my $matches = 0;
 
-  foreach my $exon($transcript->get_all_Exons) {
+  foreach my $exon(@{$transcript->get_all_Exons}) {
     $pstart = 0;
     $pend   = 0;
     
-    foreach my $f($exon->get_all_supporting_features){
+    foreach my $f(@{$exon->get_all_supporting_features}){
       
       if (!defined($protname)){
 	$protname = $f->hseqname;
@@ -899,9 +902,9 @@ sub remap_genes {
       #$newgene->type($gene->type);
       #$gene->analysis($gene->analysis);
 
-      foreach my $tran ($gene->get_all_Transcripts) {
-	foreach my $exon($tran->get_all_Exons) {
-	  foreach my $sf($exon->get_all_supporting_features) {
+      foreach my $tran (@{$gene->get_all_Transcripts}) {
+	foreach my $exon(@{$tran->get_all_Exons}) {
+	  foreach my $sf(@{$exon->get_all_supporting_features}) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
 	      my $tmp = $sf->start;
@@ -946,7 +949,7 @@ sub output{
    if(defined @genes){
      push(@{$self->{'_output'}},@genes);
    }
-
+   #print STDERR "have ".@{$self->{'_output'}}." as output\n";
    return @{$self->{'_output'}};
 }
 
