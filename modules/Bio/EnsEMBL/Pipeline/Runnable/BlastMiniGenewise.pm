@@ -341,6 +341,8 @@ sub build_runnables {
     }
   }
 
+  my %runnable_featids;
+
   foreach my $seqname (keys %partitioned_features){
 
     # Preliminary check to see whether our filtered features
@@ -351,6 +353,7 @@ sub build_runnables {
     unless ($coverage > 0.75) {
       my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
       push (@mg_runnables, $mmgw);
+      $runnable_featids{$seqname}++;
       next
     }
 
@@ -442,8 +445,9 @@ sub build_runnables {
 					   -id  => $self->genomic_sequence->id );
 
 	my $mmgw = $self->make_mmgw($genomic_subseq, $unfiltered_partitioned_features{$seqname});
-
+	$runnable_featids{$seqname}++;
 	push (@mg_runnables, $mmgw);
+
       }
     
     }else{
@@ -452,21 +456,30 @@ sub build_runnables {
 
       my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
 
+      $runnable_featids{$seqname}++;
       push (@mg_runnables, $mmgw);
     }
-      
+
   }
 
-  # Gah, what if we havent constructed a runnable by this 
-  # late stage?  It means that the homology of the blast
-  # features was so low that we threw them all away.  Had
-  # better just make a default runnable...
+  # Gah, what if we havent constructed a runnable for each
+  # feature id by this late stage?
+  # It means that the homology of the blast features for
+  # an id was so low that we threw all the features 
+  # away.  Had better just make a default runnable...
 
-  unless (scalar @mg_runnables){
-    my $mmgw = $self->make_mmgw($self->genomic_sequence, \@features);
-    push (@mg_runnables, $mmgw);
+  my %feature_ids;
+  foreach my $feature (@features){
+    $feature_ids{$feature->seqname}++;
   }
 
+  foreach my $feature_id (keys %feature_ids){
+    unless ($runnable_featids{$feature_id} > 0){
+      my $mmgw = $self->make_mmgw($self->genomic_sequence, \@features);
+
+      push (@mg_runnables, $mmgw);
+    }
+  }
 
   return \@mg_runnables;
 }
