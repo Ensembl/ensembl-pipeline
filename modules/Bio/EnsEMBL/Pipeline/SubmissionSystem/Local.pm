@@ -30,9 +30,12 @@ sub new {
   my $class = ref($caller) || $caller;
 
   my $self = bless {}, $class;
-  
+
+  $SIG{CHLD} = \&sig_chld;
+
   return $self->SUPER::new(@_);
 }
+
 
 =head2 submit
 
@@ -56,36 +59,32 @@ sub submit{
     $self->throw('expected Bio::EnsEMBL::Pipeline::Job argument');
   }
 
-  $SIG{CHLD} = \&sig_chld;
 
   unshift @_queue, $job;
 
-  while ($#_queue >= 0) {
-
-    if ($children < 2) {
-
+  while (@_queue > 0) {
+    if ($children < 1) {
       my $job = shift @_queue;
 
       if (my $pid = fork) { # fork returns PID of child to parent, 0 to child
-	
-	# PARENT
-	$children++;
-	print "Size of children is now " . $children . "; " . ($#_queue+1) . " jobs left in queue\n";
+        # PARENT
+        $children++;
+        print "Size of children is now " . $children . "; " . 
+          scalar(@_queue) . " jobs left in queue\n";
 	
       } else {
-	
-	#CHILD
-	
-	my $file_prefix = $self->_generate_file_prefix($job);
-	$job->stdout_file("${file_prefix}.out");
-	$job->stderr_file("${file_prefix}.err");
-
-	print "Executing $job with PID $$\n";
-	$job->submission_id($$);
-	$job->adaptor->update($job);
-	$job->set_current_status('SUBMITTED');
-	$job->run();
-	
+        #CHILD        
+        #my $file_prefix = $self->_generate_filename_prefix($job);
+        #$job->stdout_file("${file_prefix}.out");
+        #$job->stderr_file("${file_prefix}.err");
+        
+        print "Executing $job with PID $$\n";
+        $job->submission_id($$);
+        $job->adaptor->update($job);
+        $job->set_current_status('SUBMITTED');
+        
+        $job->run();
+        exit(0); #child process is finished now!
       }
 
     } else {
@@ -98,10 +97,8 @@ sub submit{
 
   # wait for any children to complete
   while ($children > 0) {
-
     print "$children children still running, waiting ...\n";
     sleep(2);
-
   }
 
 
@@ -109,10 +106,8 @@ sub submit{
 
 
 sub sig_chld {
-
   $children--;
-  print "Child died; children now $children\n"; 
-
+  print "Child died; children now $children\n";
 }
 
 =head2 create_job
