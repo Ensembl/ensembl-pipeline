@@ -190,7 +190,7 @@ sub get_Genewises {
     my @gw;
 
     foreach my $type ($self->genewise_types) {
-      push(@gw,$self->contig->get_Genes_by_Type($type));
+      push(@gw,$self->contig->get_Genes_by_Type($type,'evidence'));
     }
 
     $self->print_Genes(@gw);
