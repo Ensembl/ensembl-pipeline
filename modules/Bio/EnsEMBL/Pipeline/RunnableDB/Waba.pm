@@ -106,8 +106,10 @@ sub fetch_input {
     
     my $ctg_name  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($ctg_name);
+    #put the contig in to the runnable
+    $self->runnable->query($contig);
 
-    $self->genseq($contig);
+    $self->query($contig);
 }
 
 =head2 runnable
@@ -143,22 +145,22 @@ sub write_output {
     }
 
     # prepare sql
-    my $sth_c = $self->db->prepare ( q{ SELECT internal_id
+    my $sth_c = $self->db->prepare ( q{ SELECT contig_id
                                              FROM contig
-                                            WHERE id = ?
+                                            WHERE name = ?
 				         } );
 
     my $sth = $self->db->prepare ( q{ INSERT INTO waba_feature
-                                                  (id, contig, seq_start, seq_end,
-                                                   score, strand, analysis, name,
-                                                   hstart, hend, hid, perc_id, state, cigar)
+                                                  (id, contig_id, seq_start, seq_end,
+                                                   score, strand, analysis_id, name,
+                                                   hit_start, hit_end, hit_name, perc_ident, state, cigar)
 					   VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				       } );
 
     my $sth_fset = $self->db->prepare ( q{ INSERT INTO waba_fset
-                                                          (id, contig, seq_start, seq_end,
-                                                           score, strand, analysis, name,
-                                                           hstart, hend, hid, perc_id)
+                                                          (id, contig_id, seq_start, seq_end,
+                                                           score, strand, analysis_id, name,
+                                                           hit_start, hit_end, hit_name, perc_ident)
                                                    VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 					    } );
 
@@ -173,6 +175,8 @@ sub write_output {
     foreach my $aref (@refs) {
         my @fps = @$aref;
         my $fset_fp = shift @fps;
+
+      #my $fset_fp = $aref;
 
         # get the internal id of the contig
         $sth_c->execute ($fset_fp->seqname);
