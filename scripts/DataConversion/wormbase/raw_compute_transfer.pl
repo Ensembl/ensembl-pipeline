@@ -40,6 +40,8 @@ RC: while (my($name) = $sth->fetchrow){
   my $pfa = $new_db->get_ProteinAlignFeatureAdaptor;
   my $dfa = $new_db->get_DnaAlignFeatureAdaptor;
   my %analysis_hash;
+  my @dnafs;
+  my @pepfs;
   foreach my $align(@similarity_features){
     #print STDERR "have align feature ".$align." of type ".$align->analysis->logic_name." matched to ".$align->hseqname." on contig ".$align->contig->name."\n";
     if(!$analysis_hash{$align->analysis->logic_name}){
@@ -55,13 +57,16 @@ RC: while (my($name) = $sth->fetchrow){
     $align->analysis($analysis_hash{$align->analysis->logic_name});
     if($align->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
       $align->adaptor($pfa);
-      $pfa->store($align);
+      push(@pepfs, $align);
     }elsif($align->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
       $align->adaptor($dfa);
-      $dfa->store($align);
+      push(@dnafs, $align);
     }
   }
+  $pfa->store(@pepfs);
+  $dfa->store(@dnafs);
 
+  my @new_pts;
   my @prediction_transcripts = @{$old_rc->get_all_PredictionTranscripts};
   my $pta = $new_db->get_PredictionTranscriptAdaptor;
   foreach my $pt(@prediction_transcripts){
@@ -82,9 +87,10 @@ RC: while (my($name) = $sth->fetchrow){
     $pt->dbID('');
     $pt->adaptor($pta);
     $pt->analysis($analysis_hash{$pt->analysis->logic_name});
-    $pta->store($pt);
+    push(@new_pts, $pt);
   }
-
+  $pta->store(@new_pts);
+  my @new_sfs;
   my @simple_features = @{$old_rc->get_all_SimpleFeatures};
   my $sfa = $new_db->get_SimpleFeatureAdaptor;
   foreach my $sf(@simple_features){
@@ -100,9 +106,11 @@ RC: while (my($name) = $sth->fetchrow){
     $sf->dbID('');
     $sf->adaptor($sfa);
     $sf->analysis($analysis_hash{$sf->analysis->logic_name});
-    $sfa->store($sf);
+    push(@new_sfs);
   }
+  $sfa->store(@new_sfs);
   my $count = 0;
+  my @new_rfs;
   my @repeat_features = @{$old_rc->get_all_RepeatFeatures};
  
   my $rfa = $new_db->get_RepeatFeatureAdaptor;
@@ -120,9 +128,10 @@ RC: while (my($name) = $sth->fetchrow){
     $rf->adaptor($rfa);
     $rf->repeat_consensus->dbID('');
     $rf->analysis($analysis_hash{$rf->analysis->logic_name});
-    $rfa->store($rf);
+    push(@new_rfs, $rf);
     $count++;
   }
+  $rfa->store(@new_rfs);
  
 }
 
