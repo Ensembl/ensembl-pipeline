@@ -12,17 +12,23 @@ use Bio::EnsEMBL::Pipeline::Task;
 
 sub can_start{
   my $self = shift;
+
+  $self->{'remaining'} = 20;
   return 1;
 }
 
 
 sub run{
   my $self = shift;
-  $self->create_Job('Bio::EnsEMBL::Pipeline::DummyModule',
-                    1,
-                    '');
 
-  return 'TASK_OK';
+  if($self->{'remaining'}) {
+
+    $self->create_Job('Bio::EnsEMBL::Pipeline::DummyModule',  1, '');
+    $self->{'remaining'}--;
+    return 'TASK_OK';
+  }
+
+  return 'TASK_DONE';
 }
 
 sub is_finished{

@@ -14,20 +14,20 @@ sub new {
 
 sub run {
   print "RUNNING DUMMY\n";
-  sleep(10);
+  sleep(int(rand(10)));
   return;
 }
 
 
 sub write_output {
   print "WRITING DUMMY\n";
-  sleep(20);
+  sleep(int(rand(10)));
   return;
 }
 
 sub fetch_input {
   print "READING DUMMY\n";
-  sleep(30);
+  sleep(int(rand(10)));
   return;
 }
 
