@@ -424,8 +424,8 @@ sub fetch_input {
   my $chrstart  = $2;
   my $chrend    = $3;
 
-  my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
-  my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $slice_adaptor = $self->estdb->get_SliceAdaptor();
+  my $contig    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
   #$contig->_chr_name($chrid);
   $self->vcontig($contig);
 
