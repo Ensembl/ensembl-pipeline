@@ -79,7 +79,6 @@ sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    $self->{'_input_id'}    = undef;
     $self->{'_runnable'}    = [];    
 
     $self->{'_genseq'}      = undef;
