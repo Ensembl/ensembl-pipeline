@@ -588,7 +588,9 @@ sub run_blaste2g {
   my $strand;
 
   foreach my $gene(@genes) {
-    my @exons = $gene->sub_SeqFeature;
+    my @exons = $gene->feature1->sub_SeqFeature;
+    print "*numexons: " . scalar(@exons) . "\n";
+
     $strand = $exons[0]->strand;
   FEAT:    foreach my $ex(@exons){
       $ec++;
@@ -597,13 +599,8 @@ sub run_blaste2g {
       # exonerate has no concept of phase, but remapping will fail if this is unset
       $ex->phase(0);
       
-      # pretend this beast is a featurepair, not just a feature - for remapping
-      # yuk this not right way.
-      my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $ex,
-					     -feature2 => $ex);
-      
       # convert back to genomic coords, but leave the EST coordinates alone
-      my @converted = $miniseq->convert_PepFeaturePair($fp);
+      my @converted = $miniseq->convert_FeaturePair($ex);
       if ($#converted > 0) {
 	# all hell will break loose as the sub alignments will probably not map cheerfully 
 	# for now, ignore this feature.
@@ -616,7 +613,10 @@ sub run_blaste2g {
       }
       
       # now sort out sub seqfeatures - details of sub segments making up an exon.
-      foreach my $aln($ex->sub_SeqFeature){
+      print STDERR "minie2g: " . $ex->feature1->sub_SeqFeature .  "\n";
+      print STDERR "minie2g num subf: " . scalar($ex->feature1->sub_SeqFeature) . "\n";
+
+      foreach my $aln($ex->feature1->sub_SeqFeature){
 	# strands 
 	if($aln->strand != $aln->hstrand){
 	  $aln->strand(-1);
@@ -742,9 +742,9 @@ sub _createfeatures {
     
     #create analysis object
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => 'genewise',
+                                (-db              => 'est2genome',
                                  -db_version      => 1,
-                                 -program         => "genewise",
+                                 -program         => "est2genome",
                                  -program_version => 1,
                                  -gff_source      => $f1source,
                                  -gff_feature     => $f1primary,);
