@@ -264,6 +264,9 @@ sub build_Genes{
   # Remove CDS from gene where transcript has no UTR and has same CDS as one with UTR
   $self->_prune_redundant_CDS(\@preliminary_genes);
 
+  # Remove completely redundant unblessed transcripts which match a blessed one
+  $self->_prune_redundant_transcripts(\@preliminary_genes);
+
   # select the best ones per gene (use the GB_MAX_TRANSCRIPTS_PER_GENE )
   my @best_transcripts = $self->_select_best_transcripts( @preliminary_genes );
   
@@ -287,6 +290,113 @@ sub build_Genes{
   print STDERR scalar( @genes )." final genes\n";
   $self->final_genes( @genes );
 }
+
+sub _prune_redundant_transcripts {
+  my ($self,$genes) = @_;
+
+  my $nremoved = 0;
+
+  my %blessed_genetypes;
+  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+    $blessed_genetypes{$bgt->{'type'}} = 1;
+  }
+
+# For each gene
+  foreach my $gene (@$genes) {
+
+# sort transcripts by total cdna length (apologies for the complexity of this line - 
+#  its done so as only to calculate cdna length once for each transcript
+
+    my @sorted_transcripts = map { $_->[1] } sort { $b->[0] <=> $a->[0] } map { [$_->length, $_] } @{$gene->get_all_Transcripts};
+
+# so now longer UTR transcripts (with same introns will come first)
+
+# Now generate the sorted (low to high) exon arrays and put in a hash (for speed)
+# and cds start and end (genomic) hashes (for speed again)
+    my %sorted_exon_hash;
+    my %cds_start_hash;
+    my %cds_end_hash;
+    
+    foreach my $trans (@sorted_transcripts) {
+      my @exons = sort {$a->start <=> $b->start} @{$trans->get_all_Exons};
+      $sorted_exon_hash{$trans} = \@exons;
+      if ($trans->translation) {
+        $cds_start_hash{$trans} = $trans->coding_region_start;
+        $cds_end_hash{$trans}   = $trans->coding_region_end;
+      }
+    }
+
+# We're going to generate a list of transcripts to remove from the gene
+# and then remove them at the end
+    my @trans_to_remove;
+
+# for transcript
+    for (my $i=0; $i<scalar(@sorted_transcripts); $i++) {
+      my $trans = $sorted_transcripts[$i];
+  
+      next if (!defined($trans));
+      next if (!$trans->translation);
+  
+      my @exons = @{$sorted_exon_hash{$trans}};
+  
+#   for every other transcript
+      COMPTRANS:
+      for (my $j=$i+1; $j<scalar(@sorted_transcripts); $j++) {
+        my $comp_trans = $sorted_transcripts[$j];
+  
+        next if (!defined($comp_trans));
+        next if (!$comp_trans->translation);
+        next if ($trans == $comp_trans);
+        next if ($cds_start_hash{$trans} != $cds_start_hash{$comp_trans});
+        next if ($cds_end_hash{$trans} != $cds_end_hash{$comp_trans});
+  
+        my @comp_exons = @{$sorted_exon_hash{$comp_trans}};
+  
+        next if (scalar(@comp_exons) != scalar(@exons));
+  
+# special case for single exon
+        if (scalar(@exons) == 1) {
+
+          if (  exists $blessed_genetypes{$comp_trans->type} && 
+              ! exists $blessed_genetypes{$trans->type}) {
+# Hack to make sure transcript gets through if its like a blessed one
+            #print "Hacking transcript type from " . $trans->type . " to " . $comp_trans->type . "\n";
+            $trans->type($comp_trans->type);
+          }
+
+          $sorted_transcripts[$j] = undef;
+          push @trans_to_remove, $comp_trans;
+         
+        } else {
+        
+          for (my $k=0; $k<scalar(@exons) - 1; $k++) {
+            if ($exons[$k]->end != $comp_exons[$k]->end ||
+                $exons[$k+1]->start != $comp_exons[$k+1]->start) {
+              next COMPTRANS;
+            }
+          }
+
+          if (  exists $blessed_genetypes{$comp_trans->type} && 
+              ! exists $blessed_genetypes{$trans->type}) {
+# Hack to make sure transcript gets through if its like a blessed one
+            #print "Hacking transcript type from " . $trans->type . " to " . $comp_trans->type . "\n";
+            $trans->type($comp_trans->type);
+          }
+
+          $sorted_transcripts[$j] = undef;
+          push @trans_to_remove, $comp_trans;
+        }
+      }
+    }
+  
+    foreach my $trans (@trans_to_remove) {
+      $nremoved++;
+      $self->_remove_transcript_from_gene($gene,$trans);
+    }
+  }
+  print "Removed $nremoved transcript as redundant\n";
+}
+
 
 sub _prune_redundant_CDS {
   my ( $self, $genes ) = @_;
@@ -657,7 +767,6 @@ sub prune_Transcripts {
     # deal with single exon genes
     #
     ##############################
-#    my @maxexon = @{$transcripts[0]->get_all_Exons};
 
     # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
     # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
@@ -819,7 +928,6 @@ sub prune_Transcripts {
       if(exists $blessed_genetypes{$tran->type}){
 	push (@newtran, $tran);
       }
-
       elsif ($found == 0) {
 	#print STDERR "found new transcript:\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
