@@ -236,6 +236,52 @@ sub list_input_id_by_Analysis {
   return \@result;
 }
 
+=head2 list_input_id_by_Analysis_assembly_type
+
+ 
+ As for list_input_id_by_Analysis but takes an optional list ref
+of assembly types to return for. 
+
+ $obj->list_input_id_by_Analysis_assembly_type($AnalysisObj, ['test', 'other']);
+
+ This is mainly for the Finished Analysis Pipeline.
+
+=cut
+
+sub list_input_id_by_Analysis_assembly_type {
+  my ($self, $analysis, $assembly) = @_;
+  
+  if (ref $analysis && $analysis->isa("Bio::EnsEMBL::Analysis")) {
+    $analysis = $analysis->dbID;
+  }
+  $assembly ||= [];
+  my @result;
+  my $query = qq{
+      SELECT input_id
+        FROM input_id_analysis i, 
+             contig c 
+   LEFT JOIN assembly a ON c.contig_id = a.contig_id 
+       WHERE i.input_id = c.name 
+          && i.analysis_id = ?
+      };
+  if (scalar(@$assembly) > 0){
+      $query .= "&& ( " . join("||", map{ " a.type = ? " } @$assembly ) . " )";
+  }else{
+      $query .= "&& a.type IS NULL";
+  }
+
+  my $sth = $self->prepare($query);
+  
+  $sth->execute($analysis, @$assembly);
+
+  my $table = $sth->fetchall_arrayref;
+
+  foreach my $row (@{$table}) {
+    push @result, $row->[0];
+  }
+
+  return \@result;
+}
 
 =head2 list_input_id_class_by_start_count
 
