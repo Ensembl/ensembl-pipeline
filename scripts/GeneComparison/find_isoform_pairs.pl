@@ -34,12 +34,17 @@ my $compara_dbhost = 'ecs2f';
 
 
 my $from_file;
+my $gap_penalty;
 
 # options
 &GetOptions( 
-	    'from_file'  => \$from_file,
+	    'from_file'     => \$from_file,
+	    'gap_penalty:n' => \$gap_penalty,
 	   );
 
+unless( $gap_penalty ){
+  $gap_penalty = -100;
+}
 
 my $human_dnadb;
 my $mouse_dnadb;
@@ -119,6 +124,7 @@ if ( $from_file ){
   while(<>){
     chomp;
     my @entries = split;
+    print STDERR "\n-------------------------------------------------------------\n\n";
     print STDERR "comparing $entries[0] and $entries[1]\n";
     &compare( $entries[0], $entries[1]);
     push( @{$gene_pair{$entries[0]}}, $entries[1] );
@@ -145,7 +151,6 @@ sub compare{
   # later on we can apply the stable marriage algorithm
   my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
   my @transcript_matches;
-  print STDERR "\n-------------------------------------------------------------\n\n";
   foreach my $human_t ( @human_transcripts ){
     foreach my $mouse_t ( @mouse_transcripts ){
       print STDERR "blasting isoforms\n";
@@ -179,7 +184,6 @@ sub compare{
       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
       #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
       #my @score_matrix = 
-      my $gap_penalty = 0;
       &compare_Exons( $element1, $partner, $gap_penalty);
       #&print_alignment( $element1, $partner, \@score_matrix);
 
@@ -564,7 +568,15 @@ sub compare_Exons{
     else{
       $mouse_string = &exon_string( $mouse_list->[$i] );
     }
-    print STDERR $human_string."\t<---->\t".$mouse_string."\n";
+    my $score;
+    if( !($human_string eq "gap" || $mouse_string eq "gap") ){
+      $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
+    }
+    else{
+      $score = 0;
+    }
+    print STDERR $human_string."\t<---->\t".$mouse_string.
+      "\t score= ".$score."\n";
   }  
 }
 
@@ -710,7 +722,8 @@ sub blast_Exons{
 							     -threshold_type => "PVALUE",
 							     '-threshold' => 1e-10,
 							     #'-filter'    => $filter,
-							     '-options'   => 'V=1000000'
+							     '-options'       => 'V=200 B=200 W=5 E=0.01 E2=0.01',
+							     #'-options'   => 'V=1000000'
 							    );
   
   
