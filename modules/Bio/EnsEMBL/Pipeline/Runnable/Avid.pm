@@ -117,9 +117,8 @@ sub new {
                                              WORKDIR
                                             )
                                          ], @args);
-  $self->{_verbose} = 0 ;
+  $self->{_verbose} = 1 ;
 
- 
  # location of avid-binary avid-2.1b0
   $self->_avid_binary($avid);
 
@@ -143,7 +142,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-  #  $self->deletefiles;
+#     $self->deletefiles;
 }
 
 
@@ -174,13 +173,17 @@ sub run {
   $command .=  " " . $fa_first    . " ";
   $command .=  " " . $fa_secnd         ;
 
-  print STDERR "avid-command : $command\n"  if $self->_verbose;
+  print STDERR "Avid.pm: Command : $command\n"  if $self->_verbose;
 
   open( AVID, "$command |" ) || $self->throw("Error running avid $!");
   close(AVID);
 
+  print "Avid.pm: Avid run executed.. now parsing binary\n" if $self->_verbose;
+
   # parse binary output for slam-run
-   $self->_parse_binary ; 
+  $self->_parse_binary ;
+
+  print "Avid.pm: binary parsed\n" if $self->_verbose;
 
   # register files written by avid (mout,psl,...)
   $self->_avid_files;
@@ -214,6 +217,8 @@ sub _avid_files {
     $self->results ( $basename . ".mout" );
     $self->file ( $basename . ".mout" );
   }
+  $self->file ( $basename . ".aln" );
+  $self->file ( $basename . ".cns.aln" );
   return;
 }
 
@@ -310,9 +315,10 @@ sub _write_masked_sequence{
   my $file = $self->workdir."/".$nam.".fasta.masked";
 
   my $rm_slice = $slice->get_repeatmasked_seq();
-  my  $seqobj =  Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
-  $seqobj -> write_seq($rm_slice);
 
+  my  $seqobj =  Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
+
+  $seqobj->write_seq($rm_slice);
   print "Writing sequence $file\n" if ($self->_verbose);
 
   $self->file($file);
@@ -386,16 +392,13 @@ sub fasta_filename2{
 
 sub _parse_binary {
   my ($self) =  @_;
-
   $self->checkdir;
   my $wdir = $self->workdir;
 
   # constructing name of written binary .mout-file seq1.2234_seq2.8952.mout
 
-
   my $filename1 = $self->_filename1;
   my $filename2 = $self->_filename2;
-
 
   my $basefile = $self->workdir."/".$filename1."_".$filename2;
   my $binfile = $basefile.".mout";
@@ -410,7 +413,7 @@ sub _parse_binary {
   my $byte;
   my @x;
 
-  open(FH,"<$binfile") || $self->throw("Could not open Avid's binary output-file: $binfile\n");
+  open(FH,"<$binfile") || $self->throw("Avid-Error: Could not open Avid's binary output-file: $binfile\n"); # don't change !! parser depends on message
   while (read(FH,$byte,1)) {
     my $intByte = unpack("C",$byte);
     my($lHalf,$rHalf) = ( ($intByte >> 4), ($intByte & 0xF) );
@@ -436,6 +439,7 @@ sub _parse_binary {
     print OUT  join("\t",$i,$min,$max) . "\n";
     $lastMax = $max;
   }
+
   $min = $x[$i] - $halfWin;
   $min = 0 if($min < 0);
   $min = $lastMax+1 if($min > ($lastMax+1));
@@ -447,7 +451,6 @@ sub _parse_binary {
   ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
 
   $self->file($outfile);
-
   return $outfile;
 }
 
