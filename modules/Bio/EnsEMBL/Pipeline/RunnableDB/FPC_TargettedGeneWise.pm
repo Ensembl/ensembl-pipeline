@@ -59,6 +59,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
 							     GB_INPUTID_REGEX
 							    );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
+							     GB_KILL_LIST
+							    );
+
+
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
@@ -169,6 +175,7 @@ sub make_targetted_runnables {
 								-user => $self->db->username,
 								-pass => $self->db->password,
 								-host => $self->db->host);
+
   my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
   #print STDERR "have ".$pmfa." adaptor\n";
   my $input_id = $self->input_id;
@@ -192,8 +199,17 @@ sub make_targetted_runnables {
   
   $genewise_db->dnadb($self->db);
   $self->output_db($genewise_db);
+  my %kill_list = %{$self->fill_kill_list};
+
   foreach my $feat($pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end)){
     
+    #reject any proteins that are in the kill list
+    if(defined $kill_list{$feat->protein_id}){
+      print STDERR "skipping " . $feat->protein_id . "\n";
+      next;
+    }
+
+
     my $input = $feat->chr_name   . ":" . 
                 $feat->start      . "," . 
                 $feat->end        . ":" . 
@@ -347,6 +363,34 @@ sub output_db {
     return $self->{_output_db};
 }
 
+
+=head2 fill_kill_list
+
+ Title   : fill_kill_list
+ Usage   : 
+ Function: 
+           
+ Returns : 
+ Args    : 
+
+=cut
+
+sub fill_kill_list {
+  my ($self) = @_;
+  my %kill_list;
+  open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
+  while (<KILL_LIST>) {
+
+    chomp;
+    my @list = split;
+    next unless scalar(@list); 	# blank or empty line
+    $kill_list{$list[0]} = 1;
+  }
+
+  close KILL_LIST or die "error closing $GB_KILL_LIST\n";
+
+  return \%kill_list;
+}
 
 
 1;
