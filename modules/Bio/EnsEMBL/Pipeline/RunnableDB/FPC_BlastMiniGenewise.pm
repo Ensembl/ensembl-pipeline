@@ -178,7 +178,7 @@ sub write_output {
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
     my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold, 0);
-    
+
     # lose version numbers - probably temporary till pfetch indices catch up
 
     foreach my $f(@features) {
@@ -188,7 +188,7 @@ sub write_output {
       }
     }
 
-    print STDERR "Number of features = " . scalar(@features) . "\n\n";
+   print STDERR "Number of features = " . scalar(@features) . "\n\n";
 
     my @genes     = $contig->get_Genes_by_Type('TGE_gw');
 
@@ -537,6 +537,20 @@ sub output{
 
    return @{$self->{'_output'}};
 }
+
+=head2 make_seqfetcher
+
+ Title   : make_seqfetcher
+ Usage   :
+ Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching protein sequences. If 
+           $seqfetch_conf{'protein_index'} is specified in EST_conf.pl, then a Getseqs 
+           fetcher is made, otherwise it will be Pfetch
+ Example :
+ Returns : Bio::EnsEMBL::SeqFetcher
+ Args    :
+
+
+=cut
 
 sub make_seqfetcher {
   my ( $self ) = @_;
