@@ -202,6 +202,7 @@ sub write_descriptions {
 			map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database')
 		);
 	}
+    return $failed;
 }
 
 sub min {
@@ -214,32 +215,28 @@ sub fetch_descriptions {
     
 	my $descriptions = {};	# results are stored here
 
-		# first pass fails when the sequence version has changed:
+	# first pass fails when the sequence version has changed:
     my $failed_first_pass = [];
-	my $start = 0;
-	do {
-		my $next = min($chunk_size, scalar(@$id_list));
-        my $chunk = [@$id_list[$start..$next-1]];
-
-		push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
-		$start = $next;
-	} while($start<@$id_list);
-
-	my $failed_second_pass = [];
-	$start = 0;
-	do {
-		my $next = min($chunk_size, scalar(@$failed_first_pass));
-        my $chunk = [@$failed_first_pass[$start..$next-1]];
-
-		my ($succeeded_arch_len, $failed_arch_len)
-			= $self->fetch_lengths_from_archive($failed_first_pass, $descriptions);
-
-		my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions);
-
-		push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
-		$start = $next;
-	} while($start<@$failed_first_pass);
-
+    for (my $i = 0; $i < @$id_list; $i += $chunk_size) {
+        my $j = $i + $chunk_size - 1;
+        # Set second index to last element if we're off the end of the array
+        $j = $#$id_list if $#$id_list < $j;
+        # Take a slice from the array
+        my $chunk = [@$id_list[$i..$j]];
+        push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
+    }
+    
+    my $failed_second_pass = [];
+    for (my $i = 0; $i < @$failed_first_pass; $i += $chunk_size) {
+        my $j = $i + $chunk_size - 1;
+        $j = $#$failed_first_pass if $#$failed_first_pass < $j;
+        my $chunk = [@$failed_first_pass[$i..$j]];
+        my ($succeeded_arch_len, $failed_arch_len)
+			= $self->fetch_lengths_from_archive($chunk, $descriptions);
+        my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions);
+        push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
+    }
+    
     return ($descriptions, $failed_second_pass);
 }
 
@@ -247,6 +244,7 @@ sub fetch_descriptions_by_accession {
     my( $self, $id_list, $descriptions ) = @_;
     
     my $srv = $self->get_server;
+    warn "Fetching full entries for ", scalar(@$id_list), " identifiers\n";
     print $srv join(' ', '-F', @$id_list), "\n";
 
     # Set the input record separator to split on EMBL
@@ -270,7 +268,8 @@ sub fetch_descriptions_by_accession {
         my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
         $embl_parser->parse($entry);
 
-		my $name_without_version = (split(/\./,$full_name))[0];
+        my $name_without_version = $full_name;
+        $name_without_version =~ s/\.d+$//;
 
 		my $found = 0;
 		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
@@ -288,8 +287,11 @@ sub fetch_descriptions_by_accession {
 			}
 		}
 		if(!$found) {
-			my $acc_sv = $embl_parser->sequence_version;
-            warn "Expecting '$full_name' but got '$acc_sv'";
+            my $all_accs = $embl_parser->accession;
+            if (my $sv = $embl_parser->sequence_version) {
+                unshift @$all_accs, $sv;
+            }
+            warn "Expecting '$full_name' but got (@$all_accs)";
 			push @$failed, $full_name;
         }
     }
