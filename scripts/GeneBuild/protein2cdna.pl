@@ -186,7 +186,7 @@ sub check_embl {
     $seq = $fh->next_seq();
 
   };
-  close EFETCH or die ("Error running $efetch for id [$id]");;
+  close EFETCH or warn ("Error running $efetch for id [$id]");
 
   return unless defined($seq) && $seq->isa("Bio::Seq");
 
