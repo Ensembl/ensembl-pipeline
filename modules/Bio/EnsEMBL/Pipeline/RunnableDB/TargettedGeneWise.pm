@@ -397,7 +397,7 @@ sub convert_gw_output {
   # Throw here if zero results? Suggests something v. bad has happened 
   # - usually corrupt sequence file means sequences not fetched. We should 
   # never fail to fetch sequences ina a targetted run!
-  $self->throw("Did not expect zero BMG results! \n") unless scalar(@results);
+  $self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
   
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
@@ -876,7 +876,7 @@ sub make_transcript{
     #start_translation: position on the translation->start_exon coordinate system where
     #the translation starts (counting from the left)
     
-    #end_translation  : position on the translation->end_exon coordinate system where
+    #end_translation  : position on the translation->end_Exon coordinate system where
     #the translation ends (counting from the left)
     
     #for reverse strand:
@@ -884,7 +884,7 @@ sub make_transcript{
     #start_translation: position on the translation->start_exon coordinate system where
     #the translation starts (counting from the right, which is the direction of translation now)
 
-    #end_translation  : position on the translation->end_exon coordinate system where
+    #end_translation  : position on the translation->end_Exon coordinate system where
     #the translation ends (counting from the right)
   
     $translation->start_Exon($exons[0]);
@@ -1000,7 +1000,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
     }
     
     if ($intron > $GB_TARGETTED_MAX_INTRON) {
-      $curr_transcript->translation->end_exon($prev_exon);
+      $curr_transcript->translation->end_Exon($prev_exon);
 
       # need to account for end_phase of $prev_exon when setting translation->end
       $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
@@ -1033,11 +1033,11 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
       push(@split_transcripts, $curr_transcript);
     }
 
-    if($exon == $transcript->end_exon){
+    if($exon == $transcript->end_Exon){
       $curr_transcript->add_Exon($exon) unless $exon_added;
       $exon_added = 1;
 
-      $curr_transcript->translation->end_exon($exon);
+      $curr_transcript->translation->end_Exon($exon);
       $curr_transcript->translation->end($transcript->translation->end);
       
     }
