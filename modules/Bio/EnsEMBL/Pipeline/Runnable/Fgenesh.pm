@@ -450,7 +450,7 @@ sub run {
     print "have run fgenesh\n";
     #parse output and create features
     $self->parse_results();
-    #$self->deletefiles();
+    $self->deletefiles();
 }
 
 =head2 run_fgenesh
@@ -628,6 +628,7 @@ sub parse_results {
     }
 
     $self->create_genes();#makes sure only the genes which translate are outputted
+    $self->translation_test();
     $self->clear_exons(); #free up unecessary storage 
     
 }
@@ -742,6 +743,115 @@ sub create_feature {
     #print "created the exon\n";
 }
 
+sub translation_test{
+  
+  my ($self) = @_;
+
+  my @genes = $self->each_Fgenesh_Gene();
+  my $count;
+  foreach my $gene(@genes){
+    
+    my @exons = $gene->sub_SeqFeature;
+
+    if ($exons[0]->strand == 1) {
+      @exons = sort {$a->start <=> $b->start } @exons;
+    } else {
+      @exons = sort {$b->start <=> $a->start } @exons;
+    }
+    my $strand = $exons[0]->strand;
+    my $transcript = new Bio::EnsEMBL::Transcript();
+    
+    foreach my $f (@exons){
+
+      my $exon = new Bio::EnsEMBL::Exon();
+      $exon->start($f->start);
+      $exon->end($f->end);
+      if($f->strand != $strand){
+	$self->throw("strand is different for different exons in the same gene : $!");
+      }
+      $exon->strand($f->strand);
+      $exon->phase($f->phase);
+      $exon->end_phase($f->end_phase);
+      $exon->attach_seq($self->clone);
+      $exon->seqname($f->seqname);
+
+      $transcript->add_Exon($exon);
+      
+    }
+    $self->make_translation($transcript, $count);
+    $count++;
+    if($transcript->translate->seq =~  /\*/){
+      print "translation = ".$transcript->translate->seq."\n";
+      $self->warn("transcript doesn't translate properly : $!");
+    } else {
+       print "translation = ".$transcript->translate->seq."\n";
+      $self->add_translating_Fgenesh_Gene($gene);
+    }
+      
+  }
+
+
+}
+
+sub make_translation{
+    my ($self,$transcript,$count) = @_;
+
+    my $translation = new Bio::EnsEMBL::Translation;
+
+    my @exons = $transcript->get_all_Exons;
+    #@exons = sort {$a->seqname <=> $b->seqname } @exons;
+    my $exon  = $exons[0];
+
+
+    $translation->{'temporary_id'} = ("TMPP_" . $exon->contig_id . "." . $count);
+ 
+    if ($exon->phase != 0) {
+	my $tmpphase = $exon->phase;
+	
+	print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
+	
+	if ($exon->strand == 1) {
+	  my $tmpstart = $exon->start;
+	  $exon->start($tmpstart + 3 - $tmpphase);
+	  $exon->phase(0);
+	} else {
+	  my $tmpend= $exon->end;
+	  $exon->end($tmpend - 3 + $tmpphase);
+#	  print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
+	  $exon->phase(0);
+	}
+#	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
+    }   
+
+#    print ("Transcript strand is " . $exons[0]->strand . "\n");
+    
+    if ($exons[0]->strand == 1) {
+      @exons = sort {$a->start <=> $b->start} @exons;
+    } else {
+      @exons = sort {$b->start <=> $a->start} @exons;
+#      print("Start exon is " . $exons[0]->{'temporary_id'} . "\n");
+    }
+ 
+    if( $exons[0]->phase == 0 ) {
+      $translation->start(1);
+    } elsif ( $exons[0]->phase == 1 ) {
+      $translation->start(3);
+    } elsif ( $exons[0]->phase == 2 ) {
+      $translation->start(2);
+    } else {
+      $self->throw("Nasty exon phase".$exons[0]->phase);
+    }
+    
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
+
+    $translation->end($exons[$#exons]->end - $exons[$#exons]->start + 1);
+
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
+    
+    $transcript->translation($translation);
+}   
 
 ##############
 # input/output methods
@@ -773,8 +883,8 @@ sub output {
                                                 -logic_name      => 'fgenesh',
                                                 );
 
-  
-  foreach my $gene ($self->each_Fgenesh_Gene) { 
+  foreach my $gene ($self->each_translating_Fgenesh_Gene) {
+  #foreach my $gene ($self->each_Fgenesh_Gene) { 
     
      
     my @exons = $gene->sub_SeqFeature;
