@@ -18,7 +18,8 @@ Bio::EnsEMBL::Pipeline::Runnable::Exonerate
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
                                              -genomic => $genseq,
-                                             -est     => $estseq 
+                                             -est     => $estseq,
+					     -outfile => $outfile
                                              );
     or
     
@@ -69,6 +70,7 @@ use Bio::EnsEMBL::Analysis::Programs qw(exonerate);
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
+use FileHandle;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
 
@@ -86,13 +88,16 @@ sub new {
   $self->{'_protected'}   = [];         #a list of files protected from deletion
   $self->{'_arguments'}   = undef;      #arguments for exonerate
   
-  my( $genomic, $est, $exonerate, $arguments ) = 
+  my( $genomic, $est, $exonerate, $arguments) = 
     $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS)], @args);
   
+  $self->throw("no genomic sequence given\n") unless defined $genomic;
   $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
 
   # allow it to take a filename or an array ref
-  $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
+  $self->throw("no est sequence given\n") unless defined $est;
+  $self->est_sequence($est) if defined $est; 
+
   if ($exonerate) {   
     $self->exonerate($exonerate) ;
   }
@@ -124,17 +129,22 @@ sub new {
 
 sub genomic_sequence {
   my( $self, $value ) = @_;    
+
+
   
   if (defined $value) {
-    if( $value->isa("Bio::PrimarySeqI") ){
-      $self->{'_genomic_sequence'} = $value;
-      $self->genfilename("/tmp/genfile_.$$.fn");
-    }
-    else {
+    if (!ref($value)){
       # assume it's a filename - check the file exists
       $self->throw("[$value] : file does not exist\n") unless -e $value;
       $self->genfilename($value);
       $self->{'_genomic_sequence'} = $value;
+    }
+    elsif( $value->isa("Bio::PrimarySeqI") ){
+      $self->{'_genomic_sequence'} = $value;
+      $self->genfilename("/tmp/genfile_.$$.fn");
+    }
+    else {
+      $self->throw("$value is neither a Bio::Seq  nor a filename\n");
     }
   }
   
@@ -270,7 +280,7 @@ sub run {
   my $estfile = $self->estfilename;
   
   # do we need to write out the genomic sequence?
-  if($genomicseq->isa("Bio::PrimarySeqI")){
+  if($genomicseq ne $genfile){
     my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
     
@@ -290,10 +300,11 @@ sub run {
   # finally we run the beast.
   my $command = $self->exonerate() . " -w 14 -t 65 -H 100 -D 15 -m 500 -n yes -A false -G yes --cdna $estfile --genomic $genfile";
   
-  eval {
-    print (STDERR "Running command $command\n");
-    open(EXONERATE, "$command |") or $self->throw("Error running exonerate on ".$self->genfilename."\n"); 
+STDOUT->autoflush(1);
 
+  eval {
+#    print (STDERR "Running command $command\n");
+    open(EXONERATE, "$command |") or $self->throw("Error forking exonerate pipe on ".$self->genfilename."\n"); 
     # some constant strings
     my $source_tag  = "exonerate";
     
@@ -363,10 +374,10 @@ sub run {
 	$self->throw("$estname(gff) and $est_id(cigar) do not match!") unless $estname eq $est_id;
 
 	# find percent id from %gff
-	my $querystr = $genomic_start . "-" . $genomic_end . "-" . $elements[4];
+	my $querystr = $genomic_start . "-" . $genomic_end . "-" . $elements[8];
 	my $pid = $gff{$querystr};
 
-	# not every cigar prediction has a correspinding gff exon
+	# not every cigar prediction has a corresponding gff exon
 	if(!defined($pid)) { $pid = -1; }
 
 	# est seqname
@@ -378,37 +389,45 @@ sub run {
 	my $est_source = $source_tag;
 	
 	my $genomic_strand = 1;
-	if ($elements[4] eq '-') {
+	if ($elements[8] eq '-') {
 	  $genomic_strand = -1;
 	}
 	my $est_strand = 1;
-	if ($elements[8] eq '-') {
+	if ($elements[4] eq '-') {
 	  $est_strand = -1;
 	}
 
 	my $genomic_primary = $primary_tag;
 	my $est_primary = $primary_tag;
 
-	$self->_createfeatures ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
-				$est_start, $est_end, $est_id, 
-				$genomic_source, $est_source, 
-				$genomic_strand, $est_strand, 
-				$genomic_primary, $est_primary);
+	my $pair = $self->_createfeatures ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
+					 $est_start, $est_end, $est_id, 
+					 $genomic_source, $est_source, 
+					 $genomic_strand, $est_strand, 
+					 $genomic_primary, $est_primary);
+
+# needed for overall run, otherwise not
+	print $pair->seqname  . "\t" . $pair->start        . "\t" . $pair->end    . "\t" . 
+	          $pair->score    . "\t" . $pair->percent_id   . "\t" . $pair->strand . "\t" . 
+		  $pair->hseqname . "\t" . $pair->hstart       . "\t" . $pair->hend   . "\t" . 
+                  $pair->hstrand  . "\n";
+
       }    
     }
     
     
-    close (EXONERATE);
+    close (EXONERATE) or $self->throw("Error running exonerate: $command");
     
-    $self->convert_output();
   };  
-  
+
+#  close (OUT);
+
   #clean up temp files
   if(ref($estseq) eq 'ARRAY' ) {
     $self->_deletefiles($estfile);
   }
   
-  if($genomicseq->isa("Bio::PrimarySeqI")) {
+  if($genomicseq ne $genfile) {
     $self->_deletefiles($genfile);
   }
   
@@ -481,8 +500,7 @@ sub output {
 # TEMPORARY FIXME
 #  return @{$self->{'_output'}};
 #  return @{$self->{'_fplist'}};
-#  return $self->{'_fplist'}; # ref to an array
-  return @{$self->{'_fplist'}}; 
+  return $self->{'_fplist'}; # ref to an array
 }
 
 =head2 _create_features
@@ -540,6 +558,7 @@ sub _createfeatures {
     $self->throw("Can't validate") unless $fp->validate();
     push(@{$self->{'_fplist'}}, $fp);
   }
+  return $fp;
 }
 
 #####################################
