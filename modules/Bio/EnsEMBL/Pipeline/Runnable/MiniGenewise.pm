@@ -44,6 +44,9 @@ package Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 use vars qw(@ISA);
 use strict;
 
+# config file; parameters searched for here if not passed in as @args 
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";  
+
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
@@ -409,7 +412,7 @@ sub print_FeaturePair {
 
 sub get_Sequence {
   my ($self,$id) = @_;
-  
+
   if (defined($self->{'_seq_cache'}{$id})) {
     return $self->{'_seq_cache'}{$id};
   } 
@@ -517,7 +520,7 @@ sub run {
 
 sub minirun {
   my ($self) = @_;
-  
+
   my ($idhash) = $self->get_all_FeaturesById;
   
   my @ids    = keys %$idhash;
@@ -537,7 +540,7 @@ sub minirun {
      -gff_feature     => 'similarity');
   
  ID: foreach my $id (@ids) {
-    
+
     my $features = $idhash->{$id};
     my @exons;
     
@@ -545,17 +548,28 @@ sub minirun {
     
     # why > not >= 1?
     next ID unless (scalar(@$features) >= 1);
-    
+
     # forward and reverse split.
     my @forward;
     my @reverse;
+    
+	
+	if ($::genebuild_conf{'bioperldb'}) {
 
-    # forward/reverse strand split
-    foreach my $feat(@$features) {
-      if($feat->strand == 1) { push(@forward,$feat); }
-      elsif($feat->strand == -1) { push(@reverse,$feat); }
-      else { $self->throw("unstranded feature not much use for gene building\n") }
-    }
+    	foreach my $feat(@$features) {
+		
+      		if($feat->hstrand == 1) { push(@forward,$feat);}
+      		elsif($feat->hstrand == -1) { push(@reverse,$feat);}
+     		else { $self->throw("unstranded feature not much use for gene building\n") }
+    	}
+	}
+	else {
+		foreach my $feat(@$features) {
+      		if($feat->strand == 1) { push(@forward,$feat); }
+      		elsif($feat->strand == -1) { push(@reverse,$feat); }
+      		else { $self->throw("unstranded feature not much use for gene building\n") }
+    	}
+	}
     
     # run on each strand
     eval {
@@ -741,6 +755,7 @@ sub find_extras {
 	    foreach my $sf ($out->sub_SeqFeature) {
 
 		if (!($f->end < $out->start || $f->start >$out->end)) {
+			"print throwing out". $f->gffstring."\n";
 		    $found = 1;
 		}
 	    }
