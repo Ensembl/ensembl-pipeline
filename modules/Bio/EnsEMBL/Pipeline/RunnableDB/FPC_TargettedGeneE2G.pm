@@ -46,7 +46,6 @@ use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_CDNA_INDEX
 					);
@@ -76,11 +75,6 @@ sub new {
   
   # dbobj, input_id, seqfetcher, and analysis objects are all set in
   # in superclass constructor (RunnableDB.pm)
-
-  # golden path
-  my $path = $GB_GOLDEN_PATH;
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->assembly_type($path);
 
   return $self;
 }
