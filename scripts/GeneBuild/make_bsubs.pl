@@ -54,6 +54,7 @@ sub make_tbsubs {
   my $queue  = $gbc{'queue'};
   my $dir    = $gbc{'tmpdir'} . "/$runnable";
   my $pm_out = $gbc{'pm_output'};
+  $pm_out .= "pm_best.out";
   my $cdnas  = $gbc{'cdna_pairs'};
 
   # parse pmatch and cdna results
@@ -75,14 +76,13 @@ sub make_tbsubs {
   system("mkdir $dir") unless opendir(DIR, $dir);
   closedir(DIR);
   my $outf  = "$runnable.jobs.dat";
+
   open(OUTF, ">$outf") or die "Can't open $outf\n";
 
   # generate bsubs, one per protein
   open(PM, "<$pm_out") or die "Can't open $pm_out\n";
   my $tracker = 0;
   my $resdir = $dir . "/jobs0";
-#  system("mkdir $resdir") unless opendir(DIR, $resdir);
-#  closedir(DIR);
    
   while(<PM>){
     # do we need to start another output directory? Limit the files in each so we can parse them easily
