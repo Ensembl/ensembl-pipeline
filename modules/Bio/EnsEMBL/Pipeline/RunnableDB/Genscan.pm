@@ -52,6 +52,8 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Genscan;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
+use Data::Dumper;
+
 use vars qw(@ISA);
 @ISA = qw(Bio::Root::RootI);
 
@@ -197,7 +199,7 @@ sub runnable {
     if ($runnable)
     {
         #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
+        my ($parameter_string) = $self->parameters();
         $parameter_string =~ s/\s+//g;
         my @pairs = split (/,/, $parameter_string);
         my %parameters;
