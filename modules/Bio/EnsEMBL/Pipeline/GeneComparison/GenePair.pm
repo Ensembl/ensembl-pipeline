@@ -509,18 +509,18 @@ sub compare_Exons{
   }
   
   foreach my $i ( 1..$human_length ){
-      foreach my $j ( 1..$mouse_length ){
-	  $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} = 
-	      $self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
-	  
-	  #print STDERR "comparison( ".$human_exons[$i-1]->stable_id."-".$mouse_exons[$j-1]->stable_id." ) = ".
-	  #$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} ."\n";
-	  
-	  $score_matrix[$i][$j] = 
-	      $self->max( $score_matrix[$i-1][$j]   + $gap_penalty,
-			  $score_matrix[$i][$j-1]   + $gap_penalty,
-			  $score_matrix[$i-1][$j-1] + $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} );
-      }
+    foreach my $j ( 1..$mouse_length ){
+      $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} = 
+	$self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
+      
+      #print STDERR "comparison( ".$human_exons[$i-1]->stable_id."-".$mouse_exons[$j-1]->stable_id." ) = ".
+      #$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} ."\n";
+      
+      $score_matrix[$i][$j] = 
+	$self->max( $score_matrix[$i-1][$j]   + $gap_penalty,
+		    $score_matrix[$i][$j-1]   + $gap_penalty,
+		    $score_matrix[$i-1][$j-1] + $comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} );
+    }
   }
   
   my ($human_list, $mouse_list ) = 
@@ -532,35 +532,41 @@ sub compare_Exons{
   my $mouse_internal_missing = 0;
   my $exon_skipping = 0;
   my $conserved     = 0;
+  my $same_length   = 0;
   for ( my $i=0 ; $i< scalar(@$human_list); $i++ ){
-      if ( $human_list->[$i] eq 'gap' ){
-	  $human_missing++;
+    if ( $human_list->[$i] eq 'gap' ){
+      $human_missing++;
+    }
+    if ( $mouse_list->[$i] eq 'gap'){
+      $mouse_missing++;
+    }
+    if ( !( $human_list->[$i] eq 'gap' || $mouse_list->[$i] eq 'gap') ){
+      $conserved++;
+      my $human_length = $human_list->[$i]->end - $human_list->[$i]->start + 1;
+      my $mouse_length = $mouse_list->[$i]->end - $mouse_list->[$i]->start + 1;
+      if ( $human_length == $mouse_length ){
+	$same_length++;
       }
-      if ( $mouse_list->[$i] eq 'gap'){
-	  $mouse_missing++;
+    }
+    if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
+      if ( $self->haspredecessor( $human_list, $i) 
+	   && 
+	   $self->hassuccessor( $human_list, $i )
+	   &&
+	   $self->haspredecessor( $mouse_list, $i )
+	   && 
+	   $self->hassuccessor( $mouse_list, $i )
+	 ){
+	if ( $human_list->[$i] eq 'gap' ){ 
+	  $exon_skipping++;
+	  $human_internal_missing++;
+	}
+	elsif( $mouse_list->[$i] eq 'gap'){
+	  $exon_skipping++;
+	  $mouse_internal_missing++;
+	}
       }
-      if ( !( $human_list->[$i] eq 'gap' || $mouse_list->[$i] eq 'gap') ){
-	  $conserved++;
-
-      if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
-	  if ( $self->haspredecessor( $human_list, $i) 
-	       && 
-	       $self->hassuccessor( $human_list, $i )
-	       &&
-	       $self->haspredecessor( $mouse_list, $i )
-	       && 
-	       $self->hassuccessor( $mouse_list, $i )
-	       ){
-	      if ( $human_list->[$i] eq 'gap' ){ 
-		  $exon_skipping++;
-		  $human_internal_missing++;
-	      }
-	      elsif( $mouse_list->[$i] eq 'gap'){
-		  $exon_skipping++;
-		  $mouse_internal_missing++;
-	      }
-	  }
-      }
+    }
   }
   
   my $human_terminal_missing = $human_missing - $human_internal_missing;
@@ -570,20 +576,20 @@ sub compare_Exons{
   my $mouse_id = $mouse_t->stable_id || $mouse_t->dbID;
 
   print STDERR "TRANPAIR\t".
-      "$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
-	  "conserved_exons:$conserved\t".
-	      "$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
-      
+    "$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
+      "conserved_exons:$conserved\twith_same_length:$same_length\t".
+	"$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
+  
   my $print_report = 1;
   if ( $print_report ){
       for ( my $i=0; $i<scalar(@$human_list); $i++ ){
 	  my $human_string;
 	  my $mouse_string;
 	  if ( $human_list->[$i] eq 'gap'){
-	      $human_string = "             ####GAP####";
-	      }
+	    $human_string = "             ####GAP####";
+	  }
 	  else{
-	      $human_string = $self->exon_string( $human_list->[$i] );
+	    $human_string = $self->exon_string( $human_list->[$i] );
 	  }
 	  if ( $mouse_list->[$i] eq 'gap'){
 	      $mouse_string = "             ####GAP####";
