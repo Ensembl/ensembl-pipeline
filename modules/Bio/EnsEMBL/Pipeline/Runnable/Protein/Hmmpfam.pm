@@ -81,7 +81,7 @@ sub new {
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
     $self->{'_results'}   = undef;        # file to store results of seg run
     $self->{'_protected'} = [];           # a list of files protected from deletion
-  
+    print STDERR "@args\n";
     my ($query, $analysis, $options) = $self->_rearrange([qw(QUERY 
                                                              ANALYSIS
                                                              OPTIONS
@@ -92,15 +92,18 @@ sub new {
     
     $self->query ($query) if ($query);       
     $self->analysis ($analysis) if ($analysis);
-	
-    $self->program ($self->analysis->program_file);
+    print STDERR "have analysis ".$self->analysis->logic_name." with program ".$self->analysis->program_file."\n";
+    my $program = $self->analysis->program_file;
+    $self->program($self->find_executable($program)) if($program);
   
     if ($self->analysis->db_file) {
         $self->database($self->analysis->db_file);
     } else {
         $self->throw("Hmmpfam needs a database");
     }
-    
+    if(!$self->program){
+      $self->throw($self->program." not defined can't go on\n");
+    }
     $self->options ($options) if ($options);
 
     return $self;
@@ -165,6 +168,7 @@ sub query {
 
 sub program {
     my ($self, $location) = @_;
+   
     if ($location) {
         unless (-e $location) {
             $self->throw ($self->program." not found at $location");
