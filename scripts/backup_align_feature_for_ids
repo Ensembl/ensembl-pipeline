@@ -1,0 +1,54 @@
+#!/usr/local/bin/perl -w
+
+### backup_align_feature_for_ids
+
+use strict;
+use Getopt::Long 'GetOptions';
+
+{
+    my $table = 'dna';
+    my $database = 'human_finished';
+    my $out_file = undef;
+    GetOptions(
+        'table=s'       => \$table,
+        'database=s'    => \$database,
+        'outfile=s'     => \$out_file,
+        ) or die;
+    $table = "${table}_align_feature";
+    $out_file ||= "$database-$table-backup.sql";
+    die "output file '$out_file' exists" if -f $out_file;
+
+    my @dump_command = qw{
+        mysqldump
+        --host=otterpipe1
+        --user=ottro
+        --complete-insert
+        --extended-insert
+        --no-create-info
+        };
+    my( @id_list );
+    while (<>) {
+        push(@id_list, split);
+    }
+    my $chunk_size = 100;
+    while (@id_list) {
+        my @id_chunk = splice(@id_list, 0, $chunk_size);
+        printf STDERR "Dumping features for '%d' hit_names\n", scalar(@id_chunk);
+        my $id_str = join(',', map "'$_'", @id_chunk);
+        my $where = qq{--where="hit_name in($id_str);"};
+        my $command_str = qq{@dump_command $where $database $table >> $out_file};
+        system($command_str) == 0
+            or die "command exited with status=$?:\n@dump_command $where human_finished $table";
+    }
+}
+
+
+
+__END__
+
+=head1 NAME - backup_align_feature_for_ids
+
+=head1 AUTHOR
+
+James Gilbert B<email> jgrg@sanger.ac.uk
+
