@@ -167,7 +167,6 @@ sub query {
         }
         $self->{'_query'} = $seq ;
         
-        $self->queryname($self->query->id);
         $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".PCR.out");
     }
@@ -279,7 +278,7 @@ sub run {
 
     # successive runs if needed
     for (my $mm = $self->min_mismatch + 1; $mm <= $self->max_mismatch; $mm++) {
-	my $sts_tmp = $self->workdir . '/' . $self->queryname . "_$mm";
+	my $sts_tmp = $self->workdir . '/' . $self->query->id. "_$mm";
 	$self->_cp_sts_file($self->sts, $sts_tmp);
 	$self->mismatch($mm);
 	my $sts = $self->sts;
@@ -314,7 +313,7 @@ sub run_epcr {
     my $command = $self->epcr.' '.$self->sts.' '.$self->filename.' '.
      $options.' > '.$self->results;
 
-    print STDERR "Running EPCR ($command)\n";
+    #print STDERR "Running EPCR ($command)\n";
     $self->throw("Error running EPCR on ".$self->filename."\n")
      if system($command); 
     #or $self->throw("Error running EPCR: $!\n")

@@ -158,7 +158,6 @@ sub query {
         ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
             || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         $self->{'_sequence'} = $seq ;
-        $self->queryname ($self->query->id);
         $self->filename ($self->query->id.".$$.seq");
         $self->results ($self->filename.".out");
     }
