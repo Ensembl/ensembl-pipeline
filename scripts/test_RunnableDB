@@ -57,6 +57,7 @@ my $analysisid;
 my $write  = 0;
 my $check  = 0;
 my $params;
+my $pepfile;
 
 &GetOptions( 
 	     'host:s'      => \$host,
@@ -70,6 +71,7 @@ my $params;
 	     'write'       => \$write,
              'check'       => \$check,
              'parameters:s'=> \$params,
+	     'pepfile:s'   => \$pepfile,
 	     );
 
 $| = 1;
@@ -111,6 +113,10 @@ my $runobj = "$runnable"->new(-dbobj    => $db,
 			      -analysis => $analysis,
 			      %hparams,
 			     );
+
+if ($pepfile) {
+    $runobj->pep_file($pepfile);
+}
 
 $runobj->fetch_input;
 $runobj->run;
