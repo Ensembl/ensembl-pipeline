@@ -75,18 +75,23 @@ sub new {
   $self->{'_results'}   = undef; # file to store results of ssaha
   $self->{'_protected'} = [];    # a list of files protected from deletion ???
   $self->{'_min_length'}= 0;     # minimum length required for a
-                                 # predicted match to be reported
+                                 # match to be reported
+  $self->{'_min_pc_id'} = 0;     # minimum %id required for a
+                                 # match to be reported
+  $self->{'_sbjct_format'} = undef; # subject file format
 
-  my ($seq, $len, $ssaha, $db) = $self->_rearrange([
-    qw(CLONE LENGTH SSAHA DB)
+  my ($seq, $len, $pc, $sf, $ssaha, $db) = $self->_rearrange([
+      qw(CLONE MIN_LENGTH MIN_PC SUBJECT SSAHA DB)
   ], @args);
 
   $ssaha = 'ssaha' unless ($ssaha);
   $self->ssaha($self->find_executable($ssaha));
 
-  $self->clone($seq) if ($seq);
-  $self->min_length($len) if ($len);
-  $self->database($db) if ($db);
+  $self->clone($seq)            if ($seq);
+  $self->min_length($len)       if ($len);
+  $self->min_pc_id($pc)         if ($pc);
+  $self->database($db)          if ($db);
+  $self->subject_format($sf)    if ($sf);
 
   return $self; # success - we hope!
 }
@@ -115,6 +120,7 @@ sub clone {
 
 sub ssaha {
     my ($self, $location) = @_;
+
     if ($location) {
         $self->throw("SSAHA not found at $location: $!\n")
          unless (-e $location);
@@ -124,21 +130,46 @@ sub ssaha {
 }
 
 
-sub min_length {
+sub min_pc_id {
     my ($self, $len) = @_;
+
     if (defined $len && $len > 0) {
-      $self->{'_min_length'} = $len ;
+        $self->{'_min_length'} = $len;
     }
     return $self->{'_min_length'};
 }
 
 
+sub min_length {
+    my ($self, $pc) = @_;
+
+    if (defined $pc && $pc > 0) {
+        $self->{'_min_pc_id'} = $pc;
+    }
+    return $self->{'_min_pc_id'};
+}
+
+
 sub database {
     my ($self, $db) = @_;
+
     if ($db) {
-      $self->{'_database'} = $db ;
+      $self->{'_database'} = $db;
     }
     return $self->{'_database'};
+}
+
+
+sub subject_format {
+    my ($self, $format) = @_;
+
+    if ($format) {
+        unless ($format eq 'fasta' or $format eq 'hash') {
+	    $self->throw("Invalid format '$format' for query");
+        }
+	$self->{'_sbjct_format'} = $format;
+    }
+    return $self->{'_sbjct_format'};
 }
 
 
@@ -186,9 +217,15 @@ sub run_ssaha {
 	"-pf",
 	"-rq",
         "-qf fasta",
-	"-sf fasta",
+	"-rm replaceA",
 	"-lm null"
     );
+
+    if ($self->subject_format eq 'hash') {
+	push @args, "-sf hash";
+    } else {
+	push @args, "-sf fasta";
+    }
 
     push @args, "-mp " . $self->min_length if $self->min_length;
     my $cmd = join " ", $self->ssaha, $self->filename, $self->database, @args;
@@ -210,7 +247,9 @@ sub run_ssaha {
 =cut
 sub parse_results {
     my ($self, $filehandle) = @_;
+
     my $resfile = $self->results();
+    my $min_pc = $self->min_pc_id || undef;
 
     if (-e $resfile) {
         if (-z $self->results) {
@@ -234,6 +273,8 @@ sub parse_results {
 	       $strand, $query, $qstart, $qend,
 	       $sbjct, $sstart, $send, $match, $pc
 	    ) = split;
+
+	    next if $min_pc && $pc < $min_pc;
 
             my (%feat1, %feat2);
 
