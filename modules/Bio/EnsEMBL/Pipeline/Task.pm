@@ -170,24 +170,65 @@ sub name {
 sub run {
 	my $self = shift;
 
-	$self->throw('Abstract method run not implmented by subclass');
+	$self->throw('run is an Abstract method run not implmented by subclass');
 }
 
 
+
+
 sub can_start {
-	return 1;
+  my $self = shift;
+
+  my $ids = $self->get_TaskStatus('RepeatMasker')->get_successful();
+
+  return $ids->count();
+  $self->throw('can_start an Abstract method run not implmented by subclass');
 }
 
 
 sub is_finished {
-	return 1;
+  my ($self) = @_;
+  $self->throw('is_finished is an Abstract method run not implmented by subclass');
 }
 
 
-get_TaskStatus {
-	return $self->{'TaskStatus'};
+sub get_TaskStatus {
+  my $self = shift;
+  my $taskname = shift;
+
+  if($taskname && $taskname ne $self->name()) {
+    return $self->get_PipelineManager($taskname);
+  }
+  
+  return $self->{'TaskStatus'};
+}
+
+sub get_PipelineManager{
+  my ($self) = @_;
+
+  return $self->{'pipeline_manager'};
 }
 
 
+
+sub create_Job {
+  my $self = shift;
+  my $module = shift;
+  my $id = shift;
+  my $parameters = shift;
+
+  return $self->get_PipelineManager->create_Job($self->name(), $module, $id, $parameters); 
+}
+
+
+sub create_Jobs {
+  my $self = shift;
+  my $module = shift;
+  my $id_set = shift;
+  my $parameters = shift;
+
+  return $self->get_PipelineManager->createJobs($self->name(), $module, $id_set, $parameters);
+
+}
 
 1;
