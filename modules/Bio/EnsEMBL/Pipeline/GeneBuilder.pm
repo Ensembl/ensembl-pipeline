@@ -115,7 +115,7 @@ sub new {
     $self->throw("Must input a slice to GeneBuilder") unless defined($slice);
     $self->{_final_genes} = [];
     $self->{_gene_types}  = [];
-    
+        
     $self->query($slice);
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
@@ -199,6 +199,7 @@ sub build_Genes{
 										     -features    => \@features,
 										     -annotations => \@annotations,
 										    );
+      
       @supported_predictions = $genecooker->run;
     }
   }
@@ -291,10 +292,7 @@ sub get_Genes {
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
-	#foreach my $exon(@{$tran->get_all_Exons}){
-	  #print STDERR "have exon ".$exon."\n";
-	#  print STDERR "have ".@{$exon->get_all_supporting_features}."\n";
-	#}
+	
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $tran ); 
 	# my @valid_transcripts = $self->validate_transcript($t);
 	# next TRANSCRIPT unless scalar(@valid_transcripts);
@@ -502,7 +500,6 @@ sub prune_Transcripts {
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
 	foreach my $exon ( @{$transcript->get_all_Exons} ){
-	  print STDERR "1 transfering supporting evidence\n";
 	  $self->transfer_supporting_evidence($exon, $e);
 	}
       }
@@ -553,7 +550,7 @@ sub prune_Transcripts {
       # get through the check for single exon genes above.
       
     EXONS:
-      for ($i = 0; $i < $#exons; $i++){
+      for ($i = 0; $i < $#exons; $i++) {
 	my $foundpair = 0;
 	my $exon1 = $exons[$i];
 	my $exon2 = $exons[$i+1];
@@ -572,7 +569,7 @@ sub prune_Transcripts {
 	  $foundpair = 1;	# this pair will not be compared with other transcripts
 	} 
 	else {
-	  print STDERR "have a valid exon pair\n";
+	  
 	  # go through the exon pairs already stored in %pairhash. 
 	  # If there is a pair whose exon1 overlaps this exon1, and 
 	  # whose exon2 overlaps this exon2, then these two transcripts are paired
@@ -620,16 +617,14 @@ sub prune_Transcripts {
       
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
-	print STDERR "found new transcript:\n";
+	#print STDERR "found new transcript:\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
-	#foreach my $e(@{$tran->get_all_Exons}){
-	#  print STDERR "there are ".@{$e->get_all_supporting_features}." supporting features\n";
-	#}
+
 	push(@newtran,$tran);
 	@evidence_pairs = ();
       } 
       else {
-	print STDERR "transcript already seen:\n";
+	#print STDERR "transcript already seen:\n";
 	if ( $tran == $transcripts[0] ){
 	  print STDERR "Strange, this is the first transcript in the cluster!\n";
 	}
@@ -644,7 +639,6 @@ sub prune_Transcripts {
 	  my $target_exon = $pair[1];
 	  
 	  #print STDERR "\n";
-	  print STDERR "2 transfering supporting evidence\n";
 	  $self->transfer_supporting_evidence($source_exon, $target_exon)
 	}
       }
@@ -879,15 +873,10 @@ sub cluster_into_Genes{
     # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
     my @sorted_transcripts = $self->_bin_sort_transcripts( @{$cluster} );
     foreach my $transcript( @sorted_transcripts ){
-	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE){
-	  #print STDERR "have transcript ".$transcript->dbID."\n";
-	  foreach my $e((@{$transcript->get_all_Exons})){
-	    #print STDERR "have exon ".$e->dbID."\n";
-	    #print STDERR "there are ".@{$e->get_all_supporting_features}." supporting features in the transcript being added to this gene\n";
-	  }
-	  $gene->add_Transcript($transcript);
-	  #print STDERR "accepting:\n";
-	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE) {
+	    $gene->add_Transcript($transcript);
+	    #print STDERR "accepting:\n";
+	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	}
 	$count++;
     }
@@ -1087,30 +1076,30 @@ sub get_Similarities {
 
   my @features = @{ $self->query->get_all_SimilarityFeatures('',$GB_MIN_FEATURE_SCORE) };
   
+  print STDERR "retrieved ".scalar(@features)." features\n";
   my %idhash;
   my @other_features;
   
   foreach my $feature (@features) {
-    unless ( $idhash{ $feature->hseqname } ){
-      $idhash{ $feature->hseqname } = [];
-    }
-    if ($feature->length > $GB_MIN_FEATURE_LENGTH) {
-      if ($feature->isa("Bio::EnsEMBL::BaseAlignFeature")) {
-	push( @{ $idhash{ $feature->hseqname } }, $feature );
+      if ($feature->length > $GB_MIN_FEATURE_LENGTH) {
+	  unless ( $idhash{ $feature->hseqname } ){
+	      $idhash{ $feature->hseqname } = [];
+	  }
+	  if ($feature->isa("Bio::EnsEMBL::BaseAlignFeature")) {
+	      push( @{ $idhash{ $feature->hseqname } }, $feature );
+	  }
       }
-    }
-    else {
-      push(@other_features,$feature);
-    }
+      # any other feature is rejected
   }
   
-  my @merged_features = $self->merge(\%idhash);
+  # test:
+  #foreach my $id ( keys %idhash ){
+  #    print STDERR "Id: $id ".scalar(@{$idhash{$id}})." features\n";
+  #}
+ 
+  my @pruned_features = $self->prune_features(\%idhash);
 
-  my @newfeatures;
-  push(@newfeatures,@merged_features);
-  push(@newfeatures,@other_features);
-  
-  $self->features(@newfeatures);
+  $self->features(@pruned_features);
 }
    
 
@@ -1118,110 +1107,144 @@ sub get_Similarities {
 
 
 =head2 merge
+  Note(eae): very suspicious, I do not why it is doing that, and if it
+             should be doing what I think, it is not doung correctly, so
+             do not use for the time being, subjet to future revision.
 
- Description: wicked meethod that merges two or more homol features into one if they are close enough together
+ Description: wicked method that merges two or more homol features into one 
+              if they are close enough together
   Returns   : nothing
   Args      : none
 
 =cut
 
 sub merge {
-  my ($self,$feature_hash,$overlap,$query_gap,$homol_gap) = @_;
-  
-  $overlap   = 20  unless $overlap;
-  $query_gap = 15  unless $query_gap;
-  $homol_gap = 15  unless $homol_gap;
-  
-  my @mergedfeatures;
-  
-  foreach my $id (keys %{ $feature_hash }) {
+    my ($self,$feature_hash,$overlap,$query_gap,$homol_gap) = @_;
     
-    my $count = 0;
-    my @newfeatures;
-    my @features = @{$feature_hash->{$id}};
+    $overlap   = 20  unless $overlap;
+    $query_gap = 15  unless $query_gap;
+    $homol_gap = 15  unless $homol_gap;
     
-    @features = sort { $a->start <=> $b->start} @features;
+    my @mergedfeatures;
     
-    # put the first feature in the new array;
-    push(@newfeatures,$features[0]);
-    
-    for (my $i=0; $i < $#features; $i++) {
-      my $id  = $features[$i]  ->id;
-      my $id2 = $features[$i+1]->id;
-      
-      # First case is if start of next hit is < end of previous
-      if ( $features[$i]->end > $features[$i+1]->start && 
-	  ($features[$i]->end - $features[$i+1]->start + 1) < $overlap) {
+  ID:
+    foreach my $id (keys %{ $feature_hash }) {
 	
-	if ($features[$i]->strand == 1) {
-	  $newfeatures[$count]-> end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hend);
-	} 
-	else {
-	  $newfeatures[$count]-> end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hstart);
+	my $count = 0;
+	my @newfeatures;
+	my @features = @{$feature_hash->{$id}};
+	
+	@features = sort { $a->start <=> $b->start} @features;
+	unless ( @features ){
+	    print STDERR "No features here for id: $id\n";
+	    next ID;
+	}
+	while ( @features && !defined $features[0] ){
+	    print STDERR "jumping an undefined feature\n";
+	    shift @features;
 	}
 	
-	# Take the max score
-	if ($features[$i+1]->score > $newfeatures[$count]->score) {
-	  $newfeatures[$count]->score($features[$i+1]->score);
+	# put the first feature in the new array;
+	print STDERR "pushing feature[0]: ".$features[0]->gffstring."\n";
+	push(@newfeatures,$features[0]);
+
+	
+	for (my $i=0; $i < $#features; $i++) {
+	    my $id  = $features[$i]  ->id;
+	    my $id2 = $features[$i+1]->id;
+	    
+	    print STDERR "Comparing:\n";
+	    print STDERR "feature[$i]: ".$features[$i]->gffstring."\n";
+	    print STDERR "feature[".($i+1)."]: ".$features[$i+1]->gffstring."\n";
+	    
+	    # First case is if start of next hit is < end of previous
+	    if ( $features[$i]->end > $features[$i+1]->start && 
+		 ($features[$i]->end - $features[$i+1]->start + 1) < $overlap) {
+		print STDERR "overlap\n";
+		
+		if ($features[$i]->strand == 1) {
+		    $newfeatures[$count]-> end($features[$i+1]->end);
+		    $newfeatures[$count]->hend($features[$i+1]->hend);
+		} 
+		else {
+		    $newfeatures[$count]-> end($features[$i+1]->end);
+		    $newfeatures[$count]->hend($features[$i+1]->hstart);
+		}
+		
+		# Take the max score
+		if ($features[$i+1]->score > $newfeatures[$count]->score) {
+		    $newfeatures[$count]->score($features[$i+1]->score);
+		}
+		
+		if ($features[$i+1]->hstart == $features[$i+1]->hend) {
+		    $features[$i+1]->strand($features[$i]->strand);
+		}
+		
+		print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
+		
+	    }
+	    # Allow a small gap if < $query_gap, $homol_gap
+	    elsif (($features[$i]->end < $features[$i+1]->start) &&
+		   abs($features[$i+1]->start - $features[$i]->end) <= $query_gap) {
+		
+		if ($features[$i]->strand eq "1") {
+		    $newfeatures[$count]->end($features[$i+1]->end);
+		    $newfeatures[$count]->hend($features[$i+1]->hend);
+		} 
+		else {
+		    $newfeatures[$count]->end($features[$i+1]->end);
+		    $newfeatures[$count]->hstart($features[$i+1]->hstart);
+		}
+		
+		if ($features[$i+1]->score > $newfeatures[$count]->score) {
+		    $newfeatures[$count]->score($features[$i+1]->score);
+		}
+		
+		if ($features[$i+1]->hstart == $features[$i+1]->hend) {
+		    $features[$i+1]->strand($features[$i]->strand);
+		}
+		print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
+		
+	    } 
+	    else {
+		# we can't extend the merged homologies so start a
+		# new homology feature
+		
+		# first do the coords on the old feature
+		if ($newfeatures[$count]->hstart > $newfeatures[$count]->hend) {
+		    my $tmp = $newfeatures[$count]->hstart;
+		    $newfeatures[$count]->hstart($newfeatures[$count]->hend);
+		    $newfeatures[$count]->hend($tmp);
+		}
+		
+		$count++;
+		$i++;
+		
+		print STDERR "pushing feature[$i]: ".$features[$i]->gffstring."\n";
+		push(@newfeatures,$features[$i]);
+		$i--;
+	    }
 	}
 	
-	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
-	  $features[$i+1]->strand($features[$i]->strand);
+	if ( @newfeatures ){
+	    # Adjust the last new feature coords
+	    if ($newfeatures[$#newfeatures]->hstart > $newfeatures[$#newfeatures]->hend) {
+		my $tmp = $newfeatures[$#newfeatures]->hstart;
+		$newfeatures[$#newfeatures]->hstart($newfeatures[$#newfeatures]->hend);
+		$newfeatures[$#newfeatures]->hend($tmp);
+	    }
+	    
+	    my @pruned = $self->prune_features(@newfeatures);
+	    
+	    push(@mergedfeatures,@pruned);
 	}
-	
-	# Allow a small gap if < $query_gap, $homol_gap
-      } elsif (($features[$i]->end < $features[$i+1]->start) &&
-	       abs($features[$i+1]->start - $features[$i]->end) <= $query_gap) {
-	
-	if ($features[$i]->strand eq "1") {
-	  $newfeatures[$count]->end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hend);
-	} else {
-	  $newfeatures[$count]->end($features[$i+1]->end);
-	  $newfeatures[$count]->hstart($features[$i+1]->hstart);
+	else{
+	    print STDERR "No features merged\n";
 	}
-	
-	if ($features[$i+1]->score > $newfeatures[$count]->score) {
-	  $newfeatures[$count]->score($features[$i+1]->score);
-	}
-	
-	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
-	  $features[$i+1]->strand($features[$i]->strand);
-	}
-	
-      } else {
-	# we can't extend the merged homologies so start a
-	# new homology feature
-	
-	# first do the coords on the old feature
-	if ($newfeatures[$count]->hstart > $newfeatures[$count]->hend) {
-	  my $tmp = $newfeatures[$count]->hstart;
-	  $newfeatures[$count]->hstart($newfeatures[$count]->hend);
-	  $newfeatures[$count]->hend($tmp);
-	}
-	
-	$count++;
-	$i++;
-	
-	push(@newfeatures,$features[$i]);
-	$i--;
-      }
     }
     
-    # Adjust the last new feature coords
-    if ($newfeatures[$#newfeatures]->hstart > $newfeatures[$#newfeatures]->hend) {
-      my $tmp = $newfeatures[$#newfeatures]->hstart;
-      $newfeatures[$#newfeatures]->hstart($newfeatures[$#newfeatures]->hend);
-      $newfeatures[$#newfeatures]->hend($tmp);
-    }
-    
-    my @pruned = $self->prune_features(@newfeatures);
-    
-    push(@mergedfeatures,@pruned);
-  }
-  return @mergedfeatures;
+    return @mergedfeatures;
+   
 }
 
 ############################################################
@@ -1233,32 +1256,53 @@ sub merge {
  Args       : array of Bio::EnsEMBL::SeqFeature
 
 =cut
-
-sub prune_features {
-  my ($self,@features)  = @_;
     
-  my @pruned;
-
-  @features = sort {$a->start <=> $b->start} @features;
-
-  my $prev = -1;
-
-  F: 
-  foreach  my $f (@features) {
-    if ($prev != -1 && $f->hseqname eq $prev->hseqname &&
-	$f->start   == $prev->start &&
-	$f->end     == $prev->end   &&
-	$f->hstart  == $prev->hstart &&
-	$f->hend    == $prev->hend   &&
-	$f->strand  == $prev->strand &&
-	$f->hstrand == $prev->hstrand) {
-    } 
-    else {
-      push(@pruned,$f);
-      $prev = $f;
+sub prune_features {
+    my ($self,$feature_hash)  = @_;
+    my @pruned;
+ 
+  ID:
+    foreach my $id (keys %{ $feature_hash }) {
+	my @features = @{$feature_hash->{$id}};
+	@features = sort {$a->start <=> $b->start} @features;
+	
+	unless ( @features ){
+	    print STDERR "No features here for id: $id\n";
+	    next ID;
+	}
+	while ( @features && !defined $features[0] ){
+	    print STDERR "jumping an undefined feature\n";
+	    shift @features;
+	}
+	
+	my $prev = -1;
+	
+      FEATURE: 
+	foreach  my $f (@features) {
+	    if ($prev != -1 && $f->hseqname eq $prev->hseqname &&
+		$f->start   == $prev->start &&
+		$f->end     == $prev->end   &&
+		$f->hstart  == $prev->hstart &&
+		$f->hend    == $prev->hend   &&
+		$f->strand  == $prev->strand &&
+		$f->hstrand == $prev->hstrand) 
+	    {
+		#keep the one with highest score
+		if ( $f->score > $prev->score ){
+		    $prev->score( $f->score );
+		}
+		#print STDERR "pruning duplicated feature\n";
+		#print STDERR "previous: ".$prev->gffstring."\n";
+		#print STDERR "thisone : ".$f->gffstring."\n";
+		next FEATURE;
+	    } 
+	    else {
+		push(@pruned,$f);
+		$prev = $f;
+	    }
+	}
     }
-  }
-  return @pruned;
+    return @pruned;
 }
 
 ############################################################
@@ -1645,7 +1689,7 @@ sub validate_transcript{
 
 sub transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
-  print "3 transferring supporting evidence ".(caller)."\n";
+  
   my @target_sf = @{$target_exon->get_all_supporting_features};
   #  print "target exon sf: \n";
   #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
@@ -1655,7 +1699,7 @@ sub transfer_supporting_evidence{
   # keep track of features already transferred, so that we do not duplicate
   my %unique_evidence;
   my %hold_evidence;
-  
+
  SOURCE_FEAT:
   foreach my $feat ( @{$source_exon->get_all_supporting_features}){
     next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
