@@ -66,11 +66,13 @@ my $utils_verbosity = 'WARNING'; #how verbose do you want the
 #WARNING as this gives warning and throws but not deprecates or infos
 my $shuffle;
 my $accumulators = 1;
+my $force_accumulators = 0;
 my $reread_input_ids = 0; #toggle whether to reread input_id each time the
 #script loops
 my $reread_rules = 0; #toggle whether to reread rules each time the script
 #loops
-
+my $perldoc = 0;
+my @command_args = @ARGV;
 GetOptions(
            'dbhost=s'      => \$dbhost,
            'dbname=s'      => \$dbname,
@@ -106,17 +108,26 @@ GetOptions(
            'utils_verbosity=s' => \$utils_verbosity,
            'shuffle!' => \$shuffle,
            'accumulators!' => \$accumulators,
+           'force_accumulators!' => \$force_accumulators,
            'reread_input_ids!' => \$reread_input_ids,
            'reread_rules!' => \$reread_rules,
            'once!' => \$once,
-           ) or throw("Can't get rulemanager commandline arguments");
+           'perldoc!' => \$perldoc,
+           ) or useage(\@command_args);
 
+perldoc() if $perldoc;
 verbose($utils_verbosity);
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
       "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
-    exit 1;
+    $help = 1;
+}
+if($help){
+  useage(\@command_args);
+}
+if(!defined($mark_awol)){
+  $mark_awol = 0;
 }
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                        -host   => $dbhost,
@@ -156,6 +167,7 @@ if($db_sanity){
   $sanity->db_sanity_check;
 }
 
+
 my %analyses_to_run = %{$rulemanager->logic_name2dbID(\@analyses_to_run)};
 my %analyses_to_skip = %{$rulemanager->
                            logic_name2dbID(\@analyses_to_skip)};
@@ -168,7 +180,14 @@ if ($ids_to_run && ! -e $ids_to_run) {
 if($ids_to_skip && ! -e $ids_to_skip){
   throw("Must be able to read $ids_to_skip");
 }
-
+if($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
+   @analyses_to_skip || @types_to_skip || $ids_to_skip){
+  print STDERR "You are running with options which may break ".
+    "accumulators they are being switched off. You can prevent this with ".
+      "the -force_accumulators option\n";
+  $accumulators = 0;
+}
+$accumulators = 1 if($force_accumulators);
 my $all_rules = $rulemanager->rules;
 
 if($accumulators && $accumulator_sanity){
@@ -209,6 +228,8 @@ while(1){
                                  \@starts_from); 
   }
   if($reread_rules){
+    $rulemanager->empty_rules;
+    $all_rules = $rulemanager->rules;
     $rulemanager->rules_setup(\%analyses_to_run, \%analyses_to_skip, 
                               $all_rules, \%accumulator_analyses, 
                               \%always_incomplete_accumulators);
@@ -336,3 +357,222 @@ sub termhandler {
 sub sighandler {
     $rst_sig = 1;
 };
+
+
+sub useage{
+  my ($command_args) = @_;
+  print "Your commandline was :\n".
+    "RuleManager3.pl ".join("\t", @$command_args), "\n\n";
+
+  print "ensembl-pipeline/scripts/rulemanager.pl is the main script used ".
+    "to run the pipeline\n\n"; 
+  print "Everytime you run the rulemanager you must pass in the database ".
+    "options\n\n";
+  print "-dbhost     The host where the pipeline database is.\n".
+    "-dbport     The port.\n".
+      "-dbuser     The user to connect as.\n".
+        "-dbpass     The password to use.\n".
+          "-dbname   The database name.\n\n";
+  print "Other options you may find useful are:\n\n".
+    "-once, which means the RuleManager loop only executes once ".
+      "before exiting\n".
+        "-analysis and -skip_analysis, where you can specific an ".
+          "individual analysis to run or skip\n".
+            "-input_id_file and -skip_input_id_file, files containing a ".
+              "list of input ids to run in the format input_id ".
+                "input_id_type\n\n";
+  print " -perldocs will print out the perl documentation of this module ".
+    "and -help will print out the help again \n";
+}
+
+
+sub perldoc{
+	exec('perldoc', $0);
+	exit;
+}
+
+=pod
+
+=head1 NAME
+
+rulemanager.pl, a script for running the ensembl-pipeline.
+This is a script which replicates most of the behaviour previously
+described by RuleManager3.pl
+
+for more information about the ensembl-pipeline or using rulemanager.pl
+read using_the_ensembl_pipeline.txt in ensembl-doc, 
+
+There is a genome research paper
+The ensembl analysis pipeline.
+Genome Res. 2004 May;14(5):934-41.
+PMID: 15123589
+
+or mail ensembl-dev@ebi.ac.uk
+
+=head1 SYNOPSIS
+
+This script takes a series of input_ids, first group by input_id_type
+then establishes on the basis of rules described in the pipeline database
+what analyses it can run with what input_ids
+
+=head1 OPTIONS
+
+DB Connection Details
+
+
+   -dbhost     The host where the pipeline database is.
+   -dbport     The port.
+   -dbuser     The user to connect as.
+   -dbpass     The password to use.
+   -dbname     The database name.
+
+These arguments are always required all other arguments are optional
+
+Affecting the scripts behaviour
+
+   -once this flag means the script will only run through its loop once
+    this is useful for testing 
+   -reread_rules, this flag will force the rulemanager to reread the rule
+    table every loop
+   -reread_input_ids, this will force the rulemanager to reread the input
+    ids each and every loop
+   -accumulators, this is a flag to indicate if the accumulators are 
+    running. By default it is on but it is turned off if you specify any
+    flag which affects the rules or input_ids sets. You can switch
+    it off by specifying -noaccumulators 
+   -force_accumulators this forces accumulators on even if other conditions
+    would switch it on
+   -shuffle this reorders the array of input_ids each time it goes through
+    through the loop. The purpose of this is to ensure the ids aren't 
+    always checked in the same order'
+   -utils_verbosity, this affects the amount of chatter you recieve from
+    the core module Bio::EnsEMBL::Utils::Exception. By default this is set
+    to WARNING which means you see the prints from warnings and throws but
+    not from deprecate and info calls. See the modules itself for more 
+    information
+   -verbose, toggles whether some print statements are printed in this
+    script and in the RuleManager
+   -rerun_sleep, this is the amount of time the script will sleep for
+    if no jobs have been submitted in the previous loop
+
+Overridable Configurations options from Bio::EnsEMBL::Pipeline::Config 
+modules
+
+  Options also defined in Bio::EnsEMBL::Pipeline::Config modules
+
+  BatchQueue.pm
+
+  -queue_manager this specifies which 
+   Bio::EnsEMBL::Pipeline::BatchSubmission module is used by 
+   Bio::EnsEMBL::Pipeline::RuleManager
+  -job_limit the maximun number of jobs of specified status allowed in
+   system
+  -max_job_time the maximum time the rulemanager will sleep for when
+   job limit is reached
+  -min_job_time the minimum time the rulemanager will sleep for when
+   job limit is reached
+  -sleep_per_job the amount of time per job the rulemanager will sleep
+   for if the job limit is reached
+  -output_dir the path to an output directory when the jobs stderr and
+   stdout will be redirected. This alwaysoverrides the values specified in
+   BatchQueue
+  -mark_awol toggle to specify whether to mark jobs as awol if lost from
+   the submission system this can apply strain to the job table. It is on
+   by default and can be switched off using the -nomark_awol flag
+
+  General.pm
+   -runner path to a default runner script. This will override what is
+    set in General.pm but will be overidden by any analyses specific
+    settings found in BatchQueue.pm
+   -rename_on_retry a toggle to specify whether to rename stderr/stdout 
+    file when a job is retried as otherwise the submission system just
+    cats them all together
+
+Sanity Checking
+
+   -config_sanity this is a test to check certain values are defined in
+    your General.pm and BatchQueue.pm config files
+   -db_sanity this checks various tables in the databases for missing 
+   values or bad foreign key relationships
+   -accumulator_sanity this checks you accumulators are set up correctly
+   -rules_setup this checks you rules are setup correctly
+
+   this are all on by default but can be switched off using -nooption_name
+
+Altering what input_ids or analyses are considered for submission
+
+  -starts_from this should be a logic_name of an analysis which has been
+  run. The input_ids used for the central loop are retrived on the basis of
+  these logic_names. This option can appear in the commandline multiple 
+  times
+  -analysis a logic_name of an analysis you want run. If you specify
+  this option you will only run this analysis or analyses as the option can
+  appear on the command line multiple times
+  -skip_analysis a logic_name of an analysis you don't want to run. If
+  this option is specified these are the only analyses which won't be run
+  note this option and -analysis are mutually exclusive
+  -input_id_type a type of input_id you want to run with. If these is 
+  specified no other type of input will be considered. Again this can 
+  appear multiple times on the commandline
+  -skip_input_id_type a type of input to no be considered. If this appears
+  only these input_ids will not be run. Again this can appear multiple 
+  times on the commandline and is multially exclusive with -input_id_type
+  -input_id_file path to a file of input_ids which should be in the format
+  input_id input_id_type
+  -skip_input_id_file path to a file of input_ids to not run. The file
+  should be in the same format as for -input_id_file
+  
+
+Currently unused options
+
+  -kill_jobs, flag as whether to check hwo long jobs have been running for
+   and kill them if they have run for too long
+  -killed_time the length of time to let jobs run for before killing them
+  -kill_file a file where to record the input_ids and logic_names of killed
+   jobs
+
+these options are currently unused as we aren't sure of the best way to 
+check job running time. They have been brought over from RuleManager3.pl
+as the functionality may be reinstated at a later stage'
+
+=head1 EXAMPLES
+
+a standard commandline for running rulemanager
+
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -shuffle
+
+it is generally a good idea to redirect your output to a file and run the
+process in the background
+
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -shuffle >& rulemanager_output.txt&
+
+if you still want to see the output on the screen you can do this by piping
+the output though tee
+
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -shuffle | tee rulemanager_output.txt
+
+if you have just set up you database you may want to test everything is
+okay. the input_id_file option is a good way to do this
+
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -shuffle -input_id_file my_input_ids
+
+as this way you can get the pipeline to considered a limited number of
+input_ids and as such is causes less problems if things go wrong
+
+
+
+=head1 SEE ALSO
+
+  Bio::EnsEMBL::Pipeline::Job
+  Bio::EnsEMBL::Pipeline::Config::General
+  Bio::EnsEMBL::Pipeline::Config::BatchQueue
+
+  pipeline_sanity.pl script here in ensembl-pipeline/scripts
+
+and also using_the_ensembl_pipeline.txt in the ensembl-docs cvs module
+
+=cut
