@@ -956,6 +956,11 @@ sub combine_genes{
       }
     }
     
+    #unless($self->compare_translations($gw_tran[0], $newtranscript) ){
+    #  print STDERR "translation has been modified\n";
+    #}
+
+
     # check that the result is fine
     unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript,$self->query) ){
       $self->throw("problems with this combined transcript");
@@ -976,13 +981,13 @@ sub combine_genes{
     if ( $modified_peptide ){
       my $strand = $newtranscript->start_Exon->strand;
       
-      #print STDERR "before genomewise:\n";
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
+      print STDERR "before genomewise:\n";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
       
       $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
       
-      #print STDERR "after genomewise:\n";
-      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+      print STDERR "after genomewise:\n";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
 
       unless($self->compare_translations($gw_tran[0], $newtrans) ){
 	print STDERR "translation has been modified\n";
