@@ -98,8 +98,8 @@ sub new {
     $self->{'_results'}   = undef; # file to store results of EPCR
     $self->{'_word_size'} = undef;     # e-PCR 'W' parameter
     $self->{'_margin'}    = undef;     # e-PCR 'M' parameter
-    $self->{'_min_mismatch'}  = undef;     # e-PCR 'N' parameter
-    $self->{'_max_mismatch'}  = undef;     # e-PCR 'N' parameter
+    $self->{'_min_mismatch'}  = 0;     # e-PCR 'N' parameter
+    $self->{'_max_mismatch'}  = 0;     # e-PCR 'N' parameter
     $self->{'_mismatch'}  = undef;     # e-PCR 'N' parameter
     $self->{'_protected'} = [];    # a list of files protected from deletion
     $self->{'_sts'}       = undef;
