@@ -86,6 +86,8 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_GENEBUILDER_INTRON_MISMATCH
 									 EST_GENEBUILDER_EXON_MATCH
 									 CHECK_SPLICE_SITES
+									 FILTER_ON_SINGLETON_SIZE
+									 RAISE_SINGLETON_COVERAGE
 									);
 
 
@@ -481,7 +483,7 @@ sub _check_Transcripts {
       # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
       if ( scalar(@exons) == 1 ){
 	
-	if ( $FILTER_ON_SINGLETONS && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETONS ){
+	if ( $FILTER_ON_SINGLETON_SIZE && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETON_SIZE ){
 	  next TRANSCRIPT;
 	}
 	if ( $RAISE_SINGLETON_COVERAGE ){
