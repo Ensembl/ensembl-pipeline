@@ -55,7 +55,7 @@ my $counter=0;
         host
         user
         port
-        password
+        pass
         schema_sql
         module
         );
@@ -70,7 +70,7 @@ my $counter=0;
             'host'          => 'localhost',
             'user'          => 'root',
             'port'          => '3306',
-            'password'      => undef,
+            'pass'      => undef,
             'schema_sql'    => ['../sql/table.sql'],
             'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor'
             };
@@ -120,13 +120,13 @@ sub port {
     return $self->{'port'};
 }
 
-sub password {
+sub pass {
     my( $self, $value ) = @_;
     
     if ($value) {
-        $self->{'password'} = $value;
+        $self->{'pass'} = $value;
     }
-    return $self->{'password'};
+    return $self->{'pass'};
 }
 
 sub schema_sql {
@@ -164,9 +164,9 @@ sub create_db {
     my( $self ) = @_;
     
     ### FIXME: not portable between different drivers
-    my $locator = 'dbi:'. $self->driver .':host='. $self->host .';database=mysql';
+    my $locator = 'dbi:'. $self->driver .':host='. $self->host;
     my $db = DBI->connect(
-        $locator, $self->user, $self->password, {RaiseError => 1}
+        $locator, $self->user, $self->pass, {RaiseError => 1}
         ) or confess "Can't connect to server";
     my $db_name = $self->dbname;
 
@@ -185,7 +185,7 @@ sub db_handle {
     
     unless ($self->{'_db_handle'}) {
         $self->{'_db_handle'} = DBI->connect(
-            $self->test_locator, $self->user, $self->password, {RaiseError => 1}
+            $self->test_locator, $self->user, $self->pass, {RaiseError => 1}
             ) or confess "Can't connect to server";
     }
     return $self->{'_db_handle'};
@@ -195,7 +195,7 @@ sub test_locator {
     my( $self ) = @_;
     
     my $locator = 'dbi:'. $self->driver .':database='. $self->dbname;
-    foreach my $meth (qw{ host port }) {
+    foreach my $meth (qw{ host port pass}) {
         if (my $value = $self->$meth()) {
             $locator .= ";$meth=$value";
         }
@@ -208,7 +208,7 @@ sub ensembl_locator {
     
     my $module = ($self->module() || 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor');
     my $locator = '';
-    foreach my $meth (qw{ host port dbname user }) {
+    foreach my $meth (qw{ host port dbname user pass}) {
         my $value = $self->$meth();
 	if( !defined $value ) { next; }
         $locator .= ';' if $locator;
