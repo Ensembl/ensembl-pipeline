@@ -787,11 +787,12 @@ sub find_transcripts_by_protein_evidence{
   my $q = qq( SELECT distinct(t.transcript_id)
               FROM   exon e, supporting_feature sf, protein_align_feature pf,
 	             exon_transcript et, transcript t
-              WHERE  sf.exon_id    = e.exon_id                   AND
-	             sf.feature_id = pf.protein_align_feature_id AND
-	             pf.hit_name   = "$id"                       AND
-	             pf.contig_id  = e.contig_id                 AND
-                     et.exon_id    = e.exon_id                   AND
+              WHERE  sf.exon_id      = e.exon_id                   AND
+	             sf.feature_id   = pf.protein_align_feature_id AND
+	             sf.feature_type = "protein_align_feature"     AND
+                     pf.hit_name     = "$id"                       AND
+	             pf.contig_id    = e.contig_id                 AND
+                     et.exon_id      = e.exon_id                   AND
 	             et.transcript_id = t.transcript_id
             );
   
@@ -824,6 +825,7 @@ sub find_transcripts_by_protein_evidence{
 }
 
 ############################################################
+
 =head2 find_transcripts_by_dna_evidence
   
   Method to get all the transcripts in a given database that
@@ -834,14 +836,16 @@ sub find_transcripts_by_protein_evidence{
 sub find_transcripts_by_dna_evidence{
   my ($self,$id,$db) = @_;
   
+  #print STDERR "Using ".$db->dbname."\n";
   my $q = qq( SELECT distinct(t.transcript_id)
               FROM   exon e, supporting_feature sf, dna_align_feature pf,
-	             exon_transcript et, transcript t
-              WHERE  sf.exon_id    = e.exon_id                   AND
-	             sf.feature_id = pf.dna_align_feature_id     AND
-	             pf.hit_name   = "$id"                       AND
-	             pf.contig_id  = e.contig_id                 AND
-                     et.exon_id    = e.exon_id                   AND
+	             exon_transcript et, transcript t 
+              WHERE  sf.exon_id      = e.exon_id                   AND
+	             sf.feature_id   = pf.dna_align_feature_id     AND
+	             sf.feature_type = "dna_align_feature"         AND
+	             pf.hit_name     = "$id"                       AND
+	             pf.contig_id    = e.contig_id                 AND
+                     et.exon_id      = e.exon_id                   AND 
 	             et.transcript_id = t.transcript_id
             );
   
@@ -860,9 +864,10 @@ sub find_transcripts_by_dna_evidence{
   # create transcripts in slice coordinates
   my @transcripts;
   foreach my $t_id ( @tranz ){
-    my $tran     = $t_adaptor->fetch_by_dbID($t_id);
+      print STDERR "found $t_id\n";
+      my $tran     = $t_adaptor->fetch_by_dbID($t_id);
     my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
+    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name );
     my $fakegene = Bio::EnsEMBL::Gene->new();
     $fakegene->add_Transcript( $tran );
     my $tmp_gene = $fakegene->transform( $big_slice );
