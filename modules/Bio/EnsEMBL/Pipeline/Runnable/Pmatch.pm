@@ -9,6 +9,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF;
 use Bio::EnsEMBL::Root;
+use File::Copy;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -68,7 +69,7 @@ sub run_analysis{
 
   
   my $command = $self->program." -D ".$self->protein_file." ".$self->filename." > ".$self->results;
-  print STDERR $command."\n";
+  #print STDERR $command."\n";
   $self->throw("Error running pmatch on " . $self->filename) if system($command);
 }
 
@@ -81,22 +82,28 @@ sub parse_results{
 
 sub sort_results{
   my ($self) = @_;
-
-  my $command = "sort -k6,6 -k3,3n ".$self->results ." > pmatch.tmp";
+  my $sorted_file = "tmp.".$$;
+  my $command = "sort -k6,6 -k3,3n ".$self->results ." > ".$sorted_file;
   $self->throw("Error [sorting results] running pmatch on " . $self->filename) if system($command);
-  rename "pmatch.tmp", $self->results;
+  rename($sorted_file, $self->results);
   my $current_pmf;
   my $prot_id;
-  open (PM, "<".$self->results) or die "couldn't open ".$self->results."\n";
+  open (PM, "<".$self->results) or die "couldn't open ".
+    $self->results."\n";
   #print STDERR "Prot lengths ".$self->prot_lengths."\n";
+  my $line_count = 0;
+  my $pmf_count = 0;
  PMATCH:  
   while(<PM>){
+    $line_count++;
+    #print STDERR;
     my @cols = split;
     # dump out line to file just in case this turns into a problem
     
     if(!$prot_id || $cols[5] ne $prot_id){
 
       $self->add_pm_filter($current_pmf);
+      $pmf_count++;
       # start a new PMF
       $current_pmf = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF(
 								   -plengths => $self->prot_lengths,
@@ -110,11 +117,14 @@ sub sort_results{
       $current_pmf->make_coord_pair($_);
     }
   }
-
+  #print STDERR "Have ".$line_count." lines from results\n";
+  $pmf_count++;
+  #print STDERR "Have ".$pmf_count." First_PMF's\n";
   $self->add_pm_filter($current_pmf);
   # make sure we at least try to proces the last one!
   
   my @filters = @{$self->get_pm_filters};
+  #print STDERR "Have ".@filters." filters\n";
   foreach my $f(@filters){
     my @hits = $f->merge_hits;
     #print STDERR "adding ".$hits[0]." to output\n";

@@ -229,9 +229,11 @@ sub run {
   
   my @feature_pairs;
   foreach my $f (@blast_features){
+    #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
     #my $feature_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature2,
 	#					     -feature2 => $f->feature1);
-    $f->invert;
+    $f->invert($self->genomic_sequence);
+    #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
     #push(@feature_pairs, $feature_pair);
   }
 
@@ -266,9 +268,10 @@ sub run_blast {
   my @valid_seq   = $self->validate_sequence(@seq);
   #print STDERR "there are ".@valid_seq." valid sequences\n";
 
-  my $blastdb     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(
-					 -sequences => [$self->genomic_sequence],
-					 -type      => 'DNA');
+  my $blastdb     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB
+    (
+     -sequences => [$self->genomic_sequence],
+     -type      => 'DNA');
   #print STDERR "\n";
   $blastdb->run;
   #print STDERR "\n";
@@ -278,16 +281,16 @@ sub run_blast {
   foreach my $seq (@sorted_seqs) {
     # First sort out the header parsing. Blergh! cb25.NA_057.31208-61441 Slice, no descrtipion 
      my $regex;
-    #print STDERR "ID ".$self->genomic_sequence->id."\n";
-    if($GB_INPUTID_REGEX && $self->genomic_sequence->id =~ /$GB_INPUTID_REGEX/){
-      $regex = $GB_INPUTID_REGEX;
-    }elsif ($self->genomic_sequence->id =~ /^(.*)\|(.*)\|(.*)/) {
-      $regex = '^.*\|(.*)\|.*';
-    } elsif ($self->genomic_sequence->id =~ /^..\:(.*)/) {
-      $regex = '^..\:(.*)';
-    }else {
-      $regex = '^(\w+)';
-    }
+     #print STDERR "ID ".$self->genomic_sequence->name."\n";
+     if($self->genomic_sequence->name =~ /^\S+\:\S*\:(\S+)\:\S*:\S*\:\S*/){
+       $regex = '^\S+\:\S*\:(\S+)\:\S*:\S*\:\S*';
+     }elsif ($self->genomic_sequence->name =~ /^(.*)\|(.*)\|(.*)/) {
+       $regex = '^.*\|(.*)\|.*';
+     } elsif ($self->genomic_sequence->name =~ /^..\:(.*)/) {
+       $regex = '^..\:(.*)';
+     }else {
+       $regex = '^(\w+)';
+     }
     
      
      my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
@@ -295,7 +298,7 @@ sub run_blast {
 							   -database => $blastdb->dbfile,
 							   -filter => 1,
 							  );
-     
+     #print STDERR "Adding ".$dbname." ".$regex."\n";
      $run->add_regex($dbname, $regex);
      $run->run;
      
@@ -305,6 +308,7 @@ sub run_blast {
   $blastdb->remove_index_files;
   unlink $blastdb->dbfile;
   if($GB_BMG_FILTER){
+    #print STDERR "Filtering blast results\n";
     #this code will through out any sets of features where
     #none of the blast scores are higher than score set in config 
     #on the grounds its unlikely in that case that it will produce 
@@ -322,14 +326,20 @@ sub run_blast {
   HIT: foreach my $hid(keys(%feature_hash)){
       my @hit_features = @{$feature_hash{$hid}};
       foreach my $f (@hit_features){
-	if($f->score > $GB_BMG_SCORE_CUTOFF){
-	  push(@fs, @hit_features);
-	  next HIT;
-	}
+        if($f->score > $GB_BMG_SCORE_CUTOFF){
+          push(@fs, @hit_features);
+          next HIT;
+        }
       }
+    }
+    foreach my $f(@fs){
+      #print STDERR "run_blast ".$f->seqname." ".$f->hseqname."\n";
     }
     return @fs;
   }else{
+    foreach my $f(@blast_features){
+      #print STDERR "run_blast ".$f->seqname." ".$f->hseqname."\n";
+    }
     return @blast_features;
   }
   
@@ -387,9 +397,10 @@ sub get_Sequences {
     my @seq;
 
     foreach my $id ($self->ids) {
+      #print STDERR "Fetching ".$id." sequence\n";
         my $seq = $self->get_Sequence($id);
 
-        if (defined($seq) && $seq->length > 0) {
+        if ($seq && $seq->length > 0) {
             push(@seq,$seq);
         } else {
             print STDERR "Invalid sequence for $id - skipping\n";

@@ -491,6 +491,7 @@ sub parse_results {
 
   if ($REFILTER{$self->database}){
     # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
+    #print STDERR "
     my @selected_features = $self->select_features($self->output);
     $self->output(@selected_features);
   } else {
@@ -826,7 +827,7 @@ sub split_HSP {
 
 sub _convert2FeaturePair {
     my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis) = @_;
-
+  
     # The actual end of the alignment is the previous character.
     
     my $tmpqend = $qend; $tmpqend -= $qinc;
@@ -988,6 +989,9 @@ sub output {
     if (!($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
     }
+#    foreach my $f(@{$self->{'_fplist'}}){
+#      print STDERR "Blast::output ".$f->seqname." ".$f->hseqname."\n";
+#    }
     return @{$self->{'_fplist'}};
 }
 
@@ -1149,7 +1153,7 @@ sub get_regex{
   #print STDERR "getting the regex for ".$name."\n";
   if($name =~/\/tmp\//){
     $name =~ s/\/tmp\///g;
-  }
+  } 
   return $FASTA_HEADER{$name};
 }
 1;

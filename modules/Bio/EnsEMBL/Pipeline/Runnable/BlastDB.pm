@@ -118,7 +118,7 @@ sub sequences {
 sub run {
   my ($self) = @_;
   
-  if (!defined($self->dbfile)) {
+  if (!$self->dbfile) {
     my $seqfile = $self->make_seqfile;
     $self->dbfile($seqfile);
   }
@@ -161,6 +161,7 @@ sub make_seqfile {
   return $blastfile;
 }
 
+
 sub dbname {
   my ($self) = @_;
   
@@ -170,11 +171,12 @@ sub dbname {
   
   my $dbname = $self->dbfile;
   
-  $dbname =~ s/.*\/(.*?)/$1/;
+  if($dbname =~/\/tmp\//){
+    $dbname =~ s/\/tmp\///g;
+  }
   
   return $dbname;
 }
-
 
 sub remove_index_files {
   my ($self) = @_;

@@ -49,12 +49,12 @@ sub new {
            
     my( $genomic, $features,$seqfetcher, $endbias, $minimum_intron, $exon_padding, $minimum_feature_length) = 
       $self->_rearrange([qw(GENOMIC
-			    FEATURES
-			    SEQFETCHER
-			    ENDBIAS  
-			    MINIMUM_INTRON
-			    EXON_PADDING
-			    MINIMUM_FEATURE_LENGTH
+                            FEATURES
+                            SEQFETCHER
+                            ENDBIAS  
+                            MINIMUM_INTRON
+                            EXON_PADDING
+                            MINIMUM_FEATURE_LENGTH
 			   )],
 			@args);
 
@@ -176,33 +176,33 @@ sub get_all_features_by_id {
     my $feature_count = 0;
   FEAT: foreach my $f (@{$self->features}) {
       $feature_count++;
-      if (!(defined($f->hseqname))) {
-	$self->warn("No hit name for " . $f->seqname . "\n");
-	next FEAT;
+      if (!$f->hseqname) {
+        $self->warn("No hit name for " . $f->seqname . "\n");
+        next FEAT;
       } 
-      if (defined($idhash{$f->hseqname})) {
-	push(@{$idhash{$f->hseqname}},$f);
+      if ($idhash{$f->hseqname}) {
+        push(@{$idhash{$f->hseqname}},$f);
       } else {
-	$idhash{$f->hseqname} = [];
-	push(@{$idhash{$f->hseqname}},$f);
+        #print STDERR "Dealing with ".$f->hseqname."\n";
+        $idhash{$f->hseqname} = [];
+        push(@{$idhash{$f->hseqname}},$f);
       }
-      if (defined($scorehash{$f->hseqname})) {
-	if ($f->score > $scorehash{$f->hseqname}) {
-	  $scorehash{$f->hseqname} = $f->score;
-	}
+      if ($scorehash{$f->hseqname}) {
+        if ($f->score > $scorehash{$f->hseqname}) {
+          $scorehash{$f->hseqname} = $f->score;
+        }
       } else {
-	$scorehash{$f->hseqname} = $f->score;
+        $scorehash{$f->hseqname} = $f->score;
       }
+        }
+      
+      my @sorted_ids = keys %idhash;
+      #print STDERR "there are ".$feature_count." features being sorted\n";
+      @sorted_ids = sort {$scorehash{$b} <=> $scorehash{$a}} @sorted_ids;
+      
+      return (\%idhash,\@sorted_ids);
     }
     
-    my @sorted_ids = keys %idhash;
-    #print STDERR "there are ".$feature_count." features being sorted\n";
-    @sorted_ids = sort {$scorehash{$b} <=> $scorehash{$a}} @sorted_ids;
-    
-    return (\%idhash,\@sorted_ids);
-  }
-
-
 
 
 =head2 get_Sequence
@@ -229,7 +229,7 @@ sub get_Sequence {
   my $seqfetcher = $self->seqfetcher;    
   
   my $seq;
-  
+  #print STDERR "Fetching ".$id." sequence\n";
   eval {
     $seq = $seqfetcher->get_Seq_by_acc($id);
   };
@@ -262,7 +262,7 @@ sub run {
   my ($self) = @_;
 
   my ($fhash,$ids) = $self->get_all_features_by_id;
- # print STDERR "have ".@$ids." ids\n";
+  #print STDERR "have ".@$ids." ids\n";
  
   foreach my $id (@$ids) {
     #print STDERR "$id\n";
@@ -365,7 +365,7 @@ sub _find_extras {
   
  FEAT: 
   foreach my $f (@features) {
-    
+    $f->slice($self->genomic_sequence);
     my $found = 0;
 
     # does this need to be hardcoded?
@@ -376,9 +376,11 @@ sub _find_extras {
     
     foreach my $out (@output) {
       foreach my $sf ($out->sub_SeqFeature) {
-	if ($f->overlaps($sf)) {
-	  $found = 1;
-	}
+        $sf->slice($self->genomic_sequence);
+        print STDERR "Comparing ".$sf." to ".$f."\n";
+        if ($f->overlaps($sf)) {
+          $found = 1;
+        }
       }
     }
     

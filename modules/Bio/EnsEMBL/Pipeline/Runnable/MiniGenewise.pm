@@ -100,7 +100,7 @@ sub make_MiniSeq {
     @features = sort {$a->start <=> $b->start} @features;
     
   FEAT: foreach my $f (@features) {
-
+      #print STDERR "feature ".$f->start." ".$f->end."\n";
       my $start = $f->start - $self->_exon_padding;
       my $end   = $f->end   + $self->_exon_padding;
 
@@ -159,7 +159,7 @@ sub make_MiniSeq {
       $fp->start($f->start);
       $fp->end($f->end);
       $fp->seqname($f->seqname);
-      $fp->attach_seq($self->genomic_sequence);
+      $fp->slice($self->genomic_sequence);
       $fp->strand($f->strand);
       $fp->score($f->score);
       $fp->hstart($cdna_start);
@@ -196,7 +196,7 @@ sub run {
 
   my $miniseq = $self->make_MiniSeq;
 	my $minigen = $miniseq->get_cDNA_sequence;
-
+  
   my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $minigen,
 							    -protein => $self->protein_sequence,
 							    -reverse => $self->_is_reversed,
@@ -216,7 +216,9 @@ sub run {
   # representing the ungapped sub alignments for each exon
   
   my @f = $gw->output;
-  
+  #foreach my $f(@f){
+  #  print STDERR ("start ".$f->start." end ".$f->end."\n");
+  #}
   my @newf;
   
   my $strand = 1;
@@ -232,11 +234,15 @@ sub run {
     $ec++;
     
     $f->strand($strand); 
-    
+    #print STDERR "Converting ".$f->start." ".$f->end." back into genomic "
+    #      " coordinates\n";
     # need to convert whole exon back to genomic coordinates
     my @genomics = $miniseq->convert_SeqFeature($f);         
     my $gf;
-    
+    if(!@genomics){
+      print STDERR "Don't have anything returned by MiniSeq\n";
+      next FEAT;
+    }
     if ($#genomics > 0) {
       
       # all hell will break loose as the sub alignments will probably not map cheerfully 
@@ -253,7 +259,7 @@ sub run {
     $gf->phase    ($f->phase);
     $gf->end_phase($f->end_phase);
     $gf->strand   ($strand);
-    $gf->seqname  ($self->genomic_sequence->id);
+    $gf->seqname  ($self->genomic_sequence->seq_region_name);
     $gf->score    (100);
     
     # also need to convert each of the sub alignments back to genomic coordinates
@@ -268,7 +274,7 @@ sub run {
       foreach my $a(@alns) {
 	$a->strand($strand); 
 	$a->hstrand(1);      
-	$a->seqname($self->genomic_sequence->id);
+	$a->seqname($self->genomic_sequence->seq_region_name);
 	$a->hseqname($self->protein_sequence->id);
 	
 	# Maybe put a check in that this really is a sub feature
@@ -438,4 +444,3 @@ sub endbias {
 
 
 1;
-
