@@ -79,7 +79,7 @@ use Data::Dumper;
     Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Inverted->new (-CLONE => $seq);
     Function:   Initialises Inverted object
-    Returns :   a Inverted Object
+    Returns :   an Inverted Object
     Args    :   A Bio::Seq object (-CLONE), any arguments for einverted (-ARGS) 
 
 =cut
@@ -200,7 +200,7 @@ sub arguments {
 
     Title   :  run
     Usage   :   $obj->run()
-    Function:   Runs equickinverted and einverted to create array of feature pairs
+    Function:   Runs einverted to create array of feature pairs
     Returns :   none
     Args    :   none
 
@@ -286,7 +286,7 @@ sub parse_results {
             ($feat1 {name}, $feat2 {name}) = ($feat2 {name}, $feat1 {name});
             ($feat1 {score}, $feat2 {score}) = ($feat2 {score}, $feat1 {score});
             $self->createfeaturepair(\%feat2, \%feat1);
-            #reset flag variables to allow reading of next repeat
+            #reset flag variables to allow correct reading of next repeat
             $feat1{name} = undef;
             $feat1{start} = undef;
         }
