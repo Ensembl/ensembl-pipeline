@@ -43,7 +43,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 my $slice = $db->get_SliceAdaptor->fetch_by_chr_name( $chr_name );
-#my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, 20500000, 21000000 );
+#my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, 84000000,191610523 );
 my $chr_length = $slice->length;
 print STDERR "got slice $chr_name.1-$chr_length\n";
 
@@ -164,7 +164,7 @@ sub cluster_Genes{
   
   # loop over the rest of the genes
  LOOP1:
-  for (my $c=1; $c<=$#genes; $c++){
+  while( @genes ){
     
     my $next_gene = shift @genes;
     my ( $tstart,$tend,$tstrand ) = &get_gene_start_end_strand( $next_gene );
