@@ -108,14 +108,14 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     #print STDERR "Fetching contig $contigid\n";
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid)
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
     my $genseq    = $contig->primary_seq() 
         or $self->throw("Unable to fetch contig sequence");
 
     $self->genseq($genseq);
     #need to get features predicted by genscan
-     my @genscan_peps = $self->dbobj->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
+     my @genscan_peps = $self->db->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
     $self->transcripts(@genscan_peps);
    
 }
@@ -251,11 +251,11 @@ sub write_output{
   my ($self) = @_;
 
   my @features = $self->output();
-  my $pep_f_a = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+  my $pep_f_a = $self->db->get_ProteinAlignFeatureAdaptor();
   my $contig;
   eval 
     {
-      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+      $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
 
   if ($@) 

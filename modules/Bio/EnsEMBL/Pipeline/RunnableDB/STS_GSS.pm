@@ -51,7 +51,7 @@ sub fetch_input {
   $self->throw("No input id") unless defined($self->input_id);
   
   my $contigid  = $self->input_id;
-  my $contig    = $self->dbobj->get_Contig($contigid);
+  my $contig    = $self->db->get_Contig($contigid);
   
   my $genseq   = $contig->primary_seq;
   my $repeatmasked_seq = $contig->get_repeatmasked_seq;

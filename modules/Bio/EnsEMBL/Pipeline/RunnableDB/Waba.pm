@@ -105,7 +105,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
     
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $contig    = $self->db->get_Contig($contigid);
     my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
 
     $self->genseq($genseq);
@@ -144,31 +144,31 @@ sub write_output {
     }
 
     # prepare sql
-    my $sth_c = $self->dbobj->prepare ( q{ SELECT internal_id
+    my $sth_c = $self->db->prepare ( q{ SELECT internal_id
                                              FROM contig
                                             WHERE id = ?
 				         } );
 
-    my $sth = $self->dbobj->prepare ( q{ INSERT INTO waba_feature
+    my $sth = $self->db->prepare ( q{ INSERT INTO waba_feature
                                                   (id, contig, seq_start, seq_end,
                                                    score, strand, analysis, name,
                                                    hstart, hend, hid, perc_id, state, cigar)
 					   VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				       } );
 
-    my $sth_fset = $self->dbobj->prepare ( q{ INSERT INTO waba_fset
+    my $sth_fset = $self->db->prepare ( q{ INSERT INTO waba_fset
                                                           (id, contig, seq_start, seq_end,
                                                            score, strand, analysis, name,
                                                            hstart, hend, hid, perc_id)
                                                    VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 					    } );
 
-    my $sth_fset_feature = $self->dbobj->prepare ( q{ INSERT INTO waba_fset_feature
+    my $sth_fset_feature = $self->db->prepare ( q{ INSERT INTO waba_fset_feature
                                                                   (feature, fset, rank)
                                                            VALUES (?, ?, ?)
 					            } );
 
-    my $sth_last = $self->dbobj->prepare ( q{ SELECT last_insert_id() } );
+    my $sth_last = $self->db->prepare ( q{ SELECT last_insert_id() } );
 
     # loop over all arrays
     foreach my $aref (@refs) {
@@ -180,7 +180,7 @@ sub write_output {
         my $internalId = ($sth_c->fetchrow_array)[0];
 
         # get AnalysisAdaptor
-        my $analysisAdaptor = $self->dbobj->get_AnalysisAdaptor;
+        my $analysisAdaptor = $self->db->get_AnalysisAdaptor;
 
         # write analysis to the database
         my $analysis = $fset_fp->analysis;

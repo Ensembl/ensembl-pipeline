@@ -104,7 +104,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
     
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
    
     $self->genseq($genseq);
@@ -144,11 +144,11 @@ sub write_output{
   my ($self) = @_;
 
   my @features = $self->output();
-  my $simple_f_a = $self->dbobj->get_SimpleFeatureAdaptor();
+  my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
   my $contig;
   eval 
     {
-      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+      $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
 
   if ($@) 

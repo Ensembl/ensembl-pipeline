@@ -108,7 +108,7 @@ sub fetch_input {
    
     my $contigid  = $self->input_id;
     #print "contig id = ".$contigid."\n";
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     #print "contig id = ".$contig->id."\n";
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     #print "geneseq ".$genseq." \n geneseq\n";
@@ -188,7 +188,7 @@ sub write_output {
    my @transcripts = $fgenesh_runnable->each_Fgenesh_Transcript();
    if( ! @transcripts ) { return; }
 
-   my $ptransAdaptor = $self->dbobj()->get_PredictionTranscriptAdaptor();
+   my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
 
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();

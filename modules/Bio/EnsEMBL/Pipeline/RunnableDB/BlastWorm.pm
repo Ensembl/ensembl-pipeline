@@ -122,7 +122,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 
     print STDERR "Setting genseq to " . $genseq. "\n";
@@ -157,7 +157,7 @@ sub write_output {
     }
 
     # get the internal id of the contig
-    my $sth = $self->dbobj->prepare ( q{ SELECT internal_id
+    my $sth = $self->db->prepare ( q{ SELECT internal_id
                                            FROM contig
                                           WHERE id = ?
                                        } );
@@ -165,7 +165,7 @@ sub write_output {
     my $internalId = ($sth->fetchrow_array)[0];
 
 
-    $sth = $self->dbobj->prepare ( q{ INSERT INTO feature
+    $sth = $self->db->prepare ( q{ INSERT INTO feature
                                                   (id, contig, seq_start, seq_end,
                                                    score, strand, analysis, name,
                                                    hstart, hend, hid, evalue, perc_id, cigar)
@@ -174,7 +174,7 @@ sub write_output {
 
 
     # get AnalysisAdaptor
-    my $analysisAdaptor = $self->dbobj->get_AnalysisAdaptor;
+    my $analysisAdaptor = $self->db->get_AnalysisAdaptor;
 
     # write analysis to the database
     my $analysis = $featurepairs[0]->analysis;
