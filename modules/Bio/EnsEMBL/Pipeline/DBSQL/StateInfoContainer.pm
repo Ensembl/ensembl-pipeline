@@ -13,7 +13,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer 
+Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
 
 =head1 SYNOPSIS
 
@@ -21,11 +21,11 @@ Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
 
 
 =head1 DESCRIPTION
-  
-  Module which encapsulates state request for objects in the database. 
+
+  Module which encapsulates state request for objects in the database.
   Starts of with a table InputIdAnalysis, providing which analysis was done to
   inputIds but every state information access should go via this object.
-     
+
   Deliberatly NOT called an adaptor, as it does not serve obejcts.
 
 =head1 CONTACT
@@ -55,7 +55,7 @@ use strict;
 sub new {
   my $class = shift;
   my $self = bless( {}, $class);
-  
+
   my $dbobj = shift;
 
   $self->db( $dbobj );
@@ -77,7 +77,7 @@ sub fetch_analysis_by_inputId_class {
      WHERE inputId = ?
        AND class = ? } );
   $sth->execute( $inputId, $class );
- 
+
   while( my @row = $sth->fetchrow_array ) {
     my $analysis = $anaAd->fetch_by_dbID( $row[0] );
     if( defined $analysis ) {
@@ -90,13 +90,18 @@ sub fetch_analysis_by_inputId_class {
 
 sub store_inputId_class_analysis {
   my ( $self, $inputId, $class, $analysis ) = @_;
-  
+
   my $sth = $self->prepare( qq{
-    INSERT INTO InputIdAnalysis
-      SET inputId='$inputId',
-          class='$class',
-          created = now(),
-          analysisId = ? } );
+    INSERT INTO InputIdAnalysis values (
+          '$inputId',
+          '$class',
+          ?,
+          now() )} );
+#    INSERT INTO InputIdAnalysis
+#      SET inputId='$inputId',
+#          class='$class',
+#          created = now(),
+#          analysisId = ? } );
   $sth->execute( $analysis->dbID );
 }
 
@@ -111,7 +116,7 @@ sub list_inputId_by_analysis {
       FROM InputIdAnalysis
      WHERE analysisId = ? } );
   $sth->execute( $analysis->dbID );
-  
+
   while( @row = $sth->fetchrow_array ) {
     push( @result, $row[0] );
   }
@@ -125,16 +130,11 @@ sub list_inputId_class_by_start_count {
   my @result;
   my @row;
 
-  my $query = qq {
-      SELECT inputId,class 
-      FROM   InputIdAnalysis
-  };
-	 
-#  my $query = qq{
-#    SELECT inputId, class 
-#      FROM InputIdAnalysis
-#     GROUP by inputId, class };
-  
+  my $query = qq{
+    SELECT inputId, class
+      FROM InputIdAnalysis
+     GROUP by inputId, class };
+
   if( defined $start && defined $count ) {
     $query .= " LIMIT $start,$count";
   }
@@ -157,8 +157,15 @@ sub list_inputId_class_by_start_count {
   return @result;
 }
 
+sub delete_inputId_class {
+  my $self = shift;
+  my ($dbID, $class) = shift;
 
-
+  my $sth = $self->prepare( qq{
+    DELETE FROM InputIdAnalysis
+    WHERE  inputId = ?} );
+  $sth->execute($dbID);
+}
 
 sub db {
   my ( $self, $arg )  = @_;
@@ -186,4 +193,3 @@ sub deleteObj {
 }
 
 1;
-

@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor 
+Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
 
 =head1 SYNOPSIS
 
@@ -21,10 +21,10 @@ Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
 
 
 =head1 DESCRIPTION
-  
+
   Module to encapsulate all db access for persistent class Rule.
   There should be just one per application and database connection.
-     
+
 
 =head1 CONTACT
 
@@ -64,7 +64,7 @@ use strict;
 sub new {
   my $class = shift;
   my $self = bless {},$class;
-  
+
   my $dbobj = shift;
 
   $self->db( $dbobj );
@@ -117,7 +117,7 @@ sub store {
 
 sub remove {
   my ( $self, $rule ) = @_;
-  
+
   my $dbID = $rule->dbID;
   if( !defined $dbID ) {
     $self->throw( "RuleAdaptor->remove called with non persistent Rule" );
@@ -133,7 +133,7 @@ sub remove {
   $sth->execute;
 }
 
-  
+
 =head2 fetch_all
 
   Title   : fetch_all
@@ -143,8 +143,6 @@ sub remove {
   Args    : -
 
 =cut
-
-
 
 sub fetch_all {
   my $self = shift;
@@ -161,7 +159,7 @@ sub fetch_all {
   while( @queryResult = $sth->fetchrow_array ) {
     $analysis = $anaAdaptor->fetch_by_dbID( $queryResult[1] );
     $dbID = $queryResult[0];
-    
+
     $rule = Bio::EnsEMBL::Pipeline::Rule->new
       ( -dbid => $dbID,
 	-goal => $analysis,
@@ -174,7 +172,7 @@ sub fetch_all {
     SELECT ruleId, conditionLiteral
       FROM RuleConditions } );
   $sth->execute;
-  
+
   while( @queryResult = $sth->fetchrow_array ) {
       print STDERR "@queryResult\n";
       $rules{$queryResult[0]}->add_condition( $queryResult[1] );

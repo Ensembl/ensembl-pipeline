@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor 
+Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor
 
 =head1 SYNOPSIS
 
@@ -21,10 +21,10 @@ Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor
 
 
 =head1 DESCRIPTION
-  
+
   Module to encapsulate all db access for persistent class Analysis.
   There should be just one per application and database connection.
-     
+
 
 =head1 CONTACT
 
@@ -53,7 +53,7 @@ use strict;
 sub new {
   my $class = shift;
   my $self = bless {},$class;
-  
+
   my $dbobj = shift;
 
   $self->db( $dbobj );
@@ -101,7 +101,7 @@ sub fetch_all {
   Function: Retrieves an analysis from database by internal id
   Returns : throws exception when something goes wrong.
             undef if the id is not in the db.
-  Args    : 
+  Args    :
 
 =cut
 
@@ -122,7 +122,7 @@ sub fetch_by_dbID {
            created, parameters
     FROM analysisprocess
     WHERE analysisId = ? } );
-  
+
   $sth->execute( $id );
   my $rowHashRef = $sth->fetchrow_hashref;
   if( ! defined $rowHashRef ) {
@@ -148,7 +148,7 @@ sub fetch_by_newest_logic_name {
     FROM analysisprocess
     WHERE logic_name = ?
     ORDER BY created DESC } );
-  
+
   $sth->execute( $logic_name );
   my $rowHashRef = $sth->fetchrow_hashref;
   if( ! defined $rowHashRef ) {
@@ -176,7 +176,7 @@ sub fetch_by_logic_name {
     FROM analysisprocess
     WHERE logic_name = ?
     ORDER BY created DESC } );
-  
+
   $sth->execute( $logic_name );
   my $rowHashRef;
   while( $rowHashRef = $sth->fetchrow_hashref ) {
@@ -274,7 +274,7 @@ sub store {
     $analysis->dbID( $dbID );
     if( defined $dbID ) {
       $sth = $self->prepare( q{
-	SELECT created 
+	SELECT created
 	FROM analysisprocess
 	WHERE analysisId = ? } );
       $sth->execute( $dbID );
@@ -299,7 +299,7 @@ sub exists {
     my $resultAnalysis;
 
     $self->throw("Object is not a Bio::EnsEMBL::Pipeline::Analysis") unless $anal->isa("Bio::EnsEMBL::Pipeline::Analysis");
-    
+
     my $query;
     my @conditions;
     push( @conditions, "program=\"".$anal->program."\"" ), if( defined  $anal->program );
@@ -356,7 +356,7 @@ sub _objFromHashref {
       -created => $rowHash->{created},
       -logic_name => $rowHash->{logic_name}
     );
-  
+
   return $analysis;
 }
 

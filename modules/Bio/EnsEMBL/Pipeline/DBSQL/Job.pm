@@ -304,6 +304,8 @@ sub submit {
     my $cmd = "bsub -q " . $self->queue;
 
     $cmd .= " -o " . $self->stdout_file . " -e " . $self->stderr_file;
+    $cmd .= " -u scp\@sanger.ac.uk ";
+    $cmd .= " -R osf1 ";
     
     $cmd .= " \"/nfs/disk100/humpub/michele/runner  -object " . $self->input_object_file . " " . 
 	                                           "-output " . $self->output_file       . "\"";

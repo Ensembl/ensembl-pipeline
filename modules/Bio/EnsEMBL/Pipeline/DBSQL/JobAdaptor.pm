@@ -292,6 +292,39 @@ sub remove {
   $sth->execute;
 }
 
+=head2 remove_by_dbID
+
+  Title   : remove_by_dbID
+  Usage   : $jobadaptor->remove_by_dbID( $dbID )
+  Function: deletes entries for job from database tables.
+            deletes also history of status. Can take a list of ids.
+  Returns : throws exception when something goes wrong.
+  Args    : 
+
+=cut
+
+sub remove_by_dbID {
+  my $self = shift;
+  my @dbIDs = @_;
+  
+  if( $#dbIDs == -1 ) { return }
+  
+  my $inExpr = "(".join( ",",@dbIDs ).")";
+  
+  my $sth = $self->prepare( qq{
+    DELETE FROM job
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
+
+  $sth = $self->prepare( qq{
+    DELETE FROM current_status
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
+  $sth = $self->prepare( qq{
+    DELETE FROM jobstatus
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
+}
 
 
 =head2 update
@@ -405,7 +438,7 @@ sub set_status {
     my $status;
 
     eval {	
-	my $sth = $self->prepare("insert into jobstatus(jobId,status,time) values (" .
+	my $sth = $self->prepare("insert delayed into jobstatus(jobId,status,time) values (" .
 					 $job->dbID . ",\"" .
 					 $arg      . "\"," .
 					 "now())");
@@ -417,14 +450,13 @@ sub set_status {
 
 	$res = $sth->execute();
 	
-	$sth = $self->prepare("select time from jobstatus where jobId = " . $job->dbID . 
-				      " and status = \""                       . $arg      . "\"");
+	$sth = $self->prepare("select now()" );
 	
 	$res = $sth->execute();
 	
-	my $rowhash = $sth->fetchrow_hashref();
-	my $time    = $rowhash->{'time'};
-	
+	my $rowhash = $sth->fetchrow_arrayref();
+	my $time    = $rowhash->[0];
+
 	$status = Bio::EnsEMBL::Pipeline::Status->new
 	  (  -jobid   => $job->dbID,
 	     -status  => $arg,
@@ -510,7 +542,7 @@ sub get_all_status {
     unless defined($job->dbID);
 
   my $sth = $self->prepare
-    ("select id,status, UNIX_TIMESTAMP(time) from  jobstatus " . 
+    ("select jobId,status, UNIX_TIMESTAMP(time) from  jobstatus " . 
      "where id = \"" . $job->dbID . "\" order by time desc");
   
   my $res = $sth->execute();
@@ -531,6 +563,45 @@ sub get_all_status {
   return @status;
 }
 
+=head2 get_last_status
+
+  Title   : get_last_status
+  Usage   : my @status = $job->get_all_status
+ Function: Get most recent status object associated with this job
+  Returns : Bio::EnsEMBL::Pipeline::Status
+  Args    : Bio::EnsEMBL::Pipeline::Job, status string
+
+=cut
+
+sub get_last_status {
+  my ($self, $job, $status) = @_;
+
+  $self->throw("Can't get status if id not defined")
+    unless defined($job->dbID);
+
+  # $self->throw("Can't get status without suppling status string")
+  #   unless defined($status);
+
+  my $sth = $self->prepare (qq{
+    SELECT jobId, status, UNIX_TIMESTAMP(time)
+      FROM jobstatus
+     WHERE jobId = ?
+     ORDER by time desc} );
+
+  my $res = $sth->execute($job->dbID);
+  my $rowHashRef = $sth->fetchrow_hashref();
+  if( ! defined $rowHashRef ) {
+    return undef;
+  }
+
+  my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
+  my $status    = $rowHashRef->{'status'};
+  my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $job->dbID,
+						       -status  => $status,
+						       -created => $time,
+						      );
+  return $statusobj;
+}
 
 sub list_jobId_by_status {
   my $self = shift;
@@ -543,6 +614,31 @@ sub list_jobId_by_status {
       FROM job j, current_status c
      WHERE j.jobId = c.jobId
        AND c.status = '$status'
+     ORDER BY jobId } );
+  $sth->execute;
+  
+  while( @row = $sth->fetchrow_array ) {
+    push( @result, $row[0] );
+  }
+  
+  return @result;
+}
+
+
+sub list_jobId_by_status_age {
+  my $self = shift;
+  my $status = shift;
+  my $age = shift;
+  
+  my @result;
+  my @row;
+  my $sth = $self->prepare( qq{
+    SELECT js.jobId
+      FROM current_status c, jobstatus js
+     WHERE js.jobId = c.jobId
+       AND c.status = '$status'
+       AND js.status = '$status'
+       AND js.time < DATE_SUB( NOW(), INTERVAL $age MINUTE )
      ORDER BY jobId } );
   $sth->execute;
   
