@@ -129,7 +129,7 @@ sub has_condition_of_input_id_type {
   foreach my $cond (@{$self->{'_conditions'}}) {
       my $cond_anal = $ana_adaptor->fetch_by_logic_name($cond);
       if ($cond_anal->input_id_type eq $id_type) {
-          print " Condition of " . $cond_anal->logic_name . " is of type $id_type\n";
+          #print " Condition of " . $cond_anal->logic_name . " is of type $id_type\n";
           return 1;
       }
   }
@@ -171,27 +171,27 @@ sub check_for_analysis {
 #This id isn't of the right type so doesn't satify goal
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
-    print STDERR " failed input_id_type check\n";
+    #print STDERR " failed input_id_type check\n";
     return 0;
   }
 
 
-  print STDERR "\nMy goal is " . $goal . "\n";
+  #print STDERR "\nMy goal is " . $goal . "\n";
 
   for my $analysis ( @$analist ) {
-    print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n";
+   # print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n";
     $anaHash{$analysis->logic_name} = $analysis;
     if( $goal == $analysis->dbID ) {
       # already done
-      print STDERR " already done\n";
+      #print STDERR " already done\n";
       return 0;
     }
   }
 
 #the completed_accumulator_href contains input_id_type ACCUMULATOR anals that have completed
   for my $cond ( $self->list_conditions ) {
-    if ( ! defined $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
-      print STDERR " failed condition check for $cond\n";
+    if ( ! $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
+      #print STDERR " failed condition check for $cond\n";
       return 0;
     }
   }
