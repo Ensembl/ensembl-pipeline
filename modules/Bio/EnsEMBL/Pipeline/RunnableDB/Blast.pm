@@ -99,10 +99,11 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
-    
-    print "Setting genseq to " . $genseq. "\n";
+
+    print STDERR "Setting genseq to " . $genseq. "\n";
 
     $self->genseq($genseq);
+    print STDERR "Set genseq to " . $self->genseq. "\n";
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq->seq;
     if ($seq =~ /[CATG]{3}/) {
@@ -115,21 +116,19 @@ sub fetch_input {
 }
 
 #get/set for runnable and args
-sub runnable {
-    my ($self) = @_;
-    
-    if (!defined($self->{'_runnable'})) {
-      my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
-							     -database  => $self->analysis->db,
-							     -program   => $self->analysis->program,
-								 -options	=> $self->analysis->parameters, # added  by jerm
-							     -threshold_type => 'PVALUE',
-							     -threshold => 1);
 
-      $self->{'_runnable'} = $run;
+sub runnable {
+    my ($self, @runnable) = @_;
+    if (@runnable)
+    {
+        foreach my $runnable (@runnable)
+        {
+            $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") or
+                $self->throw("Input to runnable is not Bio::EnsEMBL::Pipeline::RunnableI");
+        }
+        push (@{$self->{'_runnable'}}, @runnable);
     }
-    
-    return $self->{'_runnable'};
+    return @{$self->{'_runnable'}};
 }
 
 =head2 run
@@ -143,13 +142,63 @@ sub runnable {
 =cut
 
 sub run {
-    my ($self,$dir) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched")       unless ($self->genseq());
+    my ($self) = @_;
 
-    $self->runnable->run($dir);
+    #need to pass one peptide at a time
+    $self->throw("Input must be fetched before run") unless ($self->genseq);
+    
+
+    #extract parameters into a hash
+    my ($parameter_string) = $self->analysis->parameters();
+    my %parameters;
+    my ($thresh, $thresh_type, $arguments);
+
+    if ($parameter_string)
+    {
+        $parameter_string =~ s/\s+//g;
+        my @pairs = split (/,/, $parameter_string);
+        foreach my $pair (@pairs)
+        {
+            my ($key, $value) = split (/=>/, $pair);
+            if ($key eq '-threshold_type' && $value) {
+                $thresh_type = $value;
+            }
+            elsif ($key eq '-threshold' && $value) {
+                $thresh = $value;
+            }
+            else
+	    # remaining arguments not of '=>' form
+	    # are simple flags (like -p1)
+            {
+                $arguments .= " $key ";
+            }
+        }
+    }
+
+    $parameters{'-query'} = $self->genseq;
+    $parameters{'-database'} = $self->analysis->db;
+    $parameters{'-program'} = $self->analysis->program;
+    $parameters{'-options'} = $arguments if $arguments;
+    if ($thresh && $thresh_type) {
+	$parameters{'-threshold'} = $thresh;
+	$parameters{'-threshold_type'} = $thresh_type;
+    }
+    else {
+	$parameters{'-threshold'} = 1e-3;
+	$parameters{'-threshold_type'} = 'PVALUE';
+    }
+
+    
+	my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(
+	    %parameters
+	);
+
+	$runnable->run();
+	$self->runnable($runnable);                                        
+
+    
+
 }
-
 
 =head2 output
 
@@ -164,10 +213,14 @@ sub run {
 sub output {
     my ($self) = @_;
 
-    my $runnable = $self->runnable;
-    $runnable || $self->throw("Can't return output - no runnable object");
-
-    return $runnable->output;
+    my @runnable = $self->runnable;
+    my @results;
+    
+    foreach my $runnable(@runnable){
+      print STDERR "runnable = ".$runnable[0]."\n";
+      push(@results, $runnable->output);
+    }
+    return @results;  
 }
 
 1;

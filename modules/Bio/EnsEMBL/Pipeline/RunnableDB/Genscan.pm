@@ -1,3 +1,4 @@
+
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -60,8 +61,8 @@ use vars qw(@ISA);
     Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db
                            -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
+                           -ANALYSIS    => $analysis);      
+                          
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Genscan object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Genscan object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
@@ -164,3 +165,9 @@ sub result_quality_tag {
 }
 
 1;
+
+
+
+
+
+
