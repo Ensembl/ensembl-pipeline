@@ -1,11 +1,4 @@
 #!/usr/local/bin/perl -w
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  use lib $script_dir;
-  require "EST_conf.pl";
-}
 
 =head1 NAME
 
@@ -26,7 +19,8 @@ BEGIN {
 =cut
 
 use strict;
-my %conf = %::EST_conf;
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+my %scripts_conf = %::scripts_conf;
  
 my $chunkname = $ARGV[0];
 
@@ -35,10 +29,10 @@ if(!defined $chunkname){
   exit(1);
 }
 
-my $estfiledir = $conf{'estfiledir'};
+my $estfiledir = $scripts_conf{'estfiledir'};
 my $estfile = $estfiledir . "/" . $chunkname;
 
-my $input_id   = $conf{'genomic'};
+my $input_id   = $scripts_conf{'genomic'};
 
 # check to see if can find $estfile
 if (! -e $estfile){
