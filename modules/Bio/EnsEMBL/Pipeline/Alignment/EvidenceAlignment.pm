@@ -15,9 +15,9 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
  
 =head1 SYNOPSIS
 
-# Quick start - use the following code if you want the 
-# alignment of an ensembl transcript with the evidence 
-# used to predict it:
+Quick start - use the following code if you want the 
+alignment of an ensembl transcript with the evidence 
+used to predict it:
 
 my $evidence_alignment = 
   Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
@@ -39,15 +39,15 @@ foreach my $align_seq (@$align_seqs){
   print $align_seq->seq . "\n";
 }
 
-# The '-padding' option specifies the amount of tailing
-# sequence left attached to each 'exon'.  If you set this
-# to zero be careful, as you could be truncating some
-# sequence from the aligned evidence sequences.  If this 
-# happens a warning is issued.
+The '-padding' option specifies the amount of tailing
+sequence left attached to each 'exon'.  If you set this
+to zero be careful, as you could be truncating some
+sequence from the aligned evidence sequences.  If this 
+happens a warning is issued.
 
-# Other alignment presentation options exist.  The intronic
-# regions of the alignment can make it _very_ big.  Introns
-# can be truncated thusly:
+Other alignment presentation options exist.  The intronic
+regions of the alignment can make it _very_ big.  Introns
+can be truncated thusly:
 
 my $alignment = 
   $align_tool->retrieve_alignment(
@@ -55,33 +55,44 @@ my $alignment =
       '-remove_introns'  => 1,
       '-merge_sequences' => 1);
 
-# Importantly, if you need to see non-aligned portions of 
-# the evidence sequences use the following '-show_unaligned'
-# option:
+Importantly, if you need to see non-aligned portions of 
+the evidence sequences use the following '-show_unaligned'
+option:
 
 my $alignment = 
   $align_tool->retrieve_alignment(
       '-type'           => 'all',
       '-show_unaligned' => 1);
 
+This turns on an portion of code that generates sequences
+composed of all the fragments in the evidence sequence that
+havent been matched.  This is mainly useful to genebuilders 
+worrying about things that might be missed by various similarity 
+matching algorithms.  Note that for layout the fragments are 
+placed in the intron where they conceivably should go.  If 
+you are also trimming the intron sequences be careful that 
+you arent unwittingly throwing these intronic fragments
+away.  A warning is raised if this happens.
 
-# This turns on an portion of code that generates sequences
-# composed of all the fragments in the evidence sequence that
-# havent been matched.  This is mainly useful to genebuilders 
-# worrying about things that might be missed by various similarity 
-# matching algorithms.  Note that for layout the fragments are 
-# placed in the intron where they conceivably should go.  If 
-# you are also trimming the intron sequences be careful that 
-# you aren't unwittingly throwing these intronic fragments
-# away.  A warning is raised if this happens.
+If you are displaying protein sequences in your alignment, you
+can use either single letter or three letter amino acid codes.
+By default the alignment is generated with single letter codes,
+which is fractionally faster than three letter codes.  To 
+switch on the three letter codes specify the '-three_letter_aa'
+argument when retrieving an alignment, like so:
 
-# It is possible to display a transcript with a set of external 
-# supporting features that can come from any source.  Where external
-# features are used, the supporting features attached to
-# the transcript are ignored and the external set used instead.  It
-# usually helps if the external supporting features actually overlap
-# the transcript sequence :)  This option is used by passing in 
-# supporting features at the time of object creation.
+my $alignment = 
+  $evidence_alignment->retrieve_alignment(
+     '-type'            => 'all',
+     '-three_letter_aa' => 1,);
+
+It is possible to display a transcript with a set of external 
+supporting features that can come from any source.  Where external
+features are used, the supporting features attached to
+the transcript are ignored and the external set used instead.  It
+usually helps if the external supporting features actually overlap
+the transcript sequence :)  This option is used by passing in 
+supporting features at the time of object creation.
 
 my $alignment_tool = 
   Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
@@ -91,9 +102,9 @@ my $alignment_tool =
      '-supporting_features' => \@supporting_features);
 
 
-# A few features of the actual alignment can be controled.
-# The fasta line length and the amount of 5-prime and
-# 3-prime padding can be stipulated:
+A few features of the actual alignment can be controled.
+The fasta line length and the amount of 5-prime and
+3-prime padding can be stipulated:
 
 my $alignment_tool = 
   Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
@@ -104,9 +115,9 @@ my $alignment_tool =
      '-fasta_line_length' => 60);
 
 
-# Once the alignment is generated it is possible to calculate
-# the identity of the best matching evidence for each exon.
-# Coverage is also determined.
+Once the alignment is generated it is possible to calculate
+the identity of the best matching evidence for each exon.
+Coverage is also determined.
 
 my $exon_identities = $alignment_tool->identity;
 
@@ -120,22 +131,22 @@ foreach my $exon_identity (@$exon_identities) {
   $exon_counter++;
 }
 
-# The identity scores are returned as a reference to an  array 
-# of array references (I know, bleah - need a mini-object 
-# perhaps).  Each referenced array represents the best identity 
-# and coverage for an individual exon. The reference array has
-# the format (nucleotide_identity, nucleotide_coverage,
-# protein_identity, protein_coverage).  This could be easier...
+The identity scores are returned as a reference to an  array 
+of array references (I know, bleah - need a mini-object 
+perhaps).  Each referenced array represents the best identity 
+and coverage for an individual exon. The reference array has
+the format (nucleotide_identity, nucleotide_coverage,
+protein_identity, protein_coverage).  This could be easier...
 
-# NOTE : The definition of identity used by this module ignores all
-# gaps in the sequence.  Given than many of these alignments are
-# gappy or fragmentary, including gaps in the identity score will
-# dilute it somewhat according to coverage.
+NOTE : The definition of identity used by this module ignores all
+gaps in the sequence.  Given than many of these alignments are
+gappy or fragmentary, including gaps in the identity score will
+dilute it somewhat according to coverage.
 
 
-# Alternatively, you can check the coverage of each item of aligned 
-# evidence.  This provides information about how well the aligned
-# sequences are matched to the genomic sequence.
+Alternatively, you can check the coverage of each item of aligned 
+evidence.  This provides information about how well the aligned
+sequences are matched to the genomic sequence.
 
 my $evidence_coverage = $alignment_tool->hit_coverage;
   
@@ -151,8 +162,8 @@ foreach my $hit (@$hit_coverage){
 }
 
 
-# It is possible to determine the number of exons in an alignment 
-# that have no evidence.
+It is possible to determine the number of exons in an alignment 
+that have no evidence.
 
 my $no_evidence_exons = $alignment_tool->rogue_exons;
 
@@ -320,15 +331,17 @@ sub retrieve_alignment {
   my ($type, 
       $remove_introns, 
       $show_missing_evidence,
-      $merge_sequences) = rearrange([qw(TYPE
+      $merge_sequences,
+      $three_letter_aa) = rearrange([qw(TYPE
 					REMOVE_INTRONS
 					SHOW_UNALIGNED
 					MERGE_SEQUENCES
+					THREE_LETTER_AA
 				       )],@_);
 
   $self->_type($type);
-
   $merge_sequences = 1 unless defined $merge_sequences;
+  $self->_three_letter_aa($three_letter_aa) if $three_letter_aa;
 
   unless ($self->_is_computed($type)){
     my $alignment_success = $self->_align($type, 
@@ -1681,7 +1694,11 @@ sub _build_evidence_seq {
 
   if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
     my $padded_aa_seq;
-    ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
+    if ($self->_three_letter_aa) {
+      ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$self->{_aa_names}{$1}/g;
+    } else {
+      ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
+    }
 
     my @full_seq = split //, $padded_aa_seq;
 
@@ -1990,13 +2007,13 @@ sub _exon_nucleotide_sequence {
   my ($self) = @_;
 
   if (!defined $self->{'_exon_nucleotide_sequence'}) {
-    
+
     my @exon_only_sequence;
 
     foreach my $exon (@{$self->_transcript->get_all_Exons}) {
 
       # Add the exon sequence to our 'exons only' sequence.
-      
+
       my @exon_seq = split //, $exon->seq->seq;
 
       my $exon_position;
@@ -2006,17 +2023,17 @@ sub _exon_nucleotide_sequence {
       }elsif ($self->_strand == -1) {
 	$exon_position = $self->_slice->length - $exon->end;
       }
-      
+
       foreach my $exon_nucleotide (@exon_seq){
 	if (!defined $exon_only_sequence[$exon_position]){
 	  $exon_only_sequence[$exon_position] = $exon_nucleotide;
 	  $exon_position++;
 	} else {
-	  die "Overlapping exons \!\?\!\n$@";
+	  throw "Overlapping exons\n$@";
 	}
       }
-    }    
-    
+    }
+
     # Fill in the blanks
 
     for (my $i = 0; $i < $self->_slice->length; $i++) {
@@ -2060,7 +2077,7 @@ sub _exon_protein_translation {
     my @exon_translation_sequence;
 
     my $exons = $self->_transcript->get_all_Exons;
-    
+
     foreach my $exon (@{$exons}){
       # Add a translation of this exon peptide to our translated exon sequence.
 
@@ -2079,7 +2096,7 @@ sub _exon_protein_translation {
       #       starts of exons)
       # By doing this, a complete undeleted/unrepeated sequence 
       # is displayed in the alignment.
-      
+
       if ($exon->phase == 2){ 
 	splice (@peptide, 0, 2);
       }
@@ -2092,34 +2109,24 @@ sub _exon_protein_translation {
       # to turn reverse strand genes around (the protein sequence
       # is of course in the forward direction already, just the 
       # coordinates need to be reversed).
-      
+
       my $exon_start = $exon->start;
       my $exon_end = $exon->end;
       my $exon_length = $exon_end - $exon_start;
       my $exon_phase = $exon->phase;
       my $exon_end_phase = $exon->end_phase;
-      
+
       if ($self->_strand == -1) {
-	
 	$exon_start = $self->_slice->length - $exon_end;
 	$exon_end = $exon_start + $exon_length - 1;
-
-#	($exon_phase, $exon_end_phase) = ($exon_end_phase, $exon_phase);
-
       }
 
       # Jiggling the exons about to get frame right
       my $extra_length = 0;
 
-#      $extra_length += 3 if (($exon->phase != 0) && ($exon->phase != -1));
       $extra_length += 3 if (($exon_end_phase != 0) && ($exon_end_phase != -1));
-
-#      $extra_length -= 2 if $exon->phase == 2;
-#      $extra_length -= 1 if $exon->phase == 1;
-
       $extra_length -= 2 if $exon_end_phase == 2;
       $extra_length -= 1 if $exon_end_phase == 1;
-
 
       my $peptide_genomic_start;
 
@@ -2136,9 +2143,9 @@ sub _exon_protein_translation {
       if ($self->_strand == -1) {
 	$peptide_genomic_start += 2;
       }
-      
+
       my $insert_point = $peptide_genomic_start;
-      
+
       foreach my $exon_aa (@peptide) {
 	$exon_translation_sequence[$insert_point] = $exon_aa;
 
@@ -2161,13 +2168,13 @@ sub _exon_protein_translation {
       $translated_exon_sequence .= $element;
     }
 
-    $self->{'_exon_protein_translation'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
-					     '-seq'  => $translated_exon_sequence,
-					     '-name' => 'translated_exon_sequence',
-					     '-type' => 'protein'
-                                             );
+    $self->{'_exon_protein_translation'} = 
+      Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+	 '-seq'  => $translated_exon_sequence,
+	 '-name' => 'translated_exon_sequence',
+	 '-type' => 'protein');
   }
-  
+
   return $self->{'_exon_protein_translation'};
 }
 
@@ -2253,7 +2260,7 @@ sub _build_sequence_cache {
     eval {
       $fetched_seqs = $self->_seq_fetcher->batch_fetch(@array_of_accessions);
     };
-    
+
     if ($@){
       info("Not all evidence sequences could be pfetched.\n".
 	      "Ignoring missing sequences.\n$@\n");
@@ -2277,7 +2284,7 @@ sub _build_sequence_cache {
 
     }
   }
-  
+
   # Build cache.
 
   foreach my $fetched_seq (@$fetched_seqs){
@@ -2290,7 +2297,6 @@ sub _build_sequence_cache {
 
   $self->{'_cache_is_built'} = 1;
 }
-
 
 
 =head2 _fetch_sequence
@@ -2342,6 +2348,59 @@ sub _padding {
   return $self->{'_padding'} ? $self->{'_padding'} : 0;
 }
 
+
+=head2 _three_letter_aa
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+
+sub _three_letter_aa {
+  my $self = shift;
+
+  if (@_) {
+    $self->{'_three_letter_aa'} = shift;
+  }
+  if ($self->{'_three_letter_aa'}){
+    $self->_set_aa_names;
+  }
+
+
+  return $self->{'_three_letter_aa'} ? $self->{'_three_letter_aa'} : 0;
+}
+
+sub _set_aa_names {
+  my $self = shift;
+
+  $self->{_aa_names} = {'A' => 'Ala',
+                        'B' => 'Asx',
+                        'C' => 'Cys', 
+                        'D' => 'Asp', 
+                        'E' => 'Glu', 
+                        'F' => 'Phe', 
+                        'G' => 'Gly', 
+                        'H' => 'His', 
+                        'I' => 'Ile', 
+                        'K' => 'Lys', 
+                        'L' => 'Leu', 
+                        'M' => 'Met', 
+                        'N' => 'Asn', 
+                        'P' => 'Pro', 
+                        'Q' => 'Gln', 
+                        'R' => 'Arg', 
+                        'S' => 'Ser', 
+                        'T' => 'Thr', 
+                        'V' => 'Val', 
+                        'W' => 'Trp', 
+                        'Y' => 'Tyr', 
+                        'Z' => 'Glx'}
+}
 
 =head2 _line_length
 
