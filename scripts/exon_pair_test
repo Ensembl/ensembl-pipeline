@@ -1,0 +1,265 @@
+#!/usr/local/bin/perl
+
+=head1 NAME
+
+retransfer_Features  - transfers features for a list of input clones
+=head1 SYNOPSIS
+ 
+  update.pl
+
+=head1 DESCRIPTION
+
+This script transfers all the features attached to a clone to a new
+database and deletes any existing features
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -help      Displays script documentation with PERLDOC
+    
+    -nowrite   Runs entire script without writing in recipient
+
+    -verbose   Gets all the print STDERR for testing purposes
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::DBLoader;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $fdbtype = 'rdb';
+my $fhost   = 'obi-wan';
+my $fport   = '410000';
+my $fdbname = 'ensembl';
+my $fdbuser = 'ensro';
+my $fpass   = undef;
+my $tdbtype = 'rdb';
+my $thost   = 'croc';
+my $tport   = '410000';
+my $tdbname = 'analysis';
+my $tdbuser = 'root';
+my $tpass   = undef;
+
+my $fmodule  = "Bio::EnsEMBL::DBSQL::Obj";
+my $tmodule  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+
+my $help;
+my $usefile;
+
+&GetOptions( 
+	     'fdbtype:s'  => \$fdbtype,
+	     'fhost:s'    => \$fhost,
+	     'fport:n'    => \$fport,
+	     'fdbname:s'  => \$fdbname,
+	     'fdbuser:s'  => \$fdbuser,
+	     'fpass:s'    => \$fpass,
+	     'tdbtype:s'  => \$tdbtype,
+	     'thost:s'    => \$thost,
+	     'tport:n'    => \$tport,
+	     'tdbname:s'  => \$tdbname,
+	     'tdbuser:s'  => \$tdbuser,
+	     'tpass:s'    => \$tpass,
+	     'usefile=s'  => \$usefile,
+	     'h|help'    => \$help,
+	     );
+
+
+if ($help) {
+    exec('perldoc', $0);
+}
+
+
+$| = 1;
+
+my $from_locator     = make_locator_string($fdbtype,$fmodule,$fhost,$fport,$fdbname,$fdbuser,$fpass);
+my $to_locator       = make_locator_string($tdbtype,$tmodule,$thost,$tport,$tdbname,$tdbuser,$tpass);
+
+my @cloneids         = read_clones($usefile,@ARGV);
+
+my $tdb              = new Bio::EnsEMBL::DBLoader($to_locator);
+my $fdb              = new Bio::EnsEMBL::DBLoader($from_locator);
+
+foreach my $cloneid (@cloneids) {
+    eval {
+
+	my $fclone = $fdb   ->get_Clone($cloneid);
+
+	foreach my $contig ($fclone->get_all_Contigs) {
+	    
+	    my @features = $contig->get_all_SimilarityFeatures;
+	    my @genes    = $contig->get_all_Genes;
+
+	    foreach my $gene (@genes) {
+		foreach my $exon ($gene->each_unique_Exon) {
+		    $tdb ->write_Exon($exon);
+		    $exon->find_supporting_evidence(\@features);
+		}
+
+		my @pairs = find_exon_pairs($gene);
+
+		$tdb->write_ExonPairs(@pairs);
+	    }
+	}
+    };
+
+    if ($@) {
+	print("ERROR processing clone $cloneid [$@]\n");
+    }
+}
+
+sub find_exon_pairs {
+    my ($gene) = @_;
+
+    my $gap = 5;
+
+    my @exons = $gene->each_unique_Exon;
+
+    if ($exons[0]->strand == 1) {
+	@exons = sort {$a->start <=> $b->start} @exons;
+    } else {
+	@exons = sort {$b->start <=> $a->start} @exons;
+    }
+    my @pairs;
+
+    my %pairhash;
+
+    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
+
+	my %idhash;
+	my $exon1 = $exons[$i];
+
+	    for (my $j = $i+1 ; $j < scalar(@exons); $j++) {
+
+		my $exon2 = $exons[$j];
+
+		foreach my $f1 ($exon1->each_Supporting_Feature) {
+		    foreach my $f2 ($exon2->each_Supporting_Feature) {
+
+			if ($f1->hseqname eq $f2->hseqname &&
+			    $f1->strand   == $f2->strand   &&
+			    !(defined($idhash{$f1->hseqname}))) {
+
+			    if ($f1->strand == 1) {
+				if (abs($f2->hstart - $f1->hend) < $gap) {
+				    if (!(defined($pairhash{$exon1}{$exon2}))) {
+					eval {
+					    my $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
+											    -exon2 => $exon2,
+											    -type  => "ABUTTING",
+											    );
+					    push(@pairs,$pair);
+					    
+					    $idhash{$f1->hseqname} = 1;
+					    $pairhash{$exon1}{$exon2} = 1;
+					};
+					if ($@) {
+					    warn("Error making ExonPair from [" . $exon1->id . "][" .$exon2->id ."] $@");
+					}
+				    }
+				}
+			    } elsif ($f1->strand == -1) {
+				if (abs($f1->hstart - $f2->hend) < $gap) {
+				    if (!(defined($pairhash{$exon1}{$exon2}))) {
+					eval {
+					    my $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
+											    -exon2 => $exon2,
+											    -type  => "ABUTTING",
+											    );
+					    push(@pairs,$pair);
+					    
+					    $idhash{$f1->hseqname} = 1;
+					    $pairhash{$exon1}{$exon2} = 1;
+					};
+					if ($@) {
+					    warn("Error making ExonPair from (-1)[" . $exon1->id . "][" .$exon2->id ."] $@");
+					}
+				    }
+
+				}
+			    }
+				
+			}
+		    }
+		}
+	    }
+    }
+    return @pairs;
+}
+
+sub is_Head {
+    my ($db,$exon) = @_;
+    
+    my $sth = $db->prepare("select e1.exon1_id " .
+			   "from exon_pair as e1 " .
+			   "left join exon_pair as e2 on e1.exon1_id = e2.exon2_id " .
+			   "where e2.exon1_id is null");
+
+    my $res = $sth->execute;
+
+    my $rowhash = $sth->fetchrow_hashref;
+
+}
+	
+sub is_Tail {
+    my ($db,$exon) = @_;
+    
+    my $sth = $db->prepare("select e1.exon2_id " .
+			   "from exon_pair as e1 " .
+			   "left join exon_pair as e2 on e1.exon2_id = e2.exon1_id " .
+			   "where e2.exon1_id is null");
+
+    my $res     = $sth->execute;
+    my $rowhash = $sth->fetchrow_hashref;
+
+}
+			   
+sub read_clones {
+    my ($file,@clones) = @_;
+
+    my @out;
+
+    if (defined($file)) {
+	open(IN,"<$file") || die "Can't open $file";
+    }
+
+    while (<IN>) {
+	chomp;
+	push(@out,$_);
+    }
+
+    push(@out,@clones);
+
+    return @out;
+}
+
+sub make_locator_string {
+    my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
+
+    if ($type eq "rdb") {
+	return 	"$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+    } elsif ($type eq "timdb") {
+	return "Bio::EnsEMBL::TimDB::Obj";
+    } else {
+	die "Database type [$type] not recognised\n";
+    }
+}
+
+
+
