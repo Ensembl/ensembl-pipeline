@@ -220,7 +220,12 @@ sub get_Sequence {
     my ($self,$id) = @_;
 
     if ($id =~ /\|/) {
-	$id =~ s/.*\|(.*)\|.*/$1/;
+        # Take unigene id or accession
+        if ($id =~ /\|UG\|/) {
+           $id =~ s/.*\|.*\|(.*)/$1/;
+        } else {
+	   $id =~ s/.*\|(.*)\|.*/$1/;
+        }
     }
     $id =~ s/\..*//;
 
@@ -451,7 +456,7 @@ sub create_peptide_featurepairs2 {
       $featurepair->attach_seq($self->genomic);
       $self->featurepairs($featurepair);    
 
-      print "\n" . $featurepair->gffstring . "\n";
+      print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
 
     }   
 }
@@ -589,7 +594,7 @@ sub create_peptide_featurepairs {
       $featurepair->attach_seq($self->genomic);
       $self->featurepairs($featurepair);    
 
-      print $featurepair->gffstring . "\n";
+      print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
 
     }   
 }
