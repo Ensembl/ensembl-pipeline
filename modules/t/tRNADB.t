@@ -85,7 +85,7 @@ else
 
 $runobj->write_output();
 my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
-my @features = $contig->adaptor->fetch_all_simple_features($contig, 'tRNAscan');
+my @features = @{$db->get_SimpleFeatureAdaptor->fetch_all_by_RawContig($contig)};
 
 display(@features);
 
