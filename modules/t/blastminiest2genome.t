@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
+BEGIN { $| = 1; print "1..6\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -64,13 +64,13 @@ $est_stream->write_seq($est_seq);
 
   #create SeqFetcher::Pfetch object    
   my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-								-executable  => '/usr/local/pubseq/bin/pfetch',
+								-executable  => 'pfetch',
 								-bp_index => $index_filename);
 
 unless (defined($seqfetcher))
-{ print "not ok 4\n"; }
+{ print "not ok 3\n"; }
 else
-{ print "ok 4\n"; }
+{ print "ok 3\n"; }
 
 # Make the actual BlastMiniEst2Genome object
 my $threshold = '10e-60';
@@ -83,22 +83,22 @@ my $blastminiest2genome = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome-
 
 
 unless ($blastminiest2genome)
-{ print "not ok 5\n"; }
+{ print "not ok 4\n"; }
 else
-{ print "ok 5\n"; }
+{ print "ok 4\n"; }
 
 #run BlastMiniEst2Genome runnable                            
 $blastminiest2genome->run();
-print "ok 6\n"; # 6th test passed
+print "ok 5\n"; # 6th test passed
 
 #get and store the output
 my @results = $blastminiest2genome->output();
 display(@results);
 
 unless (@results) 
-{ print "not ok 7\n"; }
+{ print "not ok 6\n"; }
 else
-{ print "ok 7\n"; }
+{ print "ok 6\n"; }
 
 # clean up sequence and index files 
 unlink ($est_filename);

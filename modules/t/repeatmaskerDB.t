@@ -2,7 +2,7 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 6;}
+BEGIN { $| = 1; plan test => 17;}
 
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
@@ -46,7 +46,7 @@ $runobj->write_output();
 ok(1);
 
 
-ok(my @repeats = $db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_RepeatFeatures());
+ok(my @repeats = @{$db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_RepeatFeatures()});
 
 display(@repeats);
 
@@ -57,7 +57,7 @@ sub display {
     #Display output
     foreach my $obj (@results)
     {
-       print STDERR ($obj->gffstring."\n");
+       print STDERR ($obj->seqname . "\t" . $obj->start . "\t" . $obj->end . "\t" . $obj->repeat_consensus_id . "\t" . $obj->hstart . "\t" . $obj->hend . "\n");
        if ($obj->sub_SeqFeature)
        {
             foreach my $exon ($obj->sub_SeqFeature)
