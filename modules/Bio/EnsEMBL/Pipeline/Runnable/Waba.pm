@@ -1,12 +1,8 @@
 # Author: Marc Sohrmann (ms2@sanger.ac.uk)
-# Copyright (c) Marc Sohrmann, 2001
-# You may distribute this code under the same terms as perl itself
 #
 # You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -33,11 +29,11 @@
 
 =head1 CONTACT
 
-  Marc Sohrmann: ms2@sanger.ac.uk
+  B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
-  The rest of the documentation details each of the object methods. 
+  The rest of the documentation details each of the object methods.
   Internal methods are usually preceded with a _.
 
 =cut
@@ -46,38 +42,37 @@ package Bio::EnsEMBL::Pipeline::Runnable::Waba;
 
 use vars qw(@ISA);
 use strict;
-$|=1;
+$| = 1;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
+use Bio::SearchIO;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 
 =head2 new
 
- Title    : new
- Usage    : my $waba =  Bio::EnsEMBL::Pipeline::Runnable::Waba->new
-                        ( -waba       => '/usr/local/pubseq/bin/waba',
-                          -query      => $query,
-                          -database   => $database
-                        );
- Function : initialises Waba object
- Returns  : a Waba object
- Args     : a Bio::Seq object, the path to the waba binaries and an analysisId (all optional)
- Throws   :
+    Arg [1]    : Bio::Seq $query
+    Arg [2]    : char $waba_binary
+    Arg [3]    : Bio::EnsEMBL::Analysis $analysis
+    Description: initialises Waba object
+    Returns    : a Waba object
+    Exceptions : none
+    Caller     : general
 
 =cut
 
 sub new {
     my ($class, @args) = @_;
-  
-    my $self = $class->SUPER::new (@_);    
-  
-    $self->{'_flist'} = [];               # an array of Bio::SeqFeatures
+
+    my $self = $class->SUPER::new (@_);
+
+    $self->{'_fplist'} = [];              # an array of Bio::SeqFeatures
     $self->{'_sequence'}  = undef;        # location of Bio::Seq object
     $self->{'_waba'}      = undef;        # location of waba executable
     $self->{'_database'}  = undef;        # name of database
@@ -85,34 +80,29 @@ sub new {
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
     $self->{'_results'}   = undef;        # file to store results of waba run
     $self->{'_protected'} = [];           # a list of files protected from deletion
-  
+
     my ($query, $waba, $database) = $self->_rearrange([qw(
 	QUERY
         WABA
 	DATABASE
     )], @args);
-  
+
     $waba ||= 'waba';
-    $self->query   ($query)    if ($query);       
-    $self->database($database) if ($database);       
+    $self->query   ($query)    if ($query);
+    $self->database($database) if ($database);
     $self->waba($self->find_executable($waba));
 
     return $self;
 }
 
-###################
-# get/set methods 
-###################
 
 =head2 query
 
- Title    : query
- Usage    : $self->query ($query);
- Function : get/set method for the Sequence object; assigns query, filename and results
- Example  :
- Returns  : a Bio::Seq or Bio::PrimarySeq object
- Args     : a Bio::Seq or Bio::PrimarySeq object (optional)
- Throws   :
+    Arg [1]    : Bio::SeqI $query
+    Description: accessor for query sequence
+    Returntype : Bio::SeqI
+    Exceptions : query not a Bio::PrimarySeqI or Bio::SeqI
+    Caller     : general
 
 =cut
 
@@ -121,7 +111,7 @@ sub query {
     if ($seq) {
 	($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
 	    || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-	$self->{'_sequence'} = $seq ;
+	$self->{'_sequence'} = $seq;
 	$self->filename ($self->query->id.".$$.seq");
 	$self->results ($self->filename.".out");
     }
@@ -131,23 +121,22 @@ sub query {
 
 =head2 waba
 
- Title    : waba
- Usage    : $self->waba('/usr/local/pubseq/bin/waba');
- Function : get/set method for the path to the program binaries
- Example  :
- Returns  : File path
- Args     : File path (optional)
- Throws   :
+    Arg [1]    : string $waba
+    Description: accessor for waba binary
+    Returntype : string
+    Exceptions : binary not found and executable
+    Caller     : general
 
 =cut
 
 sub waba {
     my ($self, $location) = @_;
+
     if ($location) {
         unless (-x $location) {
             $self->throw ("program not found at $location");
 	}
-        $self->{'_waba'} = $location ;
+        $self->{'_waba'} = $location;
     }
     return $self->{'_waba'};
 }
@@ -155,13 +144,11 @@ sub waba {
 
 =head2 database
 
- Title    : database
- Usage    : $self->database ($database);
- Function : get/set method for the analysisId
- Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
- Throws   :
+    Arg [1]    : string $db
+    Description: accessor for target database
+    Returntype : string
+    Exceptions : none
+    Caller     : general
 
 =cut
 
@@ -171,51 +158,21 @@ sub database {
         $self->{'_database'} = shift;
     }
     return $self->{'_database'};
-} 
+}
 
-
-=head2 analysis
-
- Title    : analysis
- Usage    : $self->analysis ($analysis);
- Function : get/set method for the analysis
- Example  :
- Returns  : analysis
- Args     : analysis (optional)
- Throws   :
-
-=cut
-
-sub analysis {
-    my $self = shift;
-    if (@_) {
-        $self->{'_analysis'} = shift;
-        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))      
-       || $self->throw("Input isn't a Bio::EnsEMBL::Analysis");
-    }
-    return $self->{'_analysis'};
-} 
-
-####################
-# analysis methods
-####################
 
 =head2 run
 
- Title    : run
- Usage    : $self->run ($workdir, $args)
- Function : runs program and populates @{$self->{'_flist'}} (array of features)
- Example  :
- Returns  :   
- Args     : workdir, args (optional)
- Throws   :
+    Args       : none
+    Description: runs the waba program and creates set of features
+    Returntype : none
+    Exceptions : none
+    Caller     : general
 
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
-
-    # nothing to be done with $args
+    my ($self, $dir) = @_;
 
     # check clone
     my $seq = $self->query || $self->throw("Clone required for Program\n");
@@ -232,7 +189,7 @@ sub run {
     $self->results ($tmp);
 
     # write sequence to file
-    $self->writefile;        
+    $self->writefile;
 
     # run program
     $self->run_program;
@@ -245,481 +202,350 @@ sub run {
 
 =head2 run_program
 
- Title    : run_program
- Usage    : $self->program
- Function : makes the system call to program
- Example  :
- Returns  : 
- Args     :
- Throws   :
+    Args       : none
+    Description: makes the system call to program
+    Returntype : none
+    Exceptions : system call unsuccessful
+    Caller     : general
 
 =cut
 
 sub run_program {
     my ($self) = @_;
 
-    # write the files containing the target file lists
+    # write the files containing the subject file lists
+
     my $path = $self->filename;
-    open (QP, ">$path.query") || $self->throw ("cannot create small program input file");
+    open (QP, ">$path.query") || $self->throw("CANNOT create small program input file");
     print QP "$path\n";
     close QP;
 
-    # run program
-    print STDERR "running ".$self->waba."\n";
-    $self->throw ("Error running ".$self->waba." on ".$self->filename) 
-        unless ((system ($self->waba." all $path.query ".$self->database." ".$self->results." > /dev/null")) == 0); 
+    # write the files containing the query file lists
+    # check database is a fasta file (first char '>') or a list of files
+
+    my $db = $self->database;
+    open DB, "< $db";
+    my $char = getc DB;
+    close DB;
+
+    if ($char eq '>') {
+	$db = $self->workdir . "/waba.$$.db";
+        open DB, "> $db" || $self->throw("cannot create large program input file");
+	print DB $self->database, "\n";
+        close DB;
+    }
+
+    my $cmd = $self->waba . " all $path.query $db " . $self->results .
+     "> /dev/null";
+
+    $self->throw("Error running ".$self->waba." on ".$self->filename)
+        unless ((system($cmd)) == 0);
 
     unlink "$path.query";
+    unlink "$db" if $db ne $self->database;
 }
 
 
 =head2 parse_results
 
- Title    :  parse_results
- Usage    :  $self->parse_results ($filename)
- Function :  parses waba output to give a set of features
- Example  :
- Returns  : 
- Args     : filename (optional, can be filename, filehandle or pipe, not implemented)
- Throws   :
+    Arg [1]    : filehandle containing results file (optional)
+    Description: parses output to give a set of features
+    Returntype : none
+    Exceptions : none
+    Caller     : general
 
 =cut
 
 sub parse_results {
     my ($self) = @_;
-    my $filehandle;
-    my $resfile = $self->results;
-    
-    if (-e $resfile) {
+    my $results = $self->results;
+    my $waba;
+
+    my $hname = $self->database;
+    $hname =~ s{.*/}{};
+
+    if (-e $results) {
         # it's a filename
-        if (-z $self->results) {  
+        if (-z $self->results) {
 	    print STDERR $self->waba." didn't find anything\n";
 	    return;
-        }       
-        else {
-            open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
-            $filehandle = \*OUT;
-      }
+        }
+	$waba = Bio::SearchIO->new(
+	    -format => 'waba',
+	    -file   => $results
+	);
     }
     else {
         # it'a a filehandle
-        $filehandle = $resfile;
-    }
-    
-    # parse
-
-    my $switch = 0;
-    my ($contig_match, $percent_id);
-    my ($contig, $start, $end, $strand, $contig_file);
-    my ($hid, $hstart, $hend);
-    my ($seq, $hseq, $statepath);
-    while (<$filehandle>) {
-        chomp;
-        if (/^(\S+)\s+align\s+(\S+)%\s+of\s+\d+\s+(\S+)\s+(\S+)\:(\d+)\-(\d+)\s+([+\-])\s+(\S+)\:(\d+)\-(\d+)/) {
-            $contig_match = $1;
-            $percent_id = $2;
-            $contig_file = $3;
-            $contig = $4;
-            $start = $5;
-            $end = $6;
-            $strand = $7; $strand = ($strand eq "+") ? 1 : -1;
-            $hid = $8;
-            $hstart = $9;
-            $hend = $10; 
-            $switch = 1;
-            # get rid of the path in the target name
-            ($hid) = $hid =~ /\.([^\.]+)$/;
-        }
-        elsif ($switch == 1) {
-            $seq = $_;
-            $switch++; 
-        }
-        elsif ($switch == 2) {
-            $hseq = $_;            
-            $switch++;
-        }
-        elsif ($switch == 3  || eof) {
-            $statepath = $_;
-            $switch = 0;
-            my @features = ();
-
-            my @chars = split (//, $seq);
-            my @hchars = split (//, $hseq);
-            my @states = split (//, $statepath);
-   
-            # there is something weird going on with the coordinates in waba:
-            # the start coordinate of both query and target have to be incremented
-            # by 1 in order to correspond to the sequence coordinates (the end
-            # coordinates seem fine, however).
-
-            # query sequence can be sense or antisense
-            my $substart = my $subend = ($strand == 1) ? $start+1 : $end;
-            # target sequence always sense
-            my $hsubstart = my $hsubend = $hstart+1;
-            # set the increment value (depending on the strand information)
-            my $inc = ($strand == 1) ? 1 : -1;
-            # get the state of the first position
-            my $current_state;
-            if ($states[0] =~ /^[123]$/) {
-                $current_state = "coding";
-            }
-            elsif ($states[0] =~ /^H$/) {
-                $current_state = "high";
-            }
-            elsif ($states[0] =~ /^L$/) {
-                $current_state = "low";
-    	    }
-            elsif ($states[0] =~ /^Q$/) {
-                $current_state = "query";
-	    }
-            elsif ($states[0] =~ /^T$/) {
-                $current_state = "target";
-	    } 
-            # loop over the remaining positions
-            my @query_match;
-            push (@query_match, $chars[0]);
-            my @target_match;
-            push (@target_match, $hchars[0]);
-            my $count = 1;
-            my $total_match = 0;
-            my $total_mismatch = 0;
-            my $total_block_score = 0;
-            my $total_query_insert = 0;
-            my $total_target_insert = 0;
-            while ($count <= @chars) {
-                if ($states[$count] =~ /^[123]$/ && $current_state eq "coding") {
-                    $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
-                    $hsubend = ($hchars[$count] ne '-') ? $hsubend+1 : $hsubend;
-                    push (@query_match, $chars[$count]);
-                    push (@target_match, $hchars[$count]);
-   	        }
-                elsif ($states[$count] =~ /^H$/ && $current_state eq "high") {
-                    $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
-                    $hsubend = ($hchars[$count] ne '-') ? $hsubend+1 : $hsubend;
-                    push (@query_match, $chars[$count]);
-                    push (@target_match, $hchars[$count]);
-                }
-                elsif ($states[$count] =~ /^L$/ && $current_state eq "low") {
-                    $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
-                    $hsubend = ($hchars[$count] ne '-') ? $hsubend+1 : $hsubend;
-                    push (@query_match, $chars[$count]);
-                    push (@target_match, $hchars[$count]);
-                }    
-                elsif ($states[$count] =~ /^Q$/ && $current_state eq "query") {
-                    $hsubend = ($hchars[$count] ne '-') ? $hsubend+1 : $hsubend;
-                    push (@query_match, $chars[$count]);
-                    push (@target_match, $hchars[$count]);
-                }
-                elsif ($states[$count] =~ /^T$/ && $current_state eq "target") {
-                    $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
-                    push (@query_match, $chars[$count]);
-                    push (@target_match, $hchars[$count]);
-                }
-                else {
-                    # query gap
-                    if ($substart == $subend) {
-                        my $query_insert = $hsubend-$hsubstart+1;
-                        # adjust $total_block_score;
-                        $total_block_score += 8+4*log($query_insert);
-                        $total_query_insert += $query_insert;
-                    }
-                    # target gap
-                    elsif ($hsubstart == $hsubend) {
-                        my $target_insert = ($subend > $substart) ? $subend-$substart+1 : $substart-$subend+1; 
-                        # adjust $total_block_score;
-                        $total_block_score += 8+4*log($target_insert);
-                        $total_target_insert += $target_insert;
-    		    }
-                    # coding or high/low conservation
-                    else {
-                        # parse the subalignment
-                        my ($align_coordinates, $cigar_string, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert, $block_score) = split_match ($substart, $hsubstart, \@query_match, \@target_match, $inc);
-                        # increment "total" values
-                        $total_match += $match;
-                        $total_mismatch += $mismatch;
-                        $total_block_score += $block_score;
-                        $total_query_insert += $qBaseInsert;
-                        $total_target_insert += $tBaseInsert;
-                        # calculate score and percent identity
-                        my $score = sprintf("%.2f", 2*($match-$mismatch)-$block_score);
-                        my $pid = int(100*($match/($match+$mismatch+$qBaseInsert+$tBaseInsert)));
-                        # adjust coordinates depending on strand 
-			my $tmp_substart;
-			my $tmp_subend;
-                        if ($strand == -1){
-                            my $tmp = $substart;
-                            $tmp_substart = $subend;
-                            $tmp_subend = $tmp;
-		        }
-			else {
-			    $tmp_substart = $substart;
-			    $tmp_subend = $subend;
-			}
-                        # build the featurepair
-                        my %feature;
-                        $feature{name} = $self->query->id;
-                        $feature{percent_id} = $pid;
-                        $feature{start} = $tmp_substart;
-                        $feature{end} = $tmp_subend;
-                        $feature{score} = $score;
-                        $feature{strand} = $strand;
-                        $feature{hname} = $hid;
-                        $feature{hstart} = $hsubstart;
-                        $feature{hend} = $hsubend;
-                        $feature{hstrand} = 1;
-                        # p_value needs to be set - TODO: fix this properly
-                        $feature{p_value} = 0;
-                        ($feature{source}) = $self->waba =~ /([^\/]+)$/;
-                        $feature{primary} = 'similarity';
-                        ($feature{program}) = $self->waba =~ /([^\/]+)$/;
-                        ($feature{db}) = $self->database =~ /([^\/]+)$/;
-                        ($feature{logic_name}) = $self->waba =~ /([^\/]+)$/;
-                        $feature{state} = $current_state;
-                        $feature{cigar} = $cigar_string;
-                        my $fp = $self->create_feature (\%feature);
-                        push (@features, $fp);
-                        if ($count == @chars) {
-                            last;
-		        }
-	       	    }
-                    @query_match = $chars[$count];
-                    @target_match = $hchars[$count];
-                    if ($states[$count] =~ /^[123]$/) {
-                        $current_state = "coding";
-         	    } 
-                    elsif ($states[$count] =~ /^H$/) {
-                        $current_state = "high";
-		    }
-                    elsif ($states[$count] =~ /^L$/) {
-                        $current_state = "low";
-	  	    }
-                    elsif ($states[$count] =~ /^Q$/) {
-                        $current_state = "query";
-		    }
-                    elsif ($states[$count] =~ /^T$/) {
-                        $current_state = "target";
-		    }
-                    if ($chars[$count] ne '-') {$substart = $subend+$inc;}
-                    else {$substart = $subend;}
-
-                    if ($hchars[$count] ne '-') {$hsubstart = $hsubend+1;}
-                    else {$hsubstart = $hsubend;}
-                    $subend = $substart;
-                    $hsubend = $hsubstart;
-   	        }
-    	        $count++;
-	    }
-            my $total_score = sprintf ("%.2f", 2*($total_match-$total_mismatch)-$total_block_score);
-            my $total_pid = int(100*($total_match/($total_match+$total_mismatch+$total_query_insert+$total_target_insert)));
-            my %feature;
-            $feature{name} = $self->query->id;
-            $feature{score} = $total_score;
-            $feature{percent_id} = $total_pid;
-            $feature{start} = $start+1;
-            $feature{end} = $end;
-            $feature{strand} = $strand;
-            $feature{p_value} = 0;
-            $feature{hname} = $hid;
-            $feature{hstart} = $hstart+1;
-            $feature{hend} = $hend;
-            $feature{hstrand} = 1;
-            ($feature{source}) = $self->waba =~ /([^\/]+)$/;
-            $feature{primary} = 'similarity';
-            ($feature{program}) = $self->waba =~ /([^\/]+)$/;
-            ($feature{db}) = $self->database =~ /([^\/]+)$/;
-            ($feature{logic_name}) = $self->waba =~ /([^\/]+)$/;
-            my $fp = $self->create_feature (\%feature);
-            unshift (@features, $fp);
-            push (@{$self->{'_flist'}}, \@features);
-        }
-    }
-    close $filehandle;   
-}
-
-
-=head2 create_feature
-
- Title    : create_feature
- Usage    : $self->create_feature ($feature)
- Function : creates a Bio::EnsEMBL::FeaturePair object from %feature,
-            and pushes it onto @{$self->{'_flist'}}
- Example  :
- Returns  :
- Args     :
- Throws   :
-
-=cut
-
-sub create_feature {
-    my ($self, $feat) = @_;
-
-    # create analysis object (will end up in the analysisprocess table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ();
-    $analysis->db ($feat->{db});
-    $analysis->program ($feat->{program});
-    $analysis->gff_source ($feat->{source});
-    $analysis->gff_feature ($feat->{primary});
-    $analysis->logic_name ($feat->{logic_name});
-
-    # create featurepair object
-    my $feature1 = Bio::EnsEMBL::SeqFeature->new ();
-    $feature1->seqname ($feat->{name});
-    $feature1->start ($feat->{start});
-    $feature1->end ($feat->{end});
-    $feature1->strand ($feat->{strand});
-    $feature1->score ($feat->{score});
-    $feature1->p_value ($feat->{p_value});
-    $feature1->percent_id ($feat->{percent_id});
-    $feature1->analysis ($analysis);
-
-    if ($feat->{cigar}) {
-        $feature1->add_tag_value ('cigar', $feat->{cigar});
-    }
-    if ($feat->{state}) {
-        $feature1->add_tag_value ('state', $feat->{state});
+	$waba = Bio::SearchIO->new(
+	    -format => 'waba',
+            -fh     => $results
+	);
     }
 
-    my $feature2 = Bio::EnsEMBL::SeqFeature->new ();
-    $feature2->seqname ($feat->{hname});
-    $feature2->start ($feat->{hstart});
-    $feature2->end ($feat->{hend});
-    $feature2->strand ($feat->{hstrand});
-    $feature2->score ($feat->{score});
-    $feature2->p_value ($feat->{p_value});
-    $feature2->percent_id ($feat->{percent_id});
-    $feature2->analysis ($analysis);
-
-    my $featurepair = Bio::EnsEMBL::FeaturePair->new ();
-    $featurepair->feature1 ($feature1);
-    $featurepair->feature2 ($feature2);
-
-    if ($featurepair) {
-        $featurepair->feature1->validate_prot_feature;
-        $featurepair->feature2->validate_prot_feature;
-        return $featurepair;
+    while (my $result = $waba->next_result) {
+       while (my $hit = $result->next_hit) {
+          while (my $hsp = $hit->next_hsp) {
+	      $self->split_HSP($hsp, $hit->name);
+	  }
+       }
     }
-    return undef;
 }
 
 
 =head2 output
 
- Title    : output
- Usage    : $self->output
- Function : returns an array of featurepair objects
- Example  :
- Returns  : an array of refs to arrays containing total score and Bio::EnsEmbl::FeaturePairs
- Args     :
- Throws   :
+    Arg [none] :
+    Description: returns output of running dust
+    Returntype : @{Bio::EnsEMBL::RepeatFeature}
+    Exceptions : none
+    Caller     : general
 
 =cut
 
 sub output {
     my ($self) = @_;
-    my @list = @{$self->{'_flist'}};
-    return @{$self->{'_flist'}};
+
+    return @{$self->{'_fplist'}};
 }
 
-1;
 
-######################################
-sub split_match {
-    my ($qstart, $hstart, $qchars_ref, $hchars_ref, $inc) = @_;
-    my @qchars = @$qchars_ref;
-    my @hchars = @$hchars_ref;
-    my @align_coordinates = ();
-    my $cigar_string = "";
+=head2 split_HSP
 
-    # define some variable used to calculate the score
-    my $match = 0;
-    my $mismatch = 0;
-    my $qNumInsert = 0;
-    my $qBaseInsert = 0;
-    my $tNumInsert = 0;
-    my $tBaseInsert = 0;
-    my $block_score = 0;
-    my $insert = 0;
+    Arg [1]    : Bio::Search::HSP::WABAHSP
+    Arg [2]    : feature name
+    Description: splits an HSP into ungapped FeaturePairs
+    Returntype : none
+    Exceptions : none
+    Caller     : general
 
-    # set the ungapped subalignment end
-    my $qend   = $qstart;
-    my $hend   = $hstart;
+=cut
 
-    # counter for the bases in the alignment    
-    my $count = 0;
-    # flag for ungapped subalignment
-    my $found = 0;
-    
-    # loop over all positions
+sub split_HSP {
+    my ($self, $hsp, $name) = @_;
+
+    my $qstrand = $hsp->query->strand;
+    my $hstrand = $hsp->subject->strand;
+
+    # We split the alignment strings into arrays of one char each.
+    # We then loop over this array and when we come to a gap
+    # in either the query sequence or the hit sequence we make
+    # a new feature pair.
+
+    # Before making a new feature pair we check whether we have
+    # something to make a feature pair out of - i.e. we aren't just on
+    # the 2nd or greater base in a gapped region.
+    #
+    # As we loop over the array we need to keep track of both the
+    # query coordinates and the hit coordinates.  We track the last
+    # start of a feature pair and also the current end of a feature
+    # pair.  The feature pair start is reset every time we hit a
+    # gapped position and the feature pair end is reset every time we
+    # hit an aligned region.
+
+    my @gap;
+
+    my @qchars = split(//,$hsp->query_string);  # split alignment into array of char
+    my @hchars = split(//,$hsp->hit_string);    # ditto for hit sequence
+
+    my ($qstart, $hstart, $qend, $hend);
+
+    if ($qstrand == 1) {
+        $qstart = $hsp->query->start();   # Start off the feature pair start
+    }
+    else {
+        $qstart = $hsp->query->end;
+    }
+
+    if ($hstrand == 1) {
+        $hstart = $hsp->subject->start();   # ditto
+    }
+    else {
+        $hstart = $hsp->subject->end;
+    }
+
+    $qend = $qstart;
+    $hend = $hstart;
+
+    my $count = 0;   # counter for the bases in the alignment
+    my $found = 0;   # flag saying whether we have a feature pair
+
+    my $source = $self->waba;
+    $source =~ s/\/.*\/(.*)/$1/;
+
+    my @tmpf;
+
+    my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
+                                              -db_version      => 1,
+                                              -program         => $source,
+                                              -program_version => 1,
+                                              -gff_source      => $source,
+                                              -gff_feature     => 'similarity',
+                                              -logic_name      => 'blast');
+
+    # Here goes...
+
     while ($count <= $#qchars) {
-        # We have hit an ungapped region. Increase the query and hit counters.
-        # and set the subalignment flag
-        if ($qchars[$count] ne '-' && $hchars[$count] ne '-') {
-            $qend += $inc;
-            $hend += 1;
+
+        # We have hit an ungapped region.  Increase the query and hit counters.
+        # and flag that we have a feature pair.
+
+        if ($qchars[$count] ne '-' &&
+            $hchars[$count] ne '-') {
+
+            $qend += $qstrand;
+            $hend += $hstrand;
+
             $found = 1;
-            if ($qchars[$count] eq $hchars[$count]) {
-                $match++;
-	    }
-            else {
-                $mismatch++;
-	    }
-            if ($insert > 0) {
-                $block_score += 8+4*log($insert);
-                $insert = 0;
-	    }
-        # We have hit a gapped region
+
         } else {
-            # If the subalignment flag is set,
-            # push the coordinates on the array, and reset the start and end variables
-            if ($found == 1) {
-                push (@align_coordinates, [$qstart, $hstart]);
-                if ($qchars[$count] eq '-') {
-                    $qNumInsert++;
-		}
-                if ($hchars[$count] eq '-') {
-                    $tNumInsert++;
-		}
+
+            # We have hit a gapped region.  If the feature pair flag is
+	    # set ($found) then make a feature pair, store it and reset
+	    # the start and end variables.
+
+            if ($found) {
+
+	        my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$hsp,$name, $analysis);
+	        push @tmpf, $fp;
             }
-            $insert++;
-            # We're in a gapped region. We need to increment the sequence that
-            # doesn't have the gap in it to keep the coordinates correct.
-            # We also need to reset the current end coordinates.
+
+            # We're in a gapped region.  We need to increment the sequence
+            # that doesn't have the gap in it to keep the coordinates
+	    # correct. We also need to reset the current end coordinates.
+
             if ($qchars[$count] ne '-') {
-                $qstart = $qend+$inc;
+                $qstart = $qend + $qstrand;
             } else {
                 $qstart = $qend;
-                $qBaseInsert++;
             }
             if ($hchars[$count] ne '-') {
-                $hstart = $hend+1;
+                $hstart = $hend + $hstrand;
             } else {
                 $hstart = $hend;
-                $tBaseInsert++;
             }
+
             $qend = $qstart;
             $hend = $hstart;
+
             $found = 0;
         }
         $count++;
-    }                        
-    # Remember the last feature
-    if ($found == 1) {
-        push (@align_coordinates, [$qstart, $hstart]);
-    }
-    # make the cigar string
-    my $last = $#align_coordinates;
-    if ($last >= 0) {
-        for (my $i = 0 ; $i < $last ; $i++) {
-            my $ql = ($align_coordinates[$i+1]->[0])-($align_coordinates[$i]->[0]);
-            $ql = ($ql > 0) ? $ql : -$ql;
-            my $tl = ($align_coordinates[$i+1]->[1])-($align_coordinates[$i]->[1]);
-            $tl = ($tl > 0) ? $tl : -$tl;
-            my $length = ($ql > $tl) ? $ql-$tl : $tl-$ql;
-            $cigar_string .= $align_coordinates[$i]->[0].",".$align_coordinates[$i]->[1].",$length:";
-        }
-        # add the final block
-        $cigar_string .= $align_coordinates[$#align_coordinates]->[0].",".$align_coordinates[$#align_coordinates]->[1].",0";
     }
 
-    return (\@align_coordinates, $cigar_string, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert, $block_score);
+    # Remember the last feature
+    if ($found) {
+
+        my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$hsp,$name, $analysis);
+        push @tmpf, $fp;
+    }
+
+    my $fp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@tmpf);
+
+    # helps debugging subsequent steps
+    $fp->{'qseq'} = $hsp->query_string();
+    $fp->{'sseq'} = $hsp->hit_string();
+
+    $self->growfplist($fp);
 }
+
+
+=head2 _convert2FeaturePair
+
+    Arg [1]    : int $query_start
+    Arg [2]    : int $query_end
+    Arg [3]    : int $query_strand
+    Arg [4]    : int $subject_start
+    Arg [5]    : int $subject_end
+    Arg [6]    : int $subject_strand
+    Arg [7]    : Bio::Search::HSP::WABAHSP $hsp
+    Arg [8]    : char $name
+    Arg [9]    : Bio::EnsEMBL::Analysis $analysis
+    Description: takes a set of coords and converts them into a FeaturePair
+    Returntype : Bio::EnsEMBL::FeaturePair
+    Exceptions : none
+    Caller     : general
+
+=cut
+
+sub _convert2FeaturePair {
+    my ($self, $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $hsp, $name, $analysis) = @_;
+
+    # The actual end of the alignment is the previous character.
+
+    $qend -= $qstrand;
+    $hend -= $hstrand;
+
+    # Make sure start is always < end
+
+    if ($qstart > $qend) {
+	($qstart, $qend) = ($qend, $qstart);
+    }
+    if ($hstart > $hend) {
+	($hstart, $hend) = ($hend, $hstart);
+    }
+
+    return $self->_makeFeaturePair(
+	$qstart, $qend, $qstrand,
+	$hstart, $hend, $hstrand,
+	$hsp->score,    $hsp->percent_identity,
+	$hsp->pvalue,   $name, $analysis
+    );
+}
+
+
+=head2 _makeFeaturePair
+
+    Arg  [1]   : int $query_start
+    Arg  [2]   : int $query_end
+    Arg  [3]   : int $query_strand
+    Arg  [4]   : int $subject_start
+    Arg  [5]   : int $subject_end
+    Arg  [6]   : int $subject_strand
+    Arg  [7]   : int $score
+    Arg  [8]   : int $percent_id
+    Arg  [9]   : float $e_value
+    Arg [10]   : char $hit_name
+    Arg [11]   : Bio::EnsEMBL::Analysis $analysis
+    Description: internal function that makes feature pairs
+    Returntype : Bio::EnsEMBL::FeaturePair
+    Exceptions : none
+    Caller     : general
+
+=cut
+
+sub _makeFeaturePair {
+    my ($self, $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $score, $pid, $evalue, $name, $analysis) = @_;
+
+    my $feature1 = new Bio::EnsEMBL::SeqFeature(
+	-seqname     => $self->query->id,
+        -start       => $qstart,
+        -end         => $qend,
+        -strand      => $qstrand,
+        -analysis    => $analysis,
+        -score       => $score
+    );
+    $feature1->percent_id($pid);
+    $feature1->p_value($evalue);
+
+    my $feature2 = new Bio::EnsEMBL::SeqFeature(
+	-seqname => $name,
+        -start   => $hstart,
+        -end     => $hend,
+        -strand  => $hstrand,
+        -analysis => $analysis,
+        -score    => $score
+    );
+
+    my $fp = new Bio::EnsEMBL::FeaturePair(
+        -feature1 => $feature1,
+        -feature2 => $feature2
+    );
+
+    $feature2->percent_id($pid);
+    $feature2->p_value($evalue);
+
+    return $fp;
+}
+
+1;
