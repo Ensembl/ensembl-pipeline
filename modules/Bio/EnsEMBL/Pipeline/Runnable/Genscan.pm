@@ -116,7 +116,7 @@ sub _initialize {
     else                
     { 
         eval 
-        {  $self->genscan($self->locate_runnable('genscan')); }; 
+        {  $self->genscan($self->locate_executable('genscan')); }; 
         if ($@) 
         {  $self->genscan('/nfs/disk100/humpub/OSFbin/genscan'); }
     }
@@ -271,7 +271,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Genscan\n");
     #set directory if provided
-    $self->workdir('genscan') unless ($self->workdir($dir));
+    $self->workdir('tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

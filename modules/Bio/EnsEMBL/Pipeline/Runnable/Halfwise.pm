@@ -97,7 +97,7 @@ sub _initialize {
     else                
     {   
         eval 
-        { $self->halfwise($self->locate_runnable('halfwise')); };
+        { $self->halfwise($self->locate_executable('halfwise')); };
         if ($@)
         {  $self->halfwise ('/nfs/disk100/humpub/OSFbin/halfwise'); }
     }
@@ -200,7 +200,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Halfwise\n");
     #set directory if provided
-    $self->workdir('halfwise') unless ($self->workdir($dir));
+    $self->workdir('tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

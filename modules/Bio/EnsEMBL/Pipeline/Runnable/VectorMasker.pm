@@ -108,7 +108,7 @@ sub _initialize {
     else
     {   
         eval 
-        { $self->blastn($self->locate_runnable('blastn'));  }; 
+        { $self->blastn($self->locate_executable('blastn'));  }; 
         if ($@) 
         { $self->blastn('/usr/local/pubseq/bin/blastn'); }  
     }
@@ -117,7 +117,7 @@ sub _initialize {
     else
     {   
         eval 
-        { $self->mspcrunch($self->locate_runnable('MSPcrunch')); }; 
+        { $self->mspcrunch($self->locate_executable('MSPcrunch')); }; 
         if ($@)
         { $self->mspcrunch('/usr/local/pubseq/bin/MSPcrunch'); }  
     }
@@ -264,7 +264,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Vectormasker\n");
     #set directory if provided
-    $self->workdir('vectormasker') unless ($self->workdir($dir));
+    $self->workdir('tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

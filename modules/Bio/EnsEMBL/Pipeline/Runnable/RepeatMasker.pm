@@ -111,7 +111,7 @@ sub _initialize {
     else
     {   
         eval 
-        { $self->repeatmasker($self->locate_runnable('RepeatMaskerHum')); };
+        { $self->repeatmasker($self->locate_executable('RepeatMaskerHum')); };
         if ($@)
         { $self->repeatmasker('~humpub/scripts/RepeatMaskerHum'); }
     }
@@ -214,7 +214,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for RepeatMasker\n");
     #set directory if provided
-    $self->workdir('RepeatMaskerOutput') unless ($self->workdir($dir));
+    $self->workdir('tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile();        

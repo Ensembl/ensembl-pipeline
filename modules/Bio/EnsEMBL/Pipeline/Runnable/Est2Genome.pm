@@ -76,14 +76,40 @@ sub _initialize {
     my $make = $self->SUPER::_initialize(@_);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
+    $self->{_clone}  = undef;        #location of Bio::Seq object
+    $self->{_est_genome} = undef;    #location of est2genome
+    $self->{_workdir}   = undef;     #location of temp directory
+    $self->{_filename}  =undef;      #file to store Bio::Seq object
+    $self->{_estfilename} = undef    #file to store EST Bio::Seq object
+    $self->{_results}   =undef;      #file to store results of analysis
+    $self->{_protected} =[];         #a list of files protected from deletion
+    $self->{_arguments} =undef;      #arguments for est2genome
     
-    my( $genomic, $est ) = $self->_rearrange(['GENOMIC','EST'], @args);
+    my( $genomic, $est, $est_genome. $arguments ) = 
+        $self->_rearrange(['GENOMIC','EST', 'E2G', 'ARGS'], @args);
        
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
+    if ($est2genome) 
+    {   $self->est_genome($est_genome) ;}
+    else
+    {   
+        eval 
+        { $self->est_genome($self->locate_executable('est_genome')); };
+        if ($@)
+        { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
+    }
+    if ($arguments) 
+    {   $self->arguments($arguments) ;}
+    else
+    { $self->arguments(' -reverse ') ;      }
     
     return $self; # success - we hope!
 }
+
+#################
+# get/set methods 
+#################
 
 =head2 genomic_sequence
 
@@ -101,6 +127,8 @@ sub genomic_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
+        $self->filename($self->clone->id.".$$.seq");
+        $self->results($self->filename.".est_genome.out");
     }
     return $self->{'_genomic_sequence'};
 }
@@ -122,9 +150,56 @@ sub est_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_est_sequence'} = $value;
+        $self->estfilename($self->clone->id.".$$.est.seq");
     }
     return $self->{'_est_sequence'};
 }
+
+sub estfilename {
+    my ($self, est$filename) = @_;
+    $self->{_estfilename} = $estfilename if ($estfilename);
+    return $self->{_estfilename};
+}
+
+=head2 protect
+
+    Title   :   protect
+    Usage   :   $obj->protect('.masked', '.p');
+    Function:   Protects files with suffix from deletion when execution ends
+    Args    :   File suffixes
+
+=cut
+
+=head2 workdir
+
+    Title   :   workdir
+    Usage   :   $obj->wordir('~humpub/temp');
+    Function:   Get/set method for the location of a directory to contain temp files
+    Args    :   File path (optional)
+
+=cut
+
+=head2 arguments
+
+    Title   :   arguments
+    Usage   :   $obj->arguments(' -reverse ');
+    Function:   Get/set method for est_genome arguments
+    Args    :   File path (optional)
+
+=cut
+
+sub arguments {
+    my ($self, $args) = @_;
+    if ($args)
+    {
+        $self->{_arguments} = $args ;
+    }
+    return $self->{_arguments};
+}
+
+###########
+# Analysis methods
+##########
 
 =head2 run
 
