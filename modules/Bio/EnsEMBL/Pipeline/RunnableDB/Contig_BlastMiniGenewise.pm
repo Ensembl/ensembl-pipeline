@@ -217,18 +217,18 @@ sub fetch_input {
 
     my @features;
     if ($::genebuild_conf{'bioperldb'}) {
-	  print STDERR "Fetching all similarity features\n";
-	  my @features  = $contig->get_all_SimilarityFeatures;
+	  print STDERR "Fetching all HSPs\n";
+	  my @hsps = $contig->get_all_HSPs;
+
+		
 
 	  # _select_features() to pick out the best HSPs with in a region.
-      my %selected_ids = $self->_select_features (@features); 
+      my @features = $self->_select_features (@hsps) unless (scalar(@hsps) ==0); 
 
 	  my %bdbs;
       foreach my $feat (@features){
-          if ($selected_ids{$feat->hseqname}){
               my $bioperldb = $feat->analysis->db;
               push (@{$bdbs{$bioperldb}},$feat);
-          }
       }
 
       my $bpDBAdaptor = $self->bpDBAdaptor;
@@ -248,8 +248,7 @@ sub fetch_input {
 			}	
 				
 			my %scorehash;
-			foreach my $f (@{$bdbs{$bioperldb}}) {
-			print STDERR $f->hseqname."\n";
+		foreach my $f (@{$bdbs{$bioperldb}}) {
       			if (!defined $scorehash{$f->hseqname} || $f->score > $scorehash{$f->hseqname})  {
         			$scorehash{$f->hseqname} = $f->score;
      			}
@@ -626,31 +625,82 @@ sub bpDBAdaptor {
 
 sub _select_features {
 
-        my ($self,@features) = @_;
+	my ($self,@hsps) = @_;
 
-        @features= sort {
-                $a->strand<=> $b->strand
-                       ||
-                $a->start<=> $b->start
-        } @features;
+	@hsps = sort {
+        $a->strand <=> $b->strand
+                    ||
+        $a->start <=> $b->start } @hsps;
 
-        my %selected_ids;
 
-        my $best_hit = @features[0];
-        my $best_hit = @features[0];
- 
-        foreach my $feat (@features){
-                if ($feat->overlaps($best_hit,'strong')) {
-                        if ($feat->score > $best_hit->score) {
-                                $best_hit = $feat;
-                        }
-                        }else {
-                                $selected_ids{$best_hit->hseqname} = 1;
-                                $best_hit = $feat;
-                        }
+	my @clusters;
+	my $prev = shift @hsps;
+	my $hsp_cluster = Bio::EnsEMBL::SeqFeature->new() ;
+
+	$hsp_cluster->add_sub_SeqFeature($prev,'EXPAND');
+
+	push (@clusters,$hsp_cluster);
+
+	foreach my $hsp (@hsps){
+    	if ($hsp->overlaps($hsp_cluster,'strong')){
+        	$hsp_cluster->add_sub_SeqFeature($hsp,'EXPAND');
+    	}
+    	else{
+        	$hsp_cluster = Bio::EnsEMBL::SeqFeature->new();
+       		$hsp_cluster->add_sub_SeqFeature($hsp,'EXPAND');
+        	push (@clusters,$hsp_cluster);
+   		 }
+	}
+
+
+	my @selected_hsps;
+
+	foreach my $cluster (@clusters){
+
+    	my $new_cluster = Bio::EnsEMBL::SeqFeature->new() ;
+
+    	my @hsps = $cluster->sub_SeqFeature;
+
+    	@hsps = sort { $b->sub_SeqFeature_Coverage<=> $a->sub_SeqFeature_Coverage} @hsps;
+
+   		my $longest_hsp = shift @hsps;
+
+    	push (@selected_hsps,$longest_hsp);
+
+    	HSP: foreach my $hsp (@hsps){
+            my $overlap =0;
+            my $missing_exon =0;
+
+        HSP_HIT: foreach my $hsp_hit ($hsp->sub_SeqFeature){
+			my $hit =0;
+
+       	 	LONG:   foreach my $longest_hit ($longest_hsp->sub_SeqFeature){
+                if ($hsp_hit->overlaps($longest_hit)){
+					$hit =1;
+                    my ($overlap_start,$overlap_end);
+                    $overlap_start = ($longest_hit->start < $hsp_hit->start) ? $hsp_hit->start : $longest_hit->start;
+                    $overlap_end = ($longest_hit->end > $hsp_hit->end) ? $hsp->end : $longest_hit->end;
+
+                    $overlap += $overlap_end - $overlap_start;
+                } 
+            }
+			$missing_exon = 1 unless ($hit); 
         }
  
-        return %selected_ids;
+        if (($overlap == 0 ) || (($missing_exon)&&( int($hsp->sub_SeqFeature_Coverage/$longest_hsp->sub_SeqFeature_Coverage * 100) > 80))){
+            $new_cluster->add_sub_SeqFeature($hsp,'EXPAND');
+        }
+ 
+    	}
+    	push (@clusters,$new_cluster) unless scalar($new_cluster->sub_SeqFeature == 0);
+	}
+ 
+	my @features;
+ 
+	foreach my $selected_hsp (@selected_hsps){
+    	push (@features,$selected_hsp->sub_SeqFeature);
+	}
+	return @features;
 }
 
 1;
