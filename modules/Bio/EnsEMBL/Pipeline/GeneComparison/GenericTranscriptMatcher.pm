@@ -56,7 +56,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 ######################################################################
 
@@ -64,15 +64,15 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   my( $reference_set, $match_set ) = 
-      $self->_rearrange([qw(REFERENCE_SET MATCH_SET)], @args);
+    $self->_rearrange([qw(REFERENCE_SET MATCH_SET)], @args);
   
   unless( $reference_set && $match_set ){
-      $self->warn("lacking of the inputs. Nothing to match");
-      exit(0);
+    $self->warn("lacking of the inputs. Nothing to match");
+    exit(0);
   }
   unless ( $reference_set->[0]->isa('Bio::EnsEMBL::Transcript') &&
 	   $match_set->[0]->isa('Bio::EnsEMBL::Transcript') ){
-      $self->throw("wrong input type, needs two sets of transcripts");
+    $self->throw("wrong input type, needs two sets of transcripts");
   }
   
   my $matching_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
@@ -149,18 +149,18 @@ sub run{
 
   my @reference_trans = @{$self->reference_set};
   my @match_trans     = @{$self->match_set};
-
-  print STDERR "Trying to match ".scalar( @match_trans )." transcripts to ".
-      scalar(@reference_trans)." reference transcripts\n";
+  
+  #  print STDERR "Trying to match ".scalar( @match_trans )." transcripts to ".
+  #      scalar(@reference_trans)." reference transcripts\n";
   
   foreach my $transcript ( @reference_trans ){
-      $self->_map_Transcripts( $transcript, \@match_trans );
+    $self->_map_Transcripts( $transcript, \@match_trans );
   }
   
   # before returning, check that we have written anything
   unless( $self->matching_Map ){
-      print STDERR "not matches found\n";
-      exit(0);
+    print STDERR "not matches found\n";
+    exit(0);
   }
   return;
 }
@@ -218,27 +218,26 @@ sub _map_Transcripts{
   
   # a comparison tool
   my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
-												-comparison_level         => 3,
-												-exon_match               => 0,
-												-splice_mismatch          => 1,
-												-intron_mismatch          => 0,
+												-comparison_level         => 4,
+												-splice_mismatch          => 10,
+												-intron_mismatch          => 10,
 											       );
   my $sublist;new();
   
  EST:
   foreach my $est (@$ests){
-      
-      # compare this est
-      my ($merge, $overlaps) = $transcript_comparator->compare($transcript,$est);
-      
-      # (this method checks exact exon boundary matches but
-      # allows mismatches at outer end of the 5' and 3' exons)
-      # check 5' and 3' ends in case ESTs give an alternative transcription 
-      
-      # if match, put est in $expression_map{ $transcript }
-      if ($merge){
-	  $self->matching_map->match($transcript,$est);
-      }
+    
+    # compare this est
+    my ($merge, $overlaps) = $transcript_comparator->compare($transcript,$est);
+    
+    # (this method checks exact exon boundary matches but
+    # allows mismatches at outer end of the 5' and 3' exons)
+    # check 5' and 3' ends in case ESTs give an alternative transcription 
+    
+    # if match, put est in $expression_map{ $transcript }
+    if ($merge){
+      $self->matching_map->match($transcript,$est);
+    }
   }
 }
 
