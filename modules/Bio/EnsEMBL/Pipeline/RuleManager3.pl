@@ -103,7 +103,7 @@ unless ($dbhost && $dbname && $dbuser) {
     exit 1;
 }
 
-$PIPELINE_OUTPUT_DIR ||= $output_dir;
+$PIPELINE_OUTPUT_DIR  = $output_dir if($output_dir);
 my $RUNNER_SCRIPT = $PIPELINE_RUNNER_SCRIPT || $runner;
 
 unless (-d $PIPELINE_OUTPUT_DIR) {
