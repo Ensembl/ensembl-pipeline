@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					     );
 
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
@@ -61,7 +61,6 @@ use Bio::DB::RandomAccessI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
-use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -336,6 +335,7 @@ sub make_miniseq {
     # features are on the reverse strand - handled by is_reversed
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
 
+    #print STDERR "MiniGenewise: features used to make miniseq:\n";
     foreach my $f (@genomic_features) {
 	$f->strand(1);
 	my $cdna_start = $current_coord;
@@ -352,7 +352,7 @@ sub make_miniseq {
 	
 	$pairaln->addFeaturePair($fp);
 	
-#	$self->print_FeaturePair($fp);
+	#$self->print_FeaturePair($fp);
 
 	$current_coord = $cdna_end+1;
     }
@@ -385,22 +385,22 @@ sub exon_padding {
 	$self->{'_padding'} = $arg;
     }
 
-    return $self->{'_padding'} || 100;
+    return $self->{'_padding'} || 200;
 
 }
 
 sub print_FeaturePair {
     my ($self,$nf) = @_;
     #changed $nf->id to $nf->seqname
-    print(STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
-	  $nf->start . "\t" . 
-	  $nf->end   . "\t(" . 
+    print STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
+      $nf->start . "\t" . 
+	$nf->end   . "\t(" . 
 	  $nf->strand . ")\t" .
-	  $nf->hseqname  . "\t" . 
-	  $nf->hstart   . "\t" . 
-	  $nf->hend     . "\t(" .
-	  $nf->hstrand  . ")\n");
-}
+	    $nf->hseqname  . "\t" . 
+	      $nf->hstart   . "\t" . 
+		$nf->hend     . "\t(" .
+		  $nf->hstrand  . ")\n";
+  }
 
 =head2 get_Sequence
 
@@ -420,6 +420,9 @@ sub get_Sequence {
   } 
   
   my $seqfetcher = $self->seqfetcher;    
+  
+  print STDERR "MiniGenewise: getting sequence for $id\n";
+  
   my $seq;
   eval {
     $seq = $seqfetcher->get_Seq_by_acc($id);
@@ -476,37 +479,41 @@ sub run {
 
 #    $self->get_all_Sequences(@ids);
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
-	(-db              => 'genewise',
-	 -db_version      => 1,
-	 -program         => "genewise",
-	 -program_version => 1,
-	 -gff_source      => 'genewise',
-	 -gff_feature     => 'exon',
-	 -logic_name      => 'minigenewise');
-
+      (-db              => 'genewise',
+       -db_version      => 1,
+       -program         => "genewise",
+       -program_version => 1,
+       -gff_source      => 'genewise',
+       -gff_feature     => 'exon',
+       -logic_name      => 'minigenewise');
+    
     foreach my $id (@ids) {
-	my $hseq = $self->get_Sequence(($id));
-
-	if (!defined($hseq)) {
-	    $self->throw("Can't fetch sequence for id [$id]\n");
-	}
-
+      my $hseq = $self->get_Sequence(($id));
+      
+      if (!defined($hseq)) {
+	$self->throw("Can't fetch sequence for id [$id]\n");
+      }
+      
+      
+      my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(-genomic => $self->genomic_sequence,
+							      -protein => $hseq,
+							      -memory  => 400000);
+      
+      $eg->run;
+      
+      my @f = $eg->output;
 	
-	my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(-genomic => $self->genomic_sequence,
-								-protein => $hseq,
-								-memory  => 400000);
-
-	$eg->run;
-
-	my @f = $eg->output;
-
-	foreach my $f (@f) {
-	    #print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
-	    print $f;
-	}
-
-	push(@{$self->{'_output'}},@f);
-
+      #print STDERR "MiniGenewise: in run() after Genewise\n";
+      @f = sort { $a->start <=> $b->start } @f;
+      foreach my $f (@f) {
+	#print STDERR "MiniGenewise: f is a $f\n";
+	print STDERR $f."\t".$f->start."-".$f->end." phase: ".$f->phase." end_phase: ".$f->phase." strand: ".$f->strand."n";
+	#print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
+	#print $f;
+      }
+      
+      push(@{$self->{'_output'}},@f);
+      
     }
 }
 
@@ -555,6 +562,7 @@ sub minirun {
     my @forward;
     my @reverse;
     
+	
     if ($BIOPERLDB) {
       
       foreach my $feat(@$features) {
@@ -606,7 +614,8 @@ sub run_blastwise {
 
   my @extras  = $self->find_extras (@$features);
   
-#  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
+  print STDERR "Number of features       = ".scalar(@$features)."\n";
+  print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
   
   return unless (scalar(@extras) >= 1);
   
@@ -632,34 +641,44 @@ sub run_blastwise {
   # output is a list of Features (one per exon) with subseqfeatures 
   # representing the ungapped sub alignments for each exon
   my @f = $eg->output;
-
-#  print STDERR "number of exons: " . scalar(@f)  . "\n";
+  
+  #  print STDERR "number of exons: " . scalar(@f)  . "\n";
   
   my @newf;
-
+  
   my $strand = 1;
   if ($reverse == 1) {
     $strand = -1;
   }
 
   my $ec = 0;
- FEAT: foreach my $f (@f) {
+ FEAT: 
+  foreach my $f (@f) {
     $ec++;
     $f->strand($strand); # genomic
     my $phase = $f->phase();
-    
+    my $end_phase = $f->end_phase();
+
+    #print STDERR "MiniGenewise: converting feature $f back to genomic\n";
+
     # need to convert whole exon back to genomic coordinates
     my @genomics = $miniseq->convert_SeqFeature($f);         
+    
     
     if ($#genomics > 0) {
       # all hell will break loose as the sub alignments will probably not map cheerfully 
       # and we may start introducing in frame stops ...
       # for now, ignore this feature.
       print STDERR "Warning : feature converts into > 1 features " . scalar(@genomics) . " ignoring exon $ec\n";
+      #print STDERR "feature is: ".$f->gffstring."\n";
+      #print STDERR "genomics are:\n";
+      foreach my $g (@genomics){
+	print STDERR $g->start."-".$g->end."\n";
+      }
       next FEAT;
     }
-    
-    
+    #print STDERR "feature is: ".$f->gffstring."\n";
+    #print STDERR $genomics[0]->gffstring."\n";
     # also need to convert each of the sub alignments back to genomic coordinates
     foreach my $aln($f->sub_SeqFeature) {
       my @alns = $miniseq->convert_PepFeaturePair($aln);
@@ -672,7 +691,6 @@ sub run_blastwise {
 	my $added = 0;
 	$a->strand($strand); # genomic
 	$a->hstrand(1);      # protein
-	
 	$a->seqname($aln->seqname);
 	$a->hseqname($aln->hseqname);
 	# shouldn't need to expand ... as long as we choose the right parent feature to add to!
@@ -689,7 +707,9 @@ sub run_blastwise {
     push(@newf,@genomics);
     
     foreach my $nf (@genomics) {
+      #print STDERR "MiniGenewise: this thing is a $nf\n";
       $nf->phase($phase);
+      $nf->end_phase($end_phase);
       $nf->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $nf->seqname($f->seqname);
@@ -744,30 +764,30 @@ sub find_extras {
     my @output = $self->output;
     my @new;
 
-  FEAT: foreach my $f (@features) {
-	my $found = 0;
-	if (($f->end - $f->start) < 50) {
-	    next FEAT;
+  FEAT: 
+    foreach my $f (@features) {
+      my $found = 0;
+      if (($f->end - $f->start) < 50) {
+	next FEAT;
+      }
+      #	print ("New feature\n");
+      
+      #$self->print_FeaturePair($f);
+      foreach my $out (@output) {
+	foreach my $sf ($out->sub_SeqFeature) {
+	  if (!($f->end < $out->start || $f->start >$out->end)) {
+	    $found = 1;
+	  }
 	}
-#	print ("New feature\n");
-
-	#$self->print_FeaturePair($f);
-	foreach my $out (@output) {
-	    foreach my $sf ($out->sub_SeqFeature) {
-
-		if (!($f->end < $out->start || $f->start >$out->end)) {
-			"print throwing out". $f->gffstring."\n";
-		    $found = 1;
-		}
-	    }
-	}
-	
-	if ($found == 0) {
-	    push(@new,$f);
-	}
+      }
+      print STDERR "throwing out". $f->gffstring."\n" if $found == 1;
+      if ($found == 0) {
+	push(@new,$f);
+      }
     }
     return @new;
 }
+
 =head2 output
 
   Title   : output
