@@ -105,6 +105,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf
       CLUSTERMERGE_MIN_EVIDENCE_NUMBER
       EST_USE_DENORM_GENES
       MAX_NUMBER_ESTS
+      USE_EST_DEFAULT_FILTERING
      );
 
 
@@ -440,21 +441,10 @@ sub _process_Transcripts {
   # or if the only intron they have is non standard.
   # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
   
-  my $tight = 1;
-  
-  unless ( $tight ){
-    if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
-      
-      my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-	->new( -coverage => 97,
-	       -perc_id  => 99,
-	       -depth    => 20,
-	     );
-      
-      @checked_transcripts = $est_filter->filter(\@checked_transcripts);
-    }
-  }
-  if ($tight){
+
+  # apply default filtering of EST's (introduced 2003)
+  if ( $USE_EST_DEFAULT_FILTERING ) {
+
     if ( scalar( @checked_transcripts ) > 50 ){
       my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
 	->new( -coverage => 97,
@@ -464,6 +454,20 @@ sub _process_Transcripts {
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
     }
   }
+
+
+  unless ( $USE_EST_DEFAULT_FILTERING ){
+    if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
+      my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
+	->new( -coverage => 97,
+	       -perc_id  => 99,
+	       -depth    => 20,
+	     );
+      
+      @checked_transcripts = $est_filter->filter(\@checked_transcripts);
+    }
+  }
+
 
 
   if ( scalar(@checked_transcripts) == 0 ){
@@ -494,9 +498,9 @@ sub _process_Transcripts {
 	    -label            => $label,     # we can pass a string as label to differentiate the jobs
 	   );
   
-  my $t1 = time;
+
   $merge_object->run;
-  my $t2 = time;
+
 
   my @merged_transcripts = $merge_object->output;
   
@@ -595,15 +599,17 @@ sub _check_Transcripts {
     ############################################################
     # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
     if ( scalar(@exons) == 1 ){
-      
-      if ( $FILTER_ON_SINGLETON_SIZE && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETON_SIZE ){
-	      next TRANSCRIPT;
+      my $size =  $exons[0]->end - $exons[0]->start + 1;      
+      if ( $FILTER_ON_SINGLETON_SIZE && ( $size < $FILTER_ON_SINGLETON_SIZE )){
+        print STDERR "Failed FILTER_ON_SINGLETON_SIZE check ( $size < $FILTER_ON_SINGLETON_SIZE ) \n";
+        next TRANSCRIPT;
       }
       if ( $RAISE_SINGLETON_COVERAGE ){
 	      my @evidence = @{$exons[0]->get_all_supporting_features};
 	      my $coverage = $evidence[0]->score;
 	      if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
-          next TRANSCRIPT;
+                print STDERR "SingleExonEST-check failed:  RAISE_SINGLETON_COVERAGE too low (coverage $coverage < $RAISE_SINGLETON_COVERAGE)\n";
+                next TRANSCRIPT;
 	      }
       }
     }
@@ -621,6 +627,7 @@ sub _check_Transcripts {
       ############################################################
       my $size = $exon->end - $exon->start + 1;
       if ( $size  < $EST_MIN_EXON_SIZE ){
+        print STDERR "Failed EST_MIN_EXON_SIZE check ( $size < $EST_MIN_EXON_SIZE ) \n";
         next TRANSCRIPT;
       }
       ############################################################
