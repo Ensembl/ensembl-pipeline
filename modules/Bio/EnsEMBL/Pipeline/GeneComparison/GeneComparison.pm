@@ -2677,14 +2677,15 @@ sub _cluster_Exons{
   my %exon2cluster;
   
   # main cluster feature - holds all clusters
-  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
-  
+  #my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  my $cluster_list =  Bio::EnsEMBL::SeqFeature->new;#dk 
   # sort exons by start coordinate
   @exons = sort { $a->start <=> $b->start } @exons;
 
   # Create the first exon_cluster
-  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
-  
+  #my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  my $exon_cluster = Bio::EnsEMBL::SeqFeature->new;#dk
+
   # Start off the cluster with the first exon
   $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
   $exon_cluster->strand($exons[0]->strand);    
@@ -2704,7 +2705,8 @@ sub _cluster_Exons{
       }  
       else {
 	# Start a new cluster
-	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	#$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+        $exon_cluster = Bio::EnsEMBL::SeqFeature->new;#dk
 	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
 	$exon_cluster->strand($exon->strand);
 		
