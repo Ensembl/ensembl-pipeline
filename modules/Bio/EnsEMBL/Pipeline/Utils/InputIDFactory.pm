@@ -221,4 +221,25 @@ sub generate_filename_input_ids{
    return @$ids;
 }
 
+sub get_translation_ids{
+  my ($self) = @_;
+
+  my $ids = $self->db->get_TranslationAdaptor->list_dbIDs;
+
+  return $ids;
+}
+
+
+sub generate_translation_id_input_ids{
+  my ($self) = @_;
+
+  my $ids = $self->get_translation_ids;
+  
+  print STDERR "have ".@$ids." ids\n";
+  return @$ids;
+}
+
+
+
+
 1;
