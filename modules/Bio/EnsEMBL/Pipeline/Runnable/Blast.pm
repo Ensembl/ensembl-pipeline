@@ -117,6 +117,7 @@ sub new {
     $self->{'_program'}   = undef;     # location of Blast
     $self->{'_database'}  = undef;     # name of database
     $self->{'_threshold'} = undef;     # Threshold for hit filterting
+    $self->{'_threshold_type'} = undef;
     $self->{'_options'}   = undef;     # arguments for blast
     $self->{'_filter'}    = 1;         # Do we filter features?
     $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
@@ -356,7 +357,7 @@ sub get_parsers {
     Usage   :   $obj->parse_results
     Function:   Parses the blast results and stores the output in
                 an array of feature pairs.  The output will be filtered
-                by the probability threshold.
+                by some threshold.
                 If we input a filehandle to this method the results 
                 will be read from this file rather than the filename 
                 stored in the object.  This is handy for processing
@@ -430,6 +431,8 @@ sub parse_results {
 
 	if ($self->threshold_type eq "PID") {
 	  next HSP if ($hsp->percent < $self->threshold);
+	} elsif ($self->threshold_type eq "SCORE") {
+	  next HSP if ($hsp->score < $self->threshold);
 	} elsif ($self->threshold_type eq "PVALUE") {
 	  next HSP if ($hsp->P > $self->threshold);
 	}
@@ -455,6 +458,8 @@ sub parse_results {
     my @allfeatures = $self->output;
     if ($self->threshold_type eq "PID") {
       @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
+    } elsif ($self->threshold_type eq "SCORE") {
+      @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
     } else {
       @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
     }
@@ -506,6 +511,8 @@ sub filter_hits {
 
       if ($self->threshold_type eq "PID") {
 	next HSP if ($hsp->percent < $self->threshold);
+      } elsif ($self->threshold_type eq "SCORE") {
+	next HSP if ($hsp->score < $self->threshold);
       } elsif ($self->threshold_type eq "PVALUE") {
 	next HSP if ($hsp->P > $self->threshold);
       } 
@@ -545,6 +552,8 @@ sub filter_hits {
 
   if ($self->threshold_type eq "PID") {
     @features = sort {$b->percent_id <=> $a->percent_id} @features;
+  } elsif ($self->threshold_type eq "SCORE") {
+    @features = sort {$b->score <=> $a->score} @features;
   } elsif ($self->threshold_type eq "PVALUE") {
     @features = sort {$a->p_value <=> $b->p_value} @features;
   } 
@@ -1077,7 +1086,7 @@ sub filter {
 sub get_threshold_types {
   my ($self) = @_;
 
-  return ("PID","PVALUE");
+  return ("PID","PVALUE","SCORE");
 }
 
 sub threshold_type {
