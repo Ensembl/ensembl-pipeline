@@ -789,8 +789,7 @@ sub blast_Exons{
     $id2 = $exon2;
   }
 
-  #print STDERR "comparing $id1 and $id2\n";
-
+  
   my $seq1    = $exon1->seq;
   my $length1 = $seq1->length;
   unless ( $seq1->display_id ){
@@ -808,12 +807,17 @@ sub blast_Exons{
     $min_length = $length2;
   }
   my $word = 5;
-  if ( 3*$word > $min_length ){
+  if ( 3*$word >= $min_length ){
     $word = int($min_length/3) - 1;
   }
   if ( $word < 2 ){
     return 0;
   }
+
+  #print STDERR "word: $word\n";
+  #print STDERR "comparing $id1: ".$seq1->seq."\n";
+  #print STDERR "      and $id2: ".$seq2->seq."\n";
+
 
   ############################################################
   # create database
@@ -843,12 +847,12 @@ sub blast_Exons{
 						  '-threshold_type' => "PVALUE",
 						  '-threshold'      => 1e-10,
 						  '-options'        => $options,
-						  );
+						 );
   
   
   $blast->add_regex($file,'(\S+)');
   $blast->run();
-
+  
   unlink( $database );
   
   my @featurepairs = $blast->output();
