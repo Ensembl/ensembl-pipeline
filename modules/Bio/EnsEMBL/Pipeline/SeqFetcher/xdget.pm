@@ -16,7 +16,8 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::xdget
 =head1 SYNOPSIS
 
   my $obj = Bio::EnsEMBL::Pipeline::SeqFetcher::xdget->new(
-      -executable => $exe
+      -executable => '/blah/xdget',
+      -db         => '/data/db'
   );
   my $seq = $obj->get_Seq_by_acc($acc);
 
@@ -45,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;
 use strict;
 use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
-use Bio::SeqIO;
+use Bio::Seq;
 
 use vars qw(@ISA);
 
@@ -96,17 +97,20 @@ sub executable {
 =cut
 
 sub db {
-  my ($self, $db) = @_;
-  if ($db) {
-      $self->{'_db'} = $db;
-      if (glob "$db.xp?") {
-	  $self->_moltype('p');
-      }
-      elsif (glob "$db.xn?") {
-	  $self->_moltype('n');
-      }
-      else {
-	  $self->throw("XDF database appears to be missing files");
+  my ($self, $dbref) = @_;
+
+  if ($dbref) {
+      foreach my $db (@$dbref) {
+          if (glob "$db.xp?") {
+	      $self->_moltype($db, 'p');
+          }
+          elsif (glob "$db.xn?") {
+	      $self->_moltype($db, 'n');
+          }
+          else {
+	      $self->throw("XDF database appears to be missing files");
+          }
+	  push @{$self->{'_db'}}, $db;
       }
   }
   return $self->{'_db'};  
@@ -149,43 +153,61 @@ sub get_Seq_by_acc {
   $self->throw("No accession input") unless $acc;
   $self->throw("No database defined") unless $self->db;
   
-  my $seqstr;
-  my $seq;
   my $xdget   = $self->executable;
-  my $options = $self->options;
   my $db      = $self->db;
+  local       *FH;
+  my $seq;
+  my $seqstr;
+  my $command;
+  my @out;
 
   # maybe should have some checking here to see if -n/-p have
   # already been specified in options
-  if ($self->_moltype eq 'n') {
-    $options .= " -n";
+
+  DB: foreach my $db (@{$self->db}) {
+
+    my $options = $self->options;
+
+    if ($self->_moltype($db) eq 'n') {
+      $options .= " -n";
+    }
+    else {
+      $options .= " -p";
+    }
+
+    $command = "$xdget $options $db $acc";
+
+    open FH, "$command 2>&1 |" or $self->throw("Error retrieving $acc from $db with $xdget");
+    @out = <FH>;
+    close FH;
+
+    last DB if $out[0] !~ /Not found/;
   }
-  else {
-    $options .= " -p";
-  }
 
-  my $command = "$xdget $options $db $acc";
+  shift @out;
+  my $seqstr = join(" ", @out);
+  $seqstr =~ s/\s//g;
 
-  local *FH;
-  open FH, "$command |" or $self->throw("Error retrieving $acc from $db with $xdget");
-
-  my $seq = Bio::SeqIO->new(
-    -format => 'fasta',
-    -fh     => \*FH
-  )->next_seq;
-
-  close FH or $self->throw("Error retrieving $acc from $db with $xdget");
+  $seq = Bio::Seq->new(
+    -seq              => $seqstr,
+    -display_id       => $acc,
+    -accession_number => $acc,
+    -desc             => ""
+  );
+     
 
   return $seq;
 }
 
 sub _moltype {
-    my ($self, $type) = @_;
+    my ($self, $db, $type) = @_;
+
+    return undef unless $db;
 
     if ($type) {
-	$self->{'_type'} = $type;
+	$self->{'_moltype'}{$db} = $type;
     }
-    return $self->{'_type'};
+    return $self->{'_moltype'}{$db};
 }
 
 
