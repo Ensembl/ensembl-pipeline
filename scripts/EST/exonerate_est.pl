@@ -108,10 +108,10 @@ sub get_variables {
 
   if(!(defined $host       && defined $dbname    && defined $dbuser &&
        defined $runner     && defined $runnable  && defined $exonerate &&
-       defined $estfiledir && defined $chunkname && defined $analysis &&
+       defined $estfiledir && defined $chunkname  && defined $analysis &&
        defined $input_id   && defined $outdir)){
     print "Usage: exonerate_est.pl -chunkname\n" .
-      "Additional options to be set in ESTConf.pm: EST_RUNNER, EST_EXONERATE_RUNNABLE, EST_EXONERATE, EST_REFDBNAME, EST_REFDBUSER, EST_REFDBHOST, EST_CHUNKDIR, EST_GENOMIC and EST_TMPDIR\n";
+      "Additional options to be set in ESTConf.pm: EST_RUNNER, EST_EXONERATE_RUNNABLE, EST_EXONERATE_ANALYSIS, EST_EXONERATE, EST_REFDBNAME, EST_REFDBUSER, EST_REFDBHOST, EST_CHUNKDIR, EST_GENOMIC and EST_TMPDIR\n";
     exit (1);
   }
 
