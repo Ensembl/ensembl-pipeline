@@ -48,16 +48,19 @@ use vars qw( %GeneBuilder );
 
 		GB_FINAL_GENETYPE           => 'ensembl',
 
+	        GB_MISC_OTHER_INPUT_GENETYPES => [''], # other gene-types which have to be combined / fetched (in GB_COMB_DBNAME)
+
 		# parameters for use of genscan predictions in final build		
 		GB_USE_ABINITIO            => '0',
 		GB_ABINITIO_TYPE           => 'ab_initio',
 		GB_ABINITIO_SUPPORTED_TYPE => 'ab_initio_supported',
 		GB_ABINITIO_PROTEIN_EVIDENCE => ['Swall'],
 		GB_ABINITIO_DNA_EVIDENCE     => ['Vertrna', 'Unigene'],
-    GB_ABINITIO_LOGIC_NAME => 'Genscan', 
-    #this must be a single logic_name, it only has to be defined if you
-    #have more than one type in the prediction transcript table as this
-    #breaks the PredictionGenebuilder if multiple sets are passed in
+
+                GB_ABINITIO_LOGIC_NAME => 'Genscan', 
+                #this must be a single logic_name, it only has to be defined if you
+                #have more than one type in the prediction transcript table as this
+                #breaks the PredictionGenebuilder if multiple sets are passed in
 		GB_MIN_GENSCAN_EXONS        => 4,
 		GB_GENSCAN_MAX_INTRON       => 15000,
 
