@@ -29,10 +29,8 @@ use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Exon;
-use Data::Dumper;
+
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -48,35 +46,19 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep';
-
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'swall',
-					  -db_file        => 'swall',
-					  -db_version     => '__NONE__',
-					  -program        => 'wublastp',
-					  -program_file   => 'wublastp',
-					  -module         => $runnable,
-					  -module_version => 1,
-					  -gff_source     => 'blastp',
-					  -gff_feature    => 'similarity',
-					  -logic_name     => 'blastgenscanPEP' );
+my $ana_adaptor = $db->get_AnalysisAdaptor();
+my $ana = $ana_adaptor->fetch_by_logic_name('blastgenscanPEP');
 
 unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
 
-my $id = 'AB015752.00001';
+my $id = 'Z84721.1.1.43058';
 
-my $contig = $db->get_Contig($id);
-my @genscan_peptides = $contig->get_genscan_peptides;
-
-foreach my $pep (@genscan_peptides) {
-	print STDERR "PEP " . $pep->translate->seq . "\n";
-}
-
-my $runobj = "$runnable"->new(  -dbobj      => $db,
-				-input_id   => $id,
-                                -analysis   => $ana );
+my $runobj = "$runnable"->new(  -db		=> $db,
+				-input_id	=> $id,
+                                -analysis	=> $ana );
 
 $runobj->threshold(1);
 
@@ -96,7 +78,7 @@ else
 display(@out);
 
 $runobj->write_output();
-my $contig = $db->get_Contig($id);
+my $contig = $db->get_RawContigAdaptor()->fetch_by_name($id);
 my @features = $contig->get_all_SimilarityFeatures();
 display(@features);
 
@@ -116,81 +98,73 @@ else
 my $all_features_found = 1;
 foreach my $feature (@features)
 {
-    next unless ($feature->isa("Bio::EnsEMBL::FeaturePair"));
+    next unless ($feature->isa("Bio::EnsEMBL::DnaPepAlignFeature"));
     if ($all_features_found == 1)
     {
-        $all_features_found = 0;
-        my $exon = Bio::EnsEMBL::Exon->new();
-        $exon->temporary_id           ($feature->hseqname);
-        $exon->start        ($feature->start);
-        $exon->end          ($feature->end);
-        $exon->strand       ($feature->strand);
-        $exon->phase        ($feature->phase);
-        $exon->contig_id    ($id);
-        $exon->attach_seq   ($contig->primary_seq);
-        my $count = 1;
-        foreach my $pep (@genscan_peptides)
-        {
-            my $full_pep = $pep->translate->seq;
-            my $exon_pep = $exon->translate->seq;
-            $exon_pep =~ s/^\M//i; #remove leading M's
-	    $exon_pep =~ s/\*$//; 
-	    $exon_pep =~ s/X$//; 
-            
-            if (!defined($exon_pep) || index ($full_pep, $exon_pep) > -1)
-            {
-                print STDERR "$count ---------------MATCHED-----------------------\n";
-                print STDERR "$count: Feature: ".$feature->hseqname
-                ." matched in ".$pep->dbID."\n";
-                print STDERR "$count: PHASE: ".$feature->phase." End ".$feature->end_phase
-                                      ." Start ".$feature->start." - ".$feature->end
-                                      ."(".$feature->length
-                                      .") Pep ".$feature->hstart." - ".$feature->hend
-                                      ." Strand ".$feature->strand."\n";
-                print STDERR "$count --------------------------------------------\n";
-                
-                $all_features_found = 1;
-                last;
-            }
-            #<DELETE>
-            else
-            {
-                #print STDERR "$count: NOT FOUND\n";
-                #print STDERR "$count: Feature ".$feature->hseqname."\n";
-            }
-            #</DELETE>
-            $count ++;
-        }
-        #<DELETE>
-        unless ($all_features_found)
-        {
-            print STDERR "$count *********************FAILED******************\n";
-            print STDERR "Feature ".$feature->hseqname."\n";
-            print STDERR "$count: PHASE: ".$feature->phase." End ".$feature->end_phase
-                                      ." Start ".$feature->start." - ".$feature->end
-                                      ."(".$feature->length
-                                      .") Pep ".$feature->hstart." - ".$feature->hend
-                                      ." Strand ".$feature->strand."\n";
-            print STDERR "$count **********************************************\n";
-            
-            
-            for (my $phase = 0; $phase < 3; $phase++)
-            {
-                $exon->phase($phase);
-                my $ex_pep = $exon->translate->seq();
-                $ex_pep =~ s/^M//i;
-                print STDERR "EXON: $ex_pep\n";
-                foreach my $pep (@genscan_peptides)
-                {
-                    my $peptide = $pep->translate->seq();
-                    #print STDERR "GENSCAN: \n";
-                    print STDERR "SUCCESS\n" if (index($peptide, $ex_pep) > -1);
-                }
-                
-            }
-            $all_features_found = 1;
-        }
-        #</DELETE>
+	 $all_features_found = 0;
+	 my $exon = Bio::EnsEMBL::Exon->new();
+	 $exon->temporary_id           ($feature->seqname);
+	 $exon->start        ($feature->start);
+	 $exon->end          ($feature->end);
+	 $exon->strand       ($feature->strand);
+	 $exon->contig_id    ($id);
+	 $exon->attach_seq   ($contig);
+	 my $count = 1;
+	 foreach my $pep (@genscan_peptides)
+	 {
+	     my $full_pep = $pep->translate;
+	     my $exon_pep = $exon->translate->seq;
+
+	     $exon_pep =~ s/^\M//i; #remove leading M's
+	     $exon_pep =~ s/\*$//; 
+	     $exon_pep =~ s/X$//; 
+	     
+	     if (!defined($exon_pep) || index ($full_pep, $exon_pep) > -1)
+	     {
+#		 print STDERR "$count ---------------MATCHED-----------------------\n";
+#		 print STDERR "$count: Feature: ".$feature->hseqname
+#		 ." matched in ".$pep->dbID."\n";
+#		 print STDERR "$count: Start ".$feature->start." - ".$feature->end
+#				       ."(".$feature->length
+#				       .") Pep ".$feature->hstart." - ".$feature->hend
+#				       ." Strand ".$feature->strand."\n";
+#		 print STDERR "$count --------------------------------------------\n";
+		 
+		 $all_features_found = 1;
+		 last;
+	     }
+#	     $count ++;
+	 }
+#	 #<DELETE>
+#	 unless ($all_features_found)
+#	 {
+#	     print STDERR "$count *********************FAILED******************\n";
+#	     print STDERR "Feature ".$feature->hseqname."\n";
+#	     print STDERR "$count: PHASE: ".$feature->phase." End ".$feature->end_phase
+#				       ." Start ".$feature->start." - ".$feature->end
+#				       ."(".$feature->length
+#				       .") Pep ".$feature->hstart." - ".$feature->hend
+#				       ." Strand ".$feature->strand."\n";
+#	     print STDERR "$count **********************************************\n";
+#	     
+#	     
+#	     for (my $phase = 0; $phase < 3; $phase++)
+#	     {
+#		 $exon->phase($phase);
+#		 my $ex_pep = $exon->translate->seq();
+#		 $ex_pep =~ s/^M//i;
+#		 print STDERR "EXON: $ex_pep\n";
+#		 foreach my $pep (@genscan_peptides)
+#		 {
+#		     my $peptide = $pep->translate->seq();
+#		     #print STDERR "GENSCAN: \n";
+#		     print STDERR "SUCCESS\n" if (index($peptide, $ex_pep) > -1);
+#		 }
+#		 
+#	     }
+#	     $all_features_found = 1;
+#	 }
+#	 #</DELETE>
     }
 }
 
@@ -203,7 +177,6 @@ else
 sub display {
     my @results = @_;
     #Display output
-    print STDERR "RESULTS FROM RUN\n";
     foreach my $obj (@results)
     {
        print STDERR ($obj->gffstring."\n");
@@ -216,3 +189,9 @@ sub display {
        }
     }
 }
+
+
+
+
+
+
