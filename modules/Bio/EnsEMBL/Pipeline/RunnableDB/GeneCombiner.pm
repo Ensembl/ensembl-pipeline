@@ -916,6 +916,7 @@ sub _pair_Transcripts{
   CANDIDATE:
     foreach my $est_tran ( @candidates ){
       my $one_exon_shared = 0;
+      my $one_intron_shared = 0;
       my $similar_protein = 0;
       my $exon_in_intron  = 0;
       my $exact_merge     = 0;
@@ -945,19 +946,21 @@ sub _pair_Transcripts{
       }
       
       foreach my $ens_tran ( @ens_transcripts ){
-	$one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
-	$similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
-	$exon_in_intron  = $self->_check_exon_Skipping(     $est_tran, $ens_tran);
+	$one_exon_shared   = $self->_check_exact_exon_Match(   $est_tran, $ens_tran);
+	$one_intron_shared = $self->_check_exact_intron_Match( $est_tran, $ens_tran);
+	$similar_protein   = $self->_check_protein_Match(      $est_tran, $ens_tran);
+	$exon_in_intron    = $self->_check_exon_Skipping(      $est_tran, $ens_tran);
 	
 	print "Comparing\n";
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
 	print STDERR "shared_exon    : $one_exon_shared\n";
+	print STDERR "shared_intron  : $one_intron_shared\n";
 	print STDERR "similar protein: $similar_protein\n";
 	print STDERR "exon_in_intron : $exon_in_intron\n";
 	
 	print STDERR "not using the protein info\n";
-	if ( $one_exon_shared == 1 
+	if ( ( $one_exon_shared == 1 || $one_intron_shared == 1 )
 	     #&& $similar_protein == 1
 	     && $exon_in_intron  == 1
 	     #&& $exact_merge     == 0 
@@ -1140,8 +1143,96 @@ sub _check_Completeness{
   }
   return 0;
 }
-    
+
+############################################################
+
+sub _check_exact_intron_Match{
+  my ($self,$tran1,$tran2) = @_;
+  my @introns1 = $self->_get_introns_from_Transcript($tran1);
+  my @introns2 = $self->_get_introns_from_Transcript($tran2);
+  my %range_metric;
+  foreach my $intron1 ( @introns1 ){
+    $range_metric{ $intron1->start }{ $intron1->end } = 1;
+  }
+  foreach my $intron2 ( @introns2 ){
+    if ( defined  $range_metric{ $intron2->start }{ $intron2->end } 
+	 &&  $range_metric{ $intron2->start }{ $intron2->end } == 1 ){
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+############################################################
+
+sub _get_introns_from_Transcript{
+  my ($self,$trans) = @_;
+  my @exons = sort { $a->start <=> $b->start } @{$trans->get_all_Exons};
+  
+  my @introns;
+  
+  for(my $i=0; $i<scalar(@exons);$i++){
+    if ( $i > 0 ){
+      my $intron_range = Bio::Range->new();
+      $intron_range->start($exons[$i-1]->end + 1);
+      $intron_range->end(  $exons[$i]->start - 1);
+      push( @introns, $intron_range);
+    }
+  }
+  return @introns;
+}
+
 #########################################################################
+
+sub _check_protein_Match{
+ my ($self, $tran1, $tran2 ) = @_;
+
+ my $seq1;
+ my $seq2;
+
+ my $compatible_proteins = 0;
+ eval{
+   $seq1 = $tran1->translate;
+   $seq2 = $tran2->translate;
+ };
+ if ( $seq1 && $seq2 ){
+   
+   if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
+     print STDERR "On of the peptides has a stop codon\n";
+     return 0;
+   }
+   elsif ( $seq1 eq $seq2 ){
+     print STDERR "Identical translation\n";
+     return 1;
+   }
+   elsif( $seq1 =~/$seq2/ || $seq2 =~/$seq1/ ){
+     return 1;
+   }
+ }
+ else{
+   print STDERR "unable to compare translations\n";
+   return 0;
+ }
+}
+############################################################
+
+sub _check_exact_exon_Match{
+ my ($self, $tran1, $tran2 ) = @_;
+ my @exons1 = @{$tran1->get_all_Exons};
+ my @exons2 = @{$tran2->get_all_Exons};
+ my $exact_match = 0;
+ 
+ # how many exact matches we need (maybe 1 is enough)
+ foreach my $exon1 (@exons1){
+   foreach my $exon2 (@exons2){
+     return 1 if  ( $exon1->start == $exon2->start && $exon1->end == $exon2->end );
+   }
+ }
+ return 0;
+}
+
+############################################################
 #
 # this function is another check used to find out if two given transcripts
 # are two alternative variants. This function returns 1 if there is at least
