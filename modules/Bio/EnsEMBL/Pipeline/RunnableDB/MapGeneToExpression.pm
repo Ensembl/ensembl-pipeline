@@ -62,7 +62,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::DBSQL::DBEntryAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
-use Bio::EnsEMBL::DBEntry;
+
 
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw(
@@ -113,16 +113,16 @@ sub new{
   
 
   # where the ests are (we actually want exonerate_e2g transcripts )
-  unless( $self->dbobj){
+  unless( $self->db){
     my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						    '-host'   => $EST_E2G_DBHOST,
 						    '-user'   => $EST_E2G_DBUSER,
 						    '-dbname' => $EST_E2G_DBNAME,
 						    '-dnadb'  => $refdb,
 						   ); 
-    $self->dbobj($est_db);
+    $self->db($est_db);
   }
-  $self->est_db( $self->dbobj);
+  $self->est_db( $self->db);
   $self->est_db->dnadb($refdb);
   $self->ensembl_db( $ensembl_db );
   $self->dna_db( $refdb );
@@ -193,22 +193,22 @@ sub dna_db{
 
 #############################################################
 
-sub ensembl_vc{
-  my ($self,$vc) = @_;
-  if ( $vc ){
-    $self->{'_ensembl_vc'} = $vc;
+sub ensembl_slice{
+  my ($self,$slice) = @_;
+  if ( $slice ){
+    $self->{'_ensembl_slice'} = $slice;
   }
-  return $self->{'_ensembl_vc'};
+  return $self->{'_ensembl_slice'};
 }
 
 #############################################################
 
-sub est_vc{
-  my ($self,$vc) = @_;
-  if ( $vc ){
-    $self->{'_est_vc'} = $vc;
+sub est_slice{
+  my ($self,$slice) = @_;
+  if ( $slice ){
+    $self->{'_est_slice'} = $slice;
   }
-  return $self->{'_est_vc'};
+  return $self->{'_est_slice'};
 }
 
 ############################################################
@@ -229,6 +229,7 @@ sub ensembl_genes{
 
 sub ests{
   my ( $self, @genes ) = @_;
+
   unless( $self->{_ests} ){
     $self->{_ests} =[];
   }
@@ -236,6 +237,7 @@ sub ests{
     $genes[0]->isa("Bio::EnsEMBL::Gene") || $self->throw("$genes[0] is not a Bio::EnsEMBL::Gene");
     push ( @{ $self->{_ests} }, @genes );
   }
+  print STDERR "returning an ".ref(@{ $self->{_ests} })." with ".ref(${  $self->{_ests} }[0] )."\n";
   return @{ $self->{_ests} };
 }
 
@@ -288,20 +290,26 @@ sub fetch_input {
   my $chrend   = $2;
   print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
-  my $ensembl_gpa = $self->ensembl_db->get_StaticGoldenPathAdaptor();
-  my $est_gpa     = $self->est_db->get_StaticGoldenPathAdaptor();
+  my $ensembl_sa = $self->ensembl_db->get_SliceAdaptor();
+  my $est_sa     = $self->est_db->get_SliceAdaptor();
 
-  my $ensembl_vc  = $ensembl_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $est_vc      = $est_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $est_slice      = $est_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
 
-  $self->ensembl_vc( $ensembl_vc );
-  $self->est_vc( $est_vc );
+  $self->ensembl_slice( $ensembl_slice );
+  $self->est_slice( $est_slice );
 
   # get ests (mapped with Filter_ESTs_and_E2G )
-  $self->ests($self->est_vc->get_Genes_by_Type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ));
-  
+  print STDERR "getting genes of type $EST_GENEBUILDER_INPUT_GENETYPE\n";
+  print STDERR "getting a ".ref($self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ))."\n";
+  print STDERR "got ".scalar( @{$self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' )} )." ests\n";
+  $self->ests(@{ $self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ) });
+  print STDERR "got ".scalar( $self->ests )." ests\n";
+
+
+
   # get ensembl genes (from GeneBuilder)
-  $self->ensembl_genes( $self->ensembl_vc->get_Genes_by_Type( $EST_TARGET_GENETYPE, 'evidence' ) );
+  $self->ensembl_genes(@{ $self->ensembl_slice->get_Genes_by_type( $EST_TARGET_GENETYPE, 'evidence' ) });
 
 }
   
@@ -325,12 +333,13 @@ sub run{
   # calcultate the ests that map to this transcript
 
   # if there no genes, we finish a earlier
-  unless ( $self->ests ){
-    print STDERR "No ests in this region, leaving...\n";
-    exit(0);
-  }
   unless ( $self->ensembl_genes ){
     print STDERR "no genes found in this region, leaving...\n";
+    exit(0);
+  }
+  print STDERR scalar( $self->ensembl_genes )." genes retrieved\n";
+  unless ( $self->ests ){
+    print STDERR "No ests in this region, leaving...\n";
     exit(0);
   }
    
@@ -350,11 +359,11 @@ sub run{
       
       my @est_transcripts;
       foreach my $est ( @ests ){
-	push ( @est_transcripts, $est->get_all_Transcripts );
+	push ( @est_transcripts, @{$est->get_all_Transcripts} );
       }
       
       foreach my $gene ( @genes ){
-	foreach my $transcript ( $gene->get_all_Transcripts ){
+	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	 
 	  $self->_map_ESTs( $transcript, \@est_transcripts );
 	}
@@ -467,8 +476,8 @@ sub cluster_Genes{
 sub _get_start_of_Gene{  
   my ($self,$gene) = @_;
   my $start;
-  foreach my $tran ( $gene->get_all_Transcripts){
-    foreach my $exon ( $tran->get_all_Exons ){
+  foreach my $tran ( @{$gene->get_all_Transcripts} ){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
       unless ($start){
 	$start = $exon->start;
       }
@@ -488,8 +497,8 @@ sub _get_start_of_Gene{
 sub _get_end_of_Gene{  
   my ($self,$gene) = @_;
   my $end;
-  foreach my $tran ( $gene->get_all_Transcripts){
-    foreach my $exon ( $tran->get_all_Exons ){
+  foreach my $tran ( @{$gene->get_all_Transcripts} ){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
       unless ($end){
 	$end = $exon->end;
       }
@@ -694,10 +703,10 @@ sub _check_5prime{
   my $start_exon = $transcript->start_exon;
   #my $start_exon = $transcript->translation->start_exon;
   my $strand     = $start_exon->strand;
-  foreach my $exon ( $transcript->get_all_Exons ){
+  foreach my $exon ( @{$transcript->get_all_Exons} ){
     my $est_exon_count = 0;
     
-    foreach my $est_exon ( $est->get_all_Exons ){
+    foreach my $est_exon ( @{$est->get_all_Exons} ){
       $est_exon_count++;
       if ( $exon == $start_exon ){
 	if ( $exon->overlaps( $est_exon ) ){
@@ -749,9 +758,9 @@ sub _check_3prime{
   #my $end_exon = $transcript->translation->end_exon;
   my $strand   = $end_exon->strand;
   
-  foreach my $exon ( $transcript->get_all_Exons ){
+  foreach my $exon ( @{$transcript->get_all_Exons} ){
     my $est_exon_count = 0;
-    my @est_exons = $est->get_all_Exons;
+    my @est_exons = @{$est->get_all_Exons};
     
     foreach my $est_exon ( @est_exons ){
       $est_exon_count++;
@@ -792,7 +801,7 @@ sub _check_3prime{
 sub _transcript_exonic_length{
   my ($self,$tran) = @_;
   my $exonic_length = 0;
-  foreach my $exon ($tran->get_all_Exons){
+  foreach my $exon (@{$tran->get_all_Exons}){
     $exonic_length += ($exon->end - $exon->start + 1);
   }
   return $exonic_length;
@@ -803,7 +812,7 @@ sub _transcript_exonic_length{
 
 sub _transcript_length{
     my ($self,$tran) = @_;
-    my @exons= $tran->get_all_Exons;
+    my @exons= @{$tran->get_all_Exons};
     my $genomic_extent = 0;
     if ( $exons[0]->strand == -1 ){
       @exons = sort{ $b->start <=> $a->start } @exons;
@@ -821,7 +830,7 @@ sub _transcript_length{
 sub _check_Transcript{
   my ($self,$tran) = @_;
   
-  my @exons = $tran->get_all_Exons;
+  my @exons = @{$tran->get_all_Exons};
   @exons = sort {$a->start <=> $b->start} @exons;
   
   for (my $i = 1; $i <= $#exons; $i++) {
@@ -856,8 +865,8 @@ sub output{
 sub _find_est_id{
   my ($self, $est) = @_;
   my %is_evidence;
-  foreach my $exon ($est->get_all_Exons){
-    foreach my $evidence ( $exon->each_Supporting_Feature ){
+  foreach my $exon (@{$est->get_all_Exons}){
+    foreach my $evidence ( @{$exon->get_all_Supporting_Feature} ){
       $is_evidence{ $evidence->hseqname } = 1;
     }
   }
@@ -910,7 +919,7 @@ sub write_output {
 
 sub _print_Transcript{
   my ($self,$transcript) = @_;
-  my @exons = $transcript->get_all_Exons;
+  my @exons = @{$transcript->get_all_Exons};
   my $id;
   if ( $transcript->stable_id ){
     $id = $transcript->stable_id;
