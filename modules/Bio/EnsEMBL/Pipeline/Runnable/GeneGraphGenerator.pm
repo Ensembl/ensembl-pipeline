@@ -96,8 +96,8 @@ sub _check_est_Cluster{
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$j]);
       
       # we only check on coincident exon:
-      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) 
-	   #&&	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])
+      if ( $self->_check_exact_intron_Match( $est_transcripts[$i], $est_transcripts[$j]) 
+	   && $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) 
 	 ){
 	print STDERR "they are linked\n";
 	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
@@ -167,6 +167,12 @@ sub _visit{
   return;
 }
 
+############################################################
+#
+# METHODS FOR DEFINING THE VERTEX RELATION
+#
+############################################################
+
 #########################################################################
 # having a set of est_genes only, we have no reference transcript (ensembl one),
 # so to determine whether two transcripts are two alternative forms of the same gene
@@ -185,6 +191,45 @@ sub _check_exact_exon_Match{
    }
  }
  return 0;
+}
+
+############################################################
+
+sub _check_exact_intron_Match{
+  my ($self,$tran1,$tran2) = @_;
+  my @introns1 = $self->_get_introns_from_Transcript($tran1);
+  my @introns2 = $self->_get_introns_from_Transcript($tran2);
+  my %range_metric;
+  foreach my $intron1 ( @introns1 ){
+    $range_metric{ $intron1->start }{ $intron1->end } = 1;
+  }
+  foreach my $intron2 ( @introns2 ){
+    if ( defined  $range_metric{ $intron2->start }{ $intron2->end } 
+	 &&  $range_metric{ $intron2->start }{ $intron2->end } == 1 ){
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+############################################################
+
+sub _get_introns_from_Transcript{
+  my ($self,$trans) = @_;
+  my @exons = sort { $a->start <=> $b->start } @{$trans->get_all_Exons};
+  
+  my @introns;
+  
+  for(my $i=0; $i<scalar(@exons);$i++){
+    if ( $i > 0 ){
+      my $intron_range = Bio::Range->new();
+      $intron_range->start($exons[$i-1]->end + 1);
+      $intron_range->end(  $exons[$i]->start - 1);
+      push( @introns, $intron_range);
+    }
+  }
+  return @introns;
 }
 
 #########################################################################
