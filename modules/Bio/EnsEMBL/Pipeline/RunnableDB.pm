@@ -1,9 +1,4 @@
 #
-#
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -58,13 +53,12 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
+
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI);
-
-
 
 =head2 new
 
@@ -101,10 +95,6 @@ sub new {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
-#    if(!defined $seqfetcher) {
-#      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-#    }
-
     # we can't just default this to pfetch
     $seqfetcher && $self->seqfetcher($seqfetcher);
 
@@ -126,8 +116,7 @@ sub new {
 sub analysis {
     my ($self, $analysis) = @_;
     
-    if ($analysis)
-    {
+    if ($analysis) {
         $self->throw("Not a Bio::EnsEMBL::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
         $self->{'_analysis'} = $analysis;
@@ -148,7 +137,9 @@ sub analysis {
 
 sub parameters {
     my ($self, $parameters) = @_;
+
     $self->analysis->parameters($parameters) if ($parameters);
+
     return $self->analysis->parameters();
 }
 
@@ -165,11 +156,11 @@ sub parameters {
 
 sub db {
     my( $self, $value ) = @_;
-    #print $value."\n";
-    if ($value) 
-    {
+
+    if ($value) {
        $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
          || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
+
        $self->{'_db'} = $value;
     }
     return $self->{'_db'};
@@ -187,10 +178,11 @@ sub db {
 
 sub input_id {
     my ($self, $input) = @_;
-    if ($input)
-    {
+
+    if ($input) {
         $self->{'_input_id'} = $input;
     }
+
     return $self->{'_input_id'};
 }
 
@@ -253,8 +245,11 @@ sub run {
     my ($self) = @_;
 
     foreach my $runnable ($self->runnable) {
+
       $self->throw("Runnable module not set") unless ($runnable);
       $self->throw("Input not fetched") unless ($self->genseq());
+
+      # Ugh!!!!
       $runnable->query($self->genseq());
       $runnable->run();
     }
@@ -344,12 +339,14 @@ sub slice {
 =cut
 
 sub write_output {
-    my($self) = @_;
+    my ($self) = @_;
 
-    my $db=$self->db();
+    my $db       = $self->db();
     my @features = $self->output();
     my $contig;
-    $self->warn("shouldn't be using the write_output methid of runnabledb");
+
+    $self->warn("shouldn't be using the write_output method of runnabledb");
+
     eval {
       $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
@@ -386,10 +383,13 @@ sub write_output {
 
 sub seqfetcher {
   my( $self, $value ) = @_;    
+
   if (defined($value)) {
+
     #need to check if passed sequence is Bio::DB::RandomAccessI object
     #$value->isa("Bio::DB::RandomAccessI") || 
     #  $self->throw("Input isn't a Bio::DB::RandomAccessI");
+
     $self->{'_seqfetcher'} = $value;
   }
     return $self->{'_seqfetcher'};
