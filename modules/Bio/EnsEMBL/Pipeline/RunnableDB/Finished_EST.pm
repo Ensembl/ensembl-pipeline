@@ -12,6 +12,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+use Bio::EnsEMBL::Pipeline::Config::General;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -34,29 +35,20 @@ sub fetch_input {
     $self->throw("No input id") unless defined( $self->input_id );
     
     my $contigid = $self->input_id;
-    #    my $contig   = $self->dbobj->get_Contig($contigid); #changed to
     my $rawContigAdaptor = $self->db->get_RawContigAdaptor();
     my $contig   = $rawContigAdaptor->fetch_by_name($contigid);
     
-    #    my $genseq   = $contig->primary_seq; # changed to
     my $genseq   = $contig;
-    my $masked   = $contig->get_repeatmasked_seq;
+    my $masked   = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING,$SOFT_MASKING) or $self->throw("Unable to fetch contig");
     
     my $seq = $masked->seq;
-    if ( $seq =~ /[CATG]{3}/ ) {
+    if( scalar($seq =~ s/([CATG])/$1/g) > 3 ){
         $self->input_is_void(0);
-    }
-    else {
+    }else{
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
-    
-    # Make seqfetcher
-#    my $seqfetcher = $self->make_seqfetcher;
-#    $self->seqfetcher($seqfetcher);
-    
-    
-    
+   
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_EST->new(
         '-query'      => $masked,
         '-unmasked'   => $genseq,
@@ -116,24 +108,6 @@ sub output {
     }
     return @results;
 }
-1;
-__END__
-sub make_seqfetcher {
-    my ( $self, $index ) = @_;
-    
-    my $seqfetcher;
-    if ( my $dbf = $self->analysis->db_file ) {
-        my @dbs = $dbf; 
-        #         $seqfetcher = 
-        #           Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
-        #             -db => \@dbs,
-        #         );
-    }else {
-        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
-    }
-    return $seqfetcher;
-}
-
 1;
 
 =head1 NAME - Bio::EnsEMBL::Pipeline::RunnableDB::Finished_EST
