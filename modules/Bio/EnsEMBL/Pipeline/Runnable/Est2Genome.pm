@@ -60,6 +60,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::Analysis::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
 
@@ -143,14 +144,23 @@ sub run {
     my $primary_tag = "similarity";
     my $estOrientation; #flag for est strand orientation
 
+    #create analysis object
+    my $analysis_obj    = new Bio::EnsEMBL::Analysis::Analysis
+                                (-db              => undef,
+                                 -db_version      => undef,
+                                 -program         => "est_genome",
+                                 -program_version => "",
+                                 -gff_source      => $source_tag,
+                                 -gff_feature     => $primary_tag,);
+    
     #check inputs
     my $genomicseq = $self->genomic_sequence ||
         $self->throw("Genomic sequence not provided");
     my $estseq = $self->est_sequence ||
         $self->throw("EST sequence not provided");
     
+    #get and check filenames
     my ($genfile, $estfile) = $self->_rearrange(['genomic', 'est'], @args);
-    #check or set filenames
     unless ($genfile) { $genfile = "genomic.seq"; }
     unless ($estfile) { $estfile = "est.seq"; }    
     
@@ -168,7 +178,7 @@ sub run {
     
     #run est2genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    my $est_genome_command = "est_genome -reverse -genome $genfile -est $estfile |";
+    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
     open (ESTGENOME, $est_genome_command) 
                 or $self->throw("Can't open pipe from '$est_genome_command' : $!");
 
@@ -182,8 +192,7 @@ sub run {
     {
         if ($_ =~ /^Exon/)
         {
-              warn $_;
- 
+        
               #split on whitespace
               my @elements = split;
 
@@ -192,8 +201,19 @@ sub run {
               my $f1start = $elements[3];
               my $f1end = $elements[4];
               my $f1id = $elements[5];
-              my $f2start = $elements[6];
-              my $f2end = $elements [7];
+              my ($f2start, $f2end);
+              #ensure start is always less than end
+               if ($elements[6] < $elements[7])
+              {
+                $f2start =  $elements[6]; 
+                $f2end = $elements[7];
+              }
+              else
+              {
+                $f2start =  $elements[7]; 
+                $f2end = $elements[6];
+              }
+              
               my $f2id = $elements[8];
               my $f1source = $source_tag;
               my $f2source = $source_tag;
@@ -210,7 +230,7 @@ sub run {
                                                         -score =>   $f1score,
                                                         -source =>  $f1source,
                                                         -primary => $f1primary,
-                                                        -analysis => undef );
+                                                        -analysis => $analysis_obj );
  
                my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
                                                           -end =>    $f2end,
@@ -219,7 +239,7 @@ sub run {
                                                           -score =>  undef,
                                                           -source => $f2source,
                                                           -primary =>$f2primary,
-                                                          -analysis => undef );
+                                                          -analysis => $analysis_obj );
               #create featurepair
               my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                                        -feature2 => $feat2) ;
@@ -251,8 +271,6 @@ sub output {
     return @{$self->{'_fplist'}};
 }
 
-
-    
 1;
 
 
