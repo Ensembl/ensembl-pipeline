@@ -310,7 +310,6 @@ sub parse_results {
     
     # parse
     while (<$filehandle>) {
-	print STDERR;
         chomp;
         next if /^$/;
         if (/^\>/) {
