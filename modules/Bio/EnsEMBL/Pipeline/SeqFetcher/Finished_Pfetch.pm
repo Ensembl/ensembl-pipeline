@@ -212,7 +212,7 @@ sub min {
 sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
     
-	my $descriptions = {};	% results are stored here
+	my $descriptions = {};	# results are stored here
 
 		# first pass fails when the sequence version has changed:
     my $failed_first_pass = [];
@@ -270,7 +270,7 @@ sub fetch_descriptions_by_accession {
         my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
         $embl_parser->parse($entry);
 
-		my $name_without_version = (split('.',$full_id))[0];
+		my $name_without_version = (split('.',$full_name))[0];
 
 		my $found = 0;
 		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
@@ -296,7 +296,7 @@ sub fetch_descriptions_by_accession {
     return $failed;
 }
 
-sub fetch_lengths_from_archive(
+sub fetch_lengths_from_archive {
     my( $self, $id_list, $descriptions ) = @_;
 
 	my $server = $self->get_archive_server;
