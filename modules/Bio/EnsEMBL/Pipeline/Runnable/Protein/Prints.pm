@@ -90,7 +90,6 @@ sub new {
 						   ANALYSIS)], 
 					       @args);
 
-    print STDERR "ANALYSIS: $analysis\n";
     
     $self->query ($query) if ($query);       
     $self->analysis ($analysis) if ($analysis);
@@ -243,7 +242,8 @@ sub run_analysis {
     # This routine expands the database name into $db-1 etc for
     # split databases
 
-    print STDERR "RUNNING: ".$self->analysis->program." ".$self->analysis->db_file." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
+    #print STDERR "RUNNING: ".$self->analysis->program." ".$self->analysis->db_file." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
+
 	$self->throw("Failed during prints run $!\n")
 	    
 	    unless (system ($self->analysis->program . ' ' . 
@@ -306,7 +306,7 @@ sub parse_results {
 	
 	if ($line =~ s/^3TB//) {
 	    if ($line =~ s/^[HN]//) {
-		my ($num,$temp,$tot) = "";
+		my ($num,$temp1,$tot1) = "";
 		# Grab these lines
 		#       1433ZETA        1  of  6  88.19   1328    1.00e-16  ELTVEERNLLSVAYKNVIGARRASWRIITS                          30   35   36   48
 		# split line on space, hence strip off all leading spaces first.
@@ -319,7 +319,20 @@ sub parse_results {
 		my ($fingerprintName,$motifNumber,$temp,$tot,$percentageIdentity,$profileScore,$pvalue,$subsequence,$motifLength,$lowestMotifPosition,$matchPosition,$highestMotifPosition) = @elements;
 	
 		my $start = $matchPosition;
-		my $end = $matchPosition + $motifLength - 1;
+                #
+                # If the match to the pattern lies at the end of the protein we might get padding of the subsequence with #'s, and the 
+                # end position will be bigger than the actual end of the protein. So we'll strip the #'s off the end, adjust the 
+                # motif length accordingly, and only then derive the match end.
+                my $hash_substring;
+		my $end;
+
+                if($subsequence =~ /(\#+)$/){
+                  $hash_substring = $1;
+		  $end = $matchPosition + $motifLength - 1 - length($hash_substring);
+                }else{
+		  $end = $matchPosition + $motifLength - 1;
+                }
+
 		my $print =  $printsac{$fingerprintName};
 						
 		my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
