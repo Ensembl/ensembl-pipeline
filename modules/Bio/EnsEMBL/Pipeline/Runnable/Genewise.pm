@@ -41,6 +41,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Genewise;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -48,20 +49,37 @@ sub new {
   my($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($genomic, $protein, $memory,$reverse,$endbias,$genewise) = 
-      $self->_rearrange([qw(GENOMIC PROTEIN MEMORY REVERSE ENDBIAS GENEWISE)], @args);
+  my ($genomic, $protein, $memory,$reverse,$endbias,$genewise,$gap, 
+      $ext, $subs, $options) = $self->_rearrange([qw(GENOMIC 
+						     PROTEIN 
+						     MEMORY 
+						     REVERSE 
+						     ENDBIAS 
+						     GENEWISE 
+						     GAP 
+						     EXTENSION 
+						     SUBS 
+						     OPTIONS)], @args);
   
-	$genewise = 'genewise' unless defined($genewise);
+  $genewise = $GB_GENEWISE_EXE unless defined($genewise);
 
   $self->genewise($self->find_executable($genewise));
 
   $self->genomic($genomic) || $self->throw("No genomic sequence entered for blastwise");
   $self->protein($protein) || $self->throw("No protein sequence entered for blastwise");
 
-  $self->reverse($reverse)   if (defined($reverse));             
-  $self->endbias($endbias)   if (defined($endbias));             
-  $self->memory ($memory)    if (defined($memory));
-
+  $self->reverse($reverse)   if ($reverse);             
+  $self->endbias($endbias)   if ($endbias);
+  $memory = $GB_GENEWISE_MEMORY if(!$memory);
+  $self->memory ($memory);
+  $gap = $GB_GENEWISE_GAP unless($gap);
+  $self->gap($gap);
+  $ext = $GB_GENEWISE_EXTENSION unless($ext);
+  $self->extension($ext);
+  $subs = $GB_GENEWISE_SUBS unless($subs);
+  $self->subs($subs);
+  $options = $GB_GENEWISE_OPTIONS unless($options);
+  $self->options($options);
   return $self;
 }
 
@@ -70,10 +88,15 @@ sub new {
 sub run {
     my ($self) = @_;
 
+    my($p, $f, $l) = caller;
     $self->check_environment;
-    $self->align_protein;
-
-		return 1;
+    eval{
+      $self->align_protein;
+    };
+    if($@){
+      $self->warn("Genewise run failed caller = $f:$l $@");
+    }
+    return 1;
 }
 
 
@@ -96,15 +119,19 @@ sub align_protein {
 
   my $genewise = $self->genewise;
   my $memory   = $self->memory;
-  
+  my $gap = $self->gap;
+  my $ext = $self->extension;
+  my $subs = $self->subs;
+  my $options = $self->options;
   #my $genfile  = $self->get_tmp_file('/tmp/',$self->protein->id,".gen.fa");
   #my $pepfile  = $self->get_tmp_file('/tmp/',$self->protein->id,".pro.fa");
 
   my $genfile = $self->write_sequence_to_file($self->genomic);
   my $pepfile = $self->write_sequence_to_file($self->protein);
 
-  my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
-    
+  my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
+
+  #print STDERR $command."\n";
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }
@@ -113,7 +140,9 @@ sub align_protein {
     $command .= " -trev ";
   }
   
-  
+  #print STDERR "GENEWISE running on ".$self->protein->id." with command ".$command."\n";
+  my @time = times;
+  #print STDERR "BEFORE GENEWISE @time\n"; 
   open(GW, "$command |") or $self->throw("error piping to genewise: $!\n");
 
   my @genesf_exons;
@@ -216,8 +245,9 @@ sub align_protein {
     }
   } 
   
-  close(GW) or $self->throw("Error running genewise:$!\n");
-  
+  close(GW) or $self->throw("Error running genewise with command line ".$command."\n $!");
+  @time = times;
+  #print STDERR "AFTER GENEWISE @time\n"; 
   unlink $genfile;
   unlink $pepfile;
 }
@@ -257,6 +287,49 @@ sub memory {
 
     return $self->{'_memory'} || 100000;
 }
+
+sub gap {
+    my ($self,$arg) = @_;
+
+    if(!$self->{'_gap'}){
+      $self->{'_gap'} = undef;
+    }
+    if (defined($arg)) {
+      $self->{'_gap'} = $arg;
+    }
+
+    return $self->{'_gap'} || 12;
+}
+
+sub extension {
+    my ($self,$arg) = @_;
+
+    if(!$self->{'_ext'}){
+      $self->{'_ext'} = undef;
+    }
+    if (defined($arg)) {
+      $self->{'_ext'} = $arg;
+    }
+
+    return $self->{'_ext'} || 2;
+}
+
+sub subs{
+    my ($self,$arg) = @_;
+
+    if(!$self->{'_subs'}){
+      $self->{'_subs'} = undef;
+    }
+    if (defined($arg)) {
+      $self->{'_subs'} = $arg;
+    }
+
+    return $self->{'_subs'} || 0.0000001;
+}
+
+
+
+
 
 sub genomic {
     my ($self,$arg) = @_;

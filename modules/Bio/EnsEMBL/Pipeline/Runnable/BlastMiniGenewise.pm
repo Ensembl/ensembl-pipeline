@@ -57,8 +57,10 @@ use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
-						  GB_INPUTID_REGEX
-						 );
+							   GB_INPUTID_REGEX
+							   GB_BMG_FILTER
+							   GB_BMG_SCORE_CUTOFF
+							  );
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder);
@@ -208,8 +210,12 @@ sub check_repeated {
 sub run {
   my ($self) = @_;
   
+  my @time = times;
+  #print STDERR "BEFORE BLAST @time\n"; 
   my @blast_features = $self->run_blast;
-
+  @time = times;
+  #print STDERR "AFTER BLAST @time\n"; 
+  #print STDERR "BLASTMINI have ".@blast_features." to run with\n";
   #print STDERR "There are ".scalar @features." features remaining after re-blasting.\n";
   unless (@blast_features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
@@ -217,30 +223,35 @@ sub run {
   }
 
   my $mg_runnables;
-
+  
   my @feature_pairs;
   foreach my $f (@blast_features){
-    my $feature_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature2,
-						     -feature2 => $f->feature1);
-    push(@feature_pairs, $feature_pair);
+    #my $feature_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature2,
+	#					     -feature2 => $f->feature1);
+    $f->invert;
+    #push(@feature_pairs, $feature_pair);
   }
 
   if ($self->check_repeated > 0){ 
-    $mg_runnables = $self->build_runnables(@feature_pairs);
+    $mg_runnables = $self->build_runnables(@blast_features);
   } else {
-    my $runnable = $self->make_object($self->genomic_sequence, \@feature_pairs);
+    my $runnable = $self->make_object($self->genomic_sequence, \@blast_features);
     push (@$mg_runnables, $runnable); 
   }
-
+  @time = times;
+  my $count = 0;
+  #print STDERR "BEFORE MINIGENEWISE @time\n";
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
     #print STDERR "There were " . scalar @f . " $f[0]  " 
     #  . " features after the MiniGenewise run.\n";
-
+    $count++;
     push(@{$self->{'_output'}},@f);
   }
-  
+  @time = times;
+  #print STDERR "AFTER MINIGENEWISE @time\n";
+  #print STDERR "have made ".$count." multiminigenewise runnables\n";
   return 1;
 
 }
@@ -258,7 +269,7 @@ sub run_blast {
   #print STDERR "\n";
   $blastdb->run;
   #print STDERR "\n";
-  my @features;
+  my @blast_features;
   my $dbname = $blastdb->dbname;
   my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
   foreach my $seq (@sorted_seqs) {
@@ -281,16 +292,44 @@ sub run_blast {
 							   -database => $blastdb->dbfile,
 							   -filter => 1,
 							  );
+     
      $run->add_regex($dbname, $regex);
      $run->run;
      
-     push(@features,$run->output);
+     push(@blast_features,$run->output);
    }
   
   $blastdb->remove_index_files;
   unlink $blastdb->dbfile;
+  if($GB_BMG_FILTER){
+    #this code will through out any sets of features where
+    #none of the blast scores are higher than score set in config 
+    #on the grounds its unlikely in that case that it will produce 
+    #a good gene if a gene at all
+    my @fs;
+    my %feature_hash;
+    while(my $f = shift(@blast_features)){
+      if(!$feature_hash{$f->seqname}){
+	$feature_hash{$f->seqname} = [];
+	push(@{$feature_hash{$f->seqname}}, $f);
+      }else{
+	push(@{$feature_hash{$f->seqname}}, $f);
+      }
+    }
+  HIT: foreach my $hid(keys(%feature_hash)){
+      my @hit_features = @{$feature_hash{$hid}};
+      foreach my $f (@hit_features){
+	if($f->score > $GB_BMG_SCORE_CUTOFF){
+	  push(@fs, @hit_features);
+	  next HIT;
+	}
+      }
+    }
+    return @fs;
+  }else{
+    return @blast_features;
+  }
   
-  return @features;
 }
 
 #=head2 make_mmgw
@@ -401,7 +440,12 @@ sub get_Sequence {
     my ($self,$id) = @_;
     my $seqfetcher = $self->seqfetcher;
     my $seq;
-
+    my $name;
+    if($seqfetcher->can('db')){
+    my @dbs = $seqfetcher->db;
+    $name = $dbs[0];
+    }
+    my ($p, $f, $l) = caller;
     if (!defined($id)) {
       $self->warn("No id input to get_Sequence");
     }  
@@ -411,12 +455,12 @@ sub get_Sequence {
     };
 
     if($@) {
-      $self->warn("Problem fetching sequence for id [$id] $@\n");
+      $self->warn("Problem fetching sequence for id [$id] with $seqfetcher $name  $@\n");
       return undef;
     }
     
     if(!defined($seq)){
-      $self->warn("Could not find sequence for [$id]");
+      $self->warn("Could not find sequence for [$id] with $seqfetcher $name called by $f:$l");
     }
 
     return $seq;
