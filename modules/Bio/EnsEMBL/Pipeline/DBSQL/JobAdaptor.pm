@@ -62,51 +62,56 @@ use Bio::EnsEMBL::Pipeline::Job;
 sub fetch_by_dbID{
   my ($self, $dbID) = @_;
 
+	my $cols = $self->_cols();
+
   my $query = qq {
-    SELECT job_id
-         , taskname
-	 , input_id
-	 , submission_id
-	 , job_name
-	 , array_index
-	 , parameters
-	 , module
-	 , stderr_file
-	 , stdout_file
-	 , retry_count
+    SELECT $cols
     FROM job
     WHERE job_id = $dbID };
 	
   my $sth = $self->prepare($query);
   $sth->execute;
-  my $hashRef;
-  my $job;
-  if($hashRef = $sth->fetchrow_hashref()){
-    $job = $self->_job_from_hashref($hashRef);
-  }
 
-  return $job;
+  my $jobs = $self->_jobs_from_sth($sth);
+
+	return undef if(!@$jobs);
+
+	return $jobs->[0];
 }
 
 
-=head2 fetch_all_by_taskname
 
-  Arg [1]   : taskname e.g RepeatMasker
-  Function  : to get all the jobs with a particular taskname
-  Returntype: listref
-  Exceptions: none
-  Caller    : 
-  Example   : my @jobs = @{$jobadaptor->fetch_all_by_taskname('RepeatMasker')}
+sub fetch_all_by_dbID_list {
+  my ($self, $dbIDs) = @_;
 
-=cut
+	if(@$dbIDs == 0) {
+		return [];
+	}
+
+	my $id_list = join(', ', @$dbIDs);
+
+	my $cols = $self->_cols;
+
+  my $query = qq {
+    SELECT $cols
+    FROM job
+    WHERE job_id IN ($id_list) };
+	
+  my $sth = $self->prepare($query);
+  $sth->execute;
+	
+	return $self->_jobs_from_sth($sth);
+}
 
 
-
-sub fetch_all_by_taskname{
-  my ($self, $taskname) = @_;
-
-   my $query = qq {
-    SELECT job_id
+#
+# private method, just returns the columns in the job table
+# the implementation of _jobs_from_sth depends on this method
+#
+sub _cols {
+	my $self = shift;
+	
+	return  'job_id
    , taskname
 	 , input_id
 	 , submission_id
@@ -116,57 +121,86 @@ sub fetch_all_by_taskname{
 	 , module
 	 , stderr_file
 	 , stdout_file
-   , retry_count
+	 , retry_count';
+}
+
+
+=head2 fetch_all_by_taskname
+
+  Arg [1]   : taskname e.g RepeatMasker
+  Function  : to get all the jobs with a particular taskname
+  Returntype: listref
+  Exceptions: none
+  Caller    :
+  Example   : @jobs = @{$jobadptr->fetch_all_by_taskname('RepeatMasker_task')}
+
+=cut
+
+sub fetch_all_by_taskname{
+  my ($self, $taskname) = @_;
+
+	my $cols = $self->_cols();
+
+   my $query = qq {
+    SELECT $cols
     FROM job
     WHERE taskname = ? };
 
   my $sth = $self->prepare($query);
   $sth->execute("$taskname");
-  my $hashRef;
-  my @jobs;
-  while($hashRef = $sth->fetchrow_hashref()){
-    my $job = $self->_job_from_hashref($hashRef);
+
+	my $jobs = $self->_jobs_from_sth($sth);
+
+	foreach my $job (@$jobs) {
     my $status = $self->fetch_current_status($job);
     $job->status($status);
-    push(@jobs, $job);
   }
 
-  return \@jobs;
+  return $jobs;
 }
 
 
-=head2 _job_from_hashref
+=head2 _jobs_from_sth
 
-  Arg [1]   : hashred
-  Function  : creates a job object from hashref
+  Arg [1]   : $sth an executed statement handle
+  Function  : creates a list of job objects from a statment handle
   Returntype: Bio::EnsEMBL::Pipeline::Job
   Exceptions: none
   Caller    : 
-  Example   : my $job = $self->_job_from_hashref($hashref);
+  Example   : $jobs = @{$self->_jobs_from_sth($sth);
 
 =cut
 
+sub _jobs_from_sth{
+  my ($self, $sth) = @_;
 
+	my ($job_id, $taskname, $input_id, $submission_id, $job_name, $array_index,
+	    $parameters, $module, $stderr_file, $stdout_file, $retry_count);
 
-sub _job_from_hashref{
-  my ($self, $hashref) = @_;
-  
-  my $job = Bio::EnsEMBL::Pipeline::Job->new(
-	     -input_id => $hashref->{'input_id'},
-	     -taskname => $hashref->{'taskname'},
-	     -module => $hashref->{'module'});
+	$sth->bind_columns(\$job_id, \$taskname, \$input_id, \$submission_id,
+										 \$job_name, \$array_index,	\$parameters, \$module,
+										 \$stderr_file, \$stdout_file, \$retry_count);
 
-  $job->dbID($hashref->{'job_id'});
-  $job->submission_id($hashref->{'submission_id'});
-  $job->job_name($hashref->{'job_name'});
-  $job->array_index($hashref->{'array_index'});
-  $job->parameters($hashref->{'parameters'});
-  $job->stderr_file($hashref->{'stderr_file'});
-  $job->stdout_file($hashref->{'stdout_file'});
-	$job->retry_count($hashref->{'retry_count'});
-  $job->adaptor($self);
+	my @jobs;
 
-  return $job;
+	while($sth->fetch) {
+		push @jobs, Bio::EnsEMBL::Pipeline::Job->new
+			(-input_id => $input_id,
+	     -taskname => $taskname,
+	     -module => $module,
+		   -dbID => $job_id,
+			 -submission_id => $submission_id,
+			 -job_name => $job_name,
+			 -array_index => $array_index,
+			 -parameters => $parameters,
+			 -module => $module,
+			 -stderr_file => $stderr_file,
+			 -stdout_file => $stdout_file,
+			 -retry_count => $retry_count,
+			 -adaptor => $self);
+  }
+
+  return \@jobs;
 }
 
 
@@ -221,12 +255,13 @@ sub list_current_status {
   SELECT j.job_id,
          j.input_id,
          j.taskname,
-  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':', UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
+  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':',
+             UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
   FROM   job_status js,
          job j
   WHERE  js.job_id = j.job_id
   GROUP BY js.job_id };
- 
+
   my $sth = $self->prepare( $q );
   $sth->execute();
 
@@ -376,8 +411,6 @@ sub store{
   Example   : $jobadaptor->remove($job);
 
 =cut
-
-
 
 sub remove{
   my ($self, $job) = @_;
