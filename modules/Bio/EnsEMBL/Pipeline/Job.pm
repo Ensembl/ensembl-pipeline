@@ -269,6 +269,7 @@ sub flush_runs {
   my $username = $db->username;
   my $dbname   = $db->dbname;
   my $pass     = $db->password;
+  my $port     = $db->port;
 
   # runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
   # then in same directory as Job.pm,
@@ -319,10 +320,10 @@ sub flush_runs {
     # "connect" command line accordingly (otherwise -pass gets the
     # first job id as password, instead of remaining undef)
     if ($pass) {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass";
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass -port $port";
     }
     else {
-      $cmd = $runner." -host $host -dbuser $username -dbname $dbname";
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -port $port";
     }
     $cmd .= " -output_dir ".$self->output_dir;
     $cmd .= " @job_ids";

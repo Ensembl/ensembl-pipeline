@@ -68,6 +68,7 @@ my $dbhost    = $ENV{'ENS_DBHOST'};
 my $dbname    = $ENV{'ENS_DBNAME'};
 my $dbuser    = $ENV{'ENS_DBUSER'};
 my $dbpass    = $ENV{'ENS_DBPASS'};
+my $dbport    = $ENV{'ENS_DBPORT'} || 3306;
 
 $| = 1;
 
@@ -90,6 +91,7 @@ GetOptions(
     'dbname=s'      => \$dbname,
     'dbuser=s'      => \$dbuser,
     'dbpass=s'      => \$dbpass,
+    'dbport=s'      => \$dbport,
     'local'         => \$local,
     'idlist=s'      => \$idlist,
     'runner=s'      => \$runner,
@@ -113,6 +115,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
     -user   => $dbuser,
     -pass   => $dbpass,
+    -port   => $dbport,
 );
 
 my $rule_adaptor = $db->get_RuleAdaptor;
