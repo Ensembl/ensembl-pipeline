@@ -38,18 +38,9 @@ my $all_exons_found = 1;
 
 ok(my @peptides = $genscan->genscan_peptides);
 
-foreach my $feat_pair (@results) {
+foreach my $exon (@results) {
 
     if ($all_exons_found == 1) {
-
-      $all_exons_found = 0;
-      my $exon = Bio::EnsEMBL::Exon->new();
-      $exon->temporary_id ($feat_pair->seqname);
-      $exon->start        ($feat_pair->start);
-      $exon->end          ($feat_pair->end);
-      $exon->strand       ($feat_pair->strand);
-      $exon->phase        ($feat_pair->phase);
-      $exon->contig       ($clone);
 
       foreach my $full_pep (@peptides) {
 	
@@ -67,7 +58,7 @@ foreach my $feat_pair (@results) {
 	}
       }
     }
-  }
+}
 
 ok($all_exons_found);
 
@@ -76,13 +67,8 @@ sub display {
   
   foreach my $obj (@results) {
 
-    print STDERR ($obj->gffstring . "\n");
-
-    if ($obj->sub_SeqFeature) {
-
-      foreach my $exon ($obj->sub_SeqFeature) {
+    foreach my $exon (@{$obj->get_all_Exons}) {
 	print STDERR "Exon: ".$exon->gffstring."\n";
-      }
     }
   }
   return 1;
