@@ -14,7 +14,7 @@ sub new {
 
 sub run {
   print "RUNNING DUMMY\n";
-  sleep(int(rand(10)));
+  sleep(int(rand(50)));
   return;
 }
 

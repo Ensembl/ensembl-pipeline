@@ -22,8 +22,8 @@ sub run{
   my $self = shift;
 
   if($self->{'remaining'}) {
-
-    $self->create_Job('Bio::EnsEMBL::Pipeline::DummyModule',  1, '');
+    my $id = 20 - $self->{'remaining'};
+    $self->create_Job('Bio::EnsEMBL::Pipeline::DummyModule', $id, '');
     $self->{'remaining'}--;
     return 'TASK_OK';
   }

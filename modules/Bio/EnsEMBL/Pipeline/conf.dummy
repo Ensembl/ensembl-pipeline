@@ -1,8 +1,8 @@
 [DEFAULT_DATABASE]
-host=127.0.0.1
+host=ecs1g
 user=ensadmin
 pass=ensembl
-port=5000
+port=3306
 
 #
 # Database where pipeline config is stored
@@ -23,10 +23,10 @@ path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 [LOCAL]
 output_dir = /tmp
-maxjobs = 1
+maxjobs = 3
 
 [PIPELINE_MANAGER]
-check_interval = 35
+check_interval = 10
 
 #
 # This is a list of tasks to be run by the pipeline manager
@@ -50,7 +50,7 @@ retries	= 0
 max_create = 50
 
 [DUMMY_TASK]
-timeout  = 3600
+timeout  = 30
 where = Local
 retries = 3
 
