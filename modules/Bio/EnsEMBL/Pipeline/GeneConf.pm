@@ -76,12 +76,14 @@ my $prefix='COB';
 	     
 	     # pmatch related variables - for Targetted build
 	     # path to refseq fasta file
-	     GB_REFSEQ      => '/acari/work4a/lec/cDNAs/cdnas.fa',
+	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep82.pep',
 	     # path to swissprot fasta file
 	     GB_SPTR        => '',
+	     # path to swissprot "evidence kill list" file
+	     GB_KILL_LIST   => '',
 	     # path to file where we'll write cleaned up  proteome data
-	     GB_PFASTA      => '/acari/work4a/lec/cDNAs/prepare_cdnas.fa',
-	     #GB_PFASTA      => '/acari/work4a/lec/briggsae_sequence/proteome79.fa',
+	     #GB_PFASTA      => '/acari/work4a/lec/cDNAs/prepare_cdnas.fa',
+	     GB_PFASTA      => '/acari/work4a/lec/briggsae_sequence/proteome82.fa',
 	     # path pmatch executable
 	     GB_PMATCH      => '/usr/local/ensembl/bin/pmatch',
 	     # path to directory where fpc/chromosoaml sequences are 
@@ -113,6 +115,23 @@ my $prefix='COB';
 	     # genetype for Targetted_GeneWise
 	     #GB_TARGETTED_GW_GENETYPE              => 'targetted_cdna',
 	     GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',
+	     #for est2genome runnabledb
+	     GB_EST_DATABASES => [
+                                  # fill in one complete hash for each database from which blast 
+                                  # features are to be retrieved
+                                  {                                  
+                                   'type'       => '',
+                                   'threshold'  => '',
+                                   'index'      => ''
+                                  },
+                
+                                  #                                         {
+                                  #                                          'type'       => 'dbEST', #logic name of analysis type
+                                  #                                          'threshold'  => '100',
+                                  #                                          'index'      => '/full/path/to/dbEST'
+                                  #                                         },
+                                        ],
+	     GB_EST_GENETYPE => 'est2genome'
 	     # similairity genewise specific parameters
 	     GB_SIMILARITY_DATABASES => [
 					 # fill in one complete hash for each database from which blast 
