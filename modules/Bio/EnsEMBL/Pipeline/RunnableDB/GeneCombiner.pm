@@ -405,8 +405,8 @@ sub run{
       
       print STDERR "=== ensembl genes ===\n";
       foreach my $gene ( @ens_genes ){	
-      TRAN1:
-	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+       TRAN1:
+	 foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
@@ -2360,21 +2360,22 @@ sub _make_Genes{
  TRANSCRIPT:
   foreach my $transcript (@transcripts) {
       $count++;
-      unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->ensembl_vc)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
+      unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) &&
+	     Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->ensembl_vc)
+	       ){
 	  print STDERR "skipping this transcript\n";
 	  next TRANSCRIPT;
-    }
-    push(@selected_transcripts,$transcript);
+      }
+      push(@selected_transcripts,$transcript);
   } 
-  my @genes = $self->_cluster_into_Genes(@transcripts);
+  my @genes = $self->_cluster_into_Genes(@selected_transcripts);
   
   foreach my $gene ( @genes ){
       $gene->type($genetype);
       $gene->analysis($analysis);
       foreach my $t (@{$gene->get_all_Transcripts}){
 	  unless (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($t) ){
-	      $self->warn("transcript with stop codons!");
+	      $self->warn("You don't want to write a transcript with stop codons!");
 	  }
       }
   }
