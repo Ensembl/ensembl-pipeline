@@ -13,13 +13,18 @@ CREATE TABLE job (
   KEY         (analysis_id)
 );
 
+-- to patch from previous job table use
+-- alter table job add column temp_dir varchar(100) DEFAULT '';
+-- alter table job add column exec_host varchar(40) DEFAULT '';
+
 # job_id        - job internal ID
 # input_id      - name (e.g. accession/Ensembl ID) of input
 # analysis_id   - internal ID of analysis (analysis table)
 # submission_id - ID of job in LSF
 # *_file        - files created to contain job output/error
 # retry_count   - number of times job restarted
-
+-- temp_dir     - 
+-- exec_host    - 
 # ?? what is job.objectfile - do we need/use it?
 
 
