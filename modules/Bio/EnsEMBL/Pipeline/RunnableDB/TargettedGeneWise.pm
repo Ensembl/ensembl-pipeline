@@ -187,14 +187,14 @@ sub fetch_input{
   $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
   my $sliceadp = $self->db->get_SliceAdaptor();
-  my $vcontig = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
+  my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
   
-  $self->vcontig($vcontig);
+  $self->query($slice);
   $self->protein_id($protein_id);
   
   # genewise runnable
   # repmasking?
-  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vcontig,
+  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $slice,
 								    '-ids'        => [ $protein_id ] ,
 								    '-seqfetcher' => $self->seqfetcher);
  
@@ -405,14 +405,14 @@ sub convert_gw_output {
 
 sub make_genes {
   my ($self, $count, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vcontig;
+  my $contig = $self->query;
   my @genes;
   #print STDERR "making genes\n";
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
  MAKE_GENE:  foreach my $tmpf (@$results) {
-    my $transcript = $self->make_transcript($tmpf,$self->vcontig,$genetype,$count, $analysis_obj);
+    my $transcript = $self->make_transcript($tmpf,$self->query,$genetype,$count, $analysis_obj);
 	
     # validate transcript - validate_transcript returns an array ref
     my $valid_transcripts = $self->validate_transcript($transcript);
@@ -571,7 +571,7 @@ sub validate_transcript {
 sub remap_genes {
   my ($self) = @_;
   my @newf;  
-  my $contig = $self->vcontig;
+  my $contig = $self->query;
 
   my @genes = $self->gw_genes;
  # print STDERR "REMAPPING GENES\n";
