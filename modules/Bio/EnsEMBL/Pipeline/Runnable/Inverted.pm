@@ -33,9 +33,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Inverted
 
 Inverted takes a Bio::Seq (or Bio::PrimarySeq) object and runs einverted. The
 resulting inverted repeats are used to create a pair of Bio::FeaturePairs per
-repeat. The score of feature1 is the score given by einverted, the score of
-feature2 is a the percentage identity. The output is returned as an aray of
-feature pairs.  
+repeat. The output is returned as an array of feature pairs.  
 
 =head2 Methods:
 
@@ -63,7 +61,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::Repeat;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Analysis::Programs;
@@ -288,7 +286,9 @@ sub parse_results {
             }
             $feat2 {name} = $feat1{name}."_inv_repeat";
             $feat1 {score} = $1; #score as an inverted repeat
-            $feat2 {score} = $1; #percentage identity to feature 1 is $4
+            $feat2 {score} = $1; 
+            $feat1 {percent} = $4; #percentage identity
+            $feat2 {percent} = $4;
         }
         elsif (/(\d+)\D+(\d+)/ && ($feat1{start}))
         { 
@@ -312,11 +312,11 @@ sub parse_results {
             $feat2 {db_version} = undef;
             $feat2 {program} = 'einverted';
             $feat2 {p_version} = 'unknown';
-            $self->createfeaturepair(\%feat1, \%feat2);
+            $self->create_repeat(\%feat1, \%feat2);
             #reverse scores and names
             ($feat1 {name}, $feat2 {name}) = ($feat2 {name}, $feat1 {name});
             ($feat1 {score}, $feat2 {score}) = ($feat2 {score}, $feat1 {score});
-            $self->createfeaturepair(\%feat2, \%feat1);
+            $self->create_repeat(\%feat2, \%feat1);
             #reset flag variables to allow correct reading of next repeat
             $feat1{name} = undef;
             $feat1{start} = undef;
