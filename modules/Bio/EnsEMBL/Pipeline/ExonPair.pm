@@ -61,7 +61,7 @@ sub new {
 						   EXON2
 						   TYPE
 						   )],@args);
-
+  
   
   $exon1 || $self->throw("First exon not defined in ExonPair constructor");
   $exon2 || $self->throw("Second exon not defined in ExonPair constructor");
@@ -159,28 +159,29 @@ sub type {
 =cut
 
 sub verifyExons {
-    my ($self) = @_;
-
-    $self->throw("No exon1 defined") unless $self->exon1;
-    $self->throw("No exon2 defined") unless $self->exon2;
-
-    if ($self->exon1->contig_id eq $self->exon2->contig_id) {
-	# Should we check contig version here?
-	if ($self->exon1->strand != $self->exon2->strand) {
-	    $self->throw("Exons are on opposite strands");
-	}
-
-	if ($self->exon1->strand == 1) {
-	    if ($self->exon1->end >  $self->exon2->start) {
-		$self->throw("Inconsistent coordinates for exons [" . $self->exon1->end . "][" . $self->exon2->start ."]");
-	    }
-	} else {
-	    if ($self->exon2->end >  $self->exon1->start) {
-		$self->throw("Inconsistent coordinates for exons (-1)[" . $self->exon2->end . "][" . $self->exon1->start ."]");
-	    }
-	}
+  my ($self) = @_;
+  
+  $self->throw("No exon1 defined") unless $self->exon1;
+  $self->throw("No exon2 defined") unless $self->exon2;
+  
+  if ($self->exon1->contig_id eq $self->exon2->contig_id) {
+    # Should we check contig version here?
+    if ($self->exon1->strand != $self->exon2->strand) {
+      $self->throw("Exons are on opposite strands");
     }
+    
+    if ($self->exon1->strand == 1) {
+      if ($self->exon1->end >  $self->exon2->start) {
+	$self->throw("Inconsistent coordinates for exons [" . $self->exon1->end . "][" . $self->exon2->start ."]");
+      }
+    } 
+    elsif ($self->exon2->end >  $self->exon1->start) {
+      $self->throw("Inconsistent coordinates for exons (-1)[" . $self->exon2->end . "][" . $self->exon1->start ."]");
+    }
+  }
 }
+
+
 
 
 =head2 add_coverage
@@ -193,10 +194,10 @@ sub verifyExons {
  Args    : none
 
 =cut
-
+  
 sub add_coverage {
-    my ($self) = @_;
-    $self->{'_coverage'}++;
+  my ($self) = @_;
+  $self->{'_coverage'}++;
 }
 
 
@@ -212,46 +213,41 @@ sub add_coverage {
 =cut
 
 sub coverage {
-    my ($self) = @_;
-    return $self->{'_coverage'};
+  my ($self) = @_;
+  return $self->{'_coverage'};
 }
 
 =head2 is_Covered
 
- Title   : is_Covered
  Usage   : $pair->is_Covered
- Function: Returns 1 if this pair is validated by enough evidence
- Example : 
- Returns : int
+ Function: Returns TRUE if this pair is validated by at least 1 evidence
+ Returns : BOOLEAN
  Args    : none
 
 =cut
 
 sub is_Covered {
-    my ($self) = @_;
-
-    my $est = 0;
-
-    for my $f (@{$self->get_all_Evidence}) {
-	
-	if ($f->source_tag eq "est2genome" || $f->source_tag eq "genewise") {
-	    $est = 1;
-	}
+  my ($self) = @_;
+  my $est = 0;  
+  for my $f (@{$self->get_all_Evidence}) {
+    if ($f->source_tag eq "est2genome" || $f->source_tag eq "genewise") {
+      $est = 1;
     }
-
-    if ($est == 1 || $self->coverage >= 1) {
-	return 1;
-    } else {
-	return 0;
-    }
+  }
+  if ($est == 1 || $self->coverage >= 1) {
+    return 1;
+  } 
+  else {
+    return 0;
+  }
 }
 
 =head2 compare
 
- Title   : compare
  Usage   : $pair->compare($pair2);
  Function: Compares self to another pair to 
-           see if they\'re the same
+           see if they are the same by comparing first exons with each other and
+           second exons with each other
  Example : 
  Returns : 0,1
  Args    : Bio::EnsEMBL::Pipeline::ExonPair
@@ -259,41 +255,37 @@ sub is_Covered {
 =cut
 
 sub compare {
-    my ($self,$pair) = @_;
-
-    if ($self->exon1 == $pair->exon1 && 
-	$self->exon2 == $pair->exon2) {
-	return 1;
-    } else {
-	return 0;
-    }
+  my ($self,$pair) = @_;
+  
+  if ($self->exon1 == $pair->exon1 && 
+      $self->exon2 == $pair->exon2) {
+    return 1;
+  } 
+  else {
+    return 0;
+  }
 }
 
 
 
 =head2 add_Evidence
 
- Title   : add_Evidence
- Usage   : $pair->add_Evidence($f);
- Function: Adds a sequence feature that was
-           used to create this pair
- Example : 
- Returns : nothing
- Args    : Bio::EnsEMBL::FeaturePair
+  Function: Adds a sequence feature that was used to create this pair
+  Returns : nothing
+  Args    : Bio::EnsEMBL::FeaturePair
 
 =cut
 
 sub add_Evidence {
-    my ($self,$feature) = @_;
-
-    if (!defined($self->{'_evidence'})) {
-	$self->{'_evidence'} = [];
-    }
-
-    $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless defined($feature);
-    $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless $feature->isa("Bio::EnsEMBL::FeaturePair");
-
-    push(@{$self->{'_evidence'}},$feature);
+  my ($self,$feature) = @_;
+  
+  if (!defined($self->{'_evidence'})) {
+    $self->{'_evidence'} = [];
+  }
+  
+  $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless defined($feature);
+  $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless $feature->isa("Bio::EnsEMBL::FeaturePair");
+  push(@{$self->{'_evidence'}},$feature);
 
 }
 
