@@ -152,7 +152,7 @@ sub new {
   #$self->exonerate('exonerate-0.6.7');
 
   # can add extra options as a string
-  my $basic_options = " --saturatethreshold 800 --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
+  my $basic_options = " --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
   
   if ($options){
     $basic_options .= $options;
@@ -255,7 +255,7 @@ sub run {
 sub parse_results {
   my ($self, $length) = @_;
 
-  my $verbose = 0;
+  my $verbose = 1;
   my $filehandle;
   my %length = %$length;
   my @features_within_features;
@@ -385,7 +385,7 @@ sub parse_results {
 	      $exon->end_phase( 0 );
 	    }
 	    # for every match we increase the end coordinate of the current exon
-	    print STDERR "setting exon end = ". $exon->start +  $blocks[$i+2] - 1 ."\n";
+	    print STDERR "setting exon end = ". ($exon->start +  $blocks[$i+2] - 1 )."\n";
 	    $exon->end( $exon->start +  $blocks[$i+2] - 1 );
 
 
