@@ -1,4 +1,64 @@
+#
+# Cared for by esnembl-dev  <ensembl-dev@ebi.ac.uk>
+#
+#
+# You may distribute this module under the same terms as perl itself
+#
+# POD documentation - main docs before the code
 
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Runnable::Genefinder
+
+=head1 SYNOPSIS
+
+    my $genefinder = Bio::EnsEMBL::Pipeline::Runnable::Genefinder->new(-query => $seq) #should be a Bio::PrimarySeq obj
+
+  will need to alter the hard coded paths to config files from genefinder for this to work properly
+ 
+=head1 DESCRIPTION
+
+  This package is based on Bio::EnsEMBL::Pipeline::Runnable::Genscan
+
+
+=head2 Methods:
+
+=over 4
+
+=item new($seq_obj)
+
+=item    genefinder($path_to_Genefinder)
+
+=item    workdir($directory_name)
+
+=item    run()
+
+=item    output()
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item B<Bio::EnsEMBL::Pipeline::RunnableI>
+
+=item B<Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder> 
+
+=back
+
+=head1 CONTACT
+
+Describe contact details here
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object methods. 
+Internal methods are usually preceded with a _
+
+=cut
 
 package Bio::EnsEMBL::Pipeline::Runnable::Genefinder;
 
@@ -62,6 +122,20 @@ sub new {
 ###################
 #get/set methods
 ###################
+
+
+=head2 accessor methods
+
+  Arg [1]   : scalar/object
+  Function  : get/set value to argument passed in
+  Returntype: set value
+ Exceptions: query will throw if not passed a Bio::PrimarySeq and genefinder will throw if location of executable doesn't exist'
+  Caller    : $self
+  Example   : $self->query($seq);
+
+=cut
+
+
 
 sub query {
     my ($self, $seq) = @_;
@@ -149,10 +223,24 @@ sub exons {
 }
 
 #empties exon array after they have been converted to genes
+
 sub clear_exons {
     my ($self) = @_;
     $self->{'_exons'} = [];
   }
+
+
+=head2 genefinder_genes
+
+  Arg [1]   : Bio::EnsEMBL::SeqFeature
+  Function  : add arg to the array of genes
+  Returntype: array of genes
+  Exceptions: if arg isn't a Bio::EnsEMBL::SeqFeature'
+  Caller    : $self
+  Example   : $self->genefinder_genes($gene);
+
+=cut
+
 
 sub genefinder_genes {
     my ($self, $gene) =@_;
@@ -167,7 +255,19 @@ sub genefinder_genes {
   }
 
 
-sub add_transcript{
+=head2 add_transcript
+
+  Arg [1]   : Bio::EnsEMBL::Transcript
+  Function  : adds transcript object to array
+  Returntype: array of transcripts
+ Exceptions: throws if arg isnt a Bio::EnsEMBL::Transcript
+  Caller    : $self
+  Example   : $self->add_transcript($transcript);
+
+=cut
+
+
+sub add_Transcript{
   my ($self, $transcript) =@_;
   if ($transcript)
     {
@@ -178,7 +278,19 @@ sub add_transcript{
   return @{$self->{'_transcripts'}};
 }
 
-sub each_transcript{
+
+=head2 each_Transcript
+
+  Arg [1]   : none
+  Function  : returns array of transcripts
+ Returntype: array of transcripts
+ Exceptions: throws if arg isnt a Bio::EnsEMBL::Transcript
+  Caller    : $self
+  Example   : $self->add_Transcript($transcript);
+
+=cut
+
+sub each_Transcript{
   my ($self) = @_;
 
   if (!defined($self->{'_transcripts'})) {
@@ -191,15 +303,18 @@ sub each_transcript{
 # Analysis methods
 ##########
 
+
 =head2 run
 
-    Title   :  run
-    Usage   :   $obj->run()
-    Function:   Runs genefinder and creates array of sub-seqfeatures
-    Returns :   none
-    Args    :   none
+  Arg [1]   : working directory
+  Function  : run the genefinder analysis
+  Returntype: none
+  Exceptions: throws if no  sequence object is found
+  Caller    : runnableDB normally
+  Example   : $runnable->run (see Bio::EnsEMBL::Pipeline::RunnableDB::Genefinder)
 
 =cut
+
 
 sub run {
 
@@ -223,8 +338,21 @@ sub run {
     $self->parse_results();
     $size = -s $self->results;
     #print "3 ".$size."\n";
-#    $self->deletefiles();
+    $self->deletefiles();
   }
+
+
+=head2 run_genefinder
+
+  Arg [1]   : none
+  Function  : constructs the command line and runs genefinder
+  Returntype: non
+  Exceptions: throws if no result file is produces
+  Caller    : $self
+  Example   : $self->run_genefinder
+
+=cut
+
 
 
 sub run_genefinder {
@@ -241,16 +369,39 @@ sub run_genefinder {
 
 
 
+=head2 parse_results
+
+  Arg [1]   : none
+  Function  : parse genefinders evil output
+  Returntype: none
+  Exceptions: throws if couldn't open outputfile
+  Caller    : $self'
+  Example   : $self->parse_results
+
+=cut
+
+
 
 sub parse_results{
   my ($self) = @_;
   
+  # NOTE genefinder output is evil
+  # *  [ 7.08 ]   1972..2061   2368..2553	3397..3617   10379..10703 start 
+  
+  #   [ 9.56 ]   13592..14005 end
+  
+  #   [ 15.99 ]  [TSL: -1	3.0]   14096..14145   15781..15921   15989..16093   16188..16292   16340..16493	  16761..17021 end
+  
+  #   [ 43.18 ]  [TSL: -4	3.1]   18068..18139   18193..18392   18438..18607   19152..19350   20217..20481	  20884..20968	 21508..21795	22647..22978 end
+
+  #*  [ 26.51 ]   23612..24130 U0  not this is an incomplete gene in this case the completion is of the end of the sequence 
+  #but it can just be interupted by another gene in output file this is the 3' end of a reverse strand gene the U0 indicates the exon start in phase 0
   my $resultsfile = $self->results;
   open(FH, "<".$self->results) || die("couldn't open file ".$self->results." $! \n");
   my $prefix;
   my @forward_lines;
   my @reverse_lines;
-  while(<FH>){
+  while(<FH>){ # this loop sorts the lines in to foward and reverse genes
     #print;
     chomp;
     if (/Sequence: (\S+)/) {
@@ -270,13 +421,14 @@ sub parse_results{
   my $strand = 1;
   #print STDERR "forward strand\n";
   foreach my $line(@forward_lines){
+    #print "parsing gene ".$gene_count."\n";
     #print STDERR "line ".$line,"\n";
-    $line =~ s/\[TSL: \S+\s+\S+\]//;
-    $line =~ s/end//;
-    $line =~ s/\[ -?(\d+\.\d+) \]//;
+    $line =~ s/\[TSL: \S+\s+\S+\]//; #TSL is striped iout, not sure what it is
+    $line =~ s/end//; #end is stripped off
+    $line =~ s/\[ -?(\d+\.\d+) \]//; #score is parsed out
     my $score = $1;
-    #print STDERR "have line ".$line."\n";
-    my @values = split /\s+/, $line;
+    #print STDERR "have line ".$line."\n"; 
+    my @values = split /\s+/, $line; #remaining line is split into pairs of exon coords
     #print STDERR "have values @values\n";
     if(!$values[0]){
       my $first = shift @values;  
@@ -288,7 +440,8 @@ sub parse_results{
     #print STDERR "have values @values\n";
     my $count = 0;
     my $exonname = $prefix.".".$gene_count;
-    foreach my $coord(@values){
+    foreach my $coord(@values){ #for each pair of values a feature is created
+      #print STDERR "start phase of this gene is ".$phase."\n";
       if($coord =~ /U\d/){
 	next;
       }
@@ -305,12 +458,15 @@ sub parse_results{
 	}
       }
     }
+    $phase = 0;
     $gene_count++;
   }
   #print STDERR "reverse strand\n";
   $phase = 0;
   $strand = -1;
-  foreach my $line(@reverse_lines){
+  foreach my $line(@reverse_lines){ # this is pretty much as for forward strand genes but the line of coordinate pairs has to be reversed before processing
+    #print "parsing gene ".$gene_count."\n";
+    #print "phase = ".$phase."\n";
     #print STDERR "line ".$line,"\n";
     $line =~ s/\[TSL: \S+\s+\S+\]//;
     $line =~ s/start//;
@@ -341,7 +497,9 @@ sub parse_results{
     #print STDERR "@values\n";
     my $count = 0;
     my $exonname = $prefix.".".$gene_count;
+    #print "phase = ".$phase."\n";
     foreach my $coord(@values){
+      #print STDERR "start phase of this gene is ".$phase."\n";
       if($coord =~ /U\d/){
 	next;
       }
@@ -359,6 +517,7 @@ sub parse_results{
 	}
       }
     }
+    $phase = 0;
     $gene_count++;
   }
   $self->create_genes;
@@ -366,25 +525,25 @@ sub parse_results{
 
 
 
-sub add_Transcript {
-  my ($self,$transcript) = @_;
+=head2 create_feature
 
-  if (defined($transcript)) {
-    if (!defined($self->{_transcripts})) {
-      $self->{_transcripts} = [];
-    }
-    push(@{$self->{_transcripts}},$transcript);
-  }
-}
+  Arg [1]   : int
+  Arg [2]   : int
+  Arg [3]   : float
+  Arg [4]   : int (strand should only be 1 or -1)
+  Arg [5]   : int
+  Arg [6]   : int
+  Arg [7]   : int 
+  Arg [8]   : string
+  Function  : create a seqfeature from passed in values and add to array of exons
+  Returntype: none
+  Exceptions: none
+  Caller    : $self
+  Example   : (line 452)
 
-sub each_Transcript {
-  my ($self) = @_;
+=cut
 
-  if (!defined($self->{_transcripts})) {
-    $self->{_transcripts} = [];
-  }
-  return @{$self->{_transcripts}};
-}
+
 
 
 sub create_feature {
@@ -403,6 +562,19 @@ sub create_feature {
                             -end_phase => $end_phase);  
     $self->exons($exon);
 }
+
+
+=head2 create_genes
+
+  Arg [1]   : none
+  Function  : groups exons on seqname and turns into transcripts and genes
+  Returntype: none
+  Exceptions: throws if problem creating seqfeature
+  Caller    : $self
+  Example   : $self->create_genes
+
+=cut
+
 
 #creates groups of exons as subseqfeatures.
 #relies on seqname of exons being in genefinder format 3.01, 3.02 etc
@@ -466,7 +638,7 @@ sub create_genes {
 	$self->query->id($gene_number);
 	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
 	#print "have ".$tran."\n";
-	$self->add_transcript($tran);
+	$self->add_Transcript($tran);
       }
 }
 
@@ -474,16 +646,19 @@ sub create_genes {
 # input/output methods
 #############
 
+
 =head2 output
 
-    Title   :   output
-    Usage   :   obj->output()
-    Function:   Returns an array of SeqFeatures representing predicted genes 
-                with exons stored as SubSeqFeatures.
-    Returns :   An array of SeqFeatures (genes) containing sub-seqfeatures (exons)
-    Args    :   none
+  Arg [1]   : none
+  Function  : turns exons into feature pairs
+  Returntype: array of feature pairs
+  Exceptions: none
+  Caller    : 
+  Example   : 
 
 =cut
+
+
 
 sub output {
 
@@ -501,7 +676,7 @@ sub output {
                                                 );
 
   
-  foreach my $transcript ($self->each_transcript) {
+  foreach my $transcript ($self->each_Transcript) {
     my @exons = $transcript->get_all_Exons;
 
     if ($exons[0]->strand == 1) {
@@ -545,76 +720,5 @@ sub output {
   return @feat;
 }
 
-=head2 output_exons
-
-    Title   :   output_exons
-    Usage   :   obj->output_exons()
-    Function:   Returns an array of SeqFeatures corresponding to exons
-    Returns :   An array of SeqFeatures corresponding to exons
-    Args    :   none
-
-=cut
-
-sub output_exons {
-    my ($self) = @_;
-    my @exons;
-
-    foreach my $gene ($self->genefinder_genes)
-    {
-        push (@exons, $gene->sub_SeqFeature);
-    }
-    print STDERR "No exons predicted\n" unless (@exons);
-    @exons = sort { $a->seqname <=> $b->seqname } @exons;
-    return @exons;
-}
-
-=head2 output_singlefeature
-
-    Title   :   output_singlefeature
-    Usage   :   obj->output_singlefeature()
-    Function:   Returns a single SeqFeature with exons as sub-SeqFeatures
-    Returns :   A single SeqFeature with exons as sub-SeqFeatures
-    Args    :   none
-
-=cut
-
-sub output_singlefeature {
-    my ($self) = @_;
-    my ($start, $end, $score, $analysis, $primary, $source, $p_value);
-
-    my (@genes) = $self->genes();
-    #print STDERR "No exons predicted\n" unless (@genes);
-    #calculate boundaries and aggregate values
-    foreach my $gene (@genes)
-    {
-        $start      =  $gene->start()  if (!defined($start) || $gene->start() < $start);
-        $end        =  $gene->end()    if (!defined($end)   || $gene->end()   > $end);
-        $score      += $gene->score();
-        $p_value    += $gene->p_value();
-        $analysis   =  $gene->analysis();
-        $primary    =  $gene->primary_tag();
-        $source     =  $gene->source_tag();
-    }
-    $score  = $score/scalar(@genes); #average score
-
-    my $single = Bio::EnsEMBL::SeqFeature->new
-                        (   -seqname        => 'genefinder',
-                            -strand         => 1,
-                            -score          => $score,
-                            -start          => $start,
-                            -end            => $end,
-                            -p_value        => $p_value,
-                            -analysis       => $analysis )
-                    or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
-
-    foreach my $gene (@genes)
-    {
-        foreach my $exon ($gene->sub_SeqFeature())
-        {
-            $single->add_sub_SeqFeature($exon, '');
-        }    
-    }
-    return $single;
-}
 
 1;
