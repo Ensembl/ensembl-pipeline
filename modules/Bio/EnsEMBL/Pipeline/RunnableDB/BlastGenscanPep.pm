@@ -25,7 +25,6 @@ my $genscan     = Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep->new (
 $genscan->fetch_input();
 $genscan->run();
 $genscan->output();
-$genscan->write_output(); 
 
 =head1 DESCRIPTION
 
@@ -200,41 +199,6 @@ sub output {
       push(@output,$run->output);
     }
     return @output;
-}
-
-
-=head2 write_output
-
-    Title   :   write_output
-    Usage   :   $self->write_output
-    Function:   Writes output data to db
-    Returns :   array of repeats (with start and end)
-    Args    :   none
-
-=cut
-
-sub write_output {
-    my($self) = @_;
-
-    my $db       = $self->dbobj();
-    my @features = $self->output();
-    
-    my $contig;
-    eval 
-    {
-        $contig = $db->get_Contig($self->input_id);
-    };
-    
-    if ($@) 
-    {
-	    print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
-    elsif (@features) 
-    {
-        my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	    $feat_adp->store($contig, @features);
-    }
-    return 1;
 }
 
 1;
