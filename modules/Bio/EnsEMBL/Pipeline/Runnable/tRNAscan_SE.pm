@@ -308,8 +308,6 @@ sub create_feature {
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
                             -score   => $feat->{'score'},
-                            -source_tag  => $feat->{'source'},
-                            -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
     # display_label must be a null string, and not undef

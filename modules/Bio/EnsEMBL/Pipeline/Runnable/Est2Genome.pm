@@ -430,8 +430,6 @@ sub _createfeatures {
                                               -strand      =>   $f1strand,
                                               -score       =>   $f1score,
 					      -percent_id  =>   $f1score, 
-					      -source_tag  =>   $f1source,
-                                              -primary_tag =>   $f1primary,
                                               -analysis    =>   $analysis_obj );
      
    my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
@@ -440,8 +438,6 @@ sub _createfeatures {
                                               -strand      =>   $f2strand,
                                               -score       =>   $f1score,
 					      -percent_id  =>   $f1score, 
-                                              -source_tag  =>   $f2source,
-                                              -primary_tag =>   $f2primary,
                                               -analysis    =>   $analysis_obj );
 
     #create featurepair

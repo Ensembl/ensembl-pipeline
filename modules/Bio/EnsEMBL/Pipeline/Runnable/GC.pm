@@ -260,8 +260,6 @@ sub run_gc {
 		-end     => $end_point,
 		-strand => 0,
 		-score   => $gcfraction,
-		-source_tag  => 'gc',
-		-primary_tag => 'gc_content',
 		-analysis => $analysis_obj);  
 
 	$gc->display_label('');

@@ -367,8 +367,6 @@ sub create_feature {
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
                             -score   => $feat->{'score'},
-                            -source_tag  => $feat->{'source'},
-                            -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
     $tss->display_label('');

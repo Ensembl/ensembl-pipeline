@@ -82,7 +82,7 @@ sub new {
     my $self = $class->SUPER::new(@args);
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
-    
+    #print "@args\n";
     my( $genomic, $queryseq, $seqfetcher, $threshold) = $self->_rearrange([qw(GENOMIC
 									       QUERYSEQ
 									       SEQFETCHER
@@ -308,12 +308,12 @@ sub run_blast {
     #print("Exit status of blast is $status\n");
     my $report = new Bio::Tools::BPlite('-file'=>$blastout);
 
-    #unlink $blastout;
-    #unlink $blastdb;
-    #unlink $blastdb.".csq";
-    #unlink $blastdb.".nhd";
-    #unlink $blastdb.".ntb";
-    #unlink $seqfile;
+    unlink $blastout;
+    unlink $blastdb;
+    unlink $blastdb.".csq";
+    unlink $blastdb.".nhd";
+    unlink $blastdb.".ntb";
+    unlink $seqfile;
 
     # parse blast report
     my @blast_feat = $self->parse_blast_report($report);
@@ -383,15 +383,17 @@ sub make_blast_db {
     # get est sequences
     my $estseq  = $self->queryseq;
     my $estfile = $self->queryfilename;
-    
+    #print $estseq."\n".$estfile."\n";
     # do we need to write out the est sequences?
     if(ref($estseq) eq 'ARRAY'){
+      
       eval{
 	if (-e $estfile) { $self->throw("alreayd using $estfile\n"); }
 	my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
 	  or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
 	
-	foreach my $eseq(@$estseq) { 
+	foreach my $eseq(@$estseq) {
+      
 	  $estOutput->write_seq($eseq);
 	}
       };

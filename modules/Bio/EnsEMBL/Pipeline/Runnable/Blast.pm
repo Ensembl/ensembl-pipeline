@@ -310,7 +310,7 @@ sub fetch_databases {
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
 
-    if (-e $fulldbname) {
+    if (-e $fulldbname && ! -d $fulldbname) {
 	push(@databases,$self->database);
     } else {
 	my $count = 1;
@@ -507,7 +507,7 @@ sub filter_hits {
     
  HSP: foreach my $hsp (@hsps) {
       
-      my $name = $hsp->subject->seqname ;
+      my $name = $hsp->hit->seqname ;
 
       if ($self->threshold_type eq "PID") {
 	next HSP if ($hsp->percent < $self->threshold);
@@ -518,10 +518,10 @@ sub filter_hits {
       } 
       
       my $qstart = $hsp->query->start();
-      my $hstart = $hsp->subject->start();
+      my $hstart = $hsp->hit->start();
       
       my $qend   = $hsp->query->end();
-      my $hend   = $hsp->subject->end();      
+      my $hend   = $hsp->hit->end();      
       
       my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
       
@@ -607,7 +607,7 @@ sub split_HSP {
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
 #    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
-#    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
+#    print STDERR "Alignment s : " . $hsp->hit->start . "\t" . $hsp->hit->end . "\t" . $hsp->sbjctSeq . "\n";
 
 #    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand \n";
 
@@ -635,18 +635,18 @@ sub split_HSP {
     my @hchars = split(//,$hsp->sbjctSeq);  # ditto for hit sequence
     
     my $qstart = $hsp->query->start();                # Start off the feature pair start
-    my $hstart = $hsp->subject->start();              # ditto
+    my $hstart = $hsp->hit->start();              # ditto
 
     my $qend   = $hsp->query->start();                  # Set the feature pair end also
-    my $hend   = $hsp->subject->start();                # ditto
+    my $hend   = $hsp->hit->start();                # ditto
 
     if ($qstrand == -1) {
       $qstart = $hsp->query->end;
       $qend   = $hsp->query->end;
     }
     if ($hstrand == -1) {
-      $hstart = $hsp->subject->end;
-      $hend   = $hsp->subject->end;
+      $hstart = $hsp->hit->end;
+      $hend   = $hsp->hit->end;
     }
     
     my $count = 0;                                # counter for the bases in the alignment
@@ -867,7 +867,7 @@ sub _findStrands {
     my ($self,$hsp) = @_;
 
     return ( $hsp->query->strand(),
-	     $hsp->subject->strand());
+	     $hsp->hit->strand());
 
 #    my $qstrand;
 #    my $hstrand;
@@ -877,7 +877,7 @@ sub _findStrands {
 #    } else {
 #	$qstrand = -1;
 #    }
-#    if ($hsp->subject->start() < $hsp->subject->end()) {
+#    if ($hsp->hit->start() < $hsp->hit->end()) {
 #	$hstrand = 1;
 #    } else {
 #	$hstrand = -1;
@@ -892,8 +892,8 @@ sub _findTypes {
     my $type2;
     #abs($hsp->query->end() - $hsp->query->start()) + 1;
     my $len1 = $hsp->query->length();
-    #abs($hsp->subject->end() - $hsp->subject->start) + 1;
-    my $len2 = $hsp->subject->length();
+    #abs($hsp->hit->end() - $hsp->hit->start) + 1;
+    my $len2 = $hsp->hit->length();
 
     if ($len1/$len2 > 2) {
 	$type1 = 'dna';
