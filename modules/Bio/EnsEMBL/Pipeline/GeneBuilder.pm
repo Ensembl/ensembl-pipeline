@@ -178,9 +178,10 @@ sub build_Genes {
     
     $self->print_ExonPairs;
     
-    my @transcripts         = $self->link_ExonPairs(@exons);
-    my @contigoverlaps      = $self->order_Contigs (@transcripts);
-    my @genes               = $self->make_Genes    (@transcripts);
+    my @transcripts         = $self->link_ExonPairs    (@exons);
+    my @newtran             = $self->filter_Transcripts(@transcripts);
+    my @contigoverlaps      = $self->order_Contigs     (@newtran);
+    my @genes               = $self->make_Genes        (@newtran);
 
     push(@{$self->{_genes}},@genes);
 
@@ -305,10 +306,6 @@ sub make_Exons {
     my @exons;
     my @supported_exons;
 
-
-    # ********** TEST ONLY **************
-    # To try and replicate what TimDB is doing I verify genscan exons here
-    
     my $gscount = 1;
 
     foreach my $gs (@$genscan) {
@@ -326,7 +323,9 @@ sub make_Exons {
 	    $exon->start    ($f->start);
 	    $exon->end      ($f->end  );
 	    $exon->strand   ($f->strand);
+	    $exon->phase     ($f->{phase});
 	    $exon->attach_seq($contig->primary_seq);
+
 	    push(@exons,$exon);
 	    $excount++;
 	    
@@ -372,7 +371,7 @@ sub make_Exons {
 	    $ex->version(1);
 	    $ex->created($time);
 	    $ex->modified($time);
-	    $self->set_ExonEnds($ex);
+#	    $self->set_ExonEnds($ex);
 	}
     }
 
@@ -486,28 +485,26 @@ sub  make_ExonPairs {
             # span across an intron a pair is made.
 	  F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
 #	      print ("FEATURE1 " . $f1->gffstring . "\n");
-	    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
+	      my @f = $exon2->each_Supporting_Feature;
+	    F2: foreach my $f2 (@f) {
 
 #		print ("FEATURE2 " . $f1->gffstring . "\n");
 		my @pairs = $self->get_all_ExonPairs;
-
+		
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePairI")));
 		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePairI")));
-
-#		print ("pog\n");
+		
 		# Do we have hits from the same sequence
 		# n.b. We only allow each database hit to span once
 		# across the intron (%idhash) and once the pair coverage between
 		# the two exons reaches $minimum_coverage we 
 		# stop finding evidence. (%pairhash)
-
+		
 		if ($f1->hseqname eq $f2->hseqname &&
 		    $f1->strand   == $f2->strand   &&
-
-		    
-		    !(defined($idhash{$f1->hseqname})) &&
-		    !(defined($pairhash{$exon1}{$exon2}))) {
-		    
+		    !(defined($idhash{$f1->hseqname}))) {# &&
+#		    !(defined($pairhash{$exon1}{$exon2}))) {
+							     
 		    my $ispair = 0;
 		    my $thresh = $self->threshold;
 
@@ -545,7 +542,17 @@ sub  make_ExonPairs {
 		    # We finally get to make a pair
 		    if ($ispair == 1) {
 			eval {
-#			    print STDERR "Making new pair\n";
+			    my $check = $self->check_link($exon1,$exon2,$f1,$f2);
+			    print STDERR "\nPossible pair - checking link - $check ". 
+				$exon1->start . "\t" . $exon1->end . "\n";
+			    
+			    next J unless $check;
+			    
+			    print STDERR "Making new pair " . $exon1->start . " " . 
+				                              $exon1->end   . " " . 
+							      $exon2->start . " " . 
+							      $exon2->end . "\n";
+
 			    my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
 			    
 			    if (defined $pair) {
@@ -571,6 +578,40 @@ sub  make_ExonPairs {
 	}
     }
     return $self->get_all_ExonPairs;
+}
+
+sub check_link {
+    my ($self,$exon1,$exon2,$f1,$f2) = @_;
+
+    my @pairs = $self->get_all_ExonPairs;
+    print STDERR "Checking link for " . $f1->hseqname . " " . $f1->hstart . " " . $f1->hend . " " . $f2->hstart . " " . $f2->hend . "\n";
+    foreach my $pair (@pairs) {
+
+	if ($exon1->strand == 1) {
+	    if ($exon1 == $pair->exon1) {
+		my @linked_features = $pair->get_all_Evidence;
+		
+		foreach my $f (@linked_features) {
+		    
+		    if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
+			return 0;
+		    }
+		}
+	    }
+	} else {
+	     if ($exon2 == $pair->exon2) {
+		my @linked_features = $pair->get_all_Evidence;
+		
+		foreach my $f (@linked_features) {
+		    
+		    if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
+			return 0;
+		    }
+		}
+	    }
+	 }
+    }
+    return 1;
 }
 
 sub find_ExonSet {
@@ -745,6 +786,9 @@ sub link_ExonPairs {
 	}
     }
     my $count = 1;
+
+
+
     foreach my $tran ($self->get_all_Transcripts) {
 	$tran->id ($TRANSCRIPT_ID_SUBSCRIPT . $contigid.$count);
 	$tran->version(1);
@@ -814,11 +858,19 @@ sub _recurseTranscript {
 	@exons = sort {$b->start <=> $a->start} @exons;
     }
 
-
+    
     PAIR: foreach my $pair (@pairs) {
 	print STDERR "Comparing " . $exons[$#exons]->id . "\t" . $exons[$#exons]->end_phase . "\t" . 
 	    $pair->exon2->id . "\t" . $pair->exon2->phase . "\n";
-	next PAIR if ($exons[$#exons]->end_phase != $pair->exon2->phase);
+#	next PAIR if ($exons[$#exons]->end_phase != $pair->exon2->phase);
+
+	# Only use multiple pairs once
+	#if ($#pairs > 0) {
+	#    next PAIR if ($self->{_usedPairs}{$pair} == 1);
+	#    print ("Already used pair = skipping\n");
+	#}
+
+	$self->{_usedPairs}{$pair} = 1;
 
 	if ($count > 0) {
 	    my $newtran = new Bio::EnsEMBL::Transcript;
@@ -827,8 +879,6 @@ sub _recurseTranscript {
 	    foreach my $tmpex ($tmptran->each_Exon) {
 		$newtran->add_Exon($tmpex);
 	    }
-
-
 
 	    $newtran->add_Exon($pair->exon2);
 	    $self->_recurseTranscript($pair->exon2,$newtran);
@@ -915,6 +965,7 @@ sub _getPairs {
 	}
     }
 
+    @pairs = sort { $a->exon2->start <=> $b->exon2->start} @pairs;
     return @pairs;
 }
 	
@@ -1303,26 +1354,16 @@ sub make_Translation{
 	my $tmpphase = $exon->phase;
 	print ("Old coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
 
-#	print ("Old translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-#	print ("Old translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-#	print ("Old translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
-	
 	print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
 	if ($exon->strand == 1) {
 	    my $tmpstart = $exon->start;
 	    $exon->start($tmpstart + 3 - $tmpphase);
 	    $exon->phase(0);
-#	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-#	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-#	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
 	} else {
 	    my $tmpend= $exon->end;
 	    $exon->end($tmpend - 3 + $tmpphase);
 	    print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
 	    $exon->phase(0);
-#	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-#	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-#	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
 	}
 	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
     }   
@@ -1355,11 +1396,11 @@ sub make_Translation{
     }
     shift @exons;
 
-    foreach my $exon (@exons) {
-	$exon->phase         ($endphase);
-	$endphase = $exon->end_phase;
+#    foreach my $exon (@exons) {
+#	$exon->phase         ($endphase);
+#	$endphase = $exon->end_phase;
 	
-    }
+#    }
 
     $transcript->translation($translation);
 }   
@@ -1539,6 +1580,7 @@ sub check_ExonPair {
 
     print (STDERR "Splice " . $spliceseq->seq ."\n");
 
+    return 1;
     return 0 if ($spliceseq ->seq ne "GTAG");
     return 1 if ($pair->exon1->end_phase == $pair->exon2->phase);
     return 0;
@@ -1654,9 +1696,9 @@ sub set_genscan_phases {
     }
 
 
-    print(STDERR "genscan translation = " . $gs->id . " " . $dnaseq->translate('*','X',(3-$phase)%3)->seq . "\n");
+    print(STDERR "genscan translation = " . $gs->id . " " . $dnaseq->translate('*','X',(3-$phase)%3)->seq . " " . $phase . "\n");
     foreach my $f ($gs->sub_SeqFeature) {
-	print(STDERR "Genscan exon ids " . $f->id . ":". $f->seq->seq . "\n");
+	print(STDERR "Genscan exon ids " . $f->id . ": $phase ". $f->seq->seq . "\n");
 	$f->{phase} = $phase;
 	my $len   = $f->end() - $f->start() + 1;
 	my $left_overhang = (3 - $phase)%3;
@@ -1689,6 +1731,42 @@ sub set_genscan_phases {
     return $gs;
 }
 
+# This is a somewhat kludgy attempt to deal with gene repeats
+# If, out of a set of transcripts, one transcript encompasses both
+# the start and end of other transcripts it is suspected of leaping 
+# between gene repeats and is deleted.
+#
+# I suspect this will introduce extra fragmentation but it should deal with 
+# some of the pathological cases
+
+sub filter_Transcripts {
+    my ($self,@transcripts) = @_;
+
+    my @new;
+
+    TRAN: foreach my $tran1 (@transcripts) {
+	my $foundstart = 0;
+	my $foundend   = 0;
+
+	TRAN2: foreach my $tran2 (@transcripts) {
+	    
+	    next TRAN2 if ($tran1 == $tran2);
+	    
+	    if (($tran2->first_exon->start > $tran1->first_exon->start) && 
+		($tran2->first_exon->start < $tran1->last_exon->end)) {
+		$foundstart = 1;
+	    }
+	    if (($tran2->last_exon->end > $tran1->first_exon->start) && 
+		($tran2->last_exon->end < $tran1->last_exon->end)) {
+		$foundend = 1;
+	    }
+	}
+	if ($foundstart == 0 || $foundend == 0) {
+	    push(@new,$tran1);
+	}
+    }
+    return @new;
+}
 1;
 
 
