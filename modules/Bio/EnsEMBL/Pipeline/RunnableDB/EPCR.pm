@@ -212,7 +212,7 @@ sub runnable {
                 $parameters{$key} = $value;
             }
         }
-        $parameters {'-db'}      = $self->analysis->db();  
+        $parameters {'-db'}      = $self->analysis->db_file();  
         #creates empty Bio::EnsEMBL::Runnable::Blast object
         $self->{'_runnable'} = $runnable->new(%parameters);
     }
