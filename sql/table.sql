@@ -3,8 +3,8 @@ CREATE TABLE job (
   input_id          varchar(40) NOT NULL,
   analysis_id       smallint(5) unsigned NOT NULL,
   submission_id     mediumint(10) unsigned NOT NULL,
-  stdout_file       varchar(100) NOT NULL,
-  stderr_file       varchar(100) NOT NULL,
+  stdout_file       varchar(200) NOT NULL,
+  stderr_file       varchar(200) NOT NULL,
   retry_count       tinyint(2) unsigned default 0,
 
   PRIMARY KEY (job_id),
