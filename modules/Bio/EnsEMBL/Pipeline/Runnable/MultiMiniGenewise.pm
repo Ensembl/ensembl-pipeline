@@ -47,11 +47,14 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $features,$seqfetcher, $endbias) = 
+    my( $genomic, $features,$seqfetcher, $endbias, $minimum_intron, $exon_padding, $minimum_feature_length) = 
       $self->_rearrange([qw(GENOMIC
 			    FEATURES
 			    SEQFETCHER
-			    ENDBIAS
+			    ENDBIAS  
+			    MINIMUM_INTRON
+			    EXON_PADDING
+			    MINIMUM_FEATURE_LENGTH
 			   )],
 			@args);
 
@@ -63,13 +66,31 @@ sub new {
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") unless $seqfetcher->isa("Bio::DB::RandomAccessI");
     
-    $self->genomic_sequence($genomic) if defined($genomic);
-    $self->seqfetcher($seqfetcher)    if defined($seqfetcher);
-    $self->endbias($endbias)          if defined($endbias);
-    $self->features($features)        if defined($features);
+    $self->genomic_sequence($genomic)           if defined($genomic);
+    $self->seqfetcher($seqfetcher)              if defined($seqfetcher);
+    $self->endbias($endbias)                    if defined($endbias);
+    $self->features($features)                  if defined($features);
+    $self->_minimum_intron($features)           if defined($minimum_intron);
+    $self->_exon_padding($features)             if defined($exon_padding);
+    $self->_minimum_feature_length($features)   if defined($minimum_feature_length);
     
     return $self;
   }
+
+
+=head2 features
+
+  Arg [1]   : arrayref 
+  Function  : sets varible to arrayref
+  Returntype: arrayref
+  Exceptions: throws if not given an arrayref or if elements of array aren't featurepairs'
+  Caller    : $self
+  Example   : my $features = $self->features();
+
+=cut
+
+
+
 
 sub features {
   my ($self,$features) = @_;
@@ -93,15 +114,20 @@ sub features {
   return $self->{_features};
 }
 
-=head2 genomic_sequence
 
-Title   :   genomic_sequence
-  Usage   :   $self->genomic_sequence($seq)
- Function:   Get/set method for genomic sequence
-  Returns :   Bio::Seq object
-  Args    :   Bio::Seq object
+
+=head2 object accessors
+
+  Arg [1]   : Object of correct type
+  Function  : get/set object
+  Returntype: object
+  Exceptions: throws if object not of correct type
+  Caller    : $self
+  Example   : my $genomic = $self->genomic_sequence;
 
 =cut
+
+
   
 sub genomic_sequence {
     my( $self, $value ) = @_;    
@@ -113,37 +139,6 @@ sub genomic_sequence {
     return $self->{'_genomic_sequence'};
   }
 
-=head2 endbias
-
-  Title   :   endbias
-    Usage   :   $self->endbias($endbias)
-  Function:   Get/set method for endbias
-    Returns :   
-    Args    :   
-
-=cut
-    
-sub endbias {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_endbias'} = $arg;
-  }
-  if (!defined($self->{'_endbias'})) {
-    $self->{'_endbias'} = 0;
-  }
-  return $self->{'_endbias'};
-}
-
-=head2 seqfetcher
-
-    Title   :   seqfetcher
-    Usage   :   $self->seqfetcher($seqfetcher)
-    Function:   Get/set method for SeqFetcher
-    Returns :   Bio::DB::RandomAccessI object
-    Args    :   Bio::DB::RandomAccessI object
-
-=cut
 
 sub seqfetcher {
 
@@ -159,16 +154,19 @@ sub seqfetcher {
 
 
 
-=head2 get_all_features_by_id
+=head2 get_all_feature_by_id
 
-    Title   :   get_all_features_by_id
-    Usage   :   $hash = $self->get_all_features_by_id;
-    Function:   Returns a ref to a hash of features.
-                The keys to the hash are distinct feature ids
-    Returns :   ref to hash of Bio::EnsEMBL::FeaturePair
-    Args    :   none
+  Arg [1]   : none
+  Function  : arranges all feature into hash keyed by hseqname, each element containing an anonymous array of features with that name
+              also produces an hash of key hseqname and value of score which is used to sort an array of hseqname 
+  Returntype: hasfref and array ref
+  Exceptions: warns and skips if a feature doesn't have a hseqname'
+  Caller    : $self
+  Example   : my ($idhash, $idarray) = $self->get_all_features_by_id;
 
 =cut
+
+
 
 sub get_all_features_by_id {
     my( $self) = @_;
@@ -204,34 +202,21 @@ sub get_all_features_by_id {
   }
 
 
-=head2 get_all_feature_ids
 
-  Title   : get_all_feature_ids
-  Usage   : my @ids = get_all_feature_ids
-  Function: Returns an array of all distinct feature hids 
-  Returns : @string
-  Args    : none
-
-=cut
-
-sub get_all_feature_ids {
-  my ($self) = @_;
-  
-  my ($idhash,$idref) = $self->get_all_FeaturesById;
-  
-  return @$idref;
-  
-}
 
 =head2 get_Sequence
 
-  Title   : get_Sequence
-  Usage   : my $seq = get_Sequence($id)
-  Function: Fetches sequences with id $id
-  Returns : Bio::PrimarySeq
-  Args    : none
+  Arg [1]   : sequence id/accession
+  Function  : calls seqfetcher to get sequence of id passed in
+  Returntype: Bio::PrimarySeq
+  Exceptions: throws if fetch sequence failed
+  Caller    : $self
+  Example   : $seq = $self->get_Sequence('AB10323');
 
 =cut
+
+
+
 
 sub get_Sequence {
   my ($self,$id) = @_;
@@ -254,15 +239,20 @@ sub get_Sequence {
   return $seq;
 }
 
+
+
+ 
 =head2 run
 
-  Title   : run
-  Usage   : $self->run
-  Function: 
-  Returns : none
-  Args    : 
+  Arg [1]   : none 
+  Function  : creates and runs genewise
+  Returntype: 1
+  Exceptions: throws if features don't' have hseqnames
+  Caller    : $runnableDB
+  Example   : $runnable->run;
 
 =cut
+
 
 sub run {
   my ($self) = @_;
@@ -300,6 +290,27 @@ sub run {
   return 1;
 }
 
+
+
+
+=head2 _find_extras
+
+  Arg [1]   : array of FeaturePairs
+  Function  : checks for overlaps of feature with genewise output
+  Returntype: array of FeaturePair
+  Exceptions: none
+  Caller    : $self
+  Example   : @new_features = $self->_find_extras(@features);
+
+=cut
+
+
+
+#
+# checks feature length is long enough then that feature doesn't overlapped with any of output evidence from genewise 
+# before adding to the array which will be used to make the miniseq
+#
+
 sub _find_extras {
   my ($self,@features) = @_;
   
@@ -313,7 +324,7 @@ sub _find_extras {
 
     # does this need to be hardcoded?
     # smaller for virgin genomes?
-    if (($f->end - $f->start) < 50) {
+    if (($f->end - $f->start) < $self->_minimum_feature_length) {
       next FEAT;
     }      
     
@@ -331,6 +342,72 @@ sub _find_extras {
   }
   return @new;
 }
+
+
+
+
+
+=head2 accessors this is pod for the simple acessors
+
+  Arg [1]   : int (value to be set)
+  Function  : set/get a int value
+  Returntype: int
+  Exceptions: non
+  Caller    : $self
+  Example   : $self->_minimum_intron;
+
+=cut
+
+
+
+
+
+sub _minimum_intron {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_minimum_intron'} = $arg;
+  }
+
+  return $self->{'_minimum_intron'};
+}
+
+
+sub _exon_padding {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_padding'} = $arg;
+  }
+
+  return $self->{'_padding'};
+  
+}
+
+
+sub _minimum_feature_length {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_feature_length'} = $arg;
+  }
+  #does the default want to be 50?
+  return $self->{'_feature_length'} || 50;
+  
+}
+
+sub endbias {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_endbias'} = $arg;
+  }
+  if (!defined($self->{'_endbias'})) {
+    $self->{'_endbias'} = 0;
+  }
+  return $self->{'_endbias'};
+}
+
 
 1;
 
