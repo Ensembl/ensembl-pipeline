@@ -1,9 +1,9 @@
 # Ensembl Pipeline module for handling job submission via Platform LSF 
 # load sharing software
 #
-# Cared for by Laura Clarke <lec@sanger.ac.uk>
+# Cared for by Laura Clarke 
 #
-# Copyright Laura Clarke <lec@sanger.ac.uk>
+# Copyright Laura Clarke 
 #
 # You may distribute this module under the same terms as perl itself
 #
