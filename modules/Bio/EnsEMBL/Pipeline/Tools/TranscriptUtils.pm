@@ -205,9 +205,9 @@ sub _check_Transcript{
     return $valid;
 }
 
-<<<<<<< TranscriptUtils.pm
-=======
-# parameter slice is optional. It makes sense to use it when working on fixed length slices.
+
+# parameter slice is optional. It makes sense to use it when 
+# working on fixed length slices.
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
@@ -294,9 +294,7 @@ sub _check_introns{
   }
 
 
->>>>>>> 1.40
 ############################################################
-
 # this is a set of checks for transcripts where they are based
 # on rawcontig coordinates
 
