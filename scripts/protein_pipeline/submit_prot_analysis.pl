@@ -190,7 +190,7 @@ sub run_jobs {
 #Three diffenrent way of running the analysis 1,2,3 (see documentation in the configuration file and in the perldoc of this script)
 	 if ($chunk == 1) {
 	     foreach my $i(@id) {
-		 my $command = "bsub -C 0 -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
+		 my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
 				 
 		 print STDERR "RUNNING: $command\n";
 		 
@@ -201,7 +201,7 @@ sub run_jobs {
 
 	 
 	 if ($chunk == 3) {
-	     my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
+	     my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
 	    
 
 	     print STDERR "RUNNING: $command\n";
@@ -219,7 +219,7 @@ sub run_jobs {
 	     
 	     foreach my $f(@allfiles) {
 		 if (($f ne ".") && ($f ne "..")) {
-		      my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
+		      my $command = "bsub -C 0 -J ".$r." -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
 		  
 
 		      print STDERR "RUNNING: $command\n";
