@@ -42,6 +42,19 @@ CREATE TABLE analysis_set (
 );
 
 #
+# Table structure for table 'exon_pair'
+#
+CREATE TABLE exon_pair (
+  exon1_id varchar(40) DEFAULT '' NOT NULL,
+  exon2_id varchar(40) DEFAULT '' NOT NULL,
+  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  type varchar(40) DEFAULT '' NOT NULL,
+  exon1_version varchar(40) DEFAULT '0' NOT NULL,
+  exon2_version varchar(40) DEFAULT '0' NOT NULL,
+  PRIMARY KEY (exon1_id,exon2_id,exon1_version,exon2_version,type)
+);
+
+#
 # Table structure for table 'job'
 #
 CREATE TABLE job (
