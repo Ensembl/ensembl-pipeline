@@ -39,7 +39,7 @@ Mail to B<ensembl-dev@ebi.ac.uk>
 package Bio::EnsEMBL::Pipeline::Runnable::Pseudogene;
 
 use strict;
-use Carp;
+use Carp qw(cluck);
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::SeqFeature;
@@ -76,7 +76,7 @@ sub new {
   $self->{'_modified_genes'} =[] ;# array ref to modified genes to write to new db
   $self->{'_discarded_transcripts'} = [];# array ref to discarded transcripts
   $self->{'_genes'} = []; #array of genes to test;
-  $self->{'_repeats'} = {}; # hash of repeat features corresponding to each gene;
+  $self->{'_repeats'} = {}; # hash of repeat blocks corresponding to each gene;
 
   my( $genes,$repeats,$max_intron_length, $max_intron_coverage, $max_exon_coverage) = $self->_rearrange([qw(
 												   GENES
@@ -181,8 +181,8 @@ sub repeats {
   my ($self, $repeats) = @_;
   foreach my $repeat_array (values %{$repeats}){
     foreach my $repeat (@{$repeat_array}){
-      unless ($repeat->isa("Bio::EnsEMBL::RepeatFeature")){
-        $self->throw("Input is not a Bio::EnsEMBL::RepeatFeature, it is a $repeat");
+      unless ($repeat->isa("Bio::EnsEMBL::SeqFeature")){
+        $self->throw("Input is not a Bio::EnsEMBL::SeqFeature, it is a $repeat");
       }
     }
   }
@@ -222,11 +222,11 @@ sub run {
 
 sub summary {
   my ($self) = @_;
-  print STDERR  $self->{'_real'}." real genes identified \n";
-  print STDERR  $self->{'_pseudogenes'}." pseudogenes identified \n";  
-  print STDERR  scalar(@{$self->{'_discarded_transcripts'}})." pseudotranscripts to be chucked \n";
+  print STDERR   $self->{'_real'}." real genes identified \n";
+  print STDERR   $self->{'_pseudogenes'}." pseudogenes identified \n";  
+  print STDERR   scalar(@{$self->{'_discarded_transcripts'}})." pseudotranscripts to be chucked \n";
   foreach my $transcript(@{$self->{'_discarded_transcripts'}}){
-    print STDERR  $transcript->stable_id."\n";
+    print STDERR   $transcript->stable_id."\n";
   }
   return 1;
 }
@@ -267,20 +267,22 @@ sub test_genes{
       #transcript tests
 
       #CALL PSEUDOGENE IF AT LEAST 80% COVERAGE OF INTRONS BY REPEATS
+      #AT LEAST 1 F/S EXON AND 1 REAL EXON (?)
       #TOTAL INTRON LENGTH < 5K
 
       if($evidence->{'total_intron_len'} < $self->{'_max_intron_length'} &&
-	 #	 $evidence->{'frameshift_introns'} >= 1 &&
-	 #	 $evidence->{'real_introns'} >= 1 &&
+	 $evidence->{'frameshift_introns'} >= 1 &&
+	 $evidence->{'real_introns'} >= 1 &&
 	 $evidence->{'covered_introns'} >=  $self->{'_max_intron_coverage'} ){
 	$pseudo = 1;
+	print STDERR $transcript->stable_id." - repeats in introns\n";
       }
       #ALL FRAMESHIFTED
-      
+
       if($evidence->{'num_introns'} && $evidence->{'frameshift_introns'} == $evidence->{'num_introns'}){$pseudo = 1;}
-      
+
       #EXONS CONTAMINATED
-      
+
       #    if($evidence->{'covered_exons'} >= $self->{'_max_exon_coverage'}){$pseudo = 1;}
 
 
@@ -299,8 +301,7 @@ sub test_genes{
     #############################################
     # gene is pseudogene, set type to pseudogene
     # chuck away all but the longest transcript
-    
-    
+
     if (scalar(@pseudo_trans) > 0 && scalar(@real_trans) == 0){
       $gene->type('pseudogene');
       @pseudo_trans = sort {$a->length <=> $b->length} @pseudo_trans;
@@ -328,6 +329,7 @@ sub test_genes{
       push @{$self->{'_modified_genes'}}, $gene;
       push @{$self->{'_discarded_transcripts'}},@pseudo_trans;
       $self->{'_real'}++;
+      if ($gene->type eq 'pseudogene'){$gene->type('changed');}
     }
 
     ####################################
@@ -337,6 +339,7 @@ sub test_genes{
     if (scalar(@pseudo_trans) == 0 && scalar(@real_trans) > 0){
       push (@{$self->{'_modified_genes'}},$gene); 
       $self->{'_real'}++;
+      if ($gene->type eq 'pseudogene'){$gene->type('changed');}
     }
   }
 
@@ -360,7 +363,7 @@ Arg [none] : Bio::EnsEMBL::Transcript
 sub transcript_evidence{
 
   my ($self,$transcript,$gene) =@_;
-  my $repeat_blocks = $self->get_all_repeat_blocks($transcript,$gene);
+  my $repeat_blocks = $self->{'_repeats'}->{$gene};;
   my $results;
   my  @exons =  @{$transcript->get_all_Exons};
   @exons = sort {$a->start <=> $b->start} @exons;
@@ -380,15 +383,15 @@ sub transcript_evidence{
     #in order to use range methods
 
     my $seq_feature_exon = Bio::EnsEMBL::SeqFeature->new(
-							 -START => $exon->start,
-							 -END => $exon->end,
+							 -START => $exon->start-$gene->start,
+							 -END => $exon->end-$gene->start,
 							 -STRAND => $exon->strand
 							);
     # Do intron
     if (defined($prev_exon)) {
       my $intron = Bio::EnsEMBL::SeqFeature->new(
-						 -START => $prev_exon->end+1,
-						 -END => $exon->start-1,
+						 -START => $prev_exon->end+1-$gene->start,
+						 -END => $exon->start-1-$gene->start,
 						 -STRAND => $exon->strand
 						);
       if ($intron->length > 9) {
@@ -428,48 +431,6 @@ sub transcript_evidence{
 }
 
 
-=head2 get_all_repeat_blocks
-
-  Args       : none
-  Description: Gets repeat array from _repeats hash using gene objects as keys and merges repeats into blocks
-  Returntype : array of Seq_Feature blocks;
-
-=cut 
-
-sub get_all_repeat_blocks {
-  my ($self,$transcript,$gene) = @_;
-  my @repeat_blocks;
-  my %repeat_hash = %{$self->{'_repeats'}};
-  my @repeats = @{$repeat_hash{$gene}};
-  @repeats = sort {$a->start <=> $b->start} @repeats;
-  my $curblock = undef;
-
-  REPLOOP: foreach my $repeat (@repeats) {
-      my $rc = $repeat->repeat_consensus;
-      if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) { 
-	next REPLOOP;
-      }
-      if ($repeat->start <= 0) { 
-	$repeat->start(1); 
-      }
-      if (defined($curblock) && $curblock->end >= $repeat->start) {
-	if ($repeat->end > $curblock->end) { 
-	  $curblock->end($repeat->end); 
-	}
-      }
-      else {
-	$curblock = Bio::EnsEMBL::SeqFeature->new(
-						  -START => $repeat->start,
-						  -END => $repeat->end, 
-						  -STRAND => $repeat->strand
-						 );
-	push (@repeat_blocks,$curblock);
-      }
-    }
-  @repeat_blocks = sort {$a->start <=> $b->start} @repeat_blocks;
-  return\@repeat_blocks;
-}
-
 =head2 len_covered
 
   Args       : Bio::Seq::Feature object, reference to an array of repeat blocks
@@ -483,6 +444,8 @@ sub _len_covered {
 
   my $covered_len = 0;
  RBLOOP: foreach my $repeat_block (@$repeat_blocks_ref) {
+# print STDERR  "RB " . $repeat_block->start . " " . $repeat_block->end . "\n";
+# print STDERR  "FT " . $feat->start . " " . $feat->end . "\n";
     if ($repeat_block->overlaps($feat, 'ignore')) {
       my $inter = $feat->intersection($repeat_block);
       $covered_len += $inter->length;
