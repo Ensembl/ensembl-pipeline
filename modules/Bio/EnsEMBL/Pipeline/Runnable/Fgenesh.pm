@@ -646,8 +646,6 @@ sub create_genes {
 			                    /(scalar @{$genes {$gene_number}}),
                             -start       => $gene_start    {$gene_number},
                             -end         => $gene_end      {$gene_number},
-                            -source_tag  => $gene_source   {$gene_number},
-                            -primary_tag => $gene_primary  {$gene_number},
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
 
@@ -656,7 +654,8 @@ sub create_genes {
 	  $gene->add_sub_SeqFeature($exon, '');
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
-	my $tran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($gene,$self->query);
+	print STDERR "seq = ".$self->query."\n";
+	my $tran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_with_seq($gene,$self->query);
 	$self->add_Fgenesh_Transcript($tran);
     }
     #print "created the genes\n";
@@ -694,8 +693,6 @@ sub create_feature {
                             -score   => $feat->{'score'},
                             -frame   => $feat->{'frame'},
                             -phase   => $feat->{'phase'},
-                            -source_tag  => $feat->{'source'},
-                            -primary_tag => $feat->{'type'},
                             -analysis => $analysis_obj);  
     $self->exons($exon);
     #print "created the exon\n";
@@ -751,8 +748,6 @@ sub output {
 					   -phase   => $exon->phase,
 					   -end_phase => $exon->end_phase,
 					   -score   => $exon->score,
-					   -source_tag => 'fgenesh',
-					   -primary_tag => 'prediction',
 					   -analysis     => $analysis);
       my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
 					    -start   => $exon->start,
@@ -762,8 +757,6 @@ sub output {
 					    -end_phase => $exon->end_phase,
 					    -score   => $exon->score,
 					    -p_value   => $exon->p_value,
-					    -source_tag => 'fgenesh',
-					    -primary_tag => 'prediction',
 					    -analysis     => $analysis);
 
 #      print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";

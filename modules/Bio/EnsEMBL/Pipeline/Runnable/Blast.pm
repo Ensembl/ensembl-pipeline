@@ -126,9 +126,9 @@ sub new {
     $self->{'_results'}   = undef;     # file to store results of analysis
     $self->{'_prune'}     = 1;         # Don't allow hits to the same sequence in the same region
     $self->{'_coverage'}  = 10;        # Only return hits to a depth of 10
-    $self->{'_ungapped'}  = 1;         # Do we create gapped features or not
+    $self->{'_ungapped'}  = undef;         # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
-
+    print STDERR "@args\n";
     # Now parse the input options and store them in the object
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$ungapped,$options) = 
 	    $self->_rearrange([qw(QUERY 
@@ -190,6 +190,7 @@ sub new {
     if (defined($coverage)) {
       $self->coverage($coverage);
     }
+    print STDERR "setting ungapped = ".$ungapped."\n";
     if (defined($ungapped)) {
       $self->ungapped($ungapped);
     }
@@ -393,7 +394,7 @@ sub parse_results {
     
   }
 
-  print STDERR "Ids " . keys(%ids) . "\n";
+  #print STDERR "Ids " . keys(%ids) . "\n";
 
   @parsers = ();
 
@@ -424,7 +425,7 @@ sub parse_results {
       next NAME;
     }
 
-    print "Parsing name $name\n";
+    #print "Parsing name $name\n";
     HSP: while (my $hsp = $sbjct->nextHSP) {
 
 	if ($self->threshold_type eq "PID") {
@@ -435,7 +436,7 @@ sub parse_results {
       # Each HSP is a gapped alignment.
       # This method splits the gapped alignment into
       # ungapped pieces
-      print STDERR "HSP " . $hsp->P . "\n";
+      #print STDERR "HSP " . $hsp->P . "\n";
       $self->split_HSP($hsp,$name);
 	
     }
@@ -463,7 +464,7 @@ sub parse_results {
 
       my @pruned = $search->run(@allfeatures);
 
-      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+      #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
@@ -676,7 +677,7 @@ sub split_HSP {
 	    if ($found == 1) {
 
 		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
-		print "Found " . $fp->gffstring . "\n";		
+		#print "Found " . $fp->gffstring . "\n";		
 		push(@tmpf,$fp);
 		#$self->growfplist($fp);                             	    
 	    }
@@ -711,9 +712,10 @@ sub split_HSP {
 	push(@tmpf,$fp);
 #	$self->growfplist($fp);                             	    
     }
-
+    print STDERR "ungapped = ".$self->ungapped."\n";
     if ($self->ungapped) {
       foreach my $f (@tmpf) {
+	$self->warn("can't store feature pairs this will fail\n");
 	$self->growfplist($f);                             	    
       } 
     } else {
@@ -1053,8 +1055,10 @@ sub ungapped {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
+    print STDERR "setting ungapped = ".$arg."\n";
     $self->{_ungapped} = $arg;
   }
+  print STDERR "ungapped  is = ".$self->{_ungapped}."\n";
   return $self->{_ungapped};
 }
 
@@ -1116,7 +1120,7 @@ sub blast_re {
 
   if (defined $re_string) {
     eval {
-      $re = qr!$re_string!;
+      $re = $re_string;
     };
     if ($@) {
       $self->throw("Illegal RE string $re_string");
