@@ -7,7 +7,8 @@ use Bio::EnsEMBL::Pipeline::Config;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PipelineManager;
 # set a sgnal handler 
-$SIG{INT} = \&_shut_down;
+$SIG{INT}  = \&_shut_down;
+$SIG{TERM} = \&_shut_down;
 
 # Parse command line
 my @files  = ();
