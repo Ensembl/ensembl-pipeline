@@ -34,6 +34,8 @@ my $help;
             'dont_cleanup!' => \$dont_cleanup,
             'blastdb:s' => \$blastdb,
             'rulemanager_verbose!' => \$job_submission_verbose,
+            'comparison_conf' => \$comparison_conf,
+            'run_comparison!' => \$run_comparison,
             'help!' => \$help,
            ) or perldoc();
 

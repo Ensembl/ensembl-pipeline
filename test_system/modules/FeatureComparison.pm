@@ -202,7 +202,8 @@ sub feature_info{
       next;
     }
     $name = $f->analysis->logic_name if(!$name);
-    print $f->start." ".$f->end." ".$f->strand."\n";
+    print $name." ".$f->slice->seq_region_name." ".$f->start." ".$f->end.
+      " ".$f->strand."\n";
   }
 }
 
@@ -222,20 +223,20 @@ sub pipeline_compare{
   }
   my $query_numbers = {};
   my $ref_numbers = {};
-  my $sql = "select logic_name, count(*) from analysis, ";
   foreach my $table(@$table_names){
+    my $sql = "select logic_name, count(*) from analysis, ";
     $sql .= $table." where analysis.analysis_id=".$table.".analysis_id ".
       "group by logic_name\n";
     $query_numbers = $self->run_query($sql, $query_db, $query_numbers);
-    $ref_numbers = $self->run_query($sql, $ref_db, $query_numbers);
+    $ref_numbers = $self->run_query($sql, $ref_db, $ref_numbers);
   }
   print "There are ".keys(%$query_numbers)." analysis in the query database ".
     $query_db->dbname." and ".keys(%$ref_numbers)." analysis in the reference ".
       "database ".$ref_db->dbname." all from ".@$table_names." tables\n";
-  printf("%-15s %-15s\n", 'logic_name', 'query_count', 'ref_count');
-  printf("%-15s %-15s\n", '----------', '-----------', '---------');
+  printf("%-15s %-15s %-15s\n", 'logic_name', 'query_count', 'ref_count');
+  printf("%-15s %-15s %-15s\n", '----------', '-----------', '---------');
   foreach my $logic_name(keys(%$query_numbers)){
-    printf("%-15s %-15s\n", $logic_name, $query_numbers->{$logic_name},
+    printf("%-15s %-15s %-15s\n", $logic_name, $query_numbers->{$logic_name},
            $ref_numbers->{$logic_name});
   }
 }
@@ -260,8 +261,8 @@ sub run_query{
     if(!$hash->{$logic_name}){
       $hash->{$logic_name} = $count;
     }else{
-      throw($logic_name." already appears in ".$hash." with count ".
-            $hash->{$logic_name});
+      warning($logic_name." already appears in ".$hash." with count ".
+            $hash->{$logic_name}." from database ".$db->dbname);
     }
   }
   return $hash;

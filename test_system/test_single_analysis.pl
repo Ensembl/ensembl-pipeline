@@ -90,6 +90,10 @@ sub table_groups{
   my %tables;
   $tables{'genscan'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus'];
+  $tables{'genefinder'} = ['core', 'pipeline', 'repeat_feature',
+                           'repeat_consensus'];
+  $tables{'snap'} = ['core', 'pipeline', 'repeat_feature',
+                     'repeat_consensus'];
   $tables{'fgenesh'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus'];
   $tables{'swall'} = ['core', 'pipeline', 'repeat_feature',
