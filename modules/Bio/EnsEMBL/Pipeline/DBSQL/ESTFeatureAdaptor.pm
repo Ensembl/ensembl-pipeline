@@ -33,16 +33,20 @@ use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 
 sub get_est_length {
   my ($self,$est_id) = @_;
-
-  my $query = "select est_length from est where est_id = '$est_id'";
-  my $sth = $self->prepare($query);
-  my $res = $sth->execute;
-
-  if ($sth->rows > 0) {
-    my $row = $sth->fetchrow_hashref;
-    my $id = $row->{'est_length'};
-    return $id;
+  my $query = qq(SELECT est_length 
+		 FROM est 
+		 WHERE est_id = "$est_id"
+		);
+  my $sth = $self->prepare($query) || $self->throw("can't prepare $query");
+  my $res = $sth->execute || $self->throw("can't execute $query");
+  
+  my @lengths;
+  while (my $length = $sth->fetchrow_array) {
+    push (@lengths,$length);
   }
+  @lengths = sort { $b <=> $a } @lengths;
+  my $thislength = $lengths[0];
+  return $thislength;
 }
 
 sub exists_est {
