@@ -16,10 +16,15 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer->new(-dbobj => $db
-								     -input_id => $id,
-								     -alnprog => 'crossmatch',
-								     -min_score => $score);
+    my $obj = new Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer(-db => $db
+								    -input_id => $id,
+								    -alnprog => 'bl2seq',
+								    -alntype => 'blastn',
+								    -min_score => 40,
+								    -masked => 1,
+								    -filter => "Bio::EnsEMBL::Compara::Filter::Greedy",
+								    -options => $analysis->parameters);
+
     $obj->fetch_input();
     $obj->run();
 
@@ -29,35 +34,42 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
 
 =head1 DESCRIPTION
 
-    This runnabledb creates the crossmatch runnable needed to 
-    compare two contigs from databases from different organisms
+    This runnabledb creates an alignment runnable needed to 
+    compare two DNA fragments (dnafrag could be a RawContig or a VirtualContig as Slice objects)
+    from databases of different organisms
 
     This runnabledb is more complex than usual in that it needs
     to be connected to several dbs:
 
-    alnprog: string defining the alginment runnable used. Can be 'crossmatch', 
-             'bl2seq' or 'exonarate' (the latter not implemented at the moment).
-             'crossmath' is the default.
+    alnprog: string defining the alignment runnable used. Can be 'crossmatch', 
+             'bl2seq', 'blastz' or 'exonerate' (the latter not implemented at the moment).
+             'bl2seq' is the default.
 
-    dbobj: this is where the output is finally written, 
+    -db: this is where the output is finally written, 
     storing the hits between two Ensembl databases. 
-    It is actually a Bio::EnsEMBL::Comparer::DBSQL::DBAdaptor 
+    It is actually a Bio::EnsEMBL::Compara::DBSQL::DBAdaptor 
     database, not a normal pipeline EnsEMBL database
 
-    query_db and target_db: these are the two databases from which the 
-    input dna is fetched
 
     The input id has the following format: 
-    db_name1:contig_id1::db_name2:contig_id2
 
-    contig_id1 being considered as the reference contig to define the 
+    sequence_source1:species1:dnafrag_type1:dnafrag_name1::sequence_source2:species2:dnafrag_type2:dnafrag_name2
+
+    species1 and species2: these are the two species for which the 
+    input dna has to be compared
+
+    e.g.
+    ENSEMBL:Homo_sapiens:VirtualContig:1.1.250000::ENSEMBL:Mus_musculus:VirtualContig:4.151500001.151730910
+
+    dnafrag_name1 being considered as the reference contig to define the 
     reference AlignBlockSet
 
-    min_score is an argument for the 'crossmatch' runnable to set the 
-    minimum score used in the crossmatch run. In the case of 'bl2seq' runnable 
-    it sets the minimum Eval used in bl2seq run. bl2seq runnable runs by default
-    a 'blastn' alignment type. Other alignment types ('blastp','blastx','tblastx' 
-    and 'tblastn') are not implemented yet.
+    -min_score is an common argument for all alnprog, and throw any alignment below min_score
+    -masked 0:unmasked 1:masked (repeat replaced by Ns) 2:soft masked (repeats in lower case)
+    -filter specify a perl module which takes an array of DnaDnaAlignFeature objects and 
+            returns an array of DnaDnaAlignFeature objects after filtering features
+    -options takes a string corresponding to options/parameters to be added in the executable 
+             command line.
 
 =head1 CONTACT
 
@@ -77,29 +89,50 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::Runnable::Bl2seq;
+use Bio::EnsEMBL::Pipeline::Runnable::Blastz;
 use Bio::PrimarySeq;
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::FeaturePair;
-use Bio::SeqIO;
-use Bio::EnsEMBL::Root;
-use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-  my ($score, $alnprog) = $self->_rearrange([qw(MIN_SCORE ALNPROG)],@args);
+  
+  $self->{'_filter'} = 0;
+  $self->{'_masked'} = 0;
+  $self->{'_alnprog'} = 'bl2seq';
+  $self->{'_alntype'} = 'blastn';
+  $self->{'_min_score'} = 100;
+
+  my ($min_score, $alnprog, $alntype, $masked, $filter, $options) = 
+    $self->_rearrange([qw(MIN_SCORE
+			  ALNPROG
+			  ALNTYPE
+			  MASKED
+			  FILTER
+			  OPTIONS)],@args);
+  
   bless $self, $class;
-  $score ||= 100;
-  $self->min_score($score);
-  $alnprog ||= 'crossmatch';
-  $self->alnprog($alnprog);
+
+  $self->min_score($min_score) if (defined $min_score);
+  $self->alnprog($alnprog) if (defined $alnprog);
+  $self->alntype($alntype) if (defined $alntype);
+  $self->masked($masked) if (defined $masked);
+  $self->options($options) if (defined $options);
+
+  if (defined $filter) {
+    $self->filter($filter);
+    eval "require $filter";
+    if($@) {
+      $self->warn("$filter cannot be found.\nException $@\n");
+      return undef;
+    }
+  }
+
   return $self; 
 }
 
@@ -121,34 +154,97 @@ sub fetch_input {
       unless (defined $self->alnprog &&
 	      ($self->alnprog eq 'crossmatch' ||
 	       $self->alnprog eq 'bl2seq' ||
-	       $self->alnprog eq 'exonerate'));
+	       $self->alnprog eq 'exonerate' ||
+	       $self->alnprog eq 'blastz'));
 
     my $input_id  = $self->input_id;
 
-    my ($db1,$db2,$c1,$c2);
-    if ($input_id =~ /(\S+):(\S+)::(\S+):(\S+)/ ) {
-	$db1 = $1;
-	$c1 = $2;
-	$db2 = $3;
-	$c2 = $4;
+    my ($sequence_source1,$species1,$dnafrag_type1,$dnafrag_name1,$sequence_source2,$species2,$dnafrag_type2,$dnafrag_name2);
+    if ($input_id =~ /^(\S+):(\S+):(\S+):(\S+)::(\S+):(\S+):(\S+):(\S+)$/ ) {
+      $sequence_source1 = $1;
+      $species1 = $2;
+      $dnafrag_type1 = $3;
+      $dnafrag_name1 = $4;
+      $sequence_source2 = $5;
+      $species2 = $6;
+      $dnafrag_type2 = $7;
+      $dnafrag_name2 = $8;
     }
     else {
-	$self->throw("Input id not in correct format: got $input_id, should be parsable by (\w+)\:(\S+)\/(\w+)\:(\S+)");
+	$self->throw("Input id not in correct format: got $input_id, should be parsable by 
+\/^\\S+:\\S+:\\S+:\\S+::\\S+:\\S+:\\S+\:\\S+\$\/");
     }
 
-    $self->_c1_id($c1);
-    $self->_c2_id($c2);
+    $self->_c1_id($dnafrag_name1);
+    $self->_c2_id($dnafrag_name2);
 
-    my $gadp = $self->dbobj->get_GenomeDBAdaptor();
+    my $gadp = $self->db->get_GenomeDBAdaptor();
+    
+    my ($contig1,$contig2);
+    my ($seq1,$seq2);
 
-    $db1 = $gadp->fetch_by_species_tag($db1);
-    $db2 = $gadp->fetch_by_species_tag($db2);
+    if ($sequence_source1 eq "ENSEMBL") {
 
-    my $contig1 = $db1->get_Contig($c1,'RawContig');
-    my $contig2 = $db2->get_Contig($c2,'RawContig');
+      my $core_species1adp = $gadp->fetch_by_species_tag($species1)->db_adaptor;
 
-    my $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
-    my $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
+      if ($dnafrag_type1 eq "RawContig") {
+
+	$contig1 = $core_species1adp->get_RawContigAdaptor->fetch_by_name($dnafrag_name1);
+
+      } elsif ($dnafrag_type1 eq "VirtualContig") {
+
+	my ($chr,$start,$end) = split /\./, $dnafrag_name1;
+	$contig1 = $core_species1adp->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+
+      }
+
+      if ($self->masked == 1) {
+	$seq1 = $contig1->get_repeatmasked_seq;
+	$seq1->display_id("seq1");
+      } elsif ($self->masked == 2) {
+	$seq1 = $contig1->get_repeatmasked_seq('RepeatMask',1);
+	$seq1->display_id("seq1");
+      } else {
+	$seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
+      }
+
+    } elsif ($sequence_source1 eq "FASTA") {
+
+      $seq1 = "$dnafrag_name1";
+
+    }
+
+    if ($sequence_source2 eq "ENSEMBL") {
+
+      my $core_species2adp = $gadp->fetch_by_species_tag($species2)->db_adaptor;
+
+      if ($dnafrag_type2 eq "RawContig") {
+
+	$contig2 = $core_species2adp->get_RawContigAdaptor->fetch_by_name($dnafrag_name2);
+
+      } elsif ($dnafrag_type2 eq "VirtualContig") {
+
+	my ($chr,$start,$end) = split /\./, $dnafrag_name2;
+	$contig2 = $core_species2adp->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+
+      } 
+
+      if ($self->masked == 1) {
+	$seq2 = $contig2->get_repeatmasked_seq;
+	$seq2->display_id("seq2");
+      } elsif ($self->masked == 2) {
+	$seq2 = $contig2->get_repeatmasked_seq('RepeatMask',1);
+	$seq2->display_id("seq2");
+      } else {
+	$seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
+      }
+
+    } elsif ($sequence_source2 eq "FASTA") {
+
+      $seq2 = "$dnafrag_name2";
+
+    }
+    
     
     my $alnrunnable;
 
@@ -165,13 +261,23 @@ sub fetch_input {
       
       $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(-seq1 => $seq1,
 								   -seq2 => $seq2,
-								   -min_score => 40,
-								   -min_eval => $self->min_score);
+								   -alntype => $self->alntype,
+								   -min_score => $self->min_score,
+								   -options => $self->analysis->parameters
+								  );
     } elsif ($self->alnprog eq 'exonerate') {
-      $self->throw("exonarate aligment runnable not implemented yet");
-#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
-#								      -est => [$seq1]);
-    } 
+      $self->throw("exonerate aligment runnable not implemented yet");
+#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-exonerate => "/usr/local/ensembl/bin/exonerate",
+#								      -genomic => $seq2,
+#								      -est => [$seq1],
+#								      -args => "-a 400 -p no -n -w 14 -t 65 -H 150 -D 5 -m 768");
+    } elsif ($self->alnprog eq 'blastz') {
+
+      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Blastz->new(-query => $seq1,
+								   -database => $seq2,
+								   -options => $self->analysis->parameters
+								  );
+    }
     
     $self->runnable($alnrunnable);
 }
@@ -212,85 +318,19 @@ sub output {
    }
 
    if (defined $self->{'output'}) {
-     return @{$self->{'output'}};
+#     return @{$self->{'output'}};
+     return $self->{'output'};
+
    } else {
      return ();
    }
-}
-
-=head2 _greedy_filter
-
-    Title   :   _greedy_filter
-    Usage   :   _greedy_filter(@)
-    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in three steps, 
-                First, determines the highest scored hit, and fix the expected strand hit
-                Second, hits on expected strand are kept if they do not overlap, 
-                either on query or subject sequence, previous strored, higher scored hits.
-                If hit goes trough the second step, the third test makes sure that the hit
-                is coherent position according to previous ones. 
-    Returns :   Array of Bio::EnsEMBL::FeaturePairs
-    Args    :   Array of Bio::EnsEMBL::FeaturePairs
-
-=cut
-
-sub _greedy_filter {
-  my (@DnaDnaAlignFeatures) = @_;
-
-  print "no-filtered: ",scalar @DnaDnaAlignFeatures,"\n";
-
-  @DnaDnaAlignFeatures = sort {
-    my @a_features = $a->ungapped_features;
-    my @b_features = $a->ungapped_features;
-    
-    $a_features[0]->score <=> $b_features[0]->score;
- 
-  } @DnaDnaAlignFeatures;
-  
-  my @DnaDnaAlignFeatures_filtered;
-  my $ref_strand;
-
-  foreach my $fp (@DnaDnaAlignFeatures) {
-    if (! scalar @DnaDnaAlignFeatures_filtered) {
-        push @DnaDnaAlignFeatures_filtered, $fp;
-	$ref_strand = $fp->hstrand;
-        next;
-    }
-    next if ($fp->hstrand != $ref_strand);
-    my $add_fp = 1;
-    foreach my $feature_filtered (@DnaDnaAlignFeatures_filtered) {
-      my ($start,$end,$hstart,$hend) = ($feature_filtered->start,$feature_filtered->end,$feature_filtered->hstart,$feature_filtered->hend);
-      if (($fp->start >= $start && $fp->start <= $end) ||
-	  ($fp->end >= $start && $fp->end <= $end) ||
-	  ($fp->hstart >= $hstart && $fp->hstart <= $hend) ||
-	  ($fp->hend >= $hstart && $fp->hend <= $hend)) {
-	$add_fp = 0;
-	last;
-      }
-      if ($ref_strand == 1) {
-	unless (($fp->start > $end && $fp->hstart > $hend) ||
-		($fp->end < $start && $fp->hend < $hend)) {
-	  $add_fp = 0;
-	  last;
-	}
-      } elsif ($ref_strand == -1) {
-	unless (($fp->start > $end && $fp->hstart < $hend) ||
-		($fp->end < $start && $fp->hend > $hend)) {
-	  $add_fp = 0;
-	  last;
-	}
-      }
-    }
-    push @DnaDnaAlignFeatures_filtered, $fp if ($add_fp);
-  }
-
-  return @DnaDnaAlignFeatures_filtered;
 }
 
 =head2 write_output
 
     Title   :   write_output
     Usage   :   $self->write_output()
-    Function:   Writes contents of $self->output into $self->dbobj
+    Function:   Writes contents of $self->output into $self->db
     Returns :   1
     Args    :   None
 
@@ -299,29 +339,36 @@ sub _greedy_filter {
 sub write_output {
   my ($self) = @_;
 
-  if (! scalar($self->output)) {
+  if (! scalar @{$self->output}) {
       return 1;
   } 
 
-  my @DnaDnaAlignFeatures = _greedy_filter($self->output);
-  
-  my $db = $self->dbobj();
+  my @DnaDnaAlignFeatures;
+  if ($self->filter) {
+    print STDERR "filter used: ",$self->filter,"\n";
+    print STDERR "features before filter: ",scalar @{$self->output},"\n";
+    @DnaDnaAlignFeatures = @{$self->filter->filter($self->output)};
+    print STDERR "features after filter: ",scalar @DnaDnaAlignFeatures,"\n";
+  } else {
+    @DnaDnaAlignFeatures = @{$self->output};
+  }
+  my $db = $self->db();
   my $gadb = $db->get_GenomeDBAdaptor();
   $db->get_DnaFragAdaptor();
 
   my $input_id = $self->input_id();
-  my ($species_tag1,$contig_id1,$species_tag2,$contig_id2);
+  my ($sequence_source1,$species_tag1,$dnafrag_type1,$dnafrag_name1,$sequence_source2,$species_tag2,$dnafrag_type2,$dnafrag_name2);
 
-  if ($input_id =~ /^(\S+):(\S+)::(\S+):(\S+)$/) {
-    ($species_tag1,$contig_id1,$species_tag2,$contig_id2) = ($1,$2,$3,$4);
+  if ($input_id =~ /^(\S+):(\S+):(\S+):(\S+)::(\S+):(\S+):(\S+):(\S+)$/) {
+    ($sequence_source1,$species_tag1,$dnafrag_type1,$dnafrag_name1,$sequence_source2,$species_tag2,$dnafrag_type2,$dnafrag_name2) = ($1,$2,$3,$4,$5,$6,$7,$8);
   } else {
-    die "\$input_id should be dbname1:contig_id1::dbname2:contig_id2 in CrossComparer.pm\n";
+    die "\$input_id should be sequence_source1:species1:dnafrag_type1:dnafrag_name1::sequence_source2:species2:dnafrag_type2:dnafrag_name2 in CrossComparer.pm\n";
   }
   
-  # Using $contig_id1 as consensus sequence for the reference align_id
+  # Using $dnafrag_name1 as consensus sequence for the reference align_id
 
   my $galn = $db->get_GenomicAlignAdaptor();
-  my $align_id = $galn->fetch_align_id_by_align_name($contig_id1);
+  my $align_id = $galn->fetch_align_id_by_align_name($dnafrag_name1);
 
   # Defining the align_row_id
 
@@ -331,18 +378,38 @@ sub write_output {
 
   my $aln = Bio::EnsEMBL::Compara::GenomicAlign->new();
   
-  # Using $contig_id2 as query sequence
+  # Using $dnafrag_name2 as query sequence
 
-  my $gdb = $gadb->fetch_by_species_tag($species_tag2);
-  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
-  $dnafrag->name($contig_id2);
-  $dnafrag->genomedb($gdb);
-  $dnafrag->type('RawContig');
+  my $dnafrag;
+
+  if ($sequence_source2 eq "ENSEMBL") {
+    my $gdb = $gadb->fetch_by_species_tag($species_tag2);
+    $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+    $dnafrag->name($dnafrag_name2);
+    $dnafrag->genomedb($gdb);
+    $dnafrag->type($dnafrag_type2);
+  }
   
   my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
-  
-  foreach my $f (@DnaDnaAlignFeatures) {
+  my $hseqname;
+
+  foreach my $f (sort {$a->hseqname cmp $b->hseqname} @DnaDnaAlignFeatures) {
+    $hseqname = $f->hseqname unless (defined $hseqname);
+    if ($hseqname ne $f->hseqname) {
+      $aln->add_AlignBlockSet($current_align_row_id,$abs);
+      $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
+      $hseqname = $f->hseqname;
+      $current_align_row_id++;
+    }
+    if ($sequence_source2 eq "FASTA") {
+      my $gdb = $gadb->fetch_by_species_tag($species_tag2);
+      $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+      $dnafrag->name($f->hseqname);
+      $dnafrag->genomedb($gdb);
+      $dnafrag->type($dnafrag_type2);
+    }
     my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
+
     $ab->align_start($f->start);
     $ab->align_end($f->end);
     $ab->start($f->hstart);
@@ -354,6 +421,7 @@ sub write_output {
     }
     $ab->score($f->score);
     $ab->perc_id($f->percent_id);
+# think here to revert cigar_string if strand==-1 !!
     $ab->cigar_string($f->cigar_string);
     $ab->dnafrag($dnafrag);
     
@@ -414,6 +482,46 @@ sub min_score{
 
 }
 
+=head2 masked
+
+ Title   : masked
+ Usage   : $obj->masked($boolean)
+ Function: Get/set the  value
+ Returns : value of masked
+ Args    : boolean, 0 or 1
+
+
+=cut
+
+sub masked {
+   my ($self,@args) = @_;
+   if (@args) {
+      my ($value) = @args;
+      $self->{'masked'} = $value;
+    }
+    return $self->{'masked'};
+}
+
+=head2 filter
+
+ Title   : filter
+ Usage   : $obj->filter($boolean)
+ Function: Get/set the  value
+ Returns : value of filter
+ Args    : boolean, 0 or 1
+
+
+=cut
+
+sub filter {
+   my ($self,@args) = @_;
+   if (@args) {
+      my ($value) = @args;
+      $self->{'filter'} = $value;
+    }
+    return $self->{'filter'};
+}
+
 =head2 alnprog
 
  Title   : alnprog
@@ -432,6 +540,27 @@ sub alnprog {
       $self->{'alnprog'} = $value;
     }
     return $self->{'alnprog'};
+}
+
+=head2 alntype
+
+ Title   : alntype
+ Usage   : $obj->alntype($string)
+ Function: Get/set the alntype value
+ Returns : value of alntype
+ Args    : string, some program could use different algorithm to align sequences.
+           In the case of bl2seq, it could be 'blastp', 'blastn', 'blastx', 'tblastn' 
+           or 'tblastx' (optional)
+
+=cut
+
+sub alntype {
+   my ($self,@args) = @_;
+   if (@args) {
+      my ($value) = @args;
+      $self->{'alntype'} = $value;
+    }
+    return $self->{'alntype'};
 }
 
 =head2 _c1_id
