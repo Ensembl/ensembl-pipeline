@@ -31,7 +31,11 @@ foreach my $obj (@results)
 {
     print "\n";
     foreach my $method_name (@methods) {
-        my $value = $obj->$method_name();
+        my $value = "";
+
+        if (defined($obj->$method_name)) {
+           $value = $obj->$method_name();
+        }
         printf ("%10s = $value\n", $method_name);
     }
 }
