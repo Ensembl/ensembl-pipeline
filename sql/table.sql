@@ -68,7 +68,10 @@ CREATE TABLE job (
 CREATE TABLE jobstatus (
   jobId int(10) unsigned DEFAULT '0' NOT NULL,
   status varchar(40) DEFAULT 'CREATED' NOT NULL,
-  time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL
+  time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+
+  PRIMARY KEY (jobId),
+  KEY status_index (status)
 );
 
 #
@@ -307,7 +310,9 @@ CREATE TABLE feature (
   KEY overlap (id,contig,seq_start,seq_end,analysis),
   KEY contig (contig),
   KEY hid (hid)
-);
+# Do we really need tables as big as this... :-|
+# Hopefully not but the default table length is probably too small
+) MAX_ROWS = 1000000000;
 
 #
 # Table structure for table 'fset'
