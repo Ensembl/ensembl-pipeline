@@ -355,13 +355,13 @@ sub parse_results {
             {
                 $feat1 {start}   = $hsp->queryBegin;
                 $feat1 {end}     = $hsp->queryEnd;
-                $feat1 {strand}  = -1;
+                $feat1 {strand}  = 1;
             }
             else
             {
                 $feat1 {start}   = $hsp->queryEnd;
                 $feat1 {end}     = $hsp->queryBegin;
-                $feat1 {strand}  = 1;
+                $feat1 {strand}  = -1;
             }
             
             $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
