@@ -44,7 +44,7 @@ Describe contact details here
 =head1 APPENDIX
 
 The rest of the documentation details each of the object methods. 
-Internal methods are usually preceded with a _
+Internal methods are usually preceded with a _'
 
 =cut
 

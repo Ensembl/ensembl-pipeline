@@ -12,7 +12,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General;
 use Bio::EnsEMBL::Pipeline::Runnable::Pmatch;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
-   
+use Bio::SeqIO;   
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -60,7 +60,6 @@ sub fetch_input{
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Pmatch->new(
 							       '-query' => $genseq,
 							       '-protein_file' => $self->protein_file,
-							       '-program' => $self->analysis->program,
 							       '-options' => $self->analysis->parameters,
 							       '-max_intron_size' => $self->max_intron,
 							       '-protein_lengths' => $self->prot_lengths,
@@ -182,35 +181,43 @@ sub output{
 
 sub make_protlist{
   my ($self) = @_;
-  #print STDERR "making prot_length list from $protfile\n";
+  ##print STDERR "making prot_length list from $protfile\n";
   my %plengths;
-  open (INFILE, "<".$self->protein_file) or die "Can't open ".$self->protein_file."\n";
-  $/ = '>'; # looks for fields separated by > instead of "\n"
- SEQFETCH:
-  while(<INFILE>) {
-    my @lines = split /\n/;
-    next SEQFETCH unless scalar(@lines) > 1;
-    my $description = shift (@lines);
-    $description =~ /(\S+)/; # find the first block of non-whitespace
+#  open (INFILE, "<".$self->protein_file) or die "Can't open ".$self->protein_file."\n";
+#  $/ = '>'; # looks for fields separated by > instead of "\n"
+# SEQFETCH:
+#  while(<INFILE>) {
+    
+#    my @lines = split /\n/;
+#    next SEQFETCH unless scalar(@lines) > 1;
+#    my $description = shift (@lines);
+#    $description =~ /(\S+)/; # find the first block of non-whitespace
 
-    next SEQFETCH unless defined $description and $description ne '';
-    my $bs = new Bio::Seq;
-    $bs->display_id($1);
+#    next SEQFETCH unless defined $description and $description ne '';
+#    my $bs = new Bio::Seq;
+#    $bs->display_id($1);
     
-    my $seq;
-    foreach my $line(@lines) {
-      chomp $line;
-      $seq .= $line;
-    }
+#    my $seq;
+#    foreach my $line(@lines) {
+#      chomp $line;
+#      $seq .= $line;
+#    }
     
-    $bs->seq($seq);
-    #print STDERR $bs->display_id ." = ".$bs->length."\n";
-    $plengths{$bs->display_id} = $bs->length;
+#    $bs->seq($seq);
+#    #print STDERR $bs->display_id ." = ".$bs->length."\n";
+#    $plengths{$bs->display_id} = $bs->length;
+#  }
+
+#  # note double quotes ...    
+#  $/ = "\n";
+#  close INFILE;
+
+  my $seqio = new Bio::SeqIO(-format => 'Fasta', 
+			     -file => $self->protein_file);
+  while(my $seq = $seqio->next_seq){
+    #print STDERR "have id ".$seq->id." ".$seq->length."\n";
+    $plengths{$seq->id} = $seq->length;
   }
-
-  # note double quotes ...    
-  $/ = "\n";
-  close INFILE;
   my $ref = \%plengths;
   #print STDERR "have ".$ref." hash \n";
   $self->prot_lengths($ref);
