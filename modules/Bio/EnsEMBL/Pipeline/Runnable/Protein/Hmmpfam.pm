@@ -16,11 +16,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam
 =head1 SYNOPSIS
 
   # something like this
-  my $query = new Bio::Seq(-file   => $clonefile,
+  my $query = new Bio::Seq(-file   => $queryfile,
 			   -format => 'Fasta');
 
   my $hmm =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new 
-    ('-clone'          => $query,
+    ('-query'          => $query,
      '-program'        => 'hmmpfam' or '/usr/local/pubseq/bin/hmmpfam',
      '-database'       => 'Pfam');
 
@@ -82,7 +82,7 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of seg run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis, $options) = $self->_rearrange([qw(CLONE 
+    my ($query, $analysis, $options) = $self->_rearrange([qw(QUERY 
                                                              ANALYSIS
                                                              OPTIONS)],        
                                                           @args);
@@ -93,7 +93,7 @@ sub new {
         $self->throw("BlastWorm needs an analysis");
     }
 
-    $self->clone ($clone) if ($clone);       
+    $self->query ($query) if ($query);       
 
     $self->program ($self->find_executable ($self->analysis->program_file));
   
@@ -113,11 +113,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 clone
+=head2 query
 
- Title    : clone
- Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone,
+ Title    : query
+ Usage    : $self->query ($query);
+ Function : get/set method for the Sequence object; assigns query,
             seq-filename and result-filename
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
@@ -126,14 +126,14 @@ sub new {
 
 =cut
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq) {
         ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
             || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         $self->{'_sequence'} = $seq ;
-        $self->queryname ($self->clone->id);
-        $self->filename ($self->clone->id.".$$.seq");
+        $self->queryname ($self->query->id);
+        $self->filename ($self->query->id.".$$.seq");
         $self->results ($self->filename.".out");
     }
     return $self->{'_sequence'};
@@ -249,8 +249,8 @@ sub run {
 
     # nothing to be done with $args
 
-    # check clone
-    my $seq = $self->clone || $self->throw("Clone required for ".$self->program."\n");
+    # check query
+    my $seq = $self->query || $self->throw("Query required for ".$self->program."\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));

@@ -60,7 +60,7 @@ use Bio::EnsEMBL::Analysis;
  Title    : new
  Usage    : my $tmhmm =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new
                          ( -program    => '/usr/local/pubseq/bin/tmhmm',
-                           -clone      => $clone,
+                           -query      => $query,
                            -analysis   => $analysis
                          );
  Function : initialises Tmhmm object
@@ -83,12 +83,12 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of program run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis, $program) = $self->_rearrange([qw(CLONE 
+    my ($query, $analysis, $program) = $self->_rearrange([qw(QUERY 
 						             ANALYSIS
                                                              PROGRAM)], 
 						          @args);
   
-    $self->clone ($clone) if ($clone);
+    $self->query ($query) if ($query);
 
     if ($analysis) {
         $self->analysis ($analysis);
@@ -106,11 +106,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 clone
+=head2 query
 
- Title    : clone
- Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone, filename and results
+ Title    : query
+ Usage    : $self->query ($query);
+ Function : get/set method for the Sequence object; assigns query, filename and results
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
  Args     : a Bio::Seq or Bio::PrimarySeq object (optional)
@@ -118,7 +118,7 @@ sub new {
 
 =cut
 
-sub clone {
+sub query {
   my ($self, $seq) = @_;
     if ($seq) {
 	eval {
@@ -127,8 +127,8 @@ sub clone {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->clone->id);
-	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->queryname ($self->query->id);
+	    $self->filename ($self->query->id.".$$.seq");
 	    $self->results ($self->filename.".out");
 	}
 	else {
@@ -208,8 +208,8 @@ sub program {
 sub run {
     my ($self, $dir) = @_;
 
-    # check clone
-    my $seq = $self->clone || $self->throw("Clone required for Program\n");
+    # check query
+    my $seq = $self->query || $self->throw("Query required for Program\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -241,11 +241,11 @@ sub run {
 	$self->deletefiles;
     }
     else {
-	#The clone object is not a seq object but a file.
+	#The query object is not a seq object but a file.
 	#Perhaps should check here or before if this file is fasta format...if not die
 	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
 
-	$self->filename($self->clone);
+	$self->filename($self->query);
 
 	# run program
 	$self->run_program;

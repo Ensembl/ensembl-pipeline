@@ -62,10 +62,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $seq);
     Function:   Initialises CPG object
     Returns :   a CPG Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments (-LENGTH, -GC, -OE) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments (-LENGTH, -GC, -OE) 
 
 =cut
 
@@ -82,13 +82,13 @@ sub new {
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
     
   
-     my( $clone, $analysis) = $self->_rearrange([qw(QUERY
+     my( $query, $analysis) = $self->_rearrange([qw(QUERY
 						    ANALYSIS
 						    )],
 						@args);
     
     
-    $self->clone ($clone) if ($clone);       
+    $self->query ($query) if ($query);       
     $self->analysis ($analysis) if ($analysis);
         	
     return $self; # success - we hope!
@@ -98,9 +98,9 @@ sub new {
 #Get set methods
 ######
 
-=head2 clone
+=head2 query
 
- Title   : clone
+ Title   : query
  Usage   :
  Function:
  Example :
@@ -110,7 +110,7 @@ sub new {
 
 =cut
 
-sub clone{
+sub query{
     my ($self, $seq) = @_;
     if ($seq) {
 	eval {
@@ -119,8 +119,8 @@ sub clone{
 	
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->clone->id);
-	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->queryname ($self->query->id);
+	    $self->filename ($self->query->id.".$$.seq");
 	    $self->results ($self->filename.".out");
 	}
 	else {
@@ -176,8 +176,8 @@ sub analysis{
 sub run {
  my ($self, $dir) = @_;
 
-    # check clone
-    my $seq = $self->clone || $self->throw("Clone required for Program");
+    # check query
+    my $seq = $self->query || $self->throw("Query required for Program");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -210,7 +210,7 @@ sub run {
 	$self->deletefiles;
     }
     else {
-	#The clone object is not a seq object but a file.
+	#The query object is not a seq object but a file.
 	#Perhaps should check here or before if this file is fasta format...if not die
 	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
 
