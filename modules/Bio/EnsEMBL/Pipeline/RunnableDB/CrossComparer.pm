@@ -234,21 +234,30 @@ sub output {
 =cut
 
 sub _greedy_filter {
-  my (@features) = @_;
+  my (@DnaDnaAlignFeatures) = @_;
 
-  @features = sort {$b->score <=> $a->score} @features;
+  print "no-filtered: ",scalar @DnaDnaAlignFeatures,"\n";
 
-  my @features_filtered;
+  @DnaDnaAlignFeatures = sort {
+    my @a_features = $a->ungapped_features;
+    my @b_features = $a->ungapped_features;
+    
+    $a_features[0]->score <=> $b_features[0]->score;
+ 
+  } @DnaDnaAlignFeatures;
+  
+  my @DnaDnaAlignFeatures_filtered;
   my $ref_strand;
-  foreach my $fp (@features) {
-    if (! scalar @features_filtered) {
-        push @features_filtered, $fp;
+
+  foreach my $fp (@DnaDnaAlignFeatures) {
+    if (! scalar @DnaDnaAlignFeatures_filtered) {
+        push @DnaDnaAlignFeatures_filtered, $fp;
 	$ref_strand = $fp->hstrand;
         next;
     }
     next if ($fp->hstrand != $ref_strand);
     my $add_fp = 1;
-    foreach my $feature_filtered (@features_filtered) {
+    foreach my $feature_filtered (@DnaDnaAlignFeatures_filtered) {
       my ($start,$end,$hstart,$hend) = ($feature_filtered->start,$feature_filtered->end,$feature_filtered->hstart,$feature_filtered->hend);
       if (($fp->start >= $start && $fp->start <= $end) ||
 	  ($fp->end >= $start && $fp->end <= $end) ||
@@ -261,20 +270,20 @@ sub _greedy_filter {
 	unless (($fp->start > $end && $fp->hstart > $hend) ||
 		($fp->end < $start && $fp->hend < $hend)) {
 	  $add_fp = 0;
-	  last
+	  last;
 	}
       } elsif ($ref_strand == -1) {
 	unless (($fp->start > $end && $fp->hstart < $hend) ||
 		($fp->end < $start && $fp->hend > $hend)) {
 	  $add_fp = 0;
-	  last
+	  last;
 	}
       }
     }
-    push @features_filtered, $fp if ($add_fp);
+    push @DnaDnaAlignFeatures_filtered, $fp if ($add_fp);
   }
 
-  return @features_filtered;
+  return @DnaDnaAlignFeatures_filtered;
 }
 
 =head2 write_output
@@ -294,8 +303,8 @@ sub write_output {
       return 1;
   } 
 
-  my @features = _greedy_filter($self->output);
-
+  my @DnaDnaAlignFeatures = _greedy_filter($self->output);
+  
   my $db = $self->dbobj();
   my $gadb = $db->get_GenomeDBAdaptor();
   $db->get_DnaFragAdaptor();
@@ -309,69 +318,33 @@ sub write_output {
     die "\$input_id should be dbname1:contig_id1::dbname2:contig_id2 in CrossComparer.pm\n";
   }
   
-  # Using $contig_id1 as reference sequence for the reference AlignBlockSet
+  # Using $contig_id1 as consensus sequence for the reference align_id
 
-  my $gdb = $gadb->fetch_by_species_tag($species_tag1);
-  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
-  $dnafrag->name($contig_id1);
-  $dnafrag->genomedb($gdb);
+  my $galn = $db->get_GenomicAlignAdaptor();
+  my $align_id = $galn->fetch_align_id_by_align_name($contig_id1);
 
-  # Sorting @feature from maxend to minend of reference sequence
-  # and defining the offset_max for the reference AlignBlockSet
-  
-  @features = sort {$b->end <=> $a->end} @features;
-  my $offset_max = $features[0]->end;
-
-  # sorting @feature from minstart to maxstart of reference sequence
-  # and defining the offset_min for the reference AlignBlockSet
-  
-  @features = sort {$a->start <=> $b->start} @features;
-  my $offset_min = $features[0]->start;
-
-  # Defining the align_row_id for the reference sequence;
+  # Defining the align_row_id
 
   my $current_align_row_id = 1;
 
-  # We know that reference AlignBlockSet only has one AlignBlock
-  
-  my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
-  my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
-  my $align_start = 1;
-  my $align_end = $offset_max - $offset_min + 1;
-  $ab->align_start($align_start);
-  $ab->align_end($align_end);
-  
-  $ab->start($offset_min);
-  $ab->end($offset_max);
-  $ab->strand(1);
-  $ab->dnafrag($dnafrag);
-    
-  $abs->add_AlignBlock($ab);
-  
-  # Defining an alignement and adding the reference AlignBlockSet
+  # Defining an alignement
 
   my $aln = Bio::EnsEMBL::Compara::GenomicAlign->new();
-  $aln->add_AlignBlockSet($current_align_row_id,$abs);
   
-  # Defining the align_row_id for the query sequence;
+  # Using $contig_id2 as query sequence
 
-  $current_align_row_id++;
-  
-  # Using $contig_id2 as query sequence for the query AlignBlockSet
-
-  $gdb = $gadb->fetch_by_species_tag($species_tag2);
-  $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+  my $gdb = $gadb->fetch_by_species_tag($species_tag2);
+  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
   $dnafrag->name($contig_id2);
   $dnafrag->genomedb($gdb);
+  $dnafrag->type('RawContig');
   
-  $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
+  my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
   
-  foreach my $f (@features) {
+  foreach my $f (@DnaDnaAlignFeatures) {
     my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
-    my $align_start = $f->start - $offset_min + 1;
-    my $align_end = $f->end - $offset_min + 1;
-    $ab->align_start($align_start);
-    $ab->align_end($align_end);
+    $ab->align_start($f->start);
+    $ab->align_end($f->end);
     $ab->start($f->hstart);
     $ab->end($f->hend);
     if ($f->strand == 1) {
@@ -379,6 +352,9 @@ sub write_output {
     } elsif ($f->strand == -1) {
       $ab->strand(- $f->hstrand);
     }
+    $ab->score($f->score);
+    $ab->perc_id($f->percent_id);
+    $ab->cigar_string($f->cigar_string);
     $ab->dnafrag($dnafrag);
     
     $abs->add_AlignBlock($ab);
@@ -388,10 +364,10 @@ sub write_output {
 
   $aln->add_AlignBlockSet($current_align_row_id,$abs);
 
-  # Storing alignment in the corresponding database
+  # Storing alignment in the corresponding database with the relevant align_id
 
   my $galnad = $db->get_GenomicAlignAdaptor();
-  $galnad->store($aln);
+  $galnad->store($aln,$align_id);
 
   return 1;
 }
