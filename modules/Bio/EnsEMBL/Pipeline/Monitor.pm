@@ -57,7 +57,7 @@ sub show_current_status {
 
   #Show running/failed jobs grouped by status and analysis name.
 
-  my $sth = $self->dbobj->prepare("select count(*),js.status,ap.logic_name from analysisprocess ap,current_status js,job where job.jobId = js.jobId and ap.analysisId = job.analysisId group by ap.logic_name,js.status");
+  my $sth = $self->dbobj->prepare("select count(*), js.status, a.logic_name from analysis a, job_status js, job j where j.job_Id = js.job_Id and a.analysis_id = j.analysis_id and js.is_current = 'y' group by a.logic_name, js.status");
 
   my $res = $sth->execute;
 
@@ -120,7 +120,7 @@ sub show_current_status {
 sub show_current_status_summary {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select count(*),status from current_status group by status");
+  my $sth = $self->dbobj->prepare("select count(*), status from job_status where is_current = 'y' group by status");
 
   my $res = $sth->execute;
 
@@ -172,7 +172,7 @@ sub show_current_status_summary {
 sub show_finished_summary {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select count(*),ap.logic_name,ap.analysisId from InputIdAnalysis i, analysisprocess ap where ap.analysisId = i.analysisId group by ap.analysisId;");
+  my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_Id from input_id_analysis i, analysis  a where a.analysis_Id = i.analysis_Id group by a.analysis_Id");
   
   my $res = $sth->execute;
 
@@ -187,7 +187,7 @@ sub show_finished_summary {
   while (my $ref = $sth->fetchrow_hashref) {
     my $count  = $ref->{'count(*)'};
     my $name = $ref->{'logic_name'};
-    my $id = $ref->{'analysisId'};
+    my $id = $ref->{'analysis_Id'};
 
     if (length($count) > $maxcount) {
       $maxcount = length($count);
@@ -228,7 +228,7 @@ sub show_finished_summary {
 sub show_analysisprocess {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select analysisId,logic_name,db,program,parameters,module from analysisprocess");
+  my $sth = $self->dbobj->prepare("select analysis_Id,logic_name,db,program,parameters,module from analysis");
   my $res = $sth->execute;
 
   my $maxname;
@@ -246,7 +246,7 @@ sub show_analysisprocess {
   my @modules;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $id      = $ref->{'analysisId'};
+    my $id      = $ref->{'analysis_Id'};
     my $name    = $ref->{'logic_name'};
     my $db      = $ref->{'db'};
     my $prog    = $ref->{'program'};
@@ -311,7 +311,7 @@ sub show_analysisprocess {
 sub show_Rules {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select ap.logic_name,rg.ruleid from RuleGoal rg, analysisprocess ap where ap.analysisId = rg.goalAnalysisId");
+  my $sth = $self->dbobj->prepare("select a.logic_name,rg.rule_id from rule_goal rg, analysis a where a.analysis_Id = rg.goal");
 
   my $res = $sth->execute;
 
@@ -322,7 +322,7 @@ sub show_Rules {
   my $maxid;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'ruleid'};
+    my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
 
     if (length($id) > $maxid) { $maxid = length($id);}
@@ -351,7 +351,7 @@ sub show_Rules {
 sub show_Rules_and_Conditions {
   my ($self) = @_;
 
-  my $sth = $self->dbobj->prepare("select ap.logic_name,rg.ruleid,rc.conditionLiteral from RuleConditions rc,RuleGoal rg, analysisprocess ap where ap.analysisId = rg.goalAnalysisId and rg.ruleId = rc.ruleId");
+  my $sth = $self->dbobj->prepare("select a.logic_name,rg.rule_id,rc.condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_Id = rg.goal and rg.rule_Id = rc.rule_Id");
 
   my $res = $sth->execute;
 
@@ -364,7 +364,7 @@ sub show_Rules_and_Conditions {
   my $maxcond;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'ruleid'};
+    my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
     my $cond = $ref->{'conditionLiteral'};
 
@@ -405,7 +405,7 @@ sub show_jobs_by_status_and_analysis {
   }
 	       
 
-  my $sth = $self->dbobj->prepare("select job.* from jobstatus js,job,analysisprocess ap where ap.analysisId = job.analysisId and job.jobId = js.jobId and js.status = '$status' and ap.logic_name = '$analysis'");
+  my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_Id = job.analysis_Id and job.job_Id = js.job_Id and js.status = '$status' and a.logic_name = '$analysis'");
 
   my $res = $sth->execute;
 
@@ -424,7 +424,7 @@ sub show_jobs_by_status_and_analysis {
   my $maxretry;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $jobId = $ref->{'jobId'};
+    my $jobId = $ref->{'job_Id'};
     my $input_id = $ref->{'input_id'};
     my $LSF_id = $ref->{'LSF_id'};
     my $out    = $ref->{'stdout_file'};
