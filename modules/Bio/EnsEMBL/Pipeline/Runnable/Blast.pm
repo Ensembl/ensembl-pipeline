@@ -657,7 +657,7 @@ sub filter_hits {
                                               $hstart, $hend, $hstrand, 
                                               $name, $score, $percent, 
                                               $p_value, 
-                                              $self->query->name);
+                                              $self->query->id);
            
            push(@features,$fp);
          }
@@ -947,7 +947,7 @@ sub _convert2FeaturePair {
     my $fp = $self->create_FeaturePair($tmpqstart,$tmpqend,$qstrand,
                                        $tmphstart,$tmphend,$hstrand,
                                        $name, $hsp->score, $hsp->percent,
-                                       $hsp->P, $self->query->name, 
+                                       $hsp->P, $self->query->id, 
                                        $analysis);
 
     return $fp;
