@@ -58,7 +58,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
@@ -341,12 +341,11 @@ sub run_gapped {
   
   #clean up temp files
   if(ref($estseq) eq 'ARRAY'){
-    $self->_deletefiles($estfile);
+    $self->_deletefiles($genfile, $estfile, $resfile);
   }
-  if(ref($genomicseq) eq 'ARRAY') {
-    $self->_deletefiles($genfile);
+  else {
+    $self->_deletefiles($genfile, $resfile);
   }
-  $self->_deletefiles($resfile);
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
@@ -702,8 +701,8 @@ sub add_genes {
 
 =head2 each_gene
 
-  Title   : each_gene
-  Usage   : $self->each_gene
+  Title   : each_genes
+  Usage   : $self->each_genes
   Function: Returns results of exonerate as an array of FeaturePair, one per gene. Exons
             are added as subSeqfeatures of genes, and supporting evidence as subSeqFeatures 
             of Exons.
@@ -749,7 +748,7 @@ sub output {
   if (defined $featpair) {
     push(@{$self->{'_output'}}, $featpair);
   }
-
+  
   return @{$self->{'_output'}};
 
 }
@@ -792,8 +791,8 @@ sub _create_featurepair {
 					     -strand      =>   $f1strand,
 					     -score       =>   $f1score,
 					     -percent_id  =>   $f1pid, 
-#					     -source_tag  =>   $f1source,
-#					     -primary_tag =>   $f1primary,
+					     -source_tag  =>   $f1source,
+					     -primary_tag =>   $f1primary,
 					     -analysis    =>   $analysis_obj );
   
   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
@@ -802,8 +801,8 @@ sub _create_featurepair {
 					     -strand      =>   $f2strand,
 					     -score       =>   $f1score,
 					     -percent_id  =>   $f1pid, 
-#					     -source_tag  =>   $f2source,
-#					     -primary_tag =>   $f2primary,
+					     -source_tag  =>   $f2source,
+					     -primary_tag =>   $f2primary,
 					     -analysis    =>   $analysis_obj );
   #create featurepair
   my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,

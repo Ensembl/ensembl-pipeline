@@ -56,7 +56,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
-use Bio::Tools::BPlite;
+use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 
@@ -327,7 +327,7 @@ sub run_blast {
 
 #    print("Exit status of blast is $status\n");
 
-    my $report = new Bio::Tools::BPlite('-file'=>$blastout);
+    my $report = new Bio::EnsEMBL::Pipeline::Tools::BPlite('-file'=>$blastout);
 
     while(my $sbjct = $report->nextSbjct){
       while(my $hsp = $sbjct->nextHSP){
