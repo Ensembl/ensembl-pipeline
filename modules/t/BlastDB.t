@@ -9,8 +9,14 @@ use Bio::SeqIO;
 
 ok(1);
 
-my $pepfile = 't/data/testpep.fa';
-my $estfile = 't/data/testest.fa';
+my $tmppepfile = 't/data/testpep.fa';
+my $tmpestfile = 't/data/testest.fa';
+
+system("cp $tmppepfile $tmppepfile.safe");
+system("cp $tmpestfile $tmpestfile.safe");
+
+my $pepfile = $tmppepfile .".safe";
+my $estfile = $tmpestfile .".safe";
 
 open(IN1,"<$pepfile");
 open(IN2,"<$estfile");
@@ -67,7 +73,7 @@ ok($db3->type eq 'PROTEIN');
 ok($db3->run);
 
 ok(my $dbfile3 = $db3->dbfile);
-ok($db3->dbname eq 'testpep.fa');
+ok($db3->dbname eq 'testpep.fa.safe');
 
 ok($db3->remove_index_files);
 
@@ -79,7 +85,7 @@ ok($db4->type eq 'DNA');
 ok($db4->run);
 
 ok(my $dbfile4 = $db4->dbfile);
-ok($db4->dbname eq 'testest.fa');
+ok($db4->dbname eq 'testest.fa.safe');
 
 ok($db4->remove_index_files);
 
