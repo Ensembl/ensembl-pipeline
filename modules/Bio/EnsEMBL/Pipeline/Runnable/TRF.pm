@@ -216,6 +216,8 @@ sub run {
     # parse output of trf
     $self->parse_results();
     $self->deletefiles();
+
+    1;
 }
 
 =head2 parsefile
