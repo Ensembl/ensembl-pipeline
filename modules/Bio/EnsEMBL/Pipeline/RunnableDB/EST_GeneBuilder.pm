@@ -792,7 +792,7 @@ sub _check_Transcripts {
 
 
 #    # put the accepted exons into this transcript
-#    $transcript->flush_Exon;
+#    $transcript->flush_Exons;
 #    foreach my $exon (@accepted_exons){
 #      $transcript->add_Exon($exon);
 #    }
