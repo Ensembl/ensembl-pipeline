@@ -822,7 +822,8 @@ sub can_retry{
      $logic_name = 'default';
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
-  if($self->retry_count <= $max_retry){
+
+  if($self->retry_count && $self->retry_count <= $max_retry){
      return 1;
   }else{
     return 0;
