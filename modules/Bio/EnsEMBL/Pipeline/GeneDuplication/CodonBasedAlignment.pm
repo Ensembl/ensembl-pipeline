@@ -124,7 +124,7 @@ sub sequences {
   if (@_) {
     $self->{_sequences} = shift;
 
-    foreach my $seq (@{$self->{_sequences}){
+    foreach my $seq (@{$self->{_sequences}}){
       throw("Unexpected sequence type.  Should be Bio::Seq, " . 
 	    "but was [$seq]")
 	unless $seq->isa("Bio::Seq");
