@@ -84,10 +84,6 @@ sub new {
 			(-start=>$se, -end=>$sb, -strand=>-1, 
 			 -source=>"BLAST" ) ) }
     # name the sequences
-    $self->query->seqname($qname); # query
-    $self->subject->seqname($sname); # subject
-
-    # set lengths
     if($self->query->can('seq_id')){
       $self->query->seq_id($qname); # query
       $self->subject->seq_id($sname); # subject
@@ -95,6 +91,11 @@ sub new {
       $self->query->seqname($qname); # query
       $self->subject->seqname($sname); # subject
     }
+
+    # set lengths
+    $self->query->seqlength($qlength); # query
+    $self->subject->seqlength($slength); # subject
+
     # set object vars
     $self->score($score);
     $self->bits($bits);
