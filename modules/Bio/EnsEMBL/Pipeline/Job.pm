@@ -275,12 +275,13 @@ sub flush_runs {
   # and fail if not found
 
   my $runner = $self->runner;
- 
-  unless (-x $runner) {
+
+  if(!$runner || ! -x runner){
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);
-    $self->throw("runner ".$runner." not found - needs to be set in $caller\n") unless -x $runner;
+    $self->throw("runner ".$runner." not found - needs to be set in ".
+                 "$caller\n") unless -x $runner;
   }
 
   # $anal is a logic_name
@@ -412,6 +413,10 @@ sub batch_runRemote {
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
     $self->flush_runs($self->adaptor, $queue);
+  }else{
+    #print STDERR "Not running ".$self->dbID." yet as batch size is ".
+      #$BATCH_QUEUES{$queue}{'batch_size'}." and there are ".
+      #  scalar(@{$BATCH_QUEUES{$queue}{'jobs'}})." jobs\n";
   }
 }
 
@@ -447,7 +452,7 @@ sub runLocally {
     $self->set_status( "FAILED" );
     return;
   }
-       print STDERR "Running inLSF\n"; 
+       #print STDERR "Running inLSF\n"; 
   $self->run_module();
   if ($self->current_status->status eq "SUCCESSFUL"){
     $self->adaptor->remove( $self );
@@ -464,7 +469,7 @@ sub runLocally {
 sub run_module {
   my $self = shift;
   my $module = $self->analysis->module;
-  print STDERR "Running ".$module." with ".$self."\n";
+  #print STDERR "Running ".$module." with ".$self."\n";
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
@@ -475,15 +480,15 @@ sub run_module {
   my $runnable_db_path = 
     $BATCH_QUEUES{$hash_key}{runnabledb_path};
   my $perl_path;
-  print STDERR "Getting ".$hash_key." batchqueue value\n";
+  #print STDERR "Getting ".$hash_key." batchqueue value\n";
   if($module =~ /::/){
-    print STDERR "Module contains path info already\n";
+    #print STDERR "Module contains path info already\n";
     $module =~ s/::/\//g;
     $perl_path = $module;
   }else{
     $perl_path = $runnable_db_path."/".$module;
   }
-  print STDERR "have perlpath ".$perl_path."\n";
+  #print STDERR "have perlpath ".$perl_path."\n";
  STATUS: 
   { 
     eval {
@@ -645,10 +650,10 @@ sub current_status {
     $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
                  " ".$self->analysis->logic_name." error $@");
   }
-  if($status->status eq 'SUCCESSFUL'){
-    my ($p, $f, $l) = caller;
-    print STDERR $f.":".$l."\n";
-  }
+  #if($status->status eq 'SUCCESSFUL'){
+    #my ($p, $f, $l) = caller;
+    #print STDERR $f.":".$l."\n";
+  #}
   return $status;
 }
 
@@ -822,7 +827,9 @@ sub can_retry{
      $logic_name = 'default';
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
-
+  if(!$self->retry_count){
+    return 1;
+  }
   if($self->retry_count && $self->retry_count <= $max_retry){
      return 1;
   }else{
