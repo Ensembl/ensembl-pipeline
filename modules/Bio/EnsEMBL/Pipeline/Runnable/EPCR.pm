@@ -335,6 +335,9 @@ sub parse_results {
         
         $feat1 {'name'}         = $element[0];
         $feat2 {'name'}         = ($element[3]) ? $element[3] : $element[2];
+	# nasty hack - escape the "'" - sql barfs with things
+	# like "3'UTR" - should be fixed in FeatureAdaptor...
+	$feat2{name} =~ s{\'}{\\\'};
         my ($start, $end)       = split (/\.\./, $element[1]);
         $feat1 {'start'}        = $start;
         $feat1 {'end'}          = $end;
