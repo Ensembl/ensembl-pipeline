@@ -180,6 +180,9 @@ sub write_output {
 	    $gene->analysis($analysis);
 	    $gene->type($genetype);
 	    
+	    # check terminal stop codon included in gene structure
+	    $self->check_terminal_stops(\$gene, $vc);
+
 	    # coordinate transformation
 	    if ($self->use_vcontig) {
 		eval {
@@ -340,6 +343,96 @@ sub output{
 
 ############################################################
 
+############################################################
+
+=head2 check_terminal_stops
+
+    Function:   checks that if there is a stop codon at the end of the translation, it 
+                is included in the exon structure and the translation includes it; external 
+                scripts must trim it off if required.
+    Returns :   nothing
+    Args    :   reference to Bio::EnsEMBL::Gene
+
+=cut
+
+# should only ever live on branch - for posterity! Implemented differently on main trunk
+
+sub check_terminal_stops {
+    my( $self, $generef, $slice ) = @_;
+    # what if the stop codon spans an intron? Not currently handled
+
+    # define stop codons - ideally configure in config files ...
+    my %stop_codons;
+    $stop_codons{'TAA'} = 1;
+    $stop_codons{'TAG'} = 1;
+    $stop_codons{'TGA'} = 1;
+
+    foreach my $transcript(@{$$generef->get_all_Transcripts}){
+      my $subseq_start;
+      my $subseq_end;
+      my $subseq;
+      my $trseq;
+
+      if($transcript->end_Exon->strand == -1){
+	#reverse strand
+	$subseq_end = $transcript->translation->end_Exon->end - $transcript->translation->end; 
+	$subseq_start = $subseq_end - 2;
+	
+	if ($subseq_start < 1) {
+	  print STDERR "running off end of slice - bailing\n";
+	  return;
+	}     
+	
+	$subseq = $slice->subseq($subseq_start, $subseq_end);
+	my $revseq = reverse($subseq);
+	$revseq =~ tr/a-z/A-Z/; 
+	$revseq =~ tr/ACGT/TGCA/;
+	
+	if(!defined $stop_codons{$revseq}){
+	  print STDERR "reverse NO STOP!\n";
+	  return;
+	}
+	
+	# adjust end_Exon coords if necessary
+	if($transcript->translation->end_Exon->start > $subseq_start){
+	  $transcript->translation->end_Exon->start($subseq_start);
+	}
+	
+	# adjust translation->end
+	$transcript->translation->end($transcript->translation->end + 3);
+      }
+      
+      else{
+	#forward strand
+	$subseq_start = $transcript->translation->end_Exon->start + $transcript->translation->end;
+	$subseq_end = $subseq_start + 2;
+	if ($subseq_end > ($slice->chr_end - $slice->chr_start)) {
+	  print STDERR "running off end of slice - bailing\n";
+	  return;
+	}
+	
+
+	$subseq = $slice->subseq($subseq_start, $subseq_end);
+	$subseq =~ tr/a-z/A-Z/;
+	if(!defined $stop_codons{$subseq}){
+	  print STDERR "forward NO STOP!\n";
+	  return;
+	}
+	
+	# adjust end_exon coords if necessary
+	if($transcript->translation->end_Exon->end < $subseq_end){
+	  print STDERR "adjusting exon end from " . $transcript->translation->end_Exon->end . " to $subseq_end\n";
+	  $transcript->translation->end_Exon->end($subseq_end);
+$transcript->translation->end_Exon->contig($slice);
+	}
+
+	# adjust translation end
+	$transcript->translation->end($transcript->translation->end + 3);
+      }
+    }
+}
+
+############################################################
 
 
 1;
