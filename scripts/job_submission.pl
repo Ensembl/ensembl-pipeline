@@ -231,7 +231,7 @@ sub setup_input_ids{
     my $ids = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
-                          $verbose, $logic_name, $input_id_type);
+                          $verbose, $logic_name, $rulemanager->db);
     return $ids;
   }else{
     my @ids = @{$rulemanager->stateinfocontainer
@@ -249,7 +249,7 @@ sub termhandler {
 sub make_input_ids{
   my ($slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
-      $verbose, $logic_name, $store_input_ids) = @_;
+      $verbose, $logic_name, $db) = @_;
 
   my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
     (

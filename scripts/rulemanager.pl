@@ -212,7 +212,7 @@ foreach my $rule (@$all_rules) {
 setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules, 
                \%accumulator_analyses, \%always_incomplete_accumulators, 
                $ids_to_run, $ids_to_skip, \@types_to_run, \@types_to_skip,
-               \@starts_from);
+               \@starts_from, $rulemanager);
 
 my %completed_accumulator_analyses;
 while(1){
@@ -312,7 +312,7 @@ sub setup_pipeline{
   my ($analyses_to_run, $analyses_to_skip, $all_rules, 
       $accumulator_analyses, $always_incomplete_accumulators, 
       $ids_to_run, $ids_to_skip, $types_to_run, $types_to_skip,
-      $starts_from) = @_;
+      $starts_from, $rulemanager) = @_;
 
   $rulemanager->rules_setup($analyses_to_run, $analyses_to_skip, 
                             $all_rules, $accumulator_analyses, 
