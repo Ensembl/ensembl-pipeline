@@ -87,7 +87,8 @@ CREATE TABLE input_id_analysis (
   result            smallint(10) unsigned NOT NULL,
 
   PRIMARY KEY       (analysis_id, input_id),
-  KEY input_created (input_id, created)
+  KEY input_created (input_id, created),
+  KEY input_type_idx (input_id_type, input_id)
 );
 
 # pipeline 'history' table - records each job performed in the
