@@ -63,7 +63,14 @@ use vars qw(%Config);
     
     PIPELINE_REPEAT_MASKING => ['RepeatMask'],	
 
-    SNAP_MASKING => ['RepeatMask']
+    SNAP_MASKING => [],
+
+    MAX_JOB_TIME => 86400, # the max number of seconds a job should be 
+    #spending in CPU time in LSF before being killed 86400 is 24 hours
+
+    KILLED_INPUT_IDS => '', # a path to produse a file of killed
+    # input_ids, good to have it local to the machine you running
+    # rulemanager on to prevent nfs stress
 );
 
 sub import {
