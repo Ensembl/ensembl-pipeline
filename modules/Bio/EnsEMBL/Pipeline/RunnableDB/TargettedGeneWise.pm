@@ -188,7 +188,7 @@ sub fetch_input{
   my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
   my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
-  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$newstart,$newend);
+  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$new_start,$new_end);
   
   $self->vcontig($vcontig);
   $self->protein_id($protein_id);
@@ -458,8 +458,8 @@ sub validate_transcript {
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
   $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1);$i++){
-    my $endphase = $exons[$i]->end_phase;
+  for (my $i=0;$i<(scalar(@exons-1));$i++){
+    my $end_phase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
     if ( $phase != $end_phase ){
       $self->warn("rejecting transcript with inconsistent phases( $phase - $end_phase) ");
@@ -778,13 +778,13 @@ sub make_transcript{
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
+#      $subf->feature1->source_tag($genetype);
+#      $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
       $subf->feature1->analysis($analysis_obj);
 	
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
+#      $subf->feature2->source_tag($genetype);
+#      $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
       $subf->feature2->analysis($analysis_obj);
       
