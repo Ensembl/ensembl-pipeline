@@ -354,6 +354,14 @@ sub run{
     # if we have genes of either type, let's try to match them
     if ( @genes && @ests ){
       print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
+
+      ############################################################
+      #
+      #
+      # See if you can map genes to clone libraries instead of ESTs
+      #
+      #
+      ############################################################
       
       my @est_transcripts;
       foreach my $est ( @ests ){
