@@ -1,0 +1,50 @@
+#! /usr/local/bin/perl -w
+
+use strict;
+use lib 't';
+use Test;
+use Bio::EnsEMBL::Pipeline::GeneDuplication;
+use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
+use Bio::SeqIO;
+
+BEGIN { $| = 1; plan test => 4;}
+
+ok(1);
+
+# Must give GeneDuplication a blast database that can be seq fetched from - wu_new or ncbi flavs
+
+ok(my $blastdb 
+  = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
+      -dbfile               => 't/data/relaxins.fa',
+      -molecule_type        => 'DNA',
+      -workdir              => '/tmp',
+      -copy                 => 1,
+      -index_type           => 'wu_new',
+      -make_fetchable_index => 1,
+      ));
+
+ok($blastdb->run);
+
+my $gene_dupl 
+  = Bio::EnsEMBL::Pipeline::GeneDuplication->new(
+	 '-blastdb'                => $blastdb,
+	 '-hit_coverage'           => 50,
+	 '-hit_identity'           => 80,
+	 '-regex_query_species'    => 'Hsa',
+	 '-regex_outgroup_species' => ['Lca','Ssc'],
+	 '-genetic_code'           => 1,
+	 '-work_dir'               => '/tmp',
+	);
+
+ok($gene_dupl->isa("Bio::EnsEMBL::Pipeline::GeneDuplication"));
+
+my $quick_seqio = Bio::SeqIO->new('-file'   => 't/data/relaxins.fa',
+				  '-format' => 'fasta');
+
+my $input_seq = $quick_seqio->next_seq;
+
+ok($input_seq->isa("Bio::Seq"));
+
+$input_seq->display_id('test_sequence');
+
+ok($gene_dupl->run($input_seq));
