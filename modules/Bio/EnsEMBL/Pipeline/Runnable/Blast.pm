@@ -75,6 +75,7 @@ use FileHandle;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DnaPepAlignFeature;
+use Bio::EnsEMBL::PepDnaAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
@@ -144,7 +145,7 @@ sub new {
 			      @args);
 
     if ($query) {
-      $self->clone($query);
+      $self->query($query);
     } else {
       $self->throw("No query sequence input.");
     }
@@ -215,7 +216,7 @@ sub new {
 sub run {
     my ($self, $dir) = @_;
 
-    my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
+    my $seq = $self->query || $self->throw("Query seq required for Blast\n");
 
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -721,11 +722,19 @@ sub split_HSP {
     } else {
       # Which type of feature do we want?
       my $fp;
-      if (abs($qinc/$hinc) == 1) {
+      $qinc = abs( $qinc );
+      $hinc = abs( $hinc );
+
+      if( $qinc == 3 && $hinc == 1 ) {
+	$fp = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@tmpf);
+      } elsif( $qinc == 1 && $hinc == 3 ) {
+	$fp = Bio::EnsEMBL::PepDnaAlignFeature->new(-features => \@tmpf);
+      } elsif( $qinc == 1 && $hinc == 1 ) {
 	$fp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@tmpf);
       } else {
-	$fp = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@tmpf);
+	$self->throw( "Hardcoded values wrong?? " );
       }
+      
       $self->growfplist($fp);
     }
 }
@@ -800,7 +809,7 @@ sub _makeFeaturePair {
     my $source = $self->program;             
     $source =~ s/\/.*\/(.*)/$1/;
 
-    my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->clone->id,
+    my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->query->id,
                                                 -start       => $qstart,
                                                 -end         => $qend,
                                                 -strand      => $qstrand * $hstrand,
@@ -961,7 +970,7 @@ sub output {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq) {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
@@ -970,7 +979,7 @@ sub clone {
 
       $self->{'_query'} = $seq ;
 
-      $self->filename($self->clone->id.".$$.seq");
+      $self->filename($seq->id.".$$.seq");
       $self->results($self->filename.".blast.out");
       
     }
