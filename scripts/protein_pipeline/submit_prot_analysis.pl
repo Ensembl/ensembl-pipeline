@@ -8,6 +8,19 @@
 =head2 Description
 
 This script will submit run_protein_RunnableDB
+    This is the script which is used to run the full protein analysis. The protein analysis is specific in a way that\'s the algorithms used have different speed. For example the difference of speed between hmmpfam and low complexity is huge. Moreover the analysis is done at the peptide level (much less material than for a whole).
+    There is then 3 ways of running an annotation:
+    + The classical way, protein by protein (used for hmmpfam for example)
+    + The intermediate way, using chunks of the main peptide file. For example using chunks containing 100 peptides in fasta format (used for PRINTS for example).
+    + All against all. Uses a file containing all the peptide (used for low complexity for example)
+
+    For information read:
+    ensembl-doc/protein-annotation.txt
+
+=head2 Usage
+
+  Simply: perl submit_prot_analysis.pl
+  But the configuration file Bio/EnsEMBL/Pipeline/Prot_analysis_Conf.pl has to be properly filled in.
 
 =cut
 
@@ -45,7 +58,7 @@ my $pep_file = $::scripts_conf{'pep_file'};
 #Get the location of the scratch directory
 my $scratchdir =  $::scripts_conf{'tmpdir'};
 
-print STDERR "SCRATCH: ".$scratchdir."\n";
+print STDERR "Using the following scratch directory: ".$scratchdir."\n";
 
 #Give for each analysis its corresponding runnable
 
@@ -61,8 +74,8 @@ $runnables{'Seg'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Seg";
 $runnables{'Profile'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Profile";
 $runnables{'ParacelHMM'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
 
+#Get all of the protein Ids for the whole genome
 my @ids = &get_ids();
-#my @ids = (28816);
 
 &make_directories();
 &chunk_pepfile();
@@ -107,6 +120,7 @@ sub make_directories {
 }
 
 sub chunk_pepfile {
+#Chunk the peptide file
     open (PEPFILE, "$pep_file");
     my $count = 0;
     my $chunk = 1;
@@ -150,8 +164,6 @@ sub run_jobs {
     
      foreach my $r(@toberun) {
 	 #First get the analysisId of the module which is supposed to run
-
-	 print STDERR "R: $r\n";
 	 
 	 my $q = "select analysisId from analysisprocess where module = '$r'";
     
@@ -162,6 +174,7 @@ sub run_jobs {
 
 	 unless ($analysis_id) {die "AnalysisId not defined\n"};
 
+	 #Try to know how this analysis should be run
 	 my $chunk_name = $r."_chunk";
 
 	 my $chunk = $::scripts_conf{$chunk_name};
@@ -174,6 +187,7 @@ sub run_jobs {
 
 	 my $check = "-E \"".$runner." -check -runnable ".$runnabledb."\"";
 
+#Three diffenrent way of running the analysis 1,2,3 (see documentation in the configuration file and in the perldoc of this script)
 	 if ($chunk == 1) {
 	     foreach my $i(@id) {
 		 my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
