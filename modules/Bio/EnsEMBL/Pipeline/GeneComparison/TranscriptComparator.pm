@@ -153,7 +153,7 @@ sub new{
     $self->internal_splice_overlap($internal_splice_overlap);
   }
 
-  $self->verbose(1);
+  $self->verbose(0);
 
   return $self;  
 }
