@@ -35,7 +35,7 @@ use strict;
 use Getopt::Long;
 
 # this script connects to the db it is going to write to
-use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw (
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw (
                                         	FINAL_DBHOST
 						FINAL_DBNAME
 						FINAL_DBUSER

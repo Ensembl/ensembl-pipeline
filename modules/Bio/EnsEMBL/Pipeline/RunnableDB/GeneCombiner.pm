@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::GeneGraphGenerator;
 
 # config file; parameters searched for here if not passed in as @args
 
-use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw(
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw(
 						ESTGENE_DBHOST
 						ESTGENE_DBUSER
 						ESTGENE_DBNAME

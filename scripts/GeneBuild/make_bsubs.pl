@@ -51,7 +51,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (GB_RUNNER
 							   GB_SIZE
 							  );
 
-use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw (RUNNER
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw (RUNNER
 						 GENECOMBINER_RUNNABLES
 						 SLICE_SIZE
 						 QUEUE
