@@ -540,22 +540,22 @@ sub expand_and_merge_features {
 
     if ( $self->percent_filter > 0 ) {
 
-        print "filtering on percent_id\n";
+        #print "filtering on percent_id\n";
         foreach my $unf (@blast_output) {
 
-            print $unf->percent_id."\n"; 
+            #print $unf->percent_id."\n"; 
             if ( $unf->percent_id >= $self->percent_filter ) {
                 push ( @features, $unf );
                 
             }
         }
     }
-    else {
-        push ( @features, @blast_output );
-    }
+    #else {
+ #       push ( @features, @blast_output );
+ #   }
 
     #return @features;
-    die "there are ".scalar(@features)." unmerged features\n";
+    #warn "there are ".scalar(@features)." unmerged features\n";
     my %unique_hids;
 
     foreach my $feature (@features) {
