@@ -254,13 +254,13 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR "RUNNING: ".$self->analysis->program . ' -fz ' .$self->filename. ' ' .$self->analysis->db . ' > ' .$self->results."\n";
+    print STDERR "RUNNING: ".$self->analysis->program . ' -fz ' .$self->filename. ' ' .$self->analysis->db_file . ' > ' .$self->results."\n";
 
     $self->throw("Failed during Profile run $!\n")
 	    
 	unless (system ($self->analysis->program . ' -fz ' . 
 			$self->filename. ' ' .
-			$self->analysis->db . ' > ' .
+			$self->analysis->db_file . ' > ' .
 			$self->results) == 0) ;
 }
 
