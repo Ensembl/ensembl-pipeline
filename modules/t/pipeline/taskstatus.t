@@ -1,5 +1,6 @@
 use lib 't/pipeline';
 use strict;
+use warnings;
 
 BEGIN { $| = 1;
 	use Test ;
@@ -20,7 +21,7 @@ my $taskstatus = Bio::EnsEMBL::Pipeline::TaskStatus->new(
 						         -SUBMITTED => $listref,
 						         );
 
-$taskstatus->status_report;
+
 ok($taskstatus);
    
 my $more_created = Bio::EnsEMBL::Pipeline::IDSet->new(
@@ -28,10 +29,10 @@ my $more_created = Bio::EnsEMBL::Pipeline::IDSet->new(
 						     );
 
 ok($taskstatus->add_created($more_created));
-$taskstatus->status_report;
+
 
 $taskstatus->create_existing;
-print STDERR join ',', @{$taskstatus->get_existing->ID_list};
+
 ok($taskstatus->get_existing);
 
 my $existing = $taskstatus->get_existing;
