@@ -118,7 +118,6 @@ sub run{
    # valid hits are stored in a hash of arrays
    # sort by score to know that the first score for a hseqname is its best
    
-   @input = sort { $a->score <=> $b->score } @input; 
 
    foreach my $f ( @input ) {
 
@@ -166,7 +165,7 @@ sub run{
 
    # sort the list by highest score
 
-   my @inputids = sort { $validhit{$a} <=> $validhit{$b} } keys %validhit; 
+   my @inputids = sort { $validhit{$b} <=> $validhit{$a} } keys %validhit; 
    my @accepted;
 
    # we accept all feature pairs which are valid and meet coverage criteria
