@@ -113,7 +113,7 @@ my $dnafrags = $compara->get_DnaFragAdaptor()->fetch_all_by_GenomeDB_region(
 
 my $gaa = $compara->get_GenomicAlignAdaptor;
 
-my $count = 0;
+my $count = 1;
 my $alignments_found = 0;
 
 
@@ -205,15 +205,26 @@ for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
 	    # print GFF
 	    
 	    my $homology_region_id = ($align->query_dnafrag->name).".".($align->query_start)."-".($align->query_end);
-	    print STDOUT $count."\t".
-		"compara\t".
-		    ($qy_gdb->name)."\t". 
-			($p_start) . "\t" . 
-			    ($p_end) . "\t" .
-				$align->score. "\t" . 
-				    $align->query_strand . "\t" . 
-					".". "\t" . 
-					    $homology_region_id."\n";
+
+	    my @parts = split /\s+/, $qy_gdb->name;
+	    my $name = join '_', @parts;
+	    
+	    my $strand = '+';
+	    if ( $align->query_strand == -1 ){
+		$strand = '-';
+	    }
+
+	    print STDOUT 
+		$count."\t".
+		    $name."\t".
+			"homology\t".
+			    ($p_start) . "\t" . 
+				($p_end) . "\t" .
+				    $align->score. "\t" . 
+					$strand. "\t" . 
+					    ".". "\t" . 
+						$homology_region_id."\n";
+
 	    
 	    # put the align string into result
 	    $count++;
@@ -228,7 +239,7 @@ if( ! $alignments_found ) {
   exit(0);
 } 
 else {
-  print STDERR "$count alignments found\n";
+  print STDERR ($count - 1)." alignments found\n";
 }
 
 ############################################################
