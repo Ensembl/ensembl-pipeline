@@ -54,13 +54,24 @@ use vars qw( %Slamconf );
 
 
 
-SLAM_COMP_DB_USER        => 'anonymous',
-SLAM_COMP_DB_PASS        => '',
-SLAM_COMP_DB_NAME        => 'mus_musculus_core_22_32b',
-SLAM_COMP_DB_HOST        => 'kaka.sanger.ac.uk',
-SLAM_COMP_DB_PORT        => ''
-);
+SLAM_COMP_DB_USER        => 'anonymous' ,
+SLAM_COMP_DB_PASS        => '' ,
+SLAM_COMP_DB_NAME        => 'mus_musculus_core_22_32b' ,
+SLAM_COMP_DB_HOST        => 'kaka.sanger.ac.uk' ,
+SLAM_COMP_DB_PORT        => '' ,
 
+
+SLAM_ORG2_RESULT_DB_USER        => 'ensadmin' ,
+SLAM_ORG2_RESULT_DB_PASS        => 'ensembl' ,
+SLAM_ORG2_RESULT_DB_NAME        => 'zz_test_jhv_slam_result_org2' ,
+SLAM_ORG2_RESULT_DB_HOST        => 'ecs1.sanger.ac.uk' ,
+SLAM_ORG2_RESULT_DB_PORT        => '3306'
+                                );
+
+
+
+
+################################################################################
 
 
 sub import {
