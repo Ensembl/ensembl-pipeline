@@ -252,7 +252,7 @@ sub get_Genewises {
 						-primary_tag => $g->type,
 						-source_tag => $g->type);
 # not sure this will get remapped properly ... but it is needed later on for pairing code
-	  $exon->add_Supporting_Feature($ev);
+	  $exon->add_supporting_features($ev);
 	}
 
 #	push(@genewise, @valid_transcripts);
@@ -473,7 +473,7 @@ sub make_Exons {
 	  
 	  $newexon->find_supporting_evidence(\@features);
 	  
-	  my @support = $newexon->each_Supporting_Feature;
+	  my @support = $newexon->get_all_supporting_features;
 	  
 	  if ($#support >= 0) {
 	    push(@exons,$newexon);
@@ -539,12 +539,12 @@ sub  make_ExonPairs {
 	    # For the two exons we compare all of their supporting features.
 	    # If any of the supporting features of the two exons
             # span across an intron a pair is made.
-	    my @f1 = $exon1->each_Supporting_Feature;
+	    my @f1 = $exon1->get_all_supporting_features;
 	    @f1 = sort {$b->score <=> $a->score} @f1;
 
 	  F1: foreach my $f1 (@f1) {
 	      next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
-	      my @f = $exon2->each_Supporting_Feature;
+	      my @f = $exon2->get_all_supporting_features;
 	      @f = sort {$b->score <=> $a->score} @f;
 
 	    F2: foreach my $f2 (@f) {
@@ -873,7 +873,7 @@ sub link_ExonPairs {
 
 	    if ($self->isTail($exon)) {
 		my $found = 0;
-		foreach my $f ($exon->each_Supporting_Feature) {
+		foreach my $f ($exon->get_all_supporting_features) {
 
 # ARGHHHHH VAC hard coding
 
@@ -1678,7 +1678,7 @@ sub set_ExonEnds {
 	
 	my %lefthash;
 
-	foreach my $f ($exon->each_Supporting_Feature) {
+	foreach my $f ($exon->get_all_supporting_features) {
 	    $lefthash{$f->start}++;
 	}
 
@@ -1697,7 +1697,7 @@ sub set_ExonEnds {
     if (!defined($rightend)) {
 	my %righthash;
 
-	foreach my $f ($exon->each_Supporting_Feature) {
+	foreach my $f ($exon->get_all_supporting_features) {
 	    $righthash{$f->end}++;
 	}
 
@@ -2055,7 +2055,7 @@ sub filter_Transcripts {
 #		print STDERR "Found exon5\n";
 #		$self->print_Exon($exon5);
 		# get evidence
-		my @evidence = $exon5->each_Supporting_Feature;
+		my @evidence = $exon5->get_all_supporting_features;
 		
 		# any of it genewise?
 		
@@ -2091,7 +2091,7 @@ sub filter_Transcripts {
 
 	    if (defined($exon3)) {
 		# get evidence
-		my @evidence = $exon3->each_Supporting_Feature;
+		my @evidence = $exon3->get_all_supporting_features;
 		
 		# any of it genewise?
 		  
@@ -2213,7 +2213,7 @@ sub _make_Exon {
     $exon->strand   ($subf->strand);
     $exon->phase    ($subf->phase);
     $exon->attach_seq($self->contig->primary_seq);
-    $exon->add_Supporting_Feature($subf);
+    $exon->add_supporting_features($subf);
     
     $exon->{'_5splice'} = $subf->{'_5splice'};
     $exon->{'_3splice'} = $subf->{'_3splice'};
@@ -2829,19 +2829,13 @@ sub prune_gene {
       ## transfer supporting feature data. We transfer it to exons
       foreach my $pair ( @evidence_pairs ){
 	my @pair = @$pair;
-
+	
 	# first in the pair is the 'already seen' exon
 	my $source_exon = $pair[0];
 	my $target_exon = $pair[1];
-
-	#print STDERR "transferring evi from exon ".$source_exon->{'temporary_id'}." in transcript ";
-	#foreach my $tran ( @{ $exon2transcript{ $source_exon } } ){
-	#  print STDERR $tran->{'temporary_id'}." ";
-	#}
-	#print STDERR "to exon ".$target_exon->{'temporary_id'}." in transcript ";
-	#foreach my $tran ( @{ $exon2transcript{ $target_exon } } ){
-	#  print STDERR $tran->{'temporary_id'}." ";
-	}
+	
+	
+      
 	#print STDERR "\n";
 	$self->transfer_supporting_evidence($source_exon, $target_exon)
       }
@@ -3023,8 +3017,8 @@ sub validate_transcript{
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
   $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1);$i++){
-    my $endphase = $exons[$i]->end_phase;
+  for (my $i=0; $i<(scalar(@exons-1)); $i++){
+    my $end_phase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
     if ( $phase != $end_phase ){
       $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
@@ -3083,7 +3077,7 @@ sub validate_transcript{
 sub transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
   
-  my @target_sf = $target_exon->each_Supporting_Feature;
+  my @target_sf = $target_exon->get_all_supporting_features;
   #  print "target exon sf: \n";
   #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
   
@@ -3094,7 +3088,7 @@ sub transfer_supporting_evidence{
   my %hold_evidence;
 
  SOURCE_FEAT:
-  foreach my $feat ($source_exon->each_Supporting_Feature){
+  foreach my $feat ($source_exon->get_all_supporting_features){
     next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
     
     # skip duplicated evidence objects
@@ -3125,7 +3119,7 @@ sub transfer_supporting_evidence{
     }
     #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
     #$self->print_FeaturePair($feat);
-    $target_exon->add_Supporting_Feature($feat);
+    $target_exon->add_supporting_features($feat);
     $unique_evidence{ $feat } = 1;
     $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
   }
