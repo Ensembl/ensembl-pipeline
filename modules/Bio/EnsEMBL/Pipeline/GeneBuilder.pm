@@ -235,7 +235,7 @@ sub build_Genes{
   
   unless( @all_transcripts ){
       print STDERR "no transcripts left to cook. Exiting...\n";
-      exit(0);
+      return undef;
   }
 
   print STDERR "clustering transcripts...\n";
@@ -275,6 +275,8 @@ sub build_Genes{
   }    
   print STDERR scalar( @genes )." final genes\n";
   $self->final_genes( @genes );
+
+  return 1;
 }
 
 ############################################################

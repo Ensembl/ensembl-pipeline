@@ -315,9 +315,12 @@ sub run {
 	
 	print(STDERR "GeneBuilding for $contig\n");
 	
-	$genebuilders->{$contig}->build_Genes;
-	
-	@genes = $genebuilders->{$contig}->final_genes;
+	if ($genebuilders->{$contig}->build_Genes) {
+	    @genes = $genebuilders->{$contig}->final_genes;
+	}
+	else {
+	    return;
+	}
     }
     
     $self->output( @genes );
