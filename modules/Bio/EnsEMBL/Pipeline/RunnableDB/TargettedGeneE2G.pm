@@ -60,8 +60,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-#use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
-use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
+use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -72,7 +71,7 @@ sub new {
 
   if(!defined $self->seqfetcher) {
     # will look for pfetch in $PATH - change this once PipeConf up to date
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
     $self->seqfetcher($seqfetcher);
   }
 
@@ -97,12 +96,11 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my @fps;
-  my $fpc;
-  my $pid; 
-  
+  my $chrname;
   my $start;
   my $end;
+  my $protein_id; 
+  my $cdna_id;
 
   # input format: chr22:10602496,10603128:Q9UGV6:AC00012
   # or chr22:10602496,10603128:Q9UGV6 if no cDNA
@@ -112,63 +110,55 @@ sub fetch_input{
   
   print STDERR "input: ".$entry . "\n";
   
-  if ($fpc) { $self->throw("mixed fpc contigs") unless $fpc = $1; }
-  if ($pid) { $self->throw("mixed protein hits") unless $pid = $4; }
- 
-  $fpc = $1;
-  $pid = $4;
-  my $dnaid = $5;
+  $chrname = $1;
+  $protein_id = $4;
+  $cdna_id = $5;
 
-  my $fpcstart   = $2;
-  my $fpcend     = $3;
-  my $fpcstrand  = 1;
-  
+  $start   = $2;
+  $end     = $3;
+
   if ($2 > $3) { # let blast sort it out
-      $fpcstart  = $3;
-      $fpcend    = $2;
-      $fpcstrand = -1;
+      $start  = $3;
+      $end    = $2;
   }
-  
-  $start = $fpcstart unless (defined $start && $start < $fpcstart);
-  $end = $fpcend unless (defined $end && $end > $fpcend);
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
 
-  print STDERR "$fpc $start $end\n";
+  print STDERR "$chrname $start $end\n";
 
-  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
-  print STDERR "$chrname $chrstart $chrend\n";
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
   $self->vc($vc);
   
   # genewise runnable
+  # repmasking?
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc->primary_seq,
-								    '-ids'        => [ $pid ] ,
+								    '-ids'        => [ $protein_id ] ,
 								    '-seqfetcher' => $self->seqfetcher);
  
   $self->runnable($r);
 
   # est2genome runnable
-  return unless defined($dnaid);
+  return unless defined($cdna_id);
 
   my $cdna;
   eval{
-    $cdna = $self->seqfetcher->get_Seq_by_acc($dnaid);
+    $cdna = $self->seqfetcher->get_Seq_by_acc($cdna_id);
   };
   if($@) {
-    $self->throw("problem fetching [$dnaid]: [$@]\n");
+    $self->throw("problem fetching [$cdna_id]: [$@]\n");
   }
   
   $self->{'_tmpfile'} = "/tmp/tge2g_" . $$ . ".fa";
-  my $blastdb = $self->{'_tmpfile'};
+  my $cdnafile = $self->{'_tmpfile'};
 
-  my $seqout = new Bio::SeqIO('-file' => ">$blastdb" , '-format' => 'Fasta');
+  my $seqout = new Bio::SeqIO('-file' => ">$cdnafile" , '-format' => 'Fasta');
   $seqout->write_seq($cdna);
 
-  my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'    => $vc->primary_seq, 
-								      '-queryseq'    => $blastdb,
-								      '-seqfetcher' => $self->seqfetcher);
+  # repmasking?
+  my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome('-genomic'    => $vc->primary_seq, 
+									  '-queryseq'   => $cdnafile,
+									  '-seqfetcher' => $self->seqfetcher);
 
   $self->e2g_runnable($e2g);
 }
@@ -508,6 +498,7 @@ sub convert_e2g_output {
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
   my $analysis_obj;
+
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
@@ -1166,6 +1157,10 @@ sub make_genes {
   my $contig = $self->vc;
   my @genes;
   
+$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
+
+print STDERR "***analysis dbID: " . $analysis_obj->dbID . "\n";
+
   my $time = time; chomp($time);
 
   foreach my $tmpf (@$results) {
