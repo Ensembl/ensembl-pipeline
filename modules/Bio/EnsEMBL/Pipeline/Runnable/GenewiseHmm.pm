@@ -1,7 +1,6 @@
 
 
 =pod
-
 =head1 NAME
   
 Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm - Hmms to genomic sequence
@@ -63,7 +62,7 @@ sub new {
   $self->genomic($genomic) || $self->throw("No genomic sequence entered for blastwise");
   $self->hmmfile($hmmfile) || $self->throw("No Hmm file entered for Hmmgenewise");
 
-  $self->reverse($reverse)   if (defined($reverse));             
+  $self->is_reverse($reverse)   if (defined($reverse));             
   $self->endbias($endbias)   if (defined($endbias));             
   $self->memory ($memory)    if (defined($memory));
 
@@ -153,7 +152,7 @@ sub _align_protein {
     $command .= " -init endbias -splice flat ";
   }
   
-  if ($self->reverse == 1) {
+  if ($self->is_reverse == 1) {
     $command .= " -trev ";
   }
   
@@ -263,13 +262,15 @@ sub _align_protein {
 
 # These all set/get or initializing methods
 
-sub reverse {
-    my ($self,$arg) = @_;
+sub is_reverse {
+  my ($self,$arg) = @_;
 
-    if (defined($arg)) {
-	$self->{'_reverse'} = $arg;
-    }
-    return $self->{'_reverse'};
+  if ($arg==1) {
+    $self->{'_reverse'} = $arg;
+  }else{
+    $self->{'_reverse'} = 0;
+  }
+  return $self->{'_reverse'};
 }
 
 sub endbias {

@@ -102,8 +102,9 @@ sub new {
     $self->{'_input_features'} = [];
     $self->{'_output_features'} = [];
     $self->{'_hmmfetch'} = undef;
-    $self->{'_uniquepfamids'} = [];
     $self->{'_hmmdb'} = undef;
+    $self->{'_hmmfilename'} = undef; #file to store protein profile hmms 
+    $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throw
     print "args = @args\n";
     my ($genomic, $features, $hmmfetch, $hmmdb) = $self->_rearrange([qw(GENOMIC
 									FEATURES
@@ -312,9 +313,14 @@ sub run {
     
     my @keys = keys(%swissprot_ids);
 
-    foreach my $key (@keys){
-      print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
-    }
+    #foreach my $key (@keys){
+    #  print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
+    #}
+
+    my %pfam_ids = $self->get_pfam_ids(\%swissprot_ids);
+    
+    $self->create_genewisehmm(\%pfam_ids);
+
 }
 
 
@@ -347,102 +353,82 @@ sub get_swissprot_ids{
 }
 
 
+sub get_pfam_ids{
 
-=head2  add_pfam_id
+  my ($self, $swissprot_ids) = @_;
 
- Title    : add_pfam_id
- Usage    : $self->add_pfam_id($id);
- Function : adds a pfam id to the array of ids
- Returns  : the array of ids
- Args     : a pfam id;
+  
 
-=cut
 
-sub add_pfam_id{
-    my ($self, $id) = @_;
-    if (defined($id))
-    {
-	push(@{$self->{'_pfamlist'}}, $id);
-    }
-    return @{$self->{'_pfamlist'}};
+}
+
+sub create_genewisehmm{
+
+ my ($self, $pfam_ids) = @_;
+
+ @ids = keys(%$pfam_ids);
+ my $genewisehmm;
+ my @features;
+ my $memory = 400000;
+ foreach my $id (@ids){
+   
+   my $strand = %$pfam_ids{$id};
+
+   $self->get_hmm($id);
+
+   if($strand == 1){
+    
+    $genewisehmm = $self->run_genewisehmm($strand, $memory);
+    @features = $genewisehmm->output();
+
+    $self->add_output_features(\@features);
+   
+   }elsif($strand == -1){
+     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+    $genewisehmm->run();
+    @features = $genewisehmm->output();
+
+    $self->add_output_features(\@features);
+   }elsif($strand == 0){
+     $genewisehmm = $self->run_genewisehmm(1, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+
+     $self->add_output_features(\@features);
+   
+     $genewisehmm = $self->run_genewisehmm(-1, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+
+     $self->add_output_features(\@features);
+   }else{
+
+     $self->throw("strand = ".$strand." something funnies going on : $!\n");
+
+   }
+
+ }
+
+
 }
 
 
-=head2 
+sub run_genewisehmm{
 
- Title    : each_pfam_id
- Usage    : @pfamids = $self->each_pfam_id;
- Function : returns the array of pfam ids
- Returns  : an array of pfam ids
- Args     : none
+  my ($self, $strand, $memory) = @_;
 
-=cut
-
-sub each_pfam_id{
-    my ($self) = @_;
-    return @{$self->{'_pfamlist'}};
-}
-
-
-=head2 
-
- Title    :find_unique_ids
- Usage    :$self->find_unique_ids;
- Function :ensures all the pfam ids wich will be passed to hmmfetch will be unique so the same analysis isnt run multiple times
- Returns  : nothing
- Args     : nothing
-
-=cut
-
-sub find_unique_ids{
-  my ($self) = @_;
-  my @pfam = $self->each_pfam_id;
-  my %hash;
-  foreach my $id(@pfam){
-    if(!defined($hash{$id})){
-      $hash{$id} = 1;
-    }
+  if($strand == -1){
+    my $reverse = 1;
+  }else{
+    my $reverse = undef;
   }
-  foreach my $id(keys %hash){
-      $self->add_unique_pfam_id($id);
-    }
-}     
-     
+  $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new('-genomic' => $self->genomic_sequence(),
+                                                                    '-memory' => $memory,
+                                                                    '-hmmfile' => $self->hmmfilename(),
+                                                                    '-reverse' => $reverse));
 
-=head2 add_unique_pfam_id
+  return $genewisehmm
 
- Title    : add_unique_pfam_id
- Usage    : $self->add_unique_pfam_id($id);
- Function : sets up an array of unique pfam ids 
- Returns  : the array of unique ids
- Args     : a pfam id preferable unique
-
-=cut
-
-sub add_unique_pfam_id{
-    my ($self, $id) = @_;
-    if (defined($id))
-    {
-     # print "id = ".$id."\n";
-	push(@{$self->{'_uniquepfamids'}}, $id);
-    }
-    return @{$self->{'_uniquepfamids'}};
-}
-
-
-=head2 each_unique_pfam_id
-
- Title    : each_unique_pfam_id
- Usage    : @ids = $self->each_unique_pfam_id
- Function : returns all the unique pfma ids
- Returns  : an array of pfam ids
- Args     : none
-
-=cut
-
-sub each_unique_pfam_id{
-    my ($self) = @_;
-    return @{$self->{'_uniquepfamids'}};
 }
 
 
@@ -457,23 +443,17 @@ sub each_unique_pfam_id{
 =cut
 
 sub get_hmm{
-  my ($self) = @_;
-  #open(TEMPDB, ">".$self->hmmfilename) or die "couldn't open ".$self->hmmfilename." : $!\n";
-  my $count = 0;
-  foreach  my $id  ( $self->each_unique_pfam_id) {
-    $id =~s/^(.*?\;).*/$1/;
-    $count++;
-    #print  "Loading $id\n";
-    #print "command = ".$self->hmmfetch." ".$self->hmmdb." ".$id." 2>> ".$self->errorfile."1>>".$self->hmmfilename." \n ";
-    system($self->hmmfetch." ".$self->hmmdb." ".$id." 2>> ".$self->errorfile."1>>".$self->hmmfilename)
-    #open(GETZ,  $self->hmmfetch." ".$self->hmmdb." ".$id." | ") or die "couldn't open hmmfetch : $! \n";
-    #while(<GETZ>) {
-     # print TEMPDB $_;
-    #}
-   # close(GETZ) or die "couldn't close hmmfetch : $!\n";
-  }
-  #close(TEMPDB) or die "couldn't open hmmfile : $!\n";
-  #print "starting error analysis\n";
+  
+  my ($self, $id) = @_;
+  $self->hmmfilename($self->genomic_sequence->id."dbhmm.$$");
+  $self->errorfile($self->genomic_sequence->id."err.$$");
+  
+  my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." 2> ".$self->errorfile."1>".$self->hmmfilename;
+
+  print "command = ".$command."\n";
+
+  system($command);
+  
   if (-e $self->errorfile){
     open(ERROR, $self->errorfile) or die "couldn't open error file : $!";
     while(<ERROR>){
@@ -483,16 +463,76 @@ sub get_hmm{
     }
     close(ERROR) or die "couldn't close error file : $!";
   }
+  
 }
 
 
 
 
 
+=head2  hmmfilename
+
+ Title    : hmmfilename
+ Usage    : $self->hmmfilename($filename);
+ Function : gets and sets the name of the hmmdb file
+ Returns  : the name of the hmmdb file
+ Args     : the name of the hmmdb file
+
+=cut
+
+sub hmmfilename {
+    my ($self, $args) = @_;
+    if (defined ($args)){
+	$self->{'_hmmfilename'} = $args;
+    }
+
+    return $self->{'_hmmfilename'};
+
+}
 
 
+=head2  errorfile
+
+ Title    : errorfile
+ Usage    : $self->errorfile($filename);
+ Function : gets and sets the name of the hmmdb file
+ Returns  : the name of the hmmdb file
+ Args     : the name of the hmmdb file
+
+=cut
+
+sub errorfile {
+    my ($self, $args) = @_;
+    if (defined ($args)){
+	$self->{'_errorfile'} = $args;
+    }
+
+    return $self->{'_errorfile'};
+
+}
 
 
+sub add_output_features{
+    
+    my ($self, $features) = @_;
+    
+    if (ref($features) eq "ARRAY") {
+      push(@{$self->{'_output_features'}},@$features);
+    } else {
+      $self->throw("[$features] is not an array ref.");
+    }
+      
+
+
+}
+
+sub all_output_features{
+
+  my ($self) = @_;
+
+  return @{$self->{'_output_features'}};
+
+}
 
 
 ################
