@@ -365,6 +365,7 @@ sub addExon {
     if (!defined($self->{'_output'})) {
 			$self->{'_output'} = [];
     }
+  #print STDERR "Adding ".$arg." ".$arg->start." ".$arg->end."\n";
     push(@{$self->{'_output'}},$arg);
 
 }

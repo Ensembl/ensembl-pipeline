@@ -100,7 +100,7 @@ sub make_MiniSeq {
     @features = sort {$a->start <=> $b->start} @features;
     
   FEAT: foreach my $f (@features) {
-
+      #print STDERR "feature ".$f->start." ".$f->end."\n";
       my $start = $f->start - $self->_exon_padding;
       my $end   = $f->end   + $self->_exon_padding;
 
@@ -216,7 +216,9 @@ sub run {
   # representing the ungapped sub alignments for each exon
   
   my @f = $gw->output;
-  
+  #foreach my $f(@f){
+  #  print STDERR ("start ".$f->start." end ".$f->end."\n");
+  #}
   my @newf;
   
   my $strand = 1;
@@ -232,7 +234,8 @@ sub run {
     $ec++;
     
     $f->strand($strand); 
-    
+    print STDERR "Converting ".$f->start." ".$f->end." back into genomic ".
+      " coordinates\n";
     # need to convert whole exon back to genomic coordinates
     my @genomics = $miniseq->convert_SeqFeature($f);         
     my $gf;

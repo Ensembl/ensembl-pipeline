@@ -295,7 +295,7 @@ sub run_blast {
 							   -database => $blastdb->dbfile,
 							   -filter => 1,
 							  );
-     
+     #print STDERR "Adding regex ".$regex." ".$dbname."\n";
      $run->add_regex($dbname, $regex);
      $run->run;
      

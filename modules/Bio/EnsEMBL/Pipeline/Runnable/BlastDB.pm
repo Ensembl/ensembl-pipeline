@@ -161,20 +161,22 @@ sub make_seqfile {
   return $blastfile;
 }
 
+
 sub dbname {
   my ($self) = @_;
   
-  if (!defined($self->dbfile)) {
+  if (!$self->dbfile) {
     $self->throw("No database file defined.");
   }
   
   my $dbname = $self->dbfile;
-  
-  $dbname =~ s/.*\/(.*?)/$1/;
-  
+  #print STDERR "dbname ".$dbname."\n";
+  if($dbname =~/\/tmp\//){
+    $dbname =~ s/\/tmp\///g;
+  }
+  #print STDERR $dbname."\n";
   return $dbname;
 }
-
 
 sub remove_index_files {
   my ($self) = @_;
