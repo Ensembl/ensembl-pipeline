@@ -380,7 +380,7 @@ sub write_slam_output {
   }
   ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
   # unlink txt-slam_outputfile
-  $self->file($outfile);
+##  $self->file($outfile);   #uncomment to delete txt outfiles for slam !!! 
   return $outfile;
 }
 
