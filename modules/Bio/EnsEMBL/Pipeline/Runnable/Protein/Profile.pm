@@ -84,41 +84,42 @@ sub new {
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
     
   
-    print STDERR "args: ", @args, "\n";
+     my( $query, $program, $database, $threshold, $workdir, $analysis) = $self->_rearrange([qw(QUERY
+										              PROGRAM
+										              DATABASE
+											      THRESHOLD
+											      WORKDIR
+											      ANALYSIS
+											      )],
+											  @args);
     
-    my( $query, $program, $database, $threshold, $workdir) = $self->_rearrange([qw(QUERY
-										   PROGRAM
-										   DATABASE
-										   THRESHOLD
-										   WORKDIR
-										   )],
-									       @args);
     
-    #$self->clone($sequence) if ($sequence);       
   
     if ($query) {
 	$self->clone($query);
     } else {
 	$self->throw("No query sequence given");
     }
-    
-    if ($program) {   
-	$self->program($program); }
-    else {   
-	$self->program($self->locate_executable('pfscan')); }
+ 
+    if ($analysis) {
+	$self->analysis($analysis);
+    }
+   
+    if (!defined $self->analysis->program) {   
+	$self->program($self->locate_executable('pfscan')); 
+    }
     
     if ($threshold) {
 	$self->threshold($threshold);
     }
     
-    if ($database) {
-	$self->database($database);
-    } else {
+    if (!defined $self->analysis->db) {
 	$self->throw("No database given");
     }
     if ($workdir) {
 	$self->workdir($workdir);
     }
+
 	
     return $self; # success - we hope!
 }
@@ -197,6 +198,28 @@ sub database{
 
 }
 
+=head2 analysis
+
+ Title   : analysis
+ Usage   : $obj->analysis($newval)
+ Function: 
+ Returns : value of analysis
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub analysis{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'analysis'} = $value;
+    }
+    return $obj->{'analysis'};
+
+}
+
+
 
 ###########
 # Analysis methods
@@ -242,13 +265,13 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR "RUNNING: ".$self->program . ' -fz ' .$self->filename. ' ' .$self->database . ' > ' .$self->results."\n";
+    print STDERR "RUNNING: ".$self->analysis->program . ' -fz ' .$self->filename. ' ' .$self->analysis->db . ' > ' .$self->results."\n";
 
     $self->throw("Failed during Profile run $!\n")
 	    
-	unless (system ($self->program . ' -fz ' . 
+	unless (system ($self->analysis->program . ' -fz ' . 
 			$self->filename. ' ' .
-			$self->database . ' > ' .
+			$self->analysis->db . ' > ' .
 			$self->results) == 0) ;
 }
 
@@ -289,8 +312,6 @@ sub parse_results {
 	chomp $line;
 	#print STDERR "$line\n";
 	my ($nscore,$rawscore,$from,$to,$hfrom,$hto,$ac) = $line =~ /(\S+)\s+(\d+)\s*pos.\s+(\d*)\s*-\s+(\d*)\s*\[\s+(\d*),\s+(\S*)\]\s*(\w+)/;
-	#print STDERR "$nscore,$rawscore,$from,$to,$hfrom,$hto,$ac\n";
-
 
 	my $feat = "$ac,$from,$to,$hfrom,$hto,$nscore";
 		
@@ -336,15 +357,6 @@ sub output {
 sub create_feature {
     my ($self, $feat, $sequenceId) = @_;
     
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-	(   -db              => "PROSITE",
-	    -db_version      => 1,
-	    -program         => "pfscan",
-	    -program_version => 1,
-	    -gff_source      => "profile",
-	    -gff_feature     => "domain");
-    
 #my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
     my @f = split (/,/,$feat);
     
@@ -361,14 +373,14 @@ sub create_feature {
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
 					       -end => $f[2],        
 					       -score => $f[5],
-					       -analysis => $analysis_obj,
+					       -analysis => $self->analysis,
 					       -seqname => $self->clone->id,
 					       -percent_id => 'NULL',
 					       -p_value => 'NULL');
     
     my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => $f[3],
 					      -end => $hto,
-					      -analysis => $analysis_obj,
+					      -analysis => $self->analysis,
 					      -seqname => $f[0]);
     
     
