@@ -22,7 +22,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
 								     -estfile   => $estfile,
 								     -exonerate => $exonerate,
 								     -exonerate_args => $exargs
-								     '-golden_path' => $gp,
 								    );
     $obj->fetch_input
     $obj->run
@@ -56,7 +55,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
 
@@ -72,7 +71,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                            -ESTFILE     => $estfile,
 			   -EXONERATE   => $exonerate,
 			   -EXONERATE_ARGS => $exargs,
-			   -GOLDEN_PATH => $gp,
 			  );
                            
     Function:   creates a 
@@ -86,7 +84,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                 -estfile:         filename
                 -exonerate:       path to exonerate executable (optional)
                 -exonerate_args : string (optional) 
-                -golden_path:name of golden path; defaults to UCSC if not provided
 =cut
 
 sub new {
@@ -108,11 +105,6 @@ sub new {
     # ought not to hard code
     $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 " unless defined $exargs;
     $self->exonerate_args($exargs) if defined $exargs;
-
-    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
-	 
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
 
     return $self;
 }
@@ -240,7 +232,7 @@ sub fetch_input {
 								     '-ests'           => $self->estfile,
 								     '-exonerate'      => $self->exonerate,
 								     '-exonerate_args' => $self->exonerate_args);
-    $self->vcontig($contig);
+    $self->vc($contig);
   }
 
   else {
@@ -302,12 +294,12 @@ sub output {
    return $self->{'_output'};# ref to an array
 }
 
-=head2 vcontig
+=head2 vc
 
- Title   : vcontig
- Usage   : $obj->vcontig($newval)
+ Title   : vc
+ Usage   : $obj->vc($newval)
  Function: 
- Returns : value of vcontig
+ Returns : value of vc
  Args    : newvalue (optional)
 
 =cut

@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 									  -dbobj       => $db,
 									  -input_id    => $id,
 									  -seq_index   => $index,
-									  -golden_path => $gp,
 									 );
     $obj->fetch_input
     $obj->run
@@ -40,7 +39,6 @@ Internal methods are usually preceded with a _
 
 =cut
 
-
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G;
@@ -49,24 +47,25 @@ use vars qw(@ISA);
 use strict;
 use POSIX;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
+use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::Tools::BPlite;
 use FileHandle;
+#use diagnostics;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_GOLDEN_PATH
 					EST_REFDBHOST
 					EST_REFDBNAME
 					EST_REFDBUSER
-					EST_REFDBPASS
 					EST_DBNAME
 					EST_DBHOST
 					EST_DBUSER 
@@ -74,6 +73,8 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_SOURCE
 					EST_INDEX
 				       );
+
+					#EST_REFDBPASS #not needed, it is a reference db anyway
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -110,29 +111,25 @@ sub new {
      my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
 										       REFDBHOST
 										       REFDBUSER
-										       REFPASS
-										       GOLDEN_PATH)],
+										       REFPASS)],
 										   @args);
 
-    	 
-    # check options in EST_conf.pl 
-    if(!defined $self->seqfetcher) {
-      my $seqfetcher = $self->make_seqfetcher();
-      $self->seqfetcher($seqfetcher);
-      
-    }
+	 # we force it to use BioIndex SeqFetcher
+	 my $seqfetcher = $self->make_seqfetcher();
+	 $self->seqfetcher($seqfetcher);
 
-    $path = $EST_GOLDEN_PATH;
-    $path = 'UCSC' unless (defined $path && $path ne '');
-#    print STDERR "path: $path\n";
-    $self->dbobj->static_golden_path_type($path);
+    # check options in EST_conf.pl 
+    #if(!defined $self->seqfetcher) {
+    #  my $seqfetcher = $self->make_seqfetcher();
+    #  $self->seqfetcher($seqfetcher);
+    #  
+    #}
 
 #print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
-
     $refdbname = $EST_REFDBNAME unless (defined $refdbname && $refdbname ne '');
     $refdbuser = $EST_REFDBUSER unless (defined $refdbuser && $refdbuser ne '');
     $refdbhost = $EST_REFDBHOST unless (defined $refdbhost && $refdbhost ne '');
-    $refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
+    #$refpass   = $EST_REFDBPASS unless (defined $refpass   && $refpass   ne '');
 
 #print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
@@ -142,7 +139,6 @@ sub new {
     my $estpass   = $EST_DBPASS;
 
 #print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
-
     # if we have all the parameters for a refdb, make one
 
     # otherwise, assume the refdb must be the same as the dbobj
@@ -153,7 +149,6 @@ sub new {
 						     -pass   => $refpass,
 						    );
 
-   $refdb->static_golden_path_type($path);
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
@@ -166,7 +161,6 @@ my $est_ext_feature_factory = $estdb->get_EstAdaptor();
       
       $refdb->add_ExternalFeatureFactory($est_ext_feature_factory);
       $self->estdb($refdb);
-      $self->estdb->static_golden_path_type($path);
 
       # need to have an ordinary adaptor to the est database for gene writes
       $self->dbobj->dnadb($refdb);
@@ -432,19 +426,17 @@ sub get_exon_analysis{
 sub fetch_input {
   my ($self) = @_;
   
+  print STDERR "In fetch_input\n";
   $self->throw("No input id") unless defined($self->input_id);
 
   # get virtual contig of input region
-  my $chrid     = $self->input_id;
-     $chrid     =~ s/\.(.*)-(.*)//;
-  my $chrstart  = $1;
-  my $chrend    = $2;
-
+  my ($chrid, $chrstart, $chrend)= $self->input_id =~ /(^\w+\.\w+)\.(\d+)-(\d+)/;
+  
+  print STDERR "chr info ".$chrid." ".$chrstart." ".$chrend." \n";
   my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
-
-  $self->vcontig($contig);
+  $self->vc($contig);
 
   # find exonerate features amongst all the other features  
   my @allfeatures = $contig->get_all_ExternalFeatures();
@@ -458,7 +450,7 @@ sub fetch_input {
     if (defined($feat->analysis)      && defined($feat->score) && 
 	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
       # only take high scoring ests
-      if($feat->percent_id >= 97){
+      if($feat->percent_id >= 70){
 	if(!defined $exonerate_ests{$feat->hseqname}){
 	  push (@{$exonerate_ests{$feat->hseqname}}, $feat);
 	}
@@ -470,16 +462,21 @@ sub fetch_input {
   # empty out massive arrays
   @allfeatures = ();
 
-  print STDERR "exonerate features left after filter: " . scalar(@exonerate_features) . "\n";
-  print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n";
+  print STDERR "exonerate features left with percent_id > 97 : " . scalar(@exonerate_features) . "\n";
+  print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
   
   # filter features, current depth of coverage 10, and group successful ones by est id
   my %filtered_ests;
 
+  #my @time1 = times();
   # use coverage 5 for now.
-  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 5,
-								    '-minscore' => 500);
+  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
+								    '-minscore' => 500,
+								    '-prune'    => 1,
+								  );
   my @filteredfeats = $filter->run(@exonerate_features);
+  #my @time2 = times();
+  #print STDERR "Filter time: user = ".($time2[0] - $time1[0])."\tsystem = ".($time2[1] - $time1[1])."\n";
   
   # empty out massive arrays
   @exonerate_features = ();
@@ -487,7 +484,8 @@ sub fetch_input {
   foreach my $f(@filteredfeats){
     push(@{$filtered_ests{$f->hseqname}}, $f);
   }
-  
+  print STDERR "num filtered features ". scalar( @filteredfeats) . "\n";  
+
   # empty out massive arrays
   @filteredfeats = ();
 
@@ -497,8 +495,9 @@ sub fetch_input {
   my @ids = keys %filtered_ests;
 
   my @blast_features = $self->blast(@ids);
-
   print STDERR "back from blast with " . scalar(@blast_features) . " features\n";
+  
+
 
   # make sure we can go on before we try to dosomething stupid
   if(!defined @blast_features) {
@@ -509,13 +508,13 @@ sub fetch_input {
   my %final_ests;
   foreach my $feat(@blast_features) {
     my $id = $feat->hseqname;
+    # print STDERR "id-$id-\n";
     # very annoying white space nonsense
     $id =~ s/\s//;
     $feat->hseqname($id);
     push(@{$final_ests{$id}}, $feat);
     my @fe = @{$final_ests{$id}};
   }
-
 
   # make one runnable per EST set
   my $rcount = 0;
@@ -525,8 +524,11 @@ sub fetch_input {
   my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->dbobj);
 
   # only fetch this once for the whole set or it's SLOW!
-  my $genomic  = $self->vcontig->get_repeatmasked_seq;
-
+  my $genomic  = $self->vc->get_repeatmasked_seq;
+  
+  # keep track of those ESTs who make it into a MiniEst2genome
+  my %accepted_ests;
+  
  ID:    
   foreach my $id(keys %final_ests) {
     # length coverage check for every EST
@@ -564,15 +566,62 @@ sub fetch_input {
       next ID;
     }
   
+    # before making a MiniEst2Genome, check that the one we're about to create
+    # is not redundant with any one we have created before
+    my $do_comparison_stuff = 0;
+    if ( $do_comparison_stuff == 1 ){
+    
+      foreach my $id2 ( keys( %accepted_ests ) ){
+	
+	# compare $id with each $id2
+	# if $id is redundant, skip it
+	my @feat1 = sort{ $a->start <=> $b->start } @{$final_ests{$id}};
+	my @feat2 = sort{ $a->start <=> $b->start } @{$accepted_ests{$id2} };
+	#print STDERR "comparing ".$id."(".scalar(@feat1).") with ".$id2." (".scalar(@feat2).")\n";    
+	
+	if ( scalar( @feat1 ) == scalar( @feat2 ) ){
+	  print STDERR "$id and $id2 have the same number of features\n";
+	  
+	  # first, let's make a straightforward check for exac matches:
+	  my $label = 0;
+	  while ( $label < scalar( @feat1 )                      &&
+		  $feat1[$label]->start == $feat2[$label]->start &&
+		  $feat1[$label]->end   == $feat2[$label]->end   ){	        
+	    print STDERR ($label+1)." == ".($label+1)."\n";
+	    $label++;
+	  }
+	  if ( $label == scalar( @feat1 ) ){
+	    print STDERR "EXACT MATCH between $id and $id2 features, skipping $id\n";
+	  }
+	  # make also a test for overlaps
+	  $label = 0;
+	  while ( $label < scalar( @feat1 ) && $feat1[$label]->overlaps( $feat2[$label] )  ){	        
+	    print STDERR ($label+1)." overlaps ".($label+1)."\t";
+	    print STDERR $feat1[$label]->start.":".$feat1[$label]->end."   ".
+	      $feat2[$label]->start.":".$feat2[$label]->end."\n";
+	    $label++;
+	  }
+	  if ( $label == scalar( @feat1 ) ){
+	    print STDERR "approximate MATCH between $id and $id2 features, skipping $id\n";
+	  }		
+	}
+      }
+      
+    }
+
     # make MiniEst2Genome runnables
     # to repmask or not to repmask?    
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
 								   '-genomic'  => $genomic,
 								   '-features' => \@{$final_ests{$id}},
 								   '-seqfetcher' => $self->seqfetcher,
-								   '-analysis' => $self->analysis);
+								   '-analysis' => $self->analysis
+								  );
     $self->runnable($e2g);
     $rcount++;
+  
+    # store in a hash of arrays the features put in a MiniEst2Genome
+    $accepted_ests{$id} = $final_ests{$id};
   }
 
   print STDERR "number of e2gs: $rcount\n";  
@@ -645,7 +694,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $count, $results) = @_;
-  my $contig = $self->vcontig;
+  my $contig = $self->vc;
   my $genetype = 'exonerate_e2g';
   my @genes;
   
@@ -655,7 +704,7 @@ sub make_genes {
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
-    my $transcript = $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
+    my $transcript = $self->make_transcript($tmpf, $self->vc, $genetype, $count);
     $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
     $count++;
@@ -699,7 +748,7 @@ sub make_transcript{
 
   my $excount = 1;
   my @exons;
-    
+     
   foreach my $exon_pred ($gene->sub_SeqFeature) {
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
@@ -713,7 +762,7 @@ sub make_transcript{
     $exon->phase($exon_pred->phase);
     $exon->attach_seq($contig);
     $exon->score($exon_pred->score);
-
+    print " exon ".$exon->temporary_id." start ".$exon->start." end ".$exon->end." stand ".$exon->strand." phase ".$exon->phase." endphase ".$exon->end_phase."\n";
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
       $subf->feature1->source_tag($genetype);
@@ -779,12 +828,12 @@ sub make_transcript{
 
 sub remap_genes {
   my ($self, @genes) = @_;
-  my $contig = $self->vcontig;
+  my $contig = $self->vc;
   my @remapped;
-
+  
  GENEMAP:
   foreach my $gene(@genes) {
-#     print STDERR "about to remap " . $gene->temporary_id . "\n";
+    #     print STDERR "about to remap " . $gene->temporary_id . "\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
     eval {
@@ -792,32 +841,32 @@ sub remap_genes {
       # need to explicitly add back genetype and analysis.
       $newgene->type($gene->type);
       $newgene->analysis($gene->analysis);
-
+      
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
-
+      
       my @oldtrans = $gene->each_Transcript;
       my @oldexons  = $oldtrans[0]->get_all_Exons;
-
+      
       my @newtrans = $newgene->each_Transcript;
       my @newexons  = $newtrans[0]->get_all_Exons;
-
+      
       if($#oldexons == $#newexons){
 	# 1:1 mapping; each_Exon gives ordered array of exons
 	foreach( my $i = 0; $i <= $#oldexons; $i++){
 	  $newexons[$i]->score($oldexons[$i]->score);
 	}
       }
-
+      
       else{
 	$self->warn("cannot transfer exon scores for " . $newgene->id . "\n");
       }
-
+      
       push(@remapped,$newgene);
       
     };
-     if ($@) {
-       print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
-     }
+    if ($@) {
+      print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
+    }
    }
 
   return @remapped;
@@ -866,12 +915,12 @@ sub output {
    return @{$self->{'_output'}};
 }
 
-=head2 vcontig
+=head2 vc
 
- Title   : vcontig
- Usage   : $obj->vcontig($newval)
+ Title   : vc
+ Usage   : $obj->vc($newval)
  Function: 
- Returns : value of vcontig
+ Returns : value of vc
  Args    : newvalue (optional)
 
 =head2 estfile
@@ -936,7 +985,14 @@ sub output{
 sub blast{
    my ($self, @allids) = @_;
 
+   print STDERR "retrieving ".scalar(@allids)." EST sequences\n";
+   
+   my $time1 = time();
    my @estseq = $self->get_Sequences(\@allids);
+   my $time2 = time();
+   print STDERR "SeqFetcher time: user = ".($time2 - $time1)."\n";
+   #print STDERR "SeqFetcher time: user = ".($time2[0] - $time1[0])."\tsystem = ".($time2[1] - $time1[1])."\n";
+
    if ( !scalar(@estseq) ){
      $self->warn("Odd - no ESTs retrieved\n");
      return ();
@@ -986,6 +1042,7 @@ sub get_Sequences {
 #      next ACC;
 #    }
 
+    #print STDERR "getting sequence for $acc\n";
     eval{
       $seq = $self->seqfetcher->get_Seq_by_acc($acc);
     };
@@ -1040,7 +1097,7 @@ sub make_blast_db {
 
  Title   : run_blast
  Usage   : $self->run_blast($db, $numests)
- Function: runs blast between $self->vcontig and $db, allowing a max of $numests alignments. parses output
+ Function: runs blast between $self->vc and $db, allowing a max of $numests alignments. parses output
  Example :
  Returns : array of Bio:EnsEMBL::FeaturePair representing blast hits
  Args    : $estdb: name of wublast formatted database; $numests: number of ests in the database
@@ -1057,11 +1114,13 @@ sub run_blast {
   my $blastout = "/tmp/FEE_blastout." . $$ . ".fa";;
   my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			      -file   => ">$seqfile");
-  $seqio->write_seq($self->vcontig);
+  $seqio->write_seq($self->vc);
   close($seqio->_filehandle);
 
   # set B here to make sure we can show an alignment for every EST
   my $command   = "wublastn $estdb $seqfile B=" . $numests . " -hspmax 1000  2> /dev/null >  $blastout";
+  #print STDERR "Running BLAST:\n";
+  #print STDERR "$command\n";
   my $status = system( $command );
   
   my $blast_report = new Bio::Tools::BPlite(-file=>$blastout);
@@ -1111,6 +1170,7 @@ sub run_blast {
       #create featurepair
       my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $genomic,
 					       -feature2 => $est) ;
+      #print STDERR $fp->gffstring."\n";
       if ($fp) {
 	push (@results, $fp);
       }
@@ -1140,24 +1200,24 @@ sub run_blast {
 =cut
 
 sub make_seqfetcher {
+  print STDERR "making a seqfetcher\n";
   my ( $self ) = @_;
   my $index   = $EST_INDEX;
 
   my $seqfetcher;
-
-  if(defined $index && $index ne ''){
-    my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-    
+  if($index){
+    my @db =  ($index);
+    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  
     ## SeqFetcher to be used with 'indicate' indexing:
-    # $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
+     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
+    
   }
-  # it should not default to pfetch as that would bring down LSF
   #else{
   #  # default to Pfetch
   #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   #}
-   else{
+  else{
     $self->throw( "cannot create a seqfetcher from $index");
   }
 
