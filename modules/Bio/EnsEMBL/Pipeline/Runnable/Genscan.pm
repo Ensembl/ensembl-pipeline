@@ -460,7 +460,8 @@ sub calculate_and_set_phases {
                 
             }
             $translated_exons = $self->translation(@exons);
-            
+            #Due to odd tranlslation by genscan must chop first base away if peptide begins with M
+            $translated_exons = substr($translated_exons, 1, 999999) if ($peptide =~ /^M/i); 
             if (index ($peptide, $translated_exons) > -1)
             {
                 $translation_found = 1;
@@ -468,9 +469,8 @@ sub calculate_and_set_phases {
                 last;
             }
         }
-        $self->throw("Translation (".$exons[0]->id.") not found in genscan peptide\n$peptide\n")
+        $self->throw("Translation (".$exons[0]->seqname.") not found in genscan peptide\n$peptide\n")
                     unless ($translation_found);
-        
     }
 }
 
