@@ -431,7 +431,6 @@ sub parse_results {
     }
 
     #print "Parsing name $name\n";
-    print STDERR " have ".scalar($sbjct->nextHSP)." hsps\n";
      
   HSP: while (my $hsp = $sbjct->nextHSP) {
       
