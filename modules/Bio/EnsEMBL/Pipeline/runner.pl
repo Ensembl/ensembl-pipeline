@@ -73,7 +73,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -perlonlyfeatures  => 1,
     -perlonlysequences => 1
 )
-or die ("Failed to create Bio::EnsEMBL::Pipeline::DBAdaptor to db $dbname \n");
+or die ("Failed to create Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor to db $dbname \n");
 
 print STDERR "Connected to database\n";
 
