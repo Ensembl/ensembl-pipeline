@@ -73,8 +73,9 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use Bio::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-
-
+use Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm;
+use DB_File;
+use Fcntl;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -105,11 +106,13 @@ sub new {
     $self->{'_hmmdb'} = undef;
     $self->{'_hmmfilename'} = undef; #file to store protein profile hmms 
     $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throw
-    print "args = @args\n";
-    my ($genomic, $features, $hmmfetch, $hmmdb) = $self->_rearrange([qw(GENOMIC
-									FEATURES
-									HMMFETCH
-									HMMDB)], @args);
+    $self->{'_dbm_file'} = undef;
+    #print"args = @args\n";
+    my ($genomic, $features, $hmmfetch, $hmmdb, $dbmfile) = $self->_rearrange([qw(GENOMIC
+										  FEATURES
+										  HMMFETCH
+										  HMMDB 
+										  DBMFILE)], @args);
     $self->throw("No genomic sequence input") unless defined($genomic);
     $self->genomic_sequence($genomic);
     $self->add_input_features($features);
@@ -126,7 +129,11 @@ sub new {
 	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensemb/Pfam');
 	
     }
-
+    if($dbmfile){
+      $self->dbm_file($dbmfile);
+    } else {
+      $self->dbm_file('/usr/local/ensembl/data/swiss2prot_7.0.index');	
+    }
     return $self; # success - we hope!
 }
 
@@ -264,6 +271,14 @@ sub hmmdb {
     return $self->{'_hmmdb'};
 }
 
+sub hmmdb {
+    my ($self, $args) =@_;
+
+    if (defined($args)){
+	$self->{'_hmmdb'} = $args;
+    }
+    return $self->{'_hmmdb'};
+}
 
 =head2  hmmfilename
 
@@ -287,6 +302,16 @@ sub hmmfilename {
 
 
 
+sub dbm_file {
+    my ($self, $args) = @_;
+    if (defined ($args)){
+	$self->{'_dbm_file'} = $args;
+    }
+
+    return $self->{'_dbm_file'};
+
+}
+
 
 
 
@@ -307,19 +332,19 @@ sub hmmfilename {
 
 sub run {
 
-    my ($self) = @_;
-
+    my ($self, $dir) = @_;
+    #print "running halfwise\n";
     my %swissprot_ids = $self->get_swissprot_ids();
-    
+    #print "got swiss prot ids \n";
     my @keys = keys(%swissprot_ids);
-
+    
     #foreach my $key (@keys){
     #  print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
     #}
 
     my %pfam_ids = $self->get_pfam_ids(\%swissprot_ids);
-    
-    $self->create_genewisehmm(\%pfam_ids);
+    #print "got pfam ids \n";
+    $self->create_genewisehmm(\%pfam_ids, $dir);
 
 }
 
@@ -331,7 +356,7 @@ sub get_swissprot_ids{
   my @features = $self->all_input_features();
   my %swissprot_ids;
   foreach my $f(@features){
-
+    #print "swissprot id = ".$f->hseqname."\n";
     if(!$swissprot_ids{$f->hseqname}){
      
       $swissprot_ids{$f->hseqname} = $f->strand;
@@ -357,28 +382,62 @@ sub get_pfam_ids{
 
   my ($self, $swissprot_ids) = @_;
 
+  my %swiss_pfam;
+  my %pfams;
+  my $permission = O_RDONLY;
+  tie(%swiss_pfam, "DB_File", $self->dbm_file, $permission, 0400);
   
-
-
+  foreach my $swiss_id(keys(%$swissprot_ids)){
+    #print "searching for pfam ids for ".$swiss_id."\n";  
+    my $strand = $swissprot_ids->{$swiss_id};
+    
+    my $pfam = $swiss_pfam{$swiss_id};
+    #print "found these pfam domains ".$pfam." \n";
+    if(!$pfam){
+      $self->warn("the swissprot ".$swiss_id ."entry has no pfam domains :!")
+    }
+    my @pfams = split /,/, $pfam;
+    #print "pfams = @pfams\n";
+    foreach my $pfam_id(@pfams){
+      #print "trying to create a hash entry for pfam".$pfam_id."\n";
+      if(!defined $pfams{$pfam_id}){
+	#print "defining pfam hash key\n";
+	$pfams{$pfam_id} = $strand;
+    
+     }elsif(defined$pfams{$pfam_id}){
+	if($pfams{$pfam_id} != $strand){
+	 $pfams{$pfam_id} = 0;
+	}else{
+	 $pfams{$pfam_id} = $strand;
+       }
+      }
+    }
+  }
+  return %pfams;
 }
+ 
 
 sub create_genewisehmm{
 
- my ($self, $pfam_ids) = @_;
-
- @ids = keys(%$pfam_ids);
+ my ($self, $pfam_ids, $dir) = @_;
+ #print "getting hmms\n";
+ $self->workdir('/tmp') unless ($self->workdir($dir)); 
+ $self->checkdir();
+ my @ids = keys(%$pfam_ids);
  my $genewisehmm;
  my @features;
  my $memory = 400000;
+ #print "there are ".scalar(@ids)." pfam ids to run\n";
  foreach my $id (@ids){
-   
-   my $strand = %$pfam_ids{$id};
+   #print "running for pfam ".$id."\n";
+   my $strand = $pfam_ids->{$id};
 
    $self->get_hmm($id);
-
+   #print "got hmm \n";
    if($strand == 1){
     
     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+    $genewisehmm->run();
     @features = $genewisehmm->output();
 
     $self->add_output_features(\@features);
@@ -416,16 +475,17 @@ sub create_genewisehmm{
 sub run_genewisehmm{
 
   my ($self, $strand, $memory) = @_;
-
+  my $reverse;
   if($strand == -1){
-    my $reverse = 1;
+    $reverse = 1;
   }else{
-    my $reverse = undef;
+    $reverse = undef;
   }
-  $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new('-genomic' => $self->genomic_sequence(),
+  print "creating genewisehmm\n";
+  my $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new('-genomic' => $self->genomic_sequence(),
                                                                     '-memory' => $memory,
                                                                     '-hmmfile' => $self->hmmfilename(),
-                                                                    '-reverse' => $reverse));
+                                                                    '-reverse' => $reverse);
 
   return $genewisehmm
 
@@ -445,13 +505,13 @@ sub run_genewisehmm{
 sub get_hmm{
   
   my ($self, $id) = @_;
-  $self->hmmfilename($self->genomic_sequence->id."dbhmm.$$");
+  $self->hmmfilename($id.".".$$.".hmm");
   $self->errorfile($self->genomic_sequence->id."err.$$");
-  
-  my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." 2> ".$self->errorfile."1>".$self->hmmfilename;
+  #print "getting hmm for id ".$id."\n";
+  my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." 2> ".$self->errorfile." 1>".$self->hmmfilename;
 
   print "command = ".$command."\n";
-
+  system ('pwd');
   system($command);
   
   if (-e $self->errorfile){
@@ -470,25 +530,7 @@ sub get_hmm{
 
 
 
-=head2  hmmfilename
 
- Title    : hmmfilename
- Usage    : $self->hmmfilename($filename);
- Function : gets and sets the name of the hmmdb file
- Returns  : the name of the hmmdb file
- Args     : the name of the hmmdb file
-
-=cut
-
-sub hmmfilename {
-    my ($self, $args) = @_;
-    if (defined ($args)){
-	$self->{'_hmmfilename'} = $args;
-    }
-
-    return $self->{'_hmmfilename'};
-
-}
 
 
 =head2  errorfile
@@ -540,39 +582,13 @@ sub all_output_features{
 ################
 
 
-=head2 
-
- Title    : ouptut
- Usage    : $self->output
- Function : turns the features into feature pairs
- Returns  : an array of feature pairs
- Args     : none
-
-=cut
-
-sub output {
+sub output{
 
   my ($self) = @_;
 
-  my @feat;
+  my @out = $self->all_output_features();
 
-  my $analysis = Bio::EnsEMBL::Analysis->new(   -db              => undef,
-						-db_version      => undef,
-						-program         => 'halfwise',
-						-program_version => '1.0',
-						-gff_source      => 'halfwise',
-						-gff_feature     => 'similarity',
-						-logic_name      => 'halfwise',
-						);
-
-  
-  
-
- 
-  
-  
-  
-  return @feat;
+  return @out;
 
 }
 1;

@@ -81,10 +81,10 @@ sub genewise {
 # RunnableI methods
 
 sub run {
-    my ($self) = @_;
+    my ($self, $dir) = @_;
 
     $self->_wise_init;
-    $self->_align_protein;
+    $self->_align_protein($dir);
 }
 
 sub output {
@@ -128,19 +128,20 @@ sub _wise_init {
 
 
 sub _align_protein {
-  my ($self) = @_;
+  my ($self, $dir) = @_;
   my $memory   = $self->memory;
-  
-  my $gwfile   = "/tmp/gw." . $$ . ".out";
-  my $genfile  = "/tmp/gw." . $$ . ".gen.fa";
+  $self->workdir('/tmp') unless ($self->workdir($dir));
+  $self->checkdir();
+  my $gwfile   = "gw." . $$ . ".out";
+  my $genfile  = "gw." . $$ . ".gen.fa";
   
   my $genio  = Bio::SeqIO->new (-file   => ">$genfile",
 			      '-format' => 'fasta');
   
   $genio->write_seq($self->genomic);
   $genio = undef;
-
-  
+  print "running genewisehmm\n";
+  system('pwd');
   my ($hmmname) = $self->hmmfile =~ /PF\d+/g;
 
   my $genewise = $self->genewise;
