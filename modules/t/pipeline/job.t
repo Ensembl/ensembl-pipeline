@@ -45,6 +45,7 @@ ok(test_getter_setter($job, 'module', 'Bio::EnsEMBL::Pipeline::RunnableDB::Test'
 ok(test_getter_setter($job, 'stderr_file', '/acari/nfs/tmp/12.out'));
 ok(test_getter_setter($job, 'stdout_file', '/acari/nfs/tmp/1234.err'));
 ok(test_getter_setter($job, 'status', 'WRITING'));
+ok(test_getter_setter($job, 'retry_count', 1));
 
 
 $multi_test_db->save('pipeline', 'job_status', 'job');
