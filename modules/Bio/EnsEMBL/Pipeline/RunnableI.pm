@@ -203,11 +203,11 @@ sub get_tmp_file {
 
 		# This is not good
 
-    my $num = int(rand(10000));
+    my $num = int(rand(100000));
     my $file = $dir . $stub . "." . $num . "." . $ext;
     #print STDERR "have filename ".$file."\n";
     while (-e $file) {
-        $num = int(rand(10000));
+        $num = int(rand(100000));
         $file = $dir.$stub . "." . $num . "." . $ext;
     }
     #print STDERR "returning filename ".$file."\n";
@@ -225,7 +225,7 @@ sub write_sequence_to_file {
         $self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file. Currently [$seqobj]");
     }
 
-    my $file      = $self->get_tmp_file($self->workdir,"seq",".fa");
+    my $file      = $self->get_tmp_file($self->workdir,"seq","fa");
     my $clone_out = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
       
     $clone_out->write_seq($seqobj);
