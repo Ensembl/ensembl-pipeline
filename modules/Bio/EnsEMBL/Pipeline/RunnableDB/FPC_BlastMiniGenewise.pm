@@ -900,7 +900,7 @@ sub remap_genes {
 
     };
     if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+      print STDERR "Couldn't reverse map gene " . $gene . " [$@]\n";
     }
     
 
