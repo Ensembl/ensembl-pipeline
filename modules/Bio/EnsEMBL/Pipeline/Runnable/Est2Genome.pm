@@ -341,7 +341,7 @@ sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
 }
-<<<<<<< Est2Genome.pm
+
 
 sub _createfeatures {
     my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
