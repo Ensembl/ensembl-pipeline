@@ -171,7 +171,8 @@ sub run {
 									      -peptide   => $transcript,
 									      -database  => $self->analysis->db,
 									      -program   => $self->analysis->program,
-									      -threshold => $self->threshold,
+									      -threshold => 1e-6,
+                                                                              -options   => $self->parameters,
 									      -threshold_type => 'PVALUE');
 
 	$runnable->run();
@@ -196,7 +197,11 @@ sub output {
 
     my @output;
     foreach my $run ($self->runnable) {
-      push(@output,$run->output);
+      my @tmp = $run->output;
+      foreach my $f (@tmp) {
+	$f->analysis($self->analysis);
+      }
+      push(@output,@tmp);
     }
     return @output;
 }
