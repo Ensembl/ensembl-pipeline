@@ -47,10 +47,10 @@ use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 
-use Bio::EnsEMBL::Pipeline::ESTConf qw (
-					EST_INPUTID_REGEX
-					EST_BLAT_ANALYSIS
-				       );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
+							      EST_INPUTID_REGEX
+							      EST_EXONERATE_ANALYSIS
+							     );
 
 
 use vars '@ISA';
