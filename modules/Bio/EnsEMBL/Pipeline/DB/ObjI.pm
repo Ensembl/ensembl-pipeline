@@ -139,7 +139,20 @@ sub get_AnalysisSummary {
 
 }
 
+=head2 get_all_Status {
 
+  Title   : get_all_Status
+  Usage   : my @status_list = $db->get_all_Status()
+  Function: Retrieves list of all status present in jobstatus
+  Returns : array of status present in DB
+  Args    : none
+
+=cut
+
+sub get_all_Status {
+    my ($self) = @_;
+    $self->throw("Method get_all_Status not implemented");
+}
 =head2 write_Analysis {
 
   Title   : write_Analysis
