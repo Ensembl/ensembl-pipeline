@@ -115,6 +115,8 @@ my %assembled_ids;
 my %component_ids;
 
 LINE:while(<FH>){
+  next if /^\#/;
+
   chomp;
   #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
   #cb25.fpc4250	151062	152023	14	N	962	fragment	yes

@@ -209,8 +209,9 @@ sub parse_agp{
 
   my %end_value;
   open(FH, $agp_file) or throw("Can't open ".$agp_file." ".$!);
- LINE:while(<FH>){
+ LINE:while(<FH>){   
     chomp;
+    next if /^\#/;
     #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
     #cb25.fpc4250	151062	152023	14	N	962	fragment	yes
     my @values = split;
