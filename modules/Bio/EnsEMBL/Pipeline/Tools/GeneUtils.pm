@@ -44,10 +44,11 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
   Arg[1]    : Bio::EnsEMBL::Transcript $transcript
   Arg[2]    : Bio::EnsEMBML::Slice $slice
-  Arg[3]    : int $coverage 
-  Arg[4]    : int $low_complexity
-  Arg[5]    : int $max_intron
+  Arg[3]    : int $coverage_threshold 
   Arg[4]    : ref to array of Bio::DB::RandomAccessI $seqfetchers
+  Arg[5]    : int $max_intron
+  Arg[6]    : int $min_split_coverage
+  Arg[7]    : int $low_complexity
   Function  : evaluates $transcript - rejects if mixed strands, rejects if low coverage, 
               rejects if stops in translation, splits if long introns and insufficient 
               coverage of parental protein
@@ -59,17 +60,20 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 =cut
 
 sub validate_Transcript {
-  my ($self, $transcript, $slice, $coverage, $low_complexity, $maxintron, $seqfetchers ) = @_;
+  my ($self, $transcript, $slice, $coverage_threshold, $maxintron, $min_split_coverage, $seqfetchers, $low_complexity ) = @_;
   
   my @valid_transcripts;
 
   return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript ($transcript, $slice);
 
-  return undef unless Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage      ($transcript,$coverage,$seqfetchers);
-
   return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript);
 
-  return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript,$low_complexity);
+  if(defined $low_complexity) {
+    return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript, $low_complexity);
+  }
+  my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, $coverage_threshold, $seqfetchers);
+
+  return undef unless defined $coverage;
 
   # Do we really need to do this? Can we just take out the dbID adaptor stuff
   # make a new transcript that's a copy of all the important parts of the old one
@@ -91,20 +95,28 @@ sub validate_Transcript {
     }
   }
 
-  #    split transcript if necessary
-  my $split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::split_Transcript($newtranscript, $maxintron);
-  push (@valid_transcripts, @$split_transcripts);
+  # split transcript if necessary - at present in practice all Similarity transcripts 
+  # will be run through split_transcripts but very good Targetted predictions having 
+  # long introns will not be
+  if($coverage < $min_split_coverage){
+    my $split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->split_Transcript($newtranscript, $maxintron);
+    push (@valid_transcripts, @$split_transcripts);
+  }
+  else{
+    push (@valid_transcripts, $newtranscript);
+  }
+
   return \@valid_transcripts;
 }
 
 =head2 _check_coverage
 
   Arg[1]    : Bio::EnsEMBL::Transcript $transcript
-  Arg[2]    : int $coverage 
+  Arg[2]    : int $coverage_threshold 
   Arg[3]    : ref to array of Bio::DB::RandomAccessI $seqfetchers
   Function  : calculates how much of the parent protein is covered by the predicted translation 
               and compares to a passed in coverage threshold.
-  ReturnType: 1/0; 1 if calculated coverage exceeds threshold, otherwise 0
+  ReturnType: undef calculated coverage less than $coverage_threshold, otherwise int (coverage)
   Exceptions: warns if problems fetching sequence
   Caller    :
   Example   :
@@ -112,15 +124,14 @@ sub validate_Transcript {
 =cut
 
 sub _check_coverage {
-  my ( $self, $transcript, $coverage, $seqfetchers) = @_;
+  my ( $self, $transcript, $coverage_threshold, $seqfetchers) = @_;
   
   my $matches = 0;
   my $pstart  = 0;
   my $pend    = 0;
   my $protname;
   my $plength;
-  
-  
+    
   foreach my $exon(@{$transcript->get_all_Exons}) {
     $pstart = 0;
     $pend   = 0;
@@ -146,10 +157,8 @@ sub _check_coverage {
   }
   
   my $seq; 
-  
  SEQFETCHER:
   foreach my $seqfetcher (@$seqfetchers){
-    warn "GeneUtils: getting sequence for $protname\n";
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($protname);
     };
@@ -165,7 +174,7 @@ sub _check_coverage {
   
   if(!defined $seq){
     warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, letting gene through\n");
-    return 1;
+    return 100;
   }
   
   $plength = $seq->length;
@@ -175,19 +184,19 @@ sub _check_coverage {
     return 0;
   }
   
-  my $realcoverage = 100 * $matches/$plength;
+  my $realcoverage = int(100 * $matches/$plength);
   
-  if ($realcoverage < $coverage){
+  if ($realcoverage < $coverage_threshold){
     warn("GeneUtils: Rejecting transcript for low coverage: $realcoverage\n");
-    return 0;
+    return undef;
   }
   
-  return 1;
+  return $realcoverage;
   
 }
 
 
-=head2 _SeqFeature_to_Transcript
+=head2 SeqFeature_to_Transcript
 
   Arg[1]    : Bio::EnsEMBL::SeqfeatureI $gene 
   Arg[2]    : Bio::EnsEMBL::RawContig $contig
@@ -203,35 +212,33 @@ sub _check_coverage {
 =cut
 	    
 sub SeqFeature_to_Transcript {
-  my ($self, $gene, $contig, $analysis_obj,$db,$phase) = @_;
-  
+  my ($self, $gene, $contig, $analysis_obj, $db, $phase) = @_;
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI")){
     print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";
   }
-  
-  my $transcript   = new Bio::EnsEMBL::Transcript;
-  my $translation  = new Bio::EnsEMBL::Translation;    
-  
-  $transcript->translation($translation);
-  
+
+  my $curr_phase = 0;  
+
   my $excount = 1;
   my @exons;
+
+  my $transcript   = new Bio::EnsEMBL::Transcript;
+  my $translation  = new Bio::EnsEMBL::Translation;    
+  $transcript->translation($translation);
+  
   
   my $ea;
-  
   if ($db ne "" && defined($db)) {
     $ea = $db->get_ExonAdaptor;
   }
   
-  my $curr_phase = 0;
-  
   my @pred = $gene->sub_SeqFeature;
-  
   if ($pred[0]->strand ==1 ) {
     @pred = sort {$a->start <=> $b->start} @pred;
   } else {
     @pred = sort {$b->start <=> $a->start} @pred;
   }
+
   foreach my $exon_pred (@pred) {
     my $exon = new Bio::EnsEMBL::Exon;
     
@@ -240,7 +247,7 @@ sub SeqFeature_to_Transcript {
     $exon->strand   ($exon_pred->strand);
     
     if ($phase) {
-      $exon->phase($curr_phase);
+      $exon->phase($curr_phase);# or $phase?
       my $exon_length =  $exon->end - $exon->start + 1;
       my $end_phase   = ( $exon_length + $exon->phase ) %3;
       
@@ -252,10 +259,8 @@ sub SeqFeature_to_Transcript {
       $exon->end_phase($exon_pred->end_phase);
     }
     
-    
     $exon->contig   ($contig); 
     $exon->adaptor  ($ea);
-    
     
     # sort out supporting evidence for this exon prediction
     # Now these should be made in the correct type to start with
