@@ -332,12 +332,13 @@ sub _test_for_semiexact_Merge{
 
 sub _test_for_fuzzy_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
+  
   my $allowed_mismatch = 0;
   if ( defined $self->splice_mismatch ){
     $allowed_mismatch =  $self->splice_mismatch;
   }
 
-  my $verbose = 0;
+  my $verbose = 1;
   
   #print STDERR "=========== comparing ================\n";
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
@@ -393,6 +394,14 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  print STDERR "merged single exon transcript\n" if $verbose;
 	  last EXON1;
 	}
+	# if the first overlaps with the last, we allow any overlap
+	elsif ( ( $k==0 && $j == $#exons1 ) || ( $j==0 && $k == $#exons2 ) ){
+	  $foundlink = 1;
+	  $overlaps++;
+	  $merge = 1;
+	  print STDERR "found link --> merged\n";
+	  last EXON1;
+	}
 	elsif ( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
 	  # else we force it to match the end (with a mismatch of $allowed_mismatch bases allowed)
 	  
@@ -409,7 +418,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	      ( $foundlink == 1 )                  &&
 	      ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
 	    ){
-	#print STDERR "link completed, merged transcripts\n";
+	print STDERR "link completed, merged transcripts\n";
 	$merge = 1;
 	$overlaps++;
 	last EXON1;
@@ -446,10 +455,10 @@ sub _test_for_fuzzy_semiexact_Merge{
     }
   }
   if ($merge ){
-    print STDERR "MERGE\n" if $verbose;
+    print STDERR $est_tran->dbID."V".$ens_tran->dbID." MERGE ". $ens_tran->dbID."V".$est_tran->dbID." MERGE\n" if $verbose;
   }
   else{
-    print STDERR "NO MERGE\n" if $verbose;
+    print STDERR $est_tran->dbID."V".$ens_tran->dbID." NO MERGE ". $ens_tran->dbID."V".$est_tran->dbID." NO MERGE\n" if $verbose;
   }
   
   return ($merge, $overlaps);
