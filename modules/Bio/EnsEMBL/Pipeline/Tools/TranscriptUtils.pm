@@ -35,6 +35,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::DnaPepAlignFeature;
+use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -639,6 +640,51 @@ sub _print_Peptide{
     $seqout->write_seq($translation);
   }
 }
+
+############################################################
+
+sub _clone_Transcript{
+  my ($self,$transcript) = @_;
+  
+  #print STDERR "Cloning:\n";
+  #$self->_print_Transcript($transcript);
+  my $newtranscript  = new Bio::EnsEMBL::Transcript;
+  my $newtranslation = new Bio::EnsEMBL::Translation;
+  
+
+  if ( defined $transcript->translation ){
+    my $translation_start_exon = $transcript->translation->start_Exon;
+    my $translation_end_exon   = $transcript->translation->end_Exon; 
+  }
+
+  foreach my $exon ( @{$transcript->get_all_Exons} ){
+    my $newexon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon($exon);
+    if ( defined $transcript->translation ){
+      if ($exon == $translation_start_exon){
+	$newtranslation->start_Exon($newexon);
+	$newtranslation->start($transcript->translation->start);
+      }
+      if ($exon == $translation_end_exon){
+	$newtranslation->end_Exon($newexon);
+	$newtranslation->end($transcript->translation->end);
+      }
+    }
+    
+    $newtranscript->add_Exon($newexon);
+  }
+  #$newtranscript->sort;
+  $newtranscript->dbID($transcript->dbID);
+  if (defined $transcript->type ){
+    $newtranscript->type($transcript->type);
+  }
+  if ( defined $transcript->translation ){
+    $newtranscript->translation($newtranslation);
+  }
+  return $newtranscript;
+}
+
+############################################################
+
 
 
 ############################################################
