@@ -411,6 +411,7 @@ sub convert_output{
   
  TRANSCRIPT: 
   foreach my $transcript (@transcripts) {
+    #print STDERR "In MiniGenomewise: transcript is a ".ref($transcript)."\n";
     my @newexons;
 
     # test
@@ -446,9 +447,12 @@ sub convert_output{
   EXON:
     foreach my $exon ($transcript->get_all_Exons) {
       $ec++;
-
+   
       my $phase  = $exon->phase;
       my $strand = $exon->strand;
+
+      # get the supporting evidence
+      my @evidence = $exon->each_Supporting_Feature;
 
       my @genomics = $self->miniseq->convert_SeqFeature($exon);         
       if ($#genomics > 0) {
@@ -457,13 +461,19 @@ sub convert_output{
 	             . scalar(@genomics) . " ignoring exon $ec\n";
 	next EXON;
       }
-    
+      
     foreach my $f (@genomics) {
       my $new_exon = new Bio::EnsEMBL::Exon;
       $new_exon->start($f->start);
       $new_exon->end($f->end);
       $new_exon->phase($phase);
       $new_exon->strand($strand);
+
+      # transfer the supporting evidence!!!
+      foreach my $evi ( @evidence ){
+	$new_exon->add_Supporting_Feature( $evi );
+      }
+
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $new_exon->seqname($exon->seqname);
       $new_exon->analysis($analysis_obj);
