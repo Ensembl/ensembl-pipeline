@@ -18,14 +18,14 @@ public class ReadSpecifiedDBAction extends AAction{
   
   protected void doAction(AView view, AModel aModel){
     PathStepsModel model = (PathStepsModel)aModel;
-    String host = null;
-    String port = null;
-    String user = null;
-    String password = null;
     Collection databases = null;
     String selectedDatabase = null;
     ModelElement dialogModel = model.getRootElement().getChildElement(model.READ_DB_DIALOG);
     Collection list;
+    String host = null;
+    String port = null;
+    String user = null;
+    String password = null;
     
     if(getLogger().isLoggingLow()){
       getLogger().logLow("Starting ReadSpecifiedDBAction");
@@ -35,6 +35,11 @@ public class ReadSpecifiedDBAction extends AAction{
       throw new FatalAException("ReadDBDialog expecting a model called: "+model.READ_DB_DIALOG+" but none was found");
     }
     
+    host = (String)dialogModel.getProperty(model.READ_DB_DIALOG_HOST);
+    port = (String)dialogModel.getProperty(model.READ_DB_DIALOG_PORT);
+    user = (String)dialogModel.getProperty(model.READ_DB_DIALOG_USER);
+
+    selectedDatabase = (String)dialogModel.getProperty(model.READ_DB_DIALOG_PIPELINE_DB);
     host = (String)dialogModel.getProperty(model.READ_DB_DIALOG_HOST);
     port = (String)dialogModel.getProperty(model.READ_DB_DIALOG_PORT);
     user = (String)dialogModel.getProperty(model.READ_DB_DIALOG_USER);
@@ -62,22 +67,17 @@ public class ReadSpecifiedDBAction extends AAction{
     //Run the logic to store the chains of dependent path/steps in the model
     model.getRootElement().addChildElement(
       PathStepsModel.PATH_STEPS_PANEL,
-      createPathStepsModel(
-        host,
-        port,
-        user,
-        password,
-        selectedDatabase
-      )
+      createPathStepsPanelModel(selectedDatabase)
     );
     
     view.closeReadPipelineDBDialog();
-    
+
     //System.out.println(model.toString());
     Properties history = view.getApplication().getHistory();
     history.setProperty(model.READ_DB_DIALOG_HOST, host);
     history.setProperty(model.READ_DB_DIALOG_PORT, port);
     history.setProperty(model.READ_DB_DIALOG_USER, user);
+    history.setProperty(model.READ_DB_DIALOG_PIPELINE_DB, selectedDatabase);
     
     getView().getApplication().writeHistory(history);
     
@@ -90,13 +90,8 @@ public class ReadSpecifiedDBAction extends AAction{
     }
   }
 
-  private ModelElement createFakePathStepsModel(
-    String host,
-    String port,
-    String user,
-    String password,
-    String selectedDatabase
-  ){
+  private ModelElement createFakePathStepsModel(String selectedDatabase){
+    
     ModelElement rootElement = new ModelElement(PathStepsModel.PATH_STEPS_PANEL);
     /*
     ModelElement submitContig = rootElement.createChildElement("SubmitContig");
@@ -135,7 +130,7 @@ public class ReadSpecifiedDBAction extends AAction{
     elements.add(e3);
     elements.add(e11);
     elements.add(e111);
-    elements.add(e3);
+    elements.add(e3);   
     elements.add(e31);
     elements.add(e32);
     elements.add(e4);
@@ -147,17 +142,10 @@ public class ReadSpecifiedDBAction extends AAction{
     return rootElement;
   }
   
-  private ModelElement createPathStepsModel(
-    String host,
-    String port,
-    String user,
-    String password,
-    String selectedDatabase
-  ){
+  private ModelElement createPathStepsPanelModel(String selectedDatabase){
     
     ModelElement rootElement = new ModelElement(PathStepsModel.PATH_STEPS_PANEL);
-    String jdbcDriver = "org.gjt.mm.mysql.Driver";
-    String url = "jdbc:mysql://" + host + ":" + port + "/"+selectedDatabase;
+    
     Statement statement;
     ResultSet resultSet;
     String select;
@@ -175,40 +163,9 @@ public class ReadSpecifiedDBAction extends AAction{
       getLogger().logMedium("Started creating model");
     }
 
-    if(password == null){
-      password = "";
-    }
-
     try{
-      Class.forName(jdbcDriver).newInstance();
-    }catch(IllegalAccessException exception){
       
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not access JDBC Driver constructor", exception);
-      }
-
-      throw new NonFatalAException("Could not access JDBC Driver constructor",exception);
-      
-    }catch(InstantiationException exception){
-
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not create JDBC Driver", exception);
-      }
-      
-      throw new NonFatalAException("Could not create JDBC Driver",exception);
-      
-    }catch(ClassNotFoundException exception){
-
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not find JDBC Driver class", exception);
-      }
-      
-      throw new NonFatalAException("Could not find JDBC Driver class",exception);
-      
-    }//end try
-
-    try{
-      java.sql.Connection conn = DriverManager.getConnection(url,user,password);
+      java.sql.Connection conn = createNewConnectionFromSelectedDatabase((PathStepsModel)getModel());
       statement = conn.createStatement();
       
       //
@@ -274,6 +231,15 @@ public class ReadSpecifiedDBAction extends AAction{
       
       rootElement.addProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES, elementsByLogicName.values());
 
+      if(getLogger().isLoggingMedium()){
+        getLogger().logMedium("Adding graph layout configuration properties object to model");
+      }
+
+      rootElement.addProperty(
+        PathStepsModel.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION,
+        getView().getApplication().readGraphLayoutConfiguration()
+      );
+      
     }catch(SQLException exception){
       if(getLogger().isLoggingMedium()){
         getLogger().logMedium("SQL Problems reading pipline database", exception);

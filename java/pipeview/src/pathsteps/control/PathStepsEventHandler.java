@@ -26,6 +26,7 @@ public class PathStepsEventHandler implements AEventHandler{
     getActions().put(AView.CANCEL_READ_KEY, new CancelReadAction(this));
     getActions().put(AView.READ_SPECIFIED_DB_KEY, new ReadSpecifiedDBAction(this));
     getActions().put(AView.REFRESH_BUTTON_KEY, new RereadSpecifiedDBAction(this));
+    getActions().put(AView.LAYOUT_BUTTON_KEY, new ApplyGraphLayoutAction(this));
     getActions().put(AView.SET_LAYOUT_PREFERENCES_KEY, new SetLayoutConfigurationAction(this));
     getActions().put(AView.CANCEL_LAYOUT_PREFERENCES_KEY, new CancelLayoutConfigurationAction(this));
     getActions().put(AView.SELECT_GRAPH_NODE_PARENTS_KEY, new SelectGraphNodeParentsAction(this));
@@ -44,7 +45,6 @@ public class PathStepsEventHandler implements AEventHandler{
     if(action == null){
       throw new FatalAException("No action found for key: "+key);
     }
-    
     
     try{
       

@@ -160,4 +160,8 @@ public class PathStepsTestView implements AView
   public void setLayoutConfigurationDialogOpen(boolean value) {
     layoutConfigurationDialogOpen = value;
   }
+  
+  public void applyGraphLayout() {
+  }
+  
 }

@@ -210,17 +210,18 @@ public class PathStepsPanel extends JPanel{
     int movementLimit;
     int gravity;
     boolean fixRoots;
+    Properties positionProperties;
 
     if(getView().getLogger().isLoggingHigh()){
       getView().getLogger().logHigh("Started creating graph");
     }
 
     if(model != null){
-      rootElement = getModel().getRootElement().getChildElement(PathStepsModel.PATH_STEPS_PANEL);
+      rootElement = model.getRootElement().getChildElement(PathStepsModel.PATH_STEPS_PANEL);
       if(rootElement != null){
         if(rootElement.isNew()){
 
-          layoutDialogElement = getModel().getRootElement().getChildElement(PathStepsModel.LAYOUT_DIALOG);
+          layoutDialogElement = model.getRootElement().getChildElement(PathStepsModel.LAYOUT_DIALOG);
           xSeparation = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_HORIZONTAL_SPACING);
           ySeparation = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_VERTICAL_SPACING);
           naturalEdgeLength = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH);
@@ -270,10 +271,21 @@ public class PathStepsPanel extends JPanel{
           nodes = new Node[keySet.size()];
           while(keys.hasNext()){
             key = (String)keys.next();
-            position = (Dyad)getKeyToPositionMap().get(key);
             node = new Node();
-            node.x = xSeparation * position.x() + 10;
-            node.y = ySeparation * position.y() + 10;
+            positionProperties = 
+              (Properties)
+              rootElement.getProperty(model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION);
+            
+            if(positionProperties.getProperty(key)!= null){
+              position = parsePositionString(positionProperties.getProperty(key));
+              node.x = position.x();
+              node.y = position.y();
+            }else{
+              position = (Dyad)getKeyToPositionMap().get(key);
+              node.x = xSeparation * position.x() + 10;
+              node.y = ySeparation * position.y() + 10;
+            }
+            
             node.lbl = key;
             if(getView().getLogger().isLoggingHigh()){
               getView().getLogger().logHigh("node: "+key+":"+node.x+"-"+node.y);
@@ -290,86 +302,16 @@ public class PathStepsPanel extends JPanel{
             counter++;
           }
 
-          //
-          //Gather up all edges
-          row = 0;
-          list.clear();
-          list.add(rootElement);
-          list = listChildren(list);
-          Collections.sort(list, inverseChildNumber);
-          ArrayList allEdges = new ArrayList();
-          while(!list.isEmpty()){
-            allEdges.addAll(recordEdges(row, list));
-            Collections.sort(list, inverseChildNumber);
-            list = listChildren(list);
-            row++;
-          }
-
-          //
-          //Go through each edge and add to the Edge[] array
-          pathsteps.gui.Edge edge = null;
-          Link link = null;
-          edges = new pathsteps.gui.Edge[allEdges.size()];
-          for(int i=0; i<allEdges.size(); i++){
-            link = (Link)allEdges.get(i);
-            edge = new pathsteps.gui.Edge();
-            edge.from = findNode(link.from);
-            edge.to = findNode(link.to);
-            edge.len = naturalEdgeLength;
-            edges[i] = edge;
-          }
-          
-          if(getView().getLogger().isLoggingHigh()){
-            getView().getLogger().logHigh("Starting layout\n old positions:");
-            for(int i=0; i< nodes.length; i++){
-              getView().getLogger().logHigh(nodes[i].lbl+":"+nodes[i].x+"-"+nodes[i].y);
-            }
-          }
-
-          
-          if(getView().getLogger().isLoggingHigh()){
-            getView().getLogger().logHigh("Finished layout\n New node positions:");
-            for(int i=0; i< nodes.length; i++){
-              getView().getLogger().logHigh(nodes[i].lbl+":"+nodes[i].x+"-"+nodes[i].y);
-            }
-          }
-          
           createGraphModelNodesAndEdges(rootElement, nodes);
 
           rootElement.age(); //we've read the panel. Don't re-read till a db fetch has been done
           
           recreateGraph();
 
-          LayoutCalculator calculator = new LayoutCalculator(nodes, edges, rootKeys.size() * 200, 1000);
-
-          GraphUpdater updater = 
-            new GraphUpdater(
-              calculator, 
-              getGraphModel(),
-              getCellMap(),
-              getGraphAttributeMap(),
-              iterateNumber, 
-              1, 
-              movementLimit, 
-              gravity, 
-              repulsionMultiplier
-            );
-    
-          javax.swing.Timer timer = new javax.swing.Timer(
-            10, 
-            updater
-          );
-          
-          updater.timer = timer;
-          
-          if(getView().getLogger().isLoggingMedium()){
-            getView().getLogger().logMedium("Starting timer");
-          }
-          timer.start();
           
         }else{
 
-          applyEditsFromChangedModelToGraphModel();
+          //applyEditsFromChangedModelToGraphModel();
           
         }
         
@@ -645,9 +587,65 @@ public class PathStepsPanel extends JPanel{
     getElementPortMap().put(elementKey, port);
     getGraphAttributeMap().put(elementKey, cellMap);
     getCellMap().put(elementKey, cell);
+    System.out.println(" >>>> created key "+elementKey+" with cell: "+cell.hashCode()+" with bounds: "+x+" "+y);
   }
   
   public void update(PathStepsModel model){
+    ModelElement rootElement = model.getRootElement();
+    ModelElement panelModel = rootElement.getChildElement(model.PATH_STEPS_PANEL);
+    
+    if(panelModel == null){
+      return;
+    }
+    
+    Collection allNodes = (Collection)panelModel.getProperty(model.PATH_STEPS_PANEL_ALL_NODES);
+    Iterator nodes = allNodes.iterator();
+    ModelElement node;
+    Map cellAttributes;
+    Rectangle cellBounds;
+    int cellX = 0;
+    int cellY = 0;
+    int cellWidth = 0;
+    int cellHeight = 0;
+    String boundString = null;
+    
+    Properties graphLayout = 
+      (Properties)panelModel
+        .getProperty(
+          model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION
+        );
+    
+    if(graphLayout == null){
+      throw new FatalAException(
+        "Expected a model (with a Properties value) of the element property: "+
+        model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION+
+        " for the model element :"+model.PATH_STEPS_PANEL_ALL_NODES
+      );  
+    }
+
+    while(nodes.hasNext()){
+      node = (ModelElement)nodes.next();
+      cellAttributes = (Map)getGraphAttributeMap().get(node.getKey());
+      if(cellAttributes == null){
+        throw new FatalAException("Cannot find the attribute map for cell of key "+node.getKey());
+      }
+      cellBounds = GraphConstants.getBounds(cellAttributes); 
+      cellX = new Double(cellBounds.getX()).intValue();
+      cellY = new Double(cellBounds.getY()).intValue();
+      cellWidth = new Double(cellBounds.getWidth()).intValue();
+      cellHeight = new Double(cellBounds.getHeight()).intValue();
+      boundString = 
+        (new StringBuffer())
+          .append(String.valueOf(cellX))
+          .append(" ")
+          .append(String.valueOf(cellY))
+          .append(" ")
+          .append(String.valueOf(cellWidth))
+          .append(" ")
+          .append(String.valueOf(cellHeight))
+          .toString();
+       graphLayout.setProperty(node.getKey(), boundString);
+    }
   }
   
   public void setModel(PathStepsModel model){
@@ -771,5 +769,182 @@ public class PathStepsPanel extends JPanel{
       throw new FatalAException("Attempt made to access graph in PathStepsPanel before it was initialsed");
     }
     return getGraph().getSelectionCell();
+  }
+  
+  public void applyGraphLayout(){
+
+    ArrayList list = new ArrayList();
+    Set keySet = getKeyToPositionMap().keySet();
+    Iterator keys = keySet.iterator();
+    String key = null;
+    Node node = null;
+    Dyad position = null;
+    ArrayList rootKeys = new ArrayList();
+    ArrayList allEdges = new ArrayList();
+    LayoutCalculator calculator = null;
+    GraphUpdater updater;
+    ModelElement rootElement = null;
+    ModelElement layoutDialogElement = null;
+    int row = 0;
+    Object[] roots;
+    Comparator inverseChildNumber =  new PathStepsPanel.InverseChildNumberComparator();
+    
+    int xSeparation = 0;
+    int ySeparation = 0;
+    int naturalEdgeLength = 0;
+    int repulsionMultiplier = 0;
+    int iterateNumber = 0;
+    int movementLimit = 0;
+    int gravity = 0;
+    boolean fixRoots = false;
+
+    Map cellAttributes = null;
+    Rectangle cellBounds = null;
+      
+    if(getView().getLogger().isLoggingHigh()){
+      getView().getLogger().logHigh("Started applying graph layout");
+    }
+    
+    if(model == null){
+      throw new FatalAException("Attempt to apply graph layout to a null model");
+    }
+    rootElement = model.getRootElement().getChildElement(PathStepsModel.PATH_STEPS_PANEL);
+    if(rootElement == null){
+      throw new FatalAException("Attempt to apply graph layout when PATH_STEPS_PANEL root is null");
+    }
+    
+    layoutDialogElement = model.getRootElement().getChildElement(PathStepsModel.LAYOUT_DIALOG);
+    xSeparation = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_HORIZONTAL_SPACING);
+    ySeparation = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_VERTICAL_SPACING);
+    naturalEdgeLength = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_SPRING_NATURAL_LENGTH);
+    repulsionMultiplier = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_REPULSION_MULTIPLIER);
+    iterateNumber = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_ITERATES);
+    movementLimit = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_MOVEMENT_LIMIT);
+    gravity = getNumberFromModel(layoutDialogElement, model.LAYOUT_DIALOG_GRAVITY);
+    fixRoots = getBooleanFromModel(layoutDialogElement, model.LAYOUT_DIALOG_FIX_ROOTS);
+
+    list.clear();
+    list.add(rootElement);
+    list = listChildren(list);
+
+    //list contains the first row - the 'roots'. store their keys.
+    for(int i=0; i<list.size(); i++){
+      rootKeys.add(((ModelElement)list.get(i)).getKey());
+    }
+
+    int counter=0;
+    nodes = new Node[keySet.size()];
+    while(keys.hasNext()){
+      key = (String)keys.next();
+      position = (Dyad)getKeyToPositionMap().get(key);
+      node = new Node();
+
+
+      cellAttributes = ((DefaultGraphCell)getCellMap().get(key)).getAttributes();
+      if(cellAttributes == null){
+        throw new FatalAException("Cannot find the attribute map for cell of key "+key);
+      }
+
+      cellBounds = GraphConstants.getBounds(cellAttributes);
+      System.out.println(
+        " <<<< retrieved key "+key+" with cell: "+getCellMap().get(key).hashCode()+" with bounds: "+
+        GraphConstants.getBounds(((DefaultGraphCell)getCellMap().get(key)).getAttributes())
+      );
+      
+      node.x = cellBounds.x;
+      node.y = cellBounds.y;
+      node.lbl = key;
+      
+      if(getView().getLogger().isLoggingHigh()){
+        getView().getLogger().logHigh("node: "+key+":"+node.x+"-"+node.y);
+      }
+
+      //make fixed if root.
+      if(fixRoots && rootKeys.contains(key)){
+        if(getView().getLogger().isLoggingHigh()){
+          getView().getLogger().logHigh("FIXING node with key: "+key);
+        }
+        node.fixed = true;
+      }
+      nodes[counter]=node;
+      counter++;
+    }
+
+    //
+    //Gather up all edges
+    row = 0;
+    list.clear();
+    list.add(rootElement);
+    list = listChildren(list);
+    Collections.sort(list, inverseChildNumber);
+    while(!list.isEmpty()){
+      allEdges.addAll(recordEdges(row, list));
+      Collections.sort(list, inverseChildNumber);
+      list = listChildren(list);
+      row++;
+    }
+
+    //
+    //Go through each edge and add to the Edge[] array
+    pathsteps.gui.Edge edge = null;
+    Link link = null;
+    edges = new pathsteps.gui.Edge[allEdges.size()];
+    for(int i=0; i<allEdges.size(); i++){
+      link = (Link)allEdges.get(i);
+      edge = new pathsteps.gui.Edge();
+      edge.from = findNode(link.from);
+      edge.to = findNode(link.to);
+      edge.len = naturalEdgeLength;
+      edges[i] = edge;
+    }
+    
+    calculator = new LayoutCalculator(nodes, edges, rootKeys.size() * xSeparation, 1000);
+
+    updater = 
+      new GraphUpdater(
+        calculator, 
+        getGraphModel(),
+        getCellMap(),
+        getGraphAttributeMap(),
+        iterateNumber, 
+        1, 
+        movementLimit, 
+        gravity, 
+        repulsionMultiplier
+      );
+
+    javax.swing.Timer timer = new javax.swing.Timer(
+      10, 
+      updater
+    );
+
+    updater.timer = timer;
+
+    if(getView().getLogger().isLoggingMedium()){
+      getView().getLogger().logMedium("Starting timer");
+    }
+    timer.start();
+  }
+  
+  private Dyad parsePositionString(String position){
+    StringTokenizer tokenizer = new StringTokenizer(position);
+    String number;
+    int x = 0;
+    int y = 0;
+    int count = 0;
+    while(tokenizer.hasMoreTokens() && count < 2){
+      number = tokenizer.nextToken();
+      if(count == 0){
+        x = Integer.valueOf(number).intValue();
+      }else{
+        y = Integer.valueOf(number).intValue();
+      }
+      count++;
+    }
+    
+    if(count < 1){
+      throw new FatalAException("Found a graph layout configuration with at less than two coordinates per node!");
+    }
+    return new Dyad(x,y);
   }
 }

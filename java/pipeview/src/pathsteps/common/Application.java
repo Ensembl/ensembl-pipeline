@@ -29,6 +29,7 @@ public class Application{
   
   private String applicationRoot;
   
+  private Properties graphLayoutConfiguration = new Properties();
   private Properties configuration = new Properties();
   private Properties history = new Properties();
   
@@ -246,10 +247,36 @@ public class Application{
       getApplicationLogger().logLow("writing graph layout config to file :"+fileName+" contents: "+history);
     }
     try{
-      history.store(new FileOutputStream(fileName), "Graph Layout Configuratio");
+      history.store(new FileOutputStream(fileName), "Graph Layout Configuration");
     }catch(IOException exception){
       throw new FatalAException("Could not graph layout configuration for file: "+fileName, exception);
     }
+  }
+  
+  public Properties readGraphLayoutConfiguration(){
+    String fileName = getGraphLayoutConfigurationFileName();
+    File configFile = new File(fileName);
+    
+    if(configFile.exists()){
+      if(getApplicationLogger().isLoggingLow()){
+        getApplicationLogger().logLow("Reading graph layout config from file :"+fileName);
+      }
+
+      try{
+        getGraphLayoutConfiguration().load(new FileInputStream(fileName));
+      }catch(IOException exception){
+        throw new FatalAException("Could not graph layout configuration for file: "+fileName, exception);
+      }
+    }
+    return getGraphLayoutConfiguration();
+  }
+  
+  private void setGraphLayoutConfiguration(Properties properties){
+    graphLayoutConfiguration = properties;
+  }
+  
+  public Properties getGraphLayoutConfiguration(){
+    return graphLayoutConfiguration;
   }
   
   private void setConfiguration(Properties properties){

@@ -9,6 +9,7 @@ public interface AView{
   public static String SAVE_BUTTON_KEY = "SAVE_BUTTON_KEY";
   public static String RESET_BUTTON_KEY = "RESET_BUTTON_KEY";
   public static String REFRESH_BUTTON_KEY = "CLEAR_BUTTON_KEY";
+  public static String LAYOUT_BUTTON_KEY = "LAYOUT_BUTTON_KEY";
   public static String SET_NEW_PIPELINE_DB_KEY = "SET_NEW_PIPELINE_DB_KEY";
   public static String SET_NEW_LAYOUT_PREFERENCES_KEY = "SET_NEW_LAYOUT_PREFERENCES_KEY";
   public static String READ_NEW_PIPELINE_DB_KEY = "READ_NEW_PIPELINE_DB_KEY";
@@ -31,7 +32,7 @@ public interface AView{
   public static String CONFIRM_DELETE_NODE_KEY  = "CONFIRM_DELETE_NODE_KEY";
   public static String CONFIRM_CONNECT_NODE_KEY  = "CONFIRM_CONNECT_NODE_KEY";
   
-  public static String SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY  = "CONFIRM_CONNECT_NODE_KEY";
+  public static String SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY  = "SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY";
   
   public static String CANCEL_NODE_DIALOG_KEY  = "CANCEL_NODE_DIALOG_KEY";
 
@@ -74,4 +75,6 @@ public interface AView{
   public String getNameOfSelectedNode();
   
   public void reshow();
+  
+  public void applyGraphLayout();
 }//end AView

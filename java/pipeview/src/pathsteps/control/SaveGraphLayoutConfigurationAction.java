@@ -15,18 +15,32 @@ public class SaveGraphLayoutConfigurationAction extends AAction{
   }
   
   protected void doAction(AView view, AModel aModel){
+    
     PathStepsModel model = (PathStepsModel)aModel;
     ModelElement panelModel = model.getRootElement().getChildElement(model.PATH_STEPS_PANEL);
     Properties graphLayout = null;
+    
+    view.update(model);
+
+    
     if(panelModel != null){
       graphLayout = 
         (Properties)panelModel
-          .getChildElement(model.PATH_STEPS_PANEL)
-          .getProperty(model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION);
+          .getProperty(
+            model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION
+          );
+    }else{
+      throw new FatalAException("Expecting a model element with key: "+model.PATH_STEPS_PANEL+" - none found");
     }
 
     if(graphLayout != null){
       view.getApplication().writeGraphLayoutConfiguration(graphLayout);
+    }else{
+      throw new FatalAException(
+        "Expecting a Properties object as a property (keyed by) "+
+        model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION +
+        " for the panel model element - none found "
+      );
     }
   }
 }

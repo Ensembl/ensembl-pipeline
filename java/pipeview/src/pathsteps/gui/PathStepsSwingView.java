@@ -33,6 +33,7 @@ public class PathStepsSwingView implements AView
   private JButton saveButton;
   private JButton resetButton;
   private JButton refreshButton;
+  private JButton layoutButton;
   private Application application;
   private ReadPipelineDBDialog readPipelineDBDialog;
   private LayoutConfigurationDialog layoutConfigurationDialog;
@@ -145,9 +146,15 @@ public class PathStepsSwingView implements AView
       REFRESH_BUTTON_KEY
     );
     
+    setLayoutButton(new JButton("Layout"));
+    connectToActionEventRouter(
+      getLayoutButton(),
+      LAYOUT_BUTTON_KEY
+    );
+    
     getRootFrame().getContentPane().setLayout(new GridBagLayout());
     
-    GridBagConstraints constraint = makeConstraintAt(0, row, 3);
+    GridBagConstraints constraint = makeConstraintAt(0, row, 4);
     constraint.fill = GridBagConstraints.BOTH;
     getPathStepsPanel().setMinimumSize(new Dimension(500, 500));
     getRootFrame().getContentPane().add(
@@ -180,9 +187,16 @@ public class PathStepsSwingView implements AView
     );
     
     constraint = makeConstraintAt(2,row,1);
-    constraint.anchor = GridBagConstraints.EAST;
+    constraint.anchor = GridBagConstraints.WEST;
     getRootFrame().getContentPane().add(
       getRefreshButton(), 
+      constraint
+    );
+
+    constraint = makeConstraintAt(3,row,1);
+    constraint.anchor = GridBagConstraints.WEST;
+    getRootFrame().getContentPane().add(
+      getLayoutButton(), 
       constraint
     );
 
@@ -196,7 +210,7 @@ public class PathStepsSwingView implements AView
   public void reshow(){
     getRootFrame().getContentPane().remove(getPathStepsPanel());
     
-    GridBagConstraints constraint = makeConstraintAt(0, 0, 3);
+    GridBagConstraints constraint = makeConstraintAt(0, 0, 4);
     constraint.fill = GridBagConstraints.BOTH;
     getRootFrame().getContentPane().add(
       getPathStepsPanel(), 
@@ -236,6 +250,10 @@ public class PathStepsSwingView implements AView
     getRootFrame().repaint();
   }
 
+  public void applyGraphLayout(){
+    getPathStepsPanel().applyGraphLayout();
+  }
+  
   /**
    * update the model to reflect the view.
   **/
@@ -248,6 +266,10 @@ public class PathStepsSwingView implements AView
     
     if(getLayoutConfigurationDialog() != null){
       getLayoutConfigurationDialog().update(model);
+    }
+    
+    if(getPathStepsPanel() != null){
+      getPathStepsPanel().update(model);
     }
   }
   
@@ -375,7 +397,15 @@ public class PathStepsSwingView implements AView
   private void setResetButton(JButton button){
     resetButton = button;
   }
+
+  private JButton getLayoutButton(){
+    return layoutButton;
+  }
   
+  private void setLayoutButton(JButton button){
+    layoutButton = button;
+  }
+
   private JButton getRefreshButton(){
     return refreshButton;
   }
@@ -644,4 +674,5 @@ public class PathStepsSwingView implements AView
     
 
   }
+
 }

@@ -86,6 +86,12 @@ public class GraphUpdater implements ActionListener{
     numberOfIterates -= showInterval;
     if(numberOfIterates <0){
       timer.stop();
+
+      System.out.println("Afterwards: ---------------");
+      for(int i=0; i<nodes.length; i++){
+        System.out.println(nodes[i].lbl+" "+nodes[i].x+"-"+nodes[i].y);
+      }
+      System.out.println("---------------");
     }
   }
   

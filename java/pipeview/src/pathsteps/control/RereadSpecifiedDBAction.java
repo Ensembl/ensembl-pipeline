@@ -62,13 +62,7 @@ public class RereadSpecifiedDBAction extends AAction{
     //Run the logic to store the chains of dependent path/steps in the model
     model.getRootElement().addChildElement(
       PathStepsModel.PATH_STEPS_PANEL,
-      createPathStepsModel(
-        host,
-        port,
-        user,
-        password,
-        selectedDatabase
-      )
+      createPathStepsModel(selectedDatabase)
     );
     
     //System.out.println(model.toString());
@@ -88,13 +82,7 @@ public class RereadSpecifiedDBAction extends AAction{
     }
   }
 
-  private ModelElement createFakePathStepsModel(
-    String host,
-    String port,
-    String user,
-    String password,
-    String selectedDatabase
-  ){
+  private ModelElement createFakePathStepsModel(String selectedDatabase){
     ModelElement rootElement = new ModelElement(PathStepsModel.PATH_STEPS_PANEL);
     /*
     ModelElement submitContig = rootElement.createChildElement("SubmitContig");
@@ -145,17 +133,9 @@ public class RereadSpecifiedDBAction extends AAction{
     return rootElement;
   }
   
-  private ModelElement createPathStepsModel(
-    String host,
-    String port,
-    String user,
-    String password,
-    String selectedDatabase
-  ){
+  private ModelElement createPathStepsModel(String selectedDatabase){
     
     ModelElement rootElement = new ModelElement(PathStepsModel.PATH_STEPS_PANEL);
-    String jdbcDriver = "org.gjt.mm.mysql.Driver";
-    String url = "jdbc:mysql://" + host + ":" + port + "/"+selectedDatabase;
     Statement statement;
     ResultSet resultSet;
     String select;
@@ -173,40 +153,9 @@ public class RereadSpecifiedDBAction extends AAction{
       getLogger().logMedium("Started creating model");
     }
 
-    if(password == null){
-      password = "";
-    }
-
+    
     try{
-      Class.forName(jdbcDriver).newInstance();
-    }catch(IllegalAccessException exception){
-      
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not access JDBC Driver constructor", exception);
-      }
-
-      throw new NonFatalAException("Could not access JDBC Driver constructor",exception);
-      
-    }catch(InstantiationException exception){
-
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not create JDBC Driver", exception);
-      }
-      
-      throw new NonFatalAException("Could not create JDBC Driver",exception);
-      
-    }catch(ClassNotFoundException exception){
-
-      if(getLogger().isLoggingMedium()){
-        getLogger().logMedium("Could not find JDBC Driver class", exception);
-      }
-      
-      throw new NonFatalAException("Could not find JDBC Driver class",exception);
-      
-    }//end try
-
-    try{
-      java.sql.Connection conn = DriverManager.getConnection(url,user,password);
+      java.sql.Connection conn = createNewConnectionFromSelectedDatabase((PathStepsModel)getModel());
       statement = conn.createStatement();
       
       //
@@ -270,6 +219,11 @@ public class RereadSpecifiedDBAction extends AAction{
       }
 
       rootElement.addProperty(PathStepsModel.PATH_STEPS_PANEL_ALL_NODES, elementsByLogicName.values());
+      
+      rootElement.addProperty(
+        PathStepsModel.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION,
+        getView().getApplication().readGraphLayoutConfiguration()
+      );
       
     }catch(SQLException exception){
       if(getLogger().isLoggingMedium()){

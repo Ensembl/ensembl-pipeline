@@ -11,6 +11,7 @@ public abstract class AAction{
     setView(eventHandler.getApplication().getView());
     setModel(eventHandler.getApplication().getModel());
     setLogger(eventHandler.getLogger());
+    setEventHandler(eventHandler);
     
     if(getView()== null){
       throw new FatalAException("Attempt to create AAction with null AView");
