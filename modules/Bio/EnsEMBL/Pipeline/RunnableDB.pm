@@ -30,7 +30,7 @@ Bio::EnsEMBL::Pipeline::RunnableDBI.  This object encapsulates the
 basic main methods of a RunnableDB which a subclass may override.
 
 parameters to new
--dbobj:     A Bio::EnsEMBL::DB::Obj (required), 
+-db:        A Bio::EnsEMBL::DB::Obj (required), 
 -input_id:   Contig input id (required), 
 -analysis:  A Bio::EnsEMBL::Analysis (optional) 
 
@@ -69,14 +69,14 @@ use vars qw(@ISA);
 =head2 new
 
     Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db,
+    Usage   :   $self->new(-DB          => $db,
                            -INPUT_ID    => $id,
                            -SEQFETCHER  => $sf,
 			   -ANALYSIS    => $analysis);
                            
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:         A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Bio::DB::RandomAccessI Object (required),
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 
@@ -87,15 +87,15 @@ sub new {
     
     my $self = {};
     bless $self, $class;
-    my ($dbobj,$input_id, $seqfetcher, 
+    my ($db,$input_id, $seqfetcher, 
 	$analysis) = $self->_rearrange([qw(DB
 					   INPUT_ID
 					   SEQFETCHER 
 					   ANALYSIS )], 
 				       @args);
     
-    $self->throw("No database handle input") unless defined($dbobj);
-    $self->db($dbobj);
+    $self->throw("No database handle input") unless defined($db);
+    $self->db($db);
 
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
