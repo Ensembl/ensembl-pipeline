@@ -112,11 +112,11 @@ sub fetch_input {
         or $self->throw("Unable to find contig ($contigid)\n");
 
     $self->genseq($contig);
+
+    my $pta = $self->db->get_PredictionTranscriptAdaptor;
     #need to get features predicted by genscan
-    my @genscan_peps = 
-      $self->db->get_PredictionTranscriptAdaptor->fetch_by_Contig($contig, 
-								  'Genscan');
-    $self->transcripts(@genscan_peps);
+    my $genscan_peps = $pta->fetch_all_by_RawContig($contig, 'Genscan');
+    $self->transcripts(@$genscan_peps);
    
 }
 

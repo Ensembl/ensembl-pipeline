@@ -79,24 +79,24 @@ display(@out);
 
 $runobj->write_output();
 my $contig = $db->get_RawContigAdaptor()->fetch_by_name($id);
-my @features = $contig->get_all_SimilarityFeatures();
-display(@features);
+my $features = $contig->get_all_SimilarityFeatures();
+display(@$features);
 
-unless (@features)
+unless (@$features)
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
 
-my @genscan_peptides =  $contig->get_genscan_peptides;
+my $genscan_peptides =  $contig->get_all_PredictionTranscripts();
 
-unless (@genscan_peptides)
+unless (@$genscan_peptides)
 { print "not ok 7: (Data error or bug in RawContig)\n"; }
 else
 { print "ok 7\n"; }
 
 #check re-translation of features can be matched within peptides
 my $all_features_found = 1;
-foreach my $feature (@features)
+foreach my $feature (@$features)
 {
     next unless ($feature->isa("Bio::EnsEMBL::DnaPepAlignFeature"));
     if ($all_features_found == 1)
@@ -110,7 +110,7 @@ foreach my $feature (@features)
 	 $exon->contig_id    ($id);
 	 $exon->attach_seq   ($contig);
 	 my $count = 1;
-	 foreach my $pep (@genscan_peptides)
+	 foreach my $pep (@$genscan_peptides)
 	 {
 	     my $full_pep = $pep->translate;
 	     my $exon_pep = $exon->translate->seq;
