@@ -70,11 +70,16 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_MAX_EVIDENCE_DISCONTINUITY
 					EST_GENOMEWISE_GENETYPE
 					USE_cDNA_DB
+					EST_E2G_DBHOST
+					EST_E2G_DBUSER
+					EST_E2G_DBNAME
+					EST_E2G_DBPASS
 					cDNA_DBNAME
 					cDNA_DBHOST
 					cDNA_DBUSER
 					cDNA_DBPASS
 					cDNA_GENETYPE
+
 				       );
 
 # use new Adaptor to get some extra info from the ESTs
@@ -101,9 +106,19 @@ sub new {
 						  );
     
     $self->dbobj->dnadb($refdb);
+     
+    # the db from where we take the est transcripts 
+    my $est_e2g_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							-host             => $EST_E2G_DBHOST,
+							-user             => $EST_E2G_DBUSER,
+							-dbname           => $EST_E2G_DBNAME,
+							-pass             => $EST_E2G_DBPASS,
+							);
     
+    $est_e2g_db->dnadb($refdb);
+    $self->est_e2g_db($est_e2g_db);
     
-   
+    # only if we want to read also cdnas (or other ests?) in this analysis
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       -host             => $cDNA_DBHOST,
@@ -118,6 +133,14 @@ sub new {
 
 
     return $self; 
+}
+
+sub est_e2g_db{
+    my ($self, $est_e2g_db) = @_;
+    if ($est_e2g_db){
+	$self->{_est_e2g_db} = $est_e2g_db;
+    }
+    return $self->{_est_e2g_db};
 }
 
 
@@ -259,7 +282,7 @@ sub fetch_input {
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
-    # get genomic region 
+    # get genomic region  
     my $chrid    = $self->input_id;
     $chrid       =~ s/\.(.*)-(.*)//;
     my $chrstart = $1;
@@ -267,12 +290,10 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
- 
-    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    # we get the 'exonerate_e2g' genes from $EST_E2G_BDNAME@EST_E2G_DBHOST
+    my $stadaptor = $self->est_e2g_db->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-
-   
-    
+     
     $contig->_chr_name($chrid);
     $self->vcontig($contig);
     print STDERR "got vcontig\n";
