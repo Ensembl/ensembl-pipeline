@@ -89,7 +89,23 @@ sub new {
   if (defined($exact_merge)){
     $self->exact_merge($exact_merge);
   }
-  
+
+  if ( $EST_GENEBUILDER_MERGE eq 'fuzzy_semiexact_merge' ){ 
+    $self->_merge_type('fuzzy_semiexact_merge');
+    $self->_mismatch_allowed(7);
+  }
+  elsif( $EST_GENEBUILDER_MERGE eq 'semiexact_merge' ){
+    $self->_merge_type('semiexact_merge');
+    $self->_mismatch_allowed(2);
+  }
+  elsif( $EST_GENEBUILDER_MERGE eq 'merge_allow_gaps' ){
+    $self->_merge_type('merge_allow_gaps');
+    $self->_mismatch_allowed(7);
+  }
+  else{
+    $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_MERGE for your ests/cdnas to be compared!")
+  }
+
   return $self;
 }
 
@@ -404,6 +420,9 @@ sub link_Transcripts{
  CLUSTER:
   foreach my $cluster ( @{ $transcript_clusters} ){
      
+    my %overlap_matrix;
+    $self->matrix(\%overlap_matrix);
+
     # keep track of all the lists
     my @lists;
     
@@ -558,57 +577,71 @@ description: this method computes the largest proper sublist in $list
 =cut
 
 sub _test_for_link{
-  my ($self, $list, $transcript ) = @_;
+  my ($self, $list, $transcript) = @_;
   
   my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
   my $sublist;
   my $can_merge = 0;
+  
+  my %overlap_matrix = %{$self->matrix};
 
  LINK:
   foreach my $trans_link ( @$list ){
-    
     my ($merge,$overlaps);
-    if ( $EST_GENEBUILDER_MERGE eq 'fuzzy' ){ 
-      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'fuzzy_semiexact_merge',7);
-    }
-    elsif( $EST_GENEBUILDER_MERGE eq 'exact' ){
-      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'semiexact_merge',2);
-    }
-    elsif( $EST_GENEBUILDER_MERGE eq 'loose' ){
-      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'merge_allow_gaps',7);
+    
+    if ( defined( $overlap_matrix{$transcript}{$trans_link} ) ){
+      ($merge,$overlaps) = @{$overlap_matrix{$transcript}{$trans_link}};
+      print STDERR "using cached matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
     else{
-      $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_MERGE for your ests/cdnas to be compared!")
+      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript, $self->_merge_type, $self->_mismatch_allowed);
+      $overlap_matrix{$transcript}{$trans_link} = [$merge,$overlaps];
+      print STDERR "calculating matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
-      if ($merge == 1 ){
-       $can_merge = 1;
-     }
-     # the transcript can be appended to this list if
-     # it merges to at least one member of the list
-     # and it does not overlap with those member with which
-     # it cannot merge
-     if ( $merge == 1 || $overlaps == 0 ){
-        
-        # it links to this one
-        push ( @{$sublist}, $trans_link );
-     }
-     else{
-	# stop searching as soon as we find an element to which it does not link
-        last LINK;
-     }
-  }  
+    
+    if ($merge == 1 ){
+      $can_merge = 1;
+    }
+    # the transcript can be appended to this list if
+    # it merges to at least one member of the list
+    # and it does not overlap with those member with which
+    # it cannot merge
+    if ( $merge == 1 || $overlaps == 0 ){
+      
+      # it links to this one
+      push ( @{$sublist}, $trans_link );
+    }
+    else{
+      # stop searching as soon as we find an element to which it does not link
+      last LINK;
+    }
+  }
+  
+  # update the overlap matrix
+  $self->matrix(\%overlap_matrix);
+ 
   if ( $can_merge == 0 || scalar( @$sublist ) == 0 ){
-     return undef;
+    return undef;
   }
   elsif ( scalar( @$sublist ) > 0 &&  scalar( @$sublist ) < scalar( @$list ) ){
-     return $sublist;
+    return $sublist;
   }
   elsif ( scalar( @$sublist ) == scalar( @$list ) ){
-     return $list;
+    return $list;
   }
   else{
-      $self->throw("I didn't expect to be here!!");
+    $self->throw("I didn't expect to be here!!");
   }
+}
+
+############################################################
+
+sub matrix{
+  my($self,$matrix) = @_;
+  if (defined $matrix){
+    $self->{_matrix} = $matrix;
+  }
+  return $self->{_matrix};
 }
 
 ############################################################
@@ -1318,6 +1351,26 @@ sub _transfer_Supporting_Evidence{
 #
 # GET/SET METHODS
 #
+############################################################
+
+sub _merge_type{
+  my ($self, $type ) = @_;
+  if ($type){
+    $self->{_merge_type} = $type;
+  }
+  return $self->{_merge_type};
+}
+
+############################################################
+
+sub _mismatch_allowed{
+  my ($self, $mismatch) = @_;
+  if ($mismatch){
+    $self->{_mismatch_allowed} = $mismatch;
+  }
+  return $self->{_mismatch_allowed};
+}
+
 ############################################################
 
 sub exact_merge{
