@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 =head1 SYNOPSIS
 
 my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
-					     -dbobj     => $db,
+					     -db        => $db,
 					     -input_id  => $id,
 					     -golden_path => $gp,
 					     -type      => $type,
@@ -94,7 +94,7 @@ sub new {
     $type = 'sptr' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
-    $self->dbobj->static_golden_path_type($path);
+    $self->db->static_golden_path_type($path);
     $self->type($type);
     $self->threshold($threshold);
 
@@ -125,7 +125,7 @@ sub type {
 sub write_output {
     my($self,@features) = @_;
     
-    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+    my $gene_adaptor = $self->db->get_GeneAdaptor;
 
   GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
@@ -164,7 +164,7 @@ sub write_output {
     my $chrstart = $1;
     my $chrend   = $2;
 
-    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
     my $genseq    = $contig->get_repeatmasked_seq;
 
@@ -296,7 +296,7 @@ sub convert_output {
       $self->throw("I don't know what to do with $runnable");
     }
 
-    my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+    my $anaAdaptor = $self->db->get_AnalysisAdaptor;
     my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
     my $analysis_obj;
     if(scalar(@analyses) > 1){
