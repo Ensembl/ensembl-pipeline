@@ -244,7 +244,7 @@ sub stdout_file{
    }
 
    if(!$self->{'stdout'}){
-     $self->{'stdout'} ='/dev/null'
+     $self->{'stdout'} ='/dev/zero'
    }
    return $self->{'stdout'};
 }
@@ -258,7 +258,7 @@ sub stderr_file{
      $self->{'stderr'} = $arg;
    }
    if(!$self->{'stderr'}){
-     $self->{'stderr'} ='/dev/null'
+     $self->{'stderr'} ='/dev/zero'
    }
    return $self->{'stderr'};
 }
@@ -352,7 +352,6 @@ sub delete_output{
   
   unlink $self->temp_errfile if(-e $self->temp_errfile);
   unlink $self->temp_outfile if(-e $self->temp_outfile);
-  unlink $self->temp_filename if(-e $self->temp_filename);
 }
 
 sub copy_command{

@@ -821,7 +821,7 @@ sub job_existance{
   my $exists;
   if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
      $status eq 'READING' ||$status eq 'WRITING' ||
-     $status eq 'WAIT'){
+     $status eq 'WAITING'){
     $exists = $batch_q_module->check_existance
       ($job->submission_id, $verbose);
     if($exists){

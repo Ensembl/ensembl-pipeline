@@ -165,5 +165,7 @@ JOB:foreach my $job(@jobs) {
 }
 
 if($batch_q_object->can('delete_output')){
-  $batch_q_object->delete_output() unless(!$cleanup);
+  $batch_q_object->delete_output();
 }
+
+

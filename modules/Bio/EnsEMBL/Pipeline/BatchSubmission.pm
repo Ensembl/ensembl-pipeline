@@ -1,8 +1,8 @@
 # Base Class for handling job submission via Load Sharing software
 #
-# Cared for by Laura Clarke <lec@sanger.ac.uk>
+# Cared for by Laura Clarke 
 #
-# Copyright Laura Clarke <lec@sanger.ac.uk>
+# Copyright Laura Clarke 
 #
 # You may distribute this module under the same terms as perl itself
 #
