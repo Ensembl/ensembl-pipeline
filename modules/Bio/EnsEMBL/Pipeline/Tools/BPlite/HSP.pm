@@ -1,5 +1,5 @@
 ###############################################################################
-# Bio::EnsEMBL::Analysis::Tools::BPlite::HSP
+# Bio::EnsEMBL::Pipeline::Tools::BPlite::HSP
 ###############################################################################
 # HSP = High Scoring Pair (to all non-experts as I am)
 #
@@ -8,7 +8,7 @@
 #
 # You may distribute this module under the same terms as perl itself
 
-package Bio::EnsEMBL::Analysis::Tools::BPlite::HSP;
+package Bio::EnsEMBL::Pipeline::Tools::BPlite::HSP;
 
 use vars qw(@ISA);
 use strict;

@@ -1,6 +1,6 @@
-# $Id: Sbjct.pm,v 1.4 2004-08-03 14:59:14 lec Exp $
+# $Id: Sbjct.pm,v 1.5 2004-08-03 15:00:50 lec Exp $
 ###############################################################################
-# Bio::EnsEMBL::Analysis::Tools::BPlite::Sbjct
+# Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct
 ###############################################################################
 #
 # The original BPlite.pm module has been written by Ian Korf !
@@ -8,12 +8,12 @@
 #
 # You may distribute this module under the same terms as perl itself
 
-package Bio::EnsEMBL::Analysis::Tools::BPlite::Sbjct;
+package Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct;
 
 use strict;
 
 use Bio::EnsEMBL::Root;        # root object to inherit from
-use Bio::EnsEMBL::Analysis::Tools::BPlite::HSP; # we want to use HSP
+use Bio::EnsEMBL::Pipeline::Tools::BPlite::HSP; # we want to use HSP
 #use overload '""' => 'name';
 use vars qw(@ISA);
 
@@ -165,7 +165,7 @@ sub nextHSP {
   $ql = join("", @QL);
   $sl = join("", @SL);
   $as = join("", @AS);
-  my $hsp = new Bio::EnsEMBL::Analysis::Tools::BPlite::HSP('-score'=>$score, 
+  my $hsp = new Bio::EnsEMBL::Pipeline::Tools::BPlite::HSP('-score'=>$score, 
 					'-bits'=>$bits, 
 					'-match'=>$match,
 					'-positive'=>$positive, 
