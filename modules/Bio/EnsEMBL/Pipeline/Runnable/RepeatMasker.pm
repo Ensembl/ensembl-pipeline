@@ -263,10 +263,10 @@ sub createfeaturepair {
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $seqfeature1,
                                              -feature2 => $seqfeature2) ;
-    $self->_growfplist($fp);                             
+    $self->growfplist($fp);                             
 }
 
-sub _growfplist {
+sub growfplist {
     my ($self, $fp) =@_;    
     #load fp onto array using command _grow_fplist
     push(@{$self->{'_fplist'}}, $fp);
@@ -302,7 +302,7 @@ sub writefile {
 sub deletefiles {
     my ($self) = @_;
     #delete all analysis files? probably need to 'glob' or something
-    @list = glob($self->filename."*");
+    my @list = glob($self->filename."*");
     foreach (@list)
     {
         unlink ($_) or $self->throw ("Coudln't delete $_ :$!");
