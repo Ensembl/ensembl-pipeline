@@ -69,7 +69,7 @@ sub run_analysis{
   
   my $command = $self->program." -D ".$self->protein_file." ".$self->filename." > ".$self->results;
   print STDERR $command."\n";
-  system($command);
+  $self->throw("Error running pmatch on " . $self->filename) if system($command);
 }
 
 sub parse_results{
@@ -83,7 +83,7 @@ sub sort_results{
   my ($self) = @_;
 
   my $command = "sort -k6,6 -k3,3n ".$self->results ." > pmatch.tmp";
-  system($command);
+  $self->throw("Error [sorting results] running pmatch on " . $self->filename) if system($command);
   rename "pmatch.tmp", $self->results;
   my $current_pmf;
   my $prot_id;
