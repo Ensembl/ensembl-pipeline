@@ -205,6 +205,11 @@ sub run{
   # need to convert coordinates?
   my @mapped_genes = $self->convert_coordinates( @genes );
   
+  unless ( @mapped_genes ){
+    print STDERR "Sorry, no genes found - exiting\n";
+    exit(0);
+  }
+
   $self->output(@mapped_genes);
 }
 
