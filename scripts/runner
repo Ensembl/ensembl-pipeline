@@ -61,17 +61,20 @@ my $statusfile=$obj->status_file;
 
 print("Running job\n");
 open(STATUS,">$statusfile");
-print(STATUS "RUNNING\n");
+my $time = localtime();
+print(STATUS "RUNNING $time\n");
 $obj->run;
 print("Done\n");
 
 my @out    = $obj->output;
 my $outstr = FreezeThaw::freeze(\@out);
-print(STATUS "OUTPUT_FROZEN\n");
+$time = localtime();
+print(STATUS "OUTPUT_FROZEN $time\n");
 open(OUT,">$outputfile");
 print(OUT "$outstr");
 close(OUT);
-print(STATUS "STORED\n");
+$time = localtime();
+print(STATUS "PROCESSED $time\n");
 exit(0);
 
 package FreezeThaw;
@@ -581,21 +584,4 @@ sub UNIVERSAL::FreezeEmpty {
     die "Do not know how to FreezeEmpty $type";
   }
 }
-
-END {
-    print(STATUS "PROCESSED\n");
-    close(STATUS);    
-}
 1;
-
-
-
-
-
-
-
-
-
-
-
-
