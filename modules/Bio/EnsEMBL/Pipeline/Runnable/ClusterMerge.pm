@@ -1,4 +1,6 @@
 #
+# Written by Eduardo Eyras
+#
 # Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
