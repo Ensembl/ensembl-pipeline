@@ -311,7 +311,7 @@ sub parse_results {
         $feat1 {'source'}       = 'e-PCR';
         $feat1 {'primary'}      = 'sts';
         
-        $self->createfeaturepair(\%feat1, \%feat2);
+        $self->create_FeaturePair(\%feat1, \%feat2);
     }
     close $filehandle;   
 }

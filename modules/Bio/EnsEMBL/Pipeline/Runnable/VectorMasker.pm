@@ -357,7 +357,7 @@ sub parse_results {
         $feat2 {'program'} = 'VectorMasker';
         $feat2 {'p_version'} = 'unknown';
         
-        $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
+        $self->create_FeaturePair(\%feat1, \%feat2); #may need to use references
     }
     close $filehandle;       
 }

@@ -311,11 +311,11 @@ sub parse_results {
             $feat2 {db_version} = undef;
             $feat2 {program} = 'einverted';
             $feat2 {p_version} = 'unknown';
-            $self->create_repeat(\%feat1, \%feat2);
+            $self->create_Repeat(\%feat1, \%feat2);
             #reverse scores and names
             ($feat1 {name}, $feat2 {name}) = ($feat2 {name}, $feat1 {name});
             ($feat1 {score}, $feat2 {score}) = ($feat2 {score}, $feat1 {score});
-            $self->create_repeat(\%feat2, \%feat1);
+            $self->create_Repeat(\%feat2, \%feat1);
             #reset flag variables to allow correct reading of next repeat
             $feat1{name} = undef;
             $feat1{start} = undef;

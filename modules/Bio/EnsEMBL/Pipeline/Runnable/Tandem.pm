@@ -364,7 +364,7 @@ sub parse_results {
         $feat2 {program} = 'etandem';
         $feat2 {p_version} = 1;
         
-        $self->createfeaturepair(\%feat1, \%feat2);
+        $self->create_FeaturePair(\%feat1, \%feat2);
     }
     close $filehandle;       
 }

@@ -116,7 +116,7 @@ sub new {
 
     $self->query($query) if ($query);       
 
-    my $repmask = $self->find_executable($repmask);
+    $repmask = $self->find_executable($repmask);
 
     $self->repeatmasker($repmask);
 
@@ -331,7 +331,7 @@ sub parse_results {
             $feat2 {primary}= 'repeat';
             $feat1 {source}= 'RepeatMasker';
             $feat1 {primary}= 'repeat';
-            $self->create_repeat(\%feat1, \%feat2);
+            $self->create_Repeat(\%feat1, \%feat2);
         }
     }
     close $filehandle;   

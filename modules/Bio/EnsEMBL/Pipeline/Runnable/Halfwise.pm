@@ -325,7 +325,7 @@ sub parse_results {
                         $feat2 {db_version} = 'unknown';
                     } 
                     #Should have fully defined feat1 and feat2 at his point 
-                    $self->createfeaturepair(\%feat1, \%feat2); 
+                    $self->create_FeaturePair(\%feat1, \%feat2); 
                 }               
                 #find first sequence declaration (Feature 1)
                 elsif (/\bSequence/)
