@@ -548,13 +548,11 @@ sub  make_ExonPairs {
 	      @f = sort {$b->score <=> $a->score} @f;
 
 	    F2: foreach my $f2 (@f) {
-
 		next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
-		my @pairs = $self->get_all_ExonPairs;
-		
-		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePairI")));
-		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePairI")));
-		
+		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
+
+		my @pairs = $self->get_all_ExonPairs;		
+
 		# Do we have hits from the same sequence
 		# n.b. We only allow each database hit to span once
 		# across the intron (%idhash) and once the pair coverage between

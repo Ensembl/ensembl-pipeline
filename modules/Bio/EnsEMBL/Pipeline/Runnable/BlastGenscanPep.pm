@@ -750,7 +750,7 @@ sub featurepairs {
     if ($fp)
     {
         $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair") 
-                unless $fp->isa("Bio::EnsEMBL::FeaturePairI");
+                unless $fp->isa("Bio::EnsEMBL::FeaturePair");
         push (@{$self->{'_featurepairs'}}, $fp);
     }
 

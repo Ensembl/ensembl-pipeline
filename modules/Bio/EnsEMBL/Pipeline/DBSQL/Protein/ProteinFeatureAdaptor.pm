@@ -100,7 +100,7 @@ sub write_Protein_feature {
 	    }
         }
         # check what kind of feature we're dealing with
-        if ($feature->isa ('Bio::EnsEMBL::FeaturePairI')) {
+        if ($feature->isa ('Bio::EnsEMBL::FeaturePair')) {
             $self->_store_FeaturePair ($feature, $analysisid);
         }
         else {
@@ -154,7 +154,7 @@ sub _store_Feature {
             including the gapped_alignment coordinates
  Example  : 
  Returns  : 
- Args     : a Bio::EnsEMBL::FeaturePairI
+ Args     : a Bio::EnsEMBL::FeaturePair
  Throws   :
 
 =cut _store_FeaturePair
