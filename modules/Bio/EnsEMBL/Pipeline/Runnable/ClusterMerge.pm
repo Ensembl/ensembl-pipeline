@@ -169,7 +169,6 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
-  $use_score = 1;
   if ( $use_score ){
       $self->use_score($use_score);
   }
@@ -1342,6 +1341,8 @@ sub _filter_clusters{
 sub _cluster_Transcripts {
   my ($self,$transcripts) = @_;
  
+  my $verbose = $self->verbose();
+  
   my $forward_transcripts;
   my $reverse_transcripts;
  
@@ -1359,14 +1360,14 @@ sub _cluster_Transcripts {
   if ( $forward_transcripts && @$forward_transcripts ){
     my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( $forward_transcripts );
     if ( @forward_clusters){
-      print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
+      print STDERR scalar( @forward_clusters )." clusters in forward strand\n" if $verbose;
       push( @clusters, @forward_clusters);
     }
   }
   if ( $reverse_transcripts && @$reverse_transcripts ){
     my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( $reverse_transcripts );
     if ( @reverse_clusters ){
-      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
+      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n" if $verbose;
       push( @clusters, @reverse_clusters);
     }
   }
