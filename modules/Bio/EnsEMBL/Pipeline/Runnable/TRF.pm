@@ -162,8 +162,6 @@ sub query {
 	);
 	$self->options(join(' ', @arg_list));
         
-        $self->queryname($self->query->id);
-
 	# TRF seems to want to truncate the filename to 13 chars ...
         $self->filename(substr($self->query->id.".$$", 0, 13));
 
@@ -191,14 +189,6 @@ sub trf {
     }
     return $self->{_trf};
 }
-
-=head2 workdir
-
-=cut
-
-=head2 queryname
-
-=cut
 
 ###########
 # Analysis methods

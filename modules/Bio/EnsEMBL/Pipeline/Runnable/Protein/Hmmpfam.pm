@@ -132,7 +132,6 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->query);
 	    $self->filename ($self->query.".$$.seq");
 	    $self->lsresults ($self->filename.".lsout");
 	    $self->fsresults ($self->filename.".fsout");

@@ -126,7 +126,6 @@ sub query {
 
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->queryname ($self->query->id);
 	    $self->filename ($self->query->id.".$$.seq");
 	    $self->results ($self->filename.".out");
 	}
@@ -411,14 +410,6 @@ sub output {
     my ($self) = @_;
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
-}
-
-sub queryname{
-  my ($self,$queryname) = @_;
-  if ($queryname){
-    $self->{_queryname} = $queryname;
-  }
-  return $self->{_queryname};
 }
 
 
