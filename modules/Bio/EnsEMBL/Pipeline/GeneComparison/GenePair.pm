@@ -142,6 +142,9 @@ sub compare{
   my $terminal_missing_count = 0;
   my $all_conserved_count    = 0;
 
+  my $human_id = $human_gene->stable_id || $human_gene->dbID;
+  my $mouse_id = $mouse_gene->stable_id || $mouse_gene->dbID;
+  
   foreach my $element1 ( $best_pairs_object->list1 ){
       foreach my $partner ( $best_pairs_object->partners( $element1 ) ){
 	  
@@ -150,8 +153,8 @@ sub compare{
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($element1);
 	  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($partner);
 	  
-	  my ($missing_terminal_exons, $exon_skipping, $all_exons_conserved) = 
-	      $self->compare_Exons( $element1, $partner, $self->gap_penalty, $coding_exons);
+	my ($missing_terminal_exons, $exon_skipping, $all_exons_conserved) = 
+	  $self->compare_Exons( $element1, $partner, $self->gap_penalty, $coding_exons, $human_id, $mouse_id);
 	  
 	  if ($exon_skipping ){
 	      $skipped_exons_count++;
@@ -171,8 +174,6 @@ sub compare{
       }
   }
 
-  my $human_id = $human_gene->stable_id || $human_gene->dbID;
-  my $mouse_id = $mouse_gene->stable_id || $mouse_gene->dbID;
   my $human_trans_count = scalar(@human_transcripts);
   my $mouse_trans_count = scalar(@mouse_transcripts);
   print STDERR "GENEPAIR\t".
@@ -448,7 +449,7 @@ sub get_exon_pairs{
   my @exons1 = @{$self->get_Exons( $tran1,$coding)};
   my @exons2 = @{$self->get_Exons( $tran2,$coding)};
   
-  my $verbose = 0;
+  my $verbose = 1;
   my %exon_map;
   my %exon_pointer_map;
 
@@ -554,8 +555,9 @@ sub get_exon_pairs{
 			       ( $seen_exon2 == 2 && $in_exon1 == 0 && $seen_exon1 == 0 )
 			       ){
 			      print STDERR "exons do not overlap - skipping\n" if $verbose;
+			      delete $exon_map{$i}{$j};
 			      next EXON2;
-			  }
+			    }
 			  
 			  ############################################################
 			  # match state
@@ -608,7 +610,7 @@ sub get_exon_pairs{
 				  if ( $start1 > $end2 || $end1 < $start2 ){
 				      print STDERR "they do not overlap - skipping\n" if $verbose;
 				      next EXON2;
-				  }
+				    }
 				  
 				  
 				  ############################################################
@@ -643,7 +645,7 @@ sub get_exon_pairs{
 				      print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
 				      $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
 				      $start = $j + 1;
-				      next EXON1;
+				      #next EXON1;
 				    }
 				}
 			      ############################################################
@@ -685,7 +687,7 @@ sub get_exon_pairs{
 				$start = $j + 1;
 				$in_exon1 = 0;
 				$in_exon2 = 0;
-				next EXON1;
+				#next EXON1;
 			      }
 			      ############################################################
 			      # if both have the start outside the block
@@ -707,7 +709,7 @@ sub get_exon_pairs{
 				  $start = $j + 1;
 				  $in_exon1 = 0;
 				  $in_exon2 = 0;
-				  next EXON1;
+				  #next EXON1;
 				}
 			      ############################################################
 			      # if one has the end outside the feature block
@@ -868,10 +870,10 @@ sub get_exon_pairs{
 				$in_exon1 = 0;
 				$in_exon2 = 0;
 				$start = $j + 1;
-				next EXON1;
+				#next EXON1;
 			      }
-
-			  }
+			      
+			    }
 			  
 			  ############################################################
 			  # insert state
@@ -935,23 +937,43 @@ sub get_exon_pairs{
 				print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
 				$in_exon2 = 0;
 			      }
-			      if ( $exon_map{$i}{$j} ){
-				$exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
-			      }
+			    if ( $exon_map{$i}{$j} ){
+			      $exon_pointer_map{$exon1}{$exon2} = $exon_map{$i}{$j};
+			    }
+			  }
 			}
-		      }
 		      
 		      print STDERR "finished looking at i=$i j=$j\n";
 		      if ( $exon_map{$i}{$j} ){
-			  my $s = $exon_map{$i}{$j};
-			  print STDERR "checking exon_map($i)($j) for matches: ".$s."\n";
-			  my $matches    = ( $s =~ /M/g );
-			  print STDERR "$matches matches found\n";
-			  unless ( $matches ){
-			      print STDERR "rejecting exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
-			      delete $exon_map{$i}{$j};
-			      
+			my $s = $exon_map{$i}{$j};
+			print STDERR "checking exon_map($i)($j) for matches: ".$s."\n";
+			my $matches    = ( $s =~ /M/g );
+			print STDERR "$matches matches found\n";
+			unless ( $matches ){
+			  print STDERR "rejecting exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+			  delete $exon_map{$i}{$j};
+			  
 			  }
+			
+			# if there are previous exon_maps we reject this one:
+		      }
+		      if ( $exon_map{$i}{$j} ){
+			for (my $m=0; $m< $i; $m++ ){
+			  if ( $exon_map{$m}{$j} ){
+			    print STDERR "exon($j) already taken - rejecting exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+			    delete $exon_map{$i}{$j};
+			    last;
+			  }
+			}
+		      }
+		      if ( $exon_map{$i}{$j} ){
+			for (my $n=0; $n< $j; $n++ ){
+			  if ( $exon_map{$i}{$n} ){
+			    print STDERR "exon($i) already taken - rejecting exon_map($i)($j): ".$exon_map{$i}{$j}."\n" if $verbose;
+			    delete $exon_map{$i}{$j};
+			    last;
+			  }
+			}
 		      }
 		      
 		      if ( $exon_map{$i}{$j} ){
@@ -963,10 +985,10 @@ sub get_exon_pairs{
     }         # end of EXON1
       
   }             # end of FEATURE
-  
-  
-  my $exon_object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
-  #print STDERR "pairs found:\n";
+    
+    
+    my $exon_object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+    #print STDERR "pairs found:\n";
   foreach my $i ( keys %exon_map ){
     #print STDERR "matches for exon $i\n";
     foreach my $j ( keys %{$exon_map{$i}} ){
@@ -982,9 +1004,9 @@ sub get_exon_pairs{
 	$exon_object_map->match( $exons1[$i], $exons2[$j], -1 );
 	$flag = "mismatch";
       }
-      #print STDERR $self->exon_string($exons1[$i]).
-	#"\t<---->\t".
-	 # $self->exon_string($exons2[$j])."\t".$exon_map{$i}{$j}."\t[$flag]\n";
+      print STDERR "exon($i) ".$self->exon_string($exons1[$i]).
+	"\t<---->\t".
+	  "exon($j) " .$self->exon_string($exons2[$j])."\t".$exon_map{$i}{$j}."\t[$flag]\n";
     }
   }
 
@@ -1143,7 +1165,7 @@ sub get_exon_pairs{
 sub get_exon_pair_alignment{
   my ($self,$human_list, $mouse_list, $exon_map, $exon_pointer_map ) = @_;
 
-  my $verbose = 0;
+  my $verbose = 1;
   my %exon_map = %$exon_map;
   my @human_list = @$human_list;
   my @mouse_list = @$mouse_list;
@@ -1178,13 +1200,13 @@ sub get_exon_pair_alignment{
   if ( defined( $exon_map{$human_length-1}{$mouse_length-1} ) &&
        $exon_map{$human_length-1}{$mouse_length-1} ){
    
-      print STDERR "exon_map[$human_length-1][$mouse_length-1] = ".$exon_map{$human_length-1}{$mouse_length-1}."\n" if $verbose;
+    print STDERR "exon_map[$human_length-1][$mouse_length-1] = ".$exon_map{$human_length-1}{$mouse_length-1}."\n" if $verbose;
     pop @human_list;
     pop @mouse_list;
     my ( $human_list2, $mouse_list2) = 
       $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
     print STDERR "case1: human_list2: ".$self->list_string($human_list2).
-	" mouse_list2: ".$self->list_string($mouse_list2)."\n" if $verbose;
+      " mouse_list2: ".$self->list_string($mouse_list2)."\n" if $verbose;
     push ( @{$human_list2}, $human_last );
     push ( @{$mouse_list2}, $mouse_last );
     return ( $human_list2, $mouse_list2 );
@@ -1307,10 +1329,8 @@ sub print_Feature{
 # pair up the exons from each transcript
 
 sub compare_Exons{
-  my ($self,$human_t, $mouse_t, $gap_penalty, $coding_exons, $exon_pairs ) = @_;
+  my ($self,$human_t, $mouse_t, $gap_penalty, $coding_exons, $human_gene_id, $mouse_gene_id ) = @_;
   
-  
-  my @exons_pairs = @$exon_pairs if ($exon_pairs);
 
   # get the exons 5' to 3'
   my @human_exons = @{$self->get_Exons($human_t, $coding_exons)};
@@ -1428,9 +1448,9 @@ sub compare_Exons{
   my $mouse_id = $mouse_t->stable_id || $mouse_t->dbID;
   
   print STDERR "TRANPAIR\t".
-    "$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
+    "$human_gene_id\t$human_id\thuman_exons:$human_length\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
       "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
-	"$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
+	"$mouse_gene_id\t$mouse_id\tmouse_exons:$mouse_length\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
   
   my $print_report = 1;
   if ( $print_report ){
@@ -1501,22 +1521,52 @@ sub get_Exons{
     }
   }
 
+  #print STDERR "exons:\n";
+  #foreach my $exon (@exons){
+  #  print STDERR $exon->contig->name." length: ".($exon->end - $exon->start + 1)
+  #    ." exon_seq length: ".$exon->seq->length." seq length ".length($exon->seq->seq)."\n";
+  #}
+
+  my $c=0;
   for (my $i=0; $i< scalar(@exons); $i++ ){
     if ( $i>0 && $strand == 1 ){
       if ( $exons[$i]->start - $exons[$i-1]->end - 1 < 10 ){
-	$exons[$i-1]->end($exons[$i]->end);
+	
+	# adjust_start_end() creates a new exon object!
+        my $shift = $exons[$i]->end - $exons[$i-1]->end;
+	#print STDERR "adding right $shift bp to exon: ".$exons[$i-1]->start."-".$exons[$i-1]->end."\n";
+	
+	$newexons[$c-1] = $exons[$i-1]->adjust_start_end(0,$shift);
+	
+	#print STDERR "new exon: ".$newexons[$c-1]->start."-".$newexons[$c-1]->end."\n";
+	#$exons[$i-1]->end($exons[$i]->end);
 	next;
       }
     }
     if ( $i>0 && $strand == -1 ){
       if ( $exons[$i-1]->start - $exons[$i]->end - 1 < 10 ){
-	$exons[$i-1]->start($exons[$i]->start);
+	my $shift = $exons[$i-1]->start - $exons[$i]->start;
+	#print STDERR "adding left $shift bp to exon: ".$exons[$i-1]->start."-".$exons[$i-1]->end."\n";
+	# adjust_start_end() creates a new exon object!
+	
+	$newexons[$c-1] = $exons[$i-1]->adjust_start_end(0,$shift);
+	
+	#print STDERR "new exon: ".$newexons[$c-1]->start."-".$newexons[$c-1]->end."\n";
+	#$exons[$i-1]->start($exons[$i]->start);
 	next;
       }
     }
     push (@newexons, $exons[$i] );
+    $c++;
   }
   
+  #print STDERR "New exons:\n";
+  #foreach my $exon (@newexons){
+  #  print STDERR $exon->contig->name." length: ".($exon->end - $exon->start + 1)
+  #    ." exon_seq length: ".$exon->seq->length." seq length ".length($exon->seq->seq)."\n";
+  #}
+  
+
   return \@newexons;
 }
 
