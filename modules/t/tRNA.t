@@ -32,19 +32,20 @@ print "ok 1\n";    # 1st test passed.
 my ($seq) =  set_seq();
 
 
-my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
-                                    -id          => 'HS97D16',
-                                    -accession   => 'AL009179',
-                                    -moltype     => 'dna');
+my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seq,
+					-id          => 'HS97D16',
+					-accession   => 'AL009179',
+					-moltype     => 'dna');
 
 
-unless ($clone) 
+unless ($seq) 
 { print "not ok 2\n"; }
 else
 { print "ok 2\n"; }
 
-#create CPG object    
-my $tRNA = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-CLONE => $clone);
+
+#create tRNAscan_SE object    
+my $tRNA = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-QUERY => $seq);
  
 unless ($tRNA)
 { print "not ok 3\n"; }
