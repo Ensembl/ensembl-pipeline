@@ -1,6 +1,6 @@
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
+package Bio::ensEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::Root::RootI;
@@ -40,7 +40,7 @@ sub new {
     $self->{'_fplist'} = []; #create key to an array of feature pairs
    
     
-    my $index = $self->analysis->parameters; 
+    my $index = $self->analysis->db; 
     my $seqfetcher = $self->make_seqfetcher($index);
     print "seqfetcher ".$seqfetcher."\n"; 
     $self->seqfetcher($seqfetcher);
@@ -75,7 +75,7 @@ sub fetch_input {
   my $genseq   = $contig->primary_seq;
   my $repeat_masked = undef;
   my @features;
-  my $type = $self->analysis->db;
+  my $type = $self->analysis->parameters;
   #print "type = ".$type."\n";
   my $percent_id =  50;
   my $filter;
