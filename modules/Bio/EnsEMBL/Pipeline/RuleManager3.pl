@@ -893,8 +893,8 @@ sub job_existance{
   my ($batch_q_module, $verbose, $job_adaptor) = @_;
   my @jobs = $job_adaptor->fetch_all;
   my %job_submission_ids;
-  $job_adaptor->lock_tables;
-  foreach my $job(@jobs){
+  #$job_adaptor->lock_tables;
+  JOB:foreach my $job(@jobs){
     my $status = $job->current_status->status;
     if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
        $status eq 'READING' ||$status eq 'WRITING' ||
@@ -921,7 +921,7 @@ sub job_existance{
   foreach my $job(@jobs){
     $job->set_status('AWOL');
   }
-  $job_adaptor->unlock_tables;
+  #$job_adaptor->unlock_tables;
 }
 
 #sub job_existance{
