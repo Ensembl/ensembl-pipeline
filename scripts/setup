@@ -283,3 +283,26 @@ Add to pipeline
 Add rule (two dependencies - make sure the SLICE100K type is set)
 
 run pipeline.
+
+
+Pmatches
+
+ ./add_Analysis -logic_name Pmatch -module Pmatch -input_type SLICE100K -dbname my_database
+./test_RunnableDB -user ensadmin -pass ensembl -host ecs2b -dbname my_database -logic_name Pmatch -module Pmatch -input_type Slice100K -input_id 6.45001-145000
+
+
+in GeneBuild/Pmatch
+
+GB_PMATCH
+GB_PFASTA
+
+
+x) Adding in a new blast database
+
+cd ~/ensdat
+formatdb -i human_cdna -p F 
+
+(make sure BLASTDB is set to ~/ensdat or put the full path in)
+
+add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name HumanCdna -module Blast -database human_cdna -input_type CONTIG -database_file /Users/michele/ensdat/human_cdna -program_file blastn
+#add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall     -module BlastGenscanPep -database swall          -input_type CONTIG -database_file swall -program wublastp -program_file wublastp -parameters ' -cpus=1, -hitdist=40'
