@@ -70,13 +70,18 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Slamconf qw (
                                                             SLAM_BIN
                                                             SLAM_PARS_DIR
                                                             SLAM_MAX_MEMORY_SIZE
-                                                            SLAM_MINLENGTH
                                                             SLAM_MAXLENGTH
-                                                            SLAM_COMP_DB_USER
-                                                            SLAM_COMP_DB_PASS
-                                                            SLAM_COMP_DB_NAME
-                                                            SLAM_COMP_DB_HOST
-                                                            SLAM_COMP_DB_PORT
+                                                            SLAM_MINLENGTH
+                                                            SLAM_ORG1_DNA_DB_USER
+                                                            SLAM_ORG1_DNA_DB_PASS
+                                                            SLAM_ORG1_DNA_DB_NAME
+                                                            SLAM_ORG1_DNA_DB_HOST
+                                                            SLAM_ORG1_DNA_DB_PORT
+                                                            SLAM_ORG2_DNA_DB_USER
+                                                            SLAM_ORG2_DNA_DB_PASS
+                                                            SLAM_ORG2_DNA_DB_NAME
+                                                            SLAM_ORG2_DNA_DB_HOST
+                                                            SLAM_ORG2_DNA_DB_PORT
                                                             SLAM_ORG2_RESULT_DB_USER
                                                             SLAM_ORG2_RESULT_DB_PASS
                                                             SLAM_ORG2_RESULT_DB_NAME
@@ -107,6 +112,7 @@ sub new {
   $self->regions($input_id);
 
   $self->db($db);               #super db() from runnableDB -->needs a DBConnection-Object
+  $self->attach_dnadb_org1();
   $self->db_org2;
   $self->verbose("1");
 
@@ -583,11 +589,11 @@ sub db_org2 {
   # attaching dna-db for data retreival
 
   my  $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-                                                   -user   => $SLAM_COMP_DB_USER,
-                                                   -dbname => $SLAM_COMP_DB_NAME,
-                                                   -host   => $SLAM_COMP_DB_HOST,
-                                                   -pass   => $SLAM_COMP_DB_PASS,
-                                                   -port   => $SLAM_COMP_DB_PORT,
+                                                   -user   => $SLAM_ORG2_DNA_DB_USER,
+                                                   -dbname => $SLAM_ORG2_DNA_DB_NAME,
+                                                   -host   => $SLAM_ORG2_DNA_DB_HOST,
+                                                   -pass   => $SLAM_ORG2_DNA_DB_PASS,
+                                                   -port   => $SLAM_ORG2_DNA_DB_PORT,
                                                    -driver => 'mysql'
                                                   );
   $db_result_org2 -> dnadb($dnadb);
@@ -596,7 +602,22 @@ sub db_org2 {
   return $self->{'_db_org2'};
 }
 
+sub attach_dnadb_org1 {
+  my ($self)=@_;
+  my $db=$self->db;
+  my  $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+                                                   -user   => $SLAM_ORG1_DNA_DB_USER,
+                                                   -dbname => $SLAM_ORG1_DNA_DB_NAME,
+                                                   -host   => $SLAM_ORG1_DNA_DB_HOST,
+                                                   -pass   => $SLAM_ORG1_DNA_DB_PASS,
+                                                   -port   => $SLAM_ORG1_DNA_DB_PORT,
+                                                   -driver => 'mysql'
+                                                  );
+   $db->dnadb($dnadb);
+   $self->db($db);
+   return $self->db;
 
+}
 =head2 predtrans_both_org
 
   Title    : predtrans
