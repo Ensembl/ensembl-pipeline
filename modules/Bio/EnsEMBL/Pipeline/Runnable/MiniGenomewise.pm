@@ -16,7 +16,8 @@ Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise->new(-genomic     => $genseq,
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise->new(-genomic     =
+> $genseq,
 								    -transcripts => $transcripts)
 
     $obj->run
@@ -60,14 +61,16 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $transcripts ) = $self->_rearrange([qw(GENOMIC
-							 TRANSCRIPTS)],
+    my( $genomic, $transcripts, $analysis ) = $self->_rearrange([qw(GENOMIC
+							 TRANSCRIPTS
+							 ANALYSIS)],
 						     @args);
     
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if defined($genomic);
+    $self->analysis($analysis);
 
     if (defined($transcripts)) {
 	if (ref($transcripts) eq "ARRAY") {
@@ -83,6 +86,16 @@ sub new {
     
     return $self;
 }
+
+sub analysis{
+  my ($self,$analysis) = @_;
+  if ( $analysis ){
+    $self->{analysis} = $analysis;
+  }
+  return $self->{analysis};
+}
+
+
 
 =head2 genomic_sequence
 
@@ -373,6 +386,7 @@ sub run {
 
   my $genomewise = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
   $genomewise->seq($self->miniseq->get_cDNA_sequence);
+  $genomewise->analysis($self->analysis);
 
 #  $genomewise->seq($self->genomic_sequence);
   foreach my $t($self->get_all_Transcripts){
