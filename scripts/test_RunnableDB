@@ -48,12 +48,14 @@ use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G;
 
 my $dbtype = 'rdb';
 my $host   = 'ecs1c';
