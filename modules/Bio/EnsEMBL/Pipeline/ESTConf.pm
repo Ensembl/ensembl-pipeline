@@ -56,24 +56,24 @@ use vars qw( %ESTConf );
 	    # general options for scripts
 
 	    # path to run_ESTRunnableDB
-	    EST_RUNNER                  => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
+	    EST_RUNNER                  => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
 	
 	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
 	    # we use a different on from EST_RUNNER to use different EST_DB's
-	    EST_GENE_RUNNER			=> '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
+	    EST_GENE_RUNNER			=> '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
 	    
 	    # path to ensembl-pipeline/scripts/EST
-	    EST_SCRIPTDIR               => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/EST/', 	    
+	    EST_SCRIPTDIR               => '/acari/work4a/lec/blade_code/main_trunk/ensembl-pipeline/scripts/EST/', 	    
 	    # where the result-directories are going to go
 	    #EST_TMPDIR                  => '/ecs2/scratch1/ensembl/eae/NCBI_30/cdnas',
-	    EST_TMPDIR => '/ecs2/scratch1/ensembl/eae/NCBI_30/ESTs/',
+	    EST_TMPDIR => '/acari/scratch4/ensembl/lec/new_out/',
 	    # job-queue in the farm
 	    EST_QUEUE                   => 'acari',
 	    
 	    # make_bsubs.pl options
-	    EST_EXONERATE_BSUBS         => '/ecs2/work1/eae/NCBI_30/ests/jobs_dir/exonerate.jobs',
-	    EST_FILTER_BSUBS            => '/ecs2/work1/eae/NCBI_30/ests/jobs_dir/filter_and_e2g.jobs',
-	    EST_GENEBUILDER_BSUBS       => '/ecs2/work1/eae/NCBI_30/ests/jobs_dir/EST_GeneBuilder.jobs',	
+	    EST_EXONERATE_BSUBS         => '/acari/work4a/lec/briggsae_sequence/exonerates.dat',
+	    EST_FILTER_BSUBS            => '/acari/work4a/lec/briggsae_sequence/filter_and_e2g.jobs',
+	    EST_GENEBUILDER_BSUBS       => '/acari/work4a/lec/briggsae_sequence/EST_GeneBuilder.jobs',	
 	    
 	    # for prepare_ests.pl
 	    
@@ -81,17 +81,17 @@ use vars qw( %ESTConf );
 	    EST_FILESPLITTER            => '/acari/work2/gs2/gs2/bin/fastasplit', 	    
 	    
 	    # path to file containign ALL ESTs/cDNAs
-	    EST_FILE                    => '/ecs2/work1/eae/NCBI_30/ests/all_human_ests', 	   
+	    EST_FILE                    => ' /usr/local/ensembl/data/blastdb/Worms/worm_mRNA.fa', 	   
 
 	    # path to directory where EST chunks live
 	    #EST_CHUNKDIR                => '/acari/work6a/eae.tmp/Mouse/Mouse_5.3.1/riken_mRNAs/second_rechunks',
 
 	    #EST_CHUNKDIR                => '/work6a/eae.tmp/Human/NCBI_28/ESTs/chunks',
-	    EST_CHUNKDIR                => '/ecs2/work1/eae/NCBI_30/ests/chunks/',
+	    EST_CHUNKDIR                => '/acari/work4a/lec/briggsae_sequence/mRNA_chunks/',
 
  	    # how many chunks?
 	    # for NCBI_28 we have 3690891 ests, at approx. 350 ests per chunk, we estimate
-	    EST_CHUNKNUMBER             => 20000, 	 
+	    EST_CHUNKNUMBER             => 15, 	 
 	       
 	    # path to makeseqindex executable
 	    EST_MAKESEQINDEX            => '/usr/local/ensembl/bin/makeseqindex', 	    
@@ -99,8 +99,8 @@ use vars qw( %ESTConf );
 
 	    # for exonerate_ests.pl
 	    #EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_30_dusted_masked_contigs.fa',
-	    #EST_GENOMIC                 => '/ecs2/work1/eae/NCBI_30/genome/NCBI_30_dusted_masked_all_contigs.fa',
-	     EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_30_dusted_masked_all_contigs.fa',
+	    EST_GENOMIC                 => '/acari/work4a/lec/briggsae_sequence/briggsae_dusted_masked_12_08_02.fa',
+	    #EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_30_dusted_masked_all_contigs.fa',
 
 	                                            # path to file with repeatmasked dusted genomic sequences
 	                                            # NB this file is huge - distribute it across the farm or 
@@ -118,12 +118,12 @@ use vars qw( %ESTConf );
 	    EST_FILTER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G',
 
 	    # new index, path where the directory of the index is
-	    EST_INDEX                   => '/data/blastdb/Ensembl/human_ests_index',
+	    EST_INDEX                   => '/data/blastdb/Worms/worm_mRNAs',
 	    
 	                                            # name of EST file that has been indexed and is 
 	                                            # accessible across the farm
 	                                            # for analysis(process)
-      	    EST_SOURCE                  => 'dbEST',      
+      	    EST_SOURCE                  => 'worm_mRNA',      
 	    
 
 	    # for EST_GeneBuilder
@@ -135,39 +135,40 @@ use vars qw( %ESTConf );
 	    EST_EVIDENCE_TAG            => 'exonerate_e2g',
 
 	    EST_MAX_EVIDENCE_DISCONTINUITY => 10,
-	    EST_MAX_INTRON_SIZE => 100000,
+	    EST_MAX_INTRON_SIZE => 10000,
 	    
 	    # not used at this moment
 	    EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
 	    EST_MIN_EVIDENCE_SIMILARITY => 65,
-
+	    EST_MIN_PERCENT_ID => 70,
+	    EST_MIN_COVERAGE => 90,
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
-	    # not on the same mysql instance
-	    
+	    # not on the same mysql instance 
+	    # database contention arises from having tomanny db conections open to the same databas if you have more than a couple of hundread jobs contacting the same database at the same time you will need multiple database but ifyou only have a few jobs you will probably beable to get away with only 1 database
 	    # ref_db - holds the static golden path, contig and dna information
-	    EST_REFDBNAME               => 'ens_NCBI_30',
-	    EST_REFDBHOST               => 'ecs1e',
+	    EST_REFDBNAME               => 'briggsae_newschema',
+	    EST_REFDBHOST               => 'ecs1b',
 	    EST_REFDBUSER               => 'ensro',
 	    EST_REFDBPASS               => '',
 
-	    EST_GOLDEN_PATH             => 'NCBI_30',
+	    EST_GOLDEN_PATH             => 'briggsae_170602',
 
 	    # est_db = where we load up exonerate results into the feature table
-	    EST_DBNAME                  => 'ens_NCBI_30_est2',
-	    EST_DBHOST                  => 'ecs1a',
+	    EST_DBNAME                  => 'briggsae_est_newschema',
+	    EST_DBHOST                  => 'ecs1c',
 	    EST_DBUSER                  => 'ensadmin',
 	    EST_DBPASS                  => 'ensembl',
 	    
 	    # est_e2g_db = where we write the genes we produce from the exonerate features
-	    EST_E2G_DBNAME                  => '', # this should be in a different place from the one above
-	    EST_E2G_DBHOST                  => '',
+	    EST_E2G_DBNAME                  => 'briggsae_est_newschema', # this should be in a different place from the one above
+	    EST_E2G_DBHOST                  => 'ecs1c',
 	    EST_E2G_DBUSER                  => 'ensadmin',
 	    EST_E2G_DBPASS                  => 'ensembl',
 	    
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
-	    EST_GENE_DBNAME                  => 'ens_NCBI_30_estgenes',
-	    EST_GENE_DBHOST                  => 'ecs1f',
+	    EST_GENE_DBNAME                  => 'briggsae_est_newschema',
+	    EST_GENE_DBHOST                  => 'ecs1c',
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
