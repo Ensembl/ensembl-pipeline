@@ -144,7 +144,10 @@ sub runnable {
                 $key =~ s/\s+//g;
                 $parameters{$key} = $value;
             }
+            
         }
+        $parameters {'-genscan'}  = $self->analysis->program_file;
+        $parameters {'-matrix'}   = $self->analysis->db_file;
         #creates empty Bio::EnsEMBL::Runnable::Genscan object
         $self->{'_runnable'} = $runnable->new(%parameters);
     }
