@@ -492,393 +492,99 @@ sub _pair_Transcripts{
   my $overlap_length_matrix;
   
   my %merge_list;
+  my %selected; # keeps track of the est-transcripts that have been used
 
   # we base everything on the ensembl transcripts
  ENS_TRANSCRIPT:
   foreach my $ens_tran ( @ens_transcripts ){
-    
-    foreach my $est_tran ( @est_transcripts ){
+      my @list;
       
-      # check with which est_transcripts it can merge
-      my ($merge,$overlaps) = $self->_test_for_Merge( $ens_tran, $est_tran );
-      if ($merge == 1 && $overlaps > 0 ){
-	
-	# check with which it can combine UTRs 
-	
-
-	push( @{ $merge_list{$est_tran} }, $est_tran );
-      
-	# calculate then how much they overlap
-	my ($overlap_number,$overlap_length) = _compare_Transcripts( $ens_tran, $est_tran );
-	
+    EST_TRANSCRIPT:
+      foreach my $est_tran ( @est_transcripts ){
+	  
+	  # check with which est_transcripts it can merge
+	  my ($merge,$overlaps) = $self->_test_for_Merge( $ens_tran, $est_tran );
+	  if ($merge == 1 && $overlaps > 0 ){
+	      
+	      # calculate then how much they overlap
+	      my ($overlap_number,$overlap_length, $exact_matches) = _compare_Transcripts( $ens_tran, $est_tran );
+	      
+	      push( @list, [ $overlap_number, $overlap_length, $exact_matches, $est_tran ]);
+	  }
       }
-    }
-  }
-
-    # first calculate all possible overlaps with est_transcripts
-    my @overlap_pairs;
-    foreach my $est_tran ( @est_transcripts ){
-      my ($overlap_number,$overlap_length) = _compare_Transcripts( $ens_tran, $est_tran );
-      if ( $overlap_number ){
-	$$overlap_number_matrix{ $ens_tran }{ $est_tran } = $overlap_number;
-	$$overlap_length_matrix{ $ens_tran }{ $est_tran } = $overlap_length;
-	my @list = ( $overlap_number, $overlap_length, $est_tran );
-	push ( @overlap_pairs, \@list );
-      }
-    }
-    
-    if ( @overlap_pairs ){      
-      # sort the list of @overlap_pairs in descending oder
-      # on the overlap_number and overlap_length
-      my @sorted_pairs = sort { my $result = ( $$b[0] <=> $$a[0] );
+      # take the est_transcript which overlap the most
+      my @sorted_pairs = sort { my $result = ( $$b[2] <=> $$a[2] );
 				if ($result){
-				  return $result;
+				    return $result;
 				}
 				else{
-				  return ( $$b[1] <=> $$a[1] );
+				    $result = ( $$b[0] <=> $$a[0] );
+				    if ($result){
+					return $result;
+				    }
+				    else{
+					return ( $$b[1] <=> $$a[1] );
+				    }
 				}
-			      } @overlap_pairs;
+			    } @list;
       
-      # first thing to do now is to see whether any of the matches 
-      # can be used for extending the UTRs
-      foreach my $pair ( @sorted_pairs ){
-	
-	# $pair contains ( $number_of_exon_overlaps, length_of_overlap, $est_transcript );
-	if ( $$pair[0] > 0 ){	    
-	  my $est_tran = $$pair[2];
-	  my ($merge,$overlaps) = $self->_test_for_Merge( $ens_tran, $est_tran );
+      # try to merge it, if succeeded, mark the chosen one and leave the rest
+      
+    MODIFY:
+      for (my $i = 0; $i< scalar(@list); $i++){
+	  my $est_tran = $$list[$i][3];
 	  my $modified;
-	  
-	  # if $merge == 1 the est_gene is potentially useful for extending UTRs
-	  if ( $merge ){
-	    ($ens_tran, $modified) = $self->_extend_UTRs( $ens_tran, $est_tran );
+	  ( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
+	  if ($modified == 1 ){
+	      $used_est_transcript{$est_tran} = 1;
+	      
+	      # we only allow one cdna to modify each transcript
+	      last MODIFY;
 	  }
-	  if ($modified){
-	    $used_est_transcript{ $est_tran } = 1;
-	  }
-	}
       }
-    }
-     
-    else{
-      # we found no overlapping est_transcript to this ens_transcript
-      next ENS_TRANSCRIPT;
-    }
+      
+  }   # end of ENS_TRANSCRIPT
   
-  } # end of ENS_TRANSCRIPT
-  
-
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
-
-  # those est_transcripts that have not been used for extending UTRs are potential isoforms
+  # those which haven't been used for extending UTRs are candidate isoforms
+  #
+  my @candidates;
   foreach my $est_tran ( @est_transcripts ){
-    unless ( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1 ){
-      push ( @potential_isoforms, $est_tran );
-    }
-  }
-
-  ##################################################################
-  # check first whether there are common exon translations
- ISO:
-  foreach my $potential_iso ( @potential_isoforms ){
-    my @iso_exons = $potential_iso->get_all_Exons;
-    my $count_matches = 0;
-    
-  ENS1:
-    foreach my $ens_tran ( @ens_transcripts ){
-      my @ens_exons = $ens_tran->get_all_Exons;
-      
-      foreach my $iso_exon ( @iso_exons ){
-	my $iso_exon_translation;
-	eval{
-	  $iso_exon_translation = $iso_exon->translate->seq;
-	};
-	if ($@){
-	  print STDERR "cannot get translation of isoform exon $iso_exon\n";
-	  next; 
-	}
-	
-	foreach my $ens_exon ( @ens_exons ){
-	  my $ens_exon_translation;
-	  eval{
-	    $ens_exon_translation = $ens_exon->translate->seq;
-	  };
-	  if ( $@ ){
-	    print STDERR "cannot get translation of ensembl exon $ens_exon\n";
-	    next;
-	  }
-	  
-	  # count the number of exact matches in the exon translation
-	  if ( $ens_exon_translation eq $iso_exon_translation ){
-	    $count_matches++;
-	  }
-	}
+      unless (  $used_est_transcript{ $est_tran } && $used_est_transcript{$est_tran} == 1 ){
+	  push ( @candidates, $est_tran);
       }
-    }
-    
-    # we accept an isoform if shares at least 2 exon-translations
-    # with the ensembl transcripts ( is that reasonable? )
-    if ( $count_matches > 2 ){
-      push( @accepted_isoforms, $potential_iso);
-      next ISO;
-    }
-    
-    ################################################################
-    # otherwise check whether the complete translation is similar
-    else{
-      # check whether complete translations coincide totally or partially
-      
+  }
+  if (@candidates){
+ 
+      # at the moment we just check whether there is an ens_transcript
+      # that shares one exon, part of the protein product and
+      # there is one intron matching one exon or vice versa.
 
-
-    ENS2:
-      foreach my $ens_tran ( @ens_transcripts ){
-	my $ens_translation_seq;
-	my $ens_peptide_seq;
-	my $ens_peptide_length;
-
-	eval{  
-	  $ens_translation_seq = $ens_tran->translate;
-	  $ens_peptide_seq     = $ens_translation_seq->seq; 
-	  $ens_peptide_length  = $ens_translation_seq->length;
-	};       
-	if ($@){
-	  print STDERR "problems getting translation for ensembl transcript $ens_tran\n";
-	} 
-
-	my $iso_translation_seq;
-	my $iso_peptide_seq;
-	my $iso_peptide_length; 
-	eval{
-	  $iso_translation_seq  = $potential_iso->translate;
-	  $iso_peptide_seq      = $iso_translation_seq->seq; 
-	  $iso_peptide_length   = $iso_translation_seq->length;
-	};
-	if ($@){
-	  print STDERR "problems getting translation for est_transcript $potential_iso\n";
-	}
-	
-	unless ( $iso_peptide_seq ){
-	  print STDERR "potential isoform has no translation, rejecting it...\n";
-	  # we reject this one
-	  next ISO;
-	}
-	unless ( $ens_peptide_seq ){
-	  print STDERR "ensembl transcript has no translation, strang....\n";
-	  next ENS2;
-	}
-	
-	if ( $iso_peptide_seq && $ens_peptide_seq ){
-	  # only keep transcripts whose translation has no stop codons
+      foreach my $est_tran ( @candidates ){
+	  my $one_exon_shared = 0;
+	  my $similar_protein = 0;
+	  my $exon_in_intron  = 0;
 	  
-	  if ( $iso_peptide_seq =~ /\*/ ){
-	    print STDERR "potential isoform peptide has STOP codon, rejecting it\n";
-	    next ISO;
+	  foreach my $ens_tran ( @ens_transcripts ){
+	      $one_exon_shared = $self->_check_exact_exon_Match( $est_tran, $ens_tran);
+	      $similar_protein = $self->_check_protein_Match(    $est_tran, $ens_tran);
+	      $exon_in_intron  = $self->_check_alternative_Form( $est_tran, $ens_tran);
+	      
+	      if ( $one_exon_shared == 1 && 
+		   $similar_protein == 1 &&
+		   $exon_in_intron  == 1 ){
+		  push ( @accepted_isoforms, $est_tran );
+	      }
 	  }
-	  if ( $ens_peptide_seq  =~ /\*/ ){
-	    print STDERR "ensembl transcript $ens_tran has STOP codon!!\n";
-	  }
-	  if ( $iso_peptide_seq eq $ens_peptide_seq ){
-	    print STDERR "$potential_iso and $ens_tran have identical translation\n";
-	    push ( @accepted_isoforms, $potential_iso );
-	    next ISO;
-	  }
-	  elsif ( $ens_peptide_seq =~ /$iso_peptide_seq/ ){
-	    print STDERR "potential isoform is a truncation pf the ensembl peptide\n";
-	    push ( @accepted_isoforms, $potential_iso );
-	  }
-	  elsif ( $iso_peptide_seq = ~ /$ens_peptide_seq/ ){
-	    print STDERR "ensembl peptide is a truncation of the isoform peptide\n";
-	    push ( @accepted_isoforms, $potential_iso );
-	  }
-	  # the only thing left to do would be to try to align them and get a similarity score
-	
-	}
-      }   # end of ENS
-    }     # end of else
-  }       # end of ISO
+      }      
+  }  # end of 'if (@candidates)'
+  else{
+      # nothing to do then
+  }
   
   # return the ens_transcripts (modified or not)
   return ( @ens_transcripts, @accepted_isoforms );
-
-}
-#########################################################################
-
-# this function just checks whether an ensembl transcript has the first and last exon
-# matching the internal coordinates of one est transcript so that it can be potentially used
-# for extending UTRs
-
-sub _test_for_extendable_UTRs{
   
-  my ($self,$ens_tran, $est_tran) = @_;
-  
-  my $ens_translation = $ens_tran->translation;
-  my @ens_exons       = $ens_tran->get_all_Exons;
-  my $strand          = $ens_exons[0]->strand;
-
-  # we only look at the start and end of the translations in the ensembl gene
-  my $ens_t_start_exon = $ens_translation->start_exon;
-  my $ens_t_end_exon   = $ens_translation->end_exon;
-  
-  my @est_exons = $est_tran->get_all_Exons;
-  
-  # sorting paranoia
-  if ( $strand == 1 ){
-    @est_exons = sort { $a->start <=> $b->start } @est_exons;
-    @ens_exons = sort { $a->start <=> $b->start } @ens_exons;
-  }
-  if ( $strand == -1 ){
-    @est_exons = sort { $b->start <=> $b->start } @est_exons;
-    @ens_exons = sort { $b->start <=> $b->start } @ens_exons;
-  }
-
-  my $modified = 0;
-  my $accept = 1;
- EST_EXON:
-  for ( my $i=0; $i< $#est_exons; $i++ ){
-    
-  FORWARD:
-    if ( $strand == 1 ){
-      
-      # check first the 5' UTR
-      
-      # if one est_exon has a coinciding end with the ens_exon where the translation starts
-      if ( $est_exons[$i]->end == $ens_t_start_exon->end &&
-	   $est_exons[$i]->start <= $ens_t_start_exon->start ){
-
-	# check that this est_exon does not start on top of another previous ens_exon
-       	# we accept this situation:               Not this one:    
-	#      __      __                                 __      __
-	#     |__|----|__|--- ...   ens_tran             |__|----|__|--- ...
-	#            ____                                   ________
-	#           |____|--- ...   est_tran               |________|---  ...
-	my $ok = 1;
-	foreach my $prev_exon ( @ens_exons ){
-	  if ( $prev_exon eq $ens_t_start_exon ){
-	    last;
-	  }
-	  if( $prev_exon->end >= $est_exons[$i]->start ){
-	    $ok = 0;
-	  }
-	}
-	if ( $ok == 0 ){
-	  # the est_exon starts on top of another exon, what should we do?
-	  last EST_EXON;
-	}
-      }
-     
-      # now check the 3' UTR
-      if ( $est_exons[$i]->start == $ens_t_end_exon->start &&
-	   $est_exons[$i]->end >= $ens_t_end_exon->end ){
-	
-	# check that this est_exon does not end on top of another of the following ens_exon's
-       	my $ok = 1;
-	# we sort them in the opposite direction
-	@ens_exons = sort {$b->start <=> $a->start} @ens_exons;
-	foreach my $next_exon ( @ens_exons ){
-	  if ( $next_exon eq $ens_t_end_exon ){
-	    last;
-	  }
-	  if( $next_exon->start <= $est_exons[$i]->end ){
-	    $ok = 0;
-	  }
-	}
-	if ( $ok == 0 ){
-	  # the est_exon end on top of another following exon, what should we do?
-	  last EST_EXON;
-	}
-      }
-	
-    } # end of strand == 1
-
-  REVERSE:
-    if ( $strand == -1 ){
-      
-      # check first the 5' UTR
-      # if one est_exon has a coinciding end with the ens_exon where the translation starts
-      if ( $est_exons[$i]->start == $ens_t_start_exon->start &&
-	   $est_exons[$i]->end >= $ens_t_start_exon->end ){
-	
-	# check that this est_exon does not end on top an ens_exon on the right of $ens_t_start_exon, i.e.
-       	# we accept a situation like:               but not like:
-	#           __      __                             __      __
-	#  ...  ---|__|----|__|   ens_tran         ... ---|__|----|__|
-	#           ____                                   ________
-	#       ---|____|         est_tran         ... ---|________|
-	my $ok = 1;
-	foreach my $prev_exon ( @ens_exons ){
-	  if ( $prev_exon eq $ens_t_start_exon ){
-	    last;
-	  }
-	  if( $prev_exon->start <= $est_exons[$i]->end ){
-	    $ok = 0;
-	  }
-	}
-	if ( $ok == 0 ){
-	  # the est_exon ends on top of another ens_exon, what should we do?
-	}
-	if ( $ok ){
-	  # let's merge them
-	  my $tstart = $ens_translation->start;
-	  $tstart += ( $est_exons[$i]->end - $ens_t_start_exon->end );
-	  $ens_t_start_exon->end( $est_exons[$i]->end );
-	  $ens_tran->translation($tstart);
-	  
-	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence ( $est_exons[$i]->each_Supporting_Feature ){
-	    $ens_t_start_exon->add_Supporting_Feature( $evidence );
-	  }
-	  
-	  # we need to add any possible extra UTR est_exons
-	  # but need to check possible incompatibilities with  previous ens_exons
-	  $ens_tran = $self->_add_5prime_exons($ens_tran, $est_tran, $est_exons[$i], $i);
-	  $modified = 1;
-	}
-      }
-            
-      # now check the 3' UTR
-      if ( $est_exons[$i]->end == $ens_t_end_exon->end &&
-	   $est_exons[$i]->start <= $ens_t_end_exon->start ){
-	
-	# check that this est_exon does not start on top of another ens_exon on the left of $ens_t_end_exon
-       	my $ok = 1;
-	# we sort them in the opposite direction
-	@ens_exons = sort {$a->start <=> $b->start} @ens_exons;
-	foreach my $next_exon ( @ens_exons ){
-	  if ( $next_exon eq $ens_t_end_exon ){
-	    last;
-	  }
-	  if( $next_exon->end >= $est_exons[$i]->start ){
-	    $ok = 0;
-	  }
-	}
-	if ( $ok == 0 ){
-	  # the est_exon end on top of another following exon, what should we do?
-	}
-	if ( $ok ){
-	  # let's merge them
-	  $ens_t_end_exon->start( $est_exons[$i]->start );
-	  $ens_translation->end_exon( $ens_t_end_exon );
-	  # no need to change ens of translation as this is counted from the end of the
-	  # translation->end_exon
-
-	  # add the est evidence to be able to see why we modified this exon
-	  foreach my $evidence ( $est_exons[$i]->each_Supporting_Feature ){
-	    $ens_t_end_exon->add_Supporting_Feature( $evidence );
-	  }
-	  
-	  # we need to add any possible extra UTR est_exons
-	  $ens_tran = $self->_add_3prime_exons($ens_tran, $est_tran, $est_exons[$i], $i);
-	  $modified = 1;
-	}
-      }
-	
-    } # end of strand == -1
-    
-    
-  }   # end of EST_EXON
-
-  return ($est_tran,$modified);
-
 }
 #########################################################################
 
@@ -897,8 +603,9 @@ sub _check_est_Cluster{
     for(my $j=1;$j<=scalar(@est_transripts);$j++){
       
       next if $j==$i;
-      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j] ) ){
-	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
+      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) &&
+	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])    ){
+	  push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
       }
     }
   }
@@ -930,6 +637,8 @@ sub _check_est_Cluster{
   return @accepted;
 }
 
+#########################################################################
+
 sub _visit{
   my ($self, $node, $color, $adj, $potential_gene) = @_;
   
@@ -948,6 +657,8 @@ sub _visit{
   #$self->_print_Transcript($node);
   return;
 }
+
+#########################################################################
   
 sub _print_Transcript{
   my ($self,$transcript) = @_;
@@ -963,7 +674,7 @@ sub _print_Transcript{
 
 # having a set of est_genes only, we have no reference transcript (ensembl one),
 # so to determine whether two transcripts are two alternative forms of the same gene
-# we check whether they share an exon and they have a similar protein product
+# we check whether they share at least an exon
 
 sub _check_exact_exon_Match{
  my ($self, $tran1, $tran2 ) = @_;
@@ -971,17 +682,34 @@ sub _check_exact_exon_Match{
  my @exons2 = $tran2->get_all_Exons;
  my $exact_match = 0;
  
- #check whether both translations are related to each other
+ # how many exact matches we need (maybe 1 is enough)
+ foreach my $exon1 (@exons1){
+     foreach my $exon2 (@exons2){
+	 return 1 if  ( $exon1->start == $exon2->start && $exon2->end == $exon2->end );
+     }
+ }
+ return 0;
+}
+
+#########################################################################
+#
+# having a set of est_genes only, we have no reference transcript (ensembl one),
+# so to determine whether two transcripts are two alternative forms of the same gene
+# we check whether they have a similar protein product
+
+sub _check_protein_Match{
+ my ($self, $tran1, $tran2 ) = @_;
+
  my $seq1;
  my $seq2;
 
  my $compatible_protein = 0;
  eval{
-   $seq1 = $tran1->translate;
-   $seq2 = $tran2->translate;
+     $seq1 = $tran1->translate;
+     $seq2 = $tran2->translate;
  };
  if ( $seq1 && $seq2 ){
-
+     
    if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
      print STDERR "On of the peptides has a stop codon\n";
      return 0;
@@ -994,24 +722,103 @@ sub _check_exact_exon_Match{
      $compatible_proteins = 1;
    }
  }
-
- # how many exact matches we need (maybe 1 is enough)
- foreach my $exon1 (@exons1){
-   foreach my $exon2 (@exons2){
-     next unless ( $exon1->start == $exon2->start && $exon2->end == $exon2->end );
-     $exact_match++;
-   }
- }
- 
- if ( $exact_match != 0 && $compatible_proteins != 0 ){
-   return 1;
+ if ( $compatible_proteins != 0 ){
+     return 1;
  }
  else{
-   return 0;
+     return 0;
  }
+}
+#########################################################################
+#
+# this function is another check used to find out if two given transcripts
+# are two alternative variants. This function returns 1 if there is at least
+# one 'skipped exon' between the two
+
+sub _check_alternative_Form{
+    my ($self,$tran1,$tran2) = @_;
+    my @exons1 = $tran1->get_all_Exons;
+    my @exons2 = $tran2->get_all_Exons;	
+    
+    # we actually compare ranges:
+    my @exon_list1;
+    my @intron_list1;
+    for(my $i=0; $i<scalar(@exons1);$i++){
+	my $exon_range = new Bio::Range();
+	$exon_range->start($exons1[$i]->start);
+	$exon_range->end($exons1[$i]->end);
+	push( @exon_list1, $exon_range);
+	if ( $i+1 < scalar(@exons1)){
+	    my $intron_range = new Bio::Range();
+	    $intron_range->start($exons1[$i]->end + 1);
+	    $intron_range->end($exons1[$i+1]->start - 1);
+	    push( @intron_list1, $intron_range);
+	}
+    }
+    my @exon_list2;
+    my @intron_list2;
+    for(my $i=0; $i<scalar(@exons2);$i++){
+	my $exon_range = new Bio::Range();
+	$exon_range->start($exons2[$i]->start);
+	$exon_range->end($exons2[$i]->end);
+	push( @exon_list2, $exon_range);
+	if ( $i+1 < scalar(@exons2)){
+	    my $intron_range = new Bio::Range();
+	    $intron_range->start($exons2[$i]->end + 1);
+	    $intron_range->end($exons2[$i+1]->start - 1);
+	    push( @intron_list2, $intron_range);
+	}
+    }
+    # probably, the list with more introns will be more likely to have one exon
+    # in a big intron of the other transcript, it won't be too many comparisons if we
+    # don't optimize that
+
+    for (my $i=0; $i<scalar(@exon_list1);$i++){
+	for ( my $j=0; $j<scalar(@intron_list2);$j++){
+	    
+	    # if one exon overlaps one intron
+	    if ( $exon_list1[$i]->overlaps( $intron_list2[$j] ) ){
+		
+		# and the previous or the next exon overlaps one of the flanking exons
+		if ( ( $i>0            && 
+		       $exon_list1[$i-1]->overlaps( $exon_list2[$j] ) ) 
+		     ||
+		     ( $i<$#exon_list1 &&
+		       $j<$#exon_list2 &&
+		       $exon_list1[$i+1]->overlaps( $exon_list2[$j+1] ) )
+		     ){
+		    return 1;
+		}
+	    }
+	}
+    }
+	
+    for (my $i=0; $i<scalar(@exon_list2);$i++){
+	for ( my $j=0; $j<scalar(@intron_list1);$j++){
+	    
+	    # if one exon overlaps one intron
+	    if ( $exon_list2[$i]->overlaps( $intron_list1[$j] ) ){
+		
+		# and the previous or the next exon overlaps one of the flanking exons
+		if ( ( $i>0            && 
+		       $exon_list2[$i-1]->overlaps( $exon_list1[$j] ) ) 
+		     ||
+		     ( $i<$#exon_list2 &&
+		       $j<$#exon_list1 &&
+		       $exon_list2[$i+1]->overlaps( $exon_list1[$j+1] ) )
+		     ){
+		    return 1;
+		}
+	    }
+	}
+    }
+    
+    return 0;
 }
 
 #########################################################################
+
+
 
 # this function checks whether two transcripts merge
 # according to consecutive exon overlap
@@ -1116,7 +923,7 @@ sub _test_for_Merge{
  
   }   # end of EXON1      
 
-  # we only make them merge if $merge = 1 and th2 2-to-1 and 1-to-2 overlaps are zero;
+  # we only make them merge if $merge = 1 and the 2-to-1 and 1-to-2 overlaps are zero;
   if ( $merge == 1 && $one2two_overlap == 0 && $two2one_overlap == 0 ){
     return ( 1, $overlaps );
   }
@@ -1140,49 +947,58 @@ sub _get_start_of_Transcript{
 
 #########################################################################
    
-# this compares both transcripts and calculate the number of overlapping exons and
-# the length of the overlap
+# this compares both transcripts and calculate the number of overlapping exons,
+# the length of the overlap, and the number of exact overlapping exons
 
 sub _compare_Transcripts {         
   my ($tran1, $tran2) = @_;
   my @exons1   = $tran1->get_all_Exons;
   my @exons2   = $tran2->get_all_Exons;
+
   my $overlaps = 0;
   my $overlap_length = 0;
+  my $exact = 0;
+
   foreach my $exon1 (@exons1){
-    foreach my $exon2 (@exons2){
-      if ( ($exon1->overlaps($exon2)) && ($exon1->strand == $exon2->strand) ){
-	$overlaps++;
-	
-	# calculate the extent of the overlap
-	if ( $exon1->start > $exon2->start && $exon1->start <= $exon2->end ){
-	  if ( $exon1->end < $exon2->end ){
-	    $overlap_length += ( $exon1->end - $exon1->start + 1);
+      foreach my $exon2 (@exons2){
+	  if ( ($exon1->overlaps($exon2)) && ($exon1->strand == $exon2->strand) ){
+	      $overlaps++;
+	      
+	      # exact?
+	      if ( $exon1->start == $exon2->start && $exon1->end == $exon2->end ){
+		  $exact++;
+	      }
+
+
+	      # calculate the extent of the overlap
+	      if ( $exon1->start > $exon2->start && $exon1->start <= $exon2->end ){
+		  if ( $exon1->end < $exon2->end ){
+		      $overlap_length += ( $exon1->end - $exon1->start + 1);
+		  }
+		  elsif ( $exon1->end >= $exon2->end ){
+		      $overlap_length += ( $exon2->end - $exon1->start + 1);
+		  }
+	      }
+	      elsif( $exon1->start <= $exon2->start && $exon2->start <= $exon1->end ){
+		  if ( $exon1->end < $exon2->end ){
+		      $overlap_length += ( $exon1->end - $exon2->start + 1);
+		  }
+		  elsif ( $exon1->end >= $exon2->end ){
+		      $overlap_length += ( $exon2->end - $exon2->start + 1);
+		  }
+	      }
 	  }
-	  elsif ( $exon1->end >= $exon2->end ){
-	    $overlap_length += ( $exon2->end - $exon1->start + 1);
-	  }
-	}
-	elsif( $exon1->start <= $exon2->start && $exon2->start <= $exon1->end ){
-	  if ( $exon1->end < $exon2->end ){
-	    $overlap_length += ( $exon1->end - $exon2->start + 1);
-	  }
-	  elsif ( $exon1->end >= $exon2->end ){
-	    $overlap_length += ( $exon2->end - $exon2->start + 1);
-	  }
-	}
       }
-    }
   }
   
-  return ($overlaps,$overlap_length);
+  return ($overlaps,$overlap_length,$exact);
 }    
 
 #########################################################################
 
 sub _extend_UTRs{
   # the order here is important
-  my ($self,$ens_tran, $est_tran) = @_;
+  my ($self,$ens_tran,$est_tran) = @_;
   my $ens_translation = $ens_tran->translation;
   my @ens_exons       = $ens_tran->get_all_Exons;
   my $strand          = $ens_exons[0]->strand;
@@ -1240,7 +1056,6 @@ sub _extend_UTRs{
 	  $ens_t_start_exon->start( $est_exons[$i]->start );
 	  $ens_tran->translation($tstart);
 	  
-
 	  # add the est evidence to be able to see why we modified this exon
 	  foreach my $evidence ( $est_exons[$i]->each_Supporting_Feature ){
 	    $ens_t_start_exon->add_Supporting_Feature( $evidence );
@@ -1276,7 +1091,7 @@ sub _extend_UTRs{
 	  # let's merge them
 	  $ens_t_end_exon->end( $est_exons[$i]->end );
 	  $ens_translation->end_exon( $ens_t_end_exon );
-	  # since the start coordinate does not change ans we are in the forward strand
+	  # since the start coordinate does not change as we are in the forward strand
 	  # we don't need to change the translation start/end
 	  
 	  # add the est evidence to be able to see why we modified this exon
@@ -1379,7 +1194,7 @@ sub _extend_UTRs{
     
   }   # end of EST_EXON
 
-  return ($est_tran,$modified);
+  return ($ens_tran,$modified);
 
 }
 	    
