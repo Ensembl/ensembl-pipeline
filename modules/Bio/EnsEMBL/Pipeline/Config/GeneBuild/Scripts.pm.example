@@ -65,19 +65,19 @@ use vars qw( %Scripts );
 	    GB_LENGTH_RUNNABLES      => [
 					 {
 					  runnable => 'FPC_TargettedGeneWise',
-					  analysis => 'TGE_gw',
+					  analysis => $GB_TARGETTED_GW_GENETYPE,
 					 },
 					 {
 					  runnable => 'FPC_BlastMiniGenewise',
-					  analysis => 'similarity_genewise',
+					  analysis => $GB_SIMILARITY_GENETYPE,
 					 },
 					 {
 					  runnable => 'Combine_Genewises_and_E2Gs',
-					  analysis => 'combined_gw_e2g',
+					  analysis => $GB_COMBINED_GENETYPE,
 					 },
 					 {
 					  runnable => 'Gene_Builder',
-					  analysis => 'ensembl',
+					  analysis => $GB_FINAL_GENETYPE,
 					 }
 					],
 	    
