@@ -48,7 +48,6 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
 use vars qw(@ISA);
@@ -109,6 +108,7 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;
+    my $arguments = "";
     
     if ($runnable)
     {
@@ -123,11 +123,16 @@ sub runnable {
             foreach my $pair (@pairs)
             {
                 my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
+		if ($key && $value) {
+		    $parameters{$key} = $value;
+		}
+		else {
+		    $arguments .= " $key ";
+		}
             }
         }
         $parameters{'-repm'} = $self->analysis->program_file;
-        $parameters{'-args'} = $self->parameters;
+        $parameters{'-args'} = $arguments;
         #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
         $self->{'_runnable'} = $runnable->new(%parameters);;
     }
