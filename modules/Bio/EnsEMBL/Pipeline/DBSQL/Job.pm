@@ -1,4 +1,4 @@
-#
+
 # Object for storing details of an analysis job
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
