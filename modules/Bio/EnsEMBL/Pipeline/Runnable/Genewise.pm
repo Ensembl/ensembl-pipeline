@@ -137,7 +137,7 @@ sub _align_protein {
     $proio->write_seq($self->protein);
     $proio = undef;
 
-    my $command = "genewise $protfile $genfile -gff -kbyte $memory -quiet";
+    my $command = "genewise $protfile $genfile -gff -kbyte $memory -ext 1 -gap 8 -subs 0.0000001 -quiet";
 
     if ($self->reverse == 1) {
 	$command .= " -trev ";
@@ -256,8 +256,8 @@ sub _align_protein {
 	    }
 	}
     }
-    unlink $genfile;
-    unlink $protfile;
+    #unlink $genfile;
+    #unlink $protfile;
 
     unlink $gwfile;
 }
