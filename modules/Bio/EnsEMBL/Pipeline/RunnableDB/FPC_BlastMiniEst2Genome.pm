@@ -240,9 +240,11 @@ sub fetch_input {
   my $blastdb   = $self->blastdb;
   print STDERR "fpc blastdb: $blastdb\n";
   
-  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'    => $genseq, 
-									    '-blastdb'    => $blastdb,
-									    '-seqfetcher' => $self->seqfetcher);
+  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'     => $genseq, 
+									    '-blastdb'     => $blastdb,
+									    '-seqfetcher'  => $self->seqfetcher,
+									    '-id_threshold'=> 95,
+									    '-length_threshold' => 80);
     
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
@@ -294,8 +296,12 @@ sub _convert_output {
     push(@genes, @g);
   }
 
+  # filter out genes which are poor matches to ESTs
+  my $threshold = 95;
+  my @filtered = $self->_filter_genes($threshold, @genes);
+
   # map genes back to genomic coordinates
-  my @remapped = $self->_remap_genes(@genes);	
+  my @remapped = $self->_remap_genes(@filtered);	
     
   if (!defined($self->{_output})) {
     $self->{_output} = [];
@@ -439,6 +445,67 @@ sub _make_genes {
   # no point in trying ttranslate these - they just won't.
 
   return @genes;
+
+}
+
+=head2 _filter_genes
+
+    Title   :   _filter_genes
+    Usage   :   $self->_filter_genes($threshold, @genes)
+    Function:   Filters genes on basis of the % coverage of each exon to the EST it was predicted from.
+                Only keep genes where every exon has an overall score that exceeds $threshold
+    Returns :   array of Bio::EnsEMBL::Gene
+    Args    :   int, array of Bio::EnsEMBL::Gene
+
+=cut
+
+sub _filter_genes {
+  my ($self, $threshold, @genes) = @_;
+  my @filtered;
+
+  print STDERR "about to filter " . scalar(@genes) . " genes\n";
+
+  GENE:
+  foreach my $gene(@genes) {
+    my @transcripts = $gene->each_Transcript;
+    if(scalar(@transcripts) != 1) {
+      print STDERR "eeek! got " . scalar(@transcripts) . " for " . $gene->id . " - letting it through\n";
+      push (@filtered, $gene);
+      next GENE;
+    }
+
+    print STDERR "processing " . $gene->id . "\n";
+
+    foreach my $exon($transcripts[0]->each_Exon){
+      my $matching_bases = 0;
+      foreach my $sf($exon->each_Supporting_Feature) {
+	print STDERR $sf->hseqname . " " . $sf->start . " " . $sf->end . " " . $sf->score . "\n";
+	my $length = abs($sf->end - $sf->start) +1; # start-end inclusive!
+	my $bases = ($sf->score * $length)/100;
+	$matching_bases += $bases;
+      }
+
+      my $exon_length = abs($exon->end - $exon->start) + 1; # start-end inclusive!
+      
+      # sanity checks
+      if ($matching_bases > $exon_length) {
+	$self->warn("num matches > length! makes no sense!\n");
+      }
+
+      my $coverage = ($matching_bases / $exon_length) * 100;
+      print STDERR "matching: $matching_bases / elength: $exon_length  = coverage: $coverage threshold: $threshold\n";
+
+#      next GENE unless $coverage >= $threshold;
+      next GENE unless $coverage ge $threshold;
+    }
+
+    push(@filtered, $gene);
+
+  }
+ 
+   print STDERR " we are left with " . scalar (@filtered) . " genes\n";
+
+  return (@filtered);
 
 }
 
