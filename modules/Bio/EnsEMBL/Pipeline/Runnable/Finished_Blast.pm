@@ -125,22 +125,8 @@ sub parse_results {
     $self->_apply_coverage_filter($query_length, $best_hits);
 }
 
-                
-
 sub _apply_coverage_filter {
     my( $self, $query_length, $best_hits ) = @_;
-    
-    my( $sort_sub );
-    my $thresh_type = $self->threshold_type;
-    if ($thresh_type eq 'PID') {
-        $sort_sub = sub { $b <=> $a };
-    }
-    elsif ($thresh_type eq 'PVALUE') {
-        $sort_sub = sub { $a <=> $b };
-    }
-    else {
-        $self->throw("Unknown threshold type '$thresh_type'");
-    }
     
     my $split_flag = $self->split_gapped_alignments;
     
@@ -156,7 +142,19 @@ sub _apply_coverage_filter {
     
     # Loop through from best to worst according
     # to our threshold type.
-    foreach my $bin_n (sort $sort_sub keys %$best_hits) {
+    my( @bin_numbers );
+    my $thresh_type = $self->threshold_type;
+    if ($thresh_type eq 'PID') {
+        @bin_numbers = sort { $b <=> $a } keys %$best_hits;
+    }
+    elsif ($thresh_type eq 'PVALUE') {
+        @bin_numbers = sort { $a <=> $b } keys %$best_hits;
+    }
+    else {
+        $self->throw("Unknown threshold type '$thresh_type'");
+    }
+
+    foreach my $bin_n (@bin_numbers) {
         #print STDERR "\nLooking at bin: $thresh_type $bin_n\n";
         my $score_hits = $best_hits->{$bin_n};
         
