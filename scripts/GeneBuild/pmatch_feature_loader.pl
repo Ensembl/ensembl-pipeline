@@ -68,8 +68,8 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -pass             => $pass,
 );
 
-$db->assembly_type($path);
-my $sgpa = $db->get_StaticGoldenPathAdaptor;
+#$db->assembly_type($path);
+my $sgpa = $db->get_SliceAdaptor;
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 
 # warn that pm_best.out has chr names in the form: chr_name.chr_start-chr_end

@@ -59,7 +59,7 @@ BEGIN {
 	    GB_PMATCH      => /work2/vac/rd-utils/pmatch,
 	    GB_PM_OUTPUT   => /work2/vac/GeneBuild/,
 	    GB_FPCDIR      => /work2/vac/data/humangenome,
-	    GB_TMPDIR      => /work5/scratch/vac,
+	    GB_OUTPUT_DIR      => /work5/scratch/vac,
   
   If pm_output directory is not provided, output file is written to current directory
     
@@ -75,9 +75,10 @@ use FileHandle;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_PFASTA
 					 GB_PMATCH
+                                         GB_PMATCH_MAX_INTRON
 					 GB_PM_OUTPUT
 					 GB_FPCDIR
-					 GB_TMPDIR  
+					 GB_OUTPUT_DIR  
                                         );
 $| = 1;
 
@@ -89,7 +90,7 @@ my $protfile = $GB_PFASTA;
 my $outdir   = $GB_PM_OUTPUT;
 my $fpcdir   = $GB_FPCDIR;
 my $pmatch   = $GB_PMATCH;
-my $tmpdir   = $GB_TMPDIR;
+my $tmpdir   = $GB_OUTPUT_DIR;
 my $check    = 0;
 my $outfile;
 my $chr_name;
@@ -108,6 +109,8 @@ my $pmatchfile; # can provide a pmatch results file - will be sorted by both pro
 if ($check) {
   exit(0);
 }
+
+print STDERR "have started running pm filter \n";
 
 # final check to make sure all parameters are set before we go ahead
 if(!defined($protfile) || !defined($fpcdir) || !defined($pmatch) || 
@@ -152,12 +155,13 @@ foreach my $fpcfile(@files){
     my $pmatch = $GB_PMATCH;
 
     # run pmatch -D
-    print "command = ".$pmatch." -D ".$protfile." ".$fpcfile." > ".$pmatchfile."\n";
+    print STDERR "command = ".$pmatch." -D ".$protfile." ".$fpcfile." > ".$pmatchfile."\n";
     system("$pmatch -D $protfile $fpcfile > $pmatchfile");
+    print STDERR "have run pmatch\n";
   }
   elsif(defined $pmatchfile){
     # use a different outfile
-    $outfile = $outdir . "/" . $pmatchfile . ".pm.out";
+    $outfile = $outdir . "" . $pmatchfile . ".pm.out";
   }
   elsif(!defined $pmatchfile){
     die "you need to either tell me to run_pmatch, or you need to give me a pmatch results file\n";
@@ -178,10 +182,10 @@ sub process_pmatches{
   # sort pmatch results file
   system("sort -k6,6 -k3,3n $pmatchfile > $pmatchfile.tmp");
   rename "$pmatchfile.tmp", $pmatchfile;
-
+  print STDERR "processing the  results of pmatch\n"; 
   open (OUT, ">>$outfile") or die "Can't open $outfile for output: $!\n";
   OUT->autoflush(1);
-
+  my $max_intron = $GB_PMATCH_MAX_INTRON;
   open(PMATCHES, "<$pmatchfile") or die "can't open [$pmatchfile]\n";  
   my $prot_id;
   my $current_pmf = new First_PMF(
@@ -190,7 +194,7 @@ sub process_pmatches{
 				  -pmatch   => $pmatch,
 				  -tmpdir   => $tmpdir,
 				  -fpcfile  => $fpcfile,
-				  -maxintronlen => 2500000,
+				  -maxintronlen => $max_intron,
 				 );
   
  PMATCH:  
@@ -217,7 +221,7 @@ sub process_pmatches{
 				   -pmatch   => $pmatch,
 				   -tmpdir   => $tmpdir,
 				   -fpcfile  => $fpcfile,
-				   -maxintronlen => 2500000,
+				   -maxintronlen => $max_intron,
 				  );
       $prot_id = $cols[5];
       $current_pmf->make_coord_pair($_);
@@ -240,7 +244,7 @@ sub process_pmatches{
   }
 
 
-
+  print STDERR "have finished processing pmatch results\n";
   close (OUT) or die "Can't close $outfile: $!\n";
   close (PMATCHES) or die "can't close pmatchfile: $!\n";
 

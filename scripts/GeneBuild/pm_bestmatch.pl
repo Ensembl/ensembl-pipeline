@@ -178,7 +178,7 @@ sub get_static_golden_path_adaptor {
     -pass             => $GB_DBPASS,
 );
 
-  $db->assembly_type($GB_GOLDEN_PATH);
-  my $sgpa = $db->get_StaticGoldenPathAdaptor();
+
+  my $sgpa = $db->get_SliceAdaptor();
   return $sgpa;
 }
