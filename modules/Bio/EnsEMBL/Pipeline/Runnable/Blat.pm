@@ -68,16 +68,15 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($database, $genomic, $query_seqs, $query_type, $target_type, $blat, $options) = $self->_rearrange([qw(
-													    DATABASE
-													    GENOMIC
-													    QUERY_SEQS
-													    QUERY_TYPE
-													    TARGET_TYPE
-													    BLAT
-													    OPTIONS
-													   )
-													], @args);
+  my ($database, $query_seqs, $query_type, $target_type, $blat, $options) = $self->_rearrange([qw(
+												  DATABASE
+												  QUERY_SEQS
+												  QUERY_TYPE
+												  TARGET_TYPE
+												  BLAT
+												  OPTIONS
+												 )
+											      ], @args);
   
   # must have a target and a query sequences
   unless( $query_seqs ){
@@ -89,11 +88,8 @@ sub new {
   if( $database ){
     $self->database( $database );
   }
-  elsif ($genomic){
-    $self->genomic($genomic);
-  }
   else{
-    $self->throw("Blat needs a target - genomic: $genomic or  database: $database");
+    $self->throw("Blat needs a target - database: $database");
   }
   
   # Target type: dna  - DNA sequence
@@ -128,7 +124,7 @@ sub new {
   
   # can add extra options as a string
   if ($options){
-    $self->($options);
+    $self->options($options);
   }
   return $self;
 }
@@ -281,7 +277,7 @@ sub parse_results {
       next;
     }
     
-    print $_."n";
+    #print $_."n";
 
     # create as many features as blocks there are in each output line
     my (%feat1, %feat2);
@@ -294,9 +290,9 @@ sub parse_results {
     # all the block sizes add up to $matches + $mismatches + $rep_matches
     
     # percentage identity =  ( matches not in repeats + matches in repeats ) / ( alignment length )
-    print STDERR "calculating percent_id ans score:\n";
-    print STDERR "matches: $matches, rep_matches: $rep_matches, mismatches: $mismatches, q_length: $q_length\n";
-    print STDERR "percent_id = 100x".($matches + $rep_matches)."/".( $matches + $mismatches + $rep_matches )."\n";
+    #print STDERR "calculating percent_id and score:\n";
+    #print STDERR "matches: $matches, rep_matches: $rep_matches, mismatches: $mismatches, q_length: $q_length\n";
+    #print STDERR "percent_id = 100x".($matches + $rep_matches)."/".( $matches + $mismatches + $rep_matches )."\n";
     my $percent_id = sprintf "%.2f", ( 100 * ($matches + $rep_matches)/( $matches + $mismatches + $rep_matches ) );
     
     # or is it ...?
@@ -304,7 +300,7 @@ sub parse_results {
     #my $percent_id = sprintf "%.2d", (100 * ($matches + $rep_matches)/$q_length );
     
     # we put basically score = coverage = ( $matches + $mismatches + $rep_matches ) / $q_length
-    print STDERR "score = 100x".($matches + $mismatches + $rep_matches)."/".( $q_length )."\n";
+    #print STDERR "score = 100x".($matches + $mismatches + $rep_matches)."/".( $q_length )."\n";
     
     my $score   = sprintf "%.2f", ( 100 * ( $matches + $mismatches + $rep_matches ) / $q_length );
     
@@ -315,6 +311,10 @@ sub parse_results {
     my @q_start_positions = split ",",$q_starts;
     my @t_start_positions = split ",",$t_starts;
     
+    $superfeature->seqname($q_name);
+    $superfeature->score( $score );
+    $superfeature->percent_id( $percent_id );
+
     # each line of output represents one possible entire aligment of the query (feat1) and the target(feat2)
     for (my $i=0; $i<$block_count; $i++ ){
       
