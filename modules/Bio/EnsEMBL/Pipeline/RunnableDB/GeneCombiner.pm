@@ -781,8 +781,8 @@ sub _pair_Transcripts{
 	  # check first it does not merge with anything in the cluster
 	  foreach my $ens_tran ( @ens_transcripts ){
 	    my $comparator = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-	    $exact_merge     = $comparator->_test_for_semiexact_Merge($est_tran, $ens_tran);
-	    $fuzzy_merge     = $comparator->_test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
+	    $exact_merge     = $comparator->test_for_semiexact_Merge($est_tran, $ens_tran);
+	    $fuzzy_merge     = $comparator->test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
 	    if ($exact_merge == 1){
 	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges exactly with an ensembl transcript, skipping it\n";
 	      next CANDIDATE;
@@ -797,7 +797,7 @@ sub _pair_Transcripts{
 	    $one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
 	    $similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
 	    $exon_in_intron  = $self->_check_exon_Skipping(     $est_tran, $ens_tran);
-	    #$exact_merge     = $self->_test_for_semiexact_Merge($est_tran, $ens_tran);
+	    #$exact_merge     = $self->test_for_semiexact_Merge($est_tran, $ens_tran);
 	    
 	    print "Comparing\n";
 	    $self->_print_Transcript($est_tran);
@@ -1362,7 +1362,7 @@ sub _test_for_Merge{
 # with exact exon matches, except for
 # possible mismatches in the extremal exons
 
-sub _test_for_semiexact_Merge{
+sub test_for_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
   
   my @exons1 = $est_tran->get_all_Exons;

@@ -64,7 +64,9 @@ sub new{
 # with exact exon matches, except for
 # possible mismatches in the extremal exons
 
-sub _test_for_semiexact_Merge{
+# returns 1 if there is merge, 0 otherwise
+
+sub test_for_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
   
   my @exons1 = $est_tran->get_all_Exons;
@@ -175,7 +177,7 @@ sub _test_for_semiexact_Merge{
 # analysis previously run: genomewise, est2genome,... it is more likely to
 # happen 
 
-sub _test_for_fuzzy_semiexact_Merge{
+sub test_for_fuzzy_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
   
   my @exons1 = $est_tran->get_all_Exons;
@@ -290,7 +292,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 #
 # are considered a mismatch
 
-sub _test_for_Merge{
+sub test_for_Merge{
   my ($self,$tran1,$tran2) = @_;
   my @exons1 = $tran1->get_all_Exons;
   my @exons2 = $tran2->get_all_Exons;	
@@ -403,7 +405,7 @@ sub _test_for_Merge{
 #
 # are considered a match
 
-sub _test_for_Merge_with_gaps{
+sub test_for_Merge_with_gaps{
   my ($self,$tran1,$tran2) = @_;
   my @exons1 = $tran1->get_all_Exons;
   my @exons2 = $tran2->get_all_Exons;	
@@ -511,7 +513,7 @@ sub _test_for_Merge_with_gaps{
 # this compares both transcripts and calculate the number of overlapping exons and
 # the length of the overlap
 
-sub _compare_Transcripts {         
+sub compare_Transcripts {         
   my ($tran1, $tran2) = @_;
   my @exons1   = $tran1->get_all_Exons;
   my @exons2   = $tran2->get_all_Exons;
