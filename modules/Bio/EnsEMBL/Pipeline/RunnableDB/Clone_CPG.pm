@@ -136,10 +136,10 @@ sub runnable {
             }
         }
 
-        $parameters {'-clone'} = $genseq;
+        $parameters {'-query'} = $genseq;
         #creates empty Bio::EnsEMBL::Runnable::CPG object
         push (@{$self->{'_runnable'}}, $runnable->new(
-						      -clone => $parameters{'-clone'},
+						      -query => $parameters{'-query'},
 						      -length => $parameters{'-length'},
 						      -gc => $parameters{'-gc'},
 						      -oe => $parameters{'-oe'},

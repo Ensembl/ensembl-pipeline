@@ -131,7 +131,7 @@ sub runnable {
         $parameters{'-cpg'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::CPG object
         $self->{'_runnable'} = $runnable->new
-	    ( '-clone' => $parameters{'-clone'},
+	    ( '-query' => $parameters{'-query'},
 	      '-length' => $parameters{'-length'},
 	      '-gc' => $parameters{'-gc'},
 	      '-oe' => $parameters{'-oe'},

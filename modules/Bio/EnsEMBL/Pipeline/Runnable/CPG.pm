@@ -28,7 +28,7 @@ $seq = $seqstream->next_seq();
 
 #create Bio::EnsEMBL::Pipeline::Runnable::CPG object
 
-my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-CLONE => $seq);
+my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $seq);
 
 $cpg->workdir($workdir);
 
@@ -74,10 +74,10 @@ BEGIN {
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $seq);
     Function:   Initialises CPG object
     Returns :   a CPG Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments (-LENGTH, -GC, -OE) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments (-LENGTH, -GC, -OE) 
 
 =cut
 
@@ -102,7 +102,7 @@ sub new {
   
   print STDERR "args: ", @args, "\n";
 
-  my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange([qw(CLONE 
+  my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange([qw(QUERY 
 							       LENGTH 
 							       GC 
 							       OE 
@@ -136,8 +136,7 @@ sub new {
 #################
 # get/set methods 
 #################
-# really ough to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
-# to do!
+
 sub query {
   my ($self, $seq) = @_;
   if ($seq)
@@ -242,12 +241,12 @@ sub min_oe {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
+    my ($self) = @_;
     #set arguments for cpg
     #check clone
     my $seq = $self->query() || $self->throw("Clone required for cpg\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
 
     # reset filename and results as necessary
