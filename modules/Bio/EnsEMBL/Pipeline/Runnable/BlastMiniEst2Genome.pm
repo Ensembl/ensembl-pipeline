@@ -409,6 +409,10 @@ sub run_blast {
     my $report = new Bio::Tools::BPlite('-file'=>$blastout);
 
     unlink $blastout;
+    unlink $blastdb;
+    unlink $blastdb.".csq";
+    unlink $blastdb.".nhd";
+    unlink $blastdb.".ntb";
     unlink $seqfile;
     return $report;
 
