@@ -263,4 +263,4 @@ NP_082840.1 A seemingly innocent RIKEN sequence, but similar enough to L1 elemen
 Q9D2T0 Contains integrase and viral capsid homologies (dta).
 Q80YX9 Homologous to integrase domain (dta).
 Q8VDY3 Member of integrase C superfamily (dta).
-
+NP_112232 Tiny protein that has been removed from RefSeq.  Formed the basis 51 human genes (dta).
