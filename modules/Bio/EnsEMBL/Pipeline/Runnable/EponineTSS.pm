@@ -130,7 +130,7 @@ sub new {
     }
   }
 
-  $self->epojar (find_file($epojar));
+  $self->epojar ($self->find_file($epojar));
   
   if (defined $threshold && $threshold >=0 ){
       $self->threshold($threshold);
