@@ -78,10 +78,12 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Transcript;
 use Bio::Seq;
 use Bio::SeqIO;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
@@ -429,64 +431,82 @@ sub calculate_and_set_phases {
     {
         my $peptide = $peptides[$index];
         #$genes[$index]->attach_seq ($self->clone()); 
-        
         my @exons = $genes[$index]->sub_SeqFeature();
         
-        #the phases for the first exon are set be searching within the peptide
-        my $exon = $exons[0];
-        my $exon_seq = $self->clone()->subseq($exon->start(), $exon->end());
-        #produce reverse complement sequence where necessary
-        if ($exon->strand == -1) 
+        my $translation_found = 0;
+        for (my $phase_index = 0; $phase_index < 3; $phase_index++)
         {
-	        $exon_seq =~ tr/ATCGatcg/TAGCtagc/;
-	        $exon_seq = reverse($exon_seq);
-	    }
-
-        my $bioseq = Bio::Seq->new (    -seq     =>  $exon_seq,
-                                        -id      =>  $exon->seqname,
-                                        -moltype =>  'dna' );
-        #translate in all three frames. 
-        #The parameters are (stop, unknown, frame)
-        my @translation = ( $bioseq->translate('*','.',0,1,1), 
-                            $bioseq->translate('*','.',1,1,1),
-                            $bioseq->translate('*','.',2,1,1));
-
-        my $modulo = $exon->length() % 3;
-        my ($phase_3, $phase_5);
-
-        for (my $frame = 0; $frame < scalar (@translation); $frame++)
-        {
-            my $trans_seq = $translation[$frame]->seq();
-            $trans_seq =~ s/\*$//;          #remove final stop
-            #no need to for further analysis if premature stop is found
-            next if ($trans_seq =~ /\*/);   
-            if (index($peptide, $trans_seq) > -1)
+            #try each possible translation of the predicted gene
+            my $phase = $phase_index; #because phase 1 is frame 2 and phase 2 is frame 1
+            
+            foreach my $exon (@exons)
             {
-                $phase_5 = (3-$frame)%3; #because phase 1 is frame 2 and phase 2 is frame 1
-                $phase_3 = ($modulo - $frame) % 3;
+                
+                my $end_phase   = ($exon->length - ((3-$phase) % 3)) %3;
+                $exon->phase($phase);
+                $exon->end_phase($end_phase);
+                $phase = $end_phase;
+            }
+            my $translated_exons = $self->translation(@exons);
+            
+            if (index ($peptide, $translated_exons) > -1)
+            {
+                $translation_found = 1;
+                last;
             }
         }
-        #Set phases in Bio::EnsEMBL::SeqFeature
-        $exon->phase($phase_5);
-        $exon->end_phase($phase_3);
-        #if no match found then something odd happened
-        $self->throw("Failed to match first exon in Peptide\n") unless (defined ($phase_5));
-
-        #phases for the remaining exons are calculated by reference to the first exon
-        for (my $exon_num = 1; $exon_num < scalar(@exons); $exon_num++) 
-        {
-            my $exon = $exons[$exon_num];
-            $phase_5 = $phase_3; #the previous exons 3' phase is this ones 5'
-            $phase_3 = ($exon->length - (3-$phase_5)) % 3;
-            $exon->phase($phase_5);
-            $exon->end_phase($phase_3);
-            
-            #print STDERR "EXON: ".$exon->seqname
-            #." 5\'-phase is $phase_5 Modulo is ".($exon->length%3)
-            #." 3\'-phase is $phase_3 Strand is ".$exon->strand."\n";
-        } 
+        $self->throw("Translation not found in genscan peptide\n".
+                     "Genscan peptide\$translated_exons\nTranslation\n$peptide\n") 
+                     unless ($translation_found);
+        
     }
 }
+
+sub translation {
+    my ($self, @features) = @_;
+
+    my $transcript  = Bio::EnsEMBL::Transcript->new();
+    my $translation = Bio::EnsEMBL::Translation->new();
+    my @exons;
+    foreach my $feature (@features)
+    {
+        my $exon = Bio::EnsEMBL::Exon->new();
+        $exon->id        ($feature->seqname);
+        $exon->start     ($feature->start);
+        $exon->end       ($feature->end);
+        $exon->strand    ($feature->strand);
+        $exon->phase     ($feature->phase);
+        $exon->contig_id ($self->clone->id);
+        #$exon->end_phase($feat->end_phase);
+        $exon->attach_seq($self->clone);    
+        push (@exons, $exon);
+    }
+    
+    if ($exons[0]->strand == 1)
+    {
+        @exons = sort {$a->start <=> $b->start} @exons;
+        $translation->start($exons[0]->start);
+        $translation->end($exons[$#exons]->end);
+    }
+    else
+    {
+        @exons = sort {$b->start <=> $a->start} @exons;
+        $translation->start($exons[0]->end);
+        $translation->end($exons[$#exons]->start);
+    }
+
+    $translation->start_exon_id($exons[0]->id);
+    $translation->end_exon_id($exons[$#exons]->id);
+    
+    foreach my $exon (@exons)
+    {
+        $transcript->add_Exon($exon);
+    }
+
+    $transcript->translation($translation);
+    return $transcript->translate->seq;
+}
+
 
 sub create_feature {
     my ($self, $feat) = @_;
