@@ -893,26 +893,51 @@ sub _clone_Transcript{
 =cut
 
 sub find_transcripts_by_protein_evidence{
-  my ($self,$id,$db) = @_;
-  
-  my $q = qq( SELECT distinct(t.transcript_id)
-              FROM   exon e, supporting_feature sf, protein_align_feature pf,
-	             exon_transcript et, transcript t
-              WHERE  sf.exon_id      = e.exon_id                   AND
-	             sf.feature_id   = pf.protein_align_feature_id AND
-	             sf.feature_type = "protein_align_feature"     AND
-                     pf.hit_name     = "$id"                       AND
-	             pf.contig_id    = e.contig_id                 AND
-                     et.exon_id      = e.exon_id                   AND
-	             et.transcript_id = t.transcript_id
-            );
-  
-  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-  my $res = $sth->execute || $db->throw("can't execute: $q");
+  my ($self,$id,$db,$type) = @_;
   
   my @tranz;
-  while( my ($t_id) =  $sth->fetchrow_array) {
-    push( @tranz, $t_id );
+  
+  if ( $type ){
+    my $q = qq( SELECT distinct(t.transcript_id)
+		FROM   exon e, supporting_feature sf, protein_align_feature pf,
+		       exon_transcript et, transcript t, gene g
+		WHERE  sf.exon_id      = e.exon_id                   AND
+		       sf.feature_id   = pf.protein_align_feature_id AND
+		       sf.feature_type = "protein_align_feature"     AND
+		       pf.hit_name     = "$id"                       AND
+	               pf.contig_id    = e.contig_id                 AND
+	               et.exon_id      = e.exon_id                   AND
+	               et.transcript_id = t.transcript_id            AND
+	               g.gene_id       = t.gene_id                   AND
+		       g.type          = "$type"
+ 	      );
+    
+    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+    my $res = $sth->execute || $db->throw("can't execute: $q");
+    
+    while( my ($t_id) =  $sth->fetchrow_array) {
+      push( @tranz, $t_id );
+    }
+  }
+  else{
+    my $q = qq( SELECT distinct(t.transcript_id)
+		FROM   exon e, supporting_feature sf, protein_align_feature pf,
+		exon_transcript et, transcript t
+		WHERE  sf.exon_id      = e.exon_id                   AND
+		      sf.feature_id   = pf.protein_align_feature_id AND
+		      sf.feature_type = "protein_align_feature"     AND
+		      pf.hit_name     = "$id"                       AND
+	              pf.contig_id    = e.contig_id                 AND
+	              et.exon_id      = e.exon_id                   AND
+	              et.transcript_id = t.transcript_id
+	      );
+    
+    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+    my $res = $sth->execute || $db->throw("can't execute: $q");
+    
+    while( my ($t_id) =  $sth->fetchrow_array) {
+      push( @tranz, $t_id );
+    }
   }
   
   my $t_adaptor = $db->get_TranscriptAdaptor;
@@ -922,14 +947,14 @@ sub find_transcripts_by_protein_evidence{
   # create transcripts in slice coordinates
   my @transcripts;
   foreach my $t_id ( @tranz ){
-      my $tran     = $t_adaptor->fetch_by_dbID($t_id);
-      my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
-      my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
-      my $fakegene = Bio::EnsEMBL::Gene->new();
-      $fakegene->add_Transcript( $tran );
-      my $tmp_gene = $fakegene->transform( $big_slice );
-      my @trans = @{$tmp_gene->get_all_Transcripts};
-      push ( @transcripts, $trans[0] );
+    my $tran     = $t_adaptor->fetch_by_dbID($t_id);
+    my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
+    my $big_slice = $db->get_SliceAdaptor->fetch_by_chr_name( $slice->chr_name);
+    my $fakegene = Bio::EnsEMBL::Gene->new();
+    $fakegene->add_Transcript( $tran );
+    my $tmp_gene = $fakegene->transform( $big_slice );
+    my @trans = @{$tmp_gene->get_all_Transcripts};
+    push ( @transcripts, $trans[0] );
   }
   
   return @transcripts;
@@ -945,29 +970,53 @@ sub find_transcripts_by_protein_evidence{
 =cut
 
 sub find_transcripts_by_dna_evidence{
-  my ($self,$id,$db) = @_;
+  my ($self,$id,$db, $type) = @_;
   
   #print STDERR "Using ".$db->dbname."\n";
-  my $q = qq( SELECT distinct(t.transcript_id)
-              FROM   exon e, supporting_feature sf, dna_align_feature pf,
-	             exon_transcript et, transcript t 
-              WHERE  sf.exon_id      = e.exon_id                   AND
-	             sf.feature_id   = pf.dna_align_feature_id     AND
-	             sf.feature_type = "dna_align_feature"         AND
+    my @tranz;
+
+  if ( $type ){
+    my $q = qq( SELECT distinct(t.transcript_id)
+		FROM   exon e, supporting_feature sf, dna_align_feature pf,
+		exon_transcript et, transcript t, gene g
+		WHERE  sf.exon_id      = e.exon_id                   AND
+		     sf.feature_id   = pf.dna_align_feature_id     AND
+		     sf.feature_type = "dna_align_feature"         AND
+	             pf.hit_name     = "$id"                       AND
+	             pf.contig_id    = e.contig_id                 AND
+                     et.exon_id      = e.exon_id                   AND 
+	             et.transcript_id = t.transcript_id            AND
+		     g.gene_id       = t.gene_id                   AND
+		     g.type          = "$type"
+	      );
+  
+    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+    my $res = $sth->execute || $db->throw("can't execute: $q");
+    
+    while( my ($t_id) =  $sth->fetchrow_array) {
+      push( @tranz, $t_id );
+    }
+  }
+  else{
+    my $q = qq( SELECT distinct(t.transcript_id)
+		FROM   exon e, supporting_feature sf, dna_align_feature pf,
+		exon_transcript et, transcript t 
+		WHERE  sf.exon_id      = e.exon_id                   AND
+		sf.feature_id   = pf.dna_align_feature_id     AND
+		sf.feature_type = "dna_align_feature"         AND
 	             pf.hit_name     = "$id"                       AND
 	             pf.contig_id    = e.contig_id                 AND
                      et.exon_id      = e.exon_id                   AND 
 	             et.transcript_id = t.transcript_id
             );
   
-  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-  my $res = $sth->execute || $db->throw("can't execute: $q");
-  
-  my @tranz;
-  while( my ($t_id) =  $sth->fetchrow_array) {
-    push( @tranz, $t_id );
+    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+    my $res = $sth->execute || $db->throw("can't execute: $q");
+    
+    while( my ($t_id) =  $sth->fetchrow_array) {
+      push( @tranz, $t_id );
+    }
   }
-  
   my $t_adaptor = $db->get_TranscriptAdaptor;
   my $s_adaptor = $db->get_SliceAdaptor;
   
@@ -1148,7 +1197,7 @@ print STDERR "check_splice_sites: upstream ".
 sub set_stop_codon{
   my ( $self, $transcript ) = @_;
 
-  my  $verbose = 1;
+  my  $verbose = 0;
   unless ( $transcript->translation ){
     print STDERR "transcript has no translation - cannot put the stops" if $verbose;
     return $transcript;
