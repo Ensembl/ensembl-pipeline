@@ -83,6 +83,7 @@ sub get_all_syntenic_slices{
   # it returns an array reference of Bio::EnsEMBL::DnaDnaAlignFeature objects
   #my @features = @{$adaptor->fetch_all_by_Slice($slice, $focus_species, $focus_db->assembly_type)};
   
+  print STDERR "about to retrieve the compara features\n";
   my @features = @{$adaptor->fetch_all_by_species_region($focus_species,
 							 $focus_db->assembly_type,
 							 $target_species,
@@ -793,18 +794,18 @@ sub test_for_orthology_with_tblastx{
 	if ( $coverage > $max ){
 	  $max = $coverage;
 	}
-	print STDERR "max: $max\n";
+	#print STDERR "max: $max\n";
 	my $id;
 	my $extent; 
 	my $sum_percent_id;
 	my $strand;
 	foreach my $f ( @{$orthologues[$i]} ){
-	  $id = $f->hseqname;
+	    $id = $f->hseqname;
 	  $sum_percent_id += $f->percent_id;
 	  $extent = $f->seqname;
 	  $strand = $f->strand;
 	}
-	my $perc_id = sprintf "%2.2f", (3*$sum_percent_id/scalar( @{$orthologues[$i]} ));
+	my $perc_id = sprintf "%2.2f", ($sum_percent_id/scalar( @{$orthologues[$i]} ));
 	my $g_id = $gene_id->{$transcript};
 	print STDERR "$focus_species $g_id $id $target_species coverage:$coverage percent_id:$perc_id target_id:$extent strand:$strand\n";
       }
