@@ -970,6 +970,39 @@ sub make_Translation{
     my @exons = $transcript->each_Exon;
 
 
+    my $exon  = $exons[0];
+
+    print("Starting exon is " . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n");
+
+    if ($exon->phase != 0) {
+	my $tmpphase = $exon->phase;
+	print ("Old coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
+
+	print ("Old translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+	print ("Old translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+	print ("Old translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+	
+	print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
+	if ($exon->strand == 1) {
+	    my $tmpstart = $exon->start;
+	    $exon->start($tmpstart + 3 - $tmpphase);
+	    $exon->phase(0);
+	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+	} else {
+	    my $tmpend= $exon->end;
+	    $exon->end($tmpend - 3 + $tmpphase);
+	    print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
+	    $exon->phase(0);
+	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
+	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
+	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
+	}
+	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
+    }   
+
+
     print ("Transcript strand is " . $exons[0]->strand . "\n");
 
     if ($exons[0]->strand == 1) {
@@ -984,40 +1017,19 @@ sub make_Translation{
 	$translation->end          ($exons[$#exons]->start);
 	
     }
-
-    my $exon  = $exons[0];
-    if ($exon->phase != 0) {
-	my $tmpphase = $exon->phase;
-	
-	print ("Old translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-	print ("Old translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-	print ("Old translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
-	
-	print("Starting phase is not 0 " . $tmpphase . "\n");
-	if ($exon->strand == 1) {
-	    my $tmpstart = $exon->start;
-	    $exon->start($tmpstart - 3 + $tmpphase);
-	    $exon->phase(0);
-	} else {
-	    my $tmpend= $exon->end;
-	    $exon->end($tmpend -  $tmpphase);
-	    $exon->phase(0);
-	    print ("New translation is " . $exon->seq->translate('*','X',0)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',1)->seq . "\n");
-	    print ("New translation is " . $exon->seq->translate('*','X',2)->seq . "\n");
-	}
-    }   
     
     $translation->start_exon_id($exons[0]->id);
     $translation->end_exon_id  ($exons[$#exons]->id);
     
-    my $endphase = 0;
-    print ("Making translation\n");
+    my $endphase = $exons[0]->end_phase
+;
+    print ("Making translation " . $endphase . "\n");
 
     if ($exons[0]->phase != 0) {
 	print STDERR "ERROR: start exon phase is not 0";
     }
-    
+    shift @exons;
+
     foreach my $exon (@exons) {
 	$exon->phase         ($endphase);
 	$endphase = $exon->end_phase;
@@ -1063,6 +1075,7 @@ sub set_ExonEnds {
 	    if (abs($genscan->end - $exon->end) < $gap) {
 		$rightend = $genscan->end;
 	    }
+
 	}
     }
 
@@ -1121,13 +1134,13 @@ sub set_ExonEnds {
 	print ("found 1\n");
     }
 
-    my $tran2 = $prim->translate('*','X',1);
+    my $tran2 = $prim->translate('*','X',2);
     if ($tran2->seq !~ /\*/) {
 	$self->add_ExonFrame($exon,2);
 	print ("found 2\n");
     }
 
-    my $tran3 = $prim->translate('*','X',2);
+    my $tran3 = $prim->translate('*','X',1);
     if ($tran3->seq !~ /\*/) {
 	$self->add_ExonFrame($exon,3);
 	print ("found 3\n");
@@ -1165,9 +1178,9 @@ sub check_ExonPair {
     my $match  = 0;
     my $oldphase1 = $exon1->phase;
     my $oldphase2 = $exon2->phase;
-
+    
     foreach my $frame (keys %$frame1) {
-
+	
 	$exon1->phase($frame-1);
 	my $endphase = $exon1->end_phase;
 	print ("Looking for exon2 phase of " . $endphase+1 . "\n");
@@ -1177,8 +1190,11 @@ sub check_ExonPair {
 	    $match = 1;
 	    $exon2->phase($endphase);
 
-	    print("exon 1 " . $exon1->id . " translation $frame : " . $exon1->seq->translate('*','X',$exon1->phase)->seq . "\n");
-	    print("exon 2 " . $exon2->id . " translation " . ($endphase+1) . " : " . $exon2->seq->translate('*','X',$exon2->phase)->seq . "\n");
+	    my $trans1 = $exon1->seq->translate('*','X',(3-$exon1->phase)%3)->seq;
+	    my $trans2 = $exon2->seq->translate('*','X',(3-$exon2->phase)%3)->seq;
+
+	    print("exon 1 " . $exon1->id . " translation $frame : " . $trans1. "\n");
+	    print("exon 2 " . $exon2->id . " translation " . ($endphase+1) . " : " . $trans2. "\n");
 
 	    if ($self->add_ExonPhase($exon1) && $self->add_ExonPhase($exon2)) {
 		return $match;
