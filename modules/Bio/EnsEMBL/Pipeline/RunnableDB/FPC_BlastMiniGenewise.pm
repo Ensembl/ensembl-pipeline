@@ -46,6 +46,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
+use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Exon;
@@ -63,6 +64,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_GENETYPE
 					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
 					 GB_INPUTID_REGEX
+					 GB_TARGETTED_GW_GENETYPE
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -148,7 +150,7 @@ sub write_output {
     #print STDERR "Contig        : " . $slice->id . " \n";
     #print STDERR "Length is     : " . $genseq->length . "\n\n";
     
-    my @genes     = $slice->get_Genes_by_type('TGE_gw');
+    my @genes     = $slice->get_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
     #print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
 
     foreach my $database(@{$GB_SIMILARITY_DATABASES}){
@@ -386,15 +388,19 @@ sub _make_transcript{
     $exon->contig($contig);  # replaces the attach_seq method
 
     # sort out supporting evidence for this exon prediction
-    foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->score(100);
-      $subf->feature1->analysis($analysis_obj);
-	
-      $subf->feature2->score(100);
-      $subf->feature2->analysis($analysis_obj);
-      
-      $exon->add_Supporting_Feature($subf);
-    }
+    my @sf = $exon_pred->sub_SeqFeature;
+    
+    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
+    
+    $align->seqname($contig->dbID);
+    $align->contig($contig);
+    my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
+    $align->adaptor($prot_adp);
+    $align->score(100);
+    $align->analysis($analysis_obj);
+    
+    $exon->add_Supporting_Feature($align);
+  
     
     push(@exons,$exon);
     
@@ -966,7 +972,7 @@ sub make_seqfetcher {
     my @db = ( $index );
     
     # make sure that your class is compatible with the index type
-    $seqfetcher = "$class"->new('-db' => \@db, );
+    $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
     
   }
   else{
