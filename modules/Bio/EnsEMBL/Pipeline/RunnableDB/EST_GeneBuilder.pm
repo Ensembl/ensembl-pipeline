@@ -476,7 +476,7 @@ sub check_transcripts {
   my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
 
   TRANS: 
-  foreach my $transcript(@transcripts){
+  foreach my $transcript (@transcripts){
     my @exons = $transcript->get_all_Exons;
     my $hid;
     my $strand;
@@ -497,6 +497,7 @@ sub check_transcripts {
       }
       
       # check supporting_feature consistency
+      # print STDERR "In EST_GeneBuilder.check_transcripts()...";
       $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @sf = $exon->each_Supporting_Feature;      
 
@@ -505,7 +506,9 @@ sub check_transcripts {
 	# because we get all the supporting features indiscriminately
 	next SF unless $feature->source_tag eq 'exonerate_e2g';
 	
-	if(!defined $hid) { $hid = $feature->hseqname; }
+	if(!defined $hid) { 
+	  $hid = $feature->hseqname; 
+	}
 	
 	if($hid ne $feature->hseqname){
 	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
@@ -527,6 +530,7 @@ sub check_transcripts {
     if(defined $hid && defined $$hid_trans{$hid}) { 
       $self->warn("$hid is being used by more than one transcript!\n"); 
     }
+#    print STDERR "hid: ".$hid."\ttranscript: ".$transcript."\n";
     $$hid_trans{$hid} = $transcript;
   }
 
@@ -588,41 +592,69 @@ sub make_clusters {
   my @exon_clusters = $main_cluster->sub_SeqFeature;
   print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters found\n";
   
+## we allow clusters with cDNA (or mRNA) evidence if they have 
+## one or more exons, hence in this case 'strict_lower_bound' = 0, but we don't allow 
+## single-exon clusters with only ESTs as supporting evidence, hence in this case 'strict_lower_boundt' = 1
+
+  my $strict_lower_bound = $::evidence_conf{'strict_lower_bound'};
+  
   # empty out the list of clusters
   $main_cluster->flush_sub_SeqFeature;
-  print STDERR "Throwing away clusters with one exon if it has EST hits only...\n";
+  print STDERR "Keeping clusters with ".($strict_lower_bound+1)." or more exons...\n";
 
-  ################################################################################
-  # NOTE THAT THIS IS A HACK TO MAKE IT WORK IN DROSOPHILA
-  # THE DISTINCTION BETWEEN EST and cDNA SHOULD BE READ FROM analysisId or maybe analysis name 
-  ################################################################################
+  #my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
  EXON_CLUSTER:
   foreach my $exon_cluster (@exon_clusters) {
     my @exons = $exon_cluster->sub_SeqFeature;
+    
+    # throw away empty clusters
     if ( scalar(@exons) == 0 ){
       next EXON_CLUSTER;
     }
-    if ( scalar(@exons) == 1 ){
-      my $found_est  = 0;
-      my $found_cdna = 0;
-      foreach my $feature ( $exons[0]->each_Supporting_Feature ){
-	my $hid = $feature->hseqname;
-	if ( $hid =~ /\./g ){  # ESTs have labels like AT19106.5prime or like LD23056.contig.5_3prime
-	  $found_est = 1;
-	}
-	else{                  # whereas cDNAs have labels like AI944764 (without dots)
-	  $found_cdna = 1;
-	}
-      }
-      if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
+    
+    #$exon_adaptor->fetch_evidence_by_Exon($exons[0]);
+    #my @sf = $exons[0]->each_Supporting_Feature;      
+    
+    # throw away clusters with too little exons (this should be set in Bio::EnsEMBL::Pipeline::EST_conf.pl)
+    unless ( scalar(@exons) > $strict_lower_bound ){
 	next EXON_CLUSTER; 
-      }
     }
+    
+    # keep the rest
     $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
   }
   
+#  ################################################################################
+#  # NOTE THAT WHAT FOLLOWS IS A HACK TO MAKE IT WORK IN DROSOPHILA BECAUSE cDNAs and ESTs
+#  # WHERE MIXED IN THE SAME DATABASE, IT IS RECOMMENDED TO RUN THESE INDEPENDENTLY
+#  ################################################################################
+# EXON_CLUSTER:
+#  foreach my $exon_cluster (@exon_clusters) {
+#    my @exons = $exon_cluster->sub_SeqFeature;
+#    if ( scalar(@exons) == 0 ){
+#      next EXON_CLUSTER;
+#    }
+#    if ( scalar(@exons) == 1 ){
+#      my $found_est  = 0;
+#      my $found_cdna = 0;
+#      foreach my $feature ( $exons[0]->each_Supporting_Feature ){
+#	my $hid = $feature->hseqname;
+#	if ( $hid =~ /\./g ){  # ESTs have labels like AT19106.5prime or like LD23056.contig.5_3prime
+#	  $found_est = 1;
+#	}
+#	else{                  # whereas cDNAs have labels like AI944764 (without dots)
+#	  $found_cdna = 1;
+#	}
+#      }
+#      if ( $found_est == 1 && $found_cdna != 1){   # keep clusters with one exon only if it has a cDNA hit
+#	next EXON_CLUSTER; 
+#      }
+#    }
+#    $main_cluster->add_sub_SeqFeature($exon_cluster,'EXPAND');
+#  }
+  
   @exon_clusters = $main_cluster->sub_SeqFeature;
-  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters found\n";
+  print STDERR "In EST_GeneBuilder.make_clusters(), ".scalar( @exon_clusters )." exon clusters kept\n";
       
   return $main_cluster;
 }
@@ -984,7 +1016,6 @@ sub process_clusters{
       
       # with the new representative exon in it
       $transcript->add_Exon($exon);
-      #print STDERR "going to put a transcript: ".ref($transcript)."\n";
       $self->_put_Transcript($transcript);
       
       # cluster the exons into transcripts according to the cluster-pairs made before
@@ -994,7 +1025,7 @@ sub process_clusters{
   # at this point we could check/set transcript ids, order of exons, etc...
 
   print STDERR "In EST_GeneBuilder.process_clusters: "
-    .scalar( $self->_get_all_Transcripts )." have been created\n";
+    .scalar( $self->_get_all_Transcripts )." transcripts have been created\n";
   return $self->_get_all_Transcripts;
 }
 
@@ -1028,14 +1059,23 @@ sub _recurseTranscript {
       
       if ($count>0){ # this occurs for a second link at a given cluster
 	
-	print STDERR "\n STARTING AN ALTERNATIVE TRANSCRIPT \n\n";
+	#print STDERR "\n STARTING AN ALTERNATIVE TRANSCRIPT \n\n";
 
 	# Start a new transcript
 	my $new_transcript = new Bio::EnsEMBL::Transcript;
 	
 	# put in it everything we have at this level
 	foreach my $temp_exon ( $temp_transcript->get_all_Exons ){
-	  $new_transcript->add_Exon($temp_exon);
+	  
+	  # we put a new one to make sure that exons are not shared between transcripts
+	  my $exon_copy = new Bio::EnsEMBL::Exon;
+	  $exon_copy->start($temp_exon->start);
+	  $exon_copy->end($temp_exon->end);
+	  $exon_copy->strand($temp_exon->strand);
+	  foreach my $sf ( $temp_exon->each_Supporting_Feature ){
+	    $exon_copy->add_Supporting_Feature($sf);
+	  }
+	  $new_transcript->add_Exon($exon_copy);
 	}
 	
 	# add the next exon in the link
@@ -1137,7 +1177,6 @@ sub _isHead {
      
       my @overlap = $self->match($cluster,$forward_link); 
       if ( $cluster->start == $forward_link->start ){
-	#print STDERR "returning from _isHead\n";
 	return 0;
       }
      ## this thing below is just an alternative way to see whether two clusters are the same
@@ -1250,8 +1289,7 @@ sub run {
   # run genomewise 
 
   # sort out analysis & genetype here or we will get into trouble with duplicate analyses
-  #  my $genetype = 'genomewise'; 
-  my $genetype = "new_genomewise_no1est";   # genes get written in the database with this type-name
+  my $genetype = "genomewise_fixed";   # genes get written in the database with this type-name
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis_obj;
