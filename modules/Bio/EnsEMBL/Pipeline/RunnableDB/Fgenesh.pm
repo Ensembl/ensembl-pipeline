@@ -91,13 +91,15 @@ sub new {
 
 
 
+
 =head2 fetch_input
 
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data fgenesh from the database
-    Returns :   none
-    Args    :   none
+  Args       : none
+  Example    : none
+  Description: Fetches input data for fgenesh from the database
+  Returntype : none
+  Exceptions : none
+  Caller     : Pipeline::Job
 
 =cut
 
@@ -192,7 +194,7 @@ sub write_output {
 
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
-     my @exons = $trans->get_all_Exons();
+     my @exons = @{$trans->get_all_Exons()};
 
      if ($exons[0]->strand == 1) {
        @exons = sort {$a->start <=> $b->start } @exons;
