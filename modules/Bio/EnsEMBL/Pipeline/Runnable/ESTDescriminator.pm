@@ -53,7 +53,7 @@ sub run {
   my $self = shift;
 
   my %hash_of_ests_and_gene_mapping = 
-    $self->_cluster_ests_with_genes;
+    %{$self->_cluster_ests_with_genes};
 
   ### This is were I fell asleep
 
@@ -102,7 +102,7 @@ sub _cluster_ests_with_genes {
 
   my %all_shared_ests;
   foreach my $gene_id (keys %{$self->_gene_lookup}){
-    my $est_ids = $self->_find_shared_ests_by_gene_id;
+    my $est_ids = $self->_find_shared_ests_by_gene_id($gene_id);
     foreach my $est_id (@$est_ids){
       $all_shared_ests{$est_id}++;
     }
@@ -119,7 +119,7 @@ sub _cluster_ests_with_genes {
 
     my @est_gene_distances;
 
-    my $genes_that_share_this_est = $self->_find_genes_by_est_id;
+    my $genes_that_share_this_est = $self->_find_genes_by_est_id($est_id);
 
       # EST vs gene distances
 
@@ -264,8 +264,6 @@ sub _calculate_gene_vs_est_distances {
       # sequence for calculating distance
       next if $align_seq->name eq 'genomic_sequence';
 
-      my $seq = Bio::Seq->new(-display_id => $align_seq->name,
-	  		      -seq        => $align_seq->seq);
       my $locatable_seq = Bio::LocatableSeq->new(
                             -id       => $align_seq->name,
                             -seq      => $align_seq->seq,
@@ -285,10 +283,11 @@ sub _calculate_gene_vs_est_distances {
 					-method => 'Kimura');
 
     # Store result of first column of result matrix (ie. gene vs ests)
+print STDERR "Pairwise distances between gene sequence [$gene_id] and ESTs : \n";
     for (my $row = 1; $row < scalar @$distances; $row++) {
       next if $sequence_order[$row-1] eq 'exon_sequence';
       next unless defined $distances->[$row];
-
+print STDERR "Pairwise distance : [$row] : " . $distances->[$row]->[1] . "\n";
       $self->_pairwise_distance($gene_id, 
 				$sequence_order[$row-1], 
 				$distances->[$row]->[1])
