@@ -23,9 +23,9 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 
 
-my $dbhost      = '';
-my $dbuser    = '';
-my $dbname    = '';
+my $dbhost      = 'ecs2d';
+my $dbuser    = 'ensro';
+my $dbname    = 'caenorhabditis_elegans_core_10_93';
 my $dbpass    = undef;
 
 
@@ -52,7 +52,7 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
   
   eval {
     my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
-    my $gene_id = $gene->stable_id();
+    my $gene_id = $gene->dbID();
     
     foreach my $trans ( @{$gene->get_all_Transcripts}) {
       # get out first exon. Tag it to clone and gene on this basis
@@ -67,7 +67,8 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
 	next;
       }
       my $gene_version = $gene->version;
-      my $trans_id = $trans->translation->stable_id."\n";
+      my $trans_id = $trans->translation->dbID;
+      $tseq->display_id($trans_id);
       $tseq->desc("Translation id ".$trans_id." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
       $seqio->write_seq($tseq);
     }
