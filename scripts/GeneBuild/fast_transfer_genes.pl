@@ -64,74 +64,105 @@ else{
     print STDERR "transferring all genes\n";
 }
 
+GENE:
 foreach my $gene_id (@gene_ids){
-    my $gene;
-    eval {
-	#print STDERR "fetching $gene_id\n";
-	$gene = $source_gene_adaptor->fetch_by_dbID($gene_id);
-    };
-    if ( $@ ){
-	print STDERR "Unable to read gene ".$gene->dbID." $@\n";
+  my $gene;
+  eval {
+    #print STDERR "fetching $gene_id\n";
+    $gene = $source_gene_adaptor->fetch_by_dbID($gene_id);
+  };
+  if ( $@ ){
+    my $id;
+    if (defined $gene->dbID){
+      $id = $gene->dbID;
     }
-    
-    # check if we are using type
-    if ($genetype){
-	unless ( $gene->type eq $genetype ){
-	    next;
-	}
+    else{
+      $id = 'no id';
     }
-    
-    
-    ##############################
-    # check few things first
-    ##############################
-    
-    if ($info){
-	print STDERR "gene: ".$gene->dbID."\n";
-	my @transcripts = @{$gene->get_all_Transcripts};
-	
-	foreach my $tran (@transcripts){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-	    
-	    if ( defined $tran->translation){
-	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
-	    }
-	    else { 
-		print STDERR "translation not found!\n";
-	    }
-	}
+    print STDERR "Unable to read gene ".$id." $@\n";
+    next GENE;
+  }
+  
+  # check if we are using type
+  if ($genetype){
+    unless ( $gene->type eq $genetype ){
+      next GENE;
     }
+  }
+  
     
-    ##############################
-    # store gene, same assembly so no need to massage it
-    ##############################
-    eval{	
-	print STDERR "storing gene ...\n";
-	$target_gene_adaptor->store($gene);
-    };
-    if ( $@ ){
-	print STDERR "Unable to store gene ".$gene->dbID." $@\n";
+  ##############################
+  # check few things first
+  ##############################
+  
+  if ($info){
+    my $id;
+    if (defined $gene->dbID){
+      $id = $gene->dbID;
     }
-    
-    ##############################
-    # info about the stored gene
-    ##############################
-    
-    if ($info){
-	print STDERR "gene: ".$gene->dbID."\n";
-	my @transcripts = @{$gene->get_all_Transcripts};
-	
-	foreach my $tran (@transcripts){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-	    
-	    if ( defined $tran->translation){
-	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
-	    }
-	    else { 
-		print STDERR "translation not found!\n";
-	    }
-	}
+    else{
+      $id = 'no id';
     }
+    print STDERR "gene: ".$id."\n";
+    my @transcripts = @{$gene->get_all_Transcripts};
+    
+    foreach my $tran (@transcripts){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+      
+      if ( defined $tran->translation){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
+      }
+      else { 
+	print STDERR "translation not found!\n";
+      }
+    }
+  }
+  
+  ##############################
+  # store gene, same assembly so no need to massage it
+  ##############################
+  eval{	
+    print STDERR "storing gene ...\n";
+    $target_gene_adaptor->store($gene);
+  };
+  if ( $@ ){
+    my $id;
+    if (defined $gene->dbID){
+      $id = $gene->dbID;
+    }
+    else{
+      $id = 'no id';
+    }
+    print STDERR "Unable to store gene ".$id." $@\n";
+    next GENE;
+  }
+  
+  ##############################
+  # info about the stored gene
+  ##############################
+  
+  if ($info){
+    my $id;
+    if (defined $gene->dbID){
+      $id = $gene->dbID;
+    }
+    else{
+      $id = 'no id';
+    }
+    print STDERR "gene: ".$id."\n";
+    my @transcripts = @{$gene->get_all_Transcripts};
+    
+    foreach my $tran (@transcripts){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+      
+      if ( defined $tran->translation){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
+      }
+      else { 
+	print STDERR "translation not found!\n";
+      }
+    }
+  }
 }
 
 
