@@ -1216,8 +1216,6 @@ sub make_Genes {
     # if we get here, the transcript should be fine
     next TRANSCRIPT unless $valid;
     
-#    print STDERR "Processing " . $tran->{'temporary_id'} . "\n";
-    
     $trancount++;
     
     my $found = undef;
@@ -1230,8 +1228,6 @@ sub make_Genes {
 	  
 	  if ($exon->overlaps($gene_exon)) {
 	    if ($exon->strand == $gene_exon->strand) {
-	      #		      $self->print_Exon($exon);
-	      #		      $self->print_Exon($gene_exon);
 	      $found = $gene;
 	      last GENE;
 	    } 
@@ -1245,7 +1241,6 @@ sub make_Genes {
     
     if (defined($found)) {
       $found->add_Transcript($tran);
-#      print STDERR "adding " . $tran->{'temporary_id'} . "\n";
     } 
     else {
       my $gene = new Bio::EnsEMBL::Gene;
@@ -1254,7 +1249,6 @@ sub make_Genes {
       $genecount++;
       $gene->add_Transcript($tran);
       push(@genes,$gene);
-#      print STDERR "making new gene from " . $tran->{'temporary_id'} . "\n";
     }
   } # end TRANSCRIPT
   
@@ -2675,15 +2669,26 @@ sub prune_gene {
   my %exonhash;
   my @newtran;
 
-#  print STDERR "\nProcessing cluster\n";
   foreach my $tran (@transcripts) {
-#    print STDERR "Transcript " . $tran->{'temporary_id'} . "\tlength: " . $sizehash{$tran->{'temporary_id'}} . "\n";
     my @exons = $tran->get_all_Exons;
     $tran->sort;
 
     my $i     = 0;
     my $found = 1;
     
+
+# 10.1.2002 VAC we know there's a potential problem here - single exon transcripts which are in a 
+# cluster where the longest transcriopt has > 1 exon are not going to be considered in 
+# this loop, so they'll always be marked "transcript already seen"
+# How to sort them out? If the single exon overlaps an exon in a multi exon transcript then 
+# by our rules it probably ought to be rejected the same way transcripts with shared exon-pairs are.
+# Tough one.
+# more of a problem is that if the transcript with the largest number of exons is really a
+# single exon with frameshifts, it will get rejected here based on intron size but in addition
+# any valid non-frameshifted single exon transcripts will get rejected - which is definitely not right.
+# We need code to represent frameshifted exons more sensibly so the frameshifted one doesn't 
+# get through the check for single exon genes above.
+
     for ($i = 0; $i < $#exons; $i++) {
       my $foundpair = 0;
       my $exon1 = $exons[$i];
