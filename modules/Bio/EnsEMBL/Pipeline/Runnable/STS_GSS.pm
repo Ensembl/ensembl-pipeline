@@ -14,8 +14,8 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
-use Bio::Tools::BPlite;
-use Bio::Tools::BPlite::HSP;
+use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -31,7 +31,9 @@ sub new {
     my $self = $class->SUPER::new(@args);    
 
     $self->{'_query'}     = undef;     # location of Bio::Seq object
-    $self->{'_program'}   = undef;     # location of Blast
+    $self->{'_unmasked'} = undef;
+    $self->{'_blast_program'}   = undef;     # location of Blast
+    $self->{'_est_program'}   = undef;     # location of Blast
     $self->{'_database'}  = undef;     # name of database
     $self->{'_threshold'} = undef;     # Threshold for hit filterting
     $self->{'_options'}   = undef;     # arguments for blast
@@ -44,12 +46,13 @@ sub new {
     $self->{'_seqfetcher'} = undef;
     $self->{'_prune'}     = 1;         # 
     $self->{'_coverage'}  = 10;
-    $self->{'_merged_hsps'} =[];
+    $self->{'_merged_features'} =[];
     # Now parse the input options and store them in the object
     #print "@args\n";
-    my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$options, $seqfetcher) = 
-	    $self->_rearrange([qw(QUERY 
-				  PROGRAM 
+    my( $query, $unmasked, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$options, $seqfetcher) = 
+	    $self->_rearrange([qw(QUERY
+				  UNMASKED
+				  PROGRAM
 				  DATABASE 
 				  THRESHOLD
 				  THRESHOLD_TYPE
@@ -66,8 +69,14 @@ sub new {
     } else {
       $self->throw("No query sequence input.");
     }
+    if ($unmasked) {
+      $self->unmasked($unmasked);
+    } else {
+      $self->throw("No unmasked query sequence input.");
+    }
     #print STDERR "find executable output ".$self->find_executable($program)."\n";
     $self->program($self->find_executable($program));
+   
     if ($database) {
       $self->database($database);
     } else {
@@ -138,14 +147,28 @@ sub clone {
 }
 
 
+sub unmasked {
+    my ($self, $seq) = @_;
+    if ($seq) {
+      unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
+        $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+      }
+
+      $self->{'_unmasked'} = $seq ;
+
+     
+    }
+    return $self->{'_unmasked'};
+}
+
 sub program {
   my ($self, $location) = @_;
   
   if ($location) {
     $self->throw("executable not found at $location: $!\n")     unless (-e $location && -x $location);
-    $self->{'_program'} = $location ;
+    $self->{'_blast_program'} = $location ;
   }
-  return $self->{'_program'};
+  return $self->{'_blast_program'};
 }
 
 
@@ -168,7 +191,23 @@ sub options {
   }
   return $self->{'_options'};
 }
+sub prune {
+  my ($self,$arg) = @_;
 
+  if (defined($arg)) {
+    $self->{_prune} = $arg;
+  }
+  return $self->{_prune};
+}
+
+sub coverage {
+  my($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_coverage} = $arg;
+  }
+  return $self->{_coverage};
+}
 sub filter {
     my ($self,$args) = @_;
 
@@ -230,20 +269,20 @@ sub seqfetcher {
   return $self->{'_seqfetcher'};
 }
 
-sub add_merged_hsp{
-  my ($self, $hsp) = @_;
-  if(!$hsp){
-    $self->throw("no hsp passed : $!\n");
+sub add_merged_feature{
+  my ($self, $feature) = @_;
+  if(!$feature){
+    $self->throw("no feature passed : $!\n");
   }else{
-    push(@{$self->{'_merged_hsps'}}, $hsp);
+    push(@{$self->{'_merged_features'}}, $feature);
   }
 }
 
-sub each_merged_hsp{
+sub each_merged_feature{
 
   my ($self) = @_;
 
-  return@{$self->{'_merged_hsps'}};
+  return@{$self->{'_merged_features'}};
 
 }
 
@@ -263,207 +302,142 @@ sub run {
   #print STDERR "checked directories\n";
   #write sequence to file
   $self->writefile(); 
-  $self->run_analysis();
+  my @blast_output = $self->run_blasts();
   #print STDERR "ran analysis\n";
   #parse output and create features
-  $self->parse_results;
+  $self->parse_features(\@blast_output);
+  my @features = $self->each_merged_feature;
+  my @results;
+  foreach my $feature(@features){
+   # print "running on ".$feature->hseqname." with score ".$feature->score." and evalue ".$feature->p_value."\n";
+    my @genes = $self->run_est2genome($feature);
+    push(@results, @genes);
+  }
   $self->deletefiles();
-
-  #return @hsps;
+  $self->update_analysis(\@results);
+  $self->output(\@results);
+  
 }
 
 
 
-sub run_analysis {
+sub run_blasts {
    
   my ($self) = @_;
-  
-  # This routine expands the database name into $db-1 etc for
-  # split databases
 
-  my @databases = $self->fetch_databases;
-  
-  $self->database(@databases);
+  my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query => $self->clone,
+							   -program => $self->program,
+							   -database => $self->database,
+							   -threshold => $self->threshold,
+							   -threshold_type => $self->threshold_type,
+							   -filter => $self->filter,
+							   -coverage => $self->coverage,
+							   -prune => $self->prune,
+							   -options => $self->options,
+							   
+							  );
 
-  foreach my $database (@databases) {
-    my $db = $database;
-    print "database ".$database."\n";
-    $db =~ s/.*\///;
-    #allow system call to adapt to using ncbi blastall. defaults to WU blast.	
-    my $command = $self->program ;
-    $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
-    $command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
-    $command .= ' '.$self->options. ' > '.$self->results . ".$db";
-    print $command."\n";
-    $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
-  }
+  $blast->run;
+  my @features = $blast->output;
+
+  return @features;
+							    
 }
 
 
 
-sub fetch_databases {
-  my ($self) = @_;
+
+sub parse_features {
+  my ($self, $features) = @_;
+
+ 
   
-  my @databases;
-    
-  my $fulldbname;
-
-  # If we have passed a full path name don't append the $BLASTDB
-  # environment variable.
+  my @features = @$features;
+ 
   
-  if ($self->database =~ /\//) {
-    $fulldbname = $self->database;
-  } else {
-    $fulldbname = $ENV{BLASTDB} . "/" .$self->database;
-  }
-  
-  # If the expanded database name exists put this in
-  # the database array.
-  #
-  # If it doesn't exist then see if $database-1,$database-2 exist
-  # and put them in the database array
-  
-  if (-e $fulldbname) {
-    push(@databases,$self->database);
-  } else {
-    my $count = 1;
-    
-    while (-e $fulldbname . "-$count") {
-      push(@databases,$fulldbname . "-$count");
-      $count++;
-    }
-  }
-  
-  if (scalar(@databases) == 0) {
-    $self->throw("No databases exist for " . $self->database);
-  }
-
-  return @databases;
-
-}
-
-sub get_parsers {
-  my ($self)  = @_;
-
-  my @parsers;
-
-  foreach my $db ($self->database) {
-    $db =~ s/.*\///;
-
-    my $fh = new FileHandle;
-    $fh->open("<" . $self->results . ".$db");
-    
-    my $parser = new Bio::Tools::BPlite ('-fh' => $fh);
-    
-    push(@parsers,$parser);
-  } 
-
-  return @parsers;
-}
-
-
-sub parse_results {
-  my ($self) = @_;
-
-  my %ids;
-
-  my @parsers;
-
-  
-  @parsers = $self->get_parsers;
-  
-  my @hsps;
-  foreach my $parser (@parsers) {
-    while (my $sbjct = $parser->nextSbjct) {
-      while (my $hsp = $sbjct->nextHSP) {
-	push(@hsps,$hsp);
-      }
-    }
-  }
-  
-  #return @hsps;
-  print "there are ".scalar(@hsps)."\n";
+  #return @features;
+  #print "there are ".scalar(@features)."\n";
   my %unique_hids;
 
-  foreach my $hsp(@hsps){
-    my @hseqname = split /\|/, $hsp->hseqname();
-    $unique_hids{$hseqname[1]} ||= [];
-    push(@{$unique_hids{$hseqname[1]}}, $hsp);
+  foreach my $feature(@features){
+    my $hseqname = $feature->hseqname();
+    $unique_hids{$hseqname} ||= [];
+    push(@{$unique_hids{$hseqname}}, $feature);
   }
   
   my @hids = keys(%unique_hids);
 
   foreach my $hid(@hids){
-    #  print "hsp ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
-    my @hsp_array = @{$unique_hids{$hid}};
+    #  print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
+    my @feature_array = @{$unique_hids{$hid}};
     my $hid_seq = $self->seqfetcher->get_Seq_by_acc($hid);
     my $hid_len = $hid_seq->length;
-    foreach my $hsp(@hsp_array){
-#      #print "before seqname = ".$hid." length = ".$hid_len." \nstart ".$hsp->start." end ".$hsp->end." strand ".$hsp->strand." hstart ".$hsp->hstart." hend ".$hsp->hend."\n";
-      my $genomic_start = $hsp->start;
-      my $genomic_end = $hsp->end;
-      my $hstart = $hsp->hstart;
-      my $hend = $hsp->hend;
-     if($hsp->strand == -1){
-	$hsp->start($genomic_start-($hid_len+100));
-	if($hsp->start <= 0){
-	  $hsp->start(1);
+    foreach my $feature(@feature_array){
+      #print "before seqname = ".$hid." length = ".$hid_len." start ".$feature->start." end ".$feature->end." strand ".$feature->strand." hstart ".$feature->hstart." hend ".$feature->hend."\n";
+      my $genomic_start = $feature->start;
+      my $genomic_end = $feature->end;
+      my $hstart = $feature->hstart;
+      my $hend = $feature->hend;
+     if($feature->strand == -1){
+	$feature->start($genomic_start-($hid_len+200));
+	if($feature->start <= 0){
+	  $feature->start(1);
 	}
-	$hsp->end($genomic_end+($hstart+100));
-	if($hsp->end >= $self->clone->length){
-	  $hsp->end($self->clone->length);
+	$feature->end($genomic_end+($hstart+200));
+	if($feature->end >= $self->clone->length){
+	  $feature->end($self->clone->length);
 	}
-	$hsp->hstart(1);
-	$hsp->hend($hid_len);
-      }elsif($hsp->strand == 1){
-	$hsp->start($genomic_start-($hstart+100));
-	if($hsp->start <= 0){
-	  $hsp->start(1);
+	$feature->hstart(1);
+	$feature->hend($hid_len);
+      }elsif($feature->strand == 1){
+	$feature->start($genomic_start-($hstart+200));
+	if($feature->start <= 0){
+	  $feature->start(1);
 	}
-	$hsp->end($genomic_end+($hid_len+100));
-	if($hsp->end >= $self->clone->length){
-	  $hsp->end($self->clone->length);
+	$feature->end($genomic_end+($hid_len+200));
+	if($feature->end >= $self->clone->length){
+	  $feature->end($self->clone->length);
 	}
-	$hsp->hstart(1);
-	$hsp->hend($hid_len);
+	$feature->hstart(1);
+	$feature->hend($hid_len);
       }else{
-	$self->throw($hsp->hseqname." has got ".$hsp->strand." as a stand : $!\n");
+	$self->throw($feature->hseqname." has got ".$feature->strand." as a stand : $!\n");
       }
   
-      #print "after seqname = ".$hid."\nstart ".$hsp->start." end ".$hsp->end." hstart ".$hsp->hstart." hend ".$hsp->hend."\n";
+      #print "after seqname = ".$hid."start ".$feature->start." end ".$feature->end." hstart ".$feature->hstart." hend ".$feature->hend." strand ".$feature->strand."\n";
     }
    ####needs to merge overlapping sequences#### 
-    my @sorted_forward_hsps;
-    my @sorted_reverse_hsps;
-    foreach my $hsp(@hsp_array){
-      if($hsp->strand == -1){
-	push(@sorted_reverse_hsps, $hsp)
-      }elsif($hsp->strand == 1){
-	push(@sorted_forward_hsps, $hsp)
+    my @sorted_forward_features;
+    my @sorted_reverse_features;
+    foreach my $feature(@feature_array){
+      if($feature->strand == -1){
+	push(@sorted_reverse_features, $feature)
+      }elsif($feature->strand == 1){
+	push(@sorted_forward_features, $feature)
       }else{
-	$self->throw($hsp->hid." hasn't got a stand : $!\n");
+	$self->throw($feature->hid." hasn't got a stand : $!\n");
       }
     }
-    @sorted_forward_hsps = sort{$a->start <=> $b->start || $a->end <=> $b->end} @sorted_forward_hsps;
-    @sorted_reverse_hsps = sort{$a->start <=> $b->start || $a->end <=> $b->end} @sorted_reverse_hsps;
-    $self->fuse_overlapping_hsps(\@sorted_forward_hsps);
-    $self->fuse_overlapping_hsps(\@sorted_reverse_hsps);
+    @sorted_forward_features = sort{$a->start <=> $b->start || $a->end <=> $b->end} @sorted_forward_features;
+    @sorted_reverse_features = sort{$a->start <=> $b->start || $a->end <=> $b->end} @sorted_reverse_features;
+    $self->fuse_overlapping_features(\@sorted_forward_features);
+    $self->fuse_overlapping_features(\@sorted_reverse_features);
   }
 
-  my @merged = $self->each_merged_hsp;
+  my @merged = $self->each_merged_feature;
 
-  print "there are ".scalar(@merged)." hsps\n";
+  #print "there are ".scalar(@merged)." features\n";
 }
 
-sub fuse_overlapping_hsps {
+sub fuse_overlapping_features {
     
-  my ($self, $hsp_ref) = @_;
+  my ($self, $feature_ref) = @_;
   
-  my @hsps = @$hsp_ref;
+  my @features = @$feature_ref;
   
-    for (my $i = 1; $i < @hsps;) {
-        my $f_a = $hsps[$i - 1];
-        my $f_b = $hsps[$i];
+    for (my $i = 1; $i < @features;) {
+        my $f_a = $features[$i - 1];
+        my $f_b = $features[$i];
         
         # If coordinates overlap or abut
         if ($f_a->end + 1 >= $f_b->start) {
@@ -473,7 +447,7 @@ sub fuse_overlapping_hsps {
             }
             
             # Remove b from the list
-            splice(@hsps, $i, 1);
+            splice(@features, $i, 1);
             
             # Critical error check!
             if ($f_a->start > $f_a->end) {
@@ -486,9 +460,9 @@ sub fuse_overlapping_hsps {
         }
     }
   
-  foreach my $hsp (@hsps){
+  foreach my $feature (@features){
 
-    $self->add_merged_hsp($hsp);
+    $self->add_merged_feature($feature);
 
   }
   
@@ -497,6 +471,87 @@ sub fuse_overlapping_hsps {
 
 }
 
+sub run_est2genome{
 
+  my ($self, $feature) = @_;
+  
+  my $est = $self->seqfetcher->get_Seq_by_acc($feature->hseqname);
+  my $seq = $self->unmasked->subseq($feature->start, $feature->end);
+  my $start = $feature->start;
+  my $strand = $feature->strand;
+  my $end = $feature->end;
+  my $query_seq = Bio::Seq->new (-seq => $seq,
+				 -id => $self->clone->id,
+				 -accession => $self->clone->id);
+  print "running est2genome on ".$feature->hseqname." strand ".$feature->strand."\n";
+  my $est2genome = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new(-genomic => $query_seq,
+								     -est=> $est,
+								    );
+  $est2genome->run;
+  my @features = $est2genome->output;
+  foreach my $f(@features){
+    $f->strand($strand);
+    print "ran est2genome on ".$feature->hseqname." strand ".$feature->strand."\n";
+    
+      $f->start($f->start+$start-1);
+      $f->end($f->end+$end-1);
+    
+      
+  }
+  print "there are ".scalar(@features)." outputted\n";
+								     
+  return @features;
+}
+
+sub update_analysis{
+  my($self, $feature) = @_;
+
+  my $analysis =  Bio::EnsEMBL::Analysis->new (-db        => 'dbGSS',
+					       -db_versions => 1,
+					       -program        => 'wublastn',
+					       -program_version   => 1,
+					       -module         => 'STS_GSS',
+					       -module_version => 1,
+					       -gff_source     => 'STS_GSS',
+					       -gff_feature    => 'similarity', 
+					       -logic_name     => 'Full_dbGSS',
+					       -parameters     => '-p1 B=100000 V=500 E=0.001 Z=500000000',
+				      );
+
+
+  my @features = @$feature;
+		 
+  foreach my $f(@features){
+    $f->source_tag("STS_GSS");
+    $f->feature1->analysis($analysis);
+    $f->feature1->source_tag("STS_GSS");
+    $f->feature2->analysis($analysis);
+    $f->feature2->source_tag("STS_GSS");
+    foreach my $e($f->feature1->sub_SeqFeature){
+      $e->feature1->analysis($analysis);
+      $e->feature1->source_tag("STS_GSS");
+      $e->feature2->analysis($analysis);
+      $e->feature2->source_tag("STS_GSS");
+      foreach my $s($e->feature1->sub_SeqFeature){
+	$s->feature1->analysis($analysis);
+	$s->feature1->source_tag("STS_GSS");
+	$s->feature2->analysis($analysis);
+	$s->feature2->source_tag("STS_GSS");
+      }
+    }
+  }
+    
+}
+
+sub output{
+
+  my ($self, $output) = @_;
+  if($output){
+    my @outputs = @$output;
+    push(@{$self->{'_fplist'}}, @outputs); 
+  }
+
+  return @{$self->{'_fplist'}};
+}
 
 1;
