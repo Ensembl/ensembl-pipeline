@@ -151,7 +151,7 @@ sub write_output {
       # do a per gene eval...
       eval {
 	  $gene_adaptor->store($gene);
-	  print STDERR $gene->dbID . "\n";
+	  print STDERR "wrote gene " . $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -265,7 +265,6 @@ sub run {
 sub convert_output {
   my ($self) =@_;
 
-  my $count = 1;
   my $genetype = 'riken_genewise';
 
   # get the appropriate analysis from the AnalysisAdaptor
@@ -294,7 +293,7 @@ sub convert_output {
   }
 
   foreach my $runnable ($self->runnable) {
-    my @genes = $self->make_genes($count, $genetype, $analysis_obj, $runnable);
+    my @genes = $self->make_genes($genetype, $analysis_obj, $runnable);
 
     my @remapped = $self->remap_genes($runnable, @genes);
 
@@ -335,14 +334,14 @@ sub output{
 =head2 make_genes
 
  Title   : make_genes
- Usage   : $self->make_genes($count, $genetype, $analysis_obj, $runnable)
+ Usage   : $self->make_genes($genetype, $analysis_obj, $runnable)
  Function: converts the output from $runnable into Bio::EnsEMBL::Genes in
            $contig(VirtualContig) coordinates. The genes have type $genetype, 
            and have $analysis_obj attached. Each Gene has a single Transcript, 
            which in turn has Exons(with supporting features) and a Translation
  Example : 
  Returns : array of Bio::EnsEMBL::Gene
- Args    : $count: integer, $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis, 
+ Args    : $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis, 
            $runnable: Bio::EnsEMBL::Pipeline::RunnableI
 
 
@@ -350,10 +349,9 @@ sub output{
 
 sub make_genes {
 
-  my ($self, $count, $genetype, $analysis_obj, $runnable) = @_;
+  my ($self, $genetype, $analysis_obj, $runnable) = @_;
   my $contig = $self->{$runnable};
   my @tmpf   = $runnable->output;
-  my $time  = time; chomp($time);
   my @genes;
 
   
@@ -363,10 +361,8 @@ sub make_genes {
 
     $gene->type($genetype);
     $gene->analysis($analysis_obj);
-
-    $count++;
-    
     $gene->add_Transcript($transcript);
+
     push (@genes, $gene);
   }
 
@@ -452,9 +448,6 @@ sub _make_transcript{
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
   unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
     {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
-
-  my $time  = time; 
-  chomp($time);
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
   my $translation  = new Bio::EnsEMBL::Translation;    
