@@ -55,7 +55,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile;
 use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
 use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
-
+use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General;
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation);
 
@@ -64,7 +64,14 @@ use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 #get/set for runnable and args
 sub runnable {
     my ($self) = @_;
-    
+    my $program = $self->analysis->program;
+ 
+    if($program !~ /\//){
+      my $name = $program;
+      my $full_path = $PA_IPRSCAN_DIR."/".$^O."/".$name;
+      print STDERR "have full path ".$full_path."\n";
+      $self->analysis->program($full_path);
+    } 
     if (!($self->{'_runnable'})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile->new(-query     => $self->query,
 									-analysis  => $self->analysis);
