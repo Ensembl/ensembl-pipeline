@@ -314,6 +314,19 @@ sub xor {
   return $idset;
 }
 
+
+=head2 count
+
+  Arg [1]   : none
+  Function  : returns length of list
+  Returntype: integer
+  Exceptions: none
+  Caller    : 
+  Example   : my $count = $idset->count;
+
+=cut
+
+
 sub count{
   my ($self) = @_;
 
@@ -323,5 +336,41 @@ sub count{
     return 0;
   }
 }
+
+
+=head2 subset
+
+  Arg [1]   : size, int
+  Function  : produces a slice/subset of the list
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if not passes a size
+  Caller    : 
+  Example   : my $subset = $idset->subset(10);
+
+=cut
+
+
+
+sub subset{
+  my ($self, $size) = @_;
+
+  $self->throw("need a size inorder to return a subset of $self : $!") 
+    unless $size;
+  if($size > $self->count){
+    $size = $self->count;
+  };
+  my @array = @{$self->ID_list};
+  my $end = $size -1;
+  my @subset = @array[0..$end];
+
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						 -ID_LIST => \@subset,
+						);
+
+  return $idset;
+  
+}
+
+
 
 1;

@@ -54,7 +54,7 @@ sub parameter_string{
 
 
   if(!$self->{'parameter_string'}){
-    my $config = $self->get_PipelineManager->get_Config;
+    my $config = $self->get_Config;
 
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
@@ -92,7 +92,7 @@ sub db{
   my ($self) = @_;
 
   if(!$self->{'core_db'}){
-    my $config = $self->get_PipelineManager->get_Config;
+    my $config = $self->get_Config;
     
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
@@ -117,6 +117,40 @@ sub db{
   }
 
   return $self->{'core_db'};
+}
+
+
+=head2 max_create
+
+  Arg [1]   : none
+  Function  : returns a number which represents the maximum number of ids
+  a Task should submit at once
+  Returntype: integer
+  Exceptions: none
+  Caller    : 
+  Example   : my $id_set = $potential->not($existing)->subset($self->max_create); 
+
+=cut
+
+
+sub max_create{
+  my ($self) = @_;
+
+  if(!$self->{'max_create'}){
+    my $config = $self->get_Config;
+    my $max_create = $config->get_parameter($self->name, 'max_create');
+    $self->{'max_create'} = $max_create;
+  }
+  return $self->{'max_create'};
+}
+
+sub get_Config{
+  my ($self) = @_;
+  if(!$self->{'config'}){
+    $self->{'config'} = $self->get_PipelineManager->get_Config;
+  }
+
+  return $self->{'config'};
 }
 
 1;

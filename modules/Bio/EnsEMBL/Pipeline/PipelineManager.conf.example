@@ -1,34 +1,35 @@
 [DEFAULT_DATABASE]
-host=127.0.0.1
-user=ensadmin
-pass=ensembl
-port=5000
+host=
+user=
+pass=
+port=3306
 
 #
 # Database where pipeline config is stored
 # as well as jobs & job_status
 #
 [PIPELINE_DATABASE]
-dbname = mcvicker_test_briggsae
-host=127.0.0.1
-user=ensadmin
-pass=ensembl
-port=5000
+dbname = 
+host=
+user=
+pass=
+port=3306
 
 [ENSEMBL_DATABASE]
-dbname = mcvicker_test_briggsae
+dbname = 
 
 [DNA_DATABASE]
-dbname = mcvicker_test_briggsae
+dbname = 
 
 [LSF]
-tempdir = /nfs/acari/tmp
+tmpdir = /tmp
 path = /usr/local/lsfv42/4.2/alpha5/bin/
 
+[LOCAL]
+tmpdir = /tmp
 
 [PIPELINE_MANAGER]
 check_interval = 35
-
 #
 # This is a list of tasks to be run by the pipeline manager
 #
@@ -41,20 +42,23 @@ repeatmasker_task = Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMasker
 [DEFAULT_TASK]
 ensdb = ensembl_database
 dnadb = dna_database
-where = LSF:acari:
+where = 
 batchsize = 500
 #timeout in seconds 86400 = 24hours
 timeout = 86400
-retries = 3	
+retries	= 0
+#max create represents the maxumim number of jobs a Task will create at
+#one time
+max_create = 50
 
 [REPEATMASKER_TASK]
 timeout  = 3600
 where = Local
-
+retries = 3
 
 [GENSCAN_TASK]
 timeout = 3600
 
 [TRIBE_MCL_TASK]
-where = LSF:aristotle:
+where = 
 batchsize = 1

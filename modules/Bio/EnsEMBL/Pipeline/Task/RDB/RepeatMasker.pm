@@ -24,10 +24,11 @@ sub run{
   my $self = shift;
 
   my $parameters = $self->parameter_string;
+  my $module = $self->module;
   my $potential = $self->get_input_ids;
   my $existing = $self->get_TaskStatus->get_existing;
-  my $id_set = $potential->not($existing);
-  $self->create_Jobs('Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker', 
+  my $id_set = $potential->not($existing)->subset($self->max_create);
+  $self->create_Jobs($module, 
 		     $id_set, $parameters);
 
   return 2; #TASK_DONE
@@ -58,6 +59,10 @@ sub logic_name{
   return 'RepeatMask';
 }
 
+sub module{
+  my $self = shift;
+  return 'Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker';
+}
 
 sub description{
   print STDERR "RepeatMasker runs the runnable RepeatMasker and has no dependancies\n";
