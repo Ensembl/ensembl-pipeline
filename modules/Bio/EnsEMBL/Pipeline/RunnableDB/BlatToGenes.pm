@@ -64,7 +64,6 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::ESTConf;
-#use Bio::EnsEMBL::Pipeline::GeneConf;
 
 
 use vars qw(@ISA);
