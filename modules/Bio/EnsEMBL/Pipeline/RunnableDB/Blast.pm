@@ -57,7 +57,7 @@ my %UNGAPPED;
 my %UNMASKED;
 
 foreach my $db (@$DB_CONFIG) {
-  my ($name, $ungapped, $unmasked) = ($db->{'name'}, $db->{'ungapped'}, $db->{min_unmasked});
+  my ($name, $ungapped, $unmasked) = ($db->{'name'}, $db->{'ungapped'}, $db->{'min_unmasked'});
   
   if($db && $name){
     $UNGAPPED{$name} = $ungapped;
@@ -95,7 +95,7 @@ sub fetch_input {
     my $seq = $self->query->seq;
     my $unmasked;
     if($UNMASKED{$self->analysis->db_file}){
-      $unmasked = 1;
+      $unmasked = $UNMASKED{$self->analysis->db_file};
     } else {
       $unmasked = 3;
     }
@@ -103,7 +103,7 @@ sub fetch_input {
         $self->input_is_void(0);
     } else {
         $self->input_is_void(1);
-        $self->warn("Need at least 3 nucleotides");
+        $self->warn("Need at least $UNMASKED{$self->analysis->db_file} nucleotides");
     }
 
     my $ungapped;
@@ -117,10 +117,11 @@ sub fetch_input {
     my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query          => $self->query,
 							   -database       => $self->analysis->db_file,
 							   -program        => $self->analysis->program,
-							   -options        => $self->analysis->parameters,
 							   -threshold_type => 'PVALUE',
 							   -threshold      => 1,
 							   -ungapped       => $ungapped,
+							   $self->parameter_hash 
+							   # allows parameters to be passed from analysis 'parameters' field
 							  );
 
     $self->runnable($run);
