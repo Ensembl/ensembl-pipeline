@@ -195,7 +195,7 @@ sub run {
     }
 
     $parameters{'-genomic'} = $self->genseq;
-    $parameters{'-database'} = $self->analysis->db;
+    $parameters{'-database'} = $self->analysis->db_file;
     $parameters{'-program'} = $self->analysis->program;
     $parameters{'-options'} = $arguments if $arguments;
     if ($thresh && $thresh_type) {

@@ -152,7 +152,7 @@ sub runnable {
 	my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   
 					-query    => $genseq,
 					-program  => $self->analysis->program,
-					-database => $self->analysis->db,
+					-database => $self->analysis->db_file,
 					-threshold => 1, 
 								     );
 	

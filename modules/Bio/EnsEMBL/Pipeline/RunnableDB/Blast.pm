@@ -133,7 +133,7 @@ sub runnable {
       }
       #print STDERR "ungapped = ".$ungapped."\n";
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
-							     -database  => $self->analysis->db,
+							     -database  => $self->analysis->db_file,
 							     -program   => $self->analysis->program,
 							     -options => $self->analysis->parameters,
 							     -threshold_type => 'PVALUE',

@@ -117,7 +117,7 @@ sub runnable {
         }
 
         $parameters{'-query'} = $self->genseq;
-        $parameters{'-database'} = $self->analysis->db;
+        $parameters{'-database'} = $self->analysis->db_file;
         $parameters{'-ssaha'} = $self->analysis->program;
 
         my $runnable = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(
