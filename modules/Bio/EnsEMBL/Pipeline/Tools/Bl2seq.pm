@@ -399,7 +399,6 @@ sub parse_tblastx {
   foreach my $ungapped_block (@blocks) {
     my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits,$perc_id) = ($ungapped_block->qstart,$ungapped_block->qend,$ungapped_block->qstrand,$ungapped_block->sstart,$ungapped_block->send,$ungapped_block->sstrand,$ungapped_block->bits,$ungapped_block->identity);
 
-#    my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
     my $fp = new Bio::EnsEMBL::FeaturePair;
     my $seqone = new Bio::EnsEMBL::SeqFeature;
     my $seqtwo = new Bio::EnsEMBL::SeqFeature;
