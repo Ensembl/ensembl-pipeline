@@ -156,7 +156,7 @@ sub build_Genes {
 
     #print STDERR "Finished printing genes...\n";
 
-    $self->print_gff;
+#    $self->print_gff;
 
     print STDERR "Out of build Genes...\n";
 
@@ -1140,8 +1140,15 @@ sub make_Genes {
 	    push(@genes,$gene);
 	}
     }
+
+
     foreach my $gene (@genes) {
         $self->prune_Exons($gene);
+
+    }
+    my @newgenes = $self->prune(@genes);
+
+    foreach my $gene (@newgenes) {
 	$self->add_Gene($gene);
     }
 }
@@ -2236,38 +2243,38 @@ sub print_gff {
     }
     # build a GTF Handler
 
-    my $gtf = Bio::EnsEMBL::Utils::GTF_handler->new();
-    open(GTF,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".gtf") || die "Cannot open gtf file for ".$self->contig->id."$!";
-    open(PEP,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".pep") || die "Cannot open pep file for ".$self->contig->id."$!";
+#    my $gtf = Bio::EnsEMBL::Utils::GTF_handler->new();
+#    open(GTF,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".gtf") || die "Cannot open gtf file for ".$self->contig->id."$!";
+#    open(PEP,">/nfs/disk100/humpub1/gtf_output2/".$self->contig->id.".pep") || die "Cannot open pep file for ".$self->contig->id."$!";
 
-    $gtf->dump_genes(\*GTF,$self->each_Gene);
+    #$gtf->dump_genes(\*GTF,$self->each_Gene);
 
 
-    my $seqout = Bio::SeqIO->new( '-format' => 'fasta' , -fh => \*PEP);
-    foreach my $gene ( $self->each_Gene ) {
-        foreach my $trans ( $gene->each_Transcript ) {
-             my $pep = $trans->translate();
-            $pep->desc("Gene:".$gene->id." trans:".$trans->id," Input id".$self->contig->id);
-            $seqout->write_seq($pep);
-        }
-    }
-    print (GTF "#Done\n");
-    close(GTF);
-    close(PEP);
+    #my $seqout = Bio::SeqIO->new( '-format' => 'fasta' , -fh => \*PEP);
+    #foreach my $gene ( $self->each_Gene ) {
+    #    foreach my $trans ( $gene->each_Transcript ) {
+    #         my $pep = $trans->translate();
+    #        $pep->desc("Gene:".$gene->id." trans:".$trans->id," Input id".$self->contig->id);
+    #        $seqout->write_seq($pep);
+    #    }
+    #}
+    #print (GTF "#Done\n");
+    #close(GTF);
+    #close(PEP);
 
-    foreach my $f ($self->feature) {
-	print POG $f->seqname . "\t" . $f->source_tag . "\tsimilarity\t" .
-	    $f->start . "\t" . $f->end . "\t" . $f->score . "\t";
-	if ($f->strand == 1) {
-	    print POG "+\t.\t";
-	} else {
-	    print POG ("-\t.\t");
-	}
-	if (ref($f) =~ "FeaturePair") {
-	    print (POG $f->hseqname . "\t" . $f->hstart . "\t" . $f->hend . "\n");
-	}
+#    foreach my $f ($self->feature) {
+#	print POG $f->seqname . "\t" . $f->source_tag . "\tsimilarity\t" .
+#	    $f->start . "\t" . $f->end . "\t" . $f->score . "\t";
+#	if ($f->strand == 1) {
+#	    print POG "+\t.\t";
+#	} else {
+#	    print POG ("-\t.\t");
+#	}
+#	if (ref($f) =~ "FeaturePair") {
+#	    print (POG $f->hseqname . "\t" . $f->hstart . "\t" . $f->hend . "\n");
+#	}
 
-    }
+#    }
 
     foreach my $gen ($self->genscan) {
 	foreach my $ex ($gen->sub_SeqFeature) {
@@ -2383,6 +2390,175 @@ sub readGFF {
     }
     return @fset;
 }
+
+sub prune {
+    my ($self,@genes) = @_;
+
+    my @clusters;
+    my @transcripts;
+
+    foreach my $gene (@genes) {
+	my @tran = $gene->each_Transcript;
+	
+	foreach my $tran (@tran) {
+	    eval {
+		if ($tran->translate->seq !~ /\*/) {
+		    print STDERR "Found transcript " . $tran->id . "\n";
+		    push(@transcripts,$tran);
+		}
+	    };
+	    if ($@) {
+		print STDERR "ERROR: Can't translate " . $tran->id . ". Skipping [$@]\n";
+	    }
+
+	}
+    }
+    
+  TRAN: foreach my $tran (@transcripts) {
+      my $found = 0;
+      foreach my $cluster (@clusters) {
+	    my @cltran = @$cluster;
+
+	    foreach my $tran2 (@$cluster) {
+		foreach my $exon1 ($tran->each_Exon) {
+
+		    foreach my $exon2 ($tran2->each_Exon) {
+			if ($exon1->overlaps($exon2) && $exon1->strand == $exon2->strand) {
+			    $found = 1;
+			    push(@$cluster,$tran);
+			    next TRAN;
+			}
+		    }
+		}
+	    }
+	}
+      if ($found == 0) {
+	  print STDERR "Found new cluster for " . $tran->id . "\n";
+	  my @newclus;
+	  push(@newclus,$tran);
+	  push(@clusters,\@newclus);
+      }
+  }
+    
+    my @newgenes;
+
+    CLUS: foreach my $clus (@clusters) {
+	my @tran = @$clus;
+
+	my %sizehash;
+
+	foreach my $tran (@tran) {
+	    my @exons = $tran->each_Exon;
+
+	    $sizehash{$tran} = $#exons;
+	}
+
+
+	my %pairhash;
+	my %exonhash;
+
+	@tran = sort {$sizehash{$b} <=> $sizehash{$a}} @tran;
+
+	my @newtran;
+	my @maxexon = $tran[0]->each_Exon;
+
+	if ($#maxexon == 0) {
+	    print STDERR "Single exon gene\n";
+	    my $time = time;
+	    chomp $time;
+	    my $gene = new Bio::EnsEMBL::Gene;
+	    $gene->type('pruned');
+	    $gene->created($time);
+	    $gene->modified($time);
+	    $gene->version(1);
+	    $gene->id("TMPG_" . $tran[0]->id);
+	    push(@newgenes,$gene);
+	    
+	    $gene->type('pruned');
+	    $gene->add_Transcript($tran[0]);
+
+	    next CLUS;
+	}
+
+	print STDERR "\nProcessing cluster\n";
+	foreach my $tran (@tran) {
+	    print STDERR "Transcript " . $tran->id . "\t" . $sizehash{$tran} . "\n";
+	    my @exons = $tran->each_Exon;
+
+	    my $i     = 0;
+	    my $found = 1;
+	    
+	    for ($i = 0; $i < $#exons; $i++) {
+		my $foundpair = 0;
+		my $exon1 = $exons[$i];
+		my $exon2 = $exons[$i+1];
+		
+		foreach my $exon1id (keys %pairhash) {
+		    my $exon1a = $exonhash{$exon1id};
+		    
+		    foreach my $exon2id (keys %{$pairhash{$exon1id}}) {
+			my $exon2a = $exonhash{$exon2id};
+			
+			#		print STDERR "\t Comparing to " . $exon1a->id    . " "  . 
+			#		                                  $exon1a->start . " " . 
+			#						  $exon1a->end   . " : " . 
+			#						  $exon2a->id    . " " . 
+			#						  $exon2a->start . " " . 
+			#						  $exon2a->end . "\n";
+			
+			if (($exon1->overlaps($exon1a) && 
+			     $exon2->overlaps($exon2a))) {
+			    #		    print STDERR "HOORAY! Found overlap\n";
+			    $foundpair = 1;
+			}
+		    }
+		}
+		
+		if ($foundpair == 0) {
+		    #	    print STDERR "Found new pair\n";
+		    $found = 0;
+		    
+		    $exonhash{$exon1->id} = $exon1;
+		    $exonhash{$exon2->id} = $exon2;
+		    
+		    $pairhash{$exon1->id}{$exon2->id} = 1;
+		}
+	    }
+	    
+	    if ($found == 0) {
+		print STDERR "found new transcript " . $tran->id . "\n";
+		push(@newtran,$tran);
+	    } else {
+		print STDERR "Transcript already seen " . $tran->id . "\n";
+	    }
+	}
+
+	my $time = time; chomp($time);
+	
+	if ($#newtran >= 0) {
+	    my $gene = new Bio::EnsEMBL::Gene;
+	    $gene->type('pruned');
+	    $gene->created($time);
+	    $gene->modified($time);
+	    $gene->version(1);
+
+	    my $count = 0;
+	    foreach my $newtran (@newtran) {
+		$gene->id("TMPG_" . $newtran->id);
+		if ($count < 10) {
+		    $gene->add_Transcript($newtran);
+		}
+		$count++;
+	    }
+	
+	    push(@newgenes,$gene);
+	}
+    }
+    
+    return @newgenes;
+
+    
+}     
     
 1;
 
