@@ -45,4 +45,3 @@ foreach my $obj (@features) {
   print ($obj->gffstring."\n");
 }
 
-ok(1);
