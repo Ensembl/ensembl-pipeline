@@ -409,9 +409,23 @@ sub parse_results {
             $feat2 {primary} = 'similarity';
             $feat2 {source}  = $feat2{program};
             
+            #print STDERR "F1: ".$feat1{'start'}." - ".$feat1{'end'}." (".($feat1{'end'} - $feat1{'start'} +1).")"
+            #                ."\tF2: ".$feat2{'start'}." - ".$feat2{'end'}." (".($feat2{'end'} - $feat2{'start'} +1).")\n";
+            
+            #if alignments contain gaps, the feature needs to be split
+            $feat1 {alignment} = $hsp->queryAlignment;
+            $feat2 {alignment} = $hsp->sbjctAlignment;
+            
             if ( defined $threshold && ($feat1{p} >= $threshold))
             { 
-                $self->createfeaturepair(\%feat1, \%feat2); 
+                if ($feat1 {alignment} =~ /-/ or $feat2 {alignment} =~ /-/)
+                {
+                    $self->split_gapped_feature(\%feat1, \%feat2); 
+                }
+                else
+                {    
+                    $self->createfeaturepair(\%feat1, \%feat2); 
+                }
             }
             else
             {
@@ -423,18 +437,59 @@ sub parse_results {
            
 }
 
-# FeaturePair methods:
-#sub createfeaturepair {
-#    my ($self, $feat1, $feat2) = @_;
-#    #call Bio::EnsEMBL::Pipeline::RunnableI version
-#    $self->SUPER::createfeaturepair($feat1, $feat2);
-#    my $fp = $self->shrinkfplist();
-#    $fp->percent_id     ($feat1->{percent});
-#    $fp->hpercent_id    ($feat2->{percent});
-#    $fp->p_value        ($feat1->{p});
-#    $fp->hp_value       ($feat2->{p});
-#    $self->growfplist($fp);                             
-#}
+
+#This function creates mini-features from a gapped feature. 
+#The gaps are discarded and the mini alignments have the attributes of the parent feature. 
+sub split_gapped_feature {
+    my ($self, $feat1, $feat2) = @_;
+    
+    my @f1_align  = split (//,$feat1->{'alignment'});
+    my @f2_align  = split (//,$feat2->{'alignment'});
+    my ($f1_len, $f2_len) = (scalar(@f1_align), scalar(@f2_align));
+    
+    $self->throw("Can't compare alignments where lengths don't match: F1 ($f1_len) F2 ($f2_len)\n")
+            unless  ($f1_len == $f2_len);
+    
+    #combine gap alignments into a single array
+    my @masked_align;
+    for (my $index = 0; $index < $f1_len; $index++)
+    {
+        push (@masked_align, ($f1_align[$index] eq '-' or $f2_align[$index] eq '-') ? '-' : 'x');
+    }
+    
+    my $start = 0;
+    my $mask_len = scalar(@masked_align);
+    for (my $index =0; $index < $mask_len; $index++)
+    {
+        if ($masked_align[$index] eq '-' || $index == $mask_len-1)
+        {
+            if (defined($start))
+            {
+                my $end = $index - 1; #the previous base was the end
+                my $f1_start = $feat1->{start};
+                my $f2_start = $feat2->{start};
+                $feat1->{start} = $f1_start + $start;
+                $feat1->{end}   = $f1_start + $end;
+                $feat2->{start} = $f2_start + $start;
+                $feat2->{end}   = $f2_start + $end;
+                
+                $self->createfeaturepair($feat1, $feat2);
+                #print STDERR "\nINDEX $start- $end \t";
+                #print STDERR "SPLIT: F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
+                #             ." (".($feat1->{'end'} - $feat1->{'start'} +1).")"
+                #             ."\tF2 ".$feat2->{'start'}." - ".$feat2->{'end'}
+                #             ." (".($feat2->{'end'} - $feat2->{'start'} +1).")\n";
+                $start = undef;
+                next if ($index == $mask_len-1);
+            }
+            
+            if ($masked_align[$index+1] ne '-')
+            {
+                $start = $index +1;
+            }
+        }
+    }
+}
 
 ##############
 # input/output methods
