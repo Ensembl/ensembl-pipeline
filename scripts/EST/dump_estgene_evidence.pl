@@ -93,10 +93,10 @@ foreach my $id ( @gene_ids ){
   OUT1:
     foreach my $name ( @names ){
       print OUT $id."\t".$name."\n";
-      $count++;
-      if ( $count > 9 ){
-	last OUT1;
-      }
+      #$count++;
+      #if ( $count > 9 ){
+      #	last OUT1;
+      #      }
     }
   }
 }
