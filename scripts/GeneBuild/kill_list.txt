@@ -94,4 +94,4 @@ O88329 large numbers of X's in sequence lec
 Q9Z1L2 large numbers of X's in sequence lec                      
 Q8VEW3 large numbers of X's in sequence lec                      
 Q8JZM8 large numbers of X's in sequence lec 
-
+CE04397 hypothetical protein hits briggsae +1000 times

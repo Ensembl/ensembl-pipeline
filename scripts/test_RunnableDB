@@ -61,7 +61,7 @@ if(!$write){
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
    -host   => $dbhost,
-s   -user   => $dbuser,
+   -user   => $dbuser,
    -dbname => $dbname,
    -pass   => $dbpass,
    -port   => $dbport,
@@ -118,7 +118,9 @@ if($write){
   }
 }
 
+#print "There is ".$runobj->output." features output\n\n\n";
 
+#$verbose = 1;
 if($verbose){
   my @output = $runobj->output;
   if(!@output){
@@ -138,7 +140,8 @@ if($verbose){
         }
       }
     } else {
-      my @values = split /\:/, $out->contig->name;
+      print $out->slice;
+      my @values = split /\:/, $out->slice;
       my $name = $values[2];
       print_gff($out, $name);
     }
