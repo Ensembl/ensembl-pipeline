@@ -74,6 +74,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
       
     # make sure at least one protein source database has been defined
+    
     $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
     
@@ -161,7 +162,7 @@ sub write_output {
       print STDERR "Fetching features for " . $database->{'type'} . 
 	" with score above " . $database->{'threshold'}. "\n\n";
       my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-      my @features  = @{$pafa->fetch_by_Slice_and_score($slice, $database->{'threshold'}, $database->{'type'})};
+      my @features  = @{$pafa->fetch_all_by_Slice_and_score($slice, $database->{'threshold'}, $database->{'type'})};
       print STDERR "have ".@features." \n";
       # lose version numbers - probably temporary till pfetch indices catch up
       foreach my $f(@features) {
@@ -946,7 +947,7 @@ sub output{
      $self->{'_output'} = [];
    }
     
-   if(defined @genes){
+   if(@genes){
      push(@{$self->{'_output'}},@genes);
    }
    #print STDERR "have ".@{$self->{'_output'}}." as output\n";
