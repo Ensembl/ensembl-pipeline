@@ -85,7 +85,7 @@ use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
-
+use Bio::EnsEMBL::Translation;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 							       GB_INPUTID_REGEX
@@ -100,7 +100,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined    qw (
-							       GB_COMBINED_GENETYPE
+							       GB_GENEWISE_COMBINED_GENETYPE
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
@@ -987,6 +987,7 @@ sub isHead {
  Usage   : my $foundtail = $self->isTail($exon)
  Function: checks through all ExonPairs to see whether this
            exon is connected to a following exon, i.e. it returns FALSE if this
+A
 	   exon is pair->exon1 in a pair. Returns TRUE otherwise.
  Returns : BOOLEAN
  Args    : Bio::EnsEMBL::Exon
@@ -1019,7 +1020,7 @@ sub isTail {
 sub make_Translation{
     my ($self,$transcript) = @_;
 
-    my $translation = new Bio::EnsEMBL::Translation;    
+    my $translation = Bio::EnsEMBL::Translation->new();    
     my @exons       = @{$transcript->get_all_Exons};
         
     if ($exons[0]->strand == 1) {
