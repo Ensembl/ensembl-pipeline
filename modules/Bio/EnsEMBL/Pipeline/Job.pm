@@ -62,51 +62,31 @@ sub new{
    my ($class, @args) = @_;
    my $self = bless {}, $class;
 
-   $self->{'_dbID'} = undef;
-   $self->{'_taskname'} = undef;
-   $self->{'_input_id'} = undef;
-   $self->{'_submission_id'} = undef;
-   $self->{'_array_index'} = undef;
-   $self->{'_parameters'} = undef;
-   $self->{'_module'} = undef;
-   $self->{'_stderr_file'} = undef;
-   $self->{'_stderr_out'} = undef;
-   $self->{'_status'} = undef;
-   $self->{'_adaptor'} = undef;
-	 $self->{'_job_name'} = undef;
-	 $self->{'_retry_count'} = 0;
-
    my ($dbID, $taskname, $input_id, $submission_id, $array_index,
 			 $parameters, $module, $stderr_file, $stdout_file, $status,
-			 $adaptor, $job_name) = $self->_rearrange([qw(dbID TASKNAME INPUT_ID
-																				 SUBMISSION_ID ARRAY_INDEX PARAMETERS
-                                         MODULE STDERR_FILE STDOUT_FILE STATUS
-																				 ADAPTOR JOB_NAME)], @args);
+			 $adaptor, $job_name, $retry_count) =
+			$self->_rearrange([qw(dbID TASKNAME INPUT_ID
+														SUBMISSION_ID ARRAY_INDEX PARAMETERS
+														MODULE STDERR_FILE STDOUT_FILE STATUS
+														ADAPTOR JOB_NAME RETRY_COUNT)],@args);
 
-   $self->dbID($dbID) if($dbID);
-   if(!$taskname){
-     $self->throw("Must define a taskname when creating a Job : $!");
-   }else{
-     $self->taskname($taskname);
-   }
-   if(!$input_id){
-     $self->throw("Must define a input_id when creating a Job : $!");
-   }else{
-     $self->input_id($input_id);
-   }
-   $self->submission_id($submission_id) if($submission_id);
-   $self->array_index($array_index) if($array_index);
-	 $self->job_name($job_name) if($job_name);
-   $self->parameters($parameters) if($parameters);
-   if(!$module){
-     $self->throw("Must define a module when creating a Job : $!");
-   }else{
-     $self->module($module);
-   }
-   $self->stderr_file($stderr_file) if($stderr_file);
-   $self->stdout_file($stdout_file) if($stdout_file);
-   $self->status($status) if($status);
-   $self->adaptor($adaptor) if($adaptor);
+	 $taskname || $self->throw("Must define a taskname when creating a Job");
+	 $input_id || $self->throw("Must define an input_id when creating a Job");
+	 $module   || $self->throw("Must define a module when creating a Job");
+	
+   $self->{'_dbID'}          = $dbID;
+   $self->{'_taskname'}      = $taskname;
+   $self->{'_input_id'}      = $input_id;
+   $self->{'_submission_id'} = $submission_id;
+   $self->{'_array_index'}   = $array_index;
+   $self->{'_parameters'}    = $parameters;
+   $self->{'_module'}        = $module;
+   $self->{'_stderr_file'}   = $stderr_file;
+   $self->{'_stderr_out'}    = $stdout_file;
+   $self->{'_status'}        = $status;
+   $self->{'_adaptor'}       = $adaptor;
+	 $self->{'_job_name'}      = $job_name;
+	 $self->{'_retry_count'}   = $retry_count || 0;
 
    return $self;
 }
@@ -122,6 +102,30 @@ sub new{
   Exceptions: none
   Caller    :
   Example   : my $module = $job->module;
+
+=head2 dbID
+
+=head2 taskname
+
+=head2 input_id
+
+=head2 submission_id
+
+=head2 job_name
+
+=head2 array_index
+
+=head2 parameters
+
+=head2 module
+
+=head2 stderr_file
+
+=head2 stdout_file
+
+=head2 status
+
+=head2 retry_count
 
 =cut
 
@@ -261,8 +265,6 @@ sub set_current_status{
   Example   : $job->run;
 
 =cut
-
-
 
 sub run{
   my ($self) = @_;
