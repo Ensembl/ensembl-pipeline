@@ -11,12 +11,12 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneCombiner - imports global variables used by EnsEMBL gene building
+Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner - imports global variables used by EnsEMBL gene building
 
 =head1 SYNOPSIS
 
-    use Bio::EnsEMBL::Pipeline::GeneCombiner;
-    use Bio::EnsEMBL::Pipeline::GeneCombiner qw(  );
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner;
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw(  );
 
 =head1 DESCRIPTION
 
@@ -46,7 +46,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::GeneCombiner;
+package Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner;
 
 use strict;
 use vars qw( %GeneCombiner );
