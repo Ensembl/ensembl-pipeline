@@ -75,20 +75,12 @@ while( <FILE> ) {
     
     ## wake up and check howmany jobs are left to run
     #system("bjobs -w -u eae -q acari | wc -l > number_file");
-    system("busers | grep eae > number_file");
-    open(IN,"<number_file");
-    my $result;
-    while(<IN>){
-      chomp;
-      my @entry = split;
-      $result = $entry[3];
-    }
-    close(IN);
+    my $result = &read_jobs;
+
     
     # bjobs' output contains a header with column names, hence...
-    $result -= 1;
     print "jobs still running (or pending) in the farm: $result\n";
-
+    
     if ( $result > $panic ){
       print "We have too many jobs\n";
       print "counter: $counter\n";
@@ -101,14 +93,7 @@ while( <FILE> ) {
       my $minutes = $slow/60;
       print "sleeping for another $slow seconds ( $minutes minute(s) )\n";
       system("sleep $slow");
-      system("busers | grep eae > number_file"); 
-      open(IN,"<number_file"); 
-      while(<IN>){ 
-	chomp; 
-	my @entry = split; 
-	$result = $entry[3]; 
-      } 
-      close(IN); 
+      $result = &read_jobs;
       print "jobs still running (or pending) in the farm: $result\n";
     }
   } 
@@ -116,3 +101,23 @@ while( <FILE> ) {
 }
 
 close( FILE );
+
+
+############################################################
+
+
+sub read_jobs{
+  #system("busers | grep eae > number_file");
+  system("bjobs -w | wc -l > number_file");
+  open(IN,"<number_file");
+  my $result;
+  while(<IN>){
+    chomp;
+    #my @entry = split;
+    #$result = $entry[5];
+    $result = $_;
+  }
+  close(IN);
+  return $result;
+}
+
