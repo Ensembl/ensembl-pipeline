@@ -211,7 +211,8 @@ sub run {
   my $dtype = $config->get_parameter($self->name(), 'dependency_type');
 
   my $idset;
-  my $batchsize = 50;
+  #use a conservative batchsize of 50 if none was specified
+  my $batchsize = $config->get_parameter($self->name(), 'batchsize') || 50;
 
   my $failed = $self->{'_create_failed_idset'};
 
