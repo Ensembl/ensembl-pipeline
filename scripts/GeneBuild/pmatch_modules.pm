@@ -742,8 +742,8 @@ sub merge_hits {
     my @allhits = $self->make_mergelist($p_hit);
     
     my @chosen = $self->prune(@allhits);
-    print STDERR "\nNo hits good enough for " . $p_hit->id() . "\n"
-      unless scalar(@chosen);
+#    print STDERR "\nNo hits good enough for " . $p_hit->id() . "\n"
+#      unless scalar(@chosen);
     push(@merged,@chosen);
   }
 
@@ -1055,10 +1055,18 @@ sub extend_hits {
 sub prune {
   my ($self, @all) = @_;
   my @chosen = ();
+  # reject hits with < 25% coverage
+  my $lower_threshold = 25;
+
   # sort by descending order of coverage
   @all = sort {$b->coverage <=> $a->coverage} @all;
 
   my $first = shift(@all);
+  if($first->coverage < $lower_threshold){
+    # we're done
+    return @chosen;
+  }
+  
   push (@chosen,$first);
 
   # don't select any hits that have coverage less than 2% below that of the first hit, be it 100 or 99.9 or ...
@@ -1066,8 +1074,8 @@ sub prune {
 
  PRUNE:
   foreach my $hit(@all) {
-    last PRUNE if $hit->coverage < $curr_pc;
     last PRUNE if $hit->coverage < $lower_threshold;
+    last PRUNE if $hit->coverage < $curr_pc;
     push (@chosen,$hit);
   }
 
@@ -1139,32 +1147,35 @@ sub prune_hits {
   my ($self) = @_;  
   my %prots = %{$self->{_proteins}}; # just makes it a bit easier to follow  
 
+  PROTEIN:
   foreach my $p(keys %prots){
     my @chosen = ();
     my @allhits = @{$prots{$p}};
-
+    
     # sort by descending order of coverage
     @allhits = sort {$b->coverage <=> $a->coverage} @allhits;
-
+    
     my $first = shift(@allhits);
-
+    
     # don't select any hits that have coverage less than 2% below that of the first hit, be it 100 or 99.9 or ...
     my $curr_pc = $first->coverage() - 2; 
-
+    
     # lower bound threshold - reject anything with < 25% coverage
-  my $lower_threshold = 25;
-
-  push (@chosen,$first) unless $first->coverage < $lower_threshold;
+    my $lower_threshold = 25;
+    next PROTEIN if $first->coverage < $lower_threshold;
+    
+    push (@chosen,$first) unless $first->coverage < $lower_threshold;
   PRUNE:
     foreach my $hit(@allhits) {
       
       last PRUNE if $hit->coverage() < $curr_pc;
+      last PRUNE if $hit->coverage() < $lower_threshold;
       push (@chosen,$hit);
     }
-
+    
     push(@{$self->{_output}},@chosen);
   }
-
+  
 }
 
 sub output {
@@ -1178,4 +1189,3 @@ sub output {
 
 
 1;
-
