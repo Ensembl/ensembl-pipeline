@@ -62,6 +62,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
 					 GB_SIMILARITY_GENETYPE
 					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
+					 GB_SIMILARITY_MAX_INTRON
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -452,7 +453,6 @@ sub validate_transcript {
   
   my $valid = 1;
   my $split = 0;
-  my $MAX_INTRON = 100000;
 
   # check coverage of parent protein
   my $coverage  = $self->check_coverage($transcript);
@@ -498,7 +498,7 @@ sub validate_transcript {
 #	$valid = 0;
 #      }
  
-      if ( $intron > $MAX_INTRON ) {
+      if ( $intron > $GB_SIMILARITY_MAX_INTRON ) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->dbID . "\n";
 	$split = 1;
 	$valid = 0;
