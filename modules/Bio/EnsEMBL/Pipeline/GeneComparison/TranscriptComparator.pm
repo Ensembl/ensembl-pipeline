@@ -334,8 +334,8 @@ sub _test_for_fuzzy_semiexact_Merge{
   }
   
   #print STDERR "=========== comparing ================\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $est_tran );
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $ens_tran );
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $est_tran );
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $ens_tran );
   
   my @exons1 = @{$est_tran->get_all_Exons};
   my @exons2 = @{$ens_tran->get_all_Exons};	
