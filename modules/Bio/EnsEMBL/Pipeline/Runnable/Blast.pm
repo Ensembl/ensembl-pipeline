@@ -558,7 +558,10 @@ sub _makeFeaturePair {
 						-primary_tag => 'similarity',
 						-analysis    => $analysis,
 						-score       => $score);
-		
+	
+    $feature1->percent_id($pid);
+    $feature1->pvalue($evalue);
+
     my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
 						-start   => $hstart,
 						-end     => $hend,
@@ -571,7 +574,10 @@ sub _makeFeaturePair {
     
     my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
 					   -feature2 => $feature2);
-    
+   
+    $feature2->percent_id($pid);
+    $feature2->p_value($evalue);
+ 
     return $fp;
 }
 
