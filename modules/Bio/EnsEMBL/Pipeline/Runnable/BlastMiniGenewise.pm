@@ -51,7 +51,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
-use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
@@ -220,6 +219,7 @@ sub run {
   my $mg_runnables;
 
   if ($self->check_repeated > 0){ 
+    print STDERR "Oooh - turning on the new repeat checking code (grepmehere)\n";
     $mg_runnables = $self->build_runnables(@features);
   } else {
     my $runnable = $self->make_mmgw($self->genomic_sequence, \@features);
