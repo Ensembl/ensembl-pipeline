@@ -180,14 +180,10 @@ sub get_pending_jobs {
 
 
 sub get_job_time{
-  my ($self, $ids) = @_;
-  my $submission_ids = join(" ", @$ids);
-  my $command = "bjobs -l $submission_ids";
+  my ($self) = @_;
+  my $command = "bjobs -l";
   #print $command."\n";
   my %id_times;
-  if(!scalar(@$ids)){
-    return %id_times;
-  }
   open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
   my $job_id;
   while(<BJOB>){

@@ -810,14 +810,26 @@ sub job_time_check{
       push(@submission_ids, $job->submission_id);
       $jobs{$job->submission_id} = $job;
     }
-  my $time_hash = $batch_q_module->get_job_time(\@submission_ids);
+  my $time_hash = $batch_q_module->get_job_time();
   foreach my $id(@submission_ids){
     my $job = $jobs{$id};
-    if($time_hash->{$id} >= $max_time){
-      $batch_q_module->kill_job($id);
-      print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
-      print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
-      $job->set_status('KILLED');
+    if($job->current_status->status eq 'RUNNING'){
+      if($time_hash->{$id} >= $max_time){
+        $batch_q_module->kill_job($id);
+        print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
+        print STDERR $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n" if($verbose);
+        $job->set_status('KILLED');
+        my @lost_jobs = $job_adaptor->fetch_by_submission_id($id);
+      LOST:foreach my $lj(@lost_jobs){
+          print STDERR "job ".$lj->dbID." is lost at ".
+            $lj->current_status->status."\n";
+          if($lj->dbID == $job->dbID){
+            next LOST;
+          }
+          print KILLED $lj->input_id." ".$lj->analysis->logic_name." ".$lj->analysis->module."\n";
+          $lj->set_status('KILLED');
+        }
+      }
     }
   }
 }
