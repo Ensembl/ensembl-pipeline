@@ -18,7 +18,8 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new(-genomic  => $genseq);
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new(-genomic  => $genseq,
+									 -blastdb  => $blastdb);
 
     $obj->run
 
@@ -67,12 +68,17 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $ids,$trim,$endbias) = $self->_rearrange(['GENOMIC'], @args);
+    my( $genomic, $blastdb) = $self->_rearrange(['GENOMIC',
+						 'BLASTDB'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if defined($genomic);
+
+    $self->throw("No blastdb specified") unless defined($blastdb);
+    $self->blastdb($blastdb) if defined($blastdb);
+
 
     return $self; # success - we hope!
 }
@@ -96,6 +102,35 @@ sub genomic_sequence {
     }
     return $self->{'_genomic_sequence'};
 }
+
+=head2 blastdb
+
+    Title   :   blastdb
+    Usage   :   $self->blastdb($seq)
+    Function:   Get/set method for blastdb
+    Returns :   
+    Args    :   path to blastdb
+
+=cut
+
+sub blastdb {
+    my( $self, $blastdb ) = @_;    
+    if ($blastdb) {
+
+      # check for presence of relevant files .csq, .nhd, .ntb
+      $self->throw("Can't find blastfile [$blastdb]\n") unless -e $blastdb;
+      my $csq = $blastdb . ".csq";
+      $self->throw("Can't find .csq file [$csq]\n") unless -e $csq;
+      my $nhd = $blastdb . ".nhd";
+      $self->throw("Can't find .nhd file [$nhd]\n") unless -e $nhd;
+      my $ntb = $blastdb . ".ntb";
+      $self->throw("Can't find .ntb file [$ntb]\n") unless -e $ntb;
+
+      $self->{'_blastdb'} = $blastdb;
+    }
+    return $self->{'_blastdb'};
+}
+
 
 =head2 get_all_FeatureIds
 
@@ -172,7 +207,7 @@ sub run {
       $result->hseqname($seqname);
       
       # score cutoff? percentID? any EST with any hit > ... gets used
-      if($result->score > 200 || defined ($esthash{$seqname}) ) {
+      if($result->score > 180 || defined ($esthash{$seqname}) ) {
 	push(@{$esthash{$seqname}},$result);
       }
     }
@@ -207,7 +242,7 @@ sub run_blast {
     my ($self) = @_;
 
     my $genomic = $self->genomic_sequence;
-    my $db = "/data/blastdb/dbEST-1"; # hmmmmm
+    my $blastdb = $self->blastdb;
 
     # tmp files
     my $blastout = $self->get_tmp_file("/tmp/","blast","tblastn_dbest.msptmp");
@@ -219,7 +254,7 @@ sub run_blast {
     $seqio->write_seq($genomic);
     close($seqio->_filehandle);
 
-    my $command  = "wublastn $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
+    my $command  = "wublastn $blastdb $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
 
     print (STDERR "Running command $command\n");
     my $status = system( $command );
