@@ -132,12 +132,14 @@ sub write_output {
     print STDERR "Fetching input id : " . $self->input_id. " \n\n";
 
     $self->throw("No input id") unless defined($self->input_id);
-    
-    $self->input_id = /$GB_INPUT_ID_REGEX/;
-    my $chr_id = $1;
+    my $input_id = $self->input_id;
+   
+    $input_id =~ /$GB_INPUTID_REGEX/;
+    my $chrid = $1;
     my $chrstart = $2;
     my $chrend   = $3;
 
+    
     my $sla       = $self->db->get_SliceAdaptor();
     my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
     my $genseq    = $slice->get_repeatmasked_seq;
@@ -385,6 +387,7 @@ sub _make_transcript{
     $exon->strand($exon_pred->strand);
     $exon->adaptor($self->db->get_ExonAdaptor);
     $exon->phase($exon_pred->phase);
+    $exon->end_phase($exon_pred->end_phase);
     $exon->contig($contig);  # replaces the attach_seq method
 
     # sort out supporting evidence for this exon prediction
@@ -966,7 +969,7 @@ sub make_seqfetcher {
   my $seqfetcher;
 
   (my $class = $seqfetcher_class) =~ s/::/\//g;
-  requre "$class.pm";
+  require "$class.pm";
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
