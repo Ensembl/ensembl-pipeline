@@ -960,4 +960,122 @@ sub check_splice_sites{
 }
 
 ############################################################
+# method for putting the stop codon at the end of the translation
+# if it is not already there. If the codon next to the last one is not a stop codon
+# we leav it un-touched.
+
+sub set_stop_codon{
+  my ( $self, $transcript ) = @_;
+  unless ( $transcript->translation ){
+    $self->warn("transcript has no translation - cannot put the stops");
+    return $transcript;
+  }
+
+  if ( $transcript->translation ){
+    
+    my $end      = $transcript->translation->end;
+    my $end_exon = $transcript->translation->end_Exon;
+
+    ############################################################
+    # first see whether the transcript already include the stop:  taa/tag/tga 
+    
+    # this gives you the sequence 5' to 3'
+    my $bioseq = $end_exon->seq; 
+    my $last_codon = $bioseq->subseq( $end - 2, $end );
+    if ( uc($last_codon) eq 'TAA' || uc($last_codon) eq 'TAG' || uc($last_codon) eq 'TGA' ){ 
+      print STDERR "transcript already has a stop at the end - no need to modify\n";
+      return $transcript;
+    }
+    
+    ############################################################
+    # now look at the next codon
+    
+    ############################################################
+    # first the simplest case
+    if ( $end + 3 <= ($end_exon->end - $end_exon->start + 1) ){
+      my $next_codon = $bioseq->subseq( $end+1, $end+3 );      
+      if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
+	print STDERR "next codon is a stop - extending translation\n";
+	$transcript->translation->end( $end + 3 );
+	return $transcript;
+      }
+      else{
+	print STDERR "next codon is not a stop - not modifying translation\n";
+	return $transcript;
+      }
+    }
+
+    ############################################################
+    # more complex cases we need to know if there is a next exon:
+    my $next_exon = $self->get_next_Exon( $transcript, $end_exon );
+    
+    unless( $next_exon ){
+      print STDERR "There is no downstream exon - not modifying the translation\n";
+      return $transcript;
+    }
+
+    ############################################################
+    # homany bases of the next codon sit in $end_exon?
+    my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
+    my $acceptor_bases_count = 3 - $donor_bases_count;
+
+    ############################################################
+    # get the next codon
+    my $next_bioseq = $next_exon->seq;
+    my $donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+    my $acceptor = $next_bioseq->subseq( 1, $acceptor_bases_count );
+    
+    my $next_codon = $donor.$acceptor;
+    if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
+      print STDERR "next codon is a stop - extending translation\n";
+      
+      $transcript->translation->end_Exon( $next_exon );
+      $transcript->translation->end( $acceptor_bases_count );
+
+      ############################################################
+      # re-set the phases:
+      $end_exon->end_phase($donor_bases_count);
+      $next_exon->phase( $donor_bases_count);
+      
+      return $transcript;
+    }
+    else{
+      print STDERR "next codon is not a stop - not modifying translation\n";
+      return $transcript;
+    }
+  }
+  else{
+    print STDERR "transcript has no translation - not modifying anything\n";
+    return $transcript;
+  }
+  
+}
+
+############################################################
+# method to retrieve the downstream exon of $exon, which must be part of transcript
+
+sub get_next_Exon{
+  my ($self, $transcript, $exon ) = @_;
+    
+  # this order the exons 5' to 3'
+  $transcript->sort;
+  my @exons = @{$transcript->get_all_Exons};
+  $transcript->sort;
+  for (my $i=0; $i<=$#exons; $i++ ){
+    if ( $exons[$i]->start == $exon->start 
+	 && 
+	 $exons[$i]->end   == $exon->end
+	 &&
+	 $exons[$i]->strand == $exon->strand 
+	 &&
+	 ($i+1) <= $#exons
+       ){
+      return $exons[$i+1];
+    }
+  }
+  return undef;
+}
+  
+
+
 1;
