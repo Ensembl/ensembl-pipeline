@@ -168,7 +168,7 @@ sub score_Transcripts{
       if ( $self->_label ){
 	$label = $self->_label;
       }
-      my $tran_id = $label."-".$cluster_count."-".1;
+      my $tran_id = $label."_".$cluster_count."_".1;
       $trans[0]->stable_id($tran_id);
       
       foreach my $exon ( @{$trans[0]->get_all_Exons} ){
@@ -199,7 +199,7 @@ sub score_Transcripts{
       if ( $self->_label ){
 	$label = $self->_label;
       }
-      my $tran_id = $label."-".$cluster_count."-".$tran_count;
+      my $tran_id = $label."_".$cluster_count."_".$tran_count;
       $tran->stable_id($tran_id);
 
       # list of ESTs:
@@ -363,7 +363,7 @@ sub score_Transcripts{
     $average_score   /= $trans_number;
     $average_missed_sites /= $trans_number;
 
-    my $gene_id = $label."-".$cluster_count;
+    my $gene_id = $label."_".$cluster_count;
 
     print STDERR "GENE\t".
       $gene_id."\t".
