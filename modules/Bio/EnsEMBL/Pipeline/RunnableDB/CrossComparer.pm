@@ -257,8 +257,8 @@ sub write_output {
 
   # We know that reference AlignBlockSet only has one AlignBlock
   
-  my $abs = new Bio::EnsEMBL::Compara::AlignBlockSet;
-  my $ab = new Bio::EnsEMBL::Compara::AlignBlock;
+  my $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
+  my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
   my $align_start = 1;
   my $align_end = $offset_max - $offset_min + 1;
   $ab->align_start($align_start);
@@ -287,10 +287,10 @@ sub write_output {
   $dnafrag->name($contig_id2);
   $dnafrag->genomedb($gdb);
   
-  $abs = new Bio::EnsEMBL::Compara::AlignBlockSet;
+  $abs = Bio::EnsEMBL::Compara::AlignBlockSet->new();
   
   foreach my $f (@features) {
-    my $ab = new Bio::EnsEMBL::Compara::AlignBlock;
+    my $ab = Bio::EnsEMBL::Compara::AlignBlock->new();
     my $align_start = $f->start - $offset_min + 1;
     my $align_end = $f->end - $offset_min + 1;
     $ab->align_start($align_start);
