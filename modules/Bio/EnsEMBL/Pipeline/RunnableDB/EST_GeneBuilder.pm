@@ -191,7 +191,8 @@ sub write_output {
 sub fetch_input {
     my( $self) = @_;
   
-    my $genetype = 'exonerate_e2g';
+    # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
+    my $genetype =  $::est_genome_conf{'genetype'};
 
     print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
@@ -501,10 +502,12 @@ sub check_transcripts {
       $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @sf = $exon->each_Supporting_Feature;      
 
+      # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+      my $evidence_tag = $::evidence_conf{'evidence_tag'};
     SF:
       foreach my $feature ( @sf ) {
 	# because we get all the supporting features indiscriminately
-	next SF unless $feature->source_tag eq 'exonerate_e2g';
+	next SF unless $feature->source_tag eq $evidence_tag;
 	
 	if(!defined $hid) { 
 	  $hid = $feature->hseqname; 
@@ -1147,10 +1150,11 @@ sub _get_RepresentativeExon {
   # at this point we could add all the EST-supporting-features of the rest of the exons in the cluster
   # to the supporting features of this exon, something like:
   shift @exons;
+  # my $source_tag = $::evidence_conf{'evidence_tag'};
   foreach my $ex ( @exons ){
     foreach my $sf ($ex->each_Supporting_Feature){
       # add only those that relate to EST's?
-      #next unless ( $sf->source_tag eq 'exonerate_e2g' );
+      #next unless ( $sf->source_tag eq $source_tag;
       $exon_copy->add_Supporting_Feature($sf);
     }
   }
@@ -1288,8 +1292,10 @@ sub run {
   my $cc=1;
   # run genomewise 
 
-  # sort out analysis & genetype here or we will get into trouble with duplicate analyses
-  my $genetype = "genomewise_fixed";   # genes get written in the database with this type-name
+  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+  my $genetype = $::genomewise_conf{'genetype'};
+  
+  # sort out analysis here or we will get into trouble with duplicate analyses
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis_obj;
