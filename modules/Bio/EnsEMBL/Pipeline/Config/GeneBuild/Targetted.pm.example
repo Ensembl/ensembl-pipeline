@@ -59,12 +59,13 @@ use vars qw( %Targetted );
 	      GB_TARGETTED_MIN_SPLIT_COVERAGE       => '95',
 
 	      # genetype for Targetted_GeneWise
-	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   );
+	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   
 	      GB_TARGETTED_MASKING => [],
 	     #the above setting will lead no features being masked out, if [] is used no masking will take place, if [''] is used all repeats in the table will be masked out
 	     #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
 	     GB_TARGETTED_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
 
+	     );
 sub import {
   my ($callpack) = caller(0); # Name of the calling package
   my $pack = shift; # Need to move package off @_
