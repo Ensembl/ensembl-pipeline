@@ -407,7 +407,7 @@ sub get_Features {
 
     print STDERR "\nNumber of similarity features " . scalar($self->feature) . "\n";
     print STDERR "Number of genscans              " . scalar($self->genscan)  . "\n";
-    print STDERR "Number of genewise features     " . scalar($self->genewise) . "\n\n";
+    print STDERR "Number of genewise genes     " . scalar($self->genewise) . "\n\n";
 
 
   }
@@ -2630,13 +2630,13 @@ sub prune_gene {
   # is only equivalent to the one used below when all transcripts have UTRs. 
   # The one below is actually the desired behaviour.
   # since we want long UTRs and long ORFs but the sorting must be fuzzy in the sense that we want to give priority 
-  # to a long ORF with UTR over a long ORF without UTR which is only slightly longer.
+  # to a long ORF with UTR over a long ORF without UTR which could only slightly longer.
 
   #test
-  print STDERR "1.- sordid transcripts:\n";
-  foreach my $tran (@sordid_transcripts){
-    print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
-  }
+  #print STDERR "1.- sordid transcripts:\n";
+  #foreach my $tran (@sordid_transcripts){
+  #  print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+  #}
   
   @transcripts = ();
   # sort first by orfhash{'length'}
@@ -2677,9 +2677,22 @@ sub prune_gene {
   #test
   print STDERR "2.- sorted transcripts:\n";
   foreach my $tran (@transcripts){
-    print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+    if ( $tran->dbID ){
+      print STDERR $tran->dbID." ";
+    }
+    print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+    my @exons = $tran->get_all_Exons;
+    if ( $exons[0]->strand == 1 ){
+      @exons = sort { $a->start <=> $b->start } @exons;
+    }
+    else{
+      @exons = sort { $b->start <=> $a->start } @exons;
+    }
+    foreach my $exon ( $tran->get_all_Exons ){
+      print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
+    }
   }
-
+  
 # old way - sort strictly on exon length
 #    @transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
 
@@ -2819,7 +2832,7 @@ sub prune_gene {
       @evidence_pairs = ();
     } 
     else {
-      print STDERR "\n\nTranscript already seen " . $tran->{'temporary_id'} . "\n";
+      #print STDERR "\n\nTranscript already seen " . $tran->{'temporary_id'} . "\n";
       
       ## transfer supporting feature data. We transfer it to exons
       foreach my $pair ( @evidence_pairs ){
@@ -2829,15 +2842,15 @@ sub prune_gene {
 	my $source_exon = $pair[0];
 	my $target_exon = $pair[1];
 
-	print STDERR "transferring evi from exon ".$source_exon->{'temporary_id'}." in transcript ";
-	foreach my $tran ( @{ $exon2transcript{ $source_exon } } ){
-	  print STDERR $tran->{'temporary_id'}." ";
+	#print STDERR "transferring evi from exon ".$source_exon->{'temporary_id'}." in transcript ";
+	#foreach my $tran ( @{ $exon2transcript{ $source_exon } } ){
+	#  print STDERR $tran->{'temporary_id'}." ";
+	#}
+	#print STDERR "to exon ".$target_exon->{'temporary_id'}." in transcript ";
+	#foreach my $tran ( @{ $exon2transcript{ $target_exon } } ){
+	#  print STDERR $tran->{'temporary_id'}." ";
 	}
-	print STDERR "to exon ".$target_exon->{'temporary_id'}." in transcript ";
-	foreach my $tran ( @{ $exon2transcript{ $target_exon } } ){
-	  print STDERR $tran->{'temporary_id'}." ";
-	}
-	print STDERR "\n";
+	#print STDERR "\n";
 	$self->transfer_supporting_evidence($source_exon, $target_exon)
       }
     }
@@ -3012,13 +3025,24 @@ sub validate_transcript{
   my ($self, $transcript) = @_;
   my @valid_transcripts;
 
-my @e = $transcript->get_all_Exons;
-
   my $valid = 1;
   my $split = 0;
 
+  # check exon phases:
+  my @exons = $transcript->get_all_Exons;
+  $transcript->sort;
+  for (my $i=0;$i<(scalar(@exons-1);$i++){
+    my $endphase = $exons[$i]->end_phase;
+    my $phase    = $exons[$i+1]->phase;
+    if ( $phase != $end_phase ){
+      $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
+      return undef;
+    }
+  }
+  
+
   my $previous_exon;
-  foreach my $exon($transcript->get_all_Exons){
+  foreach my $exon (@exons){
     if (defined($previous_exon)) {
       my $intron;
       
@@ -3043,15 +3067,15 @@ my @e = $transcript->get_all_Exons;
     $previous_exon = $exon;
   }
   
-  if ($valid) {
-      push(@valid_transcripts,$transcript);
-  }
-  elsif ($split){
-    # split the transcript up.
-    my @split_transcripts = $self->split_transcript($transcript);
+       if ($valid) {
+	 push(@valid_transcripts,$transcript);
+       }
+       elsif ($split){
+	 # split the transcript up.
+	 my @split_transcripts = $self->split_transcript($transcript);
     push(@valid_transcripts, @split_transcripts);
   }
-  return @valid_transcripts;
+       return @valid_transcripts;
 }
 
 =head2 transfer_supporting_evidence
