@@ -190,7 +190,7 @@ my @rules       = $rule_adaptor->fetch_all;
 
 # Need here to strip rules which don't need to be run.
 
-my @idList;     # All the input ids to check
+my @id_list;     # All the input ids to check
 
 alarm $wakeup if $wakeup;  
                 # Signal to the script to do something in the future,
@@ -204,7 +204,7 @@ while (1) {
 
     if (defined $idlist) {
 
-        # read list of id / class pairs from a file,
+        # read list of id's from a file,
         # e.g. a list of contigs on the golden path
 
         open IDS, "< $idlist" or die "Can't open $idlist";
@@ -212,7 +212,7 @@ while (1) {
             chomp;
             my($id) = split;
             ($id) or die "Invalid id $_";
-            push @idList, [ $id ];
+            push @id_list, $id;
         }
         close IDS;
     }
@@ -227,14 +227,14 @@ while (1) {
             print "Reading IDs ... ";
 
 	    foreach my $a (@start_from) {
-		push @idList, $sic->list_input_id_by_Analysis($a);
+		push @id_list, $sic->list_input_id_by_Analysis($a);
 	    }
 
             $completeRead = 1;
         }
     }
 
-    @idList = &shuffle(@idList) if $shuffle;
+    @id_list = &shuffle(@id_list) if $shuffle;
 
     # Now we loop over all the input ids. We fetch all the analyses
     # from the database that have already run. We then check all the
@@ -245,8 +245,8 @@ while (1) {
     #
     # All the analyses we're allowed to run are stored in a hash %analHash
 
-    JOBID: while (@idList) {
-        my $id = shift @idList;
+    JOBID: while (@id_list) {
+        my $id = shift @id_list;
 
         # handle signals. they are 'caught' in the handler subroutines but
         # it is only here they we do anything with them. so if the script
@@ -269,19 +269,19 @@ while (1) {
 	    last JOBID;
 	}
 
-        my @anals = $sic->fetch_analysis_by_input_id($id->[0]);
+        my @anals = $sic->fetch_analysis_by_input_id($id);
 
         my %analHash;
 
         # check all rules, which jobs can be started
 
-        my @current_jobs = $job_adaptor->fetch_by_input_id($id->[0]);
+        my @current_jobs = $job_adaptor->fetch_by_input_id($id);
 
         RULE: for my $rule (@rules)  {
             if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
-            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id->[0];
+            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id;
 
             my $anal = $rule->check_for_analysis (@anals);
 
@@ -330,14 +330,14 @@ while (1) {
 
 
             if ($@) {
-                print "ERROR: comparing to current jobs. Skipping analysis for " . $id->[0] . " [$@]\n";
+                print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
                 next JOBID;
               }
 
-            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id($anal, $id->[0]);
+            my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id($anal, $id);
 
 
-            print "Store ", $id->[0], " - ", $anal->logic_name, "\n";
+            print "Store ", $id, " - ", $anal->logic_name, "\n";
             $submitted++;
             $job_adaptor->store($job);
 
@@ -367,7 +367,7 @@ while (1) {
         sleep(3600) if $submitted == 0;
         $completeRead = 0;
         $currentStart = 0;
-        @idList = ();
+        @id_list = ();
         print "Waking up and run again!\n";
     }
 

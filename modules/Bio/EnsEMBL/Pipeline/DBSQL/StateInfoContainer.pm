@@ -236,7 +236,7 @@ sub list_input_id_by_Analysis {
   my $table = $sth->fetchall_arrayref;
 
   foreach my $row (@{$table}) {
-    push @result, $row;
+    push @result, $row->[0];
   }
 
   return @result;
