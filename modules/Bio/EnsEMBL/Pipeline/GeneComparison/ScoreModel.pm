@@ -169,7 +169,7 @@ sub score_Transcripts{
 	$label = $self->_label;
       }
       my $tran_id = $label."-".$cluster_count."-".1;
-      $tran->stable_id($tran_id);
+      $trans[0]->stable_id($tran_id);
       
       foreach my $exon ( @{$trans[0]->get_all_Exons} ){
 	$exon->score( 100 );
