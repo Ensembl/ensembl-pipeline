@@ -319,29 +319,33 @@ use vars qw( %GeneCompConf );
 		 #################################################################
 
 		 # annotation/benchmark genes
-		 DBHOST1    => 'ecs2d',
-	         DBNAME1    => 'homo_sapiens_sanger_8_30',
-		 PATH1      => 'NCBI_30',    
+		 DBHOST1    => 'ecs2a',
+	         DBNAME1    => 'otter_merged_chrs_with_anal',
+		 PATH1      => 'SANGER',    
+                 PORT1      => 3306,
 		 DBUSER1    => 'ensro',
-		 GENETYPES1 => ["HUMACE-Pseudogene"],
+		 GENETYPES1 => ["Known","Novel_CDS"],
 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 REF_DBHOST1 => 'ecs2d',                    
-		 REF_DBNAME1 => 'homo_sapiens_core_8_30',
-		 REF_PATH1   => 'NCBI_30',
+		 REF_DBHOST1 => 'ecs2a',                    
+		 REF_DBNAME1 => 'otter_merged_chrs_with_anal',
+		 REF_PATH1   => 'SANGER',
+                 REF_PORT1   => 3306,
 		 REF_DBUSER1 => 'ensro',
 
 		 # prediction genes
-		 DBHOST2    => 'ecs2d',                    
-		 DBNAME2    => 'homo_sapiens_core_8_30',
-		 PATH2      => 'NCBI_30',
+		 DBHOST2    => 'ecs2c',                    
+		 DBNAME2    => 'otter_chr20_old_annotation',
+		 PATH2      => 'VEGA',
+                 PORT2      => 19322,
 		 DBUSER2    => 'ensro',
-		 GENETYPES2 => ["ensembl"], 
+		 GENETYPES2 => ["HUMACE-Known","HUMACE-Novel_CDS"],
 		 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 REF_DBHOST2 => 'ecs2d',                    
-		 REF_DBNAME2 => 'homo_sapiens_core_8_30',
-		 REF_PATH2   => 'NCBI_30',
+		 REF_DBHOST2 => 'ecs2c',                    
+		 REF_DBNAME2 => 'otter_chr20_old_annotation',
+                 REF_PORT2   => 19322,
+		 REF_PATH2   => 'VEGA',
 		 REF_DBUSER2 => 'ensro',
 
  );

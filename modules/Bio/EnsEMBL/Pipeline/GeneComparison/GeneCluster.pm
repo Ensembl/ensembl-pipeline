@@ -272,11 +272,11 @@ sub pair_Transcripts {
   my (@ann_transcripts,@pred_transcripts);
   my (@ann_trans,@pred_trans);
   foreach my $gene ( @$pred_genes ){
-    #print STDERR "gene ".$gene->type." put in pred_trans array\n";
+    # print STDERR "gene ".$gene->type." put in pred_trans array\n";
     push( @pred_trans, @{$gene->get_all_Transcripts} );
   }
   foreach my $gene ( @$ann_genes ){
-    #print STDERR "gene ".$gene->type." put in ann_trans array\n";
+    # print STDERR "gene ".$gene->type." put in ann_trans array\n";
     push( @ann_trans, @{$gene->get_all_Transcripts} );
   }
   
@@ -321,8 +321,8 @@ sub pair_Transcripts {
       $$overlap_matrix{ $pred_tran }{ $ann_tran } = $overlap_number;
       my @list = ( $$overlap_matrix{ $pred_tran }{ $ann_tran }, $pred_tran, $ann_tran , $overlap_length);
       push ( @overlap_pairs, \@list );
-      #print STDERR "Overlap( ".$tran1->stable_id.",".$tran2->stable_id." ) = "
-      #.$$overlap_matrix{ $tran1 }{ $tran2 }."\n";
+      # print STDERR "Overlap( ".$ann_tran->stable_id.",".$pred_tran->stable_id." ) = "
+      #.$$overlap_matrix{ $pred_tran }{ $ann_tran }."\n";
     }
   }
   # @overlap_pairs contains an array of lists
@@ -350,7 +350,7 @@ sub pair_Transcripts {
     $seen_pred{ $pred_tran } = $max_overlap;
     $seen_ann{ $ann_tran }   = $max_overlap;
     $$link{ $pred_tran }{ $ann_tran } = 1;
-    #print STDERR "putting together $pred_tran and $ann_tran\n";
+    # print STDERR "putting together $pred_tran and $ann_tran\n";
     
     # scan through each overlap
   PAIR:
