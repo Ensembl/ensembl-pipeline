@@ -296,6 +296,7 @@ sub filter_output{
   foreach my $rna_id ( keys( %matches ) ){
     
     my @selected;
+  TRAN:
     foreach my $tran ( @{$matches{$rna_id}} ){ 
       my $score    = $self->_coverage($tran);
       my $perc_id  = $self->_percent_id($tran);
@@ -303,7 +304,7 @@ sub filter_output{
       ############################################################
       # we allow the rna to align with perc_id below threshold if
       # if the coverage is much better than just above threshold
-      next $rna_id unless ( ( $score >= $MIN_COVERAGE && $perc_id >= $MIN_PERCENT_ID )
+      next TRAN unless ( ( $score >= $MIN_COVERAGE && $perc_id >= $MIN_PERCENT_ID )
 			    ||
 			    ( $score >= (1 + 5/100)*$MIN_COVERAGE && $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID )
 			  );
