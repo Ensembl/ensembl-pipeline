@@ -146,6 +146,10 @@ if ($help) {
     exec('perldoc', $0);
 }
 
+if(!$host || !$user || !$dbname){
+  throw("Can't run without -dbhost $host -dbuser $user -dbname $dbname");
+  exec('perldoc', $0);
+}
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,
                                                       -pass   => $pass,
@@ -155,8 +159,14 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 
 if (!($slice) && !($single) && !($file) && !($translation_id) 
     && !($non_redundant)) {
-  die "Must define input as either contig, slice, file, translation_id ".
-  "or single";
+  throw("Must define input as either contig, slice, file, translation_id ".
+  "or single");
+  exec('perldoc', $0);
+}
+
+if(!$logic_name){
+  throw("Can't run with out a logic_name");
+  exec('perldoc', $0);
 }
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
