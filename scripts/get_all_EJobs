@@ -8,18 +8,41 @@ unshift (@INC,"/nfs/disk89/michele/bioperl-live");
 
 }
 
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Getopt::Long;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $status;
+my $id;
+
+&GetOptions( 
+	     'status:s' => \$status,
+	     'id:s'     => \$id,
+	     );
+
+die ("Input id or status") unless ($id || $status);
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-dbname => 'analysis',
- -host => 'croc',
- -user => 'root');
+						-host => 'croc',
+						-user => 'root');
 
 print("Connected to analysis database\n");
 
-my @jobs = $db->get_JobsByInputId($ARGV[0]);
+my @jobs;
+
+if ($id){
+    push(@jobs,$db->get_JobsByInputId($id));
+} elsif ($status) {
+    push(@jobs,$db->get_JobsByCurrentStatus($status));
+}
+
 print("Got jobs\n");
+
 foreach my $job (@jobs) {
-  $job->print;
+    $job->print;
 }
 
