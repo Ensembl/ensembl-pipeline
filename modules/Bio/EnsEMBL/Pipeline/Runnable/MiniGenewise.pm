@@ -77,7 +77,7 @@ sub new {
 								ENDBIAS
 								FORDER)],
 							    @args);
-    
+
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("No seqfetcher provided")                        unless defined($seqfetcher);
 
@@ -421,7 +421,7 @@ sub get_Sequence {
   
   my $seqfetcher = $self->seqfetcher;    
   
-  print STDERR "MiniGenewise: getting sequence for $id\n";
+  #print STDERR "MiniGenewise: getting sequence for $id\n";
   
   my $seq;
   eval {
@@ -507,7 +507,7 @@ sub run {
       @f = sort { $a->start <=> $b->start } @f;
       foreach my $f (@f) {
 	#print STDERR "MiniGenewise: f is a $f\n";
-	print STDERR $f."\t".$f->start."-".$f->end." phase: ".$f->phase." end_phase: ".$f->phase." strand: ".$f->strand."n";
+	#print STDERR $f."\t".$f->start."-".$f->end." phase: ".$f->phase." end_phase: ".$f->phase." strand: ".$f->strand."n";
 	#print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
 	#print $f;
       }
