@@ -389,7 +389,9 @@ sub run_bp_search {
   }
   
   # get the sequence
-  $seq = $index->fetch($id); # Returns Bio::Seq object
+  eval{
+    $seq = $index->fetch($id); # Returns Bio::Seq object
+  };
 
   $self->warn("Problem with run_bp_search for [$id]") unless defined $seq;
   
