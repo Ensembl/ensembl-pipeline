@@ -79,15 +79,15 @@ my $sequence_level = 1;
             'h|help'     => \$help,
            ) or ($help = 1);
 
-if(!$dbhost || !$dbuser || !$dbname || !$dbpass){
+if(!$host || !$dbuser || !$dbname || !$dbpass){
   print STDERR "Can't store sequence without database details\n";
   print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
     " -dbpass $dbpass\n";
   $help = 1;
 }
-if(!$coord_system_name || !$seqfile){
+if(!$cs_name || !$seqfile){
   print STDERR "Need coord_system_name and seqfile to beable to run\n";
-  print STDERR "-coord_system_name $coord_system_name -seqfile $seqfile\n";
+  print STDERR "-coord_system_name $cs_name -seqfile $seqfile\n";
 }
 
 if ($help) {
@@ -107,8 +107,10 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 
 my $csa = $db->get_CoordSystemAdaptor();
 
-my $cs = $csa->fetch_by_name($cs_name);
-
+my $cs;
+eval{
+  $cs = $csa->fetch_by_name($cs_name);
+};
 if(!$cs){
   $cs = Bio::EnsEMBL::CoordSystem->new
     (
@@ -135,11 +137,12 @@ while ( my $seq = $seqio->next_seq ) {
   my @values = split /\s+/, $seq->desc;
   my $name = $values[0];
   my $slice = Bio::EnsEMBL::Slice->new(
-                                       -seq_region_name  => $name,
-                                       -start            => 1,
-                                       -end              => $seq->length,
-                                       -strand           => 1,
-                                       -coord_system     => $cs,
+                                       -seq_region_name   => $name,
+                                       -start             => 1,
+                                       -end               => $seq->length,
+                                       -seq_region_length => $seq->length,
+                                       -strand            => 1,
+                                       -coord_system      => $cs,
                                       );
 
   $sa->store($slice, \$seq->seq);
