@@ -1,0 +1,7 @@
+
+DUSTEXE=/usr/local/ensembl/bin/dust
+SEQDIR=//work6a/vac.tmp/NCBI28/contig_chunks/
+SEQFILE=${SEQDIR}/${JOBID}
+
+BSUB_OPTIONS="-q acari -m ecsnodes"
+
