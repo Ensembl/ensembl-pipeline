@@ -82,7 +82,7 @@ sub match{
 
 sub score{
   my ($self, $obj1, $obj2 , $score) = @_;
-  unless ($obj1 && $obj2 && $score){
+  unless ($obj1 && $obj2 ){
     $self->throw("lacking arguments in score()");
   }
   #unless ( $self->{_score}{$obj1}{$obj2} && $self->{_score}{$obj2}{$obj1} ){
@@ -160,18 +160,39 @@ sub partners{
 }    
 
 ############################################################
-# condition for solution:
-# there is no two elements that they're not paired-up to each other but
+# this method takes all the pairs with the corresponding scores
+# as held in the object and finds the best pairs using
+# the 'stable-marriage' algorithm.
+
+# it return 
+
+# The Algorithm has the following condition for solution:
+# there are no two elements that they're not paired-up to each other but
 # they have better score with each other ( $score_matrix is higher ) 
 # than with their current corresponding partners
+
+# the main different between this optimization algorithm
+# and a 'best-reciprocal-pairs' approach is that
+# 'stable-marriage' produces rather 'best-available-pairs', so it keeps matches which
+# not being maximal are still optimal. It warranties only on pair
+# per element, and this is the best available one, i.e. ' you like
+# C. Schiffer but she likes D. Copperfield more than she likes you so
+# you have to stick to the next one in your priority list if available'.
 
 sub stable_marriage{
   my ($self) = @_;
 
+  # get one list
   my @list1 = $self->list1;
+  
+  # to keep track of which ones have been married already:
   my %married_object1;
   my %married_object2;
+
+  # to store the potential partners in list2 of each object in list1
   my %candidates_in_list2;
+
+  # to store the chosen partner for each object
   my %partner;
 
   foreach my $e1 ( @list1 ){
@@ -200,7 +221,7 @@ sub stable_marriage{
       
       #print STDERR "looking at $potential_partner_in_list2\n";
       # check whether it is already married
-      if ( $married_object2{ $potentia_partner_in_list2 } 
+      if ( $married_object2{ $potential_partner_in_list2 } 
 	   && $married_object2{ $potential_partner_in_list2 } == 1 ){
 	
 	# is it married to another target?
@@ -262,11 +283,13 @@ sub stable_marriage{
     } # end of PARTNER
     
   }   # end of MARRIAGE
- 
+  
+  my $new_object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
   foreach my $object1 ( keys %married_object1 ){
-    #create here a new object map with the happy pairs
-    #  print OUT $target."\t".$partner{ $target }."\t".$score_matrix{ $target }{ $partner{$target} }."\n";
+    $new_object_map->match( $partner{ $partner{$object1} }, $partner{$object1}, $self->score( $object1, $partner{$object1}) );
   }
+  return $new_object_map;
+  
 }
 ############################################################
 
