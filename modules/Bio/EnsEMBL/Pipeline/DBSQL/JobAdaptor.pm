@@ -75,7 +75,7 @@ sub new {
 sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
-  #print STDERR "Fetching job ".$id."\n";
+
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count, temp_dir, exec_host
@@ -109,7 +109,7 @@ sub fetch_by_submission_id {
   while( my $rowHashRef = $sth->fetchrow_hashref ) {
     push( @result, $self->_objFromHashref( $rowHashRef ));
   }
-  #print STDERR "Have ".@result." from fetching by ".$submissionid."\n";
+ 
   return @result;
 }
 
@@ -535,8 +535,8 @@ sub _objFromHashref {
   my $hashref = shift;
   my $job;
   my $analysis;
-  my ($p, $f, $l) = caller;
-  #print STDERR "calling JobADaptor->objectfromHashref from $f:$l\n";
+ 
+  
   $analysis =
     $self->db->get_AnalysisAdaptor->
       fetch_by_dbID( $hashref->{analysis_id} );
@@ -609,11 +609,10 @@ sub set_status {
         
         $self->current_status($job, $status);
         
-        #	print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
       };
     
     if ($@) {
-      #      print( " $@ " );
+      print( " $@ " );
       
       $self->throw("Error setting status to $stat_str");
     } else {
