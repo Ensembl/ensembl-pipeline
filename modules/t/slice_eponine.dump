@@ -1,0 +1,5 @@
+INSERT INTO analysis (created, logic_name, program, program_file,
+parameters, module, gff_source, gff_feature) VALUES
+(now(),'Eponine','eponine-scan', '/usr/opt/java131/bin/java',
+'-epojar => /usr/local/ensembl/lib/eponine-scan.jar, -threshold => 0.999',
+'Slice_EponineTSS','Eponine','TSS');

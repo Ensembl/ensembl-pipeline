@@ -1,0 +1,5 @@
+INSERT INTO analysis (created, logic_name, db, db_file, program, program_file,
+parameters, module, gff_source, gff_feature) VALUES
+(now(),'EPCR','homo_sapiens_maps_130_W7_set',
+'homo_sapiens_maps_130_W7_set','e-PCR','e-PCR',
+'-M => 150, -W => 7, -NMIN => 0, -NMAX => 2','Slice_EPCR','e-PCR','sts');
