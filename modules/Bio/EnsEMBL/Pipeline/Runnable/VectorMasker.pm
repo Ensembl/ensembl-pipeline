@@ -17,6 +17,7 @@
 Bio::EnsEMBL::Pipeline::Runnable::VectorMasker
 
 =head1 SYNOPSIS
+
 #create and fill Bio::Seq object
 my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
 my $seq = Bio::Seq->new();
@@ -29,11 +30,13 @@ $vectmask->run();
 @featurepairs = $vectmask->output();
 
 =head1 DESCRIPTION
+
 VectorMasker takes a Bio::Seq object and runs blastn with vectors_etc, the
 output is parsed by MSPcrunch and stored as Bio::EnsEMBL::FeaturePairs. 
 Arguments can be passed to MSPcrunch through the arguments() method. 
 
 =head2 Methods:
+
 new($seq_obj)
 blastn($path_to_blastn)
 mspcrunch($path_to_mspcrunch)
@@ -72,6 +75,7 @@ use Data::Dumper;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
 =head2 new
+
     Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-CLONE => $seq);
     Function:   Initialises VectorMasker object
@@ -79,6 +83,7 @@ use Data::Dumper;
     Args    :   A Bio::Seq object (-CLONE), any arguments for blastn (-ARGS) 
 
 =cut
+
 sub _initialize {
     my ($self,@args) = @_;
     my $make = $self->SUPER::_initialize(@_);    
@@ -146,12 +151,14 @@ sub results {
 }
 
 =head2 protect
+
     Title   :   protect
     Usage   :   $obj->protect('.masked', '.p');
     Function:   Protects files with suffix from deletion when execution ends
     Args    :   File suffixes
-    
+
 =cut
+
 sub protect {
     my ($self, @filename) =@_;
     push (@{$self->{_protected}}, @filename) if (@filename);
@@ -159,12 +166,14 @@ sub protect {
 }
 
 =head2 blastn
+
     Title   :   blastn
     Usage   :   $obj->blastn('/usr/local/pubseq/bin/blastn');
     Function:   Get/set method for the location of blastn
     Args    :   File path (optional)
-    
+
 =cut
+
 sub blastn {
     my ($self, $location) = @_;
     if ($location)
@@ -177,12 +186,14 @@ sub blastn {
 }
 
 =head2 mspcrunch
+
     Title   :   mspcrunch
     Usage   :   $obj->mspcrunch('/usr/local/pubseq/bin/MSPcrunch');
     Function:   Get/set method for the location of mspcrunch
     Args    :   File path (optional)
-    
+
 =cut
+
 sub mspcrunch {
     my ($self, $location) = @_;
     if ($location)
@@ -195,12 +206,14 @@ sub mspcrunch {
 }
 
 =head2 vector
+
     Title   :   vector
     Usage   :   $obj->vector('/tmp_mnt/nfs/disk100/humpub/blast/vectors_etc');
     Function:   Get/set method for the location of vector
     Args    :   File path (optional)
-    
+
 =cut
+
 sub vector {
     my ($self, $location) = @_;
     if ($location)
@@ -213,12 +226,14 @@ sub vector {
 }
 
 =head2 workdir
+
     Title   :   workdir
     Usage   :   $obj->wordir('~humpub/temp');
     Function:   Get/set method for the location of a directory to contain temp files
     Args    :   File path (optional)
-    
+
 =cut
+
 sub workdir {
     my ($self, $directory) = @_;
     if ($directory)
@@ -231,12 +246,14 @@ sub workdir {
 }
 
 =head2 arguments
+
     Title   :   arguments
     Usage   :   $obj->arguments(' -I 95 -x -');
     Function:   Get/set method for MSPcrunch arguments
     Args    :   File path (optional)
-    
+
 =cut
+
 sub arguments {
     my ($self, $args) = @_;
     if ($args)
@@ -249,7 +266,9 @@ sub arguments {
 ###########
 # Analysis methods
 ##########
+
 =head2 run
+
     Title   :  run
     Usage   :   $obj->run()
     Function:   Runs blastn and MSPcrunch and creates array of feature pairs
@@ -257,6 +276,7 @@ sub arguments {
     Args    :   none
 
 =cut
+
 sub run {
     my ($self, $dir) = @_;
     #check clone
@@ -274,13 +294,15 @@ sub run {
 }
 
 =head2 parsefile
-Title   :  parsefile
+
+    Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses blastn and MSPcrunch output to give a set of feature pairs
     Returns :   none
     Args    :   optional filename
 
 =cut
+
 sub parsefile {
     my ($self, $filename) = @_;
     $self->results($filename) if ($filename);
@@ -399,6 +421,7 @@ sub growfplist {
 # input/output methods
 #############
 =head2 output
+
     Title   :   output
     Usage   :   obj->output()
     Function:   Returns an array of feature pairs
@@ -406,6 +429,7 @@ sub growfplist {
     Args    :   none
 
 =cut
+
 sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};

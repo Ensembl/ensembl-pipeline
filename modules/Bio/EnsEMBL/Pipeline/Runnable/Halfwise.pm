@@ -18,11 +18,25 @@ Bio::EnsEMBL::Pipeline::Runnable::Halfwise
 
 =head1 SYNOPSIS
 
-    
+  #create and fill Bio::Seq object
+  my $seq = Bio::Seq->new();
+  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  $seq = $seqstream->next_seq();
+
+  #create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
+  my $halfwise = Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-CLONE => $seq);
+  $halfwise->workdir($workdir);
+  #$halfwise->run();
+  $halfwise->parsefile('/nfs/disk65/mq2/temp/halfwise.output');
+  my $featurepairs = $halfwise->output();
+
 =head1 DESCRIPTION
 
-=head2 Methods:
+Takes a Bio::Seq object and runs halfwise on it. The results are returned as an
+array of Bio::EnsEMBL::FeaturePairs. The location of halfwise can be set using
+the halfwise() method
 
+=head2 Methods:
 
 =head1 CONTACT
 
@@ -53,6 +67,7 @@ use Data::Dumper;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
 =head2 new
+
     Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-CLONE => $seq);
     Function:   Initialises Halfwise object
@@ -61,6 +76,7 @@ use Data::Dumper;
                 (Halfwise location and arguments optional)
 
 =cut
+
 sub _initialize {
     my ($self,@args) = @_;
     my $make = $self->SUPER::_initialize(@_);    
@@ -113,12 +129,14 @@ sub results {
 }
 
 =head2 protect
+
     Title   :   protect
     Usage   :   $obj->protect('.masked', '.p');
     Function:   Protects files with suffix from deletion when execution ends
     Args    :   File suffixes
-    
+
 =cut
+
 sub protect {
     my ($self, @filename) =@_;
     push (@{$self->{_protected}}, @filename) if (@filename);
@@ -126,12 +144,14 @@ sub protect {
 }
 
 =head2 halfwise
+
     Title   :   halfwise
     Usage   :   $obj->halfwise('/nfs/disk100/humpub/OSFbin/halfwise');
     Function:   Get/set method for the location of halfwise
     Args    :   File path (optional)
-    
+
 =cut
+
 sub halfwise {
     my ($self, $location) = @_;
     if ($location)
@@ -144,12 +164,14 @@ sub halfwise {
 }
 
 =head2 arguments
+
     Title   :   arguments
     Usage   :   $obj->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet');
     Function:   Get/set method for halfwise arguments arguments
     Args    :   File path (optional)
-    
+
 =cut
+
 sub arguments {
     my ($self, $args) = @_;
     if ($args)
@@ -160,12 +182,14 @@ sub arguments {
 }
 
 =head2 workdir
+
     Title   :   workdir
     Usage   :   $obj->wordir('~humpub/temp');
     Function:   Get/set method for the location of a directory to contain temp files
     Args    :   File path (optional)
-    
+
 =cut
+
 sub workdir {
     my ($self, $directory) = @_;
     if ($directory)
@@ -186,7 +210,9 @@ sub growfplist {
 ###########
 # Analysis methods
 ##########
+
 =head2 run
+
     Title   :  run
     Usage   :   $obj->run()
     Function:   Runs halfwise and creates array of feature pairs
@@ -194,6 +220,7 @@ sub growfplist {
     Args    :   none
 
 =cut
+
 sub run {
     my ($self, $dir) = @_;
     #check clone
@@ -223,13 +250,15 @@ sub run_halfwise {
 }
 
 =head2 parsefile
-Title   :  parsefile
+
+    Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses halfwise ace output to give a set of feature pairs
     Returns :   none
     Args    :   optional filename
 
 =cut
+
 sub parsefile {
     my ($self, $filename) = @_;
     $self->results($filename) if ($filename);
@@ -376,7 +405,9 @@ sub createfeaturepair {
 ##############
 # input/output methods
 #############
+
 =head2 output
+
     Title   :   output
     Usage   :   obj->output()
     Function:   A list of Feature pairs 
@@ -384,6 +415,7 @@ sub createfeaturepair {
     Args    :   none
 
 =cut
+
 sub output {
 my ($self) = @_;
     return @{$self->{'_fplist'}};

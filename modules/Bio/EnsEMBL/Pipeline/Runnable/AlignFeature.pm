@@ -166,7 +166,7 @@ sub get_all_FeaturesById {
 
     FEAT: foreach my $f ($self->get_all_Features) {
 #	print("Feature is $f " . $f->seqname . "\t" . $f->hseqname . "\n");
-	if (!(defined($f->hseqname))) {
+    if (!(defined($f->hseqname))) {
 #	    $self->warn("No hit name for " . $f->seqname . "\n");
 	    next FEAT;
 	} 

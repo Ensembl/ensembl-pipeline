@@ -17,32 +17,45 @@
 Bio::EnsEMBL::Pipeline::Runnable::Genscan
 
 =head1 SYNOPSIS
-#create and fill Bio::Seq object
-my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
-my $seq = Bio::Seq->new();
-my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
-$seq = $seqstream->next_seq();
-#create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
-my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
-$genscan->workdir($workdir);
-$genscan->run();
-my $seqfeature = $genscan->output();
-my @exons = $genscan->output_exons();
-my @genes = $genscan->output_genes();
-    
+
+  #create and fill Bio::Seq object
+  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $seq = Bio::Seq->new();
+  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  $seq = $seqstream->next_seq();
+  #create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
+  my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
+  $genscan->workdir($workdir);
+  $genscan->run();
+  my $seqfeature = $genscan->output();
+  my @exons = $genscan->output_exons();
+  my @genes = $genscan->output_genes();
+
 =head1 DESCRIPTION
+
 This package is based on Genscan2ace.
 Genscan takes a Bio::Seq object and runs Genscan on it. The
 resulting output is parsed to produce a set of Bio::SeqFeatures. 
 
 =head2 Methods:
-new($seq_obj)
-Genscan($path_to_Genscan)
-workdir($directory_name)
-run()
-output()
-output_exons()
-output_genes()
+
+=over 4
+
+=item new($seq_obj)
+
+=item    Genscan($path_to_Genscan)
+
+=item    workdir($directory_name)
+
+=item    run()
+
+=item    output()
+
+=item    output_exons()
+
+=item    output_genes()
+
+=back
 
 =head1 CONTACT
 
@@ -73,6 +86,7 @@ use Data::Dumper;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
 =head2 new
+
     Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
     Function:   Initialises Genscan object
@@ -81,6 +95,7 @@ use Data::Dumper;
                 (Genscan location and parameter file location optional)
 
 =cut
+
 sub _initialize {
     my ($self,@args) = @_;
     my $make = $self->SUPER::_initialize(@_);    
@@ -164,12 +179,14 @@ sub results {
 }
 
 =head2 protect
+
     Title   :   protect
     Usage   :   $obj->protect('.masked', '.p');
     Function:   Protects files with suffix from deletion when execution ends
     Args    :   File suffixes
-    
+
 =cut
+
 sub protect {
     my ($self, @filename) =@_;
     push (@{$self->{_protected}}, @filename) if (@filename);
@@ -177,12 +194,14 @@ sub protect {
 }
 
 =head2 genscan
+
     Title   :   genscan
     Usage   :   $obj->genscan('/nfs/disk100/humpub/OSFbin/genscan');
     Function:   Get/set method for the location of genscan
     Args    :   File path (optional)
-    
+
 =cut
+
 sub genscan {
     my ($self, $location) = @_;
     if ($location)
@@ -195,12 +214,14 @@ sub genscan {
 }
 
 =head2 parameters
+
     Title   :   parameters
     Usage   :   $obj->parameters('/nfs/disk100/humpub/OSFbin/HumanIso.smat');
     Function:   Get/set method for the location of genscan parameters
     Args    :   File path (optional)
-    
+
 =cut
+
 sub parameters {
     my ($self, $location) = @_;
     if ($location)
@@ -213,12 +234,14 @@ sub parameters {
 }
 
 =head2 workdir
+
     Title   :   workdir
     Usage   :   $obj->wordir('~humpub/temp');
     Function:   Get/set method for the location of a directory to contain temp files
     Args    :   File path (optional)
-    
+
 =cut
+
 sub workdir {
     my ($self, $directory) = @_;
     if ($directory)
@@ -252,7 +275,9 @@ sub add_gene {
 ###########
 # Analysis methods
 ##########
+
 =head2 run
+
     Title   :  run
     Usage   :   $obj->run()
     Function:   Runs genscan and creates array of sub-seqfeatures
@@ -260,6 +285,7 @@ sub add_gene {
     Args    :   none
 
 =cut
+
 sub run {
     my ($self, $dir) = @_;
     #check clone
@@ -289,13 +315,15 @@ sub run_genscan {
 }
 
 =head2 parsefile
-Title   :  parsefile
+
+    Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses Genscan output to give a set of seqfeatures
     Returns :   none
     Args    :   optional filename
 
 =cut
+
 sub parsefile {
     my ($self, $filename) = @_;
     $self->results($filename) if ($filename);
@@ -388,7 +416,7 @@ sub create_exon {
     $self->add_exon($exon);
 }
 
-#not used at present
+#only called by output_genes()
 sub create_genes {
     my ($self) = @_;
     my @exons = $self->output_exons();
@@ -444,7 +472,9 @@ sub create_genes {
 ##############
 # input/output methods
 #############
+
 =head2 output
+
     Title   :   output
     Usage   :   obj->output()
     Function:   Returns a single SeqFeature with exons as sub-SeqFeatures
@@ -452,12 +482,14 @@ sub create_genes {
     Args    :   none
 
 =cut
+
 sub output {
 my ($self) = @_;
     return $self->{'_seqfeature'};
 }
 
 =head2 output_exons
+
     Title   :   output_exons
     Usage   :   obj->output_exons()
     Function:   Returns an array of SeqFeatures corresponding to exons
@@ -465,6 +497,7 @@ my ($self) = @_;
     Args    :   none
 
 =cut
+
 sub output_exons {
     my ($self) = @_;
     my @exons = $self->seqfeature->sub_SeqFeature();
@@ -472,6 +505,7 @@ sub output_exons {
 }
 
 =head2 output_genes
+
     Title   :   output_genes
     Usage   :   obj->output_genes()
     Function:   Returns an array of SeqFeatures representing predicted genes
@@ -479,6 +513,7 @@ sub output_exons {
     Args    :   none
 
 =cut
+
 sub output_genes {
     my ($self) = @_;
     #Decided to create genes here to save uneccesary storage - genes are just reorganised exons
