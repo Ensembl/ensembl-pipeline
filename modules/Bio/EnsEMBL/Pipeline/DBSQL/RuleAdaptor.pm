@@ -163,7 +163,7 @@ sub fetch_all {
       ( '-dbid'    => $dbID,
 	'-goal'    => $analysis,
         '-adaptor' => $self );
-    print STDERR "Setting $dbID rule\n";
+    # print STDERR "Setting $dbID rule\n";
     $rules{$dbID} = $rule;
   }
 
@@ -173,9 +173,10 @@ sub fetch_all {
   $sth->execute;
 
   while( @queryResult = $sth->fetchrow_array ) {
-      print STDERR "@queryResult\n";
+      # print STDERR "@queryResult\n";
       $rules{$queryResult[0]}->add_condition( $queryResult[1] );
   }
+  # print STDERR "Found @{[scalar keys %rules]} rules\n";
   return values %rules;
 }
 
