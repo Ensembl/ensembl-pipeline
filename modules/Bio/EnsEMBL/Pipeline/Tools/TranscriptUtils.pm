@@ -633,6 +633,8 @@ sub split_Transcript{
       $count++;
       push(@final_transcripts, $st);
     }
+
+    $st->add_supporting_features(@{$transcript->get_all_supporting_features})
   }
   
   return \@final_transcripts;
@@ -889,6 +891,13 @@ sub _clone_Transcript{
   if ( defined $transcript->translation ){
     $newtranscript->translation($newtranslation);
   }
+
+  # Only a shallow copy of support
+  my @support = @{$transcript->get_all_supporting_features};
+  if ( scalar(@support) ){
+    $newtranscript->add_supporting_features(@support);
+  }
+
   return $newtranscript;
 }
 
@@ -1140,10 +1149,10 @@ sub check_splice_sites{
       $upstream_site = uc($upstream_site);
       $downstream_site = uc($downstream_site);      
 
-      print STDERR "check_splice_sites: upstream ".
-	($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
-	  "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
-      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
+#      print STDERR "check_splice_sites: upstream ".
+#	($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+#	  "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+#      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
       
@@ -1203,9 +1212,9 @@ sub check_splice_sites{
       $upstream_site = uc($upstream_site);
       $downstream_site = uc($downstream_site);
 
-      print STDERR "check_splice_sites: upstream ".
-	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
-	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
+#      print STDERR "check_splice_sites: upstream ".
+#	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
+#	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -1283,10 +1292,10 @@ sub check_canonical_splice_sites{
 	next INTRON;
       }
 
-print STDERR "check_splice_sites: upstream ".
-	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
-	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
-      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
+#print STDERR "check_splice_sites: upstream ".
+#	  ($upstream_exon->end + 1)."-".($upstream_exon->end + 2).": $upstream_site ".
+#	      "downstream ".($downstream_exon->start - 2 )."-". ($downstream_exon->start - 1 ).": $downstream_site\n";
+#      print STDERR "check_splice_sites: upstream $upstream_site, downstream: $downstream_site\n";
       ## good pairs of upstream-downstream intron sites:
       ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
 
@@ -1345,9 +1354,9 @@ print STDERR "check_splice_sites: upstream ".
       ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
       ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
       
-      print STDERR "check_splice_sites: upstream ".
-	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
-	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
+#      print STDERR "check_splice_sites: upstream ".
+#	  ($upstream_exon->start - 2)."-".($upstream_exon->start - 1).": $upstream_site ".
+#	      "downstream ".($downstream_exon->end + 1)."-". ($downstream_exon->end + 2 ).": $downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
