@@ -19,52 +19,38 @@ use vars qw(%ECR_Config);
 
 %ECR_Config = (
 
-               SUBSETAXT_MATRIX => '/ecs2/work1/klh/data/blastmat/blastz_coding.mat',
-               SUBSETAXT_CUTOFF => 3400,
+               AXTFILTER_BY_CONFIG => {
 
-               AXT_FILTERS => {
-                 'MouseBest' => {
-                   source => 'MouseBlastz',
-                   best   => 1,
-                   subset => 0,
-                   targetnib => '/ecs2/work1/klh/data/genomes/mouse33/nib_files',
+                 DEFAULT => {
+                   SOURCE        => undef,
+                   TARGETNIB     => undef,
+                   BEST          => undef,
+                   SUBSET        => undef,
+                   SUBSET_MATRIX => '/blastz/tight/matrix/for/example.mat',
+                   SUBSET_CUTOFF => 3400,
+                   CHAIN         => undef,
+                   NET           => undef,
+                 },
+
+
+                 MouseBest => {
+                   SOURCE    => 'MouseBlastz',
+                   TARGETNIB => '/directory/with/mouse/nib/files',
+                   BEST      => 1,
                  },
                  
-                 'MouseTight' => {
-                   source => 'MouseBest',
-                   best   => 0,
-                   subset => 1,
-                   targetnib => '/ecs2/work1/klh/data/genomes/mouse33/nib_files',
+                 MouseTight => {
+                   SOURCE    => 'MouseBest',
+                   TARGETNIB => '/directory/with/mouse/nib/files',
+                   SUBSET    => 1,
                  },
-                 
-                 'RatBest' => {
-                   source => 'RatBlastz',
-                   best   => 1,
-                   subset => 0,
-                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
-                 },
-                 
-                 'RatTight' => {
-                   source => 'RatBest',
-                   best   => 0,
-                   subset => 1,
-                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
-                 },
-                 
-                 'ChickenBest' => {
-                   source => 'ChickenBlastz',
-                   best   => 1,
-                   subset => 0,
-                   targetnib => '/ecs2/work1/klh/data/genomes/chicken/chr1/nib_files',
-                 },
-                 
-                 'ChickenTight' => {
-                   source => 'ChickenBest',
-                   best   => 0,
-                   subset => 1,
-                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
-                 },
-                                  
+
+                 MouseNet => {
+                   SOURCE    => 'MouseBlastz',
+                   TARGETNIB => '/directory/with/mouse/nib/files',
+                   NET       => 1,
+                 },                                  
+
                },
 
                ECR_FILTERS      => {

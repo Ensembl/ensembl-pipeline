@@ -39,7 +39,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AxtFilter;
 use Bio::EnsEMBL::Pipeline::Config::General;
-use Bio::EnsEMBL::Pipeline::Config::ECR qw(AXT_FILTERS SUBSETAXT_MATRIX SUBSETAXT_CUTOFF);
+use Bio::EnsEMBL::Pipeline::Config::ECR qw(AXTFILTER_BY_CONFIG);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -75,19 +75,24 @@ sub fetch_input {
   
   my %parameters = (-query => $contig);
 
+  my $config = $AXTFILTER_BY_CONFIG;
 
-  if (exists($AXT_FILTERS->{$logic_name}) and
-      exists($AXT_FILTERS->{$logic_name}->{source})) {
+  if (exists($config->{$logic_name}) and
+      exists($config->{$logic_name}->{SOURCE})) {
 
-    if ($AXT_FILTERS->{$logic_name}->{best}) {
-      $parameters{-best} =1;
+    if ($config->{$logic_name}->{BEST}) {
+      $parameters{-best} = 1;
     }
-    if ($AXT_FILTERS->{$logic_name}->{subset}) {
-      $parameters{-subsetmatrix} = $SUBSETAXT_MATRIX;
-      $parameters{-subsetcutoff} = $SUBSETAXT_CUTOFF;
+    if ($config->{$logic_name}->{SUBSET}) {
+      $parameters{-subset}  = 1;
+      $parameters{-subsetmatrix} = $config->{$logic_name}->{SUBSETMATRIX};
+      $parameters{-subsetcutoff} = $config->{$logic_name}->{SUBSETCUTOFF};
     }
-    if ($AXT_FILTERS->{$logic_name}->{target_lengths}) {
-      my $tlf = $AXT_FILTERS->{$logic_name}->{target_lengths};
+    if ($config->{$logic_name}->{NET}) {
+      $parameters{-net} = 1;
+    }
+    if ($config->{$logic_name}->{TARGETLENGTH}) {
+      my $tlf = $config->{$logic_name}->{TARGETLENGTHS};
       my ($fh, %lengths);
       open($fh, $tlf)
           or $self->throw("Could not open file of target seq lengths '$tlf' for reading\n");
@@ -99,9 +104,9 @@ sub fetch_input {
       $parameters{-targetlengths} = \%lengths;
     }
 
-    $parameters{-targetnib} = $AXT_FILTERS->{$logic_name}->{targetnib};
+    $parameters{-targetnib} = $config->{$logic_name}->{TARGETNIB};
 
-    my @features = @{$contig->get_all_DnaAlignFeatures($AXT_FILTERS->{$logic_name}->{source})};
+    my @features = @{$contig->get_all_DnaAlignFeatures($config->{$logic_name}->{SOURCE})};
     $parameters{-features} = \@features;
 
     if (not @features) {
@@ -113,6 +118,11 @@ sub fetch_input {
     $self->throw("Dont know how to retrieve features for " . 
                  $logic_name .
                  " ; no entry in config with 'source' filled in\n");
+  }
+
+  foreach my $program (qw(faToNib lavToAxt subsetAxt axtBest 
+                          axtChain chainNet chainToAxt netToAxt)) {
+    $parameters{"-" . $program} = $BIN_DIR . "/" . $program;
   }
 
   my $run = Bio::EnsEMBL::Pipeline::Runnable::AxtFilter->new(%parameters);

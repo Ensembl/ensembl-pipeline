@@ -54,26 +54,40 @@ sub new {
   my $self = $class->SUPER::new(@args);
   
   my ($features, 
-      $best, 
+      $best,
+      $subset,
       $subset_matrix,
       $subset_cutoff,
+      $net,
       $query,
       $target_lengths,
       $target_nib_dir,
-      $fa2nib,
-      $subset_axt,
-      $axt_best,
-      $lav2axt) = $self->_rearrange([qw(FEATURES
-                                        BEST
-                                        SUBSETMATRIX
-                                        SUBSETCUTOFF
-                                        QUERY
-                                        TARGETLENGTHS
-                                        TARGETNIB
-                                        FA2NIB
-                                        SUBSETAXT
-                                        AXTBEST
-                                        LAVTOAXT)],
+      $faToNib,
+      $subsetAxt,
+      $axtBest,
+      $lavToAxt,
+      $axtChain,
+      $chainToAxt,
+      $chainNet,
+      $netToAxt
+      ) = $self->_rearrange([qw(FEATURES
+                                BEST
+                                SUBSET
+                                SUBSETMATRIX
+                                SUBSETCUTOFF
+                                NET
+                                QUERY
+                                TARGETLENGTHS
+                                TARGETNIB
+                                FATONIB
+                                SUBSETAXT
+                                AXTBEST
+                                LAVTOAXT
+                                AXTCHAIN
+                                CHAINTOAXT
+                                CHAINNET
+                                NETTOAXT
+                                )],
                                     @args);
 
 
@@ -83,19 +97,23 @@ sub new {
       if not defined $query;
   $self->throw("You must supply a directory of nib files for the targets with -targetnib")
       if not defined $target_nib_dir;
-  $self->throw("You must filter with either -best 1 or -subset matrix_file or both\n") 
-      if not $best and not -e $subset_matrix;
 
   $subset_cutoff = 3400 if not defined $subset_cutoff;
 
-  $self->faToNib($fa2nib) if defined $fa2nib;
-  $self->subsetAxt($subset_axt) if defined $subset_axt;
-  $self->axtBest($axt_best) if defined $axt_best;
-  $self->lavToAxt($lav2axt) if defined $lav2axt;
+  $self->faToNib($faToNib) if defined $faToNib;
+  $self->subsetAxt($subsetAxt) if defined $subsetAxt;
+  $self->axtBest($axtBest) if defined $axtBest;
+  $self->lavToAxt($lavToAxt) if defined $lavToAxt;
+  $self->axtChain($axtChain) if defined $axtChain;
+  $self->chainToAxt($chainToAxt) if defined $chainToAxt;
+  $self->chainNet($chainNet) if defined $chainNet;
+  $self->netToAxt($netToAxt) if defined $netToAxt;
 
-  $self->best($best);
-  $self->subset_matrix($subset_matrix);
-  $self->subset_cutoff($subset_cutoff);
+  $self->best($best) if defined $best;
+  $self->subset_matrix($subset_matrix) if defined $subset_matrix;
+  $self->subset_cutoff($subset_cutoff) if defined $subset_cutoff;
+  $self->net($net) if defined $net;
+  
   $self->query($query);
   $self->features($features);
   $self->target_lengths($target_lengths);
@@ -172,11 +190,58 @@ sub run {
   ##############################
   # Filter with subsetAxt
   ##############################
-  if ($self->subset_matrix) {
+  if ($self->subset) {
     my $tmp_axt_file = "$work_dir/$contig_name.$$.res.axt";
     system($self->subsetAxt, $axt_file, $tmp_axt_file, $self->subset_matrix, $self->subset_cutoff)
         and $self->throw("Something went wrong with subsetAxt\n");
     rename $tmp_axt_file, $axt_file;  
+  }
+
+  ###################################
+  # Filter with axtChain and chainNet
+  ###################################
+  if ($self->net) {
+    # first have to make the chain
+
+    my $chain_file = "$work_dir/$contig_name.$$.res.chain";
+    system($self->axtChain, $axt_file, $query_nib_dir, $self->target_nib_dir, $chain_file)
+        and $self->throw("Something went wrong with axtChain\n");
+
+    # annoyingly, chainNet program needs files with the query and target lengths, even
+    # though this information is stored in the chain file; 
+    my $q_len_file = "$work_dir/query_length_file";
+    my $t_len_file = "$work_dir/target_length_file";
+    my $q_net_file = "$work_dir/query.net";
+    my $t_net_file = "$work_dir/target.net";
+    
+    open QLEN, ">$q_len_file" or $self->throw("Could not open $q_len_file for writing\n");
+    printf(QLEN "$contig_name %d\n" , $self->query->length);
+    close(QLEN);
+    
+    my (%target_len_hash);
+    open CHAIN, $chain_file or $self->throw("Could not open chain file for reading\n");
+    while(<CHAIN>) {
+      /^chain\s+\d+\s+\S+\s+\d+\s+\S+\s+\d+\s+\d+\s+(\S+)\s+(\d+)/ and do {
+        $target_len_hash{$1} = $2;
+      };
+    }
+    close(CHAIN);
+    
+    open TLEN, ">$t_len_file" or $self->throw("Could not open $t_len_file for writing\n");
+    foreach my $tid (keys %target_len_hash) {
+      printf(TLEN "%s %s\n", $tid, $target_len_hash{$tid}); 
+    }
+    close(TLEN);
+    
+    # use chainToAxt to create the Axt file
+    system($self->chainNet, $chain_file, $q_len_file, $t_len_file, $q_net_file, $t_net_file)
+        and $self->throw("Something went wrong with chainNet\n");;
+    
+    system($self->netToAxt, $q_net_file, $chain_file, $query_nib_dir, $self->target_nib_dir, $axt_file)
+        and $self->throw("Something went wrong with netToAxt\n");
+    
+    unlink $chain_file, $q_len_file, $t_len_file, $q_net_file, $t_net_file;
+    
   }
 
     
@@ -570,6 +635,61 @@ sub best {
 }
 
 
+=head2 subset
+
+    Title   :   subset
+    Usage   :   $self->subset(1)
+    Function:   Binary flag that determines whether the given feature set is 
+      filtered using subsetAxt 
+    Returns :   
+    Args    :   
+
+=cut
+
+sub subset {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_subset'} = $arg;
+  }
+  
+  if (!exists($self->{'_subset'})) {
+    $self->{'_subset'} = 0;
+  }    
+
+  return $self->{'_subset'};
+}
+
+
+
+=head2 net
+
+    Title   :   net
+    Usage   :   $self->net(1)
+    Function:   Binary flag that determines whether the given feature set is 
+      filtered using axtChain
+    Returns :   
+    Args    :   
+
+=cut
+
+sub net {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_net'} = $arg;
+  }
+  
+  if (!exists($self->{'_net'})) {
+    $self->{'_net'} = 0;
+  }    
+
+  return $self->{'_net'};
+}
+
+
+
+
 =head2 subset_matrix
 
     Title   :   subset_matrix
@@ -577,7 +697,7 @@ sub best {
     Function:   
       When this is set to a valid blastz matrix file, 
       the Runnable will rescore and trim the features with
-      the matriz using subsetAxt
+      the matrix using subsetAxt
     Returns :   
     Args    :   
 
@@ -623,109 +743,6 @@ sub subset_cutoff {
   return $self->{'_subset_cutoff'};
 }
 
-=head2 faToNib
-
-    Title   :   faToNib
-    Usage   :   $self->faToNib("/usr/local/bin/faToNib");
-    Function:   
-    Returns :   
-    Args    :   
-
-=cut
-
-sub faToNib {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_faToNib'} = $arg;
-  }
-  
-  if (!exists($self->{'_faToNib'})) {
-    $self->{'_faToNib'} = "/usr/local/ensembl/bin/faToNib";
-  }    
-
-  return $self->{'_faToNib'};
-}
-
-
-
-=head2 subsetAxt
-
-    Title   :   subsetAxt
-    Usage   :   $self->subsetAxt("/usr/local/bin/subsetAxt");
-    Function:   
-    Returns :   
-    Args    :   
-
-=cut
-
-sub subsetAxt {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_subsetAxt'} = $arg;
-  }
-  
-  if (!exists($self->{'_subsetAxt'})) {
-    $self->{'_subsetAxt'} = "/usr/local/ensembl/bin/subsetAxt";
-  }    
-
-  return $self->{'_subsetAxt'};
-}
-
-
-
-=head2 axtBest
-
-    Title   :   axtBest
-    Usage   :   $self->axtBest("/usr/local/bin/axtBest");
-    Function:   
-    Returns :   
-    Args    :   
-
-=cut
-
-sub axtBest {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_axtBest'} = $arg;
-  }
-  
-  if (!exists($self->{'_axtBest'})) {
-    $self->{'_axtBest'} = "/usr/local/ensembl/bin/axtBest";
-  }    
-
-  return $self->{'_axtBest'};
-}
-
-
-=head2 lavToAxt
-
-    Title   :   lavToAxt
-    Usage   :   $self->lavToAxt("/usr/local/bin/lavToAxt");
-    Function:   
-    Returns :   
-    Args    :   
-
-=cut
-
-sub lavToAxt {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_lavToAxt'} = $arg;
-  }
-  
-  if (!exists($self->{'_axtBest'})) {
-    $self->{'_lavToAxt'} = "/usr/local/ensembl/bin/lavToAxt";
-  }    
-
-  return $self->{'_lavToAxt'};
-}
-
-
-
 
 
 =head2 output
@@ -751,6 +768,187 @@ sub output {
 
   return @{$self->{'_output'}};
 }
+
+
+
+
+
+##############
+#### programs
+##############
+
+=head2 faToNib
+
+    Title   :   faToNib
+    Usage   :   $self->faToNib("/usr/local/bin/faToNib");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub faToNib {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_faToNib'} = $arg;
+  }
+
+  return $self->{'_faToNib'};
+}
+
+
+
+=head2 subsetAxt
+
+    Title   :   subsetAxt
+    Usage   :   $self->subsetAxt("/usr/local/bin/subsetAxt");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub subsetAxt {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_subsetAxt'} = $arg;
+  }
+
+  return $self->{'_subsetAxt'};
+}
+
+
+
+=head2 axtBest
+
+    Title   :   axtBest
+    Usage   :   $self->axtBest("/usr/local/bin/axtBest");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub axtBest {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_axtBest'} = $arg;
+  }
+  
+  return $self->{'_axtBest'};
+}
+
+
+=head2 lavToAxt
+
+    Title   :   lavToAxt
+    Usage   :   $self->lavToAxt("/usr/local/bin/lavToAxt");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub lavToAxt {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_lavToAxt'} = $arg;
+  }
+
+  return $self->{'_lavToAxt'};
+}
+
+
+=head2 axtChain
+
+    Title   :   axtChain
+    Usage   :   $self->axtChain("/usr/local/bin/axtChain");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub axtChain {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_axtChain'} = $arg;
+  }
+  
+  return $self->{'_axtChain'};
+}
+
+
+=head2 chainToAxt
+
+    Title   :   chainToAxt
+    Usage   :   $self->chainToAxt("/usr/local/bin/chainToAxt");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub chainToAxt {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_chainToAxt'} = $arg;
+  }
+  
+  return $self->{'_chainToAxt'};
+}
+
+
+=head2 chainNet
+
+    Title   :   chainNet
+    Usage   :   $self->chainNet("/usr/local/bin/chainNet");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub chainNet {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_chainNet'} = $arg;
+  }
+
+  return $self->{'_chainNet'};
+}
+
+
+=head2 netToAxt
+
+    Title   :   netToAxt
+    Usage   :   $self->netToAxt("/usr/local/bin/netToAxt");
+    Function:   
+    Returns :   
+    Args    :   
+
+=cut
+
+sub netToAxt {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_netToAxt'} = $arg;
+  }
+
+  return $self->{'_netToAxt'};
+}
+
+
+
+
 
 
 
