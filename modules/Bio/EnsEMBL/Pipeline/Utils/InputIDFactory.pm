@@ -65,7 +65,6 @@ sub generate_contig_input_ids{
 
   my @ids  = @{$self->get_contig_names};
 
-  #print "Ids @ids\n";
   return @ids;
 
 }
@@ -235,7 +234,6 @@ sub generate_translation_id_input_ids{
 
   my $ids = $self->get_translation_ids;
   
-  print STDERR "have ".@$ids." ids\n";
   return @$ids;
 }
 
