@@ -147,7 +147,7 @@ sub store_input_id_analysis {
       	(input_id, input_id_type, analysis_id, created, runhost, db_version)
       	values (?, ?, ?, now(), ?, ?)
       	});
-      $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version);
+    $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version || 'ERROR');
   }else{
       my $sth = $self->prepare(qq{
       	INSERT INTO input_id_analysis
