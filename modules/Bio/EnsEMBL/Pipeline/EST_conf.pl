@@ -87,6 +87,10 @@ package main;
 #		    'est_index'           => "/scratch3/ensembl/vac/ESTs/ests.fa",
 #		    source of ests - for putting into/retrieving from analysis
 #		    'est_source'    => 'dbEST',
+
+		    # specify the type of genes being read by EST_GeneBuilder
+		    'genetype'            => "exonerate_e2g",
+
 );
 
 #######################################################
@@ -100,8 +104,12 @@ package main;
 ## single-exon clusters with only ESTs as supporting evidence, hence in this case 'strict_lower_boundt' = 1
 
 %evidence_conf = ( 
+		  		  
 		  'strict_lower_bound' => 1,    # this is for ESTs only
 		  #'strict_lower_bound' => 0,   # this is for cDNAs and mRNAs only
+
+		  # specify the source_tag of the supporting evidence used in EST_GeneBuilder
+		  'evidence_tag'       => "exonerate_e2g",
 		 
 );
 
@@ -112,6 +120,9 @@ package main;
 %genomewise_conf = (
 #		    'genomewise_runnable' => "Bio::EnsEMBL::Pipeline::RunnableDB::Genomewise",
 		    'genomewise_runnable' => "",
+
+		    # specify the type with which the genes are going to be written
+		    'genetype'            => "genomewise2",
 );
 
 
