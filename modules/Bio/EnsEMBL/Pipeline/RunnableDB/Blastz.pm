@@ -152,9 +152,7 @@ sub write_output {
   my $fa = $db->get_DnaAlignFeatureAdaptor;
   
   foreach my $output (@features) {
-    $output->contig($self->slice);
-    $output->attach_seq($self->slice);
-    
+    $output->attach_seq($self->query);    
     $output->analysis($self->analysis);
     
     if ($self->slice->isa("Bio::EnsEMBL::Slice")) {
