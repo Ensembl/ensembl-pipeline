@@ -29,13 +29,14 @@ unless (&config_sanity_check) {
 
 # signal parameters
 my $gotsig   =  0;
+my $term_sig =  0;
 my $alarm    =  0;
 my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
-$SIG{USR1} = \&sighandler;
+# $SIG{USR1} = \&sighandler;
 $SIG{ALRM} = \&alarmhandler;
-$SIG{TERM} = \&shut_down;
+$SIG{TERM} = \&termhandler;
 
 
 # dynamically load appropriate queue manager (e.g. LSF)
@@ -133,7 +134,7 @@ foreach my $ana (@analysis) {
     else {
 	my $id = $ana_adaptor->fetch_by_logic_name($ana)->dbID;
 	if ($id) {
-            $analysis{$id};
+            $analysis{$id} = 1;
 	}
 	else {
 	    print STDERR "Could not find analysis $ana\n";
@@ -274,6 +275,11 @@ while (1) {
             alarm $wakeup;
         }
 
+	if ($term_sig) {
+	    $done = 1;
+	    last JOBID;
+	}
+
         my @anals = $sic->fetch_analysis_by_input_id_class($id->[0], $id->[1]);
 
         my %analHash;
@@ -389,12 +395,18 @@ sub shut_down {
 }
 
 
+# handler for SIGTERM
+sub termhandler {
+    $term_sig = 1;
+}
+
+
 # handler for SIGUSR1
 # sub sighandler {
 
     # SIG: {
     # }
-    # $SIG{USR1} = \&sighandler;
+    # $SIG{SIG1} = \&sighandler;
 # };
 
 
@@ -456,7 +468,7 @@ sub check_lsf_status {
     }
 
     foreach my $job ($db->fetch_by_Age($age)) {
-        my $lsf = $job->LSF_id;
+        my $lsf = $job->submission_id;
         local $_ = $job->get_last_status->status;   # Are you local?
         STAT: {
             /RUNNING/ && do {
