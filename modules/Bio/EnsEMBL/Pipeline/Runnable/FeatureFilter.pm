@@ -104,7 +104,7 @@ sub new {
 
 sub run{
   my ($self,@input) = @_;
-  
+
   my ($minscore,$maxevalue,$coverage);
   
   $minscore = $self->minscore;
@@ -114,7 +114,8 @@ sub run{
   my %validhit;
   my %hitarray;
   
-  
+  # print "XXX start filter with ".scalar(@input)." features \n";
+
   # first- scan across all features, considering
   # valid to be > minscore < maxevalue
   
@@ -126,9 +127,10 @@ sub run{
   # valid hits are stored in a hash of arrays
   # we sort by score to know that the first score for a hseqname is its best  
   @input = sort { $b->score <=> $a->score } @input;
-  
+  #my @discard;
   foreach my $f ( @input ) {
-    
+
+  # print "comparing ".$f->score." to ".$minscore."\n";
     if( $f->score > $minscore ) {
       
       unless ( $validhit{$f->hseqname} ){
@@ -159,6 +161,7 @@ sub run{
       }
     }
     
+    
     # irregardless of score, take if this hseqname is valid
     if( exists $validhit{$f->hseqname} == 1 ) {
       if( ! exists $hitarray{$f->hseqname} ) {
@@ -168,9 +171,13 @@ sub run{
     }
     
   }
-  
-  # empty input array - saves on memory!
-  
+  my @feature_counts;
+  foreach my $hid(keys(%hitarray)){
+    push(@feature_counts, @{$hitarray{$hid}});
+  }
+
+  # print "have ".scalar(@feature_counts)." after filtering by score\n";
+
   @input = ();
   
   # perl will automatically extend this array 
@@ -182,7 +189,7 @@ sub run{
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
-  
+  # print "have ".@inputids." acepted hids\n";
   # we accept all feature pairs which are valid and meet coverage criteria
   FEATURE :
     foreach my $hseqname ( @inputids ) {
@@ -206,7 +213,7 @@ sub run{
 	}
       }
       
-      if( $hole == 0 ) {
+      if( $hole == 0 ) { 
 	# completely covered 
 	next;
       }
@@ -218,19 +225,38 @@ sub run{
 	}
       }
     }
-  
+  @feature_counts = ();
+
+  foreach my $hid(@accepted_hids){
+    push(@feature_counts, @{$hitarray{$hid}});
+  }
+
+  # print "have ".scalar(@feature_counts)." after filtering by coverage\n";
+
+  # print "have ".@accepted_hids." acepted hids\n";
   # drop this huge array to save memory
   @list = ();
   
   if ($self->prune) {
     my @new;
-     
-    # prune the features per hid (per hseqname)
-    foreach my $hseqname ( @accepted_hids ) {
+
+    my @all_features;
+    
+    # collect all the features
+    foreach my $hseqname ( @accepted_hids ){
       my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
       push(@new,@tmp);
-      #push(@{$self->{'_output'}},@tmp);
+      push ( @all_features, @{$hitarray{$hseqname}} );
     }
+    # and prune all together taking the first '$self->coverage' according to score 
+    #@new = $self->prune_features( @all_features );
+
+    ## prune the features per hid (per hseqname)
+    #foreach my $hseqname ( @accepted_hids ) {
+    #  my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
+    #  push(@new,@tmp);
+    #  #push(@{$self->{'_output'}},@tmp);
+    #}
     @accepted_hids = ();
     return @new;
   
@@ -255,172 +281,84 @@ sub prune {
   return $self->{_prune};
 }
 
-
-
+# prune_features: something to handle rare akward cases
 
 sub prune_features {
-  my ($self,@input) = @_;
+  my ($self, @input) = @_;
+  $self->throw('interface fault') if @_ < 1;	# @input optional
 
-  # define the depth of the coverage
-  my $depth = $self->coverage;
+  $self->warn('experimental new prune_features method!');
 
-  # here we store the created clusters
-  my @clusters;
-  my @cluster_starts;
-  my @cluster_ends;
-
-  #print STDERR "Before:" . scalar(@input) . "features\n";
-
-  # sort the features by start coordinates, this is crucial
-  @input = sort {$a->start <=> $b->start} @input;
-
-  ## this is handy to compare the two clustering methods quickly
-  #my $old_method = 0;
-  #my $new_method = 1;
-
-#  if ( $new_method == 1 ){
-
-  # create the first cluster
-  my $count = 0;
-  my $cluster = [];
-  
-  # start it off with the first feature
-  my $first_feat = shift( @input );
-  push (@$cluster, $first_feat);
-  $cluster_starts[$count] = $first_feat->start;
-  $cluster_ends[$count]   = $first_feat->end;
-  
-  # store the list of clusters
-  push(@clusters,$cluster);
-  
-  # loop over the rest of the features
-  
- FEATURE:
-  foreach my $f ( @input ){
-    #print STDERR "trying to place feature: $f ".$f->start."-".$f->end."\n";
-    
-    # add $f to the current cluster if overlaps and strand matched
-    #print STDERR "comparing with cluster $count : "
-    #  .$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
-    
-    if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {
-      
-      push(@$cluster,$f);
-      
-      # re-adjust size of cluster
-      if ($f->start < $cluster_starts[$count]) {
-	$cluster_starts[$count] = $f->start;
-      }
-      if ($f->end  > $cluster_ends[$count]) {
-	$cluster_ends[$count] = $f->end;
-      }
-      
-    }
-    else{
-      # else, start create a new cluster with this feature
-      $count++;
-      $cluster = [];
-      push (@$cluster, $f);
-      $cluster_starts[$count] = $f->start;
-      $cluster_ends[$count]   = $f->end;
-          
-      # store it in the list of clusters
-      push(@clusters,$cluster);
-    }
-  }
-
-#}  
-
-#### the previous clustering method ######
-
-#if ( $old_method == 1 ){    
-    
-#  FEAT: 
-#    foreach my $f (@input) {
-#      #print STDERR "Processing feature " . $f->gffstring . "\n";
-#      #print STDERR "trying to place feature: ".$f->hseqname." ".$f->start."-".$f->end."\n";
-#      my $found = 0;
-      
-#      my $count = 0;
-#    CLUS: foreach my $clus (@clusters) {
-		
-#	#print STDERR "comparing with cluster $count : "
-#	#  .$cluster_starts[$count]."-".$cluster_ends[$count]."\n";
-#	foreach my $f2 ( @$clus) {
-#	  print STDERR "       ".$f2->start."-".$f2->end."\n";
-#	}
-
-#	if ($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count]) {
-#	  #print STDERR "No, go to next one\n";
-	  
-#	  #next CLUS;
-#	}
-#	if (!($f->end < $cluster_starts[$count] || $f->start > $cluster_ends[$count])) {
-	  
-#	  #print STDERR "Yes, we put it in this one\n";
-#	  $found = 1;
-#	  push(@$clus,$f);
-	  
-#	  if ($f->start < $cluster_starts[$count]) {
-#	    $cluster_starts[$count] = $f->start;
-#	  }
-#	  if ($f->end   > $cluster_ends[$count]) {
-#	    $cluster_ends[$count] = $f->end;
-#	  }
-	  
-#	  next FEAT;
-#	}
-#	$count++;
-#      }
-#      if ($found == 0) {
-#	#print STDERR "found new cluster\n";
-#	my $newclus = [];
-#	push (@$newclus,$f);
-#	push(@clusters,$newclus);
-	
-#	$cluster_starts[$count] = $f->start;
-#	$cluster_ends[$count]   = $f->end;
-	
-#      }
-#    }
-#  }
-    
-  # put here the final result
-  my @new;
-
-  # we take up to a maximum of $depth features per cluster
-  foreach my $clus (@clusters) {
-    my $count = 0;
-    my @tmp = @$clus;
-    @tmp = sort {$b->score <=> $a->score} @tmp;
-    
-    ## test
-    #print STDERR "cluster:\n";
-    #foreach my $f (@$clus){
-    #   print STDERR "feature ".$f->hseqname." ".$f->start."-".$f->end." score(".$f->score.")\n";
-    # }
-      
-    while ($count < $depth && $#tmp >= 0) {
-      my $f = shift( @tmp );
-      #print STDERR "accepting ".$f->start."-".$f->end." score(".$f->score.")\n";
-      push(@new, $f);
-      $count++;
-    }
-    #if ($#tmp >= 0) {
-      #foreach my $f ( @tmp ){
-      #print STDERR "rejecting ".$f->start."-".$f->end." score(".$f->score.")\n";
-      #}
-      #print STDERR "Removing " . scalar(@tmp) . " features\n";
-    #}
-  }
-  # drop array to save memory
-  @clusters = ();
-
-  return @new;
+    # print "XXX prune_features: total ".@input." in\n";
+    my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
+    my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
+    @input = ();
+    push @input, @plus_strand_fs;
+    push @input, @minus_strand_fs;
+    return @input;
 }
 
-  
+sub _prune_features_by_strand {
+   my ($self, $strand, @in) = @_;
+   $self->throw('interface fault') if @_ < 2;	# @in optional
 
+   my @input_for_strand = ();
+   foreach my $f (@in) {
+     push @input_for_strand, $f if $f->strand eq $strand;
+   }
+
+   return if !@input_for_strand;
+
+   # get the genomic first and last bases covered by any features
+   my @sorted_fs = sort{ $a->start <=> $b->start } @input_for_strand;
+   my $first_base = $sorted_fs[0]->start;
+   my @sorted_fs = sort{ $a->end <=> $b->end } @input_for_strand;
+   my $last_base = $sorted_fs[$#sorted_fs]->end;
+
+   # $fs: set element i to the number of features covering base i
+   my @fs_per_base = ();
+   foreach  my $base ($first_base..$last_base) {
+     $fs_per_base[$base] = 0;	# initialise
+   }
+   foreach my $f (@input_for_strand) {
+     foreach my $covered_base ($f->start..$f->end) {
+       $fs_per_base[$covered_base]++;
+     }
+   }
+
+   #print "XXX coverage vector:\n  ";
+   #foreach my $covered_base ($first_base..$last_base) {
+   #  print $fs_per_base[$covered_base];
+   #}
+   #print "\n";	# XXX
+
+   # put the worst features first, so they get removed with priority
+   # using score assumes they're from the same database search
+   @sorted_fs = sort { $a->score <=> $b->score } @input_for_strand;
+
+   my $max_coverage = $self->coverage;
+   foreach my $base ($first_base..$last_base) {
+     my $excess_fs = $fs_per_base[$base] - $max_coverage;
+     if ($excess_fs > 0) {
+       my $f_no = 0;
+       while ($excess_fs) {
+         my $start = $sorted_fs[$f_no]->start;
+         my $end = $sorted_fs[$f_no]->end;
+         if ($start <= $base and $end >= $base) {	# cut this feature
+           splice @sorted_fs, $f_no, 1;	# same index will give next feature
+           foreach my $was_covered ($start..$end) {
+             $fs_per_base[$was_covered]--;
+           }
+           $excess_fs--;
+         } else {	# didn't overlap this base, move on to next feature
+           $f_no++;
+         }
+       }
+     }
+   }
+
+   return @sorted_fs;
+}
 
 =head2 output
 
@@ -511,3 +449,4 @@ sub coverage{
 
 }
 1;
+
