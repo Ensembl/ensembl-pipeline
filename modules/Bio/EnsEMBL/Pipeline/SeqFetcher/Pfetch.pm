@@ -135,7 +135,7 @@ sub  get_Seq_by_acc {
 
   $command .= $acc;
 
-  print STDERR "$command\n";
+#  print STDERR "$command\n";
 
   open(IN,"$command |") or $self->throw("Error opening pipe to pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
@@ -157,6 +157,69 @@ sub  get_Seq_by_acc {
   $self->throw("Could not pfetch sequence for [$acc]\n") unless defined $seq;
 
   return $seq;
+}
+
+=head2 get_Seqs_by_accs
+
+  Title   : get_Seqs_by_accs
+  Usage   : $self->get_Seqs_by_accs(@accession);
+  Function: Does the sequence retrieval for an array of accesions in one pfetch call
+  Returns : Array of Bio::Seq
+  Args    : 
+
+=cut
+
+sub  get_Seqs_by_accs {
+  my ($self, @acc) = @_;
+  
+  if (!defined(@acc) || scalar(@acc < 1)) {
+    $self->throw("No accession input");
+  }  
+  
+  my @seq;
+  my $newseq;
+  my $tracker = 0;
+  my $pfetch = $self->executable;
+  my $options = $self->options;
+
+  if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
+
+  my $command = "$pfetch -q ";
+  if (defined $options){
+    $command .= "$options ";
+  }
+  
+  $command .= join " ", @acc;
+  
+#  print STDERR "$command\n";
+  
+  open(IN,"$command |") or $self->throw("Error opening pipe to pfetch for $pfetch");
+  while(<IN>){
+
+    chomp;
+    eval{
+      if(defined $_ && $_ ne "no match") {
+	$newseq = new Bio::Seq('-seq'               => $_,
+			       '-accession_number'  => $acc[$tracker],
+			       '-display_id'        => $acc[$tracker]);
+      }
+    };
+    
+    if($@){
+      print STDERR "$@\n";
+    }
+    
+    if (defined $newseq){
+      push (@seq, $newseq);
+    }
+    else{
+      $self->warn("Could not even pfetch sequence for [" . $acc[$tracker] . "]\n");
+    }
+    $tracker++;
+  }
+
+  close IN or $self->throw("Error running pfetch for $pfetch");
+  return @seq;
 }
 
 1;
