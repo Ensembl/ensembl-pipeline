@@ -40,6 +40,7 @@ The rest of the documentation details each of the object methods. Internal metho
 package Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;
 
 use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use vars qw(@ISA);
 use strict;
 
@@ -63,7 +64,19 @@ sub new {
     $self->perc_id_threshold($perc_id);
     $self->depth_threshold($depth);
     
+    $self->verbose(0);
+
     return $self;
+}
+
+############################################################
+
+sub verbose{
+  my ($self,$boolean) = @_;
+  if (defined $boolean ){
+    $self->{_verbose} = $boolean;
+  }
+  return $self->{_verbose};
 }
 
 ############################################################
@@ -140,7 +153,7 @@ sub _id{
   foreach my $exon ( @exons ){
       my @evi = @{$exon->get_all_supporting_features};
       foreach my $evi ( @evi ){
-	  $id = $evi->percent_id;
+	  $id = $evi->hseqname;
 	  last EXON if defined $id;
       }
   }
@@ -168,11 +181,11 @@ sub _end{
 sub filter {
   my ($self,$transcripts) = @_;  
   
-  my $verbose = 1;
+  my $verbose = $self->verbose();
 
-  print STDERR "filter input: ".scalar( @$transcripts )."\n";
+  print STDERR "filter input: ".scalar( @$transcripts )."\n" if $verbose;
   my @filtered_by_length = $self->filter_by_length( $transcripts );
-  print STDERR "after filter by length: ".scalar( @filtered_by_length )."\n";
+  print STDERR "after filter by length: ".scalar( @filtered_by_length )."\n" if $verbose;
 
 
   my $min_coverage = $self->coverage_threshold;
@@ -181,19 +194,20 @@ sub filter {
   
   my %exon2est;
  
-  #print STDERR "before filtering ".scalar(@sorted)."\n";
-  #foreach my $est ( @sorted ){
-  #  print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
-  #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
-  #}
+  if ( $verbose ){
+    foreach my $est ( @filtered_by_length ){
+      print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n" ;
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
+    }
+  }
   
   my @accepted_exons;
   my @tmp_ests;
   foreach my $t ( @filtered_by_length ) {
     
-      my $c  = $self->_coverage($t);
+    my $c  = $self->_coverage($t);
       my $p  = $self->_perc_id($t);
-    
+        
       next unless ( $c > $min_coverage );
       next unless ( $p > $min_perc_id );
     
@@ -215,6 +229,15 @@ sub filter {
   
   if ( $self->depth_threshold ){
     my @accepted_ests = $self->depth_filter( \@accepted_exons, \%exon2est );
+    
+    if ($verbose){
+      print STDERR "final list:\n";
+      foreach my $est ( @accepted_ests ){ 
+	print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n"; 
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est); 
+      } 
+    }
+    
     return @accepted_ests;
   }
   else{
@@ -230,6 +253,7 @@ sub filter {
 sub filter_by_length{
     my ( $self, $ests ) = @_;
     
+    my $verbose = $self->verbose();
     my %lengths;
     my $length_for_max = 0;
     my $max_count = 0;
@@ -242,7 +266,8 @@ sub filter_by_length{
       # this will not favour big unspliced ESTs over spliced ones with small exons
       my $length = $exons[-1]->end - $exons[0]->start + 1 ;  
 	#print STDERR "length: $length\n";
-	push ( @{ $lengths{ $length } }, $est );
+      $length = 10*int( $length/10 + 1 );
+      push ( @{ $lengths{ $length } }, $est );
 	
 	if ( scalar( @{ $lengths{ $length } } ) > $max_count ){
 	    $max_count      = scalar( @{ $lengths{ $length } } );
@@ -250,13 +275,11 @@ sub filter_by_length{
 	}
     }
   
-    # test
-    my %bins;
-    foreach my $key ( keys %lengths ){
-	$bins{ 10*int( $key/10 ) } += scalar ( @{ $lengths{$key} } );
-    }
-    foreach my $key ( sort { $a <=> $b } keys %bins ){
-	print STDERR "$key\t$bins{$key}\n";
+    #test
+    if ($verbose){
+      foreach my $key ( sort { $a <=> $b } keys %lengths ){
+	print STDERR "$key\t".scalar(@{ $lengths{$key} })."\n";
+      }
     }
   
     my @selected;
@@ -272,7 +295,7 @@ sub filter_by_length{
 sub depth_filter {
   my ($self,$exons,$exon2est) = @_;
 
-  my $verbose = 0;
+  my $verbose = $self->verbose;
 
   print STDERR "filtering ".scalar(@$exons)." exons\n" if $verbose;
   # no point if there are no exons!
@@ -326,11 +349,11 @@ sub depth_filter {
   
   # sort the clusters by the number of exons and other things...
   my @sorted_clusters = 
-    sort { $self->_order($b) <=> $self->_order($a) 
+    sort { $self->_average_score($b) <=> $self->_average_score($a)
 	     or
-	       $self->_average_score($b) <=> $self->_average_score($a)
+	       $self->_average_perc_id($b) <=> $self->_average_perc_id($a)
 		 or
-		   $self->_average_perc_id($b) <=> $self->_average_perc_id($a)
+		   $self->_order($b) <=> $self->_order($a) 
 		 } 
   @$cluster_list;
   
@@ -342,11 +365,11 @@ sub depth_filter {
   
   print STDERR "looking at depth of ".scalar(@sorted_clusters)." clusters\n" if $verbose;
   foreach my $cluster ( @sorted_clusters ){
-      my @exons = sort { $self->_exon_score($b) <=> $self->_exon_score($a)
-			   or
-			     $self->_exon_perc_id($b) <=> $self->_exon_perc_id($a) 
-			   } 
-      $cluster->sub_SeqFeature;
+    my @exons = sort { $self->_exon_score($b) <=> $self->_exon_score($a)
+			 or
+			   $self->_exon_perc_id($b) <=> $self->_exon_perc_id($a) 
+			 } 
+    $cluster->sub_SeqFeature;
       
       my $count = 0;
       while ( @exons ){
@@ -354,12 +377,20 @@ sub depth_filter {
 	my $est  = $exon2est{$exon};
 	if ( $count >= $depth ){
 	  $banned{$est} = 1 ;
+	  if ($verbose){
+	    print STDERR "rejecting: ";
+	    $self->_print_EST($est);
+	  }
 	}
 	
 	unless ( $banned{$est} ){
 	  unless ( $taken{$est} ){
 	    push( @accepted_ests, $est );
 	    $taken{$est} = 1;
+	    if ($verbose){
+	      print STDERR "taking: ";
+	      $self->_print_EST($est);
+	    }
 	  }
 	  $count++;
 	}
@@ -448,6 +479,16 @@ sub depth_threshold{
 
 ############################################################
 
+sub _print_EST{
+  my ($self,$t) = @_;
+  my $id      = $self->_id($t);
+  my $score   = $self->_coverage($t);
+  my $perc_id = $self->_perc_id($t);
+  my @exons = sort{ $a->start <=> $b->start } @{$t->get_all_Exons};
+  my $length = $exons[-1]->end - $exons[0]->start + 1;
+  print STDERR "$id coverage:$score perc_id:$perc_id length:$length\n";
+}
 
+############################################################
 
 1;
