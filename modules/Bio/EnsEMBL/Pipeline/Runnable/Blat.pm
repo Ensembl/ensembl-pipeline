@@ -184,10 +184,10 @@ sub run {
   }
   close( QUERY_SEQ );
   
-  my $parameters = $self->analysis->parameters;
+  #my $parameters = $self->analysis->parameters;
 
-  #my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
-  my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
+  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
+  #my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
 
   print STDERR "running blat: $command\n";
   
