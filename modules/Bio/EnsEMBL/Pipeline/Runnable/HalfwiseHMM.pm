@@ -138,8 +138,8 @@ sub new {
     if ($blastdb) {
 	$self->blastdb($blastdb);
     } else {#note database name must always contain halfwise
-	#$self->blastdb("/usr/local/ensembl/halfwise.db");
-	$self->blastdb("/nfs/disk100/pubseq/halfwise/halfwise.db");
+	$self->blastdb("/usr/local/ensembl/halfwise.db");
+	#$self->blastdb("/nfs/disk100/pubseq/halfwise/halfwise.db");
     }
     if (defined($genewise )){
 	$self->genewise_loc($self->find_executable($genewise));
@@ -168,8 +168,8 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	#$self->hmmdb('/usr/local/ensembl/data/Pfam');
-	$self->hmmdb('/nfs/disk100/pubseq/Pfam/DB/Pfam');
+	$self->hmmdb('/usr/local/ensembl/data/Pfam');
+	#$self->hmmdb('/nfs/disk100/pubseq/Pfam/DB/Pfam');
     }
     return $self; # success - we hope!
 }
