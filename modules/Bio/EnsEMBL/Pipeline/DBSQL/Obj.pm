@@ -262,9 +262,10 @@ sub get_JobsByAge {
                     .'j.queue, j.stdout_file, j.stderr_file, j.input_object_file, '
                     .'j.output_file, j.status_file, js.status '
                 .'FROM job as j, jobstatus as js, current_status as cs ' 
-                .'WHERE cs.id = js.id '
-                    .'AND js.id = j.id '
-                    .'AND Unix_TIMESTAMP(time) > Unix_TIMESTAMP()-'.$ageinseconds;
+                .'WHERE cs.id = j.id '
+                    .'AND cs.id = js.id '
+                    .'AND cs.status = js.status '
+                    .'AND Unix_TIMESTAMP(js.time) > Unix_TIMESTAMP()-'.$ageinseconds;
     
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
