@@ -163,4 +163,5 @@ Q8WYV8 Line element
 Q8N1K2 Line element
 Q8NB08 Line element
 Q9P074 hypothetical gene fragment that contains repeats - dta
-Q8NF61 protein fragment -dta 
+Q8NF61 protein fragment - dta 
+NP_775842 hypothetical protein - dta
