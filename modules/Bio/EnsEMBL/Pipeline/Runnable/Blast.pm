@@ -118,7 +118,7 @@ sub _initialize {
     if ($database) 
     {   $self->database($database) ;}
     else
-    {   $self->database('dbEST');   }
+    {   $self->database('');   }
     
     if ($arguments) 
     {   $self->arguments($arguments) ;}
@@ -181,7 +181,6 @@ sub blast {
     Title   :   database
     Usage   :   $obj->database('dbEST');
     Function:   Get/set method for the location of database
-                Valid db choices (dbEST, embl_vertna, swiv, dbSTS, dbGSS, embl_htg)
     Args    :   none
 
 =cut
@@ -190,9 +189,6 @@ sub database {
     my ($self, $db) = @_;
     if ($db)
     {
-        $self->throw ("Invalid entry for database.\n".
-                 " Valid choices (dbEST, embl_vertna, swiv, dbSTS, dbGSS, embl_htg)\n")
-                 unless ($db =~ /dbEST|embl_vertna|swiv|dbSTS|dbGSS|embl_htg/i);
         $self->{_database} = $db ;
     }
     return $self->{_database};
@@ -210,8 +206,8 @@ sub database {
 =head2 arguments
 
     Title   :   arguments
-    Usage   :   $obj->arguments(' -I 95 -x -');
-    Function:   Get/set method for BPLite arguments
+    Usage   :   $obj->arguments(' -I ');
+    Function:   Get/set method for blast arguments
     Args    :   File path (optional)
 
 =cut
@@ -257,7 +253,7 @@ sub run {
 
 =head2 parsefile
 
-    Title   :  parsefile
+    Title   :   parsefile
     Usage   :   $obj->parsefile($filename)
     Function:   Parses blast and BPLite output to give a set of feature pairs
                 parsefile can accept filenames, filehandles or pipes (\*STDIN)
@@ -269,8 +265,8 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
     print "Running blast and BPLite on ".$self->filename."\n";
-    system ($self->blast.' '.$self->database.' '.$self->filename.
-                ' > '.$self->results);
+    system ($self->blast.' '.$self->database.' '.$self->filename.'
+            .'.$self->arguments.' > '.$self->results);
     $self->throw("Couldn't create file for Blast results: $!\n") 
                 unless (-e $self->results);
 }
