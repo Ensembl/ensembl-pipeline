@@ -16,6 +16,11 @@
 
   -estfile
   -outfile
+  -clip (clips polyA/T) 
+  -clip_ends n (clips n bases from both ends - default = 0, 20 seems to be ok)
+  -quality (filters ESTs based on sequence quality)
+  -softmask ( softmask the polyA/T )
+  -min_length n (default n = 100bp)
 
 =cut
 
@@ -25,6 +30,7 @@ use Getopt::Long;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Utils::PolyA;
+use Bio::EnsEMBL::Pipeline::Tools::ESTFilter;
 
 #$| = 1; # disable buffering
 #local $/ = '>';
@@ -32,6 +38,7 @@ use Bio::EnsEMBL::Utils::PolyA;
 my $estfile;
 my $seqoutfile;
 my $clip;
+my $quality;
 my $softmask;
 
 ############################################################
@@ -47,6 +54,7 @@ my $min_length = 100;
 	    'estfile:s'     => \$estfile,
 	    'outfile:s'     => \$seqoutfile,
 	    'clip'          => \$clip,
+	    'quality'       => \$quality,
 	    'clip_ends:n'   => \$clip_ends,
 	    'softmask'      => \$softmask,
 	    'min_length'    => \$min_length,
@@ -62,6 +70,7 @@ if(!defined $estfile    ||
   print STDERR "USAGE: get_human_ests.pl -estfile estfile -outfile outfile\n";
   print STDERR "                         -clip (clips polyA/T) -clip_ends n (clips n bases from both ends)\n";
   print STDERR "                                                             default = 0, 20 seems to be ok\n";
+  print STDERR "                         -quality (filters ESTs based on sequence quality)";
   print STDERR "                         -softmask ( softmask the polyA/T )\n";
   print STDERR "                         -min_length ( min_est_length, default = 100 )\n";
   exit(0);
@@ -78,6 +87,14 @@ my $seqout = new Bio::SeqIO(-file   => ">$seqoutfile",
 
 if ( $clip_ends ){
   print STDERR "clipping $clip_ends from both ends of ESTs\n";
+}
+
+my $quality_filter;
+
+if ($quality) {
+  print STDERR "removing low-quality sequences from EST dataset.\n";
+  $quality_filter = 
+    Bio::EnsEMBL::Pipeline::Tools::ESTFilter->new('-max_single_base_run' => 8);
 }
 
 SEQFETCH:
@@ -229,6 +246,17 @@ while( my $cdna = $seqin->next_seq ){
     next SEQFETCH;
   }
 
+
+  ############################################################
+  # Apply the EST quality filter
+
+  if ($quality) {
+    if ($quality_filter->appraise($new_new_cdna)){
+      $new_new_cdna = $quality_filter->filtered_seq;
+    } else {
+      next
+    }
+  }
 
   # write sequence
   $seqout->write_seq($new_new_cdna);
