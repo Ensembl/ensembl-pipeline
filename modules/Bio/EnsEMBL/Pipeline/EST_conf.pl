@@ -14,33 +14,37 @@ package main;
 %scripts_conf = ( 
 ### general options
 		 'runner'      => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_EST_RunnableDB',
-#		'runner'      => '/work2/vac/ensembl-pipeline/scripts/run_EST_RunnableDB',
 #		'runner'      => '',
 
 		 'scriptdir'       => "/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/",
-#		'scriptdir'       => "/work2/vac/ensembl-pipeline/scripts/EST",
+#		'scriptdir'       => "",
 
 #		path to scratch directory where output subdirectories and files will be placed
-		 'tmpdir'      => '/scratch2/ensembl/eae/est/',
+#		 'tmpdir'      => '/scratch2/ensembl/eae/est/',
 #		 'tmpdir'      => '/scratch4/ensembl/vac',
+		 'tmpdir'      => 
 
 #		'queue'          => "acarilong -m \"bcscab1 bcscab3 bcscab4 bcscab5 bcscab6 bcscab7 bcscab8 bcscab9\"",
-		'queue'          => "acarilong",
-#		'queue'          => "",
+#		'queue'          => "acari",
+		'queue'          => "",
 
 ### for make_bsubs.pl - where to put the bsubs
-#		'exonerate_bsubsfile' => "/scratch4/ensembl/vac/exonerate_est.jobs",
-#		'filter_bsubsfile'    => "/scratch4/ensembl/vac/filter_and_e2g.jobs",
+#		'exonerate_bsubsfile'       => "/scratch4/ensembl/vac/exonerate_est.jobs",
+#		'filter_bsubsfile'          => "/scratch4/ensembl/vac/filter_and_e2g.jobs",
+#               'EST_GeneBuilder_bsubsfile' => "/work6a/eae.tmp/Mouse/jobs/EST_GeneBuilder.jobs",
+		'exonerate_bsubsfile' => "",
+		'filter_bsubsfile'    => "",
+		'EST_GeneBuilder_bsubsfile' => "",
 
 ### for prepare_ests.pl
 
 #		path to executable which will be used for splitting estfiles into chunks
-#		'filesplitter' => "/work2/gs2/gs2/bin/fastasplit",
+		'filesplitter' => "/work2/gs2/gs2/bin/fastasplit",
 #		'filesplitter' => "",
 
 #		path to file with all the ESTs/cDNAs/whatever in it
-#		'estfile'        => "/work2/vac/MGC/data/MGC_Hs.fa",
-		'estfile'        => "/scratch3/ensembl/vac/ESTs/ests.fa",
+#		'estfile'        => "/scratch3/ensembl/vac/ESTs/ests.fa",
+		'estfile'        => "",
 
 #	     path to dir where chunked ests are to be put
 #            NB Sanger/EBI - this needs to be somewhere on acari!!!
@@ -52,7 +56,7 @@ package main;
 #		'estchunknumber' => 1,
 
 #	     path to location of makeindex
-#		'makeindex'      => "/usr/local/ensembl/bin/makeindex",
+		'makeindex'      => "/usr/local/ensembl/bin/makeseqindex",
 #		'makeindex'      => "",
 
 
@@ -61,13 +65,18 @@ package main;
 #	     *or* input id in form chrname.start-end
 #            NB Sanger/EBI if a (large) file, this needs to be distributed across the farm or NFS will be an issue ...
 #		'genomic'   => "/data/blastdb/Golden_Path_Archive/april_masked_golden_contigs.dust.fasta",
-#		 'genomic'   => "/scratch3/ensembl/vac/ESTs/contig.dust.fa",
-
+		'genomic'   => "",
 
 ### for filter_and_e2g.pl
 #	     size of chunk to be processed in each job; best is 1Mb
-#		'filter_chunksize' => 1000000,
-	       );
+		'filter_chunksize' => 1000000,
+
+### for EST_GeneBuilder
+#	     size of chunk to be processed in each job
+		 'est_genebuilder_chunksize' => 1000000,
+		);
+
+
 
 
 %exonerate_conf = (
@@ -122,7 +131,7 @@ package main;
 		    'genomewise_runnable' => "",
 
 		    # specify the type with which the genes are going to be written
-		    'genetype'            => "genomewise2",
+		    'genetype'            => "genomewise",
 );
 
 
@@ -131,32 +140,31 @@ package main;
 # est_db = where we load up exonerate results into the feature table, build genes and write the exons out as features
 
 %db_conf = (
-	    'refdbhost'      => "ecs1d",
-#	    'refdbhost'      => "",
+#	    'refdbhost'      => "ecs1d",
+	    'refdbhost'      => "",
 	    
-	    'refdbname'      => "ens_UCSC_0801",        # where human dna lives
-#	    'refdbname'      => "ens_apr01",
-#	    'refdbname'      => "",
+#	    'refdbname'      => "ens_UCSC_0801",        # where human dna lives
+	    'refdbname'      => "",
 	    
 	    'refdbuser'      => "ensro",
 #	    'refdbuser'      => "",
 	    
 	    'refdbpass'      => "",
 	    
-	    'estdbhost'      => "ecs1e",
-#	    'estdbhost'      => "ecs1f",
+	    'estdbhost'      => "",
 #	    'estdbhost'      => "ecs1f",
 
-	    'estdbname'      => "ens_UCSC_0801_est90",   # the latest est2genome results
-#	    'estdbname'      => "exonerate_est",
-#	    'estdbname'      => "est_to_main_trunk",
+	    'estdbname'      =>
+#	    'estdbname'      => "ens_UCSC_0801_est90",   # the latest est2genome results
 	    
-	    'estdbuser'      => "ensadmin",
-#	    'estdbuser'      => "",
+#	    'estdbuser'      => "ensadmin",
+	    'estdbuser'      => "",
 	    
-	    'estdbpass'      => "ensembl",
+#	    'estdbpass'      => "ensembl",
+	    'estdbpass'      => "",
 	    
-	    'golden_path'    => "UCSC",
+#	    'golden_path'    => "UCSC",
+	    'golden_path'    => "",
 );
 
 }
