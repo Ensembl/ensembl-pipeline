@@ -518,7 +518,7 @@ sub convert_output{
     }
       
       # flush out old exons from transcript and replace them with newly remapped exons
-      $transcript->flush_Exon;
+      $transcript->flush_Exons();
       foreach my $exon(@newexons){
 	$transcript->add_Exon($exon);
       }
