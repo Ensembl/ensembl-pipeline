@@ -47,7 +47,7 @@ else
 #create Genscan object    
 
 my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
-    -CLONE => $clone,
+    -QUERY => $clone,
     -GENSCAN => 'genscan',
     -MATRIX  => 'HumanIso.smat'
 );
@@ -75,7 +75,7 @@ else
 my $all_exons_found = 1;
 my @peptides = $genscan->genscan_peptides;
 
-foreach my $feature (@results) {
+foreach my $gene (@results) {
   print STDERR "Gene $gene\n";
     if ($all_exons_found == 1) {
 

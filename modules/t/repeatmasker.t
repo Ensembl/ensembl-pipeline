@@ -44,7 +44,7 @@ else
 { print "ok 2\n"; }
 
 #create RepeatMasker object    
-my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $clone);
+my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-QUERY => $clone);
  
 unless ($repmask)
 { print "not ok 3\n"; }
