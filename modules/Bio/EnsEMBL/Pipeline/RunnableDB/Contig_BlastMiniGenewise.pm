@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise->new(
 					     -dbobj     => $db,
 					     -input_id  => $id,
-					     -golden_path => $gp
                                              );
     $obj->fetch_input
     $obj->run
@@ -67,7 +66,6 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					     );
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_SIMILARITY_TYPE
 					 GB_SIMILARITY_THRESHOLD
 					 GB_SKIP_BMG
@@ -89,13 +87,8 @@ sub new {
 	$self->seqfetcher($seqfetcher);
       }
     }
-    my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
+    my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
 
-    if(!defined $path || $path eq ''){
-      $path = $GB_GOLDEN_PATH;
-    }
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    
     if(!defined $type || $type eq ''){
       $type = $GB_SIMILARITY_TYPE;
     }
@@ -107,7 +100,6 @@ sub new {
     $type = 'sptr' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
-    $self->dbobj->static_golden_path_type($path);
     $self->type($type);
     $self->threshold($threshold);
 

@@ -51,7 +51,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_CDNA_INDEX
 					 GB_PROTEIN_INDEX
-					 GB_GOLDEN_PATH
 					 GB_SIMILARITY_TYPE
 					 GB_SIMILARITY_THRESHOLD
 					);
@@ -243,14 +242,12 @@ sub make_similarity_runnable {
 #  my $analysis = $self->dbobj->get_Analysis_Adaptor->??;
 
   my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX);
-  my $path       = $GB_GOLDEN_PATH;
   my $type       = $GB_SIMILARITY_TYPE;
   my $threshold  = $GB_SIMILARITY_THRESHOLD;
 
   my $sim = new Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise(
 									  -dbobj      => $self->dbobj,
 									  -input_id   => $self->input_id,
-									  -golden_path=> $path,
 									  -seqfetcher => $seqfetcher,
 									  -type       => $type,
 									  -threshold  => $threshold,
