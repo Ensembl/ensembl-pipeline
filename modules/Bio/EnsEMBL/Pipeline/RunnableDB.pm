@@ -88,14 +88,14 @@ sub new {
     my $self = {};
     bless $self, $class;
     my ($dbobj,$input_id, $seqfetcher, 
-	$analysis) = $self->_rearrange([qw(DBOBJ 
+	$analysis) = $self->_rearrange([qw(DB
 					   INPUT_ID
 					   SEQFETCHER 
 					   ANALYSIS )], 
 				       @args);
     
     $self->throw("No database handle input") unless defined($dbobj);
-    $self->dbobj($dbobj);
+    $self->db($dbobj);
 
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
@@ -151,27 +151,27 @@ sub parameters {
     return $self->analysis->parameters();
 }
 
-=head2 dbobj
+=head2 db
 
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
+    Title   :   db
+    Usage   :   $self->db($obj);
+    Function:   Gets or sets the value of db
     Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
                 (which extends Bio::EnsEMBL::DB::ObjI)
     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
 =cut
 
-sub dbobj {
+sub db {
     my( $self, $value ) = @_;
     
     if ($value) 
     {
         $value->isa("Bio::EnsEMBL::DB::ObjI")
             || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
+        $self->{'_db'} = $value;
     }
-    return $self->{'_dbobj'};
+    return $self->{'_db'};
 }
 
 =head2 input_id
@@ -322,7 +322,7 @@ sub vcontig {
 sub write_output {
     my($self) = @_;
 
-    my $db=$self->dbobj();
+    my $db=$self->db();
     my @features = $self->output();
   
     foreach my $f (@features) {
