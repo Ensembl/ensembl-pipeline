@@ -142,7 +142,7 @@ sub add_Transcript {
 sub get_all_Transcripts {
     my( $self, $value ) = @_;
     
-    return (@{$self->{'_transcripts'}});
+    return $self->{'_transcripts'};
 }
 
 =head2 miniseq
@@ -182,16 +182,17 @@ sub make_miniseq {
     my @exons;
     my $strand;
 
-    foreach my $transcript($self->get_all_Transcripts){
+    foreach my $transcript(@{$self->get_all_Transcripts}){
     EXON:
-      foreach my $exon($transcript->get_all_Exons){
-	# we expect to be given a set of transcripts that are all on the same 
-	# strand - genomewise can't deal with mixed strand predictions and we 
-	# really dont; want to be doing with it here
-	if(!defined $strand){
-	  # this is the first exon
-	  $strand = $exon->strand;
-	}
+      foreach my $exon (@{$transcript->get_all_Exons}){
+				# we expect to be given a set of transcripts that are all on the same 
+				# strand - genomewise can't deal with mixed strand predictions and we 
+				# really dont; want to be doing with it here
+
+				if(!defined $strand){
+					# this is the first exon
+					$strand = $exon->strand;
+				}
 	
 	if($exon->strand != $strand){
 	  $self->throw("Mixed strands in input exons! I'm outta here!\n");
@@ -343,7 +344,7 @@ sub exon_padding {
 
 sub convert_transcript_to_miniseq{
   my ($self, $transcript) = @_;
-  foreach my $exon($transcript->get_all_Exons){
+  foreach my $exon (@{$transcript->get_all_Exons}){
     my $start = $self->miniseq->pairAlign->genomic2cDNA($exon->start);
     my $end   = $self->miniseq->pairAlign->genomic2cDNA($exon->end);
 
@@ -375,7 +376,7 @@ sub run {
   $genomewise->seq($self->miniseq->get_cDNA_sequence);
 
 #  $genomewise->seq($self->genomic_sequence);
-  foreach my $t($self->get_all_Transcripts){
+  foreach my $t (@{$self->get_all_Transcripts}){
     my $converted = $self->convert_transcript_to_miniseq($t);
     $genomewise->add_Transcript($converted);
     #$genomewise->add_Transcript($t);
@@ -429,8 +430,8 @@ sub convert_output{
     
     # get the translation from the transcript
     my $translation = $transcript->translation;
-    my $start_exon  = $translation->start_exon;
-    my $end_exon    = $translation->end_exon;
+    my $start_exon  = $translation->start_Exon;
+    my $end_exon    = $translation->end_Exon;
     my ($ss,$se)    = ( $start_exon->start, $start_exon->end );
     my ($es,$ee)    = ( $end_exon->start, $end_exon->end );
     
@@ -445,14 +446,14 @@ sub convert_output{
     # convert coordinates exon by exon
     my $ec = 0;
   EXON:
-    foreach my $exon ($transcript->get_all_Exons) {
+    foreach my $exon (@{$transcript->get_all_Exons}) {
       $ec++;
    
       my $phase  = $exon->phase;
       my $strand = $exon->strand;
 
       # get the supporting evidence
-      my @evidence = $exon->each_Supporting_Feature;
+      my @evidence = @{$exon->get_all_supporting_features};
 
       my @genomics = $self->miniseq->convert_SeqFeature($exon);         
       if ($#genomics > 0) {
@@ -483,11 +484,11 @@ sub convert_output{
       # check whether $exon is the start or end exon
       if ( $exon->start == $ss && $exon->end == $se ) {
 	#print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
-	$translation->start_exon($new_exon);
+	$translation->start_Exon($new_exon);
       }
       if ( $exon->start == $es && $exon->end == $ee ) {
 	#print STDERR " >> end_exon found, converting   ".$exon." into ".$new_exon."\n";
-	$translation->end_exon($new_exon);
+	$translation->end_Exon($new_exon);
       }
     }
       
