@@ -332,82 +332,89 @@ sub _store_affy_features {
 
   foreach my $h (@h) {
     my ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
-    my $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name,$h->{'t_start'},$h->{'t_end'});
-    
-    my $probe_name = $h->{'q_id'};
-    $probe_name =~ s/^probe\://;
-    my ($probeset_name,$composite_name) = split /\:/, $probe_name;
-    my $misc_feature = Bio::EnsEMBL::MiscFeature->new (
-						       -START  => $h->{'t_start'},
-						       -END    => $h->{'t_end'},
-						       -STRAND => $h->{'t_strand'},
-						       -SLICE  => $slice,
-						      );
- 
-    $misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeName",
-								 -NAME   => "Probe name",
-								 -DESCRIPTION => "the name of the probe",
-								 -VALUE  => $probe_name,
-								)
-				 );
- 
- 
-    #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "compositeName",
-    #								 -NAME   => "Conposite name",
-    #								 -DESCRIPTION => "the name of the composite",
-    #								 -VALUE  => $composite_name,
-    #								)
-    #				 );
-
-    #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeSetName",
-    #								 -NAME   => "Probeset name",
-    #								 -DESCRIPTION => "the name of the probe set",
-    #								 -VALUE  => $probeset_name,
-    #								)
-    #				 );
-
-    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
-								-CODE   => "probeLength",
-								-NAME   => "Probe length",
-								-DESCRIPTION => "the length of the probe",
-								-VALUE  => $h->{'probe_length'},
-							       )
+    my $slice;
+    if ($seq_region_name !~ /NT/) {
+      $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name,$h->{'t_start'},$h->{'t_end'});
+      if (!$slice) {
+	print STDERR "Could not obtain slice for seq_region: $coord_system_name : $seq_region_name\n";
+	next;
+      }
+      my $probe_name = $h->{'q_id'};
+      $probe_name =~ s/^probe\://;
+      my ($probeset_name,$composite_name) = split /\:/, $probe_name;
+      my $misc_feature = Bio::EnsEMBL::MiscFeature->new (
+							 -START  => $h->{'t_start'},
+							 -END    => $h->{'t_end'},
+							 -STRAND => $h->{'t_strand'},
+							 -SLICE  => $slice,
+							);
+      
+      $misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeName",
+								   -NAME   => "Probe name",
+								   -DESCRIPTION => "the name of the probe",
+								   -VALUE  => $probe_name,
+								  )
+				   );
+      
+      
+      $misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "compositeName",
+      								 -NAME   => "Composite name",
+      								 -DESCRIPTION => "the name of the composite",
+      								 -VALUE  => $composite_name,
+      								)
+      				 );
+      
+      #$misc_feature->add_Attribute ( Bio::EnsEMBL::Attribute->new (-CODE   => "probeSetName",
+      #								 -NAME   => "Probeset name",
+      #								 -DESCRIPTION => "the name of the probe set",
+      #								 -VALUE  => $probeset_name,
+      #								)
+      #				 );
+      
+      $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								  -CODE   => "probeLength",
+								  -NAME   => "Probe length",
+								  -DESCRIPTION => "the length of the probe",
+								  -VALUE  => $h->{'probe_length'},
+								 )
+				  );
+      
+      $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								  -CODE   => "matchLength",
+								  -NAME   => "Match length",
+								  -DESCRIPTION => "number of base matched",
+								  -VALUE  => $h->{'matching_length'},
+								 )
+				  );
+      
+      
+      
+      $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
+								  -CODE   => "matchStatus",
+								  -NAME   => "Match status",
+								  -DESCRIPTION => "full_match or with_mismatch",
+								  -VALUE  => $h->{'match_status'}
+								 )
+				  );
+      
+      #
+      #  Add as many Attributes as you like
+      #
+      
+      $misc_feature->add_MiscSet( Bio::EnsEMBL::MiscSet->new (
+							      -CODE  => "AffyProbe",
+							      -NAME  => "Affy probe match",
+							      -DESCRIPTION => '',
+							      -LONGEST_FEATURE => $self->max_length,
+							     )
 				);
-
-    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
-								-CODE   => "matchLength",
-								-NAME   => "Match length",
-								-DESCRIPTION => "number of base matched",
-								-VALUE  => $h->{'matching_length'},
-							       )
-				);
-
-    
-
-    $misc_feature->add_Attribute( Bio::EnsEMBL::Attribute->new (
-								-CODE   => "matchStatus",
-								-NAME   => "Match status",
-								-DESCRIPTION => "full_match or with_mismatch",
-								-VALUE  => $h->{'match_status'}
-							       )
-				);
-    
-    #
-    #  Add as many Attributes as you like
-    #
-    
-    $misc_feature->add_MiscSet( Bio::EnsEMBL::MiscSet->new (
-							    -CODE  => "AffyProbe",
-							    -NAME  => "Affy probe match",
-							    -DESCRIPTION => "data set is $probeset_name ",
-							    -LONGEST_FEATURE => $self->max_length,
-							   )
-			      );
-    
-    $self->output($misc_feature);
+      
+      $self->output($misc_feature);
+    }
   }
+
   #$db->disconnect;
-  
+    
 }
 
 ############################################################

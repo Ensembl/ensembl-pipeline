@@ -193,7 +193,7 @@ sub write_output {
   my $mfa = $self->db->get_MiscFeatureAdaptor();
   $mfa->store( @misc_features );
   
-  my ($tot_pass_ids,$only_25,$only_24,$both,%done);
+  my ($tot_pass_ids,$only_25,$only_24,$both,$total_query_seq,%done);
 
   foreach my $q_id (keys %{$match}) {
     $tot_pass_ids++;
@@ -213,7 +213,7 @@ sub write_output {
   my $ratio_25 = $only_25/$tot_pass_ids;
   my $ratio_24 = $only_24/$tot_pass_ids;
   my $ratio_both = $both/$tot_pass_ids;
-  my $total_query_seq = $self->total_query_seq;
+  $total_query_seq += $self->total_query_seq;
   printf "total_query_seq is $total_query_seq, total pass ids is $tot_pass_ids, with 25 bases exact match is $only_25 (%.2f), with 24 bases exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
   
   return 1;
