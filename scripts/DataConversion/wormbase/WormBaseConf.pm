@@ -49,9 +49,9 @@ use vars qw( %WormBaseConf );
 		 
 		 # database to put sequnece and genes into
 		 WB_DBNAME => 'elegans_maintrunk',
-		 WB_DBHOST => 'ecs1d',
-		 WB_DBUSER => 'ecs1dadmin',
-		 WB_DBPASS => 'TyhRv',
+		 WB_DBHOST => '***',
+		 WB_DBUSER => '***',
+		 WB_DBPASS => '***',
 		 #path to index based on clone name
 		 WB_CLONE_INDEX => ['/ecs2/work1/lec/code/elegans_conversion/wormbase_clones'],
 		 # logic name of analysis object to be assigned to genes
