@@ -1,0 +1,68 @@
+=pod
+
+=head1 Pipeline configuration
+
+=head2 Author
+
+Simon Potter
+
+=head2 Date
+
+21.11.02
+
+=head1 Usage
+
+You will need to copy the .example files in order to use them, e.g.
+
+  cp Config/BatchQueue.pm.example Config/BatchQueue.pm
+
+When adding new features to the config files, please change the
+.example files and commit those. Local changes to the config files
+should be confined to the copies. This is to avoid installation
+specific information being stored in the cvs repository.
+
+The configuration is split between a number of modules. These
+normally export variables into the calling package (as 'global'
+variables), though in some cases they may want to be overridden
+at runtime. Care must be taken here to save the global variable
+into another location first, e.g.
+
+  # in main script
+  use Bio::EnsEMBL::Pipeline::Config::General;
+
+  my $RUNNER = $PIPELINE_RUNNER_SCRIPT || $runner_script
+  #               ^^ from Config file       ^^ runtime
+
+
+  # in a sub-class (e.g. Job.pm) refer to the copied variable
+  my $runner = $::RUNNER || undef;
+
+
+=head1 The modules
+
+=head2 Bio::EnsEMBL::Pipeline::Config::General
+
+General pipeline config information (location of binaries, etc.).
+
+=head2 Bio::EnsEMBL::Pipeline::Config::Blast
+
+Blast configuration. This is mainly intended to store the regular
+expressions used to extract identifiers from the fasta headers in
+blast database files; but could be used to store other blast options
+as well.
+
+=head2 Bio::EnsEMBL::Pipeline::Config::BatchQueue
+
+Configuration for batch queues, e.g. which batch queue system to
+use. Also allows per-analysis configuration of batch jobs such that
+certain analyses are only sent to certain nodes.
+
+=head1 Runtime variables
+
+Parameters such as pipeline host and database name (formally in
+pipeConf.pl) have been removed. It is intended that these always be
+specified on the command line at run time (e.g. of a RuleManager
+script), though provision is made for storing some of these in
+environment variables;
+
+=cut
