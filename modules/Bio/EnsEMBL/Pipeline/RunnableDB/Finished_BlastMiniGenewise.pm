@@ -245,22 +245,28 @@ sub run {
 =cut
 
 sub convert_output {
-  my ($self) =@_;
-  
+  my ($self) = @_;
   my $trancount = 1;
   my $genetype;
   foreach my $runnable ($self->runnable) {
-     if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
+    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
       $genetype = "ContigBlastMiniGenewise";
     }else{
       $self->throw("I don't know what to do with $runnable");
     }
-     #$genetype = "testing";
+
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
 
-        #use logic name from analysis object if possible, else take $genetype;
-        my $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype ;       
-        
+    #use logic name from analysis object if possible, else take $genetype;
+    my $anal_logic_name ;
+
+ if(defined $self->analysis){
+      $anal_logic_name = ($self->analysis->logic_name) ? $self->analysis->logic_name : $genetype ; 
+    }
+    else{
+      $anal_logic_name = $genetype;
+    }($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype ;       
+
     my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     my $analysis_obj;
     if(scalar(@analyses) > 1){
@@ -270,7 +276,6 @@ sub convert_output {
       $analysis_obj = $analyses[0];
     }
     else{
-      # make a new analysis object
       $analysis_obj = new Bio::EnsEMBL::Analysis
         (-db              => 'NULL',
          -db_version      => 'NULL',
@@ -284,148 +289,59 @@ sub convert_output {
     }
 
     my @results = $runnable->output;
-    my @genes = $self->make_genes($genetype, $analysis_obj, \@results);
+    my $genes = $self->process_genes($genetype, $analysis_obj, \@results);
 
-    $self->output(@genes);
+    $self->output(@$genes);
 
   }
 }
 
+=head2 process_genes
 
-=head2 make_genes
-
-  Title   :   make_genes
-  Usage   :   $self->make_genes
-  Function:   makes Bio::EnsEMBL::Genes out of the output from runnables
-  Returns :   array of Bio::EnsEMBL::Gene  
+  Title   :   process_genes
+  Usage   :   $self->process_genes
+  Function:   validates genes output from Genewise modules
+  Returns :   array of Bio::EnsEMBL::Gene
   Args    :   $genetype: string
               $analysis_obj: Bio::EnsEMBL::Analysis
-              $results: reference to an array of FeaturePairs
+              $results: reference to an array of Bio::EnsEMBL::Gene
 
 =cut
 
-sub make_genes {
+sub process_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->vc;
-  my @tmpf   = @$results;
   my @genes;
-  my $gene;
-  my $transcript;
-  foreach my $tmpf (@tmpf) {
-    $gene = new Bio::EnsEMBL::Gene;
-    $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
-    #my $translation = $transcript->translate;
-    #if($translation->seq =~ /\*/){
-    #  next;
-    #}else{
+  my @seqfetchers = $self->each_seqfetcher;
+
+  &throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
+      unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
+
+  PROCESS_GENE:
+  foreach my $gene (@{$results}) {
+    foreach my $transcript(@{$gene->get_all_Transcripts}){
+      foreach my $exon(@{$transcript->get_all_Exons}) {
+	foreach my $sf(@{$exon->get_all_supporting_features}) {
+	  $sf->analysis($analysis_obj);
+
+	  # this should be sorted out by the remapping to rawcontig ... strand is fine
+	  if ($sf->start > $sf->end) {
+	    my $tmp = $sf->start;
+	    $sf->start($sf->end);
+	    $sf->end($tmp);
+	  }
+	}
+	
+      }
+    }
+
     $gene->type($genetype);
     $gene->analysis($analysis_obj);
-    $gene->add_Transcript($transcript);
     push (@genes, $gene);
-    #}
   }
-  return @genes;
+
+  return \@genes;
+
 }
-
-=head2 _make_transcript
-
- Title   : make_transcript
- Usage   : $self->make_transcript($gene, $contig, $genetype)
- Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
-           with sub_SeqFeatures representing exons.
- Example :
- Returns : Bio::EnsEMBL::Transcript with Bio::EnsEMBL:Exons(with supporting feature 
-           data), and a Bio::EnsEMBL::translation
- Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::RawContig,
-  $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis
-
-
-=cut
-
-sub _make_transcript{
-  my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
-  $genetype = 'unspecified' unless defined ($genetype);
-
-  unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
-    {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
-
-  my $transcript   = new Bio::EnsEMBL::Transcript;
-  my $translation  = new Bio::EnsEMBL::Translation;    
-  $transcript->translation($translation);
-
-  my $excount = 1;
-  my @exons;
-    
-  foreach my $exon_pred ($gene->sub_SeqFeature) {
-    # make an exon
-    my $exon = new Bio::EnsEMBL::Exon;
-    
-    $exon->contig_id($contig->internal_id);
-    $exon->start($exon_pred->start);
-    $exon->end  ($exon_pred->end);
-    $exon->strand($exon_pred->strand);
-    
-    $exon->phase($exon_pred->phase);
-    $exon->attach_seq($contig->primary_seq);
-    #print "contig mol type = ".$contig->primary_seq->moltype."\n";
-    #print "exon mol type = ".$exon->entire_seq->moltype."\n";
-   
-    # sort out supporting evidence for this exon prediction
-    foreach my $subf($exon_pred->sub_SeqFeature){
-      $subf->feature1->seqname($contig->internal_id);
-      $subf->feature1->source_tag($genetype);
-      $subf->feature1->primary_tag('similarity');
-      $subf->feature1->score(100);
-      $subf->feature1->analysis($analysis_obj);
-        
-      $subf->feature2->source_tag($genetype);
-      $subf->feature2->primary_tag('similarity');
-      $subf->feature2->score(100);
-      $subf->feature2->analysis($analysis_obj);
-      
-      $exon->add_Supporting_Feature($subf);
-    }
-    
-    push(@exons,$exon);
-    
-    $excount++;
-  }
-  
-  if ($#exons < 0) {
-    print STDERR "Odd.  No exons found\n";
-  } 
-  else {
-    
-    #print STDERR "num exons: " . scalar(@exons) . "\n";
-
-    if ($exons[0]->strand == -1) {
-      @exons = sort {$b->start <=> $a->start} @exons;
-    } else {
-      @exons = sort {$a->start <=> $b->start} @exons;
-    }
-    
-    foreach my $exon (@exons) {
-      $transcript->add_Exon($exon);
-    }
-    
-    $translation->start_exon($exons[0]);
-    $translation->end_exon  ($exons[$#exons]);
-    
-    if ($exons[0]->phase == 0) {
-      $translation->start(1);
-    } elsif ($exons[0]->phase == 1) {
-      $translation->start(3);
-    } elsif ($exons[0]->phase == 2) {
-      $translation->start(2);
-    }
-    
-    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
-  }
-  
-  return $transcript;
-}
-
-
 
 =head2 output
 
