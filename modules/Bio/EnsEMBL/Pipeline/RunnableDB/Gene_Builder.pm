@@ -59,6 +59,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 							       GB_COMB_DBNAME
 							       GB_COMB_DBUSER
 							       GB_COMB_DBPASS
+							       GB_COMB_DBPORT
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
@@ -255,6 +256,7 @@ sub fetch_input {
 						      '-user'   => $GB_COMB_DBUSER,
 						      '-dbname' => $GB_COMB_DBNAME,
 						      '-pass'   => $GB_COMB_DBPASS,
+						      '-port'   => $GB_COMB_DBPORT,
 						      '-dnadb'  => $self->db,
 						      );
 
