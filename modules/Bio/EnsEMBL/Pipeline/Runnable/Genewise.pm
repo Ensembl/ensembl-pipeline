@@ -125,14 +125,12 @@ sub align_protein {
   my $options = $self->options;
   my $results_file  = $self->get_tmp_file('/tmp/',$self->protein->id,
                                           ".gen.fa");
-  #my $pepfile  = $self->get_tmp_file('/tmp/',$self->protein->id,".pro.fa");
 
   my $genfile = $self->write_sequence_to_file($self->genomic);
   my $pepfile = $self->write_sequence_to_file($self->protein);
 
   my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
 
-  #print STDERR $command."\n";
 
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
@@ -141,116 +139,127 @@ sub align_protein {
   if (($self->reverse) && $self->reverse == 1) {
     $command .= " -trev ";
   }
-  #open FH, '>'.$results_file or $self->throw("can't open $results_file");
-  #print STDERR "Have openned ".$results_file."\n";
-  #print STDERR "GENEWISE running on ".$self->protein->id." with command ".$command."\n";
-  #my @time = times;
-  #print STDERR "BEFORE GENEWISE @time\n"; 
+
+  print "Running genewise with $command\n";
+
   open(GW, "$command | ") or $self->throw("error piping to genewise: $!\n");
 
   my @genesf_exons;
   my $curr_exon;
   my $curr_gene;
 
-  # making assumption of only 1 gene prediction ... this will change once we start using hmms
 
  GENESF: 
   while (<GW>) {
-    #print FH;
     chomp;
     my @f = split;
-   
     next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting'));
-    
-    if($f[0] eq 'Gene'){
+    $self->parse_genewise_output_line(\@f, \$curr_gene, \$curr_exon, \@genesf_exons);
 
-      # flag a frameshift - ultimately we will do something clever here but for now ...
-      # frameshift is here defined as two or more genes produced by Genewise from a single protein
+  }
 
-      if (/^(Gene\s+\d+)$/){
-				if(!defined($curr_gene)){
-					$curr_gene = $1;
-				}	elsif ($1 ne $curr_gene) {
-					$self->warn("frameshift!\n");
-				}
-      }
-    }
-    
-    elsif($f[0] eq 'Exon'){
-      my $start  = $f[1];
-      my $end    = $f[2];
-      my $phase  = $f[4];
-      my $strand = 1;
-
-      if($f[1] > $f[2]){
-				$strand = -1;
-				$start  = $f[2];
-				$end    = $f[1];
-      }
-
-      my $exon_length = $end - $start + 1;
-
-      # end phase is the number of bases at the end of the exon which do not 
-      # fall in a codon and it coincides with the phase of the following exon.
-
-      my $end_phase   = ( $exon_length + $phase ) %3;
-
-      $curr_exon = new Bio::EnsEMBL::Feature;
-      $curr_exon->seqname  ($self->genomic->id);
-#      $curr_exon->id       ($self->protein->id);
-      $curr_exon->start    ($start);
-      $curr_exon->end      ($end);
-      $curr_exon->strand   ($strand);
-
-      $self->addExon($curr_exon);
-
-      push(@genesf_exons, $curr_exon);
-    
-    }  elsif($f[0] eq 'Supporting') {
-
-      my $gstart = $f[1];
-      my $gend   = $f[2];
-      my $pstart = $f[3];
-      my $pend   = $f[4];
-
-      my $strand = 1;
-
-      if ($gstart > $gend){
-				$gstart = $f[2];
-				$gend   = $f[1];
-				$strand = -1;
-      }
-      
-      if($strand != $curr_exon->strand){
-				$self->warn("incompatible strands between exon and supporting feature - cannot add suppfeat\n");
-				next GENESF;
-      }
-
-      if($pstart > $pend){
-				$self->warn("Protein start greater than end! Skipping this suppfeat\n");
-				next GENESF;
-      }
-      
-      my $fp = new Bio::EnsEMBL::FeaturePair();
-
-      $fp->start   ($gstart);
-      $fp->end     ($gend);
-      $fp->strand  ($strand);
-      $fp->seqname ($self->genomic->id);
-      $fp->hseqname($self->protein->id);
-      $fp->hstart  ($pstart);
-      $fp->hend    ($pend);
-      $fp->hstrand (1);
-      $curr_exon->add_sub_SeqFeature($fp,'');
-    }
-  } 
-  
   close(GW) or $self->throw("Error running genewise with command line ".$command."\n $!");
-  #close(FH) or $self->throw("error closing $results_file");
-  #@time = times;
-  #print STDERR "AFTER GENEWISE @time\n"; 
   unlink $genfile;
   unlink $pepfile;
+}
+
+=head2 parse_genewise_output_line
+
+  Arg [1]   : $columns_ref, reference to array of strings
+  Arg [2]   : $curr_gene_ref, reference to scalar
+  Arg [3]   : $curr_exon_ref, reference to Bio::EnsEMBL::Feature
+  Arg [4]   : $exons_ref, reference to array of Bio::EnsEMBL::Feature
+  Function  : Parses genewise output lines and adds exons/supporting features to exons_ref
+  Returntype: 
+  Exceptions: 
+  Caller    :
+  Example   :
+
+=cut
+
+sub parse_genewise_output_line{
+  my ($self, $columns_ref, $curr_gene_ref, $curr_exon_ref, $exons_ref) = @_;
+
+  if($columns_ref->[0] eq 'Gene'){
+
+    # flag a frameshift - ultimately we will do something clever here but for now ...
+    # frameshift is here defined as two or more genes produced by Genewise from a single protein
+
+    if (/^(Gene\s+\d+)$/){
+      if(!defined($$curr_gene_ref)){
+	$$curr_gene_ref = $1;
+      }	elsif ($1 ne $$curr_gene_ref) {
+	$self->warn("frameshift!\n");
+      }
+    }
+  }
+
+  elsif($columns_ref->[0] eq 'Exon'){
+    my $start  = $columns_ref->[1];
+    my $end    = $columns_ref->[2];
+    my $phase  = $columns_ref->[4];
+    my $strand = 1;
+
+    if($columns_ref->[1] > $columns_ref->[2]){
+      $strand = -1;
+      $start  = $columns_ref->[2];
+      $end    = $columns_ref->[1];
+    }
+
+    my $exon_length = $end - $start + 1;
+
+    # end phase is the number of bases at the end of the exon which do not 
+    # fall in a codon and it coincides with the phase of the following exon.
+
+    my $end_phase   = ( $exon_length + $phase ) %3;
+
+    $$curr_exon_ref = new Bio::EnsEMBL::Feature;
+    $$curr_exon_ref->seqname  ($self->genomic->id);
+    $$curr_exon_ref->start    ($start);
+    $$curr_exon_ref->end      ($end);
+    $$curr_exon_ref->strand   ($strand);
+
+    $self->addExon($$curr_exon_ref);
+    push(@$exons_ref, $$curr_exon_ref);
+  }
+
+  elsif($columns_ref->[0] eq 'Supporting') {
+
+    my $gstart = $columns_ref->[1];
+    my $gend   = $columns_ref->[2];
+    my $pstart = $columns_ref->[3];
+    my $pend   = $columns_ref->[4];
+
+    my $strand = 1;
+
+    if ($gstart > $gend){
+      $gstart = $columns_ref->[2];
+      $gend   = $columns_ref->[1];
+      $strand = -1;
+    }
+
+    if($strand != $$curr_exon_ref->strand){
+      $self->warn("incompatible strands between exon and supporting feature - cannot add suppfeat\n");
+      return;
+    }
+
+    if($pstart > $pend){
+      $self->warn("Protein start greater than end! Skipping this suppfeat\n");
+      return;
+    }
+
+    my $fp = new Bio::EnsEMBL::FeaturePair();
+
+    $fp->start   ($gstart);
+    $fp->end     ($gend);
+    $fp->strand  ($strand);
+    $fp->seqname ($self->genomic->id);
+    $fp->hseqname($self->protein->id);
+    $fp->hstart  ($pstart);
+    $fp->hend    ($pend);
+    $fp->hstrand (1);
+    $$curr_exon_ref->add_sub_SeqFeature($fp,'');
+  }
 }
 
 
