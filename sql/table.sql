@@ -26,9 +26,11 @@ CREATE TABLE job (
   retry_count       tinyint unsigned NOT NULL,
 
   PRIMARY KEY (job_id),
-  UNIQUE      (taskname, input_id),
-  KEY         (job_name, array_index),
-  KEY         (input_id)
+  # UNIQUE      (taskname, input_id),
+  # ^ can't key on two 255-char fields - max key length is 500.
+  KEY         (job_name(15), array_index),
+  KEY         (input_id(15)),
+  KEY         (taskname(15))
 );
 
 
