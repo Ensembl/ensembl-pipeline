@@ -132,8 +132,8 @@ sub generate_input_ids{
   }elsif($type eq 'chromosome'){
     $idset = $self->get_chromosome_names;
   }elsif($type eq 'file'){
-    my ($dir) = @other_info;
-    $idset = $self->get_file_names($dir);
+    my ($dir, $regex) = @other_info;
+    $idset = $self->get_file_names($dir, $regex);
   }else{
     $self->throw("don't recognise input_id type $type from string $type_string");
   }
@@ -304,7 +304,7 @@ sub get_Chromosomes{
 
 
 sub get_file_names{
-  my ($self, $dir) = @_;
+  my ($self, $dir, $regex) = @_;
   if(!$dir){
     $self->throw("need a directory inorder to fetch the filenames to be used as input_ids $!");
   }
@@ -318,8 +318,20 @@ sub get_file_names{
   foreach my $f(@allfiles) {
     if($f eq '.' || $f eq '..'){
       next;
+    }elsif(-d $f){
+      next;
     }else{
-      push(@input_ids, $f);
+      my $file;
+      if($regex){
+
+	if($f =~ /$regex/){
+	  $file = $f;
+	}
+      }else{
+	$file = $f;
+      }
+     
+      push(@input_ids, $file) if($file);
     }    
   }
   my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
