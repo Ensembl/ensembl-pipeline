@@ -1187,7 +1187,7 @@ CLUSTER:
 
     my %end;
     my $new_end;
-    my $max_end = 0;
+    my $max_end;
     
   EXON:
     foreach my $exon ($cluster->sub_SeqFeature){
@@ -1207,8 +1207,9 @@ CLUSTER:
     # take the most common end (note that we do not resolve ambiguities here)
     
     $new_end = shift( @ends );
-    $max_end = $end{ $new_end };
-    
+    if ( defined $new_end ){
+      $max_end = $end{ $new_end };
+    }
     # if we have too little exons to obtain the end, take the original value
     if ( !defined $max_end ){
       print STDERR "In last position, cluster end wins!\n";
