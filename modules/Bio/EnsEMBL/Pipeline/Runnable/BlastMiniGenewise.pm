@@ -69,15 +69,17 @@ sub _initialize {
            
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $ids,$trim) = $self->_rearrange(['GENOMIC',
+    my( $genomic, $ids,$trim,$endbias) = $self->_rearrange(['GENOMIC',
 						   'IDS',
 						   'TRIM',
+						   'ENDBIAS',
 						  ], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if defined($genomic);
+    $self->endbias($endbias) if defined($endbias);
 
     if (defined($ids)) {
 	if (ref($ids) eq "ARRAY") {
@@ -112,6 +114,30 @@ sub genomic_sequence {
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
+}
+
+=head2 endbias
+
+    Title   :   endbias
+    Usage   :   $self->endbias($endbias)
+    Function:   Get/set method for genewise endbias
+    Returns :   
+    Args    :   
+
+=cut
+
+sub endbias {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_endbias} = $arg;
+    }
+
+    if (!defined($self->{_endbias})) {
+      $self->{_endbias} = 0;
+    }    
+
+    return $self->{_endbias};
 }
 
 
@@ -200,10 +226,10 @@ sub run {
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
 
-    
     my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(-genomic  => $self->genomic_sequence,
 								     -features => \@features,
-								     -forder   => \@forder);
+								     -forder   => \@forder,
+								     -endbias  => $self->endbias);
 
     $mg->minirun;
     
