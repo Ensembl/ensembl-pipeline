@@ -62,7 +62,7 @@ while (my $est = $seqio->next_seq){
   # The appraise method returns 1 or 0, depending on whether
   # the EST is accepted or rejected by the filter.
 
-  my $filtered_seq = $est_filter->filtered_sequence;
+  my $filtered_seq = $est_filter->filtered_seq;
   # As the EST sequence could have been trimmed by the filter
   # before it was deemed acceptable, the sequence should be
   # derived from the ESTFilter object.
@@ -97,7 +97,7 @@ low quality sequence from the 3-prime of EST sequence reads.
   
 Post general queries to B<ensembl-dev@ebi.ac.uk>
 
-=cut
+=cuts
 
 package Bio::EnsEMBL::Pipeline::Tools::ESTFilter;
 
@@ -368,10 +368,12 @@ sub _calculate_blebbiness {
   my $score = 0;
 
   while (scalar @nt_stack) {
-   
+
     my $current_base = pop @nt_stack;
 
-    $score++ if (($current_base ne $prev_base)&&($current_base =~ /[ATGCatgc]/));
+    $score++ if (((! defined $prev_base)||
+		 ($current_base ne $prev_base))
+		 &&($current_base =~ /[ATGCatgc]/));
 
     $prev_base = $current_base;
   }
