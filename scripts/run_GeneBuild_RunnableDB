@@ -34,19 +34,21 @@ run_GeneBuild_RunnableDB
 use strict;
 use Getopt::Long;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
-}
-
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_DBHOST
+					 GB_DBNAME
+					 GB_DBUSER
+					 GB_DBPASS
+					 );
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
-my $host   = $::db_conf{'dbhost'};
+my $host   = $GB_DBHOST;
 my $port   = undef;
-my $dbname = $::db_conf{'dbname'};
-my $dbuser = $::db_conf{'dbuser'};
-my $dbpass = $::db_conf{'dbpass'};
+my $dbname = $GB_DBNAME;
+my $dbuser = $GB_DBUSER;
+my $dbpass = $GB_DBPASS;
 
 my $runnable;
 my $input_id;
@@ -75,7 +77,7 @@ if ($check) {
    exit(0);
 }
 
-print "args: $host : $dbuser : $dbpass : $dbname\n";
+#print "args: $host : $dbuser : $dbpass : $dbname\n";
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
