@@ -75,7 +75,7 @@ foreach my $gene(@genes){
    $count++;
    my $ecount = 0;
    print STDERR "gene $count\n";
-     foreach my $exon ( $gene->each_unique_Exon() ) {
+     foreach my $exon ( $gene->get_all_Exons() ) {
        $ecount++;
        print STDERR 	"exon $ecount\t" .
 			$exon->contig_id . "\t" . 
