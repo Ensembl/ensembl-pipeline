@@ -43,7 +43,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-use Bio::EnsEMBL::Pipeline::Config::General;
+#use Bio::EnsEMBL::Pipeline::Config::General;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
@@ -70,8 +70,9 @@ my %BATCH_QUEUES = &set_up_queues;
 sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
-
-    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count) 
+    #print STDERR "calling Job->new from ".(caller)."\n";
+    #print STDERR "@args\n";
+    my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				SUBMISSION_ID
@@ -80,6 +81,7 @@ sub new {
 				STDOUT
 				STDERR
 				RETRY_COUNT
+				OUTPUT_DIR
 				)],@args);
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
@@ -88,7 +90,7 @@ sub new {
 
     $analysis->isa("Bio::EnsEMBL::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
-
+    
     $self->dbID($dbID);
     $self->adaptor($adaptor);
     $self->input_id($input_id);
@@ -96,8 +98,17 @@ sub new {
     $self->stdout_file($stdout);
     $self->stderr_file($stderr);
     $self->retry_count($retry_count);
-    $self->submission_id           ($submission_id);
-
+    $self->submission_id($submission_id);
+    $self->output_dir($output_dir);
+    $self->output_dir($output_dir);
+    if($self->output_dir){
+      $self->make_filenames;
+    }else{
+      my $dir = $BATCH_QUEUES{$analysis->logic_name}->{'output_dir'} || $DEFAULT_OUTPUT_DIR;
+      $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
+      $self->output_dir($dir);
+      $self->make_filenames;
+    }
     return $self;
 }
 
@@ -114,14 +125,17 @@ sub new {
 =cut
 
 sub create_by_analysis_input_id {
-  my ($dummy, $analysis, $inputId) = @_;
-
+  my ($dummy, $analysis, $inputId, $output_dir, $auto_update) = @_;
+  
+  $dummy->warn("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ".(caller)." should now call the constructor directly");
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
-      -input_id    => $inputId,
-      -analysis    => $analysis,
-      -retry_count => 0
-  );
-  $job->make_filenames;
+					     -input_id    => $inputId,
+					     -analysis    => $analysis,
+					     -output_dir => $output_dir,
+					     -auto_update => $auto_update,
+					     -retry_count => 0
+					    );
+  #$job->make_filenames;
   return $job;
 }
 
@@ -259,6 +273,7 @@ sub flush_runs {
   for my $anal (@analyses) {
 
     my $queue = $BATCH_QUEUES{$anal};
+   
     my @job_ids = @{$queue->{'jobs'}};
     next unless @job_ids;
 
@@ -271,7 +286,7 @@ sub flush_runs {
       $self->throw( "Last batch job not in db" );
     }
   
-    my $pre_exec = $this_runner." -check -output_dir $::PIPELINE_OUTPUT_DIR";
+    my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
     my $batch_job = $batch_q_module->new(
 	-STDOUT     => $lastjob->stdout_file,
 	-STDERR     => $lastjob->stderr_file,
@@ -295,7 +310,7 @@ sub flush_runs {
     else {
       $cmd = $runner." -host $host -dbuser $username -dbname $dbname";
     }
-    $cmd .= " -output_dir $::PIPELINE_OUTPUT_DIR";
+    $cmd .= " -output_dir ".$self->output_dir;
     $cmd .= " @job_ids";
 
     $batch_job->construct_command_line($cmd);
@@ -378,7 +393,7 @@ sub batch_runRemote {
 
 sub runLocally {
   my $self = shift;
-
+ 
   print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
 
   local *STDOUT;
@@ -406,7 +421,8 @@ sub run_module {
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
-  
+
+  print STDERR "in run_module have autoupdate set to ".$autoupdate." while running ".$module."\n";
 
   STATUS:
   { 
@@ -603,7 +619,7 @@ sub make_filenames {
   
   my $num = int(rand(10));
 
-  my $dir = $::PIPELINE_OUTPUT_DIR . "/$num/";
+  my $dir = $self->output_dir . "/$num/";
   if( ! -e $dir ) {
     system( "mkdir $dir" );
   }
@@ -613,8 +629,8 @@ sub make_filenames {
   $stub .= time().".".int(rand(1000));
 
  
-  $self->stdout_file($dir.$stub.".out");
-  $self->stderr_file($dir.$stub.".err");
+  $self->stdout_file($dir.$stub.".out") unless($self->stdout_file);
+  $self->stderr_file($dir.$stub.".err") unless($self->stderr_file);
 }
 
 
@@ -676,6 +692,18 @@ sub submission_id {
   }
   return $self->{'_submission_id'};
 }
+
+
+sub output_dir{
+ my ($self, $arg) = @_;
+
+ if($arg){
+   $self->{'_output_dir'} = $arg;
+ }
+
+ return $self->{'_output_dir'};
+}
+
 
 
 =head2 retry_count

@@ -10,8 +10,10 @@ use Socket;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::Config::Blast;
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
 
@@ -54,18 +56,18 @@ if ($@) {
 
 my $get_pend_jobs;
 if ($batch_q_module->can("get_pending_jobs")) {
-    my $f = $batch_q_module . "::get_pending_jobs";
-    $get_pend_jobs = \&$f;
+  my $f = $batch_q_module . "::get_pending_jobs";
+  $get_pend_jobs = \&$f;
 }
 
 
 # command line options override 
 # anything set in the environment variables.
 
-my $dbhost    = $ENV{'ENS_DBHOST'};
-my $dbname    = $ENV{'ENS_DBNAME'};
-my $dbuser    = $ENV{'ENS_DBUSER'};
-my $dbpass    = $ENV{'ENS_DBPASS'};
+my $dbhost    = 'ecs1c';
+my $dbname    = 'pipeline_genebuild_test';
+my $dbuser    = 'ensadmin';
+my $dbpass    = 'ensembl';
 
 $| = 1;
 
@@ -105,7 +107,7 @@ unless ($dbhost && $dbname && $dbuser) {
 }
 
 
-my $RUNNER_SCRIPT = $PIPELINE_RUNNER_SCRIPT || $runner;
+my $RUNNER_SCRIPT = $GB_RUNNER || $runner;
 
 
 
@@ -257,7 +259,7 @@ while (1) {
 
             # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
             while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
-                sleep 300;
+                sleep 600;
             }
             alarm $wakeup;
         }
@@ -357,6 +359,7 @@ while (1) {
               if ($@) {
                 print STDERR "ERROR running job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
               }
+	      sleep($GB_RULEMANAGER_SLEEP);
             }
 
         }

@@ -120,7 +120,7 @@ while( $job_id = shift ) {
     # scp - changed to runInLSF to prevent writing output files
     # over NFS at the start of the job
     # $job->runLocally;
-    $job->runInLSF;
+    $job->run_module;
   };
   $pants = $@;
 
