@@ -558,6 +558,7 @@ sub _align {
   }
 
   # Place our finalised evidence sequence alignments into the right place.
+
   foreach my $evidence_key (keys %evidence_sequence_hash) {
     $self->_working_alignment('evidence', 
 			      $evidence_sequence_hash{$evidence_key});
@@ -1539,7 +1540,7 @@ sub _corroborating_sequences {
     }
 
     if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
-      my $align_seq = $self->_fiddly_bits($base_align_feature);
+      my $align_seq = $self->_build_evidence_seq($base_align_feature);
       next FEATURE unless $align_seq;
 
       $align_seq->exon($exon_placemarker);
@@ -1556,7 +1557,7 @@ sub _corroborating_sequences {
 		" complimented protein sequence.");
       }
 
-      my $align_seq = $self->_fiddly_bits($base_align_feature);
+      my $align_seq = $self->_build_evidence_seq($base_align_feature);
       next FEATURE unless $align_seq;
 
       $align_seq->exon($exon_placemarker);
@@ -1583,7 +1584,7 @@ sub _corroborating_sequences {
 }
 
 
-=head2 _fiddly_bits
+=head2 _build_evidence_seq
 
   Arg [1]    :
   Example    : 
@@ -1598,7 +1599,7 @@ sub _corroborating_sequences {
 
 =cut
 
-sub _fiddly_bits {
+sub _build_evidence_seq {
   my ($self, $base_align_feature) = @_;
 
   # Create an AlignmentSeq object that will store our sequences
@@ -1728,7 +1729,7 @@ sub _fiddly_bits {
       my @gap = split //, $gap;
 
       if ($hit_position < scalar @fetched_seq){
-	splice(@fetched_seq, $hit_position - 1, 0, @gap)
+	splice(@fetched_seq, $hit_position - 1, 0, @gap);
       } else {
 	throw("Gap in sequence [" . $base_align_feature->hseqname . 
 	      "] lies outside feature.  Code problem.")
@@ -1777,7 +1778,7 @@ sub _fiddly_bits {
       $base_align_feature->start > $self->_slice->length ||
       $base_align_feature->end > $self->_slice->length || 
       $base_align_feature->end < 0) {
-    info("Feature [". $base_align_feature->hseqname . " start:" . 
+    warning("Feature [". $base_align_feature->hseqname . " start:" . 
 	    $base_align_feature->start . " end:" . $base_align_feature->end 
 	    ."] extends\npast the start or end of genomic slice.  Truncating\n" . 
 	    "overhanging sequence");
@@ -1786,7 +1787,7 @@ sub _fiddly_bits {
 	 $base_align_feature->end < 0)||
 	($base_align_feature->start > $self->_slice->length &&
 	 $base_align_feature->end > $self->_slice->length)) {
-      info("Feature [" . $base_align_feature->hseqname . 
+      warning("Feature [" . $base_align_feature->hseqname . 
 	      "] lies completely outside the bounds of Slice.  Chuck.");
       splice (@fetched_seq, 0, scalar @fetched_seq);
     } elsif ($self->_strand == 1) {
@@ -1842,12 +1843,7 @@ print STDERR "Case 4.\n";
 	    ."] starts beyond end of genomic slice.");
   }
 
-  $feature_sequence = '';
-
-  foreach my $element (@feature_sequence) {
-    $feature_sequence .= $element;
-  }
-
+  $feature_sequence = join '', @feature_sequence;
   $partially_aligned->seq($feature_sequence);
 
   return $partially_aligned;
