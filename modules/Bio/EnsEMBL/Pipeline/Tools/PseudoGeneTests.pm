@@ -76,7 +76,7 @@ sub pseudogene_test{
        $threshold, $gene_id
      ) = @_;
   
-  my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
+  my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $splice_sites_correct, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
     
   ############################################################
   # is it spliced?
@@ -146,27 +146,34 @@ sub pseudogene_test{
   
   ############################################################
   # if is spliced, has it got canonical splice sites?
+  print STDERR "\n--- testing for canonical splice sites ---\n";
   if ( scalar( @{$transcript->get_all_Exons} ) > 1 ){
       if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
 	   ->check_splice_sites( $transcript ) ){
 	  print STDERR "Canonical splice sites:\tYES\n";
+	  $splice_sites_correct = 1;
       }
       else{
 	  print STDERR "Canonical splice sites:\tNO\n";
+	  $splice_sites_correct = 0;
       }
   }
   
   ############################################################
   # has it got homology in mouse
-  $mouse_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
-  
- 
+  if ( $target_species ){
+    print STDERR "\n--- testing for homology in $target_species ---\n";
+    $mouse_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
+  }
+    
   ############################################################
   # has it got homology in rat?
-  $rat_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
-  
+  if ( $target_species2 ){
+    print STDERR "\n--- testing for homology in $target_species2 ---\n";
+    $rat_homology = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
+  }
   
 #  ############################################################
 #  # Does it break synteny in mouse?
@@ -196,6 +203,7 @@ sub pseudogene_test{
   
   ############################################################
   # Does it overlap with repeats?
+    print STDERR "\n--- testing for overlap with repeats ---\n";
   if ( $self->overlap_repeats( $transcript, $focus_db ) ){
     print STDERR "it overlaps with repeats\n";
     $repeat = 1;
@@ -206,7 +214,11 @@ sub pseudogene_test{
   }
   $break_synteny_mouse = 0;
   $break_synteny_rat = 0;
-  return ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
+
+  ############################################################
+  # returning results
+
+  return ( $frameshift, $polyA, $Met, $spliced_elsewhere, $splice_sites_correct, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
 }
 
 ############################################################
@@ -342,10 +354,12 @@ sub overlap_repeats{
   
   ############################################################
   # get slice from the same db where our pseudogene is
-  my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $chr_start + $start - 1 - 100, $chr_start + $end - 1 + 100);
+  my $slice = $db->get_SliceAdaptor
+    ->fetch_by_chr_start_end( $chr_name, $chr_start + $start - 1 - 1000, $chr_start + $end - 1 + 1000);
   
-  my $rpfa = $db->get_RepeatFeatureAdaptor();
-  my @features = @{$rpfa->fetch_all_by_Slice($slice, 'RepeatMask')};
+  #my $rpfa = $db->get_RepeatFeatureAdaptor();
+  #my @features = @{$rpfa->fetch_all_by_Slice($slice, 'RepeatMask')};
+  my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
   
   ############################################################
   # find repeats that overlap at least 50% of the transript
