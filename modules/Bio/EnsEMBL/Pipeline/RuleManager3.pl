@@ -57,6 +57,7 @@ $| = 1;
 
 my $local        = 0;       # Run failed jobs locally
 my @analyses;               # Only run this analysis ids
+my @skip_analyses;
 my $submitted;
 my $idlist_file;
 my ($done, $once);
@@ -64,6 +65,9 @@ my $runner;
 my $shuffle;  
 my $output_dir;
 my %analyses;
+my %skip_analyses;
+my %skip_input_id_type;
+my %skip_input_id;
 my $verbose;
 my $rerun_sleep = 3600;
 my $overload_sleep = 300;
@@ -94,6 +98,7 @@ GetOptions(
     'once!'         => \$once,
     'shuffle!'      => \$shuffle,
     'analysis=s@'   => \@analyses,
+    'skip_analysis=s@'   => \@skip_analyses,
     'input_id_types=s@' => \@input_id_types,
     'start_from=s@' => \@starts_from,	   
     'v|verbose!'            => \$verbose,
@@ -116,10 +121,11 @@ if(!$dbhost || !$dbname || !$dbuser){
 
 useage() if $help;
 my %created_job_hash;
-if($idlist_file || @analyses || @input_id_types || @starts_from){
+if($idlist_file || @analyses || @input_id_types || @starts_from || 
+   @skip_analyses){
   print STDERR " you are running the rulemanager in a fashion which"
-  ." will probably break the accumulators so they are being "
-  ."turned off\n";
+    ." will probably break the accumulators so they are being "
+      ."turned off\n";
 
   $accumulators = 0;
 }
@@ -183,6 +189,7 @@ my $sic          = $db->get_StateInfoContainer;
 
 
 %analyses   = logic_name2dbID($ana_adaptor, @analyses);
+%skip_analyses   = logic_name2dbID($ana_adaptor, @skip_analyses);
 my %tmp = logic_name2dbID($ana_adaptor, @starts_from);
 @starts_from = keys %tmp;
 
@@ -303,17 +310,17 @@ while (1) {
     }else {
 
       if(@starts_from){
-	foreach my $analysis_id(@starts_from){
-	  my %ids;
-	  my $analysis = $ana_adaptor->fetch_by_dbID($analysis_id);
-	  my @ids = @{$sic->list_input_ids_by_analysis($analysis_id)};
-	  foreach my $id(@ids){
-	    $ids{$analysis->input_id_type}{$id} = 1;
-	  }
-	  $id_type_hash = \%ids;
-	}
+        foreach my $analysis_id(@starts_from){
+          my %ids;
+          my $analysis = $ana_adaptor->fetch_by_dbID($analysis_id);
+          my @ids = @{$sic->list_input_ids_by_analysis($analysis_id)};
+          foreach my $id(@ids){
+            $ids{$analysis->input_id_type}{$id} = 1;
+          }
+          $id_type_hash = \%ids;
+        }
       }else{
-	$id_type_hash = $sic->get_all_input_id_analysis_sets;
+        $id_type_hash = $sic->get_all_input_id_analysis_sets;
       }
     }
 
@@ -400,6 +407,10 @@ while (1) {
 	    }
 	    next RULE;
 	  }
+    if(keys %skip_analyses && 
+       defined $skip_analyses{$rule->goalAnalysis->dbID}){
+      next RULE;
+    }
 	  print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
 	  
 	  
@@ -498,9 +509,11 @@ while (1) {
     if($batch_q_module->can('check_existance')){
       print STDERR "Checking job existance\n";
       my @ids = @{$job_adaptor->list_dbIDs};
+      #$job_adaptor->lock_tables;
     JOB:foreach my $id(@ids){
         &job_existance($batch_q_module, $verbose, $job_adaptor, $id);
       }
+      #$job_adaptor->unlock_tables;
     }
     if(!$done){
       print STDERR "Checking whether to shut down\n";
@@ -525,7 +538,7 @@ while (1) {
 
 sub run_if_new {
     my ($id, $anal, $current_jobs, $local, $verbose, $output_dir, $job_adaptor) = @_;
-
+    my $flag;
     print "Checking analysis " . $anal->dbID . " ".$anal->logic_name."\n\n" if $verbose;
     # Check whether it is already running in the current_status table?
     my %current_jobs = %$current_jobs;
@@ -554,6 +567,7 @@ sub run_if_new {
             }
           }
           $cj->batch_runRemote;
+          
           print "Retrying job\n" if $verbose;
         }else {
           print "\nJob already in pipeline with status : " . $status->status . "\n" if $verbose ;
@@ -561,7 +575,6 @@ sub run_if_new {
         $retFlag = 1;
       }
     };
-
 
     if ($@) {
       print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
@@ -822,6 +835,11 @@ sub job_existance{
   if($status eq 'SUBMITTED' || $status eq 'RUNNING' || 
      $status eq 'READING' ||$status eq 'WRITING' ||
      $status eq 'WAITING'){
+    if(!$job->submission_id){
+      print STDERR "Job ".$job->dbID." status ".$status." doesn't have ".
+        "a submission_id\n";
+      return;
+    }
     $exists = $batch_q_module->check_existance
       ($job->submission_id, $verbose);
     if($exists){
@@ -922,6 +940,9 @@ Other Options
    -analysis only run with these analyses objects, can be logic_names or
     analysis ids, this option can appear in the commandline multiple 
     times
+    -skip_analysis  don't run with these analyses objects, like -analysis 
+      can be logic_names or dbIDs and can appear in the commandline
+      multiple times '
    -v verbose mode
    -dbsanity peform some db sanity checks, can be switched of with 
     -nodbsanity
