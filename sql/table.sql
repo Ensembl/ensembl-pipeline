@@ -19,7 +19,7 @@ CREATE TABLE job (
   input_id          varchar(40) NOT NULL,
   submission_id     varchar(40),
   array_index       varchar(255),
-  parameter         varchar(255),
+  parameters        varchar(255),
   module            varchar(255),
   stdout_file       varchar(100),
   stderr_file       varchar(100),
