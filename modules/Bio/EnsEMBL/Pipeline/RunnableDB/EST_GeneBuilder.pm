@@ -97,6 +97,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 MAX_TRANSCRIPTS_PER_GENE
 									 CLUSTERMERGE_MIN_EVIDENCE_NUMBER
 									 EST_USE_DENORM_GENES
+									 MAX_NUMBER_ESTS
 );
 
 
@@ -345,23 +346,7 @@ sub fetch_input {
     
     # process transcripts in the forward strand    
     if( scalar(@forward_transcripts) ){
-	if ( scalar( @forward_transcripts ) > 500 ){
-	    print STDERR "applying filtering\n";
-	    
-	    my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-	      ->new( -coverage => 95,
-		     -perc_id  => 99,
-		     -depth    => 10,
-		   );
-	    
-	    @forward_transcripts = $est_filter->filter(\@forward_transcripts);
-	    if( scalar(@forward_transcripts) ){
-		$self->_forward_transcripts( @forward_transcripts );
-	    }
-	}
-	else{
-	    $self->_forward_transcripts( @forward_transcripts );
-	}
+      $self->_forward_transcripts( @forward_transcripts );
     }
     @forward_transcripts = ();
     
@@ -407,23 +392,7 @@ sub fetch_input {
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@reverse_transcripts) . " reverse strand genes\n";
     
     if(scalar(@reverse_transcripts)){
-	if ( scalar( @reverse_transcripts ) > 500 ){
-	    print STDERR "applying filtering\n";
-	    
-	    my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-		->new( -coverage => 95,
-		       -perc_id  => 99,
-		       -depth    => 10,
-		       );
-	    
-	    @reverse_transcripts = $est_filter->filter(\@reverse_transcripts);
-	    if( scalar(@reverse_transcripts) ){
-		$self->_reverse_transcripts( @reverse_transcripts );
-	    }
-	}
-	else{
-	    $self->_reverse_transcripts( @reverse_transcripts );
-	}
+      $self->_reverse_transcripts( @reverse_transcripts );
     }
   }
 
@@ -472,6 +441,20 @@ sub _process_Transcripts {
   # or if the only intron they have is non standard.
   # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
   
+  if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
+    print STDERR "applying filtering\n";
+    
+    my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
+      ->new( -coverage => 95,
+	     -perc_id  => 99,
+	     -depth    => 20,
+	   );
+	    
+    @checked_transcripts = $est_filter->filter(\@checked_transcripts);
+    print STDERR scalar(@checked_transcripts)." transcripts after filtering\n";
+  }
+
+
   if ( scalar(@checked_transcripts) == 0 ){
     print STDERR "No transcripts left\n";
     return;
