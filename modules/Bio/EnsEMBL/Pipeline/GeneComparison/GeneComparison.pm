@@ -629,7 +629,7 @@ sub cluster_Transcripts {
   for (my $c=1; $c<=$#sorted_transcripts; $c++){
     my $found=0;
   LOOP:
-    foreach my $t_in_cluster ( $cluster->get_Transcripts){       
+    foreach my $t_in_cluster ( @{$cluster->get_Transcripts}){       
       if ( _compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
 	$cluster->put_Transcripts( $sorted_transcripts[$c] );                       
 	$found=1;
@@ -648,7 +648,7 @@ sub cluster_Transcripts {
       while ( !($cluster_count <= $lookup )  &&  !($lookup > $limit)  ){ 
 	#print STDERR "cluster_count: $cluster_count, looking at ".($cluster_count - $lookup)."\n";
 	my $previous_cluster = $clusters[ $cluster_count - 1 - $lookup ];
-	foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
+	foreach my $t_in_cluster ( @{$previous_cluster->get_Transcripts} ){
 	  if ( _compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
 	    $previous_cluster->put_Transcripts( $sorted_transcripts[$c] );                       
 	    $found=1;
@@ -712,7 +712,7 @@ sub compare_CDS{
    PAIR:
     foreach my $pair ( @pairs ){
       $pairs_count++;
-       my ($prediction,$annotation) = $pair->get_Transcripts;
+       my ($prediction,$annotation) = @{$pair->get_Transcripts};
     
       my $t_prediction = $prediction->translation;
       my $t_annotation = $annotation->translation;
@@ -797,7 +797,7 @@ sub compare_Translations{
    PAIR:
     foreach my $pair ( @pairs ){
       $pairs_count++;
-       my ($prediction,$annotation) = $pair->get_Transcripts;
+       my ($prediction,$annotation) = @{$pair->get_Transcripts};
     
       my $pred_translation_seq;
       my $ann_translation_seq;
@@ -1089,7 +1089,7 @@ sub compare_Exons{
       
       $total_identical_pairs += $identical_pair; # it adds zero or one
       # print to gff info about this pair if gff_file is available
-      my ($prediction,$annotation) = $pair->get_Transcripts;
+      my ($prediction,$annotation) = @{$pair->get_Transcripts};
       if ($self->gff_file){
 	#print STDERR "printing to GFF: ".$prediction->dbID.",".$annotation->dbID."\n";
 		      
@@ -1351,7 +1351,7 @@ sub _match_Exons{
   my %over_exon_position;
 
   # the order is given by the order they are put into the pair in GeneCluster
-  my ($prediction,$annotation) = $pair->get_Transcripts;
+  my ($prediction,$annotation) = @{$pair->get_Transcripts};
   
   # get the exons
   my (@ann_exons,@pred_exons);

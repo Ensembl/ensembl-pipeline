@@ -59,7 +59,7 @@ sub _check_Transcript{
     # hardcoded stuff, to go in a config file
     my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
-    my $MAX_INTRON_LENGTH = 200000;
+    my $MAX_INTRON_LENGTH = 150000;
     
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
@@ -92,16 +92,16 @@ sub _check_Transcript{
       EXON:
 	for (my $i = 0; $i <= $#exons; $i++) {
 
-	    ##############################
-	    # check exon length
-	    ##############################
-	    my $length = $exons[$i]->end - $exons[$i] + 1;
-	    if ( $length > $MAX_EXON_LENGTH ){
-		print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
-		$valid = 0;
-		last EXON;
-	    }
-	    
+	  ##############################
+	  # check exon length
+	  ##############################
+	  my $length = $exons[$i]->end - $exons[$i] + 1;
+	  if ( $length > $MAX_EXON_LENGTH ){
+	    print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+	    $valid = 0;
+	    last EXON;
+	  }
+	  
 	    
 	    if ( $i>0 ){
 
