@@ -57,7 +57,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							     GB_FINAL_GENETYPE
 							    );
-
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
+							  GB_INITIAL_PMATCH_LOGICNAME
+							  GB_INITIAL_PMATCH_RUNNABLEDB
+							  GB_FINAL_PMATCH_LOGICNAME
+							GB_FINAL_PMATCH_RUNNABLEDB
+							 );
 # Hash containing config info
 %Scripts = (
 	    # path to run_GeneBuild_RunnableDB ie /path/to/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB
@@ -126,7 +131,21 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 				  # header_regex => '^>\w+\|\w+\|\w+\|(\S+)\|',
 				  #},
 				 ],
-	    
+	     GB_PMATCH_RUNNABLES =>[ # for filling in the analysis table
+				  {
+				    runnable => $GB_INITIAL_PMATCH_RUNNABLEDB,
+				    analysis => $GB_INITIAL_PMATCH_LOGICNAME,
+				   },
+				   {
+				    runnable => $GB_FINAL_PMATCH_RUNNABLEDB,
+				    analysis => $GB_FINAL_PMATCH_LOGICNAME,
+				   },
+				   {
+				    runnable => 'Dummy',
+				    analysis => 'SubmitPmatch', # this and GB_SUBMIT_PMATCH_LOGICNAME should be the same 
+				   },
+				  ],
+
 	    # path to directory where fpc/chromosomal sequences are 
 	    GB_FPCDIR      => '',
 	    
