@@ -47,14 +47,14 @@ use vars qw( %Sequences );
 %Sequences = (
 
 	      # path to species specific protein index
-	      GB_TARGETTED_PROTEIN_INDEX => '',
+	      GB_PROTEIN_INDEX => '',
 
 	      # type of SeqFetcher to use
 	      # eg 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher',
-	      GB_TARGETTED_PROTEIN_SEQFETCHER =>  '', 
+	      GB_PROTEIN_SEQFETCHER =>  '', 
 
 	      # path to cDNA index
-	      GB_TARGETTED_CDNA_INDEX    => '',
+	      GB_CDNA_INDEX    => '',
 	      
 	   );
 
