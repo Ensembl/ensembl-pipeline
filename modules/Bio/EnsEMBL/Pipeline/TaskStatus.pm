@@ -136,73 +136,124 @@ sub add_created{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_created'} = $idset;
+    if(!$self->{'_created'}){
+      $self->{'_created'} = $idset;
+    }else{
+      my $total = $self->{'_created'}->or($idset);
+      $self->{'_created'} = $total;
+    }
 }
 
 sub add_submitted{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_submitted'} = $idset;
+    if(!$self->{'_submitted'}){
+      $self->{'_submitted'} = $idset;
+    }else{
+      my $total = $self->{'_submitted'}->or($idset);
+      $self->{'_submitted'} = $total;
+    }
 }
 
 sub add_reading{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_reading'} = $idset;
+    if(!$self->{'_reading'}){
+      $self->{'_reading'} = $idset;
+    }else{
+      my $total = $self->{'_reading'}->or($idset);
+      $self->{'_reading'} = $total;
+    }
 }
-
 
 sub add_running{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_running'} = $idset;
+    if(!$self->{'_running'}){
+      $self->{'_running'} = $idset;
+    }else{
+      my $total = $self->{'_running'}->or($idset);
+      $self->{'_running'} = $total;
+    }
+}
+
+
+
+sub add_successful{
+    my ($self, $arg) = @_;
+
+    my $idset = $self->_check($arg);
+    if(!$self->{'_successful'}){
+      $self->{'_successful'} = $idset;
+    }else{
+      my $total = $self->{'_successful'}->or($idset);
+      $self->{'_successful'} = $total;
+    }
 }
 
 sub add_writing{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_writing'} = $idset;
-}
-
-sub add_successful{
-    my ($self, $arg) = @_;
-
-    my $idset = $self->_check($arg);
-    $self->{'_successful'} = $idset;
+    if(!$self->{'_writing'}){
+      $self->{'_writing'} = $idset;
+    }else{
+      my $total = $self->{'_writing'}->or($idset);
+      $self->{'_writing'} = $total;
+    }
 }
 
 sub add_failed{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_failed'} = $idset;
+    if(!$self->{'_failed'}){
+      $self->{'_failed'} = $idset;
+    }else{
+      my $total = $self->{'_failed'}->or($idset);
+      $self->{'_failed'} = $total;
+    }
 }
+
 
 sub add_fatal{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_fatal'} = $idset;
+    if(!$self->{'_fatal'}){
+      $self->{'_fatal'} = $idset;
+    }else{
+      my $total = $self->{'_fatal'}->or($idset);
+      $self->{'_fatal'} = $total;
+    }
 }
 
 sub add_killed{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_killed'} = $idset;
+    if(!$self->{'_killed'}){
+      $self->{'_killed'} = $idset;
+    }else{
+      my $total = $self->{'_killed'}->or($idset);
+      $self->{'_killed'} = $total;
+    }
 }
 
-sub add_existing{
+sub add_exisiting{
     my ($self, $arg) = @_;
 
     my $idset = $self->_check($arg);
-    $self->{'_existing'} = $idset;
+    if(!$self->{'_exisiting'}){
+      $self->{'_exisiting'} = $idset;
+    }else{
+      my $total = $self->{'_exisiting'}->or($idset);
+      $self->{'_exisiting'} = $total;
+    }
 }
-
 
 
 =head2 get methods
@@ -371,3 +422,158 @@ sub status_report{
 }
 
 
+
+=head2 clean
+
+  Arg [1]   : none 
+  Function  : emptys all variables
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : $taskstatus->clean;
+
+=cut
+
+
+
+sub clean{
+  my ($self) = @_;
+
+  $self->{'_created'} = undef;
+  $self->{'_submitted'} = undef;
+  $self->{'_reading'} = undef;
+  $self->{'_running'} = undef;
+  $self->{'_writing'} = undef;
+  $self->{'_killed'} = undef;
+  $self->{'_successful'} = undef;
+  $self->{'_failed'} = undef;
+  $self->{'_fatal'} = undef;
+  $self->{'_existing'} = undef;
+}
+
+
+=head2 clean methods
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::IDSet or array ref (optional);
+  Function  : to empty the variable and replace with an argument if its 
+  passed in
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : $self->clean_created($created_ids);
+
+=cut
+
+
+
+sub clean_created{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_created'} = $idset;
+  }else{
+    $self->{'_created'} = undef;
+  }
+}
+
+sub clean_submitted{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_submitted'} = $idset;
+  }else{
+    $self->{'_submitted'} = undef;
+  }
+}
+
+sub clean_reading{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_reading'} = $idset;
+  }else{
+    $self->{'_reading'} = undef;
+  }
+}
+
+sub clean_running{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_running'} = $idset;
+  }else{
+    $self->{'_running'} = undef;
+  }
+}
+
+sub clean_writing{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_writing'} = $idset;
+  }else{
+    $self->{'_writing'} = undef;
+  }
+}
+
+sub clean_successful{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_successful'} = $idset;
+  }else{
+    $self->{'_successful'} = undef;
+  }
+}
+
+sub clean_failed{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_failed'} = $idset;
+  }else{
+    $self->{'_failed'} = undef;
+  }
+}
+
+sub clean_fatal{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_fatal'} = $idset;
+  }else{
+    $self->{'_fatal'} = undef;
+  }
+}
+
+sub clean_killed{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_killed'} = $idset;
+  }else{
+    $self->{'_killed'} = undef;
+  }
+}
+
+sub clean_existing{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    my $idset = $self->_check($arg);
+    $self->{'_existing'} = $idset;
+  }else{
+    $self->{'_existing'} = undef;
+  }
+}
+
+1;
