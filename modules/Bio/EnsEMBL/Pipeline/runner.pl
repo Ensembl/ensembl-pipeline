@@ -1,17 +1,6 @@
-#!/usr/local/bin/perl 
 
 BEGIN {
-#    shift (@INC,"/nfs/disk100/humpub/mq2/ensembl-pipeline/modules");
-#    unshift (@INC,"/nfs/disk100/humpub/mq2/ensembl/modules");
-#    unshift (@INC,"/nfs/disk100/humpub/birney/ensembl-pipeline/modules");
-#    unshift (@INC,"/nfs/disk100/humpub/birney/ensembl/modules");
-#    unshift (@INC,"/nfs/disk100/humpub/birney/bioperl-live");
-#    unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-06");
-#    unshift (@INC,"/nfs/disk100/humpub/mq2");
-#    unshift (@INC,"/nfs/disk65/mq2/ensembl/modules");
-#    unshift (@INC,"/nfs/disk65/mq2/ensembl-pipeline/modules");
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-
 }
 
 
@@ -23,9 +12,9 @@ use Getopt::Long;
 
 #parameters for Bio::EnsEMBL::Pipeline::DBSQL::Obj
 
-my $host   = $::pipeConf{'dbhost'};
-my $dbname = $::pipeConf{'dbname'};
-my $dbuser = $::pipeConf{'dbuser'};
+my $host;
+my $dbname;
+my $dbuser;
 
 my $port            = '3306';
 my $pass            = undef;
@@ -38,14 +27,17 @@ my $job_id;
 
 print STDERR join( " ", @ARGV ),"\n";
 
-GetOptions(     'host=s'     => \$host,
-                'port=n'     => \$port,
-                'dbname=s'   => \$dbname,
-                'dbuser=s'   => \$dbuser,
-                'pass=s'     => \$pass,
-		'check!'    => \$check,
-                'objfile=s'  => \$object_file,
-                'module=s'   => \$module ) or die ("Couldn't get options");
+GetOptions(
+    'host=s'    => \$host,
+    'port=n'    => \$port,
+    'dbname=s'  => \$dbname,
+    'dbuser=s'  => \$dbuser,
+    'pass=s'    => \$pass,
+    'check!'    => \$check,
+    'objfile=s' => \$object_file,
+    'module=s'  => \$module
+)
+or die ("Couldn't get options");
 
 if( defined $check ) {
   my $host = hostname();
@@ -59,20 +51,28 @@ if( defined $check ) {
     if( $host eq $_ ) {
       die "Cant use this host";
     }
-  } 
+  }
+
+  # tests for DB existence - these probably shouldn't be hard-wired in ...
+  if (defined (my $dir = $ENV{"BLASTDB"})) {
+    -e "$dir/unigene.seq" or warn "Not found unigene";
+    -e "$dir/sptr" or warn "Not found sptr";
+  }
   exit 0;
+
 }
 
 print STDERR "In runner\n";
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new 
-    (  -host   => $host,
-       -user   => $dbuser,
-       -dbname => $dbname,
-       -pass   => $pass,
-       -port   => $port,
-       -perlonlyfeatures  => 1,
-       -perlonlysequences => 1 )
-    or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new(
+    -host   => $host,
+    -user   => $dbuser,
+    -dbname => $dbname,
+    -pass   => $pass,
+    -port   => $port,
+    -perlonlyfeatures  => 1,
+    -perlonlysequences => 1
+)
+or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
 
 print STDERR "Connected to database\n";
 
@@ -80,6 +80,19 @@ print STDERR "Connected to database\n";
 print STDERR "Getting job adaptor\n";
 
 my $job_adaptor = $db->get_JobAdaptor();
+
+# Print a list of jobs in this 'batch' - this is perhaps useful later
+# to parse these output files for CPU/Mem usage etc.
+print STDOUT "LSF Batch summary\n";
+print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
+# print STDOUT "LSF ID: ", $job_adaptor->fetch_by_dbID($ARGV[0])->LSF_id, "\n";
+print STDOUT "Job ID\tinput ID\tanalysis ID\n";
+
+foreach my $id (@ARGV) {
+    my $job = $job_adaptor->fetch_by_dbID($id);
+    print STDOUT join ("\t", $id, $job->input_id, $job->analysis->logic_name), "\n";
+    # print STDOUT $id, "\n";
+}
 
 print STDERR "Got job adapter\n";
 
@@ -91,13 +104,24 @@ while( $job_id = shift ) {
 
   if( !defined $job) {
     print STDERR ( "Couldnt recreate job $job_id\n" );
+    next;
   }
-  print STDERR "Running job\n";
+  print STDERR "Running job $job_id\n";
   print STDERR "Module is " . $job->analysis->module . "\n";
   print STDERR "Input id is " . $job->input_id . "\n";
+  print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
 
-  $job->runLocally;
-  print STDERR "Done\n";
+  eval {
+    $job->runLocally;
+  };
+  $pants = $@;
+
+  if ($pants) {
+    print STDERR "Job $job_id failed: [$pants]";
+  }
+
+  print STDERR "Finished job $job_id\n";
 }
+print STDERR "Leaving runner\n";
 
 $db->{'_db_handle'}->disconnect();
