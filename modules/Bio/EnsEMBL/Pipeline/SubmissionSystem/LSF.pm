@@ -159,15 +159,26 @@ sub flush {
 		}
 
 		#execute the bsub to submit the job or job_array
-		system('bsub', @args, split($other_parms));
-
+		#would rather use system since it doesn't require a fork, but
+		#need to get job_id out of stdout :(
+		my $bsub = 'bsub ' . join(' ', @args, $other_parms) .;
+		open(SUB, $bsub." 2>&1 |") or 
+			$self->throw("could not execute command $bsub");
+		my $sub_id;
+		while(<SUB>){
+			if (/Job <(\d+)>/) {
+				$sub_id = $1;
+			}
+		}
+		close(SUB);
+		
 		foreach my $job(@jobs) {
 			#update the job table so that the submission id is also stored
 			$job->submission_id($sub_id);
 			$job_adaptor->update($job);
 		}
 	}
-
+	
 	return;
 }
 
@@ -262,25 +273,31 @@ sub _task_queue {
 }
 
 
-sub _generate_filename_prefix {
+sub _dir_prefix {
 	my $self = shift;
 	my $job  = shift;
 
   #distribute temp files evenly into 10 different dirs so that we don't
   #get too many files in the same dir
   $self->{'dir_num'} = 0 if(!defined($self->{'dir_num'}));
-	$self->{'dir_num'} = $self->{'dir_num'} +1 % 10;
+	$self->{'dir_num'} = ($self->{'dir_num'}+1) % 10;
 	
 	#
 	# get temp dir from config
 	#
 	my $config = $self->get_Config();
-	my $temp_dir = $config->get_parameter('LSF', 'tmpdir');
+	my $task_dir = $config->get_parameter('LSF', 'tmpdir');
 
-	$temp_dir || $self->throw('Could not determine temp dir for task ['.
-														$task->taskname() . ']');
+	$task_dir || $self->throw('Could not determine temp dir for task ['.
+														$job->taskname() . ']');
 	
-	$temp_dir .= $self->{'dir_num'};
+	$task_dir .= $job->taskname();
+
+	mkdir($task_dir) if(! -e $task_dir);
+
+	
+
+	$temp_dir .= $job->taskname().'/'.$self->{'dir_num'};
 
 	#create the dir if it doesn't exist
 	mkdir($temp_dir) if(! -e $temp_dir);
