@@ -429,48 +429,61 @@ sub calculate_and_set_phases {
     {
         my $peptide = $peptides[$index];
         #$genes[$index]->attach_seq ($self->clone()); 
-        foreach my $exon ($genes[$index]->sub_SeqFeature())
+        
+        my @exons = $genes[$index]->sub_SeqFeature();
+        
+        #the phases for the first exon are set be searching within the peptide
+        my $exon = $exons[0];
+        my $exon_seq = $self->clone()->subseq($exon->start(), $exon->end());
+        #produce reverse complement sequence where necessary
+        if ($exon->strand == -1) 
         {
+	        $exon_seq =~ tr/ATCGatcg/TAGCtagc/;
+	        $exon_seq = reverse($exon_seq);
+	    }
 
-            my $exon_seq = $self->clone()->subseq($exon->start(), $exon->end());
-            #produce reverse complement sequence where necessary
-            if ($exon->strand == -1) 
+        my $bioseq = Bio::Seq->new (    -seq     =>  $exon_seq,
+                                        -id      =>  $exon->seqname,
+                                        -moltype =>  'dna' );
+        #translate in all three frames. 
+        #The parameters are (stop, unknown, frame)
+        my @translation = ( $bioseq->translate('*','.',0,1,1), 
+                            $bioseq->translate('*','.',1,1,1),
+                            $bioseq->translate('*','.',2,1,1));
+
+        my $modulo = $exon->length() % 3;
+        my ($phase_3, $phase_5);
+
+        for (my $frame = 0; $frame < scalar (@translation); $frame++)
+        {
+            my $trans_seq = $translation[$frame]->seq();
+            $trans_seq =~ s/\*$//;          #remove final stop
+            #no need to for further analysis if premature stop is found
+            next if ($trans_seq =~ /\*/);   
+            if (index($peptide, $trans_seq) > -1)
             {
-	            $exon_seq =~ tr/ATCGatcg/TAGCtagc/;
-	            $exon_seq = reverse($exon_seq);
-	        }
-
-            my $bioseq = Bio::Seq->new (    -seq     =>  $exon_seq,
-                                            -id      =>  $exon->seqname,
-                                            -moltype =>  'dna' );
-            #translate in all three frames. 
-            #The parameters are (stop, unknown, frame)
-            my @translation = ( $bioseq->translate('*','.',0,1,1), 
-                                $bioseq->translate('*','.',1,1,1),
-                                $bioseq->translate('*','.',2,1,1));
-
-            my $modulo = $exon->length() % 3;
-            my ($phase_3, $phase_5);
-
-            for (my $frame = 0; $frame < scalar (@translation); $frame++)
-            {
-                my $trans_seq = $translation[$frame]->seq();
-                #no need to for further analysis if premature stop is found
-                $trans_seq =~ s/\*$//; #remove final stop
-                next if ($trans_seq =~ /\*/); #premature stop
-                if (index($peptide, $trans_seq) > -1)
-                {
-                    $phase_5 = (3-$frame)%3; #because phase 1 is frame 2 etc
-                    $phase_3 = ($modulo - $frame) % 3;
-                }
+                $phase_5 = (3-$frame)%3; #because phase 1 is frame 2 and phase 2 is frame 1
+                $phase_3 = ($modulo - $frame) % 3;
             }
-            #if no match found then something odd happened
-            $self->throw("Failed to match Exon and Peptide\n") unless (defined ($phase_5));
+        }
+        #Set phases in Bio::EnsEMBL::SeqFeature
+        $exon->phase($phase_5);
+        $exon->end_phase($phase_3);
+        #if no match found then something odd happened
+        $self->throw("Failed to match first exon in Peptide\n") unless (defined ($phase_5));
 
-            #print STDERR "EXON: ".$exon->seqname." 5\'-phase is $phase_5 Modulo is $modulo 3\'-phase is $phase_3 Strand is ".$exon->strand."\n"; 
-            #Set phases in Bio::EnsEMBL::SeqFeature
+        #phases for the remaining exons are calculated by reference to the first exon
+        for (my $exon_num = 1; $exon_num < scalar(@exons); $exon_num++) 
+        {
+            my $exon = $exons[$exon_num];
+            $phase_5 = $phase_3; #the previous exons 3' phase is this ones 5'
+            $phase_3 = ($exon->length - (3-$phase_5)) % 3;
             $exon->phase($phase_5);
             $exon->end_phase($phase_3);
+            
+            #print STDERR "EXON: ".$exon->seqname
+            #." 5\'-phase is $phase_5 Modulo is ".($exon->length%3)
+            #." 3\'-phase is $phase_3 Strand is ".$exon->strand."\n";
         } 
     }
 }
