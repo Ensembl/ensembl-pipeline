@@ -68,7 +68,6 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     EST_E2G_DBPASS     
 						     EST_GENEBUILDER_INPUT_GENETYPE
 						     EST_EVIDENCE_TAG
-						     EST_MIN_EVIDENCE_SIMILARITY
 						     EST_MAX_EVIDENCE_DISCONTINUITY
 						     EST_MAX_INTRON_SIZE
 						     EST_GENOMEWISE_GENETYPE
@@ -80,7 +79,7 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     cDNA_GENETYPE
 						     REJECT_SINGLE_EXON_TRANSCRIPTS
 						     GENOMEWISE_SMELL
-						     GENOMEWISE_MIN_EXON_SIZE
+						     EST_MIN_EXON_SIZE
 						     );
 
 
@@ -194,9 +193,9 @@ sub write_output {
 	  next;
       }
       my @transcripts = @{ $gene->get_all_Transcripts};
-      foreach my $tran (@transcripts){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-      } 
+      #foreach my $tran (@transcripts){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+#      } 
       
   }
 }
@@ -304,7 +303,6 @@ sub fetch_input {
 									      -genomic  => $slice,
 									      -analysis => $self->analysis,
 									      -smell    => $GENOMEWISE_SMELL,
-									      -skip_small_exons => $GENOMEWISE_MIN_EXON_SIZE,
 									      );
 	  
 	  $self->add_runnable($runnable,$strand);
@@ -365,7 +363,6 @@ sub fetch_input {
 									    -genomic  => $rev_slice,
 									    -analysis => $self->analysis,
 									    -smell    => $GENOMEWISE_SMELL,
-									    -skip_small_exons => $GENOMEWISE_MIN_EXON_SIZE,
 									    );
 	$self->add_runnable($runnable, $strand);
 	$runnable->add_Transcript($tran);
@@ -477,14 +474,14 @@ sub _check_Transcripts {
   # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
   my $evidence_tag    = $EST_EVIDENCE_TAG;
   
-  # the minimum allowed perc. identity of the evidence per exon 
-  my $min_similarity  = $EST_MIN_EVIDENCE_SIMILARITY;
-
   # the maximum allowed discontinuity in EST hits
   my $max_est_gap     = $EST_MAX_EVIDENCE_DISCONTINUITY;
 
   # reject ests with introns larger that this one:
   my $max_intron_length = $EST_MAX_INTRON_SIZE;
+
+  # reject exons that are smaller or equal to this size:
+  my $min_exon_size     = $EST_MIN_EXON_SIZE;
 
 
   print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
@@ -510,6 +507,11 @@ sub _check_Transcripts {
 
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
+      
+      my $new_transcript = Bio::EnsEMBL::Transcript->new();
+      if ( defined $transcript->dbID){
+	  $new_transcript->dbID($transcript->dbID);
+      }
       
       # reject the transcripts that fall off the slice at the lower end
       unless ( $self->_check_Transcript_Location($transcript,$slice,$strand) ){
@@ -541,6 +543,13 @@ sub _check_Transcripts {
 	  if ( scalar( @sf ) == 0 ){
 	      $self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
 			  "exon_id =".$exon->dbID." transcript_id = ".$transcript->dbID."\n");
+	  }
+	  
+	  ### reject too-small exons:
+	  my $size = $exon->end - $exon->start + 1;
+	  if ( $size  < $EST_MIN_EXON_SIZE ){
+	      $self->warn("rejecting very small exon: size=$size");
+	      next EXON;
 	  }
 	  
 	  ####### check the gap with the evidence of the next exon
@@ -590,12 +599,16 @@ sub _check_Transcripts {
 	      }
 	  }
 	  
+
       	  $previous_exon = $exon;
 	  
-      } # end of EXON
+	  my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $exon );
+	  $new_transcript->add_Exon( $new_exon );
 
+      } # end of EXON
+      
       # if the transcript made it to this point, keep it
-      push (@alltranscripts, $transcript);
+      push (@alltranscripts, $new_transcript);
   }
   return @alltranscripts;
   

@@ -19,7 +19,7 @@ my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq        
                                                                     -switch           => $switch,
                                                                     -smell            => $smell,
                                                                     -cds              => $cds_transcript
-								    -skip_small_exons => $min_exon_size,
+								    #-skip_small_exons => $min_exon_size,
                                                                   );
 
 where 
@@ -30,10 +30,12 @@ where
 -cds    if this option is included, it will feed a cds evidence to genomewise. This is passed in
         in the form of a transcript with exons and each exon must have phases. This option
         has not been tested in genomewise itself yet.
--skip_small_exons   
-        minimum exon size which is accepted to be run in genomewise, i.e. smaller exons are not
-        passed as evidence for genomewise. This could be useful (maybe with cross-species alignments)
-        as genomewise sometimes shifts around very small exons.
+#-skip_small_exons   
+#        minimum exon size which is accepted to be run in genomewise, i.e. smaller exons are not
+#        passed as evidence for genomewise. This could be useful (maybe with cross-species alignments)
+#        as genomewise sometimes shifts around very small exons.
+# THIS HAS BEEN CANCELLED AS IT IS MISLEADING. WE SHOULD MODIFY THE EVIDENCE BEFORE, FOR EXAMPLE:
+# BEFORE MERGING ESTs
 
 add evidence in the form of a transcript:
    $genomewise->add_Transcript($transcript);
@@ -98,9 +100,9 @@ sub new {
     $self->seq($seq);
     
     # read 'skip' argument
-    if ( $skip_small_exons ){
-	$self->_skip_small_exons( $skip_small_exons );
-    }
+    #if ( $skip_small_exons ){
+    #	$self->_skip_small_exons( $skip_small_exons );
+    #}
     
     # read smell argument (can be 0 ) or default it to 8
     if (defined($smell) ){
@@ -189,11 +191,11 @@ sub run{
 	      $self->throw("Genomewise cannot handle reverse strand exons. Must flip outside");
 	  }
 	  # skip small exons if we have chosen to do so
-	  if ( $self->_skip_small_exons ){
-	      if ( ($exon->end - $exon->start + 1 ) < $self->_skip_small_exons ){
-		  next EXON;
-	      }
-	  }
+	  #if ( $self->_skip_small_exons ){
+	  #    if ( ($exon->end - $exon->start + 1 ) < $self->_skip_small_exons ){
+	  #	  next EXON;
+	  #     }
+	  #}
 	  print E "exon ",$exon->start," ",$exon->end,"\n";
       }
       print E "//\n";
@@ -210,9 +212,9 @@ sub run{
   my $switch = $self->switch;
   my $smell  = $self->smell;
   print STDERR "running genomewise with smell: $smell and switch: $switch\n";
-  if ( $self->_skip_small_exons ){
-      print STDERR "skipping exons smaller than ".$self->_skip_small_exons."\n";
-  }
+  #if ( $self->_skip_small_exons ){
+  #    print STDERR "skipping exons smaller than ".$self->_skip_small_exons."\n";
+  #}
 
   #### Steve's version (fixed)
   #  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
