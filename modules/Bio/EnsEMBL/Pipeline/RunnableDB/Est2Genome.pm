@@ -71,7 +71,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 
 sub new {
     my ($new,@args) = @_;
-    my $self = $self->SUPER::new(@args);    
+    my $self = $new->SUPER::new(@args);    
            
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
