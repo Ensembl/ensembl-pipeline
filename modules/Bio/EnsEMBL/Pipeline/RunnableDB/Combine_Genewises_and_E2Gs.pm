@@ -272,7 +272,7 @@ sub run {
   # check:
   #print STDERR "after merging:\n";
   #foreach my $gw (@merged_gw_genes){
-  #  my @trans = $gw->get_all_Transcripts;
+  #  my @trans = @{$gw->get_all_Transcripts};
   #  print STDERR "genewise ".$gw->dbID." with ".scalar( $trans[0]->get_all_Exons )." exons\n";
   #}
 
@@ -371,7 +371,7 @@ sub run {
       #my $longest = 0;
       #foreach my $e2g(@matching_e2gs){
       #  my $length = 0;
-      #  foreach my $exon ($e2g->get_all_Exons){
+      #  foreach my $exon (@{$e2g->get_all_Exons}){
 #	$length += $exon->end - $exon->start + 1; 
 #      }
 #      if ($length > $longest){
@@ -380,7 +380,7 @@ sub run {
 #      }
 #    }
 #    # there is one transcript per gene
-#    my @e2g_tran = $chosen_e2g->get_all_Transcripts; 
+#    my @e2g_tran = @{$chosen_e2g->get_all_Transcripts}; 
 #    if ( @gw_tran == 1 &&  @e2g_tran == 1){
 #      print STDERR "combining : " . $gw_tran[0]->dbID . " with " . $e2g_tran[0]->dbID . "\n";
 #    }
@@ -389,7 +389,8 @@ sub run {
       #    }
       
       print STDERR "combining gw gene : " . $gw->dbID.":\n";
-      foreach my $tran ( @{$gw->get_all_Transcripts}){
+
+      foreach my $tran ( @{$gw->get_all_Transcripts }){
 	  $tran->sort;
 	  foreach my $exon (@{$tran->get_all_Exons}){
 	      print STDERR $exon->start."-".$exon->end." ";
@@ -424,7 +425,7 @@ sub _transcript_exonic_length_in_gene{
     my @trans = @{$gene->get_all_Transcripts};
     my $tran = $trans[0];
     my $exonic_length = 0;
-    foreach my $exon (@{$tran->get_all_Exons}){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
       $exonic_length += ($exon->end - $exon->start + 1);
     }
     return $exonic_length;
@@ -729,7 +730,7 @@ sub match_gw_to_e2g{
   my @gw_tran = @{$gw->get_all_Transcripts};
   
   my @gw_exons = @{$gw_tran[0]->get_all_Exons};
-  my $strand   = @{$gw_exons[0]->strand};
+  my $strand   = $gw_exons[0]->strand;
   if($gw_exons[$#gw_exons]->strand != $strand){
     $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n with ".$gw_tran[0]->dbId );
       return;
@@ -860,7 +861,7 @@ sub match_gw_to_e2g{
 	    # test
 	    foreach my $egtran ( @{$e2g->get_all_Transcripts} ){
 	      print STDERR "Found cDNA match trans_dbID:".$egtran->dbID."\n";
-	      #foreach my $exon (@{$egtran->get_all_Exons}){
+	      #foreach my $exon ( @{$egtran->get_all_Exons}){
 	      #  print STDERR $exon->start."-".$exon->end."  ";
 	      #}
 		#print STDERR "\n";
@@ -962,7 +963,7 @@ sub _merge_gw_genes {
 	$previous_exon->add_sub_SeqFeature($exon,'');
 	
 	my %evidence_hash;
-	foreach my $sf(@{$exon->get_all_supporting_features}){
+	foreach my $sf( @{$exon->get_all_supporting_features}){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	      next;
 	    }
@@ -1156,7 +1157,7 @@ sub _make_newtranscript {
     #print STDERR "end translation  : ".$newtranscript->translation->end."\n";
     my $count = 0;
     my $previous_ex;
-    foreach my $ex(@{$newtranscript->get_all_Exons}){
+    foreach my $ex (@{$newtranscript->get_all_Exons}){
       #print STDERR $ex->start."-".$ex->end." phase: ".$ex->phase." end_phase: ".$ex->end_phase."\n";
       
       # check phases
@@ -1169,11 +1170,11 @@ sub _make_newtranscript {
     }
 
     # dclone messes up database handles
-    foreach my $ex(@{$newtranscript->get_all_Exons}){
+    foreach my $ex (@{$newtranscript->get_all_Exons}){
       $ex->attach_seq($self->vcontig);
       $ex->contig_id($self->vcontig->id);
       # add new analysis object to the supporting features
-      foreach my $sf(@{$ex->get_all_supporting_features}){
+      foreach my $sf (@{$ex->get_all_supporting_features}){
 	$sf->analysis($analysis_obj);
 	$sf->source_tag($genetype);
       }
@@ -1811,7 +1812,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->attach_seq($self->vcontig);
 	my %evidence_hash;
 	#print STDERR "adding evidence at 5':\n";
-	foreach my $sf(@{$oldexon->get_all_supporting_features}){
+	foreach my $sf( @{$oldexon->get_all_supporting_features} ){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	    next;
 	  }
@@ -1915,7 +1916,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->attach_seq($self->vcontig);
 	#print STDERR "adding evidence in 3':\n";
 	my %evidence_hash;
-	foreach my $sf(@{$oldexon->get_all_supporting_features}){
+	foreach my $sf( @{$oldexon->get_all_supporting_features }){
 	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
 	    next;
 	  }
@@ -1976,8 +1977,8 @@ GENE:
 	  
 	  # sort out supporting feature coordinates
 	  foreach my $tran (@{$newgene->get_all_Transcripts}) {
-	      foreach my $exon(@{$tran->get_all_Exons}) {
-		  foreach my $sf(@{$exon->get_all_supporting_features}) {
+	      foreach my $exon (@{$tran->get_all_Exons}) {
+		  foreach my $sf (@{$exon->get_all_supporting_features}) {
 		      # this should be sorted out by the remapping to rawcontig ... strand is fine
 		      if ($sf->start > $sf->end) {
 			  my $tmp = $sf->start;
@@ -1996,7 +1997,8 @@ GENE:
 	    # problems come about when we switch from + strand on the vc to - strand on raw contig.
 	    my $vc_strand;
 	    
-	    foreach my $exon(@{$tran->get_all_Exons}) {
+
+	    foreach my $exon (@{$tran->get_all_Exons}) {
 	      if ($exon eq $tran->translation->start_exon()) {
 		$vc_strand = $exon->strand;
 		last;
@@ -2026,7 +2028,7 @@ GENE:
 	  } # end special case single coding exon
 	  
 	  # final exon coord sanity check
-      foreach my $exon(@{$newgene->get_all_Exons}){
+      foreach my $exon (@{$newgene->get_all_Exons}){
 	# make sure we deal with stickies!
 	if($exon->isa("Bio::EnsEMBL::StickyExon")){
 	  foreach my $ce($exon->each_component_Exon){
@@ -2035,7 +2037,7 @@ GENE:
 	      $self->throw("can't set exon->start < 1 (" . $ce->start . ") - discarding gene\n");
 	    }
 	    
-	    if($ce->end > $ce->contig->primary_seq->length){
+	    if( $ce->end > $ce->contig->primary_seq->length){
 	      $self->throw("exon extends beyond end of contig - discarding gene\n");
 	    }
 	  }
