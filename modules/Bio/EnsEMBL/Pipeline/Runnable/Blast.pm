@@ -388,8 +388,6 @@ sub parse_results {
     
   }
 
-  print STDERR "Ids " . keys(%ids) . "\n";
-
   @parsers = ();
 
   if (defined($fh)) {
@@ -407,7 +405,6 @@ sub parse_results {
       
     my $fasta_header = $sbjct->name ;	  
 
-    print STDERR "Name " . $fasta_header . "\n";
      if (($self->filter == 1) && !defined($ids{$fasta_header})) {
       next NAME;
     }
@@ -436,6 +433,7 @@ sub parse_results {
   }
   }
 
+  return unless $self->output;
 
 # Alternate feature filter. If option not present in blastconf, should default to FeatureFilter -prune
 
@@ -457,7 +455,6 @@ sub parse_results {
 
       my @pruned = $search->run(@allfeatures);
 
-      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
