@@ -222,12 +222,12 @@ sub run_transcript_mapping {
     # run sequence comparison
     my $exonerate_obj
       = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
-                                           -genomic   => $genomic_fnam,
-                                           -est       => $cdna_fnam,
-					   -arguments => ARGS
+                                           -genomic => $genomic_fnam,
+                                           -est     => $cdna_fnam,
+					   -args    => ARGS
                                           );
     $exonerate_obj->exonerate(EXECUTABLE);
-    $exonerate_obj->run();
+    $exonerate_obj->run_no_intron;
     my @features = $exonerate_obj->output;
     
     # store mapping for transcript if best coverage is good enough
@@ -261,11 +261,17 @@ sub run_transcript_mapping {
     Function:   Calculates percentage of a transcript covered by
                 FeaturePairs involving one or more hit sequences.
 		Each hit sequence may be involved in one or
-		more FeaturePairs. Intended to give correct
-		coverage even with overlapping hits. Must be
-		supplied with precisely all the FeaturePairs for
-		a single genomic transcript across the cDNA
-		database in use.
+		more FeaturePairs. Must be supplied with precisely
+		all the FeaturePairs for a single genomic
+		transcript across the cDNA database in use.
+		Results will not be distorted if the same area of
+		transcript sequence is involved in many
+		FeaturePairs, since we work with simple
+		presence/absence of coverage for each base in the
+		transcript. But if the same area of a cDNA is
+		involved in many FeaturePairs, this could lead to
+		high "coverage". (Not sure if this behaviour is
+		correct or not.)
     Returns :   reference to a hash (keys: hit sequence name,
                 values: floating point percentage coverage of
 		transcript)
