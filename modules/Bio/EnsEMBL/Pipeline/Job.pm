@@ -1,4 +1,5 @@
 
+
 # Object for storing details of an analysis job
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -67,17 +68,17 @@ sub new {
     my $self = bless {},$class;
 
     my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count ) 
-	= $self->_rearrange([qw(ADAPTOR
-				ID
-				LSF_ID
-				INPUT_ID
-				CLASS
-				ANALYSIS
-				STDOUT
-				STDERR
-				INPUT_OBJECT_FILE
-				RETRY_COUNT
-				)],@args);
+        = $self->_rearrange([qw(ADAPTOR
+                                ID
+                                LSF_ID
+                                INPUT_ID
+                                CLASS
+                                ANALYSIS
+                                STDOUT
+                                STDERR
+                                INPUT_OBJECT_FILE
+                                RETRY_COUNT
+                                )],@args);
 
     $dbID    = -1 unless defined($dbID);
     $lsfid = -1 unless defined($lsfid);
@@ -87,7 +88,7 @@ sub new {
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
     $analysis->isa("Bio::EnsEMBL::Analysis") ||
-	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
+        $self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
 
     $self->dbID         ($dbID);
     $self->adaptor  ($adaptor);
@@ -148,7 +149,7 @@ sub dbID {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_dbID'} = $arg;
+        $self->{'_dbID'} = $arg;
     }
     return $self->{'_dbID'};
 
@@ -169,7 +170,7 @@ sub adaptor {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_adaptor'} = $arg;
+        $self->{'_adaptor'} = $arg;
     }
     return $self->{'_adaptor'};
 
@@ -192,7 +193,7 @@ sub input_id {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_input_id'} = $arg;
+        $self->{'_input_id'} = $arg;
     }
     return $self->{'_input_id'};
 }
@@ -213,7 +214,7 @@ sub class {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_class'} = $arg;
+        $self->{'_class'} = $arg;
     }
     return $self->{'_class'};
 }
@@ -231,10 +232,10 @@ sub class {
 sub analysis {
     my ($self,$arg) = @_;
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
+        $self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Analysis");
 
-	$self->{'_analysis'} = $arg;
+        $self->{'_analysis'} = $arg;
     }
     return $self->{'_analysis'};
 
@@ -312,10 +313,10 @@ sub flush_runs {
   
     $cmd = "bsub -o ".$lastjob->stdout_file;
     if ($nodes) {
-	# $nodes needs to be a space-delimited list
-	$nodes =~ s/,/ /;
-	$nodes =~ s/ +/ /;
-	# undef $nodes unless $nodes =~ m{(\w+\ )*\w};
+        # $nodes needs to be a space-delimited list
+        $nodes =~ s/,/ /;
+        $nodes =~ s/ +/ /;
+        # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
         $cmd .= " -m '$nodes' ";
     }
     $cmd .= " -q $queue " if defined $queue;
@@ -358,7 +359,7 @@ sub flush_runs {
             open( FILE, ">".$_ ); close( FILE );
           }
         }
-	$job->LSF_id( $lsfid );
+        $job->LSF_id( $lsfid );
         # $job->create_lsflogfile;
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
@@ -462,7 +463,7 @@ sub runRemote {
   # otherwise fail
 
   my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  $runner =~ s:/[^/]*$:/runner.pl:;     
 
   unless (-x $runner) {
     $runner = $::pipeConf{'runner'} || undef;
@@ -529,19 +530,19 @@ sub runInLSF {
 
   eval {
       if( $module =~ /::/ ) {
-	  $module =~ s/::/\//g;
-	  require "${module}.pm";
-	  $rdb = "${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+          $module =~ s/::/\//g;
+          require "${module}.pm";
+          $rdb = "${module}"->new
+              ( -analysis => $self->analysis,
+                -input_id => $self->input_id,
+                -dbobj => $self->adaptor->db );
       } else {
-	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+          require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
           $module =~ s/\//::/g;
-	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+          $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
+              ( -analysis => $self->analysis,
+                -input_id => $self->input_id,
+                -dbobj => $self->adaptor->db );
       }
   };
   if ($err = $@) {
@@ -635,10 +636,10 @@ sub write_object_file {
     $self->throw("No input object file defined") unless defined($self->input_object_file);
 
     if (defined($arg)) {
-	my $str = FreezeThaw::freeze($arg);
-	open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
-	print(OUT $str);
-	close(OUT);
+        my $str = FreezeThaw::freeze($arg);
+        open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
+        print(OUT $str);
+        close(OUT);
     }
 }
 
@@ -798,9 +799,9 @@ sub get_files {
     @files = readdir( DIR );
     if( scalar( @files ) > 10000 ) {
       if( $count++ > 10 ) {
-	$self->throw("10000 files in directory. Can't make a new file");
+        $self->throw("10000 files in directory. Can't make a new file");
       } else {
-	next;
+        next;
       }
     } else {
       last;
@@ -815,7 +816,7 @@ sub get_files {
     foreach my $ext ( @exts ) {
       my $file  = $dir . $stub . "." . $rand . "." . $ext;
       if( -e $file ) {
-	next OCCU;
+        next OCCU;
       }
       push( @result, $file );
     }
@@ -844,7 +845,7 @@ sub stdout_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_stdout_file'} = $arg;
+        $self->{'_stdout_file'} = $arg;
     }
     return $self->{'_stdout_file'};
 }
@@ -863,7 +864,7 @@ sub stderr_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_stderr_file'} = $arg;
+        $self->{'_stderr_file'} = $arg;
     }
     return $self->{'_stderr_file'};
 }
@@ -882,7 +883,7 @@ sub input_object_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{'_input_object_file'} = $arg;
+        $self->{'_input_object_file'} = $arg;
     }
     return $self->{'_input_object_file'};
 }

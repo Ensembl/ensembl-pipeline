@@ -20,24 +20,29 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '/work1/michele/out', # working directory for err/outfiles
-    'pep_file'   => '', #
+
+    'nfstmp.dir' => '/work1/lec/out',
+                               # working directory for err/outfiles
+    'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
+
     'DBI.driver' => 'mysql',
+
     'dbhost'     => 'ecs1c',
-    'dbname'     => 'michele_anopheles', #Database name for pipeline db
-    'dbuser'     => 'ensadmin', #Database user for pipeline db
-    'dbpass'     => 'ensembl', #Database user for pipeline db
-    'queue'      => 'acari', #farm queue
+    'dbname'     => 'laura_test',
+    'dbuser'     => 'ensadmin',
+    'dbpass'     => 'ensembl',	     
+    'queue'      => 'acarilong',   # farm queue
+
+    
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bindir'     => '/usr/local/ensembl/bin/',
-    'datadir'    => '/usr/local/ensembl/data/',
-    'usenodes'   => 'ecsnodes',        # farm nodes to use (default all)
+    'bindir'     => '/usr/local/ensembl/bin',
+    'datadir'    => '/usr/local/ensembl/data',
+    'usenodes'   => '',        # farm nodes to use (default all)
     'autoupdate' => 1,         # true->update InputIdAnalysis via Job
     'runner'     => '',        # path to runner.pl, needed by Job.pm
     'cpname'     => '', #this is for crosscomparer comparadb name
     'cpuser'     => '', #and comparadb user
-    'sleep'      => 3600, #sleep time in Rulemanager3
-    'maxjobs'    => 5,
+    'sleep'      => 3600 #sleep time in Rulemanager3
     );
 }
 

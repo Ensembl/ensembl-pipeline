@@ -58,7 +58,9 @@ sub new {
   my ($jobid,$status,$created)  =
       $self->_rearrange([qw(JOBID
 			    STATUS
-			    CREATED
+		
+
+	    CREATED
 			    )],@args);
 
   $jobid   || $self->throw("Can't create a status object with no jobid");
