@@ -360,81 +360,112 @@ sub write_output{
 # supporting evidence
 
 sub make_genes{
-  my ($self,@features) = @_;
-  
-  my @genes;
- TRANSCRIPT:
-  foreach my $feature ( @features ){
-    my $transcript = Bio::EnsEMBL::Transcript->new();
-    my $gene       = Bio::EnsEMBL::Gene->new();
-    $gene->analysis($self->analysis);
+    my ($self,@features) = @_;
+    my $slice_adaptor     = $self->db->get_SliceAdaptor;
     
-    # the genetype is the logic name
-    $gene->type($self->analysis->logic_name);
-    
-    $gene->add_Transcript($transcript);
-    
-    # get all the features
-    my $prev_feature;
-    my $prev_exon;
-    
-    # sort the features according to the genomic coordinate
-    my @sub_features = sort{ $a->feature1->start <=> $b->feature1->start } $feature->sub_SeqFeature;
-    
+    my @genes;
+  TRANSCRIPT:
+    foreach my $feature ( @features ){
+	my $transcript = Bio::EnsEMBL::Transcript->new();
+	my $gene       = Bio::EnsEMBL::Gene->new();
+	$gene->analysis($self->analysis);
+	
+	# the genetype is the logic name
+	$gene->type($self->analysis->logic_name);
+	
+	# get all the features
+	my $prev_feature;
+	my $prev_exon;
+	
+	# sort the features according to the genomic coordinate
+	my @sub_features = sort{ $a->feature1->start <=> $b->feature1->start } $feature->sub_SeqFeature;
+	
+	
+      EXON:
+	foreach my $sub_feature (@sub_features){
+	    # each sub_feature is a feature pair
+	    
+	    # make the exon out of the feature1 (the genomic feature)
+	    my $exon = Bio::EnsEMBL::Exon->new();
+	    $exon->seqname($sub_feature->feature1->seqname);
+	    $exon->contig ($sub_feature->feature1->contig);
+	    $exon->start  ($sub_feature->feature1->start);
+	    $exon->end    ($sub_feature->feature1->end);
+	    $exon->strand ($sub_feature->feature1->strand);
+	    my $strand = $exon->strand;
+	    
+	    # we haven't set any translations here!!
+	    $exon->phase    (0);
+	    $exon->end_phase(0);
+	    # score is actually the coverage for the entire rna/est transcript
+	    $exon->score      ($sub_feature->feature1->score);
+	    $exon->adaptor    ($self->db->get_ExonAdaptor);
+	    
+	    # what about the supporting evidence?
+	    my @supp_features = ($sub_feature);
+	    my $supp_feature;
+	    eval{
+		$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
+	    };
+	    if ( $@ || !defined $supp_feature ){
+		$self->warn("could not create supporting feature:\n$@");
+		next TRANSCRIPT;
+	    }
+	    $supp_feature->contig     ($exon->contig);
+	    $supp_feature->seqname    ($sub_feature->feature1->seqname);
+	    $supp_feature->hseqname   ($sub_feature->feature2->seqname);
+	    $supp_feature->score      ($sub_feature->feature2->score);
+	    $supp_feature->percent_id ($sub_feature->feature2->percent_id);
+	    $supp_feature->analysis   ($self->analysis );
+	    $exon->add_supporting_features($supp_feature);
+	    
+	    if ( $prev_exon &&  ( $exon->start - $prev_exon->end ) < 10  ){
+		$prev_exon->end( $exon->end );
+		$prev_exon->add_supporting_features( @{$exon->get_all_supporting_features} );
+	    }
+	    else{
+		$transcript->add_Exon($exon);
+		$prev_exon = $exon;
+	    }
+	    
+	}
+	#print STDERR "transcript produced:\n";
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+	
+	# put sequence to the transcript:
 
-  EXON:
-    foreach my $sub_feature (@sub_features){
-      # each sub_feature is a feature pair
-      
-      # make the exon out of the feature1 (the genomic feature)
-      my $exon = Bio::EnsEMBL::Exon->new();
-      $exon->seqname($sub_feature->feature1->seqname);
-      $exon->contig ($sub_feature->feature1->contig);
-      $exon->start  ($sub_feature->feature1->start);
-      $exon->end    ($sub_feature->feature1->end);
-      $exon->strand ($sub_feature->feature1->strand);
-      my $strand = $exon->strand;
-      
-      # we haven't set any translations here!!
-      $exon->phase    (0);
-      $exon->end_phase(0);
-      # score is actually the coverage for the entire rna/est transcript
-      $exon->score      ($sub_feature->feature1->score);
-      $exon->adaptor    ($self->db->get_ExonAdaptor);
-      
-      # what about the supporting evidence?
-      my @supp_features = ($sub_feature);
-      my $supp_feature;
-      eval{
-	$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
-      };
-      if ( $@ || !defined $supp_feature ){
-	$self->warn("could not create supporting feature:\n$@");
-	next TRANSCRIPT;
-      }
-      $supp_feature->contig     ($exon->contig);
-      $supp_feature->seqname    ($sub_feature->feature1->seqname);
-      $supp_feature->hseqname   ($sub_feature->feature2->seqname);
-      $supp_feature->score      ($sub_feature->feature2->score);
-      $supp_feature->percent_id ($sub_feature->feature2->percent_id);
-      $supp_feature->analysis   ($self->analysis );
-      $exon->add_supporting_features($supp_feature);
-      
-      if ( $prev_exon &&  ( $exon->start - $prev_exon->end ) < 10  ){
-	$prev_exon->end( $exon->end );
-	$prev_exon->add_supporting_features( @{$exon->get_all_supporting_features} );
-      }
-      else{
-	$transcript->add_Exon($exon);
-	$prev_exon = $exon;
-      }
-      
+	# all exons have the same seqname
+	my $slice_id      = $transcript->start_Exon->seqname;
+	my $chr_name;
+	my $chr_start;
+	my $chr_end;
+	if ($slice_id =~/$EST_INPUTID_REGEX/){
+	    $chr_name  = $1;
+	    $chr_start = $2;
+	    $chr_end   = $3;
+	}
+	else{
+	    $self->warn("It looks that you haven't run on slices. Please check.");
+	    next TRANSCRIPT;
+	}
+	
+	my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
+	foreach my $exon (@{$transcript->get_all_Exons}){
+	    $exon->contig($slice);
+	    foreach my $evi (@{$exon->get_all_supporting_features}){
+		$evi->contig($slice);
+	    }
+	}
+        
+    
+	# check the splice sites 
+	# to see if the transcript is in the correct strand
+	my $checked_transcript = $self->check_splice_sites( $transcript );
+	
+	$gene->add_Transcript($checked_transcript);
+	push( @genes, $gene);
     }
-    #print STDERR "transcript produced:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
-    push( @genes, $gene);
-  }
-  return @genes;
+    return @genes;
 }
 
 ############################################################
@@ -443,37 +474,12 @@ sub convert_coordinates{
   my ($self,@genes) = @_;
   
   my $rawcontig_adaptor = $self->db->get_RawContigAdaptor;
-  my $slice_adaptor     = $self->db->get_SliceAdaptor;
   
   
   my @transformed_genes;
  GENE:
   foreach my $gene (@genes){
-  TRANSCRIPT:
-    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-      
-      my $slice_id      = $transcript->start_Exon->seqname;
-      my $chr_name;
-      my $chr_start;
-      my $chr_end;
-      if ($slice_id =~/$EST_INPUTID_REGEX/){
-	$chr_name  = $1;
-	$chr_start = $2;
-	$chr_end   = $3;
-      }
-      else{
-	$self->warn("It looks that you haven't run on slices. Please check.");
-	next TRANSCRIPT;
-      }
-      
-      my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
-      foreach my $exon (@{$transcript->get_all_Exons}){
-	$exon->contig($slice);
-	foreach my $evi (@{$exon->get_all_supporting_features}){
-	  $evi->contig($slice);
-	}
-      }
-    }
+ 
       
     my $transformed_gene;
     # some exons may fall on gaps!!!
@@ -514,7 +520,164 @@ sub get_chr_names{
 
 ############################################################
 
+=head2 check_splice_sites
 
+We want introns of the form:
+    
+    ...###GT...AG###...   ...###AT...AC###...   ...###GC...AG###...
+    
+if we see introns like these:
+    
+    ...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+
+we need to set the strand to the opposite. This can happen when 
+an est/cdna is annotated backwards in the db, if blat reverse 
+complement it to map it, it will find exactily the same exon 
+sequence of an homolog annotated forward, but in the opposite 
+strand. As blat does not reconfirm splice sites like est2genome,
+we need to do it ourselves. Exonerate will do this work for you.
+
+=cut
+
+sub check_splice_sites{
+    my ($self,$transcript) = @_;
+    $transcript->sort;
+    
+    print STDERR "checking splice sites in transcript:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+    
+    my $strand = $transcript->start_Exon->strand;
+    my @exons  = @{$transcript->get_all_Exons};
+    
+    my $introns  = scalar(@exons) - 1 ; 
+    if ( $introns <= 0 ){
+	return $transcript;
+    }
+    
+    my $correct  = 0;
+    my $wrong    = 0;
+    my $other    = 0;
+    
+    # all exons in the transcripts are in the same seqname coordinate system:
+    my $slice = $transcript->start_Exon->contig;
+    
+    if ($strand == 1 ){
+	
+      INTRON:
+	for (my $i=0; $i<$#exons; $i++ ){
+	    my $upstream_exon   = $exons[$i];
+	    my $downstream_exon = $exons[$i+1];
+	    my $upstream_site;
+	    my $downstream_site;
+	    eval{
+		$upstream_site = 
+		    $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		$downstream_site = 
+		    $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+	    };
+	    unless ( $upstream_site && $downstream_site ){
+		print STDERR "problems retrieving sequence for splice sites\n$@";
+		next INTRON;
+	    }
+	    
+	    print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+	    ## good pairs of upstream-downstream intron sites:
+	    ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
+	    
+	    ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
+	    ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+	    
+	    if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+		  ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+		  ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+		$correct++;
+	    }
+	    elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+		     ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+		     ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+		$wrong++;
+	    }
+	    else{
+		$other++;
+	    }
+	} # end of INTRON
+    }
+    elsif ( $strand == -1 ){
+	
+	#  example:
+	#                                  ------CT...AC---... 
+	#  transcript in reverse strand -> ######GA...TG###... 
+	# we calculate AC in the slice and the revcomp to get GT == good site
+	
+      INTRON:
+	for (my $i=0; $i<$#exons; $i++ ){
+	    my $upstream_exon   = $exons[$i];
+	    my $downstream_exon = $exons[$i+1];
+	    my $upstream_site;
+	    my $downstream_site;
+	    my $up_site;
+	    my $down_site;
+	    eval{
+		$up_site = 
+		    $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+		$down_site = 
+		    $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+	    };
+	    unless ( $up_site && $down_site ){
+		print STDERR "problems retrieving sequence for splice sites\n$@";
+		next INTRON;
+	    }
+	    ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
+	    ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+	    
+	    print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+	    if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+		  ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+		  ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+		$correct++;
+	    }
+	    elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+		     ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+		     ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+		$wrong++;
+	    }
+	    else{
+		$other++;
+	    }
+	    
+       	} # end of INTRON
+    }
+    unless ( $introns == $other + $correct + $wrong ){
+	print STDERR "STRAGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
+    }
+    if ( $wrong > $correct ){
+	print STDERR "changing strand\n";
+	return  $self->change_strand($transcript);
+    }
+    else{
+	return $transcript;
+    }
+}
+
+############################################################
+
+=head2 change_strand
+
+    this method changes the strand of the exons
+
+=cut
+
+sub change_strand{
+    my ($self,$transcript) = @_;
+    my $original_strand = $transcript->start_Exon->strand;
+    my $new_strand      = (-1)*$original_strand;
+    foreach my $exon (@{$transcript->get_all_Exons}){
+	$exon->strand($new_strand);
+    }
+    $transcript->sort;
+    return $transcript;
+}
 
 ############################################################
 #
