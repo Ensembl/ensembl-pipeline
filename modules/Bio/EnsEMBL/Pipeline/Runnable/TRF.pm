@@ -27,7 +27,7 @@ Bio::EnsEMBL::Pipeline::Runnable::TRF
 
   # create Bio::EnsEMBL::Pipeline::Runnable::TRF object
   my $trf = Bio::EnsEMBL::Pipeline::Runnable::TRF->new(
-    -CLONE => $seq
+    -QUERY => $seq
   );
   $trf->workdir($workdir);
   $trf->run();
@@ -74,11 +74,8 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Repeat;
-use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis; 
-use Bio::Seq;
-use Bio::SeqIO;
+use Bio::EnsEMBL::RepeatFeature;
+use Bio::EnsEMBL::RepeatConsensus;
 use Bio::Root::RootI;
 use FileHandle;
 
@@ -93,8 +90,8 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_fplist'}    = [];     # an array of feature pairs
-    $self->{'_clone'}     = undef;  # location of Bio::Seq object
+    $self->{'_rflist'}    = [];     # an array of feature pairs
+    $self->{'_query'}     = undef;  # location of Bio::Seq object
     $self->{'_trf'}       = undef;  # location of TRF executable
     $self->{'_workdir'}   = undef;  # location of temp directory
     $self->{'_filename'}  = undef;  # file to store Bio::Seq object
@@ -111,8 +108,8 @@ sub new {
     $self->{'_minscore'}  = 50;
     $self->{'_maxperiod'} = 500;
     
-    my ($clone, $trf, $match, $mismatch, $delta, $pm, $pi, $minscore, $maxperiod) = $self->_rearrange([qw(
-	CLONE
+    my ($query, $trf, $match, $mismatch, $delta, $pm, $pi, $minscore, $maxperiod) = $self->_rearrange([qw(
+	QUERY
 	TRF
         MATCH
         MISMATCH
@@ -135,7 +132,7 @@ sub new {
     $self->minscore  ($minscore)  if defined $minscore;
     $self->maxperiod ($maxperiod) if defined $maxperiod;
 
-    $self->clone($clone) if ($clone);       
+    $self->query($query) if ($query);       
 
     return $self;
 }
@@ -144,7 +141,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -152,7 +149,7 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-        $self->{'_clone'} = $seq ;
+        $self->{'_query'} = $seq ;
 
 	my @arg_list = (
             $self->match,
@@ -165,15 +162,15 @@ sub clone {
 	);
 	$self->options(join(' ', @arg_list));
         
-        $self->clonename($self->clone->id);
+        $self->queryname($self->query->id);
 
 	# TRF seems to want to truncate the filename to 13 chars ...
-        $self->filename(substr($self->clone->id.".$$", 0, 13));
+        $self->filename(substr($self->query->id.".$$", 0, 13));
 
         # output has (equally annoyingly) parameters in the filename
         $self->results($self->filename . "." . join('.', @arg_list) . '.dat');
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 protect
@@ -199,7 +196,7 @@ sub trf {
 
 =cut
 
-=head2 clonename
+=head2 queryname
 
 =cut
 
@@ -215,7 +212,7 @@ sub run {
     my ($self) = @_;
 
     # check seq
-    my $seq = $self->clone() || $self->throw("Seq required for TRF\n");
+    my $seq = $self->query() || $self->throw("Seq required for TRF\n");
 
     # set directory if provided
     $self->workdir('/tmp') unless $self->workdir();
@@ -238,7 +235,7 @@ sub run {
 sub run_trf {
     my ($self) = @_;
 
-    # options() set in clone() at same time as results()
+    # options() set in query() at same time as results()
     # both are a catenation of the parameters
 
     print "Running TRF; ";
@@ -285,31 +282,21 @@ sub parse_results {
             $entropy,        $mer
         ) = split;
 
-        my (%feat1, %feat2);
+        my $rc = Bio::EnsEMBL::RepeatConsensus->new;
+        $rc->name             ("trf");
+        $rc->repeat_class     ("trf");
+        $rc->repeat_consensus ($mer);
 
-        $feat1 {name} = $seqname;
-        $feat1 {score} = $score;
-        $feat1 {start} = $start;
-        $feat1 {end} = $end;
-        $feat1 {strand} = 0;
-        $feat1 {source}= 'trf';
-        $feat1 {primary}= 'repeat';
+        my $rf = Bio::EnsEMBL::RepeatFeature->new;
+        $rf->score            ($score);
+        $rf->start            ($start);
+        $rf->end              ($end);
+        $rf->strand           (0);
+        $rf->hstart           (1);
+        $rf->hend             ($end - $start + 1);
+        $rf->repeat_consensus ($rc);
 
-        $feat2 {name} = $seqname;
-        $feat2 {score} = $score;
-        $feat2 {start} = $start;
-        $feat2 {end} = $end;
-        $feat2 {strand} = 0;
-
-        $feat2 {db} = undef;
-        $feat2 {db_version} = undef;
-        $feat2 {program} = 'trf';
-        $feat2 {p_version}='1';
-        $feat2 {source}= 'trf';
-        $feat2 {primary}= 'repeat';
-
-        $self->create_repeat(\%feat1, \%feat2);
-
+        push @{$self->{'_rflist'}}, $rf;
     }
     print STDERR "No tandem repeats found\n" unless $found;
     close $filehandle;   
@@ -326,7 +313,7 @@ sub parse_results {
 
 sub output {
     my ($self) = @_;
-    return @{$self->{'_fplist'}};
+    return @{$self->{'_rflist'}};
 }
 
 # Accessor methods
