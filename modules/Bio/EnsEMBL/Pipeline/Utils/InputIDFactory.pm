@@ -136,28 +136,17 @@ sub get_slice_names{
 
   foreach my $chr (@chromosomes){
 
-    my $query = "select min(chr_start) from assembly where chromosome_id = " . $chr->dbID;
+    my $query = "select min(chr_start), max(chr_end) from assembly where chromosome_id = " . $chr->dbID;
     my $sth   = $self->db->prepare($query);
     my $res   = $sth->execute;
 
-    my $chrstart;
+    my ($chrstart, $length);
    
     while (my $ref = $sth->fetchrow_arrayref) {
-      $chrstart = $ref->[0];
-    }
-
-    $query = "select max(chr_end) from assembly where chromosome_id = " . $chr->dbID;
-    $sth   = $self->db->prepare($query);
-    $res   = $sth->execute;
-
-    my $length;
-
-    while (my $ref = $sth->fetchrow_arrayref) {
-      $length = $ref->[0];
+      ($chrstart, $length) = ($ref->[0], $ref->[1]);
     }
 
     my $count = $chrstart;
-
     while ($count < $length) {
       my $start = $count;
       my $end   = $count + $size - 1;
