@@ -234,10 +234,10 @@ sub solutions{
   # if node has extension parents
   my @extension_parents;
   if ($node->is_candidate){
-      @extension_parents = @{$node->candidate_extension_parents};
+    @extension_parents = @{$node->candidate_extension_parents};
   }
   else{
-      @extension_parents = @{$node->extension_parents};
+    @extension_parents = @{$node->extension_parents};
   }
   if ( @extension_parents ){
       
@@ -409,12 +409,12 @@ sub link_Transcripts{
 	# check the node against all the leaves
 	my $result = $self->check_tree($newnode,$all_the_leaves);
 	unless ( $result eq 'placed'){
-	    if ( $newnode->is_included ){
-		print STDERR "####### WARNING: adding leaf that is included in other node\n" if $verbose;
-	    }
-	    print STDERR "adding new leaf: ".$newnode->transcript->dbID."\n" if $verbose;
-	    push( @$all_the_leaves, $newnode);
-	    
+	  if ( $newnode->is_included ){
+	    print STDERR "####### WARNING: adding leaf that is included in other node\n" if $verbose;
+	  }
+	  print STDERR "adding new leaf: ".$newnode->transcript->dbID."\n" if $verbose;
+	  push( @$all_the_leaves, $newnode);
+	  
 	}
 	############################################################
 	# check whether this node is a candidate for a missing link:
@@ -451,19 +451,19 @@ sub link_Transcripts{
 	############################################################
 	# check the leaves - this is a bit redundant but it is a sanity-check
 	$self->_check_leaves( $all_the_leaves );
-    }
+      }
     
     # check #   
     #if ($verbose){
     #      foreach my $leaf ( @$all_the_leaves ){
     #	print STDERR "leaf:\n";
-#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($leaf->transcript);
-#	foreach my $parent ( @{$leaf->extension_parents} ){
-#	  print STDERR "extension parent:\n";
-#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($parent->transcript);
-#	}
-#      }
-#    }
+    #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($leaf->transcript);
+    #	foreach my $parent ( @{$leaf->extension_parents} ){
+    #	  print STDERR "extension parent:\n";
+    #	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($parent->transcript);
+    #	}
+    #      }
+    #    }
     
     ############################################################
     # get rid of the candidates which have been extended:
@@ -540,32 +540,40 @@ sub check_triangle{
     my ($self, $node ) = @_;
 
     my $verbose = $self->verbose();
-    print STDERR "checking for triangle for node ".$node->transcript->dbID."\n";
+    print STDERR "checking for triangle for node ".$node->transcript->dbID."\n" if $verbose;
     unless ( @{$node->extension_parents} ){
-	return 1;
+      print STDERR "No extension parents!!?\n";
+      return 1;
     }
-    
-    my $can_extension_parent;
-    my $found_triangle = 0;
     my $is_candidate = 0;
   EXT_PARENT:
     foreach my $extension_parent ( @{$node->extension_parents} ){
+      print STDERR "extension parent: ".$extension_parent->transcript->dbID."\n" if $verbose;
+      my $found_triangle = 0;
     INCL_PARENT:
-      foreach my $inclusion_parent ( @{$node->inclusion_parents} ){
-    
-
+      foreach my $inclusion_parent ( @{$node->inclusion_parents} ){	
+	my $incl_id = $inclusion_parent->transcript->dbID;
+	print STDERR "inclusion parent: ".$incl_id."\n" if $verbose;
+	
       OTHER_EXT_PARENT:
 	foreach my $other_parent ( @{$inclusion_parent->extension_parents} ){
+	  my $other_ext_id = $other_parent->transcript->dbID;
+	  print STDERR "extension parent of $incl_id: ".$other_ext_id."\n" if $verbose;
 	  if ( $other_parent == $extension_parent ){
+	    print STDERR "found triangle\n" if $verbose;
 	    $found_triangle = 1;
 	    last INCL_PARENT;
 	  }
 	}
-      
+	
 	unless ( $found_triangle ){
+	  
 	OTHER_EXT_PARENT2:
 	  foreach my $other_parent ( @{$extension_parent->inclusion_parents} ){
+	    my $other_ext_incl_id = $other_parent->transcript->dbID;
+	    print STDERR "inclusion parent of ".$extension_parent->transcript->dbID." = ".$other_ext_incl_id."\n" if $verbose;
 	    if ( $other_parent == $inclusion_parent ){
+	      print STDERR "found triangle\n" if $verbose;
 	      $found_triangle = 1;
 	      last INCL_PARENT;
 	    }
@@ -573,6 +581,7 @@ sub check_triangle{
 	}
       }
       if ( $found_triangle == 0 ){
+	print STDERR "id candidate\n" if $verbose;
 	$is_candidate = 1;
 	$node->is_candidate(1);
 	$node->add_candidate_extension_parent($extension_parent);
@@ -668,24 +677,24 @@ sub check_tree{
 	    print STDERR "placed\n" if $verbose;
 	    # check whether newnode is a new leaf
 	    if ( !$root && !$newnode->is_extended && !$newnode->is_included ){
-		if ( $added{$newnode} ){
-		    print STDERR "newnode is already a leaf\n" if $verbose;
-		}
-		unless ( $added{$newnode} ){
-		    print STDERR "adding newnode as leaf\n" if $verbose;
-		    push(@$newleaves,$newnode);
-		    $added{$newnode} = 1;
-		}
+	      if ( $added{$newnode} ){
+		print STDERR "newnode is already a leaf\n" if $verbose;
+	      }
+	      unless ( $added{$newnode} ){
+		print STDERR "adding newnode as leaf\n" if $verbose;
+		push(@$newleaves,$newnode);
+		$added{$newnode} = 1;
+	      }
 	    }
 	    
 	    # recover the leaf if it hasn't been added before, and if it is still a leaf
 	    if ( $is_leaf{ $node } && !$added{$node} && !$node->is_extended ){
-		push(@$newleaves,$node);
-		$added{$node} = 1;
+	      push(@$newleaves,$node);
+	      $added{$node} = 1;
 	    }
 	    next NODE;
 	    #return 'placed';
-	}
+	  }
 	############################################################
 	# place here if it extends a node. 
 	# 'Delete' leaf and add new leaf.
@@ -710,29 +719,30 @@ sub check_tree{
 		    $self->tag_extension_ancestors($root);
 		    
 		}
+
 		############################################################
 		# this is a new leaf of this inclusion sub-tree 
 		# ( and of the main tree if it has not been included or extended before
 		unless( $added{$newnode} ){
-		    my $label;
-		    if ($root){
-			$label = "subtree";
-			print STDERR "adding newnode as leaf of this $label\n" if $verbose;
-			push(@$newleaves,$newnode);
-			$added{$newnode} = 1;
-		    }
-		    elsif( !$newnode->is_included && !$newnode->is_extended ){
-			$label = "tree";
-			print STDERR "adding newnode as leaf of this $label\n" if $verbose;
-			push(@$newleaves,$newnode);
-			$added{$newnode} = 1;
-		    }
-		    # tag this node and all the extension ancestors recursively
-		    $self->tag_extension_ancestors($node);
-		    $placed++;
-		    next NODE;
+		  my $label;
+		  if ($root){
+		    $label = "subtree";
+		    print STDERR "adding newnode as leaf of this $label\n" if $verbose;
+		    push(@$newleaves,$newnode);
+		    $added{$newnode} = 1;
+		  }
+		  elsif( !$newnode->is_included && !$newnode->is_extended ){
+		    $label = "tree";
+		    print STDERR "adding newnode as leaf of this $label\n" if $verbose;
+		    push(@$newleaves,$newnode);
+		    $added{$newnode} = 1;
+		  }
+		  # tag this node and all the extension ancestors recursively
+		  $self->tag_extension_ancestors($node);
+		  $placed++;
+		  next NODE;
 		}
-	    }
+	      }
 	    ############################################################
 	    # else, recover the leaf if it has not been added before and continue
 	    else{
@@ -944,88 +954,88 @@ sub _recurse_extension_branch{
   ############################################################
   # recurse along the extension branch if there is any
   if ( @{$node->extension_parents} ){
-      print STDERR "inclusion -> go to extension parent\n" if $verbose;
+    print STDERR "inclusion -> go to extension parent\n" if $verbose;
       my $placed = 0;
-      
-    PARENT:
-      foreach my $parent_node ( @{$node->extension_parents} ){
+    
+  PARENT:
+    foreach my $parent_node ( @{$node->extension_parents} ){
 	  
-	  # skip if already visited (extended)
-	  if ( $self->is_visited($parent_node) ){
-	      print STDERR "skipping this node - already visited\n" if $verbose;
-	      next PARENT;
-	  }
-	  
-	  my $result2 = $self->check_node( $newnode, $parent_node );
-	  if ( $result2 eq 'extension' || $result2 eq 'no-overlap' ){
-	      
-	      #print STDERR "is there an inclusion tree on this node: ".$node->transcript->dbID."\n" if $verbose;
-	      
-	      ############################################################
-	      # if there is an inclusion tree and is valid, then check
-	      if ( defined $node->inclusion_tree ){
-		  my @tree = map { $_->transcript->dbID } @{$node->inclusion_tree};
-		  print STDERR "checking the inclusion tree : @tree\n" if $verbose;
-		  
-		  my $result3 = $self->check_tree( $newnode, $node->inclusion_tree , $node);
-		  
-		  print STDERR "result = $result3\n" if $verbose;
-		  if ( $result3 eq 'placed' ){
-		      $placed++;
-		  }
-		  ############################################################
-		  # place here if no overlap, we know it is included
-		  elsif( $result3 eq 'continue' || $result3 eq 'no-overlap' ){
-		      print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
-		      $node->add_inclusion_child($newnode);
-		      $newnode->add_inclusion_parent($node);
-		      $newnode->is_included(1);
-		      $self->tag_extension_ancestors($node);
-		      if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
-			  print STDERR "adding extension of ".
-			      $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
-			  $newnode->add_extension_parent($parent_node);
-			  $parent_node->is_extended(1);
-			  $self->tag_extension_ancestors($parent_node);
-		      }
-		      $placed++;}
-		  elsif( $result3 eq 'placed' ){
-		    $placed++;
-		    next PARENT;
-		  }
-	      }
-	      ############################################################
-	      # else place here
-	      else{
-		  print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
-		  $node->add_inclusion_child( $newnode );
-		  $newnode->add_inclusion_parent( $node );
-		  $newnode->is_included(1);
-		  $self->tag_extension_ancestors($node);
-		  if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
-		      print STDERR "adding extension of ".
-			  $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
-		      $newnode->add_extension_parent($parent_node);
-		      $parent_node->is_extended(1);
-		      $self->tag_extension_ancestors($parent_node);
-		  }
-		  $placed++;
-	      }
-	  }
-	  elsif( $result2 eq 'placed'){
-	      $placed++;
-	  }
-	} # end of PARENT
+      # skip if already visited (extended)
+      if ( $self->is_visited($parent_node) ){
+	print STDERR "skipping this node - already visited\n" if $verbose;
+	next PARENT;
+      }
       
-      ############################################################
-      # continue if we didn't place it
-      if ($placed){
-	  return 'placed';
+      my $result2 = $self->check_node( $newnode, $parent_node );
+      if ( $result2 eq 'extension' || $result2 eq 'no-overlap' ){
+	
+	#print STDERR "is there an inclusion tree on this node: ".$node->transcript->dbID."\n" if $verbose;
+	
+	############################################################
+	# if there is an inclusion tree and is valid, then check
+	if ( defined $node->inclusion_tree ){
+	  my @tree = map { $_->transcript->dbID } @{$node->inclusion_tree};
+	  print STDERR "checking the inclusion tree : @tree\n" if $verbose;
+	  
+	  my $result3 = $self->check_tree( $newnode, $node->inclusion_tree , $node);
+	  
+	  print STDERR "result = $result3\n" if $verbose;
+	  if ( $result3 eq 'placed' ){
+	    $placed++;
+	  }
+	  ############################################################
+	  # place here if no overlap, we know it is included
+	  elsif( $result3 eq 'continue' || $result3 eq 'no-overlap' ){
+	    print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
+	    $node->add_inclusion_child($newnode);
+	    $newnode->add_inclusion_parent($node);
+	    $newnode->is_included(1);
+	    $self->tag_extension_ancestors($node);
+	    if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
+	      print STDERR "adding extension of ".
+		$newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
+	      $newnode->add_extension_parent($parent_node);
+	      $parent_node->is_extended(1);
+	      $self->tag_extension_ancestors($parent_node);
+	    }
+	    $placed++;}
+	  elsif( $result3 eq 'placed' ){
+	    $placed++;
+	    next PARENT;
+	  }
+	}
+	############################################################
+	# else place here
+	else{
+	  print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$node->transcript->dbID."\n" if $verbose;
+	  $node->add_inclusion_child( $newnode );
+	  $newnode->add_inclusion_parent( $node );
+	  $newnode->is_included(1);
+	  $self->tag_extension_ancestors($node);
+	  if ( $self->compare( $newnode, $parent_node ) eq 'extension' ){
+	    print STDERR "adding extension of ".
+	      $newnode->transcript->dbID." to ".$parent_node->transcript->dbID."\n" if $verbose;
+	    $newnode->add_extension_parent($parent_node);
+	    $parent_node->is_extended(1);
+	    $self->tag_extension_ancestors($parent_node);
+	  }
+	  $placed++;
+	}
       }
-      else{
-	  print STDERR "could not place it - continue\n" if $verbose;
-	  return 'continue';
+      elsif( $result2 eq 'placed'){
+	$placed++;
       }
+    } # end of PARENT
+    
+    ############################################################
+    # continue if we didn't place it
+    if ($placed){
+      return 'placed';
+    }
+    else{
+      print STDERR "could not place it - continue\n" if $verbose;
+      return 'continue';
+    }
   }
   ############################################################
   # else, check the inclusion branch if any
@@ -1259,7 +1269,7 @@ sub _cluster_Transcripts_by_genomic_range{
   }
 
   # filter some small transcripts:
-  my @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @mytranscripts;
+  #my @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @mytranscripts;
   
   # take only the longest 50;
   #@mytranscripts = ();
@@ -1271,7 +1281,7 @@ sub _cluster_Transcripts_by_genomic_range{
   #}
   
   # first sort the transcripts
-  @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 			if ($result){
 			  return $result;
 			}
@@ -1304,10 +1314,10 @@ sub _cluster_Transcripts_by_genomic_range{
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
     
-    print STDERR "\nIn cluster ".($count+1)."\n";
-    print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
-    print STDERR "comparing:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
+    #print STDERR "\nIn cluster ".($count+1)."\n";
+    #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
+    #print STDERR "comparing:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
     
     if ( !( $self->transcript_high($transcripts[$c]) < $cluster_starts[$count] ||
 	    $self->transcript_low($transcripts[$c])  > $cluster_ends[$count] ) ){
@@ -1333,7 +1343,33 @@ sub _cluster_Transcripts_by_genomic_range{
       push(@clusters,$cluster);
     }
   }
-  return @clusters;
+  
+  my @new_clusters;
+  my $cutoff = 0;
+  if ( $cutoff ){
+    my $ccount = 0;
+    foreach my $cluster ( @clusters ){
+      $ccount++;
+      my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
+      push( @new_clusters, $new_cluster );
+      my @transcripts = @{$cluster->get_Transcripts};
+      print STDERR "cluster $ccount: ".scalar(@transcripts)." transcripts\n";
+      @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @transcripts;
+      
+      #take only the longest 50;
+      my $c = 0;
+      foreach my $trans ( @transcripts ){
+	$c++;
+        $new_cluster->put_Transcripts( $trans );
+	last if $c == 50;
+      }
+      print STDERR "new_cluster $ccount: ".scalar( @{$new_cluster->get_Transcripts} )." transcripts\n";
+    }
+    return @new_clusters;
+  }
+  else{
+    return @clusters;
+  }
 }
 
 ############################################################
