@@ -182,8 +182,7 @@ sub run {
 
   # set the working directory (usually /tmp)
   $self->workdir('/tmp') unless ($self->workdir());
-  print STDERR" working directory ".$self->workdir()."\n";
-
+  
   # results go here:
   $self->results($self->workdir()."/results.$$");
   
