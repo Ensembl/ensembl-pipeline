@@ -134,7 +134,7 @@ sub transcripts{
 sub score_Transcripts{
   my ($self) = @_;
 
-  print STDERR "**************** label : ".$self->_label."\n";
+  #print STDERR "**************** label : ".$self->_label."\n";
   my $verbose = $self->verbose;
   
   ############################################################
@@ -171,7 +171,7 @@ sub score_Transcripts{
 	$label = $self->_label;
 	
 	$tran_id = $label."_".$cluster_count."_1";
-	print STDERR "transcript: $tran_id (single transcript)\n";
+	#print STDERR "transcript: $tran_id (single transcript)\n";
 	$trans[0]->stable_id($tran_id);
       }
       else{
@@ -182,7 +182,7 @@ sub score_Transcripts{
 	$exon->score( 100 );
       }
       my @list = @{ $self->hold_list($trans[0]) };
-      print STDERR "SINGLE_TRAN\t".
+      #print STDERR "SINGLE_TRAN\t".
 	$tran_id."\t".
 	  "exons:".scalar(@exons)."\t".
 	    "ests:".scalar(@list)."\t".
@@ -199,7 +199,7 @@ sub score_Transcripts{
 	$gene_id = $cluster_count;
       }
       
-      print STDERR "GENE\t".
+      #print STDERR "GENE\t".
 	$gene_id."\t".
 	  "sites:0\t".
 	    "trans:1\t".
@@ -240,7 +240,7 @@ sub score_Transcripts{
       
 	$tran_id = $label."_".$cluster_count."_".$tran_count;
 	$tran->stable_id($tran_id);
-	print STDERR "transcript: $tran_id\n";
+	#print STDERR "transcript: $tran_id\n";
       }
       else{
 	$tran_id = $cluster_count."_".$tran_count;
@@ -342,7 +342,7 @@ sub score_Transcripts{
 	############################################################
 	# TRAN number_ests number_sites max_num_sites_covered:
 	
-	print STDERR "TRAN\t".
+	#print STDERR "TRAN\t".
 	  $tran_id."\t".
 	    "exons:".$exons."\t".
 	      "ests:".scalar(@list)."\t".
@@ -392,7 +392,7 @@ sub score_Transcripts{
 	$site_string .= $string;
       }
       
-      print STDERR "SITE\tcoverage:$site_coverage{$site}\t".
+      #print STDERR "SITE\tcoverage:$site_coverage{$site}\t".
 	"trans:$trans_number\t".
 	  "trans_with_site:$trans_with_site{$site}\t".
 	    "$site_string\n";
@@ -408,7 +408,7 @@ sub score_Transcripts{
     
     my $gene_id = $label."_".$cluster_count;
     
-    print STDERR "GENE\t".
+    #print STDERR "GENE\t".
       $gene_id."\t".
 	"sites:".$cluster_sites."\t".
 	  "trans:".$trans_number."\t".
@@ -530,7 +530,7 @@ sub get_alternative_sites{
   ############################################################
   # sites of alternative splicing are described by a cluster of exons 
   # which has genomic coordinates
-  print STDERR scalar(@sites)." sites found\n";
+  #print STDERR scalar(@sites)." sites found\n";
   return (\@sites, $exon_clusters_count);
 }
   
@@ -636,12 +636,12 @@ sub cluster_Transcripts {
     if ( $forward_trans ){
 	my $f_clusters = $self->cluster_Transcripts_by_strand($forward_trans);
 	push( @clusters, @{$f_clusters} );
-	print STDERR scalar( @{$f_clusters} ). " clusters on forward strand\n";
+	#print STDERR scalar( @{$f_clusters} ). " clusters on forward strand\n";
     }
     if ( $reverse_trans ){
 	my $r_clusters = $self->cluster_Transcripts_by_strand($reverse_trans);
 	push( @clusters, @{$r_clusters} );
-	print STDERR scalar( @{$r_clusters} ). " clusters on reverse strand\n";
+	#print STDERR scalar( @{$r_clusters} ). " clusters on reverse strand\n";
     }
     return \@clusters;
 }
@@ -733,7 +733,7 @@ sub cluster_Transcripts_by_strand {
 	$ntrans += scalar(@{$cluster->get_Transcripts});
 	foreach my $trans (@{$cluster->get_Transcripts}) {
 	    if (defined($trans_check_hash{"$trans"})) {
-		print STDERR ("Transcript " . $trans->dbID . " added twice to clusters\n") ;
+		#print STDERR ("Transcript " . $trans->dbID . " added twice to clusters\n") ;
 	    }
 	    $trans_check_hash{"$trans"} = 1;
 	}
