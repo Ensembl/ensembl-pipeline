@@ -79,13 +79,25 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
+use Bio::EnsEMBL::Pipeline::Config::Blast;
+
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-    require "Bio/EnsEMBL/Pipeline/Blast_conf.pl";
 }
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+
+
+# package variable for fasta header regexes
+# probably not best way of doing this
+my %FASTA_HEADER;
+
+foreach my $db (@$DB_CONFIG) {
+    my ($name, $header) = ($db->{'name'}, $db->{'header'});
+    $FASTA_HEADER{$name} = $header if $db && $name;
+}
+
 
 =head2 new
 
@@ -284,7 +296,7 @@ sub run_analysis {
         if (defined($::pipeConf{blast}) && $::pipeconf{blast} eq 'ncbi') {
             $command .= " -d $database -i $filename ";
         } else {
-            $command .= " $database $filename ";
+            $command .= " $database $filename -gi ";
         }
         $command .= ' '.$self->options. ' > '.$self->results . ".$db";
 
@@ -435,7 +447,7 @@ sub parse_results {
     unless ($name) {
         $self->throw("Error getting a valid accession from \"" .
         $fasta_header .
-        "\"; check your Blast_conf and / or blast headers");
+        "\"; check your Config/Blast.pm and / or blast headers");
     }
 
     # print STDERR "Name " . $fasta_header . "\n";
@@ -1079,7 +1091,7 @@ sub database {
       $self->{'_database'} = $db;
       $db =~ s!.*/!!;   # strip of leading path components
 
-      unless ($re_string = $::fasta_header_re{$db}) {
+      unless ($re_string = $FASTA_HEADER{$db}) {
         $self->throw("Must define an RE for database $db");
       }
       $self->blast_re($re_string);
