@@ -573,7 +573,7 @@ sub prune_Transcripts {
       $tran->sort;
       my @exons = @{$tran->get_all_Exons};
             
-      #print STDERR "\ntranscript: ".$tran->{'temporary_id'}."\n";
+      #print STDERR "\ntranscript: ".$tran->dbID."\n";
       #foreach my $exon ( @exons ){
       #  print STDERR $exon->start."-".$exon->end." ";
       #}
@@ -645,10 +645,10 @@ sub prune_Transcripts {
 		# transfer evidence between exons, assuming the suppfeat coordinates are OK.
 		# currently not working as the supporting evidence is not there - 
 		# can get it for genewsies, but why not there for genscans?
-			      $self->transfer_supporting_evidence($exon1, $exon1a);
-			      $self->transfer_supporting_evidence($exon1a, $exon1);
-			      $self->transfer_supporting_evidence($exon2, $exon2a);
-			      $self->transfer_supporting_evidence($exon2a, $exon2);
+			      $self->transfer_supporting_evidence($exon1, $first_exon);
+			      $self->transfer_supporting_evidence($first_exon, $exon1);
+			      $self->transfer_supporting_evidence($exon2, $second_exon);
+			      $self->transfer_supporting_evidence($second_exon, $exon2);
 	      }
 	    }
 	  }
@@ -1799,7 +1799,7 @@ sub transfer_supporting_evidence{
 	next SOURCE_FEAT;
       }
     }
-    #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
+    #print STDERR "from ".$source_exon->dbID." to ".$target_exon->dbID."\n";
     #$self->print_FeaturePair($feat);
     $target_exon->add_supporting_features($feat);
     $unique_evidence{ $feat } = 1;
