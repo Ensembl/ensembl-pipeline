@@ -490,24 +490,12 @@ sub cluster_features {
   # Sort the list of features according to their percent id.
   my @sorted_features = sort { $b->percent_id <=> $a->percent_id;} @$features;
 
-  # With sorted features, sequentially blast the 
-  # highest scoring hit against the lesser scoring
-  # sequences.  Hits that have high identity are clustered
-  # in an array of features and these hits removed from 
-  # the blast db.  Next, the  remaining highest hit is 
-  # blasted against the remaining lesser scoring hits, and
-  # so on.  If a feature doesn't hit anything it is
-  # discarded.  
-  
-  # NOTE: At the moment each lesser scoring feature is 
-  # separately blasted with the top scoring feature.  If all
-  # features are blasted together at the same time there is
-  # no way to keep track of which feature is which when then
-  # are returned.  This multiple blasting may be slow way of
-  # finding similar features.  An alternative might be to
-  # pad the non-matching nucleotides of a genomic fragment
-  # with Ns - this will still give the right  matches, in a
-  # recognisable coordinate system.  Yuck though.
+  # With the sorted features, we iteratively check each     
+  # highest scoring hit against each lesser scoring
+  # sequence.  Features that correspond to the same part of 
+  # the hit sequence (ie, are overlapping) are clustered
+  # in an array of 'exons' (and removed from the 
+  # sorted_features array). 
   
   my @all_feature_clusters;
   
@@ -519,13 +507,9 @@ sub cluster_features {
     push (@similar_features, $top_feature);
 
     my @subtracted_sorted_features;
-    for(my $i = 0; $i < scalar @sorted_features; $i++) {
-      my $lesser_feature = @sorted_features[$i];
-      
-      my @matched_feature = $self->blast_features($top_feature,
-						  [$lesser_feature]);
-      
-      if ((@matched_feature)&&($matched_feature[0]->percent_id > 95)){
+    foreach my $lesser_feature (@sorted_features) {
+
+      if ($self->check_overlap($top_feature,$lesser_feature)){
 
 	push (@similar_features, $lesser_feature);
 
@@ -540,7 +524,6 @@ sub cluster_features {
   }
 
   return \@all_feature_clusters;
-
 }
 
 =head2 form_gene_clusters
@@ -669,89 +652,55 @@ sub make_mmgw {
 
 
 
-=head2 blast_features
+=head2 check_overlap
 
   Args [1]   : query_feature - any kind of align feature.
-  Args [2]   : other features - a reference to a list of 
-               features that will be used as the db sequences.
-  Example    : $self->blast_features($query_feature, $db_features);
-  Description: Runs a blast job of a query blast feature
-               against an array of other blast features.
-               Currently is used to determine they level of
-               identity between blast features.  This is by
-               no means the best way to this, but for now it
-               works well.  This method is sufficiently
-               different to $self->run_blast that it cant be
-               merged in a neat way.
-  Returntype : A list of matched features.              
+  Args [2]   : other feature - another align feature that is
+               to be checked for substantial overlap with the
+               query feature.
+  Example    : $self->check_overlap($query_feature, $other_feature);
+  Description: Checks two features for greater than 90% hit overlap.
+               Features must be blast-generated align features 
+               resultant from a blast run against a common hit
+               sequence.
+  Returntype : 0 or 1
   Exceptions : none
-  Caller     : *ONLY* $self->make_runnables
+  Caller     : $self->cluster_features
 
 =cut
 
 
-sub blast_features {
-  my ($self, $query_feature, $blast_features) = @_;
+sub check_overlap {
+  my ($self, $query_feature, $other_feature) = @_;
 
-  # Obtain a sequence from each blast feature in order to
-  # create a blast-able database.  We are only concerned
-  # with strand so as to hand seq->subseq start and end
-  # coords in the right order.  The database may be made with
-  # sequence from the wrong strand, but this doesnt matter
-  # for our purposes.
+  my $query_start = $query_feature->{_gsf_start};
+  my $query_end   = $query_feature->{_gsf_end};
 
-  my @db_seqs;
-
-  foreach my $blast_feature (@$blast_features){
-
-    my ($feat_start, $feat_end) = sort {$a <=> $b;} $blast_feature->{_hstart}, $blast_feature->{_hend};
-
-    my $feat_seq = Bio::Seq->new(
-                     -seq => $self->genomic_sequence->subseq($feat_start, $feat_end),
-		     -id  => $blast_feature->seqname);
-
-    push (@db_seqs, $feat_seq);
-  }
-
-
-  my $blast_db     = new Bio::EnsEMBL::Pipeline::Runnable::BlastDB(
-					 -sequences => \@db_seqs,
-					 -type      => 'DNA');
-
-  $blast_db->run;
-
-  my $db_name = $blast_db->dbname;
-
-  # With a database now at hand, bam, make a query sequence object and time for the run.
-  my ($query_start, $query_end) = sort {$a <=> $b;} $query_feature->{_hstart}, $query_feature->{_hend};
-
-  my $query_seq = Bio::Seq->new(
-	           -seq => $self->genomic_sequence->subseq($query_start, $query_end),
-		   -id  => $query_feature->seqname);
-
-  # BlastConf.pl magic that sets the correct regular expression
-  # for parsing the header of the query sequence.
-
-  if ($query_seq->id =~ /\W*\w+/){
-    $::fasta_header_re{$db_name} = '\W*(\w+)';
-  } else {
-    $self->warn('Problem with regex - unlikely to be parsing correct sequence ids.');
-  }
-
-  my $blast = new Bio::EnsEMBL::Pipeline::Runnable::Blast(
-			      -query    => $query_seq,
-			      -program  => 'wublastn',
-			      -database => $blast_db->dbfile,
-			      -filter => 0,
-			      );
-  $blast->run;
+  if ($query_start > $query_end){($query_start, $query_end) = ($query_end, $query_start)}
   
-  $blast_db->remove_index_files;
-  unlink $blast_db->dbfile;
+  my $other_start = $other_feature->{_gsf_start};
+  my $other_end   = $other_feature->{_gsf_end};
   
-  return $blast->output;
+  if ($other_start > $other_end) {($other_start, $other_end) = ($other_end, $other_start)}
+  
+  unless ($query_end < $other_start || $query_start > $other_end){
+    # We have overlapping features
+    
+    my $query_length = $query_end - $query_start;
+    my $other_length = $other_end - $other_start;
+    
+    my ($start1, $start2, $end1, $end2) = sort {$a <=> $b} ($query_start, $other_start, $query_end, $other_end);
+    
+    my $overlap = $end1 - $start2;
+    
+    if (($overlap >= (0.9 * $query_length))&&($overlap >= (0.9 * $other_length))){
+      return 1
+    }
+  }
+    
+return 0;    
 }
-
+  
 
 
 sub get_Sequences {
