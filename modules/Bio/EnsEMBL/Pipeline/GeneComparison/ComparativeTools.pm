@@ -44,11 +44,6 @@ use Bio::EnsEMBL::Root;
 
 =head2 get_all_syntenic_slices
 
-
-=cut
-
-=head2 test_for_synteny_breaking
-
    Args       : $focus_slice     -> slice of which we want to retrieve the syntenic slices
                 $focus_db        -> db used by compara for the dna matches
                 $focus_species   -> the species for the transcript $transcript
@@ -70,7 +65,7 @@ sub get_all_syntenic_slices{
   
   ############################################################
   # store the size of the focus slice:
-  my $focus_length = $focus_slice->chr_end - $focus_slice->chr_start + 1 ;
+  my $focus_length = $focus_slice->chr_end - $focus_slice->chr_start + 1;
   print STDERR "search syntenic slice of ".$focus_slice->chr_name."."
     .$focus_slice->chr_start."-".$focus_slice->chr_end."\n";
   
@@ -187,6 +182,10 @@ sub get_all_syntenic_slices{
 sub test_for_synteny_breaking{
   my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold ) = @_;
 
+  unless ($threshold){
+    $threshold = 60;
+  }
+
   ############################################################
   # transcript is a transcript
   my @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
@@ -243,8 +242,11 @@ sub test_for_synteny_breaking{
   # run exonerate for each gene: left-flanking, transcript and right-flanking gene
   # take the orthologue with best coverage:
   my $synteny_breaking = 0;
+  my $synteny_is_broken = 1;
+
   foreach my $target_slice (@target_slices){
-    print STDERR "running exonerate with ".$target_slice->chr_name.".".$target_slice->chr_start."-".$target_slice->chr_end."\n";
+    print STDERR "running exonerate with ".
+      $target_slice->chr_name.".".$target_slice->chr_start."-".$target_slice->chr_end."\n";
     
     my @left_orthology_genes;
     my @right_orthology_genes;
@@ -258,7 +260,7 @@ sub test_for_synteny_breaking{
 	print STDERR "left ortholog - coverage: ".$self->_coverage( $sorted_left[0] )."\n";
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $sorted_left[0],1 );
       }
-      @left_orthology_genes  =  @{$self->filter_by_coverage( \@sorted_left, 80 )};
+      @left_orthology_genes  =  @{$self->filter_by_coverage( \@sorted_left, $threshold )};
     }
     
     ############################################################
@@ -270,7 +272,7 @@ sub test_for_synteny_breaking{
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $sorted_right[0],1 );
       }
       
-      @right_orthology_genes = @{$self->filter_by_coverage( \@sorted_right, 80 )};
+      @right_orthology_genes = @{$self->filter_by_coverage( \@sorted_right, $threshold )};
     }
 
     ############################################################
@@ -281,7 +283,7 @@ sub test_for_synteny_breaking{
 	print STDERR "\"transcript\" ortholog - coverage: ".$self->_coverage( $sorted[0] )." \n";
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $sorted[0],1 );
       }
-      @orthology_transcripts =  @{$self->filter_by_coverage( \@sorted, 80 )};
+      @orthology_transcripts =  @{$self->filter_by_coverage( \@sorted, $threshold )};
     }
     
     ############################################################
@@ -294,9 +296,21 @@ sub test_for_synteny_breaking{
       print STDERR "There is synteny breaking\n";
       $synteny_breaking = 1;
     }
-    
-    if (  $left_orthology_genes[0] && $orthology_transcripts[0] && $right_orthology_genes[0] ){
-      print STDERR "all genes have orthologs\n";
+    elsif (  !$left_orthology_genes[0] && !$orthology_transcripts[0] && !$right_orthology_genes[0] ){
+      print STDERR "there is no synteny at all\n";
+      $synteny_breaking = 1;
+    }
+    elsif (  $left_orthology_genes[0] && $orthology_transcripts[0] && $right_orthology_genes[0] 
+	     ||
+	     !$left_orthology_genes[0] && $orthology_transcripts[0] && $right_orthology_genes[0] 
+	     ||
+	     $left_orthology_genes[0] && $orthology_transcripts[0] && !$right_orthology_genes[0] 
+	     ||
+	     !$left_orthology_genes[0] && $orthology_transcripts[0] && !$right_orthology_genes[0] 
+	  ){
+
+      # one occurrence of synteny conservation is enough to flag it as preserved
+      $synteny_is_broken = 0;
       if ( $left_orthology_genes[0]->end < $orthology_transcripts[0]->start 
 	   &&
 	   $right_orthology_genes[0]->start > $orthology_transcripts[0]->end 
@@ -309,13 +323,9 @@ sub test_for_synteny_breaking{
 	$synteny_breaking = 0;
       }
     }
-    
-    if (  !$left_orthology_genes[0] && !$orthology_transcripts[0] && !$right_orthology_genes[0] ){
-      print STDERR "there is no synteny at all\n";
-      $synteny_breaking = 1;
-    }
+
   }
-  return $synteny_breaking;
+  return $synteny_is_broken;
 }
 ############################################################
 
@@ -439,6 +449,10 @@ sub get_flanking_genes{
 sub test_for_orthology{
   my ($self, $transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold ) = @_;
   
+  #unless( $threshold ){
+  #  $threshold = 60;
+  #}
+
   ############################################################
   my @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
   my $low    = $exons[0]->start;
