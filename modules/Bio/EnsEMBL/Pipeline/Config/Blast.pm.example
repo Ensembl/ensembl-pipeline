@@ -1,0 +1,91 @@
+# EnsEMBL module for Bio::EnsEMBL::Pipeline::Config::Blast;
+#
+# You may distribute this module under the same terms as perl itself
+
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::Blast
+
+=head1 SYNOPSIS
+
+    use Bio::EnsEMBL::Pipeline::Config::Blast;
+    use Bio::EnsEMBL::Pipeline::Config::Blast qw();
+
+=head1 DESCRIPTION
+
+Configuration for blast-type analyses. Primarily this is used to
+specify a regex for each database that is used to extract the
+correct accession.
+
+It imports and sets a number of standard global variables into the
+calling package. Without arguments all the standard variables are set,
+and with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%Config> hash is asked to be set.
+
+The variables can also be references to arrays or hashes.
+
+Edit C<%Config> to add or alter variables.
+
+All the variables are in capitals, so that they resemble environment
+variables.
+
+=head1 CONTACT
+
+B<ensembl-dev@ebi.ac.uk>
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::Blast;
+
+use strict;
+use vars qw(%Config);
+
+%Config = (
+    DB_CONFIG => [
+        { 
+            name    => 'embl_vertrna',
+            type    => 'dna',
+            header  => '\w+\s+(\w+)',
+	    flavour => 'wu',
+	    ungapped => 0
+        },
+        { 
+            name    => 'swall',
+            type    => 'protein',
+            header  => '^\w+\s+(\w+)',
+	    flavour => 'wu'
+        }
+    ]
+);
+
+sub import {
+    my ($callpack) = caller(0); # Name of the calling package
+    my $pack = shift; # Need to move package off @_
+
+    # Get list of variables supplied, or else all
+    my @vars = @_ ? @_ : keys(%Config);
+    return unless @vars;
+
+    # Predeclare global variables in calling package
+    eval "package $callpack; use vars qw("
+         . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if (defined $Config{ $_ }) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Config{ $_ };
+	} else {
+	    die "Error: Config: $_ not known\n";
+	}
+    }
+}
+
+1;
