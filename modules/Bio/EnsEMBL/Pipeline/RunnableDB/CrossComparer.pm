@@ -83,7 +83,7 @@ sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
     my ($score) = $self->_rearrange([qw(MIN_SCORE)],@args);
-    
+    bless $self, $class;
     $score ||= 100;
     $self->min_score($score);
     return $self; 
@@ -107,7 +107,7 @@ sub fetch_input {
     my $input_id  = $self->input_id;
 
     my ($db1,$db2,$c1,$c2);
-    if ($input_id =~ /(.+)\-(.+)\~(.+)\-(.+)/ ) {
+    if ($input_id =~ /(\S+):(\S+)::(\S+):(\S+)/ ) {
 	$db1 = $1;
 	$c1 = $2;
 	$db2 = $3;
@@ -120,8 +120,10 @@ sub fetch_input {
     $self->_c1_id($c1);
     $self->_c2_id($c2);
 
-    my $db1 = Bio::EnsEMBL::DBLoader->new($db1);
-    my $db2 = Bio::EnsEMBL::DBLoader->new($db2);
+    my $gadp = $self->dbobj->get_GenomeDBAdaptor();
+
+    my $db1 = $gadp->fetch_by_species_tag($db1)->ensembl_db();
+    my $db2 = $gadp->fetch_by_species_tag($db2)->ensembl_db();
 
     my $contig1 = $db1->get_Contig($c1);
     my $contig2 = $db2->get_Contig($c2);
@@ -133,7 +135,7 @@ sub fetch_input {
 								   -nocopy => 1,
 								   -seq1 => $seq1,
 								   -seq2 => $seq2,
-								   -score => $self->min_score(),
+								   -score => 0,
 								   );
     $self->runnable($cross);
 }
@@ -191,12 +193,23 @@ sub output{
 sub write_output {
     my($self) = @_;
 
+
+
     my @features = $self->output;
     foreach my $f (@features) {
-	print $f->seqname."\t".$f->start."\t".$f->end."\tscore:".$f->score."\t".$f->strand."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
+        print "Got feature $f\n";
+
+	#print $f->seqname."\t".$f->start."\t".$f->end."\tscore:".$f->score."\t".$f->strand."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
     }
     my $db = $self->dbobj();
     print STDERR "Going to write to ".$db->dbname."\n";
+
+# Use write.t as an example for building the genomic align datastructure
+# make sure you write back dnafrag objects first into the database.
+
+
+
+    $self->throw("Have not delt with write back yet");
 
 #    foreach my $f (@features) {
 #		    my $contig = $contig_hash{$c};
