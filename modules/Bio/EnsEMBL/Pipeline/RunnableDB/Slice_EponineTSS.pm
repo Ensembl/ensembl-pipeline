@@ -57,6 +57,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::EponineTSS;
+use Bio::EnsEMBL::Pipeline::Config::General;
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -78,7 +79,7 @@ sub fetch_input {
 
     my $slice_str = $self->input_id;
     my ($chr, $start, $end, $sgp) =
-     $slice_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
+     $slice_str =~ m!$SLICE_INPUT_ID_REGEX!;
 
     $self->db->assembly_type($sgp) if $sgp;
 
