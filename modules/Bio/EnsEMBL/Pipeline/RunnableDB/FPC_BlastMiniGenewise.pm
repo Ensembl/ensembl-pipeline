@@ -710,9 +710,9 @@ sub make_seqfetcher {
 
   Title   :   each_seqfetcher
   Usage   :   my @seqfetchers = $self->each_seqfetcher
-  Function:   Returns an array of Bio::DB::RandomAccessI representing the various sequence indices 
+  Function:   Returns an array of Bio::EnsEMBL::Pipeline::SeqFetcher representing the various sequence indices 
               listed in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES
-  Returns :   Array of Bio::DB::RandomAccessI
+  Returns :   Array of Bio::EnsEMBL::Pipeline::SeqFetcher
   Args    :   none
 
 =cut
@@ -732,9 +732,9 @@ sub each_seqfetcher {
 
   Title   :   each_seqfetcher_by_type
   Usage   :   my %seqfetchers_by_type = $self->each_seqfetcher_by_type
-  Function:   Returns a hash of Bio::DB::RandomAccessI representing the various sequence indices 
+  Function:   Returns a hash of Bio::EnsEMBL::Pipeline::SeqFetcher representing the various sequence indices 
               listed in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES keyed by type listed therein.
-  Returns :   Hash of all seqfetchers linking db_type to Bio::DB::RandomAccessI
+  Returns :   Hash of all seqfetchers linking db_type to Bio::EnsEMBL::Pipeline::SeqFetcher
   Args    :   none
 
 =cut
@@ -754,10 +754,10 @@ sub each_seqfetcher_by_type {
 
   Title   :   add_seqfetcher_by_type
   Usage   :   $self->add_seqfetcher_by_type('swall', $seqfetcher)
-  Function:   Adds a Bio::DB::RandomAccessI into $self->{'_seqfetchers'} keyed by type
+  Function:   Adds a Bio::EnsEMBL::Pipeline::SeqFetcher into $self->{'_seqfetchers'} keyed by type
   Returns :   Nothing
   Args    :   $type - string representing db type
-              $seqfetcher - Bio::DB::RandomAccesI
+              $seqfetcher - Bio::EnsEMBL::Pipeline::SeqFetcher
 
 =cut
 
@@ -766,7 +766,7 @@ sub add_seqfetcher_by_type{
 
   &throw("no type specified\n") unless defined ($type); 
   &throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
-    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::DB::RandomAccessI"); 
+    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::EnsEMBL::Pipeline::SeqFetcher"); 
   $self->{'_seqfetchers'}{$type} = $seqfetcher;
 }
 
@@ -776,7 +776,7 @@ sub add_seqfetcher_by_type{
   Title   :   get_seqfetcher_by_type
   Usage   :   my $seqfetcher = $self->get_seqfetcher_by_type('swall')
   Function:   Fetches the seqfetcher associated with a particular db type as specified in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES
-  Returns :   Bio::DB::RandomAccessI
+  Returns :   Bio::EnsEMBL::Pipeline::SeqFetcher
   Args    :   $type - string representing db type
 
 =cut
