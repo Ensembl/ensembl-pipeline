@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::SeqIO;
 
@@ -131,7 +132,7 @@ sub fetch_input{
   $chr_name = $1;
   $start    = $2;
   $end      = $3;
-  print STDERR "input_id id : $chr_name .  $start - $end\n";  
+  #print STDERR "input_id id : $chr_name .  $start - $end\n";  
   
   # genewises db
   my $slice_adaptor = $self->genewise_db->get_SliceAdaptor();
@@ -141,8 +142,8 @@ sub fetch_input{
   # get genewise genes
   my @similarity_genes = @{$self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE,'evidence')};
   my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE,'evidence')};
-  print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
-  print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
+  #print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
+  #print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
   $self->gw_genes( @similarity_genes, @targetted_genes );
   
   # cdnas db
@@ -152,12 +153,12 @@ sub fetch_input{
   
   # get cdnas 
   my @e2g = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE,'evidence')};
-  print STDERR "got " . scalar(@e2g) . " cdnas ($GB_cDNA_GENETYPE)\n";
+  #print STDERR "got " . scalar(@e2g) . " cdnas ($GB_cDNA_GENETYPE)\n";
   
   # filter cdnas
   my @newe2g = $self->_filter_cdnas(@e2g);
   $self->e2g_genes(@newe2g);
-  print STDERR "got " . scalar($self->e2g_genes) . " cdnas after filtering\n";
+  #print STDERR "got " . scalar($self->e2g_genes) . " cdnas after filtering\n";
 }
 
 
@@ -168,7 +169,7 @@ sub run {
   
   # merge exons with frameshifts into a big exon
   my @merged_gw_genes = $self->_merge_gw_genes;
-  print STDERR "got " . scalar(@merged_gw_genes) . " merged genewise genes\n";  
+  #print STDERR "got " . scalar(@merged_gw_genes) . " merged genewise genes\n";  
   
   # first of all, sort genewises by exonic length and genomic length  
   @merged_gw_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
@@ -242,12 +243,12 @@ sub run {
     } @list;
     
     #test:
-    print STDERR "matching cdnas:\n";
+    #print STDERR "matching cdnas:\n";
     foreach my $overlap ( @list ){
-      print STDERR "cdna: ".$$overlap[2]->dbID.
-	", exon_overlap: ".$$overlap[0].
-	  ", extent_overlap: ".$$overlap[1].
-	    ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
+      #print STDERR "cdna: ".$$overlap[2]->dbID.
+	#", exon_overlap: ".$$overlap[0].
+	 # ", extent_overlap: ".$$overlap[1].
+	  #  ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
     }
     
     my $count = 0;
@@ -261,12 +262,12 @@ sub run {
     } while( $used_e2g{$e2g_match} ); 	      
     
     unless ( $e2g_match){
-      print STDERR "No cdna found for gw_gene".$gw->dbID." ";
+      #print STDERR "No cdna found for gw_gene".$gw->dbID." ";
       if ( $howmany == 0 ){
-	print STDERR "(no cdna matched this gw gene)\n";
+	#print STDERR "(no cdna matched this gw gene)\n";
       }
       if ( ($count - 1) == $howmany && $howmany != 0 ){
-	print STDERR "(all matching cdnas were already used)\n";
+	#print STDERR "(all matching cdnas were already used)\n";
       }
       next GENEWISE;
     }
@@ -274,9 +275,9 @@ sub run {
     $used_e2g{$e2g_match} = 1;
     
     
-    print STDERR "combining gw gene : " . $gw->dbID.":\n";
+    #print STDERR "combining gw gene : " . $gw->dbID.":\n";
     $self->_print_Gene($gw);
-    print STDERR "with e2g gene " . $e2g_match->dbID . ":\n";
+    #print STDERR "with e2g gene " . $e2g_match->dbID . ":\n";
     $self->_print_Gene($e2g_match);
     
     my $combined_transcript = $self->combine_genes($gw, $e2g_match);
@@ -310,7 +311,7 @@ sub _filter_cdnas{
   my ($self,@e2g) = @_;
   my @newe2g;
   
-  print STDERR "filtering ".scalar(@e2g)." cdnas\n";
+  #print STDERR "filtering ".scalar(@e2g)." cdnas\n";
  cDNA_GENE:
   foreach my $e2g (@e2g) {
     
@@ -330,11 +331,11 @@ sub _filter_cdnas{
 	# reject trnascripts with long introns
 	my $intron = $exons[$i]->start - $exons[$i-1]->end - 1;
 	if ($intron > $GB_COMBINED_MAX_INTRON) {
-	  print STDERR "rejecting trans_dbID: ".$tran->dbID." for long intron: ". $intron.">".$GB_COMBINED_MAX_INTRON."\n";
+	  #print STDERR "rejecting trans_dbID: ".$tran->dbID." for long intron: ". $intron.">".$GB_COMBINED_MAX_INTRON."\n";
 	  next cDNA_TRANSCRIPT;
 	}
       }
-      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+      #print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
       push(@newe2g,$e2g);
     }
   }
@@ -425,7 +426,7 @@ sub write_output {
   
   # write genes in the database: GB_COMB_DBNAME@GB_COMB_DBHOST
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
-  
+  print STDERR "have ".$self->output." genes to write\n";
  GENE: 
   foreach my $gene ($self->output) {	
     
@@ -481,7 +482,7 @@ sub make_gene{
     }
   }
   
-  print STDERR "Produced genes:\n";
+  #print STDERR "Produced genes:\n";
   foreach my $gene (@genes){
     $self->_print_Gene($gene);
   }
@@ -512,7 +513,7 @@ sub match_protein_to_cdna{
 
   my %UTR_hash;
   
-  print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
+  #print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
   my @matching_e2g;
   my @gw_tran = @{$gw->get_all_Transcripts};
   
@@ -640,7 +641,7 @@ sub match_protein_to_cdna{
 	       # or there are UTR exons to be added
 	       (abs($current_exon->end - $gw_exons[0]->end) <= $exon_slop &&
 		$current_exon != $eg_exons[0]))){
-	    print STDERR "fiveprime reverse match\n";
+	    #print STDERR "fiveprime reverse match\n";
 	    
 	    $fiveprime_match = 1;
 	    $right_exon  = $current_exon;
@@ -653,7 +654,7 @@ sub match_protein_to_cdna{
 		  # or there are UTR exons to be added
 		  (abs($current_exon->start - $gw_exons[$#gw_exons]->start) <= $exon_slop &&
 		   $current_exon != $eg_exons[$#eg_exons]))){
-	    print STDERR "threeprime reverse match\n";
+	    #print STDERR "threeprime reverse match\n";
 
 	    $threeprime_match = 1;
 	    $left_exon = $current_exon;
@@ -668,7 +669,7 @@ sub match_protein_to_cdna{
 	
 	# test
 	foreach my $egtran ( @{$e2g->get_all_Transcripts} ){
-	  print STDERR "Found cDNA match trans_dbID:".$egtran->dbID."\n";
+	  #print STDERR "Found cDNA match trans_dbID:".$egtran->dbID."\n";
 	}
       }
     }
@@ -734,9 +735,9 @@ sub _merge_gw_genes {
     ### we follow here 5' -> 3' orientation ###
     $trans[0]->sort;
    
-    print STDERR "checking for merge: ".$trans[0]->dbID."\n";
-    print STDERR "translation:\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans[0]);
+    #print STDERR "checking for merge: ".$trans[0]->dbID."\n";
+    #print STDERR "translation:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans[0]);
 
     my $cloned_translation = new Bio::EnsEMBL::Translation;
     
@@ -781,8 +782,8 @@ sub _merge_gw_genes {
 	    
 	    # the first exon (5'->3' orientation always) is the containing exon,
 	    # which gets expanded and the other exons are added into it
-	    print STDERR "merging $exon into $previous_exon\n";
-	    print STDERR $exon->start."-".$exon->end." into ".$previous_exon->start."-".$previous_exon->end."\n";
+	    #print STDERR "merging $exon into $previous_exon\n";
+	    #print STDERR $exon->start."-".$exon->end." into ".$previous_exon->start."-".$previous_exon->end."\n";
 	    
 	    $previous_exon->end($exon->end);
 	    $previous_exon->add_sub_SeqFeature($exon,'');
@@ -851,8 +852,8 @@ sub _merge_gw_genes {
     $merged_transcript->sort;
     $merged_transcript->translation($cloned_translation);
     
-    print STDERR "merged_transcript:\n";
-  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
+    #print STDERR "merged_transcript:\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
 
     # and gene
     $gene->add_Transcript($merged_transcript);
@@ -870,7 +871,7 @@ sub combine_genes{
 
   my $modified_peptide = 0;
   my @combined_transcripts  = ();
-  
+  print STDERR "COMBINING GENES\n";
   # should be only 1 transcript
   my @gw_tran  = @{$gw->get_all_Transcripts};
   #  $gw_tran[0]->sort;
@@ -878,7 +879,12 @@ sub combine_genes{
   my @egtran = @{$e2g->get_all_Transcripts};
   #  $egtran[0]->sort;
   my @e2g_exons  = @{$egtran[0]->get_all_Exons}; # ordered array of exons
-  
+  print STDERR "1 genewise gene ";
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($gw_tran[0]);
+  print STDERR "\n\n";
+  print STDERR "2 est2genome gene ";
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($egtran[0]);
+  print STDERR "\n\n";
   # OK, let's see if we need a new gene
   # base it on the existing genewise one
   my $newtranscript = new Bio::EnsEMBL::Transcript;
@@ -995,16 +1001,16 @@ sub combine_genes{
     if ( $modified_peptide ){
       my $strand = $newtranscript->start_Exon->strand;
       
-      print STDERR "before genomewise:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
+      #print STDERR "before genomewise:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
       
       $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
       
-      print STDERR "after genomewise:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+      #print STDERR "after genomewise:\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
 
       #unless($self->compare_translations($gw_tran[0], $newtrans) ){
-      #	print STDERR "translation has been modified\n";
+      #	#print STDERR "translation has been modified\n";
       #}
       
       # if the genomewise results gets stop codons, return the original transcript:
@@ -1016,7 +1022,10 @@ sub combine_genes{
     else{
       $newtrans = $newtranscript;
     }
-    return $newtrans;
+      print STDERR "3 COMBINED GENE ";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($newtrans);
+      print STDERR "\n\n";
+      return $newtrans;
   }
   else{
       $self->warn("No combination could be built\n");
@@ -1088,7 +1097,7 @@ sub transcript_from_single_exon_genewise {
 	
 	# expand frameshifted single exon genewises back from one exon to multiple exons
 	if(scalar($ex->sub_SeqFeature) > 1){
-	  print STDERR "frameshift in a single exon genewise\n";
+	  #print STDERR "frameshift in a single exon genewise\n";
 	  my @sf = $ex->sub_SeqFeature;
 	  
 	  # save current start and end of modified exon
@@ -1226,7 +1235,8 @@ sub transcript_from_multi_exon_genewise_forward{
       $ex->start($current_exon->start);
     }
     
-    # add all the exons from the est2genome transcript, previous to this one
+    # add all the exons from the est2genome transcript, previous to this one 
+    Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
     $self->add_5prime_exons($transcript, $exoncount, @egexons);
     
     # fix translation start 
@@ -1244,22 +1254,22 @@ sub transcript_from_multi_exon_genewise_forward{
     elsif($gwstart < $current_start && $exoncount != 0){
       
       $modified_peptide = 1;
-      print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+      #print STDERR "SHORTENING GENEWISE TRANSLATION\n";
       # genewise has leaked over the start. Tougher call - we need to take into account the 
       # frame here as well
-      print STDERR "gw exon starts: $gwstart < new start: $current_start\n";
-      print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
+      #print STDERR "gw exon starts: $gwstart < new start: $current_start\n";
+      #print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
       
       # $diff is the number of bases we chop from the genewise exon
       my $diff   = $current_start - $gwstart;
       my $tstart = $translation->start;
       $self->warn("this is a case where gw translation starts at $tstart > 1") if ($tstart>1);
-      print STDERR "gw translation start: ".$tstart."\n";
-      print STDERR "start_exon: ".$translation->start_Exon->start.
-	"-".$translation->start_Exon->end.
-	  " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
-	    " phase: ".$translation->start_Exon->phase.
-	      " end_phase: ".$translation->start_Exon->end_phase."\n";
+      #print STDERR "gw translation start: ".$tstart."\n";
+      #print STDERR "start_exon: ".$translation->start_Exon->start.
+	#"-".$translation->start_Exon->end.
+	 # " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
+	  #  " phase: ".$translation->start_Exon->phase.
+	   #   " end_phase: ".$translation->start_Exon->end_phase."\n";
       
       
       if($diff % 3 == 0) { 
@@ -1322,19 +1332,19 @@ sub transcript_from_multi_exon_genewise_forward{
       elsif ( $current_exon->end < $gwexons[$#gwexons]->end && $exoncount != $#egexons ){
 	
 	$modified_peptide = 1;
-	print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+	#print STDERR "SHORTENING GENEWISE TRANSLATION\n";
 	  ## fix translation end iff genewise has leaked over - will need truncating
 	  my $diff   = $gwexons[$#gwexons]->end - $current_exon->end;
-	  print STDERR "diff: $diff\n";
+	  #print STDERR "diff: $diff\n";
 	  my $tend   = $translation->end;
 	  
 	  my $gw_exon_length   = $gwexons[$#gwexons]->end - $gwexons[$#gwexons]->start + 1;
 	  my $cdna_exon_length = $current_exon->end - $current_exon->start + 1;
-	  print STDERR "gw exon length  : $gw_exon_length\n";
-	  print STDERR "cdna exon length: $cdna_exon_length\n";
+	  #print STDERR "gw exon length  : $gw_exon_length\n";
+	  #print STDERR "cdna exon length: $cdna_exon_length\n";
 	  
 	  my $length_diff = $gw_exon_length - $cdna_exon_length;
-	  print STDERR "length diff: ".$length_diff."\n"; # should be == diff
+	  #print STDERR "length diff: ".$length_diff."\n"; # should be == diff
 	  
 	  $ex->end($current_exon->end);
 	  
@@ -1362,7 +1372,7 @@ sub transcript_from_multi_exon_genewise_forward{
 	    $translation->end($cdna_exon_length);
 	    $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
 	  }
-	  print STDERR "Forward: translation end set to : ".$translation->end."\n";
+	  #print STDERR "Forward: translation end set to : ".$translation->end."\n";
       
       }
       # need to explicitly set the translation end exon for translation to work out
@@ -1375,11 +1385,12 @@ sub transcript_from_multi_exon_genewise_forward{
       if($expanded){
 	# set translation end to what it originally was in the unmerged genewise gene
 	# taking into account the diff
-	print STDERR "Forward: expanded 3' exon, re-setting end of translation from ".$translation->end." to orig_end ($orig_tend)- ( length_diff + shift_due_to_phases ) ($end_translation_shift)".($orig_tend - $end_translation_shift)."\n";
+	#print STDERR "Forward: expanded 3' exon, re-setting end of translation from ".$translation->end." to orig_end ($orig_tend)- ( length_diff + shift_due_to_phases ) ($end_translation_shift)".($orig_tend - $end_translation_shift)."\n";
 	$translation->end($orig_tend - $end_translation_shift);
       }
       
       # finally add any 3 prime e2g exons
+      Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
       $self->add_3prime_exons($transcript, $exoncount, @egexons);
       
     } # end 3' exon    
@@ -1429,9 +1440,9 @@ sub transcript_from_multi_exon_genewise_reverse{
       # genewise has leaked over the start. Tougher call - we need to take into account the 
       # frame here as well
       $modified_peptide = 1;
-      print STDERR "SHORTENING GENEWISE TRANSLATION\n";
-      print STDERR "In Reverse strand. gw exon ends: ".$gwexons[0]->end." > cdna exon end: ".$current_exon->end."\n";
-      print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
+      #print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+      #print STDERR "In Reverse strand. gw exon ends: ".$gwexons[0]->end." > cdna exon end: ".$current_exon->end."\n";
+      #print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
       
       
       my $diff = $gwexons[0]->end - $current_exon->end;
@@ -1490,7 +1501,7 @@ sub transcript_from_multi_exon_genewise_reverse{
     #  " phase: ".$translation->start_Exon->phase.
     #      " end_phase: ".$translation->start_Exon->end_phase."\n";
     
-    
+    Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
     $self->add_5prime_exons($transcript, $exoncount, @egexons);
     
   }
@@ -1526,19 +1537,19 @@ sub transcript_from_multi_exon_genewise_reverse{
     elsif ( $current_exon->start > $gwexons[$#gwexons]->start && $exoncount != $#egexons ){
 
       $modified_peptide = 1;
-      print STDERR "SHORTENING GENEWISE TRANSLATION\n";
-      print STDERR "In Reverse strand: gw exon start: ".$gwexons[$#gwexons]->start." < cdna exon start: ".$current_exon->start."\n";
-      print STDERR "modifying exon, as cdna exon is not the last of transcript-> exoncount = $exoncount, and #egexons = $#egexons\n";
+      #print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+      #print STDERR "In Reverse strand: gw exon start: ".$gwexons[$#gwexons]->start." < cdna exon start: ".$current_exon->start."\n";
+      #print STDERR "modifying exon, as cdna exon is not the last of transcript-> exoncount = $exoncount, and #egexons = $#egexons\n";
       
 	## adjust translation
 	my $diff   = $current_exon->start - $gwexons[$#gwexons]->start;
-	print STDERR "diff: $diff\n";
+	#print STDERR "diff: $diff\n";
 	my $tend   = $translation->end; 
 	
 	my $gw_exon_length   = $gwexons[$#gwexons]->end - $gwexons[$#gwexons]->start + 1;
 	my $cdna_exon_length = $current_exon->end - $current_exon->start + 1;
-	print STDERR "gw exon length  : $gw_exon_length\n";
-	print STDERR "cdna exon length: $cdna_exon_length\n";
+	#print STDERR "gw exon length  : $gw_exon_length\n";
+	#print STDERR "cdna exon length: $cdna_exon_length\n";
 	
 	my $length_diff = $gw_exon_length - $cdna_exon_length;
 
@@ -1580,11 +1591,11 @@ sub transcript_from_multi_exon_genewise_reverse{
       
       if($expanded){
 	# set translation end to what it originally was in the unmerged genewise gene
-	print STDERR "Reverse: expanded 3' exon, re-setting translation exon ".$translation->end." to original end( $orig_tend ) - shifts_due_to_phases_etc ( $end_translation_shift ) :".($orig_tend - $end_translation_shift)."\n";
+	#print STDERR "Reverse: expanded 3' exon, re-setting translation exon ".$translation->end." to original end( $orig_tend ) - shifts_due_to_phases_etc ( $end_translation_shift ) :".($orig_tend - $end_translation_shift)."\n";
 	$translation->end($orig_tend - $end_translation_shift);
       }
-      
-      $self->add_3prime_exons($transcript, $exoncount, @egexons);
+    Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
+    $self->add_3prime_exons($transcript, $exoncount, @egexons);
       
     } # end 3' exon
   
@@ -1645,8 +1656,8 @@ sub expand_3prime_exon{
   my ($self, $exon, $transcript, $strand) = @_;
   
   if(scalar($exon->sub_SeqFeature) > 1){
-    print STDERR "expanding 3'prime frameshifted exon $exon in strand $strand: ".
-      $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
+    #print STDERR "expanding 3'prime frameshifted exon $exon in strand $strand: ".
+    #  $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
     my @sf = $exon->sub_SeqFeature;
     
     #if ($strand == 1){
@@ -1766,7 +1777,7 @@ sub compare_translations{
     print STDERR "Couldn't translate genewise gene\n";
   }
   else{
-    print STDERR "genewise: \n";             
+    #print STDERR "genewise: \n";             
     $seqout->write_seq($genewise_translation);
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($genewise_transcripts[0]);
   }
@@ -1795,7 +1806,7 @@ sub compare_translations{
     return 0;
   }
   else{
-    print STDERR "combined: \n";             
+    #print STDERR "combined: \n";             
     $seqout->write_seq($combined_translation);
   }	 
   
@@ -1887,12 +1898,12 @@ GENE:
 		      # this is still giving some problems
 		      if ($exon eq $tran->translation->start_Exon()) {
 			  if($vc_strand == 1 && $exon->strand == -1){
-			      print SDERR "vc strand 1, raw strand -1 - flipping translation start/end\n";
+			      #print SDERR "vc strand 1, raw strand -1 - flipping translation start/end\n";
 			      $self->warn("something very strange is about to happen to the  exon coordinates for transcript ". $tran->dbID);
-			      print STDERR "exon start: ".$exon->start.
-				  " changing to ".$exon->end - ($tran->translation->end -1)."\n";
-			      print STDERR "exon end  : ".$exon->end.
-				  " changing to ".$exon->end - ($tran->translation->start -1)."\n";
+			      #print STDERR "exon start: ".$exon->start.
+				#  " changing to ".$exon->end - ($tran->translation->end -1)."\n";
+			      #print STDERR "exon end  : ".$exon->end.
+				#  " changing to ".$exon->end - ($tran->translation->start -1)."\n";
 			      $exon->end($exon->end - ($tran->translation->start -1));
 			      $exon->start($exon->end - ($tran->translation->end -1));
 			  }
@@ -1906,7 +1917,7 @@ GENE:
       foreach my $exon (@{$newgene->get_all_Exons}){
 	# make sure we deal with stickies!
 	if($exon->isa("Bio::EnsEMBL::StickyExon")){
-	  foreach my $ce($exon->each_component_Exon){
+	  foreach my $ce(@{$exon->get_all_component_Exons}){
 	    # exon start and end must both be within the raw contig!!!
 	    if($ce->start < 1){
 	      $self->throw("can't set exon->start < 1 (" . $ce->start . ") - discarding gene\n");
@@ -2038,7 +2049,7 @@ sub _print_Gene{
     $id .= " ".$gene->type;
   }
   foreach my $transcript (@{$gene->get_all_Transcripts} ){
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
   }
 }
 
