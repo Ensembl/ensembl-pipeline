@@ -1078,6 +1078,7 @@ sub _process_comparison{
 sub _check_high_site{
   my ($self, $last_exon, $middle_exon, $tran ) = @_;
   
+  my $verbose = 0;
   #print STDERR "check_high_site(): checking exon ".$last_exon->start."-".$last_exon->end."\n";
   #print STDERR "against:\n";
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
@@ -1105,7 +1106,7 @@ sub _check_high_site{
 	    return 1;
 	  }
 	  else{
-	    print STDERR "external exon overlaps intron with overlap = ".$last_exon->end - $middle_exon->end."\n";
+	    print STDERR "external exon overlaps intron with overlap = ".($last_exon->end - $middle_exon->end)."\n" if $verbose;
 	    return 0;
 	  }
 	}
@@ -1187,6 +1188,7 @@ sub _check_low_site{
 sub _check_simple_high_site{
   my ($self, $last_exon, $first_exon) = @_;
   
+  my $verbose = 0;
   ############################################################
   # if we restrict external splice sites, 
   # we simply check that they do not exceed the given value ( = $self->internal_splice_overlap ) 
@@ -1196,7 +1198,7 @@ sub _check_simple_high_site{
       return 1;
     }
     else{
-      print STDERR "external exon overlaps intron with overlap = ".$last_exon->end - $first_exon->end."\n";
+      print STDERR "external exon overlaps intron with overlap = ".$last_exon->end - $first_exon->end."\n" if $verbose;
       return 0;
     }
   }
@@ -1216,6 +1218,7 @@ sub _check_simple_high_site{
 sub _check_simple_low_site{
   my ($self, $first_exon, $last_exon) = @_;
 
+  my $verbose = 0;
   ############################################################
   # if we restrict external splice sites, 
   # we simply check that they do not exceed the the given value ( = $self->internal_splice_overlap )
@@ -1226,7 +1229,7 @@ sub _check_simple_low_site{
     }
     else{
       return 0;
-      print STDERR "external exon overlaps intron with overlap = ".$last_exon->start - $first_exon->start."\n";
+      print STDERR "external exon overlaps intron with overlap = ".$last_exon->start - $first_exon->start."\n" if $verbose;
     }
   }
   return 1;
