@@ -71,7 +71,9 @@ sub new {
 }
 
 ############################################################
+#
 # $list is an arrayref with the transcripts that make up the transcript $tran
+#
 sub hold_list{
     my ($self,$tran,$list) = @_;
 
@@ -92,47 +94,111 @@ sub hold_list{
 ############################################################
 # it holds an arrayref with the predictions
 sub transcripts{
-    my ($self, $trans ) = @_;
-    if ( $tran ){
-	$self->{_predictions} = $trans;
-    }
-    return $self->{_predictions};
+  my ($self, $trans ) = @_;
+  if ( $trans ){
+    $self->{_predictions} = $trans;
+  }
+  return $self->{_predictions};
 }
 
 ############################################################
 
 sub score_Transcripts{
-    my ($self) = @_;
+  my ($self) = @_;
+  
+  ############################################################
+  # first need  to estimate how many sites of 
+  # alternative splicing there are per transcript
+  
+  ############################################################
+  # cluster transcripts into genes according to exon overlap
+  # but without make exons unique:
+  my @clusters = @{$self->cluster_Transcripts( $self->transcripts )};
+  
+  ############################################################
+  # get the sites of alt-splicing on each transcript cluster
+  foreach my $cluster ( @clusters ){
+    
+    my @sites = $self->get_alternative_sites( $cluster );
+    
+    my @trans = @{ $cluster->get_Transcripts };
     
     ############################################################
-    # first need  to estimate how many sites of 
-    # alternative splicing there are per transcript
-
-    ############################################################
-    # cluster transcripts into genes according to exon overlap
-    # but without make exons unique:
-    my @clusters = @{$self->cluster_Transcripts( $self->transcripts )};
-
-    ############################################################
-    # get the sites of alt-splicing on each transcript cluster
-    foreach my $cluster ( @clusters ){
-
-      my @sites = $self->get_alternative_sites( $cluster );
+    # now get the sites of alternative splicing
+    # contained in each transcript
+    # and then calculate the distances between 
+    # those sites and the lengths
+    # of the list of ESTs making up the transcript
+    # and compare them!
+    foreach my $tran ( @trans ){
       
-      my @trans = @{ $cluster->get_Transcripts };
-
       ############################################################
-      # now get the sites of alternative splicing
-      # contained in each transcript
-      # and then calculate the distances between 
-      # those sites and the lengths
-      # of the list of ESTs making up the transcript
-      # and compare them!
-
-
+      # which sites does this transcript have?
+      # $site is a SeqFeature with exons as sub_SeqFeatures 
+      my @these_sites;
+      foreach my $site ( @sites ){
+	my ($start,$end,$strand) = $self->get_transcript_start_end_strand($tran);
+	if ( !( $site->start > $end) && !( $site->end < $start ) ){
+	  push( @these_sites, $site );
+	}
+      }
+      
+      ############################################################
+      # make all possible pairs of sites 
+      @these_sites = sort { $a->start <=> $b->end } @these_sites;
+      my @site_pairs;
+      if ( scalar( @these_sites ) > 1 ){
+	foreach ( my $i=0; $i<$#these_sites; $i++ ){
+	  foreach (my $j=$i+1; $j<=$#these_sites; $j++ ){
+	    my $pair = [$these_sites[$i], $these_sites[$j] ];
+	    push( @site_pairs, $pair );
+	  }
+	}
+      }
+      else{
+	print STDERR "transcript with ".scalar( @these_sites )." sites\n";
+      }
+      
+      ############################################################
+      # check how many site pairs are covered by the list of ESTs
+      # in this transcript
+      my @list = @{ $self->hold_list($tran) };
+      my @covered_sites;
+      
+      foreach my $pair (@site_pairs){
+	my $covered = 0;
+	foreach my $est ( @list ){
+	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est );
+	  
+	  if ( $est->start <= $pair->[0]->end 
+	       &&
+	       $est->end > $pair->[0]->end
+	       &&
+	       $est->end >= $pair->[1]->start
+	       &&
+	       $est->start < $pair->[1]->start
+	     ){
+	    $covered = 1;
+	    push( @covered_sites, $pair );
+	  }
+	}
+      }
+      
+      print STDERR "number of site-pairs: ".scalar(@site_pairs)."\n";
+      print STDERR "number of covered site-pairs: ".scalar( @covered_sites )."\n";
+      
+      my $score = 100;
+      if ( @site_pairs ){
+	$score = sprintf "%.2f", 100*scalar( @covered_sites )/scalar( @site_pairs );
+      }
+      
+      ############################################################
+      # put the transcript score in the exons:
+      foreach my $exon ( @{$tran->get_all_Exons} ){
+	$exon->score( $score );
+      }
     }
-    
-
+  }
 }
 
 ############################################################
@@ -146,6 +212,11 @@ sub score_Transcripts{
 # and has a position in the genomic coordinates, so that we
 # do not lose information of the relative position between
 # each of them in the genomic
+
+# Note: this method will not be able to
+# see a site of alternative splicing which it
+# has been actually predicted not to have alternative splicing.
+# Thus this is not the ed of the story.
 
 sub get_alternative_sites{
   my ($self, $cluster ) = @_;
@@ -162,8 +233,8 @@ sub get_alternative_sites{
   
   ############################################################
   # cluster the exons according to overlap
-  $exon_cluster_list = $self->_cluster_Exons( @all_exons );
-  @clusters = sort { $a->start <=> $b->start } $cluster_list->sub_SeqFeature;
+  my $exon_cluster_list = $self->_cluster_Exons( @all_exons );
+  my @clusters = sort { $a->start <=> $b->start } $exon_cluster_list->sub_SeqFeature;
   
   ############################################################
   # get the sites of alternative splicing:
@@ -180,7 +251,7 @@ sub get_alternative_sites{
     while ( @exons ){
       my $exon = shift @exons;
       my $found = 0;
-      while ( found == 0 ){
+      while ( $found == 0 ){
 	my $t = shift @transcripts;
 	last if ( $seen_transcript{$t} );
 	if ( $t == $exon2transcript{ $exon } ){
@@ -282,6 +353,10 @@ sub _cluster_Exons{
 
 
 ############################################################
+#
+# this method gets the start and end of transcript meaning:
+# start: lowest coordinate
+# end  : highest coordinate
 
 sub get_transcript_start_end_strand {
   my ($t) = @_;
@@ -438,37 +513,37 @@ sub cluster_Transcripts_by_strand {
 ############################################################
 
 
-############################################################
-# Method to score each transcript
-#
-# If the transcript only has 1 site of alternative splicing
-# we give a 100 score
-#
-# else the score depends on the length of the ESTs relative
-# to the length between the two or more sites of alternative splicing
-#
+#############################################################
+## Method to score each transcript
+##
+## If the transcript only has 1 site of alternative splicing
+## we give a 100 score
+##
+## else the score depends on the length of the ESTs relative
+## to the length between the two or more sites of alternative splicing
+##
 
-sub _score_Transcript{
-    my ($tran, @other ) = @_;
+#sub _score_Transcript{
+#    my ($tran, @other ) = @_;
     
-    my @list = @{ $self->hold_list($tran) };
+#    my @list = @{ $self->hold_list($tran) };
     
-    ############################################################
-    # calculate the lengths of the ESTs used:
-    my $average = 0;
-    foreach my $est ( @list ){
+#    ############################################################
+#    # calculate the lengths of the ESTs used:
+#    my $average = 0;
+#    foreach my $est ( @list ){
 	
-	# est is a transcript object
-	my $length = $est->length;
+#	# est is a transcript object
+#	my $length = $est->length;
 	
-	$average += $length;
-    }
-    if ( @list ){
-	$average = int( $average/scalar(@list) );
-    }
+#	$average += $length;
+#    }
+#    if ( @list ){
+#	$average = int( $average/scalar(@list) );
+#    }
     
-}
+#}
 	
-############################################################
+#############################################################
 
 1;
