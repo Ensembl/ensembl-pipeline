@@ -19,9 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
 					     -dbobj     => $db,
 					     -input_id  => $id,
-					     -type      => $type,
-                                             -threshold => $threshold		    
-								    
                                              );
     $obj->fetch_input
     $obj->run
@@ -58,9 +55,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_PROTEIN_INDEX
-					 GB_SIMILARITY_TYPE
-					 GB_SIMILARITY_THRESHOLD
+					 GB_SIMILARITY_DATABASES
 					 GB_SIMILARITY_COVERAGE
 					 GB_SIMILARITY_MAX_INTRON
 					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
@@ -74,39 +69,19 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
       
-    if(!defined $self->seqfetcher) {
-      my $seqfetcher =  $self->make_seqfetcher();
-      $self->seqfetcher($seqfetcher);
-    }
-       
-    my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
+    # make sure at least one protein source database has been defined
+    $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
+      unless scalar(@{$GB_SIMILARITY_DATABASES});
 
-    if(!defined $type || $type eq ''){
-      $type = $GB_SIMILARITY_TYPE;
-    }
-    
-    if(!defined $threshold){
-      $threshold = $GB_SIMILARITY_THRESHOLD
-    }
 
-    $type = 'sptr' unless (defined $type && $type ne '');
-    $threshold = 200 unless (defined($threshold));
-
-    $self->type($type);
-    $self->threshold($threshold);
+    # make all seqfetchers
+    foreach my $db(@{$GB_SIMILARITY_DATABASES}){
+      my $seqfetcher =  $self->make_seqfetcher($db->{'index'});  
+      $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
+    }
 
     return $self; 
   }
-
-
-sub type {
-  my ($self,$type) = @_;
-
-  if (defined($type)) {
-    $self->{_type} = $type;
-  }
-  return $self->{_type};
-}
 
 
 =head2 write_output
@@ -172,83 +147,76 @@ sub write_output {
     print STDERR "Contig        : " . $contig->id . " \n";
     print STDERR "Length is     : " . $genseq->length . "\n\n";
 
-    print STDERR "Fetching features \n\n";
-
-    # need to pass in bp value of zero to prevent globbing on StaticContig.
-    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold);
-
-    # lose version numbers - probably temporary till pfetch indices catch up
-
-    foreach my $f(@features) {
-      my $name = $f->hseqname;
-      if ($name =~ /(\S+)\.\d+/) { 
-	$f->hseqname($1);
-      }
-    }
-
-    print STDERR "Number of features = " . scalar(@features) . "\n\n";
-
     my @genes     = $contig->get_Genes_by_Type('TGE_gw');
-
     print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
 
-    my %redids;
-    my $trancount = 1;
+    foreach my $database(@{$GB_SIMILARITY_DATABASES}){
 
-    # check which TargettedGenewise exons overlap similarity features
-    foreach my $gene (@genes) {
+      print STDERR "Fetching features for " . $database->{'type'} . 
+	           " with score above " . $database->{'threshold'}. "\n\n";
+      
+      my @features  = $contig->get_all_SimilarityFeatures_above_score($database->{'type'}, $database->{'threshold'});
 
-#      print STDERR "Found genewise gene " . $gene->dbID . "\n";
-
-      foreach my $tran ($gene->each_Transcript) {
-
-	foreach my $exon ($tran->get_all_Exons) {
-	  
-#	  print STDERR "Exon " . $exon->dbID . " " . $exon->strand . "\n";
-
-	  if ($exon->seqname eq $contig->id) {
-	    
-	  FEAT: foreach my $f (@features) {
-	      if ($exon->overlaps($f)) {
-		$redids{$f->hseqname} = 1;
-#		print STDERR "ID " . $f->hseqname . " covered by genewise\n";
+      # lose version numbers - probably temporary till pfetch indices catch up
+      foreach my $f(@features) {
+	my $name = $f->hseqname;
+	if ($name =~ /(\S+)\.\d+/) { 
+	  $f->hseqname($1);
+	}
+      }
+      
+      print STDERR "Number of features = " . scalar(@features) . "\n\n";
+      my %redids;
+      my $trancount = 1;
+      
+      # check which TargettedGenewise exons overlap similarity features
+      foreach my $gene (@genes) {
+	foreach my $tran ($gene->each_Transcript) {
+	  foreach my $exon ($tran->get_all_Exons) {
+	    if ($exon->seqname eq $contig->id) {
+	      
+	    FEAT: foreach my $f (@features) {
+		if ($exon->overlaps($f)) {
+		  $redids{$f->hseqname} = 1;
+		  #		print STDERR "ID " . $f->hseqname . " covered by genewise\n";
+		}
 	      }
 	    }
 	  }
+	  $trancount++;
 	}
-	$trancount++;
       }
-    }
-
-    my %idhash;
-    
-    # collect those features which haven't been used by Targetted GeneWise
-    foreach my $f (@features) {
-#      print "Feature : " . $f->gffstring . "\n";
       
-      if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-	  defined($f->hseqname) &&
-	  $redids{$f->hseqname} != 1) {
-	$idhash{$f->hseqname} = 1;
+      my %idhash;
+      
+      # collect those features which haven't been used by Targetted GeneWise
+      foreach my $f (@features) {
+	#      print "Feature : " . $f->gffstring . "\n";
 	
+	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+	    defined($f->hseqname) &&
+	    $redids{$f->hseqname} != 1) {
+	  $idhash{$f->hseqname} = 1;
+	  
+	}
       }
+      
+      my @ids = keys %idhash;
+      my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+      #    print STDERR "Feature ids are @ids\n";
+      
+      my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
+									     '-ids'      => \@ids,
+									     '-seqfetcher' => $seqfetcher,
+									     '-trim'     => 1);
+      
+      
+      $self->runnable($runnable);
+      # at present, we'll only ever have one ...
+      $self->vc($contig);
     }
-    
-    my @ids = keys %idhash;
-
-#    print STDERR "Feature ids are @ids\n";
-
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
-									   '-ids'      => \@ids,
-									   '-seqfetcher' => $self->seqfetcher,
-									   '-trim'     => 1);
-    
-    
-    $self->runnable($runnable);
-    # at present, we'll only ever have one ...
-    $self->vc($contig);
-}     
-
+  }     
+  
 
 =head2 run
 
@@ -745,6 +713,7 @@ sub check_translation {
 
 sub check_coverage{
   my ($self, $transcript) = @_;
+  print STDERR "entering check coverage\n";
   my $pstart = 0;
   my $pend = 0;
   my $protname;
@@ -777,16 +746,27 @@ sub check_coverage{
   }
   
   my $seq; 
-  eval{
-    $seq = $self->seqfetcher->get_Seq_by_acc($protname);
-  };
-  if ($@) {
-    $self->warn("Error fetching sequence for [$protname]\n");
+
+# what to do if the same protein is found in >1 seq index? 
+
+ SEQFETCHER:
+  foreach my $seqfetcher( $self->each_seqfetcher){
+    eval{
+      $seq = $seqfetcher->get_Seq_by_acc($protname);
+    };
+    if ($@) {
+      $self->warn("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+    }
+
+    if (defined $seq) {
+      last SEQFETCHER;
+    }
+
   }
   
   if(!defined $seq){
-    $self->warn("No sequence fetched for [$protname] - can't check coverage, letting gene through\n");
-    return 1;
+    $self->warn("FPC_BMG:No sequence fetched for [$protname] - can't check coverage, letting gene through\n");
+    return 100;
   }
   
   $plength = $seq->length;
@@ -945,19 +925,16 @@ sub output{
  Title   : make_seqfetcher
  Usage   :
  Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching protein sequences. If 
-           GB_PROTEIN_INDEX is specified in GeneConf.pm, then a Getseqs 
-           fetcher is made, otherwise it throws
+           $index is specified, then a Getseqs fetcher is made, otherwise it throws
  Example :
  Returns : Bio::EnsEMBL::SeqFetcher
- Args    :
+ Args    : string representing path to sequence index
 
 
 =cut
 
 sub make_seqfetcher {
-  my ( $self ) = @_;
-  my $index   = $GB_PROTEIN_INDEX;
-
+  my ( $self, $index ) = @_;
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
@@ -970,6 +947,89 @@ sub make_seqfetcher {
 
   return $seqfetcher;
 
+}
+
+=head2 each_seqfetcher
+
+  Title   :   each_seqfetcher
+  Usage   :   my @seqfetchers = $self->each_seqfetcher
+  Function:   Returns an array of Bio::DB::RandomAccessI representing the various sequence indices 
+              listed in GeneConf::GB_SIMILARITY_DATABASES
+  Returns :   Array of Bio::DB::RandomAccessI
+  Args    :   none
+
+=cut
+
+sub each_seqfetcher {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB array of seqfetchers
+   return values(%{$self->{'_seqfetchers'}});
+}
+
+=head2 each_seqfetcher_by_type
+
+  Title   :   each_seqfetcher_by_type
+  Usage   :   my %seqfetchers_by_type = $self->each_seqfetcher_by_type
+  Function:   Returns a hash of Bio::DB::RandomAccessI representing the various sequence indices 
+              listed in GeneConf::GB_SIMILARITY_DATABASES keyed by type listed therein.
+  Returns :   Hash of all seqfetchers linking db_type to Bio::DB::RandomAccessI
+  Args    :   none
+
+=cut
+
+sub each_seqfetcher_by_type {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB hash of seqfetchers
+   return %{$self->{'_seqfetchers'}};
+}
+
+=head2 add_seqfetcher_by_type
+
+  Title   :   add_seqfetcher_by_type
+  Usage   :   $self->add_seqfetcher_by_type('swall', $seqfetcher)
+  Function:   Adds a Bio::DB::RandomAccessI into $self->{'_seqfetchers'} keyed by type
+  Returns :   Nothing
+  Args    :   $type - string representing db type
+              $seqfetcher - Bio::DB::RandomAccesI
+
+=cut
+
+sub add_seqfetcher_by_type{
+  my ($self, $type, $seqfetcher) = @_;
+  $self->throw("no type specified\n") unless defined ($type); 
+  $self->throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
+    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::DB::RandomAccessI"); 
+  $self->{'_seqfetchers'}{$type} = $seqfetcher;
+}
+
+
+=head2 get_seqfetcher_by_type
+
+  Title   :   get_seqfetcher_by_type
+  Usage   :   my $seqfetcher = $self->get_seqfetcher_by_type('swall')
+  Function:   Fetches the seqfetcher associated with a particular db type as specified in GeneConf::GB_SIMILARITY_DATABASES
+  Returns :   Bio::DB::RandomAccessI
+  Args    :   $type - string representing db type
+
+=cut
+sub get_seqfetcher_by_type{
+  my ($self, $type) = @_;
+  my %seqfetchers = $self->each_seqfetcher_by_type;
+  foreach my $dbtype(keys %seqfetchers){
+    if ($dbtype eq $type){
+      return $seqfetchers{$dbtype};
+    }
+  }
 }
 
 1;
