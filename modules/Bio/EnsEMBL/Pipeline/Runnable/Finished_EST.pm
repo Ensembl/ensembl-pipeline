@@ -33,10 +33,10 @@ sub new {
     die "No QUERY (masked genomic sequence) given" unless $query;
     die "No UNMASKED (genomic sequence) given"     unless $unmasked;
 
-    $self->query            ($query);
-    $self->unmasked         ($unmasked);
-    $self->analysis         ($analysis);
-    $self->seqfetcher       ($seqfetcher);
+    $self->query     ($query);
+    $self->unmasked  ($unmasked);
+    $self->analysis  ($analysis);
+    $self->seqfetcher($seqfetcher);
     
     return $self;
 }

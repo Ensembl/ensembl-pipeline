@@ -454,18 +454,21 @@ sub parse_results {
     my @selected_features = $self->select_features($self->output);
     $self->output(@selected_features);
   } else {
-    # re-filter, with pruning
-    my @allfeatures = $self->output;
-    if ($self->threshold_type eq "PID") {
-      @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
-    } else {
-      @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
-    }
     if ($self->filter) {
-      my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune    => $self->prune,
+      # re-filter, with pruning
+      my @allfeatures = $self->output;
+
+      # This sorting is pointless, because the first thing FeatureFilter
+      # does is to sort by score!
+      if ($self->threshold_type eq "PID") {
+        @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
+      } else {
+        @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
+      }
+      my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune    => $self->prune,
 								       -coverage => $self->coverage);
 
-      my @pruned = $search->run(@allfeatures);
+      my @pruned = $filter->run(@allfeatures);
 
       #print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
