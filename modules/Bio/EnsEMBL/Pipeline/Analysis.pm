@@ -9,7 +9,7 @@
 #
 # POD documentation - main docs before the code
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -67,12 +67,12 @@ use Bio::Root::Object;
 
 sub _initialize {
   my($self,@args) = @_;
-  
+
   my $make = $self->SUPER::_initialize;
 
   my ($id,$db,$db_version,$db_file,$program,$program_version,$program_file,
       $gff_source,$gff_feature,$module,$module_version,$parameters,$created,
-      $logic_name ) = 
+      $logic_name ) =
 
 	  $self->_rearrange([qw(ID
 				DB
@@ -379,7 +379,7 @@ sub created {
 
   Title   : logic_name
   Usage   : $self->logic_name
-  Function: Get/set method for the logic_name, the name under 
+  Function: Get/set method for the logic_name, the name under
             which this typical analysis is known.
   Returns : String
   Args    : String

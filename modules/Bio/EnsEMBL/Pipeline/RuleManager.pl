@@ -21,27 +21,62 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-my $mailReceiver = "stabenau\@ebi.ac.uk";
-my $maxMails = 1;
+$| = 1;
+
+my $mailReceiver = "scp\@sanger.ac.uk";
+my $maxMails = 10000;
 my $currentMail = 0;
 $| = 1;
 my %stats = ( );
+my $stopfile = '/nfs/acari/enspipe/.rmstop';
 
 # how many second before job becomes old?
-my $oldJob = 1200;
+my $oldJob = 36000;
 
-my $chunksize = 500;
+my $chunksize = 50000;
+# my $currentStart = 300000;
 my $currentStart = 0;
 my $completeRead = 0;
+
+my $pid = fork();
+die( "Cant fork hoover" ) unless defined($pid);
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
-  ( -host => 'ensrv4.sanger.ac.uk',
-    -dbname => 'matloob_freeze17',
+  ( -host => 'ecs1a.sanger.ac.uk',
+    -dbname => 'simon_oct07',
     -user => 'ensadmin',
   );
 
+my $jobAdaptor = $db->get_JobAdaptor;
+
+if( $pid == 0 ) {
+  # Im the hoover
+  print STDERR ("Hoover started.\n" );
+  my ($laststart,$sleeptime);
+  my @jobIds;
+  
+  while( 1 ) {
+    $laststart = time();
+    # remove everything which is at least 5 minutes old
+    @jobIds = $jobAdaptor->list_jobId_by_status_age( 'HOOVER', 5 );
+    print STDERR ("Hoover ",scalar( @jobIds ), " jobs.\n" );
+    foreach my $jobId ( @jobIds ) {
+      my $job = $jobAdaptor->fetch_by_dbID( $jobId );
+      $job->remove();
+    }
+    print STDERR ("Files deleted.\n" );
+    $jobAdaptor->remove_by_dbID( @jobIds );
+    # min 5 minutes between two rounds
+    $sleeptime = 300 - time() + $laststart;
+    print STDERR ( "Hoover done, sleep $sleeptime seconds.\n" );
+    if( $sleeptime > 0 ) {
+      sleep( $sleeptime );
+    }
+  }
+}    
+
 my $ruleAdaptor = $db->get_RuleAdaptor;
 my @rules = $ruleAdaptor->fetch_all;
-my $jobAdaptor = $db->get_JobAdaptor;
 my %analHash;
 
 my $sic = $db->get_StateInfoContainer;
@@ -55,6 +90,8 @@ my $mailCount = 0;
 &intialize_hotJobs_workon;
 
 while( 1 ) {
+
+  $completeRead = 1 if -e $stopfile;
   
   if( !$completeRead ) {
     print ( "Read a chunk\n" );
@@ -80,15 +117,15 @@ while( 1 ) {
       
     # check all rules, which jobs can be started
     for my $rule ( @rules )  {
-      print( "Checking rule ",$rule->goalAnalysis->logic_name,".\n" );
-      print( " for ",$hotId->[0]," is " );
+#      print( "Checking rule ",$rule->goalAnalysis->logic_name,".\n" );
+#      print( " for ",$hotId->[0]," is " );
       	
       my $anal = $rule->check_for_analysis( @anals );
       if( $anal ) {
-        print( "fullfilled.\n" );
+#       print( "fullfilled.\n" );
 	$analHash{$anal->dbID} = $anal;
       } else {
-        print( "not fullfilled.\n" );
+#       print( "not fullfilled.\n" );
       }
     }
       
@@ -97,13 +134,16 @@ while( 1 ) {
       if( defined $workOn{ $hotId->[0]."-".$anal->dbID } ) {
       	next;
       }
+#      print "Building new job for analysis $anal...";
       my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId
 	( $anal, $hotId->[0] ); 
       $workOn{ $hotId->[0]."-".$anal->dbID } = 1;
+#     print "...storing...";
       $jobAdaptor->store( $job );
       $job->batch_runRemote( resolve_queue( $anal ));
 #      $job->runLocally;
       $stats{'jobsStarted'}++;
+#      print "Running",$anal->logic_name," on ",$hotId->[0],".\n";
       push( @hotJobs, [ $job, time ]  );
     }
   }
@@ -123,10 +163,15 @@ while( 1 ) {
   }
   # now try to find about the jobs in
   # the hotlist
-  # sleep( 3 );
+#  sleep( 3 );
+
+  print "going to check.. success\n";
   &check_jobs_against_success;
+  print "going to check .. failed\n";
   &check_jobs_against_failed;
+  print "going to check old\n";
   &check_jobs_for_old;
+  print "back for a new set\n";
   &print_stats;
 }
 
@@ -148,8 +193,8 @@ sub check_jobs_against_success {
 	( $job->input_id, $class, 
 	  $job->analysis );
       delete $workOn{$job->input_id."-".$job->analysis->dbID};
-      $job->remove;
-
+      # $job->remove; very costly ...
+      $job->set_status( "HOOVER" );
       $stats{'jobsSuccessful'}++;
       push( @hotIds, [ $job->input_id, $class ] );
       $stats{'sizeHotIds'}++;
@@ -177,12 +222,13 @@ sub check_jobs_against_failed {
       $job = $jobAdaptor->fetch_by_dbID( $job->dbID );
       if( $job->retry_count < 3 ) {
         print( "Job restart ",$job->dbID,"\n" );
-	$job->runRemote( resolve_queue( $job->analysis ));
+	# $job->runRemote( resolve_queue( $job->analysis ));
+	$job->batch_runRemote( resolve_queue( $job->analysis ));
 	$stats{'jobRestarts'}++;
 	push( @newHot, [ $job, time ] );
       } else {
 	# dont retry, send mail ....
-	mail_job_problem( $job );
+	# mail_job_problem( $job ); # sod this...
 	$stats{'jobsFailedOften'}++;
       }
     } else {
@@ -209,7 +255,7 @@ sub check_jobs_for_old {
       $count++;
       if( -s $job->stdout_file ) {
 	# job finished but didnt announce in the db
-	mail_job_problem( $job );
+	# mail_job_problem( $job ); # osod this
 	$job->set_status( "FAILED" );
 	$stats{'jobsDied'}++;
       } else {
@@ -277,7 +323,8 @@ sub to_many_error_exit {
 
 sub resolve_queue {
   my $anal = shift;
-  return "slow_blast_farm";
+  # return "slow_blast_farm";
+  return "acarichunky";
 }
 
 sub resolve_class {

@@ -12,11 +12,11 @@ Bio::EnsEMBL::Analysis::ExonPair - stores 2 exons surrounding a confirmed intron
 
 =head1 SYNOPSIS
 
-    
+
     $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
 						 -exon2 => $exon2,
 						 -type  => $type);
-    
+
     $exon1 and $exon2 are Bio::EnsEMBL::Exon;
 
 
@@ -26,7 +26,7 @@ This object stores 2 exon objects which surround a confirmed intron.  A set of t
 objects are generated from similarity matches and gene structures are then generated.
 
     my $exon1 = $pair->exon1;
-    my $exon2 = $pair->exon2; 
+    my $exon2 = $pair->exon2;
 
 =head1 CONTACT
 
@@ -68,7 +68,7 @@ sub _initialize {
 						       TYPE
 						 )],@args);
 
-  
+
   $exon1 || $self->throw("First exon not defined in ExonPair constructor");
   $exon2 || $self->throw("Second exon not defined in ExonPair constructor");
   $type  || $self->throw("No type entered for exon pair");
@@ -79,7 +79,7 @@ sub _initialize {
   $self->exon1($exon1);
   $self->exon2($exon2);
   $self->type ($type);
-  
+
   $self->verifyExons();
   $self->add_coverage();
 
@@ -93,9 +93,9 @@ sub _initialize {
  Title   : exon1
  Usage   : $pair->exon1($exon)
  Function: get/set method for the first exon
- Example : 
+ Example :
  Returns : Bio::EnsEMBL::Exon
- Args    : 
+ Args    :
 
 =cut
 
@@ -116,9 +116,9 @@ sub exon1 {
  Title   : exon2
  Usage   : $pair->exon2($exon)
  Function: get/set method for the second exon
- Example : 
+ Example :
  Returns : Bio::EnsEMBL::Exon
- Args    : 
+ Args    :
 
 =cut
 
@@ -138,7 +138,7 @@ sub exon2 {
  Title   : type
  Usage   : $pair->type($type)
  Function: get/set method for the type of exon pair
- Example : 
+ Example :
  Returns : string
  Args    : string
 
@@ -159,9 +159,9 @@ sub type {
  Title   : verifyExons
  Usage   : $pair->verifyExons
  Function: Consistency checks for the 2 exons in the pair
- Example : 
+ Example :
  Returns : nothing
- Args    : 
+ Args    :
 
 =cut
 
@@ -195,7 +195,7 @@ sub verifyExons {
  Title   : add_coverage
  Usage   : $pair->add_coverage
  Function: Increases the coverage level by 1
- Example : 
+ Example :
  Returns : nothing
  Args    : none
 
@@ -213,7 +213,7 @@ sub add_coverage {
  Title   : coverage
  Usage   : $pair->coverage
  Function: Returns the coverage level for the pair
- Example : 
+ Example :
  Returns : int
  Args    : none
 
@@ -230,9 +230,9 @@ sub coverage {
 
  Title   : compare
  Usage   : $pair->compare($pair2);
- Function: Compares self to another pair to 
+ Function: Compares self to another pair to
            see if they\'re the same
- Example : 
+ Example :
  Returns : 0,1
  Args    : Bio::EnsEMBL::Pipeline::ExonPair
 
@@ -241,7 +241,7 @@ sub coverage {
 sub compare {
     my ($self,$pair) = @_;
 
-    if ($self->exon1 == $pair->exon1 && 
+    if ($self->exon1 == $pair->exon1 &&
 	$self->exon2 == $pair->exon2) {
 	return 1;
     } else {
@@ -257,7 +257,7 @@ sub compare {
  Usage   : $pair->add_Evidence($f);
  Function: Adds a sequence feature that was
            used to create this pair
- Example : 
+ Example :
  Returns : nothing
  Args    : Bio::EnsEMBL::FeaturePair
 
@@ -286,7 +286,7 @@ sub add_Evidence {
  Usage   : my @features = $pair->get_all_Evidence;
  Function: Returns all the feature pairs that were
            used to create this pair
- Example : 
+ Example :
  Returns : Array of Bio::EnsEMBL::FeaturePair
  Args    : none
 

@@ -13,13 +13,13 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir'  => '/nfs/disk100/humpub3/pipeline',
-    'DBI.driver'  => 'mysql',
-    'dbhost'      => 'ensrv3',
-    'dbname'      => 'chr20',
+    'nfstmp.dir' => '/work1/scp/out',
+    'DBI.driver' => 'mysql',
+    'dbhost'      => 'ecs1a',
+    'dbname'      => 'simon_oct07',
     'dbuser'      => 'ensadmin',
-    'queue'       => 'ultra_blast_farm',
-    'batchsize'   => 1,
+    'queue'       => 'acarichunky',
+    'batchsize'   => 50,
 );
 }
 

@@ -74,11 +74,17 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
        -perlonlysequences => 1 )
     or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
 
+print STDERR "Connected to database\n";
+
+
 print STDERR "Getting job adaptor\n";
 
 my $job_adaptor = $db->get_JobAdaptor();
 
+print STDERR "Got job adapter\n";
+
 while( $job_id = shift ) {
+
   print STDERR "Fetching job " . $job_id . "\n";
 
   my $job         = $job_adaptor->fetch_by_dbID($job_id);
@@ -87,5 +93,11 @@ while( $job_id = shift ) {
     print STDERR ( "Couldnt recreate job $job_id\n" );
   }
   print STDERR "Running job\n";
+  print STDERR "Module is " . $job->analysis->module . "\n";
+  print STDERR "Input id is " . $job->input_id . "\n";
+
   $job->runLocally;
+  print STDERR "Done\n";
 }
+
+$db->{'_db_handle'}->disconnect();

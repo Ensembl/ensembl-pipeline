@@ -13,7 +13,7 @@ use strict;
 use DBI;
 use vars qw( @ISA );
 
-# maybe import the configuration 
+# maybe import the configuration
 BEGIN {
   require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 }
@@ -23,8 +23,8 @@ BEGIN {
 sub new {
   # without the pipeConf file nothing goes, so all parameters are there
   # may chage soonish
-  
-  my $self = bless {};    
+
+  my $self = bless {};
 
   my $dsn = "DBI:".$::pipeConf{'DBI.driver'}.":database=".$::pipeConf{'ControlDB.name'}.";host=".$::pipeConf{'ControlDB.host'};
   my $dbh =  DBI->connect( $dsn, $::pipeConf{'ControlDB.user'}, $::pipeConf{'ControlDB.pass'}, {RaiseError => 1});
@@ -33,21 +33,21 @@ sub new {
 }
 
 
-# make transition from one state to the other 
+# make transition from one state to the other
 # for a given object_state_id
 # line must be in transit for that
 sub changeState {
   my $self = shift;
   my $obj_state_id = shift;
-  my $to_nick = shift; 
+  my $to_nick = shift;
   my @result;
-   
+
   my $sth = $self->db->prepare( q{
-  
-   	SELECT o.inTransition, t.state_description_id, o.state_description_id 
+
+   	SELECT o.inTransition, t.state_description_id, o.state_description_id
 	FROM object_state o, state_description s, state_description t
 	WHERE o.object_state_id = ?
-	  AND o.state_description_id = s.state_description_id 
+	  AND o.state_description_id = s.state_description_id
 	  AND s.object_class = t.object_class
 	  AND t.state_nickname = ?
 	} );
@@ -57,7 +57,7 @@ sub changeState {
   if( @result = $sth->fetchrow_array ) {
     if( $result[0] eq 'true' ) {
       $sth = $self->db->prepare( q{
-        UPDATE object_state 
+        UPDATE object_state
 	SET last_change = NOW()
 	    ,inTransition = 'false'
 	    ,state_description_id = ?
@@ -71,8 +71,8 @@ sub changeState {
   } else {
     $self->throw( "Object not available, cant change state" );
   }
-  
-  # Log the change 
+
+  # Log the change
   # the log entry must already be there, just put the finish_transit
   # time into the row
   # objects should not pass the same state twice !!
@@ -86,19 +86,19 @@ sub changeState {
   $sth->execute( $obj_state_id, $result[2] );
 }
 
-# get_by_criteria 
-# many functions to get collection of hashes with 
+# get_by_criteria
+# many functions to get collection of hashes with
 # information about object_states.
 
 # return all object_status which are in transit
 # and have to be monitored. Used from TransitionManager.
-sub get_inTransit_toMonitor { 
+sub get_inTransit_toMonitor {
   my $self = shift;
   my @result;
   my $queryResult;
-  
+
   my $cols = "object_state_id, object_id, object_class, state_nickname";
-  
+
   my $query = qq{
     SELECT $cols
       FROM object_state o, state_description s
@@ -110,7 +110,7 @@ sub get_inTransit_toMonitor {
   while( $queryResult = $sth->fetchrow_hashref ) {
     push( @result, $queryResult );
   }
-  return @result; 
+  return @result;
 }
 
 # return where the transit_module has to be started
@@ -118,9 +118,9 @@ sub get_nonFinal_nonTransit {
   my $self = shift;
   my @result;
   my $queryResult;
-  
+
   my $cols = "object_state_id, object_id, object_class, state_nickname, transition_module, needsMonitoring";
-  
+
   my $query = qq{
     SELECT $cols
       FROM object_state o, state_description s
@@ -132,7 +132,7 @@ sub get_nonFinal_nonTransit {
   while( $queryResult = $sth->fetchrow_hashref ) {
     push( @result, $queryResult );
   }
-  return @result; 
+  return @result;
 }
 
 # used by transition monitors and aware transition modules
@@ -144,18 +144,18 @@ sub get_byIds_age {
   my $columnsListRef = shift;
   my @result;
   my $queryString;
-  
+
   my $cols = "object_state_id, object_id, object_class, state_nickname, transition_module, needsMonitoring";
   if( scalar @$columnsListRef > 0 ) {
     $cols .= ", ".join( ", ",@$columnsListRef );
   }
-  
+
   if( scalar @$idListRef > 0 ) {
     $queryString = "object_state_id in (".join(",",@$idListRef ).")";
   } else {
     return ();
   }
-  
+
   my $query = qq{
     SELECT $cols
       FROM object_state o, state_description s
@@ -163,15 +163,15 @@ sub get_byIds_age {
        AND o.state_description_id = s.state_description_id
        AND o.last_change < DATE_SUB( NOW(), INTERVAL $minutes MINUTE )
   };
- 
+
   my $sth = $self->db->prepare( $query );
   $sth->execute;
   while( my $queryResult = $sth->fetchrow_hashref ) {
     push( @result, $queryResult );
   }
-  return @result; 
+  return @result;
 }
-  
+
 
 # put an object from object_state table into transit mode
 # log the time if requested.
@@ -179,14 +179,14 @@ sub object_toTransit {
   my $self = shift;
   my $obj_state_id_list = shift;
   my $resetTransit = shift;
-  
+
   my $whereClause;
   if( ! defined $resetTransit ) {
     $resetTransit = "'true'";
   } else {
     $resetTransit = "'false'";
   }
-  
+
   # check if the object is in transit ?
   # probably not, extra unnecessary query
   if( scalar @$obj_state_id_list == 1 ) {
@@ -202,7 +202,7 @@ sub object_toTransit {
      WHERE $whereClause
   } );
   $sth->execute;
-  
+
   $sth = $self->db->prepare( qq{
     INSERT into transition_log
        ( object_state_id, object_id, state_description_id, start_transit )
@@ -233,10 +233,10 @@ sub submit {
   my $class = shift;
   my $state = shift;
   my @queryResult;
-  
+
   # get the state_description_id
   my $sth = $self->db->prepare( q{
-    SELECT state_description_id 
+    SELECT state_description_id
       FROM state_description
      WHERE object_class = ?
        AND state_nickname = ?
@@ -254,7 +254,7 @@ sub submit {
 sub db {
   my $self = shift;
   my $db = shift;
-  $db && 
+  $db &&
     ( $self->{_db} = $db );
   $self->{_db};
 }
@@ -265,15 +265,15 @@ sub db {
 sub get_param {
   my $self = shift;
   my $paramname = shift;
-  
+
   return $::pipeConf{$paramname};
 }
- 
+
 sub log_error {
   my $self = shift;
   my $obj_state_id = shift;
   my $msg = shift;
-  
+
   my $sth = $self->db->prepare( q{
     INSERT into object_error( object_state_id, error_mesg )
     VALUES ( ?, ? )
@@ -281,6 +281,6 @@ sub log_error {
   $sth->execute( $obj_state_id, $msg );
 }
 
-  
-  
+
+
 1;

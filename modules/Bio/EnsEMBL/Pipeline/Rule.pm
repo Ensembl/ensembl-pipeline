@@ -12,13 +12,13 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Rule 
+Bio::EnsEMBL::Pipeline::Rule
 
 =head1 SYNOPSIS
 
 
 =head1 DESCRIPTION
-  
+
 
 =head1 CONTACT
 
@@ -58,7 +58,7 @@ sub new {
   my $class = shift;
   my $self = bless {},$class;
 
-  my ( $goal, $adaptor, $dbID ) = 
+  my ( $goal, $adaptor, $dbID ) =
     $self->_rearrange( [ qw ( GOAL
 			      ADAPTOR
 			      DBID
@@ -121,7 +121,7 @@ sub list_conditions {
 
 sub goalAnalysis {
   my ($self,$arg) = @_;
-  
+
   ( defined $arg ) &&
     ( $self->{_goal} = $arg );
   $self->{_goal};
@@ -149,7 +149,7 @@ sub check_for_analysis {
       return 0;
     }
   }
-  
+
   for my $cond ( $self->list_conditions ) {
     if( ! defined $anaHash{$cond} ) {
       return 0;

@@ -1,4 +1,4 @@
-
+#!/usr/local/bin/perl
 use strict;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;;
@@ -20,6 +20,7 @@ my $dbhost = $::pipeConf{'dbhost'};
 my $dbname = $::pipeConf{'dbname'};
 my $dbuser = $::pipeConf{'dbuser'};
 my $queue  = $::pipeConf{'queue'};
+
 my $test   = 0;
 my $resubmit = 0;
 
@@ -39,17 +40,19 @@ my $chunksize    = 500;
 my $currentStart = 0;
 my $completeRead = 0;
 
+print "pog\n";
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
     ( -host   => $dbhost,
       -dbname => $dbname,
       -user   => $dbuser,
   );
 
+print STDERR "Connected\n";
 my $ruleAdaptor = $db->get_RuleAdaptor;
 my $jobAdaptor  = $db->get_JobAdaptor;
 my $sic         = $db->get_StateInfoContainer;
 
-check_jobs_against_failed();
+#check_jobs_against_failed();
 check_jobs_against_success();
 
 sub check_jobs_against_success {
@@ -81,7 +84,7 @@ sub check_jobs_against_success {
       }
 	  
       if (defined($job) && !$test) {
-          print "Removing job " . $job->dbID . "\n";
+          print STDERR "Removing job " . $job->dbID . "\n";
 	  $job->remove;
       }
 

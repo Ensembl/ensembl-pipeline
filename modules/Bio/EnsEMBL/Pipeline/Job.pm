@@ -263,18 +263,19 @@ sub flush_runs {
       next;
     }
 
-    my $firstjob = $adaptor->fetch_by_dbID( $batched_jobs{$queue}->[0] );
+    my $lastjob = $adaptor->fetch_by_dbID( $batched_jobs{$queue}->[$#{$batched_jobs{$queue}}] );
 
-    if( ! defined $firstjob ) {
-      $self->throw( "First batch job not in db" );
+    if( ! defined $lastjob ) {
+      $self->throw( "Last batch job not in db" );
     }
   
 
 
     my $cmd;
   
-    $cmd = "bsub -q ".$queue." -o ".$firstjob->stdout_file.
-    " -e ".$firstjob->stderr_file." -E \"$runner -check\" ";
+    $cmd = "bsub -q ".$queue." -o ".$lastjob->stdout_file.
+#    " -R osf1 ".
+    " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
     $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
     
@@ -359,10 +360,13 @@ sub batch_runRemote {
 =cut
 
 sub runLocally {
+  print STDERR "Running locally\n"; 
   my $self = shift;
-  local *STDOUT;
-  local *STDERR;
-  
+  #local *STDOUT;
+  #local *STDERR;
+
+  print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
+
   if( ! open ( STDOUT, ">".$self->stdout_file )) {
     $self->set_status( "FAILED" );
     return;
@@ -372,7 +376,7 @@ sub runLocally {
     $self->set_status( "FAILED" );
     return;
   }
-        
+       print STDERR "Running inLSF\n"; 
   $self->runInLSF();
 }
 
@@ -398,7 +402,9 @@ sub runRemote {
   my $runner = __FILE__;
   $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
+#    " -R osf1 ".
     " -e ".$self->stderr_file." -E \"$runner -check\" ";
+
 
   if( ! defined $useDB ) {
     $useDB = 1;
@@ -602,6 +608,27 @@ sub get_all_status {
 }
 
 
+=head2 get_last_status
+
+  Title   : get_last_status
+  Usage   : my @status = $job->get_all_status ($status)
+  Function: Get latest status object associated with this job
+  Returns : Bio::EnsEMBL::Pipeline::Status
+  Args    : status string
+
+=cut
+
+sub get_last_status {
+  my ($self) = @_;
+  
+  if( $self->adaptor ) {
+    return $self->adaptor->get_last_status( $self );
+  } else {
+    return undef;
+  }
+}
+
+
 sub make_filenames {
   my ($self) = @_;
   
@@ -774,9 +801,9 @@ sub remove {
   if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
   if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
 
-  if( defined $self->adaptor ) {
-    $self->adaptor->remove( $self );
-  }
+  # if( defined $self->adaptor ) {
+  # $self->adaptor->remove( $self );
+  # }
 }
 
 1;

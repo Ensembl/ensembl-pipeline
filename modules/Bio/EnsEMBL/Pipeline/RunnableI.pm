@@ -143,6 +143,7 @@ sub protect {
     }
 
     push (@{$self->{_protected}}, @filename) if (@filename);
+
     return @{$self->{_protected}};
 }
 
@@ -188,7 +189,7 @@ sub workdir {
   }
 
 sub writefile {
-  my ($self, $seqobj, $seqfilename) = @_;
+    my ($self, $seqobj, $seqfilename) = @_;
   
   if (defined($seqobj)) {
     $seqfilename = 'filename' unless ($seqfilename);
