@@ -395,6 +395,10 @@ sub make_genes {
     # make genes from valid transcripts
     foreach my $checked_transcript(@$valid_transcripts){
       #print "have ".$checked_transcript." as a transcript\n";
+
+      # add terminal stop codon if appropriate
+      $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+
       my $gene = new Bio::EnsEMBL::Gene;
       $gene->type($genetype);
       $gene->analysis($analysis_obj);
