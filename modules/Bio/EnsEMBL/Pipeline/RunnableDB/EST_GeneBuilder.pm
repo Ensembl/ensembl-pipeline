@@ -82,27 +82,28 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 #				       );
 
 use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
-					EST_INPUTID_REGEX
-					EST_REFDBHOST
-					EST_REFDBUSER
-					EST_REFDBNAME
-					EST_REFDBPASS
-					EST_E2G_DBNAME
-					EST_E2G_DBHOST
-					EST_E2G_DBUSER
-					EST_E2G_DBPASS     
-					EST_GENEBUILDER_INPUT_GENETYPE
-					EST_EVIDENCE_TAG
-					EST_MIN_EVIDENCE_SIMILARITY
-					EST_MAX_EVIDENCE_DISCONTINUITY
-					EST_MAX_INTRON_SIZE
-					EST_GENOMEWISE_GENETYPE
-					USE_cDNA_DB
-					cDNA_DBNAME
-					cDNA_DBHOST
-					cDNA_DBUSER
-					cDNA_DBPASS
-					cDNA_GENETYPE
+						     EST_INPUTID_REGEX
+						     EST_REFDBHOST
+						     EST_REFDBUSER
+						     EST_REFDBNAME
+						     EST_REFDBPASS
+						     EST_E2G_DBNAME
+						     EST_E2G_DBHOST
+						     EST_E2G_DBUSER
+						     EST_E2G_DBPASS     
+						     EST_GENEBUILDER_INPUT_GENETYPE
+						     EST_EVIDENCE_TAG
+						     EST_MIN_EVIDENCE_SIMILARITY
+						     EST_MAX_EVIDENCE_DISCONTINUITY
+						     EST_MAX_INTRON_SIZE
+						     EST_GENOMEWISE_GENETYPE
+						     USE_cDNA_DB
+						     cDNA_DBNAME
+						     cDNA_DBHOST
+						     cDNA_DBUSER
+						     cDNA_DBPASS
+						     cDNA_GENETYPE
+						     REJECT_SINGLE_EXON_TRANSCRIPTS
 				       );
 
 
@@ -453,8 +454,13 @@ sub _process_Transcripts {
   
   # reject the single exon transcripts
   my @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};
-  print STDERR scalar(@filtered_transcripts)." transcripts left after rejecting single-exon transcripts\n";
-  
+  if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
+    print STDERR scalar(@filtered_transcripts)." transcripts left after rejecting single-exon transcripts\n";
+  }
+  else{
+    print STDERR scalar(@filtered_transcripts)." transcripts obtained ( Not rejecting single-exon transcripts)\n";
+  }
+
   return @filtered_transcripts;
 }
 
@@ -1446,10 +1452,10 @@ sub _check_Translations {
     $transcript->sort;
     my @exons = @{$transcript->get_all_Exons};
 
-    # at this point, only accepts transcripts with more than one exon
+    # at this point, if necessary, only accepts transcripts with more than one exon
     # although we have checked this already, genomewise sometimes bridges 
     # over introns making one exon out of two
-    if ( scalar(@exons) == 1 ){
+    if ( $REJECT_SINGLE_EXON_TRANSCRIPTS && scalar(@exons) == 1 ){
       print STDERR "Rejected a single-exon transcript\n";
       next TRANSCRIPT;
     }
