@@ -213,7 +213,6 @@ sub run {
 
 
 	# this is a very low threshold ... we were losing a lot of good matches this way
-#	if ($intron > 50000) {
 	if ($intron > $GB_COMBINED_MAX_INTRON) {
 	  $found = 1;
 	  
@@ -237,6 +236,15 @@ sub run {
   my @merged_gw_genes = $self->_merge_gw_genes;
   print STDERR "got " . scalar(@merged_gw_genes) . " merged gw geness\n";  
 
+  # first of all, sort gw genes by length
+  @merged_gw_genes = { $self->_transcript_length_in_gene($b) <=>
+			   $self->_transcript_length_in_gene($a) } @merged_gw_genes;
+	
+
+  # keep track of the e2g genes that have been used already
+  # we aim for a one-2-one matching between proteins and cdnas
+  my %used_e2g;
+		   
  GENEWISE:
   foreach my $gw(@merged_gw_genes){
     # should be only 1 transcript
@@ -253,29 +261,77 @@ sub run {
 
     next GENEWISE unless scalar(@matching_e2gs);
 
-    # pick longest gene match for each gw (exon length - though this may not be the best way)
-    my $chosen_e2g;
-    my $longest = 0;
-    foreach my $e2g(@matching_e2gs){
-      my $length = 0;
-      foreach my $exon ($e2g->get_all_Exons){
-	$length += $exon->end - $exon->start + 1; 
+    # from the matching ones, take the best fit
+    my @list;
+    foreach my $e2g ( @matching_e2gs ){
+	# we check exon_overlap and fraction of overlap in gw and e2g:
+	my ($exon_overlap, $overlap_in_gw,$overlap_in_e2g) = $self->_check_overlap( $gw, $e2g );
+	push (@list, [$exon_overlap, $overlap_in_gw,$overlap_in_e2g,$e2g]);
+    }
+    @list = sort{ my $result = ( $list[b][0] <=> $list[a][0] );
+		  unless ($result){
+		      $result = ($list[b][1] <=> $list[a][1] );
+		      unless ($result){
+			  $result = ($list[b][2] <=> $list[a][2] );
+		      }
+		  }
+		  return $result;
+	      
+	      } @list;
+    my $found = 0;
+    my $e2g_match;
+    do{
+      my $this = shift @list;
+      $e2g_match = $this[3];
+      
+    } while( $used_e2g{$e2g_match} ); 	      
+    
+    unless ( $e2g_match){
+      print STDERR "No cdna found for gw_gene".$gw_gene->dbID."\n";
+      next GENEWISE;
+    }
+    
+    $used_e2g{$e2g_match} = 1;
+
+    ## pick longest gene match for each gw (exon length - though this may not be the best way)
+    #my $chosen_e2g;
+    #my $longest = 0;
+    #foreach my $e2g(@matching_e2gs){
+    #  my $length = 0;
+    #  foreach my $exon ($e2g->get_all_Exons){
+#	$length += $exon->end - $exon->start + 1; 
+#      }
+#      if ($length > $longest){
+#	$chosen_e2g = $e2g;
+#	$longest = $length;
+#      }
+#    }
+#    # there is one transcript per gene
+#    my @e2g_tran = $chosen_e2g->each_Transcript; 
+#    if ( @gw_tran == 1 &&  @e2g_tran == 1){
+#      print STDERR "combining : " . $gw_tran[0]->dbID . " with " . $e2g_tran[0]->dbID . "\n";
+#    }
+    #    else{
+    #      $self->warn("genes with more thatn one transcript -> gw: ".scalar(@gw_tran)." e2g: ".scalar(@e2g_tran));
+    #    }
+    
+    print STDERR "combining gw gene : " . $gw_gene->dbID.":\n";
+    foreach my $tran ( $gw_gene->each_Transcript){
+      foreach my $exon ($tran->get_all_Exons){
+	print STDERR $exon->start."-".$exon->end." ";
       }
-      if ($length > $longest){
-	$chosen_e2g = $e2g;
-	$longest = $length;
+      print STDERR "\n";
+    }
+    print STDERR "with e2g gene " . $e2g_match->dbID . ":\n";
+    foreach my $tran ( $e2g_gene->each_Transcript){
+      foreach my $exon ($tran->get_all_Exons){
+	print STDERR $exon->start."-".$exon->end." ";
       }
+      print STDERR "\n";
     }
-    # there is one transcript per gene
-    my @e2g_tran = $chosen_e2g->each_Transcript; 
-    if ( @gw_tran == 1 &&  @e2g_tran == 1){
-      print STDERR "combining : " . $gw_tran[0]->dbID . " with " . $e2g_tran[0]->dbID . "\n";
-    }
-    else{
-      $self->warn("genes with more thatn one transcript -> gw: ".scalar(@gw_tran)." e2g: ".scalar(@e2g_tran));
-    }
+
     # build combined genes
-    $self->combine_genes($gw, $chosen_e2g);
+    $self->combine_genes($gw, $e2g_match);
   }
 
   
@@ -284,6 +340,60 @@ sub run {
 
   $self->output(@remapped);
 }
+
+# method to calculate the length of a transcript which is inside a gene
+# this assumes that these genewise genes contain one transcript each
+
+sub _transcript_length_in_gene{
+    my ($self,$gene) = @_;
+    my @trans = $gene->each_Transcript;
+    my $tran = $trans[0];
+    my $length = 0;
+    foreach my $exon ($tran->get_all_Exons){
+	$length += ($exon->end - $exon->start + 1);
+    }
+    return $length;
+}
+
+# method to calculate the amount of overlap between two transcripts
+
+sub _check_overlap{
+    my ($self, $gw_gene, $e2g_gene) = @_;
+    @gw_trans  = $gw_gene->each_Transcript;
+    @e2g_trans = $e2g_gene->each_Transcript;
+
+    my $exon_overlap = 0;
+    my $extent_overlap = 0;
+    foreach my $gw_exon ( $gw_trans[0]->get_all_Exons ){
+	foreach my $e2g_exon ( $e2g_trans[0]->get_all_Exons ){
+	    if ( $gw_exon->overlaps( $e2g_exon ) ){
+		$exon_overlap++;
+		if ( $gw_exon->start >= $e2g_exon->start ){
+		    if ( $gw_exon->end < $e2g_exon->end ){
+			$extent_overlap += ( $gw_exon->end - $gw_start + 1 );
+		    }
+		    elsif ( $gw_exon->end >= $e2g_exon->end ){
+			$extent_overlap += ( $g2g_exon->end - $gw_exon->start + 1 );
+		    }
+		}
+		elsif( $gw_exon->start < $e2g_exon->start ){
+		    if ( $gw_exon->end < $e2g_exon->end ){
+			$extent_overlap += ( $gw_exon->end - $e2g_start + 1 );
+		    }
+		    elsif ( $gw_exon->end >= $e2g_exon->end ){
+			$extent_overlap += ( $e2g_exon->end - $e2g_exon->start + 1 );
+		    }
+		}
+	    }
+	}
+    }
+    my $gw_length = $self->_transcript_length_in_gene( $gw_gene );
+    my $e2g_length = $self->_transcript_length_in_gene( $e2g_gene );
+    
+    return( $exon_overlap, $extent_overlap/$gw_length, $extent_overlap/e2g_length);
+}
+    
+
 
 =head2 output
 
@@ -498,7 +608,7 @@ sub combine_genes{
       print STDERR "\n";
     }
   }
-
+  
   $self->combined_genes(@genes);
   
 }
@@ -529,16 +639,22 @@ sub match_gw_to_e2g{
   }
   
   my @gw_exons = $gw_tran[0]->get_all_Exons;
-  
   my $strand   = $gw_exons[0]->strand;
-  
   if($gw_exons[$#gw_exons]->strand != $strand){
-    $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
-    return;
+      $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n with ".$gw_tran[0]->dbId );
+      return;
   }
-  
+  if ($strand == 1 ){
+      @gw_exons = sort { $a->start <=> $b->start } @gw_exons;
+  }
+  else{
+      @gw_exons = sort { $b->start <=> $a->start } @gw_exons;
+  }
+
+
+ 
   # in order to match a starting genewise exon with an e2g exon, we need to have 
-  # a. exactly coinciding exon ends
+  # a. exactly coinciding exon boundaries
   # b. either e2g exon has start <= gw exon start, 
   # OR e2g exon start lies within $exon_slop bp of gw exon start AND the e2g transcript will add extra UTR exons. 
   # previously we had required e2g start to be strictly <= gw start, but this will lose us some valid UTRs
@@ -551,11 +667,16 @@ sub match_gw_to_e2g{
     my @egtran  = $e2g->each_Transcript;
     my @eg_exons = $egtran[0]->get_all_Exons;
 
-    $strand   = $eg_exons[0]->strand;
-    
+    $strand   = $eg_exons[0]->strand; 
     if($eg_exons[$#eg_exons]->strand != $strand){
-#      $self->warn("first and last e2g exons have different strands - skip it\n");
-      next E2G;
+	$self->warn("first and last e2g exons have different strands - skipping transcript ".$egtran[0]->dbID);
+	next E2G;
+    }
+    if ($strand == 1 ){
+	@eg_exons = sort { $a->start <=> $b->start } @eg_exons;
+    }
+    else{
+	@eg_exons = sort { $b->start <=> $a->start } @eg_exons;
     }
 
     my $fiveprime_match = 0;
@@ -563,95 +684,99 @@ sub match_gw_to_e2g{
     
 
     # Lets deal with single exon genes first
-
     if ($#gw_exons == 0) {
-      foreach my $current_exon (@eg_exons) {
-	
-	if($current_exon->strand != $gw_exons[0]->strand){
-	  next E2G;
-	}
-
+	foreach my $current_exon (@eg_exons) {
+	    
+	    if($current_exon->strand != $gw_exons[0]->strand){
+		next E2G;
+	    }
+	    
 # don't yet deal with genewise leakage for single exon genes
-	if ($gw_exons[0]->end   <= $current_exon->end && 
-	    $gw_exons[0]->start >= $current_exon->start){
-	  $fiveprime_match = 1;
-	  $threeprime_match = 1;
+	    if ($gw_exons[0]->end   <= $current_exon->end && 
+		$gw_exons[0]->start >= $current_exon->start){
+		$fiveprime_match = 1;
+		$threeprime_match = 1;
+	    }
+	    
 	}
-	
-      }
 #      if($fiveprime_match && $threeprime_match){
-      # can match either end, or both
-      if($fiveprime_match || $threeprime_match){
-	push(@matching_e2g, $e2g);
-      }
-      # Now the multi exon genewises
-    } else {
-      foreach my $current_exon (@eg_exons) {
-	if($current_exon->strand != $gw_exons[0]->strand){
-	  next E2G;
+	# can match either end, or both
+	if($fiveprime_match || $threeprime_match){
+	    push(@matching_e2g, $e2g);
 	}
-	
-	if($gw_exons[0]->strand == 1){
 
-	FORWARD:
-	  if ($gw_exons[0]->end == $current_exon->end && 
-	      # either e2g exon starts before genewise exon
-	      ($current_exon->start <= $gw_exons[0]->start || 
-	       # or e2g exon is a bit shorter but there are spliced UTR exons as well
-	       (abs($current_exon->start - $gw_exons[0]->start) <= $exon_slop && 
-		$current_exon != $eg_exons[0]))){
-#	    print STDERR "fiveprime match\n";
-	    $fiveprime_match = 1;
-	  }
-	  
-	  elsif($gw_exons[$#gw_exons]->start == $current_exon->start &&
-		# either e2g exon ends after genewise exon
-		($current_exon->end >= $gw_exons[$#gw_exons]->end ||
-		 # or there are UTR exons to be added
-		 (abs($current_exon->end - $gw_exons[$#gw_exons]->end) <= $exon_slop && 
-		 $current_exon != $eg_exons[$#eg_exons]))){
-#	    print STDERR "threeprime match\n";
-	    $threeprime_match = 1;
-	  }
+	# Now the multi exon genewises
+    } else {
+
+      E2G_EXONS:
+	foreach my $current_exon (@eg_exons) {
+	    if($current_exon->strand != $gw_exons[0]->strand){
+		next E2G;
+	    }
+	    
+	    if($gw_exons[0]->strand == 1){
+		
+	      FORWARD:
+		if ($gw_exons[0]->end == $current_exon->end && 
+		    # either e2g exon starts before genewise exon
+		    ($current_exon->start <= $gw_exons[0]->start || 
+		     # or e2g exon is a bit shorter but there are spliced UTR exons as well
+		     (abs($current_exon->start - $gw_exons[0]->start) <= $exon_slop && 
+		      $current_exon != $eg_exons[0]))){
+		    
+		    $fiveprime_match = 1;
+		}
+		elsif($gw_exons[$#gw_exons]->start == $current_exon->start &&
+		      # either e2g exon ends after genewise exon
+		      ($current_exon->end >= $gw_exons[$#gw_exons]->end ||
+		       # or there are UTR exons to be added
+		       (abs($current_exon->end - $gw_exons[$#gw_exons]->end) <= $exon_slop && 
+			$current_exon != $eg_exons[$#eg_exons]))){
+		    
+		    $threeprime_match = 1;
+		}
+	    }
+	    
+	    elsif($gw_exons[0]->strand == -1){
+	      REVERSE:
+		if ($gw_exons[0]->start == $current_exon->start &&
+		    # either e2g exon ends after gw exon
+		    ($current_exon->end >= $gw_exons[0]->end ||
+		     # or there are UTR exons to be added
+		     (abs($current_exon->end - $gw_exons[0]->end) <= $exon_slop &&
+		      $current_exon != $eg_exons[0]))){
+		    print STDERR "fiveprime reverse match\n";
+		    
+		    $fiveprime_match = 1;
+		}
+		elsif ($gw_exons[$#gw_exons]->end == $current_exon->end &&
+		       # either e2g exon starts before gw exon
+		       ($current_exon->start <= $gw_exons[$#gw_exons]->start ||
+			# or there are UTR exons to be added
+			(abs($current_exon->start - $gw_exons[$#gw_exons]->start) <= $exon_slop &&
+			 $current_exon != $eg_exons[$#eg_exons]))){
+		    print STDERR "threeprime reverse match\n";
+		    $threeprime_match = 1;
+		}
+	    }
 	}
-	
-	elsif($gw_exons[0]->strand == -1){
-	REVERSE:
-	  if ($gw_exons[0]->start == $current_exon->start &&
-	      # either e2g exon ends after gw exon
-	      ($current_exon->end >= $gw_exons[0]->end ||
-	       # or there are UTR exons to be added
-	       (abs($current_exon->end - $gw_exons[0]->end) <= $exon_slop &&
-	       $current_exon != $eg_exons[0]))){
-	    print STDERR "fiveprime reverse match\n";
-	    $fiveprime_match = 1;
-	  }
-	  elsif ($gw_exons[$#gw_exons]->end == $current_exon->end &&
-		 # either e2g exon starts before gw exon
-		 ($current_exon->start <= $gw_exons[$#gw_exons]->start ||
-		  # or there are UTR exons to be added
-		  (abs($current_exon->start - $gw_exons[$#gw_exons]->start) <= $exon_slop &&
-		  $current_exon != $eg_exons[$#eg_exons]))){
-	    print STDERR "threeprime reverse match\n";
-	    $threeprime_match = 1;
-	  }
-	}
-      }
 #      if($fiveprime_match && $threeprime_match){
-      if($fiveprime_match || $threeprime_match){
-	  push(@matching_e2g, $e2g);
-	  
-	  # test
-	  foreach my $egtran ( $e2g->each_Transcript ){
-	    print STDERR "Found mRNA match trans_dbID:".$egtran->dbID."\n";
-	    #foreach my $exon ($egtran->get_all_Exons){
-	    #  print STDERR $exon->start."-".$exon->end."  ";
-	    #}
-	    #print STDERR "\n";
-	  }
+	if($fiveprime_match || $threeprime_match){
+	    push(@matching_e2g, $e2g);
+	    
+	    # test
+	    foreach my $egtran ( $e2g->each_Transcript ){
+		print STDERR "Found mRNA match trans_dbID:".$egtran->dbID."\n";
+		#foreach my $exon ($egtran->get_all_Exons){
+		#  print STDERR $exon->start."-".$exon->end."  ";
+		#}
+		#print STDERR "\n";
+	    }
 	}
     }
-  }
+} 
+  
+  
   return @matching_e2g;
   
 }
@@ -785,10 +910,10 @@ sub _make_newtranscript {
   
   # should be only 1 transcript
   my @gw_tran  = $gw->each_Transcript;
-#  $gw_tran[0]->sort;
+  #  $gw_tran[0]->sort;
   my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
   my @egtran = $e2g->each_Transcript;
-#  $egtran[0]->sort;
+  #  $egtran[0]->sort;
   my @e2g_exons  = $egtran[0]->get_all_Exons; # ordered array of exons
   
   # OK, let's see if we need a new gene
@@ -803,15 +928,17 @@ sub _make_newtranscript {
   $translation->end($gw_tran[0]->translation->end);
   $translation->start_exon($gw_tran[0]->translation->start_exon);
   $translation->end_exon($gw_tran[0]->translation->end_exon);
-
- $newtranscript->translation($translation);
-  my $eecount = 0;
+  
+  $newtranscript->translation($translation);
   
   $newtranscript->translation->start_exon($newtranscript->start_exon);
- $newtranscript->translation->end_exon($newtranscript->end_exon);
-
-  # check strands are consistent
-  foreach my $ee(@e2g_exons){
+  $newtranscript->translation->end_exon($newtranscript->end_exon);
+  
+  my $eecount = 0;
+ EACH_E2G_EXON:
+  foreach my $ee (@e2g_exons){
+    
+    # check strands are consistent
     if ($ee->strand != $gw_exons[0]->strand){
       $self->warn("gw and e2g exons have different strands - can't combine genes\n") ;
       next GENEWISE;
@@ -827,7 +954,6 @@ sub _make_newtranscript {
 								    $translation, 
 								    $eecount, 
 								    @e2g_exons);
-      
     }
     
     else {
@@ -985,8 +1111,9 @@ sub transcript_from_single_exon_genewise {
 
   # save out current translation end - we will need this if we have to unmerge frameshifted exons later
   my $orig_tend = $translation->end;
-
+  
   # stay with being strict about gw vs e2g coords - may change this later ...
+  # the overlapping e2g exon must at least cover the entire gw_exon
   if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
 
     my $egstart = $eg_exon->start;
@@ -994,15 +1121,14 @@ sub transcript_from_single_exon_genewise {
     my $gwstart = $gw_exon->start;
     my $gwend   = $gw_exon->end;
 
-#    print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
+    # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
 
     # modify the coordinates of the first exon in $newtranscript
-    
     my $ex = $transcript->start_exon;
-
+    
     $ex->start($eg_exon->start);
     $ex->end($eg_exon->end);
-
+    
     # need to explicitly set the translation start & end exons here.
     $translation->start_exon($ex);
 
@@ -1010,34 +1136,35 @@ sub transcript_from_single_exon_genewise {
     $translation->end_exon($ex);
     
     # need to deal with translation start and end this time - varies depending on strand
+  
+  FORWARD:
     if($gw_exon->strand == 1){
       my $diff = $gwstart - $egstart;
       my $tstart = $translation->start;
       my $tend = $translation->end;
-	      
+      
       $translation->start($tstart + $diff);
       $translation->end($tend + $diff);
-
+      
       $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
       $self->throw("setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_exon->length . "\n") unless $translation->end <= $translation->end_exon->length;
     }
-
+    
+  REVERSE:
     elsif($gw_exon->strand == -1){
-      my $diff = $egend - $gwend;
+      my $diff   = $egend - $gwend;
       my $tstart = $translation->start;
-      my $tend = $translation->end;
+      my $tend   = $translation->end;
       $translation->start($tstart+$diff);
       $translation->end($tend + $diff);
 
-
       $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
       $self->throw("setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_exon->length . "\n") unless $translation->end <= $translation->end_exon->length;
     }
     
-    
     # expand frameshifted single exon genewises back from one exon to multiple exons
     if(scalar($ex->sub_SeqFeature) > 1){
-#      print STDERR "uh-oh frameshift\n";
+      # print STDERR "uh-oh frameshift\n";
       my @sf = $ex->sub_SeqFeature;
       
       # save current start and end of modified exon
@@ -1065,7 +1192,7 @@ sub transcript_from_single_exon_genewise {
       # flush the sub_SeqFeatures
       $ex->flush_sub_SeqFeature;
     }
-
+    
     # need to add back exons, both 5' and 3'
     $self->add_5prime_exons(\$transcript, $exoncount, @e2g_exons);
     $self->add_3prime_exons(\$transcript, $exoncount, @e2g_exons);
@@ -1077,13 +1204,19 @@ sub transcript_from_single_exon_genewise {
 
 sub transcript_from_multi_exon_genewise {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
+  
+  # $current_exon is the exon one the e2g_transcript we are in at the moment
+  # $exoncount is the position of the e2g exon in the array
+
   # save out current translation->end - we'll need it if we have to expand 3prime exon later
   my $orig_tend = $translation->end;
 
   my @gwtran  = $gw_gene->each_Transcript;
+  $gwtran[0]->sort;
   my @gwexons = $gwtran[0]->get_all_Exons;
   
   my @egtran  = $eg_gene->each_Transcript;
+  $egtran[0]->sort;
   my @egexons = $egtran[0]->get_all_Exons;
 
   # in order to match a starting genewise exon with an e2g exon, we need to have 
@@ -1094,40 +1227,56 @@ sub transcript_from_multi_exon_genewise {
   my $exon_slop = 20;
 
   # compare to the first genewise exon
+ FORWARD:
   if($gwexons[0]->strand == 1){
-  FORWARD:
+  
+    5_PRIME:
     if ($gwexons[0]->end == $current_exon->end && 
 	# either e2g exon starts before genewise exon
 	($current_exon->start <= $gwexons[0]->start || 
 	 # or e2g exon is a bit shorter but there are spliced UTR exons as well
 	 (abs($current_exon->start - $gwexons[0]->start) <= $exon_slop && 
 	  $current_exon != $egexons[0]))){
-
+      
       my $current_start = $current_exon->start;
       my $gwstart = $gwexons[0]->start;
       
-      # modify the coordinates of the first exon in $newtranscript
+      # modify the coordinates of the first exon in $newtranscript if
+      # e2g is larger on this end than gw.
       my $ex = $transcript->start_exon;
-      $ex->start($current_exon->start);
-
+      if ( $current_exon->start <= $gwexons[0]->start ){
+	$ex->start($current_exon->start);
+      }
+      # if the e2g exon starts after the gw exon, 
+      # modify the start only if this e2g exon is not the first of the transcript
+      elsif(  $current_exon->start > $gwexons[0]->start && $exoncount != 0 ) {
+	$ex->start($current_exon->start);
+      }
+      else{
+	$ex->start($gwstart);
+      }
       # add all the exons from the est2genome transcript, previous to this one
       $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
       
       # fix translation start 
-
       if($gwstart >= $current_start){
 	# take what it was for the gw gene, and add on the extra
 	my $tstart = $translation->start;
 	$tstart += ($gwstart - $current_start);
 	$translation->start($tstart);
-
       }
-      else{
+      # only trust a smaller cdna exon if it is not the first of the transcript
+      # (it could be a truncated cdna)
+      elsif($gwstart < $current_start && $exoncount != 0){
+	
 	# genewise has leaked over the start. Tougher call - we need to take into account the 
 	# frame here as well
-	my $diff = $current_start - $gwstart;
+	print STDERR "gw exon starts: $gwstart > new start: $current_start";
+	print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
+	
+	my $diff   = $current_start - $gwstart;
 	my $tstart = $translation->start;
-
+	
 	if    ($diff % 3 == 0) { $translation->start(1); }
 	elsif ($diff % 3 == 1) { $translation->start(3); }
 	elsif ($diff % 3 == 2) { $translation->start(2); }
@@ -1135,41 +1284,57 @@ sub transcript_from_multi_exon_genewise {
 	  $translation->start(1);
 	  $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");}
       }
+      else{
+	print STDERR "gw exon starts: $gwstart > new start: $current_start";
+	print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
+      }
       $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
 
-    } # end 5' exon
+	  } # end 5' exon
     
+    3_PRIME:
     elsif ($gwexons[$#gwexons]->start == $current_exon->start && 
-	# either e2g exon ends after genewise exon
+	   # either e2g exon ends after genewise exon
 	   ($current_exon->end >= $gwexons[$#gwexons]->end ||
-	    # or there are UTR exons to be added
+	    # or we allow to end before if there are UTR exons to be added
 	    (abs($current_exon->end - $gwexons[$#gwexons]->end) <= $exon_slop && 
 	     $current_exon != $egexons[$#egexons]))){   
       
       #      print STDERR "3' exon match\n";
       
       # modify the coordinates of the last exon in $newtranscript
+      # e2g is larger on this end than gw.
       my $ex = $transcript->end_exon;
-      $ex->end($current_exon->end);
+      if ( $current_exon->end >= $gwexons[$#gwexons]->end ){
+	$ex->end($current_exon->end);
+      }
+      # if the e2g exon ends before the gw exon, 
+      # modify the end only if this e2g exon is not the first of the transcript
+      elsif ( $current_exon->end < $gwexons[$#gwexons]->end && $exoncount != $#egexons ){
+	$ex->end($current_exon->end);
+      }
+      else{
+	$ex->end($gwexons[$#gwexons]->end);
+      }
 
       my $expanded = $self->expand_3prime_exon(\$ex, \$transcript);
-
+      
       # need to explicitly set the translation end exon for translation to work out
       my $end_ex = $transcript->end_exon;
       $translation->end_exon($end_ex);
-
+      
       if($expanded){
 	# set translation end to what it originally was in the unmerged genewise gene
-#	print STDERR "setting translation end to $orig_tend\n";
+	# print STDERR "setting translation end to $orig_tend\n";
 	$translation->end($orig_tend);
       }
-
+      
       # fix translation end iff genewise has leaked over - will need truncating
       if($current_exon->end < $gwexons[$#gwexons]->end){
-#	print STDERR "FORWARD exon length: " . $current_exon->length . "\n";
+	# print STDERR "FORWARD exon length: " . $current_exon->length . "\n";
 	$translation->end($current_exon->length);
       }
-
+      
       
       # finally add any 3 prime e2g exons
       $self->add_3prime_exons(\$transcript, $exoncount, @egexons);
@@ -1177,9 +1342,10 @@ sub transcript_from_multi_exon_genewise {
     } # end 3' exon
     
   }
-  
+ REVERSE:
   elsif($gwexons[0]->strand == -1){
-  REVERSE:
+  
+    5_PRIME:
     if ($gwexons[0]->start == $current_exon->start && 
 	# either e2g exon ends after gw exon
 	($current_exon->end >= $gwexons[0]->end ||
@@ -1223,7 +1389,8 @@ sub transcript_from_multi_exon_genewise {
       
 
     } # end 5' exon
-    
+
+    3_PRIME:
     elsif ($gwexons[$#gwexons]->end == $current_exon->end && 
 	   # either e2g exon starts before gw exon
 	   ($current_exon->start <= $gwexons[$#gwexons]->start ||
@@ -1276,7 +1443,10 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->start($oldexon->start);
 	$newexon->end($oldexon->end);
 	$newexon->strand($oldexon->strand);
-	$newexon->phase($oldexon->phase);
+
+	# these are all 5prime UTR exons
+	$newexon->phase(-1);
+	$newexon->end_phase(-1);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vc);
 	my %evidence_hash;
@@ -1299,6 +1469,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
 # to expand any frameshifts we merged in the terminal genewise exon. 
+
 sub expand_3prime_exon{
   my ($self, $exon, $transcript) = @_;
   if(scalar($$exon->sub_SeqFeature) > 1){
@@ -1329,6 +1500,7 @@ sub expand_3prime_exon{
 # of e2g exons corresponds to the end of the genewise transcript so we add back 
 # exons 3' to that position.
 # $exon and $transcript are references to Exon and Transcript objects.
+
 sub add_3prime_exons {
 my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 # need to deal with frameshifts - 3' exon is a special case as its end might have changed
@@ -1341,7 +1513,10 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	$newexon->start($oldexon->start);
 	$newexon->end($oldexon->end);
 	$newexon->strand($oldexon->strand);
-	$newexon->phase($oldexon->phase);
+	
+	# these are all exons with UTR:
+	$newexon->phase(-1);
+	$newexon->end_phase(-1);
 	$newexon->contig_id($oldexon->contig_id);
 	$newexon->attach_seq($self->vc);
 	#print STDERR "adding evidence in 3':\n";
@@ -1354,7 +1529,7 @@ my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 	  #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
 	  $newexon->add_Supporting_Feature($sf);
 	}
-#	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
+	#	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
 	$$transcript->add_Exon($newexon);
 	$$transcript->sort;
 	$c--;
