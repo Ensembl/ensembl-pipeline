@@ -686,9 +686,10 @@ sub _print_Transcript{
   if ( defined( $transcript->type ) ){
     $id .= " ".$transcript->type;
   }
+  my ($p, $f, $l) = caller;
   print STDERR "transcript: ".$id."\n";
   foreach my $exon ( @exons){
-    print STDERR $exon->gffstring."\n";
+    print STDERR $exon->start." ".$exon->end." ".$exon->strand."\n";
   }
   if ( $transcript->can('translation') && $transcript->translation){
     $self->_print_Translation($transcript);
