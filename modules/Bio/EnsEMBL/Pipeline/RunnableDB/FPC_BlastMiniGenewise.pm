@@ -234,20 +234,20 @@ sub fetch_input {
     print STDERR "Fetching input \n";
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contigid  = $self->input_id;
-       $contigid =~ s/\.(.*)//;
-    my $contignum = $1;
+    my $chrid  = $self->input_id;
+       $chrid =~ s/\.(.*)-(.*)//;
 
-    print STDERR "Contig id = $contigid , number $contignum\n";
+    my $chrstart = $1;
+    my $chrend   = $2;
 
-    $self->dbobj->static_golden_path_type('SANGER');
+    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
+
+    $self->dbobj->static_golden_path_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
-    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end('chr20',1,4000000);
-    #my $contig    = $contig[$contignum];
-    $contig->_chr_name('chr20');
-    print STDERR "Analysing contig " . $contig->id . " " . $contignum . "\n";
+    $contig->_chr_name($chrid);
 
     foreach my $rc ($contig->_vmap->each_MapContig) {
 	my $strand = "+";
@@ -257,30 +257,66 @@ sub fetch_input {
 	
 	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
     }
+
     my $genseq    = $contig->primary_seq;
 
     print STDERR "Length is " . $genseq->length . "\n";
     print STDERR "Fetching features " . $contig . "\n";
 
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('swir',200);
-
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200);
+    
     print STDERR "Number of features = " . scalar(@features) . "\n";
+
+    my @genes     = $contig->get_Genes_by_Type('pruned_TGW');
+
+    print STDERR "Found " . scalar(@genes) . " genewise genes\n";
+
+
+
+    my %redids;
+    my $trancount = 1;
+
+    foreach my $gene (@genes) {
+      print STDERR "Found genewise gene " . $gene->id . "\n";
+      foreach my $tran ($gene->each_Transcript) {
+	foreach my $exon ($tran->each_Exon) {
+	  print STDERR "Exon " . $exon->id . " " . $exon->strand . "\n";
+	  my $strand = "+";
+	  if ($exon->strand == -1) {
+	    $strand = "-";
+	  }
+
+	  print STDERR $exon->contig_id . "\tGD_CDS\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
+	  
+	   FEAT: foreach my $f (@features) {
+	    if ($exon->overlaps($f)) {
+	      $redids{$f->hseqname} = 1;
+	      print STDERR "ID " . $f->hseqname . " covered by genewise\n";
+	    }
+	  }
+	}
+	$trancount++;
+      }
+    }
 
     my %idhash;
     
     foreach my $f (@features) {
-        print "Feature " . $f . "\n";
-	if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)) {
-	    $idhash{$f->hseqname} = 1;
-	}
+#        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
+      if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+	  defined($f->hseqname)                &&
+	  $redids{$f->hseqname} != 1) {
+	$idhash{$f->hseqname} = 1;
+      }
     }
     
     my @ids = keys %idhash;
     
     print STDERR "Feature ids are @ids\n";
-    
+#    my @ids = ('O00468');
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
 									   '-ids'      => \@ids);
+    
     
     $self->add_Runnable($runnable);
     $self->{$runnable} = $contig;
@@ -324,156 +360,157 @@ sub run {
 }
 
 sub convert_output {
-    my ($self) =@_;
-
-    my @tmpf;
-    my $count = 1;
-    my $time  = time; chomp($time);
-
-    # This BAD! Shouldn't be using internal ids.
-    # <sigh> no time to change it now
-    my $analysis = $self->dbobj->get_OldAnalysis(7);
-    my $trancount = 1;
-
-    foreach my $runnable ($self->get_Runnables) {
-	my $contig = $self->{$runnable};
-	my @tmpf   = $runnable->output;
-
-	my @genes;
+  my ($self) =@_;
+  
+  my @tmpf;
+  my $count = 1;
+  my $time  = time; chomp($time);
+  
+  # This BAD! Shouldn't be using internal ids.
+  # <sigh> no time to change it now
+  my $analysis = $self->dbobj->get_OldAnalysis(7);
+  my $trancount = 1;
+  
+  foreach my $runnable ($self->get_Runnables) {
+    my $contig = $self->{$runnable};
+    my @tmpf   = $runnable->output;
+    
+    my @genes;
+    
+    foreach my $tmpf (@tmpf) {
+      
+      my $gene   = new Bio::EnsEMBL::Gene;
+      my $tran   = new Bio::EnsEMBL::Transcript;
+      my $transl = new Bio::EnsEMBL::Translation;
+      
+      $gene->type('genewise');
+      $gene->id($self->input_id . ".genewise.$count");
+      $gene->created($time);
+      $gene->modified($time);
+      $gene->version(1);
+      
+      $tran->id($self->input_id . ".genewise.$count");
+      $tran->created($time);
+      $tran->modified($time);
+      $tran->version(1);
+      
+      $transl->id($self->input_id . ".genewise.$count");
+      $transl->version(1);
+      
+      $count++;
+      
+      $gene->add_Transcript($tran);
+      $tran->translation($transl);
+      
+      
+      my $excount = 1;
+      my @exons;
+      
+      foreach my $subf ($tmpf->sub_SeqFeature) {
+	$subf->feature1->source_tag('genewise');
+	$subf->feature1->primary_tag('similarity');
+	$subf->feature1->score(100);
+	$subf->feature1->analysis($analysis);
 	
-	foreach my $tmpf (@tmpf) {
+	$subf->feature2->source_tag('genewise');
+	$subf->feature2->primary_tag('similarity');
+	$subf->feature2->score(100);
+	$subf->feature2->analysis($analysis);
 
-	    my $gene   = new Bio::EnsEMBL::Gene;
-	    my $tran   = new Bio::EnsEMBL::Transcript;
-	    my $transl = new Bio::EnsEMBL::Translation;
-	    
-	    $gene->type('genewise');
-	    $gene->id($self->input_id . ".genewise.$count");
-	    $gene->created($time);
-	    $gene->modified($time);
-	    $gene->version(1);
-	    
-	    $tran->id($self->input_id . ".genewise.$count");
-	    $tran->created($time);
-	    $tran->modified($time);
-	    $tran->version(1);
-	    
-	    $transl->id($self->input_id . ".genewise.$count");
-	    $transl->version(1);
-	    
-	    $count++;
-	    
-	    $gene->add_Transcript($tran);
-	    $tran->translation($transl);
-	    
-	    
-	    my $excount = 1;
-	    my @exons;
-	    
-	    foreach my $subf ($tmpf->sub_SeqFeature) {
-		$subf->feature1->source_tag('genewise');
-		$subf->feature1->primary_tag('similarity');
-		$subf->feature1->score(100);
-		$subf->feature1->analysis($analysis);
-
-		$subf->feature2->source_tag('genewise');
-		$subf->feature2->primary_tag('similarity');
-		$subf->feature2->score(100);
-		$subf->feature2->analysis($analysis);
-
-		my $exon = new Bio::EnsEMBL::Exon;
-
-		$exon->id($self->input_id . ".genewise.$count.$excount");
-		$exon->contig_id($contig->id);
-		$exon->created($time);
-		$exon->modified($time);
-		$exon->version(1);
-		
-		$exon->start($subf->start);
-		$exon->end  ($subf->end);
-		$exon->strand($subf->strand);
-		
-		print STDERR "\tFeaturePair " . $subf->gffstring . "\n";
-
-		$exon->phase($subf->feature1->{_phase});
-		$exon->attach_seq($self->{$runnable}->primary_seq);
-		$exon->add_Supporting_Feature($subf);
-
-		my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
-
-		my $tran0 =  $seq->translate('*','X',0)->seq;
-		my $tran1 =  $seq->translate('*','X',2)->seq;
-		my $tran2 =  $seq->translate('*','X',1)->seq;
-		
-		print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
-		print STDERR "\t exon phase 1 : " . $tran1 . "\n";
-		print STDERR "\t exon phase 2 : " . $tran2 . "\n";
-
-		push(@exons,$exon);
-		
-		$excount++;
-	    }
-	    
-	    if ($#exons < 0) {
-		print STDERR "Odd.  No exons found\n";
-	    } else {
-
-		push(@genes,$gene);
-
-		if ($exons[0]->strand == -1) {
-		    @exons = sort {$b->start <=> $a->start} @exons;
-		} else {
-		    @exons = sort {$a->start <=> $b->start} @exons;
-		}
-		
-		foreach my $exon (@exons) {
-		    $tran->add_Exon($exon);
-		}
-		
-		$transl->start_exon_id($exons[0]->id);
-		$transl->end_exon_id  ($exons[$#exons]->id);
-		
-		if ($exons[0]->strand == 1) {
-		    $transl->start($exons[0]->start);
-		    $transl->end  ($exons[$#exons]->end);
-		} else {
-		    $transl->start($exons[0]->end);
-		    $transl->end  ($exons[$#exons]->start);
-		} 
-		
-
-	    }
+	my $exon = new Bio::EnsEMBL::Exon;
+	
+	$exon->id($self->input_id . ".genewise.$count.$excount");
+	$exon->contig_id($contig->id);
+	$exon->created($time);
+	$exon->modified($time);
+	$exon->version(1);
+	
+	$exon->start($subf->start);
+	$exon->end  ($subf->end);
+	$exon->strand($subf->strand);
+	
+	print STDERR "\tFeaturePair " . $subf->gffstring . "\n";
+	
+	$exon->phase($subf->feature1->{_phase});
+	$exon->attach_seq($self->{$runnable}->primary_seq);
+	$exon->add_Supporting_Feature($subf);
+	
+	my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
+	
+	my $tran0 =  $seq->translate('*','X',0)->seq;
+	my $tran1 =  $seq->translate('*','X',2)->seq;
+	my $tran2 =  $seq->translate('*','X',1)->seq;
+	
+	print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
+	print STDERR "\t exon phase 1 : " . $tran1 . "\n";
+	print STDERR "\t exon phase 2 : " . $tran2 . "\n";
+	
+	push(@exons,$exon);
+	
+	$excount++;
+      }
+      
+      if ($#exons < 0) {
+	print STDERR "Odd.  No exons found\n";
+      } else {
+	
+	push(@genes,$gene);
+	
+	if ($exons[0]->strand == -1) {
+	  @exons = sort {$b->start <=> $a->start} @exons;
+	} else {
+	  @exons = sort {$a->start <=> $b->start} @exons;
 	}
-	my @newf;
-	foreach my $gene (@genes) {
-	    foreach my $tran ($gene->each_Transcript) {
-		print STDERR " Translation is " . $tran->translate->seq . "\n";
-		foreach my $exon ($tran->each_Exon) {
-		    my $strand = "+";
-		    if ($exon->strand == -1) {
-			$strand = "-";
-		    }
-		    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
-		}
-		$trancount++;
-	    }
-	    
-	    eval {
-		my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-		$newgene->type('genewise');
-		push(@newf,$newgene);
-	    };
-	    if ($@) {
-		print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
-	    }
-	    
-	    if (!defined($self->{_output})) {
-		$self->{_output} = [];
-	    }
-	    
-	    push(@{$self->{_output}},@newf);
+	
+	foreach my $exon (@exons) {
+	  $tran->add_Exon($exon);
 	}
+	
+	$transl->start_exon_id($exons[0]->id);
+	$transl->end_exon_id  ($exons[$#exons]->id);
+	
+	if ($exons[0]->phase == 0) {
+	  $transl->start(1);
+	} elsif ($exons[0]->phase == 1) {
+	  $transl->start(3);
+	} elsif ($exons[0]->phase == 2) {
+	  $transl->start(2);
+	}
+	
+	$transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+      }
     }
+
+  my @newf;
+  foreach my $gene (@genes) {
+    foreach my $tran ($gene->each_Transcript) {
+      print STDERR " Translation is " . $tran->translate->seq . "\n";
+      foreach my $exon ($tran->each_Exon) {
+	my $strand = "+";
+	if ($exon->strand == -1) {
+	  $strand = "-";
+	}
+	print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
+      }
+      $trancount++;
+    }
+    
+    eval {
+      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $newgene->type('genewise');
+      push(@newf,$newgene);
+    };
+    if ($@) {
+      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+    }
+    
+    if (!defined($self->{_output})) {
+      $self->{_output} = [];
+    }
+    
+    push(@{$self->{_output}},@newf);
+  }
+}
 }
 
 sub check_splice {
