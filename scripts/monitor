@@ -1,0 +1,39 @@
+#!/usr/local/bin/perl
+
+$| = 1;
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::Monitor;
+
+my $host;
+my $port;
+my $dbname;
+my $user = 'ensro';
+my $pass = undef;
+
+&GetOptions( 
+	    'host:s'    => \$host,
+	    'port:n'    => \$port,
+	    'user:s'    => \$user,
+	    'pass:s'    => \$pass,
+	    'dbname:s'  => \$dbname,
+	   );
+
+
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
+						      -user   => $user,
+						      -pass   => $pass,
+						      -dbname => $dbname);
+
+my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
+
+$monitor->show_current_status;
+$monitor->show_current_status_summary;
+$monitor->show_finished_summary;
+$monitor->show_analysisprocess;
+$monitor->show_Rules;
+$monitor->show_Rules_and_Conditions;
+$monitor->show_jobs_by_status_and_analysis('RUNNING','dbEST');
