@@ -14,9 +14,9 @@ run_GeneCombiner.pl
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in locator)
+    -dbhost      host name for database (gets put as host= in locator)
 
-    -port      For RDBs, what port to connect to (port= in locator)
+    -dbport      For RDBs, what port to connect to (port= in locator)
 
     -dbname    For RDBs, what name to connect to (dbname= in locator)
 

@@ -21,10 +21,10 @@ my $deleteall;
 my $delete_analysis;
 
 &GetOptions(
-            'host:s'    => \$host,
-            'port:n'    => \$port,
-            'user:s'    => \$user,
-            'pass:s'    => \$pass,
+            'dbhost:s'  => \$host,
+            'dbport:n'  => \$port,
+            'dbuser:s'  => \$user,
+            'dbpass:s'  => \$pass,
             'dbname:s'  => \$dbname,
             'logic_name:s' => \$logic_name,
             'delete'    => \$delete,

@@ -6,7 +6,7 @@ make_input_ids  - handles insertion, deletion and listing of rules in a database
 
 =head1 SYNOPSIS
 
-make_input_ids -host ecs1a -user ensadmin -pass **** -dbname pipeline_db -contig
+make_input_ids -dbhost ecs1a -dbuser ensadmin -dbpass **** -dbname pipeline_db -contig
 
 =head1 DESCRIPTION
 
@@ -14,15 +14,15 @@ this script allows input_ids to be generated and written to the input_id_analysi
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in locator)
+    -dbhost    host name for database (gets put as host= in locator)
 
-    -port      For RDBs, what port to connect to (port= in locator)
+    -dbport    For RDBs, what port to connect to (port= in locator)
 
     -dbname    For RDBs, what name to connect to (dbname= in locator)
 
-    -user      For RDBs, what username to connect as (user= in locator)
+    -dbuser    For RDBs, what username to connect as (user= in locator)
 
-    -pass      For RDBs, what password to use (pass= in locator)
+    -dbpass    For RDBs, what password to use (pass= in locator)
 
     -help      Displays script documentation with PERLDOC
 
@@ -78,10 +78,10 @@ my $help;
 
 
 &GetOptions(
-            'host:s'       => \$host,
-            'port:n'       => \$port,
-            'user:s'       => \$user,
-            'pass:s'       => \$pass,
+            'dbhost:s'     => \$host,
+            'dbport:n'     => \$port,
+            'dbuser:s'     => \$user,
+            'dbpass:s'     => \$pass,
             'dbname:s'     => \$dbname,
 	    'contig'       => \$contig,
 	    'slice'        => \$slice,

@@ -14,9 +14,9 @@ this is a clone of run_EST_RunnableDB
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in locator)
+    -dhhost    host name for database (gets put as host= in locator)
 
-    -port      For RDBs, what port to connect to (port= in locator)
+    -dbport    For RDBs, what port to connect to (port= in locator)
 
     -dbname    For RDBs, what name to connect to (dbname= in locator)
 

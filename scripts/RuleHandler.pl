@@ -16,9 +16,9 @@ made before rules are inserted. Rules cannot be deleted if other rules depend up
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in locator)
+    -dbhost    host name for database (gets put as host= in locator)
 
-    -port      For RDBs, what port to connect to (port= in locator)
+    -dbport    For RDBs, what port to connect to (port= in locator)
 
     -dbname    For RDBs, what name to connect to (dbname= in locator)
 
@@ -69,10 +69,10 @@ my $help;
 my %rule_goals; # hash to link up goals with rules for speed later
 
 &GetOptions(
-	    'host:s'            => \$host,
+	    'dbhost:s'          => \$host,
 	    'dbname:s'          => \$dbname,
 	    'dbuser:s'          => \$dbuser,
-	    'pass:s'            => \$pass,	    
+	    'dbpass:s'          => \$pass,	    
 	    'goal=s'            => \$goal, 
 	    'condition=s@'      => \@conditions, 
 	    'insert'            => \$insert, 

@@ -15,8 +15,8 @@ my $pass   = 'ensembl';
 my $alnprog = 'crossmatch';
 my $min_score = 50;
 
-&GetOptions('host:s' => \$host,
-	    'port:i' => \$port,
+&GetOptions('dbhost:s' => \$host,
+	    'dbport:i' => \$port,
 	    'dbname:s' => \$dbname,
 	    'dbuser:s' => \$dbuser,
 	    'pass:s' => \$pass,

@@ -19,10 +19,10 @@ my $dependents;
 my $type;
 
 &GetOptions(
-            'host:s'       => \$host,
-            'port:n'       => \$port,
-            'user:s'       => \$user,
-            'pass:s'       => \$pass,
+            'dbhost:s'     => \$host,
+            'dbport:n'     => \$port,
+            'dbuser:s'     => \$user,
+            'dbpass:s'     => \$pass,
             'dbname:s'     => \$dbname,
             'inputclass:s' => \$inputclass,
             'dependents:s' => \$dependents,

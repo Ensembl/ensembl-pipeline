@@ -4,7 +4,6 @@ use strict;
 use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::DBLoader;
 
 use vars qw(@ISA);
 
@@ -17,10 +16,10 @@ my $type = 'CLONE';
 my $fpcstub = 'ctg.';
 
 &GetOptions( 
-	     'host:s'      => \$host,
+	     'dbhost:s'    => \$host,
 	     'dbname:s'    => \$dbname,
 	     'dbuser:s'    => \$dbuser,
-	     'pass:s'      => \$pass,
+	     'dbpass:s'    => \$pass,
 	     'chr:s'       => \$chr,
 	     'type:s'      => \$type,
 	     'fpcstub:s'   => \$fpcstub,

@@ -17,10 +17,10 @@ my $slicesize;
 my $type;
 
 &GetOptions(
-            'host:s'    => \$host,
-            'port:n'    => \$port,
-            'user:s'    => \$user,
-            'pass:s'    => \$pass,
+            'dbhost:s'  => \$host,
+            'dbport:n'  => \$port,
+            'dbuser:s'  => \$user,
+            'dbpass:s'  => \$pass,
             'dbname:s'  => \$dbname,
             'slicesize:s' => \$slicesize,
             'logic_name:s' => \$logic_name,

@@ -18,15 +18,15 @@ Requires a DB connexion, input ID, name of runnable and analysis ID.
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in DBAdaptor)
+    -dbhost    host name for database (gets put as host= in DBAdaptor)
 
-    -port      For RDBs, what port to connect to (port= in DBAdaptor)
+    -dbport    For RDBs, what port to connect to (port= in DBAdaptor)
 
     -dbname    For RDBs, what name to connect to (dbname= in DBAdaptor)
 
-    -user    For RDBs, what username to connect as (dbuser= in DBAdaptor)
+    -dbuser    For RDBs, what username to connect as (dbuser= in DBAdaptor)
 
-    -pass    For RDBs, what password to use (pass= in DBAdaptor)
+    -dbpass    For RDBs, what password to use (pass= in DBAdaptor)
 
     -input_id  The input id for the RunnableDB
 
@@ -60,11 +60,11 @@ my $logic_name;
 my $module;
 
 &GetOptions( 
-	     'host:s'      => \$host,
-	     'port:n'      => \$port,
+	     'dbhost:s'    => \$host,
+	     'dbport:n'    => \$port,
 	     'dbname:s'    => \$dbname,
-	     'user:s'      => \$user,
-	     'pass:s'      => \$pass,
+	     'dbuser:s'    => \$user,
+	     'dbpass:s'    => \$pass,
 	     'input_id:s'  => \$input_id,
 	     'logic_name:s'=> \$logic_name,
              'input_type:s'=> \$input_type,

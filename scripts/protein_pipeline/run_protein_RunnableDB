@@ -48,8 +48,8 @@ my %scripts_conf = %::scripts_conf;
 
 
 &GetOptions( 
-	     'host:s'      => \$host,
-	     'port:n'      => \$port,
+	     'dbhost:s'    => \$host,
+	     'dbport:n'    => \$port,
 	     'dbname:s'    => \$dbname,
 	     'dbuser:s'    => \$dbuser,
 	     'dbpass:s'    => \$dbpass,

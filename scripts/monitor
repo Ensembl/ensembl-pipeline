@@ -29,10 +29,10 @@ my $input_id        = undef; # shows unfinished analyses for input_id
 my $lock            = 0;
 
 &GetOptions( 
-	    'host:s'            => \$host,
-	    'port:n'            => \$port,
-	    'user:s'            => \$user,
-	    'pass:s'            => \$pass,
+	    'dbhost:s'          => \$host,
+	    'dbport:n'          => \$port,
+	    'dbuser:s'          => \$user,
+	    'dbpass:s'          => \$pass,
 	    'dbname:s'          => \$dbname,
 	    'current'           => \$current,
 	    'current_summary'   => \$current_summary,
@@ -138,10 +138,10 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head2 [DB Connection Details]
 
-   -host     The host where the pipeline database is.
-   -port     The port.
-   -user     The user to connect as.
-   -pass     The password to use.
+   -dbhost   The host where the pipeline database is.
+   -dbport   The port.
+   -dbuser   The user to connect as.
+   -dbpass   The password to use.
    -dbname   The database name.
 
 =head2 [DISPLAY OPTIONS]
@@ -166,20 +166,20 @@ A Simple script using the Monitor.pm module to display information on the status
 =head1 EXAMPLES
 
 To display the current summary of the pipeline
- S<./monitor -host ecs2b -port 3306 -user ensro -dbname -current_summary>
+ S<./monitor -dbhost ecs2b -dbport 3306 -dbuser ensro -dbname -current_summary>
  
 To display ALL the input_id analysis combinations
- S<./monitor -host ecs2b -port 3306 -user ensro -dbname -unfinished>
+ S<./monitor -dbhost ecs2b -dbport 3306 -dbuser ensro -dbname -unfinished>
  
 To limit this to an assembly
- S<./monitor -host ecs2b -port 3306 -user ensro -dbname -assembly ChrX>
+ S<./monitor -dbhost ecs2b -dbport 3306 -dbuser ensro -dbname -assembly ChrX>
 
 To limit it to an input_id
- S<./monitor -host ecs2b -port 3306 -user ensro -dbname -input_id AL321765.1.1.100009>
+ S<./monitor -dbhost ecs2b -dbport 3306 -dbuser ensro -dbname -input_id AL321765.1.1.100009>
 
 To get the list of contigs B<WITHOUT> hits in the dna_align_feature table for the 
 analysis with ID 20 I<(like Oates, It may be some time)>
- S<./monitor -host ecs2b -port 3306 -user ensro -dbname -nohits dna_align_feature:20>
+ S<./monitor -dbhost ecs2b -dbport 3306 -dbuser ensro -dbname -nohits dna_align_feature:20>
 
 
 =head1 SEE ALSO

@@ -16,7 +16,7 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
 
 =head1 OPTIONS
 
-    -host    host name for database (gets put as host= in locator)
+    -dbhost    host name for database (gets put as host= in locator)
     -dbname    For RDBs, what name to connect to (dbname= in locator)
     -dbuser    For RDBs, what username to connect as (dbuser= in locator)
     -dbpass    For RDBs, what password to use (dbpass= in locator)
@@ -45,8 +45,8 @@ my $verbose = 0;
 
 &GetOptions(
 	     'dbtype:s'   => \$dbtype,
-	     'host:s'     => \$host,
-	     'port:n'     => \$port,
+	     'dbhost:s'   => \$host,
+	     'dbport:n'   => \$port,
 	     'dbname:s'   => \$dbname,
 	     'dbuser:s'   => \$dbuser,
 	     'dbpass:s'   => \$dbpass,
