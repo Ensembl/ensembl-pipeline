@@ -86,22 +86,22 @@ sub pseudogene_test{
     else{
       print STDERR "Spliced:\tNO\n";
     }
-
-    ############################################################
-    # does it have frameshifts?
-    if ( !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($transcript) 
-	 && 
-	 scalar( @{$transcript->get_all_Exons} > 1) 
+  
+  ############################################################
+  # does it have frameshifts?
+  if ( !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($transcript) 
+       && 
+       scalar( @{$transcript->get_all_Exons} > 1) 
        ){
       print STDERR "Frameshifts:\tYES\n";
       $frameshift = 1;
-    }
-    else{
+  }
+  else{
       print STDERR "Frameshifts:\tNO\n";
       $frameshift = 0;
-    }
-
-    ############################################################
+  }
+  
+  ############################################################
     # does it have an in-frame stop codon?
     
     ############################################################
@@ -128,15 +128,15 @@ sub pseudogene_test{
   
   ############################################################
   # is the evidence spliced elsewhere in the genome?
-  my $spliced_ones = $self->check_for_gene_spliced_elsewhere( $transcript, $db );
-  if ( $spliced_ones && @$spliced_ones ){
-    print STDERR "Evidence is spliced elsewhere: YES\n";
-    $spliced_elsewhere = 1;
-  }
-  else{
-    print STDERR "Evidence is spliced elsewhere: NO\n";
-    $spliced_elsewhere = 0;
-  }
+  $spliced_elsewhere = $self->check_for_gene_spliced_elsewhere( $transcript, $db );
+  #if ( $spliced_ones && @$spliced_ones ){
+  #  print STDERR "Evidence is spliced elsewhere: YES\n";
+  #  $spliced_elsewhere = 1;
+  #}
+  #else{
+  #  print STDERR "Evidence is spliced elsewhere: NO\n";
+  #  $spliced_elsewhere = 0;
+  #}
   
   ############################################################
   # if is spliced, has it got canonical splice sites?
@@ -234,27 +234,49 @@ sub is_spliced{
 
 sub has_polyA_track{
   my ($self,$transcript,$db) = @_;
-  my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
-  my $chr_name  =  $exons[0]->contig->chr_name;
-  my $end   =  $exons[0]->contig->chr_start + $exons[$#exons]->start - 1;
+  my @exons     = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
+  my $chr_name  = $exons[0]->contig->chr_name;
+  my $end       = $exons[0]->contig->chr_start + $exons[$#exons]->start - 1;
   
-  ############################################################
-  # we take X bases downstream:
-  my $poly_start = $end - 9;
-  my $poly_end   = $end + 5;
-  my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $poly_start, $poly_end )->seq;
-  
-  #####################################################################
-  print STDERR ($poly_end-$poly_start+1)."bp downstream: $seq\n";
-  my $length = length($seq);
-  my $a_count = $seq =~ tr/Aa//;
-  
-  if ( ($a_count/$length) >=6/10 ){
-    return 1;
+  if ( $exons[0]->strand == 1 ){
+      print STDERR "Last Exon: ".$exons[$#exons]->start."-".$exons[$#exons]->end.":".$exons[$#exons]->strand."\n";
+      my $start = $exons[$#exons]->end - 9;
+      my $end   = $exons[$#exons]->end + 9;
+      my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $start, $end )->seq;
+      
+      #####################################################################
+      print STDERR "$start-$end -> ".($end-$start+1)."bp downstream: $seq\n";
+      my $length = length($seq);
+      my $a_count = $seq =~ tr/Aa//;
+      if ( ($a_count/$length) >=6/10 ){
+	  return 1;
+      }
+      else{
+	  return 0;
+      }
   }
   else{
-    return 0;
+      print STDERR "Last Exon: ".$exons[0]->start."-".$exons[0]->end.":".$exons[0]->strand."\n";
+      my $start = $exons[0]->start - 9;
+      my $end   = $exons[0]->start + 9;
+      my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $start, $end )->seq;
+      
+      ############################################################
+      # get the revcomp sequence:
+      ( my $revcomp_seq = reverse $seq ) =~ tr/ACGTacgt/TGCAtgca/;
+      
+      #####################################################################
+      print STDERR "$start-$end -> ".($end-$start+1)."bp downstream: $revcomp_seq\n";
+      my $length = length($seq);
+      my $a_count = $revcomp_seq =~ tr/Aa//;
+      if ( ($a_count/$length) >=6/10 ){
+	  return 1;
+      }
+      else{
+	  return 0;
+      }
   }
+  
 }
 
 ############################################################
@@ -384,8 +406,8 @@ sub overlap_repeats{
 sub check_for_gene_spliced_elsewhere{
     my ($self,$transcript,$db) = @_;
     
-    print STDERR " --- paralogs for ".$transcript->stable_id."\n";
-    	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    #print STDERR " --- paralogs for ".$transcript->stable_id."\n";
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
     
 
     # get the evidence split by dna and protein align features:
@@ -402,7 +424,7 @@ sub check_for_gene_spliced_elsewhere{
 	    if ( @trans ){
 		my @selected;
 		foreach my $tran ( @trans ){
-		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
 		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
 			 && !$self->overlap($transcript, $tran ) ) { 
 			push ( @selected, $tran );
@@ -426,7 +448,7 @@ sub check_for_gene_spliced_elsewhere{
 	    if ( @trans ){
 		my @selected; 
 		foreach my $tran ( @trans ){ 
-		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
 		    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
 			 && !$self->overlap($transcript, $tran ) ) {  
 			push ( @selected, $tran ); 
@@ -440,13 +462,13 @@ sub check_for_gene_spliced_elsewhere{
 	    }
 	}
     }
-    if ( @spliced_transcripts ){
-	foreach my $transcript ( @spliced_transcripts ){
-	    print STDERR "$transcript:\n";
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-	  }
-    }
-    return \@spliced_transcripts;
+    #if ( @spliced_transcripts ){
+#	foreach my $transcript ( @spliced_transcripts ){
+#	    print STDERR "$transcript:\n";
+#	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+#	  }
+#    }
+    return scalar(@spliced_transcripts);
 }
   
 ############################################################
