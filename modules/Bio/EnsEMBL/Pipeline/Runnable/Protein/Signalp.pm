@@ -126,7 +126,12 @@ sub clone {
     print STDERR "CLONE: $seq\n";
     
     if ($seq) {
-	if ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")) {
+	eval {
+	    ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
+	    };
+	
+	
+	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
 	    $self->clonename ($self->clone->id);
 	    $self->filename ($self->clone->id.".$$.seq");
@@ -201,7 +206,12 @@ sub run {
     $tmp .= "/".$self->results;
     $self->results ($tmp);
 
-    if ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")) {
+    eval {
+	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+	
+
+    if (!$@) {
 	
 	# truncate the sequence (the first 50 aa are enough for signalp)
 	my $sub_seq = substr ($seq->seq, 0, 50);

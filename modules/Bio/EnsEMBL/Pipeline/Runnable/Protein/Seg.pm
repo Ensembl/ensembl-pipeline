@@ -83,8 +83,8 @@ sub new {
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
     my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
-                                                               ANALYSIS)], 
-					                    @args);
+						   ANALYSIS)], 
+					       @args);
   
     $self->clone ($clone) if ($clone);       
     $self->analysis ($analysis) if ($analysis);
@@ -126,7 +126,7 @@ sub clone {
 	    $self->{'_sequence'} = $seq ;
 	    $self->filename ("$$.tmp.seq");
 	    
-	    $self->results ("sigp.$$.out");
+	    $self->results ("seg.$$.out");
 	    
 	}
     }
@@ -325,12 +325,12 @@ sub create_feature {
 
     # create feature object
     my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
-                                                  -start       => $feat->{start},
-                                                  -end         => $feat->{end},
-                                                  -score       => $feat->{score},
-                                                  -source_tag  => $feat->{source},
-                                                  -primary_tag => $feat->{primary},
-                                                  -analysis    => $analysis,
+						-start       => $feat->{start},
+						-end         => $feat->{end},
+						-score       => $feat->{score},
+						-source_tag  => $feat->{source},
+						-primary_tag => $feat->{primary},
+						-analysis    => $analysis,
 						-percent_id => 'NULL',
 						-p_value => 'NULL',
                                                 ); 
@@ -347,7 +347,7 @@ sub create_feature {
 						-feature2 => $feat2);
 
     if ($feature) {
-	$feature->validate_prot_feature;
+	#$feature->validate_prot_feature;
 	# add to _flist
 	push (@{$self->{'_flist'}}, $feature);
     }
