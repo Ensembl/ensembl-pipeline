@@ -27,6 +27,7 @@ my $dbhost    = '';
 my $dbuser    = '';
 my $dbname    = '';
 my $dbpass    = undef;
+my $dbport    = 3306;
 my $stable_id;
 my $db_id;
 
@@ -35,6 +36,7 @@ GetOptions(
 	   'dbname=s'    => \$dbname,
 	   'dbuser=s'    => \$dbuser,
 	   'dbpass=s'    => \$dbpass,
+	   'dbport=s'    => \$dbport,
 	   'stable_id=s' => \$stable_id,
 	   'db_id=s' => \$db_id,  
 )
@@ -51,7 +53,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    
+					    '-port'   => $dbport,
 					   );
 
 
@@ -86,7 +88,7 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
         }
         my $tseq = $trans->translate();
         if ( $tseq->seq =~ /\*/ ) {
-          print STDERR "translation of ".$identifier." has stop codons. Skipping! (in clone". $fe->contig->dbID .")\n";
+          print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
           next;
         }
         

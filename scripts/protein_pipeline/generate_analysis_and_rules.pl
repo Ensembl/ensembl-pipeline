@@ -7,13 +7,15 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::Analysis;
 use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General;
 
-my ($dbhost, $dbname, $dbpass, $dbuser, $input_id_analysis, $rules, $analysis);
+my ($dbhost, $dbname, $dbpass, $dbuser, $dbport, $input_id_analysis, $rules, $analysis);
+$dbport =3306;
 
 &GetOptions( 
 	    'dbname:s' => \$dbname,
 	    'dbhost:s' => \$dbhost,
 	    'dbuser:s' => \$dbuser,
 	    'dbpass:s' => \$dbpass,
+	    'dbport:s' => \$dbport,
 	    'input_id_analysis' => \$input_id_analysis,
 	    'rules' => \$rules,
 	    'analysis' => \$analysis,
@@ -21,7 +23,7 @@ my ($dbhost, $dbname, $dbpass, $dbuser, $input_id_analysis, $rules, $analysis);
 
 
 if(!$dbname || !$dbhost || !$dbuser || !$dbpass){
-  print STDERR "Usage = -dbname -dbuser -dbhost -dbpass\n";
+  print STDERR "Usage = -dbname -dbuser -dbhost -dbpass -dbport\n";
   exit(0)
 }
 
@@ -30,6 +32,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    -user  => $dbuser,
 					    -dbname=> $dbname,
 					    -pass => $dbpass,
+					    -port => $dbport,
 					   );
 
 my @analyses = @$PA_ANALYSIS_TYPE;
