@@ -22,8 +22,6 @@ Bio::EnsEMBL::Pipeline::GeneComparisonStats - Comparison of old and new Gene/Tra
     # @newexons is a set of exons with temporary ids assigned
     # @mappedexons is the set of exons with olds ids, version numbers and new ids etc...
 
-    # this module *does not* deal with writing the new, mapped, exons into the database.
-
 
     ($mapped,$new,$untransfered) = 
              Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Exons_to_real_Exons($dbobj,
@@ -33,12 +31,6 @@ Bio::EnsEMBL::Pipeline::GeneComparisonStats - Comparison of old and new Gene/Tra
 
     # $mapped - reference to array of tempexons mapped to their new ids, with versions
     # and modified stamps correctly placed
-
-    # $new - reference to array of new exons, with new ids, versions set to 1 and
-    # modified/created time stamps.
-
-    # $untransfered - reference to array of old exons, with old ids which although were 
-    # remapped did not have exons in the new database to map to.
 
 
 =head1 DESCRIPTION
@@ -51,24 +43,6 @@ out in the new coordinates (remapping). This currently is hidden
 behind the method call get_old_Exons() on a contig object. This call
 returns old exon objects in the new coordinates, with the method
 ->identical_dna set to true or not.
-
-For exon migration, if the start/end/strand in new coordinates of the
-exons are the same then it gets the old exon id. If the dna sequence
-has changed, this increments the version number.  If not it stays the
-same.
-
-For gene/transcript migration, the following things happen. Old and
-New genes are clustered into 4 sets on the basis of shared exons (this
-occurs after exon mapping, done outside of this module)
-
-There is the possibility of >1 old gene with >1 new gene. Depending on
-the order of discovery, this will be classified as a split or
-merge. This is a known bug/feature.
-
-For each cluster, old transcripts are sorted by length and then fitted
-to new transcripts, with the best fit taking a win (fit on the number
-of co-linear identical id'd exons). Perfect matches (all exons the
-same id) trigger a direct assignment.
 
 
 =head1 CONTACT
@@ -84,7 +58,9 @@ Ensembl - ensembl-dev@ebi.ac.uk
 package Bio::EnsEMBL::Pipeline::GeneComparisonStats;
 
 use strict;
+use vars qw(@ISA);
 use Bio::EnsEMBL::DB::CloneI;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::GeneCompare;
 
 @ISA = qw(Bio::Root::RootI);
@@ -104,17 +80,15 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
 
-    my ($standard, $predictor) = $self->_rearrange([qw(STANDARD
-					  PREDICTOR
-					  )],@args);
+    my ($standard, $predictor) = $self->_rearrange([qw(STANDARD PREDICTOR)],@args);
 
     ($standard && $standard->isa('Bio::EnsEMBL::DB::CloneI')) 
         || $self->throw("GeneComparisonStats requires a standard object which implements CloneI");
     ($predictor && $predictor->isa('Bio::EnsEMBL::DB::CloneI')) 
         || $self->throw("GeneComparisonStats requires a predictor object which implements CloneI");
 
-    $self->{'_standardGenes'} = [$standard->get_all_Genes()];
-    $self->{'_predictorGenes'} = [$predictor->get_all_Genes()];
+    @{$self->{'_standardGenes'}} = $standard->get_all_Genes();
+    @{$self->{'_predictorGenes'}} = $predictor->get_all_Genes();
 
     return $self;
 }
@@ -135,9 +109,11 @@ sub new {
 
 sub getGeneSpecificity {
     my ($obj) = @_;
+    
     unless ($obj->{'_geneSpecificity'}) {
-     # write implementation here
+        $obj->_genePredictions();       
     }
+    
     return $obj->{'_geneSpecificity'};
 }
 
@@ -157,10 +133,64 @@ sub getGeneSpecificity {
 
 sub getGeneSensitivity {
     my ($obj) = @_;
+    
     unless ($obj->{'_geneSensitivity'}) {
-     # write implementation here
+        $obj->_genePredictions();
     }
+    
     return $obj->{'_geneSensitivity'};
+}
+
+
+
+=head2 _genePredictions
+
+ Title   : _genePredictions
+ Usage   : $obj->_genePredictions()
+ Function: Calculates the specificity and sensitivity at which the predictor is able to correctly identify
+            and asemble all of a gene's exons. They are both calculated at the same time because almost
+            certainly they will both be required and half the data for each calculation is the same.
+            If all the exons of a standard gene are identified and every intron-exon boundary is 
+            correct, i.e. each exon has an exact overlap, the gene is a true positive; otherwise
+            a false negative. The false positives are then found separately by counting any predictor genes which 
+            are missing from the standard set.
+ Example : 
+ Returns : Nothing
+ Args    : None
+
+=cut
+
+sub _genePredictions {
+    my ($self) = @_;
+    
+    my $truePositive = 0;
+    my $falsePositive = 0;
+    my $falseNegative = 0;    
+    my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @{$self->{'_predictorGenes'}});
+    
+    foreach my $standardGene (@{$self->{'_standardGenes'}}) {
+        $comparer->setStandardGene($standardGene);
+        if ($comparer->isExactlyMatched()) {
+            $truePositive++;
+        } else {
+            $falseNegative++;
+        }
+    }
+    
+    $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @{$self->{'_standardGenes'}});
+    
+    foreach my $predictorGene (@{$self->{'_predictorGenes'}}) {
+        $comparer->setStandardGene($predictorGene);
+        $falsePositive += $comparer->isMissed();
+    }    
+     
+    if ($truePositive == 0) {
+        $self->{'_geneSpecificity'} = 0;  
+        $self->{'_geneSensitivity'} = 0;
+    } else {           
+        $self->{'_geneSpecificity'} = $truePositive / ($truePositive + $falsePositive);  
+        $self->{'_geneSensitivity'} = $truePositive / ($truePositive + $falseNegative); 
+    }      
 }
 
 
@@ -169,11 +199,12 @@ sub getGeneSensitivity {
 
  Title   : getMissedGeneScore
  Usage   : $obj->getMissedGeneScore()
- Function: 
+ Function: A gene is considered missed if none of its exons are overlapped by a predicted gene.
+            If necessary this is calculated by a call to _getMissed with each standard gene being 
+            compared against all the predictor genes.
  Example : 
  Returns : The frequency at which the predictor completely fails to 
-            identify an gene. A gene is considered missed if none of
-            its exons are overlapped by a predicted gene.
+            identify an gene. 
  Args    : 
 
 =cut
@@ -181,18 +212,10 @@ sub getGeneSensitivity {
 sub getMissedGeneScore {
     my ($self) = @_;
     
-    unless ($obj->{'_missedGeneScore'}) {
-        my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => $self->{'_predictorGenes'});
-        my $missed = 0;
-        my $count = 0;
-        
-        foreach my $standardGene (@{$self->{'_standardGenes'}}) {
-            $comparer->setStandardGene($standardGene);
-            $missed += $comparer->isMissed();
-            $count++;
-        }
-        
-        $obj->{'_missedGeneScore'} = $missed / $count;
+    unless ($self->{'_missedGeneScore'}) { 
+        my @array1 = @{$self->{'_standardGenes'}};
+        my @array2 = @{$self->{'_predictorGenes'}};            
+        $self->{'_missedGeneScore'} = $self->_getMissed(@array1, @array2, "gene"); 
     }
     
     return $self->{'_missedGeneScore'};
@@ -204,13 +227,11 @@ sub getMissedGeneScore {
 
  Title   : getWrongGeneScore
  Usage   : $obj->getWrongGeneScore()
- Function: 
+ Function: A prediction is considered wrong if none of its exons are overlapped by a gene from the standard set.
+            If necessary this is calculated by a call to _getMissed with each predictor gene being 
+            compared against all the standard genes. 
  Example : 
- Returns : The frequency at which the predictor incorrectly identifies 
-            a gene. A prediction is considered wrong if none of its exons
-            are overlapped by a gene from the standard set. This is implemented
-            as in getMissedGeneScore but with each predictor gene being compared 
-            against the standard set.
+ Returns : The frequency at which the predictor incorrectly identifies a gene.  
  Args    : 
 
 =cut
@@ -218,21 +239,49 @@ sub getMissedGeneScore {
 sub getWrongGeneScore {
     my ($self) = @_;
     
-    unless ($obj->{'_wrongGeneScore'}) {
-        my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => $self->{'_standardGenes'});
-        my $wrong = 0;
-        my $count = 0;
-        
-        foreach my $predictorGene (@{$self->{'_predictorGenes'}}) {
-            $comparer->setStandardGene($predictorGene);
-            $wrong += $comparer->isMissed();
-            $count++;
-        }
-        
-        $obj->{'_wrongGeneScore'} = $wrong / $count;
+    unless ($self->{'_wrongGeneScore'}) { 
+        my @array1 = @{$self->{'_predictorGenes'}};
+        my @array2 = @{$self->{'_standardGenes'}};           
+        $self->{'_wrongGeneScore'} = $self->_getMissed(@array1, @array2, "gene");
     }
     
-    return $obj->{'_wrongGeneScore'};
+    return $self->{'_wrongGeneScore'};
+}
+
+
+
+=head2 _getMissed
+
+ Title   : _getMissed
+ Usage   : $obj->_getMissed()
+ Function: 
+ Example : 
+ Returns : The frequency at which the genes in array2 completely fails to 
+            identify a gene in array1. A gene is considered missed if none of
+            its exons are overlapped by a predicted gene.
+ Args    : Two arrays of genes
+
+=cut
+
+sub _getMissed {
+    my ($self, $array1, $array2, $type) = @_;
+    
+    my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @$array2);
+    my $missed = 0;
+    my $count = 0;
+        
+    foreach my $gene (@$array1) {
+        $comparer->setStandardGene($gene);
+        if ($type eq "gene") {
+            $missed += $comparer->isMissed();
+        } 
+        else {
+            $missed += $comparer->getMissed(); 
+        }   
+        $count++;
+    }
+            
+    return $missed / $count;
 }
 
 
@@ -247,33 +296,22 @@ sub getWrongGeneScore {
             exons into multiple genes. A gene from the standard set is 
             considered split if it overlaps more than one predicted gene.
             The score is defined as the sum of the number of predicted genes
-            that overlap each each standard gene divided by the number of 
+            that overlap each standard gene divided by the number of 
             standard genes that were split.
  Args    : None
 
 =cut
 
 sub getSplitGeneScore {
-    my ($obj) = @_;
+    my ($self) = @_;
     
-    unless ($obj->{'_splitGeneScore'}) {
-        my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => $self->{'_predictorGenes'});
-        my $split = 0;
-        my $overlaps = 0;
-        
-        foreach my $standardGene (@{$self->{'_standardGenes'}}) {
-            $comparer->setStandardGene($standardGene);
-            my $count = $comparer->getOverlaps();
-            if ($count > 1) {
-                $split++;
-            }
-            $overlaps += $count;
-        }
-        
-        $obj->{'_splitGeneScore'} = $overlaps / $split;
+    unless ($self->{'_splitGeneScore'}) {
+        my @array1 = @{$self->{'_standardGenes'}};
+        my @array2 = @{$self->{'_predictorGenes'}};        
+        $self->{'_splitGeneScore'} = $self->_getMulitipleOverlaps(@array1, @array2);
     }
     
-    return $obj->{'_splitGeneScore'};
+    return $self->{'_splitGeneScore'};
 }
 
 
@@ -287,18 +325,57 @@ sub getSplitGeneScore {
  Returns : The frequency at which the predictor incorrectly assembles multiple
             genes' exons into a single gene. A predicted gene is considered 
             joined if it overlaps more than one gene in the standard set.
+            The score is defined as the sum of the number of standard genes that
+            overlap each predicted genes divided by the number of predicted genes
+            that were joined.
  Args    : 
 
 =cut
 
 sub getJoinedGeneScore {
-    my ($obj) = @_;
-    unless ($obj->{'_joinedGeneScore'}) {
-     # write implementation here
+    my ($self) = @_;
+    
+    unless ($self->{'_joinedGeneScore'}) {
+        my @array1 = @{$self->{'_predictorGenes'}};
+        my @array2 = @{$self->{'_standardGenes'}};     
+        $self->{'_joinedGeneScore'} = $self->_getMulitipleOverlaps(@array1, @array2);
     }
-    return $obj->{'_joinedGeneScore'};
+    
+    return $self->{'_joinedGeneScore'};
 }
 
+
+
+=head2 _getMulitipleOverlaps
+
+ Title   : _getMulitipleOverlaps
+ Usage   : $obj->_getMulitipleOverlaps()
+ Function: 
+ Example : 
+ Returns : The ratio of the number of overlaps between the genes in array1 and array2
+            to the number of genes in array2 that overlap more than one gene in array1.
+ Args    : 
+
+=cut
+
+sub _getMulitipleOverlaps {
+    my ($self, $array1, $array2) = @_;
+    
+    my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @$array2);
+    my $multiples = 0;
+    my $overlaps = 0;
+        
+    foreach my $gene (@$array1) {
+       $comparer->setStandardGene($gene);
+       my $count = $comparer->getOverlaps();
+       if ($overlaps > 1) {
+           $multiples++;
+       }
+       $overlaps += $count;
+    }
+    
+    return $overlaps / $multiples;
+}
 
 
 =head2 getExonSpecificity
@@ -315,9 +392,11 @@ sub getJoinedGeneScore {
 
 sub getExonSpecificity {
     my ($obj) = @_;
+    
     unless ($obj->{'_exonSpecificity'}) {
-     # write implementation here
+        $obj->_exonPredictions();
     }
+    
     return $obj->{'_exonSpecificity'};
 }
 
@@ -337,11 +416,58 @@ sub getExonSpecificity {
 
 sub getExonSensitivity {
     my ($obj) = @_;
+    
     unless ($obj->{'_exonSensitivity'}) {
-     # write implementation here
+        $obj->_exonPredictions();
     }
+    
     return $obj->{'_exonSensitivity'};
 }
+
+
+
+=head2 _exonPredictions
+
+ Title   : _exonPredictions
+ Usage   : $obj->_exonPredictions()
+ Function: Calculates the specificity and sensitivity at which the predictor is able to correctly identify
+            exons and correctly recognises their boundaries. They are both calculated at the same time because almost
+            certainly they will both be required and half the data for each calculation is the same.
+            If a standard exon is exactly overlapped by a predictor exon it is a true positive; otherwise
+            a false negative. The false positives are then found separately by counting any predictor exons which 
+            are missing from the standard set.
+ Example : 
+ Returns : Nothing
+ Args    : None
+
+=cut
+
+sub _exonPredictions {
+    my ($self) = @_;
+    
+    my $truePositive = 0;
+    my $falsePositive = 0;
+    my $falseNegative = 0;    
+    my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @{$self->{'_predictorGenes'}});
+    
+    foreach my $standardGene (@{$self->{'_standardGenes'}}) {
+        $comparer->setStandardGene($standardGene);
+        my ($tP, $fN) = $comparer->getExactOverlapRatio(); 
+        $truePositive += $tP;
+        $falseNegative += $fN;        
+    }
+    
+    $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @{$self->{'_standardGenes'}});
+    
+    foreach my $predictorGene (@{$self->{'_predictorGenes'}}) {
+        $comparer->setStandardGene($predictorGene);
+        $falsePositive += $comparer->getMissed(); 
+    }    
+            
+    $self->{'_exonSpecificity'} = $truePositive / ($truePositive + $falsePositive);  
+    $self->{'_exonSensitivity'} = $truePositive / ($truePositive + $falseNegative);       
+}
+
 
 
 =head2 getMissedExonScore
@@ -358,12 +484,17 @@ sub getExonSensitivity {
 =cut
 
 sub getMissedExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_missedExonScore'}) {
-     # write implementation here
+    my ($self) = @_;
+    
+    unless ($self->{'_missedExonScore'}) {
+        my @array1 = @{$self->{'_standardGenes'}};
+        my @array2 = @{$self->{'_predictorGenes'}};            
+        $self->{'_missedGeneScore'} = $self->_getMissed(@array1, @array2, "exon"); 
     }
-    return $obj->{'_missedExonScore'};
+    
+    return $self->{'_missedExonScore'};
 }
+
 
 
 =head2 getWrongExonScore
@@ -380,12 +511,17 @@ sub getMissedExonScore {
 =cut
 
 sub getWrongExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_wrongExonScore'}) {
-     # write implementation here
+    my ($self) = @_;
+    
+    unless ($self->{'_wrongExonScore'}) {
+        my @array1 = @{$self->{'_predictorGenes'}};
+        my @array2 = @{$self->{'_standardGenes'}};           
+        $self->{'_wrongGeneScore'} = $self->_getMissed(@array1, @array2, "exon");
     }
-    return $obj->{'_wrongExonScore'};
+    
+    return $self->{'_wrongExonScore'};
 }
+
 
 
 =head2 getBaseSpecificity
@@ -406,10 +542,11 @@ sub getWrongExonScore {
 sub getBaseSpecificity {
     my ($obj) = @_;
     unless ($obj->{'_baseSpecificity'}) {
-     # write implementation here
+        $obj->_basePredictions();
     }
     return $obj->{'_baseSpecificity'};
 }
+
 
 
 =head2 getBaseSensitivity
@@ -430,9 +567,48 @@ sub getBaseSpecificity {
 sub getBaseSensitivity {
     my ($obj) = @_;
     unless ($obj->{'_baseSensitivity'}) {
-     # write implementation here
+        $obj->_basePredictions();
     }
     return $obj->{'_baseSensitivity'};
+}
+
+
+
+=head2 _basePredictions
+
+ Title   : _basePredictions
+ Usage   : $obj->_basePredictions()
+ Function: Calculates the specificity and sensitivity at which the predictor is able to correctly 
+            identify exons and correctly recognises their boundaries. They are both calculated at 
+            the same time because almost certainly they will both be required and half the data for 
+            each calculation is the same. If a standard exon is exactly overlapped by a predictor 
+            exon it is a true positive; otherwise a false negative. The false positives are then 
+            found separately by counting any predictor exons which are missing from the standard set.
+ Example : 
+ Returns : Nothing
+ Args    : None
+
+=cut
+
+sub _basePredictions {
+    my ($self) = @_;
+    
+    my $truePositive = 0;
+    my $falsePositive = 0;
+    my $falseNegative = 0; 
+             
+    my $comparer = new Bio::EnsEMBL::Pipeline::GeneCompare(-predictorGenes => @{$self->{'_predictorGenes'}});
+    
+    foreach my $standardGene (@{$self->{'_standardGenes'}}) {
+        $comparer->setStandardGene($standardGene);
+        my ($tP, $fP, $fN) = $comparer->getBaseOverlaps(); 
+        $truePositive += $tP;
+        $falsePositive += $fP;
+        $falseNegative += $fN;        
+    } 
+            
+    $self->{'_baseSpecificity'} = $truePositive / ($truePositive + $falsePositive);  
+    $self->{'_baseSensitivity'} = $truePositive / ($truePositive + $falseNegative);       
 }
 
 1;

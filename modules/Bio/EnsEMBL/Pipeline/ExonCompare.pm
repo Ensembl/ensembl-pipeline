@@ -22,9 +22,6 @@ Bio::EnsEMBL::Pipeline::EoxnCompare - Comparison of old and new Gene/Transcript/
     # @newexons is a set of exons with temporary ids assigned
     # @mappedexons is the set of exons with olds ids, version numbers and new ids etc...
 
-    # this module *does not* deal with writing the new, mapped, exons into the database.
-
-
     ($mapped,$new,$untransfered) = 
              Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Exons_to_real_Exons($dbobj,
 									    $timdb,
@@ -37,8 +34,6 @@ Bio::EnsEMBL::Pipeline::EoxnCompare - Comparison of old and new Gene/Transcript/
     # $new - reference to array of new exons, with new ids, versions set to 1 and
     # modified/created time stamps.
 
-    # $untransfered - reference to array of old exons, with old ids which although were 
-    # remapped did not have exons in the new database to map to.
 
 
 =head1 DESCRIPTION
@@ -52,36 +47,6 @@ behind the method call get_old_Exons() on a contig object. This call
 returns old exon objects in the new coordinates, with the method
 ->identical_dna set to true or not.
 
-This module is complex. I dont think there is anyway around
-this. There are two basic pieces of logic - rules for exon migration
-and rules for gene/transcript migration.
-
-For exon migration, if the start/end/strand in new coordinates of the
-exons are the same then it gets the old exon id. If the dna sequence
-has changed, this increments the version number.  If not it stays the
-same.
-
-For gene/transcript migration, the following things happen. Old and
-New genes are clustered into 4 sets on the basis of shared exons (this
-occurs after exon mapping, done outside of this module)
-
-There is the possibility of >1 old gene with >1 new gene. Depending on
-the order of discovery, this will be classified as a split or
-merge. This is a known bug/feature.
-
-For each cluster, old transcripts are sorted by length and then fitted
-to new transcripts, with the best fit taking a win (fit on the number
-of co-linear identical id'd exons). Perfect matches (all exons the
-same id) trigger a direct assignment.
-
-Versioning for transcripts is that any addition/removal of an exon, or
-any update in sequence of an exon rolls up the transcript version. The
-gene version clicks up on any transcript version or any transcript
-addition/deletion.
-
-This is thick code. It is less thick than tims code. There are comments,
-but probably not enough. I cant see many other areas for subroutines...
-
 
 =head1 CONTACT
 
@@ -92,14 +57,17 @@ Ensembl - ensembl-dev@ebi.ac.uk
 =cut
 
 
-# Let the code begin...
-
 
 package Bio::EnsEMBL::Pipeline::ExonCompare;
 
 use strict;
+use vars qw(@ISA);
+use Bio::Root::RootI;
+use Bio::EnsEMBL::Exon;
 
 @ISA = qw(Bio::Root::RootI);
+
+
 
 =head2 new
 
@@ -116,14 +84,11 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
 
-    my (@predictorExons) = $self->_rearrange([qw(
-					  PREDICTOREXONS
-					  )],@args);
-    
-    $self->{'_predictorExons'} = @predictorExons;
+    @{$self->{'_predictorExons'}} = $self->_rearrange([qw(PREDICTOREXONS)],@args);
 
     return $self;
 }
+
 
 
 =head2 setStandardExon
@@ -141,38 +106,64 @@ sub new {
 sub setStandardExon {
     my ($self, $exon) = @_;
     
+    $self->throw("$exon is not an Exon") unless ($exon->isa('Bio::EnsEMBL::Exon'));
     $self->{'_standardExon'} = $exon;
 }
 
 
-=head2 isOverlapped
+=head2 hasOverlap
 
- Title   :isOverlapped
- Usage   : $overlap = $obj->isOverlapped()
+ Title   : hasOverlap
+ Usage   : $overlap = $obj->hasOverlap()
  Function: Checks if any of the predictor exons have an overlap with the standard exon.
  Example : 
  Returns : 0 if none of the of the predictor exons overlap the standard, otherwise 1
- Args    : newvalue (optional)
+ Args    : 
 
 
 =cut
 
-sub isOverlapped {
+sub hasOverlap {
     my ($self) = @_;
 
-    $overlapped = 0;
-    $exon1 = $self->{'_standardExon'};
-    foreach $exon2 (@{$self->{'_predictorExons'}}) { 
-              
-            if (($exon2->end   > $exon1->start && $exon2->start < $exon1->end) ||
-                ($exon2->start < $exon1->end   && $exon2->end   > $exon1->start)) {
-                
-                    $overlapped = 1;
-                    break;
+    my $exon1 = $self->{'_standardExon'};
+    
+    foreach my $exon2 (@{$self->{'_predictorExons'}}) {               
+         if (($exon2->end   > $exon1->start && $exon2->start < $exon1->end) ||
+             ($exon2->start < $exon1->end   && $exon2->end   > $exon1->start)) {                
+                 return 1;
         }
     }
     
-    return $overlapped;
+    return 0;
+}
+
+
+
+=head2 hasExactOverlap
+
+ Title   : hasExactOverlap
+ Usage   : $obj->hasExactOverlap()
+ Function: 
+ Example : 
+ Returns : 1 if one of the predictor exons exactly matches the standard exon, otherwise 0.
+ Args    : 
+
+
+=cut
+
+sub hasExactOverlap {
+    my ($self) = @_;
+    
+    my $exon1 = $self->{'_standardExon'};
+   
+    foreach my $exon2 (@{$self->{'_predictorExons'}}) { 
+        if (($exon2->start == $exon1->start) && ($exon2->end == $exon1->end)) {
+            return 1;
+        }
+    }
+    
+    return 0;
 }
 
 
@@ -189,157 +180,76 @@ sub isOverlapped {
 
 =cut
 
-sub getGeneSpecificity {
+sub getOverlaps {
     my ($self) = @_;
     
     my $overlaps = 0;
-    $exon1 = $self->{'_standardExon'};
-    foreach $exon2 (@{$self->{'_predictorExons'}}) { 
-            if (($exon2->end   > $exon1->start && $exon2->start < $exon1->end) ||
-                ($exon2->start < $exon1->end   && $exon2->end   > $exon1->start)) {
-                    $overlaps++;
+    my $exon1 = $self->{'_standardExon'};
+    
+    foreach my $exon2 (@{$self->{'_predictorExons'}}) { 
+         if (($exon2->end   > $exon1->start && $exon2->start < $exon1->end) ||
+             ($exon2->start < $exon1->end   && $exon2->end   > $exon1->start)) {
+                 $overlaps++;
         }
     }
     
     return $overlaps;
 }
+   
 
-E   
 
+=head2 getBaseOverlaps
 
-=head2 getExonSpecificity
-
- Title   : getExonSpecificity
- Usage   : $obj->getExonSpecificity()
- Function: 
+ Title   : getBaseOverlaps
+ Usage   : $obj->getBaseOverlaps()
+ Function: This just considers the case of the first predictor exon found which has an overlap.
  Example : 
- Returns : The specificity at which the predictor identifies exons 
-            and correctly recognises their boundaries.
+ Returns : The number of bases on the standard exon that have true positive, true negative
+            and false positive overlaps with a predictor exon. 
  Args    : 
 
 
 =cut
 
-sub getExonSpecificity {
-    my ($obj) = @_;
-    unless ($obj->{'_exonSpecificity'}) {
-     # write implementation here
+sub getBaseOverlaps {
+    my ($self) = @_;
+        
+    my $exon1 = $self->{'_standardExon'};
+    
+    foreach my $exon2 (@{$self->{'_predictorExons'}}) { 
+         if (($exon2->end   > $exon1->start && $exon2->start < $exon1->end) ||
+             ($exon2->start < $exon1->end   && $exon2->end   > $exon1->start)) {
+     
+            # Note that the end should always be greater than the start because
+            # if it's not the values are swapped when a new Exon is created.            
+            my $truePositive = $exon1->end - $exon1->start;
+            my $falsePositive = 0;
+            my $falseNegative = 0;
+                         
+            my $leftEnd = $exon1->start - $exon2->start;
+            if ($leftEnd > 0) {
+                $falsePositive += $leftEnd;
+            } else {
+                $falseNegative += -$leftEnd;
+                $truePositive += $leftEnd;
+            }
+            
+            my $rightEnd = $exon2->end - $exon1->end;
+            if ($rightEnd > 0) {
+                $falsePositive += $rightEnd;
+            } else {
+                $falseNegative += -$rightEnd;
+                $truePositive += $rightEnd;
+            }   
+            
+            return ($truePositive, $falsePositive, $falseNegative);         
+        }
     }
-    return $obj->{'_exonSpecificity'};
+    
+    # If no overlaping exon is found there are no true or false positives and
+    # the whole length of the exon is false negative
+    return (0, 0, $exon1->length());
 }
 
-
-=head2 getExonSensitivity
-
- Title   : getExonSensitivity
- Usage   : $obj->getExonSensitivity()
- Function: 
- Example : 
- Returns : The sensitivity at which the predictor identifies exons 
-            and correctly recognises their boundaries.
- Args    : 
-
-
-=cut
-
-sub getExonSensitivity {
-    my ($obj) = @_;
-    unless ($obj->{'_exonSensitivity'}) {
-     # write implementation here
-    }
-    return $obj->{'_exonSensitivity'};
-}
-
-
-=head2 getMissedExonScore
-
- Title   : getMissedExonScore
- Usage   : $obj->getMissedExonScore()
- Function: 
- Example : 
- Returns : The frequency at which the predictor completely fails to 
-            identify an exon (no prediction or overlap). 
- Args    : 
-
-
-=cut
-
-sub getMissedExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_missedExonScore'}) {
-     # write implementation here
-    }
-    return $obj->{'_missedExonScore'};
-}
-
-
-=head2 getWrongExonScore
-
- Title   : getWrongExonScore
- Usage   : $obj->getWrongExonScore()
- Function: 
- Example : 
- Returns : The frequency at which the predictor identifies an exon
-            that has no overlap with any exon from the standard. 
- Args    : 
-
-
-=cut
-
-sub getWrongExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_wrongExonScore'}) {
-     # write implementation here
-    }
-    return $obj->{'_wrongExonScore'};
-}
-
-
-=head2 getBaseSpecificity
-
- Title   : getBaseSpecificity
- Usage   : $obj->getBaseSpecificity()
- Function: 
- Example : 
- Returns : The specificity at which the predictor correctly labels
-            a base in the genomic sequence as being part of each gene.
-            This rewards predictors that get most of each gene correct
-            and penalises those that miss large parts.
- Args    : 
-
-
-=cut
-
-sub getBaseSpecificity {
-    my ($obj) = @_;
-    unless ($obj->{'_baseSpecificity'}) {
-     # write implementation here
-    }
-    return $obj->{'_baseSpecificity'};
-}
-
-
-=head2 getBaseSensitivity
-
- Title   : getBaseSensitivity
- Usage   : $obj->getBaseSensitivity()
- Function: 
- Example : 
- Returns : The sensitivity at which the predictor correctly labels
-            a base in the genomic sequence as being part of each gene.
-            This rewards predictors that get most of each gene correct
-            and penalises those that miss large parts.
- Args    : 
-
-
-=cut
-
-sub getBaseSensitivity {
-    my ($obj) = @_;
-    unless ($obj->{'_baseSensitivity'}) {
-     # write implementation here
-    }
-    return $obj->{'_baseSensitivity'};
-}
 
 1;

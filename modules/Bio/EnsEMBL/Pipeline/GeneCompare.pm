@@ -61,28 +61,6 @@ exons are the same then it gets the old exon id. If the dna sequence
 has changed, this increments the version number.  If not it stays the
 same.
 
-For gene/transcript migration, the following things happen. Old and
-New genes are clustered into 4 sets on the basis of shared exons (this
-occurs after exon mapping, done outside of this module)
-
-There is the possibility of >1 old gene with >1 new gene. Depending on
-the order of discovery, this will be classified as a split or
-merge. This is a known bug/feature.
-
-For each cluster, old transcripts are sorted by length and then fitted
-to new transcripts, with the best fit taking a win (fit on the number
-of co-linear identical id'd exons). Perfect matches (all exons the
-same id) trigger a direct assignment.
-
-Versioning for transcripts is that any addition/removal of an exon, or
-any update in sequence of an exon rolls up the transcript version. The
-gene version clicks up on any transcript version or any transcript
-addition/deletion.
-
-This is thick code. It is less thick than tims code. There are comments,
-but probably not enough. I cant see many other areas for subroutines...
-
-
 =head1 CONTACT
 
 Ensembl - ensembl-dev@ebi.ac.uk
@@ -95,9 +73,13 @@ Ensembl - ensembl-dev@ebi.ac.uk
 package Bio::EnsEMBL::Pipeline::GeneCompare;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::GeneCompare;
+use vars qw(@ISA);
+use Bio::EnsEMBL::Pipeline::ExonCompare;
+use Bio::Root::RootI;
 
 @ISA = qw(Bio::Root::RootI);
+
+
 
 =head2 new
 
@@ -114,32 +96,29 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
 
-    my (@predictorGenes) = $self->_rearrange([qw(
-					  PREDICTORGENES
-					  )],@args);
+    my @predictorGenes = $self->_rearrange([qw(PREDICTORGENES)],@args);
                                           
-    # Note that if different genes have the same exon @predictorGenes will
+    # Note that if different genes have the same exon, @predictorGenes will
     # include multiple copies of this exon but this is precisely what we want!
-    my @predictorExons = ();
-    foreach $gene (@predictorGenes) {
-        @predictorExons = @predictorExons, [$gene->each_unique_Exon()];
-    }
-    
-    $self->{'_predictorExons'} = @predictorExons;
-
+    foreach my $gene (@predictorGenes) {
+        foreach my $exon ($gene->each_unique_Exon() ) {
+            push(@{$self->{'_predictorExons'}}, $exon);
+        }
+    }   
 
     return $self;
 }
 
 
+
 =head2 setStandardGene
 
  Title   : setStandardGene
- Usage   : $obj->setStandardGene($newval)
+ Usage   : $obj->setStandardGene($standardGene)
  Function: 
  Example : 
  Returns : 
- Args    : newvalue
+ Args    : $standardGene - reference to a Gene object
 
 
 =cut
@@ -151,12 +130,12 @@ sub setStandardGene {
 }
 
 
+
 =head2 isMissed
 
  Title   : isMissed
  Usage   : $missed = $obj->isMissed()
- Function: A gene is considered missed if none of
-            its exons are overlapped by a predicted gene.
+ Function: A gene is considered missed if none of its exons are overlapped by a predicted gene.
  Example : 
  Returns : 1 or 0
  Args    : None
@@ -167,41 +146,69 @@ sub setStandardGene {
 sub isMissed {
     my ($self) = @_;
 
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => $self->{'_predictorExons'});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
 
-    my $missed = 1;
-    foreach $standardExon (@{$self->{'_standardExons'}}) {
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
         $comparer->setStandardExon($standardExon);            
-        if ($comparer->isOverlapped()) {
-            $missed = 0;
-            break;
+        if ($comparer->hasOverlap()) {
+            return 0;
         }
     }
     
-    return $missed;
+    return 1;
 }
+
+
+
+=head2 isExactlyMatched
+
+ Title   : isExactlyMatched
+ Usage   : $obj->isExactlyMatched()
+ Function: A gene is considered exactly matched if all the exons 
+            on the standard gene are exactly identified
+ Example : 
+ Returns : 1 or 0 
+ Args    : None
+
+
+=cut
+
+sub isExactlyMatched {
+    my ($self) = @_;
+       
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+        $comparer->setStandardExon($standardExon);
+        unless ($comparer->hasExactOverlap() == 1) {
+            return 0;
+        } 
+    }
+    
+    return 1;
+}
+
 
 
 =head2 getOverlaps
 
  Title   : getOverlaps
  Usage   : $obj->getOverlaps()
- Function: 
+ Function: Calculates the number of standard exons that are overlapped by predictor exons. 
  Example : 
- Returns : The number of predictor genes that overlap the standard gene. 
+ Returns : int
  Args    : None
 
 
 =cut
 
-
 sub getOverlaps {
     my ($self) = @_;
     
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => $self->{'_predictorExons'});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
     
     my $overlaps = 0;
-    foreach $standardExon (@{$self->{'_standardExons'}}) {
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
         $comparer->setStandardExon($standardExon);            
         $overlaps += $comparer->getOverlaps();
     }
@@ -209,163 +216,104 @@ sub getOverlaps {
     return $overlaps;
 }
 
-=head2 getGeneSensitivity
 
- Title   : getGeneSensitivity
- Usage   : $obj->getGeneSensitivity()
- Function: 
+
+=head2 getExactOverlapRatio
+
+ Title   : getExactOverlaps
+ Usage   : $obj->getExactOverlapRatio()
+ Function: Calculates the number of standard exons that are exactly overlapped and the number that are not.
  Example : 
- Returns : The sensitivity at which the predictor is able to correctly identify
-            and asemble all of a gene's exons. 
- Args    : 
+ Returns : (int, int) - $overlaps, $nonOverlaps
+ Args    : None
 
 
 =cut
 
-sub getGeneSensitivity {
-    my ($obj) = @_;
-    unless ($obj->{'_geneSensitivity'}) {
-     # write implementation here
+sub getExactOverlapRatio {
+    my ($self) = @_;
+
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    
+    my $overlaps = 0;
+    my $nonOverlaps = 0;
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+    
+        $comparer->setStandardExon($standardExon);            
+        if ($comparer->hasExactOverlap()) {
+            $overlaps++;
+        } else {
+            $nonOverlaps++;
+        }
     }
-    return $obj->{'_geneSensitivity'};
+    
+    return ($overlaps, $nonOverlaps);
 }
 
 
 
+=head2 getMissed
 
-=head2 getExonSpecificity
-
- Title   : getExonSpecificity
- Usage   : $obj->getExonSpecificity()
+ Title   : getMissed
+ Usage   : $missed = $obj->getMissed()
  Function: 
  Example : 
- Returns : The specificity at which the predictor identifies exons 
-            and correctly recognises their boundaries.
- Args    : 
+ Returns : The number of standard exons which are not overlapped by predictor exons.
+ Args    : None
 
 
 =cut
 
-sub getExonSpecificity {
-    my ($obj) = @_;
-    unless ($obj->{'_exonSpecificity'}) {
-     # write implementation here
+sub getMissed {
+    my ($self) = @_;
+
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+
+    my $missed = 0;
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+        $comparer->setStandardExon($standardExon);            
+        unless ($comparer->hasOverlap()) {
+            $missed++;
+        }
     }
-    return $obj->{'_exonSpecificity'};
+    
+    return $missed;
 }
 
 
-=head2 getExonSensitivity
 
- Title   : getExonSensitivity
- Usage   : $obj->getExonSensitivity()
- Function: 
+=head2 getBaseOverlaps
+
+ Title   : getBaseOverlaps
+ Usage   : $obj->getBaseOverlaps()
+ Function: This just considers the case of the first predictor exon found which has an overlap.
  Example : 
- Returns : The sensitivity at which the predictor identifies exons 
-            and correctly recognises their boundaries.
+ Returns : The number of bases on the standard exon that have true positive, true negative
+            and false positive overlaps with a predictor exon. 
  Args    : 
 
 
 =cut
 
-sub getExonSensitivity {
-    my ($obj) = @_;
-    unless ($obj->{'_exonSensitivity'}) {
-     # write implementation here
-    }
-    return $obj->{'_exonSensitivity'};
-}
-
-
-=head2 getMissedExonScore
-
- Title   : getMissedExonScore
- Usage   : $obj->getMissedExonScore()
- Function: 
- Example : 
- Returns : The frequency at which the predictor completely fails to 
-            identify an exon (no prediction or overlap). 
- Args    : 
-
-
-=cut
-
-sub getMissedExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_missedExonScore'}) {
-     # write implementation here
-    }
-    return $obj->{'_missedExonScore'};
-}
-
-
-=head2 getWrongExonScore
-
- Title   : getWrongExonScore
- Usage   : $obj->getWrongExonScore()
- Function: 
- Example : 
- Returns : The frequency at which the predictor identifies an exon
-            that has no overlap with any exon from the standard. 
- Args    : 
-
-
-=cut
-
-sub getWrongExonScore {
-    my ($obj) = @_;
-    unless ($obj->{'_wrongExonScore'}) {
-     # write implementation here
-    }
-    return $obj->{'_wrongExonScore'};
-}
-
-
-=head2 getBaseSpecificity
-
- Title   : getBaseSpecificity
- Usage   : $obj->getBaseSpecificity()
- Function: 
- Example : 
- Returns : The specificity at which the predictor correctly labels
-            a base in the genomic sequence as being part of each gene.
-            This rewards predictors that get most of each gene correct
-            and penalises those that miss large parts.
- Args    : 
-
-
-=cut
-
-sub getBaseSpecificity {
-    my ($obj) = @_;
-    unless ($obj->{'_baseSpecificity'}) {
-     # write implementation here
-    }
-    return $obj->{'_baseSpecificity'};
-}
-
-
-=head2 getBaseSensitivity
-
- Title   : getBaseSensitivity
- Usage   : $obj->getBaseSensitivity()
- Function: 
- Example : 
- Returns : The sensitivity at which the predictor correctly labels
-            a base in the genomic sequence as being part of each gene.
-            This rewards predictors that get most of each gene correct
-            and penalises those that miss large parts.
- Args    : 
-
-
-=cut
-
-sub getBaseSensitivity {
-    my ($obj) = @_;
-    unless ($obj->{'_baseSensitivity'}) {
-     # write implementation here
-    }
-    return $obj->{'_baseSensitivity'};
+sub getBaseOverlaps {
+    my ($self) = @_;
+        
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    
+    my $truePositive = 0;
+    my $falsePositive = 0;
+    my $falseNegative = 0;
+    
+    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+        $comparer->setStandardExon($standardExon);            
+        my ($tP, $fP, $fN) = $comparer->getBaseOverlaps();
+  
+        $truePositive += $tP;
+        $falsePositive += $fP;
+        $falseNegative += $fN;
+    }  
+        
+    return ($truePositive, $falsePositive, $falseNegative);         
 }
 
 1;
