@@ -54,14 +54,15 @@ use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_VCONTIG
+					 GB_GOLDEN_PATH
+					 GB_FINALDBNAME
+					 GB_FINALDBHOST
+					 GB_DBUSER
+					 GB_DBPASS
 					 );
 use Data::Dumper;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -99,7 +100,7 @@ sub new {
     my( $vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
        
     if (! defined $vcontig) {
-       $vcontig = $::genebuild_conf{'vcontig'};
+       $GB_VCONTIG;
      }  
     
     $self->vcontig($vcontig);
@@ -108,8 +109,8 @@ sub new {
 
     # golden path
     if(!defined $path){
-    # look in GB_conf.pl
-    $path = $::db_conf{'golden_path'};
+
+    $path = $GB_GOLDEN_PATH;
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
@@ -181,10 +182,10 @@ sub write_output {
     my($self,@genes) = @_;
 
     # write genes out to a different database from the one we read genewise genes from.
-    my $dbname = $::db_conf{'finaldbname'};
-    my $dbhost = $::db_conf{'finaldbhost'};
-    my $dbuser = $::db_conf{'dbuser'};
-    my $dbpass = $::db_conf{'dbpass'};
+    my $dbname = $GB_FINALDBNAME;
+    my $dbhost = $GB_FINALDBHOST;
+    my $dbuser = $GB_DBUSER;
+    my $dbpass = $GB_DBPASS;
 
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,

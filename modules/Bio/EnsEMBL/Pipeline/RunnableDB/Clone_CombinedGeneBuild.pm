@@ -48,7 +48,10 @@ use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 # config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_PROTEIN_INDEX
+					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -83,8 +86,7 @@ sub new {
 
  Title   : make_seqfetcher
  Usage   :
- Function: checks in GB_conf::seqfetch_conf for $indexname; if it exists, 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
+ Function: if $index exists, returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
            returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
  Example :
  Returns : Bio::DB::RandomAccessI
@@ -94,9 +96,7 @@ sub new {
 =cut
 
 sub make_seqfetcher {
-  my ( $self, $indexname, $conf_hash ) = @_;
-  # need to treat contents of $conf_hash as name of hash
-  my $index = $::{$conf_hash}{$indexname};
+  my ( $self, $index ) = @_;
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
@@ -134,7 +134,7 @@ sub fetch_input{
     $self->make_targetted_runnables($contig);
     $self->make_similarity_runnable($contig);
   }
-#  $self->make_riken_runnable;
+
   $self->make_genebuild_runnable;
 }
 
@@ -154,8 +154,7 @@ sub make_targetted_runnables {
   my ($self, $contig) = @_;
 
   # set up seqfetchers
-  my $protein_fetcher = $self->make_seqfetcher("protein_index", "targetted_conf");
-  my $cdna_fetcher    = $self->make_seqfetcher("cdna_index", "targetted_conf");
+  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
 
   # we need to find all the proteins that pmatch into this region
   # take a note of those that fall across the ends of the vc? and do what, precisely?
@@ -174,8 +173,7 @@ sub make_targetted_runnables {
     my $input = $feat->chr_name   . ":" . 
                 $feat->start      . "," . 
                 $feat->end        . ":" . 
-                $feat->protein_id . ":" . 
-                $feat->cdna_id;
+                $feat->protein_id . ":" ;
 
     print STDERR "TGE input: $input\n";
 
@@ -183,7 +181,6 @@ sub make_targetted_runnables {
 				       -dbobj           => $self->dbobj,
 				       -input_id        => $input,
 				       -seqfetcher      => $protein_fetcher,
-				       -cdna_seqfetcher => $cdna_fetcher,
 #				       -analysis => $analysis,
 									     );
     $self->targetted_runnable($tgr);
@@ -239,7 +236,7 @@ sub make_similarity_runnable {
 #  analysis setting up? 
 #  my $analysis = $self->dbobj->get_Analysis_Adaptor->??;
 
-  my $seqfetcher = $self->make_seqfetcher("protein_index", "seqfetch_conf");
+  my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX);
   
   my $sim = new Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise(
 									  -dbobj      => $self->dbobj,
@@ -278,72 +275,6 @@ sub similarity_runnable{
   }
   
   return @{$self->{'_similarity_runnables'}};  
-
-}
-
-=head2 make_riken_runnable
-
- Title   : make_riken_runnable
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub make_riken_runnable {
-  my ($self) = @_;
- 
-#  analysis setting up? 
-#  my $analysis = $self->dbobj->get_Analysis_Adaptor->??;
-  my $seqfetcher = $self->make_seqfetcher("riken_index", "riken_conf");
-
-  if($seqfetcher->isa("Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch")){
-    $self->warn("no riken_index defined in GB_conf::riken_conf - cannot run Riken_BlastMiniGenewise\n");
-    return 0;
-  }
-
-
-
-  my $rik = new Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise(
-									    -dbobj      => $self->dbobj,
-									    -input_id   => $self->input_id,
-									    -seqfetcher => $seqfetcher,
-#									    -analysis   => $analysis,
-									   );
-  $self->riken_runnable($rik);
-}
-
-=head2 riken_runnable
-
- Title   : riken_runnable
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub riken_runnable {
-  my ($self, $arg) = @_;
-
-  if (!defined($self->{'_riken_runnables'})) {
-      $self->{'_riken_runnables'} = [];
-  }
-  
-  if (defined($arg)) {
-      if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-	  push(@{$self->{'_riken_runnables'}},$arg);
-      } else {
-	  $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-      }
-  }
-  
-  return @{$self->{'_riken_runnables'}};  
 
 }
 
@@ -436,13 +367,6 @@ print STDERR "***Running similarity build***\n";
     $sgw->run;
     $sgw->write_output;
   }
-
-#print STDERR "***Running riken build***\n";
-#  foreach my $rgw($self->riken_runnable){
-#    $rgw->fetch_input;
-#    $rgw->run;
-#    $rgw->write_output;
-#  }
 
 print STDERR "***Running final build***\n";
   foreach my $gb($self->genebuild_runnable){

@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 
 use vars qw(@ISA);
 use strict;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
@@ -58,30 +58,50 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use Data::Dumper;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
+					      BIOPERLDB
+					      BPNAME
+					      BPUSER
+					      BP_DBI_DRIVER
+					      BP_SUPPORTING_DATABASES
+					     );
+
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
+					 GB_SIMILARITY_TYPE
+					 GB_SIMILARITY_THRESHOLD
+					 GB_SKIP_BMG
+					 GB_PROTEIN_INDEX
+					 GB_DBHOST
+					);
+
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
 sub new {
     my ($class,@args) = @_;
-    my $self = $class->SUPER::new(@args);    
-    if (! $::genebuild_conf{'bioperldb'}) {    
+    my $self = $class->SUPER::new(@args);  
+
+    if (! $BIOPERLDB) {    
       if(!defined $self->seqfetcher) {
 	my $seqfetcher =  $self->make_seqfetcher();
 	$self->seqfetcher($seqfetcher);
       }
     }
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
+
+    if(!defined $path || $path eq ''){
+      $path = $GB_GOLDEN_PATH;
+    }
     $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
     
     if(!defined $type || $type eq ''){
-      $type = $::similarity_conf{'type'};
+      $type = $GB_SIMILARITY_TYPE;
     }
     
     if(!defined $threshold){
-      $threshold = $::similarity_conf{'threshold'};
+      $threshold = $GB_SIMILARITY_THRESHOLD;
     }
 
     $type = 'sptr' unless (defined $type && $type ne '');
@@ -216,7 +236,7 @@ sub fetch_input {
     print STDERR "contig: " . $contig . " \n";
 
     my @features;
-    if ($::genebuild_conf{'bioperldb'}) {
+    if ($BIOPERLDB) {
 	  print STDERR "Fetching all HSPs\n";
 	  my @hsps = $contig->get_all_HSPs;
 
@@ -232,7 +252,7 @@ sub fetch_input {
       }
 
       my $bpDBAdaptor = $self->bpDBAdaptor;
-      my (@bioperldbs) = split /\,/,$::genebuild_conf{'supporting_databases'};
+      my (@bioperldbs) = split /\,/,$BP_SUPPORTING_DATABASES;
 
       MINIRUN:foreach my $bioperldb (@bioperldbs){
 		
@@ -240,7 +260,7 @@ sub fetch_input {
 
 		$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
 
-		if ($::genebuild_conf{'skip_bmg'}) {
+		if ($GB_SKIP_BMG) {
 
 			unless (defined @{$bdbs{$bioperldb}}){
 				print STDERR "Contig has no associated features in $bioperldb\n";
@@ -361,8 +381,15 @@ sub convert_output {
 
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
 
-	#use logic name from analysis object if possible, else take $genetype;
-	my $anal_logic_name = ($self->analysis->logic_name)	?	$self->analysis->logic_name : $genetype	;	
+    #use logic name from analysis object if possible, else take $genetype;
+    # if $self->analysis is undefined, this will fall over ...
+    my $anal_logic_name;
+    if(defined $self->analysis){
+      $anal_logic_name = ($self->analysis->logic_name)	?	$self->analysis->logic_name : $genetype	;	
+    }
+    else{
+      $anal_logic_name = $genetype;
+    }
 	
     my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     my $analysis_obj;
@@ -556,7 +583,7 @@ sub output{
 
 sub make_seqfetcher {
   my ($self) = @_;
-  my $index = $::seqfetch_conf{'protein_index'};
+  my $index = $GB_PROTEIN_INDEX;
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
@@ -566,6 +593,7 @@ sub make_seqfetcher {
 								 );
   }
   else{
+    print STDERR "defaulting to pfetch\n";
     # default to Pfetch
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   }
@@ -595,10 +623,10 @@ sub bpDBAdaptor {
   }
   
   else{
-    my $bpname      = $::genebuild_conf{'bpname'} || undef;
-    my $bpuser      = $::genebuild_conf{'bpuser'} || undef;
-    my $dbhost      = $::db_conf{'dbhost'} || undef;
-    my $DBI_driver  = $::genebuild_conf{'DBI.driver'} || undef;
+    my $bpname      = $BPNAME || undef;
+    my $bpuser      = $BPUSER || undef;
+    my $dbhost      = $GB_DBHOST || undef;
+    my $DBI_driver  = $BP_DBI_DRIVER || undef;
     my $dbad        = Bio::DB::SQL::DBAdaptor->new(
 						   -user => $bpuser,
 						   -dbname => $bpname,

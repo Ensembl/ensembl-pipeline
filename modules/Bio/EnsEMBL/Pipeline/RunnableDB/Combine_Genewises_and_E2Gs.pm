@@ -56,8 +56,11 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
+					);
+
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -69,8 +72,7 @@ sub new {
   
   # golden path
   if(!defined $path){
-    # look in GB_conf.pl
-    $path = $::db_conf{'golden_path'};
+    $path = $GB_GOLDEN_PATH;
   }
   
   # need 2 dbs, one for getting genewises, one for getting e2gs

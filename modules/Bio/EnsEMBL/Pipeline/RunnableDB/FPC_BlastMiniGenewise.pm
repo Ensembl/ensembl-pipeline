@@ -58,9 +58,12 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
+					 GB_PROTEIN_INDEX
+					 GB_SIMILARITY_TYPE
+					 GB_SIMILARITY_THRESHOLD
+					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -75,17 +78,16 @@ sub new {
        
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
 
-    # double check in GB_conf.pl
     if(!defined $path || $path eq ''){
-      $path = $::db_conf{'golden_path'};
+      $path = $GB_GOLDEN_PATH;
     }
 
     if(!defined $type || $type eq ''){
-      $type = $::similarity_conf{'type'};
+      $type = $GB_SIMILARITY_TYPE;
     }
     
     if(!defined $threshold){
-      $threshold = $::similarity_conf{'threshold'};
+      $threshold = $GB_SIMILARITY_THRESHOLD
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
@@ -176,7 +178,7 @@ sub write_output {
     print STDERR "Fetching features \n\n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
-    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold, 0);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold);
 
     # lose version numbers - probably temporary till pfetch indices catch up
 
@@ -832,7 +834,7 @@ sub output{
  Title   : make_seqfetcher
  Usage   :
  Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching protein sequences. If 
-           $seqfetch_conf{'protein_index'} is specified in EST_conf.pl, then a Getseqs 
+           GB_PROTEIN_INDEX is specified in GeneConf.pm, then a Getseqs 
            fetcher is made, otherwise it will be Pfetch
  Example :
  Returns : Bio::EnsEMBL::SeqFetcher
@@ -843,7 +845,7 @@ sub output{
 
 sub make_seqfetcher {
   my ( $self ) = @_;
-  my $index   = $::seqfetch_conf{'protein_index'};
+  my $index   = $GB_PROTEIN_INDEX;
 
   my $seqfetcher;
 

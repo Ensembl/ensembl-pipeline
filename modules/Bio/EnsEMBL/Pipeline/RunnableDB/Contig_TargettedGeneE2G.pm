@@ -66,8 +66,12 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
+					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_TARGETTED_CDNA_INDEX
+					);
+
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -80,8 +84,7 @@ sub new {
 
   # golden path
   if(!defined $path){
-    # look in GB_conf.pl
-    $path = $::db_conf{'golden_path'};
+    $path = $GB_GOLDEN_PATH;
   }
 
   $path = 'UCSC' unless (defined $path && $path ne '');
@@ -89,7 +92,7 @@ sub new {
 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
-    my $seqfetcher = $self->make_seqfetcher("protein_index");
+    my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
     $self->seqfetcher($seqfetcher);
   }
 
@@ -99,7 +102,7 @@ sub new {
     $self->cdna_seqfetcher($cdna_seqfetcher);
   }
   else {
-    my $seqfetcher = $self->make_seqfetcher("cdna_index");
+    my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_CDNA_INDEX);
     $self->cdna_seqfetcher($seqfetcher);
   }
  
@@ -119,8 +122,7 @@ sub new {
 =cut
 
 sub make_seqfetcher{
-  my ( $self, $indexname ) = @_;
-  my $index = $::targetted_conf{$indexname};
+  my ( $self, $index ) = @_;
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
@@ -1553,11 +1555,11 @@ sub validate_exon{
     return 0;
   }
 
-  elsif($exon->start == $exon->end){
-    my $msg = "rejecting exon, start == end : " . $exon->start . " == " . $exon->end . "\n";
-    $self->warn($msg);
-    return 0;
-  }
+#  elsif($exon->start == $exon->end){
+#    my $msg = "rejecting exon, start == end : " . $exon->start . " == " . $exon->end . "\n";
+#    $self->warn($msg);
+#    return 0;
+#  }
   
   return 1;
 }

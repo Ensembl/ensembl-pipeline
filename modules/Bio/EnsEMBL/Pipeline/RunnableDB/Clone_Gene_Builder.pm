@@ -54,14 +54,10 @@ use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
+use Bio::EnsEMBL::Pipeline::GeneConf qw (
+					 GB_GOLDEN_PATH
 					 );
 use Data::Dumper;
-# config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -97,8 +93,7 @@ sub new {
 
     # golden path
     if(!defined $path){
-    # look in GB_conf.pl
-    $path = $::db_conf{'golden_path'};
+      $path = $GB_GOLDEN_PATH;
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
