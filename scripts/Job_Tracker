@@ -3,13 +3,12 @@
 
 =head1 NAME
 
-Job_submitter - looks at the analysis database and
-submits a chunk of jobs.
+Job_Tracker: Displays jobs by status, analysis id, input id or age.
 
 
 =head1 SYNOPSIS
 
-    Job_Submitter
+    Job_Tracker
 
 =head1 DESCRIPTION
 
@@ -17,15 +16,23 @@ submits a chunk of jobs.
 
 =head1 OPTIONS
 
-    -host      host name for database (gets put as host= in locator)
+    -anahost      host name for database (gets put as host= in locator)
 
-    -port      For RDBs, what port to connect to (port= in locator)
+    -anaport      For RDBs, what port to connect to (port= in locator)
 
-    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -anadbname    For RDBs, what name to connect to (dbname= in locator)
 
-    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -anadbuser    For RDBs, what username to connect as (dbuser= in locator)
 
-    -pass      For RDBs, what password to use (dbpass= in locator)
+    -anapass      For RDBs, what password to use (dbpass= in locator)
+    
+    -status       CREATED, SUBMITTED FAILED or SUCCESSFUL
+    
+    -analysis     analysis id
+    
+    -age          age since job status recorded in minutes
+
+    -input        input id
 
 =cut
 
@@ -40,6 +47,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use FreezeThaw;
+use Data::Dumper;
 
 my $anahost     = 'localhost';
 my $anaport     = '410000';
@@ -48,6 +56,8 @@ my $anadbuser   = 'root';
 my $anapass     =  undef;
 my $status      = 'FAILED';
 my $analysis    = undef;
+my $age         = undef;
+my $input_id    = undef;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -55,9 +65,11 @@ my $analysis    = undef;
 	    'anadbname:s'   => \$anadbname,
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
-            'status:s'      => \$status,
-	    'analysis:s'    => \$analysis
-	    );
+        'status:s'      => \$status,
+	    'analysis:s'    => \$analysis,
+	    'age:s'         => \$age,
+        'input:s'       => \$input_id,
+        );
 
 
 
@@ -67,29 +79,112 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -user   => $anadbuser,
 						    -pass   => $anapass);
 my @jobs;
-if ($analysis){
+my $title;
+
+if ($analysis)
+{
     @jobs = $anadb->get_JobsByAnalysis($analysis);
+    $title = "Jobs by Analysis ID ($analysis)";
 }
-else {
+elsif ($age) 
+{
+    @jobs = $anadb->get_JobsByAge($age);
+    $title = "Jobs by Age ($age min)"; 
+}
+elsif ($input_id)
+{
+    @jobs = $anadb->get_JobsByInputId($input_id);
+    $title = "Jobs by Input ID ($input_id)";
+}
+else
+{
     @jobs = $anadb->get_JobsByCurrentStatus($status);
-} 
+    $title = "Jobs by Current Status ($status)";
+}
+
+my (@created, @successful, @submitted, @failed);
+
+#sort by status
+foreach my $job (@jobs)
+{
+    if ($job->current_status->status eq 'CREATED')
+    {
+        push (@created, $job); 
+    }
+    elsif ($job->current_status->status eq 'SUBMITTED')
+    { 
+        push (@submitted, $job); 
+    }
+    elsif ($job->current_status->status eq 'SUCCESSFUL')
+    { 
+        push (@successful, $job); 
+    }
+    elsif ($job->current_status->status eq 'FAILED')
+    { 
+        push (@failed, $job); 
+    }
+}
+
+#print Dumper (@jobs);
+print STDERR "Sorted by status: CREATED ".@created." SUBMITTED ".@submitted
+      ." SUCCESSFUL ".@successful." FAILED ".@failed."\n";
+
 
 print "<BODY TEXT=\"#000000\" BGCOLOR=\"#FFFFFF\">";
     print("<TABLE>\n");
-foreach my $job (@jobs) {
-    print STDERR "Tracking job ".$job->id."\n";
-    $job->_dbobj($anadb);
-    $job->get_all_status;
-    my $status = $job->current_status->status;
+    print(  "<TR>$title</TR>"
+            ."<TR BGCOLOR=\"FF9966\">"
+            ."<TD>CREATED (".@created.")</TD>"
+            ."<TD>SUBMITTED (".@submitted.")</TD>"
+            ."<TD>SUCCESSFUL (".@successful.")</TD>"
+            ."<TD>FAILED (".@failed.")</TD>"
+            ."</TR>"
+            .(printlist(@created))
+            .(printlist(@submitted))
+            .(printlist(@successful))
+            .(printlist(@failed))
+            );
+               
+    print("</TABLE>\n");
 
-    print("<TR><TD>"            . $job->id . "</TD><TD>" .
-          "  Status : "      . $status. "</TD><TD>" .
-	  "Analysis : "      .$job->analysis->program."</TD><TD>" .
-          "<a href=\"file:" . $job->stdout_file . "\">stdout</a>" . "</TD><TD>" .
-          "<a href=\"file:" . $job->stderr_file . "\">stderr</a></TD><TD>" .
-          "<a href=\"file:" . $job->status_file . "\">status</a></TD><TD>"  .
-          $job->LSF_id ."</TD><TD></TR>" 
-);    
-} 
-print("</TABLE>\n");
-  
+
+sub printlist {
+    my (@list) = @_;
+    my $html;
+    
+    $html .= ("<TR BGCOLOR=\"00C155\"><TD>Status</TD><TD>Job ID</TD><TD>Analysis</TD><TD>Input ID</TD><TD>stdout</TD>"
+                ."<TD>stderr</TD><TD>status</TD><TD>LSF ID</TD></TR>") if (@list);
+    foreach my $job (@list)
+    {
+        print STDERR "Tracking job ".$job->id."\n";
+        $job->_dbobj($anadb);
+        $job->get_all_status;
+        my $status = $job->current_status->status;
+        $html .= ("<TR>"
+                ."<TD> ".$status." </TD>"
+                ."<TD> ".$job->id." </TD>"
+                ."<TD> ".$job->analysis->program." </TD>"
+                ."<TD> ".$job->input_id." </TD>"
+                ."<TD><a href=\"file:". $job->stdout_file."\">stdout </a>"
+                    ."(".(-s $job->stdout_file).")</TD>"
+                ."<TD><a href=\"file:". $job->stderr_file."\">stderr </a>"
+                    ."(".(-s $job->stderr_file).")</TD>"
+                ."<TD><a href=\"file:". $job->status_file."\">status </a>"
+                    ."(".(-s $job->status_file).")</TD>"
+                ."<TD> ".$job->LSF_id." </TD>"
+                ."</TR>"
+                );   
+    }
+    return $html;
+}
+
+
+
+
+
+
+
+
+
+
+
