@@ -12,6 +12,7 @@
 =head1 SYNOPSIS
 
   my $mw = Bio::EnsEMBL::Pipeline::RunnableDB::Motifwise->new(
+				    -db              => $db,
 				    -input_id        => $input_id,
                                     -analysis_tss    => $analysis_tss, 
                                     -analysis_motif  => $analysis_motif,
@@ -21,17 +22,6 @@
   $mw->run;
   my @output = $mw->output;
   $mw->write_output;
-
-  Alternatively, you can parse and store the results of an already existing 
-  motifwise output file:
-
-  my $mw = Bio::EnsEMBL::Pipeline::RunnableDB::Motifwise->new(
-                                    -analysis_tss    => $analysis_tss, 
-                                    -analysis_motif  => $analysis_motif,
-                                    );
-
-  $mw->parse_file_and_store($filename);
-
 
   The rows needed in the analysis table on the core database are:
 
@@ -91,9 +81,9 @@ sub new {
   my ($analysis_tss,
       $analysis_motif,
       $workdir) = Bio::EnsEMBL::Root->_rearrange([qw(ANALYSIS_TSS
-						     ANALYSIS_MOTIF
-						     WORK_DIR)],
-						 @args);
+						      ANALYSIS_MOTIF
+						      WORK_DIR)],
+						  @args);
   
   Bio::EnsEMBL::Root->throw("Missing either one or more analysis objects.  Need an analysis\n" . 
 			    "object for TSS features and another analysis object for Motif\n" .
@@ -106,12 +96,6 @@ sub new {
 
   push @args, ('-analysis', $analysis_tss);
 
-  # Add a dummy input id if one hasnt been specified - assuming that
-  # the object is being constructed to parse an existing file (if this
-  # is not a correct assumption, the code will mostly likely throw
-  # when it tried to parse the dummy input id).
-
-  push @args, ('-input_id', 'dummy') unless $input_id;
 
   # Make object using parent constructor.
   
@@ -163,7 +147,7 @@ sub fetch_input {
     my $seq;
 
     if (scalar @$PIPELINE_REPEAT_MASKING) {
-      $seq = $slice->get_repeatmasked_sequence($PIPELINE_REPEAT_MASKING);
+      $seq = $slice->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING);
     } else {
       $seq = $slice;
     }
@@ -219,25 +203,6 @@ sub write_output {
   
   return 1;
 }
-
-sub parse_file_and_store {
-  my ($self, $filename) = @_;
-
-  $self->throw("Cant find file [$filename].  Make sure you include the full path.")
-    unless (-e $filename);
-
-  $mw = Bio::EnsEMBL::Pipeline::Runnable::Motifwise->new(
-              -analysis_tss   => $self->_analysis_tss,
-              -analysis_motif => $self->_analysis_motif);
-
-  $mw->output($filename);
-  $mw->parse_results;
-
-  $self->write_output;
-
-  return 1
-}
-
 
 ### Storage and retrieval
 
