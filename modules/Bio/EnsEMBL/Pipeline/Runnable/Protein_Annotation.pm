@@ -156,9 +156,12 @@ sub protein_files{
 sub write_protein_file{
   my ($self, $filename, $seq) = @_;
 
-  open (OUT,">".$filename) or throw("couldn't open $filename");
-  print OUT ">".$seq->display_id."\n".$seq->seq."\n";
-  close(OUT) or throw("couldn't close $filename");
+  eval {
+      my $out = Bio::SeqIO->new(-file => ">$filename", -format => 'fasta');
+      $out->write_seq($seq);
+      $out->close();
+  };
+  $@ and $self->throw("Could not write temporary sequence file $filename [$@]");
 
   return $filename;
 }
