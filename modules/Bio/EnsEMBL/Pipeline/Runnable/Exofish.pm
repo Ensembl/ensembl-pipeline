@@ -91,7 +91,7 @@ sub run {
   $self->workdir('/tmp') unless ($self->workdir($dir));
   $self->checkdir();
 
-  # with -lcfilter, this hardmasks repeat sequence; speeds up search consierably  
+  # with -lcfilter, this hardmasks repeat sequence; speeds up search considerably  
   my $seq = $self->query->seq;    
   $seq =~ tr/N/n/;
   $self->query->seq($seq);
@@ -182,40 +182,8 @@ sub parse_results {
       
       my $aalen = ($qend - $qstart + 1) / 3;
       #print "$qstart $qend $pid $aalen\n";      
-      # Exofish filtering strategy. See figure 1 in Roest Crollius et. al. 2000
-      
-      if ($aalen < 13) {
-        next;
-      } 
-      elsif ($aalen < 15) {
-        next if $pid < 95.0;
-      } 
-      elsif ($aalen < 17) {
-        next if $pid < 90.0;
-      }
-      elsif ($aalen < 19) {
-        next if $pid < 85.0;
-      }
-      elsif ($aalen < 21) {
-        next if $pid < 80.0;
-      }
-      elsif ($aalen < 22) {
-        next if $pid < 77.5;
-      }
-      elsif ($aalen < 23) {
-        next if $pid < 75.0;
-      }
-      elsif ($aalen < 24) {
-        next if $pid < 70.0;
-      }
-      elsif ($aalen < 25) {
-        next if $pid < 67.5;
-      }
-      else {
-        # length is 25 amino acids or more. 
-        next if $pid < 55.0;
-      }
-      
+      next if not $self->exofish_match_criterion($aalen, $pid);
+ 
       my $fp = Bio::EnsEMBL::FeaturePair->new();
       $fp->seqname($qname);
       $fp->start($qstart);
@@ -241,7 +209,7 @@ sub parse_results {
                    end      => $fp->end,
                    score    => [$fp->score],
                    hseqname => [$fp->hseqname],
-                   htstart  => [$fp->hstart],
+                   hstart   => [$fp->hstart],
                    hend     => [$fp->hend],
 
                  };
@@ -295,6 +263,47 @@ sub parse_results {
   $self->output(@features);
   
   return $self->output; 
+}
+
+
+sub exofish_match_criterion {
+  my ($self, $aalen, $pid) = @_;
+
+  # Exofish filtering strategy. See figure 1 in Roest Crollius et. al. 2000
+  
+  if ($aalen < 13) {
+    return 0;
+  } 
+  elsif ($aalen < 15) {
+    return 0 if $pid < 95.0;
+  } 
+  elsif ($aalen < 17) {
+    return 0 if $pid < 90.0;
+  }
+  elsif ($aalen < 19) {
+    return 0 if $pid < 85.0;
+  }
+  elsif ($aalen < 21) {
+    return 0 if $pid < 80.0;
+  }
+  elsif ($aalen < 22) {
+    return 0 if $pid < 77.5;
+  }
+  elsif ($aalen < 23) {
+    return 0 if $pid < 75.0;
+  }
+  elsif ($aalen < 24) {
+    return 0 if $pid < 70.0;
+  }
+  elsif ($aalen < 25) {
+    return 0 if $pid < 67.5;
+  }
+  else {
+    # length is 25 amino acids or more. 
+    return 0 if $pid < 55.0;
+  }
+
+  return 1;     
 }
 
 
