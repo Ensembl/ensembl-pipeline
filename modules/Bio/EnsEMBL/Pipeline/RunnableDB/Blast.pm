@@ -81,7 +81,6 @@ sub new {
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     $self->{'_input_id'}    = undef;
-    $self->{'_parameters'}  = undef;
         
     my ( $dbobj, $input_id, $analysis) = 
             $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);

@@ -78,7 +78,6 @@ sub new {
     $self->{'_fplist'}      = [];
     $self->{'_runnable'}    = [];
     $self->{'_input_id'}    = undef;
-    $self->{'_parameters'}  = undef;
     
     my ( $dbobj, $input_id, $analysis, $threshold) = 
             $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
@@ -106,16 +105,6 @@ sub new {
 #    }
     return $self;
 }
-
-=head2 parameters
-
-    Title   :   parameters
-    Usage   :   $self->parameters($param);
-    Function:   Gets or sets the value of parameters
-    Returns :   A string containing parameters for Bio::EnsEMBL::Runnable run
-    Args    :   A string containing parameters for Bio::EnsEMBL::Runnable run
-
-=cut
 
 =head2 dbobj
 
@@ -166,27 +155,24 @@ sub fetch_input {
     }
 }
 
-#get/set for runnable and args
+=head2 runnable
+
+    Title   :   runnable
+    Usage   :   $self->runnable
+    Function:   creates Blast runnable
+    Returns :   none
+    Args    :   none
+
+=cut
 
 sub runnable {
     my ($self, $runnable, $genseq) = @_;
-    if ($runnable && $genseq)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
-        my %parameters;
-        foreach my $pair (@pairs)
-        {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
-        }
-	#create blast object    
-	my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -query    => $genseq,
-								     -program  => $self->analysis->program,
-								     -database => $self->analysis->db,
-								     -threshold => 1, 
+    if ($runnable && $genseq)    {
+	my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   
+					-query    => $genseq,
+					-program  => $self->analysis->program,
+					-database => $self->analysis->db,
+					-threshold => 1, 
 								     );
 	
 	push (@{$self->{'_runnable'}}, $blast);
