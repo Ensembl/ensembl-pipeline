@@ -60,12 +60,13 @@ my $check  = 0;
 my $params;
 my $pepfile;
 my $acc;
+my $analysis_logic_name;
 
 # can override db options on command line
 &GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
-	     'analysis:n'    => \$analysis_logic_name,
+	     'analysis:s'    => \$analysis_logic_name,
              'write'         => \$write,
              'check'         => \$check,
              'parameters:s'  => \$params,
