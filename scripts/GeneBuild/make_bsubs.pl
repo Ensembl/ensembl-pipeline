@@ -27,7 +27,8 @@ foreach my $arg($gbc{'runner'}, $gbc{'dbname'}, $gbc{'dbhost'}, $gbc{'dbuser'}, 
 	"dbuser     => $gbc{'dbuser'}\n" .
 	"dbpass     => $gbc{'dbpass'}\n" .
 	"queue      => $gbc{'queue'}\n" .
-	"tmpdir     => $gbc{'tmpdir'}\n" ;
+	"tmpdir     => $gbc{'tmpdir'}\n" .
+	"golden_path => $gbc{'golden_path'} ( empty string will use UCSC )\n" ;
 
       exit(1);
     }
@@ -69,17 +70,19 @@ sub get_chrlengths{
 sub make_tbsubs {
   my ($runnable) = @_;
   
-  my $runner = $gbc{'runner'};
-  my $dbname = $gbc{'dbname'};
-  my $dbhost = $gbc{'dbhost'};
-  my $dbuser = $gbc{'dbuser'};
-  my $dbpass = $gbc{'dbpass'};
-  my $queue  = $gbc{'queue'};
-  my $dir    = $gbc{'tmpdir'} . "/$runnable";
-  my $pm_out = $gbc{'pm_output'};
-  $pm_out .= "pm_best.out";
-  my $cdnas  = $gbc{'cdna_pairs'};
+  my $runner      = $gbc{'runner'};
+  my $dbname      = $gbc{'dbname'};
+  my $dbhost      = $gbc{'dbhost'};
+  my $dbuser      = $gbc{'dbuser'};
+  my $dbpass      = $gbc{'dbpass'};
+  my $queue       = $gbc{'queue'};
+  my $golden_path = $gbc{'golden_path'};
+  my $dir         = $gbc{'tmpdir'} . "/$runnable";
+  my $pm_out      = $gbc{'pm_output'};
+  my $cdnas       = $gbc{'cdna_pairs'};
 
+  $pm_out .= "pm_best.out";
+  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
   # check them!
   foreach my $arg($pm_out, $cdnas){
     if ($arg eq '' ){
@@ -150,7 +153,7 @@ sub make_tbsubs {
     $command .= "  $runner ";
     $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
     $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
-    $command .= " -input_id $input_id -write";      
+    $command .= " -input_id $input_id -parameters golden_path=$golden_path -write";      
     print OUTF "$command\n";
     
   }
@@ -164,15 +167,18 @@ sub make_tbsubs {
 sub make_lbsubs {
   my ($runnable) = @_;
   
-  my $runner = $gbc{'runner'};
-  my $dbname = $gbc{'dbname'};
-  my $dbhost = $gbc{'dbhost'};
-  my $dbuser = $gbc{'dbuser'};
-  my $dbpass = $gbc{'dbpass'};
-  my $queue  = $gbc{'queue'};
-  my $size   = $gbc{'size'};
-  my $dir    = $gbc{'tmpdir'} . "/$runnable";
+  my $runner      = $gbc{'runner'};
+  my $dbname      = $gbc{'dbname'};
+  my $dbhost      = $gbc{'dbhost'};
+  my $dbuser      = $gbc{'dbuser'};
+  my $dbpass      = $gbc{'dbpass'};
+  my $golden_path = $gbc{'golden_path'};
+  my $queue       = $gbc{'queue'};
+  my $size        = $gbc{'size'};
+  my $dir         = $gbc{'tmpdir'} . "/$runnable";
   
+  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
+
   # check them!
   foreach my $arg($size, $gbc{'tmpdir'}){
     if ($arg eq '' ){
@@ -219,7 +225,7 @@ sub make_lbsubs {
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
       $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
-      $command .= " -input_id $input_id -write";      
+      $command .= " -input_id $input_id -parameters golden_path=$golden_path -write";      
       print OUTF "$command\n";
       
       $count = $count + $size;
