@@ -42,7 +42,7 @@ $runobj->write_output();
 ok(1);
 
 ok(my $contig   =  $db->get_RawContigAdaptor->fetch_by_name($id));
-ok(my @features = @{$db->get_SimpleFeatureAdaptor->fetch_all_by_Contig($contig, 'cpg')});
+ok(my @features = @{$db->get_SimpleFeatureAdaptor->fetch_all_by_RawContig($contig, 'cpg')});
 
 display(@features);
 

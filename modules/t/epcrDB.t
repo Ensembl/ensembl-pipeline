@@ -92,7 +92,7 @@ $runobj->write_output();
 my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
 
 my $sfa = $db->get_SimpleFeatureAdaptor;
-my $features = $sfa->fetch_all_by_Contig($contig, 'e-PCR');
+my $features = $sfa->fetch_all_by_RawContig($contig, 'e-PCR');
 display(@features);
 
 unless (@$features)
