@@ -15,7 +15,7 @@ use Getopt::Long;
 ####################
 
 # how many jobs we submit at once
-my $jobs     = 300;
+my $jobs     = 400;
 
 # how many seconds we sleep between every <$jobs> jobs
 my $sleep    = 600;
@@ -24,7 +24,7 @@ my $sleep    = 600;
 my $slowdown = 2000; 
 
 # how many jobs we allow in the queue before we STOP the whole thing to prevent the farm to melt
-my $panic    = 5000;
+my $panic    = 10000;
 
 # the file with the bsub commands
 my $file;
@@ -92,14 +92,20 @@ while( <FILE> ) {
       die("LSF may go nuts!");
     }
     
-    if ( $result > $slowdown ){
+    while ( $result > $slowdown ){
       my $slow    = $sleep;
       my $minutes = $slow/60;
       print "sleeping for another $slow seconds ( $minutes minute(s) )\n";
-      system("sleep $slow"); # 15 min
+      system("sleep $slow");
+      system("bjobs -u eae -q acari | wc -l > number_file");
+      open(LOOP,"<number_file");
+      while(<LOOP>){
+	$result = $_;
+      }
+      print "jobs still running (or pending) in the farm: $result\n";
+      close(LOOP);
     }
   } 
-
   $counter++; 
 }
 
