@@ -246,8 +246,7 @@ sub run {
     }
 
     foreach my $f (@features) {
-
-      if ($f->score > $scorehash{$f->hseqname})  {
+      if (!defined $scorehash{$f->hseqname} || $f->score > $scorehash{$f->hseqname})  {
 	$scorehash{$f->hseqname} = $f->score;
       }
     }
