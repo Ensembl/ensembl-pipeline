@@ -67,7 +67,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 #compile time check for executable - won't work till centrally installed ...
-#use Bio::EnsEMBL::Analysis::Programs qw(exonerate); 
+use Bio::EnsEMBL::Analysis::Programs qw(exonerate); 
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::Object;
@@ -100,12 +100,11 @@ sub _initialize {
       eval 
         { $self->exonerate($self->locate_executable('exonerate')); };
       if ($@)
-        { $self->exonerate('/usr/local/pubseq/bin/exonerate'); }
+	# need a central installation ...
+        { $self->throw("Can't find exonerate!"); }
     }
   if ($arguments) 
     {   $self->arguments($arguments) ;}
-  #    else
-  #    { $self->arguments(' -reverse ') ;      }
   
   return $self; # success - we hope!
 }
