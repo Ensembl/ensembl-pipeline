@@ -1240,63 +1240,63 @@ sub _check_Completeness{
   return 0;
 }
     
-#########################################################################
+##########################################################################
 
-# having a set of est_genes only, we have no reference transcript (ensembl one),
-# so to determine whether two transcripts are two alternative forms of the same gene
-# we check whether they share at least an exon
+## having a set of est_genes only, we have no reference transcript (ensembl one),
+## so to determine whether two transcripts are two alternative forms of the same gene
+## we check whether they share at least an exon
 
-sub _check_exact_exon_Match{
- my ($self, $tran1, $tran2 ) = @_;
- my @exons1 = @{$tran1->get_all_Exons};
- my @exons2 = @{$tran2->get_all_Exons};
- my $exact_match = 0;
+#sub _check_exact_exon_Match{
+# my ($self, $tran1, $tran2 ) = @_;
+# my @exons1 = @{$tran1->get_all_Exons};
+# my @exons2 = @{$tran2->get_all_Exons};
+# my $exact_match = 0;
  
- # how many exact matches we need (maybe 1 is enough)
- foreach my $exon1 (@exons1){
-   foreach my $exon2 (@exons2){
-     return 1 if  ( $exon1->start == $exon2->start && $exon1->end == $exon2->end );
-   }
- }
- return 0;
-}
+# # how many exact matches we need (maybe 1 is enough)
+# foreach my $exon1 (@exons1){
+#   foreach my $exon2 (@exons2){
+#     return 1 if  ( $exon1->start == $exon2->start && $exon1->end == $exon2->end );
+#   }
+# }
+# return 0;
+#}
 
-#########################################################################
-#
-# having a set of est_genes only, we have no reference transcript (ensembl one),
-# so to determine whether two transcripts are two alternative forms of the same gene
-# we check whether they have a similar protein product
+##########################################################################
+##
+## having a set of est_genes only, we have no reference transcript (ensembl one),
+## so to determine whether two transcripts are two alternative forms of the same gene
+## we check whether they have a similar protein product
 
-sub _check_protein_Match{
- my ($self, $tran1, $tran2 ) = @_;
+#sub _check_protein_Match{
+# my ($self, $tran1, $tran2 ) = @_;
 
- my $seq1;
- my $seq2;
+# my $seq1;
+# my $seq2;
 
- my $compatible_proteins = 0;
- eval{
-   $seq1 = $tran1->translate;
-   $seq2 = $tran2->translate;
- };
- if ( $seq1 && $seq2 ){
+# my $compatible_proteins = 0;
+# eval{
+#   $seq1 = $tran1->translate;
+#   $seq2 = $tran2->translate;
+# };
+# if ( $seq1 && $seq2 ){
    
-   if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
-     print STDERR "On of the peptides has a stop codon\n";
-     return 0;
-   }
-   elsif ( $seq1 eq $seq2 ){
-     print STDERR "Identical translation\n";
-     return 1;
-   }
-   elsif( $seq1 =~/$seq2/ || $seq2 =~/$seq1/ ){
-     return 1;
-   }
- }
- else{
-   print STDERR "unable to compare translations\n";
-   return 0;
- }
-}
+#   if ( $seq1 =~/\*/ || $seq2 =~/\*/ ){ 
+#     print STDERR "On of the peptides has a stop codon\n";
+#     return 0;
+#   }
+#   elsif ( $seq1 eq $seq2 ){
+#     print STDERR "Identical translation\n";
+#     return 1;
+#   }
+#   elsif( $seq1 =~/$seq2/ || $seq2 =~/$seq1/ ){
+#     return 1;
+#   }
+# }
+# else{
+#   print STDERR "unable to compare translations\n";
+#   return 0;
+# }
+#}
 
 #########################################################################
 #
