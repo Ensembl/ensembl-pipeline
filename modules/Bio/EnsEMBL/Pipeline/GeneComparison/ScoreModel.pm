@@ -187,15 +187,23 @@ sub score_Transcripts{
 	
 	# first we calculate how many ests are used more than once
 	
+	my %seen_est;
+      REUSED_EST:
 	foreach my $est ( @list ){
+	  if ( $seen_est{$est} ){
+	    #print STDERR "CHECK $est has been seen already\n";
+	    next REUSED_EST;
+	  }
 	  foreach my $site ( @these_sites ){
 	    my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est ); 
 	    unless (  $est_start > $site->end || $est_end   <  $site->start ){
 	      $used_ests{$est}++;
+	      $seen_est{$est} = 1;
+	      next REUSED_EST;
 	    }
 	  }
 	}
-
+	
 	############################################################
 	# @these_sites contains now all the sites
 	# present in the transcript.
@@ -286,6 +294,11 @@ sub score_Transcripts{
 	    $exon->score( $score );
 	}
     } # end of TRAN
+    
+    #foreach my $est ( keys %used_ests ){
+    #  print STDERR "TEST est $est reused: $used_ests{$est}\n";
+    #}
+
 
     ############################################################
     # cluster info:
@@ -300,7 +313,7 @@ sub score_Transcripts{
     }
     my $est_usage_string;
     my @keys = sort { $a <=> $b } keys %bin_used_ests;
-    for ( my $j=0; $j<= $keys[-1]; $j++ ){
+    for ( my $j=1; $j<= $keys[-1]; $j++ ){
       my $string  = "used$j:0\t";
       if ( $bin_used_ests{ $j } ){
 	$string = "used$j:$bin_used_ests{ $j }\t";
