@@ -874,9 +874,16 @@ sub _pair_Transcripts{
       
       # check first it does not merge with anything in the cluster
       foreach my $ens_tran ( @ens_transcripts ){
-	my $comparator = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-	$exact_merge     = $comparator->test_for_semiexact_Merge($est_tran, $ens_tran);
-	$fuzzy_merge     = $comparator->test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
+	my $comparator1 = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
+											    -comparison_level         => 3,
+											    -splice_mismatch          => 1,
+											   );
+	my $comparator2 = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
+											    -comparison_level         => 2,
+											   );
+	
+	($exact_merge,$overlaps) = $comparator2->compare($est_tran, $ens_tran);
+	($fuzzy_merge,$overlaps) = $comparator1->compare($est_tran, $ens_tran);
 	if ($exact_merge == 1){
 	  print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges exactly with an ensembl transcript, skipping it\n";
 	  next CANDIDATE;
@@ -887,51 +894,49 @@ sub _pair_Transcripts{
 	    }
 	  }
 	  
-	  foreach my $ens_tran ( @ens_transcripts ){
-	    $one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
-	    $similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
-	    $exon_in_intron  = $self->_check_exon_Skipping(     $est_tran, $ens_tran);
-	    #$exact_merge     = $self->test_for_semiexact_Merge($est_tran, $ens_tran);
-	    
-	    print "Comparing\n";
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
-	    print STDERR "shared_exon    : $one_exon_shared\n";
-	    print STDERR "similar protein: $similar_protein\n";
-	    print STDERR "exon_in_intron : $exon_in_intron\n";
-	    #print STDERR "exact_merge    : $exact_merge\n";
-	    
-	    print STDERR "not using the protein info\n";
-	    if ( $one_exon_shared == 1 
-		 #&& $similar_protein == 1
-		 && $exon_in_intron  == 1
-		 #&& $exact_merge     == 0 
-	       ){
-	      print STDERR "BINGO, and ISOFORM found !!\n";
-	      
-	      # if they don't have the same start/end translation, try to lock phases:
-	      if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
-		   !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
-		$est_tran = $self->_lock_Phases($est_tran, $ens_tran) ;
-	      }
-	      else{
-		print STDERR "EST-transcript has the same translation start and end:\n";
-		print STDERR "EST translation start: ".$est_tran->translation->start." end: ".$est_tran->translation->end."\n";
-		print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
-	      }
-	      push ( @accepted_isoforms, $est_tran );
-	      
-	      next CANDIDATE; 
-	      ############################################################
-	      # NOTE: we accept the est gene if it does not merge with any
-	      # of the ensembl genes and if it is a valid isoform
-	      # with respect to just ONE ensembl gene.
-	      # We could try to extend that to every ensembl gene
-	      # in the cluster.
-	      # This would make it harder to lock phases
-	      ############################################################
-	    }
+      foreach my $ens_tran ( @ens_transcripts ){
+	$one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
+	$similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
+	$exon_in_intron  = $self->_check_exon_Skipping(     $est_tran, $ens_tran);
+	
+	print "Comparing\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
+	print STDERR "shared_exon    : $one_exon_shared\n";
+	print STDERR "similar protein: $similar_protein\n";
+	print STDERR "exon_in_intron : $exon_in_intron\n";
+	
+	print STDERR "not using the protein info\n";
+	if ( $one_exon_shared == 1 
+	     #&& $similar_protein == 1
+	     && $exon_in_intron  == 1
+	     #&& $exact_merge     == 0 
+	   ){
+	  print STDERR "BINGO, and ISOFORM found !!\n";
+	  
+	  # if they don't have the same start/end translation, try to lock phases:
+	  if ( !( $est_tran->translation->start == $ens_tran->translation->start) ||  
+	       !( $est_tran->translation->end   == $ens_tran->translation->end  )   ){ 
+	    $est_tran = $self->_lock_Phases($est_tran, $ens_tran) ;
 	  }
+	  else{
+	    print STDERR "EST-transcript has the same translation start and end:\n";
+	    print STDERR "EST translation start: ".$est_tran->translation->start." end: ".$est_tran->translation->end."\n";
+	    print STDERR "ensembl transl  start: ".$ens_tran->translation->start." end: ".$ens_tran->translation->end."\n";
+	  }
+	  push ( @accepted_isoforms, $est_tran );
+	  
+	  next CANDIDATE; 
+	  ############################################################
+	  # NOTE: we accept the est gene if it does not merge with any
+	  # of the ensembl genes and if it is a valid isoform
+	  # with respect to just ONE ensembl gene.
+	  # We could try to extend that to every ensembl gene
+	  # in the cluster.
+	  # This would make it harder to lock phases
+	  ############################################################
+	}
+      }
     }  # end of CANDIDATE 
   }    # end of 'if (@candidates)'
   else{
@@ -2731,7 +2736,7 @@ sub prune_Exons {
 	push(@unique_Exons, $exon);
       }
     }          
-    $tran->flush_Exons();
+    $tran->flush_Exon;
     foreach my $exon (@newexons) {
       $tran->add_Exon($exon);
     }
