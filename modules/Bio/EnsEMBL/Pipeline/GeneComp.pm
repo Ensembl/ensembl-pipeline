@@ -76,7 +76,7 @@ merge. This is a known bug/feature.
 
 For each cluster, old transcripts are sorted by length and then fitted
 to new transcripts, with the best fit taking a win (fit on the number
-of co-linear identical id'd exons). Perfect matches (all exons the
+of co-linear identical id''d exons). Perfect matches (all exons the
 same id) trigger a direct assignment.
 
 Versioning for transcripts is that any addition/removal of an exon, or
@@ -134,7 +134,7 @@ sub map_temp_Exons_to_real_Exons{
 
    
    if( scalar(@tempexons) == 0 ) {
-       $dbobj->warn("No temporary exons passed in for mapping. Can't map! - returning an empty list");
+       $newvc->warn("No temporary exons passed in for mapping. Can't map! - returning an empty list");
        return ();
    }
 
@@ -156,7 +156,7 @@ sub map_temp_Exons_to_real_Exons{
 
    foreach my $tempexon ( @tempexons ) {
        if( exists $ismapped{$tempexon->id} ) {
-	   $dbobj->throw("you have given me temp exons with identical ids. bad...");
+	   $newvc->throw("you have given me temp exons with identical ids. bad...");
        }
 
        $ismapped{$tempexon->id} = 0;
@@ -270,7 +270,7 @@ sub map_temp_Exons_to_real_Exons{
 	   next TEMPEXON;
        }
     
-       $dbobj->throw("Error - should never reach here!");
+       $newvc->throw("Error - should never reach here!");
    }
 	      
    # find exons which have not moved, and push on to untransfered array
