@@ -10,6 +10,8 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::PAML;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::Result;
+use Bio::EnsEMBL::Utils::Exception qw(warning throw);
+use Bio::EnsEMBL::Utils::Argument  qw(rearrange);
 
 
 my $DEFAULT_DISTANCE_METHOD  = 'NeiGojobori';
@@ -81,27 +83,27 @@ sub new {
       $identity_cutoff,
       $coverage_cutoff,
       $distance_cutoff,
-      $distance_method) = $self->_rearrange([qw(QUERY
-						BLASTDB
-						BLAST_PROGRAM
-						BLAST_INDEX_TYPE
-						WORK_DIR
-						CODEML_EXECUTABLE
-						GENETIC_CODE
-						REGEX_QUERY_SPECIES
-						REGEX_OUTGROUP_SPECIES
-						HIT_IDENTITY
-						HIT_COVERAGE
-						DISTANCE_CUTOFF
-						DISTANCE_METHOD
-					       )],@args);
+      $distance_method) = rearrange([qw(QUERY
+					BLASTDB
+					BLAST_PROGRAM
+					BLAST_INDEX_TYPE
+					WORK_DIR
+					CODEML_EXECUTABLE
+					GENETIC_CODE
+					REGEX_QUERY_SPECIES
+					REGEX_OUTGROUP_SPECIES
+					HIT_IDENTITY
+					HIT_COVERAGE
+					DISTANCE_CUTOFF
+					DISTANCE_METHOD
+				       )],@args);
 
   $self->_work_dir($work_dir) if $work_dir;
 
   if ($blastdb && $blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB")){
     $self->_blastdb($blastdb);
   } else {
-    $self->throw("Need a Bio::EnsEMBL::Pipeline::Runnable::BlastDB object.");
+    throw ("Need a Bio::EnsEMBL::Pipeline::Runnable::BlastDB object.");
   }
 
   $self->_query_seq($query)                               if $query;
@@ -187,7 +189,7 @@ sub run {
     }
   };
 
-  $self->throw("PAML run was unsuccessful.\n$@") 
+  throw ("PAML run was unsuccessful.\n$@") 
     if $@;
 
   unless (@results) {
@@ -196,7 +198,7 @@ print $@;
     return 0
   }
 
-  $self->throw("There are more than two sets of results returned from\n" .
+  throw ("There are more than two sets of results returned from\n" .
 	       "the PAML parser.  This was not expected.") 
     if scalar @results > 1;
 
@@ -230,12 +232,12 @@ sub _find_recent_duplications {
     $bplite_report = $self->_blast_obj->run;
   };
 
-  $self->throw("Blast did not run successfully.  Blast program was [".
+  throw ("Blast did not run successfully.  Blast program was [".
 	       $self->_blast_program."].  Index type was [".
 	       $self->_blast_index_type."].")
     if $@;
 
-  $self->throw("Blast process did not return a report.")
+  throw ("Blast process did not return a report.")
     unless ($bplite_report->isa("Bio::Tools::BPlite"));
 
   return $self->_process_for_same_species_duplicates($bplite_report);
@@ -343,7 +345,7 @@ sub _process_for_same_species_duplicates {
 
     }
 
-    $self->throw("Didnt match hit id to any regex [".$sbjct->name."].");
+    throw ("Didnt match hit id to any regex [".$sbjct->name."].");
   }
 
 
@@ -383,17 +385,15 @@ sub _process_for_same_species_duplicates {
       $closest_outgroup_distance = $hit_distance{$sorted_species_hits{$regex}->[0]->name};
     }
   }
-
   $self->outgroup_distance($closest_outgroup_distance);
 
   my @accepted_ids;
 
   foreach my $sbjct (@{$sorted_species_hits{$self->_regex_query_species}}) {
-
-    if ($hit_distance{$sbjct->name} <= $closest_outgroup_distance) {
+    if ($hit_distance{$sbjct->name} <= $closest_outgroup_distance &&
+	$hit_distance{$sbjct->name} >= 0) {
       push (@accepted_ids, $sbjct->name);
-
-    } else {
+    } elsif ($hit_distance{$sbjct->name} >= 0) {
       last;
     }
   }
@@ -417,7 +417,7 @@ sub _process_for_same_species_duplicates {
 =cut
 
 sub _run_pairwise_paml {
-  my ($self, $aligned_seqs) = @_;
+  my ($self, $aligned_seqs, $dontretry) = @_;
 
   my $paml = Bio::EnsEMBL::Pipeline::GeneDuplication::PAML->new(
 			     '-work_dir'     => $self->_work_dir,
@@ -436,8 +436,25 @@ sub _run_pairwise_paml {
     $parser = $paml->run_codeml
   };
 
-  $self->throw("Paml execution failed.\n$@")
-    if $@;
+  # PAML execution frequently fails, but is successful on a retry.
+  # Hence, if PAML fails try several retries before giving up.  This
+  # failure is usually due to PAML estimating stochastic parameters
+  # that end in floating point exceptions.  Only an independent
+  # implementation of the NG distance algorithm separate from PAML
+  # is going to free us from this very annoying problem.
+
+  my $retry_count = 0;
+  if ($@){
+    warning ("Paml execution failed - attempting a retry.\n$@");
+    while (! $parser && $retry_count < 3){
+      $parser = $self->_run_pairwise_paml($aligned_seqs, 1);
+      $retry_count++
+    }
+    unless ($parser){
+      throw ("Paml execution failed - even after three retries.\n$@")
+    }
+  }
+
 
   return $parser;
 }
@@ -464,7 +481,7 @@ sub _calculate_pairwise_distance {
   my @seqs = ($self->_fetch_seq($input_id_1), 
 	      $self->_fetch_seq($input_id_2));
 
-  $self->throw("Didnt correctly obtain two sequences for alignment.")
+  throw ("Didnt correctly obtain two sequences for alignment.")
     unless scalar @seqs == 2;
 
   my $align = $self->_pairwise_align(\@seqs);
@@ -476,7 +493,7 @@ sub _calculate_pairwise_distance {
   };
 
   if ($@){
-    $self->throw("Pairwise use of PAML failed [$input_id_1]vs[$input_id_2].\n$@");
+    throw ("Pairwise use of PAML failed [$input_id_1]vs[$input_id_2].\n$@");
     return 0
   }
 
@@ -489,7 +506,7 @@ sub _calculate_pairwise_distance {
   };
 
   if ($@){
-    $self->warn("PAML failed to give a file that could be parsed.  No doubt PAML threw an error!\n$@");
+    warning ("PAML failed to give a file that could be parsed.  No doubt PAML threw an error!\n$@");
     return 0
   }
 
@@ -513,7 +530,7 @@ sub _calculate_pairwise_distance {
 sub _pairwise_align {
   my ($self, $seqs) = @_;
 
-  $self->throw("Pairwise alignment was only expecting two sequences.")
+  throw ("Pairwise alignment was only expecting two sequences.")
     unless ((scalar @$seqs) == 2);
 
   my $cba 
@@ -605,7 +622,7 @@ sub _extract_results {
   $matrix = $result->get_NGmatrix() 
     if $self->_distance_method =~ /NeiGojobori/;
 
-  $self->throw("Failed to retrieve a result matrix from ".
+  throw ("Failed to retrieve a result matrix from ".
 	       "the PAML result.")
     unless $matrix;
 
@@ -755,7 +772,7 @@ sub outgroup_distance {
 sub _fetch_seq {
   my ($self, $id) = @_;
 
-  $self->throw("Cant fetch sequence without an id.")
+  throw ("Cant fetch sequence without an id.")
     unless $id;
 
   $self->{_cache} = {}
@@ -767,7 +784,7 @@ sub _fetch_seq {
 
   my $seq = $self->_seq_fetcher->fetch($id);
 
-  $self->throw("Sequence fetch failed for id [$id].")
+  throw ("Sequence fetch failed for id [$id].")
     unless ($seq && $seq->isa("Bio::Seq"));
 
   $self->{_cache}->{$seq->display_id} = $seq;
@@ -819,12 +836,12 @@ sub _fetch_seqs {
 sub _force_cache {
   my ($self, $seq) = @_;
 
-  $self->throw("Trying to add something odd to the sequence cache [$seq].")
+  throw ("Trying to add something odd to the sequence cache [$seq].")
     unless (defined $seq);
 
   if ($self->{_cache}->{$seq->display_id}){
-    $self->warn('Sequence [' . $seq->display_id . 
-		'] already exists in cache, but will replace.');
+    warning('Sequence [' . $seq->display_id . 
+	    '] already exists in cache, but will replace.');
   }
 
   $self->{_cache}->{$seq->display_id} = $seq;
@@ -935,20 +952,20 @@ sub _blastdb {
   if (@_) {
     $self->{_blastdb} = shift;
 
-    $self->throw("Blast database must be a Bio::EnsEMBL::Pipeline::Runnable::BlastDB.")
+    throw ("Blast database must be a Bio::EnsEMBL::Pipeline::Runnable::BlastDB.")
       unless ($self->{_blastdb}->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
 
-    $self->throw("Blast database has not been formatted.")
+    throw ("Blast database has not been formatted.")
       unless $self->{_blastdb}->db_formatted;
 
-    $self->throw("Blast database has been built without the " . 
-		 "make_fetchable_index flag set (and this is " .
-		 "a problem because the database can not be " . 
-		 "used for sequence fetching).")
+    throw ("Blast database has been built without the " . 
+	   "make_fetchable_index flag set (and this is " .
+	   "a problem because the database can not be " . 
+	   "used for sequence fetching).")
       unless $self->{_blastdb}->make_fetchable_index
   }
 
-  $self->throw("Blast database object not set.")
+  throw ("Blast database object not set.")
     unless ($self->{_blastdb});
 
   return $self->{_blastdb};
@@ -1018,17 +1035,17 @@ sub _query_seq {
   if (@_) {
     $self->{_query_seq} = shift;
 
-    $self->throw("Query sequence is not a Bio::Seq object [" . 
-		 $self->{_query_seq} . "]")
+    throw ("Query sequence is not a Bio::Seq object [" . 
+	   $self->{_query_seq} . "]")
       unless $self->{_query_seq}->isa("Bio::Seq");
 
-    $self->throw("Cant add query sequence to sequence cache manually.")
+    throw ("Cant add query sequence to sequence cache manually.")
       unless $self->_force_cache($self->{_query_seq});
 
     return
   }
 
-  $self->throw("Query sequence has not been set.")
+  throw ("Query sequence has not been set.")
     unless $self->{_query_seq};
 
   return $self->{_query_seq};
@@ -1054,7 +1071,7 @@ sub _work_dir {
     return
   }
 
-  $self->throw("Work directory not set.")
+  throw ("Work directory not set.")
     unless $self->{_work_dir};
 
   return $self->{_work_dir};
@@ -1081,7 +1098,7 @@ sub _identity_cutoff {
     return
   }
 
-  $self->throw("Blast match identity cutoff has not been set.")
+  throw ("Blast match identity cutoff has not been set.")
     unless $self->{_identity_cutoff};
 
   return $self->{_identity_cutoff};
@@ -1108,7 +1125,7 @@ sub _coverage_cutoff {
     return
   }
 
-  $self->throw("The coverage cutoff has not been set.")
+  throw ("The coverage cutoff has not been set.")
     unless $self->{_coverage_cutoff};
 
   return $self->{_coverage_cutoff};
@@ -1161,7 +1178,7 @@ sub _regex_query_species {
     return
   }
 
-  $self->throw("The regular expression used to match the sequence"
+  throw ("The regular expression used to match the sequence"
 	       ." ids from the query species has not been set.")
     unless $self->{_regex_query_species};
 
@@ -1189,8 +1206,8 @@ sub _regex_outgroup_species {
     return
   }
 
-  $self->warn('No outgroup species regex provided.  ' .
-	      'This may or may not be what you intend.')
+  warning('No outgroup species regex provided.  ' .
+	  'This may or may not be what you intend.')
     unless $self->{_regex_outgroup_species};
 
   return $self->{_regex_outgroup_species};
@@ -1219,7 +1236,7 @@ sub _genetic_code {
     return
   }
 
-  $self->throw('Genetic code unset.')
+  throw ('Genetic code unset.')
     unless $self->{_genetic_code};
 
   return $self->{_genetic_code};
@@ -1245,7 +1262,7 @@ sub _distance_method {
 
     unless ($self->{_distance_method} =~ /NeiGojobori/i |
 	    $self->{_distance_method} =~ /ML/i){
-      $self->throw("Distance method must be set to either " .
+      throw ("Distance method must be set to either " .
 		   "NeiGojobori or ML, not [".
 		   $self->{_distance_method}."]");
     }
@@ -1284,7 +1301,7 @@ sub _codeml {
   # If it looks like our executable comes with a full 
   # path, check that it will work.
 
-  $self->throw("codeml executable not found or not " .
+  throw ("codeml executable not found or not " .
 	       "executable. Trying to execute path " .
 	       "[". $self->{_codeml} ."]")
     if ($self->{_codeml} =~ /^\//
