@@ -16,11 +16,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam
 =head1 SYNOPSIS
 
   # something like this
-  my $query = new Bio::Seq(-file   => $clonefile,
+  my $query = new Bio::Seq(-file   => $queryfile,
 			   -format => 'Fasta');
 
   my $hmm =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new 
-    ('-clone'          => $query,
+    ('-query'          => $query,
      '-program'        => 'hmmpfam' or '/usr/local/pubseq/bin/hmmpfam',
      '-database'       => 'Pfam');
 
@@ -82,20 +82,17 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of seg run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis, $options) = $self->_rearrange([qw(CLONE 
+    my ($query, $analysis, $options) = $self->_rearrange([qw(QUERY 
                                                              ANALYSIS
                                                              OPTIONS)],        
                                                           @args);
-  
-    if ($analysis) {
-        $self->analysis($analysis);
-    } else {
-        $self->throw("BlastWorm needs an analysis");
-    }
 
-    $self->clone ($clone) if ($clone);       
 
-    $self->program ($self->find_executable ($self->analysis->program_file));
+    
+    $self->query ($query) if ($query);       
+    $self->analysis ($analysis) if ($analysis);
+	
+    $self->program ($self->analysis->program_file);
   
     if ($self->analysis->db_file) {
         $self->database($self->analysis->db_file);
@@ -113,11 +110,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 clone
+=head2 query
 
- Title    : clone
- Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone,
+ Title    : query
+ Usage    : $self->query ($query);
+ Function : get/set method for the Sequence object; assigns query,
             seq-filename and result-filename
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
@@ -126,15 +123,28 @@ sub new {
 
 =cut
 
-sub clone {
-    my ($self, $seq) = @_;
+sub query {
+ my ($self, $seq) = @_;
     if ($seq) {
-        ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
-            || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-        $self->{'_sequence'} = $seq ;
-        $self->clonename ($self->clone->id);
-        $self->filename ($self->clone->id.".$$.seq");
-        $self->results ($self->filename.".out");
+	eval {
+	    $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+
+	if (!$@) {
+	    $self->{'_sequence'} = $seq ;
+	    $self->queryname ($self->query);
+	    $self->filename ($self->query.".$$.seq");
+	    $self->lsresults ($self->filename.".lsout");
+	    $self->fsresults ($self->filename.".fsout");
+	}
+	else {
+	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    $self->{'_sequence'} = $seq ;
+	    $self->filename ("$$.tmp.seq");
+	    
+	    $self->lsresults ("hmm.$$.lsout");
+	     $self->fsresults ("hmm.$$.fsout");
+	}
     }
     return $self->{'_sequence'};
 }
@@ -245,33 +255,58 @@ sub options {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
+ my ($self, $dir) = @_;
 
-    # nothing to be done with $args
-
-    # check clone
-    my $seq = $self->clone || $self->throw("Clone required for ".$self->program."\n");
+    # check query
+    my $seq = $self->query || $self->throw("Query required for Program");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
     $self->checkdir;
 
     # reset filename and results as necessary (adding the directory path)
-    my $tmp = $self->workdir;
-    my $input = $tmp."/".$self->filename;
+    my $tmp1 = $self->workdir;
+    my $tmp2 = $self->workdir;
+ my $input = $tmp1."/".$self->filename;
     $self->filename ($input);
-    $tmp .= "/".$self->results;
-    $self->results ($tmp);
+    $tmp1 .= "/".$self->lsresults;
+    $self->lsresults ($tmp1);
+    $tmp2 .= "/".$self->fsresults;
+    $self->fsresults ($tmp2);
 
-    # write sequence to file
-    $self->writefile;        
 
-    # run program
-    $self->run_program;
+ eval {
+     $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+     };
+	
+	
+    if (!$@) {
+	#The inputId is a sequence file...got the normal way...
 
-    # parse output
-    $self->parse_results;
-    $self->deletefiles;
+	# write sequence to file
+	$self->writefile;        
+
+	# run program
+	$self->run_program;
+
+	# parse output
+	$self->parse_results;
+	$self->deletefiles;
+    }
+    else {
+	#The query object is not a seq object but a file.
+	#Perhaps should check here or before if this file is fasta format...if not die
+	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
+
+	$self->filename($self->query);
+	
+	
+	# run program
+	$self->run_program;
+
+	# parse output
+	$self->parse_results;
+    }
 }
 
 
@@ -294,15 +329,41 @@ sub run_program {
     print STDERR "running ".$self->program." against ".$self->database."\n";
 
     # some of these options require HMMER 2.2g (August 2001)
-    my $cmd = $self->program .' '.
-              '--acc --cut_ga --cpu 1 '.
-              $self->options .' '.
-	      $self->database      .' '.
-	      $self->filename.' > '.
-	      $self->results;
+    
+    my @dbfiles = split(/;/,$self->analysis->db_file);
+
+    if ($dbfiles[0] =~ /ls/) {
+	 
+
+	my $cmd = $self->program .' '.
+	        '--acc --cut_ga --cpu 1 '.
+	        $self->options .' '.
+	        $dbfiles[0]      .' '.
+	        $self->filename.' > '.
+		$self->lsresults;
     print STDERR "$cmd\n";   
-    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$self->database) 
+    $self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[0]) 
         unless ((system ($cmd)) == 0);
+    }
+    else {
+	die || "ls pfam file has not been provided";
+    }
+
+   if ($dbfiles[1] =~ /fs/) { 
+       
+	my $cmd = $self->program .' '.
+	        '--acc --cut_ga --cpu 1 '.
+	        $self->options .' '.
+	        $dbfiles[1]      .' '.
+	        $self->filename.' > '.
+		$self->fsresults;
+	print STDERR "$cmd\n";   
+	$self->throw ("Error running ".$self->program." on ".$self->filename." against ".$dbfiles[1]) 
+	    unless ((system ($cmd)) == 0);
+    }
+    else {
+	die || "fs pfam file has not been provided";
+    }
 }
 
 
@@ -320,35 +381,51 @@ sub run_program {
 
 sub parse_results {
     my ($self) = @_;
+
     my $filehandle;
-    my $resfile = $self->results;
-    
+    my $fshandle;
+    my $id;
+    my $resfile = $self->lsresults;
+    my $fsfile  = $self->fsresults;
+
+    #$resfile = "/tmp/hmm.4063364.lsout";
+    #$fsfile = "/tmp/hmm.4063364.fsout";
+		
+
     if (-e $resfile) {
         # it's a filename
-        if (-z $self->results) {  
+        if ((-z $self->lsresults) && (-z $self->fsresults)) {  
             print STDERR $self->program." didn't find anything\n";
             return;
         }       
         else {
-            open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
+	    open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
             $filehandle = \*OUT;
-      }
+	
+
+	    open (OUT1, "<$fsfile")  or $self->throw ("Error opening $fsfile");
+	    $fshandle = \*OUT1;
+	}
     }
     else {
         # it'a a filehandle
         $filehandle = $resfile;
+	$fshandle = $fsfile;
     }
-    
-    # parse
-    my $id;
+   
+
+
+#First parse what comes from the ls mode matches. Every match in that case is taken
     while (<$filehandle>) {
-        chomp;
+	chomp;
         last if /^Alignments of top-scoring domains/;
         next if (/^Model/ || /^\-/ || /^$/);
         if (/^Query sequence:\s+(\S+)/) {
             $id = $1;
-        }
+	}
+	
         if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+	
             my %feature;
             ($feature{name}) = $id;
             $feature{score} = $score;
@@ -366,7 +443,52 @@ sub parse_results {
             $self->create_feature (\%feature);
 	}
     }
-    close $filehandle;   
+    close FILEHANDLE; 
+
+#Then read all of the fs mode matches. If a match does not overlap with any ls match thus its taken
+    while (<$fshandle>) {
+	my ($hid, $start, $end, $hstart, $hend, $score, $evalue);
+	my $overlap = undef;
+        
+	chomp;
+	
+        last if /^Alignments of top-scoring domains/;
+        next if (/^Model/ || /^\-/ || /^$/);
+        if (/^Query sequence:\s+(\S+)/) {
+            $id = $1;
+        }
+	if (($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+	   
+	
+	    foreach my $featpair(@{$self->{'_flist'}}) {
+		my $lsstart = $featpair->feature1->start;
+		my $lsend = $featpair->feature1->end;
+		if ((($start >= $lsstart) && ($start <= $lsend)) || (($end >= $lsstart) && ($end <= $lsend))) {
+		    $overlap = 1;
+		}
+	    }
+
+	    if (!defined $overlap) {
+		#There is no ovelap thus create a feature
+		my %feature;
+		($feature{name}) = $id;
+		$feature{score} = $score;
+		$feature{p_value} = sprintf ("%.3e", $evalue);
+		$feature{start} = $start;
+		$feature{end} = $end;
+		$feature{hname} = $hid;
+		$feature{hstart} = $hstart;
+		$feature{hend} = $hend;
+		($feature{source}) = $self->program =~ /([^\/]+)$/;
+		$feature{primary} = 'similarity';
+		($feature{program}) = $self->program =~ /([^\/]+)$/;
+		($feature{db}) = $self->database =~ /([^\/]+)$/;
+		($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
+		$self->create_feature (\%feature);
+	    }
+	}
+    }
+    close (FS);
 }
 
 
@@ -436,6 +558,20 @@ sub output {
     my ($self) = @_;
     my @list = @{$self->{'_flist'}};
     return @{$self->{'_flist'}};
+}
+
+
+sub lsresults {
+    my ($self, $results) = @_;
+    $self->{_lsresults} = $results if ($results);
+    return $self->{_lsresults};
+}
+
+
+sub fsresults {
+    my ($self, $results) = @_;
+    $self->{_fsresults} = $results if ($results);
+    return $self->{_fsresults};
 }
 
 1;

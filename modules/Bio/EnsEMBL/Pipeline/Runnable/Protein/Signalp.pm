@@ -14,12 +14,12 @@
 
 =head1 SYNOPSIS
 
- my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
+ my $seqstream = Bio::SeqIO->new ( -file => $queryfile,
                                    -fmt => 'Fasta',
                                  );
  $seq = $seqstream->next_seq;
 
- my $signalp = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new ( -CLONE => $seq);
+ my $signalp = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new ( -QUERY => $seq);
  $signalp->workdir ($workdir);
  $signalp->run;
  my @results = $signalp->output;
@@ -61,7 +61,7 @@ use Bio::SeqIO;
  Title    : new
  Usage    : my $signalp =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new
                            ( -program    => '/usr/local/pubseq/bin/signalp',
-                             -clone      => $clone,
+                             -query      => $query,
                              -analysis   => $analysis,
                            );
  Function : initialises Signalp object
@@ -85,12 +85,12 @@ sub new {
     $self->{'_protected'} = [];           # a list of files protected from deletion
     $self->{'_analysis'} = undef;
 
-    my ($clone, $analysis, $program) = $self->_rearrange([qw(CLONE 
+    my ($query, $analysis, $program) = $self->_rearrange([qw(QUERY 
 						             ANALYSIS
                                                              PROGRAM)], 
 							  @args);
 
-    $self->clone ($clone) if ($clone);
+    $self->query ($query) if ($query);
 
     if ($analysis) {
         $self->analysis ($analysis);
@@ -109,11 +109,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 clone
+=head2 query
 
- Title    : clone
- Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone, filename
+ Title    : query
+ Usage    : $self->query ($query);
+ Function : get/set method for the Sequence object; assigns query, filename
 iprscan/bin/scanregexpf.pl       | /analysis/iprscan/data/confirm.patterns | NULL                                                                                                                and results
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
@@ -122,10 +122,10 @@ iprscan/bin/scanregexpf.pl       | /analysis/iprscan/data/confirm.patterns | NUL
 
 =cut
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
 
-    print STDERR "CLONE: $seq\n";
+    print STDERR "QUERY: $seq\n";
     
     if ($seq) {
 	eval {
@@ -135,8 +135,8 @@ sub clone {
 	
 	if (!$@) {
 	    $self->{'_sequence'} = $seq ;
-	    $self->clonename ($self->clone->id);
-	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->queryname ($self->query->id);
+	    $self->filename ($self->query->id.".$$.seq");
 	    $self->results ($self->filename.".out");
 	}
 	else {
@@ -215,8 +215,8 @@ sub program {
 sub run {
     my ($self, $dir) = @_;
 
-    # check clone
-    my $seq = $self->clone || $self->throw("Clone required for Program\n");
+    # check query
+    my $seq = $self->query || $self->throw("Query required for Program\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -276,7 +276,7 @@ sub run {
 	$self->filename($self->filename.".cutted");
 	$self->run_program;
 	$self->parse_results;
-	    #$self->clone ($tmpseq);
+	    #$self->query ($tmpseq);
 	    
 	    # write sequence to file
 	 #   $self->writefile;        
