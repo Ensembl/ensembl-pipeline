@@ -2,16 +2,14 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 5;}
+BEGIN { $| = 1; plan test => 7;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE;
 use Bio::PrimarySeq;
-use Bio::Seq;
-use Bio::SeqIO;
 
 ok(1);
 
-ok(my $seqstr =  set_seq);
+ok(my $seqstr = &set_seq);
 
 ok(my $seq =  Bio::PrimarySeq->new(-seq         => $seqstr,
 				   -id          => 'HS97D16',
@@ -37,11 +35,13 @@ sub display {
   foreach my $obj (@results) {
 
       print "\n";
+      print $obj->gffstring, "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
         printf ("%10s = $value\n", $method_name);
       }
     }
+  return 1;
 }
 
 sub set_seq {
