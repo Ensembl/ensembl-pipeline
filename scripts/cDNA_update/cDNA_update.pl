@@ -13,7 +13,9 @@ in an automated fashion.
 
   A. Fill in config variables, start script with argument 'run':
      "perl cDNA_setup.pl run"
-  B. Start script again with argument 'clean' after finnishing the pipeline
+  B. Check the results by comparing them to the previous alignment
+     by calling "perl cDNA_setup.pl compare"
+  C. Start script again with argument 'clean' after finnishing the pipeline
      run to clean up: "perl cDNA_setup.pl clean", removing tmp files
 
 =head1 DESCRIPTION
@@ -34,7 +36,8 @@ The steps the script performes:
   3. fastafiles: get & read input files
   4. run_analysis: run exonerate using the pipeline
 
-  5. cleanup: post-process result DB, restore config files, remove tmp files and dbs
+  5. comparison: check some numbers by comparing the results to previsous alignments
+  6. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
 What YOU need to do:
   1. Fill in the config variables in this script (just below this).
@@ -42,7 +45,7 @@ What YOU need to do:
 	fastasplit, splitting a fasta file into a number of chunks
  	polyA_clipping, removing poly-A tails from sequences
   3. Run it, check the set-up and re-run if there are errors.
-  4. Check the results
+  4. Check the results directly and by running 'compare'.
   5. Clean up any mess by running 'clean'.
   6. Hand over target-database.
 
@@ -119,6 +122,8 @@ $newfile           = "cdna_update";
 $configDIR         = $dataDIR."/configbackup";
 $chunkDIR          = $dataDIR."/chunks";
 $outDIR            = $dataDIR."/output";
+my $oldFeatureName = "Exonerate_cDNA";
+my $newFeatureName = "Exonerate_cDNA_update";
 my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
 		     configDIR sourceDIR newfile config_file masked_genome fastasplit
                      polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
@@ -128,7 +133,7 @@ my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update re
 
 
 my $option = $ARGV[0];
-if(!$option or ($option ne "run" and $option ne "clean")){
+if(!$option or ($option ne "run" and $option ne "clean" and $option ne "compare")){
    exec('perldoc', $0);
    exit 1;
 }
@@ -148,9 +153,13 @@ elsif($option eq "clean"){
   print "\ncleanign up after cDNA-update.\n";
 
   clean_up(0);
-
 }
+elsif($option eq "compare"){
+  print "\nhealthchecking after cDNA-update.\n".
+        "checking through alignments & genes.";
 
+  compare();
+}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -611,6 +620,20 @@ sub unclean_exit{
   clean_up(1);
   print "\n Restored original config files.\n Check for errors and restart script.\n";
   exit 1;
+}
+
+
+#compare results to previous data as a health-check
+#bsubs a function call for every chromosome
+sub compare{
+  my @chromosomes = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y);
+
+  foreach my $chomosome (@chromosomes){
+    $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl comparison.pl ".
+           $chomosome." ".$oldFeatureName." ".$newFeatureName." ".$dataDIR;
+    print $cmd."\n";
+    print `$cmd`;
+  }
 }
 
 
