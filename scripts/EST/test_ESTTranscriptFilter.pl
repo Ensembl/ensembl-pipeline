@@ -15,8 +15,7 @@ my $input_id;
 	     );
 
 unless ( $input_id && $dbname && $dbhost ){
-    print STDERR "script to read ESTs and pass them through\n";
-    print STDERR "ESTTranscriptFilter.pm as a test\n";
+    print STDERR "script to read ESTs and pass them through ESTTranscriptFilter.pm as a test\n";
     print STDERR "$0 -input_id -dbname -dbhost\n";
     exit(0);
 }
@@ -76,9 +75,9 @@ print_GFF( "input_est.gff", \@all_trans, "input");
 @all_trans = ();
 
 my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-    ->new( -coverage => 95,
+    ->new( -coverage => 97,
 	   -perc_id  => 99,
-	   -depth    => 10,
+	   -depth    => 20,
 	   );
 
 my @forward_filtered_ests;
