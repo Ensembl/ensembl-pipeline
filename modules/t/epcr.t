@@ -42,8 +42,9 @@ else
 { print "ok 2\n"; }
 
 #create blast object    
+my $sts_db = '/nfs/disk100/humpub/data/sanger_sts.epcr';
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (   -CLONE => $clone,
-                                                             -DB    => '/nfs/disk100/humpub/data/sanger_sts.epcr' );
+                                                             -DB   => $sts_db );
  
 unless ($blast)
 { print "not ok 3\n"; }
