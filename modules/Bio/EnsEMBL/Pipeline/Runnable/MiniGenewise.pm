@@ -53,12 +53,13 @@ sub new {
            
     $self->{'_features'} = [];
     
-    my( $genomic, $protein, $features,$endbias, $minimum_intron, $exon_padding)
+    my( $genomic, $protein, $features,$endbias, $minimum_intron, $terminal_padding, $exon_padding)
       = $self->_rearrange([qw(GENOMIC
 			      PROTEIN
 			      FEATURES
 			      ENDBIAS
 			      MINIMUM_INTRON
+			      TERMINAL_PADDING
 			      EXON_PADDING
 			     )],
 			  @args);
@@ -75,9 +76,9 @@ sub new {
     $self->protein_sequence($protein)             if defined($protein);
     $self->endbias($endbias)                      if defined($endbias);
     $self->features($features)                    if defined($features);
-    $self->_minimum_intron($minimum_intron)        if defined($minimum_intron); 
-    $self->_exon_padding($exon_padding)            if defined($exon_padding);
-   
+    $self->_minimum_intron($minimum_intron)       if defined($minimum_intron); 
+    $self->_exon_padding($exon_padding)           if defined($exon_padding);
+    $self->_terminal_padding($terminal_padding)   if defined($terminal_padding);
     return $self;
   }
 
@@ -141,13 +142,29 @@ sub make_MiniSeq {
       }
       $count++;
     }
-    
-    my $current_coord = 1;
-    
+
     # make a forward strand sequence, but tell genewise to run reversed if the 
     # features are on the reverse strand - handled by _is_reversed
 
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
+
+    # pad the termini of the sequence with 20K (configurable?) of genomic 
+    # sequence - to catch small terminal exons that are missed by blast
+    my $adjusted_start = $genomic_features[0]->start;
+    $adjusted_start -= $self->_terminal_padding;
+    if($adjusted_start < 1 ) {
+      $adjusted_start = 1;
+    }
+    $genomic_features[0]->start($adjusted_start);
+
+    my $adjusted_end = $genomic_features[$#genomic_features]->end;
+    $adjusted_end += $self->_terminal_padding;
+    if($adjusted_end > $self->genomic_sequence->length) {
+        $adjusted_end = $self->genomic_sequence->length;
+      }
+    $genomic_features[$#genomic_features]->end($adjusted_end);
+
+    my $current_coord = 1;
 
     foreach my $f (@genomic_features) {
 
@@ -373,6 +390,18 @@ sub _exon_padding {
   return $self->{'_padding'} || 200;
   
 }
+
+sub _terminal_padding {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_terminal_padding'} = $arg;
+  }
+  # does this need to be hardcoded
+  return $self->{'_terminal_padding'} || 20000;
+  
+}
+
 
 =head2 genomic_sequence
 
