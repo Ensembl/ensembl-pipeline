@@ -10,7 +10,7 @@
 
 =head1 DESCRIPTION
 
-  gets human ESTs from dbEST and polyT/polyA clips them ready for exonerate
+  gets human ESTs from dbEST or cDNAs from embl/vertRNA and polyT/polyA clips them
 
 =head1 OPTIONS
 
@@ -24,16 +24,21 @@ use strict;
 use Getopt::Long;
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Utils::PolyA;
 
-$| = 1; # disable buffering
-local $/ = '>';
+#$| = 1; # disable buffering
+#local $/ = '>';
 
 my $estfile;
 my $seqoutfile;
+my $clip;
+my $softmask;
 
 &GetOptions( 
 	    'estfile:s'     => \$estfile,
 	    'outfile:s'     => \$seqoutfile,
+	    'clip'          => \$clip,
+	    'softmask'      => \$softmask,
 	   );
 
 # usage
@@ -44,55 +49,68 @@ if(!defined $estfile    ||
   exit(1);
 }
 
-my $seqout = new Bio::SeqIO(-file => ">>$seqoutfile", "-format" => "Fasta");
+my $seqin  = new Bio::SeqIO(-file   => "<$estfile",
+			    -format => "Fasta",
+			  );
 
-open(EST, "<$estfile") or die "Can't open estfile [$estfile]\n";
+my $seqout = new Bio::SeqIO(-file   => ">$seqoutfile", 
+			    -format => "Fasta"
+			   );
+
 
 SEQFETCH:
-while (<EST>){
-  my @lines = split /\n/;
-  next SEQFETCH unless scalar(@lines) > 1;
-  my $description = shift (@lines);
-  next SEQFETCH unless $description =~ /Homo sapiens cDNA/;
-  if($description =~ /similar to .* Homo sapiens cDNA/){
-    next SEQFETCH unless $description =~ /Homo sapiens.*similar to.*Homo sapiens cDNA/;
-    print STDERR "keeping $description\n";
+#while (<EST>){
+while( my $cdna = $seqin->next_seq ){
+  
+  my $display_id  = $cdna->display_id;
+  my $description = $cdna->desc;
+
+  # First select the species:
+  next SEQFETCH unless (   $description =~ /Homo sapiens/
+			   || $description =~ /DNA.*coding.*human/
+		       );
+  
+  if(  $description =~ /similar to/ || $description =~ /homolog/i ){
+    
+    next SEQFETCH unless ( $description =~ /Homo sapiens.*similar to/ 
+			   || $description =~ /Homo sapiens.*homolog/i 
+			 );
   }
-
-  my $cdna = new Bio::Seq;
-
-  my $seq;
-  foreach my $line(@lines) {
-    chomp $line;
-    $seq .= $line;
+  #print STDERR "keeping $description\n";
+  
+  # GenBank
+  if ( $display_id =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ || $description =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ ){
+    $display_id = $1;
   }
-
-  if (($description =~ /3\'/) && ($seq =~ /^T{3,}/)) {
-    $seq =~ s/^T{3,}//;
-    $description .= " polyTT"; 
+  # EMBL vert-RNA
+  else{
+    my @labels = split /\s+/, $description;
+    $display_id = $labels[0];
   }
-  else {
-    $description .= " polyNO"; 
-  }
-
-
-  eval{
-    $cdna->seq($seq);
-  };
-
+  
+  $cdna->display_id($display_id);
+  $cdna->desc("");
+  
   if($@){
     warn("can't parse sequence for [$description]:\n$@\n");
     next SEQFETCH;
   }
 
-  # modify description
-  $cdna->display_id($description);
+   #################### clipping? 
+  my $polyA_clipper = Bio::EnsEMBL::Utils::PolyA->new();
+  my $new_cdna;
+  if ($clip){
+    print STDERR "going to pass a $cdna\n";
+    $new_cdna = $polyA_clipper->clip($cdna);
+  }
+  elsif( $softmask ){
+    $new_cdna = $polyA_clipper->mask($cdna, 'soft');
+  }
+  else{
+    $new_cdna = $cdna;
+  }
 
   # write sequence
-  $seqout->write_seq($cdna);
-  
+  $seqout->write_seq($new_cdna);
 }
-
-close EST or die "Can't close estfile [$estfile]\n";
-
 
