@@ -191,7 +191,7 @@ sub write_output {
 	push @mapped_features, $mapped[0];
 
     }
-    $sfa->store(@mapped_features);
+    $sfa->store(@mapped_features) if @mapped_features;
 
     return 1;
 }

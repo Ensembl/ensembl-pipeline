@@ -180,7 +180,7 @@ sub write_output {
 	my $contig_id = $f->contig->dbID;
     }
 
-    $sfa->store(@mapped_features);
+    $sfa->store(@mapped_features) if @mapped_features;
 
     return 1;
 }
