@@ -4,6 +4,9 @@
 
 INSERT INTO analysis (logic_name, db, db_file, program, program_version, program_file, parameters, module, gff_source, gff_feature) VALUES ('motifwise_tss','motif','/ecs2/work1/dta/motifwise/motif_dropout.lr','motifwise','beta','motifwise','-tfm_cutoff 11.0','Motifwise','motifwise','TSS');
 INSERT INTO analysis (logic_name, db, db_file, program, program_version, program_file, parameters, module, gff_source, gff_feature) VALUES ('motifwise_motif','motif','/ecs2/work1/dta/motifwise/motif_dropout.lr','motifwise','beta','motifwise','-tfm_cutoff 11.0','Motifwise','motifwise','Motif');
+INSERT INTO analysis (logic_name) VALUES ('RepeatMask');
+
+
 
 INSERT INTO assembly (chromosome_id, chr_start, chr_end, superctg_name,
 superctg_start, superctg_end, superctg_ori, contig_id, contig_start,

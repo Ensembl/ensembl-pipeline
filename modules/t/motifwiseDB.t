@@ -17,8 +17,6 @@ ok(my $ens_test = EnsTestDB->new);
 
 ok($ens_test->do_sql_file("t/dumps/chr12_snippet.dump"));
 
-print "DBNAME : " . $ens_test->dbname . "\n";
-    
 ok(my $db = $ens_test->get_DBSQL_Obj);
 
 
@@ -39,8 +37,6 @@ my $end = 63914407;
 
 ok($ana_adaptor->exists( $ana_tss ));
 ok($ana_adaptor->exists( $ana_motif ));
-
-print "Analysis adaptor dbIDs : (tss) " . $ana_tss->dbID . " (motif) " .  $ana_motif->dbID . "\n";
 
 ok(my $runobj = "$runnable"->new(-db             => $db,
 				 -input_id       => $id,
@@ -66,7 +62,6 @@ ok(my $slice   =  $db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $e
 ok(my @tss_features = @{$db->get_SimpleFeatureAdaptor->fetch_all_by_Slice($slice, 'motifwise_tss')});
 ok(my @motif_features = @{$db->get_SimpleFeatureAdaptor->fetch_all_by_Slice($slice, 'motifwise_motif')});
 
-system('sleep 10');
 ok(display(@tss_features));
 ok(display(@motif_features));
 
