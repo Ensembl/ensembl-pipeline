@@ -432,7 +432,8 @@ sub batch_runRemote {
 sub runLocally {
   my $self = shift;
  
-  print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
+  #print STDERR "Running locally " . $self->stdout_file . " " 
+  #. $self->stderr_file . "\n"; 
 
   local *STDOUT;
   local *STDERR;
@@ -448,6 +449,13 @@ sub runLocally {
   }
        print STDERR "Running inLSF\n"; 
   $self->run_module();
+  if ($self->current_status->status eq "SUCCESSFUL"){
+    $self->adaptor->remove( $self );
+    if($self->cleanup){
+      unlink $self->stderr_file if(-e $self->stderr_file);
+      unlink $self->stdout_file if(-e $self->stdout_file);
+    }
+  }
 }
 
 
@@ -485,7 +493,7 @@ sub run_module {
                               -input_id => $self->input_id,
                               -db => $self->adaptor->db );
     };
-      
+    
     if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
@@ -510,29 +518,30 @@ sub run_module {
     }
     else {
       # "RUNNING"
-      
       eval {
-        $self->set_status( "RUNNING" );
-        $rdb->db->disconnect_when_inactive(1); 
-        $rdb->run;
-        $rdb->db->disconnect_when_inactive(0); 
+	      $self->set_status( "RUNNING" );
+	      $rdb->run;
       };
-      
       if ($err = $@) {
+        
+        print STDERR $@ . "\n";
+        
         if(my $err_state = $rdb->failing_job_status){
           $self->set_status( $err_state );
         }else{
-          $self->set_status( "FAILED" ); # default to just failed these jobs get retried
+          $self->set_status( "FAILED" ); # default to just failed 
+          #these jobs get retried
         }
         print (STDERR "RUNNING: Lost the will to live Error\n");
-        $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
+        $self->throw("Problems running $module for " . 
+                     $self->input_id . " [$err]\n");
       }
       
       # "WRITING"
       eval {
-        
-        $self->set_status( "WRITING" );
-        $rdb->write_output;
+	      $self->set_status( "WRITING" );
+	      $rdb->write_output;
+	      # ------------------------------------------------------------
 	      if($rdb->can('db_version_searched')){
           my $new_db_version = $rdb->db_version_searched();
           my $analysis = $self->analysis();
@@ -544,12 +553,14 @@ sub run_module {
 	      } else {
           $SAVE_RUNTIME_INFO = 0;
 	      }
-	      $self->set_status( "SUCCESSFUL" );
+	      # -----------------------------------------------------------
+        $self->set_status("SUCCESSFUL");
       }; 
       if ($err = $@) {
 	      $self->set_status( "FAILED" );
 	      print (STDERR "WRITING: Lost the will to live Error\n");
-	      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
+	      $self->throw("Problems for $module writing output for " . 
+                     $self->input_id . " [$err]" );
       }
     }
     
@@ -569,16 +580,18 @@ sub run_module {
 	    # -------------------------------------------------------------
     };
     if ($err = $@) {
-	    print STDERR "Error updating successful job ".$self->dbID .
-        "[$err]\n";
-	    $self->throw("Problems for updating sucessful job for " . 
-                   $self->input_id . " [$err]" );
-    } else {
+      my $error_msg = "Job finished successfully, but could not be ".
+        "recorded as finished.  Job : [" . $self->input_id . "]\n[$err]";
+      eval {
+        $self->set_status("FAIL_NO_RETRY");
+      };
+      $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
+      $self->throw($error_msg);
+    }else {
       print STDERR "Updated successful job ".$self->dbID."\n";
     }
   }
 }
-
 
 =head2 set_status
 
@@ -624,10 +637,15 @@ sub current_status {
   my $status;
   eval{
     $status = $self->adaptor->current_status( $self, $arg );
+      
   };
   if($@){
     $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
                  " ".$self->analysis->logic_name." error $@");
+  }
+  if($status->status eq 'SUCCESSFUL'){
+    my ($p, $f, $l) = caller;
+    print STDERR $f.":".$l."\n";
   }
   return $status;
 }
