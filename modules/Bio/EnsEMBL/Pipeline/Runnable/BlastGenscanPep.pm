@@ -223,7 +223,6 @@ sub align_hits_to_contig {
 
   for my $feature ( @features ) {
     my %exon_hash = ();
-    my $contig = $feature->contig;
     # for each ungapped piece in it
     foreach my $ugFeature ( $feature->ungapped_features() ) {
       my $cdna_total = 1;
@@ -240,7 +239,7 @@ sub align_hits_to_contig {
 	my $gend   = $gcoord->end;
 	my $gstrand = $gcoord->strand;
 	my $cdna_start = $cdna_total;
-	my $cdna_end = $cdna_start + $gstart - $gend;
+	my $cdna_end = $cdna_start + $gend - $gstart;
 	$cdna_total += $gend - $gstart + 1;
 
 	#determine which exon this genomic coordinate overlaps
@@ -281,7 +280,6 @@ sub align_hits_to_contig {
 
 	my $fp = Bio::EnsEMBL::FeaturePair->new;
 
-	$fp->contig($contig);
 	$fp->start($gstart);
 	$fp->end($gend);
 	$fp->strand($gstrand);
@@ -289,10 +287,12 @@ sub align_hits_to_contig {
 	$fp->p_value($feature->p_value);
 	$fp->percent_id($feature->percent_id);
 	$fp->analysis($feature->analysis);
+	$fp->seqname($feature->seqname);
 
 	$fp->hseqname($feature->hseqname);
 	$fp->hstart($pep_start + $ugFeature->hstart() - 1);
 	$fp->hend($pep_end + $ugFeature->hstart() - 1);
+	$fp->contig($feature->contig);
 
 	push( @{$exon_hash{$exon}}, $fp );
       }
