@@ -195,15 +195,15 @@ use vars qw( %GeneCompConf );
 		 #################################################################
 
 		 # annotation/benchmark genes
-		 #DBHOST1    => 'ecs1d',
+		 #DBHOST1    => 'ecs2d',
 	         #DBNAME1    => 'homo_sapiens_sanger_6_29',
 		 #PATH1      => "NCBI_29",    
 		 #DBUSER1    => "ensro",
 		 #GENETYPES1 => ["HUMACE-Known","HUMACE-Novel_CDS"],
 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 #REF_DBHOST1 => 'ecs1e',                    
-		 #REF_DBNAME1 => 'NCBI29_raw',
+		 #REF_DBHOST1 => 'ecs2d',                    
+		 #REF_DBNAME1 => 'homo_sapiens_sanger_6_29',
 		 #REF_PATH1   => 'NCBI_29',
 		 #REF_DBUSER1 => 'ensro',
 
@@ -221,35 +221,38 @@ use vars qw( %GeneCompConf );
 		 #REF_DBUSER2 => 'ensro',
 
 
-		 #########################################################
-		 # comparison between mouse+riken and riken-cdna mapping #
-		 #########################################################
+		 ###############################################
+		 # comparison between cDNA+EST and annotation  #
+		 ###############################################
 
 		 # annotation/benchmark genes
-		 #DBHOST1    => 'ecs1e',
-		 #DBNAME1    => 'mouse_5_3_riken_genebuild',
-		 #PATH1      => "CHR",    
+		 #DBHOST1    => 'ecs1a',                    
+		 #DBHOST1    => 'ecs1d',                    
+		 #DBNAME1    => 'homo_sapiens_sanger_6_29',
+		 #DBNAME1    => 'ens_NCBI_29',
+		 #PATH1      => 'NCBI_29',    
 		 #DBUSER1    => "ensro",
-		 #GENETYPES1 => ["Riken_ensembl"],
-
+		 #GENETYPES1 => ["ensembl"], 
+		 #GENETYPES1 => ["HUMACE-Known","HUMACE-Novel_CDS"],
+		 
 		 # prediction genes
-		 #DBHOST2    => 'ecs1b',                    
-		 #DBNAME2    => 'mouse_whitehead_0401_rikens',
-		 #PATH2      => 'CHR',
+		 #DBHOST2    => 'ecs1e',                    
+		 #DBNAME2    => 'ens_NCBI_29_est2',
+		 #PATH2      => 'NCBI_29',
 		 #DBUSER2    => 'ensro',
-		 #GENETYPES2 => ["genomewise"], 
-		 #GENETYPES2 => ["exonerate_e2g"], 
-
+		 #GENETYPES2 => ["genomewise_MASS"], 
+		 
+		 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 #REF_DBHOST1 => 'ecs1e',                    
-		 #REF_DBNAME1 => 'mouse_5_3_riken_genebuild',
-		 #REF_PATH1   => 'CHR',
+		 #REF_DBHOST1 => 'ecs1a',                    
+		 #REF_DBNAME1 => 'ens_NCBI_29',
+		 #REF_PATH1   => 'NCBI_29',
 		 #REF_DBUSER1 => 'ensro',
 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 #REF_DBHOST2 => 'ecs1e',                    
-		 #REF_DBNAME2 => 'mouse_5_3_riken_genebuild',
-		 #REF_PATH2   => 'CHR',
+		 #REF_DBHOST2 => 'ecs1a',                    
+		 #REF_DBNAME2 => 'ens_NCBI_29',
+		 #REF_PATH2   => 'NCBI_29',
 		 #REF_DBUSER2 => 'ensro',
 
 		 #################################################################
@@ -257,32 +260,60 @@ use vars qw( %GeneCompConf );
 		 #################################################################
 
 		 # annotation/benchmark genes
-		 DBHOST1    => 'ecs1a',
-	         DBNAME1    => 'ens_NCBI_29',
-		 PATH1      => "NCBI_29",    
-		 DBUSER1    => "ensro",
-		 GENETYPES1 => ["ensembl2"],
+		 #DBHOST1    => 'ecs1a',
+	         #DBNAME1    => 'ens_NCBI_29',
+		 #PATH1      => "NCBI_29",    
+		 #DBUSER1    => "ensro",
+		 #GENETYPES1 => ["ensembl"],
 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 REF_DBHOST1 => 'ecs1a',                    
-		 REF_DBNAME1 => 'ens_NCBI_29',
-		 REF_PATH1   => 'NCBI_29',
+		 #REF_DBHOST1 => 'ecs1a',                    
+		 #REF_DBNAME1 => 'ens_NCBI_29',
+		 #REF_PATH1   => 'NCBI_29',
+		 #REF_DBUSER1 => 'ensro',
+
+		 # prediction genes
+		 #DBHOST2    => 'ecs1a',                    
+		 #DBNAME2    => 'ens_NCBI_29_cdna',
+		 #PATH2      => 'NCBI_29',
+		 #DBUSER2    => 'ensro',
+		 #GENETYPES2 => ["genomewise"], 
+		 
+		 # reference database ( one with common sequence, golden path, contig, etc... )
+		 #REF_DBHOST2 => 'ecs1e',                    
+		 #REF_DBNAME2 => 'NCBI29_raw',
+		 #REF_PATH2   => 'NCBI_29',
+		 #REF_DBUSER2 => 'ensro',
+		 
+		 #################################################################
+		 # comparison between ensembl genes NCBI_30 and human annotation #
+		 #################################################################
+
+		 # annotation/benchmark genes
+		 DBHOST1    => 'ecs2d',
+	         DBNAME1    => 'homo_sapiens_sanger_8_30',
+		 PATH1      => 'NCBI_30',    
+		 DBUSER1    => 'ensro',
+		 GENETYPES1 => ["HUMACE-Pseudogene"],
+
+		 # reference database ( one with common sequence, golden path, contig, etc... )
+		 REF_DBHOST1 => 'ecs2d',                    
+		 REF_DBNAME1 => 'homo_sapiens_core_8_30',
+		 REF_PATH1   => 'NCBI_30',
 		 REF_DBUSER1 => 'ensro',
 
 		 # prediction genes
-		 DBHOST2    => 'ecs1a',                    
-		 DBNAME2    => 'ens_NCBI_29_cdna',
-		 PATH2      => 'NCBI_29',
+		 DBHOST2    => 'ecs2d',                    
+		 DBNAME2    => 'homo_sapiens_core_8_30',
+		 PATH2      => 'NCBI_30',
 		 DBUSER2    => 'ensro',
 		 GENETYPES2 => ["ensembl"], 
 		 
 		 # reference database ( one with common sequence, golden path, contig, etc... )
-		 REF_DBHOST2 => 'ecs1e',                    
-		 REF_DBNAME2 => 'NCBI29_raw',
-		 REF_PATH2   => 'NCBI_29',
+		 REF_DBHOST2 => 'ecs2d',                    
+		 REF_DBNAME2 => 'homo_sapiens_core_8_30',
+		 REF_PATH2   => 'NCBI_30',
 		 REF_DBUSER2 => 'ensro',
-
-
 
  );
 

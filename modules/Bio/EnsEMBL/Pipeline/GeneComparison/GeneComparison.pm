@@ -831,50 +831,73 @@ sub compare_Translations{
     if ( $pred_peptide_length && $ann_peptide_length ){
        my $difference = int( ($ann_peptide_length - $pred_peptide_length)/10 );
        $diff_relative_to_annotation{ $difference }++;
-    }
-        
-    my $goback = 0; 
-    unless ( $pred_peptide_seq ){
-      print STDERR "prediction has no translation\n";
-      $goback = 1;
-    }
-    unless ( $ann_peptide_seq ){
-      print STDERR "annotation has no translation\n";
-      $goback = 1;
-    }
-    if ( $goback ){
-      next PAIR;
-    }
-      # only store the genes whose translation has no stop codons
-    
-    if ( $pred_peptide_seq && $ann_peptide_seq){
-     if ( $pred_peptide_seq =~ /\*/ ){
-	 print STDERR "prediction peptide has STOP codon\n";
      }
-     if ( $ann_peptide_seq  =~ /\*/ ){
-	 print STDERR "annotation peptide has STOP codon\n";
-     }
-     if ( $ann_peptide_seq eq $pred_peptide_seq ){
-         print STDERR "Identical translation\n";
-         #print STDERR "If you don't believe it...\n";
-         #print STDERR "Annotation: $ann_peptide_seq\n";
-         #print STDERR "Prediction: $pred_peptide_seq\n";
-         $exact_match++;
-     }
-     elsif ( $ann_peptide_seq =~ /$pred_peptide_seq/ ){
-         print STDERR "prediction is a truncated peptide of the annotation\n";
-         $pred_embedded_in_ann++;
-     }
-     elsif ( $pred_peptide_seq = ~ /$ann_peptide_seq/ ){
-         print STDERR "annotation is a truncated peptide of the prediction\n";
-         $ann_embedded_in_pred++;
-     }
-     else{
       
-         # the only thing left to do would be to try to align them and get a similarity score
-     }
-     print STDERR "\n";
-    }  
+      my $goback = 0; 
+      unless ( $pred_peptide_seq ){
+	print STDERR "prediction has no translation\n";
+	$goback = 1;
+      }
+      unless ( $ann_peptide_seq ){
+	print STDERR "annotation has no translation\n";
+	$goback = 1;
+      }
+      if ( $goback ){
+	next PAIR;
+      }
+      # only store the genes whose translation has no stop codons
+      
+      if ( $pred_peptide_seq && $ann_peptide_seq){
+	
+	my $ann_stop = 0;
+	my $pred_stop = 0;
+	if ( $pred_peptide_seq =~ /\*/ ){
+	  print STDERR "prediction peptide has STOP codon\n";
+	  $pred_stop = 1;
+	  if ( $prediction->stable_id ){
+	    print STDERR "id: ".$prediction->stable_id."\n";
+	  }
+	  elsif( $prediction->dbID ){
+	    print STDERR "id: ".$prediction->dbID."\n";
+	  }
+	} 
+	
+	if ( $ann_peptide_seq  =~ /\*/ ){
+	  print STDERR "annotation peptide has STOP codon\n";
+	  $ann_stop = 1;
+	  if ( $annotation->stable_id ){
+	    print STDERR "id: ".$annotation->stable_id."\n";
+	  }
+	  elsif( $annotation->dbID ){
+	    print STDERR "id: ".$annotation->dbID."\n";
+	  }
+	}   
+	
+	if ( $ann_stop and $pred_stop ){
+	  next PAIR;
+	}
+
+	if ( $ann_peptide_seq eq $pred_peptide_seq ){
+	  print STDERR "Identical translation\n";
+	  #print STDERR "If you don't believe it...\n";
+	  #print STDERR "Annotation: $ann_peptide_seq\n";
+	  #print STDERR "Prediction: $pred_peptide_seq\n";
+	  $exact_match++;
+	}
+	elsif ( $ann_peptide_seq =~ /$pred_peptide_seq/ ){
+	  print STDERR "prediction is a truncated peptide of the annotation\n";
+	  $pred_embedded_in_ann++;
+	}
+	elsif ( $pred_peptide_seq = ~ /$ann_peptide_seq/ ){
+	  print STDERR "annotation is a truncated peptide of the prediction\n";
+	  $ann_embedded_in_pred++;
+	}
+	else{
+	  
+	  # the only thing left to do would be to try to align them and get a similarity score
+	}
+	print STDERR "\n";
+      }  
     } # end of PAIR
   }   # end of CLUSTER
   
@@ -975,6 +998,7 @@ sub compare_Exons{
   my @total_pred_unpaired;
   my @total_ann_doubled;
   my @total_pred_doubled;
+  my $total_identical_pairs = 0; # counts the total of identical transcript pairs
   my $exact_matches   = 0; # counts the number of exact matching exons
   my $exon_pair_count = 0; # counts the number of exons
 
@@ -1061,9 +1085,9 @@ sub compare_Exons{
       $pairs_count++;
       
       # we match the exons in the pair
-      my ($printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats, $matchlength_stats) = 
-	$self->_match_Exons($pair, $coding);
-
+      my ($printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats, $matchlength_stats, $identical_pair) = $self->_match_Exons($pair, $coding);
+      
+      $total_identical_pairs += $identical_pair; # it adds zero or one
       # print to gff info about this pair if gff_file is available
       my ($prediction,$annotation) = $pair->get_Transcripts;
       if ($self->gff_file){
@@ -1157,6 +1181,7 @@ sub compare_Exons{
 
   # print out the results
   print STDERR "Total number of transcript pairs: ".$pairs_count."\n";
+  print STDERR "Total number of identical pairs : ".$total_identical_pairs."\n";
   print STDERR "Transcripts unpaired:\n".
     scalar( @total_ann_unpaired ).
       " from annotation, ( $total_ann_unpaired_from_unclustered from unclustered genes)\n". 
@@ -1526,8 +1551,14 @@ sub _match_Exons{
   my $match_stats       = [ $exon_pair_count    , $exact_matches          ];
   my $matchlength_stats = [ $prediction_matched, $annotation_length, $prediction_length ];
 
+  my $identical_pair = 0;
+  if (scalar(@ann_exons) == scalar(@pred_exons) && scalar(@ann_exons) == $exact_matches){
+    $identical_pair = 1;
+  }
+
   # we return printout{ pair }{ exon_number } = [ exon/no link, exon/no link, extra comments ]
-  return ( $printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats , $matchlength_stats);
+  return 
+    ( $printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats , $matchlength_stats, $identical_pair);
 }
 
 ####################################################################################

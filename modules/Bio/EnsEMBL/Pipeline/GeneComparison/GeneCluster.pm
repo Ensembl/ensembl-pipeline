@@ -12,7 +12,15 @@ comparison criteria external to this class (for instance, in the
 methods compare and _compare_Genes methods of the class GeneComparison).
 Each GeneCluster object holds the IDs of the genes clustered and the beginning and end coordinates
 of each one (taken from the start and end coordinates of the first and last exon in the correspondig
-get_all_Exons array)
+get_all_Exons array). Before putting genes into each cluster, two arrayref with gene types must be set:
+
+my $cluster = new Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
+$cluster->gene_Types($arrayref1, $arrayref2);
+
+where, for instance:
+$arrayref1 = ['Known','Novel'];
+$arrayref2 = ['ensembl'];
+
 
 =head1 CONTACT
 
@@ -112,15 +120,16 @@ sub put_Genes {
 sub get_Genes {
   my $self = shift @_;
   my @genes;
-  if ( !defined( $self->{'_benchmark_genes'} ) && !defined( $self->{'_prediction_genes'} ) ){
-    $self->warn("The gene array you try to retrieve is empty");
-    @genes = ();
-  }
   if ( $self->{'_benchmark_genes'} ){
     push( @genes, @{ $self->{'_benchmark_genes'} } );
   }
   if ( $self->{'_prediction_genes'} ){
     push( @genes, @{ $self->{'_prediction_genes'} } );
+  }
+  if ( !defined( $self->{'_benchmark_genes'} ) && !defined( $self->{'_prediction_genes'} ) ){
+    $self->warn("The gene array you try to retrieve is empty");
+    print STDERR "cluster ref: $self\n";
+    @genes = ();
   }
   return @genes;
 }
@@ -248,11 +257,11 @@ sub pair_Transcripts {
   my (@ann_transcripts,@pred_transcripts);
   my (@ann_trans,@pred_trans);
   foreach my $gene ( @$pred_genes ){
-    print STDERR "gene ".$gene->type." put in pred_trans array\n";
+    #print STDERR "gene ".$gene->type." put in pred_trans array\n";
     push( @pred_trans, $gene->each_Transcript );
   }
   foreach my $gene ( @$ann_genes ){
-    print STDERR "gene ".$gene->type." put in ann_trans array\n";
+    #print STDERR "gene ".$gene->type." put in ann_trans array\n";
     push( @ann_trans, $gene->each_Transcript );
   }
   
@@ -301,6 +310,9 @@ sub pair_Transcripts {
       #.$$overlap_matrix{ $tran1 }{ $tran2 }."\n";
     }
   }
+  # @overlap_pairs contains an array of lists
+  # each list contains: ( number_of_exon_overlaps, prediction, annotation, length_of_overlap )
+  
   if ( @overlap_pairs ){
     # sort the list of @overlap_pairs on the overlap
     my @sorted_pairs = sort { my $result = ( $$b[0] <=> $$a[0] );
@@ -728,14 +740,15 @@ sub start{
   my @genes = $self->get_Genes;
   my $start;
   foreach my $gene ( @genes ) {
-    my @exons = $gene->get_all_Exons;
-    @exons = sort { $a->start <=> $b->start } @exons;
-    my $this_start = $exons[0]->start;
-    unless ( $start ){
-      $start = $this_start;
-    }
-    if ( $this_start < $start ){
-      $start = $this_start;
+    foreach my $tran ( $gene->each_Transcript ){
+      foreach my $exon ( $tran->get_all_Exons ){
+	unless ($start){
+	  $start = $exon->start;
+	}
+	if ( $exon->start < $start ){
+	  $start = $exon->start;
+	}
+      }
     }
   }
   return $start;
@@ -749,16 +762,15 @@ sub end{
   my @genes = $self->get_Genes;
   my $end;
   foreach my $gene ( @genes ) {
-    my @exons = $gene->get_all_Exons;
-    @exons = sort { $b->end <=> $a->end } @exons;
-    
-    # this is the largest end of all exons
-    my $this_end = $exons[0]->end;
-    unless ( $end ){
-      $end = $this_end;
-    }
-    if ( $this_end > $end ){
-      $end = $this_end;
+    foreach my $tran ( $gene->each_Transcript ){
+      foreach my $exon ( $tran->get_all_Exons ){
+	unless ($end){
+	  $end = $exon->end;
+	}
+	if ( $exon->end > $end ){
+	  $end = $exon->end;
+	}
+      }
     }
   }
   return $end;
