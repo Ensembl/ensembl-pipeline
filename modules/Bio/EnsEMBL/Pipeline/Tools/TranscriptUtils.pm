@@ -56,13 +56,14 @@ use Bio::EnsEMBL::DBSQL::SliceAdaptor;
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
+# note - intron lengths now checked separately using _check_introns
+
 sub _check_Transcript{
     my ($self,$transcript, $slice) = @_;
     
     # hardcoded stuff, to go in a config file
     my $MAX_EXON_LENGTH   = 20000;
     my $UNWANTED_EVIDENCE = "NG_";
-    my $MAX_INTRON_LENGTH = 200000;
     
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
@@ -128,27 +129,6 @@ sub _check_Transcript{
 		}
 	    
 
-	    
-		##############################
-		# check intron length
-		##############################
-		if ( $strand == 1 ){
-		    my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
-		elsif( $strand == -1 ){
-		    my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
-		    if ( $intron_length > $MAX_INTRON_LENGTH ){
-			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
-			$valid = 0;
-			last EXON;
-		    }
-		}
-		
 		##############################
 		# check for folded transcripts
 		##############################
@@ -196,6 +176,80 @@ sub _check_Transcript{
     }
     return $valid;
 }
+
+# parameter slice is optional. It makes sense to use it when working on fixed length slices.
+# If it is not used, the method can still be used to check consistency of the transcript
+# although always on chromosomal/slice coordinates, never in rawcontig coordinates.
+
+sub _check_introns{
+    my ($self,$transcript, $slice) = @_;
+    
+    # hardcoded stuff, to go in a config file
+    my $MAX_INTRON_LENGTH = 200000;
+    
+    my $id = $self->transcript_id( $transcript );
+    my $valid = 1;
+    
+    my $strand =  $transcript->start_Exon->strand;
+
+    $transcript->sort;
+    
+    ############################################################
+    # check that transcripts are not completely outside the slice
+    # allow transcripts that fall partially off the slice only at 
+    # one end, the 'higher' end of the slice
+    ############################################################
+    if ( $slice ){
+	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
+	    print STDERR "transcript $id outside the slice\n";
+	    $valid = 0;
+	}
+	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+	    print STDERR "transcript $id falls off the slice by its lower end\n";
+	    $valid = 0;
+	}
+    }
+    
+
+    my @exons = @{$transcript->get_all_Exons};
+
+    if(scalar(@exons) == 0)   {
+      print STDERR "transcript with no exons\n";
+      $valid = 0;
+    }
+    elsif (scalar(@exons) > 1 ) {
+      
+    EXON:
+      for (my $i = 0; $i <= $#exons; $i++) {
+	
+	##############################
+	# check intron length
+	##############################
+	if ( $strand == 1 ){
+	  my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
+	  if ( $intron_length > $MAX_INTRON_LENGTH ){
+	    print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+	    $valid = 0;
+	    last EXON;
+	  }
+	}
+	elsif( $strand == -1 ){
+	  my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
+	  if ( $intron_length > $MAX_INTRON_LENGTH ){
+	    print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
+	    $valid = 0;
+	    last EXON;
+	  }
+	}
+      }
+    }
+      
+    if ($valid == 0 ){
+      $self->_print_Transcript($transcript);
+    }
+    return $valid;
+  }
+
 
 ############################################################
 
@@ -1079,7 +1133,7 @@ sub set_stop_codon{
 	return $transcript;
       }
       else{
-	print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
+	print STDERR "1. next codon is not a stop ($next_codon) - not modifying translation\n" if $verbose;
 	return $transcript;
       }
     }
@@ -1122,7 +1176,7 @@ sub set_stop_codon{
 	return $transcript;
       }
       else{
-	print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
+	print STDERR "2. next codon is not a stop ($next_codon) - not modifying translation\n" if $verbose;
 	return $transcript;
       }
     }    
@@ -1149,13 +1203,13 @@ sub set_stop_codon{
 	# here we distinguish the strands
 	if ( $end_exon->strand == 1 ){
 	  my $slice_start = $end_exon->contig->chr_start;
-
 	  ############################################################
 	  # calculate the next codon start/end in chr coordinates 
 	  my $codon_start = $slice_start + ( $end_exon->start + $end - 1 ) - 1;
 	  my $codon_end   = $codon_start + 2;
 	  my $codon_slice = $adaptor
 	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
+
 	  my $codon = $codon_slice->seq;
 	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
 	    print STDERR "next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
@@ -1164,7 +1218,7 @@ sub set_stop_codon{
 	    return $transcript;
 	  }
 	  else{
-	    print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
+	    print STDERR "3. next codon (falling off the exon) ($codon) is not a stop - not modifying\n" if $verbose;
 	    return $transcript;
 	  }
 	}
@@ -1189,7 +1243,7 @@ sub set_stop_codon{
 	    return $transcript;
 	  }
 	  else{
-	    print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
+	    print STDERR "4. next codon (falling off the exon) is not a stop ($codon) - not modifying\n" if $verbose;
 	    return $transcript;
 	  }
 	}
@@ -1262,6 +1316,22 @@ sub get_previous_Exon{
 }
   
 
+# calculates and returns ORF length as a percnetage of total transcript length
+sub _get_ORF_coverage {
 
+  my ($self, $transcript) = @_;
+  my $orf_coverage;
+  my $transcript_length = $transcript->length;
+#print STDERR "transcript length: $transcript_length\n";
+
+
+  my $translateable = $transcript->translateable_seq;
+  my $translateable_length = length($translateable);
+#print STDERR "translateable length: $translateable_length\n";
+  $orf_coverage = 100 * ($translateable_length/$transcript_length);
+  print STDERR "orf coverage: $orf_coverage\n";
+  return $orf_coverage;
+
+}
 
 1;
