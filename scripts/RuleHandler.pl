@@ -201,7 +201,7 @@ sub delete_rule {
 =cut
 sub show_analyses {
 
-  my @analyses = $anaAdaptor->fetch_all();
+  my @analyses = @{$anaAdaptor->fetch_all()};
   scalar(@analyses) or die "There are no analyses in the database\n";
   foreach my $analysis(@analyses) {
     print 

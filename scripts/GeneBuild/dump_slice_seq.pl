@@ -36,13 +36,13 @@ use Getopt::Long;
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-my $dbname     = 'briggsae_intermediate_newschema';
+my $dbname     = '';
 my $dbuser     = 'ensro'; # always use read only
-my $dbhost     = 'ecs1c';
-my $dnadbname  = 'briggsae_intermediate_newschema';
+my $dbhost     = '';
+my $dnadbname  = '';
 my $dnadbuser  = 'ensro'; # always use ensro
-my $dnadbhost  = 'ecs1c';
-my $path       = 'briggsae_170602';
+my $dnadbhost  = '';
+my $path       = '';
 my $start;
 my $end;
 my $outfile    = 'out.fa';

@@ -1445,6 +1445,25 @@ sub get_previous_Exon{
 
   
 
+sub _get_ORF_coverage {
+
+  my ($self, $transcript) = @_;
+  my $orf_coverage;
+  my $transcript_length = $transcript->length;
+#print STDERR "transcript length: $transcript_length\n";
+
+
+  my $translateable = $transcript->translateable_seq;
+  my $translateable_length = length($translateable);
+#print STDERR "translateable length: $translateable_length\n";
+  $orf_coverage = 100 * ($translateable_length/$transcript_length);
+  print STDERR "orf coverage: $orf_coverage\n";
+  return $orf_coverage;
+
+}
+
+
+
 
 
 1;
