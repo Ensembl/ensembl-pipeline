@@ -15,7 +15,7 @@ use Bio::SeqIO;
 
 use Bio::EnsEMBL::Utils::PolyA;
 
-my ($mask, $softmask, $poly_a_clip, $clip_len, $min_length, $help);
+my ($mask, $softmask, $poly_a_clip, $clip_len, $min_length, $outfile, $help);
 
 &GetOptions( 
 	     'mask'         => \$mask,
@@ -23,18 +23,23 @@ my ($mask, $softmask, $poly_a_clip, $clip_len, $min_length, $help);
 	     'hardclip=s'   => \$clip_len,
 	     'polyaclip'    => \$poly_a_clip,
 	     'minlen=s'     => \$min_length,
+             'outfile=s'    => \$outfile,
 	     'help'         => \$help
 	   );
 
 
 &usage if $help;
 
+
+die "You must give the name of an output filw with -outfile\n" 
+    if not defined $outfile;
+
 $min_length = 100 if not defined $min_length;
 
 # fasta format
 
 my $seqout = new Bio::SeqIO( '-format' => "fasta",
-			     '-fh' => \*STDOUT );
+			     '-file' => ">$outfile" );
 
 my $polyA_clipper = Bio::EnsEMBL::Utils::PolyA->new();
 
@@ -101,15 +106,15 @@ foreach my $file (@ARGV) {
 
 
 sub usage {
-    print "Usage: clip_dnas.pl <-mask|-softmask> <-hardclip n> <-polyaclip> <-minlen n> file1.fa file2.fa ...\n\n";
-    print "Recommended settings:\n   clip_cdnas.pl -polyaclip -minlen 100 file1.fa file.fa...\n";
+    print "Usage: clip_dnas.pl -outfile out.fa <-mask|-softmask> <-hardclip n> <-polyaclip> <-minlen n> file1.fa file2.fa ...\n\n";
+    print "Recommended settings:\n   clip_cdnas.pl -outfile out.fa -polyaclip -minlen 100 file1.fa file.fa...\n";
     print "   (clips polyAs only, rejecting if result is less than 100 bp)\n";
     print "Other examples:\n";
-    print "To softmask polyA:\n   clip_cdnas.pl -softmask -polyaclip file1.fa file2.fa ...\n";
-    print "To hardmask polyA:\n   clip_cdnas.pl -mask -polyaclip file1.fa file2.fa ...\n";
-    print "To hard clip 20bp from each end:\n   clip_cdnas.pl -hardclip 20 file1.fa file2.fa ...\n";
-    print "Hard clip 20bp followed by polyA clip:\n   clip_cdnas.pl -hardclip 20 -polyA file1.fa file2.fa ...\n";
-    print "To reject entries < 60bp after clipping:\n   clip_cdnas.pl -hardclip 20 -polyA -minlen 60 file1.fa file2.fa ...\n";
-    print "To do nothing(!):\n   clip_cdnas.pl file1.fa file2.fa ...\n";
+    print "To softmask polyA:\n   clip_cdnas.pl -outfile out.fa -softmask -polyaclip file1.fa file2.fa ...\n";
+    print "To hardmask polyA:\n   clip_cdnas.pl -outfile out.fa -mask -polyaclip file1.fa file2.fa ...\n";
+    print "To hard clip 20bp from each end:\n   clip_cdnas.pl -outfile out.fa -hardclip 20 file1.fa file2.fa ...\n";
+    print "Hard clip 20bp followed by polyA clip:\n   clip_cdnas.pl -outfile out.fa -hardclip 20 -polyA file1.fa file2.fa ...\n";
+    print "To reject entries < 60bp after clipping:\n   clip_cdnas.pl -outfile out.fa -hardclip 20 -polyA -minlen 60 file1.fa file2.fa ...\n";
+    print "To do nothing(!):\n   clip_cdnas.pl -outfile out.fa file1.fa file2.fa ...\n";
     exit(0);
 }
