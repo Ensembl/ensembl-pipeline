@@ -109,8 +109,8 @@ sub runnable {
     my ($self) = @_;
     
     if (!defined($self->{'_runnable'})) {
-	print STDERR "CLONE: ".$self->genseq."\n";
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-clone     => $self->genseq,
+	print STDERR "QUERY: ".$self->genseq."\n";
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-query     => $self->genseq,
 									-analysis  => $self->analysis	);
  
            

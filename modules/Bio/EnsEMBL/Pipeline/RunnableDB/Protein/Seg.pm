@@ -199,7 +199,7 @@ sub runnable {
     
     if (!defined($self->{'_runnable'})) {
 	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-clone     => $self->genseq,
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-query     => $self->genseq,
 									  -analysis  => $self->analysis	);
 	
 	
