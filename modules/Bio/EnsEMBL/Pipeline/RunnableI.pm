@@ -189,6 +189,10 @@ sub workdir {
         $self->throw ("$directory doesn't exist\n") unless (-d $directory);
         $self->{_workdir} = $directory;
     }
+	elsif ($::pipeConf{'workdir'})
+	{
+		$self->{_workdir}= $::pipeConf{'workdir'};
+	}
     return $self->{_workdir};
   }
 
