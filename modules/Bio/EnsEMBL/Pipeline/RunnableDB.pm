@@ -308,6 +308,18 @@ sub vc {
 
 }
 
+
+sub vcontig{
+  my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'_vc'} = $value;
+    }
+    return $obj->{'_vc'};
+}
+ 
+
+
 =head2 write_output
 
     Title   :   write_output
