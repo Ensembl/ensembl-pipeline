@@ -3,6 +3,7 @@
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
 # Copyright Michele Clamp
+# Last modified by SCP 15/06/2001
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -16,28 +17,31 @@ Importer
 
 =head1 SYNOPSIS
 
-  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj('-host' => $host,
-                                                     '-dbname' => $dbname,
-                                                     '-user'   => 'ensadmin');
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(
+      '-host'   => $host,
+      '-dbname' => $dbname,
+      '-user'   => 'ensadmin'
+  );
 
   my $mirror_dir = '/nfs/disk100/humpub/th/unfinished_ana/';
 
-  my $importer   = new Importer(-dbobj      => $dbobj,
-                                -mirror_dir => $mirror_dir);
+  my $importer   = new Importer(
+      '-dbobj'      => $dbobj,
+      '-mirror_dir' => $mirror_dir
+  );
 
-  $importer->files(['xxx.gz', 'yyy.gz']);
+  $importer->retain_old_versions(1);
   $importer->importClones;
 
 =head1 DESCRIPTION
 
-Reads sequences from files in a directory, makes them into clone
-objects and writes them into the database.  Before writing it detects
-whether the database already has the sequence and deletes it if it is
-a previous version.  If the sequence being written is the same or a
-previous version to that in the database a warning is printed and the
+Reads sequences from files in a directory, makes them into clone objects
+and writes them into the database. Before writing it looks to see what
+previous versions of that clone exist. If it is a previous version and
+the option retain_old_versions is set, it will keep the existing version,
+otherwise it will delete it. If the sequence being written is the same or
+a previous version to that in the database a warning is printed and the
 sequence isn't written.
-
-Previous versions of clones my be retained with retain_old_versions()
 
 =head1 CONTACT
 
@@ -50,6 +54,7 @@ Internal methods are usually preceded with a _
 
 =cut
 #' # make emacs happy
+
 
 package Bio::EnsEMBL::Pipeline::Importer;
 
@@ -71,9 +76,11 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 =head2 new
 
     Title   :   new
-    Usage   :   my $importer   = new Importer('-dbobj'      => $dbobj,
-                                              '-mirror_dir' => $mirror_dir,
-                                              '-species'    => $species);
+    Usage   :   my $importer   = new Importer(
+		    '-dbobj'      => $dbobj,
+                    '-mirror_dir' => $mirror_dir,
+                    '-species'    => $species
+		);
     Function:   Initializes module
     Returns :   
     Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,
@@ -120,6 +127,7 @@ sub importClones {
   my ($self) = @_;
 
   my @files;
+  # import from a specific list of files
   if (defined $self->files) {
     my $tmp = $self->files;
     foreach my $file (@{$tmp}) {
@@ -131,7 +139,7 @@ sub importClones {
       }
     }
     $self->throw("Couldn't find any of the specified files") 
-	unless scalar @files > 0;
+     unless scalar @files > 0;
   }
   else {
     @files = $self->getNewFiles;
@@ -139,35 +147,34 @@ sub importClones {
   my $logfile = $self->logfile;
 
   open(LOG,">>$logfile") || $self->throw("Can't write to logfile $logfile");
+  autoflush LOG;
 
-  $self->readChromosomes;
+  # $self->readChromosomes;
 
- FILE: foreach my $file (@files) {
-      next FILE if ($file =~ /_cc/); 
+  FILE: foreach my $file (@files) {
+    next FILE if ($file =~ /_cc/); 
 
-      $self->{'_clones'} = [];
-      $self->{'_clonehash'} = {};
+    $self->{'_clones'} = [];
+    $self->{'_clonehash'} = {};
 
-      eval {
-	my $clones = $self->readFile($file);
+    eval {
+      my $clones = $self->readFile($file);
 	
-	my @keys = keys(%$clones);
+      my @keys = keys(%$clones);
 
-	print ("\nNumber of clones is " . scalar(@keys) . "\n");
+      print ("\nNumber of clones is " . scalar(@keys) . "\n");
 	
-	$self->makeClones     ($clones);
-	$self->checkClones    ($clones);
-	$self->writeClones    ($clones);
-
-      };
-      if ($@) {
-	$self->warn("ERROR: Error reading file  $file [$@]\n");
-      } else {
-	print LOG $file . "\n";
-      }
+      $self->makeClones     ($clones);
+      $self->checkClones    ($clones);
+      $self->writeClones    ($clones);
+    };
+    if ($@) {
+      $self->warn("ERROR: Error reading file  $file [$@]\n");
+    } else {
+      print LOG $file . "\n";
+    }
   }
   close (LOG);
-
 }
 
 sub checkClones {
@@ -189,7 +196,7 @@ sub checkClones {
 	$ok = 0;
       }
 
-      my $file = $self->{'_clonehash'}{$clone->id}{file};
+      my $file = $self->{'_clonehash'}{$clone->id}{'file'};
       
       if (!defined($clone->htg_phase)) {
 	$self->warn("ERROR: Clone " . $clone->id . " in file $file has no htg_phase");
@@ -244,13 +251,11 @@ sub checkClones {
 
     if ($ok == 1) {
       my $oldclone;
-
       eval {
 	$oldclone = $self->dbobj->get_Clone($clone->id);
       };
 
       if ($@) {
-
 	if ($clone->htg_phase == 0) {
 	  $self->warn("PHASE: Ignoring phase 0 clone " . $clone->id . "\n");
 	} else {
@@ -263,7 +268,7 @@ sub checkClones {
 	  if ($oldversion > $clone->embl_version) {
 	    $self->warn("ERROR : Inconsistent clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version);
 	  }elsif ($oldversion == $clone->embl_version) {
-	    $self->warn("ERROR : Identical clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version. " in file " . $self->{'_clonehash'}{$clone->id}{file} . "\n");
+	    $self->warn("ERROR : Identical clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version. " in file " . $self->{'_clonehash'}{$clone->id}{'file'} . "\n");
 	  } else {
             if ($self->retain_old_versions) {
 	      print STDERR "Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "; keeping old version\n";
@@ -400,6 +405,16 @@ sub readFile {
   my $finished = 0;
   my $ccfile;
   my ($spec,$ftype);
+  my (%idlist);
+
+  if (defined $self->ids) {
+    my $file = $self->ids;
+    open FILE, "< $file";
+    while (<FILE>) {
+      chomp;
+      $idlist{$_} = 1;
+    }
+  }
 
   $self->throw("Need to specify species: mm or hs")
    unless ($self->species eq 'mm' || $self->species eq 'hs');
@@ -431,8 +446,9 @@ sub readFile {
 			     -format => 'fasta');
   
   while (my $fasta = $seqio->next_seq) {
-    printf STDERR  "Sequence %20s %s\n", $fasta->id,$fasta->desc;
     my $id = $fasta->id;
+    next if defined $self->ids && (!defined $idlist{$id});
+    printf STDERR  "Sequence %20s %s\n", $id, $fasta->desc;
     if ($finished && $fasta->desc =~ /HTGS_PHASE/) {
       $self->warn("Found unfinished sequence amongst allegedly finished sequence; skipping "
       . $fasta->desc);
@@ -440,22 +456,21 @@ sub readFile {
     }
     $id =~ s/\.(.*)//;
     
-    $clonehash->{$id}{seq}     = $fasta;
-    $clonehash->{$id}{version} = $1;
-    $clonehash->{$id}{file}    = $file;
-    my $accver = "$id." . $clonehash->{$id}{version};
-    $clonehash->{$id}{chr}     = $self->{'_chromosome'}{$accver}
-     if (defined $self->{'_chromosome'}{$accver});
+    $clonehash->{$id}{'seq'}     = $fasta;
+    $clonehash->{$id}{'version'} = $1;
+    $clonehash->{$id}{'file'}    = $file;
+    my $accver = "$id." . $clonehash->{$id}{'version'};
+    # $clonehash->{$id}{chr}     = $self->{'_chromosome'}{$accver}
+    #  if (defined $self->{'_chromosome'}{$accver});
     
     my $desc = $fasta->desc;
-    # my ($id,$type,$phase) = split(' ',$desc);
     my ($tmp,$type,$phase) = split(' ',$desc);
-    $clonehash->{$id}{id} = $id;
+    $clonehash->{$id}{'id'} = $id;
     if ($type eq $ftype) {
-      $clonehash->{$id}{phase} = 4;
+      $clonehash->{$id}{'phase'} = 4;
     } else {
       $phase =~ s/HTGS_PHASE//;
-      $clonehash->{$id}{phase} = $phase;
+      $clonehash->{$id}{'phase'} = $phase;
     }
   }
   
@@ -469,11 +484,9 @@ sub readFile {
       if ($_ =~ /^SV\s+(.*)\.(.*)/) {
 	$accession = $1;
       
-	$clonehash->{$1}{version} = $2;
-	$clonehash->{$1}{contigs} = [];
+	$clonehash->{$accession}{'version'} = $2;
+	$clonehash->{$accession}{'contigs'} = [];
       } elsif ($_ =~ /(\d+)\s+(\d+):? contig of/) {
-	  # disclaimer: this re (^^) should work, but not guaranteed, e.g.
-	  # needed ? after : because of file format "inconsistencies"... arrgh!      
       
         push(@{$clonehash->{$accession}{'contigs'}},{ 'start' => $1, 
 						      'end'   => $2});
@@ -543,18 +556,18 @@ sub makeClones {
   
   foreach my $acc (@acc) {
     
-    if (defined($clones->{$acc}{seq})) {
+    if (defined($clones->{$acc}{'seq'})) {
       print "\nProcessing $acc\n\n";
       
       my $clone     = new Bio::EnsEMBL::PerlDB::Clone;      
       
       $self->clones($clone);
 
-      my $seq   = $clones->{$acc}{seq};
-      my $ver   = $clones->{$acc}{version};
-      my $id    = $clones->{$acc}{id};
-      my $chr   = $clones->{$acc}{chr};
-      my $phase = $clones->{$acc}{phase};
+      my $seq   = $clones->{$acc}{'seq'};
+      my $ver   = $clones->{$acc}{'version'};
+      my $id    = $clones->{$acc}{'id'};
+      my $chr   = $clones->{$acc}{'chr'};
+      my $phase = $clones->{$acc}{'phase'};
 
       $clone->htg_phase   ($phase);
       $clone->id          ($acc);
@@ -562,14 +575,14 @@ sub makeClones {
       $clone->embl_id     ($id);
       $clone->version     (1);
 
-      printf (STDERR "\tFound %10s seq\n",    $clones->{$acc}{seq}->length);
-      printf (STDERR "\tFound %10s version\n",$clones->{$acc}{version});
-      printf (STDERR "\tFound %10s id\n",     $clones->{$acc}{id});
-      printf (STDERR "\tFound %10s chr\n",    $clones->{$acc}{chr});
-      printf (STDERR "\tFound %10s phase\n",  $clones->{$acc}{phase});
+      printf (STDERR "\tFound %10s seq\n",    $clones->{$acc}{'seq'}->length);
+      printf (STDERR "\tFound %10s version\n",$clones->{$acc}{'version'});
+      printf (STDERR "\tFound %10s id\n",     $clones->{$acc}{'id'});
+      printf (STDERR "\tFound %10s chr\n",    $clones->{$acc}{'chr'});
+      printf (STDERR "\tFound %10s phase\n",  $clones->{$acc}{'phase'});
       
       if ($phase != 4) {
-	my @contigs = @{$clones->{$acc}{contigs}};
+	my @contigs = @{$clones->{$acc}{'contigs'}};
 
 	# if we haven't got a list of clones by reading the cc file
 	# need to divide clone into contigs the dirty way ...
@@ -587,12 +600,12 @@ sub makeClones {
 	print STDERR "\nContigs : " . scalar(@contigs) . "\n";
 	foreach my $contig (@contigs) {
 
-	  my $seqstr    = $seq->subseq($contig->{start},$contig->{end});
-	  my $offset    = $contig->{start};
+	  my $seqstr    = $seq->subseq($contig->{'start'},$contig->{'end'});
+	  my $offset    = $contig->{'start'};
 	  
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  my $contigid  = "$acc.$ver.$offset." . $contig->{end};
+	  my $contigid  = "$acc.$ver.$offset." . $contig->{'end'};
 	  
 	  $newcontig->id          ($contigid);
 	  $newcontig->seq         (new Bio::Seq(-id => $id, -seq =>$seqstr));    
@@ -600,7 +613,7 @@ sub makeClones {
 	  $newcontig->version     (1);
 	  $newcontig->embl_version($ver);
 	  $newcontig->embl_order  ($count);
-	  $newcontig->chromosome  ($chr);
+	  # $newcontig->chromosome  ($chr);
 
 #	  print (STDERR "\tContig " . $newcontig->id . "\t : " . $newcontig->embl_offset . "\t" . ($newcontig->offset+$newcontig->length-1) . "\n");
 	  
@@ -608,17 +621,16 @@ sub makeClones {
 	  $count++;
 	}
       } else {
-	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
-	  
-	  my $contigid  = "$acc.$ver.1" . $seq->length;
+	  my $newcontig = new Bio::EnsEMBL::PerlDB::Contig;
 
+	  my $contigid  = "$acc.$ver.1." . $seq->length;
 
 	  $newcontig->id          ($contigid);
 	  $newcontig->seq         ($seq);    
 	  $newcontig->embl_offset (1);
 	  $newcontig->version     ($ver);
 	  $newcontig->embl_version($ver);
-	  $newcontig->chromosome  ($chr);
+	  # $newcontig->chromosome  ($chr);
 	  $newcontig->embl_order  (1);
 
 #	  print (STDERR "\tContig " .$newcontig->id . "\t : " . $newcontig->embl_offset . "\t" . ($newcontig->offset+$newcontig->length-1) . "\n");
@@ -830,6 +842,25 @@ sub files {
     $self->{'_files'} = $files;
   }
   return $self->{'_files'};
+}
+
+=head2 ids
+
+    Title   :   ids
+    Usage   :   $obj->ids('ids.txt')
+    Function:   Get/set for a specific list of ids
+    Returns :   filename
+    Args    :   filename
+
+=cut
+
+sub ids {
+  my($self, $ids) = @_;
+
+  if (defined $ids) {
+    $self->{'_ids'} = $ids;
+  }
+  return $self->{'_ids'};
 }
 
 1;
