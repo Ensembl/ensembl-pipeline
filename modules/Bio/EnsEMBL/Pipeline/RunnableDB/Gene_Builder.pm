@@ -100,10 +100,10 @@ sub new {
        
     if (! defined $vcontig) {
        $vcontig = $::genebuild_conf{'vcontig'};
-    } 
-    else {
-       $self->vcontig($vcontig);
-    }
+     }  
+    
+    $self->vcontig($vcontig);
+    
     $self->extend($extend);
 
     # golden path
