@@ -47,6 +47,11 @@ use strict;
 use Bio::Root::RootI;
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::Index::Fasta;
+use Bio::Index::EMBL;
+use Bio::Index::SwissPfam;
+
+
 
 use vars qw(@ISA);
 
@@ -123,6 +128,47 @@ sub getz {
   
 }
 
+=head2 bp_index
+
+    Title   :   bp_index
+    Usage   :   $self->bp_index('/usr/local/ensembl/data/bp.inx')
+    Function:   Get/set for a bioperl index
+    Returns :   path to bioperl index
+    Args    :   path to bioperl index
+
+=cut
+
+sub bp_index {
+  
+  my ($self, $inx) = @_;
+  if ($inx)
+    {
+      $self->{'_inx'} = $inx;
+    }
+  return $self->{'_inx'};  
+  
+}
+
+=head2 bp_format
+
+    Title   :   bp_format
+    Usage   :   $self->bp_format('Fasta')
+    Function:   Get/set for a bioperl index format
+    Returns :   String representing format
+    Args    :   String representing format
+
+=cut
+
+sub bp_format {
+  
+  my ($self, $format) = @_;
+  if ($format)
+    {
+      $self->{'_format'} = $format;
+    }
+  return $self->{'_format'};  
+  
+}
 
 =head2 run_pfetch
 
@@ -294,5 +340,59 @@ sub parse_header {
     print STDERR "newid: $newid\n";
 
     return $newid;
+}
+
+=head2 run_bp_search
+
+    Title   :   run_bp_search
+    Usage   :   $self->run_bp_search($id,$inx,$format)
+    Function:   Retrieves a sequence from the specified Bioperl index
+    Returns :   Bio::Seq, or undef
+    Args    :   id of sequence to be retrieved, string representing path to bioperl index,
+                string representing index format
+
+=cut
+
+sub run_bp_search {
+
+  my ($self,$id,$inx,$format) = @_;
+  my $seq;
+  my $index;
+
+  if (!defined($id)) {
+    $self->throw("No id input to run_bp_search");
+  }
+  
+  if (!defined($inx)){
+    $inx = $self->bp_index;
+    if (!defined($inx)) {
+      $self->throw("Cannot run_bp_search without an indexfile");
+    }
+  }
+
+  if (!defined($format)){
+    $format = $self->bp_format;
+    if (!defined($format) || ($format ne 'Fasta' && $format ne 'EMBL' && $format ne 'SwissPfam')) {
+      $self->throw("Cannot run_bp_search without a valid format: Fasta, EMBL or SwissPfam");
+    }
+  }
+  
+  my $type = 'Bio::Index::' . $format;
+  eval {
+    $index = $type->new($inx);
+  };
+
+  if ($@) {
+    my $tmp = $@; # for some reason, warn empties out $@ ...
+    $self->warn("Problem opening the index [$inx] - check you have supplied the right format!");
+    $self->throw ("[$tmp]!");
+  }
+  
+  # get the sequence
+  $seq = $index->fetch($id); # Returns Bio::Seq object
+
+  $self->warn("Problem with run_bp_search for [$id]") unless defined $seq;
+  
+  return $seq;
 }
 
