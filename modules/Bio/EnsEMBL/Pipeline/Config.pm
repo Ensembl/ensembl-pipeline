@@ -261,7 +261,7 @@ sub _parse_files {
       }
 
       # key=value
-      if (/^(\S+)\s*=\s*(\S+)/) {   # $1 = key, $2 = value
+      if (/^(\S+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
 
 	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
 	my $value = $2;
