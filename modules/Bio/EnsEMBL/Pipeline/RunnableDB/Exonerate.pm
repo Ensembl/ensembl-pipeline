@@ -82,8 +82,6 @@ sub new {
   $self->dbobj($dbobj);
 
   $self->throw("Analysis object required") unless ($analysis);
-  $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-    unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
   $self->analysis($analysis);
   
   $self->throw("No input id input") 
@@ -112,7 +110,7 @@ sub fetch_input {
   my $contig    = $self->dbobj->get_Contig($contigid);
   #   my $genseq   = $contig->primary_seq;
   my $genseq = $contig->get_repeatmasked_seq();
-  my @features = $contig->get_all_SimilarityFeatures;
+#  my @features = $contig->get_all_SimilarityFeatures;
   $self->{_genseq} = $genseq;
   
   # set up sequence arrays
@@ -173,13 +171,13 @@ sub run {
   $self->runnable->run();
 
   # sort out predicted genes
-  $self->convert_output();
+  $self->_convert_output();
 }
 
-=head2 convert_output
+=head2 _convert_output
 
-    Title   :   convert_output
-    Usage   :   $self->convert_output
+    Title   :   _convert_output
+    Usage   :   $self->_convert_output
     Function:   converts exons found by exonerate into Bio::EnsEMBL::Gene 
                 ready to be stored in the database
     Returns :   Nothing, but  $self->{_output} contains the Gene objects
@@ -190,7 +188,7 @@ sub run {
 # not presently doing anything with gene, intron & splice site features. Quite possibly 
 # we ought to ...
 
-sub convert_output {
+sub _convert_output {
   
   my ($self) = @_;
   my $count  = 1;
@@ -437,8 +435,8 @@ sub _make_gene {
 
     Title   :   _get_ests
     Usage   :   $self->_get_ests(@features)
-    Function:   Screens FeaturePairs in @features for vert EST blast hits, retrieves sequences and
-                makes them into an array of Bio::Seq
+    Function:   Screens FeaturePairs in @features for vert EST blast hits, retrieves 
+                and validates sequences and makes them into an array of Bio::Seq
     Returns :   Array of Bio::EnsEMBL::Seq
     Args    :   None
 
@@ -472,7 +470,12 @@ sub _get_ests {
     }
   my @seq = $self->_get_Sequences(@mrnafeatures);
 
+  # validate sequences
+  #  my @valid_seq   = $self->_validate_sequence(@seq);
+  
+  #  return @valid_seq;
   return @seq;
+
 }
 
 =head2 _get_Sequences
@@ -615,6 +618,58 @@ sub _get_Sequence {
   
   return $seq;
   
+}
+
+=head2 _validate_sequence
+
+    Title   :   _validate_sequence
+    Usage   :   $self->_validate_sequence(@seq)
+    Function:   Takes an array of Seq or PrimarySeq objects and 
+                returns valid ones, removing invalid characters 
+                for nucleic acid sequences and rejecting sequences 
+                that are not nucleic acid
+    Returns :   Array of Bio::Seq
+    Args    :   Array of Bio::Seq
+
+=cut
+
+sub _validate_sequence {
+  my ($self, @seq) = @_;
+  my @validated;
+  foreach my $seq (@seq)
+    {
+      print STDERR ("$seq is not a Bio::PrimarySeq or Bio::Seq\n") 
+	unless ($seq->isa("Bio::PrimarySeq") ||
+		$seq->isa("Bio::Seq"));
+      my $sequence = $seq->seq;
+      if ($sequence !~ /[^acgtn]/i)
+        {
+	  push (@validated, $seq);
+        }
+      else 
+        {
+	  $_ = $sequence;
+	  my $len = length ($_);
+	  my $invalidCharCount = tr/mrwsykvhdbxMRWSYKVHDBX/n/;
+	  #extract invalid characters
+	  $sequence =~ s/[ACGTN]//ig;
+	  if ($invalidCharCount / $len > 0.05)
+            {
+	      $self->warn("Ignoring ".$seq->display_id()
+			  ." contains more than 5% ($invalidCharCount) "
+			  ."odd nucleotide codes ($sequence)\n Type returns "
+			  .$seq->moltype().")\n");
+            }
+	  else
+            {
+	      $self->warn ("Cleaned up ".$seq->display_id
+			   ." for blast : $invalidCharCount invalid chars ($sequence)\n");
+	      $seq->seq($_);
+	      push (@validated, $seq);
+            }
+        }
+    } 
+  return @validated;  
 }
 
 
