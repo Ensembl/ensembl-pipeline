@@ -151,7 +151,7 @@ sub score_Transcripts{
   my $cluster_count = 0;
   CLUSTER:
   foreach my $cluster ( @clusters ){
-
+    
     $cluster_count++;
     my $label;
     
@@ -165,22 +165,55 @@ sub score_Transcripts{
     
     if (scalar(@trans)==1 ){
       print STDERR "1 transcript-> all exons get 100 as score\n" if $verbose;
+      my $tran_id;
       $label = '';
       if ( $self->_label ){
 	$label = $self->_label;
+	
+	$tran_id = $label."_".$cluster_count."_1";
+	print STDERR "transcript: $tran_id (single transcript)\n";
+	$trans[0]->stable_id($tran_id);
       }
-      my $tran_id = $label."_".$cluster_count."_1";
-      print STDERR "transcript: $tran_id (single transcript)\n";
-      $trans[0]->stable_id($tran_id);
-      
-      foreach my $exon ( @{$trans[0]->get_all_Exons} ){
+      else{
+	$tran_id = $cluster_count."_1";
+      }
+      my @exons = @{$trans[0]->get_all_Exons};
+      foreach my $exon ( @exons  ){
 	$exon->score( 100 );
       }
+      my @list = @{ $self->hold_list($trans[0]) };
+      print STDERR "SINGLE_TRAN\t".
+	$tran_id."\t".
+	  "exons:".scalar(@exons)."\t".
+	    "ests:".scalar(@list)."\t".
+	      "sites:0\t".
+		"covered:all\t".
+		  "score:100\t".
+		    "s-c:0\n";
+      
+      my $gene_id;
+      if ( $self->_label ){
+	my $gene_id = $label."_".$cluster_count;
+      }
+      else{
+	$gene_id = $cluster_count;
+      }
+      
+      print STDERR "GENE\t".
+	$gene_id."\t".
+	  "sites:0\t".
+	    "trans:1\t".
+	      "exon_clust:".scalar(@exons)."\t".
+		"2^N:0\t".
+		  "av_score:100\t".
+		    "av_missed_sites:0\n";
+      
+      
       next CLUSTER;
     }
     
     # my $exon_clusters_count; # counts howmany exon clusters are in this transcript clusters
-
+    
     my ($sites, $exon_clusters_count ) = $self->get_alternative_sites( $cluster );
     my $average_score = 0;
     my $average_missed_sites;
@@ -191,6 +224,7 @@ sub score_Transcripts{
     # contained in each transcript
     # and then calculate the distances between 
     # those sites and the lengths
+
     # of the list of ESTs making up the transcript
     # and compare them!
     my $tran_count = 0;
@@ -200,31 +234,36 @@ sub score_Transcripts{
       # invent a tran stable id with the slice id, cluster_id and a number
       $tran_count++;
       $label = '';
+      my $tran_id;
       if ( $self->_label ){
 	$label = $self->_label;
+      
+	$tran_id = $label."_".$cluster_count."_".$tran_count;
+	$tran->stable_id($tran_id);
+	print STDERR "transcript: $tran_id\n";
       }
-      my $tran_id = $label."_".$cluster_count."_".$tran_count;
-      $tran->stable_id($tran_id);
-      print STDERR "transcript: $tran_id\n";
+      else{
+	$tran_id = $cluster_count."_".$tran_count;
+      }
       # list of ESTs:
       my @list = @{ $self->hold_list($tran) };
       
       print STDERR "finding sites in transcript: " if $verbose;
-	if ($verbose ){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
+      if ($verbose ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $tran );
+      }
+      ############################################################
+      # which sites does this transcript have?
+      # $site is a SeqFeature with exons as sub_SeqFeatures 
+      my @these_sites;
+      foreach my $site ( @$sites ){
+	my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
+	if ( !( $site->start > $end) && !( $site->end < $start ) ){
+	  push( @these_sites, $site );
+	  $trans_with_site{$site}++;
 	}
-	############################################################
-	# which sites does this transcript have?
-	# $site is a SeqFeature with exons as sub_SeqFeatures 
-	my @these_sites;
-	foreach my $site ( @$sites ){
-	    my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
-	    if ( !( $site->start > $end) && !( $site->end < $start ) ){
-		push( @these_sites, $site );
-		$trans_with_site{$site}++;
-	    }
-	}
-	
+      }
+      
 	
 	############################################################
 	# @these_sites contains now all the sites
@@ -366,9 +405,9 @@ sub score_Transcripts{
     my $max_sites     = 2 ** $cluster_sites;
     $average_score   /= $trans_number;
     $average_missed_sites /= $trans_number;
-
+    
     my $gene_id = $label."_".$cluster_count;
-
+    
     print STDERR "GENE\t".
       $gene_id."\t".
 	"sites:".$cluster_sites."\t".
