@@ -426,5 +426,30 @@ sub _print_Gene{
   }
 }
 
+############################################################
+
+sub _clone_Gene{
+  my ($self,$gene) = @_;
+  
+  my $newgene = new Bio::EnsEMBL::Gene;
+  if ($gene->type){
+      $newgene->type( $gene->type);
+  }
+  if ( defined $gene->dbID ){
+      $newgene->dbID($gene->dbID);
+  }
+  if ( defined $gene->analysis ){
+      $newgene->analysis($gene->analysis);
+  }
+  foreach my $transcript (@{$gene->get_all_Transcripts}){
+    my $newtranscript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($transcript);
+    $newgene->add_Transcript($newtranscript);
+  }
+  return $newgene;
+}
+
+############################################################
+
+
 1;
 
