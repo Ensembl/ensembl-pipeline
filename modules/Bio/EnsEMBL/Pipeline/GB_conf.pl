@@ -25,6 +25,15 @@ package main;
 #	    'dbpass'      => 'ensembl',
 	    'dbpass'      => '',	  
 
+# db for writing final genes to - to get round table locks
+# this db needs to have clone & contig tables populated
+# later we will copy over dna, pruned features etc to hand over
+#	    'finaldbhost'    => 'ecs1f',
+	    'finaldbhost'    => '',
+
+#	    'finaldbname'    => 'final_genebuild',
+	    'finaldbname'    => '',
+
 #           'golden_path' => 'UCSC',
 	    'golden_path' => '',
 );
