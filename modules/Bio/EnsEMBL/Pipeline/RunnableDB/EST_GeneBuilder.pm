@@ -1,3 +1,4 @@
+
 # Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
 # Copyright GRL & EBI
@@ -113,7 +114,7 @@ sub new {
 						   -host             => $EST_DBHOST,
 						   -user             => $EST_DBUSER,
 						   -dbname           => $EST_DBNAME,
-						   -pass             => $EST_DBPASS,
+						    -pass             => $EST_DBPASS,
 						   );
     
     $est_db->dnadb($refdb);
@@ -250,8 +251,11 @@ sub fetch_input {
     my $genes;
     if ($EST_USE_DENORM_GENES){
       my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
+      print STDERR "getting denormalised genes from slice: ".
+	$slice->chr_name.".".$slice->chr_start."-".$slice->chr_end." with genetype $genetype\n";
       $genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
-    } else {
+    } 
+    else {
       $genes  = $slice->get_all_Genes_by_type($genetype);
     } 
     
@@ -319,7 +323,7 @@ sub fetch_input {
 
     my $revgenes;
     if ($EST_USE_DENORM_GENES){
-      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->db);
+      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
       $revgenes = $dga->get_genes_by_Slice_and_type($rev_slice, $genetype);
     } else {
       $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
@@ -415,29 +419,15 @@ sub _process_Transcripts {
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
 
-  my $merge_object2 
-    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
-      ->new(
-	    -transcripts      => \@merged_transcripts,
-	    -comparison_level => $EST_GENEBUILDER_COMPARISON_LEVEL,
-	    -splice_mismatch  => $EST_GENEBUILDER_SPLICE_MISMATCH,
-	    -intron_mismatch  => $EST_GENEBUILDER_INTRON_MISMATCH,
-	    -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
-	    -minimum_order    => $CLUSTERMERGE_MIN_EVIDENCE_NUMBER,
-	   );
-  
-  $merge_object2->run;
-  my @merged_transcripts2 = $merge_object2->output;
-
   # reject the single exon transcripts
   my @filtered_transcripts;
   if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
-    @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts2)};      
+    @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
     print STDERR scalar(@filtered_transcripts)
       ." transcripts left after rejecting single-exon transcripts\n";
   }
   else{
-    @filtered_transcripts = @merged_transcripts2;
+    @filtered_transcripts = @merged_transcripts;
     print STDERR scalar(@filtered_transcripts)
       ." transcripts obtained ( Not rejecting single-exon transcripts)\n";
   }
@@ -1479,7 +1469,7 @@ sub _check_Translations {
 	print STDERR "TRANSLATION HAS STOP CODONS!! - skipping\n";
 	next TRANSCRIPT
       }
-
+      
       ############################################################
       # put possible stop at the end:
       eval{
