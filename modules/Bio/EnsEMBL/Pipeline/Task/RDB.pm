@@ -6,20 +6,74 @@ use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::Task;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-
+use Bio::EnsEMBL::Pipeline::Task::Utils::InputIDFactory;
 
 @ISA = ('Bio::EnsEMBL::Pipeline::Task');
 
 
-#the new is used from the base class as this constructor wouldn't need
-#to do any additional work
-
-
-=head2 logic_name
+=head2 new
 
   Arg [1]   : none
-  Function  : returns a string which is the logic_name of a particular
-  analysis
+  Function  : Create a new RDB object and instantiate its InputIDFactory
+  Returntype: Bio::EnsEMBL::Pipeline::Task::RDB
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
+sub new {
+    my ($class,@args) = @_;
+
+    my $self = $class->SUPER::new(@args);    
+
+    $self->{'input_id_factory'} = undef;
+    $self->{'input_ids'} = undef;
+    my $inputidfac = Bio::EnsEMBL::Pipeline::Task::Utils::InputIDFactory->new(
+  -CONFIG => $self->get_Config,
+  -TASKNAME => $self->name,
+  -DB => $self->db,
+ );
+
+   $self->input_id_factory($inputidfac); 
+
+   return $self;
+}
+
+
+
+=head2 input_id_factory
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::Task::Utils::InputIDFactory
+  Function  : getter/setter
+  Returntype: 
+  Exceptions: none
+  Caller    : 
+  Example   : $self->input_id_factory($input_id_fact);
+
+=cut
+
+
+
+sub input_id_factory{
+  my $self = shift;
+
+  if(@_){
+    $self->{'input_id_factory'} = shift;
+  }
+
+  return  $self->{'input_id_factory'};
+}
+
+=head2 abstract methods
+
+  Arg [1]   : none
+  Function  : these methods should all be implemented in the child
+  classes logicname should return the analysis logic_name, module should
+  return the full perl declatation for the module which the Task needs to
+  instantiate
   Returntype: string 
   Exceptions: This method will throw as it is an abstract method but
   sub classes should implement this method and as such shouldn't throw'
@@ -35,6 +89,43 @@ sub logic_name{
   $self->throw("logic_name should be implemented by subclass $!");
 }
 
+sub module{
+  my ($self) = @_;
+  
+  $self->throw("module should be implemented by subclass $!");
+}
+
+
+sub input_ids_to_start{
+ my ($self) = @_;
+  
+ $self->throw("input_ids_to_start should be implemented by subclass $!"); 
+}
+
+
+
+=head2 get_input_ids
+
+  Arg [1]   : none
+  Function  : calls the InputIDFactory method generate_input_ids
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: none
+  Caller    : 
+  Example   : my $ids = $self->get_input_ids;
+
+=cut
+
+
+
+sub get_input_ids{
+ my ($self) = @_;
+  
+ if(!$self->{'input_ids'}){
+   my $idset = $self->input_id_factory->generate_input_ids;
+   $self->{'input_ids'} = $idset; 
+ }
+ return $self->{'input_ids'}; 
+}
 
 =head2 parameter_string
 
@@ -144,13 +235,65 @@ sub max_create{
   return $self->{'max_create'};
 }
 
-sub get_Config{
-  my ($self) = @_;
-  if(!$self->{'config'}){
-    $self->{'config'} = $self->get_PipelineManager->get_Config;
-  }
 
-  return $self->{'config'};
+
+=head2 run
+
+  Arg [1]   : none
+  Function  : calls to create_Jobs
+  Returntype: TASK_DONE
+  Exceptions: none
+  Caller    : 
+  Example   : $task->run;
+
+=cut
+
+
+
+sub run{
+  my $self = shift;
+
+  my $parameters = $self->parameter_string;
+  my $module = $self->module;
+  my $potential = $self->input_ids_to_start;
+  my $existing = $self->get_TaskStatus->get_existing;
+  my $id_set = $potential->not($existing)->subset($self->max_create);
+  $self->create_Jobs($module, 
+		     $id_set, $parameters);
+
+  return 2; #TASK_DONE
 }
+
+
+
+=head2 is_finished
+
+  Arg [1]   : none
+  Function  : checks if all the input_ids that exist for this task have
+  been successfully completed
+  Returntype: 1/0 depending on if the Task is finished or not
+  Exceptions: none
+  Caller    : 
+  Example   : if($task->is_finished){}
+
+=cut
+
+
+
+sub is_finished{
+  my $self = shift;
+
+  my $potential = $self->get_input_ids;
+  my $successful = $self->get_TaskStatus->get_successful;
+
+  if(!$potential || !$successful){
+    return undef;
+  }elsif($potential->count == $successful->count){
+    return 1;
+  }else{
+    return 0;
+  }
+}
+
 
 1;
