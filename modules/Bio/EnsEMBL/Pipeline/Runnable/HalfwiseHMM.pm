@@ -727,13 +727,14 @@ sub parse_results{
 	      $feature{score} = $elements[5];
 	      
 	    } elsif (/cds/i) {
-	      
-	      $feature{start} = $elements[3];
-	      $feature{end} = $elements[4];
 	      if($elements[6] eq '+'){
 		$feature{strand} = 1;
+		$feature{start} = $elements[3];
+		$feature{end} = $elements[4];
 	      }elsif($elements[6] eq '-'){
 		$feature{strand} = -1;
+		$feature{start} = $elements[4];
+		$feature{end} = $elements[3];
 	      }
 	      $feature{frame} = $elements[7];
 	      $feature{seqname} = $elements[0];
