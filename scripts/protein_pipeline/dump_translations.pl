@@ -32,6 +32,7 @@ my $dnadbuser    = '';
 my $dnadbname    = '';
 my $dnadbpass    = undef;
 my $dbport    = 3306;
+my $dnadbport    = 3306;
 my $stable_id = 0;
 my $db_id = 0;
 my $file;
