@@ -87,24 +87,19 @@ sub input_id_factory{
 
 sub logic_names{
   my ($self) = @_;
-  
-  if(!$self->{'logic_names'}){
-     my $config = $self->get_Config;
 
+  if(!$self->{'logic_name'}){
+    my $config = $self->get_Config;
+    
     if(!$config){
       $self->throw("PipelineManager ".$self->get_PipelineManager.
                    " seems to be missing its config $!");
     }
-     my $logic_names = $config->get_parameter($self->name, 'logic_names');
-     my @logic_names = split /:/, $logic_names;
-     if(@logic_names == 0){
-       $self->throw($self->name." has no logic names defined for it in config $!");
-     }
-     $self->{'logic_names'} = \@logic_names;
+    my $logic_name = $config->get_parameter($self->name, 'logic_name');
+    $self->{'logic_name'} = $logic_name;
   }
   
-  return $self->{'logic_names'};
-  
+  return $self->{'logic_name'};
 }
 
 sub module{
@@ -319,6 +314,10 @@ sub start{
     }
   }
 
+  if($self->get_input_ids->count == $self->get_TaskStatus->get_existing->count){
+    return 'TASK_DONE';
+  }
+ 
   return 'TASK_OK'; 
   
 }

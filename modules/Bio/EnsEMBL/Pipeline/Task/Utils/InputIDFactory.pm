@@ -121,14 +121,13 @@ sub generate_input_ids{
     my ($size, $overlap) = @other_info;
     my $warn = 0;
     if(!$size){
-      $warn = 1;
+      print STDERR "InputIDFactory:124 No size defined being set to 1MB\n";
       $size = 1000000;
     }
     if(!$overlap){
-      $warn = 1;
+      print STDERR "InputIDFactory:128 No overlap defined being set to 0\n";
       $overlap = 0;
     }
-    $self->warn("your type string $type_string specifed slice without giving a size or overlap assuming you want 1MB pieces with no overlap\n");
     $idset = $self->get_slice_names($size, $overlap);
   }elsif($type eq 'chromosome'){
     $idset = $self->get_chromosome_names;
@@ -211,15 +210,15 @@ sub get_slice_names{
 	$end = $length;
       }
       
-      my $input_id = $chr . "." . $start . "-" .  $end;
+      my $input_id = $chr->chr_name . "." . $start . "-" .  $end;
       push(@input_ids, $input_id);
       $count = $count + $size - $overlap;
     }
   }
 
-  my $idset = Bio::EnsEMBL::Pipeline::IDSet(
-					    -id_list => \@input_ids,
-					   );
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						 -id_list => \@input_ids,
+						);
 
   return $idset;
 
@@ -252,14 +251,14 @@ sub get_chromosome_names{
 
   foreach my $chr(@chromosomes){
     my $length = $chr->length;
-    my $input_id = $chr . ".1-" .  $length;
+    my $input_id = $chr->chr_name . ".1-" .  $length;
     push(@input_ids, $input_id);
     
   }
 
-  my $idset = Bio::EnsEMBL::Pipeline::IDSet(
-					    -id_list => \@input_ids,
-					   );
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						 -id_list => \@input_ids,
+						);
 
   return $idset;
 
@@ -285,9 +284,8 @@ sub get_Chromosomes{
   if(!$self->{'chromosomes'}){
     my $chr_adp = $self->db->get_ChromosomeAdaptor;
     my $chromosomes = $chr_adp->fetch_all;
-    $self->{'chromsomes'} = $chromosomes;
+    $self->{'chromosomes'} = $chromosomes;
   }
-
   return $self->{'chromosomes'};
 }
 
@@ -324,9 +322,9 @@ sub get_file_names{
       push(@input_ids, $f);
     }    
   }
-  my $idset = Bio::EnsEMBL::Pipeline::IDSet(
-					    -id_list => \@input_ids,
-					   );
+  my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						 -id_list => \@input_ids,
+						);
   
   return $idset;
 }
