@@ -24,6 +24,7 @@ use Bio::EnsEMBL::Pipeline::Config::Blast;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use IO::Socket;
+use Data::Dumper; 
 
 $| = 1; # localise?
 
@@ -218,7 +219,8 @@ sub check_not_overloaded{
         '-QUEUE' => $DEFAULT_BATCH_QUEUE, 
         '-DEBUG' => 0
         };
-    while ((ref($GET_PEND_JOBS) eq 'CODE') && !$term_sig && (&$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS)) {
+    #while ((ref($GET_PEND_JOBS) eq 'CODE') && !$term_sig && (&$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS)) {
+    while ($GET_PEND_JOBS && !$term_sig && &$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS) {
 	&pause(1);
     }
 }
@@ -497,27 +499,48 @@ while (1) {
             # print "Checking analysis " . $anal->dbID . "\n\n";
             # Check whether it is already running in the current_status table?
 	    $submitted->{$anal->logic_name} ||= 0;
+            my $submittable = 1;
             eval {
                 foreach my $cj (@current_jobs) {
 
-                    # print "Comparing to current_job " . $cj->input_id . " " .
-#                           $cj->analysis->dbID . " " .
-#                           $cj->current_status->status . " " .
-#                           $anal->dbID . "\n";
+                    #print "Comparing to current_job " . $cj->input_id . " " .
+                    #$cj->analysis->dbID . " " .
+                    #$cj->current_status->status . " " .
+                    #$anal->dbID . "\n";
 
                     if ($cj->analysis->dbID == $anal->dbID) {
                         if ($cj->current_status->status eq 'FAILED' && $cj->retry_count <= $DEFAULT_RETRIES) {
+                            my $sigset2 = POSIX::SigSet->new(&POSIX::SIGALRM);
+                            sigprocmask(SIG_BLOCK, $sigset2) or die "Can't block SIGALRM for batch_runRemote: $!\n";
                             $cj->batch_runRemote;
+                            sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after batch_runRemote: $!\n";
                             # print "Retrying job\n";
+                        }elsif($cj->current_status->status eq 'VOID'){
+                            $submittable = 0;
+                            my $input_id = $cj->input_id();
+                            my $analysis = $cj->analysis();
+                            my $dbID     = $cj->dbID();
+                            eval{
+                                $sic->store_input_id_analysis($input_id,
+                                                              $analysis,
+                                                              'localhost'
+                                                              );
+                            };
+                            if($@){
+                                print STDERR "Error updating 'VOID' job $dbID :\n[$@]\n";
+                            }else{
+                                print STDERR " *** Updated 'VOID' job <$dbID> *** \n";
+                            }
                         }
                         else {
+                            $submittable = 0;
                             # print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n";
                         }
-                        last;
+                        #next ANAL;
                     }
                 }
             };
-
+            next ANAL unless $submittable;
 
             if ($@) {
                 print "ERROR: comparing to current jobs. Skipping analysis for " . $id . " [$@]\n";
@@ -555,13 +578,13 @@ while (1) {
               }
             }
             sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after batch_runRemote: $!\n";
-
+            
         }
 
     }
 
     &shut_down($DBADAPTOR) if $done || $once;
-    my $this_time = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
+    my $this_time;# = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
     my $slept;
     if($this_time){ 
         # not much was submitted, probably because
