@@ -1067,7 +1067,6 @@ sub prune {
  PRUNE:
   foreach my $hit(@all) {
     last PRUNE if $hit->coverage < $curr_pc;
-    last PRUNE if $hit->coverage < $lower_threshold;
     push (@chosen,$hit);
   }
 
