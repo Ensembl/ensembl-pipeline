@@ -250,17 +250,11 @@ sub parse_Header {
 sub make_miniseq {
     my ($self,@features) = @_;
 
-    my $strand = 1;
-
-    
-    print STDERR "Strand is $strand\n";
-
-    my $seqname = $features[0]->seqname;;
+    my $seqname = $features[0]->seqname;
     @features = sort {$a->start <=> $b->start} @features;
-    
     my $count  = 0;
     my $mingap = $self->minimum_intron;
-
+    
     my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
 
     my @genomic_features;
@@ -270,11 +264,7 @@ sub make_miniseq {
     
   FEAT: foreach my $f (@features) {
       print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
-      if ($f->strand != $strand) {
-	  $self->warn("Mixed strands in features set - skipping feature");
-	  next FEAT;
-      }
-      
+
       my $start = $f->start;
       my $end   = $f->end;
       
@@ -292,12 +282,14 @@ sub make_miniseq {
       print STDERR "Count is $count : $mingap " . $gap  . "\n";
 
       if ($count > 0 && ($gap < $mingap)) {
+	# STRANDS!!!!!
 	  if ($end < $prevend) { $end = $prevend;}
 	  print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
 	  $genomic_features[$#genomic_features]->end($end);
 	  $prevend     = $end;
 	  $prevcdnaend = $f->hend;
+	  print STDERR "Merged start end are " . $genomic_features[$#genomic_features]->start . "\t" .  $genomic_features[$#genomic_features]->end . "\n";
       } else {
 	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
@@ -306,6 +298,7 @@ sub make_miniseq {
         $newfeature->start     ($start);
 	    $newfeature->end       ($end);
 	    $newfeature->strand    (1);
+# ???	    $newfeature->strand    ($strand);
 	    $newfeature->attach_seq($self->genomic_sequence);
 
 	    push(@genomic_features,$newfeature);
@@ -323,18 +316,14 @@ sub make_miniseq {
     }
 
     # Now we make the cDNA features
+    # but presumably only if we actually HAVE any ... 
+    return unless scalar(@genomic_features);
 
     my $current_coord = 1;
     
-    if ($strand == 1) {
-	@genomic_features = sort {$a->start <=> $b->start } @genomic_features;
-    } elsif ($strand == -1) {
-	print STDERR "Reverse strand - reversing coordinates\n";
-
-	@genomic_features = sort {$b->start <=> $a->start } @genomic_features;
-    } else {
-	$self->throw("Invalid value for strand [$strand]");
-    }
+    # make a forward strand sequence, but tell genewise to run reversed if the 
+    # features are on the reverse strand - handled by is_reversed
+    @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
 
     foreach my $f (@genomic_features) {
 	$f->strand(1);
@@ -345,7 +334,7 @@ sub make_miniseq {
                            -seqname => $f->seqname.'.cDNA',
                            -start => $cdna_start,
 					       -end   => $cdna_end,
-					       -strand => $strand);
+					       -strand => 1);
 	
 	my $fp  = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
 						-feature2 => $tmp);
@@ -387,6 +376,8 @@ sub exon_padding {
     }
 
     return $self->{_padding} || 100;
+#    return $self->{_padding} || 1000;
+
 }
 
 sub print_FeaturePair {
@@ -427,7 +418,6 @@ ID:    foreach my $id (@id) {
 	next ID unless defined($newid);
 	print(STDERR "New id :  is $newid [$id]\n");
 
-
 	open(IN,"pfetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
 
 	my $seq;
@@ -437,30 +427,26 @@ ID:    foreach my $id (@id) {
 	    $seq .= $_;
 	}
 	
-	if (!defined($seq) || $seq eq "no match" || $seq =~ /No available pfetch servers/) {
-	    $self->warn("Couldn't find sequence for [$id] using pfetch ");
+	if (!defined($seq) || $seq eq "no match") {
+	    open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
+           
+	   $seq = "";
 	    
-	    close(IN);
-	    open(IN,"efetch -f $id |");
 	    while (<IN>) {
 		chomp;
-		if ($_ !~ /^>/) {
-		    $seq .= $_;
-		}
+		$seq .= $_;
 	    }
-	} 
-	
-	print ("Seqstring for $id is $seq\n");
+	}
 
 	if (!defined($seq)) {
 	    $self->throw("Couldn't find sequence for $newid [$id]");
 	}
-	
+    
 	$seq = new Bio::PrimarySeq(-id  => $newid,
-				   -seq => $seq);
+				      -seq => $seq);
 	
 	$self->{_seq_cache}{$id} = $seq;
-	
+
 	return $seq;
     }
 }
@@ -472,8 +458,60 @@ sub get_all_Sequences {
     my @newid;
 
     foreach my $id (@id) {
-	$self->get_Sequence($id);
+	my $newid = $self->parse_Header($id);
+	push(@newid,$newid);
+
+	print(STDERR "New id is $newid [$id]\n");
+
+	$seqstr .= $newid . " ";
     }
+
+    open(IN,"pfetch -q $seqstr |") || $self->throw("Error fetching sequence for id [$seqstr]");
+	
+    my $count = 0;
+    foreach my $id (@id) {
+	my $seq = <IN>;
+	chomp($seq);
+	if ($seq ne "no match") {
+	    $self->{_seq_cache}{$id} = new Bio::PrimarySeq(-seq => $seq,
+							   -id  => $newid[$count]);
+	}
+	$count++;
+    }
+	
+    SEQ: foreach my $id (@id) {
+	my $seq   = $self->{_seq_cache}{$id};
+
+	next SEQ unless !defined($seq);
+	
+
+	my $newid = $self->parse_Header($id);
+
+	next SEQ unless defined($newid);
+	next SEQ if $newid eq "";
+	print(STDERR "New id :$newid:$id\n");
+
+	open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
+	    
+	$seq = "";
+	    
+	while (<IN>) {
+	    chomp;
+	    $seq .= $_;
+	}
+	
+	if (!defined($seq)) {
+	    $self->warn("Couldn't find sequence for $newid [$id]");
+	}
+	
+	$seq = new Bio::PrimarySeq(-id  => $newid,
+				      -seq => $seq);
+
+	print("Found seq for $id  $seq\n");
+
+	$self->{_seq_cache}{$id} = $seq;
+    }
+
 }
 
 =head2 run
@@ -486,144 +524,215 @@ sub get_all_Sequences {
 
 =cut
 
-sub minirun {
+sub run {
     my ($self) = @_;
-
-    my $idhash = $self->get_all_FeaturesById;
     
-    my @ids    = keys %$idhash;
 
-    if (defined($self->{_forder})) {
-	@ids = @{$self->{_forder}};
-    }
+    my @ids = $self->get_all_FeatureIds;
 
-    $self->get_all_Sequences(@ids);
-
+#    $self->get_all_Sequences(@ids);
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
-	(-db              => undef,
-	 -db_version      => undef,
+	(-db              => 'genewise',
+	 -db_version      => 1,
 	 -program         => "genewise",
 	 -program_version => 1,
 	 -gff_source      => 'genewise',
-	 -gff_feature     => 'similarity',);
+	 -gff_feature     => 'exon',);
 
-    ID: foreach my $id (@ids) {
+    foreach my $id (@ids) {
+	my $hseq = $self->get_Sequence(($id));
 
-	my $features = $idhash->{$id};
-	my @exons;
-
-	print(STDERR "Processing $id\n");
-
-	next ID unless (ref($features) eq "ARRAY");
-
-	print(STDERR "Features = " . scalar(@$features) . "\n");
-
-	next ID unless (scalar(@$features) > 1);
-	
-	eval {
-	    
-	    my @extras  = $self->find_extras (@$features);
-
-	    print STDERR "Number of extra features = " . scalar(@extras) . "\n";
-
-	    next ID unless (scalar(@extras) > 1);
-
-	    my $miniseq = $self->make_miniseq(@$features);
-	    my $hseq    = $self->get_Sequence($id);
-	    
-	    my $reverse = $self->is_reversed(@$features);
-
-	    print STDERR "Reverse 2 $reverse\n";
-
-	    print("Hseq $id " . $hseq->seq . "\n");
-	    print("cdna " . $miniseq->get_cDNA_sequence . "\n");
-
-	    if (!defined($hseq)) {
-		$self->throw("Can't fetch sequence for id [$id]\n");
-	    }
-
-	    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $miniseq->get_cDNA_sequence,
-								      -protein => $hseq,
-								      -memory  => 400000,
-								      "-reverse" => $reverse);
-	    
-	    $eg->run;
-	    
-	    my @f = $eg->output;
-	    my @newf;
-	    
-	    my $strand = 1;
-	    if ($reverse == 1) {
-		$strand = -1;
-	    }
-	    foreach my $f (@f) {
-		$f->strand(1);
-		$f->hstrand($strand);
-		
-		print(STDERR "Aligned output is " . $f->id    . "\t" . 
-		      $f->start      . "\t" . 
-		      $f->end        . "\t(" . 
-		      $f->strand     . ")\t" .
-		      $f->hseqname   . "\t" . 
-		      $f->hstart     . "\t" . 
-		      $f->hend       . "\t(" .
-		      $f->hstrand    . ")\t" .
-		      $f->feature1->{_phase}   . "\n");
-		
-		my $phase = $f->feature1->{_phase};
-		print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
-
-        #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
-		my @newfeatures = $miniseq->convert_FeaturePair($f);         
-
-		if ($#newfeatures > 0) {
-		    print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
-		}
-		push(@newf,@newfeatures);
-		
-		foreach my $nf (@newfeatures) {
-		    $nf->feature1->{_phase} = $phase;
-		    $nf->feature2->{_phase} = $phase;
-		    
-        #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-		    $nf->seqname($f->seqname);
-		    $nf->hseqname($id);
-		    $nf->score   (100);
-		    $nf->analysis($analysis_obj);
-        #end BUGFIX
-		}
-		
-	    }
-	    
-	    my $fset = new Bio::EnsEMBL::SeqFeature();
-
-
-
-	    foreach my $nf (@newf) {
-		$fset->add_sub_SeqFeature($nf,'EXPAND');
-		$fset->seqname($nf->seqname);
-		$fset->analysis($analysis_obj);
-		$nf->strand($nf->hstrand);
-		print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
-		    $nf->start     . "\t" . 
-		    $nf->end       . "\t(" . 
-		    $nf->strand    . ")\t" .
-		    $nf->hseqname  . "\t" . 
-		    $nf->hstart    . "\t" . 
-		    $nf->hend      . "\t(" .
-		    $nf->hstrand   . ")\t:" .
-		    $nf->feature1->{_phase} . ":\t:" . 
-		    $nf->feature2->{_phase} . ":\n");
-	    }
-
-	    push(@{$self->{_output}},$fset);
-
-	};
-	if ($@) {
-	    print STDERR "Error running blastwise for " . $features->[0]->hseqname . " [$@]\n";
+	if (!defined($hseq)) {
+	    $self->throw("Can't fetch sequence for id [$id]\n");
 	}
+
+	
+	my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(-genomic => $self->genomic_sequence,
+								-protein => $hseq,
+								-memory  => 400000);
+
+	$eg->run;
+
+	my @f = $eg->output;
+
+	foreach my $f (@f) {
+	    #print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
+	    print $f;
+	}
+
+	push(@{$self->{_output}},@f);
+
+    }
+}
+
+# VAC Need to deal separately with forward and reverse features? There is a problem with mixed 
+# strand features ...
+sub minirun {
+  my ($self) = @_;
+  
+  my $idhash = $self->get_all_FeaturesById;
+  
+  my @ids    = keys %$idhash;
+  
+  if (defined($self->{_forder})) {
+    @ids = @{$self->{_forder}};
+  }
+  
+  $self->get_all_Sequences(@ids);
+  my $analysis_obj    = new Bio::EnsEMBL::Analysis
+    (-db              => undef,
+     -db_version      => undef,
+     -program         => "genewise",
+     -program_version => 1,
+     -gff_source      => 'genewise',
+     -gff_feature     => 'similarity',);
+  
+ ID: foreach my $id (@ids) {
+    
+    my $features = $idhash->{$id};
+    my @exons;
+    
+    print(STDERR "Processing $id\n");
+    next ID unless (ref($features) eq "ARRAY");
+    
+    print(STDERR "Features = " . scalar(@$features) . "\n");
+
+    # why > not >= 1?
+    next ID unless (scalar(@$features) >= 1);
+    
+    print STDERR "Still here\n";
+
+    # ugh. forward and reverse split.
+    my @forward;
+    my @reverse;
+    
+    foreach my $feat(@$features) {
+      if($feat->hstrand == 1) { push(@forward,$feat); }
+      elsif($feat->hstrand == -1) { push(@reverse,$feat); }
+      else { $self->throw("unstranded feature not much use for gene building\n") }
+    }
+    
+    # run on each strand
+    eval {
+      print STDERR "forward\n";
+      $self->run_blastwise($id, \@forward, $analysis_obj);
+    };
+    if ($@) {
+      print STDERR "Error running blastwise for forward strand on" . $features->[0]->hseqname . " [$@]\n";
     }
 
+    eval {
+      print STDERR "reverse\n";
+      $self->run_blastwise($id, \@reverse, $analysis_obj);
+    };
+    if ($@) {
+      print STDERR "Error running blastwise for reverse strand on" . $features->[0]->hseqname . " [$@]\n";
+    }
+
+  }
+  
+}
+
+sub run_blastwise {
+  my ($self,$id,$features,$analysis_obj) = @_;
+
+  my @extras  = $self->find_extras (@$features);
+  
+  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
+  
+#  next ID unless (scalar(@extras) >= 1);
+  return unless (scalar(@extras) >= 1);
+  
+  my $miniseq = $self->make_miniseq(@$features);
+  my $hseq    = $self->get_Sequence($id);
+  
+  my $reverse = $self->is_reversed(@$features);
+  
+  print STDERR "Reverse 2 $reverse\n";
+#  print STDERR "Hseq $id " . $hseq->seq . "\n";
+#print STDERR "cdna " . $miniseq->get_cDNA_sequence->seq . "\n";
+  
+  if (!defined($hseq)) {
+    $self->throw("Can't fetch sequence for id [$id]\n");
+  }
+  
+  my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $miniseq->get_cDNA_sequence,
+							    -protein => $hseq,
+							    -memory  => 400000,
+							    "-reverse" => $reverse);
+  
+  $eg->run;
+  
+  my @f = $eg->output;
+  my @newf;
+  
+  my $strand = 1;
+  if ($reverse == 1) {
+    $strand = -1;
+  }
+  foreach my $f (@f) {
+    $f->strand(1);
+    $f->hstrand($strand);
+    
+    print(STDERR "Aligned output is " . $f->id    . "\t" . 
+	  $f->start      . "\t" . 
+	  $f->end        . "\t(" . 
+	  $f->strand     . ")\t" .
+	  $f->hseqname   . "\t" . 
+	  $f->hstart     . "\t" . 
+	  $f->hend       . "\t(" .
+	  $f->hstrand    . ")\t" .
+	  $f->feature1->{_phase}   . "\n");
+    
+    my $phase = $f->feature1->{_phase};
+
+    # VC $f->feature2->{_phase} is not set
+    print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
+    #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
+    my @newfeatures = $miniseq->convert_FeaturePair($f);         
+    
+    if ($#newfeatures > 0) {
+      print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
+    }
+    push(@newf,@newfeatures);
+    
+    foreach my $nf (@newfeatures) {
+      $nf->feature1->{_phase} = $phase;
+      $nf->feature2->{_phase} = $phase;
+      
+      #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+      $nf->seqname($f->seqname);
+      $nf->hseqname($id);
+      $nf->score   (100);
+      $nf->analysis($analysis_obj);
+      #end BUGFIX
+    }
+    
+  }
+  
+  my $fset = new Bio::EnsEMBL::SeqFeature();
+  
+  
+  
+  foreach my $nf (@newf) {
+    $fset->add_sub_SeqFeature($nf,'EXPAND');
+    $fset->seqname($nf->seqname);
+    $fset->analysis($analysis_obj);
+    $nf->strand($nf->hstrand);
+    print(STDERR "Realigned output is " . $nf->seqname    . "\t" . 
+	  $nf->start     . "\t" . 
+	  $nf->end       . "\t(" . 
+	  $nf->strand    . ")\t" .
+	  $nf->hseqname  . "\t" . 
+	  $nf->hstart    . "\t" . 
+	  $nf->hend      . "\t(" .
+	  $nf->hstrand   . ")\t:" .
+	  $nf->feature1->{_phase} . ":\t:" . 
+	  $nf->feature2->{_phase} . ":\n");
+  }
+  
+  push(@{$self->{_output}},$fset);
+  
 }
 
 sub is_reversed {
@@ -640,7 +749,6 @@ sub is_reversed {
 	} elsif ($f->hstrand == -1) {
 	    $rcount++;
 	}
-
     }
     print STDERR "Number of features is " . scalar(@features) . "\n";
     print STDERR "Forward/reverse counts " . $fcount . " " . $rcount . "\n";
