@@ -27,7 +27,7 @@ my $comp_level        = 5;
 my $splice_mismatch   = 10;
 my $intron_mismatch   = 0;
 my $min_order         = 1;
-my $restrict_ext_site = 0;
+my $internal_splice_overlap = 0;
 my $sets;
 my $help;
 
@@ -35,14 +35,14 @@ my $help;
 
 &GetOptions( 
 	    #'gff_format:s'        => \$gff_format,
-	     'input:s'             => \$input,
-	     'output:s'            => \$output,
-	     'comp_level:n'        => \$comp_level,
-	     'splice_mismatch'     => \$splice_mismatch,
-	     'intron_mismatch'     => \$intron_mismatch,
-	     'restrict_ext_site:s' => \$restrict_ext_site, 
-	     'sets'                => \$sets,
-	     'help'                => \$help,
+	     'input:s'                   => \$input,
+	     'output:s'                  => \$output,
+	     'comp_level:n'              => \$comp_level,
+	     'splice_mismatch:n'         => \$splice_mismatch,
+	     'intron_mismatch:n'         => \$intron_mismatch,
+	     'internal_splice_overlap:n' => \$internal_splice_overlap,
+	     'sets'                      => \$sets,
+	     'help'                      => \$help,
 	     );
 
 if ( $help || !$input || !$output){
@@ -97,11 +97,11 @@ foreach my $tag ( keys %trans ){
 ############################################################
 
 print STDERR "running ClusterMerge with parameters:\n";
-print STDERR "comp_level        = $comp_level\n";
-print STDERR "splice_mismatch   = $splice_mismatch\n";
-print STDERR "intron_mismatch   = $intron_mismatch\n"; 
-print STDERR "min_order         = $min_order\n";
-print STDERR "restrict_ext_site = $restrict_ext_site\n";
+print STDERR "comp_level              = $comp_level\n";
+print STDERR "splice_mismatch         = $splice_mismatch\n";
+print STDERR "intron_mismatch         = $intron_mismatch\n"; 
+print STDERR "min_order               = $min_order\n";
+print STDERR "internal_splice_overlap =  $internal_splice_overlap\n";
 
 ############################################################
 
@@ -112,7 +112,7 @@ my $cluster_merge =
 							-splice_mismatch               => $splice_mismatch,
 							-intron_mismatch               => $intron_mismatch,
 							-minimum_order                 => $min_order,
-							_restrict_external_splice_site => $restrict_ext_site,
+							-internal_splice_overlap       => $internal_splice_overlap,
 						       );
 
   
@@ -267,7 +267,7 @@ sub usage {
 
     -output          : name of the output file
 
-    -comp_level      : comparison level (default = 5 )
+    -comp_level      : comparison level (default = 3 )
                        1 --> strict: exact exon matching. 
                        Does not use any other parameteres passed in. Example:
 
@@ -283,7 +283,7 @@ sub usage {
                        3 ---> allow internal mismatches. 
                        Uses the parameters 'exon_match' and 'splice_mismatch' if defined. Example:
 
-                       #####-----######----#######
+                       #####---########----######
                        #####-----######----####------#####
 
                        4 ---> allow intron mismatches. 
@@ -304,15 +304,13 @@ sub usage {
 
      -intron_mismatch: maximum number of non-opverlapping nucleotides allowed in introns (default = 0 )
 
-     _rest_ext_site  : restrict extermal splice site; if we want to restrict how much can exceed
-                       an external exon an internal splice site:
-    
-                                       |--d--|
+     -internal_splice_overlap: (default = 0 ) 
+                       number of base pairs (N) we allow an external exon overlap
+                       an intron in another transcript:
+                                       |--N--|
                        ######-------##########
                       #######-------####-------------#######
     
-		       If TRUE 'd' must be <= splice_mismatch, else 'd' can be anything
-
      -exon_match     : TRUE if we want both transcripts to match 1-to-1 all their exons
 
      -min_order      : minimum number of transcripts required to be in a cluster to create a merged transcript 
