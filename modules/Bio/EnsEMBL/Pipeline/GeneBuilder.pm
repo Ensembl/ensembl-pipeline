@@ -1,11 +1,11 @@
-
+#
 #
 # BioPerl module for GeneBuilder
 #
 # Cared for by EnsEMBL <ensembl-dev@ebi.ac.uk>
 #
 # You may distribute this module under the same terms as perl itself
-
+#
 # POD documentation - main docs before the code
 
 =pod 
@@ -61,6 +61,7 @@ Describe contact details here
 
 =head1 APPENDIX
 
+
 The rest of the documentation details each of the object
 methods. Internal methods are usually preceded with a _
 
@@ -89,8 +90,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted   qw (
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined    qw (
-							       GB_COMBINED_GENETYPE
-							      );
+                                                               GB_GENEWISE_COMBINED_GENETYPE 
+                                                               GB_BLESSED_COMBINED_GENETYPE
+                                                              );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 							       GB_SIMILARITY_GENETYPE
@@ -101,6 +103,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+                                                               GB_MISC_OTHER_INPUT_GENETYPES
 							       GB_MIN_GENSCAN_EXONS
 							       GB_GENSCAN_MAX_INTRON
 							       GB_MIN_FEATURE_SCORE
@@ -108,7 +111,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_ABINITIO_TYPE
 							       GB_ABINITIO_SUPPORTED_TYPE
 							       GB_ABINITIO_PROTEIN_EVIDENCE
-                     GB_ABINITIO_LOGIC_NAME
+                                                               GB_ABINITIO_LOGIC_NAME
 							       GB_ABINITIO_DNA_EVIDENCE
 							       GB_MAXSHORTINTRONLEN
 							       GB_MINSHORTINTRONLEN
@@ -138,13 +141,20 @@ sub new {
     $self->{_gene_types}  = [];
 
     $self->query($slice);
-    $self->gene_types($GB_COMBINED_GENETYPE);
+    $self->gene_types($GB_GENEWISE_COMBINED_GENETYPE );
+    $self->gene_types($GB_BLESSED_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
+
     $self->gene_types("KnownUTR");
+
     foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
       $self->gene_types($bgt->{'type'});
     }
+
+    for my $misc (@{$GB_MISC_OTHER_INPUT_GENETYPES}){
+      $self->gene_types($misc);
+   }
 
   
     $self->input_id($input_id);
@@ -190,13 +200,11 @@ sub build_Genes{
   
   # get all genes of type defined in gene_types() on this slice
   $self->get_Genes;
-  #print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
-  
+  #print STDERR "After checks: Number of genewise and combined transcripts: " . scalar($self->combined_Transcripts) . "\n";
   #test
   #  foreach my $t ( $self->combined_Transcripts ){
-  #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
-
-#  }
+   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+  #  }
 
   
   if ( $GB_USE_ABINITIO ){
