@@ -160,7 +160,7 @@ sub run{
 
  GENE:
   while( <GW> ) {
-    #print STDERR $_;
+    print STDERR $_;
 
       /\/\// && last;
       if( /Gene/ ) {
@@ -349,8 +349,9 @@ sub run{
 	# check just in case
 	if ( $exon_in->overlaps( $exon_out ) ){
 	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-#	    $feature->analysis($self->analysis);
+	    #$feature->analysis($self->analysis);
 #	    $feature->source_tag($self->analysis->logic_name);
+	    $feature->contig($exon_out->contig);
 	    $exon_out->add_supporting_features( $feature );
 	  }
 	}
@@ -368,6 +369,7 @@ sub run{
 	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
 #	      $feature->analysis($self->analysis);
 #	      $feature->source_tag($self->analysis->logic_name);
+	      $feature->contig($exon_out->contig);
 	      $exon_out->add_supporting_features( $feature );
 	    }
 	  }
@@ -392,6 +394,7 @@ sub run{
 	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
 #		$feature->analysis($self->analysis);
 #		$feature->source_tag($self->analysis->logic_name);
+		$feature->contig($exon_out->contig);
 		$exon_out->add_supporting_features( $feature );
 	      }
 	    }

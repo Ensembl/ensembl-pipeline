@@ -66,19 +66,22 @@ sub new {
     
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
-
+    
     $self->genomic_sequence($genomic) if defined($genomic);
 
     if (defined($transcripts)) {
-	if (ref($transcripts) eq "ARRAY") {
-	    my @t = @$transcripts;
-	    
-	    foreach my $t (@t) {
-		$self->add_Transcript($t);
-	    }
-	} else {
-	    $self->throw("[$transcripts] is not an array ref.");
+      if (ref($transcripts) eq "ARRAY") {
+	my @t = @$transcripts;
+	
+	foreach my $t (@t) {
+	  print STDERR "transcript passed to MiniGenomewise::new()\n";
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+	  
+	  $self->add_Transcript($t);
 	}
+      } else {
+	$self->throw("[$transcripts] is not an array ref.");
+      }
     }
     
     return $self;
@@ -368,7 +371,6 @@ sub convert_transcript_to_miniseq{
 sub run {
   my ($self) = @_;
   
-
   # make miniseq representation to cover all transcripts
   $self->make_miniseq;
 
@@ -383,7 +385,7 @@ sub run {
   }
   
   $genomewise->run;
-
+  
   $self->convert_output($genomewise->output);
 }
 
@@ -464,29 +466,30 @@ sub convert_output{
 	next EXON;
       }
       
-    foreach my $f (@genomics) {
-      my $new_exon = new Bio::EnsEMBL::Exon;
-      $new_exon->start($f->start);
-      $new_exon->end($f->end);
-      $new_exon->phase($phase);
-      $new_exon->end_phase($end_phase);
-      $new_exon->strand($strand);
-
-      # transfer the supporting evidence!!!
-      foreach my $evi ( @evidence ){
-	$new_exon->add_supporting_features( $evi );
-      }
-
-      #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-      $new_exon->seqname($exon->seqname);
-      $new_exon->analysis($analysis_obj);
-      #end BUGFIX
-      push(@newexons, $new_exon);    
-    
-      # check whether $exon is the start or end exon
-      if ( $exon->start == $ss && $exon->end == $se ) {
-	#print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
-	$translation->start_Exon($new_exon);
+      foreach my $f (@genomics) {
+	my $new_exon = new Bio::EnsEMBL::Exon;
+	$new_exon->start($f->start);
+	$new_exon->end($f->end);
+	$new_exon->phase($phase);
+	$new_exon->end_phase($end_phase);
+	$new_exon->strand($strand);
+	
+	# transfer the supporting evidence!!!
+	foreach my $evi ( @evidence ){
+	  $evi->contig($new_exon->contig);
+	  $new_exon->add_supporting_features( $evi );
+	}
+	
+	#BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+	$new_exon->seqname($exon->seqname);
+	$new_exon->analysis($analysis_obj);
+	#end BUGFIX
+	push(@newexons, $new_exon);    
+	
+	# check whether $exon is the start or end exon
+	if ( $exon->start == $ss && $exon->end == $se ) {
+	  #print STDERR " >> start_exon found, converting ".$exon." into ".$new_exon."\n";
+	  $translation->start_Exon($new_exon);
       }
       if ( $exon->start == $es && $exon->end == $ee ) {
 	#print STDERR " >> end_exon found, converting   ".$exon." into ".$new_exon."\n";
