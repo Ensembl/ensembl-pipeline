@@ -67,9 +67,10 @@ use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf qw (
 						     EST_E2G_DBUSER
 						     EST_E2G_DBPASS     
 						     EST_GENEBUILDER_INPUT_GENETYPE
-						     EST_EVIDENCE_TAG
-						     EST_MAX_EVIDENCE_DISCONTINUITY
+						     EST_MIN_INTRON_SIZE
 						     EST_MAX_INTRON_SIZE
+						     EST_MAX_EVIDENCE_DISCONTINUITY
+						     EST_GENEBUILDER_INTRON_MISMATCH
 						     EST_GENOMEWISE_GENETYPE
 						     USE_cDNA_DB
 						     cDNA_DBNAME
@@ -458,10 +459,8 @@ sub _reject_single_exon_Transcripts{
 =head2 _check_Transcripts
     
     Usage   :   @transcripts = $self->_check_Transcripts(@transcripts)
-    Function:   checks transcripts obtained from EST2Genome for consistency among exons
-                in strand, hit_name (hid), exon content,
-                and also checks that the hits associated to consecutive exons do not have a
-                discontinuity (in hit-coordinates) larger than than a certain limit
+    Function:   checks transcripts (representing ESTs or cDNAs) for consistency:
+the maximum allowed discontinuity in the evidence is $EST_MAX_EVIDENCE_DISCONTINUITY;
     Returns :   @Bio::EnsEMBL::Transcript
     Args    :   @Bio::EnsEMBL::Transcript, ref to hash for linking hid to transcript, ref to hash for linking 
                 exon to hid, 
@@ -471,17 +470,10 @@ sub _reject_single_exon_Transcripts{
 sub _check_Transcripts {
   my ($self, $ref_transcripts, $strand) = @_;
 
-  # the source_tag of the supporting evidence is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-  my $evidence_tag    = $EST_EVIDENCE_TAG;
-  
-  # the maximum allowed discontinuity in EST hits
-  my $max_est_gap     = $EST_MAX_EVIDENCE_DISCONTINUITY;
+  # the maximum allowed discontinuity in EST hits = $EST_MAX_EVIDENCE_DISCONTINUITY;
+  # reject ests with introns larger than $EST_MAX_INTRON_SIZE;
+  # reject exons that are smaller or equal to $EST_MIN_EXON_SIZE;
 
-  # reject ests with introns larger that this one:
-  my $max_intron_length = $EST_MAX_INTRON_SIZE;
-
-  # reject exons that are smaller or equal to this size:
-  my $min_exon_size     = $EST_MIN_EXON_SIZE;
 
 
   print STDERR "EST_GeneBuilder: checking consistency of transcripts...\n";
@@ -575,7 +567,7 @@ sub _check_Transcripts {
 		  }
 		  
                   # check the evidence gap between both exons
-		  if ( $est_gap > $max_est_gap ){
+		  if ( $est_gap > $EST_MAX_EVIDENCE_DISCONTINUITY ){
 		      print STDERR "Rejecting transcript: EST evidence with gap too large: $est_gap\n";
 		    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 		      next TRANSCRIPT;
@@ -588,22 +580,29 @@ sub _check_Transcripts {
 	  
 	  # 100000 bases is quite tight, we better keep it low for ESTs
 	  if ($exon_count > 1 ){
-	      my ( $s, $e, $intron_length);
-	      $s             = $previous_exon->end;
-	      $e             = $exon->start;
-	      $intron_length = $e - $s - 1;
-	      if ( $intron_length > $max_intron_length ){
-		  print STDERR "Rejecting transcript for having too long intron: $intron_length\n";
-		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-		  next TRANSCRIPT;
-	      }
+	    my ( $s, $e, $intron_length);
+	    $s             = $previous_exon->end;
+	    $e             = $exon->start;
+	    $intron_length = $e - $s - 1;
+	    if ( $intron_length > $EST_MAX_INTRON_SIZE ){
+	      print STDERR "Rejecting transcript for having too long intron: $intron_length\n";
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	      next TRANSCRIPT;
+	    }
+	  }
+
+	  # reject small introns
+	  if ( $EST_MIN_INTRON_SIZE && $exon_count>1 ){
+	    if ( $exon->start - $previous_exon->end - 1 <=  $EST_GENEBUILDER_INTRON_MISMATCH ){
+	      $previous_exon->end( $exon->end );
+	      next EXON;
+	    }
 	  }
 	  
-
       	  $previous_exon = $exon;
 	  
-	  my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $exon );
-	  $new_transcript->add_Exon( $new_exon );
+	  #my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $exon );
+	  $new_transcript->add_Exon( $previous_exon );
 
       } # end of EXON
       
