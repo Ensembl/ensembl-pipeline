@@ -27,11 +27,15 @@ Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter - Filters a search runnable
 =head1 DESCRIPTION
 
 Filters search results, such as Blast, on several criteria. The most
-important ones are minscore, maxevalue, coverage. Coverage is as
-follows:
+important ones are minscore, maxevalue, coverage. Crudely, coverage
+reduces redundant data (e.g., almost-identical ESTs with different
+accession numbers) and prune reduces overlapping features (e.g., hits
+to a repetitive sequence).
+
+In detail, coverage filtering acts as follows:
 
   sort hit-sequence-accessions in decreasing order of
-  maximum HSP score;
+  maximum feature score;
 
   for each hit-sequence-accession in turn:
 
@@ -40,15 +44,20 @@ follows:
 
       remove all features for this hit-sequence-accession;
 
-An arbitrary but consistent sorting criterion is used to order
-hit-sequence-accessions of equal maximum HSP score.
+Within the set of features for a given hit-sequence-accession, features
+are considered in decreasing order of score. Where two or more
+hit-sequence-accessions have equal maximum feature score, secondary
+sorting is in decreasing order of total score for the
+hit-sequence-accession's features, followed by alphabetical order for
+hit-sequence accession number.
 
 The option prune allows only a maximum number of features per
 strand per genomic base per hit sequence accession, this number also
 being specified by the coverage parameter. Prune works on a
 per-hit-sequence-accession basis and removes features (not entire
-hit-sequence-accessions) until the criterion is met. Prune filtering
-occurs after coverage filtering.
+hit-sequence-accessions) until the criterion is met for each
+hit-sequence-accession. Prune filtering occurs after coverage
+filtering.
 
 =head1 CONTACT
 
@@ -56,10 +65,10 @@ Ensembl - ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object methods.
+Internal methods are usually preceded with a _
 
 =cut
-
 
 # Let the code begin...
 
@@ -135,6 +144,7 @@ sub run{
   # valid to be > minscore < maxevalue
   
   my $maxend   = 0;
+  my %totalscore;     # total score per hid
   
   # all featurepairs have a score. 
   # some may have an evalue.
@@ -142,15 +152,16 @@ sub run{
   # valid hits are stored in a hash of arrays
   # we sort by score to know that the first score for a hseqname is its best  
   @input = sort { $b->score <=> $a->score } @input;
-  #my @discard;
   foreach my $f ( @input ) {
 
-  # print "comparing ".$f->score." to ".$minscore."\n";
     if( $f->score > $minscore ) {
       
       unless ( $validhit{$f->hseqname} ){
 	$validhit{$f->hseqname} = 0;
+	$totalscore{$f->hseqname} = 0;
       }
+
+      $totalscore{$f->hseqname} =+ $f->score;
       
       if( $f->can('evalue') && defined $f->evalue ) {
 	if( $f->evalue < $maxevalue ) {
@@ -199,13 +210,15 @@ sub run{
   my @list;
   $list[$maxend] = 0;
   
-  # sort the list by highest score, then alphabetically for ties
-   my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $a cmp $b }
-                    keys %validhit;
+  # sort the list by highest score, then by total score for ties, and
+  # alphabetically as a last resort
+  my @inputids = sort {    $validhit{$b}   <=> $validhit{$a}
+                        or $totalscore{$b} <=> $totalscore{$a}
+			or $a cmp $b } keys %validhit;
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
-  print "have ".@inputids." accepted hids before filtering on coverage\n";
+
   # we accept all feature pairs which are valid and meet coverage criteria
   FEATURE :
     foreach my $hseqname ( @inputids ) {
@@ -247,9 +260,6 @@ sub run{
     push(@feature_counts, @{$hitarray{$hid}});
   }
 
-  print "have ".scalar(@accepted_hids)." accepted hids after filtering by coverage\n";
-
-  # print "have ".@accepted_hids." acepted hids\n";
   # drop this huge array to save memory
   @list = ();
   
