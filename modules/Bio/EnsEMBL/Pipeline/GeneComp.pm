@@ -194,41 +194,6 @@ sub map{
     if ($before_g != $after_g) {
 	print $log "GENE MAPPING BUG: Size of temp genes and final genes not equal, bad bug! Temp genes: $before_g, final: $after_g";
     }
-
-    #Archiving is dealt with within the mapping methods
-    #We archive all dead gene ids, and infor on dead transcripts
-    #and proteins
-
-    #convert back to raw coordinates
-    #my @rawgenes;
-    #print $log "Converting genes to raw coordinates...\n";
-    #foreach my $gene (@$finalgenes) {
-	#print $log "Dumping structure of genes\n";
-	#$gene->_dump(\*$mapfile);
-	#foreach my $exon ($gene->all_Exon_objects) {
-	#    $exon->contig_id($vc->id);
-	#}
-	#my $newgene;
-	#eval {
-	#    $newgene = $vc->convert_Gene_to_raw_contig($gene);
-	#};
-	#if ($@) {
-	#    print $log "CONVERSION BUG: Could not convert gene ".$gene->id." to raw contigs coordinates because of $@\n";
-	#}
-	#else {
-	#    push (@rawgenes,$newgene);
-	#}
-    #}
-    #print $log "Writing genes to final database...\n";
-    #write final set to final db
-    #foreach my $rgene (@rawgenes) {
-	#eval {
-	#    $self->finaldb->gene_Obj->write($rgene);
-	#};
-	#if ($@) {
-	#    print $log "GENE WRITING BUG: Could not write back gene ".$rgene->id." to database,error:\n$@";
-	#}
-    #}
     return 1;
 }
 
@@ -245,7 +210,7 @@ sub map{
 
 sub map_temp_Exons_to_real_Exons{
    my ($self) = @_;
-
+   my $arc = $self->archive;
    my $vc = $self->vc();
    my $log = $self->log;
    my $map = $self->mapfile;
@@ -303,6 +268,11 @@ sub map_temp_Exons_to_real_Exons{
        }
        exit 0;
    }
+   my %e_v;
+   foreach my $oldexon ( @oldexons ) {
+       $e_v{$oldexon->id}=$oldexon->version;
+   }
+   
 
    my @tempexons2;
    my %bestfit;
@@ -311,7 +281,7 @@ sub map_temp_Exons_to_real_Exons{
    #First sort out identical exons...
    print $log "Checking for identical exons...\n";
    IDENTICAL:foreach my $tempexon ( @tempexons ) {
-       print $log "Trying to find identical exon to ".$tempexon->id." (".$tempexon->start."-".$tempexon->end.")\n";
+       #print $log "Trying to find identical exon to ".$tempexon->id." (".$tempexon->start."-".$tempexon->end.")\n";
        foreach my $oldexon ( @oldexons ) {
 	   if ($tempexon->start > $oldexon->end) {
 	       #Skip this old exon, it ends before temp starts
@@ -323,11 +293,10 @@ sub map_temp_Exons_to_real_Exons{
 	       if (! $bestfit{$tempexon->id}) {
 		   push (@tempexons2,$tempexon);
 		   $bestfit{$tempexon->id}=1;
-		   print $log "Pushing ".$tempexon->id." into tempexons2 array\n";
 	       }
 	       next IDENTICAL;
 	   }
-	   print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
+	   #print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
 	   # if start/end/strand is identical, it is definitely up for moving.
 	   
 	   if( $tempexon->start == $oldexon->start &&
@@ -337,7 +306,6 @@ sub map_temp_Exons_to_real_Exons{
 	       # ok - if we have already moved this - ERROR
 	       if( $moved{$oldexon->id} == 1 ) {
 		   print $log "Duplicate! ".$tempexon->id." maps to ".$oldexon->id." with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand."\n";
-		   print $log "D: Pushing ".$tempexon->id." into tempexons2\n";
 		   if (!$bestfit{$tempexon->id} ) {
 		       push (@tempexons2,$tempexon);
 		       $bestfit{$tempexon->id}=1;
@@ -368,12 +336,10 @@ sub map_temp_Exons_to_real_Exons{
 	       }
 	       push (@mapped,$tempexon);
 	       print $log $tempexon->version."\n";
-	       print $log "Assigning moved to ".$oldexon->id."\n";
 	       $moved{$oldexon->id} = 1;
 	       next IDENTICAL;
 	   }
        }
-       print $log "2: Pushing ".$tempexon->id." into tempexons2\n";
        if (!$bestfit{$tempexon->id} ) {
 	   push (@tempexons2,$tempexon);
 	   $bestfit{$tempexon->id}=1;
@@ -384,33 +350,35 @@ sub map_temp_Exons_to_real_Exons{
    my $size = scalar (@tempexons2);
    print $log "Going to do bestfit/new on $size remaining exons...\n";
    $size = scalar (@oldexons);
-   print $log "Checking against $size old exons...\n";
+
    # we can't map some exons directly. Second scan over all exons to see whether
    # there is significant overlap
-BESTFIT:foreach my $tempexon2 (@tempexons2) {
+   #Hash to hold all alternative bestfits, 
+   #to archive those not used (in split cases)
+   my %bf;
+   
+ BESTFIT:foreach my $tempexon2 (@tempexons2) {
      my $biggestoverlap = undef;
      my $overlapsize = 0;
-     print $log "BESTFIT Trying to find overlapping exon to ".$tempexon2->id." (".$tempexon2->start."-".$tempexon2->end.")\n";
+     #print $log "BESTFIT Trying to find overlapping exon to ".$tempexon2->id." (".$tempexon2->start."-".$tempexon2->end.")\n";
      if ($ismapped{$tempexon2->id} == 1) {
 	 next;
      }
      foreach my $oldexon ( @oldexons ) {
-	
+	 
 	 if ($tempexon2->start > $oldexon->end) {
 	     #Skip this old exon, it ends before temp starts
-	     #print $log "Skipping, ends before start\n";
 	     next;
 	 }
 	 if( $oldexon->start > $tempexon2->end ) {
 	     #Go out of loop, reached old exon after temp
-	     #print $log "Get out, starts after end...\n";
 	     last;
 	 }
-	 print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
+	 #print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
 	 if( $oldexon->overlaps($tempexon2) && $moved{$oldexon->id} == 0 ) {
+	     $bf{$oldexon->id}=$tempexon2->id;
 	     my $intexon = $oldexon->intersection($tempexon2);
 	     my $tovsize = ($intexon->end - $intexon->start +1); 
-	     print STDERR "Overlap size: $tovsize\n";
 	     if( !defined $biggestoverlap ) {
 		 $biggestoverlap = $oldexon;
 		 $overlapsize = $tovsize; 
@@ -427,7 +395,7 @@ BESTFIT:foreach my $tempexon2 (@tempexons2) {
 	 # set ismapped to 1 for this tempexon2
 	 
 	 $ismapped{$tempexon2->id} = 1;
-	 
+	 delete $bf{$biggestoverlap->id};
 	 # we move the id. Do we move the version?
 	 print $log "EXON MAP BEST FIT: ",$tempexon2->id," ",$biggestoverlap->id." ";
 	 print $map $tempexon2->id,"\t",$biggestoverlap->id."\n";
@@ -438,7 +406,6 @@ BESTFIT:foreach my $tempexon2 (@tempexons2) {
 	 print $log $tempexon2->version."\n";
 	 $tempexon2->modified($time);
 	 push(@mapped,$tempexon2);
-	 print $log "Second assigning of moved for ".$biggestoverlap->id." to 1\n";
 	 $moved{$biggestoverlap->id} = 1;
 	 my $size=scalar (@oldexons);
 	 while( my $tempoldexon = shift @oldexons ) {
@@ -462,10 +429,14 @@ BESTFIT:foreach my $tempexon2 (@tempexons2) {
 	 push(@new,$tempexon2);
 	 next BESTFIT;
      }
-     
-     $self->throw("Error - should never reach here!");
- }
-	      
+    $self->throw("Error - should never reach here!");
+}
+   foreach my $alternative (keys (%bf)) {
+       my $tempid = $bf{$alternative};
+       my $v = $e_v{$alternative};
+       $arc->write_deleted_id('exon',$alternative,$v,$temp_old{$tempid});
+       print $log "EXON MAP KILLED $alternative (ALTERNATIVE BESTFIT ".$temp_old{$tempid}.")\n";
+   }
    $self->{'_exon_map_hash'} = \%temp_old;
    $self->{'_mapped_exons'} = \@mapped;
    $self->{'_new_exons'} = \@new;
