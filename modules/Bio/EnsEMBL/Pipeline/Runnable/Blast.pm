@@ -313,11 +313,12 @@ sub parse_results {
       #if alignments contain gaps, the feature needs to be split
       $feat1 {alignment} = $hsp->queryAlignment;
       $feat2 {alignment} = $hsp->sbjctAlignment;
-            
+      
+      
       if ($feat1 {alignment} =~ /-/ or $feat2 {alignment} =~ /-/) {
-	$self->split_gapped_feature(\%feat1, \%feat2); 
+	  $self->split_gapped_feature(\%feat1, \%feat2); 
       } else {                    
-	$self->createfeaturepair(\%feat1, \%feat2); 
+	  $self->createfeaturepair(\%feat1, \%feat2); 
       }
     }
   } 
@@ -346,6 +347,8 @@ sub split_gapped_feature {
     $type2 = 'dna';
   }
   
+  #print STDERR "Got $type1 - $type2\n";
+
   #There's a strange bug in wublastn where a gap is inserted at the end of an alignment
   #The alignment is trimmed of any terminal gaps so that the alignment ends on a valid feature
   while ($feat1->{'alignment'} =~ /-$/ || $feat2->{'alignment'} =~ /-$/) {
@@ -362,22 +365,30 @@ sub split_gapped_feature {
 
   #replace bases and gaps with positions and mask number
   if ($type1 eq 'pep' && $type2 eq 'dna') {
-    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
-    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
+      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
+      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
   } elsif ($type1 eq 'dna' && $type2 eq 'pep') {
-    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
-    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
+      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
+      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
+  } else {
+      # dna-dna
+      @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
+      @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
   }
+
   $self->throw("Can't split feature where alignment lengths don't match: F1 ("
 	       .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
     if (scalar(@masked_f1) != scalar(@masked_f2)); 
     
   my $building_feature;
   my $mask_len = scalar(@masked_f1);
+  
+  
+
   my ($f1_start, $f2_start);
     for (my $index =0; $index < $mask_len; $index++)
     {
-        
+
         if ($masked_f1[$index] == -1 || $masked_f2[$index] == -1 || $index == $mask_len -1)
         {
             #One of the alignments contains an insertion.

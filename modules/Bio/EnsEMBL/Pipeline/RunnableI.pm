@@ -308,6 +308,7 @@ sub createfeaturepair {
     #create featurepair
     my $fp = Bio::EnsEMBL::FeaturePair->new  (  -feature1 => $seqfeature1,
                                                 -feature2 => $seqfeature2 ) ;
+
     $self->growfplist($fp);                             
 }
 
