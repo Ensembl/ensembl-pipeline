@@ -57,6 +57,20 @@ use Bio::EnsEMBL::Root;
 # new() inherited from Bio::EnsEMBL::DBSQL::BaseAdaptor
 
 
+sub get_available_adaptors {
+  my ($self) = @_;
+
+  my $pairs = $self->SUPER::get_available_adaptors();
+
+  $pairs->{'Analysis'}           = 'Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor';
+  $pairs->{'Job'}                = 'Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor';
+  $pairs->{'PmatchFeature'}      = 'Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor';
+  $pairs->{'Rule'}               = 'Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor';
+  $pairs->{'StateInfoContainer'} = 'Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer';
+
+  return $pairs; 
+}
+
 =head2 get_JobAdaptor
 
  Title   : get_JobAdaptor
