@@ -36,10 +36,10 @@ use Getopt::Long;
 
 # this script connects to the db it is going to write to
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw (
-                                        	FINAL_DBHOST
-						FINAL_DBNAME
-						FINAL_DBUSER
-						FINAL_DBPASS
+                                        	REF_DBHOST
+						REF_DBNAME
+						REF_DBUSER
+						REF_DBPASS
                                        );
 
 
@@ -47,10 +47,10 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $port   = undef;
-my $dbname = $FINAL_DBNAME;
-my $dbuser = $FINAL_DBUSER;
-my $dbpass = $FINAL_DBPASS;
-my $host   = $FINAL_DBHOST;
+my $dbname = $REF_DBNAME;
+my $dbuser = $REF_DBUSER;
+my $dbpass = $REF_DBPASS;
+my $host   = $REF_DBHOST;
 
 
 my $runnable;
