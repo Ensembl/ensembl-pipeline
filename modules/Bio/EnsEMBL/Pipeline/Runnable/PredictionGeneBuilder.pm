@@ -704,7 +704,7 @@ sub isHead {
   my $minimum_coverage = 1;
   foreach my $pair ($self->get_all_ExonPairs) {
     my $exon2 = $pair->exon2;
-    if (($exon == $exon2 && ($pair->is_Covered == 1)) {
+    if (($exon == $exon2 && ($pair->is_Covered == 1) ) ) {
       return 0;
     }
   }
