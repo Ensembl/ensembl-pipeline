@@ -227,8 +227,8 @@ sub make_protlist{
 sub convert_coords_to_genomic{
   my ($self, $name, $start, $end) = @_;
 
-  my ($chr_name, $chr_start, $chr_end) = /$GB_INPUTID_REGEX/;
-  if($chr_start - 1 == 0){
+  my ($chr_name, $chr_start, $chr_end) = $self->input_id =~ /$GB_INPUTID_REGEX/;
+  if($start - 1 == 0){
     return ($chr_name, $start, $end);
   }
   my $genomic_start = $start+$chr_start-1;
@@ -245,8 +245,13 @@ sub convert_output{
   
   
   my @out = $self->uniquify(@results);
-  
-
+  foreach my $f(@out){
+   my $query = $f->chr_name;
+   if($query =~ /$GB_INPUTID_REGEX/){
+     my $chr = $1;
+     $f->chr_name($chr);
+   }
+  }
   $self->output(@out);
 }
 
