@@ -264,10 +264,7 @@ sub run_eponine {
 #    print "Running eponine-scan\n";
     $self->throw("Error running eponine-scan on ".$self->filename."\n") 
     
-    # swap this line back into the code to get the -fast option.
-#        if (system ($self->java.' -fast -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
-
-        if (system ($self->java.' -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
+    if (system ($self->java.' -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
 
 }
 
