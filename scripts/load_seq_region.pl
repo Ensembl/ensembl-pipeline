@@ -59,8 +59,8 @@ table. T
     means sequence will be stored from the fasta file. This option isn't valid
     if an agp_file is being passed in'
     -agp_file the name of the agp file to be parsed
-    -fasta_file, name of the fasta file to be parsed  if the -sequence_level
-                 option is also set the sequence will not be stored
+    -fasta_file, name of the fasta file to be parsed without the presence of
+             the -sequence_level option the sequence will not be stored
     -verbose, prints the name which is going to be used can be switched 
               off with -noverbose
     -help      displays this documentation with PERLDOC
