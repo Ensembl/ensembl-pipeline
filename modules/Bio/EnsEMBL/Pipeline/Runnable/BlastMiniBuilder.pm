@@ -192,7 +192,7 @@ sub build_runnables {
 
 	my @sorted_gene_cluster = sort {$a->{_gsf_start} <=> $b->{_gsf_start};} @$gene_cluster;
 
-	my $rough_gene_length = $_sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
+	my $rough_gene_length = $sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
 
 	my $padding_length;
 	if ($rough_gene_length > 10000) {
