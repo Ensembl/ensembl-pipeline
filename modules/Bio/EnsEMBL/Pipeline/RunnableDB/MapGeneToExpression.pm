@@ -66,20 +66,24 @@ use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw(
 								   EST_INPUTID_REGEX
 								   EST_REFDBHOST
+								   EST_REFDBPORT
 								   EST_REFDBUSER
 								   EST_REFDBNAME
 								   EST_REFDBPASS
 								   EST_DBHOST
+								   EST_DBPORT
 								   EST_DBUSER
 								   EST_DBNAME
 								   EST_DBPASS
 								   EST_TARGET_DBNAME
 								   EST_TARGET_DBHOST
+								   EST_TARGET_DBPORT
 								   EST_TARGET_DBUSER
 								   EST_TARGET_DBPASS      
 								   EST_TARGET_GENETYPE
 								   EST_GENETYPE
 								   EST_EXPRESSION_DBHOST
+								   EST_EXPRESSION_DBPORT
 								   EST_EXPRESSION_DBNAME
 								   EST_EXPRESSION_DBUSER
 								   EST_EXPRESSION_DBPASS
@@ -102,11 +106,13 @@ sub new{
 						  -host             => $EST_REFDBHOST,
 						  -user             => $EST_REFDBUSER,
 						  -dbname           => $EST_REFDBNAME,
+                                                  -port             => $EST_REFDBPORT,
 						);
   
   # where the genes are
   my $ensembl_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						      '-host'   => $EST_TARGET_DBHOST,
+						      '-port'   => $EST_TARGET_DBPORT,
 						      '-user'   => $EST_TARGET_DBUSER,
 						      '-dbname' => $EST_TARGET_DBNAME,
 						      '-pass'   => $EST_TARGET_DBPASS,
@@ -118,6 +124,7 @@ sub new{
   unless( $self->db){
     my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						    '-host'   => $EST_DBHOST,
+						    '-port'   => $EST_DBPORT,
 						    '-user'   => $EST_DBUSER,
 						    '-dbname' => $EST_DBNAME,
 						    '-dnadb'  => $refdb,
@@ -133,6 +140,7 @@ sub new{
   # this is also where we are going to store the results
   my $expression_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor->new(
 									  '-host'   => $EST_EXPRESSION_DBHOST,
+									  '-port'   => $EST_EXPRESSION_DBPORT,
 									  '-user'   => $EST_EXPRESSION_DBUSER,
 									  '-dbname' => $EST_EXPRESSION_DBNAME,
 									  '-pass'   => $EST_EXPRESSION_DBPASS,
@@ -294,8 +302,8 @@ sub fetch_input {
   my $ensembl_sa = $self->ensembl_db->get_SliceAdaptor();
   my $est_sa     = $self->est_db->get_SliceAdaptor();
 
-  my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-  my $est_slice      = $est_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $ensembl_slice  = $ensembl_sa->fetch_by_region('chromosome',$chrname,$chrstart,$chrend);
+  my $est_slice      = $est_sa->fetch_by_region('chromosome',$chrname,$chrstart,$chrend);
 
   $self->ensembl_slice( $ensembl_slice );
   $self->est_slice( $est_slice );
