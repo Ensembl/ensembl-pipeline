@@ -1,6 +1,6 @@
-# $Id: Iteration.pm,v 1.1 2002-07-01 15:31:54 lec Exp $
-# Bioperl module Bio::EnsEMBL::Pipeline::Tools::BPlite::Iteration
-#	based closely on the Bio::EnsEMBL::Pipeline::Tools::BPlite modules
+# $Id: Iteration.pm,v 1.2 2004-08-03 14:59:14 lec Exp $
+# Bioperl module Bio::EnsEMBL::Analysis::Tools::BPlite::Iteration
+#	based closely on the Bio::EnsEMBL::Analysis::Tools::BPlite modules
 #	Ian Korf (ikorf@sapiens.wustl.edu, http://sapiens.wustl.edu/~ikorf), 
 #	Lorenz Pollak (lorenz@ist.org, bioperl port)
 #
@@ -61,13 +61,13 @@ This software is provided "as is" without warranty of any kind.
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::Tools::BPlite::Iteration;
+package Bio::EnsEMBL::Analysis::Tools::BPlite::Iteration;
 
 use strict;
 use vars qw(@ISA);
 use Bio::EnsEMBL::Root; # root object to inherit from
-use Bio::EnsEMBL::Pipeline::Tools::BPlite; #
-use Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct;
+use Bio::EnsEMBL::Analysis::Tools::BPlite; #
+use Bio::EnsEMBL::Analysis::Tools::BPlite::Sbjct;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -185,7 +185,7 @@ sub nextSbjct {
   ####################
   # the Sbjct object #
   ####################
-  my $sbjct = new Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct('-name'=>$def,
+  my $sbjct = new Bio::EnsEMBL::Analysis::Tools::BPlite::Sbjct('-name'=>$def,
 					    '-length'=>$length,
                                             '-fh'=>$self->{'FH'}, 
 					    '-lastline'=>$self->{'LASTLINE'}, 
