@@ -167,7 +167,8 @@ sub fetch_input{
   
   $self->vc($vc);
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( -genomic => $vc->primary_seq,
-								    -ids => \@fps);
+								    -ids     => \@fps,
+                                                                    -endbias => 1);
   
   
   
