@@ -47,10 +47,13 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $features,$seqfetcher, $endbias, $minimum_intron, $exon_padding, $minimum_feature_length) = 
+    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $minimum_intron, $exon_padding, $minimum_feature_length) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
+			    TERMINAL_PADDING
+			    EXON_PADDING
+			    MINIMUM_INTRON
                             ENDBIAS  
                             MINIMUM_INTRON
                             EXON_PADDING
@@ -70,9 +73,9 @@ sub new {
     $self->seqfetcher($seqfetcher)              if defined($seqfetcher);
     $self->endbias($endbias)                    if defined($endbias);
     $self->features($features)                  if defined($features);
-    $self->_minimum_intron($features)           if defined($minimum_intron);
-    $self->_exon_padding($features)             if defined($exon_padding);
-    $self->_minimum_feature_length($features)   if defined($minimum_feature_length);
+    $self->_minimum_intron($minimum_intron)     if defined($minimum_intron);
+    $self->_exon_padding($exon_padding)         if defined($exon_padding);
+    $self->_minimum_feature_length($minimum_feature_length)   if defined($minimum_feature_length);
     #print STDERR @$features." have be passed into MultiMiniGenewise\n";
     return $self;
   }
@@ -292,6 +295,9 @@ sub run {
 									     -genomic => $self->genomic_sequence,
 									     -protein => $pepseq,
 									     -features=> \@forward,
+									     -terminal_padding => $self->_terminal_padding,
+									     -minimum_intron   => $self->_minimum_intron,
+									     -exon_padding     => $self->_exon_padding,
 									     -endbias => $self->endbias);
 	  
 	  $runnable->run;
@@ -313,6 +319,9 @@ sub run {
 									     -genomic => $self->genomic_sequence,
 									     -protein => $pepseq,
 									     -features=> \@reverse,
+									     -terminal_padding   => $self->_terminal_padding,
+									     -minimum_intron => $self->_minimum_intron,
+									     -exon_padding   => $self->_exon_padding,
 									     -endbias => $self->endbias);
 	
 	  $runnable->run;
@@ -439,6 +448,16 @@ sub _exon_padding {
   
 }
 
+sub _terminal_padding {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_terminal_padding'} = $arg;
+  }
+
+  return $self->{'_terminal_padding'};
+  
+}
 
 sub _minimum_feature_length {
   my ($self,$arg) = @_;
