@@ -93,15 +93,16 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = $self->_rearrange([qw(
-												       DATABASE
-												       QUERY_SEQS
-												       QUERY_TYPE
-												       TARGET_TYPE
-												       EXONERATE
-												       OPTIONS
-												      )
-												   ], @args);
+  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = 
+      $self->_rearrange([qw(
+			    DATABASE
+			    QUERY_SEQS
+			    QUERY_TYPE
+			    TARGET_TYPE
+			    EXONERATE
+			    OPTIONS
+			    )
+			 ], @args);
   
   
   $self->{_output} = [];
@@ -119,10 +120,8 @@ sub new {
     $self->throw("Exonerate needs a target - database: $database");
   }
 
-  # Target type: dna  - DNA sequence
-  #              prot - protein sequence
-  #              dnax - DNA sequence translated in six frames to protein
-  #              The default is dna
+  ############################################################
+  # Target type: The default is dna
   if ($target_type){
     $self->target_type($target_type);
   }
@@ -131,12 +130,8 @@ sub new {
     $self->target_type('dna');
   }
 
-  # Query type: dna  - DNA sequence
-  #             rna  - RNA sequence
-  #             prot - protein sequence
-  #             dnax - DNA sequence translated in six frames to protein
-  #             rnax - DNA sequence translated in three frames to protein
-  #             The default is dna
+  ############################################################
+  # Query type: The default is dna
   if ($query_type){
     $self->query_type($query_type);
   }
@@ -145,15 +140,15 @@ sub new {
     $self->query_type('dna');
   }
 
-  # can choose which exonerate to use
-  
-  #$self->exonerate('exonerate-0.6.7') unless $exonerate;
-  $self->exonerate($self->find_executable($exonerate));
-  #$self->exonerate('exonerate-0.6.7');
+  ############################################################
+  # we are using the latest version: exonerate-0.6.7
+  $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
 
-  # can add extra options as a string
+  ############################################################
+  # options
   my $basic_options = " --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
   
+  # can add extra options as a string
   if ($options){
     $basic_options .= $options;
   }
@@ -176,6 +171,8 @@ Function:   Runs exonerate script and puts the results into the file $self->resu
   
 sub run {
   my ($self) = @_;
+
+  my $verbose = 0;
     
   my $dir         = $self->workdir();
   my $exonerate   = $self->exonerate;
@@ -206,17 +203,17 @@ sub run {
   #  close( TARGET_SEQ );
   #}
   
+  ############################################################
   # write the query sequence into a temporary file then
   my $query = "$dir/query_seqs.$$";
-  
   open( QUERY_SEQ,">$query") || $self->throw("Could not open $query $!");
-  
   my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
 			       '-fh'     => \*QUERY_SEQ);
   
   # we write each Bio::Seq sequence in the fasta file $query
   my %length;
   foreach my $query_seq ( @query_seqs ){
+      ## calculate the length
       #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
       $length{ $query_seq->display_id} = $query_seq->length;
       $seqout->write_seq($query_seq);
@@ -224,65 +221,24 @@ sub run {
   close( QUERY_SEQ );
   
   my $command ="exonerate-0.6.7 ".
-    $self->options.
-      " --querytype $query_type --targettype $target_type --query $query --target $target > ".$self->results; 
+      $self->options.
+	  " --querytype $query_type --targettype $target_type --query $query --target $target |";
+
   #print STDERR "running exonerate: $command\n";
+
+  open( EXO, $command ) || $self->throw("Error running exonerate $!");
   
   # system calls return 0 (true in Unix) if they succeed
-  $self->throw("Error running exonerate\n") if (system ($command));
+  #$self->throw("Error running exonerate\n") if (system ($command));
   
-  $self->output( $self->parse_results( \%length ));
-  
-  # remove interim files (but do not remove the database if you are using one)
-  unlink $query;
-  if ( $self->genomic){
-    unlink $target;
-  }
-}
-
-############################################################
-
-=head2 parse_results
-
- Usage   :   $obj->parse_results
- Function:   reads the Blat output (in PSL format or psLayout ) which has been written to
-             a local file $self->results. can accept filenames, filehandles or pipes (\*STDIN)
- Returns :   a list of Features (each alignment), each feature with a list of sub_Seqfeatures (each block of the alignment)
- Args    :   optional filename
-
-=cut
-
-sub parse_results {
-  my ($self, $length) = @_;
-
-  my $verbose = 0;
-  my $filehandle;
-  my %length = %$length;
-  my @features_within_features;
-  
-  my $resfile = $self->results();
-  
-  if (-e $resfile) {
-    if (-z $self->results) {
-      print STDERR "Exonerate didn't find any matches\n";
-      return; 
-    } 
-    else {
-      open (OUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");
-      $filehandle = \*OUT;
-    }
-  }
-  else { #it'a a filehandle
-    $filehandle = $resfile;
-  }
-  
+    
   ############################################################
   # store each alignment as a transcript with supporting features
   my @transcripts;
 
   ############################################################
-  # extract values
-  while (<$filehandle>){
+  # parse results - avoid writing to disk the output
+  while (<EXO>){
       
     print STDERR $_ if $verbose;
       
@@ -324,7 +280,7 @@ sub parse_results {
       # M 7 7     /
       # 
     chomp;
-    my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $gene_orientation, $perc_id, @blocks) = split;
+    my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $perc_id, $gene_orientation, @blocks) = split;
     
     # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
     $q_start++;
@@ -534,30 +490,21 @@ sub parse_results {
 	$evidence->score($coverage);
       }
     }
-    
-    # test
-    #print STDERR "produced transcript:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    
-    ############################################################
-    # reject single-exon alignments which cover less than half the cdna/est:
-    #if ( scalar( @{$transcript->get_all_Exons} ) ){
-    #  my $mapped_length = $transcript->get_all_Exons->[0]->end - $transcript->get_all_Exons->[0]->start + 1;
-    #  if ( $mapped_length <= $length{$q_id}/2 ){
-#	next;
-#      }
-#    }
-    
+        
     push( @transcripts, $transcript );
-      
+    
   } # end of while loop
   
-  close $filehandle;
-  
-  #get rid of the results file
-  unlink $self->results;
-  
-  return @transcripts;
+  $self->output( @transcripts );
+
+  close(EXO);  
+    
+  ############################################################
+  # remove interim files (but do not remove the database if you are using one)
+  unlink $query;
+  if ( $self->genomic){
+    unlink $target;
+  }
 }
 
 ############################################################
