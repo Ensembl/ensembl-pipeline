@@ -106,6 +106,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+   
     $self->genseq($genseq);
 }
 
@@ -138,5 +139,29 @@ sub runnable {
     }
     return $self->{'_runnable'};
 }
+
+sub write_output{
+  my ($self) = @_;
+
+  my @features = $self->output();
+  my $simple_f_a = $self->dbobj->get_SimpleFeatureAdaptor();
+  my $contig;
+  eval 
+    {
+      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    };
+
+  if ($@) 
+    {
+      print STDERR "Contig not found, skipping writing output to db: $@\n";
+    }
+  foreach my $f(@features){
+    $f->analysis($self->analysis);
+    $simple_f_a->store($contig->dbID, $f);
+  }
+
+
+}
+
 
 1;

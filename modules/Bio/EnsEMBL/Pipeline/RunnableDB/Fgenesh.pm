@@ -105,7 +105,7 @@ sub fetch_input {
     my($self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
-
+   
     my $contigid  = $self->input_id;
     #print "contig id = ".$contigid."\n";
     my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
@@ -114,7 +114,7 @@ sub fetch_input {
     #print "geneseq ".$genseq." \n geneseq\n";
     $self->{'contig'} = $contig;
     $self->genseq($genseq);
-
+  
 }
 
 
@@ -183,7 +183,7 @@ sub result_quality_tag {
 
 sub write_output {
    my $self = shift;
-
+  
    my $fgenesh_runnable = ($self->runnable())[0];
    my @transcripts = $fgenesh_runnable->each_Fgenesh_Transcript();
    if( ! @transcripts ) { return; }
@@ -199,16 +199,17 @@ sub write_output {
      } else {
        @exons = sort {$b->start <=> $a->start } @exons;
      }
-     print "ANALYSIS: ",$self->analysis()->dbID,"\n";
+     #print "ANALYSIS: ",$self->analysis()->dbID,"\n";
 
      $ptrans->analysis( $self->analysis() );
      for my $exon ( @exons ) {
-       print STDERR "adding contig ".$self->{'contig'}." to exon\n";
+       #print STDERR "adding contig ".$self->{'contig'}." to exon\n";
        $exon->contig( $self->{'contig'} );
        $ptrans->add_Exon( $exon );
      }
      $ptransAdaptor->store( $ptrans );
    }
+  
 }
 
 1;

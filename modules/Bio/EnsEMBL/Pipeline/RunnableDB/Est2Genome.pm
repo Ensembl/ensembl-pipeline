@@ -58,8 +58,8 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_EST_TYPE
-					 GB_EST_THRESHOLD
+					 GB_EST_DATABASES
+					 GB_EST_GENETYPE
 					);
 
 
@@ -79,6 +79,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                 -seqfetcher: A Bio::DB::RandomAccessI Object (required)
 =cut
 
+
 sub new {
     my ($new,@args) = @_;
     my $self = $new->SUPER::new(@args);    
@@ -87,25 +88,15 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
     my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    
-    if(!defined $type || $type eq ''){
-      $type = $GB_EST_TYPE;
+    $self->throw("no protein source databases defined in GeneConf::GB_EST_DATABASES\n") 
+    unless scalar(@{$GB_EST_DATABASES});
+	 
+    foreach my $db(@{$GB_EST_DATABASES}){
+      my $seqfetcher = $self->make_seqfetcher($db->{'index'});
+      $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
     }
-    if(!defined $threshold){
-      $threshold = $GB_EST_THRESHOLD;
-    }
-
-    $type = 'Full_dbEST' unless (defined $type && $type ne '');
-    $threshold = 200 unless (defined($threshold));
-
-    $self->type($type);
-    $self->threshold($threshold);
     
-    my $seqfetcher = $self->make_seqfetcher();
-    
-    $self->seqfetcher($seqfetcher);
-	
-    return $self;
+   return $self;
 }
 
 
@@ -178,59 +169,47 @@ sub threshold {
 sub fetch_input {
   my( $self) = @_;
   #print "running fetch input\n";  
-  my @fps;
-  my %ests;
-  my @estseqs;
   $self->throw("No input id") unless defined($self->input_id);
   
   
   my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  #print "got contig\n";
   my $genseq   = $contig->get_repeatmasked_seq;
-  #print "got dnaseq\n";
+
   
  
   my $alignadaptor = $self->dbobj->get_DnaAlignFeatureAdaptor();
-  my @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
   
-  my @filtered_features;
-  foreach my $f(@features){
-    #print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
-    if($f->score >= $self->threshold){
-      push(@filtered_features, $f);
-    }
-  }
-  #print "got data\n";
-  foreach my $f (@filtered_features) {
-    my $hid = $f->hseqname;
-    if(!defined $ests{$hid}){
-      $ests{$hid}= 1;
-    }
-	
-  }
-
-  
-  
-  
+  foreach my $database(@{$GB_EST_DATABASES}){
+    my %ests;
+    my @estseqs;
+    print STDERR "Fetching features for " . $database->{'type'} . 
+      " with score above " . $database->{'threshold'}. "\n";
     
-
-  
-  #print "got all unique dbest feature pairs";  
-  #print "fetching sequences = ".$self->seqfetcher."\n";  
-  foreach my $id(keys %ests){
-    my $est = $self->seqfetcher->get_Seq_by_acc($id);
-    #print $est."\n";
-    push(@estseqs, $est);
+    my @features = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
+    print STDERR "have ".scalar(@features)." to run against est2genome\n\n";
+    foreach my $f (@features) {
+      my $hid = $f->hseqname;
+      if(!defined $ests{$hid}){
+	$ests{$hid}= 1;
+      }
       
-  }
-  #print "got all ests\n";
-  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'     => $genseq, 
-									    '-queryseq' => \@estseqs,
-									    '-seqfetcher'  => $self->seqfetcher);
-  #print "created BlastMiniEst2Genome Runnable\n";  
-  $self->runnable($runnable);
-  #print "finshed fetching input\n";
-}    
+    }
+    my $seqfetcher = $self->get_seqfetcher_by_type($database->{'type'});
+    foreach my $id(keys %ests){
+      my $est = $seqfetcher->get_Seq_by_acc($id);
+      
+      push(@estseqs, $est);
+      
+    }
+    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'     => $genseq, 
+									       '-queryseq' => \@estseqs,
+									       '-seqfetcher'  => $seqfetcher);
+    
+    $self->runnable($runnable);
+  
+  }    
+
+}
       
   
     
@@ -242,23 +221,36 @@ sub fetch_input {
 
 sub runnable {
     my ($self,$arg) = @_;
-
+ 
+    if(!defined($self->{'_seqfetchers'})) {
+      $self->{'_seqfetchers'} = [];
+    }
+    
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
+      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
 	
-	$self->{_runnable} = $arg;
+      push(@{$self->{_runnable}}, $arg);
     }
 
-    return $self->{_runnable};
+    return @{$self->{_runnable}};
 }
 
 sub run {
     my ($self) = @_;
-
-    my $runnable = $self->runnable;
-    $runnable || $self->throw("Can't run - no runnable object");
-    
-    $runnable->run;
+ 
+    foreach my $runnable ($self->runnable) {
+      $runnable || $self->throw("Can't run - no runnable object");
+      #print STDERR "using ".$runnable."\n";
+      #my $estseqs =  $runnable->queryseq;
+      #print STDERR "there are ".scalar(@$estseqs)." to run against\n";
+      #foreach my $est(@$estseqs){
+#	print STDERR $est->accession_number()."\n";
+ #     }
+      $runnable->run;
+  #    print STDERR "have finshed running \n\n";
+    }
+   
+   
     $self->_convert_output();
     #print "have run est2genome\n";
 }
@@ -282,13 +274,13 @@ sub write_output {
  
     
     
-  print "writting output there should be ".scalar(@genes)." written to the database\n"; 
+  #print "writting output there should be ".scalar(@genes)." written to the database\n"; 
  GENE: foreach my $gene (@genes) {	
     # do a per gene eval...
     eval {
       #print "gene = ".$gene."\n";
       my $dbid = $gene_adaptor->store($gene);
-      print "gene has been store as ".$dbid."\n";
+      #print "gene has been store as ".$dbid."\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -303,20 +295,13 @@ sub write_output {
 sub _convert_output {
   my ($self) = @_;
   my $count  = 1;
-  my $time   = time; chomp($time);
+  my $time   = time; 
+  chomp($time);
   my @genes;
-  my $genetype = 'Est2Genome';
+  my $genetype = $self->analysis->logic_name;
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
-  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
-  my $analysis;
-  #print "converting output\n";
-  if(scalar(@analyses) > 1){
-    $self->throw("panic! > 1 analysis for $genetype\n");
-  }
-  elsif(scalar(@analyses) == 1){
-    $analysis = $analyses[0];
-  }
-  else{
+  my $analysis = $anaAdaptor->fetch_by_logic_name($genetype);
+  if(!$analysis){
     # make a new analysis object
     $analysis = new Bio::EnsEMBL::Analysis
       (-db              => 'dbEST',
@@ -332,7 +317,7 @@ sub _convert_output {
   # make an array of genes for each runnable
   #print $analysis."\n";
   foreach my $runnable ($self->runnable) {
-    my @g = $self->_make_genes($count, $time, $runnable, $analysis);
+    my @g = $self->_make_genes($count, $time, $runnable, $self->analysis);
     push(@genes, @g);
   }
   #print STDOUT "genes = @genes\n";
@@ -349,8 +334,8 @@ sub _convert_output {
 sub _make_genes {
   my ($self, $count, $time, $runnable, $analysis) = @_;
   my $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  print STDERR "contig = ".$contig." dbId = ".$contig->dbID."\n";
-  my $genetype = 'eg';
+  #print STDERR "contig = ".$contig." dbId = ".$contig->dbID."\n";
+  my $genetype = $GB_EST_GENETYPE;
   my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
   #print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
   my @genes;
@@ -392,22 +377,20 @@ sub _make_genes {
       # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
       
 
-      $exon_pred->score(100); # ooooooohhhhhh
+      $exon->score(100); # ooooooohhhhhh
       $exon->analysis($gene->analysis);
       #print "num subfeatures: " . scalar($exon_pred->sub_SeqFeature) . "\n";
 
       # sort out supporting evidence for this exon prediction
       foreach my $subf($exon_pred->sub_SeqFeature){
 	$subf->seqname($contig->dbID);
-	$subf->feature1->seqname($contig->dbID);
-	$subf->feature2->seqname($contig->dbID);	
-	$subf->feature1->analysis($exon_pred->analysis);
+	$subf->feature1->seqname($contig->dbID);	
+	$subf->feature1->analysis($exon->analysis);
 	#print " supporting feature analysis ".$exon->analysis."\n";
 	$subf->feature2->analysis($exon->analysis);
 	$subf->analysis($exon->analysis);
 	#print $subf->analysis."\n";
 	$exon->add_Supporting_Feature($subf);
-	print "supporting feature contig id = ".$subf->contig_id."\n";
       }
       
       push(@exons,$exon);
@@ -462,13 +445,13 @@ sub _make_genes {
 }
 
 sub make_seqfetcher {
-  my ( $self ) = @_;
-  my $index   = $ENV{BLASTDB}."/".$self->analysis->db;
+  my ( $self, $index ) = @_;
+ 
   my $seqfetcher;
-
-  if(defined $self->analysis->db && $self->analysis->db ne ''){
+  #print STDERR "making seqfetch with index ".$index."\n";
+  if($index){
     my @db = ( $index );
-    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs->new('-db' => \@db,);
+    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::GetSeqs->new('-db' => \@db,);
   }
   else{
     # default to Pfetch
@@ -477,6 +460,47 @@ sub make_seqfetcher {
   
   return $seqfetcher;
 
+}
+
+sub add_seqfetcher_by_type{
+  my ($self, $type, $seqfetcher) = @_;
+  $self->throw("no type specified\n") unless defined ($type); 
+  $self->throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
+    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::DB::RandomAccessI"); 
+  $self->{'_seqfetchers'}{$type} = $seqfetcher;
+}
+
+
+sub get_seqfetcher_by_type{
+  my ($self, $type) = @_;
+  my %seqfetchers = $self->each_seqfetcher_by_type;
+  foreach my $dbtype(keys %seqfetchers){
+    if ($dbtype eq $type){
+      return $seqfetchers{$dbtype};
+    }
+  }
+}
+
+sub each_seqfetcher_by_type {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB hash of seqfetchers
+   return %{$self->{'_seqfetchers'}};
+}
+
+sub each_seqfetcher {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB array of seqfetchers
+   return values(%{$self->{'_seqfetchers'}});
 }
 
 1;

@@ -98,17 +98,16 @@ sub new {
 
 sub fetch_input {
     my($self) = @_;
-    
+   
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 
-    print STDERR "Setting genseq to " . $genseq. "\n";
-
+    
     $self->genseq($genseq);
-    print STDERR "Set genseq to " . $self->genseq. "\n";
+  
 # input sequence needs to contain at least 3 consecutive nucleotides
     my $seq = $self->genseq->seq;
     if ($seq =~ /[CATG]{3}/) {
@@ -118,6 +117,7 @@ sub fetch_input {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
+   
 }
 
 #get/set for runnable and args
@@ -131,7 +131,7 @@ sub runnable {
       }else{
 	$ungapped = undef;
       }
-      print STDERR "ungapped = ".$ungapped."\n";
+      #print STDERR "ungapped = ".$ungapped."\n";
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
@@ -159,10 +159,12 @@ sub runnable {
 
 sub run {
     my ($self,$dir) = @_;
+   
     $self->throw("Runnable module not set") unless ($self->runnable());
     $self->throw("Input not fetched")       unless ($self->genseq());
 
     $self->runnable->run($dir);
+  
 }
 
 
@@ -183,6 +185,37 @@ sub output {
     $runnable || $self->throw("Can't return output - no runnable object");
 
     return $runnable->output;
+}
+
+
+sub write_output{
+  my ($self) = @_;
+
+  my @features = $self->output();
+  my $dna_f_a = $self->dbobj->get_DnaAlignFeatureAdaptor();
+  my $pep_f_a = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+  my $contig;
+  eval 
+    {
+      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    };
+
+  if ($@) 
+    {
+      print STDERR "Contig not found, skipping writing output to db: $@\n";
+    }
+  foreach my $f(@features){
+    $f->analysis($self->analysis);
+    if($f->isa('Bio::EnsEMBL::DnaDnaAlignFeature')){
+      $dna_f_a->store($contig->dbID, $f);
+    }elsif($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
+      $pep_f_a->store($contig->dbID, $f);
+    }else{
+      $self->throw("don't know how to store $f\n");
+    }
+  }
+
+
 }
 
 1;

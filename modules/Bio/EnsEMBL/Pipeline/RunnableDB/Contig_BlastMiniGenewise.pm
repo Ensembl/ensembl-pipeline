@@ -67,12 +67,11 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					     );
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
-					 GB_SIMILARITY_TYPE
-					 GB_SIMILARITY_THRESHOLD
-					 GB_SKIP_BMG
-					 GB_PROTEIN_INDEX
 					 GB_DBHOST
+					 GB_PROTEIN_INDEX
+					 GB_SKIP_BMG
+					 GB_SIMILARITY_DATABASES
+					 GB_SIMILARITY_GENETYPE
 					);
 
 
@@ -91,26 +90,16 @@ sub new {
     }
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
 
-    if(!defined $path || $path eq ''){
-      $path = $GB_GOLDEN_PATH;
-    }
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    
-    if(!defined $type || $type eq ''){
-      $type = $GB_SIMILARITY_TYPE;
-    }
-    
-    if(!defined $threshold){
-      $threshold = $GB_SIMILARITY_THRESHOLD;
-    }
-
-    $type = 'Swall' unless (defined $type && $type ne '');
-    $threshold = 200 unless (defined($threshold));
-
+   
     $self->dbobj->static_golden_path_type($path);
-    $self->type($type);
-    $self->threshold($threshold);
 
+    $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
+      unless scalar(@{$GB_SIMILARITY_DATABASES});
+    
+    foreach my $db(@{$GB_SIMILARITY_DATABASES}){
+      my $seqfetcher = $self->make_seqfetcher($db->{'index'});
+      $self->add_seqfetcher_by_type($db->{'type'}, $seqfetcher);
+    }
 
     return $self; 
 }
@@ -302,20 +291,15 @@ sub fetch_input {
     }
     else {
       my $alignadaptor = $self->dbobj->get_ProteinAlignFeatureAdaptor();
-      @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
+      foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+      @features  = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
       
       #print STDERR "Number of features = " . scalar(@features) . "\n";
       my @filtered_features;
       
-      foreach my $f(@features){
-	#print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
-	if($f->score >= $self->threshold){
-	  push(@filtered_features, $f);
-	}
-      }
       my %idhash;
       
-      foreach my $f (@filtered_features) {
+      foreach my $f (@features) {
 	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	    defined($f->hseqname)) {
 	  $idhash{$f->hseqname} = 1;
@@ -323,11 +307,11 @@ sub fetch_input {
       }
     
       my @ids = keys %idhash;
-      
+      my $seqfetcher = $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
       my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
 									     '-ids'        => \@ids,
-									     '-seqfetcher' => $self->seqfetcher,
+									     '-seqfetcher' => $seqfetcher,
 									     '-trim'       => 1);
       
       
@@ -337,6 +321,22 @@ sub fetch_input {
     # at present, we'll only ever have one ...
     $self->vcontig($contig);
 }     
+
+sub runnable {
+    my ($self,$arg) = @_;
+ 
+    if(!defined($self->{'_seqfetchers'})) {
+      $self->{'_seqfetchers'} = [];
+    }
+    
+    if (defined($arg)) {
+      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
+	
+      push(@{$self->{_runnable}}, $arg);
+    }
+
+    return @{$self->{_runnable}};
+}
 
 =head2 run
 
@@ -353,11 +353,11 @@ sub run {
 
     #Now there is more than one...
     foreach my $runnable ($self->runnable) {
-		if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise")){
-			$runnable->minirun;
-		}else{
-      		$runnable->run;
-		}
+      if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise")){
+	$runnable->minirun;
+      }else{
+	$runnable->run;
+      }
     }
     
     $self->convert_output;
@@ -606,6 +606,48 @@ sub make_seqfetcher {
   return $seqfetcher;
 }
 
+sub add_seqfetcher_by_type{
+  my ($self, $type, $seqfetcher) = @_;
+  $self->throw("no type specified\n") unless defined ($type); 
+  $self->throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
+    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::DB::RandomAccessI"); 
+  $self->{'_seqfetchers'}{$type} = $seqfetcher;
+}
+
+
+sub get_seqfetcher_by_type{
+  my ($self, $type) = @_;
+  my %seqfetchers = $self->each_seqfetcher_by_type;
+  foreach my $dbtype(keys %seqfetchers){
+    if ($dbtype eq $type){
+      return $seqfetchers{$dbtype};
+    }
+  }
+}
+
+sub each_seqfetcher_by_type {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB hash of seqfetchers
+   return %{$self->{'_seqfetchers'}};
+}
+
+sub each_seqfetcher {
+  my ($self) = @_;
+  
+  if(!defined($self->{'_seqfetchers'})) {
+     $self->{'_seqfetchers'} = {};
+   }
+    
+  # NB array of seqfetchers
+   return values(%{$self->{'_seqfetchers'}});
+}
+
+
 =head2 bpDBAdaptor
 
   Title   : bpDBAdaptor
@@ -732,6 +774,7 @@ sub _select_features {
     	push (@features,$selected_hsp->sub_SeqFeature);
 	}
 	return @features;
+      }
 }
 
 1;

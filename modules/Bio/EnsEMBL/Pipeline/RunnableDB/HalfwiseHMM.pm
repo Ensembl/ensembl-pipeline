@@ -1,7 +1,6 @@
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
-#
 # Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
@@ -59,8 +58,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_SIMILARITY_TYPE
-					 GB_SIMILARITY_THRESHOLD
+					 GB_SIMILARITY_DATABASES
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -87,19 +85,6 @@ sub new {
     my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    if(!defined $type || $type eq ''){
-      $type = $GB_SIMILARITY_TYPE;
-    }
-    if(!defined $threshold){
-      $threshold = $GB_SIMILARITY_THRESHOLD;
-    }
-
-    $type = 'Swall' unless (defined $type && $type ne '');
-    $threshold = 200 unless (defined($threshold));
-
-    $self->type($type);
-    $self->threshold($threshold);
-
     return $self;
 }
 
@@ -134,8 +119,7 @@ sub threshold {
 
 sub fetch_input {
   my( $self) = @_;
-  #print "running fetch input\n";  
-  my @fps;
+  #print "running fetch input\n"; 
   my %ests;
   my @estseqs;
   $self->throw("No input id") unless defined($self->input_id);
@@ -150,33 +134,32 @@ sub fetch_input {
   #print "got data\n";
   
   my $alignadaptor = $self->dbobj->get_ProteinAlignFeatureAdaptor();
-  my @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
   
-  #print STDERR "Number of features = " . scalar(@features) . "\n";
-  my @filtered_features;
-      
-  foreach my $f(@features){
-    #print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
-    if($f->score >= $self->threshold){
-      push(@filtered_features, $f);
-    }
-  }
+  foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+     my @fps;
+    my @features  = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
   
-  foreach my $f (@filtered_features) {
-    if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-	defined($f->hseqname)) {
-      push(@fps, $f);
+    #print STDERR "Number of features = " . scalar(@features) . "\n";
+
+  
+    foreach my $f (@features) {
+      if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+	  defined($f->hseqname)) {
+	push(@fps, $f);
+      }
     }
-  }
-  #print "got".scalar(@fps)." feature pairs\n";
-  #print STDERR "have ".$genseq."\n";
-  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-query'     => $genseq, 
-								     '-features' => \@fps,
-								    );
-  #print "created HalfwiseHMM Runnable\n";  
-  $self->runnable($runnable);
-  #print "finshed fetching input\n";
-}    
+    #print "got".scalar(@fps)." feature pairs\n";
+    #print STDERR "have ".$genseq."\n";
+    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-query'     => $genseq, 
+								       '-features' => \@fps,
+								      );
+    #print "created HalfwiseHMM Runnable\n";  
+    $self->runnable($runnable);
+    #print "finshed fetching input\n";
+   
+  }    
+
+}
       
   
     
@@ -192,43 +175,37 @@ sub fetch_input {
 =cut    
     
 
-
-
 sub runnable {
     my ($self,$arg) = @_;
-
+ 
+    if(!defined($self->{'_seqfetchers'})) {
+      $self->{'_seqfetchers'} = [];
+    }
+    
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
+      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
 	
-	$self->{_runnable} = $arg;
+      push(@{$self->{_runnable}}, $arg);
     }
 
-    return $self->{_runnable};
+    return @{$self->{_runnable}};
 }
-
-
-=head2  run
-
-    Arg      : none
-    Function : runs the runnable and runs _convert_output(); 
-    Exception: thows if no runnable is defined
-    Caller   : 
-    Example  :
-
-=cut
 
 sub run {
     my ($self) = @_;
-    #print "running halfwisehmm\n";
-    my $runnable = $self->runnable;
-    $runnable || $self->throw("Can't run - no runnable object");
-    #print "halfwiseDB\n";
-    $runnable->run;
-    #print "halfwiseDB\n";
-    $self->_convert_output();
-    
-}
  
+    foreach my $runnable ($self->runnable) {
+      $runnable || $self->throw("Can't run - no runnable object");
+      print "using ".$runnable."\n";
+      $runnable->run;
+    }
+   
+   
+    $self->_convert_output();
+    #print "have run est2genome\n";
+}
+
+
 
 =head2  output
 
@@ -262,6 +239,8 @@ sub run {
 sub write_output {
 
   my($self) = @_;
+  my @times = times;
+  print STDERR "started writing @times \n";
   #$self->_convert_output();
   my @genes    = $self->output();
   
@@ -281,6 +260,8 @@ sub write_output {
     }
     
   }
+  @times = times;
+  print STDERR "finished writing @times \n";
    return 1;
 }
 
@@ -322,15 +303,17 @@ sub _convert_output {
       );
   }
    # make an array of genes for each runnable
-    my $runnable = $self->runnable();
-    my @out = $runnable->output;
-    #print "HalfwiseDB\n";
-    #"converting ".scalar(@out)." features to genes\n";
-    my @g = $self->_make_genes($genetype, $analysis, \@out);
-    push(@genes, @g);
+  my @out;
+  foreach my $runnable($self->runnable){
+    push(@out, $runnable->output);
+  }
+  #print "HalfwiseDB\n";
+  #"converting ".scalar(@out)." features to genes\n";
+  my @g = $self->_make_genes($genetype, $analysis, \@out);
+  push(@genes, @g);
   
  #print STDOUT "genes = @genes\n";
-
+  
     
   if (!defined($self->{_output})) {
     $self->{_output} = [];

@@ -103,11 +103,11 @@ sub new {
 
 sub fetch_input {
     my($self) = @_;
-    
+
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    print STDERR "Fetching contig $contigid\n";
+    #print STDERR "Fetching contig $contigid\n";
     my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($contigid)
         or $self->throw("Unable to find contig ($contigid)\n");
     my $genseq    = $contig->primary_seq() 
@@ -115,7 +115,9 @@ sub fetch_input {
 
     $self->genseq($genseq);
     #need to get features predicted by genscan
-    $self->transcripts($contig->get_genscan_peptides);
+     my @genscan_peps = $self->dbobj->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
+    $self->transcripts(@genscan_peps);
+   
 }
 
 sub transcripts {
@@ -125,8 +127,8 @@ sub transcripts {
     {
         foreach (@transcripts)
         {
-#            $self->throw("Input $_ is not a Bio::EnsEMBL::Transcript\n")
-#                unless $_->isa("Bio::EnsEMBL::Transcript");
+            $self->throw("Input $_ is not a Bio::EnsEMBL::PredictionTranscript\n")
+                unless $_->isa("Bio::EnsEMBL::PredictionTranscript");
         }
         push (@{$self->{'_transcripts'}}, @transcripts);
     }
@@ -160,10 +162,11 @@ sub runnable {
 
 sub run {
     my ($self) = @_;
-
+    my @times = times;
+    print STDERR "started running @times \n";
     #need to pass one peptide at a time
     $self->throw("Input must be fetched before run") unless ($self->genseq);
-    print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
+    #print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
 
     #extract parameters into a hash
     my ($parameter_string) = $self->analysis->parameters();
@@ -216,7 +219,8 @@ sub run {
 	$self->runnable($runnable);                                        
 
     }
-
+    @times = times;
+    print STDERR "finished running @times \n"; 
 }
 
 =head2 output
@@ -242,5 +246,33 @@ sub output {
     }
     return @output;
 }
+
+sub write_output{
+  my ($self) = @_;
+
+  my @features = $self->output();
+  my $pep_f_a = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+  my $contig;
+  eval 
+    {
+      $contig = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    };
+
+  if ($@) 
+    {
+      print STDERR "Contig not found, skipping writing output to db: $@\n";
+    }
+  foreach my $f(@features){
+    $f->analysis($self->analysis);
+    if($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
+      $pep_f_a->store($contig->dbID, $f);
+    }else{
+      $self->throw("don't know how to store $f\n");
+    }
+  }
+
+
+}
+
 
 1;

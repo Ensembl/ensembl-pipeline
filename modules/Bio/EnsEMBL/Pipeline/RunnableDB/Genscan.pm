@@ -109,6 +109,7 @@ sub fetch_input {
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
     $self->{'contig'} = $contig;
+ 
 }
 
 #get/set for runnable and args
@@ -152,7 +153,7 @@ sub init {
 
 sub write_output {
    my $self = shift;
-
+ 
    my $genscan_runnable = ($self->runnable())[0];
    my @transcripts = $genscan_runnable->each_Transcript();
    if( ! @transcripts ) { return; }
@@ -177,6 +178,7 @@ sub write_output {
      }
      $ptransAdaptor->store( $ptrans );
    }
+  
 }
 
 
