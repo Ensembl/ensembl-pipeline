@@ -27,8 +27,13 @@ sub _fetch {
   my $command;
 
   if (ref $id eq 'ARRAY') {
+    for (my $i = 0; $i < scalar @$id; $i++){
+      $id->[$i] =~ s/(\S+).*/$1/;
+    }
+
     $command = $self->db->seqfetch_command . " @$id";
   } else {
+    $id =~ s/(\S+).*/$1/;
     $command = $self->db->seqfetch_command . " " . $id;
   }
 
