@@ -831,7 +831,7 @@ sub find_transcripts_by_protein_evidence{
 
 =cut
 
-sub find_transcripts_by_protein_evidence{
+sub find_transcripts_by_dna_evidence{
   my ($self,$id,$db) = @_;
   
   my $q = qq( SELECT distinct(t.transcript_id)
