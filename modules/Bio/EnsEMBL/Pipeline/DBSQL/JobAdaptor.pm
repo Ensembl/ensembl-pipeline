@@ -187,7 +187,7 @@ sub fetch_current_status{
     SELECT status
     FROM job_status
     WHERE job_id = ?
-    ORDER by time
+    ORDER by sequence_num
     DESC
     LIMIT 1};
 
@@ -215,11 +215,11 @@ sub list_current_status {
   my $self = shift;
 
   my $q = qq {
-  SELECT j.job_id, 
+  SELECT j.job_id,
          j.input_id,
          j.taskname,
-  MAX(CONCAT(LPAD(UNIX_TIMESTAMP(js.time), 11,'0'), ':', js.status)) AS max_status
-  FROM   job_status js, 
+  MAX(CONCAT(LPAD(js.sequence_num, 10, '0'),':', UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
+  FROM   job_status js,
          job j
   WHERE  js.job_id = j.job_id
   GROUP BY js.job_id };
@@ -231,8 +231,9 @@ sub list_current_status {
   my ( $job_id, $input_id, $taskname, $max_status );
 	$sth->bind_columns(\$job_id, \$input_id, \$taskname, \$max_status);
   while($sth->fetch() ) {
+		my ($seqnum, $timestamp, $status) = split(':', $max_status);
     push( @$result,
-	    [ $job_id, $taskname, $input_id, reverse split(':', $max_status) ]);
+	    [ $job_id, $taskname, $input_id,  $status, $timestamp ]);
   }
   return $result;
 }
