@@ -45,7 +45,8 @@ my $input_id;
 
 &get_variables();
 
-my $command = "$runner -runnable $runnable -input_id $input_id -write";
+#my $command = "$runner -runnable $runnable -input_id $input_id -write";
+my $command = "$runner -runnable $runnable -input_id $input_id";
 
 print STDERR "command is $command\n";
 
