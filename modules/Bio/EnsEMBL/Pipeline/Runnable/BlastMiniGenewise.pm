@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
+
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
 							   GB_INPUTID_REGEX
 							   GB_BMG_FILTER
@@ -285,7 +286,7 @@ sub run_blast {
     } elsif ($self->genomic_sequence->id =~ /^..\:(.*)/) {
       $regex = '^..\:(.*)';
     }else {
-      $regex = '^(\w+)\s+';
+      $regex = '^(\w+)';
     }
     
      
