@@ -120,7 +120,7 @@ foreach my $gene_id ( @gene_ids){
 
       # is strand defined?
       if ( !defined $info{strand}{$exon_id} ){
-	print STDERR "exon $exon_id has no strand\n";
+	print STDERR "PROBLEM: exon $exon_id has no strand\n";
       }
 
       # is strand consistent among exons?
@@ -128,21 +128,21 @@ foreach my $gene_id ( @gene_ids){
 	$strand = $info{strand}{$exon_id};
       }      
       if ( $info{strand}{$exon_id} != $strand ){
-	print STDERR "Problem with the strands in transcript $tran_id:\n";
+	print STDERR "PROBLEM: Problem with the strands in transcript $tran_id:\n";
 	&print_transcript( $exons,$info);
       }
      
       # mark single exon transcripts
       if ( scalar(@exons) == 1){
 	my $length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
-	print STDERR "single exon transcript $tran_id of length: $length\n";      
+	print STDERR "PROBLEM: single exon transcript $tran_id of length: $length\n";      
       }
       
       # are phases consistent?
       if ($exon_count>1){
 	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
 	  if ( $end_phase != $info{start_phase}{$exon_id} ){
-	    print STDERR "Inconsistent phases in transcript $tran_id:\n";
+	    print STDERR "PROBLEM: Inconsistent phases in transcript $tran_id:\n";
 	    &print_transcript( $exons,$info);
 	  }
 	}
@@ -157,13 +157,13 @@ foreach my $gene_id ( @gene_ids){
 	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
 	  if ( $strand == 1){
 	    if ( $info{start}{$exon_id} < $info{end}{$previous_exon} ){
-	      print STDERR "Transcript $tran_id folds back on itself\n";
+	      print STDERR "PROBLEM: Transcript $tran_id folds back on itself\n";
 	      &print_transcript( $exons,$info);
 	    }
 	  }
 	  if ($strand == -1){
 	    if  ( $info{end}{$exon_id} > $info{start}{$previous_exon} ){
-	      print STDERR "Transcript $tran_id folds back on itself\n";
+	      print STDERR "PROBLEM: Transcript $tran_id folds back on itself\n";
 	      &print_transcript( $exons,$info);
 	    }
 	  }
