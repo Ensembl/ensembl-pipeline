@@ -59,9 +59,7 @@ use vars qw( %Pmatch );
 	   #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
 	   GB_PMATCH_SOFTMASK => 0, #set to one if you want the repeats softmasked ie lower case bases rather than uppercase N's
 	   GB_INITIAL_PMATCH_LOGICNAME => 'Pmatch', #logic_name of first pmatch analysis  
-	   GB_INITIAL_PMATCH_RUNNABLEDB => 'Pmatch',  #RunnableDB to be used for first pmatch analysis,  
 	   GB_FINAL_PMATCH_LOGICNAME => 'BestPmatch', #logicname of best in genome analysis
-	   GB_FINAL_PMATCH_RUNNABLEDB => 'BestPmatch',  #RunnableDB to be used for second pmatch analysis,
 	  );
 
 sub import {
