@@ -212,6 +212,8 @@ sub write_output {
     
     ############################################################
     # put fake stable_ids to keep track of the scoring
+    #VAC hack
+    $self->_label(1);
     if ( $self->_label ){
 
       my $gene_id;
@@ -1681,9 +1683,11 @@ sub _check_Translations {
       }
       
       ############################################################
-      # put possible stop at the end:
+      # put possible start and stop:
       eval{
+	$transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon( $transcript );
 	$transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon( $transcript );
+
       };
       if($@){
 	print STDERR "there was a problem with the trancript: [$@]\n"

@@ -464,6 +464,9 @@ sub make_genes {
     # make one gene per valid transcript
     foreach my $valid (@$valid_transcripts){
 
+      # add a start codon if appropriate
+      $valid = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($valid);
+
       # add a stop codon if appropriate
       $valid = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($valid);
 
