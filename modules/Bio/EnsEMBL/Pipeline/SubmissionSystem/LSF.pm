@@ -205,7 +205,7 @@ sub flush {
 			
       #add the job name and array index
       push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
-      $command = "$runner -jobname $lsf_job_name -index $dbargs";
+      $command = "$runner -jobname $lsf_job_name -index  $dbargs";
     }
 
     #execute the bsub to submit the job or job_array
@@ -213,7 +213,7 @@ sub flush {
     #need to get job_id out of stdout :(
     my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
 
-    print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
+    #print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
     #my $sub_id = int(rand(100000));
 
     open(SUB, $bsub." 2>&1 |") or
@@ -318,10 +318,16 @@ sub submit {
 
 sub create_Job {
   my ($self, $taskname, $module, $input_id, $parameter_string) = @_;
-
+  
+  my $pending = $self->get_pending_jobs($taskname);
+  my $max = $self->max_pending;
+  #print STDERR "pending = ".$pending." max = ".$max."\n";
+  if($pending >= $max){
+      print STDERR "LSF has too many pending jobs won't create any more\n";
+      return undef;
+    }
   my $config = $self->get_Config();
   my $job_adaptor = $config->get_DBAdaptor->get_JobAdaptor();
-
   my $job = Bio::EnsEMBL::Pipeline::Job->new
     (-TASKNAME   => $taskname,
      -MODULE     => $module,
@@ -330,8 +336,7 @@ sub create_Job {
 
 
   #store the job and set its status to created
-  $job_adaptor->store($job);
-
+  my $dbID = $job_adaptor->store($job);
   return $job;
 }
 
@@ -395,5 +400,44 @@ sub _dir_prefix {
   return "$temp_dir/";
 }
 
+
+sub get_pending_jobs{
+  my ($self, $taskname) = @_;
+
+  my $where = $self->get_Config->get_parameter($taskname, 'where');
+  my ($queue, $other_parms);
+  (undef, $queue, $other_parms) = split(':', $where, 3);
+
+  my $command = "bjobs -p";
+  $command .= " -q $queue | grep PEND" if($queue);
+  my @lines;
+  open (BJOBS, "$command 2>&1 |") or do{
+    return 0;
+  };
+  @lines = <BJOBS>;
+  
+  close(BJOBS) or do{
+    return 0;
+  };
+  
+
+  return 0 if $lines[0] =~ /No pending job found/;
+  return scalar(@lines);
+  
+  
+  
+}
+
+
+
+sub max_pending{
+  my ($self) = @_;
+  
+  if(!$self->{'max_pending'}){
+    my $max = $self->get_Config->get_parameter('LSF', 'max_pending');
+    $self->{'max_pending'} = $max;
+  }
+  return $self->{'max_pending'};
+}
 
 1;
