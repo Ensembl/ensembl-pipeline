@@ -44,19 +44,20 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::CPG';
 my $ana_adaptor = $db->get_AnalysisAdaptor();
+my $ana = $ana_adaptor->fetch_by_logic_name('cpg');
 
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'cpg',
-                                                    -program_file   => '/usr/local/pubseq/bin/cpg',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'cpg',
-                                                    -gff_feature    => 'cpg_island', 
-#                                                    -parameters     => '-LENGTH => 50, -GC => 75',
-                                                    -parameters     => '',
-                                                    -logic_name     => 'cpg',
-                                                     );
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
+#                                                    -db_version     => '__NONE__',
+#                                                    -program        => 'cpg',
+#                                                    -program_file   => '/usr/local/pubseq/bin/cpg',
+#                                                    -module         => $runnable,
+#                                                    -module_version => 1,
+#                                                    -gff_source     => 'cpg',
+#                                                    -gff_feature    => 'cpg_island', 
+##                                                    -parameters     => '-LENGTH => 50, -GC => 75',
+#                                                    -parameters     => '',
+#                                                    -logic_name     => 'cpg',
+#                                                     );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -65,7 +66,7 @@ else
 my $id ='AB016897.00001';  # 4 cpg of > 400
 
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(  -dbobj      => $db,
+my $runobj = "$runnable"->new(  -db      => $db,
 			        -input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
@@ -84,7 +85,9 @@ else
 #display(@out);
 
 $runobj->write_output();
-my @features = $db->get_Contig($id)->get_all_SimilarityFeatures();
+my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
+my @features = $contig->adaptor->fetch_all_simple_features($contig, 'cpg');
+
 display(@features);
 
 unless (@features)
