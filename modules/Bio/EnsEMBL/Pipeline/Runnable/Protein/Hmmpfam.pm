@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam
+Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam
 
 =head1 SYNOPSIS
 
@@ -22,8 +22,7 @@
   my $hmm =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new 
     ('-clone'          => $query,
      '-program'        => 'hmmpfam' or '/usr/local/pubseq/bin/hmmpfam',
-     '-database'       => 'Pfam',
-     '-options'        => '--acc --cut_ga');
+     '-database'       => 'Pfam');
 
   $hmm->workdir ($workdir);
   $hmm->run;
@@ -83,17 +82,23 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of seg run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $program, $database, $options) = $self->_rearrange([qw(CLONE 
-                                                                       PROGRAM
-                                                                       DATABASE
-                                                                       OPTIONS)],        
-                                                                   @args);
+    my ($clone, $analysis, $options) = $self->_rearrange([qw(CLONE 
+                                                             ANALYSIS
+                                                             OPTIONS)],        
+                                                          @args);
   
+    if ($analysis) {
+        $self->analysis($analysis);
+    } else {
+        $self->throw("BlastWorm needs an analysis");
+    }
+
     $self->clone ($clone) if ($clone);       
-    $self->program ($self->find_executable ($program));
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
   
-    if ($database) {
-        $self->database($database);
+    if ($self->analysis->db_file) {
+        $self->database($self->analysis->db_file);
     } else {
         $self->throw("Hmmpfam needs a database");
     }
@@ -177,6 +182,28 @@ sub database {
         $self->{'_database'} = shift;
     }
     return $self->{'_database'};
+} 
+
+
+=head2 analysis
+
+ Title    : analysis
+ Usage    : $self->analysis ($analysis);
+ Function : get/set method for the analysis
+ Example  :
+ Returns  : analysis
+ Args     : analysis (optional)
+ Throws   :
+
+=cut
+
+sub analysis {
+    my $self = shift;
+    if (@_) {
+        $self->{'_analysis'} = shift;
+        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))             || $self->throw("Input isn't a Bio::EnsEMBL::AnalysisI or Bio::EnsEMBL::Analysis");
+    }
+    return $self->{'_analysis'};
 } 
 
 
@@ -266,7 +293,9 @@ sub run_program {
     # run program
     print STDERR "running ".$self->program." against ".$self->database."\n";
 
-    my $cmd = $self->program .' '. 
+    # some of these options require HMMER 2.2g (August 2001)
+    my $cmd = $self->program .' '.
+              '--acc --cut_ga --cpu 1 '.
               $self->options .' '.
 	      $self->database      .' '.
 	      $self->filename.' > '.
@@ -357,14 +386,6 @@ sub parse_results {
 sub create_feature {
     my ($self, $feat) = @_;
 
-    # create analysis object (will end up in the analysis table)
-    my $analysis = Bio::EnsEMBL::Analysis->new;
-    $analysis->db ($feat->{db});
-    $analysis->program ($feat->{program});
-    $analysis->gff_source ($feat->{source});
-    $analysis->gff_feature ($feat->{primary});
-    $analysis->logic_name ($feat->{logic_name});
-
     # create featurepair object
     my $feature1 = Bio::EnsEMBL::SeqFeature->new;
     $feature1->seqname ($feat->{name});
@@ -374,7 +395,7 @@ sub create_feature {
     $feature1->p_value ($feat->{p_value});
     $feature1->source_tag ($feat->{source});
     $feature1->primary_tag ($feat->{primary});
-    $feature1->analysis ($analysis);
+    $feature1->analysis ($self->analysis);
 
     my $feature2 = Bio::EnsEMBL::SeqFeature->new;
     $feature2->seqname ($feat->{hname});
@@ -384,7 +405,7 @@ sub create_feature {
     $feature2->p_value ($feat->{p_value});
     $feature2->source_tag ($feat->{source});
     $feature2->primary_tag ($feat->{primary});
-    $feature2->analysis ($analysis);
+    $feature2->analysis ($self->analysis);
 
     my $featurepair = Bio::EnsEMBL::FeaturePair->new;
     $featurepair->feature1 ($feature1);
