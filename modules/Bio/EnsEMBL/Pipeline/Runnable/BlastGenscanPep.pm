@@ -91,7 +91,6 @@ sub new {
   $self->{'_threshold_type'}   = undef;
   $self->{'_options'}     = undef;
     
-  
   # Read the input parameters and set them in the object
 
   my ( $genomic,$peptide,$program,$database,$threshold,$threshold_type,$options) = 
@@ -293,7 +292,7 @@ sub align_hits_to_contig {
 	$fp->hseqname($feature->hseqname);
 	$fp->hstart($pep_start + $ugFeature->hstart() - 1);
 	$fp->hend($pep_end + $ugFeature->hstart() - 1);
-	$fp->contig($feature->contig);
+	$fp->slice($feature->slice);
 
 	push( @{$exon_hash{$exon}}, $fp );
       }
@@ -403,7 +402,7 @@ sub create_peptide_featurepairs {
       my $featurepair = Bio::EnsEMBL::FeaturePair->new (-feature1   => $dna_feat,
 							-feature2   => $pep_feat );
 
-	$featurepair->attach_seq($self->genomic);
+	$featurepair->slice($self->genomic);
 	$featurepair->{'_exon_align'} = $ex_align;
 	push( @output_features, $featurepair );
       }

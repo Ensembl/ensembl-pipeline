@@ -230,21 +230,8 @@ sub run {
   
   my @feature_pairs;
   foreach my $f (@blast_features){
-    #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
-    #my $feature_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature2,
-	#					     -feature2 => $f->feature1);
     $f->invert($self->genomic_sequence);
-    #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
-    #push(@feature_pairs, $feature_pair);
   }
-  @blast_features = sort{$a->start <=> $b->start  
-                           || $a->end <=> $b->end} @blast_features; 
-  #foreach my $bf(@blast_features){
-    #print STDERR "BLAST RESULTS ".$bf->start." ".$bf->end." ".$bf->strand.
-    #  " ".$bf->hseqname." ".$bf->hstart." ".$bf->hend." ".
-    #    $bf->hstrand." ".$bf->percent_id." ".$bf->p_value." ".$bf->score.
-    #      "\n";
-  #}
   if ($self->check_repeated > 0){ 
     #print STDERR "BMG:249 Checking if there are repeated genes\n";
     $mg_runnables = $self->build_runnables(@blast_features);

@@ -65,7 +65,7 @@ use Bio::DB::RandomAccessI;
 use Bio::EnsEMBL::Root;
 
 #compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
+use Bio::EnsEMBL::Analysis::Programs qw(est2genome); 
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 

@@ -71,7 +71,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::PredictionTranscript;
 
@@ -656,7 +656,7 @@ sub create_genes {
       $self->genefinder_genes($gene); #add gene to main object
       #print STDERR "contig ".$gene->contig."\n";
       $self->query->id($gene_number);
-      my $tran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_with_seq($gene, $self->query);
+      my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
       #print "have ".$tran."\n";
       $self->add_Transcript($tran);
     }

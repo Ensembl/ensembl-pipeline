@@ -56,6 +56,49 @@ sub run_blaste2g {
      }
 }
 
+=head2 run
+
+  Title   : run
+  Usage   : $self->run()
+  Function: Runs est2genome on MiniSeq representation of genomic sequence for each EST
+  Returns : none
+  Args    : 
+
+=cut
+
+sub run {
+    my ($self) = @_;
+    
+    my ($esthash) = $self->get_all_FeaturesById;
+    
+    my @ests    = keys %$esthash;
+    
+    $self->get_all_Sequences(@ests);
+    
+    my $number_of_errors = 0;
+    
+    foreach my $est (@ests) {
+        my $features = $esthash->{$est};
+        my @exons;
+        
+        next unless (ref($features) eq "ARRAY");
+        next unless (scalar(@$features) >= 1);
+      
+        eval {
+            $self->run_blaste2g($est, $features);
+        };
+      
+        if ($@) {
+            $number_of_errors++;
+            print STDERR "Error running blaste2g on" . $features->[0]->hseqname . " [$@]\n";
+        }
+        
+    }
+    # Thought it might be useful to throw at this point if there have been errors.
+    # There might have only been a problem with one of the ests.  
+    $self->throw("See previous errors...") if $number_of_errors;
+    return 1;
+}
 
 sub add_output{
     my($self, @feat_pairs) = @_;

@@ -74,7 +74,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::PredictionTranscript;
 use Bio::Seq;
 use Bio::EnsEMBL::Root;

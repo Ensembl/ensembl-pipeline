@@ -83,7 +83,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::PredictionTranscript;
-use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Root;
 
 
@@ -481,7 +481,7 @@ sub calculate_and_set_phases_new {
 
       my @exons   = $genes[$i]->sub_SeqFeature();
       print STDERR "Exons are $#exons\n";
-      my $tran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_guess_phases($genes[$i],$self->slice);
+      my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_guess_phases($genes[$i],$self->slice);
 
       print STDERR "\nPeptide is " . $peptides[$i] . "\n";
       

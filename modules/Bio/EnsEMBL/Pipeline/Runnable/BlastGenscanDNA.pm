@@ -410,7 +410,7 @@ sub align_hits_to_contig {
 	$fp->hstart($hstart);
 	$fp->hend($hend);
 	$fp->hstrand($hstrand);
-	$fp->contig($feature->contig);
+	$fp->slice($feature->slice);
 
 	#store generated feature pairs, hashed on exons
 	push( @{$exon_hash{$exon}}, $fp );
@@ -561,7 +561,7 @@ sub create_peptide_featurepairs {
 
       $featurepair->{'_exon_align'} = $ex_align;
 
-      $featurepair->attach_seq($self->genomic);
+      $featurepair->slice($self->genomic);
       #print STDERR "After conversion ",$featurepair->start," ",$featurepair->end," ",$featurepair->hstart," ",$featurepair->hend,"\n";
 
       push(@output_features,$featurepair);

@@ -53,7 +53,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
-use BPlite; # NOT Bio::Tools:BPlite - it doesn't support Multi in bioperl 0.7
+use Bio::EnsEMBL::Pipeline::Tools::BPlite; # NOT Bio::Tools:BPlite - it doesn't support Multi in bioperl 0.7
 use Bio::EnsEMBL::Pipeline::Runnable::Twinscan;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);

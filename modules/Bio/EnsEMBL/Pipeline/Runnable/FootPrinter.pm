@@ -70,7 +70,7 @@ sub new {
   $self->_tree($tree)                     if $tree;
   $self->_parameters($parameters)         if $parameters;    
   $self->_primary_id($primary_id)         if $primary_id;
-  $self->_primary_coords($primary_coords) if $primary_end;
+  $self->_primary_coords($primary_coords) if $primary_coords;
   $self->_primary_strand($primary_strand) if $primary_strand;
   $self->_db($db)                         if $db;
   $self->_footprinter($executable)        if $executable;
@@ -109,7 +109,7 @@ sub _conserved_seqs {
     $self->throw("Input alignment must be an array of Bio::Seq or Bio::PrimarySeq objects.") 
       unless (ref ($self->{_conserved_seqs}) eq 'ARRAY');
     
-    foreach my $seq (@{$self->{_conserved_seqs}) {
+    foreach my $seq (@{$self->{_conserved_seqs}}) {
       $self->throw("Input align doesnt contain an array of Bio::SeqI or Bio::PrimarySeqI")
 	unless ($seq->isa("Bio::PrimarySeqI") || 
 		$seq->isa("Bio::SeqI"));      
@@ -254,9 +254,9 @@ sub _write_tree {
 
   print TREEFILE $self->_tree . "\n";
 
-  close (TREEFILE)
- 
-  return 1
+  close (TREEFILE);
+  
+  return 1;
 }
 
 
@@ -332,7 +332,7 @@ sub run_footprinter {
   # we need to change to our working directory before we start and then
   # remember to change back when we are done.
 
-  my $orig_dir = $cwd(); # Using the Cwd module
+  my $orig_dir = &cwd(); # Using the Cwd module
 
   chdir $self->workdir;
 
@@ -366,7 +366,7 @@ sub run_footprinter {
 
 sub parse_results {
   my $self = shift;
-
+  
   # Open the output file and begin parsing.  The output file
   # is a modified/mangled fasta file, where for each line of
   # sequence two subsequent lines of digits show information
@@ -374,95 +374,97 @@ sub parse_results {
   # parsimony score for each nucleotide of potential motifs.
   # The second line numbers each motif for identification.
   # Identification numbers are comparable between sequences.
-
-  open (OUTPUT, $self->_outfile) 
-    or die "Couldnt open footprinter output file [".$self->_outfile."]";
+  
+  open (OUTPUT, $self->_outfile) or 
+    die "Couldnt open footprinter output file [".$self->_outfile."]";
 
   while (<OUTPUT>){
-
-    if ( />/ && /$self->_primary_id/){
-
+    if( />/ && /$self->_primary_id/){
       my $result_string;
-
+      
       while (<OUTPUT>){ # Another bite at this stream.
-	last if (/>/);
-	$result_string += $line;
+        last if (/>/);
+        $result_string += $_;
       }
-
+      
       my @result = split /\n/, $result_string;
-
+      
       my $sequence;
       my $parsimony_score;
       my $identities;
-
+      
       while (@result){
-
-	my $sequence .= shift @result;
-	my $parsimony_score .= shift @result;
-	my $identities .= shift @result;
-
+        
+        my $sequence .= shift @result;
+        my $parsimony_score .= shift @result;
+        my $identities .= shift @result;
+        
       }
-
+      
       $sequence        =~ s/\n//g;
       $parsimony_score =~ s/\n//g;
       $identities      =~ s/\n//g;
-
+      
       my @sequence        = split //, $sequence;
       my @parsimony_score = split //, $parsimony_score;
       my @identities      = split //, $identities;
-
-      $self->throw("Something has gone wrong during the footprinter output parsing.")
-	unless ((scalar @sequence == scalar @{$self->_primary_coords})&&
-		(scalar @sequence == scalar @parsimony_score)&&
-		(scalar @sequence == scalar @identities));
+      
+      $self->throw("Something has gone wrong during the footprinter output parsing.") unless 
+        ((scalar @sequence == scalar @{$self->_primary_coords})&&
+         (scalar @sequence == scalar @parsimony_score)&&
+         (scalar @sequence == scalar @identities));
 
 
       my %sort_hash;
-
+      
       for (my $base = 1; $base <= scalar @sequence; $base++) {
-	
-	$self->throw("Non-alphabetic characters in sequence.") 
-	  unless $sequence[$base] =~ /[A-z]/;
-	
-	$self->throw("Genomic position coordinates dont seem to match sequence.")
-	  if ($sequence[$base] ne 'N' && $self->_primary_coords->[$base])
+        
+        $self->throw("Non-alphabetic characters in sequence.") 
+          unless $sequence[$base] =~ /[A-z]/;
+        
+        $self->throw("Genomic position coordinates dont seem ".
+                     "to match sequence.") if 
+                       ($sequence[$base] ne 'N' && 
+                        $self->_primary_coords->[$base]);
 
-	next unless $identities[$base] =~ /\d/;
-	
-	push (@{$sort_hash{$identities[$base]}}, [$base, $self->_primary_coords->[$base]])
-
+        next unless $identities[$base] =~ /\d/;
+        
+        push (@{$sort_hash{$identities[$base]}}, 
+              [$base, $self->_primary_coords->[$base]])
+          
       }
 
       foreach my $motif (keys %sort_hash){
-
-	my $start  = $sort_hash{$motif}->[0]->[1];
-	my $end    = $sort_hash{$motif}->[-1]->[1];
-	my $length = scalar @{$sort_hash{$motif}};
-	my $median = $sort_hash{$motif}->[0]->[0] + sprintf("%", ($length/2));
-
-	if ($self->_primary_strand == -1){
-	  $start = $sort_hash{$motif}->[0]->[1];
-	  $end = $sort_hash{$motif}->[-1]->[1];
-	}
-
-	my %feature;	
-	
-	$feature{name}            = 'footprinter_motif';
-	$feature{score}           = $parsimony_score[$median];
-	$feature{start}           = $start;
-	$feature{end}             = $end;
-	$feature{strand}          = 0;
-	$feature{program}         = 'footprinter';
-	$feature{program_version} = '1';
-	$feature{display_label}   = "";
-	
-	$self->create_feature(\%feature);
+        
+        my $start  = $sort_hash{$motif}->[0]->[1];
+        my $end    = $sort_hash{$motif}->[-1]->[1];
+        my $length = scalar @{$sort_hash{$motif}};
+        my $median = $sort_hash{$motif}->[0]->[0] + 
+          sprintf("%", ($length/2));
+        
+        if ($self->_primary_strand == -1){
+          $start = $sort_hash{$motif}->[0]->[1];
+          $end = $sort_hash{$motif}->[-1]->[1];
+        }
+        
+        my %feature;	
+        
+        $feature{name}            = 'footprinter_motif';
+        $feature{score}           = $parsimony_score[$median];
+        $feature{start}           = $start;
+        $feature{end}             = $end;
+        $feature{strand}          = 0;
+        $feature{program}         = 'footprinter';
+        $feature{program_version} = '1';
+        $feature{display_label}   = "";
+        
+        $self->create_feature(\%feature);
       }
 
     }
-
+  }
   close (OUTPUT);
-
+  
 }
 
 
@@ -506,9 +508,11 @@ sub create_feature {
 						   -score   =>  $feat->{score},
 						   -analysis => $self->{_analysis});  
     
-    $first_exon->display_label($feat->{'display_label'});
+    $feature->display_label($feat->{'display_label'});
 
     $self->output($feature);
 
-    return 1
+    return 1;
 }
+
+1;

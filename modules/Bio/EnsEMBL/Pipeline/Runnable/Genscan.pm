@@ -87,7 +87,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::PredictionTranscript;
-use Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::Root;
 
 
@@ -450,7 +450,7 @@ sub calculate_and_set_phases_new {
 
 	my @exons   = $genes[$i]->sub_SeqFeature();
         # print STDERR "Exons are $#exons\n";
-	my @newtran = Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::fset2transcript_3frame($genes[$i],$self->query);
+	my @newtran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_3frame($genes[$i],$self->query);
 
         # print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 
@@ -508,7 +508,7 @@ sub calculate_and_set_phases_new {
 		foreach my $exon (@{$tran->get_all_Exons()}) {
 		    #print "exon ".$exon->seqname." ".$exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
 		}
-		$tran->temporary_id($self->query->id . "." . $count);
+		#$tran->temporary_id($self->query->id . "." . $count);
 		$count++;
 		#print "translation = ".$temp_tran."\n";
 		if($temp_tran =~/\*/){

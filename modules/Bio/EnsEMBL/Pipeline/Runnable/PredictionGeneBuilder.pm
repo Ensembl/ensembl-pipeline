@@ -485,7 +485,7 @@ sub _make_Exon {
   
 sub  make_ExonPairs {
   my ($self,@exons) = @_;
-  no warnings;
+  #no warnings;
   my $gap = 5;  
   my %pairhash;
   
@@ -618,7 +618,7 @@ sub  make_ExonPairs {
     }
   }
   return $self->get_all_ExonPairs;
-  use warnings;
+  #use warnings;
 }
 
 ############################################################
