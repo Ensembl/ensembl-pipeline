@@ -85,7 +85,7 @@ use vars qw( %Exonerate );
 	      #####################
 	      
 	      # full path fo the dir where we have the masked-dusted chromosomes
-	      EST_GENOMIC                 => '/ecs2/work1/eae/Rat/genome/',
+	      EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI_31/genome',
 	      
 	      # path to file with repeatmasked dusted genomic sequences
 	      # NB this file is huge - distribute it across the farm or 
