@@ -48,6 +48,10 @@ are not exhaustive enough at the level of individual alignments for
 (1) to be performed with any accuracy.  A comprehensive BLAST search at 
 the raw compute stage would allow (1); currently being investigated. 
 
+NOTE: The user can supply a file of pre-prepared slice names (a simple 
+list of names separated by carriage returns), in which case the script will
+act as before - retrieving and partioning the full set of seed-protein-features -
+for only the supplied list of slices.
 
 =head1 OPTIONS
 
@@ -88,7 +92,8 @@ my (
     $help,
     $verbose,
     $max_slice_size,
-    $logic_name);
+    $logic_name,
+    $slice_name_file);
 my $coord_system ='toplevel' ;
 
 &GetOptions(
@@ -98,6 +103,7 @@ my $coord_system ='toplevel' ;
 	    'max_slice=s'  => \$max_slice_size,
 	    'verbose'      => \$verbose,
 	    'coord_system=s' => \$coord_system,
+      'slice_name_file:s' => \$slice_name_file,	    
 );
 exec('perldoc', $0) if $help;
 
@@ -149,6 +155,19 @@ if (not $ana_type) {
 
 $max_slice_size = 5000000 if not $max_slice_size;
 
+if($slice_name_file){
+ open (SLICES, "<$slice_name_file") or die "could not open file with slice $slice_name_file";
+}
+
+my @slice_names;
+
+while(<SLICES>){
+  chomp;
+  my ($name) = split;
+  push @slice_names, $name;
+}
+
+
 my $sl_adp = $db->get_SliceAdaptor;
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db,
@@ -165,8 +184,21 @@ my @iids_to_write;
 
 $verbose and print STDERR "Generating Initial input ids...\n";
 
-# foreach my $chr (sort {$a->dbID <=> $b->dbID} @{$db->get_ChromosomeAdaptor->fetch_all}) {
-foreach my $slice_id (@{$inputIDFactory->generate_input_ids}) {
+if(!@slice_names){
+  foreach my $slice_id ( @{ $inputIDFactory->generate_input_ids } ) {
+    push @iids_to_write, get_iids_from_slice($slice_id); 
+  }
+}else{
+  print STDERR "Retrieved ".@slice_names." slice names\n";
+  foreach my $slice_id ( @slice_names ) {
+    push @iids_to_write, get_iids_from_slice($slice_id); 
+  }
+}
+
+sub get_iids_from_slice{
+  my ($slice_id) = @_;
+  my @iids_from_slice;
+
     my $chr_slice = $sl_adp->fetch_by_name( $slice_id );
     my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name( $slice_id );
 
@@ -261,6 +293,7 @@ foreach my $slice_id (@{$inputIDFactory->generate_input_ids}) {
 	}
     }
 }
+
 
 if ($write) {
     my $s_inf_cont =$db->get_StateInfoContainer;
