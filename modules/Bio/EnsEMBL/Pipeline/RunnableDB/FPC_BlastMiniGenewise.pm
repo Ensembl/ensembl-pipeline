@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_PROTEIN_INDEX
 					 GB_SIMILARITY_TYPE
@@ -64,6 +65,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_MAX_INTRON
 					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
 					 GB_SIMILARITY_GENETYPE
+					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -499,6 +501,13 @@ sub validate_transcript {
     return undef;
   }
   
+  # check for low complexity
+  my $low_complexity = $self->check_low_complexity($transcript);
+  if($low_complexity > $GB_SIMILARITY_MAX_LOW_COMPLEXITY){
+    $self->warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
+    return undef;
+  }
+
   my $previous_exon;
   foreach my $exon($transcript->get_all_Exons){
     if (defined($previous_exon)) {
@@ -792,6 +801,64 @@ sub check_coverage{
   my $coverage = $matches/$plength;
   $coverage *= 100;
   return $coverage;
+
+}
+
+=head2 check_low_complexity
+
+ Title   : check_complexity
+ Usage   :
+ Function: uses seg to find low complexity regions in transcript->translate. 
+           Calculates overall %low complexity of the translation
+ Example :
+ Returns : percentage low complexity sequence
+ Args    :
+
+
+=cut
+
+sub check_low_complexity{
+  my ($self, $transcript) = @_;
+  my $low_complexity;
+  eval{
+    
+    my $protseq = $transcript->translate;
+    $protseq->display_id($transcript->{'temporary_id'} . ".translation");
+
+    # ought to be got from analysisprocess table
+    my $analysis = Bio::EnsEMBL::Analysis->new(
+					       -db           => 'low_complexity',
+					       -program      => '/usr/local/ensembl/bin/seg',
+					       -program_file => '/usr/local/ensembl/bin/seg',
+					       -gff_source   => 'Seg',
+					       -gff_feature  => 'annot',
+					       -module       => 'Seg',
+					       -logic_name   => 'Seg'
+					      );
+    my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg( -CLONE    => $protseq,
+								   -analysis => $analysis);
+    $seg->run;
+    my $lc_length = 0;
+    foreach my $feat($seg->output){
+      if($feat->end < $feat->start){
+	my $tmp = $feat->start;
+	$feat->start($feat->end);
+	$feat->end($tmp);
+      }
+
+      $lc_length += $feat->end - $feat->start + 1;
+    }
+    
+    $low_complexity = (100*$lc_length)/($protseq->length)
+    
+  };
+  
+  if($@){
+    print STDERR "problem running seg: \n[$@]\n";
+    return 0; # let transcript through
+  }
+
+  return $low_complexity;
 
 }
 
