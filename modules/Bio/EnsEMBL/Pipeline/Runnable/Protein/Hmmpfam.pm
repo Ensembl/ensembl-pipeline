@@ -325,7 +325,7 @@ sub parse_results {
             $feature{score} = $score;
             $feature{p_value} = sprintf ("%.3e", $evalue);
             $feature{start} = $start;
-            $feature{end} = $hend;
+            $feature{end} = $end;
             $feature{hname} = $hid;
             $feature{hstart} = $hstart;
             $feature{hend} = $hend;
