@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl
 
 =head1 NAME
 
@@ -10,9 +10,10 @@ prototype for a suite of checks after the gene build. The checks are based on vi
 contigs of 5Mb (this size should be the same one as the one used during the genebuild). It checks so far:
 
 1.- all exons in a gene are in the same strand
-2.- also checks for folded transcripts
-3.- it flags also single exon genes and from these, the ones which are longer than 50000 bases
-4.- it also checks some function calls. Not all may be relevant for the genome at hand
+2.- it checks that phases are consistent between exons
+3.- also checks for folded transcripts
+4.- it flags also single exon genes and from these, the ones which are longer than 50000 bases
+
 
 For mouse denormalised contigs: in order to know the size of the chromosomes, 
 you must have a file with the internal_ids and raw_contig ids.
@@ -91,9 +92,8 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 print STDERR "connected to $dbname : $dbhost\n";
 
 print STDERR "checking genes of type $genetype\n";
-my $path = $db->static_golden_path_type;
 
-print STDERR "path: ".$path."\n";
+#print STDERR "path: ".$path."\n";
 
 my @gene_ids = &get_gene_ids($db,$genetype);
 
@@ -208,31 +208,33 @@ sub check_transcript{
   my $db = shift;
   my $t_id = shift;
 
-  my $q = qq( SELECT e.exon_id, 
-	      if(sgp.raw_ori=1,(e.seq_start-sgp.raw_start+sgp.chr_start), 
-		 (sgp.chr_start+sgp.raw_end-e.seq_end)) as start, 
-	      if(sgp.raw_ori=1,(e.seq_end-sgp.raw_start+sgp.chr_start), 
-		 (sgp.chr_start+sgp.raw_end-e.seq_start)) as end, 
-	      e.phase as phase,
-	      e.end_phase as end_phase,
-	      if (sgp.raw_ori=1,e.strand,(-e.strand)) as strand, 
-	      sgp.chr_name, 
-	      abs(e.seq_end-e.seq_start)+1 as length, 
+  my $q = qq( SELECT e.exon_id,  
+	      if(ass.contig_ori=1,(e.contig_start-ass.contig_start+ass.chr_start),
+		 (ass.chr_start+ass.contig_end-e.contig_end)) as start,
+	      if(ass.contig_ori=1,(e.contig_end-ass.contig_start+ass.chr_start),
+		 (ass.chr_start+ass.contig_end-e.contig_start)) as end,
+	      if (ass.contig_ori=1,e.contig_strand,(-e.contig_strand)) as strand,
+	      c.name,        
+	      abs(e.contig_end-e.contig_start)+1 as length,
+	      e.phase,
+	      e.end_phase,
 	      et.rank, 
 	      if(e.exon_id=tl.start_exon_id,
 		 (concat(tl.seq_start," (start)",
 			 if(e.exon_id=tl.end_exon_id,(concat(" ",tl.seq_end," (end)")),("")))),
-		 if (e.exon_id=tl.end_exon_id,(concat(tl.seq_end," (end)")),(""))) 
-	      as transcoord, 
+		 if (e.exon_id=tl.end_exon_id,(concat(tl.seq_end," (end)")),("")))   
+	      as transcoord,
 	      if(e.sticky_rank>1,(concat("sticky (rank = ",e.sticky_rank,")")),
-		 ("")) as sticky 
+		 ("")) as sticky
 	      FROM  translation tl, exon e, transcript tr, exon_transcript et, 
-	      static_golden_path sgp 
+	      assembly ass, chromosome c
 	      WHERE e.exon_id=et.exon_id AND 
 	      et.transcript_id=tr.transcript_id AND 
-	      sgp.raw_id=e.contig_id AND sgp.type = '$path' AND 
-	      tr.transcript_id = $t_id AND 
-	      tr.translation_id=tl.translation_id 
+	      ass.chromosome_id=c.chromosome_id AND                              
+	      ass.contig_id=e.contig_id AND 
+	      ass.type = 'NCBI_30' AND
+	      tr.transcript_id = 243 AND  
+	      tr.translation_id=tl.translation_id
 	      ORDER BY et.rank
 	    );
 
@@ -242,7 +244,7 @@ sub check_transcript{
   my %exon;
   my @exons;
 
-  while( my ($exon_id,$start,$end,$phase,$end_phase,$strand,$chr,$length,$rank,$transl,$sticky) = $sth->fetchrow_array) {
+  while( my ($exon_id,$start,$end,$strand,$chr,$length,$phase,$end_phase,$rank,$transl,$sticky) = $sth->fetchrow_array) {
     #print STDERR "$exon_id\t$start\t$end\t$phase\t$end_phase\t$strand\t$chr\t$length\t$rank\t$transl\t$sticky\n";
     push (@exons,$exon_id);
     $exon{start}{$exon_id}       = $start;
