@@ -16,10 +16,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer->new(
-					     -input_id => $id,
-					     -score => $score
-								    );
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer->new(-dbobj => $db
+								     -input_id => $id,
+								     -alnprog => 'crossmatch',
+								     -min_score => $score);
     $obj->fetch_input();
     $obj->run();
 
@@ -35,6 +35,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
     This runnabledb is more complex than usual in that it needs
     to be connected to several dbs:
 
+    alnprog: string defining the alginment runnable used. Can be 'crossmatch', 
+             'exonerate' or 'bl2seq' (the latter not implemented at the moment).
+             'crossmath' is the default.
+
     dbobj: this is where the output is finally written, 
     storing the hits between two Ensembl databases. 
     It is actually a Bio::EnsEMBL::Comparer::DBSQL::DBAdaptor 
@@ -44,7 +48,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
     input dna is fetched
 
     The input id has the following format: 
-    db_name:contig_id/db_name:contig_id
+    db_name1:contig_id1::db_name2:contig_id2
+
+    contig_id1 being considered as the reference contig to define the 
+    reference AlignBlockSet
 
     min_score is an argument for the crossmatch runnable to set the 
     minimum score used in the crossmatch run
@@ -70,6 +77,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
+use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::PrimarySeq;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
@@ -82,10 +90,12 @@ use Data::Dumper;
 sub new {
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-  my ($score) = $self->_rearrange([qw(MIN_SCORE)],@args);
+  my ($score, $alnprog) = $self->_rearrange([qw(MIN_SCORE ALNPROG)],@args);
   bless $self, $class;
   $score ||= 100;
   $self->min_score($score);
+  $alnprog ||= 'crossmatch';
+  $self->alnprog($alnprog);
   return $self; 
 }
 
@@ -103,6 +113,11 @@ sub fetch_input {
     my($self) = @_; 
 
     $self->throw("No input id") unless defined($self->input_id);
+    $self->throw("alnprog should be 'crossmatch' or 'bl2seq'or 'exonerate'")
+      unless (defined $self->alnprog &&
+	      ($self->alnprog eq 'crossmatch' ||
+	       $self->alnprog eq 'bl2seq' ||
+	       $self->alnprog eq 'exonerate'));
 
     my $input_id  = $self->input_id;
 
@@ -131,15 +146,24 @@ sub fetch_input {
     my $seq1 = Bio::PrimarySeq->new( -display_id => 'seq1', -seq => $contig1->seq);
     my $seq2 = Bio::PrimarySeq->new( -display_id => 'seq2', -seq => $contig2->seq);
     
-    my $cross = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new( 
-								   -nocopy => 1,
-								   -seq1 => $seq1,
-								   -seq2 => $seq2,
-								   -score => $self->min_score,
-								   -minmatch => 14,
-								   -masklevel => 80
-								   );
-    $self->runnable($cross);
+    my $alnrunnable;
+
+    if ($self->alnprog eq 'crossmatch') {
+      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::CrossMatch->new(-nocopy => 1,
+								       -seq1 => $seq1,
+								       -seq2 => $seq2,
+								       -score => $self->min_score,
+								       -minmatch => 14,
+								       -masklevel => 80);
+    } elsif ($self->alnprog eq 'bl2seq') {
+      $self->throw("bl2seq aligment runnable not implemented yet");
+#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new();
+    } elsif ($self->alnprog eq 'exonerate') {
+      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
+								      -est => [$seq1]);
+    } 
+    
+    $self->runnable($alnrunnable);
 }
 
 =head2 run
@@ -155,7 +179,6 @@ sub fetch_input {
 
 sub run {
     my ($self) = @_;
-
     $self->throw("Can't run - no runnable objects") unless $self->runnable;
     $self->runnable->run();
     $self->output($self->runnable->output);
@@ -195,7 +218,7 @@ sub write_output {
   my ($self) = @_;
   
   my @features = $self->output;
-
+  
   my $db = $self->dbobj();
   my $gadb = $db->get_GenomeDBAdaptor();
   $db->get_DnaFragAdaptor();
@@ -206,7 +229,7 @@ sub write_output {
   if ($input_id =~ /^(\S+):(\S+)::(\S+):(\S+)$/) {
     ($species_tag1,$contig_id1,$species_tag2,$contig_id2) = ($1,$2,$3,$4);
   } else {
-    die "\$input_id should be yadda:contig_id::yadda:contig_id in CrossComparer.pm\n";
+    die "\$input_id should be dbname1:contig_id1::dbname2:contig_id2 in CrossComparer.pm\n";
   }
   
   # Using $contig_id1 as reference sequence for the reference AlignBlockSet
@@ -219,7 +242,7 @@ sub write_output {
   # Sorting @feature from maxend to minend of reference sequence
   # and defining the offset_max for the reference AlignBlockSet
   
-  @features = sort {$b->start <=> $a->start} @features;
+  @features = sort {$b->end <=> $a->end} @features;
   my $offset_max = $features[0]->end;
 
   # sorting @feature from minstart to maxstart of reference sequence
@@ -257,7 +280,7 @@ sub write_output {
 
   $current_align_row_id++;
   
-  # Using $contig_id2 as query sequence for the reference AlignBlockSet
+  # Using $contig_id2 as query sequence for the query AlignBlockSet
 
   $gdb = $gadb->fetch_by_species_tag($species_tag2);
   $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
@@ -274,7 +297,11 @@ sub write_output {
     $ab->align_end($align_end);
     $ab->start($f->hstart);
     $ab->end($f->hend);
-    $ab->strand($f->hstrand);
+    if ($f->strand == 1) {
+      $ab->strand($f->hstrand);
+    } elsif ($f->strand == -1) {
+      $ab->strand(- $f->hstrand);
+    }
     $ab->dnafrag($dnafrag);
     
     $abs->add_AlignBlock($ab);
@@ -332,6 +359,26 @@ sub min_score{
     }
     return $obj->{'min_score'};
 
+}
+
+=head2 alnprog
+
+ Title   : alnprog
+ Usage   : $obj->alnprog($string)
+ Function: Get/set the alnprog value
+ Returns : value of alnprog
+ Args    : string, could be 'crossmatch', 'exonerate' or 'bl2seq' (optional)
+
+
+=cut
+
+sub alnprog {
+   my ($self,@args) = @_;
+   if (@args) {
+      my ($value) = @args;
+      $self->{'alnprog'} = $value;
+    }
+    return $self->{'alnprog'};
 }
 
 =head2 _c1_id
