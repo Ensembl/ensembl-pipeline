@@ -319,23 +319,27 @@ sub get_JobsByAnalysis {
   Function: Retrieves all jobs in the database matching status and 
             an analysis id
   Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
-  Args    : int analysis id, string status
+  Args    : int analysis id, string status, and optional start and end limits
 
 =cut
 
 sub get_JobsbyStatus_and_Analysis {
-    my ($self,$status, $analysis) = @_;
+    my ($self,$status, $analysis, $start, $end) = @_;
 
     $self->throw("Require status and analysis id for get_JobsbyStatus_and_Analysis") 
-                            unless ($analysis && $status);
+                            unless ($analysis && $status); 
 
     my $query = "select j.id, j.input_id, j.analysis, j.LSF_id," .
 	                   "j.machine,queue, j.stdout_file, j.stderr_file,".
                        "j.input_object_file, j.output_file,".
                        "j.status_file " . 
-	            "from job as j, current_status as cs ". 
-                "where j.id = cs.id and j.analysis = $analysis ".
-                       "and cs.status = \'$status\'";
+	            "from job as j, current_status as cs, jobstatus as js ". 
+                "where j.id = cs.id and js.id = cs.id and ". 
+                       "cs.status = js.status and ".
+                       "j.analysis = $analysis and ".
+                       "cs.status = \'$status\' ".
+                       "order by js.time DESC";
+    $query .= " limit $start, $end" if ($start && $end);
                  
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
