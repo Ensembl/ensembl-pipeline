@@ -2,9 +2,7 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 6;
-	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-      }
+BEGIN { $| = 1; plan test => 16; }
 
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Genscan;
@@ -49,16 +47,18 @@ ok(my $contig = $db->get_RawContigAdaptor()->fetch_by_name($id));
 ok(my $prediction_transcripts = $contig->get_all_PredictionTranscripts());
 
 foreach my $pred_trans (@{$prediction_transcripts}) {
-  print "Transcript  " . $pred_trans->translate . "\n";
+  print STDERR "Transcript  " . $pred_trans->translate . "\n";
 }    
 
 sub display {
   my @results = @_;
 
   foreach my $obj (@results) {
-    print ($obj->gffstring."\n");
-    if ($obj->sub_SeqFeature) {
-      foreach my $exon ($obj->sub_SeqFeature) {
-	print "Sub: ".$exon->gffstring."\n";
+    if ($obj->get_all_Exons) {
+      foreach my $exon (@{$obj->get_all_Exons}) {
+	print STDERR "Trancr/Exon: ".$exon->gffstring."\n";
       }
     }
+  }
+  return 1;
+}
