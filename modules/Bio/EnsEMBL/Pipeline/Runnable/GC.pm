@@ -70,7 +70,7 @@ use strict;
 use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::SimpleFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
@@ -93,7 +93,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);    
   
-  $self->{'_flist'} = []; #an array of Bio::SeqFeatures
+  $self->{'_flist'} = []; #an array of Bio::SimpleFeatures
   $self->{'_sequence'} = undef; #location of bio::seq object
   $self->{'_window'} = 0; #size of window to be analysed
   
@@ -254,7 +254,7 @@ sub run_gc {
         
         $start_point++; ## substr takes first character as '0' - necessary to +1 to write correct co-ordinates to DB
         $end_point ++; ## same as above
-        my $gc = Bio::EnsEMBL::SeqFeature->new
+        my $gc = Bio::EnsEMBL::SimpleFeature->new
 	    (   -seqname => $self->query->id,
 		-start   => $start_point,
 		-end     => $end_point,
@@ -263,6 +263,8 @@ sub run_gc {
 		-source_tag  => 'gc',
 		-primary_tag => 'gc_content',
 		-analysis => $analysis_obj);  
+
+	$gc->display_label('');
 
 	$start_point = $end_point ; # +1 already added to $end point above - not necesssary here
 	#$end_point = $end_point + $window ;
@@ -288,6 +290,7 @@ sub run_gc {
                 with exons stored as SubSeqFeatures.
     Returns :   An array of SeqFeatures the gc content of each widnow
     Args    :   none
+    Ahem    :   does it really?!?
 
 =cut
 
