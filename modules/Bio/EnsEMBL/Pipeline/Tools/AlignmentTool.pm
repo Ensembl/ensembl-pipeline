@@ -337,7 +337,7 @@ sub _align {
 
   for (my $i = 0; $i < $self->_slice->length; $i++) {
     my $is_deletion = 0;
-    
+
   DELETION_HUNT:
     foreach my $unaligned_sequence (@$evidence_sequences){
       if ((defined $unaligned_sequence->{'deletions'}->[$i])
@@ -348,7 +348,6 @@ sub _align {
     }
     
     if ($is_deletion) {
-      
       splice (@$genomic_sequence, $i, 0, '-');
       splice (@$exon_nucleotide_sequence, $i, 0, '-');
 
@@ -507,7 +506,7 @@ sub _compute_identity {
 	# final exon contains 3-prime UTR
 
 	for (my $i = $exon->start - 1; $i < $exon->end; $i++) {
-#print "Exon residue : " . $exon_protein_sequence->[$i] . " Matched base : " . $match_sequence->[$i] . "\n";
+
 	  unless (defined ($match_sequence->[$i]) &&
 		  defined ($exon_protein_sequence->[$i]) &&
 		  (($exon_protein_sequence->[$i] eq $match_sequence->[$i])||
@@ -528,7 +527,7 @@ sub _compute_identity {
 	next EVIDENCE_ITEM if ($self->_type eq 'protein');
 
 	for (my $i = $exon->start - 1; $i < $exon->end; $i++) {
-#print "Genomic base : " . $genomic_sequence->[$i] . " Matched base : " . $match_sequence->[$i] . "\n";
+
 	  unless (defined ($genomic_sequence->[$i]) &&
 		  defined ($match_sequence->[$i]) && 
 		  (($genomic_sequence->[$i] eq $match_sequence->[$i])||
@@ -1013,9 +1012,8 @@ sub _fiddly_bits {
   # take account of the padding of our sequence.
 
   if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
-
     my $padded_aa_seq;
-    ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
+    ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\*\*/g;
     
     my @full_seq = split //, $padded_aa_seq;
     
@@ -1025,10 +1023,8 @@ sub _fiddly_bits {
     my $last_aa = ($hend * 3) - 1;
 
     my $length = $last_aa - $first_aa + 1;
-#print STDERR "hstart:\t$hstart\tfirst_aa:\t$first_aa\thend:\t$hend\tlast_aa:\t$last_aa\n";
-#print STDERR "Size of full sequence : " . scalar @full_seq . "\n";    
+
     @fetched_seq = splice(@full_seq, $first_aa, $length);
-#print STDERR "Size of spliced sequence : " . scalar @fetched_seq . "\n";
   } 
 
   # If we have a dna align feature, extracting the correct portion
@@ -1100,7 +1096,7 @@ sub _fiddly_bits {
   # overshoots the end of our slice.  Chop.
 
   if ($genomic_start < 0) {
-$self->warn("Erk, unimplemented code!!!  Feature start lies off the end of the slice.  Dying.");
+$self->warn("Erk, unimplemented code!!!  Feature start lies off the end of the slice.");
 #    warn("Feature extends past the ends of genomic slice.  Don\'t worry, truncating it to fit.");
     
 #    $genomic_start = 0;
@@ -1259,15 +1255,13 @@ sub _exon_protein_translation {
     
     foreach my $exon (@{$exons}){
       # Add a translation of this exon peptide to our translated exon sequence.
-#print "Exon Length : " . $exon->length . "\n";      
       my $peptide_obj = $exon->peptide($self->_transcript);
       my $peptide = $peptide_obj->seq;
-#print STDERR "Peptide " . $peptide . "\n";
+
       $peptide =~ s/(.)/$1\-\-/g;
-#print STDERR "Mangled Peptide " . $peptide . "\n";
+
       my @peptide = split //, $peptide;
-#print STDERR "Size of split peptide is : " . scalar @peptide . "\n";      
-#print "   --------//---------- \n";
+
       # Whack off the first residue if it is only a partial 
       # codon (the internal rule is to:
       #   - include a whole residue for partial codons at ends
@@ -1321,8 +1315,6 @@ sub _exon_protein_translation {
       $extra_length -= 1 if $exon_end_phase == 1;
 
 
-#print STDERR "Exon phase : " .$exon->phase . "\tend-phase : " . $exon->end_phase . "\tExtra length : " . $extra_length . "\tFiddled exon end :  $exon_end\tUnfiddled exon end : " . $exon->end . "\n";      
-#print STDERR "Extra length : " . $extra_length . "\n";
       my $peptide_genomic_start;
 
       if ($exon_end_phase != -1) {
@@ -1343,10 +1335,9 @@ sub _exon_protein_translation {
       
       foreach my $exon_aa (@peptide) {
 	$exon_translation_sequence[$insert_point] = $exon_aa;
-#print STDERR $exon_aa;
+
 	$insert_point++;
       }
-#print STDERR "\n";
     }
 
     # Fill in the blanks
