@@ -73,7 +73,8 @@ my $reread_rules = 0; # toggle whether to reread rules each time the script
                       # loops
 my $perldoc = 0;
 my @command_args = @ARGV;
-
+my $submission_limit;
+my $submission_number = 1000;
 GetOptions(
            'dbhost=s'              => \$dbhost,
            'dbname=s'              => \$dbname,
@@ -114,6 +115,8 @@ GetOptions(
            'reread_rules!'         => \$reread_rules,
            'once!'                 => \$once,
            'perldoc!'              => \$perldoc,
+           'submission_limit!'     => \$submission_limit,
+           'submission_number=s'     => \$submission_number,
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -186,20 +189,21 @@ if ($ids_to_skip && ! -e $ids_to_skip) {
 }
 
 if ($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
-    @analyses_to_skip || @types_to_skip || $ids_to_skip) {
+    @analyses_to_skip || @types_to_skip || $ids_to_skip || 
+    $submission_limit) {
   print STDERR "You are running with options which may break " .
                "accumulators they are being switched off. You can prevent this with " .
                "the -force_accumulators option\n";
   $accumulators = 0;
 }
 
-$accumulators = 1 if($force_accumulators);
-
 my $all_rules = $rulemanager->rules;
 
 if ($accumulators && $accumulator_sanity) {
   $accumulators = $sanity->accumulator_sanity_check($all_rules, $accumulators);
 }
+
+$accumulators = 1 if($force_accumulators);
 
 if ($rules_sanity) {
   $sanity->rule_type_sanity($all_rules, $verbose);
@@ -223,7 +227,7 @@ setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules,
                \@starts_from, $rulemanager);
 
 my %completed_accumulator_analyses;
-
+my $submission_count = 0;
 while (1) {
   print "Reading IDs \n" if $verbose;
   my $submitted = 0;
@@ -284,11 +288,19 @@ while (1) {
 
       print "\n\n Ended up with " . scalar(keys %analHash) . " analyses which pass conditions\n" if ($verbose);
       for my $anal (values %analHash) {
-        if ($rulemanager->can_job_run($input_id, $anal,$current_jobs_hash)) {
+        if ($rulemanager->can_job_run($input_id, $anal,
+                                      $current_jobs_hash)) {
           $submitted++;
-        }
-      }
-    }
+          $submission_count++;
+          if ($submission_limit && $submission_count 
+              >= $submission_number) {
+            $done = 1;
+            last INPUT_ID_TYPE; 
+          } 
+        } 
+      } 
+    } 
+    
   }
 
   if (!$done && !$reset) {
@@ -303,6 +315,7 @@ while (1) {
 
           if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name},$accumulator_jobs_hash)) {
             $submitted++;
+            $submission_count++;
           } elsif (exists($incomplete_accumulator_analyses{$logic_name})) {
             print "Accumulator type analysis $logic_name ".
                   "conditions unsatisfied\n" if $verbose;
@@ -316,7 +329,7 @@ while (1) {
   }
 
   $rulemanager->job_stats($job_limit);
-
+  
   if (!$done) {
     if (!$rulemanager->check_if_done) {
       $done = 1;
@@ -532,7 +545,8 @@ Altering what input_ids or analyses are considered for submission
   input_id input_id_type
   -skip_input_id_file path to a file of input_ids to not run. The file
   should be in the same format as for -input_id_file
-  
+  -submission_limit, only submit a defined number of jobs, by default 1000
+  -submission_number, the number of jobs to submit
 
 Currently unused options
 
