@@ -6,67 +6,84 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;
 
 my $dbhost;
+my $dnadbhost;
 my $dbuser    = 'ensro';
 my $dbname;
+my $dnadbname;
 my $dbpass    = undef;
 
-my $genetype = "ensembl"; # default genetype
+my $genetype;
 
 
 $dbuser = "ensro";
 GetOptions(
 	   'dbname:s'    => \$dbname,
 	   'dbhost:s'    => \$dbhost,
+	   'dnadbname:s'  => \$dnadbname,
+	   'dnadbhost:s'  => \$dnadbhost,
 	   'genetype:s'  => \$genetype,
 	  );
 
-unless ( $dbname && $dbhost ){
+unless ( $dbname && $dbhost && $dnadbhost && $dnadbname ){
   print STDERR "script to check splice sites\n";
-  print STDERR "Usage: $0 -dbname -dbhost -genetype (default: ensembl)\n";
+  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost (-genetype)\n";
   exit(0);
 }
+
+my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					       '-host'   => $dnadbhost,
+					       '-user'   => $dbuser,
+					       '-dbname' => $dnadbname,
+					       '-pass'   => $dbpass,
+					      );
+
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-host'   => $dbhost,
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
+					    '-dnadb'  => $dnadb,
 					   );
 
 
 print STDERR "connected to $dbname : $dbhost\n";
 
-print STDERR "checking genes of type $genetype\n";
-
+if ( $genetype ){
+  print STDERR "checking genes of type $genetype\n";
+}
 
 my @gene_ids      = @{$db->get_GeneAdaptor->list_geneIds};
 my $slice_adaptor = $db->get_SliceAdaptor;
 
+print "gene_id\ttran_id\tcanonical\tnon_canonical\twrong\tevidence\n";
+############################################################
+
 GENE:
 foreach my $gene_id ( @gene_ids){
-  my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
-
-  #unless ($gene->is_known){
-  #  next GENE;
-  #}
-
-  my $gene_stable_id = $gene->stable_id(); 
-  my $slice = $slice_adaptor->fetch_by_gene_stable_id( $gene_stable_id );
   
-  $gene->transform( $slice );
-  
+  my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id,1);
+
+  if ( $genetype ){
+    next GENE unless ( $genetype eq $gene->type );
+  }
+
  TRANS:
   foreach my $trans ( @{$gene->get_all_Transcripts} ) {
-    my @mouse_evidence       = &get_mouse_only_evidence( $trans );
+    #my @mouse_evidence       = &get_mouse_only_evidence( $trans );
     #unless ( @mouse_evidence ){
     #  next TRANS;
     #}
-    my $tran_stable_id   = $trans->stable_id;
+    my @evidence = &get_evidence($trans);
+
+    my $tranid   = $trans->stable_id || $trans->dbID;
+    my $geneid   = $gene->stable_id  || $gene->dbID;
     my ($canonical,$non_canonical,$wrong) = &check_splice_sites($trans);
-    print $gene_stable_id."\t".$tran_stable_id."\t".$canonical."\t".$non_canonical."\t".$wrong."\n";
+    print $geneid."\t".$tranid."\t".$canonical."\t".$non_canonical."\t".$wrong."\t@evidence\n";
   }
 }
 
+############################################################
 
 sub get_mouse_only_evidence{
   my ($t) = @_;
@@ -94,7 +111,22 @@ sub get_mouse_only_evidence{
   return ();
 }
 
+############################################################
 
+sub get_evidence{
+  my ($t) = @_;
+  my %evidence;
+  my $mouse = 0;
+  my $other = 0;
+  foreach my $exon ( @{$t->get_all_Exons} ){
+    foreach my $feature ( @{$exon->get_all_supporting_features}){
+      $evidence{ $feature->hseqname } = 1;
+    }
+  }
+  return keys %evidence;
+}
+
+############################################################
 
 sub check_splice_sites{
   my ($transcript) = @_;
