@@ -4,12 +4,6 @@
 #
 # You may distribute this code under the same terms as perl itself
 
-BEGIN{
-    $ENV{'BLASTDB'}     = '/data/blastdb/Ensembl';
-    $ENV{'BLASTMAT'}    = '/usr/local/ensembl/data/blastmat';
-    $ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
-}
-
 use strict;
 use Getopt::Long;
 use Sys::Hostname;

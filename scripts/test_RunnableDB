@@ -91,6 +91,7 @@ if(!$analysis){
 my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
+
 print STDERR "creating runnable ".$file."\n" if($verbose);
 
 $runnable =~ s/\//::/g;
@@ -98,6 +99,7 @@ my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
 			     );
+
 #print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
 &eval_method($runobj, 'fetch_input');
 print STDERR "Fetched input\n" if($verbose);
@@ -168,7 +170,8 @@ sub eval_method{
     $obj->$method;
   };
   if($@){
-    print STDERR "Problem calling ".$method." on ".$obj."\n";
+    print STDERR "Problem calling ".$method." on ".$obj."-------------\n";
+ 
     print "$@\n";
     exit;
   }

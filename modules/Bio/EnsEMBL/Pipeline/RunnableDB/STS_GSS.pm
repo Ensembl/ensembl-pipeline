@@ -16,6 +16,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::STS_GSS;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 
+
 sub new {
     my ($new,@args) = @_;
     my $self = $new->SUPER::new(@args);    
@@ -116,6 +117,7 @@ sub run {
     my ($self) = @_;
     
     my $runnable = $self->runnable;
+    warn $runnable;
     $runnable || $self->throw("Can't run - no runnable object");
     eval{
         $runnable->run;

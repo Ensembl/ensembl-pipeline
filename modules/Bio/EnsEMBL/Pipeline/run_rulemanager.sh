@@ -1,5 +1,11 @@
 #!/bin/sh
 
+BLASTDB="/data/blastdb/Ensembl"
+BLASTMAT="/usr/local/ensembl/data/blastmat"
+BLASTFILTER="/usr/local/ensembl/bin"
+
+export BLASTDB BLASTMAT BLASTFILTER
+
 root_dir="/ecs4/work5/finished/production"
 
 PERL5LIB="$root_dir/ensembl-pipeline/modules\

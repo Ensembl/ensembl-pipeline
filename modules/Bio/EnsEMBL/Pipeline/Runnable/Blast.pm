@@ -391,7 +391,7 @@ sub fetch_databases {
     my @databases;
 
     my $dbname = $self->database; 
-    #print "fetching databases for ".$dbname."\n";
+    print "fetching databases for ".$dbname."\n";
     $dbname =~ s/\s//g;
 
     # prepend the environment variable $BLASTDB if

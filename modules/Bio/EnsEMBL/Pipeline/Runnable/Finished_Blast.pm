@@ -13,8 +13,6 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Blast);
 
-$ENV{BLASTDB} = '/data/blastdb/Ensembl';
-
 BEGIN {
     print "\nUSING " . __PACKAGE__ . "\n\n";
 }
@@ -334,7 +332,7 @@ sub fetch_databases {
 
     my $db_names = $self->database; 
     $db_names =~ s/\s//g;
-    # print STDERR "fetching databases for ".$db_names."\n";
+     #print STDERR "fetching databases for ".$db_names."\n";
     foreach my $dbname(split(",", $db_names)){ # allows the use of a comma separated list in $self->database
 	# prepend the environment variable $BLASTDB if
 	# database name is not an absoloute path
