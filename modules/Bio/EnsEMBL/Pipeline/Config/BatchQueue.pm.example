@@ -44,60 +44,104 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
-    QUEUE_MANAGER      => 'LSF',
-    DEFAULT_BATCH_SIZE => 10,
-    DEFAULT_RETRIES    => 3,
-    DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-    MAX_PENDING_JOBS   => 500,
-    QUEUE_CONFIG       => [
+	   QUEUE_MANAGER      => 'LSF',
+	   DEFAULT_BATCH_SIZE => 10,
+	   DEFAULT_RETRIES    => 3,
+	   DEFAULT_BATCH_QUEUE => 'acarilong', # put in the queue  of your choice, eg. 'acari'
+	   DEFAULT_OUTPUT_DIR => '',
+	   MAX_PENDING_JOBS   => 400,
+	   AUTO_JOB_UPDATE     => 1,
+	   QUEUE_CONFIG       => [
+				  {
+				   logic_name => 'RepeatMask',
+				   batch_size => 10,
+				   resource   => '',
+				   retries    => 3,
+				   sub_args   => '',
+				   runner     => '',
+				   queue => 'acarilong',
+				   output_dir => '/acari/work1/lec/out/'
+				  },
 	{
-	    logic_name => 'RepeatMask',
-	    batch_size => 20,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
+	 logic_name => 'Genscan',
+	 batch_size => 10,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong', 
+	 output_dir => '/acari/work1/lec/out/'
 	},
 	{
-	    logic_name => 'Genefinder',
-	    batch_size => 20,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
-	},
-	{
-	    logic_name => 'CPG',
-	    batch_size => 20,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
+	 logic_name => 'CPG',
+	 batch_size => 10,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
 	},
 	{		   
-	    logic_name => 'tRNA',
-	    batch_size => 20,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
+	 logic_name => 'tRNA',
+	 batch_size => 10,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
 	},
 	{
-	    logic_name => 'TRF',
-	    batch_size => 20,
-	    resource   => '',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
+	 logic_name => 'TRF',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
 	},
 	{
-	    logic_name => 'Genscan',
-	    batch_size => 20,
-	    resource   => 'alpha',
-	    retries    => 3,
-	    sub_args   => '',
-	    runner     => ''
-	}
+	 logic_name => 'Swall',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
+	},
+	{
+	 logic_name => 'Human_ESTs',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
+	},
+	{
+	 logic_name => 'Mouse_ESTs',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
+	},
+	{
+	 logic_name => 'Other_ESTs',
+	 batch_size => 1,
+	 resource   => '',
+	 retries    => 3,
+	 sub_args   => '',
+	 runner     => '',
+	 queue => 'acarilong',
+	 output_dir => '/acari/work1/lec/out/'
+	},
+			  				  	  
     ]
 );
 
