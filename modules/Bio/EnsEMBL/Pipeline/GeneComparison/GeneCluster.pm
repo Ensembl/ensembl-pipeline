@@ -285,12 +285,12 @@ sub pair_Transcripts {
   my %start_table_ann;
   my $i=0;
   foreach my $tran ( @pred_trans ) {
-    $start_table_pred{$i} = $tran->start_exon->start;
+    $start_table_pred{$i} = $tran->start_Exon->start;
     $i++;
   }
   my $j=0;
   foreach my $tran ( @ann_trans  ) {
-    $start_table_ann{$j} = $tran->start_exon->start;
+    $start_table_ann{$j} = $tran->start_Exon->start;
     $j++;
   }
   foreach my $pos ( sort { $start_table_pred{$a} <=> $start_table_pred{$b} } keys %start_table_pred ){
