@@ -82,22 +82,30 @@ sub new {
     $self->{'_threshold'} = undef; # Value of the threshod
     $self->{'_parameters'}= undef;
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
-    
+    $self->{'_analysis'} = undef;
+    $self->{'_all'} = undef;
   
-    my( $query, $database, $threshold, $workdir, $analysis, $parameters) = $self->_rearrange([qw(QUERY
-												 DATABASE
-												 THRESHOLD
-												 WORKDIR
-												 ANALYSIS
-												 PARAMETERS
-												 )],
-											     @args);
+    my( $query, $database, $threshold, $workdir, $analysis, $parameters,$all) = $self->_rearrange([qw(QUERY
+												      DATABASE
+												      THRESHOLD
+												      WORKDIR
+												      ANALYSIS
+												      PARAMETERS
+												      ALL
+												      )],
+												  @args);
     
     
-  
+    if ($all) {
+	$self->all($all);
+    }
+
     if ($query) {
 	$self->clone($query);
-    } else {
+    } 
+
+    else
+    {
 	$self->throw("No query sequence given");
     }
  
@@ -143,16 +151,17 @@ sub new {
 sub clone{
     my ($self,$seq) = @_;
     
-    if ($seq)
-    {
-	unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
+    if (($seq)&&(!$self->all)) {
 	{
-	    $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
+	    unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
+	    {
+		$self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
+	    }
+	    $self->{'_sequence'} = $seq ;
+	    
+	    #$self->filename($self->all);
+	    #$self->results("scanprosite.out");
 	}
-	$self->{'_sequence'} = $seq ;
-	
-	$self->filename($self->clone->id.".$$.seq");
-	$self->results($self->filename.".out");
     }
     return $self->{'_sequence'};
 }
@@ -172,11 +181,44 @@ sub analysis{
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'analysis'} = $value;
+      $obj->{'_analysis'} = $value;
     }
-    return $obj->{'analysis'};
+    return $obj->{'_analysis'};
 
 }
+
+=head2 all
+
+ Title   : all
+ Usage   : $obj->all($newval)
+ Function: 
+ Returns : value of all
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub all{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+
+      print STDERR "VALUE: $value\n";
+      unless ($value) 
+	{
+	    $obj->throw("Peptide file is not defined\n");
+	}
+
+      $obj->{'_all'} = $value;
+      
+      $obj->filename($obj->all);
+      $obj->results("scanprosite$$.out");
+
+    }
+    return $obj->{'_all'};
+
+}
+
 
 
 ###########
@@ -196,18 +238,21 @@ sub analysis{
 sub run {
     my ($self, $dir) = @_;
 
-    my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
+    #my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
 
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
 
     #write sequence to file
-    $self->writefile(); 
+    if (!$self->all) {
+	
+	$self->writefile();
+    }
     $self->run_analysis();
 
     #parse output and create features
     $self->parse_results();
-    $self->deletefiles();
+    #$self->deletefiles();
   }
 
 =head2 run_analysis
@@ -223,19 +268,13 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR "RUNNING: perl ".$self->analysis->program . ' -pattern ' .$self->analysis->db. ' -emotif ' .$self->parameters.' '.$self->filename . ' > ' .$self->results."\n";
+    my $run = "/usr/local/bin/perl ".$self->analysis->program . ' -pattern ' .$self->analysis->db. ' -confirm  /analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.$self->filename . ' > ' .$self->results;
 
-    $self->throw("Failed during ScanProsite run $!\n")
-	    
-       unless (system ('perl '.$self->analysis->program . 
-		       ' -pattern ' .$self->analysis->db.
-		       ' -confirm /analysis/iprscan/data/confirm.patterns'.
-		       $self->parameters.' '.
-			$self->filename. ' >  ' .
-		       $self->results) == 0) ;
+    print STDERR "RUNNING: $run\n";
+
+    system($run)==0 || die "$0\Error running '$run' : $!";
+
 }
-
-
 
 =head2 parse_results
 
@@ -249,6 +288,8 @@ sub run_analysis {
 =cut
 sub parse_results {
     my ($self) = @_;
+
+    print STDERR "PARSING\n";
     
     my $filehandle;
     my $resfile = $self->results();
@@ -265,7 +306,7 @@ sub parse_results {
     my %printsac;
     my $line;
     
-    my $sequenceId;
+    #my $sequenceId;
     my @features;
     while (<CPGOUT>) {
 	$line = $_;
@@ -273,15 +314,18 @@ sub parse_results {
 	print STDERR "$line\n";
 	my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
 
+	#print STDERR "ID: $id\n";
+	#$sequenceId = $id;
+
 	if ($hid) {
-	    my $feat = "$hid,$from,$to,$confirmed";
+	    my $feat = "$hid,$from,$to,$confirmed,$id";
 	    
 	    push (@features,$feat);
 	}
     }
 		
     foreach my $feats (@features) {
-	$self->create_feature($feats,$sequenceId);
+	$self->create_feature($feats);
 	print STDERR "$feats\n";
     }
     @features = 0;
@@ -317,7 +361,7 @@ sub output {
 
 =cut
 sub create_feature {
-    my ($self, $feat, $sequenceId) = @_;
+    my ($self, $feat) = @_;
     
     my @f = split (/,/,$feat);
 
@@ -334,7 +378,7 @@ sub create_feature {
 					       -end => $f[2],        
 					       -score => $score,
 					       -analysis => $self->analysis,
-					       -seqname => $self->clone->id,
+					       -seqname => $f[4],
 					       -percent_id => 'NULL',
 					       -p_value => 'NULL');
     
