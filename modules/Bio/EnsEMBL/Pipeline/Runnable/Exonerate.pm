@@ -176,7 +176,6 @@ sub est_sequence {
       
     }
     else {
-      print STDERR $value." must be a filename checking\n";
       # it's a filename - check the file exists
       $self->throw("[$value] : file does not exist\n") unless -e $value;
       $self->estfilename($value);
@@ -286,35 +285,44 @@ sub genfilename {
 
   Title   : run
   Usage   : $self->run
-  Function: Runs exonerate; the optional $ungapped flag determines whether to run
-            ungapped - default is gapped.
+  Function: Runs exonerate; the optional argument determines
+            whether to run with or without intron modelling
+            - default is with intron modelling.
   Returns : nothing
-  Args    : $ungapped flag - optional
+  Args    : one optional argument: if it is defined and
+            nonzero, we run without intron modelling
 
 =cut
 
 sub run {  
-  my ($self, $ungapped) = @_;
+  my ($self, $no_intron) = @_;
 
-  if(defined $ungapped){
-    $self->run_ungapped;
+  if(defined $no_intron and $no_intron){
+    $self->run_no_intron;
   }
   else{
-    $self->run_gapped;
+    $self->run_intron;
   }
 }
 
-=head2 run_gapped
+sub run_gapped {
+  my ($self) = @_;
+  $self->warn("run_gapped is deprecated, use run_intron instead");
+  return $self->run_intron;
+}
 
-  Title   : run_gapped
-  Usage   : $self->run_gapped()
-  Function: Runs exonerate in gapped mode and stores results as FeaturePairs
+=head2 run_intron
+
+  Title   : run_intron
+  Usage   : $self->run_intron()
+  Function: Runs exonerate with intron modelling and stores
+            results as FeaturePairs
   Returns : TRUE on success, FALSE on failure.
   Args    : none 
 
 =cut
 
-sub run_gapped {
+sub run_intron {
   my ($self) = @_;
 
   # this method needs serious tidying
@@ -337,11 +345,11 @@ sub run_gapped {
     $user_args = "";
   }
   my $exonerate_command = $self->exonerate() . " " . $user_args
-    . " -n true -A false --cdna $estfile --genomic $genfile >" . $resfile;
+    . " -A false --cdna $estfile --genomic $genfile >" . $resfile;
   
   eval {
     # better to do this as a pipe?
-    print (STDERR "Running command $exonerate_command\n");
+    print (STDERR "command is $exonerate_command\n");
     $self->throw("Error running exonerate on ".$self->filename."\n") 
       if (system ($exonerate_command)); 
     $self->parse_results($resfile);
@@ -462,18 +470,24 @@ sub parse_results {
   close(EXONERATE);
 }
 
-=head2 run_ungapped
+sub run_ungapped {
+  my ($self) = @_;
+  $self->warn("run_ungapped is deprecated, use run_no_intron instead");
+  return $self->run_no_intron;
+}
 
-  Title   : run_ungapped
-  Usage   : $self->run_ungapped()
-  Function: Runs exonerate in ungapped mode (-n yes) and stores results as FeaturePairs
-            Here we are only interested in having one FeaturePair per exon
+=head2 run_no_intron
+
+  Title   : run_no_intron
+  Usage   : $self->run_no_intron()
+  Function: Runs exonerate without modelling introns (i.e., with
+            option -n yes) and stores results as FeaturePairs.
   Returns : TRUE on success, FALSE on failure.
   Args    : none 
 
 =cut
 
-sub run_ungapped {
+sub run_no_intron {
   my ($self) = @_;
 
   #check inputs
