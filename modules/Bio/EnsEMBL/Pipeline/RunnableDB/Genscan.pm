@@ -155,14 +155,14 @@ sub write_output {
    my $self = shift;
  
    my $genscan_runnable = ($self->runnable())[0];
-   my @transcripts = $genscan_runnable->each_Transcript();
+   my @transcripts = @{$genscan_runnable->get_all_Transcripts()};
    if( ! @transcripts ) { return; }
 
    my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
 
    for my $trans ( @transcripts ) {
      my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
-     my @exons = $trans->get_all_Exons();
+     my @exons = @{$trans->get_all_Exons()};
 
      if ($exons[0]->strand == 1) {
        @exons = sort {$a->start <=> $b->start } @exons;
