@@ -76,9 +76,9 @@ sub store {
   my ( $self, $flag ) = @_;
 
   $self->check_flag($flag);
-  my $sql = "INSERT INTO flag SET ensembl_id = ".
-    $flag->ensembl_id." , analysis_id = ".
-    $flag->goalAnalysis->dbID." , table_name = '".
+  my $sql = "INSERT INTO flag SET ensembl_id = '".
+    $flag->ensembl_id."' , analysis_id = '".
+    $flag->goalAnalysis->dbID."' , table_name = '".
       $flag->type."';";
   my $sth = $self->prepare($sql);
   $sth->execute;
