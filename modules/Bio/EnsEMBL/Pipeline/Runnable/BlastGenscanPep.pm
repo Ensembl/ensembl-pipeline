@@ -232,10 +232,9 @@ sub align_hits_to_contig {
 					      $ugFeature->end());
       foreach my $gcoord ( @split ) {
 	if($gcoord->isa('Bio::EnsEMBL::Mapper::Gap')) {
-	  $cdna_total += $gcoord->length;
-	  next;
+	  $self->throw('Unexpected gap mapping peptide' .
+		       'coords to genomic coords');
 	}
-
 
 	my $gstart = $gcoord->start;
 	my $gend   = $gcoord->end;
@@ -292,8 +291,8 @@ sub align_hits_to_contig {
 	$fp->analysis($feature->analysis);
 
 	$fp->hseqname($feature->hseqname);
-	$fp->hstart($pep_start - $ugFeature->start() + $ugFeature->hstart());
-	$fp->hend($pep_end - $ugFeature->start() + $ugFeature->hstart());
+	$fp->hstart($pep_start + $ugFeature->hstart() - 1);
+	$fp->hend($pep_end + $ugFeature->hstart() - 1);
 
 	push( @{$exon_hash{$exon}}, $fp );
       }
@@ -318,12 +317,8 @@ sub create_peptide_featurepairs {
     #create featurepairs
     my @output_features;
 
-    #print STDERR " ARNE Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
-
     foreach my $ex_align (@aligned_exons)
     {
-      #print STDERR "ARNE Found aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
-
         my ($ex_start, $ex_end, $pep_start, $pep_end, $start_phase, $end_phase);
 
       #This splits features across multiple exons and records phases
@@ -331,7 +326,6 @@ sub create_peptide_featurepairs {
       
       if ($ex_align->{'pep_start'}  < $fp->start) {
 	#feature starts inside current exon
-	#print STDERR "ARNE - inside\n";
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'}
 	  + (($fp->start - $ex_align->{'pep_start'})*3);
@@ -344,7 +338,6 @@ sub create_peptide_featurepairs {
 	$pep_start   = $fp->hstart;
       } else {
 	#feature starts in a previous exon or absolute start of current exon
-	#print STDERR "ARNE - previous\n";
 
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'};
@@ -357,8 +350,6 @@ sub create_peptide_featurepairs {
         
       if ($$ex_align{'pep_end'}    > $fp->end) {
 	#feature ends in current exon
-	#print STDERR "ARNE - ends\n";
-
 	if ($ex_align->{strand} == 1) {
 	  $ex_end     = $ex_align->{'gen_start'}
 	  + (($fp->end -  $ex_align->{'pep_start'})*3)+2;
@@ -369,8 +360,6 @@ sub create_peptide_featurepairs {
 	$end_phase  = 0;
 	$pep_end    = $fp->hend;
       } else {
-	#print STDERR "ARNE - later exon\n";
-
 	#feature ends in a later exon or absolute end of current exon
 	if ($ex_align->{strand} == 1) {
 	  $ex_end     = $ex_align->{'gen_end'};
@@ -416,9 +405,6 @@ sub create_peptide_featurepairs {
 	$featurepair->attach_seq($self->genomic);
 	$featurepair->{'_exon_align'} = $ex_align;
 	push( @output_features, $featurepair );
-
-	#print STDERR "\n ARNE" . $featurepair->gffstring . "\n";
-
       }
     return @output_features;
 }
