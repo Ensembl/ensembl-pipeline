@@ -46,12 +46,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
-
+use Bio::EnsEMBL::Pipeline::GeneConf qw (GB_EST_GENETYPE);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -77,7 +78,7 @@ sub new {
     # in superclass constructor (RunnableDB.pm)
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    my $seqfetcher = $self->make_seqfetcher($self->analysis->db);
     $self->seqfetcher($seqfetcher);
 	
     return $self;
@@ -157,15 +158,17 @@ sub fetch_input {
   print "got feature pairs\n";
   
   foreach my $fp(@fps){
-    if($fp->analysis->logic_name eq 'Full_dbEST'){
+    print "getting features with logic_name ".$self->analysis->parameters."\n";
+    if($fp->analysis->logic_name eq $self->analysis->parameters){
       my $hid = $fp->hseqname;
       if(!defined $ests{$hid}){
+	print $hid."\n";
 	$ests{$hid}= 1;
       }
       }
   }
   
-  print "got all unique dbest feature pairs";  
+  print "got all unique dbest feature pairs\n";  
     
   foreach my $id(keys %ests){
     
@@ -173,7 +176,7 @@ sub fetch_input {
     push(@estseqs, $est);
       
   }
-  print "got all ests\n";
+  print "got ",scalar(@estseqs)," ests\n";
   my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'     => $genseq, 
 									    '-queryseq' => \@estseqs,
 									    '-seqfetcher'  => $self->seqfetcher);
@@ -254,7 +257,7 @@ sub _convert_output {
   my $count  = 1;
   my $time   = time; chomp($time);
   my @genes;
-  my $genetype = 'Est2Genome';
+  my $genetype = $self->analysis->logic_name;
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis;
@@ -296,7 +299,7 @@ sub _convert_output {
 sub _make_genes {
   my ($self, $count, $time, $runnable, $analysis) = @_;
   my $contig = $self->dbobj->get_Contig($self->input_id);
-  my $genetype = 'eg';
+  my $genetype = $self->analysis->logic_name;
   my $internal_id = $contig->internal_id;
   my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
   print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
@@ -326,7 +329,7 @@ sub _make_genes {
       
      
       $exon->contig_id($internal_id);
-    
+      $exon->analysis($analysis);
       $exon->seqname($self->input_id);
       $exon->start($exon_pred->start);
       $exon->end  ($exon_pred->end);
@@ -339,7 +342,7 @@ sub _make_genes {
       # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
       $exon_pred->source_tag('E2G');
       $exon_pred->primary_tag('E2G');
-
+      $exon_pred->analysis($analysis);
       $exon_pred->score(100); # ooooooohhhhhh
       
       print "num subfeatures: " . scalar($exon_pred->sub_SeqFeature) . "\n";
@@ -349,11 +352,11 @@ sub _make_genes {
 	$subf->feature1->source_tag($genetype);
 	$subf->feature1->primary_tag('similarity');
 	$subf->feature1->analysis($exon_pred->analysis);
-	
+	$subf->feature1->seqname($internal_id);
 	$subf->feature2->source_tag($genetype);
 	$subf->feature2->primary_tag('similarity');
 	$subf->feature2->analysis($exon_pred->analysis);
-	
+	$subf->feature2->seqname($internal_id);
 	$exon->add_Supporting_Feature($subf);
       }
       
@@ -408,6 +411,22 @@ sub _make_genes {
 
 }
 
+
+sub make_seqfetcher{
+  my ($self, $db) = @_;
+
+  if(!$db){
+    $self->throw("haven't got a dir to make the seqfetcher with $db $!\n");
+  }
+  
+  my @databases;
+  my $db_string = $ENV{BLASTDB}."/".$db;
+  
+  my @databases = ($db_string);
+  my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new( -db => \@databases);
+
+  return $seqfetcher;
+}
 
 
 1;
