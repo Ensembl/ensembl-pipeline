@@ -18,13 +18,13 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA
 
   my $db       = Bio::EnsEMBL::DBLoader->new($locator);
   my $genscan  = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
-                -dbobj      => $db,
-                -input_id   => $input_id
-                -analysis   => $analysis);
-  $genscan->fetch_input();
+			   -genomic     => $genomic
+                           -peptide     => $peptide
+                           -program     => 'tblastn',
+			   -database    => 'dbest',
+			   -threshold   => 1e-6);
   $genscan->run();
   $genscan->output();
-  $genscan->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
@@ -362,7 +362,7 @@ sub align_hits_to_contig2 {
 	}
 
 	my $dna_feat1 = Bio::EnsEMBL::SeqFeature->new 
-	  ( -seqname    =>  $contig->name,
+	  ( -seqname    =>  $contig->display_id,
 	    -start      =>  $gstart, 
 	    -end        =>  $gend,
 	    -strand     =>  $gstrand,
