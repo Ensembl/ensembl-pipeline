@@ -971,7 +971,7 @@ sub restart{
                     $restart_string .= " " . $option;
                 }
             }
-            print STDERR "$NAMED : RestartString <$SELF$restart_string -buffyMode>\n";
+            print STDERR "$NAMED : RestartString <$SELF$restart_string>\n";
         }
         return $restart_string . " -buffyMode\n";
     }

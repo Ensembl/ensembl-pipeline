@@ -91,24 +91,22 @@ if(!$analysis){
 my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
-
-print STDERR "creating runnable ".$file."\n" if($verbose);
+#print STDERR "creating runnable ".$file."\n" if($verbose);
 
 $runnable =~ s/\//::/g;
 my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
 			     );
-
 #print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
 &eval_method($runobj, 'fetch_input');
-print STDERR "Fetched input\n" if($verbose);
+#print STDERR "Fetched input\n" if($verbose);
 &eval_method($runobj, 'run');
-print STDERR "Run ".$runobj."\n" if($verbose);
+#print STDERR "Run ".$runobj."\n" if($verbose)
 if($write){
-  print STDERR "Writing output\n";
+  #print STDERR "Writing output\n";
   &eval_method($runobj, 'write_output');
-  print STDERR "written output\n" if($verbose);
+  #print STDERR "written output\n" if($verbose);
 }
 
 my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, created) values( ?, ?, ?, now())";
@@ -170,8 +168,7 @@ sub eval_method{
     $obj->$method;
   };
   if($@){
-    print STDERR "Problem calling ".$method." on ".$obj."-------------\n";
- 
+    print STDERR "Problem calling ".$method." on ".$obj."\n";
     print "$@\n";
     exit;
   }

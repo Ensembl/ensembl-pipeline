@@ -21,4 +21,5 @@ exec ./Finished_RuleManager.pl \
 -dbport 3302 \
 -dbuser ottadmin \
 -dbpass lutralutra \
+-start_from SubmitContig \
 $@

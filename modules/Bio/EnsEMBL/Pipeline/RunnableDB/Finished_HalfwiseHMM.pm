@@ -177,6 +177,7 @@ sub getPfamDB{
 #        $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%{$pfam_meta->get_hash_by_key('pfam_db')});
         $self->{'_pfam_db'} = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(%$pfam_db_conn);
     }
+
     return $self->{'_pfam_db'};
 }
 
@@ -184,8 +185,9 @@ sub check_db_versions{
     my ($self) = @_;
     my $my_pfam = $self->db_version_searched();
     my $pfam_ls = $self->pfam_ls_version();
+
     unless($pfam_ls eq $my_pfam){
-#        $self->throw("VERSION MISMATCH : $pfam_ls not equal to $my_pfam\n");
+       # $self->throw("VERSION MISMATCH : $pfam_ls not equal to $my_pfam\n");
     }
 }
 
@@ -212,11 +214,12 @@ sub pfam_ls_version{
         warn "BlastableVersion is cvs revision $BlastableVersion::revision \n" if $debug_this;
             
         my $ver = eval { 
-            my $blast_ver = BlastableVersion->new();
+		    my $blast_ver = BlastableVersion->new();
             $blast_ver->force_dbi($force_dbi); # if set will be SLOW.
             $blast_ver->get_version($db);
             $blast_ver;
         };
+
         $self->throw("I failed to get a BlastableVersion for $db") if $@;
         
         my $dbv = $ver->version();
