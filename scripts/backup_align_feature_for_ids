@@ -33,7 +33,6 @@ use Getopt::Long 'GetOptions';
     my $chunk_size = 100;
     while (@id_list) {
         my @id_chunk = splice(@id_list, 0, $chunk_size);
-        printf STDERR "Dumping features for '%d' hit_names\n", scalar(@id_chunk);
         my $id_str = join(',', map "'$_'", @id_chunk);
         my $where = qq{--where="hit_name in($id_str);"};
         my $command_str = qq{@dump_command $where $database $table >> $out_file};
