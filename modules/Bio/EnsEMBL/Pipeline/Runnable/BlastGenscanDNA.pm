@@ -30,14 +30,14 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA
 
 This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides
 constructed from assembling genscan predicted features to peptide
-sequence. The resulting blast hits are written back as FeaturePairs.
+sequence. The resulting blast hits are stored as DnaDnaAlignFeature's.
 The appropriate Bio::EnsEMBL::Analysis object must be passed
 for extraction of appropriate parameters. A
 Bio::EnsEMBL::Pipeline::DBSQL::Obj is required for databse access.
 
 =head1 CONTACT
 
-Describe contact details here
+B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -52,6 +52,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 
 use vars qw(@ISA);
 
@@ -77,7 +78,6 @@ use vars qw(@ISA);
 
 
 =cut
-
 
 sub new {
   my ($class, @args) = @_;
@@ -153,13 +153,14 @@ sub new {
   return $self;
 }
 
+
 =head2 run
 
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->run()
-    Returns :   none
-    Args    :   none
+    Args       : none
+    Description: runs the blast program and creates features
+    Returntype : none
+    Exceptions : none
+    Caller     : general
 
 =cut
 
@@ -175,7 +176,7 @@ sub run {
     #print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
 
     my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
-				       -seq        => $transcript->translate(),
+				       -seq        => $transcript->translate->seq,
 				       -moltype    => 'protein' );
 
     #print STDERR "cDNA length: ", $peptide->length, "\n";
@@ -197,7 +198,7 @@ sub run {
    $runnable->run();
   
     $self->align_hits_to_contig2($runnable->output);
-  }
+}
 
 sub check_features {
   my ($self,$pep,@f) = @_;
@@ -285,6 +286,7 @@ sub get_Sequence {
     return $seq;
 }
 
+
 =head2 output
 
     Title   :   output
@@ -300,6 +302,7 @@ sub output {
 
     return $self->featurepairs();  
 }
+
 
 sub align_hits_to_contig2 {
   my ( $self, @features )  = @_;
