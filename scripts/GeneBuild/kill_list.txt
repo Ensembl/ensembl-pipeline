@@ -258,9 +258,47 @@ Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
 O70449 Putative retrovirus-related gag1 gene (matches rat - dta)
 Q8BLS1 RIKEN sequence very similar to O70449, which is a retrovirus-like gene (matches rat - dta)
 Q9CRM2 172 Q9CRM2_MOUSE Q9CRM2 Mus musculus 12 days embryo male wolffian duct includes surrounding region cDNA, RIKEN full-length enriched library, clone:6720473M11 product:weakly similar to RETROVIRUS-RELATED GAG POLYPROTEIN (Fragment). from rat retroviral protein
+Q6LCX0 1452 Q6LCX0_MOUSE Q6LCX0 Mus musculus clone CCD40 LINE-1 element ORF1 (Fragment).
+Q9QUR4 1487 Q9QUR4_MOUSE Q9QUR4 Mus musculus L1 retrotransposon, Tf subfamily L1Md-Tf19, partial sequence (Mus musculus L1 retrotransposon, Tf subfamily L1Md-Tf16, partial sequence) (Fragment).
+Q8BR13 1583 Q8BR13_MOUSE Q8BR13 Mus musculus adult male corpora quadrigemina cDNA, RIKEN full-length enriched library, clone:B230325I02 product:L1 repeat, Tf subfamily, member 29, full insert sequence. (Fragment).
+Q8BHB5 7314 Q8BHB5_MOUSE Q8BHB5 Mus musculus 12 days embryo embryonic body between diaphragm region and neck cDNA, RIKEN full-length enriched library, clone:9430076C16 product:L1 repeat, Tf subfamily, member 30, full insert sequence (Mus musculus 12 days embryo embryonic body between diaphragm region and neck cDNA, RIKEN full-length enriched library, clone:9430081H21 product:SIMILAR TO L1 REPEAT, TF SUBFAMILY, MEMBER 30 homolog).
+Q61785 103 Q61785_MOUSE Q61785 ORF2; 5' end undetermined. (Fragment).
+Q8R1U0 121 Q8R1U0_MOUSE Q8R1U0 Hypothetical protein.
+Q8C4B3 140 Q8C4B3_MOUSE Q8C4B3 Mus musculus 0 day neonate cerebellum cDNA, RIKEN full-length enriched library, clone:C230070D10 product:hypothetical protein, full insert sequence.
+Q7TQ37 189 Q7TQ37_MOUSE Q7TQ37 Pol protein.
+NP_899122.1 332 gi|50233844|ref|NP_899122.1| hypothetical protein LOC280487 [Mus musculus]
+Q7TQ38 439 Q7TQ38_MOUSE Q7TQ38 Gag protein.
+Q8CDH6 491 Q8CDH6_MOUSE Q8CDH6 Mus musculus adult male testis cDNA, RIKEN full-length enriched library, clone:4932416G22 product:hypothetical protein, full insert sequence.
+Q9Z155 506 Q9Z155_MOUSE Q9Z155 Reverse transcriptase (Fragment).
+NP_001005856.1 728 gi|54312064|ref|NP_001005856.1| reverse transcriptase [Mus musculus]
+P11369 898 POL2_MOUSE P11369 Retrovirus-related Pol polyprotein LINE-1 (Long interspersed element- 1) (L1) [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease].
+P11260 977 YO11_MOUSE P11260 Hypothetical protein ORF-1137.
+O08906 1222 O08906_MOUSE O08906 Reverse transcriptase (Fragment).
+O54849 1242 O54849_MOUSE O54849 Hypothetical protein.
+O54850 1304 O54850_MOUSE O54850 Endonuclease/reverse transcriptase.
+Q9QUJ6 1387 Q9QUJ6_MOUSE Q9QUJ6 Mus musculus DNA, L1 element insertion in intron 3 of Mitf gene.
+Q9R225 1392 Q9R225_MOUSE Q9R225 Mus musculus L1 retrotransposon, Tf subfamily L1Md-Tf2, partial sequence. (Fragment).
+O08905 1410 O08905_MOUSE O08905 RNP particle component (Fragment) 
+P11367 12 POL3_MOUSE P11367 Retrovirus-related Pol polyprotein (Endonuclease) (Fragment).
+Q7M6U5 12 Q7M6U5_MOUSE Q7M6U5 Pol protein (Fragment).
+P10404 13 ENV1_MOUSE P10404 Retrovirus-related Env polyprotein [Contains: Coat protein GP70] (Fragment).
+Q80SV2 14 Q80SV2_MOUSE Q80SV2 Truncated envelope polyprotein.
+Q811J2 11 Q811J2_MOUSE Q811J2 Hypothetical protein (Fragment). like a gag pol protein (lec)
+Q8C2B1 18 Q8C2B1_MOUSE Q8C2B1 Mus musculus 2 days neonate thymus thymic cells cDNA, RIKEN full- length enriched library, clone:E430033N13 product:retrovirus-related pol polyprotein homolog.
+Q61590 21 Q61590_MOUSE Q61590 M.musculus p12 GAG gene homologue (Fragment)
+Q7TQ39 23 Q7TQ39_MOUSE Q7TQ39 Gag protein.
+Q8BMX1 24 Q8BMX1_MOUSE Q8BMX1 Mus musculus 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2700079J08 product:GAG PROTEIN homolog (Fragment).
+P10400 31 POL1_MOUSE P10400 Retrovirus-related Pol polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease] (Fragment).
+Q811J2 11 Q811J2_MOUSE Q811J2 Hypothetical protein (Fragment). like gag proteins
+Q61706 14 Q61706_MOUSE Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 106. like a pol
+Q66JW8 19 Q66JW8_MOUSE Q66JW8 Hypothetical protein.
+). like a Gag protein
+Q99K18 25 Q99K18_MOUSE Q99K18 BC005512 protein (Fragment). Pol protein
+Q8BTS2 95 Q8BTS2_MOUSE Q8BTS2 Mus musculus 2 days neonate thymus thymic cells cDNA, RIKEN full- length enriched library, clone:E430029J22 product:ANTIGEN LEC-A homolog (Fragment). Gag protein
 Q9D9F4 Translation of a L1-like RIKEN sequence (dta).
 NP_082840.1 A seemingly innocent RIKEN sequence, but similar enough to L1 elements to cause 80-odd single exon gene predictions (dta).
 Q9D2T0 Contains integrase and viral capsid homologies (dta).
 Q80YX9 Homologous to integrase domain (dta).
 Q8VDY3 Member of integrase C superfamily (dta).
 NP_112232 Tiny protein that has been removed from RefSeq.  Formed the basis 51 human genes (dta).
+
