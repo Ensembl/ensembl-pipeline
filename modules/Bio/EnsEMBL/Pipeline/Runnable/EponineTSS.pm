@@ -150,6 +150,7 @@ sub query {
 
       $self->filename($self->query->id.".$$.seq");
       $self->results($self->filename.".out");
+      $self->file($self->results);
   }
   return $self->{'_sequence'};
 }
