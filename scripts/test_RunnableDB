@@ -60,10 +60,11 @@ print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_n
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
-   -host             => $dbhost,
-   -user             => $dbuser,
-   -dbname           => $dbname,
-   -pass             => $dbpass,
+   -host   => $dbhost,
+   -user   => $dbuser,
+   -dbname => $dbname,
+   -pass   => $dbpass,
+   -port   => $dbport,
   );
 
 die "No input id entered" unless defined ($input_id);
