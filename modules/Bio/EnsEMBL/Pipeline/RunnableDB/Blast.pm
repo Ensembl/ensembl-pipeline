@@ -51,10 +51,12 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
-use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+
 use vars qw(@ISA);
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+@ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
 
@@ -97,8 +99,6 @@ sub new {
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
     $self->analysis($analysis);
     
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast');
-    
     return $self;
 }
 
@@ -121,33 +121,26 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+
+    print STDERR "Setting genseq to " . $genseq. "\n";
+
     $self->genseq($genseq);
+    print STDERR "Set genseq to " . $self->genseq. "\n";
 }
 
 #get/set for runnable and args
 sub runnable {
-    my ($self, $runnable) = @_;
+    my ($self) = @_;
     
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->analysis->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $key =~ s/\s+//g;
-                $parameters{$key} = $value;
-            }
-        }
-        $parameters {'-db'}      = $self->analysis->db_file();
-        $parameters {'-blast'}   = $self->analysis->program_file();  
-        #creates empty Bio::EnsEMBL::Runnable::Blast object
-        $self->{'_runnable'} = $runnable->new(%parameters);
+    if (!defined($self->{_runnable})) {
+      my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
+							     -database  => $self->analysis->db,
+							     -program   => $self->analysis->program,
+							     -threshold => 1);
+
+      $self->{'_runnable'} = $run;
     }
+    
     return $self->{'_runnable'};
 }
 
@@ -164,8 +157,9 @@ sub runnable {
 sub run {
     my ($self) = @_;
     $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched") unless ($self->genseq());
-    $self->runnable->clone($self->genseq());
+    $self->throw("Input not fetched")       unless ($self->genseq());
+
     $self->runnable->run();
 }
 
+1;
