@@ -6,7 +6,6 @@ CREATE TABLE job (
   lsf_id            mediumint(10) unsigned NOT NULL,
   stdout_file       varchar(100) NOT NULL,
   stderr_file       varchar(100) NOT NULL,
-  object_file       varchar(100) NOT NULL,
   retry_count       tinyint(2) unsigned default 0,
 
   PRIMARY KEY (job_id),
