@@ -1034,8 +1034,8 @@ sub set_stop_codon{
 
       ############################################################
       # re-set the phases:
-      $end_exon->end_phase($donor_bases_count);
-      $next_exon->phase( $donor_bases_count);
+      $end_exon->end_phase($donor_bases_count%3);
+      $next_exon->phase( $donor_bases_count%3 );
       
       return $transcript;
     }
