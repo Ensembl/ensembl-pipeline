@@ -1008,7 +1008,7 @@ sub _print_Transcript{
   else{
     $id = "no id";
   }
-  print STDERR "transcript id: ".$transcript->dbID." type: ".$self->_transcript_Type($transcript)."\n";
+  print STDERR "transcript id: ".$id." type: ".$self->_transcript_Type($transcript)."\n";
   foreach my $exon ( @exons){
     print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
   }
