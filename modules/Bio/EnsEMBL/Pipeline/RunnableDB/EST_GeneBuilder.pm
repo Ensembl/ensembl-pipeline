@@ -47,16 +47,15 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
-					 );
 
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
@@ -65,12 +64,63 @@ sub new {
 
     # dbobj input_id mandatory and read in by BlastableDB
     if (!defined $self->seqfetcher) {
-      my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+       my $seqfetcher = $self->make_seqfetcher();
       $self->seqfetcher($seqfetcher);
     }
 
+
+# dbobj needs a reference dna database
+    my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						  -host             => $::db_conf{'refdbhost'},
+						  -user             => $::db_conf{'refdbuser'},
+						  -dbname           => $::db_conf{'refdbname'},
+						  -pass             => $::db_conf{'refdbpass'},
+						  -perlonlyfeatures => 0,
+						 );
+
+    $self->dbobj->dnadb($refdb);
+
+    my $path = $::db_conf{'golden_path'};
+    $path    = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
+
     return $self; 
 }
+
+=head2 make_seqfetcher
+
+ Title   : make_seqfetcher
+ Usage   :
+ Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching EST sequences. If 
+           $est_genome_conf{'est_index'} is specified in EST_conf.pl, then a Getseqs 
+           fetcher is made, otherwise it will be Pfetch. NB for analysing large numbers 
+           of ESTs eg all human ESTs, pfetch is far too slow ...
+ Example :
+ Returns : Bio::EnsEMBL::SeqFetcher
+ Args    :
+
+
+=cut
+
+sub make_seqfetcher {
+  my ( $self ) = @_;
+  my $index   = $::est_genome_conf{'est_index'};
+
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  }
+
+  return $seqfetcher;
+
+}
+
 
 =head2 RunnableDB methods
 
@@ -110,91 +160,14 @@ sub new {
 =cut
 
 sub write_output {
-    my($self,@features) = @_;
+    my ($self) = @_;
 
-    my $db = $self->dbobj;
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
    
-    if( !defined $db ) {
-      $self->throw("unable to make write db");
-    }
-    
-    my %contighash;
-    my $gene_obj = $db->gene_Obj;
-
-    my @newgenes = $self->output;
-    return unless ($#newgenes >= 0);
-
-    # get new ids
-    eval {
-
-	my $genecount  = 0;
-	my $transcount = 0;
-	my $translcount = 0;
-	my $exoncount  = 0;
-
-	# get counts of each type of ID we need.
-
-	foreach my $gene ( @newgenes ) {
-	    $genecount++;
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$transcount++;
-		$translcount++;
-	    }
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		$exoncount++;
-	    }
-	}
-
-	# get that number of ids. This locks the database
-
-	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	my @translids =  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-	my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-
-	# database locks are over.
-
-	# now assign ids. gene and transcripts are easy. Exons are harder.
-	# the code currently assummes that there is one Exon object per unique
-	# exon id. This might not always be the case.
-
-	foreach my $gene ( @newgenes ) {
-	    $gene->id(shift(@geneids));
-	    my %exonhash;
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		my $tempid = $exon->id;
-		$exon->id(shift(@exonsid));
-		$exonhash{$tempid} = $exon->id;
-	    }
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$trans->id(shift(@transids));
-		$trans->translation->id(shift(@translids));
-		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-	    }
-	    
-	}
-
-	# paranoia!
-	if( scalar(@geneids) != 0 || scalar(@exonsid) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
-	    $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonsid));
-	}
-
-    };
-    if( $@ ) {
-	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-    }
-
-
-    # this now assummes that we are building on a single VC.
-
-
-
-  GENE: foreach my $gene (@newgenes) {	
-      # do a per gene eval...
+  GENE: foreach my $gene ($self->output) {	
       eval {
-	
-	  $gene_obj->write($gene);
+	$gene_adaptor->store($gene);
+	print STDERR "wrote gene " . $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -217,7 +190,7 @@ sub write_output {
 sub fetch_input {
     my( $self) = @_;
 
-    my $genetype = 'bmeg';
+    my $genetype = 'exonerate_e2g';
 
     print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
@@ -231,8 +204,6 @@ sub fetch_input {
 
     print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
 
-    $self->dbobj->static_golden_path_type('UCSC');
-
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
 
@@ -245,7 +216,7 @@ sub fetch_input {
     print STDERR "*** forward strand\n";
 
     # get genes
-    my @genes  = $contig->get_Genes_by_Type($genetype, 'evidence');
+    my @genes  = $contig->get_Genes_by_Type($genetype);
     
     print STDERR "Number of genes = " . scalar(@genes) . "\n";
     if(!scalar(@genes)){
@@ -261,11 +232,11 @@ GENE:
     foreach my $gene(@genes) {
       my @transcripts = $gene->each_Transcript;
       if(scalar(@transcripts) > 1 ){
-	$self->warn($gene->id . " has more than one transcript - skipping it\n");
+	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
 	next GENE;
       }
 
-      my @exons = $transcripts[0]->each_Exon;
+      my @exons = $transcripts[0]->get_all_Exons;
 
       if(scalar(@exons) == 1){
 	$single++;
@@ -316,11 +287,11 @@ GENE:
     foreach my $gene(@revgenes) {
       my @transcripts = $gene->each_Transcript;
       if(scalar(@transcripts) > 1 ){
-	$self->warn($gene->id . " has more than one transcript - skipping it\n");
+	$self->warn($gene->temporary_id . " has more than one transcript - skipping it\n");
 	next REVGENE;
       }
 
-      my @exons = $transcripts[0]->each_Exon;
+      my @exons = $transcripts[0]->get_all_Exons;
 
       if(scalar(@exons) == -1){
 	next REVGENE;
@@ -396,7 +367,7 @@ sub cluster_transcripts {
     foreach my $est(@$set){
       my $trans = $est2transcript{$est};
 #      print STDERR "transcript: " . $trans->id . "\n";
-      $transcripts{$trans->id} = $trans;
+      $transcripts{$trans->temporary_id} = $trans;
     }
     push (@transcript_clusters, [ values %transcripts ])
   }
@@ -418,10 +389,11 @@ sub cluster_transcripts {
 sub check_transcripts {
   my ($self, $hid_trans, $exon_hid, @transcripts) = @_;
   my @allexons;
+  my $exon_adaptor = $self->dbobj->get_ExonAdaptor;
 
   TRANS: 
   foreach my $transcript(@transcripts){
-    my @exons = $transcript->each_Exon;
+    my @exons = $transcript->get_all_Exons;
     my $hid;
     my $strand;
     
@@ -435,21 +407,22 @@ sub check_transcripts {
       }
       
       if($strand ne $exon->strand){
-	$self->warn("strand not consistent among exons for " . $transcript->id . " - skipping it\n");
+	$self->warn("strand not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
 	next TRANS;
       }
       
       # check supporting_feature consistency
+      $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @sf = $exon->each_Supporting_Feature;      
     SF:
-      foreach my $feature(@sf) {
+      foreach my $feature($exon->each_Supporting_Feature) {
 	# because we get all the supporting features indiscriminately
-	next SF unless $feature->source_tag eq 'bmeg'; 
+	next SF unless $feature->source_tag eq 'exonerate_e2g'; 
 	
 	if(!defined $hid) { $hid = $feature->hseqname; }
 	
 	if($hid ne $feature->hseqname){
-	  $self->warn("hid not consistent among exons for " . $transcript->id . " - skipping it\n");
+	  $self->warn("hid not consistent among exons for " . $transcript->temporary_id . " - skipping it\n");
 	  next TRANS;
 	}
 
@@ -723,7 +696,7 @@ sub link_clusters{
 	  my $s2;
 	  foreach my $exon(@sub2){
 	    if ($$exon_hid{$exon}{'hid'} eq $hid1){
-	      print STDERR "cluster $c " . $s1->id . " links to cluster $c2 " . $exon->id . "\n";
+	      print STDERR "cluster $c " . $s1->id . " links to cluster $c2 " . $exon->temporary_id . "\n";
 	      $s2 = $exon;
 	    }
 	  }
@@ -737,7 +710,7 @@ sub link_clusters{
 	      # Only allow a $tol discontinuity in the sequence
 
 	      if ($s1->strand == $s2->strand && 
-		  (abs($$exon_hid{$s1}{'hend'} - $$exon_hid{$s2}{'start'}) < $tol || 
+		  (abs($$exon_hid{$s1}{'hend'} - $$exon_hid{$s2}{'hstart'}) < $tol || 
 		   abs($$exon_hid{$s1}{'hstart'} - $$exon_hid{$s2}{'hend'}) < $tol)) {
 
 		$found = 1;
@@ -979,15 +952,11 @@ sub make_genes {
     $count++;
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($contig->id . ".$genetype.$count");
-    $gene->version(1);
-    $gene->created($time);
-    $gene->modified($time);
+    $gene->temporary_id($contig->id . ".$genetype.$count");
     $gene->analysis($analysis_obj);
 
     # add transcript to gene
-    $transcript->id($contig->id . ".$genetype.$count");
-    $transcript->version(1);
+    $transcript->temporary_id($contig->id . ".$genetype.$count");
     $gene->add_Transcript($transcript);
 
 
@@ -997,14 +966,11 @@ sub make_genes {
     # sort the exons 
     $transcript->sort;
     my $excount = 1;
-    my @exons = $transcript->each_Exon;
+    my @exons = $transcript->get_all_Exons;
 
     foreach my $exon(@exons){
-      $exon->id($contig->id . ".$genetype.$count.$excount");
+      $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
-      $exon->created($time);
-      $exon->modified($time);
-      $exon->version(1);
       $exon->attach_seq($contig->primary_seq);
       $excount++;
       }
@@ -1013,12 +979,10 @@ sub make_genes {
 
     # sort out translation
     my $translation  = new Bio::EnsEMBL::Translation;    
-    $translation->id($contig->id . ".$genetype.$count");
-    $translation->version(1);    
-    
-    $translation->start_exon_id($exons[0]->id);
+    $translation->temporary_id($contig->id . ".$genetype.$count");
+    $translation->start_exon($exons[0]);
 
-    $translation->end_exon_id  ($exons[$#exons]->id);
+    $translation->end_exon  ($exons[$#exons]);
     if ($exons[0]->phase == 0) {
       $translation->start(1);
     } elsif ($exons[0]->phase == 1) {
@@ -1065,7 +1029,7 @@ sub remap_genes {
       
     };
     if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+      print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
     }
     
   }
