@@ -47,7 +47,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $minimum_intron, $exon_padding, $minimum_feature_length) = 
+    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $gap, $extension, $matrix, $minimum_intron, $exon_padding, $minimum_feature_length) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
@@ -55,6 +55,9 @@ sub new {
 			    EXON_PADDING
 			    MINIMUM_INTRON
                             ENDBIAS  
+                            GAP  
+                            EXTENSION  
+                            MATRIX  
                             MINIMUM_INTRON
                             EXON_PADDING
                             MINIMUM_FEATURE_LENGTH
@@ -72,6 +75,9 @@ sub new {
     $self->genomic_sequence($genomic)           if defined($genomic);
     $self->seqfetcher($seqfetcher)              if defined($seqfetcher);
     $self->endbias($endbias)                    if defined($endbias);
+    $self->gap($gap)                        if defined($gap);
+    $self->extension($extension)                  if defined($extension);
+    $self->matrix($matrix)                     if defined($matrix);
     $self->features($features)                  if defined($features);
     $self->_minimum_intron($minimum_intron)     if defined($minimum_intron);
     $self->_exon_padding($exon_padding)         if defined($exon_padding);
@@ -298,7 +304,11 @@ sub run {
 									     -terminal_padding => $self->_terminal_padding,
 									     -minimum_intron   => $self->_minimum_intron,
 									     -exon_padding     => $self->_exon_padding,
-									     -endbias => $self->endbias);
+									     -endbias          => $self->endbias,
+									     -gap              => $self->gap,
+									     -extension        => $self->extension,
+									     -matrix           => $self->matrix,
+									    );
 	  
 	  $runnable->run;
 	  ##print STDERR "MiniGenewise output " . $runnable->output . "\n";
@@ -323,7 +333,11 @@ sub run {
 									     -terminal_padding   => $self->_terminal_padding,
 									     -minimum_intron => $self->_minimum_intron,
 									     -exon_padding   => $self->_exon_padding,
-									     -endbias => $self->endbias);
+									     -endbias        => $self->endbias,
+									     -gap            => $self->gap,
+									     -extension      => $self->extension,
+									     -matrix         => $self->matrix,
+									    );
 	
 	  $runnable->run;
 	  #print STDERR "MiniGenewise output " . $runnable->output . "\n";
@@ -482,6 +496,41 @@ sub endbias {
   return $self->{'_endbias'};
 }
 
+sub gap {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_gap'} = $arg;
+  }
+  if (!defined($self->{'_gap'})) {
+    $self->{'_gap'} = 0;
+  }
+  return $self->{'_gap'};
+}
+
+sub extension {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_extension'} = $arg;
+  }
+  if (!defined($self->{'_extension'})) {
+    $self->{'_extension'} = 0;
+  }
+  return $self->{'_extension'};
+}
+
+sub matrix {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_matrix'} = $arg;
+  }
+  if (!defined($self->{'_matrix'})) {
+    $self->{'_matrix'} = 0;
+  }
+  return $self->{'_matrix'};
+}
 
 1;
 

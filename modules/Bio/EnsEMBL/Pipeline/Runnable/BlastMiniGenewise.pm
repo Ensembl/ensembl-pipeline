@@ -71,11 +71,14 @@ sub new {
 
   my $self = $class->SUPER::new(@args);
   
-  my( $genomic, $ids, $seqfetcher, $endbias, $terminal_padding, $exon_padding, $minimum_intron, $check_repeated) = 
+  my( $genomic, $ids, $seqfetcher, $endbias, $gap, $extension, $matrix, $terminal_padding, $exon_padding, $minimum_intron, $check_repeated) = 
     $self->_rearrange([qw(GENOMIC
 			  IDS
 			  SEQFETCHER
 			  ENDBIAS
+			  GAP
+			  EXTENSION
+			  MATRIX
 			  TERMINAL_PADDING
 			  EXON_PADDING
 			  MINIMUM_INTRON
@@ -92,6 +95,9 @@ sub new {
   $self->ids($ids)                                     if defined($ids);
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
+  $self->gap($gap)                                 if defined($gap);
+  $self->extension($extension)                           if defined($extension);
+  $self->matrix($matrix)                              if defined($matrix);
   $self->terminal_padding($terminal_padding)           if defined($terminal_padding);
   $self->exon_padding($exon_padding)                   if defined($exon_padding);
   $self->minimum_intron($minimum_intron)               if defined($minimum_intron);
@@ -166,6 +172,79 @@ sub endbias {
 
     return $self->{'_endbias'};
 }
+
+=head2 gap
+
+    Title   :   gap
+    Usage   :   $self->gap($gap)
+    Function:   Get/set method for genewise gap
+    Returns :   
+    Args    :   
+
+=cut
+
+sub gap {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_gap'} = $arg;
+    }
+
+    if (!defined($self->{'_gap'})) {
+      $self->{'_gap'} = 0;
+    }    
+
+    return $self->{'_gap'};
+}
+
+=head2 extension
+
+    Title   :   extension
+    Usage   :   $self->extension($extension)
+    Function:   Get/set method for genewise extension
+    Returns :   
+    Args    :   
+
+=cut
+
+sub extension {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_extension'} = $arg;
+    }
+
+    if (!defined($self->{'_extension'})) {
+      $self->{'_extension'} = 0;
+    }    
+
+    return $self->{'_extension'};
+}
+
+=head2 matrix
+
+    Title   :   matrix
+    Usage   :   $self->matrix($matrix)
+    Function:   Get/set method for genewise matrix
+    Returns :   
+    Args    :   
+
+=cut
+
+sub matrix {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_matrix'} = $arg;
+    }
+
+    if (!defined($self->{'_matrix'})) {
+      $self->{'_matrix'} = 0;
+    }    
+
+    return $self->{'_matrix'};
+}
+
 
 =head2 terminal_padding
 
@@ -469,7 +548,10 @@ sub make_object {
 									'-terminal_padding' => $self->terminal_padding,
 									'-exon_padding'     => $self->exon_padding,
 									'-minimum_intron'   => $self->minimum_intron,
-									'-endbias'    => $self->endbias
+									'-endbias'    => $self->endbias,
+									'-gap'        => $self->gap,
+									'-extension'  => $self->extension,
+									'-matrix'     => $self->matrix,
 				      );
 
   return $mg;
