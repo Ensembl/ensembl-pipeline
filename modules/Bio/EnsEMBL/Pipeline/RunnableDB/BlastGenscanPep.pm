@@ -194,7 +194,7 @@ sub run {
 									    -peptide   => $transcript,
 									    -database  => $self->analysis->db,
 									    -program   => $self->analysis->program,
-									    -threshold => 1e-6);
+									    -threshold => 75);
 
       $runnable->run();
       $self->runnable($runnable);                                        
