@@ -5,6 +5,7 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
 use Bio::EnsEMBL::Pipeline::Tools::PseudoGeneTests;
+use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Getopt::Long;
 use strict;
 
@@ -44,7 +45,7 @@ my  $focus_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 my $focus_species = $FOCUS_SPECIES;
 
-my $gene = $focus_db->gene_adaptor->fetch_by_dbID( $gene_id, 1);
+my $gene = $focus_db->get_GeneAdaptor->fetch_by_dbID( $gene_id, 1);
 my $db = $focus_db;
 
 my $compara_db = Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
@@ -57,30 +58,30 @@ my $compara_db = Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
 my ($target_db, $target_db2);
 my ($target_species, $target_species2);
 if ( @$COMPARATIVE_DBS ){
-    if ( $COMPARATIVE_DBS->[0] ){
-	$target_species = $COMPARATIVE_DBS->[0]->{SPECIES};
-	$target_db =  
-	  Bio::EnsEMBL::Compara::DBSQL::DBAdaptor
-	      ->new(
-		    -user      => 'ensro',
-		    -dbname    => $COMPARATIVE_DBS->[0]->{DBNAME},
-		    -host      => $COMPARATIVE_DBS->[0]->{DHOST},
-		    );
-	$target_db->assembly_type( $COMPARATIVE_DBS->[0]->{PATH} );
-    }
-    if ( $COMPARATIVE_DBS->[1] ){
-	$target_species2 = $COMPARATIVE_DBS->[1]->{SPECIES};
-	$target_db2 =  
-	  Bio::EnsEMBL::Compara::DBSQL::DBAdaptor
-	      ->new(
-		    -user      => 'ensro',
-		    -dbname    => $COMPARATIVE_DBS->[1]->{DBNAME},
-		    -host      => $COMPARATIVE_DBS->[1]->{DHOST},
-		    );
-	$target_db2->assembly_type( $COMPARATIVE_DBS->[1]->{PATH} );
-    }
+  if ( $COMPARATIVE_DBS->[0] ){
+    $target_species = $COMPARATIVE_DBS->[0]->{SPECIES};
+    $target_db =  
+      Bio::EnsEMBL::DBSQL::DBAdaptor
+	->new(
+	      -user      => 'ensro',
+	      -dbname    => $COMPARATIVE_DBS->[0]->{DBNAME},
+	      -host      => $COMPARATIVE_DBS->[0]->{DBHOST},
+	     );
+    $target_db->assembly_type( $COMPARATIVE_DBS->[0]->{PATH} );
+  }
+  if ( $COMPARATIVE_DBS->[1] ){
+    $target_species2 = $COMPARATIVE_DBS->[1]->{SPECIES};
+    $target_db2 =  
+      Bio::EnsEMBL::DBSQL::DBAdaptor
+	->new(
+	      -user      => 'ensro',
+	      -dbname    => $COMPARATIVE_DBS->[1]->{DBNAME},
+	      -host      => $COMPARATIVE_DBS->[1]->{DBHOST},
+	     );
+    $target_db2->assembly_type( $COMPARATIVE_DBS->[1]->{PATH} );
+  }
 }
-    
+
 
 print STDERR "databases target_db = $target_db  target_db2 = $target_db2\n";
 
