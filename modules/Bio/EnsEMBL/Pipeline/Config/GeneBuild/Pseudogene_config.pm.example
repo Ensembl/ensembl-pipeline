@@ -45,12 +45,43 @@ use vars qw( %Pseudogene_config );
 
 # Hash containing config info
 %Pseudogene_config = (	
-		#total length of introns
+
+		# configs for the introns in repeats test
+
+		# total length of introns
 		PS_MAX_INTRON_LENGTH   => '5000',
-		#%coverd  repeats
+
+		# %coverd  repeats
 		PS_MAX_INTRON_COVERAGE => '80',
-		#%coverd by repeats
+
+		# %coverd by repeats
 		PS_MAX_EXON_COVERAGE   => '20',	
+		
+		PS_NUM_FRAMESHIFT_INTRONS  => 1,
+
+		PS_NUM_REAL_INTRONS  => 1,
+
+		# configs for the spliced elsewhere tests
+
+		# %ID of a tbalstx of the (presumed) retrotransposed query sequence to its 
+		# homolog that is spliced elsewhere in the genome. hits falling below 
+		# this cutoff are ignored (80%) is suggested
+		PS_PERCENT_ID_CUTOFF   => 80,
+
+		# ratio of the spans of the retrotransposed gene vs its spliced homologue
+		# spliced / retrotransposed
+		# ie: 1 is the same length genes 
+		# many retrotransposed genes have a ratio > 10
+		# used to make retrotransposition decision
+		PS_SPAN_RATIO          => 1.5,
+
+		# mimimum number of exons for the spliced gene to have
+		PS_MIN_EXONS           => 2,
+		# limit the number of hits from the align feature table
+		PS_SQL_LIMIT           => 100,
+		# minimum score of the align feature required
+		PS_FEATURE_SCORE       => 300,
+
 	       );	
 
 sub import {
