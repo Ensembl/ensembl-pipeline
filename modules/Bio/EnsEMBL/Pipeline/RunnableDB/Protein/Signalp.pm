@@ -50,6 +50,7 @@ use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp;
+use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -88,7 +89,8 @@ sub new {
     my $params;
     if ($params ne "") { $params .= ","; }
     # get the path to the binaries from the Analysis object (analysisprocess table)
-    $params .= "-program=>".$self->analysis->program_file.",";
+    print STDERR "PROGR0: ".$self->analysis->program."\n";
+    $params .= "-program=>".$self->analysis->program.",";
     # get the analysisId from the Analysis object (analysisprocess table)
     $params .= "-analysisid=>".$self->analysis->dbID;
     $self->parameters($params);
@@ -114,13 +116,32 @@ sub new {
 sub fetch_input {
     my ($self) = @_;
     my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
-    my $prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id)
-	|| $self->throw ("couldn't get the protein sequence from the database");
-    my $pepseq    = $prot->seq;
-    my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
-					   '-id'          => $self->input_id,
-					   '-accession'   => $self->input_id,
-					   '-moltype'     => 'protein');
+    my $prot;
+    my $peptide;
+
+    eval {
+	$prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id);
+    };
+    
+    if (!$@) {
+	#The id is a protein id, that's fine, create a PrimarySeq object
+	my $pepseq    = $prot->seq;
+	$peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
+					    '-id'          => $self->input_id,
+					    '-accession'   => $self->input_id,
+					    '-moltype'     => 'protein');
+    }
+
+    else {
+	#An error has been returned...2 solution, either the input is a peptide file and we can go on or its completly rubish and we throw an exeption.
+	
+	
+	#Check if the file exists, if not throw an exeption 
+	$self->throw ("The input_id given is neither a protein id nor an existing file") unless (-e $self->input_id);
+	$peptide = $self->input_id;
+    }
+
+    
     $self->genseq($peptide);
 }
 
@@ -141,7 +162,12 @@ sub write_output {
     my ($self) = @_;
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;;
     my @featurepairs = $self->output;
-    $proteinFeatureAdaptor->store (@featurepairs);
+
+    foreach my $feat(@featurepairs) {
+	$proteinFeatureAdaptor->write_Protein_feature($feat);
+    }
+
+    #$proteinFeatureAdaptor->store (@featurepairs);
 }
 
 

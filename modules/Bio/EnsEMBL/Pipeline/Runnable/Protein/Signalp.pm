@@ -50,6 +50,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
+use Bio::SeqIO;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -86,11 +87,19 @@ sub new {
 					                       PROGRAM
                                                                ANALYSISID)], 
 					                    @args);
+
+    print STDERR "PROGR: $program\n";
   
     $self->clone ($clone) if ($clone);       
     $self->analysisid ($analysisid) if ($analysisid);
-    $self->program ($self->find_executable ($program));
- 
+
+    if (!defined $program) {
+	$self->program ($self->find_executable ($program));
+    }
+    else {
+	$self->program($program);
+    }
+
     return $self;
 }
 
@@ -102,7 +111,8 @@ sub new {
 
  Title    : clone
  Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone, filename and results
+ Function : get/set method for the Sequence object; assigns clone, filename
+iprscan/bin/scanregexpf.pl       | /analysis/iprscan/data/confirm.patterns | NULL                                                                                                                and results
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
  Args     : a Bio::Seq or Bio::PrimarySeq object (optional)
@@ -113,12 +123,21 @@ sub new {
 sub clone {
     my ($self, $seq) = @_;
     if ($seq) {
-	($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
-	    || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
-	$self->{'_sequence'} = $seq ;
-	$self->clonename ($self->clone->id);
-	$self->filename ($self->clone->id.".$$.seq");
-	$self->results ($self->filename.".out");
+	if ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")) {
+	    $self->{'_sequence'} = $seq ;
+	    $self->clonename ($self->clone->id);
+	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->results ($self->filename.".out");
+	}
+	else {
+	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    $self->{'_sequence'} = $seq ;
+	    $self->filename ("$$.tmp.seq");
+
+	    print STDERR "FILENAMEN: ".$self->filename."\n";
+	    $self->results ("sigp.$$.out");
+	    
+	}
     }
     return $self->{'_sequence'};
 }
@@ -194,23 +213,67 @@ sub run {
     # reset filename and results as necessary (adding the directory path)
     my $tmp = $self->workdir;
     my $input = $tmp."/".$self->filename;
+    print STDERR "INTPUT: $input\n";
     $self->filename ($input);
     $tmp .= "/".$self->results;
     $self->results ($tmp);
 
-    # truncate the sequence (the first 50 aa are enough for signalp)
-    my $sub_seq = substr ($seq->seq, 0, 50);
-    $seq->seq ($sub_seq);
+    if ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")) {
+	
+	# truncate the sequence (the first 50 aa are enough for signalp)
+	my $sub_seq = substr ($seq->seq, 0, 50);
+	$seq->seq ($sub_seq);
+	
+	# write sequence to file
+	$self->writefile;        
 
-    # write sequence to file
-    $self->writefile;        
+	# run program
+	$self->run_program;
+	
+	# parse output
+	$self->parse_results;
+	$self->deletefiles;
+    }
+    else {
+	my $in  = Bio::SeqIO->new(-file => $seq, '-format' =>'Fasta');
+	my $out = Bio::SeqIO->new(-file => ">".$self->filename.".cutted", '-format' =>'Fasta');
 
-    # run program
-    $self->run_program;
+	open (OUT,">".$self->filename.".cutted");
 
-    # parse output
-    $self->parse_results;
-    $self->deletefiles;
+	print STDERR "SEQ: ".$self->filename.".cutted\n";
+	while ( my $tmpseq = $in->next_seq() ) {
+	    print STDERR "AC: ".$tmpseq->display_id."\n";
+	    #print STDERR "AC: ".$tmpseq->seq."\n";
+	    
+	    my $sub_seq = substr ($tmpseq->seq, 0, 50);
+	    
+	    $tmpseq->seq($sub_seq);
+
+	    print OUT ">".$tmpseq->display_id."\n".$tmpseq->seq."\n";
+
+	    #$out->write_seq($tmpseq);
+	    
+	    
+	}
+	close(OUT);
+	$self->filename($self->filename.".cutted");
+	$self->run_program;
+	$self->parse_results;
+	    #$self->clone ($tmpseq);
+	    
+	    # write sequence to file
+	 #   $self->writefile;        
+	    
+	    # run program
+	  #  $self->run_program;
+	    
+	    # parse output
+	   # $self->parse_results;
+	   # $self->deletefiles;
+	    
+	#}
+	
+    }
 }
 
 
@@ -228,10 +291,19 @@ sub run {
 
 sub run_program {
     my ($self) = @_;
+    
+    print STDERR "RUNNING: ".$self->program." -t euk ".$self->filename." > ".$self->results."\n";
+    
+    my $filename = $self->filename;
+
+    $filename = "/tmp/1980455.tmp.seq.cutted";
+    
+
     # run program
     print STDERR "running ".$self->program."\n";
+    
     $self->throw ("Error running ".$self->program." on ".$self->filename) 
-        unless ((system ($self->program." -t euk ".$self->filename." > ".$self->results)) == 0); 
+        unless ((system ($self->program." -t euk ".$self->filename. " > ".$self->results)) == 0); 
 }
 
 
@@ -251,7 +323,7 @@ sub parse_results {
     my ($self) = @_;
     my $filehandle;
     my $resfile = $self->results;
-    
+
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
@@ -327,16 +399,29 @@ sub create_feature {
                                                );
 
     # create feature object
-    my $feature = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
-                                                  -start       => $feat->{start},
-                                                  -end         => $feat->{end},
-                                                  -source_tag  => $feat->{source},
-                                                  -primary_tag => $feat->{primary},
-                                                  -analysis    => $analysis,
+    my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
+						-start       => $feat->{start},
+						-end         => $feat->{end},
+						-source_tag  => $feat->{source},
+						-primary_tag => $feat->{primary},
+						-analysis    => $analysis,
+						-percent_id => 'NULL',
+						-p_value => 'NULL',
                                                  ); 
 
+
+
+    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => 0,
+					      -end => 0,
+					      -analysis => $analysis,
+					      -seqname => 'Sigp');
+    
+    
+    my $feature = new Bio::EnsEMBL::FeaturePair(-feature1 => $feat1,
+						-feature2 => $feat2);
+
     if ($feature) {
-	$feature->validate_prot_feature;
+	#$feature->validate_prot_feature;
 	# add to _flist
 	push (@{$self->{'_flist'}}, $feature);
     }
