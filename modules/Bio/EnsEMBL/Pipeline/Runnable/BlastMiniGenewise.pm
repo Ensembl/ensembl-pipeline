@@ -51,6 +51,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(pfetch efetch); 
+use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
@@ -245,7 +246,7 @@ sub run_blast {
     my $blastout = $self->get_tmp_file("/tmp/","blast","swir.msptmp");
     my $seqfile  = $self->get_tmp_file("/tmp/","seq","fa");
 
-    my $seqio = Bio::SeqIO->new(-format => 'Fasta',
+    my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 				-file   => ">$seqfile");
 
     $seqio->write_seq($seq);

@@ -630,7 +630,7 @@ sub minirun {
 	    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $miniseq->get_cDNA_sequence,
 								      -protein => $hseq,
 								      -memory  => 400000,
-	                                                              -reverse => $reverse);
+	                                                              "-reverse" => $reverse);
 	    
 	    $eg->run;
 	    

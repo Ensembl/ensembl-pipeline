@@ -40,6 +40,7 @@ use Bio::Root::Object;
 use Bio::EnsEMBL::Analysis::Programs qw(genewise); 
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::Pipeline::RunnableI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object);
 
@@ -125,13 +126,13 @@ sub _align_protein {
     my $protfile = "/tmp/gw." . $$ . ".pro.fa";
 
     my $genio  = new Bio::SeqIO(-file   => ">$genfile",
-				-format => 'fasta');
+				'-format' => 'fasta');
 
     $genio->write_seq($self->genomic);
     $genio = undef;
 
     my $proio  = new Bio::SeqIO(-file   => ">$protfile",
-				-format => 'fasta');
+				'-format' => 'fasta');
 
     $proio->write_seq($self->protein);
     $proio = undef;

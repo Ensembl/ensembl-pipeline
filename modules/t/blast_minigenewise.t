@@ -34,7 +34,7 @@ $loaded = 1;
 print "ok 1\n";    # 1st test passed.
 
 my $in  = new Bio::SeqIO(-file => 't/data/AC004663.fa',
-                          -format => 'fasta');
+                          '-format' => 'fasta');
 
 my $gen = $in->next_seq;
 

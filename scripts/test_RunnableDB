@@ -52,7 +52,7 @@ use vars qw(@ISA);
 my $dbtype = 'rdb';
 my $host   = 'ensrv4';
 my $port   = '410000';
-my $dbname = 'ensembl_freeze17_michele';
+my $dbname = 'arne_freeze05_tim';
 my $dbuser = 'ensadmin';
 my $pass   = undef;
 my $runnable;

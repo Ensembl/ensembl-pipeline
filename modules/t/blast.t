@@ -26,7 +26,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
-
+$| = 1;
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
 my ($seq) =  set_seq();
@@ -42,9 +42,12 @@ else
 { print "ok 2\n"; }
 
 #create blast object    
+my $pwd = `pwd`;
+chomp($pwd);
+
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
                                                              -BLAST => 'blastn',
-                                                             -DB    => 'dbEST');
+                                                             -DB    => "$pwd/t/data/AL035422.fa");
  
 unless ($blast)
 { print "not ok 3\n"; }
@@ -64,7 +67,7 @@ else
 { print "ok 5\n"; }
 
 my @methods = qw( seqname start end strand hseqname hstart hend hstrand
-                  percent_id p_value hpercent_id hp_value score hscore);
+                  score percent_id p_value);
 #Display output
 foreach my $obj (@results)
 {

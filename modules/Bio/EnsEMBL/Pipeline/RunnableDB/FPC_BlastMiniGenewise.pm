@@ -144,20 +144,21 @@ sub write_output {
 
 
     eval {
+	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
+	    =~ s/$GENE_ID_SUBSCRIPT//;
+	(my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
+	    =~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
+	(my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
+	    =~ s/$PROTEIN_ID_SUBSCRIPT//;
+	print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
+	(my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
+	    =~ s/$EXON_ID_SUBSCRIPT//;
+	
+
 	foreach my $gene (@features) {
 	    print STDERR "Feature is $gene\n";
 
 	    print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
-	    
-	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
-		=~ s/$GENE_ID_SUBSCRIPT//;
-	    (my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
-		=~ s/$TRANSCRIPT_ID_SUBSCRIPT//;
-	    (my $pcount = $gene_obj->get_new_TranslationID($PROTEIN_ID_SUBSCRIPT))
-		=~ s/$PROTEIN_ID_SUBSCRIPT//;
-	    print STDERR "Weiiiiird $EXON_ID_SUBSCRIPT\n";
-	    (my $ecount = $gene_obj->get_new_ExonID($EXON_ID_SUBSCRIPT))
-		=~ s/$EXON_ID_SUBSCRIPT//;
 	    
 	    
 	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
@@ -247,7 +248,7 @@ sub fetch_input {
 
     my $contig    = $contig[$contignum];
 
-    print STDERR "Analysing contig " . $contig->id . "\n";
+    print STDERR "Analysing contig " . $contig->id . " " . $contignum . "\n";
     foreach my $rc ($contig->_vmap->each_MapContig) {
 	my $strand = "+";
 	if ($rc->orientation == -1) {
@@ -257,7 +258,13 @@ sub fetch_input {
 	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
     }
     my $genseq    = $contig->primary_seq;
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('blastp',200);
+
+    print STDERR "Length is " . $genseq->length . "\n";
+    print STDERR "Fetching features\n";
+
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('swir',200);
+
+    print STDERR "Number of features = " . scalar(@features) . "\n";
 
     my %idhash;
     
@@ -325,7 +332,7 @@ sub convert_output {
     # This BAD! Shouldn't be using internal ids.
     # <sigh> no time to change it now
     my $analysis = $self->dbobj->get_OldAnalysis(10);
-
+    my $trancount = 1;
     foreach my $runnable ($self->get_Runnables) {
 	my $contig = $self->{$runnable};
 	my @tmpf   = $runnable->output;
@@ -405,7 +412,7 @@ sub convert_output {
 		$excount++;
 	    }
 	    
-	    if ($#exons == 0) {
+	    if ($#exons < 0) {
 		print STDERR "Odd.  No exons found\n";
 	    } else {
 
@@ -433,7 +440,7 @@ sub convert_output {
 		} 
 		
 		my @newf;
-		
+
 		foreach my $gene (@genes) {
 		    foreach my $tran ($gene->each_Transcript) {
 			print STDERR " Translation is " . $tran->translate->seq . "\n";
@@ -442,8 +449,9 @@ sub convert_output {
 			    if ($exon->strand == -1) {
 				$strand = "-";
 			    }
-			    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . "\n";
+			    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . ".$trancount\n";
 			}
+			$trancount++;
 		    }
 		    
 		    eval {
@@ -485,11 +493,11 @@ sub check_splice {
 
 sub output {
     my ($self) = @_;
-
-    if (defined($self->{_output})) {
-	return @{$self->{_output}};
+   
+    if (!defined($self->{_output})) {
+      $self->{_output} = [];
     } 
-	
+    return @{$self->{_output}};
 }
 
 

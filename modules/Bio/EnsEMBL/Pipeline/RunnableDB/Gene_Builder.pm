@@ -190,7 +190,7 @@ sub write_output {
 
 	eval {
         foreach my $gene (@newgenes) {	    
-           $gene->type('ensembl');
+           $gene->type('pruned');
 	print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
 	
 	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
