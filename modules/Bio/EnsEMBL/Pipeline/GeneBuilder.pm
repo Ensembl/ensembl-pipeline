@@ -98,7 +98,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
-use FreezeThaw;
+#use FreezeThaw;
 
 use vars qw(@ISA);
 use strict;
