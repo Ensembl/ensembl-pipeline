@@ -91,6 +91,16 @@ sub flush {
 	my $config = $self->get_Config();
 	my $job_adaptor = $config->get_DBAdaptor->get_JobAdaptor();
 
+  #construct command line db options for runner script
+  my $db = $config->get_DBAdaptor();
+  $self->throw('could not obtain pipeline database connection') if(!$db);
+  my $dbargs = join(' ',
+                    '-host',   $db->host,
+                    '-port',   $db->port,
+                    '-dbname', $db->dbname,
+                    '-dbuser', $db->user,
+                    '-pass',   $db->pass);
+
 	foreach $taskname (@tasknames) {
 
 		#extract the queue name and free form parameters from the 'where'
@@ -110,13 +120,13 @@ sub flush {
 		my $lsf_job_name = join('_', $taskname, time(),$self->{'sub_count'});
 
 		#add the preexec to the arguments
-		my @args = ('-E', '"runner.pl -pre_exec"');
+		my @args = ('-E', "\"runner.pl -check $dbargs\"");
 		#add the queue name
 		push @args, ('-q', $queue);
 		
 
     my $dir_prefix = $self->_dir_prefix($taskname);
-    my $command = "perl runner.pl -jobname $lsf_job_name";
+    my $command = "\"runner.pl -jobname $lsf_job_name $dbargs\"";
 
 		#
 		# If there is only a single job submit it normally
@@ -181,6 +191,8 @@ sub flush {
 		#would rather use system() since it doesn't require a fork, but
 		#need to get job_id out of stdout :(
 		my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
+
+    print STDERR "LSF: EXECUTING COMMAND:\n\t$command\n";
 
 		open(SUB, $bsub." 2>&1 |") or
 			$self->throw("could not execute command [$bsub]");
