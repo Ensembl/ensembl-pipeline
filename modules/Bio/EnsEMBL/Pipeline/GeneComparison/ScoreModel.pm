@@ -143,13 +143,17 @@ sub score_Transcripts{
     }
     
     if (scalar(@trans)==1 ){
-      print STDERR "1 transcript-> all exon get 100 as score\n" if $verbose;
+      print STDERR "1 transcript-> all exons get 100 as score\n" if $verbose;
       foreach my $exon ( @{$trans[0]->get_all_Exons} ){
 	$exon->score( 100 );
       }
       next CLUSTER;
     }
-
+    
+    # we keep track of howmany ests per cluster, which overlap at least
+    # of site of alt-splicing, are sued multiple times.
+    my %used_ests;
+    
     my @sites = $self->get_alternative_sites( $cluster );
     my $average_score = 0;
 
@@ -181,6 +185,17 @@ sub score_Transcripts{
 	    }
 	}
 	
+	# first we calculate how many ests are used more than once
+	
+	foreach my $est ( @list ){
+	  foreach my $site ( @these_sites ){
+	    my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est ); 
+	    unless (  $est_start > $site->end || $est_end   <  $site->start ){
+	      $used_ests{$est}++;
+	    }
+	  }
+	}
+
 	############################################################
 	# @these_sites contains now all the sites
 	# present in the transcript.
@@ -202,7 +217,7 @@ sub score_Transcripts{
 		print STDERR "sites: " if $verbose;
 		my @site_combination;             
 		for ( my $j=0; $j<$n-$i; $j++ ){
-		    print STDERR ($j+$diff)." " if $verbose;
+		  print STDERR ($j+$diff)." " if $verbose;
 		    push( @site_combination, $these_sites[$j+$diff] );
 		}
 		print STDERR "\n" if $verbose;
@@ -271,20 +286,34 @@ sub score_Transcripts{
 	    $exon->score( $score );
 	}
     } # end of TRAN
-    
+
     ############################################################
     # cluster info:
     my $cluster_sites = scalar( @sites );
     my $trans_number  = scalar( @trans );
     my $max_sites     = 2 ** $cluster_sites;
     $average_score   /= $trans_number;
-
+    
+    my %bin_used_ests;
+    foreach my $key ( keys %used_ests ){
+      $bin_used_ests{ $used_ests{$key} }++;
+    }
+    my $est_usage_string;
+    my @keys = sort { $a <=> $b } keys %bin_used_ests;
+    for ( my $j=0; $j<= $keys[-1]; $j++ ){
+      my $string  = "used$j:0\t";
+      if ( $bin_used_ests{ $j } ){
+	$string = "used$j:$bin_used_ests{ $j }\t";
+      }
+      $est_usage_string .= $string;
+    }
+    
     print STDERR "CLUSTER\t".
 	"sites:".$cluster_sites."\t".
 	    "trans:".$trans_number."\t".
 		"2^N:".$max_sites."\t".
-		    "av_score:".$average_score."\n";
-    
+		    "av_score:".$average_score."\t".
+		      $est_usage_string."\n";
 		    
 
   }   # end of CLUSTER
