@@ -172,13 +172,13 @@ sub run {
       $self->throw("No peptide input");
     }
 
-    print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
+    #print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
 
     my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
 				       -seq        => $transcript->translate(),
 				       -moltype    => 'protein' );
 
-    print STDERR "Peptide length: ", $peptide->length, "\n";
+    #print STDERR "Peptide length: ", $peptide->length, "\n";
     if ($peptide->length < 3) {
       print "Peptide too short (min length is 3); skipping transcript\n";
       return;
@@ -203,7 +203,7 @@ sub run {
 sub check_features {
   my ($self,$pep,@f) = @_;
 
-  print STDERR "Peptide is " . $pep . "\n";
+  #print STDERR "Peptide is " . $pep . "\n";
 
   my %seqhash;
 
@@ -229,8 +229,8 @@ sub check_features {
 	  
 	  $hdna =~ tr/a-z/A-Z/;
 	  
-	  print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " "  . "\n" ;
-	  print $fdna . "\n$rdna\n" . $hdna . "\n";
+	  #print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " "  . "\n" ;
+	  #print $fdna . "\n$rdna\n" . $hdna . "\n";
       };
       if ($@) {
 	  print STDERR "Couldn't fetch sequence for " . $f->hseqname . " No alignment printed [$@]\n";
@@ -259,7 +259,7 @@ sub get_Sequence {
 
     next ID unless defined($id);
 
-    print(STDERR "Sequence id :  is [$id]\n");
+    #print(STDERR "Sequence id :  is [$id]\n");
 
     open(IN,"efetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
 	
@@ -281,7 +281,7 @@ sub get_Sequence {
 			   -seq => $seqstr);
     
 
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+    #print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
 }
@@ -308,14 +308,14 @@ sub align_hits_to_contig2 {
   # for each feature
   
   for my $feature ( @features ) {
-    print ::LOG join
-      ( "\n", 
-	( "\n", "Blast result:",
-	  "Start ".$feature->start." End ".$feature->end,
-	  "hstart ".$feature->hstart." hend ".$feature->hend,
-	  "qury: ".$feature->{'qseq'},
-	  "subj: ".$feature->{'sseq'},
-	  "\n" ));
+    #print STDERR join
+    #  ( "\n", 
+#	( "\n", "Blast result:",
+#	  "Start ".$feature->start." End ".$feature->end,
+#	  "hstart ".$feature->hstart." hend ".$feature->hend,
+#	  "qury: ".$feature->{'qseq'},
+#	  "subj: ".$feature->{'sseq'},
+#	  "\n" ));
 
 
     my %exon_hash = ();
@@ -323,7 +323,7 @@ sub align_hits_to_contig2 {
     for my $ugFeature ( $feature->ungapped_features() ) {
       
       my $f = $ugFeature;
-      print ::LOG "ugfeature: ",join( " ", ( $f->start(), $f->end(), $f->strand(), "-", $f->hstart(), $f->hend(), $f->hstrand() )),"\n";      # ask the $self->peptide to do cdna2genomic
+ #     print STDERR "ugfeature: ",join( " ", ( $f->start(), $f->end(), $f->strand(), "-", $f->hstart(), $f->hend(), $f->hstrand() )),"\n";      # ask the $self->peptide to do cdna2genomic
       #   for f->start*3-2 f->end*3
       my @split = $self->peptide->cdna2genomic
 	(( $ugFeature->start() * 3 -2 ), 
@@ -470,7 +470,7 @@ sub align_hits_to_contig {
     #map each feature to 1 or more exons
     foreach my $gapped_feature ( @features ) {
       my @split_features;
-      print STDERR "DEBUG: processing $gapped_feature Cigar:",$gapped_feature->cigar_string(),"\n";
+      #print STDERR "DEBUG: processing $gapped_feature Cigar:",$gapped_feature->cigar_string(),"\n";
 
       foreach my $fp ( $gapped_feature->ungapped_features() ) {   
 	unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'})
@@ -481,7 +481,7 @@ sub align_hits_to_contig {
 	#find each matching exon
 	my (@aligned_exons);
 	foreach my $ex_align (@exon_aligns) {
-	  print STDERR "\tExon " . $ex_align->{gen_start} . " " . $ex_align->{gen_end} . " " . $ex_align->{pep_start} . " " . $ex_align->{pep_end} . "\n";
+	  #print STDERR "\tExon " . $ex_align->{gen_start} . " " . $ex_align->{gen_end} . " " . $ex_align->{pep_start} . " " . $ex_align->{pep_end} . "\n";
 	  if (!($fp->end < $ex_align->{pep_start} || $fp->start > $ex_align->{pep_end})) {
 	    push (@aligned_exons, $ex_align);
 	  }
@@ -503,7 +503,7 @@ sub align_hits_to_contig {
 
       foreach my $exon_id ( keys %exon_hash ) {
 	foreach my $sf ( @{$exon_hash{$exon_id}} ) {
-	  print STDERR "DEBUG features pair ",$sf->start," ",$sf->end," ",$sf->hstart," ",$sf->hend,"\n";
+	  #print STDERR "DEBUG features pair ",$sf->start," ",$sf->end," ",$sf->hstart," ",$sf->hend,"\n";
 	}
 
 	my $dna_align_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new
@@ -523,10 +523,10 @@ sub create_peptide_featurepairs {
     
     my @output_features;
 
-    print STDERR "\nConverting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\t" . $fp->hstrand . "\n";
+    #print STDERR "\nConverting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\t" . $fp->hstrand . "\n";
 
     foreach my $ex_align (@aligned_exons) {
-      print "\nFound aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
+      #print "\nFound aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
       my ($ex_start, $ex_end, $dna_start, $dna_end, $start_phase, $end_phase);
       #This splits features across multiple exons and records phases
       if ($ex_align->{'pep_start'}  < $fp->start) {
@@ -648,13 +648,13 @@ sub create_peptide_featurepairs {
       $featurepair->{'_exon_align'} = $ex_align;
 
       $featurepair->attach_seq($self->genomic);
-      print STDERR "After conversion ",$featurepair->start," ",$featurepair->end," ",$featurepair->hstart," ",$featurepair->hend,"\n";
+      #print STDERR "After conversion ",$featurepair->start," ",$featurepair->end," ",$featurepair->hstart," ",$featurepair->hend,"\n";
 
       push(@output_features,$featurepair);
 
 
       
-      print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
+      #print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
 
     }   
 
@@ -781,7 +781,7 @@ sub featurepairs {
                 unless $fp->isa("Bio::EnsEMBL::FeaturePairI");
         push (@{$self->{'_featurepairs'}}, $fp);
     }
-    print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
+    #print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
     return @{$self->{'_featurepairs'}};
 }
 

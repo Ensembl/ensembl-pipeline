@@ -165,13 +165,13 @@ sub run {
     $self->throw("No peptide input");
   }
   
-  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
+  #print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
 
   my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
 				     -seq        => $transcript->translate(),
 				     -moltype    => 'protein' );
 
-  print STDERR "Peptide length: ", $peptide->length, "\n";
+  #print STDERR "Peptide length: ", $peptide->length, "\n";
   if ($peptide->length < 3) {
     print "Peptide too short (min length is 3); skipping transcript\n";
     return;
@@ -355,7 +355,7 @@ sub align_hits_to_contig {
     
     my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
     if ($expep =~ s/x$//i) {
-      print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
+      #print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
     }
     
     $self->throw("Exon translation not found in peptide") 
@@ -424,7 +424,7 @@ sub align_hits_to_contig {
     
     foreach my $exon_id ( keys %exon_hash ) {
       foreach my $sf ( @{$exon_hash{$exon_id}} ) {
-	print STDERR "DEBUG features pair ",$sf->start," ",$sf->end," ",$sf->hstart," ",$sf->hend,"\n";
+	#print STDERR "DEBUG features pair ",$sf->start," ",$sf->end," ",$sf->hstart," ",$sf->hend,"\n";
       }
       
       my $dna_align_feature = Bio::EnsEMBL::DnaPepAlignFeature->new
@@ -444,11 +444,11 @@ sub create_peptide_featurepairs {
     #create featurepairs
     my @output_features;
 
-    print STDERR " ARNE Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
+    #print STDERR " ARNE Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
 
     foreach my $ex_align (@aligned_exons)
     {
-      print STDERR "ARNE Found aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
+      #print STDERR "ARNE Found aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
 
         my ($ex_start, $ex_end, $pep_start, $pep_end, $start_phase, $end_phase);
 
@@ -457,7 +457,7 @@ sub create_peptide_featurepairs {
       
       if ($ex_align->{'pep_start'}  < $fp->start) {
 	#feature starts inside current exon
-	print STDERR "ARNE - inside\n";
+	#print STDERR "ARNE - inside\n";
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'}
 	  + (($fp->start - $ex_align->{'pep_start'})*3);
@@ -470,7 +470,7 @@ sub create_peptide_featurepairs {
 	$pep_start   = $fp->hstart;
       } else {
 	#feature starts in a previous exon or absolute start of current exon
-	print STDERR "ARNE - previous\n";
+	#print STDERR "ARNE - previous\n";
 
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'};
@@ -483,7 +483,7 @@ sub create_peptide_featurepairs {
         
       if ($$ex_align{'pep_end'}    > $fp->end) {
 	#feature ends in current exon
-	print STDERR "ARNE - ends\n";
+	#print STDERR "ARNE - ends\n";
 
 	if ($ex_align->{strand} == 1) {
 	  $ex_end     = $ex_align->{'gen_start'}
@@ -495,7 +495,7 @@ sub create_peptide_featurepairs {
 	$end_phase  = 0;
 	$pep_end    = $fp->hend;
       } else {
-	print STDERR "ARNE - later exon\n";
+	#print STDERR "ARNE - later exon\n";
 
 	#feature ends in a later exon or absolute end of current exon
 	if ($ex_align->{strand} == 1) {
@@ -543,7 +543,7 @@ sub create_peptide_featurepairs {
 	$featurepair->{'_exon_align'} = $ex_align;
 	push( @output_features, $featurepair );
 
-	print STDERR "\n ARNE" . $featurepair->gffstring . "\n";
+	#print STDERR "\n ARNE" . $featurepair->gffstring . "\n";
 
       }
     return @output_features;
@@ -552,7 +552,7 @@ sub create_peptide_featurepairs {
 sub check_features {
   my ($self,$pep,@f) = @_;
 
-  print STDERR "Peptide is " . $pep . "\n";
+  #print STDERR "Peptide is " . $pep . "\n";
 
   my %seqhash;
 
@@ -567,8 +567,8 @@ sub check_features {
     my $hpep = substr($seq->seq,$f->hstart-1,($f->hend - $f->hstart + 1));
     my $pos  = index($pep,$fpep->seq);
 
-    print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " " . $pos . "\n" ;
-      print $fpep->seq . "\n" . $hpep . "\n";
+    #print "\tFeature " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\t" . $f->phase . "\t" . $f->hstart . "\t" . $f->hend . " " . $pos . "\n" ;
+     # print $fpep->seq . "\n" . $hpep . "\n";
 
   }
 }
@@ -579,7 +579,7 @@ sub get_Sequence {
 
     next ID unless defined($id);
 
-    print(STDERR "Sequence id :  is [$id]\n");
+    #print(STDERR "Sequence id :  is [$id]\n");
     my $seq;
     if ($BIOPERLDB) {
       
@@ -615,7 +615,7 @@ sub get_Sequence {
 			     -seq => $seqstr);
     }
 
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+    #print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
 }

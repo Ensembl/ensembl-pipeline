@@ -1,3 +1,5 @@
+
+
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -74,7 +76,7 @@ use Bio::EnsEMBL::Root;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC       => $genomicseq,
-			   -EST           => $estseq,
+                           -EST           => $estseq,
                            -E2G           => $executable,
                            -ARGS          => $args);
                            
@@ -103,7 +105,7 @@ sub new {
     
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
-    print STDERR "Genomic $genomic\n"; 
+    #print STDERR "Genomic $genomic\n"; 
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
@@ -113,7 +115,7 @@ sub new {
         eval 
         { $self->est_genome($self->locate_executable('est_genome')); };
         if ($@)
-        { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
+       { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
@@ -265,72 +267,74 @@ sub run {
         
     #The -reverse switch ensures correct numbering on EST seq in either orientation
     my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-    print STDERR "running for " . $estseq->display_id . "\n";
+    #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
-      print (STDERR "Running command $est_genome_command\n");
+      #print (STDERR "Running command $est_genome_command\n");
       open (ESTGENOME, $est_genome_command) 
-	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
+        or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
       #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
-      print STDERR "firstline: \t$firstline\n";
+      #print STDERR "firstline: \t$firstline\n";
       # put the gene on the minus strand iff splice sites imply reversed gene
-      if ($firstline =~ /REVERSE/) { print STDERR "***reversed gene***\n"; $estOrientation = -1; }
+      if ($firstline =~ /REVERSE/) { #print STDERR "***reversed gene***\n"; 
+	$estOrientation = -1;
+      }
       else {$estOrientation = 1}
-     
+      #print STDERR  "estorientation has been set to ".$estOrientation."\n";
       #read output
       while (<ESTGENOME>) {
-	if ($_ =~ /Segmentation fault/) {
-	  $self->warn("Segmentation fault from est_genome\n");
-	  close (ESTGENOME) or $self->warn("problem running est_genome: $!\n");
-	  return(0);
-	}
-	elsif ($_ =~ /^(Segment|Exon|Span)/) {
-	  
-	  #split on whitespace
-	  my @elements = split;
-	  
-	  #extract values from output line
-	  my $f1score  = $elements[2];
-	  my $f1start  = $elements[3];
-	  my $f1end    = $elements[4];
-	  my $f1id     = $elements[5];
-	  my ($f2start, $f2end);
-	  my $f2id     = $elements[8];
-	  my $f1source = $source_tag;
-	  my $f2source = $source_tag;
-	  #my $f1strand = 1;
-	  my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
-	  #my $f2strand = $estOrientation;
-	  my $f2strand = 1;
-	  my $f1primary = $elements[0];
-	  my $f2primary = $f1primary;
-	  #ensure start is always less than end
-	  if ($elements[6] < $elements[7])
-	    {
-	      $f2start =  $elements[6]; 
-	      $f2end = $elements[7];
-	    }
-	  else
-	    {
-	      $f2start =  $elements[7]; 
-	      $f2end = $elements[6];
-	    }              
-	  #create array of featurepairs              
-	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
-				  $f2start, $f2end, $f2id, $f1source, 
-				  $f2source, $f1strand, $f2strand, 
-				  $f1primary, $f2primary);
+        if ($_ =~ /Segmentation fault/) {
+          $self->warn("Segmentation fault from est_genome\n");
+          close (ESTGENOME) or $self->warn("problem running est_genome: $!\n");
+          return(0);
+        }
+        elsif ($_ =~ /^(Segment|Exon|Span)/) {
+          
+          #split on whitespace
+          my @elements = split;
+          
+          #extract values from output line
+          my $f1score  = $elements[2];
+          my $f1start  = $elements[3];
+          my $f1end    = $elements[4];
+          my $f1id     = $elements[5];
+          my ($f2start, $f2end);
+          my $f2id     = $elements[8];
+          my $f1source = $source_tag;
+          my $f2source = $source_tag;
+          #my $f1strand = 1;
+          my $f1strand = $estOrientation; # otherwise this is going to get lost later on ....
+          #my $f2strand = $estOrientation;
+          my $f2strand = 1;
+          my $f1primary = $elements[0];
+          my $f2primary = $f1primary;
+          #ensure start is always less than end
+          if ($elements[6] < $elements[7])
+            {
+              $f2start =  $elements[6]; 
+              $f2end = $elements[7];
+            }
+          else
+            {
+              $f2start =  $elements[7]; 
+              $f2end = $elements[6];
+            }              
+          #create array of featurepairs              
+          $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
+                                  $f2start, $f2end, $f2id, $f1source, 
+                                  $f2source, $f1strand, $f2strand, 
+                                  $f1primary, $f2primary);
         }    
 
       }
       if(!close(ESTGENOME)){
-	$self->warn("problem running est_genome: $!\n");
-	return(0);
+        $self->warn("problem running est_genome: $!\n");
+        return(0);
       }
-
+      #print STDERR "converting output\n";
       $self->convert_output;
-
+      #print STDERR "\n\n";
     };
 
     $self->_deletefiles($genfile, $estfile);
@@ -371,6 +375,7 @@ sub convert_output {
       push(@genes, $f);
     }
     elsif($f->primary_tag eq 'Exon'){
+      #print STDERR "exon start ".$f->start." end ".$f->end." strand ".$f->strand." hstrand ".$f->hstrand."\n";
       push(@exons, $f);
     }
     elsif($f->primary_tag eq 'Segment'){
@@ -385,9 +390,9 @@ sub convert_output {
     
     foreach my $g(@genes){
       if($ex->start >= $g->start  && $ex->end <= $g->end
-	 && $ex->strand == $g->strand && !$added){
-	$g->feature1->add_sub_SeqFeature($ex,'');
-	$added = 1;
+         && $ex->strand == $g->strand && !$added){
+        $g->feature1->add_sub_SeqFeature($ex,'');
+        $added = 1;
       }
     }
     $self->warn("Exon $ex could not be added to a gene ...\n") unless $added;     
@@ -399,14 +404,14 @@ sub convert_output {
     
     foreach my $e(@exons){
       if($sf->start >= $e->start  && $sf->end <= $e->end
-	 && $sf->strand == $e->strand && !$added){
-	$e->feature1->add_sub_SeqFeature($sf,'');
-	$added = 1;
+         && $sf->strand == $e->strand && !$added){
+        $e->feature1->add_sub_SeqFeature($sf,'');
+        $added = 1;
       }
     }
     $self->warn("Feature $sf could not be added to an exon ...\n") unless $added;     
   }
-  
+
   push(@{$self->{'_output'}},@genes);
 
 }
@@ -414,7 +419,7 @@ sub convert_output {
 sub _createfeatures {
     my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
         $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
-    
+    #print STDERR "creating feature ".$f1id." start ".$f1start." end ".$f1end." strand ".$f1strand." hid ".$f2id." hstart ".$f2start." hend ".$f2end." hstrand ".$f2strand."\n";
 
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
                                 (-db              => "none",
@@ -429,7 +434,7 @@ sub _createfeatures {
                                               -seqname     =>   $f1id,
                                               -strand      =>   $f1strand,
                                               -score       =>   $f1score,
-					      -percent_id  =>   $f1score, 
+                                              -percent_id  =>   $f1score, 
                                               -analysis    =>   $analysis_obj );
      
    my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
@@ -437,7 +442,7 @@ sub _createfeatures {
                                               -seqname     =>   $f2id,
                                               -strand      =>   $f2strand,
                                               -score       =>   $f1score,
-					      -percent_id  =>   $f1score, 
+                                              -percent_id  =>   $f1score, 
                                               -analysis    =>   $analysis_obj );
 
     #create featurepair

@@ -76,7 +76,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::RepeatFeature;
 use Bio::EnsEMBL::RepeatConsensus;
-use Bio::Root::Root;
+use Bio::EnsEMBL::Root;
 use FileHandle;
 
 

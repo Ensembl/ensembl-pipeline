@@ -1,4 +1,4 @@
-#
+
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
@@ -17,9 +17,9 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'    => $genseq,
-									 '-seqfetcher' => $seqfetcher,
-									 '-queryseq'   => $queryseq,
-									 '-threshold'  => $threshold);
+                                                                         '-seqfetcher' => $seqfetcher,
+                                                                         '-queryseq'   => $queryseq,
+                                                                         '-threshold'  => $threshold);
 
     $obj->run
 
@@ -64,9 +64,9 @@ use Data::Dumper;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC       => $genomicseq,
-			   -QUERYSEQ      => $queryseq,
+                           -QUERYSEQ      => $queryseq,
                            -SEQFETCHER    => $sf,
-			   -THRESHOLD     => $threshold);
+                           -THRESHOLD     => $threshold);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome object
@@ -84,11 +84,11 @@ sub new {
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     #print "@args\n";
     my( $genomic, $queryseq, $seqfetcher, $threshold) = $self->_rearrange([qw(GENOMIC
-									       QUERYSEQ
-									       SEQFETCHER
-									       THRESHOLD)],
-									   @args);
-	 
+                                                                               QUERYSEQ
+                                                                               SEQFETCHER
+                                                                               THRESHOLD)],
+                                                                           @args);
+         
     $self->throw("No genomic sequence input")           
       unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") 
@@ -189,22 +189,22 @@ sub queryseq {
     if ($queryseq) { 
       if (ref($queryseq) eq 'ARRAY') {
 
-	# I'm not at all sure this is right
-	my $time = time; chomp($time);
-	my $estfile = "/tmp/estfile_.$$.$time.fn";
-	$self->queryfilename($estfile);
+        # I'm not at all sure this is right
+        my $time = time; chomp($time);
+        my $estfile = "/tmp/estfile_.$$.$time.fn";
+        $self->queryfilename($estfile);
 
-	foreach my $est(@$queryseq) {
-	  $est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
-	}
+        foreach my $est(@$queryseq) {
+          $est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+        }
 
-	$self->{'_query_sequences'} = $queryseq;
+        $self->{'_query_sequences'} = $queryseq;
       }
       else {
-	# it's a filename - check the file exists
-	$self->throw("[$queryseq] : file does not exist\n") unless -e $queryseq;
-	$self->queryfilename($queryseq);
-	$self->{'_query_sequences'} = $queryseq;
+        # it's a filename - check the file exists
+        $self->throw("[$queryseq] : file does not exist\n") unless -e $queryseq;
+        $self->queryfilename($queryseq);
+        $self->{'_query_sequences'} = $queryseq;
     }
   }
   
@@ -245,7 +245,7 @@ sub run {
     # filter ESTs using blast
     my @blast_res = $self->run_blast();
 
-    #print STDERR "**got " . scalar(@blast_res) . "blast hits\n";
+    print STDERR "**got " . scalar(@blast_res) . "blast hits\n";
     
     my %blast_ests;
     my @feat;
@@ -258,7 +258,7 @@ sub run {
       # may move this out of here.
       #print "p value = ".$res->p_value." threshold = ".$self->blast_threshold."\n";
       if($res->p_value > $self->blast_threshold || defined $blast_ests{$seqname}) {
-	push(@{$blast_ests{$seqname}}, $res);
+        push(@{$blast_ests{$seqname}}, $res);
       }
     }
 
@@ -269,8 +269,8 @@ sub run {
       # make MiniEst2Genome runnables
       
       my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->genomic_sequence,
-								     '-features' => \@features,
-								     '-seqfetcher' => $self->seqfetcher);
+                                                                     '-features' => \@features,
+                                                                     '-seqfetcher' => $self->seqfetcher);
 
       # run runnable
       $e2g->run;
@@ -295,7 +295,7 @@ sub run_blast {
     my $seqfile  = $self->get_tmp_file("/tmp/","seq","fa");
 
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
-				-file   => ">$seqfile");
+                                -file   => ">$seqfile");
 
     $seqio->write_seq($genomic);
     close($seqio->_filehandle);
@@ -332,37 +332,37 @@ sub parse_blast_report{
       # strands
       my $strand = 1;
       if($hsp->subject->strand != $hsp->query->strand){
-	$strand = -1;
+        $strand = -1;
       }
 
       # only keep good hits!
       next HSP unless $hsp->P >= $self->blast_threshold;
 
       my $genomic = new Bio::EnsEMBL::SeqFeature(
-						 -start   => $hsp->query->start,
-						 -end     => $hsp->query->end,
-						 -strand  => $strand,
-						 -seqname => $hsp->query->seqname,
-						 -score   => $hsp->score,
-						 -p_value => $hsp->P,
-						);
+                                                 -start   => $hsp->query->start,
+                                                 -end     => $hsp->query->end,
+                                                 -strand  => $strand,
+                                                 -seqname => $hsp->query->seqname,
+                                                 -score   => $hsp->score,
+                                                 -p_value => $hsp->P,
+                                                );
 
       # munging est seqname as BPlite is giving it back like O95793 (577 letters)
-	my $estname = $hsp->subject->seqname;
-	$estname =~ s/^(\S+).+/$1/;
-	my $est = new Bio::EnsEMBL::SeqFeature(
-						   -start   => $hsp->subject->start,
-						   -end     => $hsp->subject->end,
-						   -strand  => 1,
-						   -seqname => $estname,
-						   -score   => $hsp->score,
-					           -p_value => $hsp->P,
-						   );
+        my $estname = $hsp->subject->seqname;
+        $estname =~ s/^(\S+).+/$1/;
+        my $est = new Bio::EnsEMBL::SeqFeature(
+                                                   -start   => $hsp->subject->start,
+                                                   -end     => $hsp->subject->end,
+                                                   -strand  => 1,
+                                                   -seqname => $estname,
+                                                   -score   => $hsp->score,
+                                                   -p_value => $hsp->P,
+                                                   );
 
-	my $featurepair = new Bio::EnsEMBL::FeaturePair(
-							-feature1 => $genomic,
-							-feature2 => $est
-						       );
+        my $featurepair = new Bio::EnsEMBL::FeaturePair(
+                                                        -feature1 => $genomic,
+                                                        -feature2 => $est
+                                                       );
       push (@blast_feat, $featurepair);
     }
   }
@@ -374,7 +374,7 @@ sub print_FeaturePair {
     my ($self,$pair) = @_;
 
     print STDERR $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . $pair->score . "\t" .
-	$pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
+        $pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
 }
 
 sub make_blast_db {
@@ -388,19 +388,19 @@ sub make_blast_db {
     if(ref($estseq) eq 'ARRAY'){
       
       eval{
-	if (-e $estfile) { $self->throw("alreayd using $estfile\n"); }
-	my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
-	  or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
-	
-	foreach my $eseq(@$estseq) {
+        if (-e $estfile) { $self->throw("alreayd using $estfile\n"); }
+        my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
+          or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
+        
+        foreach my $eseq(@$estseq) {
       
-	  $estOutput->write_seq($eseq);
-	}
+          $estOutput->write_seq($eseq);
+        }
       };
       
       if($@){
-	$self->warn("couldn't make blast db - problem writing estfile\n");
-	return;
+        $self->warn("couldn't make blast db - problem writing estfile\n");
+        return;
       }
       
     }
@@ -419,7 +419,7 @@ sub get_tmp_file {
 
     
     if ($dir !~ /\/$/) {
-	$dir = $dir . "/";
+        $dir = $dir . "/";
     }
 
 #    $self->check_disk_space($dir);
@@ -428,9 +428,9 @@ sub get_tmp_file {
     my $file = $dir . $stub . "." . $num . "." . $ext;
 
     while (-e $file) {
-	$num = int(rand(10000));
-	$file = $stub . "." . $num . "." . $ext;
-    }			
+        $num = int(rand(10000));
+        $file = $stub . "." . $num . "." . $ext;
+    }                   
     
     return $file;
 }
@@ -486,11 +486,9 @@ sub validate_sequence {
 sub output {
     my ($self) = @_;
     if (!defined($self->{'_output'})) {
-	$self->{'_output'} = [];
+        $self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
 }
 
 1;
-
-
