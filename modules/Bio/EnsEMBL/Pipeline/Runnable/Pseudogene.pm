@@ -6,7 +6,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Pseudogene_2
+Bio::EnsEMBL::Pipeline::Runnable::Pseudogene
 
 =head1 SYNOPSIS
 
@@ -30,8 +30,8 @@ Runs tests to identiy pseudogenes:
 Calls it a pseudo gene if:
 
 1. All of the introns are frameshifted.
-2. Real introns are covered with repeats
-3. Single exon and there is a copyelsewhere in the genome that is spliced
+2. Real introns are covered with repeats.
+3. Real introns in a two exon gene are covered with a protein feature
 
 Pseudogene takes a Bio::EnsEMBL::Slice object and assesses genes and transcripts for evidence of retrotransposition.
 In the case of genes being identified as pseudogenes, the gene objects have their type set to pseudogene and all but the longest transcripts and translations are deleted.
@@ -65,7 +65,7 @@ use vars qw(@ISA);
 
   Args       : various
   Description: Runnable constructor
-  Returntype : Bio::EnsEMBL::Pipeline::Tools::Pseudogene
+  Returntype : Bio::EnsEMBL::Pipeline::Runnable::Pseudogene
   Caller     : general
 
 =cut
@@ -73,11 +73,8 @@ use vars qw(@ISA);
 
 sub new {
   my ($class,@args) = @_;
-
   my $self = $class->SUPER::new(@args);
-
   #SET UP ANY INSTANCE VARIABLES
-
 
   $self->{'_modified_genes'} =[] ; # array ref to modified genes to write to new db
   $self->{'_discarded_transcripts'} = []; # array ref to discarded transcripts
@@ -90,18 +87,14 @@ sub new {
 							 GENES
 							 REPEAT_FEATURES
 							)], @args);
-
   if ($genes) {
     $self->genes($genes);
   }
   if ($repeats) {
     $self->repeats($repeats);
   }
-
   return $self;
 }
-
-
 
 =head2 run
 
@@ -141,13 +134,13 @@ sub summary {
   return 1;
 }
 
-
 =head2 test_genes
 
 Arg [none] :
   Description: Check genes one transcript at at a time pushes test result for each transcript onto an array, tests array to make final decision  genes are classed as pseudogenes if the following criteria are met:
 1. At least 80% of the introns are covered with repeats and the total intron length is smaller than 5kb and the gene has a least 1 real and 1 frameshifted intron (default values).
 2. All of the introns are short frameshifted introns
+3. A two exon gene with intron covered with a protein feature
   Returntype : none
   Exceptions : none
   Caller     : general
@@ -175,7 +168,6 @@ sub test_genes{
       next GENE;
     }
 
-
     ####################################
     # gene is multiexon, run other tests
 
@@ -198,7 +190,6 @@ sub test_genes{
 	print STDERR join (', ',%{$evidence}),"\n";
 	next TRANS;
       }
-
 
       #ALL FRAMESHIFTED - it is a pseudogene
 	

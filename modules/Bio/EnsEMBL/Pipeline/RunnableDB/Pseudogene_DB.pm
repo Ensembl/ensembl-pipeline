@@ -20,7 +20,7 @@ my $runnabledb = Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB->new(
 $runnabledb->fetch_input();
 $runnabledb->run();
 my @array = @{$runnabledb->output};
-$runnabledb->write_output();2
+$runnabledb->write_output();
 
 array ref returned by output contain all the genes found on the slice, modified to relflect pseudogene status
 
@@ -31,7 +31,6 @@ This object wraps Bio::EnsEMBL::Pipeline::Runnable::Pseudogene.pm
 Opens connections to 3 dbs:
 1 for repeat sequences (GB_DB)
 1 for fetching genes from (GB_FINAL)
-1 db connection for querying align_feature tables for spliced elsewhere tests
 
 fetches all the genes on the slice, all the repeats associtaed with each gene and 
 collects alignment feature evidence for single exon genes and passes them to the 
@@ -158,8 +157,8 @@ sub fetch_input {
 
 =head2 get_all_repeat_blocks
 
-Args       : none
- Description: merges repeats into blocks for each gene
+  Args       : none
+  Description: merges repeats into blocks for each gene
   Returntype : array of Seq_Feature blocks;
 
 =cut 
@@ -201,7 +200,7 @@ sub get_all_repeat_blocks {
 Args       : none
  Description: writes gene array into db specified in Bio::EnsEMBL::Config::GeneBuild::Databases.pm
   exception  : warns if it cannot write gene
-  Returntype : array of Seq_Feature blocks;
+  Returntype : none
 
 =cut 
 
@@ -209,16 +208,13 @@ Args       : none
 sub write_output {
   my($self) = @_;
   my @genes = @{$self->output};
-
   #  empty_Analysis_cache();
-
   # write genes out to a different database from the one we read genes from.
   my $dbname = $PSEUDO_DBNAME;
   my $dbhost = $PSEUDO_DBHOST;
   my $dbuser = $PSEUDO_DBUSER;
   my $dbpass = $PSEUDO_DBPASS;
   my $dbport = $PSEUDO_DBPORT;
-  
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					      '-host'   => $dbhost,
 					      '-user'   => $dbuser,
@@ -249,6 +245,7 @@ sub write_output {
       $self->warn("UNABLE TO WRITE GENE:\n$@");
     }
   }
+  return 1;
 }
 
 
@@ -281,16 +278,9 @@ before runnning the runnable
 =cut 
 
 sub run  {
-
   my ($self) = @_;
-
   foreach my $runnable ($self->runnable) {
-
     $self->throw("Runnable module not set") unless ($runnable);
-
-    # Not sure about this
-    #     $self->throw("Input not fetched")       unless ($self->query);
-
     $runnable->run();
     if ($self->validate_genes) {
       $self->output($runnable->output);
@@ -335,26 +325,6 @@ sub gene_db {
   return $self->{'_gene_db'};
 }
 
-=head2 gene_db_connection
-
-  Arg [1]    : Bio::EnsEMBL::DBSQL::DBConnection
-  Description: get/set gene db conection used for sql query in spliced_elsewhere
-  Returntype : Bio::EnsEMBL::DBSQL::DBConnection
-  Exceptions : none
-  Caller     : general
-
-=cut
-
-sub gene_db_connection {
-  my ($self, $gene_db_connection) = @_;
-  if ($gene_db_connection){
-  unless ($gene_db_connection->isa("Bio::EnsEMBL::DBSQL::DBConnection")){
-    $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBConnection, it is a $gene_db_connection");
-    }
-    $self->{'_gene_db_connection'} = $gene_db_connection;
-  }
-  return $self->{'_gene_db_connection'};
-}
 
 =head2 rep_db
 
