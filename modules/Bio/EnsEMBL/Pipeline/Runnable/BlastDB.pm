@@ -124,12 +124,13 @@ sub run {
   }
  
   my $command = $self->format_command . " " . $seqfile;
-print $command . "\n"; 
+
   my $exit_status = system($command);
 
   if ($exit_status) {
     return 0 
   } else {
+    $self->db_formatted(1);
     return 1
   }
 }
@@ -216,17 +217,18 @@ print "Sating my appetite for destruction.\n";
 =cut
 
 sub dbfile {
-  my ($obj,$value) = @_;
-  if( defined $value) {
+  my ($self,$value) = @_;
+
+  if(defined $value) {
     if ($value !~ /^\//) {
       my $pwd = `pwd`;
       chomp($pwd);
       $value = $pwd . "/" . $value;
     }
-    $obj->{'dbfile'} = $value;
+    $self->{_dbfile} = $value;
   }
-  return $obj->{'dbfile'};
-  
+
+  return $self->{_dbfile};  
 }
 
 =head2 type
@@ -247,6 +249,16 @@ sub type{
     $obj->{'type'} = $value;
   }
   return $obj->{'type'}; 
+}
+
+sub db_formatted {
+  my $self = shift;
+
+  if (@_){
+    $self->{_db_formatted} = shift
+  }
+
+  return $self->{_db_formatted}
 }
 
 
@@ -274,11 +286,11 @@ sub index_method {
     
     if (($value =~ /new/i)&&($self->type eq 'DNA')) {
       $self->{_format_command}   = 'xdformat -n -I';
-      $self->{_seqfetch_command} = 'xdget -n ' . $self->dbfile . ' ';
+      $self->{_seqfetch_command} = ['xdget -n' , 'blastdb' , 'seqid'];
       
     } elsif (($value =~ /new/i)&&($self->type eq 'PROTEIN')) {
       $self->{_format_command}   = 'xdformat -p -I';
-      $self->{_seqfetch_command} = 'xdget -p ' . $self->dbfile . ' -s ';
+      $self->{_seqfetch_command} = ['xdget -p' , 'blastdb' , 'seqid'];
       
     } elsif ($value =~ /old/i) {
       
@@ -295,8 +307,8 @@ sub index_method {
     }
     
   } elsif ($value =~ /ncbi/i) {
-    $self->{_format_command}   = 'formatdb -o T -i';
-    $self->{_seqfetch_command} = 'fastacmd -d ' . $self->dbfile . ' ';
+    $self->{_format_command}   = 'formatdb -o T -i ';
+    $self->{_seqfetch_command} = ['fastacmd -d' , 'blastdb' , '-s', 'seqid'];
   } 
   
   $self->throw("Database indexing method [$value] not recognised.")
@@ -309,8 +321,6 @@ sub index_method {
 sub format_command {
   my $self = shift;
 
-  
-
   return $self->{_format_command}
 }
 
@@ -320,7 +330,26 @@ sub seqfetch_command {
   $self->throw("Blast database is not configured for sequence fetching (yet).") 
     if $self->{_seqfetch_command} eq 'throw';
 
-  return $self->{_seqfetch_command}
+  $self->throw("Blast database has not been set and/or formatted.\n"
+	       . "You may need to use the \'run\' method on your object first.")
+    unless ($self->dbfile && $self->db_formatted);
+
+  my $command;
+
+  foreach my $bit (@{$self->{_seqfetch_command}}){
+    if ($bit eq 'blastdb'){
+      $command .= $self->dbfile . ' ';
+      next
+    }
+    if ($bit eq 'seqid') {
+      # Unimplemented.  Could accept ids directly.
+      next
+    }
+    
+    $command .= $bit . ' ';
+  }
+
+  return $command
 }
 
 
