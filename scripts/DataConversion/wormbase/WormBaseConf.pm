@@ -45,7 +45,7 @@ use vars qw( %WormBaseConf );
 				  gff_file => '/ecs2/work1/lec/code/elegans_conversion/CHROMOSOME_X.gff',
 				 }
 			       ],
-		 WB_AGP_TYPE => 'elegans_90',
+		 WB_AGP_TYPE => 'elegans_91',
 		 
 		 # database to put sequnece and genes into
 		 WB_DBNAME => 'elegans_maintrunk',
@@ -61,6 +61,7 @@ use vars qw( %WormBaseConf );
 			     }
 			    ],
 		 WB_LOGIC_NAME => 'wormbase',
+		 WB_DEBUG => 1,
 		);
 
 sub import {

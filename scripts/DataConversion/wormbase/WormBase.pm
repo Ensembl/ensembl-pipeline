@@ -5,6 +5,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(get_seq_ids get_sequences_pfetch agp_parse parse_gff write_genes translation_check);
 
+use strict;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
@@ -26,6 +27,9 @@ sub get_seq_ids{
      next;
    }
    if($contig eq '.'){
+     next;
+   }
+   if(!$contig =~ /\S+\.\d+/){
      next;
    }
    push(@seq_ids, $contig)
@@ -77,6 +81,9 @@ sub agp_parse{
     if($contig eq '.'){
       next;
     }
+    if(!$contig =~ /\S+\.\d+/){
+      next;
+    }
     if ($raw_ori eq '+') {
       $raw_ori = 1;
     }
@@ -114,19 +121,24 @@ sub agp_parse{
 
 
 sub parse_gff{
-  my ($file, $seq) = @_;
+  my ($file, $seq, $analysis) = @_;
 
+  print STDERR "opening ".$file."\n";
   open(FH, $file) or die"couldn't open ".$file." $!";
 
   die " seq ".$seq." is not a Bio::Seq " unless($seq->isa("Bio::SeqI") || 
 						$seq->isa("Bio::Seq")  || 
 						$seq->isa("Bio::PrimarySeqI"));
-
-  my $transcripts = &process_file(\*FH);
-  
-  my $processed_transcripts = &process_transcripts($transcripts, $seq, $analysis);
-  my $genes = &create_transcripts($processed_transcripts);
-
+  my @genes;
+  my $transcripts = undef;
+  $transcripts = &process_file(\*FH);
+  #print "there are ".keys(%$transcripts)." distinct transcripts\n";
+  my $processed_transcripts = undef;
+  $processed_transcripts = &process_transcripts($transcripts, $seq, $analysis);
+  #print "there are ".keys(%$processed_transcripts)." transcript\n";
+  my $genes = undef;
+  $genes = &create_transcripts($processed_transcripts);
+  #print "PARSE GFF there are ".keys(%$genes)." genes\n";
   foreach my $gene_id(keys(%$genes)){
     my $transcripts = $genes->{$gene_id};
     my $unpruned = &create_gene($transcripts, $gene_id);
@@ -134,7 +146,8 @@ sub parse_gff{
     my $gene = &prune_Exons($unpruned);
     push(@genes, $gene);
   }
-
+  close(FH);
+  #print "PARSE_GFF ".@genes." genes\n";
   return \@genes;
 }
 
@@ -151,6 +164,10 @@ sub process_file{
     chomp;
     my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split;
     my $element = $_;
+    if($chr =~ /sequence-region/){
+      #print STDERR $_;
+      next LOOP;
+    }
     if(!$status && !$type){
       #print "status and type no defined skipping\n";
       next LOOP;
@@ -241,7 +258,7 @@ sub create_transcripts{
   my $transcript_id;
   foreach my $transcript(keys(%transcripts)){
     my $time = time;
-    #print STDERR "transcript ".$transcript." \n";
+    #print STDERR "transcript ".$transcript." \n" if($transcript =~ /C07F11\.1/);
     my @exons = @{$transcripts{$transcript}};
     if($transcript =~ /\w+\.\d+[a-z A-Z]/){
       #print STDERR "parsing gene name\n";
@@ -252,7 +269,7 @@ sub create_transcripts{
       $gene_name = $transcript;
       $transcript_id = $transcript;
     }
-    #print STDERR "have gene name ".$gene_name." and transcript id ".$transcript_id."\n";
+    #print STDERR "have gene name ".$gene_name." and transcript id ".$transcript_id."\n" if($transcript =~ /C07F11\.1/);
     my $transcript = new Bio::EnsEMBL::Transcript;
     my $translation = new Bio::EnsEMBL::Translation;
     my @sorted_exons;
@@ -388,6 +405,7 @@ sub prune_Exons {
 sub write_genes{
   my ($genes, $db) = @_;
 
+  #print "WRITE GENES there are ".@$genes." genes\n";
   my %non_translating;
   my %non_transforming;
   

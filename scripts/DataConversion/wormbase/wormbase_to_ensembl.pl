@@ -20,6 +20,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					   );
 
 
+# adding assembly type to meta table
 my $meta_sql = "insert into meta(meta_key, meta_value) values(\'assembly.default\', ?)";
 
 my $meta_sth = $db->prepare($meta_sql);
@@ -28,19 +29,21 @@ $meta_sth->execute($WB_AGP_TYPE);
 my $analysis_adaptor = $db->get_AnalysisAdaptor();
 my $analysis = $analysis_adaptor->fetch_by_logic_name($WB_LOGIC_NAME);
 
-foreach my $chromosome_info(@{$WB_CHR_INFO}){
+foreach my $chromosome_info(@{$WB_CHR_INFO}) {
+
+  print "handling ".$chromosome_info->{'chr_name'}." with files ".$chromosome_info->{'agp_file'}." and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
 
   my $chromosome = Bio::EnsEMBL::Chromosome->new(-chr_name => $chromosome_info->{'chr_name'},
 						 -length => $chromosome_info->{'length'},
 						 -adaptor =>$db->get_ChromosomeAdaptor, 
 						);
 
-  $db->get_ChromosomeAdaptor->store($chromosome);
+  $db->get_ChromosomeAdaptor->store($chromosome); # adding chromosome to database
   open(FH, $chromosome_info->{'agp_file'});
   my $fh = \*FH;
-  my $seq_ids = &get_seq_ids($fh);
+  my $seq_ids = &get_seq_ids($fh); # getting embl accs from agp
   
-  seek($fh, 0, 0);
+  seek($fh, 0, 0); #resetting the fh to the start of the agp file 
   my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
   
   my $obda = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(-db => $WB_CLONE_INDEX);
@@ -116,61 +119,12 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
   }
 
   my $chr = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
-  my $genes = &parse_gff($chromosome_info->{'gff_file'}, $chr);
+  my $genes = [];
+  #print "FIRST ".@$genes." genes\n";
+  $genes = &parse_gff($chromosome_info->{'gff_file'}, $chr, $analysis);
+  #print "WORMBASE_TO_ENSEMBL ".@$genes." genes\n";
   #my ($non_translating, $non_transforming) = &write_genes($genes, $db);
   &write_genes($genes, $db);
-  #print "there are ".keys(%$non_translating)." clones with non translating genes\n";
-#  print "there are ".keys(%$non_transforming)." clones with non translating genes\n";
-
-#  foreach my $clone_name(keys(%$non_translating)){
-#    print "remaking ".$clone_name." sequence\n";
-#    my $wormbase_seq = $obda->get_Seq_by_acc($clone_name);
-#    my $clone_adaptor = $db->get_CloneAdaptor;
-#    my $old_clone = $clone_adaptor->fetch_by_name($clone_name);
-#    my ($old_contig) = @{$old_clone->get_all_Contigs};
-#    my $contig_id = $old_contig->dbID;
-#    my $embl_acc = $old_clone->embl_id;
-#    my $version = $old_clone->embl_version;
-#    $clone_adaptor->remove($old_clone);
-#    my $clone     = new Bio::EnsEMBL::Clone;
-#    my $contig    = new Bio::EnsEMBL::RawContig; 
-#    $clone->htg_phase(3);
-#    $clone->id($clone_name); 
-#    $clone->embl_id($embl_acc);
-#    $clone->version(1);
-#    $clone->embl_version($version);
-#    my $contig_name = $embl_acc.".1.".$wormbase_seq->length;
-#    $contig->name($contig_name);
-#    $contig->seq($wormbase_seq->seq);
-#    $contig->length($wormbase_seq->length);
-#    $contig->adaptor($db->get_RawContigAdaptor);
-#    $clone->add_Contig($contig);
-#    my $time = time;
-#    $clone->created($time);
-#    $clone->modified($time);
-#    eval{
-#      $db->get_CloneAdaptor->store($clone);
-#    };
-#    if($@){
-#      die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
-#    }
-#    my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
-#    my $assembly_sth = $db->prepare($assembly_sql);
-#    $assembly_sth->execute($contig->dbID, $contig_id);
-#    my $gene_adaptor = $db->get_GeneAdaptor;
-#    foreach my $gene(@{$non_translating->{$clone_name}}){
-#      foreach my $exon(@{$gene->get_all_Exons}){
-#	$exon->contig($contig);
-#      }
-#      print "checking translation of ".$gene->stable_id."\n";
-#      my $translated_gene = &translation_check($gene);
-#      if($translated_gene){
-#	$gene_adaptor->store($translated_gene);
-#      }else{
-#	print STDERR "gene ".$gene->stable_id." doesn't translate at all something odd going on\n";
-#      }
-#    }
-#  }
 
   my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
 
@@ -181,13 +135,8 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
     if($translation){
       next TRANSLATION;
     }else{
-      #print "gene ".$gene->stable_id." doesn't translate\n";
-      #foreach my $transcript(@{$gene->get_all_Transcripts}){
-      #	&display_exons(@{$transcript->get_all_Exons});
-      #	&non_translate($transcript);
-      #      }
       my ($clone_name) = $gene->stable_id =~ /(\S+)\.\d+/;
-      #print STDERR "have clone ".$clone_name."\n";
+      print STDERR "have clone ".$clone_name."\n" if($WB_DEBUG);
       $gene->transform;
       my @exons = @{$gene->get_all_Exons};
       my $old_contig = $exons[0]->contig;
@@ -196,10 +145,10 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
       my $contig    = new Bio::EnsEMBL::RawContig; 
       $clone->htg_phase(3);
       $clone->id($clone_name);
-      #print "old contig name ".$old_contig->name."\n";
+      print "old contig name ".$old_contig->name."\n" if($WB_DEBUG);
       my ($embl_acc) = $old_contig->name =~ /(\S+\.\d+)\.\d+\.\d+/;
       my ($version) = $embl_acc =~ /\S+\.(\d+)/;
-      #print "embl_acc = ".$embl_acc." version ".$version."\n";
+      print "embl_acc = ".$embl_acc." version ".$version."\n" if($WB_DEBUG);
       $clone->embl_id($embl_acc);
       $clone->version(1);
       $clone->embl_version($version);
@@ -218,7 +167,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
       if($@){
 	die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
       }
-      #print "changing contig dbid from ".$old_contig->dbID." to ".$contig->dbID."\n";
+      print "changing contig dbid from ".$old_contig->dbID." to ".$contig->dbID."\n" if($WB_DEBUG);
       my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
       my $assembly_sth = $db->prepare($assembly_sql);
       $assembly_sth->execute($contig->dbID, $old_contig->dbID);
@@ -232,15 +181,16 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
       }else{
 	print $new_seq_gene->stable_id." still doesn't translate bugger\n";
 	#$gene->transform;
-	#my @exons = @{$new_seq_gene->get_all_Exons};
+	my @exons = @{$new_seq_gene->get_all_Exons};
 	#print "have exon ".$exons[0]."\n";
-	#print "gene lies on contig ".$exons[0]->contig->name."\n";
-	#&display_exons(@exons);
-	#my ($transcript) = @{$new_seq_gene->get_all_Transcripts};
-	#&non_translate($transcript);
+	#print "gene lies on contig ".$exons[0]->contig->name."\n" if($WB_DEBUG);
+	#&display_exons(@exons) if($WB_DEBUG);
+	#my ($transcript) = @{$new_seq_gene->get_all_Transcripts} if($WB_DEBUG);
+	#&non_translate($transcript) if($WB_DEBUG);
       }
     }
   }
+  close($fh);
 }
 
 
