@@ -51,7 +51,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
@@ -66,7 +66,11 @@ sub new {
     my $self = $class->SUPER::new(@args);
 
     # dbobj input_id mandatory and read in by BlastableDB
-
+    if (!defined $self->seqfetcher) {
+      my $seqfetcher = new Bio::EnsEMBL::Pipeline::Seqfetcher::BPIndex( '-index'  => '/work2/vac/genomewise/uni.test.inx',
+									'-format' => 'Fasta');
+      $self->seqfetcher($seqfetcher);
+    }
     return $self; 
 }
 
@@ -270,7 +274,8 @@ sub fetch_input {
     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
     foreach my $id(@ids){
-      my $seq = $seqfetcher->run_bp_search($id,'/work2/vac/genomewise/uni.test.inx','Fasta');
+      my $seq = $self->seqfetcher->get_Seq_by_acc($id);
+
       my $e2g = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new( -genomic => $contig->primary_seq,
 								   -est => $seq
 								 );
@@ -301,13 +306,13 @@ sub gw_runnable{
 sub add_e2g_Runnable {
   my ($self,$arg) = @_;
   
-  if (!defined($self->{_e2g_runnables})) {
-    $self->{_e2g_runnables} = [];
+  if (!defined($self->{'_e2g_runnables'})) {
+    $self->{'_e2g_runnables'} = [];
   }
   
   if (defined($arg)) {
     if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      push(@{$self->{_e2g_runnables}},$arg);
+      push(@{$self->{'_e2g_runnables'}},$arg);
     } else {
       $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
     }
@@ -317,11 +322,11 @@ sub add_e2g_Runnable {
 sub get_e2g_runnables {
   my ($self) = @_;
   
-  if (!defined($self->{_e2g_runnables})) {
-    $self->{_e2g_runnables} = [];
+  if (!defined($self->{'_e2g_runnables'})) {
+    $self->{'_e2g_runnables'} = [];
   }
   
-  return @{$self->{_e2g_runnables}};
+  return @{$self->{'_e2g_runnables'}};
 }
 
 
@@ -336,7 +341,7 @@ sub run {
   
   # now run genomewise
   my $gw_runnable = $self->gw_runnable;
-  my @e2g_transcripts = @{$self->{_e2g_transcripts}};
+  my @e2g_transcripts = @{$self->{'_e2g_transcripts'}};
   foreach my $t(@e2g_transcripts){
     $gw_runnable->add_Transcript($t);
   }
@@ -381,7 +386,7 @@ sub convert_e2g_output {
       $exon->strand($exon_pred->strand);
       
       $exon->phase($exon_pred->{_phase});
-      $exon->attach_seq($self->vc);
+      $exon->attach_seq($self->vc->primary_seq);
 
       # supporting feature data goes here
 
@@ -412,127 +417,216 @@ sub convert_e2g_output {
     
     
   
-  if (!defined($self->{_e2g_transcriptss})) {
-    $self->{_e2g_transcripts} = [];
+  if (!defined($self->{'_e2g_transcripts'})) {
+    $self->{'_e2g_transcripts'} = [];
   }
   
-  print STDERR "e2g transcriptss: " . scalar(@transcripts) . "\n";
+  print STDERR "e2g transcripts: " . scalar(@transcripts) . "\n";
   
-  push(@{$self->{_e2g_transcripts}},@transcripts);  
+  push(@{$self->{'_e2g_transcripts'}},@transcripts);  
 }
   
-#sub convert_output {
-#  my ($self) =@_;
+sub convert_output {
+  my ($self) =@_;
   
-#  my $count = 1;
-#  my $time  = time; chomp($time);
-#  my $genetype;
+  my $gwr = $self->gw_runnable;
+
+  my @transcripts = $gwr->output;
+ 
+  my @genes = $self->make_genes;
+
+  # check translations
+  foreach my $gene(@genes){
+    foreach my $trans ( $gene->each_Transcript ) {
+      print STDERR "translation: \n";
+      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+      print STDERR "checktrans: ";
+      $seqio->write_seq($trans->translate); 
+      print STDERR "\n ";	
+    }
+  }
   
-#  foreach my $runnable ($self->get_Runnables) {
-#    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
-#      $genetype = "FPC_BMG";
-#    }
-#    else{
-#      $self->throw("I don't know what to do with $runnable");
-#    }
-
-#    my @results  = $runnable->output;
-#    my @genes    = $self->make_genes($count, $genetype, \@results);
-#    my @remapped = $self->remap_genes($genetype, \@genes);
-
-#    # store the genes
-#    if (!defined($self->{_output})) {
-#      $self->{_output} = [];
-#    }
-#    push(@{$self->{_output}},@remapped);
-#  }
-#}
-
-
-#sub make_genes {
-
-#  my ($self,$count,$genetype,$results) = @_;
-#  my $contig = $self->vc;
-#  my @genes;
+  my @remapped = $self->remap_genes('genomewise', \@genes);
+ # check translations
+  foreach my $gene(@remapped){
+    foreach my $trans ( $gene->each_Transcript ) {
+      print STDERR "translation: \n";
+      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+      print STDERR "checktrans: ";
+      $seqio->write_seq($trans->translate); 
+      print STDERR "\n ";	
+    }
+  }
+  # store genes
   
-#  foreach my $tmpf (@$results) {
-#    my $gene   = new Bio::EnsEMBL::Gene;
-#    $gene->type($genetype);
-#    $gene->id($self->input_id . ".$genetype.$count");
-#    $gene->version(1);
+  if (!defined($self->{'_output'})) {
+    $self->{'_output'} = [];
+  }
 
-#    # call fset2supported_transcript
-#    my $transcript = &Bio::EnsEMBL::DBSQL::Utils::fset2supported_transcript($tmpf,$self->vc,$genetype,$count);
-#    # add transcript to gene
-#    $gene->add_Transcript($transcript);
-#    $count++;
+  print STDERR "remmapped genes: " . scalar(@remapped) . "\n";
 
-#    # and store it
-#    push(@genes,$gene);
-#  }
-#  return @genes;
-#}
-
-#sub remap_genes {
-#  my ($self,$genetype,$genes) = @_;
-#  my $contig = $self->vc;
-
-#  my @newf;
-#  my $trancount=1;
-#  foreach my $gene (@$genes) {
-#    eval {
-#      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-#      $newgene->type($genetype);
-#      foreach my $tran ($newgene->each_Transcript) {
-#	foreach my $exon($tran->each_Exon) {
-#	  print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
-#	  foreach my $sf($exon->each_Supporting_Feature) {
-#	    print STDERR "sub_align: " . 
-#	    $sf->seqname . "\t" .
-#	    $sf->start . "\t" .
-#	    $sf->end . "\t" .
-#	    $sf->strand . "\t" .
-#	    $sf->hseqname . "\t" .
-#	    $sf->hstart . "\t" .
-#	    $sf->hend . "\n";
-#	  }
-#	}
-#      }
-#      push(@newf,$newgene);
-
-#    };
-#    if ($@) {
+  push(@{$self->{'_output'}},@remapped);
+}
 
 
-#      print STDERR "contig: $contig\n";
-#      foreach my $tran ($gene->each_Transcript) {
-#	foreach my $exon($tran->each_Exon) {
-#	  foreach my $sf($exon->each_Supporting_Feature) {
-#	    print STDERR "hid: " . $sf->hseqname . "\n";
-#	  }
-#	}
-#      }
 
+sub make_genes {
 
-#      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
-#    }
+  my ($self) = @_;
+  my $count = 0;
+  my @genes;
+  my $genetype = 'go';
+  my $time  = time; chomp($time);
+
+  my @trans = $self->gw_runnable->output;
+  print "transcripts: " . scalar(@trans) . "\n";
+
+  foreach my $transcript ($self->gw_runnable->output) {
+    $count++;
+    my $gene   = new Bio::EnsEMBL::Gene;
+    $gene->type($genetype);
+    $gene->id($self->vc->id . ".$genetype.$count");
+    $gene->version(1);
     
-
-#  }
-
-#  return @newf;
-
-#}
+    # add transcript to gene
+    $transcript->id($self->vc->id . ".$genetype.$count");
+    $gene->add_Transcript($transcript);
 
 
-#sub output {
-#    my ($self) = @_;
+    # and store it
+    push(@genes,$gene);
+
+    # sort the exons 
+    $transcript->sort;
+    my $excount = 1;
+    my @exons = $transcript->each_Exon;
+
+    foreach my $exon(@exons){
+      $exon->id($self->vc->id . ".$genetype.$count.$excount");
+      $exon->contig_id($self->vc->id);
+      $exon->created($time);
+      $exon->modified($time);
+      $exon->attach_seq($self->vc->primary_seq);
+      $excount++;
+      }
+    
+    print STDERR "exons: " . scalar(@exons) . "\n";
+
+    # sort out translation
+    my $translation  = new Bio::EnsEMBL::Translation;    
+    $translation->id($self->vc->id . ".$genetype.$count");
+    $translation->version(1);    
+    
+    $translation->start_exon_id($exons[0]->id);
+
+    $translation->end_exon_id  ($exons[$#exons]->id);
+    if ($exons[0]->phase == 0) {
+      $translation->start(1);
+    } elsif ($exons[0]->phase == 1) {
+      $translation->start(3);
+    } elsif ($exons[0]->phase == 2) {
+      $translation->start(2);
+    }
+    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+
+    $transcript->translation($translation);
+  }
+  return @genes;
+}
+
+sub remap_genes {
+  my ($self,$genetype,$genes) = @_;
+  my $contig = $self->vc;
+  
+  print STDERR "genes before remap: " . scalar(@$genes) . "\n";
+  
+  my @newf;
+  my $trancount=1;
+  foreach my $gene (@$genes) {
+    eval {
+      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+      $newgene->type($genetype);
+      foreach my $tran ($newgene->each_Transcript) {
+	foreach my $exon($tran->each_Exon) {
+	  if ($exon->isa('Bio::EnsEMBL::StickyExon')){
+	    # need to deal with component exons
+	    foreach my $ce($exon->each_component_Exon){
+	      print STDERR $ce->contig_id . "\tgenewise\texon\t" . $ce->start . "\t" . $ce->end . "\t100\t" . $ce->phase . "\n";
+	    }
+	  }
+	  else {
+	    print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
+	  }
+	  foreach my $sf($exon->each_Supporting_Feature) {
+	    print STDERR "sub_align: " . 
+	      $sf->seqname . "\t" .
+	      $sf->start . "\t" .
+	      $sf->end . "\t" .
+	      $sf->strand . "\t" .
+	      $sf->hseqname . "\t" .
+	      $sf->hstart . "\t" .
+	      $sf->hend . "\n";
+	  }
+	}
+      }
+      push(@newf,$newgene);
+      
+    };
+    if ($@) {
+      
+      
+      print STDERR "contig: $contig\n";
+      foreach my $tran ($gene->each_Transcript) {
+	foreach my $exon($tran->each_Exon) {
+	  foreach my $sf($exon->each_Supporting_Feature) {
+	    print STDERR "hid: " . $sf->hseqname . "\n";
+	  }
+	}
+      }
+      
+      
+      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+    }
+    
+    
+  }
+  
+  return @newf;
+  
+}
+
+
+sub output {
+    my ($self) = @_;
    
-#    if (!defined($self->{_output})) {
-#      $self->{_output} = [];
-#    } 
-#    return @{$self->{_output}};
-#}
+    if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
+    } 
+    return @{$self->{'_output'}};
+}
+
+
+=head2 vc
+
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub vc{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'vc'} = $value;
+    }
+    return $obj->{'vc'};
+
+}
+
 
 1;
 
