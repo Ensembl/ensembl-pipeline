@@ -5,13 +5,13 @@ BEGIN {
 }
 
 
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Sys::Hostname;
 
 use Getopt::Long;
 
 
-#parameters for Bio::EnsEMBL::Pipeline::DBSQL::Obj
+#parameters for Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
 my $host;
 my $dbname;
@@ -64,7 +64,7 @@ if( defined $check ) {
 }
 
 print STDERR "In runner\n";
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new(
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $host,
     -user   => $dbuser,
     -dbname => $dbname,
@@ -73,7 +73,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new(
     -perlonlyfeatures  => 1,
     -perlonlysequences => 1
 )
-or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
+or die ("Failed to create Bio::EnsEMBL::Pipeline::DBAdaptor to db $dbname \n");
 
 print STDERR "Connected to database\n";
 
