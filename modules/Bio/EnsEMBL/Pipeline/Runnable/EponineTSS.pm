@@ -60,7 +60,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::SimpleFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
@@ -86,7 +86,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);    
   
-  $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
+  $self->{'_flist'}     = [];    # an array of Bio::SimpleFeatures
   $self->{'_sequence'}  = undef; # location of Bio::Seq object
   $self->{'_java'}      = undef; # location of java vm
   $self->{'_epojar'}    = undef; # location of eponine-scan.jar executable JAR file.
@@ -302,7 +302,7 @@ sub parse_results {
             my @element = split;
             my (%feature);
             $feature {name} = $element[0];
-            $feature {score} = $element[5];
+            $feature {score} = $self->trunc_float_3($element[5]);
             $feature {start} = $element[3];
             $feature {end} = $element[4];
             $feature {strand} = $element[6];
@@ -361,7 +361,7 @@ sub create_feature {
                             -gff_feature     => $feat->{'primary'});
 
     #create and fill Bio::EnsEMBL::Seqfeature object
-    my $tss = Bio::EnsEMBL::SeqFeature->new
+    my $tss = Bio::EnsEMBL::SimpleFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},
                             -end     => $feat->{'end'},
@@ -371,6 +371,7 @@ sub create_feature {
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
+    $tss->display_label('');
     if ($tss)
       {
 	$tss->validate();
@@ -379,3 +380,4 @@ sub create_feature {
 	push(@{$self->{'_flist'}}, $tss);
       }
 }
+
