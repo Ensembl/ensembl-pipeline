@@ -28,59 +28,51 @@ public class JavaLogger implements ALogger{
   }
   
   public void logLow(String message){
-    getLogger().info(message);
+    ALogRecord record = new ALogRecord(ALogLevel.LOW, message, getPrefix());
+    getLogger().log(record);
   }
   
   public void logLow(String message, Throwable exception){
-    logLow(message);
-    getLogger().throwing(getClass().getName(), "logLow", exception);
+    ALogRecord record = new ALogRecord(ALogLevel.LOW, message, getPrefix());
+    record.setThrown(exception);
+    getLogger().log(record);
   }
   
   public boolean isLoggingLow(){
-    if(getLogger().getLevel() != null){
-      return getLogger().getLevel().equals(Level.INFO);
-    }else if(getLogger().getParent() != null){
-      return getLogger().getParent().getLevel().equals(Level.INFO);
-    }else{
-      return false;
-    }
+    return getLogger().isLoggable(ALogLevel.LOW);
   }
   
   public void logMedium(String message){
-    getLogger().fine(message);
+    ALogRecord record = new ALogRecord(ALogLevel.MEDIUM, message, getPrefix());
+    getLogger().log(record);
   }
   
   public void logMedium(String message, Throwable exception){
-    logMedium(message);
-    getLogger().throwing(getClass().getName(), "logMedium", exception);
+    ALogRecord record = new ALogRecord(ALogLevel.MEDIUM, message, getPrefix());
+    record.setThrown(exception);
+    getLogger().log(record);
   }
   
   public boolean isLoggingMedium(){
-    if(getLogger().getLevel() != null){
-      return getLogger().getLevel().equals(Level.FINE);
-    }else if(getLogger().getParent() != null){
-      return getLogger().getParent().getLevel().equals(Level.FINE);
-    }else{
-      return false;
-    }
+    return getLogger().isLoggable(ALogLevel.MEDIUM);
   }
   
   public void logHigh(String message){
-    getLogger().finest(message);
+    ALogRecord record = new ALogRecord(ALogLevel.HIGH, message, getPrefix());
+    getLogger().log(record);
   }
   
   public void logHigh(String message, Throwable exception){
-    logHigh(message);
-    getLogger().throwing(getClass().getName(), "logHigh", exception);
+    ALogRecord record = new ALogRecord(ALogLevel.HIGH, message, getPrefix());
+    record.setThrown(exception);
+    getLogger().log(record);
   }
   
   public boolean isLoggingHigh(){
-    if(getLogger().getLevel() != null){
-      return getLogger().getLevel().equals(Level.FINEST);
-    }else if(getLogger().getParent() != null){
-      return getLogger().getParent().getLevel().equals(Level.FINEST);
-    }else{
-      return false;
-    }
+    return getLogger().isLoggable(ALogLevel.HIGH);
+  }
+ 
+  private String getPrefix(){
+    return prefix;
   }
 }

@@ -26,6 +26,7 @@ public class Application{
   private ALogger eventLogger;
   private ALogger applicationLogger;
   private ALogger viewLogger;
+  private ALogger modelLogger;
   
   private String applicationRoot;
   
@@ -100,15 +101,22 @@ public class Application{
    * to the console.
   **/
   private void createLoggers(){
+    //
+    //This weird little line has the effect of LOADING the ALogLevel class, 
+    //which instantiates the array of 'allowed' LogLevels inside LogLevel, which
+    //in turn means that the LogManager can happily set itself to a log level
+    //of LOW/MEDIUM/HIGH, instead of one of the standard log levels...
+    ALogLevel level = new ALogLevel("Hello", 1);
+    
     String fileName = getLoggerConfigurationFileName();
     File configurationFile;
     LogManager manager;
     
     configurationFile = new File(fileName);
     if(!configurationFile.exists()){
-      setEventLogger(new SimpleLogger("EVT"));
-      setApplicationLogger(new SimpleLogger("APP"));
-      setViewLogger(new SimpleLogger("VIEW"));
+      setEventLogger(new SimpleLogger(ALogRecord.CONTROL));
+      setApplicationLogger(new SimpleLogger(ALogRecord.APP));
+      setViewLogger(new SimpleLogger(ALogRecord.VIEW));
     }else{
       
       System.setProperty(JAVA_LOGGING_PROPERTIES_FILE_NAME, fileName);
@@ -122,17 +130,17 @@ public class Application{
         throw new FatalAException("Could not successfully open the logging properties file: "+fileName);
       }
       
-      setEventLogger(new JavaLogger("EVT"));
-      setApplicationLogger(new JavaLogger("APP"));
-      setViewLogger(new JavaLogger("VIEW"));
+      setEventLogger(new JavaLogger(ALogRecord.CONTROL));
+      setApplicationLogger(new JavaLogger(ALogRecord.APP));
+      setViewLogger(new JavaLogger(ALogRecord.VIEW));
+      setModelLogger(new JavaLogger(ALogRecord.MODEL));
     }
-      
   }
-  
+
   private void setTestMode(boolean newValue){
     testMode = newValue;
   }
-  
+
   private boolean isTestMode(){
     return testMode;
   }
@@ -183,6 +191,14 @@ public class Application{
 
   private void setViewLogger(ALogger logger){
     viewLogger = logger;
+  }
+  
+  private ALogger getModelLogger(){
+    return modelLogger;
+  }
+
+  private void setModelLogger(ALogger logger){
+    modelLogger = logger;
   }
   
   /**
