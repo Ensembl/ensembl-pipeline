@@ -246,6 +246,7 @@ sub new {
     $self->warn("Database doesn't contain translation.  Subsequently, ".
 		"wont be able to display translations of each exon ".
 		"or calculate protein identity scores.");
+    $self->_type('nucleotide');
     $self->_translatable(0);
   }
 
@@ -290,11 +291,13 @@ sub retrieve_alignment {
   my ($type, 
       $remove_introns, 
       $padding, 
-      $show_missing_evidence) = $self->_rearrange([qw(TYPE
-						      REMOVE_INTRONS
-						      PADDING
-						      SHOW_UNALIGNED
-						     )],@_);
+      $show_missing_evidence,
+      $merge_sequences) = $self->_rearrange([qw(TYPE
+						REMOVE_INTRONS
+						PADDING
+						SHOW_UNALIGNED
+						MERGE_SEQUENCES
+					       )],@_);
   
 
   unless ($type) {
@@ -305,7 +308,8 @@ sub retrieve_alignment {
   $padding = 100 unless ($padding);
 
   unless ($self->_is_computed($type)){
-    $self->_align($type, $show_missing_evidence, $remove_introns, $padding);
+    $self->_align($type, $show_missing_evidence, $remove_introns, 
+		  $padding, $merge_sequences);
   }
 
   return $self->_create_Alignment_object($type, $show_missing_evidence);
@@ -410,7 +414,8 @@ sub rogue_exons {
 =cut
 
 sub _align {
-  my ($self, $type, $show_missing_evidence, $truncate_introns, $padding) = @_;
+  my ($self, $type, $show_missing_evidence, $truncate_introns, 
+      $padding, $merge_sequences) = @_;
 
   # Collect all our sequences for aligning
 
@@ -480,6 +485,11 @@ sub _align {
     $self->_working_alignment('evidence', $evidence_sequence);
   }
 
+  # If sequences are to be merged, do this now.
+  if ($merge_sequences){
+    $self->_merge_same_sequences;
+  }
+
   # If unaligned fragments are to be shown, find these now.
 
   if ($show_missing_evidence) {
@@ -530,7 +540,7 @@ sub _create_Alignment_object {
     $alignment->add_sequence($evidence_sequence);
   }
 
-  if ($show_missing_evidence) {
+  if ($show_missing_evidence && $self->_working_alignment('unaligned')) {
     foreach my $missing_sequence (@{$self->_working_alignment('unaligned')}){
       $alignment->add_sequence($missing_sequence);
     }
@@ -885,7 +895,7 @@ sub _derive_unmatched_sequences {
     my $sequence = '';
 
     foreach my $element (@slice_seq_array) {
-      $sequence .= $element;
+      $sequence .= $element unless !$element;
     }
 
     my $display_seqname = "Unmatched " . $seqname;
@@ -925,8 +935,11 @@ sub _truncate_introns {
 
   push (@sequences, $self->_working_alignment('genomic_sequence'));
   push (@sequences, $self->_working_alignment('exon_nucleotide'));
-  push (@sequences, $self->_working_alignment('exon_protein'));
-  
+
+  if (($self->_type eq 'all')||($self->_type eq 'protein')){
+    push (@sequences, $self->_working_alignment('exon_protein'));
+  }  
+
   foreach my $aligned_seq (@{$self->_working_alignment('evidence')}){
     push (@sequences, $aligned_seq);
   }
@@ -988,6 +1001,68 @@ sub _truncate_introns {
   }
   
   return 1;
+}
+
+=head2 _merge_same_sequences
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _merge_same_sequences {
+  my ($self) = @_;
+
+  my @sequences = @{$self->_working_alignment('evidence')};
+
+  # Blam!
+
+  $self->_working_alignment('evidence', 'empty');
+
+  my %same_sequences_hash;
+
+  foreach my $sequence (@sequences) {
+    
+    push (@{$same_sequences_hash{$sequence->name}}, $sequence);
+  }
+
+  foreach my $sequence_name (keys %same_sequences_hash){
+
+    my $chimera = '-' x $self->_slice->length;
+
+    my @chimera = split (//, $chimera);
+
+    foreach my $alike_sequence (@{$same_sequences_hash{$sequence_name}}){
+      
+      my $seq_array = $alike_sequence->seq_array;
+
+      for (my $i = 0; $i <= scalar @$seq_array; $i++) {
+
+	if ($seq_array->[$i] ne '-'){
+	  if ($chimera[$i] && $chimera[$i] ne '-'){
+	    $self->warn("Very bad - evidence from the same sequence overlaps between" .
+			"exons.  You should not be merging sequences.  Set : " .
+			"\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
+	  } else {
+	    $chimera[$i] = $seq_array->[$i] unless $seq_array->[$i] eq '-';
+	  }
+	}
+      }
+    }
+
+    my $merged_align_seq = $same_sequences_hash{$sequence_name}->[0];
+
+    $merged_align_seq->store_seq_array(\@chimera);
+
+    $self->_working_alignment('evidence', $merged_align_seq);
+
+  }
+
+  return 1
 }
 
 
@@ -1104,13 +1179,18 @@ sub _working_alignment {
 		 . "a slot that isnt allowed ($slot)");
   }
 
+  if (defined $slot && defined $align_seq && $align_seq eq 'empty'){
+    undef $self->{'_working_alignment_array'}->{$slot};
+    return 1
+  }
+
   if (defined $slot && defined $align_seq){
 
     unless ($align_seq->isa("Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq")){
       $self->throw("Sequence passed to _working alignment was not an " . 
 		   "AlignmentSeq, it was a [$align_seq]")
     }
-    
+
     push (@{$self->{'_working_alignment_array'}->{$slot}}, $align_seq);
 
   } elsif (defined $slot && !defined $align_seq) {
