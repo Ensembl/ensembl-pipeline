@@ -413,7 +413,9 @@ sub get_low_complexity_length {
 		$lc_length += abs($feat->end - $feat->start) + 1;
 	}
     
-	my $low_complexity = (100*$lc_length)/($self->query->length);
+	my $low_complexity = ($lc_length)/($self->query->length);
+
+	$low_complexity *= 100;
 
 	return $low_complexity;
 }
