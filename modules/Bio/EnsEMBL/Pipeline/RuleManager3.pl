@@ -340,7 +340,7 @@ while (1) {
                     if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
                         $rule->has_condition_of_input_id_type($input_id_type) ) {
 
-                        print " Makes ACCUMULATOR " . $rule->goalAnalysis->logic_name  . " incomplete\n";
+                        print " Makes ACCUMULATOR " . $rule->goalAnalysis->logic_name  . " incomplete\n" if($verbose);
                         $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
                     }
                 }
