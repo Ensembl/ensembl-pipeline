@@ -19,6 +19,8 @@
  To construct a new Bio::EnsEMBL::Pipeline::Runnable::Slam object use
 
  $obj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
+                                                      -slice1        => $slice1,
+                                                      -slice2        => $slice2,
                                                       -fasta1        => 'seq1.fasta',
                                                       -fasta2        => 'seq2.fasta',
                                                       -approx_align  => 'myaatfile.aat',
@@ -34,6 +36,8 @@
 or
 
  $obj = Bio::EnsEMBL::Pipeline::Runnable::Slam->new(
+                                                    -slice1        => $slice1,
+                                                    -slice2        => $slice2,
                                                     -fasta1        => 'seq1.fasta',
                                                     -fasta2        => 'seq2.fasta',
                                                     -approx_align  => 'myaatfile.aat',
@@ -54,6 +58,10 @@ be performed on 3 diffrent organisms: H.sapiens, M.musculus and R.norvegicus.
 =head1 OPTIONS
 
 =over
+
+=item  B<-slice1>        first slice (Bio::SeqIO-object)
+
+=item  B<-slice2>        second slice (Bio::SeqIO-object)
 
 =item  B<-fasta1>        /path/to/fastafile1
 
@@ -93,6 +101,8 @@ package Bio::EnsEMBL::Pipeline::Runnable::Slam;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::PredictionTranscript;
+use Bio::EnsEMBL::PredictionExon;
+
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::SeqFeature;
@@ -112,6 +122,8 @@ sub new {
   bless $self,$class;
 
   my (
+      $slice1,                  # refrence to first slice
+      $slice2,                  # refrence to second slice
       $fasta1,                  # filename 1st fasta-seq
       $fasta2,                  # filename 2nd fasta-seq
       $approx_align,            # filename modified approximate alignement (.aat-File)
@@ -124,6 +136,8 @@ sub new {
       $debug,                   # opt. debug-option for slam
       $verbose                  # opt. verbose-option for runnable
      ) = $self->_rearrange([qw(
+                               SLICE1
+                               SLICE2
                                FASTA1
                                FASTA2
                                APPROX_ALIGN
@@ -138,6 +152,10 @@ sub new {
                               )
                            ], @args
                           );
+
+  $self->slice1($slice1);
+  $self->slice2($slice2);
+
 
   $self->fasta1($fasta1);
   $self->fasta2($fasta2);
@@ -164,8 +182,130 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-#  $self->deletefiles;
+  #  $self->deletefiles;
 }
+
+=pod
+
+=head2 _parse_results (String, String)
+
+  Title    : run
+  Usage    : $obj->_parse_ results
+  Function : parses the gff-resultfile created in the slam-run
+  Returns  : none
+  Args     : 1 String which specify the file-basename of the fasta-file
+
+=cut
+
+# example of gff-file written by slam
+# (see http://www.sanger.ac.uk/Software/formats/GFF/)
+
+# <seqname> <source> <feature>   <start>  <end> <score> <strand> <frame> [attributes]   |    [comments]        |
+#=========================part1========================================================   ---------part2------ | -----part3--------
+#  $seq     $src     $feat        $start  $end  $score  $strand  $frame   $gid   $ginr  |   $tr_id      $tr_nr |   $ex     $extype
+
+#  seq1      SLAM     CDS         18350   18443    .        +       1     gene_id "001" ; transcript_id "001.1"; exontype "internal"
+#  seq2      SLAM     CDS         18525   18594    .        +       0     gene_id "001" ; transcript_id "001.1"; exontype "internal"
+#  seq2      SLAM     CDS         18731   18747    .        +       2     gene_id "001" ; transcript_id "001.1"; exontype "terminal"
+#  seq2      SLAM     stop_codon  18745   18747    .        +       .     gene_id "001" ; transcript_id "001.1";
+#  seq2      SLAM     SLAM_CNS    18749   18816    .        .       .     cns_id "005"  ; identity "85.1"
+#  seq2      SLAM     SLAM_CNS    20900   20986    .        .       .     cns_id "006"  ; identity "69.8"
+#  seq2      SLAM     stop_codon  21269   21271    .        -       .     gene_id "002" ; transcript_id "002.1";
+#  seq2      SLAM     CDS         21269   21444    .        -       2     gene_id "002" ; transcript_id "002.1"; exontype "terminal"
+#  seq2      SLAM     CDS         21521   21656    .        -       0     gene_id "002" ; transcript_id "002.1"; exontype "internal"
+#  seq2      SLAM     CDS         21938   22578    .        -       2     gene_id "002" ; transcript_id "002.1"; exontype "internal"
+#  seq2      SLAM     CDS         22944   23925    .        -       0     gene_id "002" ; transcript_id "002.1"; exontype "initial"
+#  seq2      SLAM     start_codon 23923   23925    .        -       .     gene_id "002" ; transcript_id "002.1";
+#  seq2      SLAM     SLAM_CNS    26181   26242    .        .       .     cns_id "007"  ; identity "68.9"
+
+
+# interesting lines
+# <seqname> <source> <feature>   <start>  <end> <score> <strand> <frame> [attributes]   [comments]
+#  seq1      SLAM     CDS         18350   18443    .        +       1     gene_id "001" ; transcript_id "001.1"; exontype "internal"
+#  seq2      SLAM     CDS         18525   18594    .        +       0     gene_id "001" ; transcript_id "001.1"; exontype "internal"
+#  seq2      SLAM     CDS         18731   18747    .        +       2     gene_id "001" ; transcript_id "001.1"; exontype "terminal"
+#  seq2      SLAM     stop_codon  18745   18747    .        +       .     gene_id "001" ; transcript_id "001.1";
+#  seq2      SLAM     stop_codon  21269   21271    .        -       .     gene_id "002" ; transcript_id "002.1";
+#  seq2      SLAM     CDS         21269   21444    .        -       2     gene_id "002" ; transcript_id "002.1"; exontype "terminal"
+#  seq2      SLAM     CDS         21521   21656    .        -       0     gene_id "002" ; transcript_id "002.1"; exontype "internal"
+#  seq2      SLAM     CDS         21938   22578    .        -       2     gene_id "002" ; transcript_id "002.1"; exontype "internal"
+#  seq2      SLAM     CDS         22944   23925    .        -       0     gene_id "002" ; transcript_id "002.1"; exontype "initial"
+#  seq2      SLAM     start_codon 23923   23925    .        -       .     gene_id "002" ; transcript_id "002.1";
+
+
+sub _parse_results {
+
+  # parsing the results and adding predicted exons (predictionExon-obj) to transcript-objects
+  my ($self,$slice,$basefile) = @_;
+
+  my $path = $self->workdir;
+  my $gff  = $self->workdir."/".$basefile.".gff";
+
+  # what to do if resultfile contains no data ?
+  $gff  = "/tmp/seq1.38047.gff";
+
+  # we will walk through the file
+  # if a line has a gene_id we will store the gene-id in a hash-keyhash
+  # we also store the line in another hash
+  # later, we'll process the two hashes
+  my (%genes,%predex);
+
+  open(IN,"$gff") || die "could not read file $gff";
+
+  while (<IN>) {
+    chomp;
+    if (/gene_id/) {
+      my @line = split /;/; #only the attributes 0-9 are stable
+      my @attributes = /\s+/,$line[0];
+      my $key = "$attributes[8] $attributes[9]";
+      $genes{$key}=();  # key: -->gene_id "001"<-- FIND THE ERROR !
+      $predex{$_}=\@attributes;
+    }
+  } # EOF
+  close(IN);
+
+## now let's process the predicted genes !!!
+#  my ($gene,$predict);
+#  foreach(keys %genes) {
+#    $gene = $_;
+#    print "\n-$gene-\n";
+#    foreach(keys %predex){
+#      if (/$gene/){
+#        # reference to an array !!!
+#        my @temp = @{$predex{$_}};
+#        print "$temp[0]\t$temp[1]\n";
+#      }
+#    }
+#  }
+##    # processing the whole line
+
+#      my ($seq,$src,$feat,$start,$end,$score,$strand,$frame,$gid_act,$ginr) = split/\s+/, $line[0];
+#      my ($tr_id,$tr_nr) = split/\s+/, $line[1];
+#      my ($et, $extype) = split/\s+/, $line[2];
+
+#    if ($ln=~m/gene_id/) {      # we have coding sequence and we have a transcript
+
+#      if ($geneid_old ne $geneid_act) {
+#      $strand = 1 if ($strand eq "+");
+#      $strand = -1 if ($strand eq "-");
+#      $strand = 0 if ($strand eq ".");
+
+
+
+#      my $ex = new Bio::EnsEMBL::PredictionExon(
+#                                                -START     => $start,
+#                                                -END       => $end,
+#                                                -STRAND    => $strand, #valid values (Feature.pm: 1,-1,0)
+#                                                -SLICE     => $slice,
+#                                                -DBID      => 100, # EDIT!
+#                                                -P_VALUE   => 0,
+#                                                -SCORE     => 0
+#                                               );
+#    }
+#    $geneid_old = $geneid_act;
+
+}
+
 
 
 =pod
@@ -207,14 +347,17 @@ sub run {
   $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
 
-  $fasta1=~s/\/tmp//;
-  $fasta2=~s/\/tmp\///;
+  my $wdir = $self->workdir;
+
+  $fasta1=~s/$wdir\///;         # get rid of workdir-prefix (/tmp/)
+  $fasta2=~s/$wdir\///;         # get rid of workdir-prefix 
+
 
 
   $self->file($fasta1."_".$fasta2.".cns");
 
-#  print "cns-alignment-file : ".$fasta1."_".$fasta2.".cns\n";
-
+  $self->_parse_results($self->slice1,$fasta1); #  only file-basename
+  $self->_parse_results($self->slice2,$fasta2); #  only file-basename
   return 1
 }
 
@@ -223,7 +366,7 @@ sub files_to_delete {
 
   $file=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   my @suffix = qw (.gff .rna .pep );
-  foreach (@suffix){
+  foreach (@suffix) {
     $self->file($file.$_);
   }
   return;
@@ -231,7 +374,7 @@ sub files_to_delete {
 
 
 
-#-------------------- START taken from slam.pl --------------------
+
 sub _getgcdir{
   my $self = shift;
 
@@ -242,18 +385,18 @@ sub _getgcdir{
   my $org2 = $self->org2;
 
   my $gcdirs = {
-    'H.sapiens_M.musculus' => [
-      [ 0,  43],
-      [43,  51],
-      [51,  57],
-      [57, 100]
-    ],
-  },
+                'H.sapiens_M.musculus' => [
+                                           [ 0,  43],
+                                           [43,  51],
+                                           [51,  57],
+                                           [57, 100]
+                                          ],
+               },
 
-  my $pairName = sprintf("%s_%s",$org1,$org2);
+                 my $pairName = sprintf("%s_%s",$org1,$org2);
   my $gcdir;
 
-  if(exists($gcdirs->{$pairName})) {
+  if (exists($gcdirs->{$pairName})) {
     print "We have paramter bins defined for this organism pair.\n" if $self->verbose;
 
     my($seqStream,$seqObj);
@@ -276,8 +419,8 @@ sub _getgcdir{
 
     $gcdir = undef;
     my $nBins = scalar(@{$gcdirs->{$pairName}});
-    for(my $i=0; $i<$nBins; $i++) {
-      if(($gc > $gcdirs->{$pairName}[$i][0]) && ($gc <= $gcdirs->{$pairName}[$i][1])) {
+    for (my $i=0; $i<$nBins; $i++) {
+      if (($gc > $gcdirs->{$pairName}[$i][0]) && ($gc <= $gcdirs->{$pairName}[$i][1])) {
         $gcdir = sprintf("bin%d",$i+1);
         last;
       }
@@ -314,7 +457,7 @@ sub _seqlen {
   return $len;
 }
 
-#-------------------- END ----------------------------------------
+
 
 
 sub fasta1 {
@@ -391,6 +534,24 @@ sub minlength{
   $self->{_minlength} = $minlength if (defined $minlength);
   return $self->{_minlength};
 }
+
+sub slice1{
+  my ($self,$slice1) = @_;
+
+  $self->{_slice1} = $slice1 if (defined $slice1);
+  $self->throw("Slam needs a first slice to work on!\n") if (! defined $self->{_slice1} && !defined $slice1);
+  return $self->{_slice1};
+}
+
+sub slice2{
+  my ($self,$slice2) = @_;
+
+  $self->{_slice2} = $slice2 if (defined $slice2);
+  $self->throw("Slam needs a first slice to work on!\n") if (! defined $self->{_slice2} && !defined $slice2);
+  return $self->{_slice2};
+}
+
+
 
 
 ############################################################
