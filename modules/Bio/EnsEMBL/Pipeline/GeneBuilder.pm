@@ -157,14 +157,13 @@ sub build_Genes {
     $self->make_Exons;
     
     $self->make_ExonPairs;
-#    $self->print_ExonPairs;
     
-     $self->link_ExonPairs;
+    $self->link_ExonPairs;
 
     $self->filter_Transcripts;
     $self->make_Genes;
 
-    $self->print_gff;
+#    $self->print_gff;
 
     print STDERR "Out of build Genes...\n";
 
@@ -190,26 +189,23 @@ sub get_Genewises {
     my @gw;
 
     foreach my $type ($self->genewise_types) {
-#      push(@gw,$self->contig->get_Genes_by_Type($type,'evidence'));
       # we'll explicitly call fetch_evidence_by_Exon later on
       push(@gw,$self->contig->get_Genes_by_Type($type));
     }
-
-    $self->print_Genes(@gw);
     
     foreach my $g (@gw) {
 
       foreach my $t ($g->each_Transcript) {
-	print STDERR "Pruning Genewise " . $t->dbID . "\n";
 
         # set temporary_id to be dbID
 	$t->{'temporary_id'} = ($t->dbID) unless (defined $t->{'temporary_id'} && $t->{'temporary_id'} ne '');
 
 	my $valid = 1;
+	my $split = 0;
+
 	my $prev;
 
         foreach my $exon ($t->get_all_Exons) {
-#VAC remapping genes will later fail if $exon->contig_id is undefined; doesn't actually use the contig_id - why shoudl ti? this is all on a VC.
 	  $self->warn("no contig id\n") unless defined $exon->contig_id;
 	  if(!defined $exon->contig_id){ $exon->contig_id("sticky"); }
 
@@ -223,10 +219,10 @@ sub get_Genewises {
 	    } else {
 	      $intron = abs($exon->end   - $prev->start + 1);
 	    }
-	    print STDERR "Intron length is " . $intron . "\n";
 
 	    if ($intron > 100000) {
 	      print STDERR "Intron too long $intron  for gene " . $g->dbID . "\n";
+	      $split = 1;
 	      $valid = 0;
 	    }
 
@@ -252,6 +248,14 @@ sub get_Genewises {
 	if ($valid) {
 	  push(@genewise,$t);
 	}
+	elsif ($split){
+	  # split the transcript up.
+	  my @split_transcripts = $self->split_transcript($t);
+	  foreach my $t(@split_transcripts){
+	    push(@genewise, $t);
+	  }
+	}
+	
       }
     }
 
@@ -275,13 +279,13 @@ sub get_Predictions {
     my @genscan;
 
     foreach my $f (@preds) {
-      print STDERR "\nGot feature set " . $f->seqname    . "\t" . 
-	$f->start      . "\t" . 
-        $f->end        . "\t" . 
-        $f->strand     . "\t" . 
-	$f->score      . "\t" . 
-	$f->source_tag . "\t" . 
-	$f->primary_tag ."\n\n";
+#      print STDERR "\nGot feature set " . $f->seqname    . "\t" . 
+#	$f->start      . "\t" . 
+#        $f->end        . "\t" . 
+#        $f->strand     . "\t" . 
+#	$f->score      . "\t" . 
+#	$f->source_tag . "\t" . 
+#	$f->primary_tag ."\n\n";
 
         my $fset = $self->set_phases($f,$contig);
 
@@ -329,7 +333,7 @@ sub get_Similarities {
       }
     }
 
-    print STDERR "Found " . scalar(@newfeatures) . " similarity features\n";
+#    print STDERR "Found " . scalar(@newfeatures) . " similarity features\n";
     
     my @tmp;
 
@@ -440,7 +444,6 @@ sub make_Exons {
 	    if (!(($gwend < $f->start) || $gwstart > $f->end)) {
 	      
 	      if ($gwstrand == $f->strand) {
-		#print STDERR "Ignoring genscan exon\n";
 		$ignored_exons++;
 		next EXON;
 	      }
@@ -451,8 +454,6 @@ sub make_Exons {
 	  $newexon->find_supporting_evidence(\@features);
 	  
 	  my @support = $newexon->each_Supporting_Feature;
-	  
-	  #	  print ("Supporting evidence for " . $newexon->id .  "\t" . @support . "\n");
 	  
 	  if ($#support >= 0) {
 	    push(@exons,$newexon);
@@ -492,8 +493,6 @@ sub  make_ExonPairs {
     my @forward;
     my @reverse;
 
-    print STDERR "Making exon pairs \n";
-
   EXON: for (my $i = 0; $i < scalar(@exons)-1; $i++) {
 
 	print ("Looking at exon $i\n");
@@ -525,14 +524,12 @@ sub  make_ExonPairs {
 
 	  F1: foreach my $f1 (@f1) {
 	      next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
-#	      print ("FEATURE1 " . $f1->gffstring . "\n");
 	      my @f = $exon2->each_Supporting_Feature;
 	      @f = sort {$b->score <=> $a->score} @f;
 
 	    F2: foreach my $f2 (@f) {
 
 		next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
-#		print ("FEATURE2 " . $f2->gffstring . "\n");
 		my @pairs = $self->get_all_ExonPairs;
 		
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePairI")));
@@ -678,7 +675,6 @@ sub merge {
 	if ($features[$i+1]->score > $newfeatures[$count]->score) {
 	  $newfeatures[$count]->score($features[$i+1]->score);
 	}
-#	$newfeatures[$count]->score($newfeatures[$count]->score + $features[$i+1]->score);
 	
 	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
 	  $features[$i+1]->strand($features[$i]->strand);
@@ -699,8 +695,6 @@ sub merge {
 	if ($features[$i+1]->score > $newfeatures[$count]->score) {
 	  $newfeatures[$count]->score($features[$i+1]->score);
 	}
-	
-#	$newfeatures[$count]->score($newfeatures[$count]->score + $features[$i+1]->score);
 	
 	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
 	  $features[$i+1]->strand($features[$i]->strand);
@@ -749,8 +743,6 @@ sub prune_features {
   my $prev = -1;
 
   F: foreach  my $f (@features) {
-#      print STDERR "Feature is " . $f->gffstring . "\n";
-
     if ($prev != -1 && $f->hseqname eq $prev->hseqname &&
 	$f->start   == $prev->start &&
 	$f->end     == $prev->end   &&
@@ -758,7 +750,6 @@ sub prune_features {
 	$f->hend    == $prev->hend   &&
 	$f->strand  == $prev->strand &&
 	$f->hstrand == $prev->hstrand) {
-#      print STDERR "Duplicate\n";
     } else {
       push(@pruned,$f);
       $prev = $f;
@@ -849,15 +840,17 @@ sub link_ExonPairs {
 	    if ($self->isTail($exon)) {
 		my $found = 0;
 		foreach my $f ($exon->each_Supporting_Feature) {
-		    if ($f->analysis->db eq "sptr" && $f->score > 200) {
+
+# ARGHHHHH VAC hard coding
+
+#		    if ($f->analysis->db eq "sptr" && $f->score > 200) {
+		    if ($f->analysis->db eq "swall" && $f->score > 200) {
 			$found = 1;
 		    } 
 		}
 		next EXON unless ($found == 1);
 
 	    }
-
-	    print STDERR "Found new transcript start [" . $exon->{'temporary_id'} . "]\n";
 
 	    my $transcript = new Bio::EnsEMBL::Transcript;
 
@@ -872,7 +865,6 @@ sub link_ExonPairs {
 
 
     foreach my $tran ($self->get_all_Transcripts) {
-      print "Transcript is " . $tran->{'temporary_id'} . "\n";
 	$tran->{'temporary_id'} = ($TRANSCRIPT_ID_SUBSCRIPT . "." . $self->contig->id . "." .$count);
 	$self->make_Translation($tran,$count);
 	$count++;
@@ -896,7 +888,6 @@ sub link_ExonPairs {
 
 sub _recurseTranscript {
     my ($self,$exon,$tran) = @_;
-    print STDERR "In recurse transcript\n"; 
     if (defined($exon) && defined($tran)) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon")       unless $exon->isa("Bio::EnsEMBL::Exon");
 	$self->throw("[$tran] is not a Bio::EnsEMBL::Transcript") unless $tran->isa("Bio::EnsEMBL::Transcript");
@@ -932,7 +923,7 @@ sub _recurseTranscript {
 
     my @pairs = $self->_getPairs($exon);
 
-    print STDERR "Pairs are @pairs\n";
+#    print STDERR "Pairs are @pairs\n";
 
     my @exons = $tran->get_all_Exons;;
     
@@ -948,12 +939,6 @@ sub _recurseTranscript {
 	print STDERR "Comparing " . $exons[$#exons]->{'temporary_id'} . "\t" . $exons[$#exons]->end_phase . "\t" . 
 	    $pair->exon2->{'temporary_id'} . "\t" . $pair->exon2->phase . "\n";
 	next PAIR if ($exons[$#exons]->end_phase != $pair->exon2->phase);
-
-	# Only use multiple pairs once
-	#if ($#pairs > 0) {
-	#    next PAIR if ($self->{'_usedPairs'}{$pair} == 1);
-	#    print ("Already used pair = skipping\n");
-	#}
 
 	$self->{'_usedPairs'}{$pair} = 1;
 
@@ -1044,8 +1029,8 @@ sub _getPairs {
     $self->throw("Input must be Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
 
     foreach my $pair ($self->get_all_ExonPairs) {
-        print STDERR "Pairs " . $pair->exon1->{'temporary_id'} . "\t" . $pair->is_Covered . "\n";
-        print STDERR "Pairs " . $pair->exon2->{'temporary_id'} . "\t" . $pair->is_Covered . "\n\n";
+#        print STDERR "Pairs " . $pair->exon1->{'temporary_id'} . "\t" . $pair->is_Covered . "\n";
+#        print STDERR "Pairs " . $pair->exon2->{'temporary_id'} . "\t" . $pair->is_Covered . "\n\n";
 	if (($pair->exon1->{'temporary_id'} eq $exon->{'temporary_id'}) && ($pair->is_Covered == 1)) {
 	    push(@pairs,$pair);
 	}
@@ -1139,7 +1124,7 @@ sub make_Genes {
     push(@transcripts,$self->get_Genewises);
 
     foreach my $tran (@transcripts) {
-      print STDERR "Processing " . $tran->{'temporary_id'} . "\n";
+#      print STDERR "Processing " . $tran->{'temporary_id'} . "\n";
 
 	$trancount++;
 	
@@ -1147,7 +1132,6 @@ sub make_Genes {
 
 
 	GENE: foreach my $gene (@genes) {
-#	  EXON: foreach my $gene_exon ($gene->each_unique_Exon) {
 	  EXON: foreach my $gene_exon ($gene->get_all_Exons) {
 
 	      foreach my $exon ($tran->get_all_Exons) {
@@ -1178,7 +1162,7 @@ sub make_Genes {
 	    $genecount++;
 	    $gene->add_Transcript($tran);
 	    push(@genes,$gene);
-print STDERR "making new gene from " . $tran->{'temporary_id'} . "\n";
+#print STDERR "making new gene from " . $tran->{'temporary_id'} . "\n";
 	}
     }
 
@@ -1267,7 +1251,6 @@ sub make_id_hash {
     my %id;
 
     foreach my $f (@features) {
-	print STDERR "Feautre $f\n";
 	if (!defined($id{$f->hseqname})) {
 	    $id{$f->hseqname} = [];
 	}
@@ -1293,9 +1276,9 @@ sub translate_Exon {
 
     my $dna = $exon->seq;
     
-    print ("Tran 0 " . $dna->translate('*','X',0)->seq . "\n");
-    print ("Tran 1 " . $dna->translate('*','X',1)->seq . "\n");
-    print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
+#    print ("Tran 0 " . $dna->translate('*','X',0)->seq . "\n");
+#    print ("Tran 1 " . $dna->translate('*','X',1)->seq . "\n");
+#    print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
 }
 
 =head2 make_Translation
@@ -1332,19 +1315,19 @@ sub make_Translation{
 	} else {
 	  my $tmpend= $exon->end;
 	  $exon->end($tmpend - 3 + $tmpphase);
-	  print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
+#	  print ("New start end " . $exon->start . "\t" . $exon->end . "\n");
 	  $exon->phase(0);
 	}
-	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
+#	print ("New coords are " . $exon-> start . "\t" . $exon->end . "\t" . $exon->phase . "\t" . $exon->end_phase . "\n");
     }   
 
-    print ("Transcript strand is " . $exons[0]->strand . "\n");
+#    print ("Transcript strand is " . $exons[0]->strand . "\n");
     
     if ($exons[0]->strand == 1) {
       @exons = sort {$a->start <=> $b->start} @exons;
     } else {
       @exons = sort {$b->start <=> $a->start} @exons;
-      print("Start exon is " . $exons[0]->{'temporary_id'} . "\n");
+#      print("Start exon is " . $exons[0]->{'temporary_id'} . "\n");
     }
  
     if( $exons[0]->phase == 0 ) {
@@ -1397,7 +1380,7 @@ sub set_ExonEnds {
 	foreach my $genscan ($gs->sub_SeqFeature) {
 
 	    if ($genscan->overlaps($exon)) {
-		print (STDERR "Found overlap : " . $genscan->id . "\t" . $exon->{'temporary_id'} . "\n");
+#		print (STDERR "Found overlap : " . $genscan->id . "\t" . $exon->{'temporary_id'} . "\n");
 
 		$fover = $genscan;
 
@@ -1457,7 +1440,7 @@ sub set_ExonEnds {
 
     $exon->phase($fover->{phase});
 
-    print(STDERR "New exon start end = $leftend\t$rightend\t" . $exon->translate->seq . "\n");
+#    print(STDERR "New exon start end = $leftend\t$rightend\t" . $exon->translate->seq . "\n");
 
     $exon->start($leftend);
     $exon->end  ($rightend);
@@ -1474,29 +1457,21 @@ sub set_ExonEnds {
     my $tran1 = $prim->translate('*','X',0);
     if ($tran1->seq !~ /\*/) {
 	$self->add_ExonFrame($exon,1);
-	print ("found 1\n");
     }
 
     my $tran2 = $prim->translate('*','X',2);
     if ($tran2->seq !~ /\*/) {
 	$self->add_ExonFrame($exon,2);
-	print ("found 2\n");
     }
 
     my $tran3 = $prim->translate('*','X',1);
     if ($tran3->seq !~ /\*/) {
 	$self->add_ExonFrame($exon,3);
-	print ("found 3\n");
     }
 
     my $trancount = 0;
     my $framehash = $self->get_all_ExonsFrame($exon);
     $trancount = scalar(keys(%{$framehash}));
-    print ("trancount $trancount for " . $exon->{'temporary_id'} . "\n");
-    print(STDERR "translation 1 " . $tran1->seq . "\n");
-    print(STDERR "translation 2 " . $tran2->seq . "\n");
-    print(STDERR "translation 3 " . $tran3->seq . "\n");
-
 
     if ($trancount == 0) {
 	print STDERR "ERROR: No translatable frame\n";
@@ -1543,7 +1518,7 @@ sub check_ExonPair {
 
     $pair->splice_seq($spliceseq);
 
-    print (STDERR "Splice " . $spliceseq->seq ."\n");
+#    print (STDERR "Splice " . $spliceseq->seq ."\n");
 
     return 1;
     return 0 if ($spliceseq ->seq ne "GTAG");
@@ -1558,18 +1533,18 @@ sub check_ExonPair {
 	
 	$exon1->phase($frame-1);
 	my $endphase = $exon1->end_phase;
-	print (STDERR "Looking for exon2 phase of " . $endphase+1 . "\n");
+#	print (STDERR "Looking for exon2 phase of " . $endphase+1 . "\n");
 
 	if ($frame2->{$endphase+1} == 1) {
-	    print STDERR "Hooray! Found matching phases\n";
+#	    print STDERR "Hooray! Found matching phases\n";
 	    $match = 1;
 	    $exon2->phase($endphase);
 
 	    my $trans1 = $exon1->seq->translate('*','X',(3-$exon1->phase)%3)->seq;
 	    my $trans2 = $exon2->seq->translate('*','X',(3-$exon2->phase)%3)->seq;
 
-	    print(STDERR "exon 1 " . $exon1->{'temporary_id'} . " translation $frame : " . $trans1. "\n");
-	    print(STDERR "exon 2 " . $exon2->{'temporary_id'} . " translation " . ($endphase+1) . " : " . $trans2. "\n");
+#	    print(STDERR "exon 1 " . $exon1->{'temporary_id'} . " translation $frame : " . $trans1. "\n");
+#	    print(STDERR "exon 2 " . $exon2->{'temporary_id'} . " translation " . ($endphase+1) . " : " . $trans2. "\n");
 
 	    if ($self->add_ExonPhase($exon1) && $self->add_ExonPhase($exon2)) {
 		return $match;
@@ -1615,7 +1590,7 @@ sub add_ExonPhase {
     my ($self,$exon) = @_;
 
     if (defined($self->{'_exonphase'}{$exon})) {
-	print STDERR "Already defined phase : old phase " . $self->{'_exonphase'}{$exon} . " new " . $exon->phase . "\n";
+#	print STDERR "Already defined phase : old phase " . $self->{'_exonphase'}{$exon} . " new " . $exon->phase . "\n";
 	if ($self->{'_exonphase'}{$exon} != $exon->phase) {
 	    return 0;
 	}
@@ -1697,14 +1672,14 @@ sub set_phases {
       my $cdna;
       foreach my $ex (@nrf) {
 	 
-	print STDERR "\tSub feature " . $ex->{'temporary_id'}          . "\t" .
-	  $ex->start       . "\t" . 
-	  $ex->end         . "\t" . 
-	  $ex->strand      . "\t" . 
-	  $ex->{'_5splice'}   . "\t" . 
-	  $ex->{'_3splice'}   . "\t" .
-	  $ex->phase          . "\t" . 
-	  $ex->end_phase      . "\n";
+#	print STDERR "\tSub feature " . $ex->{'temporary_id'}          . "\t" .
+#	  $ex->start       . "\t" . 
+#	  $ex->end         . "\t" . 
+#	  $ex->strand      . "\t" . 
+#	  $ex->{'_5splice'}   . "\t" . 
+#	  $ex->{'_3splice'}   . "\t" .
+#	  $ex->phase          . "\t" . 
+#	  $ex->end_phase      . "\n";
 
 	my $dna = $ex->seq->seq;
   
@@ -1715,12 +1690,12 @@ sub set_phases {
       my  $i = 0;
       my  $found = -1;
 
+# does this actually do anything?
+
       while ($i < 3) {
 	my $pep = new Bio::Seq(-seq => $cdna);
 	my $seq = $pep->translate('*','X',$i)->seq;
 
-#	print STDERR "seq " . $seq . "\n";
-	
 	$seq =~ s/\*$//;
 
 	$i++;
@@ -1731,7 +1706,7 @@ sub set_phases {
 
       $seq =~ s/(.{72})/$1\n/g;
 
-      print "\nFinal translation is \n\n$seq\n\n";
+#      print "\nFinal translation is \n\n$seq\n\n";
 
       
     };
@@ -1754,36 +1729,12 @@ sub set_phases {
 sub filter_Transcripts {
     my ($self) = @_;
 
-    print STDERR "Filtering transcripts\n";
+#    print STDERR "Filtering transcripts\n";
     my @transcripts = $self->get_all_Transcripts;
 
     my @new;
 
     push(@new,@transcripts);
-#    TRAN: foreach my $tran1 (@transcripts) {
-#	my $foundstart = 0;
-#	my $foundend   = 0;
-
-#      TRAN2: foreach my $tran2 (@transcripts) {
-	    
-#	    next TRAN2 if ($tran1 == $tran2);
-	    
-#	    if (($tran2->first_exon->start > $tran1->first_exon->start) && 
-#		($tran2->first_exon->start < $tran1->last_exon->end)) {
-#		$foundstart = 1;
-#	    }
-#	    if (($tran2->last_exon->end > $tran1->first_exon->start) && 
-#		($tran2->last_exon->end < $tran1->last_exon->end)) {
-#		$foundend = 1;
-#	    }
-#	}
-#	if ($foundstart == 0 || $foundend == 0) {
-#	    push(@new,$tran1);
-#	}
-#    }
-#    print "Done first filter\n";
-    
-
     # We now also have to filter transcripts to trim off the satellite single exon genscan genes that
     # happen at the end of genewise genes.
 
@@ -1791,11 +1742,11 @@ sub filter_Transcripts {
     
     my @new2;
 
-    print STDERR "Starting second filter @new\n";
+    print STDERR "Starting second filter\n";
     foreach my $tran (@new) {
 	my @gexons = $tran->get_all_Exons;
 
-	print ("Looking at " . $tran->{'temporary_id'} . "\t" . $#gexons . "\n");
+#	print ("Looking at " . $tran->{'temporary_id'} . "\t" . $#gexons . "\n");
 	if ($#gexons == 0) {
 	    # find nearest 5' exon
 	    my $exon5;
@@ -1803,13 +1754,13 @@ sub filter_Transcripts {
 	    my $gap = 10000000000;
 	    my $found_genewise = 0;
 
-	    print STDERR "\nFound single exon gene " . $tran->{'temporary_id'} . "\n";
-	    $self->print_Exon($gexons[0]);
+#	    print STDERR "\nFound single exon gene " . $tran->{'temporary_id'} . "\n";
+#	    $self->print_Exon($gexons[0]);
 
 	  EX2: foreach my $ex (@exons) {
 	      next EX2 if ($ex == $gexons[0]);
 
-		  $self->print_Exon($ex);
+#		  $self->print_Exon($ex);
 
 	      if ($ex->strand == $gexons[0]->strand &&
 		  ($gexons[0]->start - $ex->end)  > 0 &&
@@ -1817,12 +1768,12 @@ sub filter_Transcripts {
 		  $exon5 = $ex;
 		  $gap = ($gexons[0]->start - $ex->end);
 	      }
-	      $self->print_Exon($ex);
+#	      $self->print_Exon($ex);
 
 	  }
 	    if (defined($exon5)) {
-		print STDERR "Found exon5\n";
-		$self->print_Exon($exon5);
+#		print STDERR "Found exon5\n";
+#		$self->print_Exon($exon5);
 		# get evidence
 		my @evidence = $exon5->each_Supporting_Feature;
 		
@@ -1831,7 +1782,7 @@ sub filter_Transcripts {
 		foreach my $ev (@evidence) {
 		  foreach my $type ($self->genewise_types) {
 		    if ($ev->source_tag eq $type) {
-		      print ("Tag " . $ev->source_tag . "\n");
+#		      print ("Tag " . $ev->source_tag . "\n");
 		      # don't use transcript
 		      $found_genewise = 1;
 		    }
@@ -1844,7 +1795,7 @@ sub filter_Transcripts {
 	  EX3: foreach my $ex (@exons) {
 	      next EX3 if ($ex == $gexons[0]);
 #		  print STDERR "\t Gap $gap";
-		  $self->print_Exon($ex);
+#		  $self->print_Exon($ex);
 
 	      # find nearest 3' exon
 	      if ($ex->strand == $gexons[0]->strand &&
@@ -1854,7 +1805,7 @@ sub filter_Transcripts {
 		  $gap = ($ex->start - $gexons[0]->end);
 	      }
 #	    print STDERR "\t Gap $gap";
-	    $self->print_Exon($ex);
+#	    $self->print_Exon($ex);
 
 	  }
 
@@ -1865,7 +1816,7 @@ sub filter_Transcripts {
 		# any of it genewise?
 		  
 		  foreach my $ev (@evidence) {
-		      print ("Tag " . $ev->source_tag . "\n");
+#		      print ("Tag " . $ev->source_tag . "\n");
 		      if ($ev->source_tag eq "genewise") {
 			  # don't use transcript
 			  $found_genewise = 1;
@@ -2085,7 +2036,7 @@ sub add_ExonPair {
 
     if (defined($arg) && $arg->isa("Bio::EnsEMBL::Pipeline::ExonPair")) {
 	push(@{$self->{'_exon_pairs'}},$arg);
-        print STDERR "Adding exon pair $arg\n";
+#        print STDERR "Adding exon pair $arg\n";
     } else {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::ExonPair");
     }
@@ -2235,16 +2186,6 @@ sub print_gff {
 
     close(POG);
 
-# VAC
-# pog.fa not used & not cleaned up?
-#    open (POG,">pog.fa");
-#    print POG ">". $self->contig->id . "\n";
-
-#    my $seq = $self->contig->primary_seq->seq;
-#    $seq =~ s/(.{72})/$1\n/g;
-#    
-#    print POG $seq . "\n";
-#    close(POG);
 }
 
 
@@ -2334,7 +2275,7 @@ sub prune {
 	foreach my $tran (@tran) {
 	    eval {
 		if ($tran->translate->seq !~ /\*/) {
-		    print STDERR "Found transcript " . $tran->{'temporary_id'} . "\n";
+#		    print STDERR "Found transcript " . $tran->{'temporary_id'} . "\n";
 		    push(@transcripts,$tran);
 
 		    my @exons = $tran->get_all_Exons;
@@ -2369,7 +2310,7 @@ sub prune {
 	    }
 	}
       if ($found == 0) {
-	  print STDERR "Found new cluster for " . $tran->{'temporary_id'} . "\n";
+#	  print STDERR "Found new cluster for " . $tran->{'temporary_id'} . "\n";
 	  my @newclus;
 	  push(@newclus,$tran);
 	  push(@clusters,\@newclus);
@@ -2405,7 +2346,7 @@ sub prune {
 	my @maxexon = $tran[0]->get_all_Exons;
 
 	if ($#maxexon == 0) {
-	    print STDERR "Single exon gene\n";
+#	    print STDERR "Single exon gene\n";
 	    my $gene = new Bio::EnsEMBL::Gene;
 	    $gene->type('pruned');
 	    $gene->{'temporary_id'} = ($tran[0]->{'temporary_id'});
@@ -2417,9 +2358,9 @@ sub prune {
 	    next CLUS;
 	}
 
-	print STDERR "\nProcessing cluster\n";
+#	print STDERR "\nProcessing cluster\n";
 	foreach my $tran (@tran) {
-	    print STDERR "Transcript " . $tran->{'temporary_id'} . "\t" . $sizehash{$tran} . "\n";
+#	    print STDERR "Transcript " . $tran->{'temporary_id'} . "\t" . $sizehash{$tran} . "\n";
 	    my @exons = $tran->get_all_Exons;
 
 	    if ($exons[0]->strand == 1) {
@@ -2444,7 +2385,7 @@ sub prune {
 		  $intron = abs($exon1->start   - $exon2->end + 1);
 		}
 
-		print STDERR "Intron size $intron\n";
+#		print STDERR "Intron size $intron\n";
 		if ($intron < 50) {
 		  $foundpair = 1;
 		} else {
@@ -2466,7 +2407,7 @@ sub prune {
 		}
 		
 		if ($foundpair == 0) {
-		    	    print STDERR "Found new pair\n";
+#		    	    print STDERR "Found new pair\n";
 		    $found = 0;
 
 		    $exonhash{$exon1->{'temporary_id'}} = $exon1;
@@ -2477,10 +2418,10 @@ sub prune {
 	      }
 	    
 	    if ($found == 0) {
-		print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
+#		print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
 		push(@newtran,$tran);
 	    } else {
-		print STDERR "Transcript already seen " . $tran->{'temporary_id'} . "\n";
+#		print STDERR "Transcript already seen " . $tran->{'temporary_id'} . "\n";
 	    }
 	}
 
@@ -2508,15 +2449,131 @@ sub prune {
 	      print STDERR "ERROR: Couldn;t fetch supporting evidence for " . $gene->{'temporary_id'} . ":\n[$@]\n";
 	    }
 	    else{
-	      print STDERR "got evidence for " . $gene->{'temporary_id'} . "\n";
+#	      print STDERR "got evidence for " . $gene->{'temporary_id'} . "\n";
 	    }
 	    
 	    push(@newgenes,$gene);
 	}
     }
     
-    print STDERR "newgenes: " . scalar(@newgenes) . "\n";
+#    print STDERR "newgenes: " . scalar(@newgenes) . "\n";
 
     return @newgenes;  
   }
+
+=head2 split_transcript
+
+ Title   : split_transcript 
+ Usage   : my @splits = $self->split_transcript($transcript)
+ Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
+           transcripts that result. 
+ Returns : @Bio::EnsEMBL::Transcript
+ Args    : Bio::EnsEMBL::Transcript
+
+=cut
+
+
+sub split_transcript{
+  my ($self, $transcript) = @_;
+  my @split_transcripts   = ();
+
+  if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+    $self->warn("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+    return (); # empty array
+  }
+  
+  my $prev_exon;
+  my $exon_added = 0;
+  my $curr_transcript = new Bio::EnsEMBL::Transcript;
+  my $translation     = new Bio::EnsEMBL::Translation;
+  $curr_transcript->translation($translation);
+
+  my @exons = $transcript->get_all_Exons;
+
+  foreach my $exon($transcript->get_all_Exons){
+    $exon_added = 0;
+      # is this the very first exon?
+    if($exon == $transcript->start_exon){
+
+      $prev_exon = $exon;
+      
+      # set $curr_transcript->translation start and start_exon
+      $curr_transcript->add_Exon($exon);
+      $exon_added = 1;
+      $curr_transcript->translation->start_exon($exon);
+      $curr_transcript->translation->start($transcript->translation->start);
+      push(@split_transcripts, $curr_transcript);
+    }
+    
+    if ($exon->strand != $prev_exon->strand){
+      return (); # empty array
+    }
+
+    # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+    my $intron = 0;
+    if ($exon->strand == 1) {
+      $intron = abs($exon->start - $prev_exon->end + 1);
+    } else {
+      $intron = abs($exon->end   - $prev_exon->start + 1);
+    }
+    
+    if ($intron > 100000) {
+      # set translation end and end_exon of $curr_transcript->translation based on phase of $prev_exon
+      $curr_transcript->translation->end_exon($prev_exon);
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1);
+      
+      # start a new transcript 
+      my $t  = new Bio::EnsEMBL::Transcript;
+      my $tr = new Bio::EnsEMBL::Translation;
+      $t->translation($tr);
+
+      # add exon unless already added, and set translation start and start_exon
+      $t->add_Exon($exon) unless $exon_added;
+
+      $t->translation->start_exon($exon);
+
+      if ($exon->phase == 0) {
+	$t->translation->start(1);
+      } elsif ($exon->phase == 1) {
+	$t->translation->start(3);
+      } elsif ($exon->phase == 2) {
+	$t->translation->start(2);
+      }
+
+      # this new transcript becomes the current transcript
+      $curr_transcript = $t;
+
+      push(@split_transcripts, $curr_transcript);
+    }
+
+    if($exon == $transcript->end_exon){
+      # set $curr_transcript end_exon and end
+      $curr_transcript->translation->end_exon($exon);
+      $curr_transcript->translation->end($transcript->translation->end);
+    }
+
+    else{
+      # just add the exon
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+    }
+    
+    # this exon becomes $prev_exon for the next one
+    $prev_exon = $exon;
+
+  }
+
+  # discard any single exon transcripts
+  my @t = ();
+  foreach my $st(@split_transcripts){
+    my @ex = $st->get_all_Exons;
+    if(scalar(@ex) > 1){
+      push(@t, $st);
+    }
+  }
+
+  return @t;
+
+}
+
+
 1;
