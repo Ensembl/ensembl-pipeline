@@ -2,22 +2,27 @@
 
 use strict;
 use Bio::EnsEMBL::Pipeline::Importer;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 $| = 1;
 
-my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => 'ensrv4',
+my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => 'ecs1a',
 						   -dbname => 'mouse',
+						   -pass   => 'ensembl',
 						   -user   => 'ensadmin');
 
-my $mirror_dir = '/nfs/disk100/humpub/th/unfinished_ana/';
+my $mirror_dir = '/scratch2/ensembl/enspipe/embl_feed/';
 
 my $importer   = new Bio::EnsEMBL::Pipeline::Importer(-dbobj      => $dbobj,
+						      -species    => 'mm',
 						      -mirror_dir => $mirror_dir);
 
 # This does the reading,parsing and writing of the new sequences
 
+$importer->retain_old_versions(0);
 $importer->importClones;
+
+exit;
 
 # This stuff is just proving to myself we have sequence in the database
   
