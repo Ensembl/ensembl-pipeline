@@ -29,10 +29,10 @@ $genscan->write_output(); #writes to DB
 =head1 DESCRIPTION
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::Genscan to add
-functionality for reading and writing to databases.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
-extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
-required for databse access.
+functionality for reading and writing to databases. The appropriate
+Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+is required for database access.
 
 =head1 CONTACT
 
