@@ -103,7 +103,7 @@ sub make_seqfetcher {
     my @db = ( $index );
     
     # make sure that your class is compatible with the index type
-    $seqfetcher = "$class"->new('-db' => \@db, );
+    $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
     $self->throw("can't make seqfetcher\n");

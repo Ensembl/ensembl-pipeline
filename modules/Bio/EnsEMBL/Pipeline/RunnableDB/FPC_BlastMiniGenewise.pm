@@ -457,11 +457,11 @@ sub validate_transcript {
   # check exon phases:
   my @exons = $transcript->get_all_Exons;
   $transcript->sort;
-  for (my $i=0;$i<(scalar(@exons-1);$i++){
+  for (my $i=0;$i<(scalar(@exons)-1);$i++){
     my $endphase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
-    if ( $phase != $end_phase ){
-      $self->warn("rejecting transcript with inconsistent phases ( $phase - $end_phase) ");
+    if ( $phase != $endphase ){
+      $self->warn("rejecting transcript with inconsistent phases ( $phase - $endphase) ");
       return undef;
     }
   }
