@@ -105,7 +105,7 @@ if (defined $params){
   }
 }
 
-my $runobj = "$runnable"->new(-dbobj    => $db,
+my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      %hparams,
 			     );

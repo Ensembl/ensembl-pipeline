@@ -136,7 +136,7 @@ sub get_chrlengths{
 					      -user   => $EST_REFDBUSER,
 					      -dbname => $EST_REFDBNAME,
 					     );
-  my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
+  my $q = "SELECT name, length FROM chromosome";
   
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
   my $res = $sth->execute || $db->throw("can't execute: $q");
@@ -174,7 +174,7 @@ sub make_exonerate_bsubs {
   $estfile .= "_chunk_";
 
   my $numchunks = $EST_CHUNKNUMBER;
-
+ 
   for(my $i = 0; $i < $numchunks; $i++){
     my $num = $i;
     while (length($num) < 7){
