@@ -102,6 +102,70 @@ sub dbobj {
     return $self->{'_dbobj'};
 }
 
+=head2 fetch_output
+
+    Title   :   fetch_output
+    Usage   :   $self->fetch_output
+    Function:   Fetchs output data from a frozen perl object
+    Returns :   array of exons (with start and end)
+    Args    :   none
+
+=cut
+
+sub fetch_output {
+    my($self,$output) = @_;
+    
+    $output || $self->throw("No frozen object passed for the output");
+    
+    my $object;
+    open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
+    
+    while (<IN>) {
+	$_ =~ s/\[//;
+	$_ =~ s/\]//;
+	$object .= $_;
+    }
+    close(IN);
+    my @out;
+    my (@obj) = FreezeThaw::thaw($object);
+    foreach my $array (@obj) {
+	foreach my $object (@$array) {
+	    push @out, $object;
+	}
+    }
+    return @out;
+}
+
+=head2 write_output
+
+    Title   :   write_output
+    Usage   :   $self->write_output
+    Function:   Writes output data to db
+    Returns :   array of exons (with start and end)
+    Args    :   none
+
+=cut
+
+sub write_output {
+    my($self,@features) = @_;
+
+    my $db=$self->dbobj();
+
+    @features || $self->throw("No frozen object passed for the output");
+    my $contig;
+    eval {
+	$contig = $db->get_Contig($self->input_id);
+    };
+    if ($@) {
+	print STDERR "Contig not found, skipping writing output to db\n";
+    }
+    else {
+	my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+	$feat_Obj->write($contig,@features);
+    }
+    return 1;
+}
+
 =head2 fetch_input
 
     Title   :   fetch_input
