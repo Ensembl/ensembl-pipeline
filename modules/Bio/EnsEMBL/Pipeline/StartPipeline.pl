@@ -52,7 +52,7 @@ $pipeline_manager->run();
 
 # Called when signal is recieved
 sub _shut_down {
-
+  print STDERR "\n\nReceived INTERRUPT, will shutdown gracefully...\n\n";
   $pipeline_manager->{'stop'} = 1;
 
 }
