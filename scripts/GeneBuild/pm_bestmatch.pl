@@ -8,9 +8,46 @@ BEGIN {
   require "GB_conf.pl";
 }
 
+=head1 NAME
+
+  pm_bestmatch.pl
+
+=head1 SYNOPSIS
+ 
+  pm_bestmatch.pl
+
+=head1 DESCRIPTION
+
+  pm_bestmatch.pl processes data output from pm_filter.pl and returns the best hit(s) 
+  in the genome for each pmatched protein.
+
+  pm_bestmatch.pl takes input from STDIN and returns the best hit(s) for each of the 
+  proteins whose results are passed in. If all the pm_filter.pl output files from 
+  the various chromosomes are catted together, pm_bestmatch.pl will return the best 
+  hit(s) in the genome.
+
+  The top hit and any hits with coverage within 2% are returned.
+
+  Typical usage:
+
+  cat *.pm.out > allhits.pmatch
+  ./pm_bestmatch.pl < allhits.pmatch
+  
+
+=head1 OPTIONS
+  
+  Options are to be set in GB_conf.pl
+  The important ones for this script are:
+     pm_output   directory to write filtered output files
+
+     eg.
+	    'pm_output'   => '/work2/vac/GeneBuild/',
+  
+  If pm_output directory is not provided, output file is written to current directory
+    
+=cut
+
 use strict;
-
-
 use pmatch_modules; 
 use Bio::Seq;
 use File::Find;

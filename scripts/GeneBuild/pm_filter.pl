@@ -8,6 +8,65 @@ BEGIN {
   require "GB_conf.pl";
 }
 
+=head1 NAME
+
+  pm_filter.pl
+
+=head1 SYNOPSIS
+ 
+  pm_filter.pl
+
+=head1 DESCRIPTION
+
+  pm_filter.pl runs and filters the output from pmatch when running human 
+  proteome vs genomic sequence - pmatch produces reams of info that can be usefully 
+  combined and input to eg TargettedGenewise
+
+  pmatch compares a DNA fasta file with a protein fasta file; this script 
+  needs to be given the location of the fasta file contain the human proteome, 
+  the directory at the head of the tree containing all the fpc contig fasta 
+  files and the chromosome on which to run. The first two options are common 
+  with other scripts and should be set in GB_conf.pl
+
+  pm_filter.pl should be run once for each chromosome. The results are written out to 
+  chrname.pm.dat in the pm_output directory specified in GB_conf.pl
+
+  The script analyses the whole chromosome by running pmatch for the protein data 
+  against each fpc contig file in turn, and then combining the results to find 
+  the "best" hit for each protein ie the one with the greatest percentage 
+  coverage of the protein sequence, as long as the coverage exceeds the lower threshold 
+  of 25%. It also returns any hits that have coverage within 2% of this best hit, again 
+  as long as coverage >= 25%. We cannot just take the longest hit for each 
+  protein as we expect (at least) one hit per exon, not one hit per protein. 
+  Percentage coverage is based on protein sequence length.
+
+  Typical usage:
+
+  ./pm_filter.pl -chr chr1
+  
+
+=head1 OPTIONS
+  
+  Options are to be set in GB_conf.pl
+  The important ones for this script are:
+     pfasta      clean file of proteins in fasta format
+     pmatch      location of the pmatch executable
+     pm_output   directory to write filtered output files
+     fpcdir      top of the hierarchy where the fpcctg fasta files are
+     tmpdir      scratch area
+
+     eg.
+	    'pfasta'      => '/work2/vac/GeneBuild/human_proteome.fa',
+	    'pmatch'      => '/work2/vac/rd-utils/pmatch',
+	    'pm_output'   => '/work2/vac/GeneBuild/',
+	    'fpcdir'      => '/work2/vac/data/humangenome',
+	    'tmpdir'      => '/work5/scratch/vac',
+  
+  If pm_output directory is not provided, output file is written to current directory
+    
+=cut
+
+
 use strict;
 use pmatch_modules; 
 use Bio::Seq;
