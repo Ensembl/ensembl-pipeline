@@ -297,7 +297,7 @@ sub retrieve_alignment {
 sub _align {
   my ($self, $type, $show_missing_evidence, $truncate_introns) = @_;
 
-  my $evidence_sequences = $self->_corroborating_sequences($type);
+  my $evidence_sequences = $self->_corroborating_sequences;
 
   return 0 unless $evidence_sequences;
 
@@ -923,22 +923,25 @@ sub _seq_fetcher {
 =cut
 
 sub _corroborating_sequences {
-  my ($self, $type) = @_;
+  my $self = shift;
 
-  # Work through supporting features and create a sequence for each.
+  # Work through supporting features attached to each exon and 
+  # create a sequence for each.
 
   my %name_vs_type;
-#  my $exon_placemarker = 0;
-
-  # Work through each item of supporting evidence attached to our exon.
 
  FEATURE:
   foreach my $base_align_feature (@{$self->_all_supporting_features}){
 
-    if ((($type eq 'nucleotide')
+    if ((($self->_type eq 'nucleotide')
 	 &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
-	||(($type eq 'protein')
+	||(($self->_type eq 'protein')
 	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")))){
+      next FEATURE;
+    }
+
+    if ((defined $base_align_feature->percent_id)
+	&&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
       next FEATURE;
     }
 
@@ -948,11 +951,6 @@ sub _corroborating_sequences {
       } elsif ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
 	$name_vs_type{$base_align_feature->hseqname} = 'nucleotide';
       }
-    }
-
-    if ((defined $base_align_feature->percent_id)
-	&&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
-      next FEATURE;
     }
 
     $self->_build_evidence_seq($base_align_feature);
