@@ -229,14 +229,14 @@ sub run {
     my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(-genomic  => $self->genomic_sequence,
 								     -features => \@features,
 								     -forder   => \@forder,
-								     -endbias  => $self->endbias);
+								     "-endbias"  => $self->endbias);
 
     $mg->minirun;
     
     my @f = $mg->output;
-    
+
     foreach my $f (@f) {
-      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
+#      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
     }
 
     push(@{$self->{_output}},@f);
@@ -455,8 +455,14 @@ sub get_Sequence {
     
     print(STDERR "Sequence id :  is [$id]\n");
 
-    $seq = $seqfetcher->run_pfetch($id);
-    
+    # VAC FIXME
+    # temporarily get rid of pfetch for Riken, or we'll end up with DNA not protein sequences
+    $seq = $seqfetcher->run_bp_search($id,'/data/blastdb/riken_prot.inx','Fasta');
+
+    if(!defined($seq)){
+      $seq = $seqfetcher->run_pfetch($id);
+    }
+
     if(!defined($seq)){
       $self->throw("Could not find sequence for [$id]");
     }
