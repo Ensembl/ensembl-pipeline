@@ -21,7 +21,7 @@ package main;
 
 %pipeConf = ( 
     'nfstmp.dir' => '', # working directory for err/outfiles
-    'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
+    'pep_file'   => '', #
     'DBI.driver' => 'mysql',
     'dbhost'     => 'mysql',
     'dbname'     => '', #Database name for pipeline db
