@@ -127,8 +127,9 @@ sub new {
   
   $self->exonerate($exonerate);
   
-  my $basic_options = '--showalignment no --softmasktarget yes  --showvulgar no --ryo "myoutput: %S %V %pi\n" --dnahspthreshold 116';
-  
+  #my $basic_options = '--showalignment no  --showvulgar no --ryo "myoutput: %S %V %pi\n" --dnahspthreshold 116';
+  my $basic_options = '--showalignment no --bestn 100 --dnahspthreshold 116 --fsmmemory 256 --dnawordlen 25 --dnawordthreshold 11';
+
   if ($options){
     $self->options($options);
   }
@@ -252,10 +253,10 @@ sub run {
     # match_length is 25 bs, it may not be exact match, score 125->exact match, score 116 match 24 bs
     # if it is 120 M 24 24, it means exact match for 24 bs.
     
-    if (/^myoutput\:/) {
+    if (/^vulgar\:/) {
       my $h={};
       chomp;
-      my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $match, $matching_length, $null, $pid) = split;
+      my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $match, $matching_length) = split;
       
       # the VULGAR 'start' coordinates are 1 less than the actual position on the sequence
       $q_start++;
@@ -280,20 +281,17 @@ sub run {
       $h->{'score'} = $score;
       $h->{'probe_length'} = $length{$h->{'q_id'}};
       $h->{'matching_length'} = $matching_length;
-      $h->{'percent_id'} = $pid;
-      
+        
+      #print "q_id is $q_id, q_start is $q_start, q_en is $q_end, strand is $strand,t_id is $t_id,t_start is $t_start,t_end is $t_end,score is $score\n";
       ###for affymetrix probe sequence, they are 25 bs long, we require at least 24 bs exact match###
-      #if ($h->{'matching_length'} ==24 and $h->{'percent_id'} ==100) {
-      if ($h->{'matching_length'} == $h->{'probe_length'}-1 and $h->{'percent_id'}==100) {
-	#print "24 $_\n";
+      
+      if ($h->{'matching_length'} == $h->{'probe_length'}-1) {
 	$h->{'match_status'} = "Mismatch";
 	#$match{$h->{'q_id'}}{'mis_match_count'}++;
 	push @pro_features, $h;
       } 
-      #elsif ($h->{'matching_length'} ==25 and $h->{'percent_id'}>=96) {
-      elsif ($h->{'matching_length'} == $h->{'probe_length'} and $h->{'percent_id'}>=(($h->{'probe_length'}-1)/$h->{'probe_length'}*100)) {
-	#print "25 $_\n";
-	if ($h->{'percent_id'} == 100) {
+      elsif ($h->{'matching_length'} == $h->{'probe_length'}) {
+	if ($h->{'score'} == 125) {
 	  $h->{'match_status'} = "Fullmatch";
 	  #$match{$h->{'q_id'}}{'full_match_count'}++;
 	}
@@ -333,11 +331,11 @@ sub _store_affy_features {
     
     if ($h->{'t_id'} =~/Zebrafish/i) {
       $coord_system_name = undef;
-      $seq_region_name = $h->{'t_id'} =~ /^Contig\:(\S+)\..*$/;
+      ($seq_region_name) = $h->{'t_id'} =~ /^Contig\:(\S+)\..*$/;
     }
     else {
       $coord_system_name = "chromosome";
-      $seq_region_name = $h->{'t_id'} =~ /^(\S+)\..*$/;
+      ($seq_region_name) = $h->{'t_id'} =~ /^(\S+)\..*$/;
     }
     
     $slice = $self->db->get_SliceAdaptor->fetch_by_region($coord_system_name,$seq_region_name);
