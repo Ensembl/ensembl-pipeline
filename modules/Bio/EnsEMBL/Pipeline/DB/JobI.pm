@@ -168,6 +168,22 @@ sub submit {
     $self->throw("Method submit not implemented");
 }
 
+=head2 store
+
+  Title   : store
+  Usage   : $self->store
+  Function: Stores the job object as a persistent object
+  Returns : nothing
+  Args    : none
+
+=cut
+
+sub store {
+    my ($self) = @_;
+
+    $self->throw("Method store not implemented");
+}
+
 
 =head2 freeze
 

@@ -40,11 +40,15 @@ use vars qw(@ISA);
 use strict;
 use DBI;
 
+use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+
 use FreezeThaw qw(freeze thaw);
 
 # Inherits from the base bioperl object
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::Root::Object);
 
 sub _initialize {
@@ -106,12 +110,12 @@ sub get_Clone{
 
    if( ! $rv ) {
        # make sure we deallocate sth - keeps DBI happy!
-       $sth = 0;
+       $sth = undef;
        $self->throw("Clone $disk_id does not seem to occur in the database!");
    }
 
    my $clone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone( -disk_id    => $disk_id,
-					       -dbobj => $self );
+							 -dbobj      => $self );
 
    return $clone;
 }
@@ -342,10 +346,15 @@ sub write_Analysis {
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
     
-#    $sth = $self->prepare("select LAST_INSERT_ID()");
-#    $res = $sth->execute();
+    $sth = $self->prepare("select LAST_INSERT_ID()");
+    $res = $sth->execute();
 
-#    my $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
+    my $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
+
+    $analysis->id($id);
+
+    # Should fetch the created stamp as well now.
+
     return $analysis;
 }
 
@@ -371,7 +380,7 @@ sub exists_Analysis {
 	" program_file = \""    . $anal->program_file    . "\" and " .
         " parameters = \""      . $anal->parameters      . "\" and " .
         " module = \""          . $anal->module          . "\" and " .
-        " module_version = \""    . $anal->module_version  . "\" and " .
+        " module_version = \""  . $anal->module_version  . "\" and " .
 	" gff_source = \""      . $anal->gff_source      . "\" and" .
 	" gff_feature = \""     . $anal->gff_feature     . "\"";
 
@@ -497,6 +506,162 @@ sub _db_handle {
     return $self->{_db_handle};
 }
 
+
+=head2 get_all_ExonPairs
+    
+ Title   : get_all_ExonPairs(@contigs)
+ Usage   : my @pairs = get_all_ExonPairs(@contigs);
+ Function: Returns all the exon pairs for exons that lie on 
+           the input contigs
+ Example : 
+ Returns : @Bio::EnsEMBL::Analysis::ExonPair
+ Args    : @Bio::EnsEMBL::DB::ContigI
+
+=cut
+
+
+sub get_all_ExonPairs {
+    my ($self,@contigs) = @_;
+
+    my @pairs;
+    my $contigstr = "";
+
+    foreach my $contig (@contigs) {
+	$self->throw("Not a Bio::EnsEMBL::DB::ContigI") unless $contig->isa("Bio::EnsEMBL::DB::ContigI");
+	$contigstr .= "'" . $contig->id . "',";
+    }
+
+    $contigstr =~ s/(.*)\,$/$1/;
+
+    my ($exon1_id,$exon2_id,$exon1_version,$exon2_version,$created);
+
+    # This could be changed so it gets all the exons as well
+
+    my $query = "select distinct ep.exon1_id,ep.exon2_id,ep.created,ep.type,exon1_version,exon2_version " . 
+	"from exon_pair as ep,exon as e where " .
+        "e.contig in (" . $contigstr . ") and "             .
+	"((ep.exon1_id = e.id and ep.exon1_version = e.version) or " .
+	"( ep.exon2_id = e.id and ep.exon2_version = e.version))";
+
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+
+    while (my $row = $sth->fetchrow_arrayref) {
+	my $ex1id    = $row->[0];
+	my $ex2id    = $row->[1];
+	my $created  = $row->[2];
+	my $type     = $row->[3];
+	my $version1 = $row->[4];
+	my $version2 = $row->[5];
+	my $contigid = $row->[6];
+
+	my $exon1 = $self->get_Exon($ex1id);
+	my $exon2 = $self->get_Exon($ex2id);
+
+	my $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
+							-exon2 => $exon2,
+							-type  => $type);
+	
+	push(@pairs,$pair);
+    }
+ 
+    return (@pairs);
+
+}
+
+
+=head2 write_ExonPairs
+    
+ Title   : write_ExonPairs(@pairs)
+ Usage   : my @pairs = write_ExonPairs(@pairs);
+ Function: Returns all the exon pairs for exons that lie on 
+           the input contigs
+ Example : 
+ Returns : @Bio::EnsEMBL::Pipeline::ExonPair
+ Args    : @Bio::EnsEMBL::DB::ContigI
+
+=cut
+
+sub write_ExonPairs {
+    my ($self,@pairs) = @_;
+
+    my $sth = $self->prepare("insert into exon_pair(exon1_id,exon2_id,type,created,exon1_version,exon2_version) " .
+			     "values (?,?,?,?,?,?)");
+
+    foreach my $pair (@pairs) {
+	$self->throw("Pair $pair is not an ExonPair") unless $pair->isa("Bio::EnsEMBL::Pipeline::ExonPair");
+
+
+	my $sth2 = $self->prepare("select * from exon_pair where " .
+				  "exon1_id = '"      . $pair->exon1->id      . "' and " .
+				  "exon2_id = '"      . $pair->exon2->id      . "' and " .
+				  "exon1_version = '" . $pair->exon1->version . "' and " .
+				  "exon2_version = '" . $pair->exon2->version . "'");
+
+	my $res = $sth2->execute;
+
+	if ($sth2->rows == 0) {
+	    $sth->execute($pair->exon1->id,
+			  $pair->exon2->id,
+			  $pair->type,
+			  "now()",
+			  $pair->exon1->version,
+			  $pair->exon2->version);
+	} else {
+	    $self->warn("Exon pair [" . $pair->exon1->id . "][" . $pair->exon2->id . 
+			" already exists. Not writing to database");
+	}
+    }
+}
+
+=head2 write_Exon
+
+ Title   : write_Exon
+ Usage   : $obj->write_Exon($exon)
+ Function: writes a particular exon into the database
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub write_Exon{
+   my ($self,$exon) = @_;
+   my $old_exon;
+   
+   if( ! $exon->isa('Bio::EnsEMBL::Exon') ) {
+       $self->throw("$exon is not a EnsEMBL exon - not dumping!");
+   }
+
+   eval {
+       $old_exon = $self->get_Exon($exon->id);
+
+       $self->warn("Exon [" . $exon->id . "] already exists in database. Not writing");
+
+       
+   };
+   
+   if  ( $@ || ($exon->version > $old_exon->version)) {
+       my $exonst = "insert into exon (id,version,contig,created,modified," .
+	   "seq_start,seq_end,strand,phase,stored,end_phase) values ('" .
+	       $exon->id()         . "'," .
+               $exon->version()    . ",'".
+	       $exon->contig_id()  . "', FROM_UNIXTIME(" .
+	       $exon->created()    . "), FROM_UNIXTIME(" .
+	       $exon->modified()   . ")," .
+	       $exon->start        . ",".
+	       $exon->end          . ",".
+	       $exon->strand       . ",".
+	       $exon->phase        . ",now(),".
+	       $exon->end_phase    . ")";
+       
+       my $sth = $self->prepare($exonst);
+       $sth->execute();
+   }
+}
+
+
 =head2 _lock_tables
 
  Title   : _lock_tables
@@ -538,7 +703,6 @@ sub _lock_tables{
  Returns : 
  Args    :
 
-
 =cut
 
 sub _unlock_tables{
@@ -551,8 +715,73 @@ sub _unlock_tables{
 }
 
 
-=head2 DESTROY
+=head2 get_Exon
 
+ Title   : get_Exon
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+=cut
+
+sub get_Exon{
+   my ($self,$exonid) = @_;
+
+   my $exon = Bio::EnsEMBL::Exon->new();
+
+   my $sth     = $self->prepare("select id,version,contig,UNIX_TIMESTAMP(created)," . 
+				"UNIX_TIMESTAMP(modified),seq_start,seq_end,strand," . 
+				"phase from exon where id = '$exonid'");
+   my $res     = $sth->execute;
+   my $rowhash = $sth->fetchrow_hashref;
+
+   if( ! defined $rowhash ) {
+       $self->throw("No exon of this id $exonid");
+   }
+
+   $exon->contig_id($rowhash->{'contig'});
+   $exon->version  ($rowhash->{'version'});
+
+   my $contig_id = $exon->contig_id();
+
+   # we have to make another trip to the database to get out the contig to clone mapping.
+#   my $sth2     = $self->prepare("select clone from contig where id = '$contig_id'");
+#   my $res2     = $sth2->execute;
+#   my $rowhash2 = $sth2->fetchrow_hashref;
+
+#   $exon->clone_id($rowhash2->{'clone'});
+
+   # rest of the attributes
+   $exon->id      ($rowhash->{'id'});
+   $exon->created ($rowhash->{'UNIX_TIMESTAMP(created)'});
+   $exon->modified($rowhash->{'UNIX_TIMESTAMP(modified)'});
+   $exon->start   ($rowhash->{'seq_start'});
+   $exon->end     ($rowhash->{'seq_end'});
+   $exon->strand  ($rowhash->{'strand'});
+   $exon->phase   ($rowhash->{'phase'});
+   
+   # we need to attach this to a sequence. For the moment, do it the stupid
+   # way perhaps?
+
+#   my $seq;
+
+#   if( $self->_contig_seq_cache($exon->contig_id) ) {
+#       $seq = $self->_contig_seq_cache($exon->contig_id);
+#   } else {
+#       my $contig = $self->get_Contig($exon->contig_id());
+#       $seq = $contig->seq();
+#       $self->_contig_seq_cache($exon->contig_id,$seq);
+#   }
+
+#   $exon->attach_seq($seq);
+
+   return $exon;
+}
+
+
+=head2
  Title   : DESTROY
  Usage   :
  Function:
@@ -560,8 +789,8 @@ sub _unlock_tables{
  Returns : 
  Args    :
 
-
 =cut
+
 
 sub DESTROY{
    my ($obj) = @_;
@@ -573,3 +802,7 @@ sub DESTROY{
        $obj->{'_db_handle'} = undef;
    }
 }
+
+
+
+

@@ -138,7 +138,7 @@ my $runjob  = $db->get_Job($id);      print(STDERR "Fetching job from database\n
 
 # Now fetch the output from the database
 
-my $outjob = $db->get_Job($id);       print(STDERR "Fetching run job from database\n");
+my $outjob = $db    ->get_Job($id);   print(STDERR "Fetching run job from database\n");
 my @out    = $outjob->output;         print(STDERR "Fetching output\n");
 
 print(STDERR "Output is : \n");

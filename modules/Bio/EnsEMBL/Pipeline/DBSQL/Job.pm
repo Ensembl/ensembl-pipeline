@@ -54,12 +54,14 @@ sub _initialize {
     my ($self,@args) = @_;
 
     my $make = $self->SUPER::_initialize;
-    my ($dbobj,$input_id,$analysis,$queue,$create) = $self->_rearrange([qw(DBOBJ
-									   INPUT_ID
-									   ANALYSIS
-									   QUEUE
-									   CREATE
-									   )],@args);
+    my ($dbobj,$input_id,$analysis,$queue,$create,$file_output) 
+	= $self->_rearrange([qw(DBOBJ
+				INPUT_ID
+				ANALYSIS
+				QUEUE
+				CREATE
+				FILE_OUTPUT
+				)],@args);
 
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $dbobj      || $self->throw("Can't create a job object without a database handle");
@@ -71,11 +73,14 @@ sub _initialize {
     $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis");
 
-    $self->_dbobj  ($dbobj);
-    $self->input_id($input_id);
-    $self->queue   ($queue);
-    $self->analysis($analysis);
+    $self->{_file_output} = 1;
 
+    $self->_dbobj     ($dbobj);
+    $self->input_id   ($input_id);
+    $self->queue      ($queue);
+    $self->analysis   ($analysis);
+    $self->file_output($file_output);
+    
     $self->LSF_id(-1);
     $self->machine("__NONE__");
 
@@ -197,6 +202,41 @@ sub analysis {
 }
 
 
+=head2 file_output
+
+  Title   : file_output
+  Usage   : $self->file_output
+  Function: Get/set method for whether
+            we put output in a file or not
+  Returns : 0,1
+  Args    : none,0 or 1
+
+=cut
+
+
+sub file_output {
+    my ($self,$arg) = @_;
+
+    my $pwd = "/nfs/disk100/humpub/michele/out";
+
+    if (defined($arg)) {
+	if ($arg == 1) {
+	    $self->{_file_output} = 1;
+
+	    $self->output_file($pwd . "/pog.$$.out");
+	    $self->error_file ($pwd . "/pog.$$.err");
+
+	} elsif ($arg == 0) {
+	    $self->{_file_output} = 0;
+	} else {
+	    $self->throw("Only 0 or 1 valid arguments for file_output [$arg]");
+	}
+    }
+
+    return $self->{_file_output};
+
+}
+
 =head2 LSF_id
 
   Title   : LSF_id
@@ -213,6 +253,7 @@ sub LSF_id {
 
     if (defined($arg)) {
 	$self->{_LSF_id} = $arg;
+	
     }
     return $self->{_LSF_id};
 
@@ -259,6 +300,46 @@ sub machine {
 }
 
 
+=head2 output_file
+
+  Title   : output_file
+  Usage   : $self->output_file($file);
+  Function: Get/set method for the job output file
+  Returns : string
+  Args    : string
+
+=cut
+
+sub output_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_output_file} = $arg;
+    }
+    return $self->{_output_file};
+}
+
+
+=head2 error_file
+
+  Title   : error_file
+  Usage   : $self->error_file($file)
+  Function: Get/set method for the error file 
+  Returns : string
+  Args    : string
+
+=cut
+
+sub error_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{_error_file} = $arg;
+    }
+    return $self->{_error_file};
+}
+
+
 
 =head2 submit
 
@@ -279,7 +360,41 @@ sub submit {
     
     print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
 
-    return $status;
+
+    my $cmd = "bsub -q " . $self->queue;
+    my $opt = "";
+
+    if ($self->file_output == 1) {
+	$cmd .= " -o " . $self->output_file . " -e " . $self->error_file;
+	$opt  = "-f";
+    }
+
+    $cmd .= " \"/nfs/disk100/humpub/michele/runner " . $opt . " -o \\\"" . FreezeThaw::freeze($obj) . "\\\"\"";
+
+    print STDERR "Command is $cmd\n";
+
+    open (SUB,"$cmd |");
+
+    my $lsfid = 0;
+
+    while (<SUB>) {
+	if (/Job <(\d+)>/) {
+	    $lsfid = $1;
+	    $self->LSF_id($lsfid);
+	    $self->store($obj);
+	    print (STDERR $_);
+	}
+    }
+		   
+    close(SUB);
+
+    if ($lsfid != 0) {
+	my $status = $self->set_status("SUBMITTED");
+	print STDERR "Submitted job number " . $self->LSF_id . " to queue " . $self->queue . "\n";
+	return $status;
+    } else {
+	$self->throw("Couldn't submit job " . $self->id . " to queue " . $self->queue);
+    }
 }
 
 =head2 store

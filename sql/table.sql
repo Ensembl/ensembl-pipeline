@@ -96,3 +96,25 @@ CREATE TABLE jobstatus (
   time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL
 );
 
+#
+# Table structure for table 'exon'
+#
+CREATE TABLE exon (
+  id varchar(40) DEFAULT '' NOT NULL,
+  contig varchar(40) DEFAULT '' NOT NULL,
+  version int(10) DEFAULT '1' NOT NULL,
+  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  modified datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  stored datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  seq_start int(10) DEFAULT '0' NOT NULL,
+  seq_end int(10) DEFAULT '0' NOT NULL,
+  strand int(2) DEFAULT '1' NOT NULL,
+  phase int(11) DEFAULT '0' NOT NULL,
+  end_phase int(11) DEFAULT '0' NOT NULL,
+  KEY idx1 (id,contig),
+  PRIMARY KEY (id),
+  KEY contig_index (contig)
+);
+
+#
+
