@@ -368,6 +368,7 @@ sub write_output {
     my $contig;
 
     my $sim_adp  = $self->db->get_SimpleFeatureAdaptor;
+    my $mf_adp   = $self->db->get_MarkerFeatureAdaptor;
     my $pred_adp = $self->db->get_PredictionTranscriptAdaptor;
     my $dna_adp  = $self->db->get_DnaAlignFeatureAdaptor;
     my $rept_adp = $self->db->get_RepeatFeatureAdaptor;
@@ -417,6 +418,14 @@ sub write_output {
 
 	push(@{$features{simple}},$f);
 
+      } elsif ($f->isa("Bio::EnsEMBL::Map::MarkerFeature")) {
+
+	if (!defined($features{marker})) {
+	  $features{marker} = [];
+	}
+
+	push(@{$features{marker}},$f);
+
       } elsif ($f->isa("Bio::EnsEMBL::DnaPepAlignFeature")) {
 
 	if (!defined($features{dnapep})) {
@@ -461,6 +470,9 @@ sub write_output {
     }
     if ($features{simple}) {
       $sim_adp->store(@{$features{simple}});
+    }
+    if ($features{marker}) {
+      $mf_adp->store(@{$features{marker}});
     }
     if ($features{dnadna}) {
       $dna_adp->store(@{$features{dnadna}});
