@@ -1,43 +1,4 @@
-#
-# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
-#
-# Copyright GRL & EBI
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
 
-=pod 
-
-=head1 NAME
-
-  Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
-
-=head1 SYNOPSIS
-
-    my $obj = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-    								-pfetch_server => '',
-    								-pfetch_port => '',
-    								-options => ''
-							     );
-    my $seq = $obj->get_Seq_by_acc($acc);
-
-=head1 DESCRIPTION
-
-  Object to retrieve sequences as Bio::Seq, using pfetch.
-
-=head1 CONTACT
-
-Describe contact details here
-
-=head1 APPENDIX
-
-The rest of the documentation details each of the object methods. 
-Internal methods are usually preceded with a _
-
-=cut
-
-# Let the code begin...
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 
 use strict;
@@ -51,31 +12,19 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::RootI Bio::DB::RandomAccessI);
 
-BEGIN{
-	print "Finished_Pfetch Loaded\n";
-}
-
 sub new {
     my ( $class, @args ) = @_;
     my $self = bless {}, $class;
 
-    my ( $server, $port, $options ) = $self->_rearrange( [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
+    my ( $server, $port, $options, $archive_port ) = $self->_rearrange(
+        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS', 'ARCHIVE_PORT' ], @args );
 
-    if ( !defined $server ) {
-        $server = 'cbi2.internal.sanger.ac.uk';
-    }
-    $self->server($server);
+    $self->server($server || 'cbi2.internal.sanger.ac.uk');
+    $self->port($port || 22100);
+    $self->archive_port($archive_port || 23100);
+    $self->options($options);
 
-    if ( !defined $port ) {
-        $port = '22100';
-    }
-    $self->port($port);
-
-    if ( defined $options ) {
-        $self->options($options);
-    }
-
-    return $self;    # success - we hope!
+    return $self;
 }
 
 =head2 server
@@ -114,6 +63,16 @@ sub port {
     return $self->{'_port'};
 }
 
+sub archive_port {
+    my( $self, $archive_port ) = @_;
+    
+    if ($archive_port) {
+        $self->{'_archive_port'} = $archive_port;
+    }
+    return $self->{'_archive_port'};
+}
+
+
 =head2 options
 
   Title   : options
@@ -137,8 +96,6 @@ sub options {
 sub get_server {
     my ($self) = @_;
 
-    local $^W = 0;
-
     my $host = $self->server;
     my $port = $self->port;
 
@@ -153,7 +110,25 @@ sub get_server {
         $server->autoflush(1);
         return $server;
     }
+}
 
+sub get_archive_server {
+    my ($self) = @_;
+
+    my $host = $self->server;
+    my $port = $self->archive_port;
+
+    my $server = IO::Socket::INET->new(
+        PeerAddr => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Type     => SOCK_STREAM,
+        Timeout  => 10,
+    );
+    if ($server) {
+        $server->autoflush(1);
+        return $server;
+    }
 }
 
 =head2 get_Seq_by_acc
@@ -180,8 +155,7 @@ sub get_Seq_by_acc {
     for ( my $i = 0 ; $i < @id_list ; $i++ ) {
         chomp( my $seq_string = <$server> );
         eval {
-            if ( defined $seq_string && $seq_string ne 'no match' )
-            {
+            if (defined $seq_string && $seq_string ne 'no match') {
 
                 my $seq = new Bio::Seq(
                     '-seq'              => $seq_string,
@@ -213,37 +187,156 @@ sub get_Seq_by_acc {
         return $seq_list[0];
     }
 }
+
 sub write_descriptions {
-    my ( $self, $dbobj, @ids ) = @_;
-    my $sth = $dbobj->prepare( qq{ 
-                                REPLACE DELAYED INTO 
-                                hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
-                                VALUES (?,TRIM(?),?,?,?)}
-    );
-	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
-	my $server = $self->get_server();
-	print  $server "-F " . join(" ", @ids) . "\n";
-	local $/ = "//\n";
-	while(<$server>){
-		#print "**************************************\n";
-		next unless $_ !~ /no match/;
-		$embl_parser->parse($_);
-		my @hit_row = (
-		               $embl_parser->sequence_version || shift(@{$embl_parser->accession}),
-		               $embl_parser->description,
-		               $embl_parser->seq_length,
-		               $embl_parser->taxon,
-		               $embl_parser->which_database
+    my( $self, $dbobj, $id_list, $chunk_size ) = @_;
+
+    $chunk_size ||= 200;
+
+	my ($descriptions,$failed) = fetch_descriptions($self, $id_list, $chunk_size);
+
+    my $sth = $self->prepare_hit_desc_sth($dbobj);
+	for my $accession (keys %$descriptions) {
+		$sth->execute(
+			$accession,
+			map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database')
 		);
-		#print "Name                 :" . $hit_row[0] . "\n";
-		#print "Description      : " . $hit_row[1] . "\n";
-		#print "Sequence length: " . $hit_row[2] . "\n";
-		#print "TaxonomyID         : " .$hit_row[3] . "\n";
-		#print "Database           : " . $hit_row[4] . "\n";
-		#print "**************************************\n";
-		$sth->execute(@hit_row);
 	}
-	
+    return $failed;
 }
+
+sub fetch_descriptions {
+    my( $self, $id_list, $chunk_size ) = @_;
+    
+	my $descriptions = {};	# results are stored here
+
+	# first pass fails when the sequence version has changed:
+    my $failed_first_pass = [];
+    for (my $i = 0; $i < @$id_list; $i += $chunk_size) {
+        my $j = $i + $chunk_size - 1;
+        # Set second index to last element if we're off the end of the array
+        $j = $#$id_list if $#$id_list < $j;
+        # Take a slice from the array
+        my $chunk = [@$id_list[$i..$j]];
+        push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
+    }
+    
+    my $failed_second_pass = [];
+    for (my $i = 0; $i < @$failed_first_pass; $i += $chunk_size) {
+        my $j = $i + $chunk_size - 1;
+        $j = $#$failed_first_pass if $#$failed_first_pass < $j;
+        my $chunk = [@$failed_first_pass[$i..$j]];
+        my ($succeeded_arch_len, $failed_arch_len)
+			= $self->fetch_lengths_from_archive($chunk, $descriptions);
+        my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions);
+        push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
+    }
+    
+    return ($descriptions, $failed_second_pass);
+}
+
+sub fetch_descriptions_by_accession {
+    my( $self, $id_list, $descriptions ) = @_;
+    
+    my $srv = $self->get_server;
+    warn "Fetching full entries for ", scalar(@$id_list), " identifiers\n";
+    print $srv join(' ', '-F', @$id_list), "\n";
+
+    # Set the input record separator to split on EMBL
+    # entries, which end with "//\n" on a line.
+    local ${/} = "//\n";  # ${/} is the same as $/, but doesn't mess up
+                          # syntax highlighting in my editor!
+
+    my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new;
+
+	my $failed = [];
+
+    for (my $i = 0; $i < @$id_list; $i++) {
+        my $entry = <$srv>;
+
+        # Each entry may have one or more "no match" lines at the start
+        $i += $entry =~ s/^no match\n//mg;
+
+        # The end of the loop
+        last unless $entry;
+        
+        my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
+        $embl_parser->parse($entry);
+
+        my $name_without_version = $full_name;
+        $name_without_version =~ s/\.d+$//;
+
+		my $found = 0;
+		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
+			if ($name_without_version eq $one_of_names) {
+				$found = 1;
+				# warn "Found '$name_without_version'";
+
+					# NB: do not redefine any of these if already defined
+				$descriptions->{$full_name}{description}||= $embl_parser->description;
+				$descriptions->{$full_name}{length}		||= $embl_parser->seq_length;
+				$descriptions->{$full_name}{taxonid}	||= $embl_parser->taxon;
+				$descriptions->{$full_name}{database}	||= $embl_parser->which_database;
+
+				last NAMES;
+			}
+		}
+		if(!$found) {
+            my $all_accs = $embl_parser->accession;
+            if (my $sv = $embl_parser->sequence_version) {
+                unshift @$all_accs, $sv;
+            }
+            warn "Expecting '$full_name' but got (@$all_accs)";
+			push @$failed, $full_name;
+        }
+    }
+    return $failed;
+}
+
+sub fetch_lengths_from_archive {
+    my( $self, $id_list, $descriptions ) = @_;
+
+	my $server = $self->get_archive_server;
+	print $server join(" ", '-l', @$id_list), "\n";
+
+	my $succeeded = [];
+	my $failed    = [];
+	my $i = 0;
+	while (<$server>) {
+		chomp;
+		my $full_name = $id_list->[$i];
+		if($_ ne 'no match') {
+			$descriptions->{$full_name}{length}	= $_;
+			push @$succeeded, $full_name;
+		} else {
+			warn "${full_name}'s length is not in the archive";
+			push @$failed, $full_name;
+		}
+		$i++;
+	}
+	return ($succeeded,$failed);
+}
+
+sub prepare_hit_desc_sth {
+    my( $self, $dbobj ) = @_;
+    
+    my $sth = $dbobj->prepare(qq{ 
+        REPLACE INTO hit_description (hit_name
+              , hit_description
+              , hit_length
+              , hit_taxon
+              , hit_db)
+        VALUES (?,TRIM(?),?,?,?)
+        });
+    return $self->{'_hit_desc_sth'} = $sth; # James, do we really need to save it?
+}
+
+sub get_hit_desc_sth {
+    my( $self ) = @_;
+    
+    reuturn $self->{'_hit_desc_sth'};	# ------,,----- and restore it, if it's only used in 1 place?
+}
+
 1;
+
 __END__
