@@ -1,0 +1,125 @@
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::GeneDupl
+
+=head1 SYNOPSIS
+
+    use Bio::EnsEMBL::Pipeline::Config::GeneDupl;
+    use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw( GD_HIT_COVERAGE );
+
+=head1 DESCRIPTION
+
+=cut
+
+package Bio::EnsEMBL::Pipeline::Config::GeneDupl;
+
+use strict;
+use vars qw( %GeneDupl );
+
+# Hash containing config info
+%GeneDupl = 
+  (
+   # Location of the _formatted_ blast database - the formatted fasta file.
+   GD_BLASTDB_FILE         => '',
+
+   # Location of blastn executable to use.  Defaults to 'wublastn'.  This
+   # blast flavour should match the index type specified in GB_BLAST_VARIANT.
+   GD_BLAST_EXE            => '',
+
+   # Variant of BLAST used to format the database.  Options are :
+   #
+   #   String     Description           Database format command-stub
+   #   ------     -----------           ----------------------------
+   #   'ncbi'     original NCBI BLAST   formatdb -o T -p F
+   #   'wu_new'   newer WashU BLAST     xdformat -n -I
+   #   'wu_old'   older WashU BLAST     pressdb
+   GD_BLAST_VARIANT        => 'wu_new',
+
+   # Location of codeml executable (from PAML package).
+   GD_CODEML_EXE           => '',
+
+   # Regex that will match ids from ingroup species (eg. ENSG for Homo sapiens).
+   GD_INGROUP_REGEX        => 'ENSG',
+
+   # Listref of regexes that will match ids from outgroup species.
+   GD_OUTGROUP_REGEXES     => ['ENSMUSG', 'ENSRNOG'],
+
+   # Minimum permitted coverage of match sequences.  Defaults to 0.80.
+   GD_HIT_COVERAGE         => '90',
+
+   # Mimimum permitted identity for homology matches.  Defaults to 0.80.
+   GD_HIT_IDENTITY         => '60',
+
+   # Arbritrary genetic distance (Ks) cutoff to use when an outgroup match
+   # has not been found.  Also used when outgroup matches are more 
+   # distant than this cutoff value.  Defaults to 1.0.
+   GD_DISTANCE_CUTOFF      => '0.6',
+
+   # Genetic code to use when translating sequences.  Codes are exactly the
+   # same as those used within BioPerl.  Universal genetic code is 1.  Vertebrate
+   # mitochondrial genetic code is 2.  See the Bio::Tools::CodonTable method 
+   # for a full list of options.
+   GD_GENETIC_CODE         => '1',
+
+   # Location of temporary working disk space.  Defaults to /tmp.
+   GD_WORK_DIR             => '/tmp',
+
+   # Method to use for calculating genetic distance.  Options are : 
+   #   'NeiGojobori'  - Nei & Gojobori (1986) Mol. Bio. Evol. 3:418-26.
+   #   'ML'           - Ad-hoc pairwise method implemented within PAML.
+   # Default method is 'NeiGojobori'
+   GD_DISTANCE_METHOD      => 'NeiGojobori',
+
+   # How output is to be stored.  Options are :
+   #   'files'  - output written to text file.
+   #   'db'     - output written directly to a Compara database.
+   GD_OUTPUT_METHOD        => 'files',
+
+   # Location of directory where output files should be written.
+   GD_OUTPUT_DIR          => '',
+
+   # Details of Compara schema database where output should be written.
+   GD_OUTPUT_DBNAME        => '',
+   GD_OUTPUT_DBHOST        => '',
+   GD_OUTPUT_DBUSER        => '',
+   GD_OUTPUT_DBPASS        => '',
+   GD_OUTPUT_DBPORT        => '',
+
+   # Mode for output generation.  Compara alignments are stored in amino acid
+   # coordinates, however it may also be desirable to produce results in
+   # nucleotide coordinates.  Options are :
+   #   'nucleotide'  - alignments as nucleotide sequences
+   #   'aminoacid'   - alignments as amino acid sequences
+   # Defaults to 'nucleotide'.
+   GD_OUTPUT_TYPE          => 'nucleotide',
+
+  );
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+
+  # Get list of variables supplied, or else everything
+  my @vars = @_ ? @_ : keys( %GeneDupl );
+  return unless @vars;
+
+    # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $GeneDupl{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$GeneDupl{ $_ };
+	} else {
+	    die "Error: GeneDupl: $_ not known\n";
+	}
+    }
+}
+
+1;
