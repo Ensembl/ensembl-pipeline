@@ -129,7 +129,7 @@ sub fetch_input{
   $self->gw_genes( $targetted_genes );
 
   # get blessed genes
-  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if($self->blessed_db);
 
   my @blessed_genes;
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
@@ -153,7 +153,8 @@ sub fetch_input{
   print STDERR "got " . scalar($self->cdna_genes) . " cdnas after filtering\n";
   $self->genewise_db->dbc->disconnect_when_inactive(1);
   $self->cdna_db->dbc->disconnect_when_inactive(1);
-  $self->blessed_db->dbc->disconnect_when_inactive(1);
+  $self->blessed_db->dbc->disconnect_when_inactive(1) 
+    if($self->blessed_db);
 }
 
 sub run {
@@ -2115,15 +2116,17 @@ sub blessed_db {
       $self->{_blessed_db} = $blessed_db;
     }
     if(!$self->{_blessed_db}){
-      $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
-        (
-         '-host'   => $GB_BLESSED_DBHOST,
-         '-user'   => $GB_BLESSED_DBUSER,
-         '-pass'   => $GB_BLESSED_DBPASS,
-         '-port'   => $GB_BLESSED_DBPORT,
-         '-dbname' => $GB_BLESSED_DBNAME,
-         '-dnadb' => $self->db,
-        );
+      if($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME){
+        $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+          (
+           '-host'   => $GB_BLESSED_DBHOST,
+           '-user'   => $GB_BLESSED_DBUSER,
+           '-pass'   => $GB_BLESSED_DBPASS,
+           '-port'   => $GB_BLESSED_DBPORT,
+           '-dbname' => $GB_BLESSED_DBNAME,
+           '-dnadb' => $self->db,
+          );
+      }
     }
 
     return $self->{_blessed_db};
