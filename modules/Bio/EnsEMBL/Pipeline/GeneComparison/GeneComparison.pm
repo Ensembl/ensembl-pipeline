@@ -32,7 +32,7 @@ cluster the transcripts using the gene clusters obtained above
    
   my @transcript_clusters = $gene_comparison->cluster_Transcripts_by_Gene(@clusters);
 
-Also, one can cluster the transcripts of the genes in _gene_array1 and gene_array2 directly
+Also, one can cluster the transcripts of the genes in annotation_Genes() and prediction_Genes() directly
 (cluster all transcripts without going through gene-clustering)
 
   my @same_transcript_clusters = $gene_comparison->cluster_Transcripts;
@@ -91,7 +91,7 @@ the new() method accepts two array references
 
 sub new {
   
-  my ($class,$gene_array1,$gene_array2) = @_;
+  my ($class,@args) = @_;
   # as convention, we put first the annotated (or benchmark) genes and second the predicted genes
   # Anyway, the comparisons are made from the gene_array2 with respect to the gene_array1
   # so 'missing_exons' means when gene_array2 misses exons with respect to gene_array1 and
@@ -102,38 +102,67 @@ sub new {
   }
   my $self = {};
   bless($self,$class);
+  
+  my ( $annotation_db, $prediction_db, $annotation_genes, $prediction_genes, $input_id ) = 
+    $self->_rearrange([qw(ANNOTATION_DB
+			  PREDICTION_DB
+			  ANNOTATION_GENES
+			  PREDICTION_GENES
+			  INPUT_ID)],
+		      @args);
+  
+  $self->annotation_db($annotation_db);
+  $self->prediction_db($prediction_db);
+  $self->annotation_Genes(@$annotation_genes);
+  $self->prediction_Genes(@$prediction_genes);
+
   $self->{'_unclustered_genes'}= [];
   $self->{'_gene_clusters'}= [];
 
-  if ( $gene_array1 && $gene_array2 ){
-    $self->{'_gene_array1'}= $gene_array1;
-    $self->{'_gene_array2'}= $gene_array2;
-  
-    # we keep track of the gene types present in both arrays
-
-    my %types1;
-    foreach my $gene ( @{ $gene_array1 } ){
-      $types1{$gene->type}=1;
+  if ( $self->annotation_Genes && $self->prediction_Genes ){
+    
+    my %ann_types;
+    foreach my $gene ( $self->annotation_Genes ){
+      $ann_types{$gene->type}=1;
     }
-    foreach my $k ( keys(%types1) ){            # put in the array type_array1 
-      push( @{ $self->{'_type_array1'} }, $k);  # the gene types present in gene_array1
+    foreach my $k ( keys(%ann_types) ){            
+      push( @{ $self->{'_annotation_types'} }, $k);
     }
 
-    my %types2;
-    foreach my $gene ( @{ $gene_array2 } ){
-      $types2{$gene->type}=1;
+    my %pred_types;
+    foreach my $gene ( $self->prediction_Genes ){
+      $pred_types{$gene->type}=1;
     }
-    foreach my $k ( keys(%types2) ){            # put in the array _type_array2 
-      push( @{ $self->{'_type_array2'} }, $k);  # the gene types present in gene_array2
+    foreach my $k ( keys(%pred_types) ){           
+      push( @{ $self->{'_prediction_types'} }, $k);
     }
   }
   else{
     $self->throw( "Can't create a Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison object without passing in two gene arrayref");
   }
-  if ( scalar( @{ $gene_array1 } ) == 0 || scalar( @{ $gene_array2 } ) == 0 ){
+  if ( scalar( $self->annotation_Genes ) == 0 || scalar( $self->prediction_Genes ) == 0 ){
     $self->throw( "At least one of the lists of genes to compare is empty. Cannot create a GeneComparison object");
   }
   return $self;
+}
+######################################################################################
+
+sub annotation_Genes {
+  my ($self,@genes) = @_;
+  if ( @genes ){
+    push ( @{ $self->{'_annotation_genes'} }, @genes );
+  }
+  return @{ $self->{'_annotation_genes'} };
+}
+
+######################################################################################
+
+sub prediction_Genes {
+  my ($self,@genes) = @_;
+  if ( @genes ){
+    push ( @{ $self->{'_prediction_genes'} }, @genes );
+  }
+  return @{ $self->{'_prediction_genes'} };
 }
 
 ######################################################################################
@@ -146,12 +175,12 @@ All the comparisons are made from the gene_array1 with respect to the gene_array
 =cut
 
 sub gene_Types {
-   my ($self,$type1,$type2) = @_;
-   if ( $type1 && $type2 ){
-     $self->{'_type_array1'} = $type1; 
-     $self->{'_type_array2'} = $type2;
+   my ($self,$ann_type,$pred_type) = @_;
+   if ( $ann_type && $pred_type ){
+     $self->{'_annotation_types'} = $ann_type; 
+     $self->{'_prediction_types'} = $pred_type;
    }
-   return ( $self->{'_type_array1'}, $self->{'_type_array2'} );
+   return ( $self->{'_annotation_types'}, $self->{'_prediction_types'} );
 }
 
 ######################################################################################
@@ -169,7 +198,7 @@ sub gene_Types {
 sub cluster_Genes {
 
   my ($self) = @_;
-  my @genes = ( @{ $self->{'_gene_array1'} }, @{ $self->{'_gene_array2'} } );
+  my @genes = ( $self->annotation_Genes, $self->prediction_Genes);
   
   #### first sort the genes by the left-most position coordinate ####
   my %start_table;
@@ -330,7 +359,7 @@ sub cluster_Genes {
 
   This method creates one GeneCluster object per benchmark gene and then PAIR them with predicted genes
   according to their exon overlap. As a default it takes the genes stored in the GeneComparison object 
-  as data fields (or attributes) '_gene_array1' and '_gene_array2'. It can also accept instead as argument
+  as data fields. It can also accept instead as argument
   an array of genes to be paired, but then information about their gene-type is lost (to be solved). 
   The result is put into $self->{'_gene_clusters'} and $self->{'_unclustered_genes'} 
   
@@ -341,8 +370,8 @@ sub pair_Genes {
   my ($self) = @_;
   my (@genes1,@genes2);
 
-  @genes1 =  @{ $self->{'_gene_array1'} };
-  @genes2 =  @{ $self->{'_gene_array2'} };
+  @genes1 =  $self->annotated_Genes;
+  @genes2 =  $self->predciont_Genes;
 
   #### first sort the genes by the left-most position coordinate ####
   my %start_table;
@@ -498,7 +527,7 @@ sub cluster_Transcripts {
   my ($self,@transcripts) = @_;
  
   unless ( @transcripts ){                        
-    my @genes = ( @{ $self->{'_gene_array1'} }, @{ $self->{'_gene_array2'} } );
+    my @genes = ( $self->annotation_Genes, $self->prediction_Genes );
     foreach my $gene (@genes){
       my @more_transcripts = $gene->each_Transcript;
       push ( @transcripts, @more_transcripts );
@@ -848,9 +877,9 @@ sub compare_Translations{
   Usage   : my %stats = $gene_comparison->compare_Exons(\@gene_clusters);
   Function: This method takes an array of GeneCluster objects, pairs up all the transcripts in each 
             cluster and then go through each transcript pair trying to match the exons. 
-            It keeps track of the exons present in the gene_array2 passed to new() that are missing in
-            the corresponding transcript of gene_array1, also of those exons that are overpredicted in
-            in gene_array1 with respect to gene_array2. It also gives a generic exon_mismatch result.
+            It keeps track of the exons present in the annotation_genes passed to new() that are missing in
+            the corresponding transcript of prediction_genes, also of those exons that are overpredicted in
+            in prediction_genes with respect to annotation_genes. It also gives a generic exon_mismatch result.
             Setting the flag 'coding' in the arguments we can compare the CDSs
   
   Returns : a hash with the arrays of transcript pairs (each pair being a Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster) as values, and the number of missing exons as keys, useful to make a histogram
@@ -1450,14 +1479,48 @@ sub _get_length_of_Transcripts {
 
 
 sub input_id {  
-  my $self = shift @_;
-  my ($chr,$chrstart,$chrend) = @_;
-  if ( $chr && $chrstart && $chrend ){
-    $self->{'_chr_name'}  = $chr;
-    $self->{'_chr_start'} = $chrstart;
-    $self->{'_chr_end'}   = $chrend;
+  my ($self,$input_id) = @_;
+
+  if ($input_id){
+    $self->{'_input_id'} = $input_id;
+    my $chr      = $input_id;
+    $chr         =~ s/\.(.*)-(.*)//;
+    my $chrstart = $1;
+    my $chrend   = $2;
+    if ( $chr && $chrstart && $chrend ){
+      $self->chr_name(  $chr);
+      $self->chr_start( $chrstart );
+      $self->chr_end(   $chrend  );
+    }
   }
-  return ( $self->{'_chr_name'}, $self->{'_chr_start'}, $self->{'_chr_end'} );
+  return $self->{'_input_id'};
+}
+
+
+sub chr_name{
+  my ($self,$chr_name) = @_;
+  if ($chr_name){
+    $self->{'_chr_name'} = $chr_name;
+  }
+  return $self->{'_chr_name'};
+}
+
+
+sub chr_start{
+  my ($self,$chr_start) = @_;
+  if ($chr_start){
+    $self->{'_chr_start'} = $chr_start;
+  }
+  return $self->{'_chr_start'};
+}
+
+
+sub chr_end{
+  my ($self,$chr_end) = @_;
+  if ($chr_end){
+    $self->{'_chr_end'} = $chr_end;
+  }
+  return $self->{'_chr_end'};
 }
 
 
@@ -1593,13 +1656,13 @@ sub get_Exon_Statistics{
     @transcripts2 = @{$array2};
     
   }
-  else{                            # or else read the transcripts from the gene_array data fields
-    my @genes1 = @{ $self->{'_gene_array1'} };
+  else{                            # or else read the transcripts from the data fields
+    my @genes1 = $self->annotation_Genes;
     foreach my $gene (@genes1){
       my @more_transcripts = $gene->each_Transcript;
       push ( @transcripts1, @more_transcripts );
     }
-    my @genes2 = @{ $self->{'_gene_array2'} };
+    my @genes2 = $self->prediction_Genes;
     foreach my $gene (@genes2){
       my @more_transcripts = $gene->each_Transcript;
       push ( @transcripts2, @more_transcripts );
@@ -1697,12 +1760,12 @@ sub get_Coding_Exon_Statistics{
     
   }
   else{                          # or else read the transcripts from the gene_array data fields
-    my @genes1 = @{ $self->{'_gene_array1'} };
+    my @genes1 = $self->annotation_Genes;
     foreach my $gene (@genes1){
       my @more_transcripts = $gene->each_Transcript;
       push ( @transcripts1, @more_transcripts );
     }
-    my @genes2 = @{ $self->{'_gene_array2'} };
+    my @genes2 = $self->prediction_Genes;
     foreach my $gene (@genes2){
       my @more_transcripts = $gene->each_Transcript;
       push ( @transcripts2, @more_transcripts );
@@ -1956,18 +2019,18 @@ sub get_unmatched_Genes {
   
   # if we have already the unclustered genes, we can read them out from $self->{'_unclustered_genes'}
   if ($self->unclustered ){
-    my @types1 = @{ $self->{'_type_array1'} };
-    my @types2 = @{ $self->{'_type_array2'} };
+    my @types1 = @{ $self->{'_annotation_types'} };
+    my @types2 = @{ $self->{'_prediction_types'} };
     my @unclustered = $self->unclustered; 
     my (@array1,@array2);
     foreach my $cluster (@unclustered){
       my $gene = ${ $cluster->get_Genes }[0]; 
-      foreach my $type1 ( @{ $self->{'_type_array1'} } ){
+      foreach my $type1 ( @{ $self->{'_annotation_types'} } ){
 	if ($gene->type eq $type1){
 	  push ( @array1, $gene );
 	}
       }
-      foreach my $type2 ( @{ $self->{'_type_array2'} } ){
+      foreach my $type2 ( @{ $self->{'_prediction_types'} } ){
 	if ($gene->type eq $type2){
 	  push ( @array2, $gene );
 	}
@@ -1979,8 +2042,8 @@ sub get_unmatched_Genes {
   # if not, we can compute them directly
   my (%found1,%found2);
 
-  foreach my $gene1 ( @{ $self->{'_gene_array1'} } ){
-    foreach my $gene2 ( @{ $self->{'_gene_array2'} } ){
+  foreach my $gene1 ( $self->annotation_Genes ){
+    foreach my $gene2 ( $self->prediction_Genes ){
       if ( _compare_Genes($gene1,$gene2)){
 	$found1{$gene1->stable_id} = 1;
 	$found2{$gene2->stable_id} = 1;
@@ -1988,7 +2051,7 @@ sub get_unmatched_Genes {
     }
   }
   my @unmatched1;
-  foreach my $gene1 ( @{ $self->{'_gene_array1'} } ){
+  foreach my $gene1 ( $self->annotation_Genes ){
     unless ( $found1{$gene1->stable_id} ){
       my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
       $new_cluster->gene_Types($self->gene_Types);
@@ -1997,7 +2060,7 @@ sub get_unmatched_Genes {
     }
   }
   my @unmatched2;
-  foreach my $gene2 ( @{ $self->{'_gene_array2'} } ){
+  foreach my $gene2 ( $self->prediction_Genes ){
     unless ( $found2{$gene2->stable_id} ){
       my $new_cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
       $new_cluster->gene_Types($self->gene_Types);
@@ -2016,7 +2079,7 @@ it returns an array of GeneCluster objects, where these objects contain
 fragmented genes: genes of a given type which are overlapped with more than one
 gene of the other type. In order to avoid repetition of work, if a gene-clustering
 has been already performed, one can pass the array of clusters as an argument.
-This, however, is only allowed if _type_array1 and _type_array2 are defined, since the method
+This, however, is only allowed if _annotation_types and _prediction_types are defined, since the method
 makes use of them.
 
 =cut
@@ -2026,7 +2089,7 @@ sub get_fragmented_Genes {
   my @clusters;
   my @fragmented;
 
-  if (@array && $self->{'_type_array1'} && $self->{'_type_array2'} ){
+  if (@array && $self->{'_annotation_types'} && $self->{'_prediction_types'} ){
     @clusters = @array;
   }
   else{
@@ -2041,8 +2104,8 @@ sub get_fragmented_Genes {
     foreach my $gene ( @genes ){
      
       my $type = $gene->type;
-      push( @type1, grep /$type/, @{ $self->{'_type_array1'} } );
-      push( @type2, grep /$type/, @{ $self->{'_type_array2'} } );
+      push( @type1, grep /$type/, @{ $self->{'_annotation_types'} } );
+      push( @type2, grep /$type/, @{ $self->{'_prediction_types'} } );
       # @type1 and @type2 hold all the occurrences of gene-types 1 and 2, respectively
       if ( ( @type1 && scalar(@type1)>1 ) || ( @type2 && scalar(@type2) >1 ) ) {
 	push (@fragmented, $cluster);
@@ -2271,7 +2334,7 @@ sub exon_Coverage{
 
 
   ### now calculate the coverage according to $lower_bound percentage overlap
-  if ($lower_bound){
+  if (defined($lower_bound)){
     my %seen_exon3;
     my $count_covered_exons3 = 0;
     my %perc_overlap_distribution3;
