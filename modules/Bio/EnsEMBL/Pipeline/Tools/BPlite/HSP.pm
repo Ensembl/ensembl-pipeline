@@ -42,12 +42,13 @@ sub new {
 
     my $self = $class->SUPER::new(%newargs);
     
-    my ($score,$bits,$match,$positive,$p,$qb,$qe,$sb,$se,$qs,
+    my ($score,$bits,$match,$positive,$percent,$p,$qb,$qe,$sb,$se,$qs,
 	$ss,$hs,$qname,$sname,$qlength,$slength, $frame) = 
 	    $self->_rearrange([qw(SCORE
 				  BITS
 				  MATCH
 				  POSITIVE
+				  PERCENT
 				  P
 				  QUERYBEGIN
 				  QUERYEND
@@ -97,7 +98,8 @@ sub new {
     $self->query->frac_identical($match);
     $self->subject->frac_identical($match);
 #    $self->{'PERCENT'} = int( (1000 * $match) / $self->query->length ) / 10;
-    $self->{'PERCENT'} = 100 * ($match / $self->subject->length);
+#    $self->{'PERCENT'} = 100 * ($match / $self->subject->length);
+    $self->{'PERCENT'} = defined($percent) ? $percent : 100 * ($match / $self->subject->length);
     $self->{'POSITIVE'} = $positive;
     $self->{'QS'} = $qs;
     $self->{'SS'} = $ss;
