@@ -50,7 +50,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
-use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
+#use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;

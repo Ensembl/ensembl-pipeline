@@ -256,16 +256,21 @@ sub db {
 
 sub run {
     my ($self, $dir, $args) = @_;
+
     #set arguments for epcr
     $self->arguments($args) if ($args);
+
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for EPCR\n");
+
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
+
     #write sequence to file
     $self->writefile();        
     $self->run_epcr();
+
     #parse output of epcr
     $self->parse_results();
     $self->deletefiles();
@@ -285,8 +290,10 @@ sub run {
 sub run_epcr {
     my ($self) = @_;
     #run EPCR
+
     my $command = $self->epcr.' '.$self->db.' '.$self->filename.' '.
      $self->options.' > '.$self->results;
+
     print STDERR "Running EPCR ($command)\n";
     $self->throw("Error running EPCR on ".$self->filename."\n")
      if system($command); 

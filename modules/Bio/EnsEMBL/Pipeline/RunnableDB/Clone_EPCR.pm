@@ -57,6 +57,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::EPCR;
 
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::EPCR);
 
 =head2 new
@@ -130,7 +131,7 @@ sub runnable {
         $parameters {'-db'}      = $self->analysis->db_file();  
         $parameters {'-clone'}   = $genseq;
         push (@{$self->{'_runnable'}}, 
-         Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters);
+	      Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters));
     }
     return @{$self->{'_runnable'}};
 }
@@ -239,7 +240,7 @@ sub write_output {
     foreach my $runnable ($self->runnable())
     {
 	my $contig;
-	my @features = $self->output();
+	my @features = $runnable->output();
 	eval 
 	{
           $contig = $db->get_Contig($runnable->clone->display_id());
@@ -250,9 +251,12 @@ sub write_output {
 	}
 	elsif (@features)
 	{
+            foreach my $f (@features) {
+                $f->seqname($contig->internal_id);
+            }
 	    print STDERR "Writing features to database\n";
-	    my $feat_Obj = Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	    $feat_Obj->write($contig, @features);
+#	    my $feat_Obj = Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+#	    $feat_Obj->write($contig, @features);
 	}
     }
     return 1;

@@ -121,11 +121,14 @@ sub new {
       
     # Now parse the input options and store them in the object
 
-    my( $query, $program, $database, 
-	$threshold, $filter,$options) = 
-	    $self->_rearrange([qw(QUERY PROGRAM 
-				  DATABASE THRESHOLD
-				  FILTER OPTIONS)], 
+    my( $query, $program, $database, $threshold, $threshold_type, $filter,$options) = 
+	    $self->_rearrange([qw(QUERY 
+				  PROGRAM 
+				  DATABASE 
+				  THRESHOLD
+				  THRESHOLD_TYPE
+				  FILTER 
+				  OPTIONS)], 
 			      @args);
     if ($query) {
       $self->clone($query);
@@ -155,6 +158,10 @@ sub new {
     
     if (defined($threshold)) {
       $self->threshold($threshold);
+    }
+
+    if (defined($threshold_type)) {
+      $self->threshold_type($threshold_type);
     }
 
     if (defined($filter)) {
@@ -379,8 +386,11 @@ sub parse_results {
       }
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	next HSP if ($hsp->percent < $self->threshold);
-	
+	if ($self->threshold_type eq "PID") {
+	  next HSP if ($hsp->percent < $self->threshold);
+	} elsif ($self->threshold_type eq "PVALUE") {
+	  next HSP if ($hsp->P > $self->threshold);
+	}
 	# Each HSP is a gapped alignment.
 	# This method splits the gapped alignment into
 	# ungapped pieces
@@ -404,8 +414,12 @@ sub filter_hits {
       my $name = $sbjct->name ;
       
     HSP: while (my $hsp = $sbjct->nextHSP) {
-	next HSP if ($hsp->percent < $self->threshold);
-	
+	if ($self->threshold_type eq "PID") {
+	  next HSP if ($hsp->percent < $self->threshold);
+	} elsif ($self->threshold_type eq "PVALUE") {
+	  next HSP if ($hsp->P > $self->threshold);
+	} 
+
 	my $qstart = $hsp->query->start();
 	my $hstart = $hsp->subject->start();
 	
@@ -492,7 +506,7 @@ sub split_HSP {
 #    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
 #    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
 
-#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
+#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand \n";
 
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
@@ -518,9 +532,18 @@ sub split_HSP {
     
     my $qstart = $hsp->query->start();                # Start off the feature pair start
     my $hstart = $hsp->subject->start();              # ditto
-    
+
     my $qend   = $hsp->query->start();                  # Set the feature pair end also
     my $hend   = $hsp->subject->start();                # ditto
+
+    if ($qstrand == -1) {
+      $qstart = $hsp->query->end;
+      $qend   = $hsp->query->end;
+    }
+    if ($hstrand == -1) {
+      $hstart = $hsp->subject->end;
+      $hend   = $hsp->subject->end;
+    }
     
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
@@ -864,4 +887,31 @@ sub filter {
     return $self->{'_filter'};
 }
 
+sub get_threshold_types {
+  my ($self) = @_;
+
+  return ("PID","PVALUE");
+}
+
+sub threshold_type {
+  my ($self,$type) = @_;
+
+  my @types = $self->get_threshold_types;
+  
+  if (defined($type)) {
+    my $found = 0;
+    foreach my $allowed_type ($self->get_threshold_types) {
+      if ($type eq $allowed_type) {
+	$found = 1;
+      }
+    }
+    if ($found == 0) {
+
+      $self->throw("Type [$type] is not an allowed type.  Allowed types are [@types]");
+    } else {
+      $self->{_threshold_type} = $type;
+    }
+  }
+  return $self->{_threshold_type} || $types[0];
+}
 1;

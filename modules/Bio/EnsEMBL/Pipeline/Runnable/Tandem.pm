@@ -104,7 +104,7 @@ sub new {
         eval 
         { $self->etandem($self->locate_executable('etandem')); };
         if ($@)
-        { $self->etandem('/nfs/disk100/pubseq/emboss/osf/EMBOSS-0.0.4/emboss/etandem'); }
+        { $self->etandem('/nfs/disk100/pubseq/emboss/osf/EMBOSS-BIN/etandem'); }
     }
     if ($equicktandem) 
     {   $self->etandem($equicktandem) ;}
@@ -113,7 +113,7 @@ sub new {
         eval 
         { $self->equicktandem($self->locate_executable('equicktandem')); };
         if ($@)
-        { $self->equicktandem('/nfs/disk100/pubseq/emboss/osf/EMBOSS-0.0.4/emboss/equicktandem'); }
+        { $self->equicktandem('/nfs/disk100/pubseq/emboss/osf/EMBOSS-BIN/equicktandem'); }
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
@@ -132,7 +132,7 @@ sub clone {
     {
         unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
         {
-            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+            $self->throw("Input [" . $seq . "] isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{_clone} = $seq ;
         $self->clonename($self->clone->id);
@@ -362,7 +362,7 @@ sub parse_results {
         $feat2 {db} = undef;
         $feat2 {db_version} = undef;
         $feat2 {program} = 'etandem';
-        $feat2 {p_version} = 'unknown';
+        $feat2 {p_version} = 1;
         
         $self->createfeaturepair(\%feat1, \%feat2);
     }
