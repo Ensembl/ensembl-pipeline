@@ -601,7 +601,7 @@ sub current_status {
   };
   if($@){
     $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
-                 " error $@");
+                 " ".$self->analysis->logic_name." error $@");
   }
   return $status;
 }
@@ -770,7 +770,7 @@ sub retry_count {
 sub can_retry{
   my ($self, $logic_name) = @_;
 
-  $logic_name = $self->analysis->logic_name if($!logic_name);
+  $logic_name = $self->analysis->logic_name if(!$logic_name);
   if(!$BATCH_QUEUES{$logic_name}){
      $logic_name = 'default';
   }
