@@ -92,7 +92,7 @@ use Data::Dumper;
     Function:   Initialises Genscan object
     Returns :   a Genscan Object
     Args    :   A Bio::Seq object 
-                (Genscan location and parameter file location optional)
+                (Genscan location and matrix file location optional)
 
 =cut
 
@@ -111,10 +111,11 @@ sub _initialize {
     $self->{_results}   =undef;     #file to store results of genscan
     $self->{_protected} =[];        #a list of file suffixes protected from deletion
     $self->{_parameters} =undef;    #location of parameters for genscan
-    my($clonefile, $genscan, $parameters) = 
-        $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM'], @args);
+    my($clonefile, $genscan, $parameters, $matrix) = 
+        $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM', 'MATRIX'], @args);
 
     $self->clone($clonefile) if ($clonefile);
+    
     if ($genscan)       
     {$self->genscan($genscan) ;}
     else                
@@ -124,10 +125,17 @@ sub _initialize {
         if ($@) 
         {  $self->genscan('/nfs/disk100/humpub/OSFbin/genscan'); }
     }
-    if ($parameters)    
-    { $self->clone($parameters) ; }
+    
+    if ($matrix)    
+    { $self->matrix($matrix) ; }
     else                
-    {$self->parameters('/nfs/disk100/humpub/OSFbin/HumanIso.smat'); }     
+    {$self->matrix('/nfs/disk100/humpub/OSFbin/HumanIso.smat'); }
+         
+    if ($parameters)    
+    { $self->parameters($parameters) ; }
+    else                
+    {$self->parameters(''); }     
+    
     return $self; # success - we hope!
 }
 
@@ -151,24 +159,6 @@ sub clone {
     return $self->{_clone};
 }
 
-=head2 protect
-
-    Title   :   protect
-    Usage   :   $obj->protect('.masked', '.p');
-    Function:   Protects files with suffix from deletion when execution ends
-    Args    :   File suffixes
-
-=cut
-
-=head2 threshold
-
-    Title   :   threshold
-    Usage   :   $obj->threshold($value);
-    Function:   Get/set method for threshold score required for outputting
-                Feature/FeaturePair
-    Args    :   Optional value (theshold score value)
-
-=cut
 
 =head2 genscan
 
@@ -190,10 +180,31 @@ sub genscan {
     return $self->{_genscan};
 }
 
+=head2 matrix
+
+    Title   :   matrix
+    Usage   :   $obj->matrix('/nfs/disk100/humpub/OSFbin/HumanIso.smat');
+    Function:   Get/set method for the location of genscan matrix
+    Args    :   File path (optional)
+
+=cut
+
+sub matrix {
+    my ($self, $location) = @_;
+    if ($location)
+    {
+        $self->throw("Genscan matrix not found at $location: $!\n") 
+                                                    unless (-e $location);
+        $self->{_matrix} = $location ;
+    }
+    return $self->{_matrix};
+}
+
+
 =head2 parameters
 
     Title   :   parameters
-    Usage   :   $obj->parameters('/nfs/disk100/humpub/OSFbin/HumanIso.smat');
+    Usage   :   $obj->parameters('parameters');
     Function:   Get/set method for the location of genscan parameters
     Args    :   File path (optional)
 
@@ -203,21 +214,10 @@ sub parameters {
     my ($self, $location) = @_;
     if ($location)
     {
-        $self->throw("Genscan parameters not found at $location: $!\n") 
-                                                    unless (-e $location);
         $self->{_parameters} = $location ;
     }
     return $self->{_parameters};
 }
-
-=head2 workdir
-
-    Title   :   workdir
-    Usage   :   $obj->wordir('~humpub/temp');
-    Function:   Get/set method for the location of a directory to contain temp files
-    Args    :   File path (optional)
-
-=cut
 
 sub exons {
     my ($self, $exon) =@_;
@@ -236,7 +236,7 @@ sub clear_exons {
     $self->{'_exons'} = [];
 }
 
-sub genes {
+sub genscan_genes {
     my ($self, $gene) =@_;
     if ($gene)
     {
@@ -247,7 +247,7 @@ sub genes {
     return @{$self->{'_genes'}};
 }
 
-sub peptides {
+sub genscan_peptides {
     my ($self, $peptide) = @_;
     push (@{$self->{'_peptides'}}, $peptide) if ($peptide);
     return @{$self->{'_peptides'}};
@@ -286,7 +286,7 @@ sub run {
 sub run_genscan {
     my ($self) = @_;
     print "Running genscan on ".$self->filename."\n";
-    open (OUTPUT, $self->genscan.' '.$self->parameters.' '.$self->filename.' |')
+    open (OUTPUT, $self->genscan.' '.$self->matrix.' '.$self->filename.' |')
             or $self->throw("Couldn't open pipe to genscan: $!\n");  
     open (RESULTS, ">".$self->results)
             or $self->throw("Couldn't create file for genscan results: $!\n");
@@ -392,7 +392,7 @@ sub parse_results {
             }
             my @peptides = split (/::/, $peptide_string);
             foreach (@peptides)
-                { $self->peptides($_); }
+                { $self->genscan_peptides($_); }
         }
     }
     #end of big loop. Now build up genes
@@ -410,8 +410,8 @@ sub parse_results {
 #Only called if $self->clone is set; doesn't work where only parsefile was called.
 sub calculate_and_set_phases {
     my ($self) = @_;
-    my @genes       = $self->genes();
-    my @peptides    = $self->peptides();
+    my @genes       = $self->genscan_genes();
+    my @peptides    = $self->genscan_peptides();
 
     #check file has been correctly parsed to give equal genes and peptides
     $self->throw("Mismatch in number of genes and peptides parsed from file") 
@@ -461,8 +461,9 @@ sub calculate_and_set_phases {
             {
                 my $trans_seq = $translation[$frame]->seq();
                 #no need to for further analysis if premature stop is found
-                next if (($trans_seq =~ /\*/) && ($trans_seq!~ /\*$/));
-                if ($peptide =~ /$trans_seq/)
+                $trans_seq =~ s/\*$//; #remove final stop
+                next if ($trans_seq =~ /\*/); #premature stop
+                if (index($peptide, $trans_seq) > -1)
                 {
                     $phase_5 = (3-$frame)%3; #because phase 1 is frame 2 etc
                     $phase_3 = ($modulo - $frame) % 3;
@@ -567,7 +568,7 @@ sub create_genes {
         {
             $gene->add_sub_SeqFeature($exon, '');
         }
-        $self->genes($gene); #add gene to main object
+        $self->genscan_genes($gene); #add gene to main object
     }    
 }
 
@@ -588,8 +589,8 @@ sub create_genes {
 
 sub output {
 my ($self) = @_;
-    print STDERR "No genes predicted\n" unless ($self->genes());
-    return $self->genes();
+    print STDERR "No genes predicted\n" unless ($self->genscan_genes());
+    return $self->genscan_genes();
 }
 
 =head2 output_exons
@@ -605,7 +606,7 @@ my ($self) = @_;
 sub output_exons {
     my ($self) = @_;
     my @exons;
-    foreach my $gene ($self->genes)
+    foreach my $gene ($self->genscan_genes)
     {
         push (@exons, $gene->sub_SeqFeature);
     }
