@@ -64,106 +64,104 @@ else{
     print STDERR "transferring all genes\n";
 }
 
-GENE:
-foreach my $gene_id (@gene_ids){
-  my $gene;
-  eval {
-    #print STDERR "fetching $gene_id\n";
-    $gene = $source_gene_adaptor->fetch_by_dbID($gene_id);
-  };
-  if ( $@ ){
-    my $id;
-    if (defined $gene->dbID){
-      $id = $gene->dbID;
+ GENE:
+    foreach my $gene_id (@gene_ids){
+	
+	my $gene;
+	eval {
+	    #print STDERR "fetching $gene_id\n";
+	    $gene = $source_gene_adaptor->fetch_by_dbID($gene_id);
+	};
+	if ( $@ ){
+	    print STDERR "Unable to read gene ".$gene->dbID." $@\n";
+	}
+	
+	# check if we are using type
+	if ($genetype){
+	    unless ( $gene->type eq $genetype ){
+		next GENE;
+	    }
+	}
+	
+	
+	##############################
+	# check few things first
+	##############################
+	
+	if ($info){
+	    print STDERR "gene: ".$gene->dbID."\n";
+	    my @transcripts = @{$gene->get_all_Transcripts};
+	    
+	    foreach my $tran (@transcripts){
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		
+		if ( defined $tran->translation){
+		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
+		}
+		else { 
+		    print STDERR "translation not found!\n";
+		}
+	    }
+	}
+	
+	############################################################
+	# clone the gene and check all its transcripts
+	############################################################
+	my $newgene = new Bio::EnsEMBL::Gene;
+	if ($gene->type){
+	    $newgene->type( $gene->type);
+	}
+	if ( defined $gene->dbID ){
+	    $newgene->dbID($gene->dbID);
+	}
+	if ( defined $gene->analysis ){
+	    $newgene->analysis($gene->analysis);
+	}
+      TRANS:
+	foreach my $transcript (@{$gene->get_all_Transcripts}){
+	    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_rawcontig_Transcript($transcript) ){
+		print STDERR "bad transcript, skipping\n";
+		next TRANS;
+	    }
+	    $newgene->add_Transcript($transcript);
+	}
+	unless ( scalar(@{$newgene->get_all_Transcripts}) > 0 ){
+	    print STDERR "gene has been left without good transcripts, skipping\n";
+	    next GENE;
+	}
+	
+	##############################
+	# store gene, same assembly so no need to massage it
+	##############################
+	eval{	
+	    print STDERR "storing gene ...\n";
+	    $target_gene_adaptor->store($newgene);
+	};
+	if ( $@ ){
+	    print STDERR "Unable to store newgene ".$newgene->dbID." $@\n";
+	}
+	
+	##############################
+	# info about the stored gene
+	##############################
+	
+	if ($info){
+	    print STDERR "stored gene: ".$newgene->dbID."\n";
+	    my @transcripts = @{$newgene->get_all_Transcripts};
+	    
+	    foreach my $tran (@transcripts){
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+		
+		if ( defined $tran->translation){
+		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
+		}
+		else { 
+		    print STDERR "translation not found!\n";
+		}
+	    }
+	}
     }
-    else{
-      $id = 'no id';
-    }
-    print STDERR "Unable to read gene ".$id." $@\n";
-    next GENE;
-  }
-  
-  # check if we are using type
-  if ($genetype){
-    unless ( $gene->type eq $genetype ){
-      next GENE;
-    }
-  }
-  
-    
-  ##############################
-  # check few things first
-  ##############################
-  
-  if ($info){
-    my $id;
-    if (defined $gene->dbID){
-      $id = $gene->dbID;
-    }
-    else{
-      $id = 'no id';
-    }
-    print STDERR "gene: ".$id."\n";
-    my @transcripts = @{$gene->get_all_Transcripts};
-    
-    foreach my $tran (@transcripts){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-      
-      if ( defined $tran->translation){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
-      }
-      else { 
-	print STDERR "translation not found!\n";
-      }
-    }
-  }
-  
-  ##############################
-  # store gene, same assembly so no need to massage it
-  ##############################
-  eval{	
-    print STDERR "storing gene ...\n";
-    $target_gene_adaptor->store($gene);
-  };
-  if ( $@ ){
-    my $id;
-    if (defined $gene->dbID){
-      $id = $gene->dbID;
-    }
-    else{
-      $id = 'no id';
-    }
-    print STDERR "Unable to store gene ".$id." $@\n";
-    next GENE;
-  }
-  
-  ##############################
-  # info about the stored gene
-  ##############################
-  
-  if ($info){
-    my $id;
-    if (defined $gene->dbID){
-      $id = $gene->dbID;
-    }
-    else{
-      $id = 'no id';
-    }
-    print STDERR "gene: ".$id."\n";
-    my @transcripts = @{$gene->get_all_Transcripts};
-    
-    foreach my $tran (@transcripts){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
-      
-      if ( defined $tran->translation){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($tran->translation);
-      }
-      else { 
-	print STDERR "translation not found!\n";
-      }
-    }
-  }
-}
+
 
 
 
