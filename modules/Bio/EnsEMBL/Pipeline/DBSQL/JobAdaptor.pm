@@ -76,7 +76,7 @@ sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
   my $sth = $self->prepare(q{
-    SELECT job_id, input_id, class, analysis_id, submission_id,
+    SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  job_id = ?
@@ -111,7 +111,7 @@ sub fetch_by_dbID_list {
   local $" = ',';   # are you local?
 
   my $sth = $self->prepare( qq{
-    SELECT job_id, input_id, class, analysis_id, submission_id,
+    SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM job
     WHERE job_id in (@id) } );
@@ -147,7 +147,7 @@ sub fetch_by_Status_Analysis {
     my $analysisId = $analysis->dbID;
 
     my $query = q{
-	SELECT   j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id,
+	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
 	         j.stdout_file, j.stderr_file, j.retry_count,
                  j.status_file
 	FROM     job j, job_status js
@@ -193,7 +193,7 @@ sub fetch_by_age {
     #convert age from minutes to seconds
 
     my $sth = $self->prepare(qq{
-	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.submission_id,
+	SELECT j.job_id, j.input_id, j.analysis_id, j.submission_id,
                j.stdout_file, j.stderr_file,
                j.retry_count
 	FROM   job j, job_status js
@@ -232,7 +232,7 @@ sub fetch_by_input_id {
   my @result;
 
   my $sth = $self->prepare(q{
-    SELECT job_id, input_id, class, analysis_id, submission_id,
+    SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  input_id = ?
@@ -266,14 +266,13 @@ sub store {
   }
 
   my $sth = $self->prepare(q{
-    INSERT into job (input_id, class, analysis_id,
+    INSERT into job (input_id, analysis_id,
                      submission_id, stdout_file, stderr_file, 
                      retry_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
   });
 
   $sth->execute( $job->input_id,
-                 $job->class,
                  $job->analysis->dbID,
                  $job->submission_id,
                  $job->stdout_file,
@@ -425,7 +424,6 @@ sub _objFromHashref {
       '-id'        => $hashref->{'job_id'},
       '-submission_id' => $hashref->{'submission_id'},
       '-input_id'  => $hashref->{'input_id'},
-      '-class'     => $hashref->{'class'},
       '-stdout'    => $hashref->{'stdout_file'},
       '-stderr'    => $hashref->{'stderr_file'},
       '-analysis'  => $analysis,
@@ -434,19 +432,6 @@ sub _objFromHashref {
   return $job;
 }
 
-
-# provide a hashref
-# each value in it used for a combined query, if the described object is in
-# returns a job object, if it is in, else undef
-
-sub exists {
-  my $self = shift;
-  my $hashref = shift;
-
-  $self->throw( "Not implemented yet" );
-}
-
-# Code directly from Michele
 
 =head2 set_status
 
