@@ -213,7 +213,6 @@ sub write_output {
     ############################################################
     # put fake stable_ids to keep track of the scoring
     if ( $self->_label ){
-
       my $gene_id;
       my $trans_count = 0;
       foreach my $tran (@trans){
@@ -221,7 +220,7 @@ sub write_output {
 	my $tran_id = $tran->stable_id || $$."_".$trans_count;
 	$tran->version(1);
 	if ( $tran_id =~/(\S+\.\d+-\d+_\w+)_(\d+)_(\d+)/ ){
-	  $gene_id = $1."_".$gene_count;
+	  $gene_id = $1."_".$2;
 	}
 	else{
 	  $gene_id = $$."_".$gene_count;
@@ -232,9 +231,6 @@ sub write_output {
  	foreach my $exon ( @{$tran->get_all_Exons} ){
 	  $exon_count++;
 	  $exon->stable_id( $tran_id."_".$exon_count );
-	  $exon->created(1);
-	  $exon->version(1);
-	  $exon->modified(1);
 	  print STDERR "exon: ".$exon->stable_id."\n";
 	}
 	if ( $tran->translation ){
@@ -242,7 +238,7 @@ sub write_output {
 	  $tran->translation->version(1);
 	}
 	#print STDERR "transcript ".$tran_id."\n";
-	#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($tran);
       } 
       print STDERR "gene: $gene_id\n";
       $gene->stable_id( $gene_id );
@@ -250,10 +246,10 @@ sub write_output {
       $gene->modified(1);
       $gene->version(1);
     }
-
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
-
+    
+    $gene_adaptor->store($gene);
+    print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
+    
     if ( $self->_label ){
       foreach my $tran (@trans){
 	print STDERR "transcript dbID:".$tran->dbID." stable_id:".$tran->stable_id."\n";
@@ -445,17 +441,35 @@ sub _process_Transcripts {
   # or if the only intron they have is non standard.
   # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
   
-  if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
-    print STDERR "applying filtering\n";
-    
-    my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-      ->new( -coverage => 97,
-	     -perc_id  => 99,
-	     -depth    => 20,
-	   );
-	    
-    @checked_transcripts = $est_filter->filter(\@checked_transcripts);
-    print STDERR scalar(@checked_transcripts)." transcripts after filtering\n";
+  my $tight = 1;
+  
+  unless ( $tight ){
+    if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
+      print STDERR "applying filtering\n";
+      
+      my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
+	->new( -coverage => 97,
+	       -perc_id  => 99,
+	       -depth    => 20,
+	     );
+      
+      @checked_transcripts = $est_filter->filter(\@checked_transcripts);
+      print STDERR scalar(@checked_transcripts)." transcripts after filtering\n";
+    }
+  }
+  if ($tight){
+    if ( scalar( @checked_transcripts ) > 50 ){
+      print STDERR "applying tight filtering\n";
+      
+      my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
+	->new( -coverage => 97,
+	       -perc_id  => 99,
+	       -depth    => 5,
+	     );
+      
+      @checked_transcripts = $est_filter->filter(\@checked_transcripts);
+      print STDERR scalar(@checked_transcripts)." transcripts after tight filtering\n";
+    }
   }
 
 
@@ -485,6 +499,7 @@ sub _process_Transcripts {
 	    -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
 	    -minimum_order    => $CLUSTERMERGE_MIN_EVIDENCE_NUMBER,
 	    -internal_splice_overlap => 0,
+	    -use_score        => 0,
 	    -label            => $label,     # we can pass a string as label to differentiate the jobs
 	   );
   
