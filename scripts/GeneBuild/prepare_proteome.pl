@@ -69,11 +69,7 @@ sub get_kill_list {
     if (scalar(@element) == 0) {	# blank or empty line
       next;
     }
-    if (scalar(@element) != 1) {
-      die "kill list format wrong"
-    } else {
-      push @kill_list, $element[0];
-    }
+    push @kill_list, $element[0];
   }
   close KILL_LIST_FH or die "file error for $kill_list";
   return \@kill_list;
