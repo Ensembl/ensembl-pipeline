@@ -138,7 +138,7 @@ sub write_output {
 
     my $gene_adaptor = $self->genewise_db->get_GeneAdaptor;
     my @genes = $self->output;
-    print STDERR "have ".@genes." genes\n";
+    #print STDERR "have ".@genes." genes\n";
     GENE: foreach my $gene (@genes) {	
 	# do a per gene eval...
 	eval {
@@ -166,7 +166,7 @@ sub write_output {
 sub fetch_input {
   my( $self) = @_;
     
-  print STDERR "Fetching input id : " . $self->input_id. " \n";
+  #print STDERR "Fetching input id : " . $self->input_id. " \n";
   
   &throw("No input id") unless defined($self->input_id);
   $self->fetch_sequence($GB_SIMILARITY_MASKING, $self->genewise_db);
@@ -180,14 +180,14 @@ sub fetch_input {
   
   if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
     foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-      print STDERR "FETCHING GENE TYPE : $type\n";
+      #print STDERR "FETCHING GENE TYPE : $type\n";
       foreach my $mask_genes (@{$self->query
                                   ->get_all_Genes_by_type($type)}) {
         push (@genes,$mask_genes);
       }
     }
   } else {
-    print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
+    #print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
     @genes = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
   }
   my $database_count = 0;
@@ -197,7 +197,7 @@ sub fetch_input {
            "%s\@%s...", $database->{'type'}, 
            $database->{'threshold'}, 
            $self->db->dbname, 
-           $self->db->host);
+           $self->db->host."\n");
     
     my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
     my @features  = @{$pafa->fetch_all_by_Slice_and_score
@@ -205,7 +205,7 @@ sub fetch_input {
                          $database->{'threshold'}, 
                          $database->{'type'}
                         )};
-    print STDERR "got " . @features." \n";
+    #print STDERR "got " . @features." \n";
     next DATABASE if not @features;
     
     foreach my $f(@features) {
@@ -276,20 +276,20 @@ sub fetch_input {
     my @ids = keys %idhash;
     
     if ($GB_SIMILARITY_BLAST_FILTER) {
-      print STDERR "Performing Anopheles-stle filtering...\n";
-      print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
+      #print STDERR "Performing Anopheles-stle filtering...\n";
+      #print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
       
       my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
       my @newids = $self->prune_features($self->query,\@sortedids,\%idhash);
 	    
-	    print "  No. IDS AFTER FILTER: ".scalar(@newids)."\n"; 
+	    #print "  No. IDS AFTER FILTER: ".scalar(@newids)."\n"; 
 	    
 	    @ids = @newids;
     }
     
     my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
     #print STDERR "Feature ids are @ids\n";
-    #print STDERR "have ".@ids." ids to pass to BMG\n";
+    print STDERR "have ".@ids." ids to pass to BMG\n";
     if(!@ids){
       print STDERR $database->{'type'}." has no features to put into ".
         "BlastMiniGenewise\n";
@@ -307,7 +307,7 @@ sub fetch_input {
     # at present, we'll only ever have one ...       	
   }
   if(!$database_count){
-    print $self->input_id." had no features to pass into BMG is this ".
+    #print $self->input_id." had no features to pass into BMG is this ".
       " correct?\n";
   }
 }    
@@ -378,6 +378,7 @@ sub convert_output {
     }
     
     my @results = $runnable->output;
+    print STDERR "have ".@results." results from BMG\n";
     my $genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
     my @remapped = @{$self->remap_genes($genes)};
@@ -501,7 +502,7 @@ sub remap_genes {
 
     };
     if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene . " [$@]\n";
+      #print STDERR "Couldn't reverse map gene " . $gene . " [$@]\n";
     }
     
 
@@ -1063,6 +1064,7 @@ sub genewise_db {
                   "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_genewise_db} = $genewise_db;
     }
+    
     if(!$self->{_genewise_db}){
       $GB_GW_DBHOST = $self->db->host     if (!$GB_GW_DBHOST);
       $GB_GW_DBUSER = $self->db->username if (!$GB_GW_DBUSER);
@@ -1071,13 +1073,14 @@ sub genewise_db {
       $GB_GW_DBPORT = $self->db->dbname   if (!$GB_GW_DBPORT);
     
       
-      my $self->{'genewise_db'} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      $self->{_genewise_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
          '-host'   => $GB_GW_DBHOST,
          '-user'   => $GB_GW_DBUSER,
          '-pass'   => $GB_GW_DBPASS,
          '-port'   => $GB_GW_DBPORT,
          '-dbname' => $GB_GW_DBNAME,
+         '-dnadb'  => $self->db,
         );
     }
     return $self->{_genewise_db};
