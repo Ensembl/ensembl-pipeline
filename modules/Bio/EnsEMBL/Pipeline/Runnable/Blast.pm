@@ -228,9 +228,8 @@ sub run {
 
     #parse output and create features
     $self->parse_results;
+
     $self->deletefiles();
-    
-   
 }
 
 sub databases {
@@ -452,7 +451,9 @@ sub parse_results {
   }
  }
 
-  print "have ".$count." hsps after filtering\n";
+  #print STDERR "Have ".$count." hsps after filtering\n";
+  #print STDERR "Pruning set to :" . $self->prune . "\n";
+
 # Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
   if ($::pipeConf{'filter_blast'}){
@@ -472,11 +473,12 @@ sub parse_results {
     if ($self->filter) {
       my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-prune    => $self->prune,
                                                                        -coverage => $self->coverage);
-
       my @pruned = $search->run(@allfeatures);
 
-      #print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+#      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
+      $self->output(@allfeatures);
+      
     }
   }
 
@@ -612,8 +614,8 @@ sub split_HSP {
     my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
-#    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
-#    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
+    #print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
+    #print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
 
 #    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand \n";
 
@@ -654,6 +656,8 @@ sub split_HSP {
       $hstart = $hsp->subject->end;
       $hend   = $hsp->subject->end;
     }
+
+    #print STDERR "hstart ". $hstart . "\t" . " hend " . $hend . " qstart " . $qstart . " qend " . $qend . "\n";
     
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
@@ -691,10 +695,12 @@ sub split_HSP {
 
             if ($found == 1) {
 
-                my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
-                #print "Found " . $fp->gffstring . "\n";                
-                push(@tmpf,$fp);
-                #$self->growfplist($fp);                                         
+	      #print STDERR "hstart ". $hstart . "\t" . " hend " . $hend . " qstart " . $qstart . " qend " . $qend . "\n";
+
+	      my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
+	      #print "Found " . $fp->gffstring . "\n";                
+	      push(@tmpf,$fp);
+	      #$self->growfplist($fp);                                         
             }
         
             # We're in a gapped region.  We need to increment the sequence that
@@ -722,6 +728,7 @@ sub split_HSP {
 
     # Remember the last feature
     if ($found == 1) {
+
         my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
         #print "Found " . $fp->gffstring . "\n";
         push(@tmpf,$fp);
@@ -803,7 +810,7 @@ sub _convert2FeaturePair {
         $tmphend   = $tmp;
     }
     
-    #print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
+    # print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\t" . $name . "\n";
 
     my $fp = $self->_makeFeaturePair($tmpqstart,$tmpqend,$qstrand,$tmphstart,$tmphend,$hstrand,$hsp->score,
                                      $hsp->percent,$hsp->P,$name,$analysis);
@@ -838,13 +845,13 @@ sub _makeFeaturePair {
     $feature1->percent_id($pid);
     $feature1->p_value($evalue);
 
+
     my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
                                                 -start   => $hstart,
                                                 -end     => $hend,
                                                 -strand  => $hstrand,
                                                 -analysis => $analysis,
                                                 -score    => $score);
-    
     
     my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
                                            -feature2 => $feature2);

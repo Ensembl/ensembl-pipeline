@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
+Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA
 
 =head1 SYNOPSIS
 
@@ -172,7 +172,7 @@ sub run {
       $self->throw("No peptide input");
     }
 
-    #print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
+    print STDERR "Creating BioPrimarySeq ". " " . $transcript->translate() . "\n";
 
     my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
 				       -seq        => $transcript->translate(),
@@ -376,12 +376,12 @@ sub align_hits_to_contig2 {
 	  ( -seqname    =>  $feature->hseqname,
 	    -start      =>  $cdna_start - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
 	    -end        =>  $cdna_end - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
+	    -strand     =>  $feature->hstrand,
 	    -score      =>  $feature->score,
 	    -p_value    =>  $feature->p_value,
 	    -percent_id =>  $feature->percent_id,
 	    -analysis   =>  $feature->analysis );
 
-      
 	my $featurepair = Bio::EnsEMBL::FeaturePair->new (-feature1   => $dna_feat1,
 							  -feature2   => $dna_feat2 );
 	
@@ -651,8 +651,6 @@ sub create_peptide_featurepairs {
       #print STDERR "After conversion ",$featurepair->start," ",$featurepair->end," ",$featurepair->hstart," ",$featurepair->hend,"\n";
 
       push(@output_features,$featurepair);
-
-
       
       #print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
 
