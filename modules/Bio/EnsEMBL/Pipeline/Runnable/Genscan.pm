@@ -120,7 +120,6 @@ sub new {
         $self->_rearrange([qw(CLONE GENSCAN PARAM MATRIX)], @args);
 
     $self->clone($clonefile) if ($clonefile);
-    print STDERR "GENSCAN $genscan\tMATRIX $matrix\n";
 
     my $bindir = $::pipeConf{'bindir'} || undef;
     my $datadir = $::pipeConf{'datadir'} || undef;
@@ -370,6 +369,7 @@ sub parse_results {
                                 unless (scalar(@element) == 13); 
                                 
                    my ($gene, $exon) = split (/\./, $element[0]); 
+
                    $feature {name} = $gene + ($exon/100); #name must be a number
                    #arrange numbers so that start is always < end
                    if ($element[2] eq '+')
@@ -391,6 +391,7 @@ sub parse_results {
                    $feature {'program_version'} = '1.0';
                    $feature {'primary'} = 'prediction';
                    $feature {'source'} = 'genscan';
+
                    $self->create_feature(\%feature);
                 }
                 #gene/exon data ends with line 'predicted peptide sequence(s)'
@@ -425,148 +426,76 @@ sub parse_results {
     }
     #end of big loop. Now build up genes
     $self->create_genes();
+
     unless ($self->clone)
     {
         print STDERR "Can't calculate phases if Bio::Seq isn't supplied\n";
         return;
     }
-    $self->calculate_and_set_phases();
+    $self->calculate_and_set_phases_new();
     $self->clear_exons(); #free up unecessary storage 
 }
 
-#uses peptide and translated exons to calculate start and end phase.
-#Only called if $self->clone is set; doesn't work where only parsefile was called.
-sub calculate_and_set_phases {
+
+sub calculate_and_set_phases_new {
     my ($self) = @_;
+
     my @genes       = $self->genscan_genes();
     my @peptides    = $self->genscan_peptides();
 
-    #check file has been correctly parsed to give equal genes and peptides
-    $self->throw("Mismatch in number of genes (".scalar(@genes).") and peptides ("
-                 .scalar(@peptides).") parsed from file") 
-                 unless (scalar(@genes) == scalar (@peptides));
+    $self->throw("Mismatch in number of genes (".scalar(@genes).
+		 ") and peptides ("             .scalar(@peptides).
+		 ") parsed from file") unless (scalar(@genes) == scalar (@peptides));
 
-    #Genscan phases are just the result of modulo 3 division which is useless.
-    #Correct calculation of phases requires the sequence to be translated into
-    #all three reading frames and compared against the genscan predicted peptide
-    #sequence. This is a fairly messy but simple way of doing it. 
-    #DEFINITION OF PHASE - bloody hard to find!
-    #"Spliceosomal introns may be classified according to their position
-    #relative to the reading frame of the gene (Sharp, 1981): introns lying
-    #between two codons (phase 0); introns interrupting a codon between the
-    #first and second base (phase 1); and introns interrupting a codon between
-    #the second and third base (phase 2)."
-    #Sharp, P.A. (1981). Speculations on RNA splicing
-    #Cell 23:643-46
+    my $i = 0;
+    my $count = 1;
+  GENE: while ($i < scalar(@genes)) {
 
-    GENE: for (my $index=0; $index < scalar(@genes); $index++)
-    {
-        my $peptide = $peptides[$index];
-        #$genes[$index]->attach_seq ($self->clone()); 
-        my @exons = $genes[$index]->sub_SeqFeature();
-        
-        my $translated_exons;
-        my $translation_found = 0;
-        for (my $phase_index = 0; $phase_index < 3; $phase_index++)
-        {
-            #try each possible translation of the predicted gene
-            my $phase = $phase_index; #because phase 1 is frame 2 and phase 2 is frame 1
-            
-            foreach my $exon (@exons)
-            {
-                
-                my $end_phase   = ($exon->length - ((3-$phase) % 3)) %3;
-                $exon->phase($phase);
-                $exon->end_phase($end_phase);
-                $phase = $end_phase;
-                
-            }
-            $translated_exons = $self->translation(@exons);
-            if ($peptide =~ /^x/i)
-            {
-                $peptide =~ s/^\w//;
-                $translated_exons =~ s/^\w//;
-            }
-            #genscan translated partial genes correctly whilst exon translation begin with M
-            $translated_exons =~ s/^M//i; #remove intial M from exon
-            
-            if (index ($peptide, $translated_exons) > -1)
-            {
-                $translation_found = 1;
-                #print STDERR "MATCHED\n $translated_exons\n";
-                last;
-            }
-        }
-	unless ($translation_found) {
-            $self->warn("Translation (".$exons[0]->seqname.") not found in genscan peptide\n$peptide\n");
-	    next GENE;
+      my $peptide = $peptides[$i];
+      my @exons   = $genes[$i]->sub_SeqFeature();
+      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
+
+#      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
+
+      foreach my $tran (@newtran) {
+
+	if (index($peptides[$i],$tran->translate->seq) >= 0) {
+	  print STDERR $tran->id . " " . $tran->translate->seq . "\n";
+
+	  foreach my $exon ($tran->each_Exon) {
+#	    print $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
+	  }
+	  $tran->id($self->clone->id . "." . $count);
+	  $count++;
+	  $self->add_Transcript($tran);
+	  $i++;
+	  next GENE;
 	}
+      }
+
+#      print "\n";
+      $i++;
     }
+  }
+
+sub add_Transcript {
+  my ($self,$transcript) = @_;
+
+  if (defined($transcript)) {
+    if (!defined($self->{_transcripts})) {
+      $self->{_transcripts} = [];
+    }
+    push(@{$self->{_transcripts}},$transcript);
+  }
 }
 
-sub translation {
-    my ($self, @features) = @_;
+sub each_Transcript {
+  my ($self) = @_;
 
-    my $transcript  = Bio::EnsEMBL::Transcript->new();
-    my $translation = Bio::EnsEMBL::Translation->new();
-    my @exons;
-    foreach my $feature (@features)
-    {
-        my $exon = Bio::EnsEMBL::Exon->new();
-        $exon->id        ($feature->seqname);
-        $exon->start     ($feature->start);
-        $exon->end       ($feature->end);
-        $exon->strand    ($feature->strand);
-        $exon->phase     ($feature->phase);
-        $exon->contig_id ($self->clone->id);
-        #$exon->end_phase($feat->end_phase);
-        $exon->attach_seq($self->clone);    
-        push (@exons, $exon);
-    }
-    
-    if ($exons[0]->strand == 1)
-    {
-        @exons = sort {$a->start <=> $b->start} @exons;
-	my $startpos;
-	if( $exons[0]->phase == 0) {
-	  $startpos = 1;
-	} elsif ( $exons[0]->phase == 1 ) {
-	  $startpos = 3;
-	} else {
-	  $startpos = 2;
-	}
-
-        $translation->start($startpos);
-        $translation->end($exons[$#exons]->length);
-    }
-    else
-    {
-        @exons = sort {$b->start <=> $a->start} @exons;
-
-	my $startpos;
-	if( $exons[0]->phase == 0) {
-	  $startpos = 1;
-	} elsif ( $exons[0]->phase == 1 ) {
-	  $startpos = 3;
-	} else {
-	  $startpos = 2;
-	}
-
-
-        $translation->start($startpos);
-        $translation->end($exons[$#exons]->length);
-    }
-
-    $translation->start_exon_id($exons[0]->id);
-    $translation->end_exon_id($exons[$#exons]->id);
-    
-    foreach my $exon (@exons)
-    {
-        $transcript->add_Exon($exon);
-    }
-
-    $transcript->translation($translation);
-    return $transcript->translate->seq;
+  if (!defined($self->{_transcripts})) {
+    $self->{_transcripts} = [];
+  }
+  return @{$self->{_transcripts}};
 }
 
 
@@ -606,8 +535,6 @@ sub create_genes {
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
-    #no longer require exons, so can probably delete them to save memory
-    #$self->clear_exons();
 
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
@@ -679,9 +606,64 @@ sub create_genes {
 =cut
 
 sub output {
-my ($self) = @_;
-    print STDERR "No genes predicted\n" unless ($self->genscan_genes());
-    return $self->genscan_genes();
+  my ($self) = @_;
+  #    print STDERR "No genes predicted\n" unless ($self->genscan_genes());
+  #    return $self->genscan_genes();
+  
+  my @feat;
+
+  my $analysis = Bio::EnsEMBL::Analysis->new(   -db              => undef,
+						-db_version      => undef,
+						-program         => 'genscan',
+						-program_version => 1,
+						-gff_source      => 'genscan',
+						-gff_feature     => 'prediction',
+						);
+
+  
+  foreach my $transcript ($self->each_Transcript) {
+    my @exons = $transcript->each_Exon;
+
+    if ($exons[0]->strand == 1) {
+      @exons = sort {$a->start <=> $b->start } @exons;
+    } else {
+      @exons = sort {$b->start <=> $a->start } @exons;
+    }
+#    print STDERR "\n" .$transcript->id . "\n";
+
+    foreach my $exon (@exons) {
+      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $transcript->id,
+					   -start   => $exon->start,
+					   -end     => $exon->end,
+					   -strand  => $exon->strand,
+					   -phase   => $exon->phase,
+					   -score   => $exon->score,
+					   -source_tag => 'genscan',
+					   -primary_tag => 'prediction',
+					   -analysis     => $analysis);
+      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $transcript->id,
+					    -start   => $exon->start,
+					    -end     => $exon->end,
+					    -strand  => $exon->strand,
+					    -phase   => $exon->phase,
+					    -score   => $exon->score,
+					    -source_tag => 'genscan',
+					    -primary_tag => 'prediction',
+					    -analysis     => $analysis);
+
+ #     print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
+
+      $f->analysis($analysis);
+      $f2->analysis($analysis);
+
+      my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
+					     -feature2 => $f2);
+
+      push(@feat,$fp);
+    }
+
+  }
+  return @feat;
 }
 
 =head2 output_exons
@@ -697,6 +679,7 @@ my ($self) = @_;
 sub output_exons {
     my ($self) = @_;
     my @exons;
+
     foreach my $gene ($self->genscan_genes)
     {
         push (@exons, $gene->sub_SeqFeature);
