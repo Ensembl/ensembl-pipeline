@@ -66,7 +66,12 @@ use Data::Dumper;
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
-               
+        
+    if(!defined $self->seqfetcher) {
+      my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+      $self->seqfetcher($seqfetcher);
+    }
+       
     return $self; 
 }
 
@@ -364,7 +369,7 @@ sub convert_output {
   # This BAD! Shouldn't be using internal ids.
   # <sigh> no time to change it now
   # eh? what analysis should this be now? Is it still 7?
-  my $analysis = $self->dbobj->get_OldAnalysis(7);
+#  my $analysis = $self->dbobj->get_OldAnalysis(7);
   my $trancount = 1;
   my $genetype;
   foreach my $runnable ($self->runnable) {
