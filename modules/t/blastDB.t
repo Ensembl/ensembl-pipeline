@@ -43,8 +43,8 @@ print "ok 2\n";
 my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS',
-                                                    -db_file        => 'dbSTS',
+my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS-1',
+                                                    -db_file        => 'dbSTS-1',
                                                     -db_version     => '1',                  
                                                     -program        => 'wublastn',
                                                     -program_file   => 'wublastn',
@@ -63,8 +63,8 @@ else
 my $id ='AB000381.00001';
 $ana_adaptor->exists( $ana );
 my $runobj = "$runnable"->new(  -dbobj      => $db,
-			                    -input_id   => $id,
-                                -analysis   => $ana );
+				-input_id   => $id,
+				-analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
 else

@@ -72,7 +72,7 @@ my $counter=0;
             'port'          => '3306',
             'password'      => undef,
             'schema_sql'    => ['../sql/table.sql'],
-            'module'        => 'Bio::EnsEMBL::DBSQL::Obj'
+            'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::Obj'
             };
         foreach my $f (keys %$self) {
             confess "Unknown config field: '$f'" unless $known_field{$f};
@@ -169,10 +169,15 @@ sub create_db {
         $locator, $self->user, $self->password, {RaiseError => 1}
         ) or confess "Can't connect to server";
     my $db_name = $self->dbname;
+
+    print STDERR "Database name is $db_name\n";
+
     $db->do("CREATE DATABASE $db_name");
     $db->disconnect;
-    
+    print STDERR "Created database\n";
+    print STDERR "Reading SQL file\n";
     $self->do_sql_file(@{$self->schema_sql});
+    print STDERR "done\n";
 }
 
 sub db_handle {
@@ -201,7 +206,7 @@ sub test_locator {
 sub ensembl_locator {
     my( $self) = @_;
     
-    my $module = ($self->module() || 'Bio::EnsEMBL::DBSQL::Obj');
+    my $module = ($self->module() || 'Bio::EnsEMBL::Pipeline::DBSQL::Obj');
     my $locator = '';
     foreach my $meth (qw{ host port dbname user }) {
         my $value = $self->$meth();
@@ -218,6 +223,7 @@ sub get_DBSQL_Obj {
     my $locator = $self->ensembl_locator();
     return Bio::EnsEMBL::DBLoader->new($locator);
 }
+
 
 sub do_sql_file {
     my( $self, @files ) = @_;

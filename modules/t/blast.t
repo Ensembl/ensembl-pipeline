@@ -41,11 +41,11 @@ else
 { print "ok 2\n"; }
 
 #create blast object    
-my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -CLONE => $clone,
-                                                             -BLAST => 'wublastn',
-                                                             -DB    => 'dbSTS',
-                                                             -THRESHOLD => 1,
-                                                             -ARGS  => '');
+my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -query    => $clone,
+                                                             -program  => 'wublastn',
+                                                             -database => 'dbSTS-1',
+                                                             -threshold => 1,
+                                                             );
  
 unless ($blast)
 { print "not ok 3\n"; }
