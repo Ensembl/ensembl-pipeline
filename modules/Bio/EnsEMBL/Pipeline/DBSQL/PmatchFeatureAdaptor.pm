@@ -159,7 +159,7 @@ sub get_PmatchFeatures_by_protein_id {
 
     }
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::PmatchFeature(-protein_id  => $prot_id,
+    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $prot_id,
 							    -start    => $start,
 							    -end      => $end,
 							    -chr_name => $chr_name,
@@ -179,7 +179,7 @@ sub get_PmatchFeatures_by_protein_id {
  Usage   :
  Function: retrieves all the Pmatchefeatures for a given chromosomal range
  Example :
- Returns : array of Bio::EnsEMBL::Pipeline::Tools::PmatchFeature
+ Returns : array of Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature
  Args    :
 
 
@@ -230,7 +230,7 @@ sub get_PmatchFeatures_by_chr_start_end {
 
     
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
+    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
 							    -start    => $start,
 							    -end      => $end,
 							    -chr_name => $chr_name,
@@ -289,7 +289,7 @@ sub fetch_by_logic_name {
 
     
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
+    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
 							    -start    => $start,
 							    -end      => $end,
 							    -chr_name => $chr_name,
