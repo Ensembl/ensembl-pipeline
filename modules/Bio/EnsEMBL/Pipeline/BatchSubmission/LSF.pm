@@ -231,15 +231,13 @@ sub get_job_time{
 }
 
 sub check_existance{
-  
   my ($self, $id_hash, $verbose) = @_;
-  
   my %job_submission_ids = %$id_hash;
   my $command = "bjobs";
   open(BJOB, "$command 2>&1 |") or 
     $self->throw("couldn't open pipe to bjobs");
   my %existing_ids;
-  LINE:while(<BJOB>){
+ LINE:while(<BJOB>){
     print STDERR if($verbose);
     chomp;
     if ($_ =~ /No unfinished job found/) {
@@ -247,6 +245,9 @@ sub check_existance{
     }
     my @values = split;
     if($values[0] =~ /\d+/){
+      if($values[2] eq 'UNKWN'){
+        next LINE;
+      }
       $existing_ids{$values[0]} = 1;
     }
   }
@@ -256,7 +257,8 @@ sub check_existance{
       push(@awol_jobs, @{$job_submission_ids{$job_id}});
     }
   }
-  close(BJOB) or $self->throw("Can't close pipe to bjobs");
+  close(BJOB);
+  #or $self->throw("Can't close pipe to bjobs");
   return \@awol_jobs;
 }
 
