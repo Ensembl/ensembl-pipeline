@@ -262,10 +262,6 @@ sub run {
     
     my @f = $mg->output;
 
- #   foreach my $f (@f) {
- #      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
- #   }
-
     push(@{$self->{'_output'}},@f);
 
 }
@@ -371,14 +367,12 @@ sub make_blast_db {
     print STDERR "Blast db file is $blastfile\n";
 
     foreach my $seq (@seq) {
-	print STDERR "Writing seq " . $seq->id ."\n";
 	$seqio->write_seq($seq);
     }
 
     close($seqio->_filehandle);
 
     my $status = system("pressdb $blastfile");
-    print (STDERR "Status from pressdb $status\n");
 
     return $blastfile;
 }
@@ -486,11 +480,12 @@ sub get_Sequence {
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
     if($@) {
-      $self->throw("Problem fetching sequence for id [$id]\n");
+      $self->warn("Problem fetching sequence for id [$id]\n");
+      return undef;
     }
 
     if(!defined($seq)){
-      $self->throw("Could not find sequence for [$id]");
+      $self->warn("Could not find sequence for [$id]");
     }
 
     print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
@@ -527,5 +522,3 @@ sub trim {
 }
 
 1;
-
-
