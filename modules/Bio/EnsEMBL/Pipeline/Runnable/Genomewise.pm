@@ -19,6 +19,7 @@ my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq    => $
                                                                     -switch => $switch,
                                                                     -smell  => $smell,
                                                                     -cds    => $cds_transcript
+								    -skip_small_exons => $exon_size,
                                                                   );
 
 where 
@@ -29,6 +30,10 @@ where
 -cds    if this option is included, it will feed a cds evidence to genomewise. This is passed in
         in the form of a transcript with exons and each exon must have phases. This option
         has not been tested in genomewise itself yet.
+-skip_small_exons   
+        minimum exon size which is accepted to be run in genomewise, i.e. smaller exons are not
+        passed as evidence for genomewise. This could be useful (maybe with cross-species alignments)
+        as genomewise sometimes shifts around very small exons.
 
 add evidence in the form of a transcript:
    $genomewise->add_Transcript($transcript);
@@ -69,6 +74,7 @@ use strict;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -77,25 +83,30 @@ sub new {
     
     my $self = $class->SUPER::new(@args);
     
-    my( $seq, $switch, $smell, $cds ) = $self->_rearrange([qw(SEQ
-							      SWITCH
-							      SMELL
-							      CDS
-							     )],
-							  @args);
-    
+    my( $seq, $switch, $smell, $cds, $skip_small_exons ) = $self->_rearrange([qw(SEQ
+										 SWITCH
+										 SMELL
+										 CDS
+										 SKIP_SMALL_EXONS
+										 )],
+									     @args);
     
     unless ( $seq ){
-      $self->throw->("must provide a PrimarySeq with option -seq");
+	$self->throw->("must provide a PrimarySeq with option -seq");
     }
     $self->seq($seq);
     
+    # read 'skip' argument
+    if ( $skip_small_exons ){
+	$self->_skip_small_exons( $skip_small_exons );
+    }
+    
     # read smell argument (can be 0 ) or default it to 8
     if (defined($smell) ){
-      $self->smell($smell);
+	$self->smell($smell);
     }
     else{
-      $self->smell(8);
+	$self->smell(8);
     }
     # read the switch argument or default it to 10000
     if (defined($switch)){
@@ -161,58 +172,54 @@ sub run{
   
   # can pass multiple transcripts to genomewise
   foreach my $transcript ( @{$self->get_all_Transcripts}) {
-    
-    #print STDERR "In Genomewise, before going through genomewise\n";
-    my $excount = 0;
-    foreach my $exon ( @{$transcript->get_all_Exons} ) {
-      $excount++;
-
-      # store supporting evidence
-      my @evi = @{$exon->get_all_supporting_features};
-      #print STDERR "Exon $excount: ".scalar(@evi)." features\n";
-
-      $supp_evidence{ $exon } = \@evi;
-
-      ## test
-      if (@evi){
-	foreach my $evi ( @evi ){
-	  #print STDERR $evi." - ".$evi->gffstring."\n";
-	}
-      }
-      else{
-	;#print STDERR "No supporting evidence\n";
-      }
       
-      if( $exon->strand == -1 ) {
-	$self->throw("Genomewise cannot handle reverse strand exons. Must flip outside");
+      #print STDERR "In Genomewise, before going through genomewise\n";
+      my $excount = 0;
+      
+    EXON:
+      foreach my $exon ( @{$transcript->get_all_Exons} ) {
+	  $excount++;
+	  
+	  # store supporting evidence
+	  my @evi = @{$exon->get_all_supporting_features};
+	  $supp_evidence{ $exon } = \@evi;
+	  
+	  if( $exon->strand == -1 ) {
+	      $self->throw("Genomewise cannot handle reverse strand exons. Must flip outside");
+	  }
+	  # skip small exons if we have chosen to do so
+	  if ( $self->_skip_small_exons ){
+	      if ( ($exon->end - $exon->start + 1 ) < $self->_skip_small_exons ){
+		  next EXON;
+	      }
+	  }
+	  print E "exon ",$exon->start," ",$exon->end,"\n";
       }
-      print E "exon ",$exon->start," ",$exon->end,"\n";
-    }
-    print E "//\n";
+      print E "//\n";
   }
-
+  
   if ( $self->cds ){
-    foreach my $exon ( @{$self->cds->get_all_Exons} ){
-      print E $exon->start." ".$exon->end." ".$exon->phase."\n";
-    }
-    print E "//\n";
+      foreach my $exon ( @{$self->cds->get_all_Exons} ){
+	  print E $exon->start." ".$exon->end." ".$exon->phase."\n";
+      }
+      print E "//\n";
   }
   close(E);
   
   my $switch = $self->switch;
   my $smell  = $self->smell;
 
-  print STDERR "running genomewise with smell: 8 and switch: $switch\n";
-
-#### Steve's version (fixed)
-#  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
+  #print STDERR "running genomewise with smell: $smell and switch: $switch\n";
+  
+  #### Steve's version (fixed)
+  #  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
   
   ### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
   open(GW,"/usr/local/ensembl/bin/genomewise -switch $switch -silent -nogff -smell $smell -notrans -nogenes -geneutr $genome_file $evi_file |");
   
-    # parse gff output for start, stop, strand, phase
+  # parse gff output for start, stop, strand, phase
   my $genename = '';
-
+  
  GENE:
   while( <GW> ) {
     /\/\// && last;
@@ -222,7 +229,6 @@ sub run{
       my $trans = Bio::EnsEMBL::Translation->new();
       $t->translation($trans);
       $self->output($t);
-      #push(@{$self->{'_output_array'}},$t);
       
       my $seen_cds = 0;
       my $seen_utr3 = 0;
@@ -371,88 +377,93 @@ sub run{
   #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
   
 
+  ############################################################
   ##### need to put back the supporting evidence
+  ############################################################
+
   # since exons have been created anew, need to check overlaps
   my @trans_out = $self->output;
   my @trans_in  = @{$self->get_all_Transcripts};
   
   # let's try to make it fast:
   if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
-    my @exons_in  = @{$trans_in[0] ->get_all_Exons};
-    my @exons_out = @{$trans_out[0]->get_all_Exons};
-    
-    # most of the time the numbers of exons doesn't vary
-    if ( scalar( @exons_in ) == scalar ( @exons_out ) ){
-      #print STDERR "passing evi info between 2 transcripts with same number of exons\n";
-      while ( scalar ( @exons_in ) > 0 ){
-	my $exon_in  = shift( @exons_in  );
-	my $exon_out = shift( @exons_out );  
-	
-	# check just in case
-	if ( $exon_in->overlaps( $exon_out ) ){
-	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-	    $exon_out->add_supporting_features( $feature );
-	  }
-	}
-	else{
-	  $self->throw("Try to pass evidence between exons that do not overlap, this is not good!");
-	}
-      }
-    }
-    else{
-      # if not the same number of exons, we cannot know how the split happened
-      print STDERR "passing evi info between 2 transcripts with different number of exons\n";
-      foreach my $exon_in ( @exons_in ){
-	foreach my $exon_out( @exons_out ){
-	  if ( $exon_out->overlaps($exon_in) ){
-	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-	      $exon_out->add_supporting_features( $feature );
-	    }
-	  }
-	}
-      }
-    }
-
-  }
-  else{
-    # if we have more than one transcript at one or both sides, we also have to check them all
-    print STDERR "passing evi info between more than 2 transcripts\n";
-    foreach my $tran_in ( @trans_in){
-      my @exons_in  = @{$trans_in[0] ->get_all_Exons};
+      my ( $consecutive_overlap, $mismatches ) = 
+	  $self->_check_consecutive_overlap( $trans_in[0], $trans_out[0] );
       
-      foreach my $tran_out ( @trans_out ){
-	my @exons_out = @{$trans_out[0]->get_all_Exons};
-	
-	foreach my $exon_in ( @exons_in ){
+      if ( $consecutive_overlap == 1 ){
+	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+	  my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
 	  
-	  foreach my $exon_out( @exons_out ){
-	    if ( $exon_out->overlaps($exon_in) ){
-	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
-		$exon_out->add_supporting_features( $feature );
+	EXON_2_EXON:
+	  while ( scalar ( @exons_in ) > 0 ){
+	      my $exon_in  = shift( @exons_in  );
+	      my $exon_out = shift( @exons_out );  
+	      
+	      # check just in case
+	      if ( $exon_in->overlaps( $exon_out ) ){
+		  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+		      $exon_out->add_supporting_features( $feature );
+		  }
 	      }
-	    }
-	  }
-	}
-      }
-    }   
-  }
-    
-  ## now we check that all the evi info has been correctly passed
-  foreach my $tran_out ( @trans_out ){
-    my $count = 0;
-    foreach my $exon_out ( @{$tran_out->get_all_Exons} ) {
-      $count++;
-      my @evi = @{$exon_out->get_all_supporting_features};
-      #print "Exon $count: ".scalar(@evi)." features\n";
-      if (@evi){
-  	#foreach my $evi ( @evi ){
-        #print STDERR $evi." - ".$evi->gffstring."\n";
-  	#}
+	  } # end of EXON_2_EXON
       }
       else{
-  	;#print STDERR "No supporting evidence\n";
+	  
+	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+	  my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+		
+	  print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+	  foreach my $exon_in ( @exons_in ){
+	      foreach my $exon_out( @exons_out ){
+		  if ( $exon_out->overlaps($exon_in) ){
+		      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+			  $exon_out->add_supporting_features( $feature );
+		      }
+		  }
+	      }
+	  }
       }
-    }
+      
+  }
+  else{
+      # if we have more than one transcript at one or both sides, we also have to check them all
+      print STDERR "passing evi info between more than 2 transcripts\n";
+      foreach my $tran_in ( @trans_in){
+	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+	  
+	  foreach my $tran_out ( @trans_out ){
+	      my @exons_out =  sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+	      
+	      foreach my $exon_in ( @exons_in ){
+		  
+		  foreach my $exon_out( @exons_out ){
+		      if ( $exon_out->overlaps($exon_in) ){
+			  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+			      $exon_out->add_supporting_features( $feature );
+			  }
+		      }
+		  }
+	      }
+	  }
+      }   
+  }
+  
+  ## now we check that all the evi info has been correctly passed
+  foreach my $tran_out ( @trans_out ){
+      my $count = 0;
+      foreach my $exon_out ( @{$tran_out->get_all_Exons} ) {
+	  $count++;
+	  my @evi = @{$exon_out->get_all_supporting_features};
+	  #print "Exon $count: ".scalar(@evi)." features\n";
+	  if (@evi){
+	      #foreach my $evi ( @evi ){
+	      #print STDERR $evi." - ".$evi->gffstring."\n";
+	      #}
+	  }
+	  else{
+	      ;#print STDERR "No supporting evidence\n";
+	  }
+      }
   }
   unlink $genome_file;
   unlink $evi_file;
@@ -562,32 +573,73 @@ sub smell{
 
 ############################################################
 
-#sub _make_Analysis{
-#  my ($self) = @_;
-  
-#  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
-#  my $genetype = 'genomewise';
+sub _skip_small_exons{
+    my ($self,$skip_small_exons) =@_;
+    if ( $skip_small_exons ){
+	$self->{_skip_small_exons} = $skip_small_exons;
+    }
+    return $skip_small_exons;
+}
+
+############################################################
+
+sub _transfer_transcript_supporting_evidence{
+    my ($self,$trans_source,$trans_target) = @_;
     
-#  # sort out analysis here
-#  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-#  my $analysis = $anaAdaptor->fetch_by_logic_name($genetype);
+    my @exons_source  = @{$trans_source->get_all_Exons};
+    my @exons_target  = @{$trans_target->get_all_Exons};
+    
+    # most of the time the numbers of exons doesn't vary
+    if ( scalar( @exons_source ) == scalar ( @exons_target ) ){
+	#print STDERR "passing evi info between 2 transcripts with same number of exons\n";
+	while ( scalar ( @exons_source ) > 0 ){
+	    my $exon_in  = shift( @exons_source  );
+	    my $exon_out = shift( @exons_target );  
+	    
+	    # check just in case
+	    if ( $exon_in->overlaps( $exon_out ) ){
+	      Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence( $exon_in,$exon_out);
+	    }
+	    else{
+		$self->warn("Trying to pass evidence between exons that do not overlap, this won't work!");
+	    }
+	}
+    }
+    else{
+	# if not the same number of exons, we cannot know how the split happened
+	print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+	foreach my $exon_in ( @exons_source ){
+	    foreach my $exon_out( @exons_target ){
+		if ( $exon_out->overlaps($exon_in) ){
+		  Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence( $exon_in,$exon_out);
+		}
+	    }
+	}
+    }
+}
 
-#  #set analysis
-#  $self->analysis($analysis);
-  
-##  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
-  
-# return $self->analysis;
-#}
+############################################################
 
-#sub analysis{
-#  my ($self,$analysis) = @_;
-#  if ( $analysis ){
-#    $self->{analysis} = $analysis;
-#  }
-#  return $self->{analysis};
-#}
+sub _check_consecutive_overlap{
+    my ( $self, $t1, $t2 ) = @_;
+    my @e1 = sort { $a->start <=> $b->start } @{$t1->get_all_Exons};
+    my @e2 = sort { $a->start <=> $b->start } @{$t2->get_all_Exons};
+    my $consecutive_overlap = 1;
+    my $mismatches = 0;
+    
+  EXON_2_EXON:
+    while ( scalar ( @e1 ) > 0 ){
+	my $exon_in  = shift( @e1 );
+	my $exon_out = shift( @e2 );  
+       	unless ( $exon_in->overlaps( $exon_out ) ){
+	    $consecutive_overlap = 0;
+	    $mismatches++;
+	}
+    }
+    return ( $consecutive_overlap, $mismatches );
+}
 
+############################################################
 
 
 
