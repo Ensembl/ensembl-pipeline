@@ -155,7 +155,7 @@ sub run {
   
   # set the working directory (usually /tmp)
   $self->workdir('/tmp') unless ($self->workdir());
-  print STDERR" working directory ".$self->workdir()."\n";
+  #print STDERR" working directory ".$self->workdir()."\n";
 
   # results go here:
   $self->results($self->workdir()."/results.$$");
@@ -249,7 +249,7 @@ sub run {
       next;
     }
     
-    print $_."\n";
+    #print STDERR $_."\n";
 
     # create as many features as blocks there are in each output line
     my (%feat1, %feat2);
@@ -274,6 +274,10 @@ sub run {
     # we put basically score = coverage = ( $matches + $mismatches + $rep_matches ) / $q_length
     #print STDERR "score = 100x".($matches + $mismatches + $rep_matches)."/".( $q_length )."\n";
     
+    unless ( $q_length ){
+      $self->warn("length of query is zero, something is wrong!");
+      next;
+    }
     my $score   = sprintf "%.2f", ( 100 * ( $matches + $mismatches + $rep_matches ) / $q_length );
     
     # size of each block of alignment (inclusive)
@@ -322,7 +326,12 @@ sub run {
       #$feat2 {end}   = $feat2{start} + $block_sizes[$i] - 1;
       $feat2 {start} = $query_start;
       $feat2 {end}   = $query_end;
-      
+      if ( $query_end <  $query_start ){
+	$self->warn("dodgy feature coordinates: end = $query_end, start = $query_start. Reversing...");
+	$feat2 {end}   = $query_start;
+	$feat2 {start} = $query_end;
+      }
+
       $feat1 {start} = $t_start_positions[$i] + 1;
       $feat1 {end}   = $feat1{start} + $block_sizes[$i] - 1;
       
@@ -352,14 +361,14 @@ sub run {
   #get rid of the results file
   unlink $self->results;
 
-  print STDERR "\n";
-  print STDERR "Features created:\n";
-  foreach my $superf ( @features_within_features ){
-    foreach my $subf ( $superf->sub_SeqFeature ){
-      print STDERR $subf->gffstring."\n";
-    }
-  }
-
+  #print STDERR "\n";
+  #print STDERR "Features created:\n";
+  #foreach my $superf ( @features_within_features ){
+  #  foreach my $subf ( $superf->sub_SeqFeature ){
+  #    print STDERR $subf->gffstring."\n";
+  #  }
+  #}
+  
   # remove interim files (but do not remove the database if you are using one)
   unlink $query;
   
