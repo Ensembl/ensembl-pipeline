@@ -59,20 +59,12 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
 	    EST_GENE_RUNNER   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
 	    
-	    	    
-	    # where the result-directories are going to go	
-    	    EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/rerun_estgenes',
-	    
+            # where the result-directories are going to go	
+    	    EST_TMPDIR        => '/ecs2/scratch5/ensembl/eae/human_estgenes_eae_rerun/',	    
 	    # job-queue in the farm
 	    EST_QUEUE         => 'acari',
 	    
-	    # where we have a genome
-	    # It should be a set of fastA files with
-	    # each file as chr_name.fa, all with the same line length
-	    EST_GENOMIC	      => '/data/blastdb/Ensembl/NCBI33/genome/',
-
-	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch3/ensembl/eae/NCBI_31/rerun_estgenes/EST_GeneBuilder.jobs',
-	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/genes2ests.jobs', 
+	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch5/ensembl/eae/human_estgenes_eae_rerun/EST_Genebuilder.jobs',
 	    
 	    ############################################################
 	    # each runnable has an analysis
@@ -81,9 +73,6 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    EST_GENEBUILDER_RUNNABLE   => 'Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder',
 	    EST_GENEBUILDER_ANALYSIS   => 'estgene',
 
-	    EST_EXPRESSION_RUNNABLE    => 'Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression',
-	    EST_EXPRESSION_ANALYSIS    => 'expression',
-
 	    ############################################################
 	    # EST_GeneBuilder
 	    ############################################################
@@ -91,13 +80,24 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    EST_GENEBUILDER_CHUNKSIZE        => 1000000,      #  we use 1000000 (ie 1MB) chunks
 		  
 	    EST_GENEBUILDER_INPUT_GENETYPE => 'exonerate',
-	    ESTGENE_TYPE        => 'estgene',
+	    ESTGENE_TYPE                   => 'estgene',
 	    
+
+			 # where we have a genome
+			     # It should be a set of fastA files with
+			     # each file as chr_name.fa, all with the same line length
+			 EST_GENOMIC      => '/data/blastdb/Ensembl/NCBI33/genome/',
+
 	    # ORFs can be calculated with genomewise (which has a bug (14/08/2003))
 	    # or with a simpler method which takes the longest ORF starting with M,
 	    # and if there is none, it takes the longest ORF.
 	    USE_GENOMEWISE    => 0,			 
 	    
+			 # if the slice chunk has over this number of ESTs
+			 # a filter procedure fires off:
+			 MAX_NUMBER_ESTS    => 500,
+
+	    			 
 			 # if this is set to TRUE it will reject ests that do not
 			 # have all splice sites correct
 			 CHECK_SPLICE_SITES => 1,
@@ -106,11 +106,10 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 FILTER_ON_SINGLETON_SIZE => 200,
 
 			 # if set to a number, it will reject single exon ests that have score smaller than this
-			 RAISE_SINGLETON_COVERAGE => 95,
-
+			 RAISE_SINGLETON_COVERAGE => 99,
 
 	                 ## you must choose one type of merging for cdnas/ests: 2 and 3 are the common ones
-			 EST_GENEBUILDER_COMPARISON_LEVEL => 5,
+			 EST_GENEBUILDER_COMPARISON_LEVEL => 2,
 			 
 			 # for details see documentation 
 			 # in Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator
@@ -121,10 +120,10 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # 5---> loose mode - consecutive exon overlap - allows intron mismatches
 			 
 			 # you can alow a mismatch in the splice sites
-			 EST_GENEBUILDER_SPLICE_MISMATCH  => 40,
+			 EST_GENEBUILDER_SPLICE_MISMATCH  => 8,
 			 
 			 # you can allow matches over small introns 
-			 EST_GENEBUILDER_INTRON_MISMATCH => 20,
+			 EST_GENEBUILDER_INTRON_MISMATCH => 10,
 
 			 # you can bridge over small introns: we difuse the small intron into one exon
 			 # if set to false transcripts with small introns will be rejected
@@ -146,7 +145,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 GENOMEWISE_SMELL                => 0,
 			 
 			 # exons smaller than this will not be include in the merging algorithm
-			 EST_MIN_EXON_SIZE               => 10,
+			 EST_MIN_EXON_SIZE               => 20,
 
 			 # ests with intron bigger than this will not be incuded either
 			 EST_MAX_INTRON_SIZE             => 200000,
@@ -154,7 +153,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # this says to ClusterMerge what's the minimum
 			 # number of ESTs/cDNAs that must be 'included' into a
 			 # final transcript
-			 CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 2,
+			 CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 1,
 
 			 # maximum number of transcripts allowed to 
 			 # be in a gene. Even by tuning the other parameteres
@@ -162,10 +161,12 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # which, unless what you're doing is really targetted
 			 # to a known case or with very good quality ests/cdnas, it
 			 # is not very reliable.
-			 MAX_TRANSCRIPTS_PER_GENE => 10,
+			 MAX_TRANSCRIPTS_PER_GENE => 100000,
 
-            # If using denormalised gene table, set this option to 1.
-	    EST_USE_DENORM_GENES => 1,
+			 # If using denormalised gene table, set this option to 1.
+			 EST_USE_DENORM_GENES => 0,
+
+			 
 
 			 
 	    # database config
@@ -180,24 +181,22 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    # ref_db - holds the static golden path, contig and dna information
 	    ############################################################
 	    
-	    EST_REFDBNAME               => 'ens_NCBI_31',
-	    EST_REFDBHOST               => 'ecs2b',
+	    EST_REFDBNAME               => 'human_NCBI33_raw2',
+	    EST_REFDBHOST               => 'ecs2',
 	    EST_REFDBUSER               => 'ensro',
 	    EST_REFDBPASS               => '',
 
 	    # this is in general the database where we read the mapped ests/cdnas
 	    # from, in order to use them for the EST_GeneBuilder
 			 
-			 EST_DBNAME                  => 'ens_NCBI_31_est',
-			 EST_DBHOST                  => 'ecs2f',
-			 #EST_DBNAME                  => 'homo_sapiens_est_12_31',
-			 #EST_DBHOST                  => 'ecs2d',
-			 EST_DBUSER                  => 'ensro',
-			 EST_DBPASS                  => '',
+			 EST_DBNAME                  => 'human_ests_eae',
+			 EST_DBHOST                  => 'ecs2c',
+			 EST_DBUSER                  => 'ensadmin',
+			 EST_DBPASS                  => 'ensembl',
 
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
-	    EST_GENE_DBNAME                  => 'NCBI31_estgene_rerun',
-	    EST_GENE_DBHOST                  => 'ecs2c',
+	    EST_GENE_DBNAME                  => 'human_estgenes_eae_rerun',
+	    EST_GENE_DBHOST                  => 'ecs2b',
 	    EST_GENE_DBUSER                  => 'ensadmin',
 	    EST_GENE_DBPASS                  => 'ensembl',
 	    
@@ -210,46 +209,6 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    cDNA_DBUSER                  => '',
 	    cDNA_DBPASS                  => '',
 	    cDNA_GENETYPE                => '',	  
-
-	    
-	    ############################################################
-	    # parameters for the map of expression data. 
-	    # Currently only available for human
-	    ############################################################
-
-
-
-	    # if you want to map expression data to a set of genes via ESTs, 
-	    # ( see Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression )
-	    # set this to 1 if you want to map genes to ests after the genebuild
-	    # this is only for human
-	    MAP_GENES_TO_ESTS            => '0',
-
-	    # you can specify here the database where those genes are
-	    EST_TARGET_DBNAME            => 'ens_NCBI_31',
-	    EST_TARGET_DBHOST            => 'ecs2b',
-	    EST_TARGET_DBUSER            => 'ensro',
-	    EST_TARGET_DBPASS            => '',
-	    
-	    # gene type to which we are going to map the ests
-	    EST_TARGET_GENETYPE          => 'ensembl',
-	   
-	    	    
-	    # you can specify here the database (non ensembl schema)
-	    # where the expression database is.
-	    # So far we have one adaptor only for SANBI's Stack database
-	    EST_EXPRESSION_DBHOST        => 'ecs2a',
-	    EST_EXPRESSION_DBNAME        => 'eae_human_expression2',
-	    EST_EXPRESSION_DBUSER        => 'ensro',
-	    EST_EXPRESSION_DBPASS        => '',
-
-	    # the gene2est analysis is run with this script:
-	    #(put your own path here)
-	    EST_EXPRESSION_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/map_ExpressionData.pl',
-	    
-	    # size of the chunks to run the gene to est map
-	    # this should be the same one used in the GeneBuild as specified in GeneConf.pm
-	    EST_EXPRESSION_CHUNKSIZE          => '5000000',		
 
 	   );
 
