@@ -78,7 +78,7 @@ sub fetch_by_dbID {
   #print STDERR "Fetching job ".$id."\n";
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, analysis_id, submission_id,
-           stdout_file, stderr_file, retry_count
+           stdout_file, stderr_file, retry_count, temp_dir, exec_host
     FROM   job
     WHERE  job_id = ?
   });
@@ -92,6 +92,26 @@ sub fetch_by_dbID {
   return $job;
 }
 
+
+sub fetch_by_submission_id {
+  my $self = shift;
+  my $submissionid = shift;
+  my @result;
+
+  my $sth = $self->prepare(q{
+    SELECT job_id, input_id, analysis_id, submission_id,
+           stdout_file, stderr_file, retry_count, temp_dir, exec_host
+    FROM   job
+    WHERE  submission_id = ?
+  });
+
+  $sth->execute($submissionid);
+  while( my $rowHashRef = $sth->fetchrow_hashref ) {
+    push( @result, $self->_objFromHashref( $rowHashRef ));
+  }
+  #print STDERR "Have ".@result." from fetching by ".$submissionid."\n";
+  return @result;
+}
 
 =head2 fetch_by_dbID_list
 
@@ -113,7 +133,7 @@ sub fetch_by_dbID_list {
 
   my $sth = $self->prepare( qq{
     SELECT job_id, input_id, analysis_id, submission_id,
-           stdout_file, stderr_file, retry_count
+           stdout_file, stderr_file, retry_count, temp_dir, exec_host
     FROM job
     WHERE job_id in (@id) } );
 
@@ -150,7 +170,7 @@ sub fetch_by_Status_Analysis {
     my $query = q{
 	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
 	         j.stdout_file, j.stderr_file, j.retry_count,
-                 j.status_file
+           j.temp_dir, j.exec_host
 	FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
         AND      j.analysis = ?
@@ -183,7 +203,8 @@ sub fetch_by_Status {
 
     my $query = q{
 	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
-	         j.stdout_file, j.stderr_file, j.retry_count
+	         j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
+           j.exec_host
 	FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
         AND      js.status = ?
@@ -233,7 +254,8 @@ sub fetch_all{
 
   my $query = q{
 	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
-	         j.stdout_file, j.stderr_file, j.retry_count
+	         j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
+           j.exec_host
 	FROM     job j
     };
 
@@ -270,8 +292,8 @@ sub fetch_by_age {
 
     my $sth = $self->prepare(qq{
 	SELECT j.job_id, j.input_id, j.analysis_id, j.submission_id,
-               j.stdout_file, j.stderr_file,
-               j.retry_count
+         j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
+         j.exec_host
 	FROM   job j, job_status js
 	WHERE  j.job_id = js.job_id
 	AND    is_current = 'y'
@@ -309,7 +331,7 @@ sub fetch_by_input_id {
 
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, analysis_id, submission_id,
-           stdout_file, stderr_file, retry_count
+           stdout_file, stderr_file, retry_count, temp_dir, exec_host
     FROM   job
     WHERE  input_id = ?
   });
@@ -358,16 +380,20 @@ sub store {
   my $sth = $self->prepare(q{
     INSERT into job (input_id, analysis_id,
                      submission_id, stdout_file, stderr_file, 
-                     retry_count)
-    VALUES (?, ?, ?, ?, ?, ?)
+                     retry_count, temp_dir, exec_host)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   });
 
-  $sth->execute( $job->input_id,
-                 $job->analysis->dbID,
-                 $job->submission_id,
-                 $job->stdout_file,
-                 $job->stderr_file,
-                 $job->retry_count );
+  $sth->execute( 
+                $job->input_id,
+                $job->analysis->dbID,
+                $job->submission_id,
+                $job->stdout_file,
+                $job->stderr_file,
+                $job->retry_count,
+                $job->temp_dir,
+                $job->execution_host,
+               );
 
   $sth = $self->prepare("SELECT LAST_INSERT_ID()");
   $sth->execute;
@@ -453,7 +479,8 @@ sub remove_by_dbID {
             $jobAdaptor->update($job);
             $jobAdaptor->update(@jobs)
   Function: a job which is already in db can update its contents
-            it only updates stdout_file, stderr_file, retry_count
+            it only updates stdout_file stderr_file, retry_count, 
+            temp_dir, exec_host.
             and submission_id
   Returns : throws exception when something goes wrong.
   Args    : an array of Pipeline::Job objects
@@ -466,20 +493,24 @@ sub update {
   # only stdout, stderr, retry, submission_id and status are likely to be updated
 
   my $sth = $self->prepare(q{
-    UPDATE job
-    SET    stdout_file   = ?,
-           stderr_file   = ?,
-           retry_count   = ?,
-           submission_id = ?
-    WHERE  job_id = ?
-  });
+                             UPDATE job
+                             SET    stdout_file   = ?,
+                             stderr_file   = ?,
+                             retry_count   = ?,
+                             submission_id = ?,
+                             exec_host = ?,
+                             temp_dir = ?
+                             WHERE  job_id = ?
+                            });
 
   foreach my $job (@jobs) {
     $sth->execute( $job->stdout_file,
-		   $job->stderr_file,
-		   $job->retry_count,
-		   $job->submission_id,
-		   $job->dbID );
+                   $job->stderr_file,
+                   $job->retry_count,
+                   $job->submission_id,
+                   $job->execution_host,
+                   $job->temp_dir,
+                   $job->dbID );
   }
 }
 
@@ -503,21 +534,24 @@ sub _objFromHashref {
   my $hashref = shift;
   my $job;
   my $analysis;
-
+  my ($p, $f, $l) = caller;
+  #print STDERR "calling JobADaptor->objectfromHashref from $f:$l\n";
   $analysis =
     $self->db->get_AnalysisAdaptor->
       fetch_by_dbID( $hashref->{analysis_id} );
-
-  $job = Bio::EnsEMBL::Pipeline::Job->new(
-      '-dbobj'     => $self->db,
-      '-adaptor'   => $self,
-      '-id'        => $hashref->{'job_id'},
-      '-submission_id' => $hashref->{'submission_id'},
-      '-input_id'  => $hashref->{'input_id'},
-      '-stdout'    => $hashref->{'stdout_file'},
-      '-stderr'    => $hashref->{'stderr_file'},
-      '-analysis'  => $analysis,
-      '-retry_count' => $hashref->{'retry_count'}
+  $job = Bio::EnsEMBL::Pipeline::Job->new
+    (
+     '-dbobj'     => $self->db,
+     '-adaptor'   => $self,
+     '-id'        => $hashref->{'job_id'},
+     '-submission_id' => $hashref->{'submission_id'},
+     '-input_id'  => $hashref->{'input_id'},
+     '-stdout'    => $hashref->{'stdout_file'},
+     '-stderr'    => $hashref->{'stderr_file'},
+     '-analysis'  => $analysis,
+     '-retry_count' => $hashref->{'retry_count'},
+     '-exec_host' => $hashref->{'exec_host'},
+     '-temp_dir' => $hashref->{'temp_dir'},
   );
   return $job;
 }
@@ -547,41 +581,42 @@ sub set_status {
         my ($sth, $res);
 
         $sth = $self->prepare(q{
-	    UPDATE job_status
-	    SET    is_current = 'n'
-	    WHERE  job_id = ?
-	});
+                                UPDATE job_status
+                                SET    is_current = 'n'
+                                WHERE  job_id = ?
+                               });
 	$res = $sth->execute($jobId);
-
-	$sth = $self->prepare(q{
-	    INSERT DELAYED into job_status
-		   (job_id, status, time, is_current)
-	    VALUES (?, ?, NOW(), 'y')
-	});
-	$res = $sth->execute($jobId, $stat_str);
-
-	$sth = $self->prepare("SELECT NOW()");
-	$res = $sth->execute();
-	
-	my $time = ($sth->fetchrow_arrayref())->[0];
-
-	$status = Bio::EnsEMBL::Pipeline::Status->new(
- 	    '-jobid'   => $jobId,
-	    '-status'  => $stat_str,
-	    '-created' => $time,
-	);
-	
-	$self->current_status($job, $status);
-	
-#	print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
-    };
-
+        
+        $sth = $self->prepare(q{
+                                INSERT DELAYED into job_status
+                                (job_id, status, time, is_current)
+                                VALUES (?, ?, NOW(), 'y')
+                               });
+        $res = $sth->execute($jobId, $stat_str);
+        
+        $sth = $self->prepare("SELECT NOW()");
+        $res = $sth->execute();
+        
+        my $time = ($sth->fetchrow_arrayref())->[0];
+        
+        $status = Bio::EnsEMBL::Pipeline::Status->new
+          (
+           '-jobid'   => $jobId,
+           '-status'  => $stat_str,
+           '-created' => $time,
+          );
+        
+        $self->current_status($job, $status);
+        
+        #	print("Status for job [" . $job->dbID . "] set to " . $status->status . "\n");
+      };
+    
     if ($@) {
-#      print( " $@ " );
-
-	$self->throw("Error setting status to $stat_str");
+      #      print( " $@ " );
+      
+      $self->throw("Error setting status to $stat_str");
     } else {
-	return $status;
+      return $status;
     }
 }
 
@@ -601,42 +636,42 @@ sub current_status {
 
     if (defined($arg))
     {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object")
-	    unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-	$job->{'_status'} = $arg;
+      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object")
+        unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
+      $job->{'_status'} = $arg;
     }
     else
-    {
-	$self->throw("Can't get status if id not defined")
-	    unless defined($job->dbID);
-	my $id =$job->dbID;
-	my $sth = $self->prepare(q{
-	    SELECT status
-	    FROM   job_status
-	    WHERE  job_id = ?
-	    AND    is_current = 'y'
-	});
-	my $res = $sth->execute($id);
-	my $status;
-	while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	    $status = $rowhash->{'status'};
-	}
-
-	$sth = $self->prepare("SELECT NOW()");
-	$res = $sth->execute();
-	my $time;
-	while (my $rowhash = $sth->fetchrow_arrayref()) {
-	    $time    = $rowhash->[0];
-	}
-	my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
-	    '-jobid'   => $id,
-	    '-status'  => $status,
-	    '-created' => $time,
-	);
-	$job->{'_status'} = $statusobj;
-    }
+      {
+        $self->throw("Can't get status if id not defined")
+          unless defined($job->dbID);
+        my $id =$job->dbID;
+        my $sth = $self->prepare(q{
+                                   SELECT status
+                                   FROM   job_status
+                                   WHERE  job_id = ?
+                                   AND    is_current = 'y'
+                                  });
+        my $res = $sth->execute($id);
+        my $status;
+        while (my  $rowhash = $sth->fetchrow_hashref() ) {
+          $status = $rowhash->{'status'};
+        }
+        
+        $sth = $self->prepare("SELECT NOW()");
+        $res = $sth->execute();
+        my $time;
+        while (my $rowhash = $sth->fetchrow_arrayref()) {
+          $time    = $rowhash->[0];
+        }
+        my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
+                                                            '-jobid'   => $id,
+                                                            '-status'  => $status,
+                                                            '-created' => $time,
+                                                           );
+        $job->{'_status'} = $statusobj;
+      }
     return $job->{'_status'};
-}
+  }
 
 =head2 get_all_status
 
