@@ -107,7 +107,7 @@ sub new {
 
     &throw("No analysis object input") unless defined($analysis);
     $self->analysis($analysis);
-    &verbose('EXCEPTION');
+    &verbose('WARNING');
     return $self;
 }
 
