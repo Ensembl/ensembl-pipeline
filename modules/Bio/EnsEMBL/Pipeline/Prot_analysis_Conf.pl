@@ -48,6 +48,35 @@ package main;
 
 		  'pfam'        => '',
 
+		  'scanprosite'  => '',
+
+#Chunk size for each analysis 1 (whole genome but 1 entry at a time) or 0 (give a full peptide dataset)
+#If nothing is set, will consider that you don't want to run it...
+
+		  'prints_chunk' => '',
+		  
+		  'prosite_chunk' => '',
+		  
+		  'profile_chunk' => '',
+
+		  'pfam_chunk'    => '',
+		  
+		  'scanprosite_chunk' => '',
+
+		  'tmhmm_chunk'       => '',
+		  
+		  'coils_chunk'       => '',
+
+		  'signalp_chunk'     => '',
+		  
+		  'seg_chunk'         => '',
+
+#paracel use 0 from no, 1 for yes. If nothing is set, suppose that the paracel is not used
+
+		  'paracel'  => ''
+ 
 }
+
+
 
 1;
