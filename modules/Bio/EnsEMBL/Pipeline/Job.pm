@@ -101,9 +101,9 @@ sub new {
     }else{
       my $dir;
       if(!$BATCH_QUEUES{$analysis->logic_name}){
-	$dir =  $DEFAULT_OUTPUT_DIR;
+        $dir =  $DEFAULT_OUTPUT_DIR;
       }else{
-	$dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
+        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
       }
       $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
       $self->output_dir($dir);
@@ -457,8 +457,12 @@ sub run_module {
   my $rdb;
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
+  my $hash_key = $self->analysis->logic_name;
+  if(!$BATCH_QUEUES{$hash_key}){
+    $hash_key = 'default';
+  }
   my $runnable_db_path = 
-    $BATCH_QUEUES{$self->analysis->logic_name}{runnabledb_path};
+    $BATCH_QUEUES{$hash_key};
   my $perl_path;
   if($module =~ /::/){
     $module =~ s/::/\//g;
@@ -891,6 +895,7 @@ sub set_up_queues {
 	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
             $q{'default'}{'jobs'} = [];
             $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
+       $q{'default'}{'runnabledb_path'} ||= $DEFAULT_RUNNABLEDB_PATH;
 	}
     }
   
