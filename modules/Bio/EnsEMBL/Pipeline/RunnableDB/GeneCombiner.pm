@@ -871,7 +871,8 @@ sub _pair_Transcripts{
       my $exon_in_intron  = 0;
       my $exact_merge     = 0;
       my $fuzzy_merge     = 0;
-      
+      my $overlaps = 0;
+
       # check first it does not merge with anything in the cluster
       foreach my $ens_tran ( @ens_transcripts ){
 	my $comparator1 = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(
@@ -963,9 +964,9 @@ sub _lock_Phases{
   my $est_end_exon;
   my $est_start_translation;
   my $est_end_translation;
-
+  
   foreach my $exon (@{$est_tran->get_all_Exons}){
-    if ( $exon->overlaps( $ens_start_Exon ) ){
+    if ( $exon->overlaps( $ens_start_exon ) ){
       $est_start_exon = $exon;
       
       if ( $exon->strand == 1 && $ens_start_exon->strand == 1 ){
@@ -1008,8 +1009,8 @@ sub _lock_Phases{
 
   # recompute phases:
   $est_tran->sort;
-  $seen_start = 0;
-  $seen_end   = 0;
+  my $seen_start = 0;
+  my $seen_end   = 0;
   my $previous_exon;
   foreach my $exon (@{$est_tran->get_all_Exons}){
     if ( $exon == $est_start_exon && $exon == $est_end_exon ){
