@@ -442,14 +442,14 @@ sub runInLSF {
 	  $rdb = "${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+		-db => $self->adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
           $module =~ s/\//::/g;
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+		-db => $self->adaptor->db );
       }
     };
     if ($err = $@) {
