@@ -43,10 +43,12 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+#use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_INPUTID_REGEX
+					 GB_TARGETTED_PROTEIN_SEQFETCHER
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -70,6 +72,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 
 sub new {
   my ($class, @args) = @_;
+  #print STDERR "args @args\n";
   my $self = $class->SUPER::new(@args);
   
   # db, input_id, seqfetcher, and analysis objects are all set in
@@ -92,17 +95,18 @@ sub new {
 =cut
 
 sub make_seqfetcher {
-  my ( $self, $index ) = @_;
+  my ( $self, $index, $seqfetcher_class ) = @_;
 
   my $seqfetcher;
-  #print STDERR "index is ".$index."\n";
+  
+  (my $class = $seqfetcher_class) =~ s/::/\//g;
+  require "$class.pm";
+
   if(defined $index && $index ne ''){
-   # print STDERR "index is ".$index."\n";
     my @db = ( $index );
-    #print "array of indexes are @db\n";
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
-								  '-db' => \@db,
-								 );
+    
+    # make sure that your class is compatible with the index type
+    $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
     $self->throw("can't make seqfetcher\n");
@@ -110,6 +114,7 @@ sub make_seqfetcher {
 
   return $seqfetcher;
 }
+
 
 =head2 fetch_input
 
@@ -145,7 +150,7 @@ sub make_targetted_runnables {
   my ($self) = @_;
 
   # set up seqfetchers
-  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
+  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX, $GB_TARGETTED_PROTEIN_SEQFETCHER);
 
   # we need to find all the proteins that pmatch into this region
   # take a note of those that fall across the ends of the vc? and do what, precisely?
@@ -177,7 +182,7 @@ sub make_targetted_runnables {
 								       -db         => $self->db,
 								       -input_id      => $input,
 								       -seqfetcher    => $protein_fetcher,
-#								       -analysis => $analysis,
+								       -analysis => $self->analysis,
 								      );
     $self->targetted_runnable($tgr);
   }
