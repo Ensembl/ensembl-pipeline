@@ -37,15 +37,17 @@ print "ok 1\n";    # 1st test passes.
     
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
-$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
+#$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
     
 # Get an EnsEMBL db object for the test db
-my $db = $ens_test->get_DBSQL_Obj;
+# my $db = $ens_test->get_DBSQL_Obj;
+my $db = new Bio::EnsEMBL::DBSQL::Obj(-host => 'ensrv4',
+                                      -dbname => 'ensembl_freeze17_michele',
+                                      -user => 'ensadmin');
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep';
 my $parameters = '-THRESHOLD => 1, -ARGS => -hspmax 1000 nogap';
-my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'swir',
                                                     -db_file        => 'swir',
                                                     -db_version     => '__NONE__',
@@ -61,8 +63,7 @@ unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-$ana_adaptor->exists( $ana );
-my $id = 'AB015752.00001';
+my $id = 'AP000074.00001';
 my $runobj = "$runnable"->new(  -dbobj      => $db,
 			                    -input_id   => $id,
                                 -analysis   => $ana );
