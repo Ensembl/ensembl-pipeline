@@ -67,9 +67,10 @@ sub run{
   my @output;
   foreach my $hit(@hits){
     #print STDERR "have ".$hit."\n";
-    my ($name, $start, $end) = $self->convert_coords_to_genomic($hit->query,
-                                                                $hit->qstart,
-                                                                $hit->qend);
+    my ($name, $start, $end) = 
+      $self->convert_coords_to_genomic($hit->query,
+                                       $hit->qstart,
+                                       $hit->qend);
     $hit->query($name);
     $hit->qstart($start);
     $hit->qend($end);
@@ -171,39 +172,10 @@ sub output{
 
 
 
-
 sub make_protlist{
   my ($self) = @_;
   ##print STDERR "making prot_length list from $protfile\n";
   my %plengths;
-#  open (INFILE, "<".$self->protein_file) or die "Can't open ".$self->protein_file."\n";
-#  $/ = '>'; # looks for fields separated by > instead of "\n"
-# SEQFETCH:
-#  while(<INFILE>) {
-    
-#    my @lines = split /\n/;
-#    next SEQFETCH unless scalar(@lines) > 1;
-#    my $description = shift (@lines);
-#    $description =~ /(\S+)/; # find the first block of non-whitespace
-
-#    next SEQFETCH unless defined $description and $description ne '';
-#    my $bs = new Bio::Seq;
-#    $bs->display_id($1);
-    
-#    my $seq;
-#    foreach my $line(@lines) {
-#      chomp $line;
-#      $seq .= $line;
-#    }
-    
-#    $bs->seq($seq);
-#    #print STDERR $bs->display_id ." = ".$bs->length."\n";
-#    $plengths{$bs->display_id} = $bs->length;
-#  }
-
-#  # note double quotes ...    
-#  $/ = "\n";
-#  close INFILE;
 
   my $seqio = new Bio::SeqIO(-format => 'Fasta', 
 			     -file => $self->protein_file);
@@ -214,8 +186,8 @@ sub make_protlist{
   my $ref = \%plengths;
   #print STDERR "have ".$ref." hash \n";
   $self->prot_lengths($ref);
-}
 
+}
 
 sub convert_coords_to_genomic{
   my ($self, $name, $start, $end) = @_;
@@ -249,54 +221,41 @@ sub convert_output{
 
 sub uniquify{
   my ($self, @features) = @_;
-  my $file = "/tmp/$$.pm.out";
   my @output;
  
  # print STDERR "UNIQUFY\n";
-  open (OUT, ">".$file);
-  foreach my $hit(@features) {
-    print OUT $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
-  #  print STDERR $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
-  }
-  #print STDERR "UNIQUFY\n";
-  close(OUT);
-  my $sorted_file = "/tmp/$$.pm.out.sorted";
-  my $command = "sort -u ".$file." > ".$sorted_file;
-  system($command);
-  
-  open(PMATCHES, "<$sorted_file") or die "couldn't open ".$sorted_file." $!";
-  while(<PMATCHES>){
-    #print;
-    chomp;
-    # eg chr22:10602496,10603128:Q9UGV6:99.4
-    # cb25.fpc0002:136611,136883:CE00763:47.7
-    if(!/(\S+):(\d+),(\d+):(\S+):(\S+)/){
-      die "Cannot parse [$_]\nClean out protein and pmatch_feature tables before rerunning script!\n";
-    }
-    my $chr = $1;
-    my $start = $2;
-    my $end = $3;
-    my $protein = $4;
-    my $coverage = $5;
-    #print STDERR "chr ".$chr." start ".$start." end ".$end." protein ".$protein." coverage ".$coverage."\n";
-    if($start > $end){
-      $start = $3;
-      $end = $2;
-    }
 
-   
-    my $cdna_id = undef;
-    my $pmf = Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature->new(-protein_id  => $protein,
-								 -start       => $start,
-								 -end         => $end,
-								 -chr_name    => $chr,
-								 -coverage    => $coverage,
-								 -analysis => $self->analysis,
-								);
-    push(@output, $pmf);
+  my %seen;
+  foreach my $hit(@features) {
+      my $key = $hit->query  . ":" .$hit->qstart . ":" .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage;
+      $seen{$key} = 1;
   }
-  unlink $file;
-  unlink $sorted_file;
+
+  foreach my $pmatch_line (sort keys %seen) {
+      if ($pmatch_line =~ /^(\S+):(\d+):(\d+):(\S+):(\S+)$/){
+	  my $chr = $1;
+	  my $start = $2;
+	  my $end = $3;
+	  my $protein = $4;
+	  my $coverage = $5;
+	  #print STDERR "chr ".$chr." start ".$start." end ".$end." protein ".$protein." coverage ".$coverage."\n";
+	  if($start > $end){
+	      $start = $3;
+	      $end = $2;
+	  }
+   
+	  my $cdna_id = undef;
+	  my $pmf = Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature->new(-protein_id  => $protein,
+									      -start       => $start,
+									      -end         => $end,
+									      -chr_name    => $chr,
+									      -coverage    => $coverage,
+									      -analysis => $self->analysis,
+								);
+	  push(@output, $pmf);
+      }
+  }
+
   return @output;
 }
 1;

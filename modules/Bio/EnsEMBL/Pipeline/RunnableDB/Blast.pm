@@ -106,12 +106,16 @@ sub fetch_input {
     } else {
       $ungapped = undef;
     }
-    
+    # note the parameters column of the analysis table for a blast
+    # run must follow this format
+    # -runnable_arg => value, -runnable_arg => value
+    #for example -filter => 0, -options => -cpus 1 -spoutmax 1 
+    #-hitdist 40 W=4 T=16 V=700000 B=700000 Y=320000000 Z=500000000
     my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
       (-query          => $self->query,
        -database       => $self->analysis->db_file,
        -program        => $self->analysis->program,
-       -options        => $self->analysis->parameters,
+       $self->parameter_hash 
        -threshold_type => 'PVALUE',
        -threshold      => 1,
        -ungapped       => $ungapped,

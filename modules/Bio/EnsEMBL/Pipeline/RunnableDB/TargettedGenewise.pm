@@ -207,13 +207,27 @@ sub fetch_input{
   }
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
-
+  $new_start = $start if $new_start < $start;
+  $new_end = $end if $new_end > $end;
   #print STDERR "Fetching ".$seq_region." ".$start." ".$end."\n";
+  if($new_start < 1){
+    $new_start = 1;
+  }
   my $sliceadp = $self->db->get_SliceAdaptor();
-  my $slice = $sliceadp->fetch_by_region($cs_name,$seq_region, $new_start,
-                                         $new_end, $strand, $cs_version);
+  my $slice = $sliceadp->fetch_by_region($cs_name,$seq_region,
+                                         $new_start,$new_end,
+                                         $strand, $cs_version);
   
-    
+  if($slice->end() > $slice->seq_region_length) {
+    #refetch slice, since we went past end, second call is fast
+    $new_end = $slice->seq_region_length();
+    $slice = $sliceadp->fetch_by_region($cs_name, $seq_region,
+                                        $new_start, $new_end,
+                                        $strand, $cs_version);
+  }
+
+
+  
   $self->query($slice);
   my $seq;
   if(@$GB_TARGETTED_MASKING){

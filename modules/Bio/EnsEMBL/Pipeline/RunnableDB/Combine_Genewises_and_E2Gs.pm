@@ -96,6 +96,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
 							    GB_COMBINED_GENETYPE
 							   );
 
+#use diagnostics;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -324,9 +325,9 @@ sub run {
     
     
     print STDERR "combining gw gene : " . $gw->dbID.":\n";
-    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($gw);
+#    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($gw);
     print STDERR "with e2g gene " . $e2g_match->dbID . ":\n";
-    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($e2g_match);
+#    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($e2g_match);
     
     my $combined_transcript = $self->combine_genes($gw, $e2g_match);
     if ( $combined_transcript ){
@@ -372,7 +373,7 @@ sub _filter_cdnas{
 
       next cDNA_TRANSCRIPT unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran,$self->query) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($tran,$self->query));
 
-#      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
       push(@newe2g,$e2g);
     }
   }
@@ -433,15 +434,15 @@ sub write_output {
     eval {
       $gene_adaptor->store($gene);
       print STDERR "wrote gene dbID " . $gene->dbID . "\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      }
+#      foreach my $t ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+#      }
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      }
+#      foreach my $t ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+#      }
     }
   }
 }
@@ -490,9 +491,9 @@ sub make_gene{
   }
   
   print STDERR "Produced genes:\n";
-  foreach my $gene (@genes){
-    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($gene);
-  }
+#  foreach my $gene (@genes){
+#    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($gene);
+#  }
   
   $self->combined_genes(@genes);
   
@@ -693,12 +694,13 @@ sub _compute_UTRlength{
 
  my $UTRlength = 0;
  my $in_UTR = 1;
+
  foreach my $exon ( @exons ){
-   if ( $exon == $left_exon ){
+   if ( defined $left_exon && $exon == $left_exon ){
      $UTRlength += $left_diff;
      $in_UTR     = 0;
    }
-   elsif( $exon == $right_exon ){
+   elsif( defined $right_exon && $exon == $right_exon ){
      $UTRlength += $right_diff;
      $in_UTR     = 1;
    }
@@ -990,16 +992,16 @@ sub combine_genes{
       my $strand = $newtranscript->start_Exon->strand;
       
       print STDERR "before genomewise:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
+#      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
       
       $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
       
       print STDERR "after genomewise:\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
+#    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
       
-      #unless($self->compare_translations($gw_tran[0], $newtrans) ){
-      #	print STDERR "translation has been modified\n";
-      #}
+#      unless($self->compare_translations($gw_tran[0], $newtrans) ){
+#      	print STDERR "translation has been modified\n";
+#      }
       
       # if the genomewise results gets stop codons, return the original transcript:
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
@@ -1833,16 +1835,16 @@ sub remap_genes {
     }
     else{
       print STDERR "transform didn't give anything back on the gene:\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      }
+#      foreach my $t ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+#      }
     }
     # did we throw exceptions?
     if ($@) {
       print STDERR "Couldn't reverse map gene:  [$@]\n";
-      foreach my $t ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      }
+#      foreach my $t ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+#      }
     }
   }
   
@@ -2001,11 +2003,20 @@ sub _transfer_evidence {
   my ($self, $combined_transcript, $cdna_transcript) = @_;
   foreach my $combined_exon(@{$combined_transcript->get_all_Exons}){
     foreach my $cdna_exon(@{$cdna_transcript->get_all_Exons}){
-      # exact match or overlap? Be strict for now; later will need to recalculate feature boundaries etc
-      if($combined_exon->start == $cdna_exon->start &&
-         $combined_exon->end == $cdna_exon->end &&
-         $combined_exon->strand == $cdna_exon->strand){
-         print STDERR "exact match " . $combined_exon->dbID . " with " . $cdna_exon->dbID . "; transferring evidence\n";
+      # exact match or overlap? 
+
+# exact match
+#
+#      if($combined_exon->start == $cdna_exon->start &&
+#         $combined_exon->end == $cdna_exon->end &&
+#         $combined_exon->strand == $cdna_exon->strand){
+#         print STDERR "exact match " . $combined_exon->dbID . " with " . $cdna_exon->dbID . "; transferring evidence\n";
+#         Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
+#      }
+
+       # overlap - feature boundaries may well be wonky
+       if($combined_exon->overlaps($cdna_exon)){
+         print STDERR "overlap: " . $combined_exon->dbID . " with " . $cdna_exon->dbID . "; transferring evidence\n";
          Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
       }
     }
@@ -2132,7 +2143,7 @@ sub output{
     $self->{'_output'} = [];
   }
   
-  if(defined @genes){
+  if(@genes){
     push(@{$self->{'_output'}},@genes);
   }
   

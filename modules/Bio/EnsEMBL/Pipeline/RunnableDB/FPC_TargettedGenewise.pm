@@ -226,13 +226,14 @@ sub make_targetted_runnables {
 
     #print STDERR "TGW input: $input\n";
 
-    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise(
-									-db => $self->db,
-									-input_id => $input,
-									-seqfetcher => $protein_fetcher,
-									-analysis => $self->analysis,
-									-output_db => $self->output_db,
-								       );
+    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise
+      (
+       -db => $self->db,
+       -input_id => $input,
+       -seqfetcher => $protein_fetcher,
+       -analysis => $self->analysis,
+       -output_db => $self->output_db,
+      );
     $self->targetted_runnable($tgr);
   }
 
