@@ -902,20 +902,20 @@ sub _get_SubseqFetcher {
 
 ############################################################
 
-# must override RunnableDB::output() which is an eveil thing reading out from the Runnable objects
+# must override RunnableDB::output() which is an evil thing reading out from the Runnable objects
 
 sub output {
   my ($self, @output) = @_;
-  if (@output){
-    push( @{$self->{_output} }, @output);
-  }
-  
-  my @ret_output;
-  if($self->{_output}){
-    @ret_output = @{$self->{_output}};
+
+  unless ($self->{_output}){
+    $self->{_output} = [];
   }
 
-  return @ret_output;
+  if (@output){
+    push( @{$self->{_output}}, @output);
+  }
+
+  return @{$self->{_output}}
 }
 
 ############################################################
