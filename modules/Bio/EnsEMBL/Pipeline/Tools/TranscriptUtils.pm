@@ -37,6 +37,8 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Utils::PolyA;
+use Bio::EnsEMBL::DBSQL::SliceAdaptor;
+
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -1135,7 +1137,7 @@ sub set_stop_codon{
 	  # calculate the next codon start/end in chr coordinates 
 	  my $codon_start = $slice_start + ( $end_exon->start + $end - 1 ) - 1;
 	  my $codon_end   = $codon_start + 2;
-	  my $codon_slice = $adaptor->get_SliceAdaptor
+	  my $codon_slice = $adaptor
 	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
 	  my $codon = $codon_slice->seq;
 	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
@@ -1156,7 +1158,7 @@ sub set_stop_codon{
 	  # calculate the next codon start/end in chr coordinates 
 	  my $codon_end   = $slice_start + $end_exon->end - $end - 1;
 	  my $codon_start = $codon_end - 2;
-	  my $codon_slice = $adaptor->get_SliceAdaptor
+	  my $codon_slice = $adaptor
 	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
 	  my $pre_codon = $codon_slice->seq;
 
