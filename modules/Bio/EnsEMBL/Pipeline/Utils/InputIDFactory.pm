@@ -427,7 +427,7 @@ sub store_input_ids{
     };
     if($@){
       throw("Error storing input_id $id for analysis ".
-            $self->analysis->logic_name);
+            $self->get_analysis->logic_name);
     }
   }
   return 1;
