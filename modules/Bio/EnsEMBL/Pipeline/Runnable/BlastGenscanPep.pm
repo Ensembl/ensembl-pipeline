@@ -275,7 +275,7 @@ sub align_hits_to_contig2 {
 	my $pep_end = ( $cdna_end / 3 );
 
 	my $dna_feat = Bio::EnsEMBL::SeqFeature->new 
-	  ( -seqname    =>  $contig->name,
+	  ( -seqname    =>  $contig->display_id,
 	    -start      =>  $gstart, 
 	    -end        =>  $gend,
 	    -strand     =>  $gstrand,
