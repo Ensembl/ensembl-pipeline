@@ -151,14 +151,10 @@ sub pseudogene_test{
   # single-exon transcripts get a label '-1'
   $splice_sites_correct = -1;
   if ( scalar( @{$transcript->get_all_Exons} ) > 1 ){
-    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
-	 ->check_splice_sites( $transcript ) ){
-      print STDERR "Canonical splice sites:\tYES\n";
-      $splice_sites_correct = 1;
-    }
-    else{
-      print STDERR "Canonical splice sites:\tNO\n";
-      $splice_sites_correct = 0;
+    $splice_sites_correct = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->check_splice_sites( $transcript );
+    
+    if ( $splice_sites_correct ){
+      print STDERR "Number of canonical splice sites:$splice_sites_correct\n";
     }
   }
 
