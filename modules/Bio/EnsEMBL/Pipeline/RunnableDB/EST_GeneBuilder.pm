@@ -486,7 +486,7 @@ sub _process_Transcripts {
   }
  
   my $merge_object 
-      = Bio::EnsEMBL::Pipeline::Runnable::CusterMerge->new(
+      = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
 							   -transcripts => \@transcripts,
 							   );
 								
