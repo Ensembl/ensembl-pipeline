@@ -59,17 +59,13 @@ intron_mismatch = INT -----------> Maximum number of bases that we consider for 
                                    The reason for this is that we do not expect very very small intron to be
                                    real
 
-restrict_external_splice_site ---> TRUE if we want to restrict how much can exceed
-                                   an external exon an internal splice site:
-    
-                                                    |--d--|
+internal_splice_overlap  --------> (default = 0 ) 
+                                   number of base pairs (N) we allow an external exon overlap
+                                   an intron in another transcript:
+
+                                                     |--N--|
                                     ######-------##########
                                    #######-------####-------------#######
-    
-                                   If TRUE 'd' must be <= splice_mismatch, else 'd' can be anything
-                                   The difference 'd' could be due to a true splice site, but with
-                                   ESTs it is most likely to be an artifact
-    
 
 minimum_order -------------------> positive INT, it is the minimum number of ESTs that must be in a list
                                    to use that list for merging. The default is 1.
@@ -132,6 +128,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
+use Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Node;
 
@@ -141,7 +138,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $use_score) 
+  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $internal_splice_overlap, $use_score) 
       = $self->_rearrange([qw(
 			      TRANSCRIPTS
 			      COMPARISON_LEVEL
@@ -149,6 +146,7 @@ sub new {
 			      INTRON_MISMATCH
 			      EXON_MATCH
 			      MINIMUM_ORDER
+			      INTERNAL_SPLICE_OVERLAP
 			      USE_SCORE
 			      )], 
 			  @args);
@@ -164,20 +162,24 @@ sub new {
   # $splice_mismatch  = 10,
   # $intron_mismatch  = 7,
   # $exon_match       = 0,
-
+  # $internal_splice_overlap = 0,
+  
   # to get some blah,blah
   $self->verbose(0);
 
-
+  $use_score = 1;
   if ( $use_score ){
       $self->use_score($use_score);
   }
+  
 
   if ( $comparison_level ){
     $self->_comparison_level($comparison_level);
+    print STDERR "comparison_level = ".$self->_comparison_level."\n";
   }
   else{
-    print STDERR "defaulting comparison_level to ".$self->_comparison_level."\n";
+    print STDERR "defaulting comparison_level to 2\n";
+    $self->_comparison_level(2 );
   }
   
   if ($minimum_order){
@@ -189,29 +191,38 @@ sub new {
   
   if ( defined $splice_mismatch ){
     $self->_splice_mismatch( $splice_mismatch );
-    print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
+    #print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
   }
   else{
     $self->_splice_mismatch( 10 );
-    print STDERR "defaulting splice mismatch to ".$self->_splice_mismatch."\n";
+    #print STDERR "defaulting splice mismatch to ".$self->_splice_mismatch."\n";
   }
 
   if ( defined $intron_mismatch ){
     $self->_intron_mismatch( $intron_mismatch );
-    print STDERR "intron mismatch ".$self->_intron_mismatch."\n";
+    #print STDERR "intron mismatch ".$self->_intron_mismatch."\n";
   }
   else{
     $self->_intron_mismatch( 7 );
-    print STDERR "defaulting intron mismatch to ".$self->_intron_mismatch."\n";
+    #print STDERR "defaulting intron mismatch to ".$self->_intron_mismatch."\n";
+  }
+
+  if ( defined $internal_splice_overlap ){
+    $self->_internal_splice_overlap( $internal_splice_overlap );
+    #print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
+  }
+  else{
+    $self->_intternal_splice_overlap( 0 );
+    #print STDERR "defaulting internal_splice_overlap = 0\n";
   }
 
   if ( defined $exon_match ){
     $self->_exon_match( $exon_match );
-    print STDERR "exon match ".$self->_exon_match."\n";
+    #print STDERR "exon match ".$self->_exon_match."\n";
   }
   else{
     $self->_exon_match( 0 );
-    print STDERR "defaulting exon match to ".$self->_exon_match."\n";
+    #print STDERR "defaulting exon match to ".$self->_exon_match."\n";
   }
   
   return $self;
@@ -1111,7 +1122,7 @@ sub compare{
 	    -exon_match                       => $self->_exon_match,
 	    -splice_mismatch                  => $self->_splice_mismatch,
 	    -intron_mismatch                  => $self->_intron_mismatch,
-	    -internal_splice_overlap => 0,
+	    -internal_splice_overlap          => $self->_internal_splice_overlap,
 	   );
   
   my %overlap_matrix = %{$self->matrix};
@@ -1199,16 +1210,17 @@ sub run {
   # we can score the predictions:
   my @final_transcripts;
   if ( $self->use_score ){
+    print STDERR "calculating scores\n";
       my $score_model = 
 	Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel
 	    ->new(
 		  -hold_list   => $self->hold_list,
 		  -transcripts => \@merged_transcripts,
 		  );
-      @final_transcripts = $score_model->score_Transcripts;
+    @final_transcripts = $score_model->score_Transcripts;
   }
   else{
-      @final_transcripts = @merged_transcripts;
+    @final_transcripts = @merged_transcripts;
   }
   
   @merged_transcripts = ();
@@ -2132,6 +2144,16 @@ sub _intron_mismatch{
     $self->{_intron_mismatch} = $mismatch;
   }
   return $self->{_intron_mismatch};
+}
+
+############################################################
+
+sub _internal_splice_overlap{
+  my ($self, $value) = @_;
+  if (defined $value){
+    $self->{_internal_splice_overlap} = $value;
+  }
+  return $self->{_internal_splice_overlap};
 }
 
 ############################################################
