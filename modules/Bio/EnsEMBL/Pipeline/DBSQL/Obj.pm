@@ -108,7 +108,7 @@ sub get_TimClone{
 
 =cut
 
-sub create_Clone{
+sub create_Clone {
    my ($self,$disk_id,$clone_group,$chromosome) = @_;
 
    $disk_id || $self->throw("Trying to create a clone without a disk id!\n");
@@ -129,8 +129,7 @@ sub create_Clone{
    }
 }
 
-
-=head2 get_Job {
+=head2 get_Job 
 
   Title   : get_Job
   Usage   : my $job = $db->get_Job($id)
@@ -251,6 +250,17 @@ sub get_JobsByCurrentStatus {
     return @jobs;
 }
 
+=head2 get_JobsByAge {
+
+  Title   : get_JobsByAge
+  Usage   : my @jobs = $db->get_JobsByAge($duration)
+  Function: Retrieves all jobs in the database
+            that are older than than a certain duration given in minutes.
+  Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
+  Args    : int
+
+=cut
+
 sub get_JobsByAge {
     my ($self,$age) = @_;
 
@@ -258,9 +268,9 @@ sub get_JobsByAge {
         unless defined($age);
     #convert age from minutes to seconds
     my $ageinseconds = $age * 60;
-    my $query = 'SELECT j.id, j.input_id, j.analysis, j.LSF_id, j.machine, '
+    my $query = 'SELECT cs.id, j.input_id, j.analysis, j.LSF_id, j.machine, '
                     .'j.queue, j.stdout_file, j.stderr_file, j.input_object_file, '
-                    .'j.output_file, j.status_file, cs.status '
+                    .'j.output_file, j.status_file '
                 .'FROM job as j, jobstatus as js, current_status as cs ' 
                 .'WHERE cs.id = js.id '
                     .'AND cs.status = js.status '
@@ -287,8 +297,8 @@ sub get_JobsByAnalysis {
     $self->throw("No input analysis for get_JobsByCurrentAnalysis") unless defined($analysis);
     
     my $query = "select id,input_id,analysis,LSF_id,machine,queue," .
-	"stdout_file,stderr_file,input_object_file,output_file,status_file " . 
-	    " from job where analysis = $analysis"; 
+	            "stdout_file,stderr_file,input_object_file,output_file,status_file " . 
+	            " from job where analysis = $analysis"; 
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
     
@@ -299,6 +309,44 @@ sub get_JobsByAnalysis {
 	push(@jobs,$job);
     }
 
+    return @jobs;
+}
+
+=head2 get_JobsbyStatus_and_Analysis {
+
+  Title   : get_JobsbyStatus_and_Analysis
+  Usage   : my @jobs = $db->get_JobsbyStatus_and_Analysis($id, $status)
+  Function: Retrieves all jobs in the database matching status and 
+            an analysis id
+  Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
+  Args    : int analysis id, string status
+
+=cut
+
+sub get_JobsbyStatus_and_Analysis {
+    my ($self,$status, $analysis) = @_;
+
+    $self->throw("Require status and analysis id for get_JobsbyStatus_and_Analysis") 
+                            unless ($analysis && $status);
+
+    my $query = "select j.id, j.input_id, j.analysis, j.LSF_id," .
+	                   "j.machine,queue, j.stdout_file, j.stderr_file,".
+                       "j.input_object_file, j.output_file,".
+                       "j.status_file " . 
+	            "from job as j, current_status as cs ". 
+                "where j.id = cs.id and j.analysis = $analysis ".
+                       "and cs.status = \'$status\'";
+                 
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+    
+    my @jobs;
+    
+    while (my $row = $sth->fetchrow_hashref) 
+    {
+	    my $job = $self->_parseJob($row);
+	    push(@jobs,$job);
+    }
     return @jobs;
 }
 
@@ -504,12 +552,12 @@ sub get_Analysis {
     $self->throw("No analysis id input") unless defined($id);
 
     my $query = "select created, " .
-	        "program,program_version,program_file," .
-	        "db,db_version,db_file," .
-		"module,module_version," .
-		"gff_source,gff_feature,".
-		"parameters " . 
-		"from analysisprocess where " . 
+	            "program,program_version,program_file," .
+	            "db,db_version,db_file," .
+		        "module,module_version," .
+		        "gff_source,gff_feature,".
+		        "parameters " . 
+		        "from analysisprocess where " . 
                 "id = $id";
 
     my $sth = $self->prepare($query);
@@ -528,7 +576,7 @@ sub get_Analysis {
 	my $module_version  = $rowhash->{'module_version'};
 	my $parameters      = $rowhash->{'parameters'};
 
-	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id              => $id,
+	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id => $id,
 							    -created         => $created,
 							    -program         => $program,
 							    -program_version => $program_version,
@@ -549,6 +597,97 @@ sub get_Analysis {
 
 }
 
+=head2 get_all_Analysis 
+
+  Title   : get_all_Analysis
+  Usage   : my @analyses = $db->get_all_Analysis()
+  Function: Retrieves all analysis objects
+  Returns : a list of Bio::EnsEMBL::Pipeline::Analysis
+  Args    : none
+
+=cut
+
+sub get_all_Analysis {
+    my ($self) =@_;
+    
+    my $query = "select id, " .
+	            "program,program_version," .
+	            "db,db_version," .
+		        "gff_source,gff_feature, ".
+                "module, module_version,parameters ".
+		        "from analysisprocess ";
+    
+    my $sth = $self->prepare($query);
+    my $rv  = $sth->execute();
+    my @analyses;
+    
+    if ($rv && $sth->rows > 0)
+    {
+        while (my $row = $sth->fetchrow_hashref)
+        {
+            my $id              = $row->{'id'};
+            my $program         = $row->{'program'};
+            my $program_version = $row->{'program_version'};
+            my $db              = $row->{'db'};
+            my $db_version      = $row->{'db_version'};
+            my $gff_source      = $row->{'gff_source'};
+            my $gff_feature     = $row->{'gff_feature'};
+            my $module          = $row->{'module'};
+	        my $module_version  = $row->{'module_version'};
+	        my $parameters      = $row->{'parameters'};
+            
+                        
+            my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(
+                                -id              => $id,
+							    -program         => $program,
+							    -program_version => $program_version,
+							    -db              => $db,
+							    -db_version      => $db_version,
+							    -gff_source      => $gff_source,
+                                -gff_feature     => $gff_feature,
+                                -module          => $module,
+							    -module_version  => $module_version,
+							    -parameters      => $parameters,
+                                );
+            push (@analyses, $analysis);
+        }
+    }
+    else
+    {
+        $self->throw("No data in analysis table\n");
+    }
+    return (@analyses);
+}
+
+=head2 get_AnalysisSummary 
+
+  Title   : get_AnalysisSummary
+  Usage   : my $analyis = $db->get_AnalysisSummary($id)
+  Function: Retrieves summary of analyses objects matching analysis id
+  Returns : a hash containing summary of analyses
+  Args    : int
+
+=cut
+
+sub get_AnalysisSummary {
+    my ($self, $id) = @_;
+    
+    my $query = "select count(*), cs.status " .
+	            "from job, current_status as cs " .
+	            "where job.id = cs.id " .
+		        "and job.analysis = $id ".
+                "group by cs.status";
+    
+    my $sth = $self->prepare($query);
+    my $rv  = $sth->execute();
+    my %summary;
+    
+    while (my $row = $sth->fetchrow_hashref)
+    {
+            $summary{$row->{'status'}}  = $row->{'count(*)'};        
+    }
+    return %summary;
+}
 
 =head2 prepare
 
@@ -595,7 +734,7 @@ sub _db_handle {
 
 
 =head2 get_all_ExonPairs
-    
+
  Title   : get_all_ExonPairs(@contigs)
  Usage   : my @pairs = get_all_ExonPairs(@contigs);
  Function: Returns all the exon pairs for exons that lie on 
@@ -658,7 +797,7 @@ sub get_all_ExonPairs {
 
 
 =head2 write_ExonPairs
-    
+
  Title   : write_ExonPairs(@pairs)
  Usage   : my @pairs = write_ExonPairs(@pairs);
  Function: Returns all the exon pairs for exons that lie on 
@@ -702,7 +841,7 @@ sub write_ExonPairs {
 }
 
 =head2 delete_ExonPairs
-    
+
  Title   : delete_ExonPairs(@pairs)
  Usage   : $obj->delete_ExonPairs(@pairs)
  Function: Deletes all input exon pairs from the database
@@ -737,7 +876,6 @@ sub delete_ExonPairs {
  Example :
  Returns : 
  Args    :
-
 
 =cut
 
