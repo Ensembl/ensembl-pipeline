@@ -35,11 +35,11 @@ sub new {
   my $self = $class->SUPER::new(@args);    
   
   # Now parse the input options and store them in the object
-  my( $query, $program, $database, $do_not_project) = 
+  my( $query, $program, $database, $project) = 
       $self->_rearrange([qw(QUERY 
                             PROGRAM 
                             DATABASE 
-                            DONOTPROJECT)],
+                            PROJECT)],
                         @args);
   
   if ($query) {
@@ -58,8 +58,8 @@ sub new {
   $program = "wutblastx" if not $program;
   $self->program($self->find_executable($program));
 
-  if (defined($do_not_project)) {
-    $self->do_not_project($do_not_project);
+  if (defined($project)) {
+    $self->project($project);
   }
   
   my $core_options = "-cpus 1 -compat1.4 -lcfilter -matrix EXOFISH -sort_by_highscore W=5 X=25 T=75 S=89 S2=89";  
@@ -199,7 +199,7 @@ sub parse_results {
     }
   }
 
-  if (not $self->do_not_project) {
+  if ($self->project) {
     my (@projected_hits);
     
     foreach my $fp (sort {$a->start <=> $b->start} @features) {
@@ -362,14 +362,14 @@ sub output {
 }
 
 
-sub do_not_project {
-  my ($self, $do_not_project) = @_;
+sub project {
+  my ($self, $project) = @_;
 
-  if (defined($do_not_project)) {
-    $self->{'_do_not_project'} = $do_not_project;
+  if (defined($project)) {
+    $self->{'_project'} = $project;
   }
   
-  return $self->{'_do_not_project'};
+  return $self->{'_project'};
 }
 
 
