@@ -21,7 +21,13 @@ Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
 									  );
     $gene_machine->run;
 
-    my @new_transcripts = $gene_machine->output;
+    one can retrieve the lists of transcripts that can merge:
+    my @lists = $gene_machine->sub_clusters;
+   
+    where @lists is a list of listrefs, each one cointaining a list of transcript objects
+
+    one can retrieve the transcripts already merged:
+    my @merged_transcripts = $gene_machine->output;
 
 
 =head1 DESCRIPTION
@@ -87,7 +93,6 @@ sub new {
 
 =head2 run
 
-Usage   :   $self->run
  Function:   main magic and witchcraft on the transcripts. 
   it fills up the holder $self->output with transcript objects
   
@@ -98,20 +103,25 @@ sub run {
   my @transcripts = $self->input_transcripts;
 	 
   # cluster the transcripts
- my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
-	 print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
+  my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
+  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
-	 # merge the transcripts in each cluster according to consecutive exon overlap
-	 my @merged_transcripts  = $self->_merge_Transcripts(\@transcript_clusters);
-	 print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
+  # find the lists of clusters that can be merged together according to consecutive exon overlap
+  my @lists = $self->link_Transcripts( \@transcript_clusters );
+  print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
+
+  # merge each list into a putative transcript
+  my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
+  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
 	 
-	 $self->output(@merged_transcripts);
-	
+  $self->output(@merged_transcripts);
 }
+
+
 
 ############################################################
 #
-# METHODS CALLED BY THE RUN METHOD
+# CLUSTERING OF TRANSCRIPTS BY GENOMIC EXTENT
 #
 ############################################################
 
@@ -305,326 +315,318 @@ sub transcript_low{
   return $low;
 }
 
+
+############################################################
+#
+# CLUSTERING OF TRANSCRIPTS BY CONSECUTIVE EXON OVERLAP
+#
 ############################################################
 
+=head2 link_Transcripts
 
+ description: reads all the transcripts per cluster and merges those that
+              are redundant with each other, producing brand new transcripts from that,
+              see below the description of the algorithm
 
+ Algorithm:
 
+    pre-processing: cluster transcripts by genomic extent overlap (rough clustering), 
+                    done in _cluster_Transcripts_by_genomic_range
 
-#########################################################################
+    for each cluster of transcripts C
 
-=head2 _merge_Transcripts
+      pre-processing: sort the transcripts in C in ascending order by their start coordinate. If this coincides
+                      we sort desc by the end coordinate.
 
- Function: reads all the transcripts per cluster and merges those that
-           are redundant with each other, producing brand new transcripts from that,
-           see below the description of the algorithm
+      L = { all the lists that we are going to create }
 
-Algorithm:
-    
-    for each cluster of transcripts T={t}
-      for each transcript t1
-        loop over the rest t2
-           loop over those in the t1-set and only add t2 to this set if: 
-             at least merges to one in the set and with those that does not 
-             merge it should not overlap at all (to avoid merging things that shouldn't merge)
-     
-           allow for transcripts to be used twice
-      proceed as above with the next transcript in the list, 
+      for each transcript t_i in C {
 
+        start list list(i)(0) with t_i
+	list(i)(a) represents every list that begins with t_i
+ 
+        for each t_j in C, j>i {
+  
+          for each list(i)(a), a = 0,...,N {
+  
+            compare t_j with every element t_k in list(i)(a)  
+	  }
+	  there are 3 possibilities: 
+	      
+	  1. if t_j merges with at least one element in list(i)(a) and
+	     with those that do not merge, it does even not overlap,
+	     ==> add t_j to the end of list(i)(a)
+	         go to the next t_j
+		
+	  2. if t_j has the properties as in 1) but with a proper sub-list of list(i)(a)
+             ==> create a new list list(i)(a_max + 1) = sublist of list(i)(a) and add t_j at the end
+                 go to the next t_j
+  
+          3. if not 1. and not 2. ==> go to the next list list(i)(a+1)
+	}
 
-    once we've gone through the whole lot, merge the chosen transcripts and put the resulting 
-    transcript in an array.
-    
-    check that the resulting transcripts do not merge among themselves, 
-    we merge and create new transcripts out of those that still can merge
+        put the lists list(i)(a) a=0,...,N in L	
+        go to the next t_i
+      }
+
+      remove lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
+      sort the lists in L descending by the number of elements
+      accept the first list list_0
+      for each list_m in L m>0 {   
+        if list_m is not included in (or equal to) list_n for n = 0,...,m-1 ==> accept list_m
+      }
     
 =cut
 
-sub _merge_Transcripts{
-  my ($self,$ref_transcript_clusters,$strand) = @_;
-    
-  my @total_merged_transcripts;
-  
-  # look in each cluster
-  my $count =0;
+sub link_Transcripts{
+  my ($self,$transcript_clusters,$strand) = @_;
 
+  my @final_lists;  
+
+  # look in each cluster
  CLUSTER:
-  foreach my $cluster ( @{ $ref_transcript_clusters } ){
-    
-    $count++;
-    
-    # keep track of the transcripts originating each newly created one
-    # each $origin_list{$new_transcript} is an array of transcripts
-    my %origin_list;
+  foreach my $cluster ( @{ $transcript_clusters } ){
+     
+    # keep track of all the lists
+    my @lists;
+
+    # keep track of every list starting in each transcript:
+    my %lists;
 
     # get the transcripts in this cluster
     my @transcripts = $cluster->get_Transcripts;
     
-    # sort the transcripts by the number of exons in descending order
-    # for equal number of exons, order according to start coordinate
-    # this is crucial!!
-    @transcripts = sort { my $result = ( scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) );
-			  if ($result){
-			      return $result;
+    # sort the transcripts by the left most coordinate in ascending order
+    # for equal value, order by the right most coordinate in descending order
+    @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+	  		  if ($result){
+		 	    return $result;
+			   }
+			   else{
+			    return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
 			  }
-			  else{
-			      return ( $a->start_Exon->start <=> $b->start_Exon->start );
-			  }
-		      } @transcripts;
-    
-    ##############################
-    #print STDERR "\nNew Cluster:\n";
-    #foreach my $tran (@transcripts){
-    #  print STDERR "transcript: $tran\n";
-    #  foreach my $exon ( $tran->get_all_Exons ){
-    #	print STDERR $exon->start.":".$exon->end."  ";
-    #  }
-    #  print STDERR "\n";
-    #}
-    ##############################
-
-    # now we loop over the transcripts, 
-    my %is_merged;
-    
-    # store the transcripts we create
-    my %created_transcripts;
-    my %chosen_list;
+			} @transcripts;
     
     # for each transcript
   TRAN1:
-    for (my $u=0; $u<scalar(@transcripts); $u++){
+    for (my $i=0; $i<scalar(@transcripts); $i++){
 
-      # store the transcripts that can merge
-      my @current_list = ();
-      push (@current_list, $transcripts[$u]);
+      # store this one in the first list
+      my $first_list = [];
+      push (@$first_list, $transcripts[$i]);
+
+      # keep track of all the lists that start on $transcript[i]
+      push (@{$lists{$i}}, $first_list );
       
       # go over the rest
     TRAN2:
-      for (my $v=$u+1; $v<scalar(@transcripts); $v++){
+      for (my $j=$i+1; $j<scalar(@transcripts); $j++){
 	
-	my $overlap_ifnot_merged   = 0;
-	my $merge_to_current       = 0;
-	
-	# loop over the accepted transcripts
-	for (my $w=0; $w<scalar(@current_list); $w++){
+	# loop over each of the lists{i}
+      LIST:
+	foreach my $list ( @{$lists{$i}} ){
 	  
-	  # in order to merge a transcript...
-	  #print STDERR "comparing $current_list[$w] ($w) and $transcripts[$v] ($v)\n";
+	  # check whether this trans can be linked to this list or to a proper sublist
+	  # or maybe to none of the above
+	  my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
 	  
-	  my ($merge,$overlaps) = $self->_test_for_Merge( $current_list[$w], $transcripts[$v] );
-	  
-	  # ...there must be at least one in @current_list to which $transcripts[$v] merges
-	  #print STDERR "merge = $merge, overlaps = $overlaps\n";
-	  if ( 1 == $merge ){
-	    $merge_to_current = 1;
+	  unless ( $new_list ){
+	    next LIST;
 	  }
-
-	  # ...and it should not overlap with those to which it does not merge
-	  unless (1 == $merge){
-	    $overlap_ifnot_merged += $overlaps;
+	  # if it returns the same list
+	  if ( $new_list == $list ){
+	    
+	    # add the it to the current list:
+	    push( @$list, $transcripts[$j] );
+	    next TRAN2;
 	  }
-        }
-	
-	# ... and then it can merge to the list in @current_list
-	if ( 1 == $merge_to_current && 0 == $overlap_ifnot_merged ){
-	  push (@current_list, $transcripts[$v]);
-	}
-	
-      } # end of TRAN2
+	  # it could return a proper sub list
+	  elsif( $new_list != $list ){
+	    
+	    # add it to the sublist:
+	    push ( @$new_list , $transcripts[$j] );
+	    
+	    # add this new list to the $lists{$i}
+	    push ( @{$lists{$i}}, $new_list );
+	  }
+	  
+	} # end of LIST
+      }   # end of TRAN2
       
-      # keep track of the transcripts that are going to be used
-      $chosen_list{ $u } = \@current_list;
+      #put $lists{$i} in @lists
+      push ( @lists, @{$lists{$i}} );
 
-    }   # end of TRAN1
+    }  
 
-    # create a new transcript with those merged above
-    for (my $u=0; $u<scalar(@transcripts); $u++){
-      $created_transcripts{$u} = $self->_produce_Transcript( $chosen_list{ $u }, $strand );
-    }
- 
-    # at this point we have $created_transcripts{u=0,1,...,$#transcripts} transcripts
-    my @created_transcripts = values ( %created_transcripts );
+    # remove lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
     
-#    # print created transcripts
-#    @created_transcripts  = sort { my $result = ( scalar( $b->get_all_Exons ) <=> scalar( $a->get_all_Exons ) );
-#				     if ($result){
-#				       return $result;
-#				     }
-#				     else{
-#				       return ( $a->start_Exon->start <=> $b->start_Exon->start );
-#				     }
-#				   } @created_transcripts; 
+    # sort the lists in descending by the number of elements
+    my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
+    
+    my @accepted_lists;
 
-#    print STDERR "\ntranscripts created:\n";
-#    for (my $u=0; $u<scalar(@transcripts); $u++){
-#      print STDERR "tran ".$created_transcripts{$u}.":";
-#      foreach my $e1 ( $created_transcripts{$u}->get_all_Exons ){
-#	print STDERR $e1->start.":".$e1->end."\t";
-#      }
-#      print STDERR "\nFrom the following ones:\n";
+    # accept the longest list
+    push ( @accepted_lists, shift @sorted_lists );
+    
+    # check the rest
+  LIST:
+    while ( @sorted_lists ){
+      my $list = shift @sorted_lists;
+      my $found_embedding = 0;
       
-#      foreach my $tran ( @{ $chosen_list{$u} } ){
-#	print STDERR "   tran ".$tran.":";
-#	foreach my $e1 ( $tran->get_all_Exons ){
-#	  print STDERR $e1->start.":".$e1->end."\t";
-#	}
-#	print STDERR "\n";
-#      }
-#    }
-
-    # we process again the transcripts for possible residual merges
-    my @merged_transcripts = $self->_check_for_residual_Merge(\@created_transcripts,$strand);
-
-    ############################################################
-    # why do we still get residual merge?
-    # maybe we need to refine the algorithm so that it comes
-    # clean first time around
-    ############################################################
-
-    # We put here yet another check, to make sure that we really get rid of redundant things
-    
-    # if we have produce more than one transcript, check again
-    
-    if ( scalar( @merged_transcripts ) > 1 ){
-	my @merged_transcripts2 = $self->_check_for_residual_Merge(\@merged_transcripts,$strand);
-	
-	# replace then the previous list by this new one:
-	@merged_transcripts = ();
-	push ( @merged_transcripts, @merged_transcripts2);
-      } 
-  
-    # check for the single exon transcripts ( dandruff ), they are no good
-    print STDERR "Eliminating single exon transcripts this shouldn't be in ClusterMerge, it should be in EST_GeneBuilder\n";
-    my @final_merged_transcripts;
-    foreach my $tran ( @merged_transcripts ){
-	if ( scalar ( @{$tran->get_all_Exons} ) == 1 ){
-	    next;
+    ACCEPTED_LIST:
+      foreach my $accepted_list ( @accepted_lists ){
+	if ( $self->_check_embedding( $list, $accepted_list ) ){
+	  next LIST;
 	}
-	else{
-	    push( @final_merged_transcripts, $tran );
-	}
+      }
+      
+      # if we get to this point, it means that this list is genuine
+      push( @accepted_lists, $list );
     }
     
-    # keep track of everything it is created for every cluster
-    push (@total_merged_transcripts, @final_merged_transcripts);
+    # store the lists for this cluster into the big final list:
+    push (@final_lists, @accepted_lists);
     
-    # empty arrays to save memory
-    @merged_transcripts       = ();
-    @final_merged_transcripts = ();
-    
-  }     # end of CLUSTER		       
-		       
-  return @total_merged_transcripts;
+  } # end of CLUSTER
 		      
+  # @final_lists contain a list of listrefs, 
+  # each one containing the transcripts that can merge with each other		      
+
+
+  $self->sub_clusters( @final_lists );
+		       
+  return @final_lists;	      
 }
 
-#########################################################################
+############################################################
 
-=head2 _check_for_residual_Merge
- Function: this function is called from _merge_Transcripts and checks whether after merging the transcript
-           there is any residual merge
- Returns : It returns two numbers ($merge,$overlaps), where
-           $merge = 1 (0) when they do (do not) merge,
-           and $overlaps is the number of exon-overlaps.
+=head2 _test_for_link
+
+description: this method computes the largest proper sublist in $list 
+             starting in the same element as $list
+             to which $transcript can be linked
+             
+     Arg[1]: a listref with the list elements
+     Arg[2]: a transcript object
+     Return: it can return $list, a sub_list, or undef
 
 =cut
 
-sub _check_for_residual_Merge{
+sub _test_for_link{
+  my ($self, $list, $transcript ) = @_;
+  my $sublist   = undef;
+  my $can_merge = 0;
 
-   my ($self, $created_tran_ref, $strand) = @_;
-   my @created_transcripts = @$created_tran_ref;
-
-   # first of all, sort them again, this is CRUCIAL!!!
-   @created_transcripts = sort { my $result = ( scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) );
-				     if ($result){
-				       return $result;
-				     }
-				     else{
-				       return ( $a->start_Exon->start <=> $b->start_Exon->start );
-				     }
-				   } @created_transcripts;
-    
-
-    # we process the transcripts, the results go in this hash
-    my %new_transcripts;
-    my $max_label = 0;
-    my @labels;
-
-    # for each created transcript
-  TRAN: 
-    foreach my $tran (@created_transcripts){
-      my $found = 0;
-      my $label = 0;
-
-      # loop over the existing new_transcripts
-    NEW_TRAN: 
-      foreach my $k ( @labels ){
-
-	# take each new_transcript
-	my $new_tran = $new_transcripts{ $k };
-	
-#	# test for merge
-#	print STDERR "comparing\n";
-#	print STDERR $new_tran.":";
-#	foreach my $e1 ( $new_tran->get_all_Exons ){
-#	  print STDERR $e1->start.":".$e1->end."\t";
-#	}
-#	print STDERR "\n".$tran.":";
-#	foreach my $e1 ( $tran->get_all_Exons ){
-#	  print STDERR $e1->start.":".$e1->end."\t";
-#	}
-#	print STDERR "\n";
-      
-	my ($merge,$overlaps) = $self->_test_for_Merge( $new_tran, $tran );
-
-	# if they can merge, merge them and put the new transcript in this place 
-	if ( $merge == 1 ){
-	  $found = 1;
-	  my @list = ( $new_tran, $tran );
-	  #print STDERR "They MERGE,\n";
-	  #print STDERR "adding it to new_transcripts[ $label ] = $new_transcripts{ $label }\n";
-	  my $new_transcript = $self->_produce_Transcript( \@list, $strand );
-	  $new_transcripts{ $label } = $new_transcript;
-	  #print STDERR "producing a new  new_transcripts[ $label ] = $new_transcripts{ $label }\n\n";
-	  next TRAN;
-	}
-	else{
-	  # go to the next cluster
-	  $label++;
-	}
-      } # end of NEW_TRAN
-      
-      # if it does not merge to any transcript, create a new new_tran
-      if ($found == 0) {
-	$max_label = $label;
-	push ( @labels, $label);
-	#print STDERR "*** LABEL: $label ***\n";
-	$new_transcripts{ $label } = $tran;
-      }    
-    
-    }   # end of TRAN
-
-    my @merged_transcripts = values( %new_transcripts );
-
-   # ### print out the results
-#    print STDERR "Transcripts created:\n";
-#    foreach my $tran ( @merged_transcripts ){
-#      print STDERR "tran ".$tran.":";
-#      foreach my $e1 ( $tran->get_all_Exons ){
-#	print STDERR $e1->start.":".$e1->end."\t";
-#      }
-#      print STDERR "\n";
-#    }
-
-  return @merged_transcripts;
+ LINK:
+  foreach my $trans_link ( @$list ){
+     my ($merge,$overlaps) = $self->_test_for_Merge( $trans_link, $transcript );
+     if ($merge == 1 ){
+       $can_merge = 1;
+     }
+     # the transcript can be appended to this list if
+     # it merges to at least one member of the list
+     # and it does not overlap with those member with which
+     # it cannot merge
+     if ( $merge == 1 || $overlaps == 0 ){
+        
+        # it links to this one
+        push ( @{$sublist}, $trans_link );
+     }
+     else{
+	# stop searching as soon as we find an element to which it does not link
+        last LINK;
+     }
+  }  
+  if ( scalar( @$sublist ) == 0 || $can_merge == 0){
+     return undef;
+  }
+  elsif ( scalar( @$sublist ) > 0 &&  scalar( @$sublist ) < scalar( @$list ) ){
+     return $sublist;
+  }
+  elsif ( scalar( @$sublist ) == scalar( @$list ) ){
+     return $list;
+  }
+  else{
+      $self->throw("I didn't expect to be here!!");
+  }
 }
 
+############################################################
 
+=head2 _check_embedding
 
-#########################################################################
+     Arg[1]: a listref of transcripts
+     Arg[2]: a listref of transcripts which potentially contains Arg[1]
+description: this method checks whether Arg[1] is included in Arg[2], in the following sense
+             if list2 = ( 1,3,4,6 ) and list1 = ( 3,4) ==> list2 includes list1. 
+             It mimics the idea of the Boyer-Moore algorithm
+
+=cut
+
+sub _check_embedding{
+  my ( $self, $list, $bigger_list ) = @_;
+  
+  my @list = @$list;
+  my @bigger_list = @$bigger_list;
+  unless ( scalar(@list) <= scalar( @bigger_list ) ){
+      $self->throw("problem with the sorting, please check!");
+  }
+  
+  # with a bit of preprocessing this can be made pretty quick
+  
+  # last element in list:
+  my $last_in_list = $list[$#list];
+
+  # store the positions where this element occurs in bigger_list starting from the right
+  my @positions;
+  for (my $k= $#bigger_list; $k>=0; $k-- ){
+      if ( $bigger_list[$k] == $last_in_list ){
+	  push( @positions, $k);
+	  last;
+      }
+  }
+
+  # if it does not occur in bigger_list, return false
+  unless (@positions){
+      return 0;
+  }
+
+  # else, start matching from that position:
+  my $i = $#list;  
+  my $j = shift @positions;
+
+  while ( $j >=0 ){
+            
+      while ( $list[$i] == $bigger_list[$j] && $i >=0 && $j >= 0){
+	  $i--;
+	  $j--;
+      }
+
+      if ( $i == -1 ){
+	  # list is embedded in bigger_list
+	  return 1;
+      }
+      elsif ( @positions ){
+	  # start looking from the next occurrence of $last_in_list in @bigger_list
+	  $j = shift @positions;
+	  $i = $#list;
+      }
+      else{
+	  # no more occurrences
+	  return 0;
+      }
+  }
+  
+  # sorry, we got to the end of bigger_list, and no match was found
+  return 0;
+}
+
+############################################################
+
 
 =head2 _test_for_Merge
- Function: this function is called from _merge_Transcripts and actually checks whether two transcripts
+ Function: this function is called from link_Transcripts and actually checks whether two transcripts
            inputs merge.
  Returns : It returns two numbers ($merge,$overlaps), where
            $merge = 1 (0) when they do (do not) merge,
@@ -726,82 +728,93 @@ EXON1:
   return ($merge,$overlaps);
 }
   
-
-
+############################################################
+#
+# MERGE TRANSCRIPTS
+#
 ############################################################
 
-=head2 _produce_Transcript
- Function: reads all the est2genome transcripts that can be merged and make a single transcript
-           out of them
+=head2 merge_Transcripts
+
+description: make a transcript for every list built above in link_Transcripts().
+             the procedure goes by clustering the exons, finding the splice ends
+             and then producing the transcripts.
+        Arg: a listref with al the listrefs produced in link_Transcripts()
+
 =cut
 
-sub _produce_Transcript{
-  my ($self,$merged,$strand) = @_;
-
-  my @allexons;
-  my %exon2transcript;			
-  my %is_first;
-  my %is_last;			
-	       
-  # collect all exons
-  foreach my $tran (@{ $merged }){
-
-    my @exons = @{$tran->get_all_Exons};
-
-    # sort them in genomic order
-    @exons    = sort { $a->start <=> $b->start } @exons;
-
-    push ( @allexons, @exons );
+sub merge_Transcripts{
+    my ($self,$lists) = @_;
+	
+    my @merged_transcripts;
     
-    # keep track of whether the exons is first or last and the transcript it belongs to
-    for (my $i = 0; $i< scalar( @exons ); $i++){
-      if ( 0 == $i ){
-	$is_first{$exons[$i]} = 1;
-      }
-      else{
-	$is_first{$exons[$i]} = 0;
-      }
-      if ( $#exons == $i ){
-	$is_last{$exons[$i]} = 1;
-      }
-      else{
-	$is_last{$exons[$i]} = 0;
-      }
-      $exon2transcript{$exons[$i]} = $tran;
+    foreach my $list ( @$lists ){
+	
+	my @allexons;
+	my %exon2transcript;			
+	my %is_first;
+	my %is_last;			
+	
+	# collect all exons
+	foreach my $tran (@{ $list }){
+	    
+	    my @exons = @{$tran->get_all_Exons};
+	    
+	    # sort them in genomic order regardless of the strand
+	    @exons    = sort { $a->start <=> $b->start } @exons;
+	    
+	    push ( @allexons, @exons );
+	    
+	    # keep track of whether the exons is first or last and the transcript it belongs to
+	    for (my $i = 0; $i< scalar( @exons ); $i++){
+		if ( 0 == $i ){
+		    $is_first{$exons[$i]} = 1;
+		}
+		else{
+		    $is_first{$exons[$i]} = 0;
+		}
+		if ( $#exons == $i ){
+		    $is_last{$exons[$i]} = 1;
+		}
+		else{
+		    $is_last{$exons[$i]} = 0;
+		}
+		$exon2transcript{$exons[$i]} = $tran;
+	    }
+	}
+	
+	# cluster the exons
+	my $first_cluster_list = $self->_cluster_Exons( @allexons );
+	
+	# set start and end of the clusters (using the info collected above)
+	my $cluster_list = $self->_set_splice_Ends($first_cluster_list,\%exon2transcript,\%is_first,\%is_last);
+	
+	# we turn each cluster into an exon and create a new transcript with these exons
+	my $transcript    = Bio::EnsEMBL::Transcript->new();
+	my @exon_clusters = $cluster_list->sub_SeqFeature;
+	
+	foreach my $exon_cluster (@exon_clusters){
+	    
+	    my $new_exon = Bio::EnsEMBL::Exon->new();
+	    $new_exon->start ($exon_cluster->start );
+	    $new_exon->end   ($exon_cluster->end   );
+	    
+	    # set the strand to be the same as the exon_cluster
+	    $new_exon->strand($exon_cluster->strand);
+	    
+	    my %evidence_hash;
+	    my %evidence_obj;
+	    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
+		$self->_transfer_Supporting_Evidence($exon,$new_exon);
+	    }
+	    
+	    $transcript->add_Exon($new_exon);
+	}
+	
+	push ( @merged_transcripts, $transcript );
     }
-  }
-
-  # cluster the exons
-  my $first_cluster_list = $self->_cluster_Exons( @allexons );
-
-  # set start and end of the clusters (using the info collected above)
-  my $cluster_list = $self->_set_splice_Ends($first_cluster_list,\%exon2transcript,\%is_first,\%is_last,$strand);
-
-  # we turn each cluster into an exon and create a new transcript with these exons
-  my $transcript    = Bio::EnsEMBL::Transcript->new();
-  my @exon_clusters = $cluster_list->sub_SeqFeature;
-
-  foreach my $exon_cluster (@exon_clusters){
-
-    my $new_exon = Bio::EnsEMBL::Exon->new();
-    $new_exon->start ($exon_cluster->start );
-    $new_exon->end   ($exon_cluster->end   );
+    return @merged_transcripts;
     
-    ###  dont't set strand yet, genomewise cannot handle that ###
-    # we put it to 1 anyway, so that minigenomewise does not complain?
-    # the real strand will be dealt with in the run method
-    $new_exon->strand(1);
-
-    my %evidence_hash;
-    my %evidence_obj;
-    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
-      $self->_transfer_Supporting_Evidence($exon,$new_exon);
-    }
-
-    $transcript->add_Exon($new_exon);
-  }
- 			
-  return $transcript;
 }
 
 ############################################################
@@ -869,16 +882,23 @@ sub _cluster_Exons{
 
 ############################################################
 
-
 =head2 _set_splice_Ends
 
-    Usage   :   $cluster_list = $self->_set_splice_Ends($cluster_list)
-    Function:   Resets the ends of the clusters to the most frequent coordinate
-   
+  Function: Resets the ends of the clusters to the most frequent coordinate
+            not allowing to contribute exons which are at one end of its
+            original transcript. When the cluster represents the first or the lasst exon
+            of the merged transcript, we always take the external exon coordinate that
+            extends the transcript the most, to allow for UTRs to build up.
+    Arg[1]: listref with the exon_clusters
+    Arg[2]: hashref assigning to each exon, the transcripts it comes from
+    Arg[3]: hashref holding a BOOLEAN for each exon to test whether it is the first in the transcript
+    Arg[4]: hashref holding a BOOLEAN for each exon to test whether it is the last in the transcript
+            Note - order in transcripts is here considered low-coord to high-coord, regardles of
+            the strand
 =cut
 
 sub _set_splice_Ends {
-  my ($self, $cluster_list, $ref_exon2transcript_hash, $ref_is_first, $ref_is_last, $strand) = @_;
+  my ($self, $cluster_list, $ref_exon2transcript_hash, $ref_is_first, $ref_is_last) = @_;
 
   # hash having exons as keys and mother-transcript as value
   my %exon2transcript = %$ref_exon2transcript_hash;
@@ -1267,6 +1287,19 @@ sub output {
 	push( @{$self->{_output_transcripts} }, @transcripts );
     }
     return @{$self->{_output_transcripts} };
+}
+
+############################################################
+
+# this holds a lists of lists, where each list
+# contains the transcripts that can be merged with each other
+
+sub sub_clusters {
+  my ($self,@lists) = @_;
+  if ( @lists ){
+    push ( @{ $self->{_sub_clusters} }, @lists );
+  }
+  return @{$self->{_sub_clusters}};
 }
 
 ############################################################
