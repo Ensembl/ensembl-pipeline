@@ -515,17 +515,17 @@ sub run{
 
   print STDERR "================ GENES MADE =====================\n";
   print STDERR scalar($self->ensembl_genes)." ensembl genes (".scalar(@original_ens_transcripts)." transcripts) and ".
-      scalar($self->estgenes)." estgenes (".scalar(@original_est_transcripts)." transcripts)\n";    
+    scalar($self->estgenes)." estgenes (".scalar(@original_est_transcripts)." transcripts)\n";    
   print STDERR "have produced ".scalar(@transcripts)." transcripts, which are clustered into ".scalar(@newgenes)." genes:\n";
   my $count = 0;
   foreach my $gene (@newgenes){
-      $count++;
-      print STDERR "gene $count: ".$gene->type."\n";
-      foreach my $transcript (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-      }
+    $count++;
+    print STDERR "gene $count: ".$gene->type."\n";
+    foreach my $transcript (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    }
   }
-
+  
   print STDERR scalar(@newgenes)." genes 2b remapped\n";
   # remap them to raw contig coordinates
   my @remapped = $self->_remap_Genes(\@newgenes);
@@ -539,7 +539,6 @@ sub run{
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
       }
   }
-  
   print STDERR scalar(@remapped)." genes remapped\n";
   
   # store the genes
@@ -557,8 +556,6 @@ sub run{
 # METHODS CALLED FROM RUN METHOD... DOING ALL THE MAGIC
 #
 ############################################################
-
-
 
 
 # this method cluster genes only according to genomic extent
@@ -2280,12 +2277,12 @@ sub _make_Genes{
       $gene->type($genetype);
       $gene->analysis($analysis);
       foreach my $t (@{$gene->get_all_Transcripts}){
-	  unless (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($t) ){
-	      $self->warn("You don't want to write a transcript with stop codons!");
-	  }
+	unless (  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($t) ){
+	  $self->warn("You don't want to write a transcript with stop codons!");
+	}
       }
-  }
-
+    }
+  
   return @genes;
 }
 
@@ -2711,71 +2708,6 @@ sub _transfer_transcript_supporting_evidence{
 	    }
 	}
     }
-}
-
-
-
-############################################################
-
-=head2 _transfer_supporting_evidence
-
- Title   : _transfer_supporting_evidence
- Usage   : $self->transfer_supporting_evidence($source_exon, $target_exon)
- Function: Transfers supporting evidence from source_exon to target_exon, 
-           after checking the coordinates are sane and that the evidence is not already in place.
- Returns : nothing, but $target_exon has additional supporting evidence
-
-=cut
-
-sub _transfer_supporting_evidence{
-  my ($self, $source_exon, $target_exon) = @_;
-  
-  my @target_sf = @{$target_exon->get_all_supporting_features};
-  #  print "target exon sf: \n";
-  #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
-  
-  #  print "source exon: \n";
- 
-  # keep track of features already transferred, so that we do not duplicate
-  my %unique_evidence;
-  my %hold_evidence;
-
- SOURCE_FEAT:
-  foreach my $feat ( @{$source_exon->get_all_supporting_features}){
-    next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
-    
-    # skip duplicated evidence objects
-    next SOURCE_FEAT if ( $unique_evidence{ $feat } );
-    
-    # skip duplicated evidence 
-    if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
-      #print STDERR "Skipping duplicated evidence\n";
-      next SOURCE_FEAT;
-    }
-
-    #$self->print_FeaturePair($feat);
-    
-  TARGET_FEAT:
-    foreach my $tsf (@target_sf){
-      next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
-      
-      if($feat->start    == $tsf->start &&
-	 $feat->end      == $tsf->end &&
-	 $feat->strand   == $tsf->strand &&
-	 $feat->hseqname eq $tsf->hseqname &&
-	 $feat->hstart   == $tsf->hstart &&
-	 $feat->hend     == $tsf->hend){
-	
-	#print STDERR "feature already in target exon\n";
-	next SOURCE_FEAT;
-      }
-    }
-    #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
-    #$self->print_FeaturePair($feat);
-    $target_exon->add_supporting_features($feat);
-    $unique_evidence{ $feat } = 1;
-    $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
-  }
 }
 
 ############################################################
