@@ -250,7 +250,16 @@ sub filter_output{
 
   my %matches;
 
+TRAN:
   foreach my $transcript (@results ){
+    my $score    = $self->_coverage($transcript);
+    my $perc_id  = $self->_percent_id($transcript);
+
+    ##########################################
+    # lower bound: 40% identity, 40% coverage
+    # to avoid unnecessary processing
+    ##########################################
+    next TRAN unless ( $score >= 40 && $perc_id >= 40 );
     my $id = $self->_evidence_id($transcript);
     push ( @{$matches{$id}}, $transcript );
   }
