@@ -84,7 +84,7 @@ BEGIN {
 
 sub new {
   my ($class,@args) = @_;
-q  my $self = $class->SUPER::new(@args);    
+  my $self = $class->SUPER::new(@args);    
   
   $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
   $self->{'_sequence'}  = undef; # location of Bio::Seq object
@@ -94,7 +94,7 @@ q  my $self = $class->SUPER::new(@args);
   $self->{'_filename'}  = undef; # file to store Bio::Seq object
   $self->{'_results'}   = undef; # file to store results of eponine-scan
   $self->{'_protected'} = [];    # a list of files protected from deletion ???
-  $self->{'_threshold'} = 0.999  # minimum posterior for filtering predictions 
+  $self->{'_threshold'} = 0.999; # minimum posterior for filtering predictions 
   
   print STDERR "args: ", @args, "\n";
 
@@ -137,7 +137,7 @@ q  my $self = $class->SUPER::new(@args);
   }
   
   if (defined $threshold && $threshold >=0 ){
-      $self->threshold($gc);
+      $self->threshold($threshold);
   } else {
       $self->threshold(50); 
   }
@@ -255,7 +255,7 @@ sub run {
     #write sequence to file
     $self->writefile();        
     $self->run_eponine();
-    #parse output of cpg
+    #parse output of eponine
     $self->parse_results();
     $self->deletefiles();
 }
@@ -272,7 +272,7 @@ sub run {
 =cut
 sub run_eponine {
     my ($self) = @_;
-    #run cpg
+    #run eponine
     print "Running eponine-scan\n";
     $self->throw("Error running eponine-scan on ".$self->filename."\n") 
         if (system ($self->java.' -fast -jar '.$self->epojar.' -seq '.$self->filename.' -threshold '.$self->threshold." > ".$self->results)); 
@@ -385,7 +385,7 @@ sub create_feature {
 
     if ($tss)
       {
-	$cpg->validate();
+	$tss->validate();
 
 	# add to _flist
 	push(@{$self->{'_flist'}}, $tss);

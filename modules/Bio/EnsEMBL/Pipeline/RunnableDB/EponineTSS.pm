@@ -92,7 +92,7 @@ sub new {
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for CPG from the database
+    Function:   Fetches input data for Eponine from the database
     Returns :   none
     Args    :   none
 
