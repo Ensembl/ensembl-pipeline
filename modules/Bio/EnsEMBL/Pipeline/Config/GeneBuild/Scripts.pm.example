@@ -61,15 +61,6 @@ use vars qw( %Scripts );
 	    # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
 	    GB_KILL_LIST   => '',
 	    
-	    # eg TargettedGeneE2G
-	    # array of hashes, each has contains the runnable class name and the analysis logic name
-	    GB_TARGETTED_RUNNABLES   => [
-					 { 
-					  runnable => '',
-					  analysis => '',
-					 }
-					],
-	    
 	    # array of hashes, each hash contains the runnable class name and the analysis logic name
 	    GB_LENGTH_RUNNABLES      => [
 					 {
