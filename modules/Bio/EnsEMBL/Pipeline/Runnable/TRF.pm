@@ -268,7 +268,7 @@ sub parse_results {
         $start,          $end,            $period_size,
         $copy_number,    $consensus_size, $percent_matches,
         $percent_indels, $score,          $A,
-        $T,              $G,              $C,
+        $C,              $G,              $T,
         $entropy,        $mer
        ) = split;
     
