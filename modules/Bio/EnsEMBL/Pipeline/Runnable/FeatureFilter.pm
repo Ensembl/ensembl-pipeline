@@ -19,7 +19,8 @@ Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter - Filters a search runnable
                                                     -coverage  => 5,
 					            -minscore  => 100,
 					            -maxevalue => 0.001,
-					            -prune     => 1
+					            -prune     => 1,
+						    -hardprune => 1
 				                                 );
 
    my @filteredfeatures = $search->run(@features);
@@ -27,10 +28,13 @@ Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter - Filters a search runnable
 =head1 DESCRIPTION
 
 Filters search results, such as Blast, on several criteria. The most
-important ones are minscore, maxevalue and coverage. Crudely, coverage
-reduces redundant data (e.g., almost-identical ESTs with different
-accession numbers), and prune reduces overlapping features (e.g., hits
-to a repetitive sequence).
+important ones are minscore, maxevalue, coverage and hardprune.
+Crudely, coverage reduces redundant data (e.g., almost-identical ESTs
+with different accession numbers), and prune reduces overlapping
+features (e.g., hits to a repetitive sequence). If hardprune is in
+effect, a separate, final prune-like step is performed across all
+features, to ensure no genomic base is covered to more than the
+specified depth per strand.
 
 Coverage filtering is compulsory and is intended to reduce excessive
 coverage of each strand of the query. In detail, coverage filtering
@@ -59,19 +63,27 @@ features are considered in decreasing order of score.
 Coverage filtering is conservative in that it keeps all features for
 a hit-sequence-accession unless all features for that
 hit-sequence-accession are covered too deeply. If there is but one
-feature that isn't covered so deeply, this will save all features
-for this hit-sequence-accession. Hence coverage filtering does not
+feature that isn't covered too deeply, this will save all features
+for the hit-sequence-accession. Hence coverage filtering does not
 provide a hard limit on the depth of coverage.
 
-The option prune, if on, allows only a maximum number of features
-per strand per genomic base per hit sequence accession, this number
-also being specified by the coverage parameter. Prune works on a
-per-hit-sequence-accession basis and removes features (not entire
-hit-sequence-accessions) until the criterion is met for each
-hit-sequence-accession. Prune filtering occurs after coverage
+The option prune is off by default. If on, it allows only a maximum
+number of features per strand per genomic base per hit sequence
+accession, this number also being specified by the coverage parameter.
+Prune works on a per-hit-sequence-accession basis and removes features
+(not entire hit-sequence-accessions) until the criterion is met for
+each hit-sequence-accession. Prune filtering occurs after coverage
 filtering. It provides a hard limit on the depth of coverage by
 each hit-sequence-accession, but does not prevent deep overall
 coverage by many different hit-sequence-accessions.
+
+The option hardprune is off by default. If on, allows only a maximum
+number of features per strand per genomic base. This is achieved by a
+prune-like step in which all features are considered together,
+irrespective of hit-sequence-accession. This is more severe than
+the above prune step and provides a hard limit on the depth of
+coverage of genomic sequence. Hardprune can be performed with or
+without prune. The hardprune step is the final stage of filtering.
 
 =head1 CONTACT
 
@@ -103,24 +115,25 @@ sub new {
 
   my $self = $class->SUPER::new(@args);  
 
-  my($minscore,$maxevalue,$coverage,$prune) = $self->_rearrange([qw(MINSCORE
+  my($minscore,$maxevalue,$coverage,$prune, $hardprune) = $self->_rearrange(
+                                                                [qw(MINSCORE
 								    MAXEVALUE
 								    COVERAGE
 								    PRUNE
-							     )],
-							 @args);
-
-
+								    HARDPRUNE
+							           )], @args);
 
   $minscore  = -100000 unless $minscore;
   $maxevalue = 0.1     unless $maxevalue;
   $coverage  = 10      unless $coverage;
   $prune     = 0       unless $prune;
+  $hardprune = 0       unless $hardprune;
 
   $self->minscore($minscore);
   $self->maxevalue($maxevalue);
   $self->coverage($coverage);
-  $self->prune   ($prune);
+  $self->prune($prune);
+  $self->hardprune($hardprune);
   
   $self->{'_output'} = [];
 
@@ -273,24 +286,60 @@ sub run{
     }
   }
   
+  my @accepted_features = ();
   if ($self->prune) {
-    my @new = ();
-    foreach my $hid ( keys %accepted_hids ){
+    foreach my $hid ( keys %accepted_hids ) {
       my @tmp = $self->prune_features(@{$hitarray{$hid}});
-      push(@new,@tmp);
+      push(@accepted_features, @tmp);
     }
-    %accepted_hids = ();	# free some memory?
-    return @new;
-  
   } else {
-    my @accepted_features = ();
-    foreach my $hid ( keys %accepted_hids ){
+    foreach my $hid ( keys %accepted_hids ) {
       push(@accepted_features, @{$hitarray{$hid}} );
     }
-    %accepted_hids = ();	# free some memory?
-    return @accepted_features;
   }
+
+  # free some memory?
+  %accepted_hids = ();
+  %hitarray = ();
+
+  if ($self->hardprune) {
+    # prune all together taking the first '$self->coverage' according to score 
+    @accepted_features = $self->prune_features( @accepted_features );
+  }
+
+  return @accepted_features;
+    
 }
+
+=head2 hardprune
+
+ Title   : hardprune
+ Usage   : $obj->hardprune(0);
+ Function: 
+ Returns : value of hardprune
+ Args    : newvalue (optional), nonzero for 'on'
+
+
+=cut
+
+sub hardprune {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_hardprune} = $arg;
+  }
+  return $self->{_hardprune};
+}
+
+=head2 prune
+
+ Title   : prune
+ Usage   : $obj->prune(1);
+ Function: 
+ Returns : value of prune
+ Args    : newvalue (optional), nonzero for 'on'
+
+=cut
 
 sub prune {
   my ($self,$arg) = @_;
