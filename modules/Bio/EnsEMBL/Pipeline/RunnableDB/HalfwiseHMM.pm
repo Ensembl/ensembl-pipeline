@@ -318,12 +318,16 @@ sub _make_genes {
   foreach my $tmpf (@tmpf) {
     my $gene       = new Bio::EnsEMBL::Gene;
     my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
-
+    #my $translation = $transcript->translate;
+    #if($translation->seq =~ /\*/){
+    #  next;
+    #}else{
     $gene->type($genetype);
     $gene->analysis($analysis_obj);
     $gene->add_Transcript($transcript);
-
+    
     push (@genes, $gene)
+      #}
   }
 
   return @genes;
@@ -371,7 +375,7 @@ sub _make_transcript{
     $exon->strand($exon_pred->strand);
     
     $exon->phase($exon_pred->phase);
-    $exon->attach_seq($contig);
+    $exon->attach_seq($contig->primary_seq);
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
