@@ -323,12 +323,12 @@ sub parse_results {
             $feature {end} = $element[2];
             $feature {strand} = 0;
             $feature {program} = 'cpg';
-	    $feature {program_version} = '1';
-	    $feature {display_label} = "oe = $oe";
-          
-	    $self->create_feature(\%feature);
-
-	  
+            $feature {program_version} = '1';
+            $feature {display_label} = "oe = $oe";
+            
+            $self->create_feature(\%feature);
+            
+            
         }
     }
     close $filehandle;   
@@ -365,31 +365,15 @@ sub output {
 =cut
 sub create_feature {
     my ($self, $feat) = @_;
-
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => $feat->{'program'},
-                            -program_version => $feat->{'program_version'},
-                            -gff_source      => $feat->{'source'},
-                            -gff_feature     => $feat->{'primary'});
-
     #create and fill Bio::EnsEMBL::Seqfeature object
-    my $cpg = Bio::EnsEMBL::SimpleFeature->new
-                        (   -seqname => $feat->{'name'},
-                            -start   => $feat->{'start'},
-                            -end     => $feat->{'end'},
-                            -strand  => $feat->{'strand'},
-                            -score   => $feat->{'score'},
-                            -analysis => $analysis_obj);  
-
+    my $cpg = Bio::EnsEMBL::SimpleFeature->new();  
     $cpg->display_label($feat->{'display_label'});
-    if ($cpg)
-      {
-	
-
-	# add to _flist
-	push(@{$self->{'_flist'}}, $cpg);
+    $cpg->start($feat->{'start'});
+    $cpg->end($feat->{'end'});
+    $cpg->strand(0);
+    $cpg->score($feat->{'score'});
+    if ($cpg){
+        # add to _flist
+        push(@{$self->{'_flist'}}, $cpg);
       }
 }
