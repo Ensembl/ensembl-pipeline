@@ -41,7 +41,7 @@ required for databse access.
 
 =head1 CONTACT
 
-Describe contact details here
+For general Ensembl comments mail to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -104,7 +104,7 @@ sub fetch_input {
     my $cloneid  = $self->input_id;
     my $clone    = $self->dbobj->get_Clone($cloneid);
     foreach my $contig ($clone->get_all_Contigs()) {
-	my $genseq = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+	my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
 	$self->runnable($genseq);
     }
 }
@@ -112,6 +112,7 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $genseq) = @_;
+    my $arguments = "";
     
     if ($genseq)
     {
@@ -125,11 +126,17 @@ sub runnable {
             foreach my $pair (@pairs)
             {
                 my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
-            }
+		if ($key && $value) {
+		    $parameters{$key} = $value;
+		}
+		else {
+		    $arguments .= " $key ";
+		}
+	    }
         }
-        $parameters {'-db'}      = $self->analysis->db_file();  
+        $parameters {'-sts'}     = $self->analysis->db_file();  
         $parameters {'-clone'}   = $genseq;
+        $parameters {'-options'} = $arguments;
         push (@{$self->{'_runnable'}}, 
 	      Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(%parameters));
     }

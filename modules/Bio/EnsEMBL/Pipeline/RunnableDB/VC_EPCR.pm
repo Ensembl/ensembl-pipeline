@@ -144,7 +144,7 @@ sub runnable {
 		}
             }
         }
-        $parameters {'-db'}      = $self->analysis->db_file();  
+        $parameters {'-sts'}     = $self->analysis->db_file();  
         $parameters {'-options'} = $arguments;
         $parameters {'-pcr'}     = $self->analysis->program_file();  
         #creates empty Bio::EnsEMBL::Runnable::EPCR object

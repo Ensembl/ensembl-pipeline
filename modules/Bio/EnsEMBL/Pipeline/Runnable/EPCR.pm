@@ -17,46 +17,27 @@ Bio::EnsEMBL::Pipeline::Runnable::EPCR
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
-  my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
-  $seq = $seqstream->next_seq();
-  #create Bio::EnsEMBL::Pipeline::Runnable::EPCR object
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
+  my $seq = $seqstream->next_seq();
+
+  #create and run Bio::EnsEMBL::Pipeline::Runnable::EPCR object
   my $pcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (-QUERY => $seq);
   $pcr->workdir($workdir);
   $pcr->run();
+
+  # collect results
   my @results = $pcr->output();
 
 =head1 DESCRIPTION
 
 EPCR takes a Bio::Seq (or Bio::PrimarySeq) object and runs e-PCR on it. The
 resulting .out file is parsed to produce a set of feature pairs.
-Arguments can be passed to e-PCR through the arguments() method. 
 Options can be passed to e-PCR through the options() method. 
-
-=head2 Methods:
-
-=over4
-
-=item new($seq_obj)
-
-=item epcr($path_to_EPCR)
-
-=item workdir($directory_name)
-
-=item arguments($args)
-
-=item options($args)
-
-=item run()
-
-=item output()
-
-=back
 
 =head1 CONTACT
 
-Describe contact details here
+For general Ensembl comments mail to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -72,22 +53,20 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Repeat;
 use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis; 
-use Bio::Seq;
-use Bio::SeqIO;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+
 
 =head2 new
 
-    Title   :   new
-    Usage   :   my $obj = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(-QUERY => $seq);
-    Function:   Initialises EPCR object
-    Returns :   a EPCR Object
-    Args    :   A Bio::Seq object (-QUERY), a database (-DB).
+Initializes EPCR object. Takes a Bio::Seq object and an STS database.
+
+  my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
+      -query => $seq
+      -sts   => 'sts_file'
+  );
 
 =cut
 
@@ -103,10 +82,10 @@ sub new {
     $self->{'_results'}   = undef; # file to store results of EPCR
     $self->{'_options'}   = undef; # file to store results of EPCR
     $self->{'_protected'} = [];    # a list of files protected from deletion
-    $self->{'_db'}        = undef;
+    $self->{'_sts'}       = undef;
     
-    my( $query, $epcr, $db, $options) = $self->_rearrange([qw(
-	QUERY PCR DB OPTIONS
+    my( $query, $epcr, $sts, $options) = $self->_rearrange([qw(
+	QUERY PCR STS OPTIONS
     )], @args);
 
     $epcr = 'e-PCR' unless ($epcr);
@@ -116,8 +95,8 @@ sub new {
 
     $self->epcr   ($self->find_executable($epcr));
 
-    if (defined($db)) {
-      $self->db     ($self->find_file($db));
+    if (defined($sts)) {
+      $self->sts     ($self->find_file($sts));
     } else {
       $self->throw("No primer database entered\n");
     }
@@ -125,9 +104,33 @@ sub new {
     return $self; 
 }
 
-#################
-# get/set methods 
-#################
+
+=head2 Get/set methods
+
+=over 4
+
+=item epcr
+
+name of binary (e.g. 'e-PCR'),
+or explicit location if a full path is given
+
+=item options
+
+options to pass to e-PCR, such as margin size 'M=200'
+
+=item query
+
+a Bio::Seq like object on which the analysis will be run
+
+=item sts
+
+Location of STS file containing primer pairs and names of markers
+(e.g. 'mapprimer_maps_110')
+
+=back
+
+=cut
+
 
 sub query {
     my ($self, $seq) = @_;
@@ -146,90 +149,46 @@ sub query {
     return $self->{'_query'};
 }
 
-=head2 epcr
-
-    Title   :   epcr
-    Usage   :   $obj->epcr('~humpub/bin/EPCR');
-    Function:   Get/set method for the location of EPCR
-    Args    :   File path (optional)
-
-=cut
 
 sub epcr {
     my ($self, $location) = @_;
     if ($location)
     {
-        $self->throw("e-PCR not found at $location: $!\n") 
-                                                    unless (-e $location);
+        $self->throw("e-PCR binary not found at $location: $!\n") 
+         unless (-e $location);
         $self->{'_epcr'} = $location ;
     }
     return $self->{'_epcr'};
 }
 
-=head2 options
 
-    Title   :   options
-    Usage   :   $obj->options('M=500');
-    Function:   Get/set method for e-PCR options
-    Args    :   File path (optional)
-
-=cut
-
-
-=head2 arguments
-
-    Title   :   arguments
-    Usage   :   $obj->arguments('-init wing -pseudo -caceh -cut 25 -aln 200 -quiet');
-    Function:   Get/set method for getz arguments arguments
-    Args    :   File path (optional)
-
-=cut
-
-sub arguments {
-    my ($self, $args) = @_;
-    if ($args)
+sub sts {
+    my ($self, $sts) = @_;
+    if ($sts)
     {
-        $self->{'_arguments'} = $args ;
+        $self->throw("STS file not found! Check path and name ($sts)\n") 
+         unless (-e $sts);
+        $self->{'_sts'} = $sts;
     }
-    return $self->{'_arguments'};
+    return $self->{'_sts'};
 }
 
-sub db {
-    my ($self, $db) = @_;
-    if ($db)
-    {
-        $self->throw("DB not found! Check path and name ($db)\n") 
-                                                    unless (-e $db);
-        $self->{'_db'} = $db;
-    }
-    return $self->{'_db'};
-}
-
-###########
-# Analysis methods
-##########
 
 =head2 run
 
-    Title   :   run
-    Usage   :   $obj->run($workdir, $args)
-    Function:   Runs EPCR and creates array of featurepairs
-    Returns :   none
-    Args    :   optional $workdir and $args (e.g. '-ace' for ace file output)
+Runs EPCR. Writes seqeuence to a temporary file, runs EPCR, parses
+output file and deletes temporary files.
 
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
+    my ($self) = @_;
 
-    #set arguments for epcr
-    $self->arguments($args) if ($args);
-
-    #check clone
-    my $seq = $self->query() || $self->throw("Clone required for EPCR\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for EPCR\n");
 
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
 
     #write sequence to file
@@ -241,11 +200,12 @@ sub run {
     $self->deletefiles();
 }
 
+
 sub run_epcr {
     my ($self) = @_;
     #run EPCR
 
-    my $command = $self->epcr.' '.$self->db.' '.$self->filename.' '.
+    my $command = $self->epcr.' '.$self->sts.' '.$self->filename.' '.
      $self->options.' > '.$self->results;
 
     print STDERR "Running EPCR ($command)\n";
@@ -255,6 +215,13 @@ sub run_epcr {
     #check results exist
     $self->throw($self->results." not created by EPCR\n") unless (-e $self->results);   
 }
+
+=head2 parse_results
+
+Takes either an ouput file or a file handle and parses output.
+Creates FeaturePair's;
+
+=cut
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
@@ -280,11 +247,9 @@ sub parse_results {
         return;
     }
     
-    foreach my $output (@output) #loop from 3rd line
+    foreach (@output) #loop from 3rd line
     {  
-	# OK? - this split will break if line doesn't start with whitespace
-	# needs checking ...
-        my @element = split (/\s+/, $output);  
+        my @element = split;
         my (%feat1, %feat2);
         
         $feat1 {'name'}         = $element[0];
@@ -302,7 +267,7 @@ sub parse_results {
         #misc
         $feat1 {'score'}        = -1000;
         $feat2 {'score'}        = -1000;
-        $feat2 {'db'}           = $self->db || undef;
+        $feat2 {'db'}           = $self->sts || undef;
         $feat2 {'db_version'}   = 1;
         $feat2 {'program'}      = 'e-PCR';
         $feat2 {'p_version'}    ='1';
@@ -317,17 +282,9 @@ sub parse_results {
 }
 
 
-##############
-# input/output methods
-#############
-
 =head2 output
 
-    Title   :   output
-    Usage   :   obj->output()
-    Function:   Returns an array of feature pairs
-    Returns :   Returns an array of feature pairs
-    Args    :   none
+Returns an array of FeaturePair's (must be called after parse_results()).
 
 =cut
 

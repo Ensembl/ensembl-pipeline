@@ -36,7 +36,7 @@ is required for databse access.
 
 =head1 CONTACT
 
-Describe contact details here
+For general Ensembl comments mail to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -80,8 +80,7 @@ sub new {
     
     $self->throw("Analysis object required") unless ($self->analysis);
     
-    # inheritance is tripping us up here
-    &Bio::EnsEMBL::Pipeline::RunnableDB::EPCR::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::EPCR');
+    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::EPCR');
     return $self;
 }
 
@@ -136,7 +135,7 @@ sub runnable {
 		}
             }
         }
-        $parameters {'-db'}      = $self->analysis->db_file();  
+        $parameters {'-sts'}     = $self->analysis->db_file();  
         $parameters {'-options'} = $arguments;
         $parameters {'-pcr'}     = $self->analysis->program_file();  
         #creates empty Bio::EnsEMBL::Runnable::EPCR object
