@@ -645,6 +645,7 @@ sub combine_genes{
   chomp($time);
 
   foreach my $trans(@newtrans){
+    $trans->sort;
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
     $gene->id($self->input_id . "$genetype.$count"); 
@@ -682,7 +683,6 @@ sub _merge_gw_genes {
   foreach my $gwg($self->gw_genes){
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('combined');
-    #  $gene->id($self->input_id . ".combined.$count");
     $gene->id($gwg->id);
     $gene->version(1);
     
@@ -697,8 +697,6 @@ sub _merge_gw_genes {
     foreach my $exon($trans[0]->each_Exon){
       my $prev_exon;
       
-#      print STDERR "exon id: " . $exon->id . "\n";
-
       if ($ecount && $pred_exons[$ecount-1]){
 	$prev_exon = $pred_exons[$ecount-1];
       }
@@ -784,7 +782,10 @@ sub _make_newtranscripts {
     my @gw_tran = $gene->each_Transcript;
     my @gw_ex = $gw_tran[0]->each_Exon; # need ordered array
     my $strand = $gw_ex[0]->strand;
-    $self->warn("first and last gw exons have different strands - odd things will happen\n") if ($gw_ex[$#gw_ex]->strand != $strand);
+    if($gw_ex[$#gw_ex]->strand != $strand){
+      $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
+      next GENE;
+    }
     
     my $foundtrans = 0;  
     if(scalar(@gw_ex) == 1){
@@ -817,8 +818,10 @@ sub _make_newtranscripts {
       print "e2g exons: " . scalar(@eg_ex) . "\n";
 
       foreach my $ee(@eg_ex){
-	$self->warn("gw and e2g exons have different strands - odd things will happen\n") 
-	  if ($ee->strand != $strand);
+	if ($ee->strand != $strand){
+          $self->warn("gw and e2g exons have different strands - can't combine genes\n") ;
+          next GENE;
+        }
 
 	# single exon genewise prediction?
 	if(scalar(@gw_ex) == 1) {# eeeep
@@ -1072,6 +1075,7 @@ sub transcript_from_multi_exon_genewise {
       my $c = $#egexons;
       while($c > $exoncount){
 	$transcript->add_Exon($egexons[$c]);
+	$transcript->sort;
 	$c--;
       }
       
@@ -1137,6 +1141,7 @@ sub transcript_from_multi_exon_genewise {
       my $c = $#egexons;
       while($c > $exoncount){
 	$transcript->add_Exon($egexons[$c]);
+	$transcript->sort;
 	$c--;
       }
       
@@ -1218,6 +1223,7 @@ sub remap_genes {
     print STDERR "about to remap " . $gene->id . "\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
+
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
