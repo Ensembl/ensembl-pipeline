@@ -15,71 +15,101 @@ use Bio::SeqIO;
 
 use Bio::EnsEMBL::Utils::PolyA;
 
-my ($mask, $poly_a_clip, $clip_len, $min_length);
+my ($mask, $softmask, $poly_a_clip, $clip_len, $min_length, $help);
 
 &GetOptions( 
 	     'mask'         => \$mask,
+	     'softmask'     => \$softmask,
 	     'hardclip=s'   => \$clip_len,
-	     'polya'        => \$poly_a_clip,
-	     'minlen=s'     => \$min_length
+	     'polyaclip'    => \$poly_a_clip,
+	     'minlen=s'     => \$min_length,
+	     'help'         => \$help
 	   );
 
+
+&usage if $help;
 
 $min_length = 100 if not defined $min_length;
 
 # fasta format
-my $seqin = new Bio::SeqIO( '-format' => "fasta",
-			    '-fh' => \*STDIN );
+
 my $seqout = new Bio::SeqIO( '-format' => "fasta",
 			     '-fh' => \*STDOUT );
 
 my $polyA_clipper = Bio::EnsEMBL::Utils::PolyA->new();
 
-while( my $cdna = $seqin->next_seq ){
-    my $new_cdna;
+foreach my $file (@ARGV) {
+    my $seqin = new Bio::SeqIO( '-format' => "fasta",
+				'-file' => $file );
 
-    if ( $clip_len ){
-	my $seq = $cdna->seq;
-	my $seq_length = length( $seq );
+    while( my $cdna = $seqin->next_seq ){
+	my $new_cdna;
 	
-	# skip it if you are going to clip more than the actual length of the EST
-	if ( 2*$clip_len >= $seq_length ){
-	    next SEQFETCH;
-	}
+	if ( $clip_len ){
+	    my $seq = $cdna->seq;
+	    my $seq_length = length( $seq );
+	    
+	    # skip it if you are going to clip more than the actual length of the EST
+	    if ( 2*$clip_len >= $seq_length ){
+		next SEQFETCH;
+	    }
 
-	my $new_seq = substr( $seq, $clip_len, $seq_length - 2*$clip_len ); 
-	if ($mask) {
-	    $new_seq = "N" x $clip_len . $new_seq . "N" x $clip_len;
-	}
+	    my $seq_left = substr( $seq, 0, $clip_len ); 
+	    my $new_seq = substr( $seq, $clip_len, $seq_length - 2*$clip_len ); 
+	    my $seq_right = substr( $seq, $clip_len + $seq_length - 2*$clip_len);
 
-	# skip it if you are left with an EST of less than 100bp
-	if ( length( $new_seq ) < $min_length ){
-	    next SEQFETCH;
+	    if ($mask) {
+		$new_seq = "N" x $clip_len . $new_seq . "N" x $clip_len;
+	    }
+	    elsif ($softmask) {
+		$new_seq = lc($seq_left) . $new_seq . lc($seq_right);
+	    }
+	    
+	    # skip it if you are left with an EST of less than 100bp
+	    if ( length( $new_seq ) < $min_length ){
+		next SEQFETCH;
+	    }
+	    
+	    $new_cdna = new Bio::Seq;
+	    $new_cdna->display_id( $cdna->display_id );
+	    $new_cdna->desc( $cdna->desc );
+	    $new_cdna->seq($new_seq);
 	}
-
-	$new_cdna = new Bio::Seq;
-	$new_cdna->display_id( $cdna->display_id );
-	$new_cdna->description( $cdna->description );
-	$new_cdna->seq($new_seq);
+	else{ 
+	    $new_cdna = $cdna;
+	}
+	
+	if ($poly_a_clip){
+	    #print STDERR "going to pass ".$new_cdna->display_id."\n";
+	    if ($mask or $softmask) {
+		$new_cdna = $polyA_clipper->mask($new_cdna, $softmask);
+	    }
+	    else {
+		$new_cdna = $polyA_clipper->clip($new_cdna);
+	    }
+	    
+	    if (not $new_cdna or $new_cdna->length < $min_length) {
+		next;
+	    } 
+	}
+	
+	# write sequence
+	$seqout->write_seq($new_cdna);
     }
-    else{ 
-	$new_cdna = $cdna;
-    }
-    
-    if ($poly_a_clip){
-	#print STDERR "going to pass ".$new_cdna->display_id."\n";
-	if ($mask) {
-	    $new_cdna = $polyA_clipper->mask($new_cdna);
-	}
-	else {
-	    $new_cdna = $polyA_clipper->clip($new_cdna);
-	}
+}
 
-	if (not $new_cdna or $new_cdna->length < $min_length) {
-	  next SEQFETCH;  
-	} 
-    }
 
-    # write sequence
-    $seqout->write_seq($new_cdna);
+
+sub usage {
+    print "Usage: clip_dnas.pl <-mask|-softmask> <-hardclip n> <-polyaclip> <-minlen n> file1.fa file2.fa ...\n\n";
+    print "Recommended settings:\n   clip_cdnas.pl -polyaclip -minlen 100 file1.fa file.fa...\n";
+    print "   (clips polyAs only, rejecting if result is less than 100 bp)\n";
+    print "Other examples:\n";
+    print "To softmask polyA:\n   clip_cdnas.pl -softmask -polyaclip file1.fa file2.fa ...\n";
+    print "To hardmask polyA:\n   clip_cdnas.pl -mask -polyaclip file1.fa file2.fa ...\n";
+    print "To hard clip 20bp from each end:\n   clip_cdnas.pl -hardclip 20 file1.fa file2.fa ...\n";
+    print "Hard clip 20bp followed by polyA clip:\n   clip_cdnas.pl -hardclip 20 -polyA file1.fa file2.fa ...\n";
+    print "To reject entries < 60bp after clipping:\n   clip_cdnas.pl -hardclip 20 -polyA -minlen 60 file1.fa file2.fa ...\n";
+    print "To do nothing(!):\n   clip_cdnas.pl file1.fa file2.fa ...\n";
+    exit(0);
 }
