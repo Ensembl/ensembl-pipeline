@@ -1,51 +1,41 @@
+use lib 't';
+use Test;
+use strict;
 
-
-
-BEGIN { $| = 1; print "1..4\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan tests => 5;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::ORF;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-my ($seq) =  set_seq();
-
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
-
+ok(my $seq = get_seq_str());
 
 $seq =  Bio::PrimarySeq->new(  -seq         => $seq,
-                                    -id          => 'AI937824',
-                                    -accession   => 'AI937824',
-                                    -moltype     => 'dna');
-unless ($seq) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
+			       -id          => 'AI937824',
+			       -accession   => 'AI937824',
+			       -moltype     => 'dna');
+
+ok(2);
+
+my $orf = Bio::EnsEMBL::Pipeline::Runnable::ORF->new (-seq => $seq , 
+						      -length => 50);
+
+ok($orf);
+ok($orf->run);
+
+foreach my $out ( $orf->output ) {
+    print $out->start," ",$out->end," ",$out->strand," ",$out->{'_peptide'},"\n";
+}
 
 
-my $orf = Bio::EnsEMBL::Pipeline::Runnable::ORF->new (   -seq => $seq , -length => 50);
-
-print "ok 3\n";
-
-$orf->run;
-
-foreach $out ( $orf->output ) {
-	#print "Got at $out\n";
-	#print $out->start," ",$out->end," ",$out->strand," ",$out->{'_peptide'},"\n";
-	}
-
-print "ok 4\n";
+ok($orf);
 
 
 
-sub set_seq {
-#embedded sequence! Because I can't create Bio::PrimarySeqs from files
+
+sub get_seq_str {
+
 my $seq = 
 'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
 'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.
