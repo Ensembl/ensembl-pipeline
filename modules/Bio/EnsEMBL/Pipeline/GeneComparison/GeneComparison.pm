@@ -920,7 +920,21 @@ sub compare_Exons{
   my $total_missing_exon_count = 0; # counts the number of overpredicted exons
   my $total_over_exon_count    = 0; # same for overpredictions
   my $total_exon_mismatches    = 0; # includes the above two cases
+
+  my $ann_genes_with_unpaired_predictions = 0; # just to have an idea about how much alt-splicing is predicted
  
+  # these effectively counts howmany transcripts come from the unclustered genes
+  my $total_ann_unpaired_from_unclustered = 0;
+  my $total_pred_unpaired_from_unclustered = 0; 
+
+  # when the set of transcripts is not clustered into genes, these numbers are handy to know
+  # how many clusteres we have formed with only one type of gene. Otherwise these numbers should coincide
+  # with the number of unclustered genes and the total_number_of_transcripts in those unclustered ones
+  my $total_clusters_with_only_ann  = 0;
+  my $total_clusters_with_only_pred = 0;
+  my $total_transcripts_in_clusters_with_only_ann  = 0;
+  my $total_transcripts_in_clusters_with_only_pred = 0;
+  
   my %over_exon_position;           # keeps track of the positions of the exons
   my %missing_exon_position;        # keeps track of the positions of the exons
   
@@ -977,13 +991,40 @@ sub compare_Exons{
     my ( $pairs, $ann_unpaired, $pred_unpaired ) = $gene_cluster->pair_Transcripts;
     print STDERR "found ".scalar(@$pairs)." pairs\n";
     
-    # print the unpaired transcripts if gff_file is available
-    if ($self->gff_file){
-      foreach my $tran ( @$ann_unpaired ){
-	$self->toGFF($tran,"annotation","unpaired");
+    # if there are not pairs, check whether the cluster only contains genes of one type
+    # this can happen when transcripts haven't been clustered into genes
+    my $only_ann  = 0;
+    my $only_pred = 0;
+    if (scalar(@$pairs) == 0){
+      my @genes = $gene_cluster->get_Genes;
+      my @annotation = ();
+      my @prediction = ();
+      foreach my $gene (@genes){
+	my $type = $gene->type;
+	push( @annotation, grep /^$type$/, @{ $self->{'_annotation_types'} } );
+	push( @prediction, grep /^$type$/, @{ $self->{'_prediction_types'} } );
       }
-      foreach my $tran ( @$pred_unpaired ){
-	$self->toGFF($tran,"prediction","unpaired");
+      if ( @annotation && !@prediction ){
+	$total_clusters_with_only_ann++;
+	$only_ann = 1;
+      }
+      elsif( !@annotation && @prediction ){
+	$total_clusters_with_only_pred++;
+	$only_pred = 1;
+      }
+      else{
+	print STDERR "Bad luck, no pairs formed even though we have genes from both types\n";
+	next;
+      }
+    }
+    if ( $only_ann ){
+      foreach my $gene ( $gene_cluster->get_Genes ){
+	$total_transcripts_in_clusters_with_only_ann += scalar($gene->each_Transcript);
+      }
+    }
+    elsif ( $only_pred ){
+      foreach my $gene ( $gene_cluster->get_Genes ){
+	$total_transcripts_in_clusters_with_only_pred += scalar($gene->each_Transcript);
       }
     }
 
@@ -995,6 +1036,7 @@ sub compare_Exons{
     if ( $ann_unpaired ){
       push ( @ann_unpaired , @{ $ann_unpaired }  );
       $total_annotation_length  += $self->_get_length_of_Transcripts( $ann_unpaired );
+      $ann_genes_with_unpaired_predictions++;
     }
     if ( $pred_unpaired ){
       push ( @pred_unpaired, @{ $pred_unpaired } );
@@ -1095,13 +1137,15 @@ sub compare_Exons{
     my $type = $genes[0]->type;
     my @annotation;
     my @prediction;
-    push( @annotation, grep /$type/, @{ $self->{'_annotation_types'} } );
-    push( @prediction, grep /$type/, @{ $self->{'_prediction_types'} } );
+    push( @annotation, grep /^$type$/, @{ $self->{'_annotation_types'} } );
+    push( @prediction, grep /^$type$/, @{ $self->{'_prediction_types'} } );
     if ( @annotation && !@prediction ){
       push ( @total_ann_unpaired, @transcripts );
+      $total_ann_unpaired_from_unclustered += scalar(@transcripts);
     }
     elsif( !@annotation && @prediction ){
       push ( @total_pred_unpaired, @transcripts );
+      $total_pred_unpaired_from_unclustered += scalar(@transcripts); 
     }
     else{
       $self->warn("something is wrong, can't classify gene of type $type");
@@ -1113,8 +1157,22 @@ sub compare_Exons{
 
   # print out the results
   print STDERR "Total number of transcript pairs: ".$pairs_count."\n";
-  print STDERR "Transcripts unpaired: ".scalar( @total_ann_unpaired )." from annotation, and ". 
-    scalar( @total_pred_unpaired )." from prediction\n";
+  print STDERR "Transcripts unpaired:\n".
+    scalar( @total_ann_unpaired ).
+      " from annotation, ( $total_ann_unpaired_from_unclustered from unclustered genes)\n". 
+	scalar( @total_pred_unpaired ).
+	  " from prediction, ( $total_pred_unpaired_from_unclustered from unclustered genes)\n";
+
+  print STDERR "Total number of clusters with only annotation genes\n";
+  print STDERR "  and not classified as unclustered: ".$total_clusters_with_only_ann."\n";
+  print STDERR "                      with a total of: ".$ total_transcripts_in_clusters_with_only_ann." transcripts\n";
+  print STDERR "Total number of clusters with only prediction genes\n";
+  print STDERR "  and not classified as unclustered: ".$total_clusters_with_only_pred."\n";
+  print STDERR "                      with a total of: ".$ total_transcripts_in_clusters_with_only_pred." transcripts\n";
+
+  print STDERR "\nNumber of clusters that contain unpaired predictions (number of predicted splicing in annotated genes) = $ann_genes_with_unpaired_predictions\n";
+
+  print STDERR "\nTranscripts unpaired from annotation:\n";
   foreach my $tran ( @total_ann_unpaired ){
     my $id;
     if ( $tran->stable_id ){
@@ -1123,8 +1181,14 @@ sub compare_Exons{
     elsif ( $tran->dbID ){
       $id = $tran->dbID;
     }
-    print STDERR $id."\n";
+    print STDERR $id."\t";
+    
+    # print the unpaired transcripts to gff_file if available
+    if ($self->gff_file){
+      $self->toGFF($tran,"annotation","unpaired");
+    }
   }
+  print STDERR "\nTranscripts unpaired from prediction:\n";
   foreach my $tran ( @total_pred_unpaired ){
     my $id;
     if ( $tran->stable_id ){
@@ -1133,7 +1197,10 @@ sub compare_Exons{
     elsif ( $tran->dbID ){
       $id = $tran->dbID;
     }
-    print STDERR $id."\n";
+    print STDERR $id."\t";
+    if ($self->gff_file){
+      $self->toGFF($tran,"prediction","unpaired");
+    }
   }
   
   #print STDERR "Transcripts repeated: ".scalar( @total_ann_doubled )." from annotation, and ".
@@ -1149,7 +1216,6 @@ sub compare_Exons{
   print STDERR "Exact matches                 : ".$exact_matches." out of ".$exon_pair_count."\n";  
   print STDERR "Total exon mismatches         : ".$total_exon_mismatches."\n";
   
-
   print STDERR "Exons missed by the prediction: ".$total_missing_exon_count."\n";
   if ( $missing_exon_position{"first"} ){
     printf STDERR " position %5s = %2d missed\n", ("first" , $missing_exon_position{"first"});
@@ -2321,14 +2387,82 @@ sub flush_gene_Clusters {
 
 =head2
   
+  This method compares the exons from both gene sets and find the overlaps above a certain
+  threshold. This threshold represents the minimum length of the annotation exon covered by
+  the prediction
+
+=cut
+
+sub exon_Coverage{
+  my ($self,$ann_genes,$pred_genes,$lower_bound) = @_;
+  
+  # first get all exons
+  my @ann_exons;
+  my @pred_exons;
+  foreach my $tran ( @$ann_genes ){
+    push ( @ann_exons, $tran->get_all_Exons );
+  }
+  foreach my $tran ( @$pred_genes ){
+    push ( @pred_exons, $tran->get_all_Exons );
+  }
+
+  if (defined($lower_bound)){
+    my %seen_exon3;
+    my $count_covered_exons3 = 0;
+    my %perc_overlap_distribution3;
+    
+  ANN_EXON:
+    foreach my $ann_exon ( @ann_exons ){
+      if ( $seen_exon3{ $ann_exon } ){
+	next ANN_EXON;
+      }
+      
+    PRED_EXON:
+      foreach my $pred_exon ( @pred_exons ){
+	if ( $seen_exon3{ $pred_exon } ){
+	  next PRED_EXON;
+	}
+	if ( $ann_exon->overlaps( $pred_exon ) ){
+	  my $overlap_length = $self->_exon_Overlap($ann_exon, $pred_exon);
+	  my $ann_length     = $ann_exon->length;
+	  my $perc_overlap   = 100 * ( $overlap_length / $ann_length);
+	  if ( $perc_overlap >= $lower_bound ){
+	    $seen_exon3{ $ann_exon }  = 1;
+	    $seen_exon3{ $pred_exon } = 1;
+	    $count_covered_exons3++;
+	    next ANN_EXON;
+	  }
+	}
+      }
+    }
+
+
+  print STDERR "EXON COVERAGE ACCORDING TO EXON-OVERLAP >= $lower_bound %\n";
+  print STDERR "Total predicted exons: ".scalar(@pred_exons)."\n";
+  print STDERR "Total annotated exons: ".scalar(@ann_exons)."\n";
+  print STDERR "Found annotated exons: ".$count_covered_exons3."\n";
+  
+  my $sensitivity3 = $count_covered_exons3/scalar(@ann_exons);
+  my $specificity3 = $count_covered_exons3/scalar(@pred_exons);
+
+  printf STDERR "               Sensitivity: %.2f\n",$sensitivity3;
+  printf STDERR "               Specificity: %.2f\n",$specificity3;
+  print STDERR "\n";
+  }
+}  
+
+############################################################
+
+=head2
+  
   This method compares the genomic lengths spanned by the prediction and the benchmark exons.
   It takes all the ranges of genomic sequece as a 1-dimensional projection of the exons from both sides and
   calculates the overlap relative to each total length.
 
 =cut
 
-sub exon_Coverage{
-  my ($self,$ann_genes,$pred_genes,$lower_bound) = @_;
+sub exon_Coverage_by_Length{
+  my ($self,$ann_genes,$pred_genes) = @_;
   
   # first get all exons
   my @ann_exons;
@@ -2376,58 +2510,14 @@ sub exon_Coverage{
   my $sensitivity = $overlap_length/$ann_length;
   my $specificity = $overlap_length/$pred_length;
 
-  print STDERR "               Sensitivity: $sensitivity\n";
-  print STDERR "               Specificity: $specificity\n";
+  printf STDERR "               Sensitivity: %.2f\n", $sensitivity;
+  printf STDERR "               Specificity: %.2f\n", $specificity;
   print STDERR "\n";
+}
 
-
-  ### now calculate the coverage according to $lower_bound percentage overlap
-  if (defined($lower_bound)){
-    my %seen_exon3;
-    my $count_covered_exons3 = 0;
-    my %perc_overlap_distribution3;
-    
-  ANN_EXON:
-    foreach my $ann_exon ( @ann_exons ){
-      if ( $seen_exon3{ $ann_exon } ){
-	next ANN_EXON;
-      }
-      
-  PRED_EXON:
-    foreach my $pred_exon ( @pred_exons ){
-      if ( $seen_exon3{ $pred_exon } ){
-	next PRED_EXON;
-      }
-      if ( $ann_exon->overlaps( $pred_exon ) ){
-	my $overlap_length = $self->_exon_Overlap($ann_exon, $pred_exon);
-	my $ann_length     = $ann_exon->length;
-	my $perc_overlap   = 100 * ( $overlap_length / $ann_length);
-	if ( $perc_overlap >= $lower_bound ){
-	  $seen_exon3{ $ann_exon }  = 1;
-	  $seen_exon3{ $pred_exon } = 1;
-	  $count_covered_exons3++;
-	  next ANN_EXON;
-	}
-      }
-    }
-    }
-
-
-  print STDERR "EXON COVERAGE ACCORDING TO EXON-OVERLAP >= $lower_bound %\n";
-  print STDERR "Total predicted exons: ".scalar(@pred_exons)."\n";
-  print STDERR "Total annotated exons: ".scalar(@ann_exons)."\n";
-  print STDERR "Found annotated exons: ".$count_covered_exons3."\n";
-  
-  my $sensitivity3 = $count_covered_exons3/scalar(@ann_exons);
-  my $specificity3 = $count_covered_exons3/scalar(@pred_exons);
-
-  print STDERR "               Sensitivity: $sensitivity3\n";
-  print STDERR "               Specificity: $specificity3\n";
-  print STDERR "\n";
-  }
-}  
 
 ############################################################
+
 
 =head2
 
