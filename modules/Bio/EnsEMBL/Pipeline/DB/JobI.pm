@@ -334,4 +334,22 @@ sub input_object_file {
     return $self->{_input_object_file};
 }
 
-1;
+=head2 status_file
+
+  Title   : status_file
+  Usage   : my $file = $self->status_file
+  Function: Get/set method for the status file
+  Returns : string
+  Args    : string
+
+=cut
+
+sub status_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{_status_file} = $arg;
+    }
+    return $self->{_status_file};
+}
+

@@ -532,7 +532,11 @@ sub input_object_file {
     return $self->jobobj->input_object_file($arg);
 }
 
+sub status_file {
+    my ($self,$arg) = @_;
 
+    return $self->jobobj->status_file($arg);
+}
 sub disconnect {
    my ($self) = @_;
 
