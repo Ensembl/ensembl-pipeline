@@ -1035,7 +1035,7 @@ We want introns of the form:
 sub check_splice_sites{
   my ($self,$transcript,$strand) = @_;
  
-  my $verbose = 1;
+  my $verbose = 0;
   
   my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
   
