@@ -269,8 +269,7 @@ while(1){
    }
   if(!$done && !$reset){
     if($accumulators){
-      %completed_accumulator_analyses = $rulemanager->
-          fetch_complete_accumulators;
+      %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
       foreach my $logic_name (keys %accumulator_analyses) {
         if (!exists($incomplete_accumulator_analyses{$logic_name}) &&
             !exists($completed_accumulator_analyses{$logic_name})) {
