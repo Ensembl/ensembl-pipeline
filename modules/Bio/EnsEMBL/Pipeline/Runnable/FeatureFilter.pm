@@ -177,9 +177,9 @@ sub run{
   my @list;
   $list[$maxend] = 0;
   
-  # sort the list by highest score, then alphabetically for ties
-  my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $a cmp $b }
-                   keys %validhit;
+   # sort the list by highest score, then alphabetically for ties
+   my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $a cmp $b }
+                    keys %validhit;
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
@@ -225,23 +225,13 @@ sub run{
   
   if ($self->prune) {
     my @new;
-
-    my @all_features;
-    
-    # collect all the features
-    foreach my $hseqname ( @accepted_hids ){
-      push ( @all_features, @{$hitarray{$hseqname}} );
-    }
      
-    # and prune all together taking the first '$self->coverage' according to score 
-    @new = $self->prune_features( @all_features );
-
-    ## prune the features per hid (per hseqname)
-    #foreach my $hseqname ( @accepted_hids ) {
-    #  my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
-    #  push(@new,@tmp);
-    #  #push(@{$self->{'_output'}},@tmp);
-    #}
+    # prune the features per hid (per hseqname)
+    foreach my $hseqname ( @accepted_hids ) {
+      my @tmp = $self->prune_features(@{$hitarray{$hseqname}});
+      push(@new,@tmp);
+      #push(@{$self->{'_output'}},@tmp);
+    }
     @accepted_hids = ();
     return @new;
   
