@@ -47,10 +47,10 @@ else
 { print "ok 2\n"; }
 
 #create EPCR object    
-my $sts_db = $::pipeConf{'datadir'} . '/mapprimer';
+my $sts_db = $::pipeConf{'datadir'} . '/mapprimer_maps_130';
 my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
-    -CLONE   => $clone,
-    -DB      => $sts_db,
+    -QUERY   => $clone,
+    -STS     => $sts_db,
     -OPTIONS => 'M=1000'
 );
  
