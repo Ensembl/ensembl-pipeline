@@ -263,18 +263,19 @@ sub run {
 
     }
         
-    #run est_genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
     my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-
+    print STDERR "running for " . $estseq->display_id . "\n";
     eval {
       print (STDERR "Running command $est_genome_command\n");
       open (ESTGENOME, $est_genome_command) 
 	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
-      #Use the first line to get EST orientation
+      #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
-      if ($firstline =~ /reverse/i) { $estOrientation = -1; }
+      print STDERR "firstline: \n$firstline\n";
+      # put the gene on the minus strand iff splice sites imply reversed gene
+      if ($firstline =~ /REVERSE/) { print STDERR "***reversed gene***\n"; $estOrientation = -1; }
       else {$estOrientation = 1}
      
       #read output
@@ -325,7 +326,7 @@ sub run {
       $self->convert_output;
 
     };
-    #clean up temp files
+
     $self->_deletefiles($genfile, $estfile);
     if ($@) {
         $self->throw("Error running est_genome [$@]\n");
