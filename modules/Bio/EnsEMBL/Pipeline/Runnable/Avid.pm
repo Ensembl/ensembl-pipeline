@@ -111,14 +111,20 @@ sub new {
 
   ########### PASSED OPTIONS ############################
 
-  $self->options( $options);
+  print "options $options\n";
+  if ($options) {
+    $self->options( $options );
+  }else{
+    $self->options("-obin");
+  }
 
 
-  ########### SETTING 4 PID-DEPENDED FILENAMES #########
 
   $self->filenames($$);
+  $self->avid_files($$);
 
 
+  $self->printvars;
   return $self;
 }
 
@@ -127,8 +133,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-
-#  unlink $self->_query_file;
+  unlink $self->filenames;
 }
 
 
@@ -160,6 +165,8 @@ sub run {
   my $command   = $self->avid_binary  . " " .$self->options;
      $command .=  " " . $file1 . " " . $file2;
 
+
+  $self->avid_files(333);
 
   print STDERR "Avid command : $command\n"  if $self->_verbose;
 
@@ -200,12 +207,8 @@ sub avid_binary {
 ############################################################
 
 sub options {
-  my ($self, $options) = @_;
-  if ($options) {
-    $self->{_options} = $options ;
-  }else{
-    $self->{_options} = " -obin";
-  }
+  my ($self,$opt) = @_; 
+    $self->{_options}= $opt if $opt;
   return $self->{_options};
 }
 
@@ -249,12 +252,13 @@ sub write_sequences {
 
 
 
-########### BUILDING FILENAMES ###########
+########### BUILDING FILENAMES WITH PATH ###########
 
 sub filenames {
   my ($self,$pid) = @_;
 
   my @filenames;
+
   if ( $pid ) {
     for(my $i=1;$i<=2;$i++) {
       push @filenames, $self->workdir."/seq$i.$pid.fasta"; 
@@ -266,6 +270,11 @@ sub filenames {
 }
 
 
+sub avid_files {
+  my ($self,$pid) = @_;
+ ;
+}
+
 sub _verbose {
   my $self = shift;
     $self->{_verbose} = shift if @_ ;
@@ -273,7 +282,13 @@ sub _verbose {
 }
 
 
-sub printVars {
+sub seq_names {
+  my ($self, $fn ) = @_ ;
+      my @names = @{$fn};
+  return; 
+}
+
+sub printvars {
   my $self = shift;
   my %obj = %{$self};
   print map { "$_ => $obj{$_}\n" }  keys %obj ;
