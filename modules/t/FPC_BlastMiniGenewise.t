@@ -50,9 +50,12 @@ my $id='chr1.75000-100000';
 my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise';
+
 my $fbmg = "$runnable"->new(-dbobj      => $db,
 			    -input_id   => $id,
-			    -seqfetcher => $fetcher);	
+			    -seqfetcher => $fetcher,
+			    -type       => 'sptr',
+                            -threshold  => 100);	
 
 
 unless ($fbmg)
