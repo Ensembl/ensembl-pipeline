@@ -241,10 +241,8 @@ sub fetch_input {
   print STDERR "fpc blastdb: $blastdb\n";
   
   my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'     => $genseq, 
-									    '-blastdb'     => $blastdb,
-									    '-seqfetcher'  => $self->seqfetcher,
-									    '-id_threshold'=> 95,
-									    '-length_threshold' => 80);
+									    '-queryseq'     => $blastdb,
+									    '-seqfetcher'  => $self->seqfetcher);
     
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
@@ -297,11 +295,12 @@ sub _convert_output {
   }
 
   # filter out genes which are poor matches to ESTs
-  my $threshold = 95;
-  my @filtered = $self->_filter_genes($threshold, @genes);
+#  my $threshold = 95;
+#  my @filtered = $self->_filter_genes($threshold, @genes);
 
   # map genes back to genomic coordinates
-  my @remapped = $self->_remap_genes(@filtered);	
+#  my @remapped = $self->_remap_genes(@filtered);	
+  my @remapped = $self->_remap_genes(@genes);	
     
   if (!defined($self->{_output})) {
     $self->{_output} = [];
