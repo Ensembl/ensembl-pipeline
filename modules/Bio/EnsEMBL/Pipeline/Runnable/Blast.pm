@@ -81,7 +81,7 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
-use Bio::Tools::BPlite;
+use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -346,7 +346,7 @@ sub get_parsers {
     my $fh = new FileHandle;
     $fh->open("<" . $self->results . ".$db");
     
-    my $parser = new Bio::Tools::BPlite ('-fh' => $fh);
+    my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite ('-fh' => $fh);
     
     push(@parsers,$parser);
   } 
@@ -380,7 +380,7 @@ sub parse_results {
   my @parsers;
 
   if (defined($fh)) {
-    my $parser = new Bio::Tools::BPlite(-fh => $fh);
+    my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
     @parsers = $self->get_parsers;
@@ -404,7 +404,7 @@ sub parse_results {
   @parsers = ();
 
   if (defined($fh)) {
-    my $parser = new Bio::Tools::BPlite(-fh => $fh);
+    my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
     @parsers = $self->get_parsers;
