@@ -79,7 +79,7 @@ if ( $t_id){
 
   my $tran = $db->get_TranscriptAdaptor->fetch_by_dbID($t_id);
   my @exons = @{$tran->get_all_Exons};
-  print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\strand\tlength\n";
+  print "internal_id\tcontig_id\tcontig_name\tstart-end\tphase\tend_ph\tstrand\tlength\thit_name\tstart-end\tlength\tscore\tperc_id\n";
   foreach my $exon (@exons){
     
     # if exon is sticky print each component
@@ -87,8 +87,8 @@ if ( $t_id){
       
       foreach my $exon_c ( @{$exon->get_all_component_Exons} ){
 	my $length = $exon_c->end - $exon_c->start +1;
-	print $exon_c->contig->dbID."\t".$exon_c->contig->name."\t".
-	  $exon_c->dbID."\t".$exon_c->start."\t".$exon_c->end."\t".$exon_c->phase."\t".
+	print "Exon: ".$exon_c->dbID."\t".$exon_c->contig->dbID."\t".$exon_c->contig->name."\t".
+	  $exon_c->start."-".$exon_c->end."\t".$exon_c->phase."\t".
 	    $exon_c->end_phase."\t".$exon_c->strand."\t".$length."\n";
 	&print_evidence($exon_c);
 	print "\n";
@@ -96,8 +96,8 @@ if ( $t_id){
     }
     else{
       my $length = $exon->end - $exon->start +1;
-      print $exon->contig->dbID."\t".$exon->contig->name."\t".
-	$exon->dbID."\t".$exon->start."\t".$exon->end."\t".$exon->phase."\t".
+      print "Exon: ".$exon->dbID."\t".$exon->contig->dbID."\t".$exon->contig->name."\t".
+	$exon->start."-".$exon->end."\t".$exon->phase."\t".
 	  $exon->end_phase."\t".$exon->strand."\t".$length."\n";
       &print_evidence($exon);
       print "\n";
@@ -136,7 +136,7 @@ elsif ( $tstable_id){
   print  "From TranscriptAdaptor: $t_id\n";
   my $tran = $db->get_TranscriptAdaptor->fetch_by_stable_id($tstable_id);
   my @exons = @{$tran->get_all_Exons};
-  print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\strand\tlength\n";
+  print "internal_id\tcontig_id\tcontig_name\tstart-end\tphase\tend_ph\strand\tlength\thit_name\tstart-end\tlength\tscore\tperc_idn";
   foreach my $exon (@exons){
     
     # if exon is sticky print each component
@@ -144,8 +144,8 @@ elsif ( $tstable_id){
       
       foreach my $exon_c ( @{$exon->get_all_component_Exons} ){
 	my $length = $exon_c->end - $exon_c->start +1;
-	print $exon_c->contig->dbID."\t".$exon_c->contig->name."\t".
-	  $exon_c->dbID."\t".$exon_c->start."\t".$exon_c->end."\t".$exon_c->phase."\t".
+	print "Exon: ".$exon_c->dbID."\t".$exon_c->contig->dbID."\t".$exon_c->contig->name."\t".
+	  $exon_c->start."-".$exon_c->end."\t".$exon_c->phase."\t".
 	    $exon_c->end_phase."\t".$exon_c->strand."\t".$length."\n";
 	&print_evidence($exon_c);
 	print "\n";
@@ -153,8 +153,8 @@ elsif ( $tstable_id){
     }
     else{
       my $length = $exon->end - $exon->start +1;
-      print $exon->contig->dbID."\t".$exon->contig->name."\t".
-	$exon->dbID."\t".$exon->start."\t".$exon->end."\t".$exon->phase."\t".
+      print "Exon: ".$exon->dbID."\t".$exon->contig->dbID."\t".$exon->contig->name."\t".
+	$exon->start."-".$exon->end."\t".$exon->phase."\t".
 	  $exon->end_phase."\t".$exon->strand."\t".$length."\n";
       &print_evidence($exon);
       print "\n";
@@ -310,10 +310,13 @@ sub print_evidence{
     foreach my $evi ( @evidence ){
       my $length = $evi->end - $evi->start + 1;
       my $hlength = $evi->hend - $evi->hstart + 1;
-      print "Evidence: ".$evi->dbID."\t".$evi->contig->dbID."\t".$evi->contig->name."\t".
-	$evi->start."-".$evi->end."\t".$evi->phase."\t".
-	  $evi->end_phase."\t".$evi->strand."\t".$length."\t".
-	    $evi->hstart."-".$evi->hend."\t".$hlength."\t".$evi->hseqname."\n";
+      print "Evidence ".$evi->dbID."\t".
+	$evi->contig->dbID."\t".$evi->contig->name."\t".
+	  $evi->start."-".$evi->end."\t".$evi->phase."\t".
+	    $evi->end_phase."\t".$evi->strand."\t".$length."\t".
+	      $evi->hseqname."\t".
+		$evi->hstart."-".$evi->hend."\t".$hlength."\t".
+		  $evi->score."\t".$evi->percent_id."\n";
     }
   }
   else{
