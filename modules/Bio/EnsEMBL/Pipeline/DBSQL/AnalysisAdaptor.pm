@@ -147,8 +147,8 @@ sub fetch_by_logic_name {
   
   $sth->execute( $logic_name );
   my $rowHashRef;
-  while( $rowHash = $sth->fetchrow_hashref ) {
-    $analysis = $self->_objFromHashref( $rowHashRef );
+  while( $rowHashRef = $sth->fetchrow_hashref ) {
+       $analysis = $self->_objFromHashref( $rowHashRef );
     if( defined $analysis ) {
       push( @result, $analysis );
     }
