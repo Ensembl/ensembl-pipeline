@@ -35,8 +35,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDBI;
 
 use vars qw(@ISA);
 use strict;
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
-if ($::genebuild_conf{'bioperldb'}) {
+use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
+					      BIOPERLDB
+					     ); 
+if ($BIOPERLDB) {
   require Bio::DB::SQL::DBAdaptor;
 }
 use Bio::EnsEMBL::Pipeline::RunnableI;
