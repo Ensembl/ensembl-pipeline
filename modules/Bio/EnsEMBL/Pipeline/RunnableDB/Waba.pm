@@ -104,11 +104,10 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
     
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_Contig($contigid);
-    my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+    my $ctg_name  = $self->input_id;
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($ctg_name);
 
-    $self->genseq($genseq);
+    $self->genseq($contig);
 }
 
 =head2 runnable
