@@ -35,9 +35,9 @@ my $dbname;
 	    
 	    );
 
-unless( $dbhost && $dbname ){
-    print STDERR "Captain Kirk! We don't have the database information, exiting the operation, beep!\n";
-    exit(0);
+unless( $dbhost && $dbname && $chr && $outfile ){
+  print STDERR "Usage: $0 -chr -dbname -dbhost [ -mask -dust -softmase -maskall ] -outfile\n";
+  exit(0);
 }
 
 # connect to the database
@@ -47,10 +47,10 @@ my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					   -dbname=> $dbname
 					  );
 
-unless ($chr && $outfile){
-  print STDERR "Usage: $0 -chr  -outfile [ -mask -dust -softmask -maskall ]\n";
-  exit(0);
-}
+#unless ($chr && $outfile){
+#  print STDERR "Usage: $0 -chr  -outfile [ -mask -dust -softmask -maskall ]\n";
+#  exit(0);
+#}
 
 
 open OUT, ">$outfile";
@@ -58,13 +58,12 @@ my $out = Bio::SeqIO->new(-format=>'Fasta',
 			  -fh =>  \*OUT,
 			 );
 
-my $sgp = $db->get_SliceAdaptor;
+my $slice = $db->get_SliceAdaptor->fetch_by_chr_name( $chr );
 
 # get chr names and sizes:
-my ($chr_start,$chr_end) = &get_chr_start_end($db,$chr);
-
-print STDERR "fetching $chr . $chr_start - $chr_end\n";
-my $slice = $sgp->fetch_by_chr_start_end($chr,$chr_start,$chr_end);
+#my ($chr_start,$chr_end) = &get_chr_start_end($db,$chr);
+#print STDERR "fetching $chr . $chr_start - $chr_end\n";
+#my $slice = $sgp->fetch_by_chr_start_end($chr,$chr_start,$chr_end);
 
 my @logic_names;
 my $soft = 0;
