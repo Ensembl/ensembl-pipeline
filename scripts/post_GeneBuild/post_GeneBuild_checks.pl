@@ -67,7 +67,7 @@ $dbuser = "ensro";
 
 unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
   print STDERR "script to check the sanity of genes and transcripts after a build\n";
-  print STDERR "Usage: $0 --dbname -dbhost -dnadbname -dnadbhost -genetype\n";
+  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost -genetype\n";
   exit(0);
 }
 
@@ -89,123 +89,92 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print STDERR "connected to $dbname : $dbhost\n";
-#$db->static_golden_path_type($path);
-
-my $sa = $db->get_StaticGoldenPathAdaptor();
 
 print STDERR "checking genes of type $genetype\n";
-print STDERR "path: ".$db->static_golden_path_type."\n";
-# get genomic regions
-my $chr_lengths = get_chrlengths($db,$db->static_golden_path_type);
-my %chr_lengths = %$chr_lengths;
+my $path = $db->static_golden_path_type;
 
+print STDERR "path: ".$path."\n";
 
-# take 1MB vc's and check genes for each vc:
-foreach my $chr ( keys( %chr_lengths ) ){
+my @gene_ids = &get_gene_ids($db,$genetype);
+
+GENE:
+foreach my $gene_id ( @gene_ids){
+  print STDERR "checking gene dbID: ".$gene_id."\n";
   
-  my $start   = 1;
-  my $end     = 5000000;
-  my $stop  = 0;
+  my @transcript_ids = &get_transcript_ids($db,$gene_id);
 
-  while ( $start < $chr_lengths{$chr} ){
-    my $vc =  $sa->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
-    print STDERR "vc: $chr.$start-$end\n";
-    my @genes;
-    eval{
-      @genes = $vc->get_Genes_by_Type($genetype);
-    };
-    if ($@){
-      print STDERR "trouble trying to get genes by type $genetype in this vc\n";
-      print STDERR $@;
-    }
-  GENE: 
-    foreach my $gene ( @genes ){
+ TRANSCRIPT:
+  foreach my $tran_id ( @transcript_ids ){
+    print STDERR "checking transcript dbID: ".$tran_id."\n";
+    my ($exons,$info) = &check_transcript($db,$tran_id);
+    my @exons = @$exons;
+    my %info = %$info;
+
+    my $strand;
+    my $end_phase;
+    my $previous_exon;
+    my $exon_count = 0;
+  EXON:
+    foreach my $exon_id (@exons){
+      $exon_count++;
+
+      # is strand defined?
+      if ( !defined $info{strand}{$exon_id} ){
+	print STDERR "exon $exon_id has no strand\n";
+      }
+
+      # is strand consistent among exons?
+      unless ( $strand ){
+	$strand = $info{strand}{$exon_id};
+      }      
+      if ( $info{strand}{$exon_id} != $strand ){
+	print STDERR "Problem with the strands in transcript $tran_id:\n";
+	&print_transcript( $exons,$info);
+      }
+     
+      # mark single exon transcripts
+      if ( scalar(@exons) == 1){
+	my $length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
+	print STDERR "single exon transcript $tran_id of length: $length\n";      
+      }
       
-      # check all exons are on the same strand
-      my $strand;
-      EXON:
-	foreach my $exon($gene->get_all_Exons){
-	  if(!defined $exon->strand || ($exon->strand != 1 && $exon->strand != -1)){
-	    print STDERR "Exon " . $exon->dbID . " has no strand!!\n";
-	    last EXON;
-	  }
-	  if(!defined $strand){ $strand = $exon->strand; }
-	  if($exon->strand != $strand){
-	    print STDERR "strand problem with gene " . $gene->dbID . "\n";
-	    last EXON;
+      # are phases consistent?
+      if ($exon_count>1){
+	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
+	  if ( $end_phase != $info{start_phase}{$exon_id} ){
+	    print STDERR "Inconsistent phases in transcript $tran_id:\n";
+	    &print_transcript( $exons,$info);
 	  }
 	}
+      }
+      $end_phase = $info{end_phase}{$exon_id};
+
+
+      # folded transcripts?
+      if ($exon_count>1){
 	
-      # check there are no folded transcripts
-      TRANSCRIPT:
-	foreach my $transcript($gene->each_Transcript){
-	  my @exons = $transcript->get_all_Exons;
-	  
-	  # check also for long single-exons genes
-	  if ( scalar( @exons ) == 1 ){
-	    print STDERR "single exon transcript : ".$transcript->dbID."\n";
-	    my $start  = $exons[0]->start;
-	    my $end    = $exons[0]->end;
-	    my $length = $end-$start+1;
-	    if ( $length > 50000 ){
-	      print STDERR "long exon : ".$exons[0]->dbID." length: $length\n";
+	#unless both exons are sticky
+	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
+	  if ( $strand == 1){
+	    if ( $info{start}{$exon_id} < $info{end}{$previous_exon} ){
+	      print STDERR "Transcript $tran_id folds back on itself\n";
+	      &print_transcript( $exons,$info);
 	    }
 	  }
-
-	  my $i;
-	  for ($i = 1; $i < $#exons; $i++) {
-	    if ($exons[0]->strand == 1) {
-	      if ($exons[$i]->start < $exons[$i-1]->end) {
-		print STDERR "ERROR:  Transcript folds back on itself. Transcript : " . $transcript->dbID . "\n";
-		foreach my $exon ( @exons ){
-		  print STDERR $exon->start.":".$exon->end."\t";
-		}
-		print STDERR "\n";
-		next TRANSCRIPT;
-	      } 
-	    } elsif ($exons[0]->strand == -1) {
-	      if ($exons[$i]->end > $exons[$i-1]->start) {
-		print STDERR "ERROR:  Transcript folds back on itself. Transcript : " . $transcript->dbID . "\n";
-		foreach my $exon ( @exons ){
-		  print STDERR $exon->start.":".$exon->end."\t";
-		}
-		print STDERR "\n";
-		next TRANSCRIPT;
-	      } 
-	    } else {
-	      print STDERR "EEEK:In transcript  " . $transcript->dbID . " No strand for exon - can't check for folded transcript\n";
+	  if ($strand == -1){
+	    if  ( $info{end}{$exon_id} > $info{start}{$previous_exon} ){
+	      print STDERR "Transcript $tran_id folds back on itself\n";
+	      &print_transcript( $exons,$info);
 	    }
 	  }
 	}
       }
+      $previous_exon = $exon_id;
 
-    # check some function calls
-    eval{
-      my @genes     = $vc->get_all_Genes_exononly();
-      my @genes     = $vc->get_all_Genes('evidence');
-      
-      my @tmpgenes    = $vc->get_Genes_by_Type('ensembl','evidence');
-      my @preds     = $vc->get_all_PredictionFeatures;
-      
-      my @features  = $vc->get_all_SimilarityFeatures_above_score('cpg',25);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('trna',80);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('unigene.seq',80);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('embl_vertrna',80);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('dbEST',1,0);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('swall',1);
-      @features     = $vc->get_all_SimilarityFeatures_above_score('human_mrna',1);
-    };
-    if ($@){
-      print STDERR "Error testing a functionality:\n$@\n";
-    }
-    
-    $start += 5000000;
-    $end   += 5000000;
-    if ( $end > $chr_lengths{$chr} ){
-      $end = $chr_lengths{$chr};
-    }
-  }  
-}
+    } # end of EXON
+  }   # end of TRANSCRIPT
+}     # end of GENE
+
 
 
 ########################################################
@@ -232,4 +201,143 @@ sub get_chrlengths{
     $chrhash{$chr} = $length;
   }
   return \%chrhash;
+}
+
+
+sub check_transcript{
+  my $db = shift;
+  my $t_id = shift;
+
+  my $q = qq( SELECT e.exon_id, 
+	      if(sgp.raw_ori=1,(e.seq_start-sgp.raw_start+sgp.chr_start), 
+		 (sgp.chr_start+sgp.raw_end-e.seq_end)) as start, 
+	      if(sgp.raw_ori=1,(e.seq_end-sgp.raw_start+sgp.chr_start), 
+		 (sgp.chr_start+sgp.raw_end-e.seq_start)) as end, 
+	      e.phase as phase,
+	      e.end_phase as end_phase,
+	      if (sgp.raw_ori=1,e.strand,(-e.strand)) as strand, 
+	      sgp.chr_name, 
+	      abs(e.seq_end-e.seq_start)+1 as length, 
+	      et.rank, 
+	      if(e.exon_id=tl.start_exon_id,
+		 (concat(tl.seq_start," (start)",
+			 if(e.exon_id=tl.end_exon_id,(concat(" ",tl.seq_end," (end)")),("")))),
+		 if (e.exon_id=tl.end_exon_id,(concat(tl.seq_end," (end)")),(""))) 
+	      as transcoord, 
+	      if(e.sticky_rank>1,(concat("sticky (rank = ",e.sticky_rank,")")),
+		 ("")) as sticky 
+	      FROM  translation tl, exon e, transcript tr, exon_transcript et, 
+	      static_golden_path sgp 
+	      WHERE e.exon_id=et.exon_id AND 
+	      et.transcript_id=tr.transcript_id AND 
+	      sgp.raw_id=e.contig_id AND sgp.type = '$path' AND 
+	      tr.transcript_id = $t_id AND 
+	      tr.translation_id=tl.translation_id 
+	      ORDER BY et.rank
+	    );
+
+  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+  my $res = $sth->execute || $db->throw("can't execute: $q");
+  
+  my %exon;
+  my @exons;
+
+  while( my ($exon_id,$start,$end,$phase,$end_phase,$strand,$chr,$length,$rank,$transl,$sticky) = $sth->fetchrow_array) {
+    #print STDERR "$exon_id\t$start\t$end\t$phase\t$end_phase\t$strand\t$chr\t$length\t$rank\t$transl\t$sticky\n";
+    push (@exons,$exon_id);
+    $exon{start}{$exon_id}       = $start;
+    $exon{end}{$exon_id}         = $end;
+    $exon{start_phase}{$exon_id} = $phase;
+    $exon{end_phase}{$exon_id}   = $end_phase;
+    $exon{strand}{$exon_id}      = $strand;
+    $exon{chr}{$exon_id}         = $chr;
+    if ($sticky){
+      $exon{sticky}{$exon_id} = 1;
+    }
+    else{
+      $exon{sticky}{$exon_id} = 0;
+    }
+  }
+  return (\@exons,\%exon);
+}
+
+sub get_transcript_ids{
+  my $db   = shift;
+  my $gene_id = shift;
+
+  if (!$db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor')) {
+    die "get_chrlengths should be passed a Bio::EnsEMBL::DBSQL::DBAdaptor\n";
+  }
+
+  
+  my $q = qq( SELECT transcript_id
+	      FROM transcript
+	      WHERE gene_id=$gene_id
+            );
+
+  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+  my $res = $sth->execute || $db->throw("can't execute: $q");
+
+  my @transcript_ids;
+  while( my $id = $sth->fetchrow_array) {
+    push(@transcript_ids,$id);
+  }
+  return @transcript_ids;
+}
+
+
+sub get_gene_ids{
+  my $db   = shift;
+  my $type = shift;
+
+  if (!$db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor')) {
+    die "get_chrlengths should be passed a Bio::EnsEMBL::DBSQL::DBAdaptor\n";
+  }
+
+  my %chrhash;
+
+  my $q = qq( SELECT gene_id
+	      FROM gene
+	      WHERE type='$type'
+            );
+
+  my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+  my $res = $sth->execute || $db->throw("can't execute: $q");
+
+  my @gene_ids;
+  while( my $id = $sth->fetchrow_array) {
+    push( @gene_ids, $id);
+  }
+  return @gene_ids;
+}
+
+
+sub print_transcript{
+  my $exons = shift;
+  my $info  = shift;
+
+  my @exons = @$exons;
+  my %info = %$info;
+
+  my $strand = $info{strand}{$exons[0]};
+  if ($strand == 1){
+    @exons = sort{ $info{start}{$a} <=> $info{start}{$b} } @exons;
+  }
+  elsif($strand == -1){
+    @exons = sort{ $info{start}{$b} <=> $info{start}{$a} } @exons;
+  }
+
+  foreach my $exon_id ( @exons ){
+    my $sticky_label ='';
+    if ( $info{sticky}{$exon_id} == 1){
+      $sticky_label = 'sticky';
+    }
+    
+    print STDERR $exon_id." ".$info{start}{$exon_id}."-".$info{end}{$exon_id}.
+      " phase: ".$info{start_phase}{$exon_id}.
+	" end_phase: ".$info{end_phase}{$exon_id}.
+	  " strand: ".$info{strand}{$exon_id}.
+	    " chr: ".$info{chr}{$exon_id}.
+	      " ".$sticky_label."\n";
+  }
 }
