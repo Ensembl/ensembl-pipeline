@@ -171,7 +171,6 @@ sub fetch_input {
 	      -options     => $self->options,
 	      -target_type => $self->target_type,
 	      -query_type  => $self->query_type,
-	      -analysis_obj  => $self->analysis,
 	     );
       $self->runnables($runnable);
     }
@@ -240,6 +239,7 @@ sub filter_output{
   my @good_matches;
 
   my %matches;
+
   foreach my $transcript (@results ){
     my $id = $self->_evidence_id($transcript);
     push ( @{$matches{$id}}, $transcript );
@@ -349,7 +349,8 @@ sub write_output{
       
       
       eval{
-	  $gene_adaptor->store($gene);
+	$gene_adaptor->store($gene);
+	
       };
       if ($@){
 	  $self->warn("Unable to store gene!!\n$@");
@@ -364,8 +365,11 @@ sub make_genes{
   
   my @genes;
   my $slice_adaptor = $self->db->get_SliceAdaptor;
+
+  my $gene;
+  my $checked_transcript;
   foreach my $tran ( @transcripts ){
-    my $gene = Bio::EnsEMBL::Gene->new();
+    $gene = Bio::EnsEMBL::Gene->new();
     $gene->analysis($self->analysis);
     $gene->type($self->analysis->logic_name);
     
@@ -375,10 +379,12 @@ sub make_genes{
     my $chr_name;
     my $chr_start;
     my $chr_end;
+    #print STDERR " slice_id = $slice_id\n";
     if ($slice_id =~/$EST_INPUTID_REGEX/){
       $chr_name  = $1;
       $chr_start = $2;
       $chr_end   = $3;
+      print STDERR "chr: $chr_name start: $chr_start end: $chr_end\n";
     }
     else{
       $self->warn("It cannot read a slice id from exon->seqname. Please check.");
@@ -388,10 +394,11 @@ sub make_genes{
       $exon->contig($slice);
       foreach my $evi (@{$exon->get_all_supporting_features}){
 	$evi->contig($slice);
+	$evi->analysis($self->analysis);
       }
     }
     
-    my $checked_transcript = $self->check_splice_sites( $tran );
+    $checked_transcript = $self->check_splice_sites( $tran );
     $gene->add_Transcript($checked_transcript);
     push( @genes, $gene);
   }
@@ -513,8 +520,13 @@ sub check_splice_sites{
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
   
   my $strand = $transcript->start_Exon->strand;
-  my @exons  = @{$transcript->get_all_Exons};
-  
+  my @exons;
+  if ( $strand == 1 ){
+    @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
+  }
+  else{
+    @exons = sort { $b->start <=> $a->start } @{$transcript->get_all_Exons};
+  }
   my $introns  = scalar(@exons) - 1 ; 
   if ( $introns <= 0 ){
     return $transcript;
@@ -552,6 +564,10 @@ sub check_splice_sites{
       
       ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
       ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+      
+      #print STDERR "strand: + upstream (".
+      #($upstream_exon->end + 1)."-".($upstream_exon->end + 2 ).") = $upstream_site, downstream ".
+      #($downstream_exon->start - 2)."-".($downstream_exon->start - 1).") = $downstream_site\n";
       
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
@@ -596,7 +612,7 @@ sub check_splice_sites{
       ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
       ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
       
-      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+      #print STDERR "strand: - upstream $upstream_site, downstream: $downstream_site\n";
       if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
 	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
 	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
@@ -638,7 +654,11 @@ sub change_strand{
     my $original_strand = $transcript->start_Exon->strand;
     my $new_strand      = (-1)*$original_strand;
     foreach my $exon (@{$transcript->get_all_Exons}){
-	$exon->strand($new_strand);
+      $exon->strand($new_strand);
+      foreach my $evi ( @{$exon->get_all_supporting_features} ){
+	$evi->strand($new_strand);
+	$evi->hstrand( $evi->hstrand*(-1) );
+      }
     }
     $transcript->sort;
     return $transcript;
