@@ -213,14 +213,20 @@ use vars qw( %ESTConf );
 	    
 
 	    # how strict you want the merging of cdnas/ests to be.
-	    # one of these values = 'exact', 'fuzzy', 'loose'
-	    EST_GENEBUILDER_MERGE          => 'fuzzy',
-	    # the recommended thing is to use 'fuzzy' if you want to allow edge-mismatches in the
-	    # exon comparisons, for instance in ests that are likely to contain errors
-	    # 'exact' would be for good quality data (e.g. cdnas) as it requires exact exon-edge matching
-	    # and it could allow alternative UTRs to be resolved
-	    # there is also the option 'loose', which merges also introns that falls in exons,
-	    # this is when you really don't trust those ests.
+	    EST_GENEBUILDER_MERGE          => 'fuzzy_semiexact_merge',
+	    # one of these values 
+	    #semiexact_merge       = test for exact exon matches, except for possible mismatches in the extremal exons
+	    #fuzzy_semiexact_merge = this function checks whether two transcripts merge
+                                     with fuzzy exon matches: there is consecutive exon overlap 
+	                             but there are mismatches of $allowed_mismatches bases 
+	                             allowed at the edges of any exon pair
+	    # simple_merge         = this function checks whether two transcripts merge
+                                     according to consecutive exon overlap (just overlap, without looking at the 
+                                     exon positions) and it only considers 1-to-1 matches
+	    # merge_allow_gaps     = this function checks whether two transcripts merge
+                                     according to consecutive exon overlap allowing for 1-to-many ot many-to-1 matches
+
+	    
 
 	    EST_MAX_EVIDENCE_DISCONTINUITY => 10,
 	    EST_MAX_INTRON_SIZE => 300000,
