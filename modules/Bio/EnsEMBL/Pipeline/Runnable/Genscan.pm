@@ -55,6 +55,16 @@ resulting output is parsed to produce a set of Bio::SeqFeatures.
 
 =back
 
+=head1 SEE ALSO
+
+=over 4
+
+=item B<Bio::EnsEMBL::Pipeline::RunnableI>
+
+=item B<Bio::EnsEMBL::Pipeline::RunnableDB::Genscan> 
+
+=back
+
 =head1 CONTACT
 
 Describe contact details here
@@ -76,14 +86,10 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
-use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::DBSQL::Utils;
-use Bio::Seq;
 use Bio::Root::RootI;
-use Bio::SeqIO;
 
-#use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -113,6 +119,7 @@ sub new {
     $self->{'_results'}   = undef; # file to store results of genscan
     $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
     $self->{'_parameters'} =undef; #location of parameters for genscan
+
     my($query, $genscan, $parameters, $matrix) = 
         $self->_rearrange([qw(QUERY GENSCAN PARAM MATRIX)], @args);
 
@@ -206,10 +213,10 @@ sub matrix {
 =cut
 
 sub parameters {
-    my ($self, $location) = @_;
-    if ($location)
+    my ($self, $param) = @_;
+    if ($param)
     {
-        $self->{'_parameters'} = $location ;
+        $self->{'_parameters'} = $param;
     }
     return $self->{'_parameters'};
 }
@@ -264,11 +271,11 @@ sub genscan_peptides {
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+    my ($self) = @_;
     #check seq
     my $seq = $self->query() || $self->throw("Seq required for Genscan\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 
