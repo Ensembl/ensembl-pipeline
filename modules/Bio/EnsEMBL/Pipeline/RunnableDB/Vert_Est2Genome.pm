@@ -257,13 +257,13 @@ sub get_organism {
 
 sub runnable {
     my ($self,$arg) = @_;
-
+    
     if (defined($arg)) {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
 	
 	$self->{_runnable} = $arg;
     }
-
+    
     return $self->{_runnable};
 }
 
@@ -282,16 +282,20 @@ sub run {
     }
     
     foreach my $f (@features) {
-    if (defined($f->analysis) && defined($f->score) && defined ($f->analysis->db) 
-            && $f->analysis->db eq "vert"  && $f->score > 100) {
 
-	  my $organism = $self->get_organism($f->hseqname);
-	  if (!defined($idhash{$f->hseqname})) { #
-#	  if ($organism eq "Homo sapiens (human)" && !defined($idhash{$f->hseqname})) { #
-        push(@mrnafeatures,$f);
-		$idhash{$f->hseqname} =1;
+	if (defined($f->analysis)      && defined($f->score) && 
+	    defined($f->analysis->db)  && $f->analysis->db eq "vert"  &&
+	    $f->score > 100) {
+
+	    my $organism = $self->get_organism($f->hseqname);
+
+	    if (!defined($idhash{$f->hseqname})) { 
+		if ($organism eq "Homo sapiens (human)" && !defined($idhash{$f->hseqname})) { 
+		    push(@mrnafeatures,$f);
+		    $idhash{$f->hseqname} =1;
+		}
 	    } else {
-	      print STDERR ("Ignoring feature " . $f->hseqname . "\n");
+		print STDERR ("Ignoring feature " . $f->hseqname . "\n");
 	    }
 	}
     }
@@ -305,6 +309,7 @@ sub run {
     my @seq         = $self->get_Sequences(@mrnafeatures);
     my $blastdb     = $self->make_blast_db(@seq);
     my @newfeatures = $self->run_blast($genseq,$blastdb);
+
     print STDERR "Number of features post blast is " . scalar(@newfeatures) . "\n";
 
     unless (@newfeatures)
@@ -317,41 +322,46 @@ sub run {
     print "GENOMIC $genseq \t FEATURES ".@newfeatures."\n";
       
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
-								                                      '-features' => \@newfeatures);
-    # Get rid of large data objects
+								      '-features' => \@newfeatures);
     
     $self->{_features} = [];
+
     $self->runnable($runnable);
     $self->throw("Can't run - no runnable object") unless defined($self->runnable);
     $self->runnable->minirun;
+
     my @tmpf = $self->runnable->output;
+
     foreach my $tmpf (@tmpf) {
-      $tmpf->seqname($self->input_id);
-      $tmpf->id($self->input_id);
-      $tmpf->source_tag("tblastn");
-      $tmpf->primary_tag("similarity");
-      $tmpf->strand($tmpf->hstrand);
+	$tmpf->seqname($self->input_id);
+	$tmpf->id($self->input_id);
+	$tmpf->source_tag("tblastn");
+	$tmpf->primary_tag("similarity");
+	$tmpf->strand($tmpf->hstrand);
     }
+
     if ($#tmpf > 0) {
-      my $i;
-      for ($i = 0; $i <= $#tmpf-1; $i++) {
-	$self->check_splice($tmpf[$i],$tmpf[$i+1]);
-      }
-    }
-  }
-
-sub check_splice {
-  my ($self,$f1,$f2) = @_;
-
-
-  my $splice1 = substr($self->{_genseq}->seq,$f1->end,2);
-  my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
-
-#  print ("Start/end " . $f1->start . "\t" . $f1->end . "\t" . $f2->start . "\t" . $f2->end . "\n");
-    if (abs($f2->start - $f1->end) > 50) {
-    print ("Splices are " . $f1->hseqname . " [" . $splice1 . "][" . $splice2 . "] " . ($f2->start - $f1->end) . "\n");
+	my $i;
+	for ($i = 0; $i <= $#tmpf-1; $i++) {
+	    $self->check_splice($tmpf[$i],$tmpf[$i+1]);
+	}
     }
 }
+
+sub check_splice {
+    my ($self,$f1,$f2) = @_;
+    
+    my $splice1 = substr($self->{_genseq}->seq,$f1->end,2);
+    my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
+    
+    if (abs($f2->start - $f1->end) > 50) {
+	print ("Splices are " . $f1->hseqname . " [" . 
+	                        $splice1      . "][" . 
+	                        $splice2      . "] " . 
+	       ($f2->start - $f1->end)        . "\n");
+    }
+}
+
 
 sub output {
     my ($self) = @_;
