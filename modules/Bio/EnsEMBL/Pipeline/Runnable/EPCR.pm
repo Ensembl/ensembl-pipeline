@@ -361,6 +361,7 @@ sub parse_results {
 	# nasty hack - escape the "'" - sql barfs with things
 	# like "3'UTR" - should be fixed in FeatureAdaptor...
         $hit =~ s{\'}{\\\'};
+	$self->_add_hit($hit);
 
         $feat->{'name'} = $name;
         $feat->{'start'} = $start;
