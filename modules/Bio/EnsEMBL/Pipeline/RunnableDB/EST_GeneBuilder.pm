@@ -178,9 +178,11 @@ sub write_output {
   
  GENE: 
   foreach my $gene ($self->output) {	
-      eval {
+    my $num = scalar(@{$gene->get_all_Transcripts});
+    
+    eval {
 	  $gene_adaptor->store($gene);
-	  print STDERR "wrote gene " . $gene->dbID . "\n";
+	  print STDERR "wrote gene " . $gene->dbID . " with $num transcripts\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -1227,9 +1229,13 @@ sub run {
   my @ready_reverse_genes          = $self->_make_shared_exons_unique( @selected_reverse_genes );
   
   # map them to raw contig coordinates
-  my @reverse_remapped             = $self->remap_genes(\@reverse_genes, $strand);
+  my @reverse_remapped             = $self->remap_genes(\@ready_reverse_genes, $strand);
 
   $self->output(@reverse_remapped);
+
+  foreach my $gene ( $self->output ){
+    print STDERR "gene with ".scalar(@{$gene->get_all_Transcripts})." transcripts\n";
+  }
 
 }
 
@@ -1250,11 +1256,14 @@ sub _select_best_transcripts{
 		       }
 		     }  @{$gene->get_all_Transcripts};
     
+    print STDERR " $gene has ".scalar(@trans)." transcripts\n";
   TRAN:
     foreach my $tran ( @trans ){
       $count++;
+      print STDERR "count: $count\n";
       next GENE if $count > $MAX_TRANSCRIPTS_PER_GENE;
       push ( @selected_transcripts, $tran );
+      print STDERR "transcript accepted\n";
     }
   }
   return @selected_transcripts;
@@ -1277,7 +1286,7 @@ sub _mean_coverage{
   foreach my $id ( @ids  ){
     $mean_coverage += $score{$id};
   }
-  print STDERR "Mean coverage = ".($mean_coverage/scalar(@ids))."\n";
+  #print STDERR "Mean coverage = ".($mean_coverage/scalar(@ids))."\n";
   return $mean_coverage/scalar(@ids);
 }
 
@@ -1518,7 +1527,6 @@ sub _cluster_into_Genes{
   #foreach my $t ( @transcripts_unsorted ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
   #}
-
   # flusold genes
   #$self->flush_Genes;
   
@@ -1602,7 +1610,6 @@ sub _cluster_into_Genes{
     $gene->type($genetype);
     $gene->analysis($analysis);
     
-    # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
     foreach my $transcript( @{$cluster} ){
       $gene->add_Transcript($transcript);
     }
