@@ -10,7 +10,7 @@ use Bio::Seq;
 
 ok(1);
 
-ok(my $seqstr)     =  set_seq());
+ok(my $seqstr      =  set_seq());
 
 ok(my $seq	   =  Bio::Seq->new(	-seq         => $seqstr,
 					-id          => 'HSAC74',

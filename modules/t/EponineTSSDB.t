@@ -33,7 +33,7 @@ ok($runobj->fetch_input);
 
 ok($runobj->run);
 
-ok(my @out = $runobj->output;
+ok(my @out = $runobj->output);
 
 ok($runobj->write_output);
 
