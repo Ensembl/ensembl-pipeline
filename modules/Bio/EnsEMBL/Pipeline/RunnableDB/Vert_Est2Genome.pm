@@ -206,7 +206,7 @@ sub fetch_input {
 
     foreach my $f (@features) {
 	if (defined($f->analysis) && $f->analysis->db eq "vert"  && $f->score > 1000) {
-	    my $organism = $self->get_organism($f->hid);
+	    my $organism = $self->get_organism($f->hseqname);
 	    if ($organism eq "Homo sapiens (human)") {
 		push(@mrnafeatures,$f);
 	    } else {
@@ -225,11 +225,9 @@ sub get_organism {
     my ($self,$hid) = @_;
 
     $self->throw("No hid input") unless defined($hid);
-
+    my $org;
     eval {
 	open (ORG,"efetch $hid |");
-
-	my $org;
 
 	while (<ORG>) {
 	    chomp;
