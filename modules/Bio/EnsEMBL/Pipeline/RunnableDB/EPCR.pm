@@ -89,7 +89,7 @@ sub new {
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for repeatmasker from the database
+    Function:   Fetches input data for epcr from the database
     Returns :   none
     Args    :   none
 
@@ -102,7 +102,7 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
-    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+    my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
 }
 
@@ -180,7 +180,7 @@ sub fetch_output {
     Title   :   write_output
     Usage   :   $self->write_output
     Function:   Writes output data to db
-    Returns :   array of repeats (with start and end)
+    Returns :   nothing
     Args    :   none
 
 =cut
