@@ -209,11 +209,11 @@ sub run{
   ############################################################
   # print out the results:
   foreach my $gene (@genes){
-      foreach my $trans (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
-      }
+    foreach my $trans (@{$gene->get_all_Transcripts}){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+    }
   }
-
+  
   ############################################################
   # need to convert coordinates?
   my @mapped_genes = $self->convert_coordinates( @genes );
@@ -343,19 +343,42 @@ sub write_output{
 ############################################################
 
 sub make_genes{
-    my ($self,@transcripts) = @_;
+  my ($self,@transcripts) = @_;
   
-    my @genes;
-    foreach my $tran ( @transcripts ){
-	my $gene       = Bio::EnsEMBL::Gene->new();
-	$gene->analysis($self->analysis);
-	$gene->type($self->analysis->gff_feature);
-        
-	my $checked_transcript = $self->check_splice_sites( $tran );
-	$gene->add_Transcript($checked_transcript);
-	push( @genes, $gene);
+  my @genes;
+  my $slice_adaptor = $self->db->get_SliceAdaptor;
+  foreach my $tran ( @transcripts ){
+    my $gene = Bio::EnsEMBL::Gene->new();
+    $gene->analysis($self->analysis);
+    $gene->type($self->analysis->logic_name);
+    
+    ############################################################
+    # put a slice on the transcript
+    my $slice_id      = $tran->start_Exon->seqname;
+    my $chr_name;
+    my $chr_start;
+    my $chr_end;
+    if ($slice_id =~/$EST_INPUTID_REGEX/){
+      $chr_name  = $1;
+      $chr_start = $2;
+      $chr_end   = $3;
     }
-    return @genes;
+    else{
+      $self->warn("It cannot read a slice id from exon->seqname. Please check.");
+    }
+    my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
+    foreach my $exon (@{$tran->get_all_Exons}){
+      $exon->contig($slice);
+      foreach my $evi (@{$exon->get_all_supporting_features}){
+	$evi->contig($slice);
+      }
+    }
+    
+    my $checked_transcript = $self->check_splice_sites( $tran );
+    $gene->add_Transcript($checked_transcript);
+    push( @genes, $gene);
+  }
+  return @genes;
 }
 
 ############################################################
