@@ -88,7 +88,7 @@ sub new {
   $self->est_sequence($est) if defined $est; 
 
   if ($exonerate) {   
-    $self->exonerate($exonerate) ;
+    $self->exonerate($exonerate);
   }
   else {   
     eval 
@@ -280,21 +280,41 @@ sub genfilename {
 
   Title   : run
   Usage   : $self->run
-  Function: Runs exonerate in gapped mode and stores results as FeaturePairs
-  Returns : TRUE on success, FALSE on failure.
-  Args    : 
+  Function: Runs exonerate; the optional $ungapped flag determines whether to run
+            ungapped - default is gapped.
+  Returns : nothing
+  Args    : $ungapped flag - optional
 
 =cut
 
-sub run{  
+sub run {  
+  my ($self, $ungapped) = @_;
+
+  if(defined $ungapped){
+    $self->run_ungapped;
+  }
+  else{
+    $self->run_gapped;
+  }
+}
+
+=head2 run_gapped
+
+  Title   : run_gapped
+  Usage   : $self->run_gapped()
+  Function: Runs exonerate in gapped mode and stores results as FeaturePairs
+  Returns : TRUE on success, FALSE on failure.
+  Args    : none 
+
+=cut
+
+sub run_gapped {
   my ($self) = @_;
   $self->warn("presently there is no gapped cigar parser for exonerate");
 
   # store raw output FeaturePairs in $self->output
   # store "genes" in $self->add_genes via convert_output
   # $self->convert_output;
-
-
 }
 
 =head2 run_ungapped
@@ -343,7 +363,7 @@ sub run_ungapped {
   # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
   # are got from $self->arguments.
   my $command = $self->exonerate() . " " .  $self->arguments . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
-
+print STDERR "command is $command\n";
   # disable buffering of STDOUT
   STDOUT->autoflush(1);
 
