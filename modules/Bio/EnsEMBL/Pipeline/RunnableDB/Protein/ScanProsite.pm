@@ -114,13 +114,10 @@ sub fetch_input {
 sub runnable {
     my ($self) = @_;
 
-    print STDERR "PROGR :".$self->analysis->program."\t".$self->analysis->parameters."\n";
-    
     if (!defined($self->{'_runnable'})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->new(
 									    -query => $self->genseq,
-									    -database  => $self->analysis->db,
-									    -program   => $self->analysis->program,
+									    -analysis  => $self->analysis,
 									    -parameters => $self->analysis->parameters);
  
            
