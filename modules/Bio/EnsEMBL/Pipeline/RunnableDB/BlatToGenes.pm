@@ -58,17 +58,26 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::BlatToGenes;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blat;
+use Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Gene;
+use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::ESTConf;
 
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_BLAT_GENOMIC
+				       );
 
 use vars qw(@ISA);
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
+
+my %offset_cache; # This is temporary and needs to be moved to a closure.
+my %cache;        # This too...
+
 
 sub new {
   my ($class,@args) = @_;
@@ -200,42 +209,12 @@ sub run{
   if ( @filtered_results ){
     
     # make genes out of the features
-    #print STDERR scalar(@filtered_results)." filtered results to be made into genes\n";
     my @genes = $self->make_genes(@filtered_results);
-    #rint STDERR scalar(@genes)." genes created\n";
-    
-    # print out the results:
-    #oreach my $gene (@genes){
-     #foreach my $trans (@{$gene->get_all_Transcripts}){
-	#io::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
-	#foreach my $exon (@{$trans->get_all_Exons}){
-	#  foreach my $evi (@{$exon->get_all_supporting_features}){
-	#    print STDERR $evi->hseqname." ".
-	#      $evi->start." ".$evi->end." ".
-	#	$evi->hstart." ".$evi->hend." ".
-	#	  $evi->primary_tag." ".$evi->source_tag."\n";
-	#  }
-	#}
-      #
-    #
-    
-    #print STDERR "=== Before converting coordinates ===\n";
-    #foreach my $gene (@genes ){
-    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-    #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    # } 
-    #}    
+
     # need to convert coordinates?
-    my @mapped_genes = $self->convert_coordinates( @genes );
+#    my @mapped_genes = $self->convert_coordinates( @genes );
     
-    #print STDERR "=== After converting coordinates ===\n";
-    #foreach my $gene (@mapped_genes ){
-    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-    #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-    #  }  
-    #}    
-    #print STDERR "passing ".scalar(@mapped_genes)." genes to output()\n";
-    $self->output(@mapped_genes);
+    $self->output(@genes);
     
   }
   else{
@@ -276,8 +255,8 @@ sub filter_output{
       #}
       my $score = $match->score;
       
-      my $only_best_score      = 0;
-      my $hits_within_2percent = 1;
+      my $only_best_score      = 1;
+      my $hits_within_2percent = 0;
 
       # we can select: best in genome matches
       if ( $only_best_score ){
@@ -329,8 +308,12 @@ sub write_output{
     #foreach my $tran (@{$gene->get_all_Transcripts}){
     #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     #}
+
+    my $blat_gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor->new($self->db);
+
     eval{
-      $gene_adaptor->store($gene);
+#      $gene_adaptor->store($gene);
+      $blat_gene_adaptor->store($gene);
     };
     if ($@){
       $self->warn("Unable to store gene!!");
@@ -341,10 +324,10 @@ sub write_output{
     }
     else{
       print STDERR "stored gene ".$gene->type." ".$gene->dbID."\n";
-      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence(   $transcript );
-      }
+#      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence(   $transcript );
+#      }
     }
   }
 }
@@ -361,10 +344,35 @@ sub write_output{
 sub make_genes{
     my ($self,@features) = @_;
     my $slice_adaptor     = $self->db->get_SliceAdaptor;
-    
+
+    # Sort features to group chromosomes together.
+    # This is to avoid needing to cache or reload chromsomes
+    # later on.
+
+    my %partitioned_by_chromosome;
+
+    foreach my $feature (@features) {
+print "New feature $feature\n";
+       my @sub_features = $feature->sub_SeqFeature;
+
+       my $seqname = $sub_features[0]->seqname;
+print "     $seqname\n";
+       push (@{$partitioned_by_chromosome{$seqname}}, $feature);
+
+    }
+
+    my @orderly_features;
+
+    foreach my $chr_key (keys %partitioned_by_chromosome) {
+
+      foreach my $chr_feat (@{$partitioned_by_chromosome{$chr_key}}) {
+	push (@orderly_features, $chr_feat);
+      }
+    }
+
     my @genes;
   TRANSCRIPT:
-    foreach my $feature ( @features ){
+    foreach my $feature ( @orderly_features ){
 	my $transcript = Bio::EnsEMBL::Transcript->new();
 	my $gene       = Bio::EnsEMBL::Gene->new();
 	$gene->analysis($self->analysis);
@@ -382,6 +390,7 @@ sub make_genes{
 	
       EXON:
 	foreach my $sub_feature (@sub_features){
+
 	    # each sub_feature is a feature pair
 	    
 	    # make the exon out of the feature1 (the genomic feature)
@@ -559,8 +568,22 @@ sub check_splice_sites{
     my $other    = 0;
     
     # all exons in the transcripts are in the same seqname coordinate system:
+
     my $slice = $transcript->start_Exon->contig;
-    
+
+    # The slice we have above is a dangerous thing to use on the farm.
+    # Subsequent code needs to retrieve a large number of subseqs to
+    # check splice sites and we end up virtually loading the whole
+    # genome assembly via the AssemblyMapper.  This mapping activity
+    # is database heavy and can totally swamp the database when more
+    # than about 180 instances of this code is running.  Hence, we can
+    # use a backdoor method to get the sequence we need.  This method
+    # retrieves the sequence from the chromosome files that should be
+    # local to every node on the farm.  This means not using the database
+    # quite so much, and with judicious caching little time is spent on
+    # disk IO.
+    my $nonmapped_slice = $self->_directly_fetch_chromosome($slice);
+
     if ($strand == 1 ){
 	
       INTRON:
@@ -571,10 +594,16 @@ sub check_splice_sites{
 	    my $downstream_site;
 	    eval{
 		$upstream_site = 
-		    $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		    $nonmapped_slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
 		$downstream_site = 
-		    $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		    $nonmapped_slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
 	    };
+
+#print "SLICE     UP " . $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) ) . "\n";
+print "NONMAPPED UP " . $nonmapped_slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) ) . "\n";
+#print "SLICE     DOWN " . $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) ) . "\n";
+print "NONMAPPED DOWN " . $nonmapped_slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) ) . "\n";
+
 	    unless ( $upstream_site && $downstream_site ){
 		print STDERR "problems retrieving sequence for splice sites\n$@";
 		next INTRON;
@@ -619,10 +648,17 @@ sub check_splice_sites{
 	    my $down_site;
 	    eval{
 		$up_site = 
-		    $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+		    $nonmapped_slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
 		$down_site = 
-		    $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+		    $nonmapped_slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
 	    };
+
+#print "SLICE     UP " . $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
+print "NONMAPPED UP " . $nonmapped_slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
+#print "SLICE     DOWN " . $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) ) . "\n";
+print "NONMAPPED DOWN " . $nonmapped_slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) ) . "\n";
+
+
 	    unless ( $up_site && $down_site ){
 		print STDERR "problems retrieving sequence for splice sites\n$@";
 		next INTRON;
@@ -677,6 +713,115 @@ sub change_strand{
     $transcript->sort;
     return $transcript;
 }
+
+
+
+############################################################
+
+=head2 _directly_fetch_chromosome
+
+  This method allows the chromosome sequence to be loaded 
+  from disc rather than the database.  Admittedly, this sounds 
+  really stupid, but there is a reason for it.  When a large number 
+  of Slices are to be pulled from the database, making heavy use of
+  the AssemblyMapper, eventually most of the assembly will be loaded
+  on and off by the AssemblyMapper->register_region method.  On a 
+  busy system this actvity can totally swamp the database (loading 
+  the assembly 400 times).  In this situation it is not so crazy to 
+  want to derive the needed sequence from a local source, with 
+  judicious use of caching.  
+
+=cut
+
+sub _directly_fetch_chromosome_Slice {
+
+  my ($self, $slice) = @_;
+
+  $self->_chromosome_offset_cache($slice->chr_name, $slice->chr_start);
+
+  return $self->_fetch_from_chromosome_cache($slice->chr_name);
+
+}
+
+############################################################
+
+
+=head2 _fetch_from_chromosome_cache
+
+  Controls the caching of loaded chromosome sequences.
+
+=cut
+
+sub _fetch_from_chromosome_cache {
+
+  my ($self, $chr_name) = @_;
+
+#  my %cache;          # These are made global - BAD - should be a more sophisticated data structure.
+  my $CACHE_SIZE = 5;  # How much memory can we count on?  ~1Gb -> using half of this gets us ~5 chromosomes.
+
+
+  if (defined $cache{$chr_name}){
+    print "Reading chromosome $chr_name from cache.\n";
+    return $cache{$chr_name};
+
+  } else {
+
+    my ($old_chr) = keys %cache; 
+    delete $cache{$old_chr};
+    print "Removed chromosome $old_chr from cache.\n";
+
+    print "Reading chromosome $chr_name from file to cache\n";
+
+    my $chr_filename = $EST_BLAT_GENOMIC . "/" . $chr_name . "\.fa";
+
+    my $seq_io = Bio::SeqIO->new('-file'   => $chr_filename,
+				 '-format' => 'fasta');
+
+    my $chr_seq = $seq_io->next_seq;
+
+    $cache{$chr_name} = $chr_seq;
+
+  }
+
+}
+
+############################################################
+
+=head2 _chromosome_offset_cache
+
+  The chromosome sequence offset is something that should not 
+  be forgotten.  Presently it is not used, but here is the 
+  code should it become important.
+
+=cut
+
+sub _chromosome_offset_cache {
+
+  my ($self, $chr_name, $chr_offset) = @_;
+
+# %offset_cache is defined as a global var - BAD - need to make a closure.
+
+  if (defined $chr_offset) {
+
+    if (defined $offset_cache{$chr_name} && $offset_cache{$chr_name} ne $chr_offset){
+      $self->throw("Multiple differing offsets found for chromosome " . 
+		   "$chr_name : values $chr_offset " .  $offset_cache{$chr_name});
+    } elsif (!defined $offset_cache{$chr_name}) {
+      $offset_cache{$chr_name} = $chr_offset;
+      return $offset_cache{$chr_name};
+    }
+
+  } else {
+    unless (!defined $offset_cache{$chr_name}) {
+      return $offset_cache{$chr_name};
+    }
+    
+    $self->throw("Offset for chromosome $chr_name is not known.");
+  }
+
+}
+
+
 
 ############################################################
 #
