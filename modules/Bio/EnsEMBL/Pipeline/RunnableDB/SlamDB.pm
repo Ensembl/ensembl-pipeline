@@ -1,5 +1,4 @@
 
-
 =pod
 
 =head1 NAME
@@ -129,8 +128,6 @@ sub run{
     # run ApproxAlign on org slices
     print "And now, I run aat for yo\n";
 
-    print "parsed_binary_filename handend over to avid: " . $avid->parsed_binary_filename . "\n";
-
     my $approx_obj = $self->approx_align( $avid->parsed_binary_filename, $avid->fasta_filename1, $avid->fasta_filename2 );
 
     # cut the first seq according to the positions of the repeats
@@ -138,7 +135,9 @@ sub run{
     # using the aat-file
 
     print "...and now I will calculate the cutting for you, Master\n";
+
     my @cuts = @{ $self->calculate_cutting ( $approx_obj ) } ;
+
     print "SlamDB.pm: CALCULATED CUTTING using the repeats out of db:\n";
 
   for(@cuts){
@@ -148,19 +147,14 @@ sub run{
     }
     print "\n\n";
 
-    print "SlamDB: perhaps the aatfile i have just writen is buggy\n";
-    # output for checking the splitting-file
-    my $bug_aat =  $ApproxAlign->aatfile;
-    print "$bug_aat\n";
 
-    exit("dieeeee");
-
+    
     my $bug_f1  = "/tmp/". $avid->_filename1.".fasta";
     my $bug_f2  = "/tmp/". $avid->_filename2.".fasta";
     my $bug_rmf = "/tmp/db_repeats.out";
 
     #  perl test_slam_cutting.pl /tmp/fasta1.fasta /tmp/fasta2.fasta /tmp/aatfile.aat /tmp/rempeatmsk.out 
-    print "perl  test_slam_cutting.pl  $bug_f1 $bug_f2 $bug_aat $bug_rmf\n";
+
 
     # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
