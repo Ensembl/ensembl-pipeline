@@ -244,11 +244,11 @@ sub run_analysis {
     # This routine expands the database name into $db-1 etc for
     # split databases
 
-    print STDERR "RUNNING: ".$self->analysis->program." ".$self->analysis->db." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
+    print STDERR "RUNNING: ".$self->analysis->program." ".$self->analysis->db_file." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
 	$self->throw("Failed during prints run $!\n")
 	    
 	    unless (system ($self->analysis->program . ' ' . 
-			    $self->analysis->db . ' ' .
+			    $self->analysis->db_file . ' ' .
 			    $self->filename. ' ' .
 			    '-fjR >'.
 			    #'-fj -a -o 15   > ' . 
