@@ -133,7 +133,7 @@ sub run{
 
 #### Steve's version (fixed)
 
-  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
+  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
 
   
   # we try now without -smell 4
@@ -287,8 +287,8 @@ sub run{
 #    }
 #  }
   # tidy up output files.
-  # unlink $genome_file;
-  # unlink $evi_file;
+   #unlink $genome_file;
+   #unlink $evi_file;
 
 }
 
