@@ -82,11 +82,11 @@ sub new {
     }
 
     if(!defined $type || $type eq ''){
-      $path = $::similarity_conf{'type'};
+      $type = $::similarity_conf{'type'};
     }
     
     if(!defined $threshold){
-      $path = $::similarity_conf{'threshold'};
+      $threshold = $::similarity_conf{'threshold'};
     }
 
     $path = 'UCSC' unless (defined $path && $path ne '');
@@ -177,7 +177,7 @@ sub write_output {
     print STDERR "Fetching features \n\n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
-    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type,$self->threshold, 0);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold, 0);
     
     # lose version numbers - probably temporary till pfetch indices catch up
 
