@@ -35,10 +35,10 @@ $cpg->write_output(); #writes to DB
 =head1 DESCRIPTION
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::CPG to add
-functionality to read and write to databases.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
-extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
-required for database access.
+functionality to read and write to databases. The appropriate
+Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+is required for database access.
 
 =head1 CONTACT
 
