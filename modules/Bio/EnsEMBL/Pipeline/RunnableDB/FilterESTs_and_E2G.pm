@@ -1207,20 +1207,13 @@ sub make_seqfetcher {
 
   my $seqfetcher;
   if(defined $index && $index ne ''){
-    #my $index = '/data/blastdb/Ensembl/human.ests';
     my @db = ( $index );
-    
-    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex('-db' => \@db,);
-
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  
     ## SeqFetcher to be used with 'indicate' indexing:
     # $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
-
+    
   }
-  #if(defined $index && $index ne ''){
-  #  my @db = ( $index );
-  #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-  #}
   #else{
   #  # default to Pfetch
   #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
