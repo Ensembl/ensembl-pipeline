@@ -59,6 +59,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blat;
 use Bio::EnsEMBL::Pipeline::DBSQL::BlatGeneAdaptor;
+use Bio::EnsEMBL::Pipeline::SubseqFetcher;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
@@ -74,9 +75,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 use vars qw(@ISA);
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
-
-my %offset_cache; # This is temporary and needs to be moved to a closure.
-my %cache;        # This too...
 
 
 sub new {
@@ -571,18 +569,18 @@ sub check_splice_sites{
 
     my $slice = $transcript->start_Exon->contig;
 
-    # The slice we have above is a dangerous thing to use on the farm.
-    # Subsequent code needs to retrieve a large number of subseqs to
-    # check splice sites and we end up virtually loading the whole
-    # genome assembly via the AssemblyMapper.  This mapping activity
-    # is database heavy and can totally swamp the database when more
-    # than about 180 instances of this code is running.  Hence, we can
-    # use a backdoor method to get the sequence we need.  This method
-    # retrieves the sequence from the chromosome files that should be
-    # local to every node on the farm.  This means not using the database
-    # quite so much, and with judicious caching little time is spent on
-    # disk IO.
-    my $nonmapped_slice = $self->_directly_fetch_chromosome($slice);
+    # The slice we have above needs to be used with caution.  If we are 
+    # Blatting a big genome, any method call that triggers assembly mapping 
+    # could lock up our database.  Blat returns a scatter of hits across
+    # multiple chromosomes and requires very large parts of the assembly to
+    # repeatedly be loaded.
+
+    # Given that we have the chromosomal sequences stored locally on each
+    # node of the farm, it is an easy thing to quickly retrieve small 
+    # sections of it using a Bio::EnsEMBL::Pipeline::SubseqFetcher object.
+    # This object works just like a Slice for retrieving subseqs.
+
+    my $chr_seqfetcher = $self->_get_SubseqFetcher($slice);
 
     if ($strand == 1 ){
 	
@@ -594,15 +592,15 @@ sub check_splice_sites{
 	    my $downstream_site;
 	    eval{
 		$upstream_site = 
-		    $nonmapped_slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		    $chr_seqfetcher->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
 		$downstream_site = 
-		    $nonmapped_slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		    $chr_seqfetcher->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
 	    };
 
 #print "SLICE     UP " . $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) ) . "\n";
-print "NONMAPPED UP " . $nonmapped_slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) ) . "\n";
+#print "NONMAPPED UP " . $chr_seqfetcher->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) ) . "\n";
 #print "SLICE     DOWN " . $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) ) . "\n";
-print "NONMAPPED DOWN " . $nonmapped_slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) ) . "\n";
+#print "NONMAPPED DOWN " . $chr_seqfetcher->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) ) . "\n";
 
 	    unless ( $upstream_site && $downstream_site ){
 		print STDERR "problems retrieving sequence for splice sites\n$@";
@@ -654,9 +652,9 @@ print "NONMAPPED DOWN " . $nonmapped_slice->subseq( ($downstream_exon->start - 2
 	    };
 
 #print "SLICE     UP " . $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
-print "NONMAPPED UP " . $nonmapped_slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
+#print "NONMAPPED UP " . $chr_seqfetcher->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) ) . "\n";
 #print "SLICE     DOWN " . $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) ) . "\n";
-print "NONMAPPED DOWN " . $nonmapped_slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) ) . "\n";
+#print "NONMAPPED DOWN " . $chr_seqfetcher->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) ) . "\n";
 
 
 	    unless ( $up_site && $down_site ){
@@ -718,107 +716,37 @@ sub change_strand{
 
 ############################################################
 
-=head2 _directly_fetch_chromosome
+=head2 _get_SubseqFetcher
 
-  This method allows the chromosome sequence to be loaded 
-  from disc rather than the database.  Admittedly, this sounds 
-  really stupid, but there is a reason for it.  When a large number 
-  of Slices are to be pulled from the database, making heavy use of
-  the AssemblyMapper, eventually most of the assembly will be loaded
-  on and off by the AssemblyMapper->register_region method.  On a 
-  busy system this actvity can totally swamp the database (loading 
-  the assembly 400 times).  In this situation it is not so crazy to 
-  want to derive the needed sequence from a local source, with 
-  judicious use of caching.  
-
-=cut
-
-sub _directly_fetch_chromosome_Slice {
-
-  my ($self, $slice) = @_;
-
-  $self->_chromosome_offset_cache($slice->chr_name, $slice->chr_start);
-
-  return $self->_fetch_from_chromosome_cache($slice->chr_name);
-
-}
-
-############################################################
-
-
-=head2 _fetch_from_chromosome_cache
-
-  Controls the caching of loaded chromosome sequences.
+When working in chromosomal coordinates, as Blat can, this method
+can fetch sequence information directly from the sequence files
+stored on each node of the farm.  This method and the object it
+returns should be used in situations where retrieving sequence from
+the database will mean that the database instance will be overwhelmed.
+This method allows the chromosome sequence to be loaded from disc 
+rather than the database.  Admittedly, this sounds really stupid, 
+but when a large number of Slices are to be pulled from the database, 
+making heavy use of the AssemblyMapper, eventually most of the assembly 
+will be loaded on-and-off by the AssemblyMapper.  On a busy system this 
+actvity can totally swamp the database (loading the assembly hundreds
+of times).
 
 =cut
 
-sub _fetch_from_chromosome_cache {
-
-  my ($self, $chr_name) = @_;
-
-#  my %cache;          # These are made global - BAD - should be a more sophisticated data structure.
-  my $CACHE_SIZE = 5;  # How much memory can we count on?  ~1Gb -> using half of this gets us ~5 chromosomes.
-
-
-  if (defined $cache{$chr_name}){
-    print "Reading chromosome $chr_name from cache.\n";
-    return $cache{$chr_name};
-
-  } else {
-
-    my ($old_chr) = keys %cache; 
-    delete $cache{$old_chr};
-    print "Removed chromosome $old_chr from cache.\n";
-
-    print "Reading chromosome $chr_name from file to cache\n";
-
-    my $chr_filename = $EST_BLAT_GENOMIC . "/" . $chr_name . "\.fa";
-
-    my $seq_io = Bio::SeqIO->new('-file'   => $chr_filename,
-				 '-format' => 'fasta');
-
-    my $chr_seq = $seq_io->next_seq;
-
-    $cache{$chr_name} = $chr_seq;
-
-  }
-
-}
-
-############################################################
-
-=head2 _chromosome_offset_cache
-
-  The chromosome sequence offset is something that should not 
-  be forgotten.  Presently it is not used, but here is the 
-  code should it become important.
-
-=cut
-
-sub _chromosome_offset_cache {
-
-  my ($self, $chr_name, $chr_offset) = @_;
-
-# %offset_cache is defined as a global var - BAD - need to make a closure.
-
-  if (defined $chr_offset) {
-
-    if (defined $offset_cache{$chr_name} && $offset_cache{$chr_name} ne $chr_offset){
-      $self->throw("Multiple differing offsets found for chromosome " . 
-		   "$chr_name : values $chr_offset " .  $offset_cache{$chr_name});
-    } elsif (!defined $offset_cache{$chr_name}) {
-      $offset_cache{$chr_name} = $chr_offset;
-      return $offset_cache{$chr_name};
-    }
-
-  } else {
-    unless (!defined $offset_cache{$chr_name}) {
-      return $offset_cache{$chr_name};
-    }
+sub _get_SubseqFetcher {
     
-    $self->throw("Offset for chromosome $chr_name is not known.");
+  my ($self, $slice) = @_;
+  
+  if (defined $self->{'_current_chr_name'}  && 
+      $slice->chr_name eq $self->{'_current_chr_name'} ){
+    return $self->{'_chr_subseqfetcher'};
+  } else {
+    
+    $self->{'_current_chr_name'} = $slice->chr_name;
+    my $chr_filename = $EST_BLAT_GENOMIC . "/" . $slice->chr_name . "\.fa";
+    
+    $self->{'_chr_subseqfetcher'} = Bio::EnsEMBL::Pipeline::SubseqFetcher->new($chr_filename);
   }
-
 }
 
 
