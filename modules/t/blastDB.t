@@ -36,34 +36,42 @@ print "ok 1\n";    # 1st test passes.
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
 $ens_test->do_sql_file("t/runnabledb.dump");
-    
+
+# Get the current directory for later...
+my $pwd = `pwd`;
+chomp($pwd);
+
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 my $parameters = '-THRESHOLD => 1e-10, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
-                                                    -db_file        => 'embl_vertrna',
-                                                    -db_version     => '1',                  
-                                                    -program        => 'wublastn',
-                                                    -program_file   => 'wublastn',
-                                                    -program_version=> 1,
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'wublastn',
-                                                    -gff_feature    => 'similarity', 
-                                                    -parameters     => $parameters,
-						    -logic_name     => 'blast',
-                                                     );
+my $ana = $ana_adaptor->fetch_by_logic_name('wublastn');
+$ana->db('AI053588.fa');
+$ana->db_file("$pwd/t/data/AI053588.fa");
+
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
+#                                                    -db_file        => 'embl_vertrna',
+#                                                    -db_version     => '1',                  
+#                                                    -program        => 'wublastn',
+#                                                    -program_file   => 'wublastn',
+#                                                    -program_version=> 1,
+#                                                    -module         => $runnable,
+#                                                    -module_version => 1,
+#                                                    -gff_source     => 'wublastn',
+#                                                    -gff_feature    => 'similarity', 
+#                                                    -parameters     => $parameters,
+#						    -logic_name     => 'blast',
+#                                                     );
 
 unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id ='AB000381.00001';
+my $id = 'AL009179.00001';
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(  -dbobj      => $db,
+my $runobj = "$runnable"->new(  -db      => $db,
 				-input_id   => $id,
 				-analysis   => $ana );
 unless ($runobj)
@@ -71,7 +79,7 @@ unless ($runobj)
 else
 { print "ok 4\n"; }
 
-$runobj->fetch_input;;
+$runobj->fetch_input;
 $runobj->run('/tmp/');
 
 my @out = $runobj->output;
@@ -83,7 +91,7 @@ else
 print STDERR "Feature Hits: ".scalar(@out)."\n";
 
 $runobj->write_output();
-my @features = $db->get_Contig($id)->get_all_SimilarityFeatures();
+my @features = $db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_SimilarityFeatures();
 #display(@features);
 
 unless (@features)
