@@ -42,6 +42,21 @@ package Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts;
 
 use strict;
 use vars qw( %Scripts );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
+							     GB_TARGETTED_GW_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
+							     GB_SIMILARITY_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
+							     GB_COMBINED_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+							     GB_FINAL_GENETYPE
+							    );
 
 # Hash containing config info
 %Scripts = (
