@@ -22,13 +22,13 @@ use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
 my $mailReceiver = "stabenau\@ebi.ac.uk";
-my $maxMails = 3;
+my $maxMails = 5;
 my $currentMail = 0;
 
 my %stats = ( );
 
 # how many second before job becomes old?
-my $oldJob = 600;
+my $oldJob = 1800;
 
 # $statusDir = '/tmp/ruleManager';
 
@@ -164,13 +164,13 @@ sub check_jobs_against_failed {
   my %failedHash = map { ( $_, 1 ) } @failed;
   
   my @newHot;
-
+  print "Failed jobs: ", scalar( @failed ), ".\n";
   while( @hotJobs ) {
     my ( $job, $time ) = @{shift( @hotJobs )};
     if( defined $failedHash{$job->dbID} ) {
       # yep, failed job, get an updated version of it ...
       $job = $jobAdaptor->fetch_by_dbID( $job->dbID );
-      if( $job->retry_count < 2 ) {
+      if( $job->retry_count < 3 ) {
         print( "Job restart ",$job->dbID,"\n" );
 	$job->runRemote( resolve_queue( $job->analysis ));
 	$stats{'jobRestarts'}++;
@@ -193,12 +193,15 @@ sub check_jobs_against_failed {
 # works on @hotJobs
 sub check_jobs_for_old {
   my $now = time;
+  my $count = 0;
 
-  my @newHot;
+  print "Check for old jobs ";
+
   for my $jobTime ( @hotJobs ) {
     my ( $job, $time ) = @{$jobTime};
     if( $now-$time > $oldJob ) {
       $stats{'jobsOld'}++;
+      $count++;
       if( -s $job->stdout_file ) {
 	# job finished but didnt announce in the db
 	mail_job_problem( $job );
@@ -212,6 +215,7 @@ sub check_jobs_for_old {
       }
     }
   }
+  print "... found $count.\n";
 }
 
 
@@ -221,7 +225,7 @@ sub mail_job_problem {
   print ( "Problem with job mailed\n" );
   open( PIPE, "| Mail -s \"Pipeline problem\" $mailReceiver" ) or 
     die( "Cant contact babysitter..." );
-  print PIPE ( "Tried ",$job->analysis->module," 3 times and faild\n" );
+  print PIPE ( "Tried ",$job->analysis->module," 3 times and failed\n" );
   print PIPE ( "on input id ", $job->input_id,"\n" );
   
   if( open( FILE, $job->stdout_file )) {

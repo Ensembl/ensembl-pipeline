@@ -237,6 +237,7 @@ sub runRemote {
   my $useDB = shift;
 
   local *SUB;
+  local *FILE;
 
   if( !defined $self->adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
@@ -252,16 +253,22 @@ sub runRemote {
   my $runner = __FILE__;
   $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
-    " -e ".$self->stderr_file." ";
+    " -e ".$self->stderr_file." -E \"$runner -check\" ";
 
   if( ! defined $useDB ) {
     $useDB = 1;
   }
 
+  if( $self->retry_count > 0 ) {
+    for ( $self->stdout_file, $self->stderr_file ) {
+      open( FILE, ">".$_ ); close( FILE );
+    }
+  }
+
   if( $useDB ) {
     # find out db details from adaptor
     # generate the lsf call
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -job ".$self->dbID." -E \"$runner -check\"";
+    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -job ".$self->dbID;
     
   } else {
     # make the object
@@ -433,7 +440,7 @@ sub get_all_status {
 sub make_filenames {
   my ($self) = @_;
   
-  my @files = $self->get_files( $self->input_id,,"obj","out","err" );
+  my @files = $self->get_files( $self->input_id,"obj","out","err" );
   for (@files) {
     open( FILE, ">".$_ ); close( FILE );
   }
