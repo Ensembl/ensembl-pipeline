@@ -33,7 +33,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::Process:Est2Genome;
+package Bio::EnsEMBL::Pipeline::Process::Est2Genome;
 
 use vars qw(@ISA);
 use strict;
@@ -48,9 +48,9 @@ sub _initialize {
     my ($self,@args) = @_;
 
     my $make = $self->SUPER::_initialize;
-    my ($dbobj,$input_ids)  $self->_rearrange([qw(DBOBJ
-						  INPUT_IDS
-						  )],@args);
+    my ($dbobj,$input_ids) = $self->_rearrange([qw(DBOBJ
+						   INPUT_IDS
+						   )],@args);
 
     $input_ids  || $self->throw("Can't create an AnalysisProcess object without input_ids");
     $dbobj      || $self->throw("Can't create an AnalysisProcess object without a database handle");

@@ -50,7 +50,6 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBSQL::Clone;
-use Bio::EnsEMBL::DBSQL::Contig;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Clone;

@@ -133,7 +133,7 @@ sub est_sequence {
             or
             $self->run("genomic.seq", "est.seq")
   Function: Runs est2genome and stores results as FeaturePairs
-  Returns : none
+  Returns : TRUE on success, FALSE on failure.
   Args    : Temporary filenames for genomic and est sequences
 
 =cut
@@ -227,11 +227,13 @@ sub run {
       }
       close(ESTGENOME);
     };
-    if ($@) {
-      print ("Error running est_genome [$@]\n");
-    }
     #clean up temp files
-    $self->_deletefiles($genfile, $estfile, $dirname);
+    $self->_deletefiles($genfile, $estfile);
+    if ($@) {
+        $self->throw("Error running est_genome [$@]\n");
+    } else {
+        return 1;
+    }
 }
 
 =head2 output
@@ -272,7 +274,7 @@ sub _createfeatures {
                                               -source_tag =>   $f1source,
                                               -primary_tag =>  $f1primary,
                                               -analysis => $analysis_obj );
-                                              
+
      my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
                                                 -end =>      $f2end,
                                                 -seqname =>  $f2id,
@@ -350,11 +352,15 @@ sub _diskspace {
 
 
 sub _deletefiles {
-    my ($self, $genfile, $estfile, $dirname) = @_;
-
-#    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
-#    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
-
+    my ($self, @files) = @_;
+    
+    my $unlinked = unlink(@files);
+    if ($unlinked == @files) {
+        return 1;
+    } else {
+        my @fails = grep -e, @files;
+        $self->throw("Failed to remove @fails : $!\n");
+    }
 }
 
 

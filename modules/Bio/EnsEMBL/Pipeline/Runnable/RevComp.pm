@@ -33,7 +33,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::Runnable::RevComp
+package Bio::EnsEMBL::Pipeline::Runnable::RevComp;
 
 use vars qw(@ISA);
 use strict;
@@ -63,14 +63,14 @@ sub run {
     my ($self) = @_;
 
  
-    my $str = $seq->seq;
+    my $str = $self->seq->seq;
 
     $str =~ tr/atgcATGC/tacgTACG/;
     $str = reverse($str);
 
-    $self->{_revseq} = new Bio::Seq(-seq => $str;
-				    -id  => $self->seq->id . ".rc"
-				    );
+    $self->{_revseq} = Bio::Seq->new(-seq => $str,
+				     -id  => $self->seq->id . ".rc",
+				     );
     
 }
 

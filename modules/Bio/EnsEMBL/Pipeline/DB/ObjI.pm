@@ -44,6 +44,10 @@ use Bio::EnsEMBL::DB::ObjI;
 
 @ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::Root::RootI);
 
+=head1 ABSTRACT METHODS
+
+These methods should all be implemented in an
+object implementing C<Bio::EnsEMBL::Pipeline::ObjI>.
 
 =head2 get_Job {
 

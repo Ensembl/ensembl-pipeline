@@ -85,23 +85,10 @@ sub input_id {
 
 =head2 dbobj
 
-    Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
+Inherited from C<Bio::EnsEMBL::Pipeline::RunnableDBI>.
 
 =cut 
 
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
-
-        $value->isa("Bio::EnsEMBL::Pipeline::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::Pipeline::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
 
 =head2 fetch_output
 
@@ -116,10 +103,10 @@ sub dbobj {
 sub fetch_output {
     my($self,$output) = @_;
     
-    $output || $self->throw("No frozen object passed for the output");
+    $output || $self->throw("Name of frozen object data file not given");
     
     my $object;
-    open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
+    open (IN,"<$output") || $self->throw("Could not open output data file '$output'");
     
     while (<IN>) {
 	$_ =~ s/\[//;
@@ -209,17 +196,19 @@ sub runnable {
 sub run {
     my ($self) = @_;
 
-    $self->throw("Can't run - no runnable object") unless defined($self->runnable);
+    my $runnable = $self->runnable;
+    $runnable || $self->throw("Can't run - no runnable object");
 
-    $self->runnable->minirun;
+    return $runnable->minirun;
 }
 
 sub output {
     my ($self) = @_;
 
-    $self->throw("Can't return output  - no runnable object") unless defined($self->runnable);
+    my $runnable = $self->runnable;
+    $runnable || $self->throw("Can't return output - no runnable object");
 
-    return $self->runnable->output;
+    return $runnable->output;
 }
 
 1;

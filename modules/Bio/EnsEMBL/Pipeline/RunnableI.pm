@@ -27,7 +27,9 @@ Describe contact details here
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the
+object methods. Internal methods are usually
+preceded with a _
 
 =cut
 
@@ -44,16 +46,39 @@ use Bio::Root::Object;
 
 @ISA = qw(Bio::Root::Object);
 
+=head1 ABSTRACT MEHTHODS
+
+These methods need to be implemented in any
+module which implements
+C<Bio::EnsEMBL::Pipeline::RunnableI>.
+
+=head2 run
+
+    $self->run();
+
+Actually runs the analysis programs.  If the
+analysis has fails, it should throw an
+exception.  It should also remove any temporary
+files created (before throwing the exception!).
+
+=head2 output
+
+    @output = $self->output();
+
+Return a list of objects created by the analysis
+run (eg: C<Bio::EnsEMBL::FeaturePair> objects).
+
+=cut
 
 sub run {
     my ($self) = @_;
 
-    $self->throw("run not implemented in Bio::EnsEMBL::Pipeline::RunnableI");
+    $self->throw("run not implemented");
 }
 
 sub output {
     my ($self) = @_;
 
-    $self->throw("output not implemented in Bio::EnsEMBL::Pipeline::RunnableI");
+    $self->throw("output not implemented");
 }
 
