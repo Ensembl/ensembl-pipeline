@@ -256,7 +256,7 @@ sub run {
     my %idhash;
 
     foreach my $f (@features) {
-	if (defined($f->analysis) && $f->analysis->db eq "vert"  && $f->score > 1000) {
+	if (defined($f->analysis) && $f->analysis->db eq "vert"  && $f->score > 100) {
 	  my $organism = $self->get_organism($f->hseqname);
 	  if (!defined($idhash{$f->hseqname})) { #
 #	  if ($organism eq "Homo sapiens (human)" && !defined($idhash{$f->hseqname})) { #
