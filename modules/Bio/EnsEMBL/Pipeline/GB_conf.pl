@@ -149,10 +149,10 @@ package main;
 %genebuild_conf = (
 		   'vcontig' => 0, #set to choose vc/rc building
 		   'bioperldb' => 0, #set to use/not bioperl-db to fetch seq
-		   'bpname'     => 'bioperl_db', #bioperl-db database name
-		   'bpuser'     => 'root', #bioperl-db database user
-		   'bpbiodb_id' => '2', #bioperl-db biodatabase_id
-		   'supporting_databases' => 'nrtest', #dbs for supp evidence
+		   'bpname'     => '', #bioperl-db database name
+		   'bpuser'     => '', #bioperl-db database user
+		   'bpbiodb_id' => '', #bioperl-db biodatabase_id
+		   'supporting_databases' => '', #dbs for supp evidence
 );
 
 }
