@@ -11,6 +11,19 @@ use Bio::EnsEMBL::Pipeline::IDSet;
 
 
 
+=head2 new
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::Config
+  Arg [2]   : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Arg [3]   : string
+  Function  : creates an InputIDFactory object
+  Returntype: Bio::EnsEMBL::Pipeline::Task::Utils::InputIDFactory
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
 sub new{
   my $caller = shift;
 
@@ -28,7 +41,23 @@ sub new{
   $self->db($db) if($db);
   $self->taskname($taskname) if($taskname);
   $self->throw("you need to pass at least a config object and a taskname to an InputIDFactory $!") unless($self->config && $self->taskname);
+
+  return $self;
 }
+
+
+
+=head2 getters/setters
+
+  Arg [1]   : generally objecst or string
+  Function  : will set an arg to a variable and return that arg 
+  subsquently
+  Returntype: objects or strings
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 
@@ -64,6 +93,21 @@ sub taskname{
 }
 
 
+
+=head2 generate_input_ids
+
+  Arg [1]   : none
+  Function  : on the basis of whats in config decides which method to 
+  call to generate the input_ids
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if the type isn't recognised'
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
 sub generate_input_ids{
   my ($self) = @_;
 
@@ -94,8 +138,22 @@ sub generate_input_ids{
   }else{
     $self->throw("don't recognise input_id type $type from string $type_string");
   }
+
+  return $idset;
 }
 
+
+
+=head2 get_contig_names
+
+  Arg [1]   : none
+  Function  : uses the core dbconnection to get a list of contig names
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if there is no db connection
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 sub get_contig_names{
@@ -116,6 +174,21 @@ sub get_contig_names{
 }
 
 
+=head2 get_slice_names
+
+  Arg [1]   : size, int
+  Arg [2]   : overlap, int
+  Function  : produces a set of slice names based on the size and overlap
+  specified in the format chr_name.start-end
+  Returntype:  Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if it has no core db connection
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
 sub get_slice_names{
   my ($self, $size, $overlap) = @_;
 
@@ -125,7 +198,7 @@ sub get_slice_names{
 
   my @input_ids;
 
-  my @chromosomes = @{$self->get_chromosomes};
+  my @chromosomes = @{$self->get_Chromosomes};
 
   foreach my $chr(@chromosomes){
     my $length = $chr->length;
@@ -152,6 +225,20 @@ sub get_slice_names{
 
 }
 
+
+=head2 get_chromosome_names
+
+  Arg [1]   : none
+  Function  : produces slice type input_ids in the format chr_name.1-length
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if no core db connection
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+
 sub get_chromosome_names{
   my ($self) = @_;
 
@@ -161,7 +248,7 @@ sub get_chromosome_names{
 
   my @input_ids;
 
-  my @chromosomes = @{$self->get_chromosomes};
+  my @chromosomes = @{$self->get_Chromosomes};
 
   foreach my $chr(@chromosomes){
     my $length = $chr->length;
@@ -178,7 +265,21 @@ sub get_chromosome_names{
 
 }
 #this method assumes the lengths in the chromosome table are correct
-sub get_chromosomes{
+
+
+=head2 get_Chromosomes
+
+  Arg [1]   : none 
+  Function  : gets chromosome objects from the database
+  Returntype: array ref of Bio::EnsEMBL::Chromosomes
+  Exceptions: none
+  Caller    : 
+  Example   : 
+
+=cut
+
+
+sub get_Chromosomes{
   my ($self) = @_;
 
   if(!$self->{'chromosomes'}){
@@ -189,6 +290,19 @@ sub get_chromosomes{
 
   return $self->{'chromosomes'};
 }
+
+
+
+=head2 get_file_names
+
+  Arg [1]   : directory path (string)
+  Function  : to get a list of filenames from the directory
+  Returntype: Bio::EnsEMBL::Pipeline::IDSet
+  Exceptions: throws if no directory is passed in 
+  Caller    : 
+  Example   : 
+
+=cut
 
 
 sub get_file_names{
