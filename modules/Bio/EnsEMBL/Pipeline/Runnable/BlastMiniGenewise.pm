@@ -57,6 +57,7 @@ use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Pipeline::SeqFetcher;
 
 use Data::Dumper;
 
@@ -406,34 +407,33 @@ sub validate_sequence {
     } 
     return @validated;  
 }
+
+=head2 get_Sequence
+
+  Title   : get_Sequence
+  Usage   : my $seq = get_Sequence($id)
+  Function: Fetches sequences with id $id
+  Returns : Bio::PrimarySeq
+  Args    : none
+
+=cut
     
 sub get_Sequence {
     my ($self,$id) = @_;
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+    my $seq;
 
-
-    next ID unless defined($id);
-
+    if (!defined($id)) {
+      $self->warn("No id input to get_Sequence");
+    }  
+    
     print(STDERR "Sequence id :  is [$id]\n");
 
-    open(IN,"pfetch -q $id |") || $self->throw("Error fetching sequence for id [$id]");
-	
-    my $seqstr;
-	
-    while (<IN>) {
-	chomp;
-	$seqstr .= $_;
+    $seq = $seqfetcher->run_pfetch($id);
+    
+    if(!defined($seq)){
+      $self->throw("Could not find sequence for [$id]");
     }
-    
-    
-
-    if (!defined($seqstr) || $seqstr eq "no match") {
-	$self->warn("Couldn't find sequence for [$id]");
-	return;
-    }
-
-    my $seq = new Bio::Seq(-id  => $id,
-			   -seq => $seqstr);
-    
 
     print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
