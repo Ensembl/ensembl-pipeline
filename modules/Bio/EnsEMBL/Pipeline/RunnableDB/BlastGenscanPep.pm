@@ -103,8 +103,24 @@ sub new {
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
     $self->set_parameters($analysis);
-    
+    $self->threshold(1e-6);   
     return $self;
+}
+
+=head2 threshold
+
+    Title   :   threshold
+    Usage   :   $obj->threshold($value);
+    Function:   Get/set method for threshold p value required for writing
+                Feature/FeaturePair to database.
+    Args    :   Optional value (p value from Blast)
+
+=cut
+
+sub threshold {
+    my ($self, $value) = @_;
+    $self->{'_threshold'} = $value if ($value);
+    return $self->{'_threshold'};
 }
 
 =head2 fetch_input
@@ -219,6 +235,7 @@ sub run {
         my %parameters = $self->formatted_parameters();
         my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(%parameters);
         $runnable->clone($peptide);
+        $runnable->threshold($self->threshold());
         $runnable->run();
         $self->runnable($runnable);                                        
     }
@@ -419,6 +436,7 @@ sub create_aligned_featurepairs {
                                 -seqname    => $fp->hseqname,
                                 -start      => $pep_start,
                                 -end        => $pep_end,
+                                -strand     => 1,
                                 -start_frac => $start_phase,
                                 -end_frac   => $end_phase,
                                 -score      => $fp->score,
