@@ -342,7 +342,7 @@ sub make_blast_db {
     my ($self,@seq) = @_;
 
     my $blastfile = $self->get_tmp_file('/tmp/','blast','fa');
-    my $seqio = Bio::SeqIO->new(-format => 'Fasta',
+    my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$blastfile");
     print STDERR "seq io is " . $seqio . "\n";
     print STDERR "Blast db file is $blastfile\n";
@@ -406,7 +406,7 @@ sub run_blast {
     my $blastout = $self->get_tmp_file("/tmp/","blast","tblastn_vert.msptmp");
     my $seqfile  = $self->get_tmp_file("/tmp/","seq","fa");
 
-    my $seqio = Bio::SeqIO->new(-format => 'Fasta',
+    my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$seqfile");
 
     $seqio->write_seq($seq);
@@ -521,7 +521,7 @@ sub get_Sequence {
 	$self->throw("Couldn't find sequence for $newid [$id]");
     }
     
-    my $seq = new Bio::Seq(-id  => $newid,
+    $seq = new Bio::Seq(-id  => $newid,
 			   -seq => $seq);
 	
     $self->{_seq_cache}{$id} = $seq;
