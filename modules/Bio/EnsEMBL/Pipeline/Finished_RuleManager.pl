@@ -38,7 +38,7 @@ my $DEBUG                 = 1;
 my $NAMED                 = 'FINISHED_PIPELINE';
 my $OUT                   = $ENV{$NAMED."_OUTFILE"};
 
-my $OVERLOAD_SLEEP        = 10;  # THIS SHOULD BE SIG_BLOCKED [3600]
+my $OVERLOAD_SLEEP        = 3600;  # THIS SHOULD BE SIG_BLOCKED [3600]
 my $PAUSE                 = 6;     # THIS DOESN'T NEED TO BE    [60]
 my $GET_PEND_JOBS         = undef; # subroutine to check number of pending jobs in queue
 
@@ -53,7 +53,7 @@ my $GET_PEND_JOBS         = undef; # subroutine to check number of pending jobs 
 my $term_sig = 0;
 my $rst_sig  = 0;
 my $alarm    = 0;
-my $wakeup   = 6;   # period to check batch queues; set to 0 to disable
+my $wakeup   = 120;   # period to check batch queues; set to 0 to disable
 
 # the signal handlers
 
@@ -337,7 +337,7 @@ my @rules       = $rule_adaptor->fetch_all;
 
 my @id_list;     # All the input ids to check
 
-alarm $wakeup if $wakeup;  
+#alarm $wakeup if $wakeup;  
                 # Signal to the script to do something in the future,
                 # Such as check for failed jobs, no of jobs in queue
 
@@ -455,13 +455,17 @@ while (1) {
         # check all rules, which jobs can be started
 
         my @current_jobs = $job_adaptor->fetch_by_input_id($id);
+        
+        #warn "@rules";
 
         RULE: for my $rule (@rules)  {
             # what does this check ????
             if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
-            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
+            my $dbID = $rule->goalAnalysis->dbID;
+            my $logic = $rule->goalAnalysis->logic_name;
+            print "Check $dbID, $logic  - " . $id if $verbose;
             # hard wiring makes devil happy.
             my $anal = $rule->check_for_analysis (\@anals, 'CONTIG');
 
@@ -584,7 +588,7 @@ while (1) {
     }
 
     &shut_down($DBADAPTOR) if $done || $once;
-    my $this_time;# = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
+    my $this_time = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
     my $slept;
     if($this_time){ 
         # not much was submitted, probably because

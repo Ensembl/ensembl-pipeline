@@ -15,6 +15,9 @@ use vars qw(@ISA);
 
 $ENV{BLASTDB} = '/data/blastdb/Ensembl';
 
+BEGIN {
+    print "\nUSING " . __PACKAGE__ . "\n\n";
+}
 
 my %FASTA_HEADER;
 my %BLAST_FLAVOUR;
@@ -106,6 +109,10 @@ sub parse_results {
 	$self->throw("no regex defined for ".$db);
     }
     print "SETTING [parse_results]: regex is </" . $re . "/>\n";
+
+    my %files = %{$self->filesizes};
+    print "OUTPUT  [filesize]: " . join(",", map{ "<file $_ = '$files{$_}'>" } keys(%files)) . "\n"; 
+
     foreach my $parser (@parsers) {
         while ( my $sbjct = $parser->nextSbjct ) {
 	    my $fasta_header = $sbjct->name ;    
@@ -181,7 +188,6 @@ sub _apply_coverage_filter {
     print "SETTING [_apply_coverage_filter]: max_coverage is <" . $max_coverage . ">\n";
     $self->throw("Max coverage '$max_coverage' is beyond limit of method '255'") if $max_coverage > 255;
     print "SETTING [_apply_coverage_filter]: discard_overlaps is <" . ( $discard_overlaps ? "ON" : "OFF" ) . ">\n";
-
     # Make a string of nulls (zeroes) the length of the query
     my $coverage_map = "\0" x ( $query_length + 1 );
 
@@ -203,7 +209,7 @@ sub _apply_coverage_filter {
 
     foreach my $bin_n (@bin_numbers) {
 	       
-	#print STDERR "\nLooking at bin: $thresh_type $bin_n\n";
+	print STDERR "\nLooking at bin: $thresh_type $bin_n\n";
 	my $score_hits = $best_hits->{$bin_n};
 
 	# Loop through from best to worst according
@@ -225,7 +231,7 @@ sub _apply_coverage_filter {
 		@hsps = $self->_discard_worst_overlapping(@hsps) if $discard_overlaps;
 
 		unless ($max_coverage == 0){
-#		print STDERR "    Looking at $name ";
+		print STDERR "    Looking at $name ";
 		    foreach my $hsp (@hsps) {
 			my $q = $hsp->query;
 			foreach my $i ( $q->start .. $q->end ) {

@@ -213,17 +213,16 @@ sub get_Seq_by_acc {
         return $seq_list[0];
     }
 }
-
-
-### This is not the right place for this!
-### Is it used?
 sub write_descriptions {
     my ( $self, $dbobj, @ids ) = @_;
+    return ;
     my $sth = $dbobj->prepare( qq{ 
                                 REPLACE DELAYED INTO 
                                 hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
                                 VALUES (?,TRIM(?),?,?,?)}
     );
+    my $count = 100;
+    while (my @hundred_ids = splice(@ids, @ids > $count ? -$count : 0)){
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
 	print  $server "-F " . join(" ", @ids) . "\n";
@@ -234,7 +233,7 @@ sub write_descriptions {
 		$embl_parser->parse($_);
 		my @hit_row = (
 		               $embl_parser->sequence_version || shift(@{$embl_parser->accession}),
-		               $embl_parser->description,
+                               $embl_parser->description,
 		               $embl_parser->seq_length,
 		               $embl_parser->taxon,
 		               $embl_parser->which_database
@@ -247,9 +246,7 @@ sub write_descriptions {
 		#print "**************************************\n";
 		$sth->execute(@hit_row);
 	}
-	
+    }	
 }
-
-
 1;
 __END__

@@ -282,7 +282,8 @@ sub run_analysis {
     my @databases = $self->fetch_databases;
     
     $self->databases(@databases);
-
+    
+    my $compress_out = $self->compress_out ? ' | gzip -f > ' : ' > ';
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
@@ -300,7 +301,9 @@ sub run_analysis {
         } else {
             $command .= " $database $filename ";
         }
-        $command .= ' -gi '.$self->options. ' 2>&1 > '.$self->results . ".$db ";
+        $command .= ' -gi ' . $self->options 
+            . ' 2>&1 ' . $compress_out 
+            . $self->results . ".$db ";
 
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
@@ -337,6 +340,7 @@ sub run_analysis {
                     $self->warn("Something FATAL happened to BLAST we've ".
                                 "not seen before, please add it to Package: ".
                                  __PACKAGE__ . ", File: " . __FILE__); 
+                    $self->warn("The ERROR was as between starred single quotes *'$match'*");
                     die ($UNKNOWN_ERROR_STRING."\n"); # send appropriate 
                     #string as standard this will be failed so job can be 
                     #retried when in pipeline
@@ -428,13 +432,16 @@ sub get_parsers {
   my ($self)  = @_;
 
   my @parsers;
-
+  my $output_is_compressed = $self->compress_out;
   foreach my $db ($self->databases) {
     $db =~ s/.*\///;
 
-    my $fh = new FileHandle;
-    $fh->open("<" . $self->results . ".$db");
-    
+    my $fh      = new FileHandle;
+    my $file    = $self->results.".$db";
+    my $filestr = ($output_is_compressed ? "gunzip -c $file |" : "< $file");
+    $fh->open($filestr);
+    my ($filesize) = (stat($fh))[7];
+    $self->filesizes($file, $filesize);
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite ('-fh' => $fh);
     
     push(@parsers,$parser);
@@ -442,7 +449,13 @@ sub get_parsers {
 
   return @parsers;
 }
-
+sub filesizes{
+    my ($self, $filename, $size) = @_;
+    $self->{'_output_filesizes'} ||= {};
+    
+    $self->{'_output_filesizes'}->{$filename} = $self->__convert_filesize_for_humans($size) if $size && $filename;
+    return $self->{'_output_filesizes'} || {};
+}
 
 =head2 parse_results
 
@@ -1266,6 +1279,24 @@ sub get_regex{
     $name =~ s/\/tmp\///g;
   }
   return $FASTA_HEADER{$name};
+}
+sub compress_out{
+    return 0;
+}
+sub __convert_filesize_for_humans{
+    my ($self, $bytes) = @_;
+    my $Kb = 1024;
+    my $Mb = 1024 * $Kb;
+    my $Gb = 1024 * $Mb;
+    if($bytes < $Kb){
+        return sprintf("%d b", $bytes);
+    }elsif($bytes > $Kb && $bytes < $Mb){
+        return sprintf("%.00f Kb", $bytes / $Kb);
+    }elsif($bytes > $Mb && $bytes < $Gb){
+        return sprintf("%.00f Mb", $bytes / $Mb);
+    }else{
+        return sprintf("%.00f Gb", $bytes / $Gb);
+    }
 }
 1;
 

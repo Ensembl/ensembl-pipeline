@@ -42,34 +42,174 @@ package Bio::EnsEMBL::Pipeline::Config::Blast;
 
 use strict;
 use vars qw(%Config);
-
+#chr10_int_repeats
 %Config = (
          UNKNOWN_ERROR_STRING => 'FAILED',  # this is the error blast
-         # will return if an unregconised exit code occurs. This
-         # string gets propagated through to the pipeline if it is running
-         # AS standard this string is failed as this means the job will be
-         # retried by the pipeline    
     DB_CONFIG => [
         { 
-            name    => 'embl_vertrna',
+            name    => 'embl_vertrna,emnew_vertrna',
             type    => 'dna',
-            header  => '\w+\s+(\w+)',
-	    flavour => 'wu',
-	    ungapped => 0,
-	    refilter => 0,
-	    min_unmasked => 10, # this is the minimum number of unmasked
-                                # bases which must appear in sequence before
-				# blast will be run
+#example       	    >BZ412789 BZ412789.1 GFP192 BayGenomics
+            header  => '\S+\s+(\S+)\s',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0
+        },
+        { 
+            name    => 'dbMOUSE-EST,dbHUMAN-EST,dbOTHERS-EST',
+            type    => 'dna',
+#example            >gi|272208|gb|M61958.1|M61958 EST00006 Hippocampus, Str
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0
+        },
+        { 
+            name    => 'dbHUMAN-EST',
+            type    => 'dna',
+#example            >gi|272208|gb|M61958.1|M61958 EST00006 Hippocampus, Str
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0
+        },
+        { 
+	    name    => 'dbMOUSE-EST',
+            type    => 'dna',
+#example            >gi|272208|gb|M61958.1|M61958 EST00006 Hippocampus, Str
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0
+        },
+        { 
+            name    => 'dbOTHERS-EST',
+            type    => 'dna',
+#example            >gi|272208|gb|M61958.1|M61958 EST00006 Hippocampus, Str
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0
+        },
+        { 
+            name    => 'dbSTS',
+            type    => 'dna',
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0
+        },
+        { 
+            name    => 'uniprot',
+            type    => 'protein',
+            header  => '^\w+\s+(\w+)',
+            flavour => 'wu',
+            discard_overlaps => 1,
+            max_coverage => 10
         },
         { 
             name    => 'swall',
             type    => 'protein',
             header  => '^\w+\s+(\w+)',
-	    flavour => 'wu',
-	    ungapped => 0,
-	    refilter => 0,
-	    min_unmasked => 15,
-        }
+            flavour => 'wu',
+            discard_overlaps => 1,
+            max_coverage => 10
+        },
+        { 
+            name    => '/acari/work1a/rds/blastdb/chr10_int_repeats',
+            type    => 'dna',
+#example       	    >BZ412789 BZ412789.1 GFP192 BayGenomics
+            header  => '([^>]+)',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1
+        },
+        {
+            name => '/acari/work1a/rds/blastdb/chr9_int_repeats/chr9_int_repeats.fa',
+            type    => 'dna',
+#example       	    >AL731535.6.1.34521
+            header  => '([^>]+)',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+
+        },
+        { 
+            name    => '/data/blastdb/Fish/zfish_EMBL_ESTs.fa',
+            type    => 'dna',
+#example       	    >AA542437 AA542437.1 fa06f03.r1 Zebrafish ICR
+            header  => '\w+\s(\S+)',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            
+        },
+        { 
+#            name    => '/ecs4/work3/rds/blastdb/WASHU_EST_clusters.fna',
+            name => '/ecs4/work3/rds/blastdb/WASHU_EST_clusters/WASHU_EST_clusters.fna',
+#            name => '/ecs4/work3/rds/blastdb/EST_clusters/EST_clusters.fa',
+            type    => 'dna',
+#example       	    >AA542437 AA542437.1 fa06f03.r1 Zebrafish ICR
+            header  => '([\S]+)',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+        },
+	{
+	    name    => 'refseqdna/hs.fna',
+            type    => 'dna',
+#example	    >gi|20270531|ref|NG_001199.1| 
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+	},
+	{
+	    name    => 'refseqdna/zebrafish.fna',
+            type    => 'dna',
+#example	    >gi|20270531|ref|NG_001199.1| 
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+	},
+	{
+	    name    => 'refseqdna/mouse.fna',
+            type    => 'dna',
+#example	    >gi|20270531|ref|NG_001199.1| 
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+	},
+	{
+	    name    => 'refseqdna/rat.fna',
+            type    => 'dna',
+#example	    >gi|20270531|ref|NG_001199.1| 
+            header  => '^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|',
+            flavour => 'wu',
+            ungapped => 0,
+            discard_overlaps => 0,
+            max_coverage => 0,
+            no_desc => 1,
+	}
     ]
 );
 

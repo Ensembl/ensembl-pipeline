@@ -320,9 +320,7 @@ sub flush_runs {
       );
     my $cmd;
   
-    if(!$self->cleanup){
-      $batch_job->stderr_file($lastjob->stderr_file);
-    }
+    
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly otherwise -pass gets the
@@ -435,8 +433,7 @@ sub batch_runRemote {
 sub runLocally {
   my $self = shift;
  
-  #print STDERR "Running locally " . $self->stdout_file . " " 
-  #. $self->stderr_file . "\n"; 
+  print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
 
   local *STDOUT;
   local *STDERR;
@@ -452,13 +449,6 @@ sub runLocally {
   }
        print STDERR "Running inLSF\n"; 
   $self->run_module();
-  if ($self->current_status->status eq "SUCCESSFUL"){
-    $self->adaptor->remove( $self );
-    if($self->cleanup){
-      unlink $self->stderr_file if(-e $self->stderr_file);
-      unlink $self->stdout_file if(-e $self->stdout_file);
-    }
-  }
 }
 
 
@@ -518,21 +508,16 @@ sub run_module {
 	  # "RUNNING"
 	  eval {
 	      $self->set_status( "RUNNING" );
-	      $rdb->db->disconnect_when_inactive(1); 
-        $rdb->run;
-        $rdb->db->disconnect_when_inactive(0); 
+	      $rdb->run;
 	  };
 	  if ($err = $@) {
-
-	    print STDERR $@ . "\n";
-
-	    if(my $err_state = $rdb->failing_job_status){
-	      $self->set_status( $err_state );
-	    }else{
-	      $self->set_status( "FAILED" ); # default to just failed these jobs get retried
-	    }
-	    print (STDERR "RUNNING: Lost the will to live Error\n");
-	    $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
+              if(my $err_state = $rdb->failing_job_status){
+                  $self->set_status( $err_state );
+              }else{
+                  $self->set_status( "FAILED" ); # default to just failed these jobs get retried
+              }
+	      print (STDERR "RUNNING: Lost the will to live Error\n");
+	      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
 	  }
 	  
 	  # "WRITING"
@@ -576,15 +561,12 @@ sub run_module {
 	    # -------------------------------------------------------------
 	};
 	if ($err = $@) {
-            my $error_msg = "Job finished successfully, but could not be recorded as finished.  Job : [" 
-              . $self->input_id . "]\n[$err]";
-
+	    print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
+	    $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
             eval {
               $self->set_status("FAIL_NO_RETRY");
             };
-            $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
-        
-            $self->throw($error_msg);
+            $self->throw("Error updating input_id_analysis table [$@]") if $@;
 	}
 	else {
 	    print STDERR "Updated successful job ".$self->dbID."\n";

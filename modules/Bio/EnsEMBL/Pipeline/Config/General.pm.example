@@ -50,29 +50,22 @@ use vars qw(%Config);
 
     # location of output and error files
     # (can also be specified on RuleManager command line)
-    PIPELINE_OUTPUT_DIR => '',
+    PIPELINE_OUTPUT_DIR => '/acari/work1a/rds/out',
 
     # temporary working space (e.g. /tmp)
-    PIPELINE_WORK_DIR   => '',
+    PIPELINE_WORK_DIR   => '/tmp',
 
     # default runner script
-    PIPELINE_RUNNER_SCRIPT => '',
+    PIPELINE_RUNNER_SCRIPT => '/acari/work1a/rds/head/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/runner.pl',
+
+    # automatic update in input_id_analysis of completed jobs
+    AUTO_JOB_UPDATE     => 1,
+
+    PIPELINE_REPEAT_MASKING => ['RepeatMask','trf'],
     
-    #regex for spiting up slice input_ids
-    SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',	   
-    
-    PIPELINE_REPEAT_MASKING => ['RepeatMask'],	
-
-    SNAP_MASKING => [],
-
-    MAX_JOB_TIME => 86400, # the max number of seconds a job should be 
-    #spending in CPU time in LSF before being killed 86400 is 24 hours
-
-    KILLED_INPUT_IDS => '', # a path to produse a file of killed
-    # input_ids, good to have it local to the machine you running
-    # rulemanager on to prevent nfs stress
+    SOFT_MASKING => 0,
 );
-
+$ENV{PATH} = "$Config{BIN_DIR}:$ENV{PATH}";
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
     my $pack = shift; # Need to move package off @_

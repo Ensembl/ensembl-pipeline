@@ -302,13 +302,13 @@ sub parse_results {
         {
             my @element = split;
             my (%feature);
-            $feature {name} = $element[0];
-            $feature {score} = $self->trunc_float_3($element[5]);
+            $feature {name}  = $element[0];
+            $feature {score} = $element[5]; # $self->trunc_float_3($element[5]);
             $feature {start} = $element[3];
-            $feature {end} = $element[4];
+            $feature {end}   = $element[4];
             $feature {strand} = $element[6];
-            $feature {source}= 'Eponine';
-            $feature {primary}= 'TSS';
+            $feature {source} = 'Eponine';
+            $feature {primary} = 'TSS';
 	    $feature {program} = 'eponine-scan';
 	    $feature {program_version} = '2';
           

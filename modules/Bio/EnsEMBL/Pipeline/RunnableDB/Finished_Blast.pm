@@ -48,21 +48,24 @@ use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Hum::Sort 'ace_sort';
 use vars qw(@ISA);
 
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
 my %UNGAPPED;
 my %UNMASKED;
+my %NO_DESC;
 
 foreach my $db (@$DB_CONFIG) {
-    my (   $name,         $ungapped,         $unmasked )
-    = ($db->{'name'}, $db->{'ungapped'}, $db->{min_unmasked});
+    my (   $name,         $ungapped,         $unmasked,       $pfetch)
+    = ($db->{'name'}, $db->{'ungapped'}, $db->{min_unmasked}, $db->{no_desc});
     
     if($db && $name){
         $UNGAPPED{$name} = $ungapped;
         $UNMASKED{$name} = $unmasked;
-        }else{
+        $NO_DESC{$name}  = $pfetch;
+    }else{
         my($p, $f, $l) = caller;
         warn("either db ".$db." or name ".$name." isn't defined so can't work $f:$l\n");
     }
@@ -102,7 +105,7 @@ sub fetch_input {
     my $ungapped;
     if($UNGAPPED{$self->analysis->db_file}){
         $ungapped = 1;
-        } else {
+    } else {
         $ungapped = undef;
     }
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast->new(-query          => $self->query,
@@ -210,11 +213,15 @@ sub run {
         }
         my $db_version = $runnable->get_db_version if $runnable->can('get_db_version');
         $self->db_version_searched($db_version); # make sure we set this here
-        if ( my @output = $runnable->output ) {
+        # $self->updateAnalysis_with_db_version(); # alter the analysis.
+        # trying to move this from Job.pm
+        if ( (my @output = $runnable->output) && !($NO_DESC{$self->analysis->db_file})) {
             my $dbobj      = $self->db;
             my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
             my %ids        = map { $_->hseqname, 1 } @output;
             $seqfetcher->write_descriptions( $dbobj, keys(%ids) );
+        }else{
+            warn "Either didn't find anything or Don't fetch descriptions was true\n";
         }
     }
     return 1;
@@ -243,6 +250,55 @@ sub db_version_searched{
     $self->{'_db_version_searched'} = $arg if $arg;
 
     return $self->{'_db_version_searched'};
+}
+
+sub updateAnalysis_with_db_version{
+    my ($self) = @_;
+    my $db_version  = $self->db_version_searched();
+    $self->throw(" *** No db version *** " . 
+                 " Probably BlastableVersion's fault." . 
+                 " check out debugging that.") unless $db_version;
+    my $analysis    = $self->analysis();
+    my $current_dbv = $analysis->db_version();
+    unless($current_dbv){
+        # got to store it if nothing already there.
+        # set the analysis to have the searched db_version
+        $analysis->db_version($db_version); 
+        # and store it
+        $analysis->store();
+        # and return
+        return 1;
+    }
+    if ($db_version ne $current_dbv){
+        # this temporarily sets the analysis obj to be
+        # the db version of the searched blastable.
+        # later on we should do a $analysis->store here
+        $analysis->db_version($db_version);
+        return 1;
+    }
+
+    # method to check most up to date not used
+    # got to check which is the most up to date
+    my @dbsearched  = ($db_version  =~ /(\d+)-(\w+)-(\d+)(.+)?/);
+    my @current_dbv = ($current_dbv =~ /(\d+)-(\w+)-(\d+)(.+)?/);
+    if(@dbsearched >= 3 && @current_dbv >= 3){
+        # comparing 01-Jan-04
+        my ($day, $mon, $yr, $ver)     = @dbsearched;
+        my ($cday, $cmon, $cyr, $cver) = @current_dbv;
+        $ver  =~ s/\D+//g if $ver;  # only interested in numbers
+        $cver =~ s/\D+//g if $cver; # only interested in numbers
+
+        my $lt = 0;
+        # this means that the info had a version
+        # and the current db version was lower than what it was searched
+        $lt &= 8 if ($ver && $cver && $cver < $ver);
+        $lt &= 1 if ($cyr  < $yr);
+        $lt &= 2 if ($cmon < $mon);
+        $lt &= 4 if ($cday < $day);
+
+        return 1 unless($lt);  # current analysis->db_version is up-to-date
+        
+    }
 }
 
 1;
