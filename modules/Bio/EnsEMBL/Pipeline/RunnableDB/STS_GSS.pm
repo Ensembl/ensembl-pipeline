@@ -166,12 +166,12 @@ sub run {
       #print $f->source_tag."\n";
     }
     
-    my @output = $runnable->output;
-    my $dbobj = $self->dbobj;
-    my $seqfetcher = $self->make_seqfetcher;
-    my %ids = map { $_->hseqname, $_ } @output;
-    $seqfetcher->write_descriptions($dbobj, keys(%ids) );
-    
+    if (my @output = $runnable->output){
+        my $dbobj = $self->dbobj;
+        my $seqfetcher = $self->make_seqfetcher;
+        my %ids = map { $_->hseqname, $_ } @output;
+        $seqfetcher->write_descriptions($dbobj, keys(%ids) );
+    }
 }
 
 
