@@ -80,7 +80,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::EnsEMBL::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 
 BEGIN {
