@@ -326,8 +326,8 @@ sub fetch_input {
             for( ; $ex_idx < @exonmask_regions; ) {
               my $mask_exon = $exonmask_regions[$ex_idx];
               
-              #printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, 
-              #$mask_exon->{'end'};
+              printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, 
+              $mask_exon->{'end'};
               if ($mask_exon->{'start'} > $f->end) {
                 # no exons will overlap this feature
                 next FEAT;
@@ -406,17 +406,16 @@ sub fetch_input {
 
 sub run {
     my ($self) = @_;
-
+    $self->genewise_db->disconnect_when_inactive(1);
     # is there ever going to be more than one?
+    #print STDERR "have ".$self->runnable." runnables\n";
     foreach my $runnable ($self->runnable) {
       $runnable->run;
     }
-    
+    $self->genewise_db->disconnect_when_inactive(0);
     $self->convert_output;
     # print STDERR "HAVE CONVERTED OUTPUT\n";
 }
-
-
 
 =head2 mask_gene_region_lists
 
@@ -446,43 +445,43 @@ sub mask_gene_region_lists {
 	foreach my $type (@mask_gene_types) {
 	    #print STDERR "Fetching gene type : $type\n";
 	    
-	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
-		my @mask_exons = grep { $_->seqname eq $slice->id } (sort {$a->start <=> $b->start} @{$mask_genes->get_all_Exons});
-		push @mask_gene_regions, { start => $mask_exons[0]->start, 
-					   end   => $mask_exons[-1]->end };
+    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
+      my @mask_exons = grep { $_->seqname eq $slice->id } (sort {$a->start <=> $b->start} @{$mask_genes->get_all_Exons});
+      push @mask_gene_regions, { start => $mask_exons[0]->start, 
+                                 end   => $mask_exons[-1]->end };
 	    
-		foreach my $mask_exon (@mask_exons) {
+      foreach my $mask_exon (@mask_exons) {
 		    push @mask_exon_regions, { start => $mask_exon->start,
-					       end   => $mask_exon->end };
-		}
-	    }
-	    #printf STDERR "  Initial mask gene list %d long\n", scalar(@mask_gene_regions);
-	    #printf STDERR "  Initial mask exon list %d long\n", scalar(@mask_exon_regions);
+                                   end   => $mask_exon->end };
+      }
+    }
+    #printf STDERR "  Initial mask gene list %d long\n", scalar(@mask_gene_regions);
+    #printf STDERR "  Initial mask exon list %d long\n", scalar(@mask_exon_regions);
 	}
 	# make the mask list non-redundant. Much faster when checking against features
 	my (@nr_mask_exon_regions, @nr_mask_gene_regions);
-
+  
 	foreach my $mask_exon_reg (sort {$a->{'start'} <=> $b->{'start'}} @mask_exon_regions) {
-	    if (@nr_mask_exon_regions and $nr_mask_exon_regions[-1]->{'end'} > $mask_exon_reg->{'start'}) {
-		if ($mask_exon_reg->{'end'} > $nr_mask_exon_regions[-1]->{'end'}) {
+    if (@nr_mask_exon_regions and $nr_mask_exon_regions[-1]->{'end'} > $mask_exon_reg->{'start'}) {
+      if ($mask_exon_reg->{'end'} > $nr_mask_exon_regions[-1]->{'end'}) {
 		    $nr_mask_exon_regions[-1]->{'end'} = $mask_exon_reg->{'end'};
-		}
-	    } else {
-		push @nr_mask_exon_regions, $mask_exon_reg;		
-	    }
+      }
+    } else {
+      push @nr_mask_exon_regions, $mask_exon_reg;		
+    }
 	}
 	foreach my $mask_gene_reg (sort {$a->{'start'} <=> $b->{'start'}} @mask_gene_regions) {
-	    if (@nr_mask_gene_regions and $nr_mask_gene_regions[-1]->{'end'} > $mask_gene_reg->{'start'}) {
-		if ($mask_gene_reg->{'end'} > $nr_mask_gene_regions[-1]->{'end'}) {
+    if (@nr_mask_gene_regions and $nr_mask_gene_regions[-1]->{'end'} > $mask_gene_reg->{'start'}) {
+      if ($mask_gene_reg->{'end'} > $nr_mask_gene_regions[-1]->{'end'}) {
 		    $nr_mask_gene_regions[-1]->{'end'} = $mask_gene_reg->{'end'};
-		}
+      }
 	    } else {
-		push @nr_mask_gene_regions, $mask_gene_reg;		
+        push @nr_mask_gene_regions, $mask_gene_reg;		
 	    }
 	}
 
 	$self->{'_mask_region_lists'} = [\@nr_mask_exon_regions, \@nr_mask_gene_regions];
-    }
+}
 
     return @{$self->{'_mask_region_lists'}};
 }
