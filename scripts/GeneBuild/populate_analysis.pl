@@ -112,7 +112,7 @@ $OUTPUT_FIELD_SEPARATOR = "\n";
 
 # global vars
 my $insert = 0; # 1 to auto insert
-my @analyses = ();
+#my @analyses = ();
 my $insert_prefix = "insert into analysis (analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature ) values (";
 my $insert_postfix = ");";
 
@@ -122,12 +122,20 @@ my $insert_postfix = ");";
 	   );
 
 # do something useful
+my @pipeline_analysis = &analyses_from_pipeline;
+my @genebuild_analysis = &analyses_from_config;
+my @pmatch_analysis = &analyses_from_pmatch;
+#print "@analyses\n";;
 
-&analyses_from_pipeline;
-&analyses_from_config;
-print "@analyses\n";;
-
-if($insert){ &insert; }
+if($insert){ 
+    my $dbhash = &insert_into_pipeline(\@genebuild_analysis, \@pmatch_analysis); 
+    print STDERR "have dbhash".$dbhash."\n";
+     foreach my $key(keys(%$dbhash)){
+	print "have ".$key." ".$dbhash->{$key}."\n";
+    }
+    print STDERR "have dbhash".$dbhash."\n";
+    &insert_into_genebuild($dbhash, \@pipeline_analysis, \@genebuild_analysis, \@pmatch_analysis);
+}
 
 sub analyses_from_pipeline {
   # get old analyses from GB_DB
@@ -139,7 +147,7 @@ sub analyses_from_pipeline {
 					     );
 
   my $query = "select * from analysis";
-
+  my @analyses;
   my $sth = $db->prepare($query);
   my $res = $sth->execute;
   my @fields = qw (logic_name
@@ -173,14 +181,14 @@ sub analyses_from_pipeline {
     #print STDERR $analysis."\n";
     push (@analyses, $analysis);
   }
-  
+  return @analyses;
 }
 
 sub analyses_from_config{
 
   # track logic names to make sure we don't try to insert with the same one more than once
   my %logic_names;
-  
+  my @analyses;
   # from genebuild configs
   
     #print STDERR "genebuild analysis\n";
@@ -230,6 +238,16 @@ sub analyses_from_config{
     }
   
     #print STDERR "pmatch analysis\n";
+    
+  return @analyses;
+}
+
+
+sub analyses_from_pmatch{
+    
+    my %logic_names;
+    my @analyses;
+
     foreach my $runnable_hash(@{$GB_PMATCH_RUNNABLES}){
       my $entry = $insert_prefix;
       my $analysis = $runnable_hash->{analysis};
@@ -249,61 +267,88 @@ sub analyses_from_config{
       push (@analyses, $entry);
       
     }
-  
+
+    return @analyses;
 }
 
-sub insert {
-  my %dbs; # keep track of host/name pairs to make sure we don't insert into the same db more than once
 
+sub insert_into_genebuild {
+    my ($dbhash, $pipeline_analysis, $genebuild_analysis, $pmatch_analysis) = @_;
+    
+   # print STDERR "have dbhash".$dbhash."\n";
+   #  foreach my $key(keys(%$dbhash)){
+#	print "have ".$key." ".$dbhash->{$key}."\n";
+ #   }
+
+    my $analysis_refs = [$pipeline_analysis, $genebuild_analysis, $pmatch_analysis];
   # first GeneBuild::Databases
   # I'm sure there's a more automatic way to generate the db details and convert them
   # and avoid all this hard coding. Humph.
 
   # GB_DB
-  $dbs{$GB_DBNAME} = $GB_DBHOST;
+  
   
   # GB_GWDB
   #print STDERR "inserting into genewise db\n";
-  if(   (!defined $dbs{$GB_GW_DBNAME}) || 
-	(defined $dbs{$GB_GW_DBNAME} && $dbs{$GB_GW_DBNAME} ne $GB_GW_DBHOST)){
-    $dbs{$GB_GW_DBNAME} = $GB_GW_DBHOST;
-    &insert_into_db($GB_GW_DBNAME, $GB_GW_DBHOST, $GB_GW_DBUSER, $GB_GW_DBPASS);
+  if(   (!defined $dbhash->{$GB_GW_DBNAME}) || 
+	(defined $dbhash->{$GB_GW_DBNAME} && $dbhash->{$GB_GW_DBNAME} ne $GB_GW_DBHOST)){
+    $dbhash->{$GB_GW_DBNAME} = $GB_GW_DBHOST;
+    &insert_into_db($GB_GW_DBNAME, $GB_GW_DBHOST, $GB_GW_DBUSER, $GB_GW_DBPASS, $analysis_refs );
   }
   
   # GB_COMB_DB
   #print STDERR "inserting into gb comb db\n";
-  if(   (!defined $dbs{$GB_COMB_DBNAME}) || 
-	(defined $dbs{GB_COMB_DBNAME} && $dbs{$GB_COMB_DBNAME} ne $GB_COMB_DBHOST)){
-    $dbs{$GB_COMB_DBNAME} = $GB_COMB_DBHOST;
-    &insert_into_db($GB_COMB_DBNAME, $GB_COMB_DBHOST, $GB_COMB_DBUSER, $GB_COMB_DBPASS);
+  if(   (!defined $dbhash->{$GB_COMB_DBNAME}) || 
+	(defined $dbhash->{GB_COMB_DBNAME} && $dbhash->{$GB_COMB_DBNAME} ne $GB_COMB_DBHOST)){
+    $dbhash->{$GB_COMB_DBNAME} = $GB_COMB_DBHOST;
+    &insert_into_db($GB_COMB_DBNAME, $GB_COMB_DBHOST, $GB_COMB_DBUSER, $GB_COMB_DBPASS, $analysis_refs);
   }
   #print STDERR "inserting into cdna db\n";
   # GB_cDNA_DB - don;t think we need to populate this analysis table ...
-  if(   (!defined $dbs{$GB_cDNA_DBNAME}) || 
-	(defined $dbs{$GB_cDNA_DBNAME} && $dbs{$GB_cDNA_DBNAME} ne $GB_cDNA_DBHOST)){
-    $dbs{$GB_cDNA_DBNAME} = $GB_cDNA_DBHOST;
-    &insert_into_db($GB_cDNA_DBNAME, $GB_cDNA_DBHOST, $GB_cDNA_DBUSER, $GB_cDNA_DBPASS);
+  if(   (!defined $dbhash->{$GB_cDNA_DBNAME}) || 
+	(defined $dbhash->{$GB_cDNA_DBNAME} && $dbhash->{$GB_cDNA_DBNAME} ne $GB_cDNA_DBHOST)){
+    $dbhash->{$GB_cDNA_DBNAME} = $GB_cDNA_DBHOST;
+    &insert_into_db($GB_cDNA_DBNAME, $GB_cDNA_DBHOST, $GB_cDNA_DBUSER, $GB_cDNA_DBPASS, $analysis_refs);
   }
 
   # GB_FINALDB
   #print STDERR "inserting into finaldb\n";
-  if(   (!defined $dbs{$GB_FINALDBNAME}) || 
-	(defined $dbs{$GB_FINALDBNAME} && $dbs{$GB_FINALDBNAME} ne $GB_FINALDBHOST)){
-    $dbs{$GB_FINALDBNAME} = $GB_FINALDBHOST;
-    &insert_into_db($GB_FINALDBNAME, $GB_FINALDBHOST, $GB_FINALDBUSER, $GB_FINALDBPASS);
+  if(   (!defined $dbhash->{$GB_FINALDBNAME}) || 
+	(defined $dbhash->{$GB_FINALDBNAME} && $dbhash->{$GB_FINALDBNAME} ne $GB_FINALDBHOST)){
+    $dbhash->{$GB_FINALDBNAME} = $GB_FINALDBHOST;
+    &insert_into_db($GB_FINALDBNAME, $GB_FINALDBHOST, $GB_FINALDBUSER, $GB_FINALDBPASS, $analysis_refs);
   }
   
   # Now GeneCombiner
   #print STDERR "Inserting into GeneCombiner db\n";
-  if(   (!defined $dbs{$FINAL_DBNAME}) || 
-	(defined $dbs{$FINAL_DBNAME} && $dbs{$FINAL_DBNAME} ne $FINAL_DBHOST)){
-    $dbs{$FINAL_DBNAME} = $FINAL_DBHOST;
-    &insert_into_db($FINAL_DBNAME, $FINAL_DBHOST, $FINAL_DBUSER, $FINAL_DBPASS);
+  if(   (!defined $dbhash->{$FINAL_DBNAME}) || 
+	(defined $dbhash->{$FINAL_DBNAME} && $dbhash->{$FINAL_DBNAME} ne $FINAL_DBHOST)){
+    $dbhash->{$FINAL_DBNAME} = $FINAL_DBHOST;
+    &insert_into_db($FINAL_DBNAME, $FINAL_DBHOST, $FINAL_DBUSER, $FINAL_DBPASS, $analysis_refs);
   }
 }
 
+
+sub insert_into_pipeline{
+    my ($genebuild, $pmatch) = @_;
+    
+    my %dbs;
+    my $analysis_refs = [$genebuild, $pmatch];
+    
+    if((!defined $dbs{$GB_DBNAME}) || 
+       (defined $dbs{$GB_DBNAME} && $dbs{$GB_DBNAME} ne $GB_DBHOST)){
+	$dbs{$GB_DBNAME} = $GB_DBHOST;
+	&insert_into_db($GB_DBNAME, $GB_DBHOST, $GB_DBUSER, $GB_DBPASS, $analysis_refs );
+    }
+    #print "have ".%dbs."\n";
+    #foreach my $key(keys(%dbs)){
+#	print "have ".$key." ".$dbs{$key}."\n";
+    #}
+    return \%dbs;
+}
+
 sub insert_into_db{
-  my ($name, $host, $user, $pass) = @_;
+  my ($name, $host, $user, $pass, $analysis_refs) = @_;
 
   if($name eq '' || $host eq '' || $user eq ''){
     print "can't insert into db unless we have name[$name], host[$host] & user[$user] details\n";
@@ -316,10 +361,13 @@ sub insert_into_db{
 					      '-pass'   => $pass,
 					      '-dbname' => $name,
 					     );
-
-  #print "inserting into $name @ $host\n";  
-  foreach my $analysis(@analyses){
-    my $sth = $db->prepare($analysis);
-    $sth->execute;
+  foreach my $analysis_lines(@$analysis_refs){
+      my @analyses = @$analysis_lines;
+      print "inserting into $name @ $host\n";  
+      foreach my $analysis(@analyses){
+	  #print STDERR "Trying to insert ".$analysis."\n"; 
+	  my $sth = $db->prepare($analysis);
+	  $sth->execute;
+      }
   }
 }
