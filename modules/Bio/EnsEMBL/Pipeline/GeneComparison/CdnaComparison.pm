@@ -50,11 +50,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
                 Bio::EnsEMBL::Pipeline::GeneComparison::CdnaComparison->new(
                   -TRANSCRIPT_ARRAYREF => \@transcript_seqs,
 		  -CDNA_ARRAYREF       => \@cdna_seqs);
-
-foreach my $transcript_id (keys %name_map) {
-  print "$transcript_id\t", $name_map{$transcript_id}, "\n";
-}
-
     Function:   Initialises CdnaComparison object
     Returns :   A CdnaComparison object
     Args    :   Reference to array of PrimarySeq objects representing
@@ -92,8 +87,7 @@ sub new {
 =head2 transcript_arrayref
 
     Title   :   transcript_arrayref
-    Usage   :   $cdna_comp->transcript_arrayref(
-                  \@ensembl_transcript_seqs);
+    Usage   :   $cdna_comp->transcript_arrayref( \@transcript_seqs);
     Function:   get/set for reference to array of transcript
                 PrimarySeqs
     Returns :   reference to array of PrimarySeq
@@ -149,8 +143,8 @@ sub get_transcript_mapping {
 
     Title   :   transcript_percent_coverage
     Usage   :   $cdna_comp->transcript_percent_coverage(97.5);
-    Function:   get/set for threshold percentage of a transcript
-                involved in FeaturePairs with a cDNA
+    Function:   get/set for minimum acceptable percentage of a
+                transcript involved in FeaturePairs with a cDNA
     Returns :   floating point value in the range [1..100]
     Args    :   optional floating point value in the range
                 [1..100]
@@ -177,7 +171,7 @@ sub transcript_percent_coverage {
                 In this mapping, each transcript is represented
 		either zero or one times, but each cDNA is
 		represented zero, one, or more times. Use
-		get_transcript_mapping to obtain results.
+		get_transcript_mapping to access the results.
     Returns :   none
     Args    :   none
 
