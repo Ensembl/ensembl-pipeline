@@ -47,7 +47,6 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::EnsEMBL::Pipeline::SimpleJob;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use FreezeThaw;
-use Data::Dumper;
 
 my $anahost     = 'localhost';
 my $anaport     = '410000';
@@ -125,66 +124,75 @@ foreach my $job (@jobs)
     }
 }
 
-#print Dumper (@jobs);
-print STDERR "Sorted by status: CREATED ".@created." SUBMITTED ".@submitted
+print STDERR "Sorted by status: JOBS: ".@jobs." CREATED ".@created." SUBMITTED ".@submitted
       ." SUCCESSFUL ".@successful." FAILED ".@failed."\n";
-
 
 print "<BODY TEXT=\"#000000\" BGCOLOR=\"#FFFFFF\">";
     print("<TABLE>\n");
     print(  "<TR>$title</TR>"
-            ."<TR BGCOLOR=\"FF9966\">"
+            ."<TR BGCOLOR=\"00FF55\">"
             ."<TD>CREATED (".@created.")</TD>"
             ."<TD>SUBMITTED (".@submitted.")</TD>"
             ."<TD>SUCCESSFUL (".@successful.")</TD>"
             ."<TD>FAILED (".@failed.")</TD>"
             ."</TR>"
-            .(printlist(@created))
-            .(printlist(@submitted))
-            .(printlist(@successful))
-            .(printlist(@failed))
             );
-               
     print("</TABLE>\n");
+    
+    printlist(@created);
+    printlist(@submitted);
+    printlist(@successful);
+    printlist(@failed);          
+    
 
+print STDERR "Sorted by status:\n JOBS: ".@jobs." CREATED ".@created." SUBMITTED ".@submitted
+      ." SUCCESSFUL ".@successful." FAILED ".@failed."\n";
 
 sub printlist {
     my (@list) = @_;
-    my $html;
     
-    $html .= ("<TR BGCOLOR=\"00C155\"><TD>Status</TD><TD>Job ID</TD><TD>Analysis</TD><TD>Input ID</TD><TD>stdout</TD>"
-                ."<TD>stderr</TD><TD>status</TD><TD>LSF ID</TD></TR>") if (@list);
+    print "<PRE>\n" 
+          ."+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
+          ."|   STATUS   | JOB ID |   ANALYSIS  |    INPUT ID    |  LSF ID |STDOUT       | STDERR (bytes)|  STATUS  |\n" 
+          ."+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
+            if (@list);
+   
+   #print  "|123456789012|12345678|1234567890123|1234567890123456|1234567890|123456789012|123456789012345|1234567890|\n";
+          
     foreach my $job (@list)
     {
         print STDERR "Tracking job ".$job->id."\n";
         $job->_dbobj($anadb);
         $job->get_all_status;
-        my $status = $job->current_status->status;
-        $html .= ("<TR>"
-                ."<TD> ".$status." </TD>"
-                ."<TD> ".$job->id." </TD>"
-                ."<TD> ".$job->analysis->program." </TD>"
-                ."<TD> ".$job->input_id." </TD>"
-                ."<TD><a href=\"file:". $job->stdout_file."\">stdout </a>"
-                    ."(".(-s $job->stdout_file).")</TD>"
-                ."<TD><a href=\"file:". $job->stderr_file."\">stderr </a>"
-                    ."(".(-s $job->stderr_file).")</TD>"
-                ."<TD><a href=\"file:". $job->status_file."\">status </a>"
-                    ."(".(-s $job->status_file).")</TD>"
-                ."<TD> ".$job->LSF_id." </TD>"
-                ."</TR>"
-                );   
+        my $status      = $job->current_status->status;
+        my $jobid       = $job->id;
+        my $analysis    = $job->analysis->program;
+        my $input       = $job->input_id;
+        my $outsize     = -s $job->stdout_file;
+        my $errsize     = -s $job->stderr_file;
+        my $statsize    = -s $job->status_file;
+        my $lsf         = $job->LSF_id;
+        my $stdout      = "| <a href=\"file:". $job->stdout_file."\">stdout</a>";
+        my $stderr      = "| <a href=\"file:". $job->stderr_file."\">stderr</a>";
+        my $statfile    = "| <a href=\"file:". $job->status_file."\">status</a>";
+        
+        $status         = "| ".$status          .(" " x (11 - length ($status))); 
+        $jobid          = "| ".$jobid           .(" " x (7  - length ($jobid)));
+        $analysis       = "| ".$analysis        .(" " x (12 - length ($analysis)));
+        $input          = "| ".$input           .(" " x (15 - length ($input)));     
+        $outsize        = " ".$outsize          .(" " x (5  - length ($outsize)));
+        $errsize        = " ".$errsize          .(" " x (7  - length ($errsize)));
+        $statsize       = " ".$statsize         .(" " x (2  - length ($statsize)));
+        $lsf            = "| ".$lsf             .(" " x (8  - length ($lsf)));
+        
+        print   ($status.$jobid.$analysis.$input.$lsf.$stdout.$outsize.$stderr.$errsize.$statfile.$statsize."|\n");
+                   
     }
-    return $html;
+    
+    print "+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
+          ."</PRE>\n" 
+          if (@list);
 }
-
-
-
-
-
-
-
-
 
 
 
