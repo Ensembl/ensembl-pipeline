@@ -88,7 +88,9 @@ if(!$analysis){
   
 }
 
-my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
+my $runnable;
+if($analysis->module =~ "Bio::") { $runnable = $analysis->module; }
+else { $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module; }
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
 print STDERR "creating runnable ".$file."\n" if($verbose);
