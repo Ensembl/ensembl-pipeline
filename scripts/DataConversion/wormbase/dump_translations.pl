@@ -23,11 +23,11 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
 
-my $dbhost      = '';
-my $dbuser    = '';
-my $dbname    = '';
+my $dbhost      = 'ecs1b';
+my $dbuser    = 'ensro';
+my $dbname    = 'elegans_95';
 my $dbpass    = undef;
-my $stable_id;
+my $stable_id = 1;
 my $db_id;
 
 GetOptions(
@@ -41,7 +41,7 @@ GetOptions(
 or die ("Couldn't get options");
 
 
-if(!$stable_id || !$db_id){
+if(!$stable_id && !$db_id){
   die "need to specify to use either stable_id or dbId for the header line";
 }elsif($stable_id && $db_id){
   print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
