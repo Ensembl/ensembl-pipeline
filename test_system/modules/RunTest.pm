@@ -493,10 +493,14 @@ sub check_output_dir{
   if(-d $self->output_dir){
     return 0;
   }else{
+    print $self->output_dir." doesn't seem to exist making one\n";
     eval{
       mkdir($self->output_dir);
     };
     if($@){
+      $self->exception("Failed to create ".$self->output_dir." $@");
+    }
+    if(! -e $self->output_dir){
       $self->exception("Failed to create ".$self->output_dir." $@");
     }
     $self->cleanup_dir(1);
@@ -1084,7 +1088,7 @@ sub fetch_features_by_dbID{
 
 sub before_throw{
   my ($self) = @_;
-  if(!$self->dont_cleanup){
+  if(!$self->dont_cleanup_tests){
     $self->cleanup;
     if($self->ref_testdb){
       $self->cleanup($self->ref_testdb);
