@@ -62,7 +62,7 @@ sub new {
     my ( $server, $port, $options ) = $self->_rearrange( [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
     if ( !defined $server ) {
-        $server = 'pubseq.internal.sanger.ac.uk';
+        $server = 'cbi2.internal.sanger.ac.uk';
     }
     $self->server($server);
 
