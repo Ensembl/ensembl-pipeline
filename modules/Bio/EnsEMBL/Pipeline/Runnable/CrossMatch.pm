@@ -49,7 +49,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root
+# Object preamble - inherits from Bio::EnsEMBL::RunnableI
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeatureFactory;
@@ -67,7 +67,20 @@ sub new {
   bless $self,$class;
   
   $self->{'_fp_array'} =[];
-  my ($seq1,$seq2,$workdir,$score,$minmatch,$masklevel,$debug) = $self->_rearrange([qw(SEQ1 SEQ2 WORKDIR SCORE MINMATCH MASKLEVEL)],@args);
+  my ($seq1,
+      $seq2,
+      $workdir,
+      $score,
+      $minmatch,
+      $masklevel,
+      $debug) = 
+	  $self->_rearrange([qw(
+				SEQ1 
+				SEQ2 
+				WORKDIR 
+				SCORE 
+				MINMATCH 
+				MASKLEVEL)],@args);
   if( !defined $seq1 || !defined $seq2 ) {
       $self->throw("Must pass in both seq1 and seq1 args");
   }
@@ -126,17 +139,22 @@ sub run{
    close(F);
    
    #build crossmatch factory
-   my $cmf = CrossMatch::Factory->new($self->score,$self->minmatch,$self->masklevel);
+   my $cmf = CrossMatch::Factory->new($self->score,
+				      $self->minmatch,
+				      $self->masklevel);
    $cmf->dir($self->workdir);
    $cmf->alignments(1);
 
-   print STDERR "About to run crossmatch from runnable...\n";
+   #print STDERR "About to run crossmatch from runnable...\n";
+
+   my $executable = $self->locate_executable('cross_match');
+
    #run crossmatch factory
    my $cm;
    eval {
-       $cm = $cmf->crossMatch($file1,$file2);
+       $cm = $cmf->crossMatch($file1,$file2,$executable);
    };
-   print STDERR "Finished crossmatch in runnable...\n";
+   #print STDERR "Finished crossmatch in runnable...\n";
 
    if( $@ ) {
        unlink($file1);
@@ -384,7 +402,7 @@ sub seq2{
 =head1 Embedded CrossMatch module
 
 To prevent another outside dependency, embedding the crossmatch module
-in here directly.
+in here directly.  (*EEK*)
 
 =cut
 
@@ -400,7 +418,7 @@ use Cwd;
 # Makes a new CrossMatch factory object
 sub new {
     # order here is important, as we used to only specify min score
-    my ($pkg,$minscore,$minmatch,$masklevel) = @_;
+    my ($pkg,$minscore,$minmatch,$masklevel,$executable) = @_;
     my( @dir );
 
     # Default to cwd if no directories supplied
@@ -420,6 +438,7 @@ sub new {
 	minScore  => $minscore,
 	maskLevel => $masklevel, # 101, Show all matches
 	alignments => 0,  # don't keep/parse alignments by default
+        executable => $executable,
 	_extn => ['']
 	}, $pkg;
 }
@@ -614,6 +633,7 @@ sub _save_hit{
 sub crossMatch {
     my $matcher = shift;
     my( @seq ) = (@_)[0,1];
+    my $executable = (@_)[2];
     
     defined $seq[1]
 	or croak qq(not enough arguments to crossMatch: "@_");
@@ -636,13 +656,13 @@ sub crossMatch {
     my @align;
     my $ialign;
     my $match = CrossMatch->new(@seq, $minM, $minS, $mask);
-    print STDERR "Options used by crossmatch -minmatch $minM -minscore $minS -masklevel $mask\n";
-    my $cross_command="/work2/elia/bin/cross_match -minmatch $minM -minscore $minS -masklevel $mask";
+    #print STDERR "Options used by crossmatch -minmatch $minM -minscore $minS -masklevel $mask\n";
+    my $cross_command= "$executable -minmatch $minM -minscore $minS -masklevel $mask";
     if($matcher->{'alignments'}){
 	$cross_command.=" -alignments";
     }
     $cross_command.=" @seq 2>/dev/null |";
-    print STDERR "opening cross match pipe\n";
+    #print STDERR "opening cross match pipe\n";
     open( CROSS_MATCH, $cross_command )
         or croak "Can't open pipe '$cross_command' : $!";
     while (<CROSS_MATCH>) {
@@ -677,9 +697,9 @@ sub crossMatch {
 	@res = split;
 	$ialign=1;
     }
-    print STDERR "About to process...\n";
+    #print STDERR "About to process...\n";
     &_save_hit($match,\@res,\@align);
-    print STDERR "saved hits \n";
+    #print STDERR "saved hits \n";
         
     # Check exit status of cross_match
     unless (close CROSS_MATCH) {
