@@ -20,7 +20,7 @@ my $label;
 
 unless ( $dbname && $dbhost && $label ){
   print STDERR "script to fake some stable ids for genes, transcripts, exons and translations\n";
-  print STDERR "Usage: $0 -dbname -dbhost -label ( ENSest, ENS, ENSRNO, ...)\n";
+  print STDERR "Usage: $0 -dbname -dbhost -label ( ENSEST, ENS, ENSRNO, ...)\n";
   exit(0);
 }
 
