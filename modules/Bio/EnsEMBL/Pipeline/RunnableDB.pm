@@ -165,12 +165,12 @@ sub parameters {
 
 sub db {
     my( $self, $value ) = @_;
-    
+    #print $value."\n";
     if ($value) 
     {
-        $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
-            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
-        $self->{'_db'} = $value;
+       $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
+         || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
+       $self->{'_db'} = $value;
     }
     return $self->{'_db'};
 }
@@ -349,7 +349,7 @@ sub write_output {
     my $db=$self->db();
     my @features = $self->output();
     my $contig;
-
+    $self->warn("shouldn't be using the write_output methid of runnabledb");
     eval {
       $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };

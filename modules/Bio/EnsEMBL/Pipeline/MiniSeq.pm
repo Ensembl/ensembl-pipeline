@@ -129,7 +129,7 @@ sub pairAlign {
        }
 
        foreach my $p ($pair->eachFeaturePair) {
-	   if ($p->feature1->strand != 1) {
+	   if ($p->strand != 1) {
 	       $self->throw("Can't have a PairAlign object where the strand of the first object is reversed");
 	   }
        }
@@ -166,12 +166,12 @@ sub get_cDNA_sequence {
    return unless (scalar @exons > 0);
 
    foreach my $exon (@exons) {
-       $seqstr .= $exon->feature1->seq->seq;
+       $seqstr .= $exon->seq->seq;
    }
-   if ($exons[0]->feature2->strand == 1) {
+   if ($exons[0]->hstrand == 1) {
        return new Bio::PrimarySeq('-id' => "genomic" ,
 				  -seq => $seqstr);
-   } elsif ($exons[0]->feature2->strand == -1) {
+   } elsif ($exons[0]->hstrand == -1) {
        my $tmpseq = new Bio::PrimarySeq('-id'  => 'genomic',
 					-seq => $seqstr);
        return $tmpseq->revcom;
