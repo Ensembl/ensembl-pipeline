@@ -54,7 +54,13 @@ use vars qw(%Config);
 
     # default runner script 
     PIPELINE_RUNNER_SCRIPT => '',
-    
+
+    # default input_file_directory
+    PIPELINE_INPUT_DIR => '',
+
+    # default target_file_directory
+    PIPELINE_TARGET_DIR => '',
+
     #regex for spiting up slice input_ids
     SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',	   
     
