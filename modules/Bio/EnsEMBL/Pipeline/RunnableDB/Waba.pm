@@ -79,12 +79,9 @@ sub new {
 
     $self->throw("Analysis object required") unless ($self->analysis);
     
-    # set up cpg specific parameters
+    # set up waba specific parameters (none for the moment)
     my $params = $self->parameters();
     if ($params ne "") { $params .= " , "; }
-    $params .= "-program=>".$self->analysis->program_file.",";
-    # define the database
-    $params .= "-database=>".$self->analysis->db_file;
 
     $self->parameters($params);
 
@@ -248,24 +245,20 @@ sub write_output {
 sub runnable {
     my ($self, $runnable) = @_;
     
-    if ($runnable)
-    {
+    if ($runnable) {
         #extract parameters into a hash
         my ($parameter_string) = $self->parameters() ;
         my %parameters;
-        if ($parameter_string)
-        {
-#            $parameter_string =~ s/\s+//g;
+        if ($parameter_string) {
             my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
+            foreach my $pair (@pairs) {
                 my ($key, $value) = split (/=>/, $pair);
 		$key =~ s/\s+//g;
+                $value =~ s/\s+//g;
                 $parameters{$key} = $value;
             }
         }
-
-        $self->{'_runnable'} = $runnable->new(%parameters);
+        $self->{'_runnable'} = $runnable->new(-analysis => $self->analysis, %parameters);
     }
     return $self->{'_runnable'};
 }
