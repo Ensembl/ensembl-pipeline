@@ -387,8 +387,8 @@ sub create_existing{
        my $idset = $total_ids->or($self->get_fatal);
        $total_ids = $idset;
     }
-    $self->add_exisiting($total_ids);
-    
+    $self->add_existing($total_ids);
+
     return $total_ids;
 }
 
