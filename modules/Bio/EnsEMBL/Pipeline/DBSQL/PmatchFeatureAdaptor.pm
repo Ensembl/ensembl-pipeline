@@ -167,6 +167,76 @@ sub get_PmatchFeatures_by_protein_id {
   return @pmatch;
 }
 
+=head2 get_PmatchFeatures_by_chr_start_end
+
+ Title   : get_PmatchFeatures_by_chr_start_end
+ Usage   :
+ Function: retrieves all the Pmatchefeatures for a given chromosomal range
+ Example :
+ Returns : array of Bio::EnsEMBL::Pipeline::PmatchFeature
+ Args    :
+
+
+=cut
+
+sub get_PmatchFeatures_by_chr_start_end {
+  my ($self, $chrname, $chrstart, $chrend) = @_;
+  my $query = "SELECT * FROM pmatch_feature pmf,protein " .
+              "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
+              "AND pmf.chr_name = '$chrname' " .
+	      "AND pmf.start >= $chrstart " .
+	      "AND pmf.end <= $chrend ";
+
+  my $sth = $self->prepare($query);
+  my $res = $self->execute;
+
+  my @pmatch;
+  my %cdnas;
+  my %proteins;
+
+  while (my $row = $sth->fetchrow_hashref) {
+    my $prot_internal_id = $row->{protein_internal_id};
+    my $chr_name         = $row->{chr_name};
+    my $start            = $row->{start};
+    my $end              = $row->{end};
+    my $coverage         = $row->{coverage};
+
+    if (!defined($proteins{$prot_internal_id})) {
+
+      my $protid = $self->get_protein_id($prot_internal_id);
+      if (!defined($protid)){
+	$self->throw("no protein for internal_id $prot_internal_id\n");
+      }
+
+      $proteins{$prot_internal_id}    = $protid;
+    }
+
+    if (!defined($cdnas{$prot_internal_id})) {
+
+      $cdnas{$prot_internal_id}    = $self->get_cdna_id($prot_internal_id);
+      # not every protein has a corresponding cdna
+      if (!defined($cdnas{$prot_internal_id})){
+	$cdnas{$prot_internal_id} = "";
+      }
+    }
+
+    
+
+    my $feature = new Bio::EnsEMBL::Pipeline::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
+							    -start    => $start,
+							    -end      => $end,
+							    -chr_name => $chr_name,
+							    -cdna_id  => $cdnas{$prot_internal_id},
+							    -coverage => $coverage,
+							    );
+
+    push(@pmatch,$feature);
+
+  }
+
+  return @pmatch;
+}
+
 sub get_cdna_id {
   my ($self,$protein_id) = @_;
   
