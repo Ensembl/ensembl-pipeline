@@ -537,12 +537,12 @@ sub _align {
   # frameshifts
 
   foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
-    print STDERR $tracked_deletion . "\t" . 
+    print STDOUT $tracked_deletion . "\t" . 
       scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
     foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
-      print STDERR $deletion->[1] ." (" . $deletion->[0] . ")  ";
+      print STDOUT $deletion->[1] ." (" . $deletion->[0] . ")  ";
     }
-    print STDERR "\n";
+    print STDOUT "\n";
   }
 
 
@@ -1041,14 +1041,15 @@ sub _truncate_introns {
   my @coordinates;
   foreach my $exon (@{$self->_transcript->get_all_Exons}){
 
-    my $exon_start = $exon->start;
-    my $exon_end   = $exon->end;
+    my $intron_coord_1 = $exon->start - 1;
+    my $intron_coord_2 = $exon->end + 1;
 
     if ($self->_strand == -1) {
-      $exon_start = $self->_slice->length - $exon_start + 1;
-      $exon_end   = $self->_slice->length - $exon_end + 1;
+      $intron_coord_1 = $self->_slice->length - ($exon->start + 1) + 1;
+      $intron_coord_2 = $self->_slice->length - ($exon->end - 1) + 1;
     }
-    push(@coordinates, $exon_start, $exon_end);
+    push(@coordinates, $intron_coord_1, $intron_coord_2);
+
   }
 
   # Get locations of gaps in genomic sequence.
@@ -1078,7 +1079,7 @@ sub _truncate_introns {
 
   foreach my $align_seq (@sequences){
 
-    my $seq_array = $align_seq->seq_array;
+    my $seq = $align_seq->seq;
 
     my @working_coordinates = @coordinates;
 
@@ -1089,19 +1090,18 @@ sub _truncate_introns {
 
       next INTRON unless ($intron_start + $self->_padding + 22) < ($intron_end - $self->_padding - 22);
 
-      my @offcut = splice (@$seq_array, $intron_start + $self->_padding, 
-			   ($intron_end - 2*$self->_padding - $intron_start), 
-			   '---intron-truncated---');
+      my $offcut = substr($seq, $intron_start + $self->_padding - 1, 
+			  ($intron_end - 2*$self->_padding));
 
       if ($self->_padding == 0) {
-	@offcut = splice (@$seq_array, $intron_start + $self->_padding, 
-			  ($intron_end - 2*$self->_padding - $intron_start), 
-			  '');
-      }
-
-      my $offcut;
-      foreach my $discarded_element (@offcut) {
-	$offcut .= $discarded_element;
+	$seq = 
+	  substr($seq, 0, $intron_start - 1) . 
+	    substr($seq, $intron_end + 1, length($seq));
+      } else {
+	$seq = 
+	  substr($seq, 0, $intron_start + $self->_padding - 1) . 
+	    '---intron-truncated---' . 
+	      subseq($seq, ($intron_end - 2*$self->_padding + 1), length($seq));
       }
 
       if (($offcut =~ /atgc/i)&&($align_seq->name ne 'genomic_sequence')) {
@@ -1110,7 +1110,7 @@ sub _truncate_introns {
 		"around the exon sequences.\n");
       }
     }
-    $align_seq->store_seq_array($seq_array);
+    $align_seq->seq($seq);
   }
 
   return 1;
@@ -2012,11 +2012,7 @@ sub _exon_nucleotide_sequence {
 
     # Convert back to a string
 
-    my $exon_sequence = '';
-    foreach my $element (@exon_only_sequence) {
-      $exon_sequence .= $element;
-    }
-
+    my $exon_sequence = join('', @exon_only_sequence);
 
     $self->{'_exon_nucleotide_sequence'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
 					     '-seq'  => $exon_sequence,
