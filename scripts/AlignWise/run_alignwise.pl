@@ -12,14 +12,16 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
+use Bio::Seq;
+use Bio::EnsEMBL::Pipeline::Runnable::AlignWise;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-my $verbose = 1;
+my $verbose = 0;
 my $input_id;
 my $alignment_type = "WGA";
 my $focus_species  = 'Homo sapiens';
-my $compara_host   =  'ecs2f';
-my $compara_name   = 'ensembl_compara_15_1';
+my $compara_host   =  'ecs2d';
+my $compara_name   = 'ensembl_compara_16_1';
 my $compara_port   = '3306';
 my $compara_conf   = '/nfs/acari/eae/ensembl/ensembl-compara/modules/Bio/EnsEMBL/Compara/Compara.conf';
 my @target_species = ( 'Mus musculus', 'Rattus norvegicus');
@@ -221,54 +223,64 @@ else {
   print STDERR "$count alignments found\n";
 }
 
+my @sequences = ( $focus_seq, @target_seq );
+my $focus_id  = $focus_genomedb->name()." ".$input_id;
+my @ids       = ( $focus_id );
+foreach my $target_genome ( @target_genomes ){
+    push ( @ids, $target_genome->name );
+}
 
 ############################################################
 # convert the multiple fasta file with query est/rna sequences into an array of seq features
+#my @target_bioseqs;
+#my $focus_id = $focus_genomedb->name()." ".$input_id."\n";
+#my $focus_bioseq = Bio::Seq->new(
+#				 -DISPLAY_ID => $focus_id,
+#				 -MOLTYPE    => 'dna',
+#				 -SEQ        => $focus_seq,
+#				 );
 
-my @target_bioseqs;
-my $focus_id = $focus_genomedb->name()." ".$input_id."\n";
-my $focus_bioseq = Bio::Seq->new(
-				 -DISPLAY_ID => $focus_id,
-				 -MOLTYPE    => 'dna',
-				 -SEQ        => $focus_seq,
-				);
-
-for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
-  my $target_bioseq = Bio::Seq->new(
-				    -DISPLAY_ID => $target_genomes[$i_species]->name(),
-				    -MOLTYPE    => 'dna',
-				    -SEQ        => $target_seq[$i_species],
-				   );
-  push (@target_bioseqs, $target_bioseq);
-}
+#for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
+#    my $target_bioseq = Bio::Seq->new(
+#				      -DISPLAY_ID => $target_genomes[$i_species]->name(),
+#				      -MOLTYPE    => 'dna',
+#				      -SEQ        => $target_seq[$i_species],
+#				      );
+#    push (@target_bioseqs, $target_bioseq);
+#}
 
 
 ############################################################
 # create runnable
-#my $runnable = Bio::EnsEMBL::Pipeline::AlignWise->new(
-#						      -focus   => $focus_bioseq,
-#						      -query   => \@sequences,
-#						     );
+# we pass strings
+my $runnable = Bio::EnsEMBL::Pipeline::Runnable::AlignWise->new(
+								-slice  => $focus_slice,
+								-seqs   => \@sequences,
+								-ids    => \@ids,
+								);
 
 
-open(MULTI,">multi.fa") or die("cannot open file [multi.fa] for writing");
+$runnable->run;
 
-print MULTI ">".$focus_genomedb->name()."\n";
-for( my $i=0; $i<length( $focus_seq ); $i+=60 ){
-  print MULTI substr( $focus_seq, $i, 60 ),"\n";
-}
-for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
-  print MULTI ">".$target_genomes[$i_species]->name()."\n";
-  my $seq=$target_seq[$i_species];
-  for( my $i=0; $i<length( $seq ); $i+=60 ){
-    print MULTI substr( $seq, $i, 60 ),"\n";
-  }
-}
-
-close(MULTI);
+my @output = $runnable->output;
 
 
-exit(0);
+#open(MULTI,">multi.fa") or die("cannot open file [multi.fa] for writing");
+
+#print MULTI ">".$focus_genomedb->name()."\n";
+#for( my $i=0; $i<length( $focus_seq ); $i+=60 ){
+#  print MULTI substr( $focus_seq, $i, 60 ),"\n";
+#}
+#for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
+#  print MULTI ">".$target_genomes[$i_species]->name()."\n";
+#  my $seq=$target_seq[$i_species];
+#  for( my $i=0; $i<length( $seq ); $i+=60 ){
+#    print MULTI substr( $seq, $i, 60 ),"\n";
+#  }
+#}
+
+#close(MULTI);
+
 
 ############################################################
 
