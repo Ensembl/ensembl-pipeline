@@ -18,6 +18,7 @@ Bio::EnsEMBL::Pipeline::Analysis.pm - Stores details of an analysis run
 =head1 SYNOPSIS
 
     my $obj    = new Bio::EnsEMBL::Analysis::Analysis(-id              => $id,
+						      -logical_name    => 'SWIRBlast',
 						      -db              => $db,
 						      -db_version      => $db_version,
 						      -db_file         => $db_file,
@@ -70,7 +71,8 @@ sub _initialize {
   my $make = $self->SUPER::_initialize;
 
   my ($id,$db,$db_version,$db_file,$program,$program_version,$program_file,
-      $gff_source,$gff_feature,$module,$module_version,$parameters,$created) = 
+      $gff_source,$gff_feature,$module,$module_version,$parameters,$created,
+      $logic_name ) = 
 
 	  $self->_rearrange([qw(ID
 				DB
@@ -85,9 +87,10 @@ sub _initialize {
 				MODULE_VERSION
 				PARAMETERS
 				CREATED
+				LOGIC_NAME
 				)],@args);
 
-  $self->id             ($id);
+  $self->dbID             ($id);
   $self->db             ($db);
   $self->db_version     ($db_version);
   $self->db_file        ($db_file);
@@ -100,28 +103,29 @@ sub _initialize {
   $self->gff_feature    ($gff_feature);
   $self->parameters     ($parameters);
   $self->created        ($created);
+  $self->logic_name ( $logic_name );
 
   return $self; # success - we hope!
 }
 
 
-=head2 id
+=head2 dbID
 
-  Title   : id
-  Usage   : $self->id
+  Title   : dbID
+  Usage   : $self->dbID
   Function: Get/set method for the id
   Returns : int
   Args    : int
 
 =cut
 
-sub id {
+sub dbID {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_id} = $arg;
+	$self->{_dbid} = $arg;
     }
-    return $self->{_id};
+    return $self->{_dbid};
 }
 
 
@@ -370,6 +374,26 @@ sub created {
 
     return $self->{_created};
 }
+
+=head2 logic_name
+
+  Title   : logic_name
+  Usage   : $self->logic_name
+  Function: Get/set method for the logic_name, the name under 
+            which this typical analysis is known.
+  Returns : String
+  Args    : String
+
+=cut
+
+
+sub logic_name {
+  my ($self, $arg ) = @_;
+  ( defined $arg ) &&
+    ($self->{_logic_name} = $arg);
+  $self->{_logic_name};
+}
+
 
 1;
 

@@ -41,18 +41,17 @@ use strict;
 use DBI;
 
 use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
-use Bio::EnsEMBL::Pipeline::Analysis;
-use Bio::EnsEMBL::Pipeline::ExonPair;
-use Bio::EnsEMBL::Pipeline::DB::ObjI;
-use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 use Bio::Root::Object;
 
-use FreezeThaw qw(freeze thaw);
+# use FreezeThaw qw(freeze thaw);
 
 # Inherits from the base bioperl object
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI  Bio::EnsEMBL::DBSQL::Obj Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::DBSQL::Obj Bio::Root::Object);
 
 sub _initialize {
     my ($self,@args) = @_;
@@ -63,171 +62,74 @@ sub _initialize {
 
 }
 
-=head2 get_TimClone
+=head2 get_JobAdaptor
 
- Title   : get_Clone
- Usage   : $db->get_Clone($disk_id)
- Function: Gets a Clone object with disk_id as its disk_id
- Example : $db->get_Clone($disk_id)
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::Clone object 
- Args    : disk_id
+ Title   : get_JobAdaptor
+ Usage   : $db->get_JobAdaptor
+ Function: The Adaptor for Job objects in this db
+ Example : 
+ Returns : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+ Args    : 
 
 
 =cut
 
-sub get_TimClone{
-   my ($self,$disk_id) = @_;
+sub get_JobAdaptor {
+  my ($self) = @_;
 
-   $disk_id || $self->throw("Trying to delete a clone without a disk id!");
+  if( ! defined $self->{_JobAdaptor} ) {
+    $self->{_JobAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor->new
+      ( $self );
+  }
 
-   my $sth = $self->prepare("select disk_id from clone where disk_id = \"$disk_id\";");
-   my $res = $sth ->execute();
-   my $rv  = $sth ->rows;
-
-   if( ! $rv ) {
-       # make sure we deallocate sth - keeps DBI happy!
-       $sth = undef;
-       $self->throw("Clone $disk_id does not seem to occur in the database!");
-   }
-
-   my $clone = new Bio::EnsEMBL::Pipeline::DBSQL::Clone( -disk_id    => $disk_id,
-							 -dbobj      => $self );
-
-   return $clone;
+  return $self->{_JobAdaptor};
 }
 
-=head2 create_Clone
+=head2 get_AnalysisAdaptor
 
- Title   : create_Clone
- Usage   : $db->create_Clone($disk_id,$clone_group,$chromosome)
- Function: writes a new clone in the database
- Example : $db->create_Clone('dummy','SU','22')
- Returns : nothing
- Args    : disk_id,clone group,chromosome
+ Title   : get_AnalysisAdaptor
+ Usage   : $db->get_AnalysisAdaptor
+ Function: The Adaptor for Analysis objects in this db
+ Example : 
+ Returns : Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor
+ Args    : 
 
 
 =cut
 
-sub create_Clone {
-   my ($self,$disk_id,$clone_group,$chromosome) = @_;
+sub get_AnalysisAdaptor {
+  my ($self) = @_;
 
-   $disk_id || $self->throw("Trying to create a clone without a disk id!\n");
-   $clone_group || $self->throw("Trying to create a clone without a clone group!");
-   $chromosome || $self->throw("Trying to create a clone without a chromosome id!");
-   
-   my @sql;
+  if( ! defined $self->{_AnalysisAdaptor} ) {
+    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
+      ( $self );
+  }
 
-   push(@sql,"lock tables clone write");
-   push(@sql,"insert into clone(disk_id,clone_group,chromosome,last_check,created,modified) values('$disk_id','$clone_group','$chromosome',now(),now(),now())");
-   push(@sql,"unlock tables");   
-
-   foreach my $sql (@sql) {
-     my $sth =  $self->prepare($sql);
-     #print STDERR "Executing $sql\n";
-     my $rv  =  $sth->execute();
-     $self->throw("Failed to insert clone $disk_id") unless $rv;
-   }
-}
-
-=head2 get_Job 
-
-  Title   : get_Job
-  Usage   : my $job = $db->get_Job($id)
-  Function: Retrieves a job from the database
-            when given its id
-  Returns : Bio::EnsEMBL::Pipeline::DB::JobI
-  Args    : int
-
-=cut
-
-
-sub get_Job {
-    my ($self,$id) = @_;
-
-    $self->throw("No input id for get_Job") unless defined($id);
-
-    my $sth = $self->prepare("select id,input_id,analysis,LSF_id,machine,object,queue " . 
-			     "from job " . 
-			     "where id = $id");
-    my $res = $sth->execute();
-    my $row = $sth->fetchrow_hashref;
-
-    my $input_id    = $row->{input_id};
-    my $analysis_id = $row->{analysis};
-    my $LSF_id      = $row->{LSF_id};
-    my $machine     = $row->{machine};
-    my $object      = $row->{object};
-    my $queue       = $row->{queue};
-
-    my $analysis    = $self->get_Analysis($analysis_id);
-
-    my $job;
-
-    if (defined($object)) 
-    {
-	    print(STDERR "Recreating job object from stored version\n");
-	    ($job)  = FreezeThaw::thaw($object);
-
-        if (! $job->isa("Bio::EnsEMBL::Pipeline::DB::JobI")) 
-        {
-	        $self->throw("Object string didn't return a Bio::EnsEMBL::Pipeline::DB::JobI object [" . ref($job) ."]");
-        }
-        
-	    $job->_dbobj($self);
-    } 
-    else 
-    {
-        print(STDERR "Creating new job object - no stored version\n");
-
-        $job = new Bio::EnsEMBL::Pipeline::DBSQL::Job(
-                                  -dbobj    => $self,
-                                  -id       => $id,
-						          -input_id => $input_id,
-						          -analysis => $analysis,
-						          -LSF_id   => $LSF_id,
-						          -machine  => $machine,
-						          -queue    => $queue,
-						          );
-        #$job->_dbobj($self);
-    }
-    
-    return $job;
+  return $self->{_AnalysisAdaptor};
 }
 
 
-=head2 get_JobsByInputId {
+=head2 get_RuleAdaptor
 
-  Title   : get_JobsByInputId
-  Usage   : my @jobs = $db->get_JobsByInputId($id)
-  Function: Retrieves all jobs in the database
-            that have a certain input id.
-	        Input id will usually be associated with
-            a sequence in the main ensembl database.
-  Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
-  Args    : int
+ Title   : get_RuleAdaptor
+ Usage   : $db->get_RuleAdaptor
+ Function: The Adaptor for Rule objects in this db
+ Example : 
+ Returns : Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
+ Args    : 
+
 
 =cut
 
+sub get_RuleAdaptor {
+  my ($self) = @_;
 
-sub get_JobsByInputId {
-    my ($self,$id) = @_;
+  if( ! defined $self->{_RuleAdaptor} ) {
+    $self->{_RuleAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor->new
+      ( $self );
+  }
 
-
-    $self->throw("No input input_id for get_JobsByInputId") unless defined($id);
-    my $query = "select id,input_id,analysis,LSF_id,machine,object,queue " . 
-	",stdout_file,stderr_file,input_object_file,output_file,status_file " .
-        "from job " . 
-	"where input_id = \"$id\"";
-    
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute();
-    
-    my @jobs;
-    while (my $row = $sth->fetchrow_hashref) {
-	my $job = $self->_parseJob($row);
-	push(@jobs,$job);
-    }
-    return @jobs;
+  return $self->{_RuleAdaptor};
 }
 
 sub get_JobsByCurrentStatus {
@@ -471,264 +373,7 @@ sub get_InputIdsByAnalysis {
 }
 
 
-=head2 write_Analysis {
 
-  Title   : write_Analysis
-  Usage   : $db->write_Analysis($analysis)
-  Function: Write an analysis object into the database
-            with a check as to whether it exists.
-  Returns : nothing
-  Args    : int
-
-=cut
-
-
-sub write_Analysis {
-    my ($self,$analysis) = @_;
-
-    $self    ->throw("Input must be Bio::EnsEMBL::Pipeline::Analysis [$analysis]") unless
-    $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
-
-
-    my ($id,$created) = $self->exists_Analysis($analysis);
-
-    if (defined($id)) 
-    {
-	    $analysis->id     ($id);
-	    $analysis->created($created);
-	    return $analysis;
-    }
-    my $query = 
-	                     "insert into analysisprocess(id,created,db,db_version,db_file," .
-                	     "program,program_version,program_file," .
-			     "parameters,module,module_version," .
-			     "gff_source,gff_feature) " .
-			     " values (NULL," . 
-			     "now()"                    .   ",\"" .
-			     $analysis->db              . "\",\"" .
-			     $analysis->db_version      . "\",\"" .
-			     $analysis->db_file         . "\",\"" .
-			     $analysis->program         . "\",\"" .
-			     $analysis->program_version . "\",\"" .
-			     $analysis->program_file    . "\",\"" .
-			     $analysis->parameters      . "\",\"" .
-			     $analysis->module          . "\",\"" .
-			     $analysis->module_version  . "\",\"" .
-			     $analysis->gff_source      . "\",\"" .
-			     $analysis->gff_feature     . "\")";
-
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute();
-    
-    $sth = $self->prepare("select LAST_INSERT_ID()");
-    $res = $sth->execute();
-
-    $id = $sth->fetchrow_hashref->{'LAST_INSERT_ID()'};
-
-    $analysis->id($id);
-
-    # Should fetch the created stamp as well now.
-
-    return $analysis;
-}
-
-=head2 exists_Analysis
-
- Title   : exists_Analysis
- Usage   : $obj->exists_Analysis($anal)
- Function: Tests whether this feature already exists in the database
- Example :
- Returns : Analysis id if the entry exists
- Args    : Bio::EnsEMBL::Analysis::Analysis
-
-=cut
-
-sub exists_Analysis {
-    my ($self,$anal) = @_;
-
-    $self->throw("Object is not a Bio::EnsEMBL::Pipeline::Analysis") unless $anal->isa("Bio::EnsEMBL::Pipeline::Analysis");
-
-    my $query = "select id,created from analysisprocess where " .
-	" program =    \""      . $anal->program         . "\" and " .
-        " program_version = \"" . $anal->program_version . "\" and " .
-	" program_file = \""    . $anal->program_file    . "\" and " .
-        " parameters = \""      . $anal->parameters      . "\" and " .
-        " module = \""          . $anal->module          . "\" and " .
-        " module_version = \""  . $anal->module_version  . "\" and " .
-	" gff_source = \""      . $anal->gff_source      . "\" and" .
-	" gff_feature = \""     . $anal->gff_feature     . "\"";
-    my $sth = $self->prepare($query);
-    my $rv  = $sth->execute();
-
-    if ($rv && $sth->rows > 0) {
-	my $rowhash = $sth->fetchrow_hashref;
-	my $analid  = $rowhash->{'id'}; 
-	my $created = $rowhash->{'created'};
-
-	return ($analid,$created);
-    } else {
-	return;
-    }
-}
-
-=head2 get_Analysis {
-
-  Title   : get_Analysis
-  Usage   : my $analyis = $db->get_Analysis($id)
-  Function: Retrieves an analysis object with
-            id $id
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : int
-
-=cut
-
-
-sub get_Analysis {
-    my ($self,$id) = @_;
-
-    $self->throw("No analysis id input") unless defined($id);
-
-    my $query = "select created, " .
-	            "program,program_version,program_file," .
-	            "db,db_version,db_file," .
-		        "module,module_version," .
-		        "gff_source,gff_feature,".
-		        "parameters " . 
-		        "from analysisprocess where " . 
-                "id = $id";
-
-    my $sth = $self->prepare($query);
-    my $rv  = $sth->execute();
-
-    if ($rv && $sth->rows > 0) {
-	my $rowhash         = $sth->fetchrow_hashref;
-	my $created         = $rowhash->{'created'};
-	my $program         = $rowhash->{'program'};
-	my $program_version = $rowhash->{'program_version'};
-	my $program_file    = $rowhash->{'program_file'};
-	my $db              = $rowhash->{'db'};
-	my $db_version      = $rowhash->{'db_version'};
-	my $db_file         = $rowhash->{'db_file'};
-	my $module          = $rowhash->{'module'};
-	my $module_version  = $rowhash->{'module_version'};
-	my $parameters      = $rowhash->{'parameters'};
-    my $gff_source      = $rowhash->{'gff_source'};
-    my $gff_feature     = $rowhash->{'gff_feature'};
-    
-	my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(-id => $id,
-							    -created         => $created,
-							    -program         => $program,
-							    -program_version => $program_version,
-							    -program_file    => $program_file,
-							    -db              => $db,
-							    -db_version      => $db_version,
-							    -db_file         => $db_file,
-							    -module          => $module,
-							    -module_version  => $module_version,
-                                -gff_source      => $gff_source,
-						        -gff_feature     => $gff_feature,
-							    -parameters      => $parameters,
-                                );
-
-
-	return ($analysis);
-    } else {
-	$self->throw("Couldn't find analysis object with id [$id]");
-    }
-
-}
-
-=head2 get_all_Analysis 
-
-  Title   : get_all_Analysis
-  Usage   : my @analyses = $db->get_all_Analysis()
-  Function: Retrieves all analysis objects
-  Returns : a list of Bio::EnsEMBL::Pipeline::Analysis
-  Args    : none
-
-=cut
-
-sub get_all_Analysis {
-    my ($self) =@_;
-    
-    my $query = "select id, " .
-	            "program,program_version," .
-	            "db,db_version," .
-		        "gff_source,gff_feature, ".
-                "module, module_version,parameters ".
-		        "from analysisprocess ";
-    
-    my $sth = $self->prepare($query);
-    my $rv  = $sth->execute();
-    my @analyses;
-    
-    if ($rv && $sth->rows > 0)
-    {
-        while (my $row = $sth->fetchrow_hashref)
-        {
-            my $id              = $row->{'id'};
-            my $program         = $row->{'program'};
-            my $program_version = $row->{'program_version'};
-            my $db              = $row->{'db'};
-            my $db_version      = $row->{'db_version'};
-            my $gff_source      = $row->{'gff_source'};
-            my $gff_feature     = $row->{'gff_feature'};
-            my $module          = $row->{'module'};
-	        my $module_version  = $row->{'module_version'};
-	        my $parameters      = $row->{'parameters'};
-            
-                        
-            my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(
-                                -id              => $id,
-							    -program         => $program,
-							    -program_version => $program_version,
-							    -db              => $db,
-							    -db_version      => $db_version,
-							    -gff_source      => $gff_source,
-                                -gff_feature     => $gff_feature,
-                                -module          => $module,
-							    -module_version  => $module_version,
-							    -parameters      => $parameters,
-                                );
-            push (@analyses, $analysis);
-        }
-    }
-    else
-    {
-        $self->throw("No data in analysis table\n");
-    }
-    return (@analyses);
-}
-
-=head2 get_AnalysisSummary 
-
-  Title   : get_AnalysisSummary
-  Usage   : my $analyis = $db->get_AnalysisSummary($id)
-  Function: Retrieves summary of analyses objects matching analysis id
-  Returns : a hash containing summary of analyses
-  Args    : int
-
-=cut
-
-sub get_AnalysisSummary {
-    my ($self, $id) = @_;
-    
-    my $query = "select count(*), cs.status " .
-	            "from job, current_status as cs " .
-	            "where job.id = cs.id " .
-		        "and job.analysis = $id ".
-                "group by cs.status";
-    
-    my $sth = $self->prepare($query);
-    my $rv  = $sth->execute();
-    my %summary;
-    
-    while (my $row = $sth->fetchrow_hashref)
-    {
-            $summary{$row->{'status'}}  = $row->{'count(*)'};        
-    }
-    return %summary;
-}
 
 =head2 prepare
 
@@ -774,216 +419,6 @@ sub _db_handle {
 }
 
 
-=head2 get_all_ExonPairs
-
- Title   : get_all_ExonPairs(@contigs)
- Usage   : my @pairs = get_all_ExonPairs(@contigs);
- Function: Returns all the exon pairs for exons that lie on 
-           the input contigs
- Example : 
- Returns : @Bio::EnsEMBL::Analysis::ExonPair
- Args    : @Bio::EnsEMBL::DB::ContigI
-
-=cut
-
-
-sub get_all_ExonPairs {
-    my ($self,@contigids) = @_;
-
-    my @pairs;
-    my $contigstr = "";
-
-    foreach my $contig (@contigids) {
-#	$self->throw("Not a Bio::EnsEMBL::DB::ContigI") unless $contig->isa("Bio::EnsEMBL::DB::ContigI");
-	$contigstr .= "'" . $contig . "',";
-    }
-
-    $contigstr =~ s/(.*)\,$/$1/;
-
-    my ($exon1_id,$exon2_id,$exon1_version,$exon2_version,$created);
-
-    # This could be changed so it gets all the exons as well
-    
-    my $query = "select distinct ep.exon1_id,ep.exon2_id,ep.created,ep.type,exon1_version,exon2_version " . 
-	"from exon_pair as ep,exon as e where " .
-        "e.contig in (" . $contigstr . ") and "             .
-	"((ep.exon1_id = e.id and ep.exon1_version = e.version) or " .
-	"( ep.exon2_id = e.id and ep.exon2_version = e.version))";
-
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute();
-
-    while (my $row = $sth->fetchrow_arrayref) {
-	my $ex1id    = $row->[0];
-	my $ex2id    = $row->[1];
-	my $created  = $row->[2];
-	my $type     = $row->[3];
-	my $version1 = $row->[4];
-	my $version2 = $row->[5];
-	my $contigid = $row->[6];
-
-	my $exon1 = $self->get_Exon($ex1id);
-	my $exon2 = $self->get_Exon($ex2id);
-
-	my $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
-							-exon2 => $exon2,
-							-type  => $type);
-	
-	push(@pairs,$pair);
-    }
- 
-    return (@pairs);
-
-}
-
-
-=head2 write_ExonPairs
-
- Title   : write_ExonPairs(@pairs)
- Usage   : my @pairs = write_ExonPairs(@pairs);
- Function: Returns all the exon pairs for exons that lie on 
-           the input contigs
- Example : 
- Returns : @Bio::EnsEMBL::Pipeline::ExonPair
- Args    : @Bio::EnsEMBL::DB::ContigI
-
-=cut
-
-sub write_ExonPairs {
-    my ($self,@pairs) = @_;
-
-    my $sth = $self->prepare("insert into exon_pair(exon1_id,exon2_id,type,created,exon1_version,exon2_version) " .
-			     "values (?,?,?,?,?,?)");
-
-    foreach my $pair (@pairs) {
-	$self->throw("Pair $pair is not an ExonPair") unless $pair->isa("Bio::EnsEMBL::Pipeline::ExonPair");
-
-
-	my $sth2 = $self->prepare("select * from exon_pair where " .
-				  "exon1_id = '"      . $pair->exon1->id      . "' and " .
-				  "exon2_id = '"      . $pair->exon2->id      . "' and " .
-				  "exon1_version = '" . $pair->exon1->version . "' and " .
-				  "exon2_version = '" . $pair->exon2->version . "'");
-
-	my $res = $sth2->execute;
-
-	if ($sth2->rows == 0) {
-	    $sth->execute($pair->exon1->id,
-			  $pair->exon2->id,
-			  $pair->type,
-			  "now()",
-			  $pair->exon1->version,
-			  $pair->exon2->version);
-	} else {
-	    $self->warn("Exon pair [" . $pair->exon1->id . "][" . $pair->exon2->id . 
-			" already exists. Not writing to database");
-	}
-    }
-}
-
-=head2 delete_ExonPairs
-
- Title   : delete_ExonPairs(@pairs)
- Usage   : $obj->delete_ExonPairs(@pairs)
- Function: Deletes all input exon pairs from the database
- Example : 
- Returns : Nothing
- Args    : @Bio::EnsEMBL::Pipeline::ExonPair
-
-=cut
-
-sub delete_ExonPairs {
-    my ($self,@pairs) = @_;
-
-    foreach my $pair (@pairs) {
-	$self->throw("Not an Bio::EnsEMBL::Pipeline::ExonPair") unless $pair->isa("Bio::EnsEMBL::Pipeline::ExonPair");
-
-	my $query = "delete from exon_pair where exon1_id = \""        . $pair->exon1->id      . "\" and " .
-	                                        "exon2_id = \""        . $pair->exon2->id      . "\" and " .
-						"exon1_version = \""   . $pair->exon1->version . "\" and " .
-     				                "exon2_version = \""   . $pair->exon2->version . "\"";
-
-	my $sth = $self->prepare($query);
-	my $res = $sth->execute;
-
-    }
-}
-
-=head2 write_Exon
-
- Title   : write_Exon
- Usage   : $obj->write_Exon($exon)
- Function: writes a particular exon into the database
- Example :
- Returns : 
- Args    :
-
-=cut
-
-sub write_Exon{
-   my ($self,$exon) = @_;
-   my $old_exon;
-   
-   if( ! $exon->isa('Bio::EnsEMBL::Exon') ) {
-       $self->throw("$exon is not a EnsEMBL exon - not dumping!");
-   }
-
-   eval {
-       $old_exon = $self->get_Exon($exon->id);
-
-       $self->warn("Exon [" . $exon->id . "] already exists in database. Not writing");
-
-       
-   };
-   
-   if  ( $@ || ($exon->version > $old_exon->version)) {
-       my $exonst = "insert into exon (id,version,contig,created,modified," .
-	   "seq_start,seq_end,strand,phase,stored,end_phase) values ('" .
-	       $exon->id()         . "'," .
-               $exon->version()    . ",'".
-	       $exon->contig_id()  . "', FROM_UNIXTIME(" .
-	       $exon->created()    . "), FROM_UNIXTIME(" .
-	       $exon->modified()   . ")," .
-	       $exon->start        . ",".
-	       $exon->end          . ",".
-	       $exon->strand       . ",".
-	       $exon->phase        . ",now(),".
-	       $exon->end_phase    . ")";
-
-       my $sth = $self->prepare($exonst);
-       $sth->execute();
-   }
-}
-
-
-=head2 delete_Exon
-
- Title   : delete_Exon
- Usage   : $obj->delete_Exon($exon_id)
- Function: Deletes exon, including exon_transcript rows
- Example : $obj->delete_Exon(ENSE000034)
- Returns : nothing
- Args    : $exon_id
-
-
-=cut
-
-sub delete_Exon{
-    my ($self,$exon_id) = @_;
-
-    $exon_id || $self->throw ("Trying to delete an exon without an exon_id\n");
-    
-    #Delete exon_transcript rows
-#    my $sth = $self->prepare("delete from exon_transcript where transcript = '".$exon_id."'");
-#    my $res = $sth ->execute;
-
-    #Delete exon rows
-    my $sth = $self->prepare("delete from exon where id = '".$exon_id."'");
-    my $res = $sth->execute;
-
- #   $self->delete_Supporting_Evidence($exon_id);
-
-}
 
 =head2 _lock_tables
 
@@ -1038,72 +473,6 @@ sub _unlock_tables{
 }
 
 
-=head2 get_Exon
-
- Title   : get_Exon
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-=cut
-
-sub get_Exon{
-   my ($self,$exonid) = @_;
-
-   my $exon = Bio::EnsEMBL::Exon->new();
-
-   my $sth     = $self->prepare("select id,version,contig,UNIX_TIMESTAMP(created)," . 
-				"UNIX_TIMESTAMP(modified),seq_start,seq_end,strand," . 
-				"phase from exon where id = '$exonid'");
-   my $res     = $sth->execute;
-   my $rowhash = $sth->fetchrow_hashref;
-
-   if( ! defined $rowhash ) {
-       $self->throw("No exon of this id $exonid");
-   }
-
-   $exon->contig_id($rowhash->{'contig'});
-   $exon->version  ($rowhash->{'version'});
-
-   my $contig_id = $exon->contig_id();
-
-   # we have to make another trip to the database to get out the contig to clone mapping.
-#   my $sth2     = $self->prepare("select clone from contig where id = '$contig_id'");
-#   my $res2     = $sth2->execute;
-#   my $rowhash2 = $sth2->fetchrow_hashref;
-
-#   $exon->clone_id($rowhash2->{'clone'});
-
-   # rest of the attributes
-   $exon->id      ($rowhash->{'id'});
-   $exon->created ($rowhash->{'UNIX_TIMESTAMP(created)'});
-   $exon->modified($rowhash->{'UNIX_TIMESTAMP(modified)'});
-   $exon->start   ($rowhash->{'seq_start'});
-   $exon->end     ($rowhash->{'seq_end'});
-   $exon->strand  ($rowhash->{'strand'});
-   $exon->phase   ($rowhash->{'phase'});
-   
-   # we need to attach this to a sequence. For the moment, do it the stupid
-   # way perhaps?
-
-#   my $seq;
-
-#   if( $self->_contig_seq_cache($exon->contig_id) ) {
-#       $seq = $self->_contig_seq_cache($exon->contig_id);
-#   } else {
-#       my $contig = $self->get_Contig($exon->contig_id());
-#       $seq = $contig->seq();
-#       $self->_contig_seq_cache($exon->contig_id,$seq);
-#   }
-
-#   $exon->attach_seq($seq);
-
-   return $exon;
-}
-
-
 =head2
  Title   : DESTROY
  Usage   :
@@ -1124,6 +493,19 @@ sub DESTROY{
        $obj->{'_db_handle'}->disconnect;
        $obj->{'_db_handle'} = undef;
    }
+}
+
+sub deleteObj {
+  my $self = shift;
+  my @dummy = values %{$self};
+  foreach my $key ( keys %$self ) {
+    delete $self->{$key};
+  }
+  foreach my $obj ( @dummy ) {
+    eval {
+      $obj->deleteObj;
+    }
+  }
 }
 
 
