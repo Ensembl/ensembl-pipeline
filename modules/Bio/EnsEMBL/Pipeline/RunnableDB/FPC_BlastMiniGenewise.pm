@@ -598,9 +598,9 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
     # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
     my $intron = 0;
     if ($exon->strand == 1) {
-      $intron = abs($exon->start - $prev_exon->end + 1);
+      $intron = abs($exon->start - $prev_exon->end - 1);
     } else {
-      $intron = abs($exon->end   - $prev_exon->start + 1);
+      $intron = abs($prev_exon->start - $exon->end - 1);
     }
     
     if ($intron > 100000) {
