@@ -136,22 +136,13 @@ sub list_inputId_class_by_start_count {
      GROUP by inputId, class };
 
   if( defined $start && defined $count ) {
-    $query .= " LIMIT $start,$count";
+    $query .= "LIMIT $start,$count";
   }
-
   my $sth = $self->prepare( $query );
   $sth->execute;
 
-  my %seenhash;
-
   while( @row = $sth->fetchrow_array ) {
-      my $id    = $row[0];
-      my $class = $row[1];
-
-      if (!defined($seenhash{$id . "-" . $class})) {
-	  push( @result, [ $id, $class ] );
-      }
-      $seenhash{$id . "-" . $class} = 1;
+    push( @result, [ $row[0], $row[1] ] );
   }
 
   return @result;
