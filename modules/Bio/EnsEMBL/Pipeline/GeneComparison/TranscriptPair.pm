@@ -29,6 +29,7 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Blastz;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -96,10 +97,10 @@ sub blast_isoforms{
     
     my ($seq1, $seq2 );
     if ( $coding_exons ){
-	my $string1 = $tran1->translateable_seq;
-	$seq1       = Bio::Seq->new(
-				    -DISPLAY_ID => $id1,
-				    -MOLTYPE    => 'dna',
+      my $string1 = $tran1->translateable_seq;
+      $seq1       = Bio::Seq->new(
+				  -DISPLAY_ID => $id1,
+				  -MOLTYPE    => 'dna',
 				  -SEQ        => $string1,
 				 );
       
@@ -485,6 +486,9 @@ sub gap_penalty{
 sub blast_genomic_isoforms{
   my ( $self,$tran1, $tran2, $coding_exons , $gene_id1, $gene_id2) = @_;
   
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran1);
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran2);
+
   my $padding = 500;
   # query
   my $id1;
@@ -519,6 +523,7 @@ sub blast_genomic_isoforms{
    
   my $chr_start = $exons[0]->start;
   my $chr_end   = $exons[-1]->end;
+  print STDERR "1: start $chr_start, end: $chr_end\n";
   my $seqname;
   foreach my $exon ( @exons ){
     $seqname = $exon->seqname;
@@ -531,7 +536,8 @@ sub blast_genomic_isoforms{
   if ( $exons[0]->strand == 1 ){
       $slice1 = $slice_adaptor
 	  ->fetch_by_chr_start_end($chr_name,$chr_start-$padding,$chr_end+$padding);
-      $seq1 = $slice1->get_repeatmasked_seq(['RepeatMask','Dust'],1);
+      #$seq1 = $slice1;
+      $seq1 = $slice1->get_repeatmasked_seq(['RepeatMask'],1);
   }
   else{
       my $seq = $slice_adaptor
@@ -539,7 +545,8 @@ sub blast_genomic_isoforms{
       
       my $id  = "reverse_".$seq->display_id;
       $slice1   = $seq->invert;
-      $seq1     = $slice1->get_repeatmasked_seq(['RepeatMask','Dust'],1);
+      #$seq1     = $slice1;
+      $seq1     = $slice1->get_repeatmasked_seq(['RepeatMask'],1);
       $seq1->display_id($id);
       $seq1->id($id);
       #$seq1->name($id);
@@ -548,6 +555,8 @@ sub blast_genomic_isoforms{
   
   my $chr_start2 = $exons2[0]->start;
   my $chr_end2   = $exons2[-1]->end;
+  print STDERR "2: start $chr_start2, end: $chr_end2\n";
+
   my $seqname2;
   foreach my $exon ( @exons2 ){
     $seqname2 = $exon->seqname;
@@ -559,13 +568,16 @@ sub blast_genomic_isoforms{
   my ($seq2,$slice2);
   if ( $exons2[0]->strand == 1 ){
       $slice2 = $slice_adaptor2->fetch_by_chr_start_end($chr_name2,$chr_start2,$chr_end2);
-      $seq2 = $slice2->get_repeatmasked_seq(['RepeatMask','Dust'],1); 
+      #$seq2 = $slice2;
+      $seq2 = $slice2->get_repeatmasked_seq(['RepeatMask'],1); 
   }
   else{
     my $seq = $slice_adaptor2->fetch_by_chr_start_end($chr_name2,$chr_start2,$chr_end2);
     my $id  = "reverse_".$seq->display_id;
     $slice2 = $seq->invert;
-    $seq2   = $slice2->get_repeatmasked_seq(['RepeatMask','Dust'],1);
+    $seq2   = $slice2->get_repeatmasked_seq(['RepeatMask'],1);
+    #$seq2   = $slice2;
+    
     $seq2->display_id($id);
     $seq2->id($id);
     #$seq2->name($id);
@@ -595,11 +607,12 @@ sub blast_genomic_isoforms{
   
   
   my $blastz =  Bio::EnsEMBL::Pipeline::Runnable::Blastz
-      ->new ('-query'     => $seq1,
-	     '-database'  => $database,
-	     '-options'   => 'B=0 C=2 K=2200 T=1',
-	     );
+    ->new ('-query'     => $seq1,
+	   '-database'  => $database,
+	   '-options'   => 'B=0 C=2 K=1000 T=1',
+	  );
   
+
   $blastz->run();
   
   my @featurepairs = $blastz->output();
@@ -608,10 +621,10 @@ sub blast_genomic_isoforms{
   #    print STDERR $self->print_Feature($fp);
   #}
   #print STDERR "##############################\n";
-  #unlink ( $database );
-  #unlink( $database."csq" );
-  #unlink( $database."nhd" );
-  #unlink( $database."ntb" );
+  unlink ( $database );
+  unlink( $database."csq" );
+  unlink( $database."nhd" );
+  unlink( $database."ntb" );
   
   ############################################################
   # map the exons into the feature coordinates:
@@ -624,7 +637,7 @@ sub blast_genomic_isoforms{
   my @exon_pairs;
   my ($exon_object_map, $exon_map) = $self->get_exon_pairs( $transcript1, $transcript2, \@featurepairs ,$coding_exons, $gene_id1, $gene_id2);
   
-  print STDERR "gpt exon pairs\n";
+  #print STDERR "got exon pairs\n";
 
   return ($exon_object_map, $exon_map);
 }
@@ -723,6 +736,8 @@ sub get_exon_pairs{
     my ($self, $tran1, $tran2, $features, $coding , $gene_id1, $gene_id2) = @_;
     
     my @features = @$features;
+    print STDERR "number of features: ".scalar(@features)."\n";
+
     my @exons1 = @{$self->get_Exons( $tran1,$coding)};
     my @exons2 = @{$self->get_Exons( $tran2,$coding)};
     
