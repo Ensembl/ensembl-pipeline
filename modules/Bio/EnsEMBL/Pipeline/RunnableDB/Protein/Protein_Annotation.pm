@@ -127,12 +127,12 @@ sub write_output {
     my($self) = @_;
 
     my @features = $self->output();
-    
-     my $feat_Obj=$self->db->get_ProteinFeatureAdaptor();  
+    print STDERR "Have ".@features." to write\n";
+    my $feat_Obj=$self->db->get_ProteinFeatureAdaptor();  
 
     foreach my $feat(@features) {
-	
-	$feat_Obj->store($feat);
+      print STDERR "Trying to store ".$feat."\n";
+      $feat_Obj->store($feat);
     }
 
     return 1;

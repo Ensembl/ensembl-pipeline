@@ -95,6 +95,8 @@ sub locate_executable {
 
 sub filename {
     my ($self, $filename) = @_;
+    #my ($p, $f, $l) = caller;
+    #print STDERR "Setting filename to ".$filename." $f:$l\n" if($filename);
     $self->{_filename} = $filename if ($filename);
     return $self->{_filename};
 }
@@ -210,7 +212,8 @@ sub get_tmp_file {
         $num = int(rand(100000));
         $file = $dir.$stub . "." . $num . "." . $ext;
     }
-    #print STDERR "returning filename ".$file."\n";
+    #my($p, $f, $l) = caller;
+    #print STDERR "get_tmp_file: returning filename ".$file." $f:$l\n";
     return $file;
 }
    
@@ -306,7 +309,7 @@ sub diskspace {
 
 sub create_FeaturePair {
     my ($self, $start, $end, $strand, $hstart, $hend, 
-        $hstrand, $hseqname, $percent_id, $score, $p_value, $seq,
+        $hstrand, $hseqname, $score, $percent_id, $p_value, $seq,
         $analysis) = @_;
    
     my $fp = Bio::EnsEMBL::FeaturePair->new(
