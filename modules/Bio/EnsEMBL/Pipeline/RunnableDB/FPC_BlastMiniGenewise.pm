@@ -134,20 +134,21 @@ sub write_output {
     my $gene_obj = $db->gene_Obj;
 
 
-    my $EXON_ID_SUBSCRIPT       = "MGWE";
-    my $TRANSCRIPT_ID_SUBSCRIPT = "MGWT";
-    my $GENE_ID_SUBSCRIPT       = "MGWG";
-    my $PROTEIN_ID_SUBSCRIPT    = "MGWP";
+    my $EXON_ID_SUBSCRIPT       = "BGWE";
+    my $TRANSCRIPT_ID_SUBSCRIPT = "BGWT";
+    my $GENE_ID_SUBSCRIPT       = "BGWG";
+    my $PROTEIN_ID_SUBSCRIPT    = "BGWP";
 
     my $sth = $db->prepare("lock tables gene write, genetype write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
     $sth->execute;
 
 
-    foreach my $gene (@features) {
+    eval {
+	foreach my $gene (@features) {
+	    print STDERR "Feature is $gene\n";
 
-	eval {
 	    print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
-	
+	    
 	    (my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
 		=~ s/$GENE_ID_SUBSCRIPT//;
 	    (my $tcount = $gene_obj->get_new_TranscriptID($TRANSCRIPT_ID_SUBSCRIPT))
@@ -202,19 +203,17 @@ sub write_output {
 	    }
 	    
 	    $gene_obj->write($gene);
-	    
+	}
 	};
 	if ($@) {
 	    $sth = $db->prepare("unlock tables");
 	    $sth->execute;
 	    
 	    $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
+	} else {
+	    $sth = $db->prepare("unlock tables");
+	    $sth->execute;
 	}
-	
-    }
-
-    $sth = $db->prepare("unlock tables");
-    $sth->execute;
 
 }
 
@@ -234,44 +233,50 @@ sub fetch_input {
     print STDERR "Fetching input \n";
     $self->throw("No input id") unless defined($self->input_id);
 
+    my $contigid  = $self->input_id;
+       $contigid =~ s/\.(.*)//;
+    my $contignum = $1;
+
+    print STDERR "Contig id = $contigid , number $contignum\n";
+
     $self->dbobj->static_golden_path_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
-#    my $contig    = $stadaptor->fetch_VirtualContig_by_fpc_name($self->input_id);
 
-    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($self->input_id,500000,10000,1000000,100);
+    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
 
-    foreach my $contig (@contig) {
-	print STDERR "Analysing contig " . $contig->id . "\n";
-	foreach my $rc ($contig->_vmap->each_MapContig) {
-	    my $strand = "+";
-	    if ($rc->orientation == -1) {
-		$strand = "-";
-	    }
+    my $contig    = $contig[$contignum];
 
-	    print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
-	}
-	my $genseq    = $contig->primary_seq;
-	my @features  = $contig->get_all_SimilarityFeatures_above_score('blastp',200);
-
-	my %idhash;
-	
-	foreach my $f (@features) {
-	    if (defined($f->hseqname)) {
-		$idhash{$f->hseqname} = 1;
-	    }
+    print STDERR "Analysing contig " . $contig->id . "\n";
+    foreach my $rc ($contig->_vmap->each_MapContig) {
+	my $strand = "+";
+	if ($rc->orientation == -1) {
+	    $strand = "-";
 	}
 	
-	my @ids = keys %idhash;
-	
-	print STDERR "Feature ids are @ids\n";
-
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
-									       '-ids'      => \@ids);
-
-	$self->add_Runnable($runnable);
-	$self->{$runnable} = $contig;
+	print STDERR $rc->contig->id . "\tsequence\t" . $rc->contig->id . "\t" . $rc->start . "\t" . $rc->end . "\t100\t" . $strand . "\t0\n";
     }
+    my $genseq    = $contig->primary_seq;
+    my @features  = $contig->get_all_SimilarityFeatures_above_score('blastp',200);
+
+    my %idhash;
+    
+    foreach my $f (@features) {
+	if (defined($f->hseqname)) {
+	    $idhash{$f->hseqname} = 1;
+	}
+    }
+    
+    my @ids = keys %idhash;
+    
+    print STDERR "Feature ids are @ids\n";
+    
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
+									   '-ids'      => \@ids);
+    
+    $self->add_Runnable($runnable);
+    $self->{$runnable} = $contig;
+
 }
      
 sub add_Runnable {
@@ -317,6 +322,10 @@ sub convert_output {
     my $count = 1;
     my $time  = time; chomp($time);
 
+    # This BAD! Shouldn't be using internal ids.
+    # <sigh> no time to change it now
+    my $analysis = $self->dbobj->get_OldAnalysis(10);
+
     foreach my $runnable ($self->get_Runnables) {
 	my $contig = $self->{$runnable};
 	my @tmpf   = $runnable->output;
@@ -348,13 +357,23 @@ sub convert_output {
 	    $gene->add_Transcript($tran);
 	    $tran->translation($transl);
 	    
-	    push(@genes,$gene);
 	    
 	    my $excount = 1;
 	    my @exons;
 	    
 	    foreach my $subf ($tmpf->sub_SeqFeature) {
+		$subf->feature1->source_tag('genewise');
+		$subf->feature1->primary_tag('similarity');
+		$subf->feature1->score(100);
+		$subf->feature1->analysis($analysis);
+
+		$subf->feature2->source_tag('genewise');
+		$subf->feature2->primary_tag('similarity');
+		$subf->feature2->score(100);
+		$subf->feature2->analysis($analysis);
+
 		my $exon = new Bio::EnsEMBL::Exon;
+
 		$exon->id($self->input_id . ".genewise.$count.$excount");
 		$exon->contig_id($contig->id);
 		$exon->created($time);
@@ -365,64 +384,86 @@ sub convert_output {
 		$exon->end  ($subf->end);
 		$exon->strand($subf->strand);
 		
-		# This is dummy phase
-		$exon->phase(0);
+		print STDERR "\tFeaturePair " . $subf->gffstring . "\n";
+
+		$exon->phase($subf->feature1->{_phase});
+		$exon->attach_seq($self->{$runnable}->primary_seq);
+		$exon->add_Supporting_Feature($subf);
+
+		my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
+
+		my $tran0 =  $seq->translate('*','X',0)->seq;
+		my $tran1 =  $seq->translate('*','X',2)->seq;
+		my $tran2 =  $seq->translate('*','X',1)->seq;
+		
+		print STDERR "\n\t exon phase 0 : " . $tran0 . " " . $exon->phase . "\n";
+		print STDERR "\t exon phase 1 : " . $tran1 . "\n";
+		print STDERR "\t exon phase 2 : " . $tran2 . "\n";
+
 		push(@exons,$exon);
 		
 		$excount++;
 	    }
 	    
-	    if ($exons[0]->strand == -1) {
-		@exons = sort {$b->start <=> $a->start} @exons;
+	    if ($#exons == 0) {
+		print STDERR "Odd.  No exons found\n";
 	    } else {
-		@exons = sort {$a->start <=> $b->start} @exons;
-	    }
-	    
-	    foreach my $exon (@exons) {
-		$tran->add_Exon($exon);
-	    }
-	    
-	    $transl->start_exon_id($exons[0]->id);
-	    $transl->end_exon_id  ($exons[$#exons]->id);
-	    
-	    if ($exons[0]->strand == 1) {
-		$transl->start($exons[0]->start);
-		$transl->end  ($exons[$#exons]->end);
-	    } else {
-		$transl->start($exons[0]->end);
-		$transl->end  ($exons[$#exons]->start);
-	    } 
 
-	}
+		push(@genes,$gene);
 
-	my @newf;
-	
-	foreach my $gene (@genes) {
-	    foreach my $tran ($gene->each_Transcript) {
-		foreach my $exon ($tran->each_Exon) {
-		    my $strand = "+";
-		    if ($exon->strand == -1) {
-			$strand = "-";
-		    }
-		    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . "\n";
+		if ($exons[0]->strand == -1) {
+		    @exons = sort {$b->start <=> $a->start} @exons;
+		} else {
+		    @exons = sort {$a->start <=> $b->start} @exons;
 		}
-	    }
-
-	    eval {
-		my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-		$newgene->type('genewise');
-		push(@newf,$newgene);
-	    };
-	    if ($@) {
-		print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+		
+		foreach my $exon (@exons) {
+		    $tran->add_Exon($exon);
+		}
+		
+		$transl->start_exon_id($exons[0]->id);
+		$transl->end_exon_id  ($exons[$#exons]->id);
+		
+		if ($exons[0]->strand == 1) {
+		    $transl->start($exons[0]->start);
+		    $transl->end  ($exons[$#exons]->end);
+		} else {
+		    $transl->start($exons[0]->end);
+		    $transl->end  ($exons[$#exons]->start);
+		} 
+		
+		my @newf;
+		
+		foreach my $gene (@genes) {
+		    foreach my $tran ($gene->each_Transcript) {
+			print STDERR " Translation is " . $tran->translate->seq . "\n";
+			foreach my $exon ($tran->each_Exon) {
+			    my $strand = "+";
+			    if ($exon->strand == -1) {
+				$strand = "-";
+			    }
+			    print STDERR $exon->contig_id . "\tgenewise\tsexon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand .  "\t" . $exon->phase . "\t" . $tran->id . "\n";
+			}
+		    }
+		    
+		    eval {
+			my $newgene = $contig->convert_Gene_to_raw_contig($gene);
+			$newgene->type('genewise');
+			push(@newf,$newgene);
+		    };
+		    if ($@) {
+			print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+		    }
+		}
+		
+		
+		if (!defined($self->{_output})) {
+		    $self->{_output} = [];
+		}
+		
+		push(@{$self->{_output}},@newf);
 	    }
 	}
-	
-	if (!defined($self->{_output})) {
-	    $self->{_output} = [];
-	}
-	
-	push(@{$self->{_output}},@newf);
     }
     
 }

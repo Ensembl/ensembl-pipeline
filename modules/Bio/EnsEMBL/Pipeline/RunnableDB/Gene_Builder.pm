@@ -179,35 +179,18 @@ sub write_output {
     my $vc = $genebuilders->{$contig}->contig;
 
     return unless ($#genes >= 0);
+    my @newgenes;
 
-    # build a GTF Handler
-
-    my $gtf = Bio::EnsEMBL::Utils::GTF_handler->new();
-    open(GTF,">/nfs/disk100/humpub1/gtf_output/".$self->input_id.".gtf") || die "Cannot open gtf file for ".$self->input_id."$!";
-    open(PEP,">/nfs/disk100/humpub1/gtf_output/".$self->input_id.".pep") || die "Cannot open pep file for ".$self->input_id."$!";
-
-    $gtf->dump_genes(\*GTF,@genes);
-   
- 
-    my $seqout = Bio::SeqIO->new( '-format' => 'fasta' , -fh => \*PEP);
-    foreach my $gene ( @genes ) {
-	foreach my $trans ( $gene->each_Transcript ) {
-	     my $pep = $trans->translate();
-	    $pep->desc("Gene:".$gene->id." trans:".$trans->id," Input id".$self->input_id);
-	    $seqout->write_seq($pep);
-	}
-    }
-    print (GTF "#Done\n"); 
-    close(GTF);
-    close(PEP);
-    return;
-
-
-    foreach my $gene (@genes) {	    
-	my $sth = $db->prepare("lock tables gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
+     foreach my $gene (@genes) { 
+	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
+       push(@newgenes,$newgene);
+     }
+    my $sth = $db->prepare("lock tables genetype write, gene write, exon write, transcript write, exon_transcript write, translation write,dna read,contig read,clone read,feature read,analysis read");
 	$sth->execute;
 
 	eval {
+        foreach my $gene (@newgenes) {	    
+           $gene->type('ensembl');
 	print STDERR "Exon stub is $EXON_ID_SUBSCRIPT\n";
 	
 	(my $gcount = $gene_obj->get_new_GeneID($GENE_ID_SUBSCRIPT))
@@ -263,11 +246,10 @@ sub write_output {
 		
 	    }
 
-	my $newgene = $vc->convert_Gene_to_raw_contig($gene);
-	$gene_obj->write($newgene);
-
-    };
-	if ($@) {
+	$gene_obj->write($gene);
+       }
+       };
+    if ($@) {
 	    $sth = $db->prepare("unlock tables");
 	    $sth->execute;
 
@@ -277,8 +259,6 @@ sub write_output {
 	    $sth->execute;
 	}
 
-    }
-
 
      # Set attribute tag on all contigs
      $db->extension_tables(1);
@@ -287,7 +267,7 @@ sub write_output {
         my @contigs = $vc->get_all_RawContigs;
 
         foreach my $contig (@contigs) {
-            $contig->set_attribute('GENE_BUILD_SEPT20',1); 
+            $contig->set_attribute('GENE_BUILD_NOV05',1); 
         }
      }
 }
@@ -307,13 +287,19 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contigid  = $self->input_id;
-    #my $contig    = $self->dbobj->get_Contig($contigid);
     $self->dbobj->static_golden_path_type('UCSC');
 
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
-    my $contig    = $stadaptor->fetch_VirtualContig_by_fpc_name($self->input_id);
 
+    my $contigid  = $self->input_id;
+	$contigid =~ s/\.(.*)//;
+    my $contignum = $1;
+
+    print STDERR "Contig id = $contigid , number $contignum\n";
+
+    my @contig	  = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
+
+    my $contig	  = $contig[$contignum];
 
     my $analysis = $self->dbobj->get_OldAnalysis(8);
 
@@ -403,6 +389,7 @@ sub run {
 	$genebuilders->{$contig}->build_Genes;
 	@vcgenes = @{$genebuilders->{$contig}{_genes}};
         print STDERR "Genes before conversion\n";
+	$vc->_dump_map(\*STDERR);
         $genebuilders->{$contig}->print_Genes(@vcgenes);
         print STDERR "Converting coordinates";
         #foreach my $g (@vcgenes) {
