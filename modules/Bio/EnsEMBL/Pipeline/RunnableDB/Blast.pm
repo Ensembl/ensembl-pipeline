@@ -46,7 +46,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
-
+use Bio::EnsEMBL::Pipeline::Config::General;
 use vars qw(@ISA);
 
 
@@ -82,7 +82,7 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
+    my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
     
     $self->query($genseq);
   

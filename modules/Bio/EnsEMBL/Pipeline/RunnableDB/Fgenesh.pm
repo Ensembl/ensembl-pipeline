@@ -51,168 +51,35 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Fgenesh;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Fgenesh;
+use Bio::EnsEMBL::Pipeline::Config::General;
 use Data::Dumper;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);      
-                          
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Fgenesh object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Fgenesh object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    $self->{'_parameters'}  = undef;
-    
-    
-
-     
-    $self->throw("Analysis object required") unless ($self->analysis);
-    $self->init('Bio::EnsEMBL::Pipeline::Runnable::Fgenesh');
-    
-    return $self;
-}
-
-
-
-
-=head2 fetch_input
-
-  Args       : none
-  Example    : none
-  Description: Fetches input data for fgenesh from the database
-  Returntype : none
-  Exceptions : none
-  Caller     : Pipeline::Job
-
-=cut
-
 sub fetch_input {
-    my($self) = @_;
+    my( $self) = @_;
     
+
     $self->throw("No input id") unless defined($self->input_id);
-   
+    
     my $contigid  = $self->input_id;
-    #print "contig id = ".$contigid."\n";
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    #print "contig id = ".$contig->id."\n";
-    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
-    #print "geneseq ".$genseq." \n geneseq\n";
-    $self->{'contig'} = $contig;
-    $self->genseq($genseq);
-  
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
+
+    $self->query($contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING));
+
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Fgenesh(
+	      -query   => $self->query,
+              -fgenesh => $self->analysis->program_file,
+              -matrix  => $self->analysis->db_file,
+	      -param    => $self->arguments
+    );
+
+    $self->runnable($runnable);
+
+    return 1;
 }
 
-
-
-=head2 init
-
-    Title   :   init
-    Usage   :   $self->init
-    Function:   initializes the fgenesh runnable
-    Returns :   nothing
-    Args    :   name of runnable
-
-=cut
-
-#get/set for runnable and args
-sub init {
-    my ($self, $runnable) = @_;
-    
-    if ($runnable) {
-      #extract parameters into a hash
-      my %parameters;
-      my ($parameter_string) = $self->parameters();
-      if ($parameter_string) {
-	my @pairs = split (/,/, $parameter_string);
-	foreach my $pair (@pairs) {
-	  
-	  my ($key, $value) = split (/=>/, $pair);
-	  $key =~ s/\s+//g;
-	  $parameters{$key} = $value;
-	}
-	
-      }
-      $parameters {'-fgenesh'}  = $self->analysis->program_file;
-      $parameters {'-matrix'}   = $self->analysis->db_file;
-      #creates empty Bio::EnsEMBL::Runnable::Fgenesh object
-      my $runnable = $runnable->new(%parameters);
-      $self->runnable($runnable);
-    }
-}
-
-
-=head2 result_quality_tag
-
-    Title   :   result_quality_tag
-    Usage   :   $self->result_quality_tag
-    Function:   Returns an indication of whether the data is suitable for 
-                further analyses. Allows distinction between failed run and 
-                no hits on a sequence.
-    Returns :   'VALID' or 'INVALID'
-    Args    :   none
-
-=cut
-#a method of writing back result quality
-sub result_quality_tag {
-    my ($self) = @_;
-    
-    if ($self->output)
-    {
-        return 'VALID';
-    }
-    else
-    {
-        return 'INVALID';
-    }
-}
-
-sub write_output {
-   my $self = shift;
-  
-   my $fgenesh_runnable = ($self->runnable())[0];
-   my @transcripts = $fgenesh_runnable->each_Fgenesh_Transcript();
-   if( ! @transcripts ) { return; }
-
-   my $ptransAdaptor = $self->db()->get_PredictionTranscriptAdaptor();
-
-   for my $trans ( @transcripts ) {
-     my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
-     my @exons = @{$trans->get_all_Exons()};
-
-     if ($exons[0]->strand == 1) {
-       @exons = sort {$a->start <=> $b->start } @exons;
-     } else {
-       @exons = sort {$b->start <=> $a->start } @exons;
-     }
-     #print "ANALYSIS: ",$self->analysis()->dbID,"\n";
-
-     $ptrans->analysis( $self->analysis() );
-     for my $exon ( @exons ) {
-       #print STDERR "adding contig ".$self->{'contig'}." to exon\n";
-       $exon->contig( $self->{'contig'} );
-       $ptrans->add_Exon( $exon );
-     }
-     $ptransAdaptor->store( $ptrans );
-   }
-  
-}
 
 1;
 

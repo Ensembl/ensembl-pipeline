@@ -46,7 +46,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
-
+use Bio::EnsEMBL::Pipeline::Config::General;
 use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -64,7 +64,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
 
-    $self->query($contig->get_repeatmasked_seq(['RepeatMask']));
+    $self->query($contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING));
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genscan(
 	      -query   => $self->query,
