@@ -313,9 +313,9 @@ sub run_analysis {
         # this loop reads the STDERR from the blast command
         # checking for FATAL: messages (wublast) [what does ncbi blast say?]
         # N.B. using simple die() to make it easier for RunnableDB to parse.
-        print STDERR "-------------- Here begins Blast's STDERR ---------------\n";
+        #print STDERR "-------------- Here begins Blast's STDERR ---------------\n";
         while(<$fh>){
-            print STDERR "$_";
+           # print STDERR "$_";
             if(/FATAL:(.+)/){
                 my $match = $1;
                 if($match =~ /There are no valid contexts in the requested search/){
@@ -352,7 +352,7 @@ sub run_analysis {
             #    die qq{"UNKNOWN_ERROR"\n};
             #}
         }
-        print STDERR "-------------- Here ends Blast's STDERR ---------------\n";
+        #print STDERR "-------------- Here ends Blast's STDERR ---------------\n";
         unless(close $fh){
             # checking for failures when closing.
             # we should't get here but if we do then $? is translated below see man perlvar
@@ -802,6 +802,12 @@ sub split_HSP {
 
 	      my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
 	      #print "Found " . $fp->gffstring . "\n";                
+        if ($fp->can("positive_matches")) { 	 
+          $fp->positive_matches($hsp->positive); 	 
+        } 	 
+        if ($fp->can("identical_matches")) { 	 
+          $fp->identical_matches($hsp->match); 	 
+        }
 	      push(@tmpf,$fp);
 	      #$self->growfplist($fp);                                         
             }
