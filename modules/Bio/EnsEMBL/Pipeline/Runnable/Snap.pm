@@ -322,7 +322,7 @@ sub run {
     $self->run_snap();
     #parse output and create features
     $self->parse_results();
-#    $self->deletefiles();
+    $self->deletefiles();
     unlink ($self->protfile) or $self->throw ("Couldn't delete ".$self->protfile.":$!");
     return 1;
 }
