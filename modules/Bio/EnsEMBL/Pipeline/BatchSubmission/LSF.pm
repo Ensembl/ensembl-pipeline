@@ -423,7 +423,7 @@ sub copy_command{
     $self->{'_copy_command'} = $arg;
   }
 
-  return $self->{'_copy_command'} || 'lsrcp -a';
+  return $self->{'_copy_command'} || 'lsrcp ';
 }
 
 
