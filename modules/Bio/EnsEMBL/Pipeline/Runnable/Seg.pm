@@ -52,16 +52,17 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 
 =head2 new
 
  Title    : new
- Usage    : my $seg =  Bio::Worm::Pipeline::Runnable::Seg->new ( -program    => '/usr/local/pubseq/bin/seg',
-                                                                 -clone      => $clone,
-                                                                 -analysisid => 4,
-                                                               );
+ Usage    : my $seg =  Bio::EnsEMBL::Pipeline::Runnable::Seg->new
+                       ( -program    => '/usr/local/pubseq/bin/seg',
+                         -clone      => $clone,
+                         -analysisid => 4,
+                       );
  Function : initialises Seg object
  Returns  : a Seg object
  Args     : a Bio::Seq object, the path to the seg binaries and an analysisId (all optional)
@@ -70,34 +71,41 @@ use Bio::EnsEMBL::Analysis;
 =cut
 
 sub new {
-  my ($class, @args) = @_;
+    my ($class, @args) = @_;
+  
+    my $self = $class->SUPER::new (@_);    
+  
+    $self->{'_flist'} = [];               # an array of Bio::SeqFeatures
+    $self->{'_sequence'}  = undef;        # location of Bio::Seq object
+    $self->{'_seg'} = undef;              # location of seg executable
+    $self->{'_workdir'}   = undef;        # location of tmp directory
+    $self->{'_filename'}  = undef;        # file to store Bio::Seq object
+    $self->{'_results'}   = undef;        # file to store results of seg run
+    $self->{'_protected'} = [];           # a list of files protected from deletion
+  
+    my ($clone, $seg, $analysisid) = $self->_rearrange([qw(CLONE 
+					                   PROGRAM
+                                                           ANALYSISID)], 
+					                @args);
+  
+    $self->clone ($clone) if ($clone);       
+    $self->analysisid ($analysisid) if ($analysisid);
+  
+    my $bindir = $::pipeConf{'bindir'} || undef;
 
-  my $self = $class->SUPER::new (@_);    
+    if (-x $seg) {
+        # passed from RunnableDB (full path assumed)   
+        $self->seg ($seg); 
+    }
+    elsif (defined $bindir && -x ($seg = "$bindir/seg")) {
+        $self->seg ($seg);
+    }
+    else {   
+        # search shell $PATH
+        $self->seg ($self->locate_executable('seg'));
+    }
   
-  $self->{'_flist'} = [];               # an array of Bio::SeqFeatures
-  $self->{'_sequence'}  = undef;        # location of Bio::Seq object
-  $self->{'_seg'} = undef;              # location of seg executable
-  $self->{'_workdir'}   = undef;        # location of tmp directory
-  $self->{'_filename'}  = undef;        # file to store Bio::Seq object
-  $self->{'_results'}   = undef;        # file to store results of seg run
-  $self->{'_protected'} = [];           # a list of files protected from deletion
-  
-  my ($clone, $seg, $analysisid) = $self->_rearrange([qw(CLONE 
-					                 PROGRAM
-                                                         ANALYSISID)], 
-					              @args);
-  
-  $self->clone ($clone) if ($clone);       
-  $self->analysisid ($analysisid) if ($analysisid);
-  
-  if ($seg) {   
-      $self->seg ($seg); 
-  }
-  else {   
-      $self->seg ($self->locate_executable('seg'));
-  }
-  
-  return $self;
+    return $self;
 }
 
 ###################
@@ -166,7 +174,7 @@ sub analysisid {
 sub seg {
     my ($self, $location) = @_;
     if ($location) {
-        unless (-e $location) {
+        unless (-x $location) {
             $self->throw ("seg not found at $location");
 	}
         $self->{'_seg'} = $location ;
@@ -174,7 +182,9 @@ sub seg {
     return $self->{'_seg'};
 }
 
+####################
 # analysis methods
+####################
 
 =head2 run
 
@@ -234,9 +244,9 @@ sub run {
 sub run_seg {
     my ($self) = @_;
     # run seg
-    print "running seg\n";
+    print STDERR "running seg\n";
     $self->throw ("Error running seg on ".$self->filename) 
-        if (system ($self->seg.' '.$self->filename." -l > ".$self->results)); 
+        unless ((system ($self->seg." ".$self->filename." -l > ".$self->results)) == 0); 
 }
 
 
@@ -260,16 +270,16 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print "seg didn't find anything\n";
+	    print STDERR "seg didn't find anything\n";
 	    return;
         }       
         else {
             open (SEGOUT, "<$resfile") or $self->throw ("Error opening $resfile");
-            $filehandle = *SEGOUT;
+            $filehandle = \*SEGOUT;
       }
     }
     else {
-         # it'a a filehandle
+        # it'a a filehandle
         $filehandle = $resfile;
     }
     
@@ -288,11 +298,10 @@ sub parse_results {
      	    $feature {score} = $score;
 	    $feature {start} = $start;
 	    $feature {end} = $end;
-            $feature {strand} = '.';
 	    $feature {source}= 'seg';
 	    $feature {primary}= 'low_complexity';
 	    $feature {program} = 'seg';
-  	    $self->create_feature(\%feature);
+  	    $self->create_feature (\%feature);
 	}
     }
     close $filehandle;   
@@ -316,23 +325,23 @@ sub create_feature {
     my ($self, $feat) = @_;
 
     # create analysis object (will end up in the analysis table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ( -db              => $feat->{'db'},               # optional
-                                                 -db_version      => $feat->{'db_version'},       # optional
-                                                 -program         => $feat->{'program'},
-                                                 -program_version => $feat->{'program_version'},
-                                                 -gff_source      => $feat->{'source'},
-                                                 -gff_feature     => $feat->{'primary'},
+    my $analysis = Bio::EnsEMBL::Analysis->new ( -db              => $feat->{db},               # optional
+                                                 -db_version      => $feat->{db_version},       # optional
+                                                 -program         => $feat->{program},
+                                                 -program_version => $feat->{program_version},
+                                                 -gff_source      => $feat->{source},
+                                                 -gff_feature     => $feat->{primary},
                                                );
 
     # create featurepair object
-    my $feature1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{'name'},
-                                                   -start       => $feat->{'start'},
-                                                   -end         => $feat->{'end'},
-                                                   -score       => $feat->{'score'},
-                                                   -p_value     => $feat->{'p_value'},            # optional
-                                                   -percent_id  => $feat->{'percent_id'},
-                                                   -source_tag  => $feat->{'source'},
-                                                   -primary_tag => $feat->{'primary'},
+    my $feature1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
+                                                   -start       => $feat->{start},
+                                                   -end         => $feat->{end},
+                                                   -score       => $feat->{score},
+                                                   -p_value     => $feat->{p_value},            # optional
+                                                   -percent_id  => $feat->{percent_id},
+                                                   -source_tag  => $feat->{source},
+                                                   -primary_tag => $feat->{primary},
                                                    -analysis    => $analysis,
                                                  ); 
     $feature1->add_tag_value ('analysisid', $self->analysisid);
