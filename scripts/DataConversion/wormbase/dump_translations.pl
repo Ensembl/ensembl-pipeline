@@ -21,19 +21,31 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
+use Getopt::Long;
 
-
-my $dbhost      = 'ecs2d';
-my $dbuser    = 'ensro';
-my $dbname    = 'caenorhabditis_elegans_core_10_93';
+my $dbhost      = '';
+my $dbuser    = '';
+my $dbname    = '';
 my $dbpass    = undef;
+my $stable_id;
+my $db_id;
+
+GetOptions(
+	   'dbhost=s'    => \$dbhost,
+	   'dbname=s'    => \$dbname,
+	   'dbuser=s'    => \$dbuser,
+	   'dbpass=s'    => \$dbpass,
+	   'stable_id=s' => \$stable_id,
+	   'db_id=s' => \$db_id,  
+)
+or die ("Couldn't get options");
 
 
-
-
-
-
-
+if(!$stable_id || !$db_id){
+  die "need to specify to use either stable_id or dbId for the header line";
+}elsif($stable_id && $db_id){
+  print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
+}
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-host'   => $dbhost,
 					    '-user'   => $dbuser,
@@ -60,16 +72,25 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
       my $fe = $exon[0];
       
       my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
-      
+      my $identifier;
+      if($db_id){
+	$identifier = $trans->dbID;
+      }
+      if($stable_id){
+	if(!$db_id){
+	  $identifier = $trans->stable_id;
+	}else{
+	  $identifier .= ".".$trans->stable_id;
+	}
+      }
       my $tseq = $trans->translate();
       if ( $tseq->seq =~ /\*/ ) {
-	print STDERR "translation of ".$trans->id." has stop codons. Skipping! (in clone". $fe->contig->dbID .")\n";
+	print STDERR "translation of ".$identifier." has stop codons. Skipping! (in clone". $fe->contig->dbID .")\n";
 	next;
       }
-      my $gene_version = $gene->version;
-      my $trans_id = $trans->translation->dbID;
-      $tseq->display_id($trans_id);
-      $tseq->desc("Translation id ".$trans_id." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
+      
+      $tseq->display_id($identifier);
+      $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
       $seqio->write_seq($tseq);
     }
   };

@@ -69,6 +69,11 @@ use vars qw( %WormBaseConf );
 		 #input_id_analysis table to run new raw computes will be written too
 		 WB_SUBMIT_CONTIG_ID => '' #the analysis id of the submit contig analysis object for the raw computes
 		 WB_RAW_COMPUTES => 0 #check for wormbase_to_ensembl.pl to see if there are existing raw computes if set to 0 will write entries to input_id_analysis table
+		 WB_OPERON_LOGIC_NAME => '', #logic names
+		 WB_RNAI_LOGIC_NAME => '',  # for simple features to be 
+		 WB_EXPR_LOGIC_NAME => '', # parsed out of the gff
+		 WB_SL1_LOGIC_NAME => '',
+		 WB_SL2_LOGIC_NAME => '',
 		);
 
 sub import {

@@ -28,7 +28,11 @@ $meta_sth->execute($WB_AGP_TYPE);
 
 my $analysis_adaptor = $db->get_AnalysisAdaptor();
 my $analysis = $analysis_adaptor->fetch_by_logic_name($WB_LOGIC_NAME);
-
+my $operon_analysis = $analysis_adaptor->fetch_by_logic_name($WB_OPERON_LOGIC_NAME) if($WB_OPERON_LOGIC_NAME);
+my $rnai_analysis = $analysis_adaptor->fetch_by_logic_name($WB_RNAI_LOGIC_NAME) if($WB_RNAI_LOGIC_NAME);
+my $expr_analysis = $analysis_adaptor->fetch_by_logic_name($WB_EXPR_LOGIC_NAME) if($WB_EXPR_LOGIC_NAME);
+my $sl1_analysis = $analysis_adaptor->fetch_by_logic_name($WB_SL1_LOGIC_NAME);
+my $sl2_analysis = $analysis_adaptor->fetch_by_logic_name($WB_SL2_LOGIC_NAME);
 foreach my $chromosome_info(@{$WB_CHR_INFO}) {
 
   print "handling ".$chromosome_info->{'chr_name'}." with files ".$chromosome_info->{'agp_file'}." and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
@@ -119,37 +123,62 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
       if($translation){
 	next TRANSLATION;
       }else{
-	my ($clone_name) = $gene->stable_id =~ /(\S+)\.\d+/;
-	$gene->transform;
-	my @exons = @{$gene->get_all_Exons};
-	my $old_contig = $exons[0]->contig;
-	my $clone_seq = $obda->get_Seq_by_acc($clone_name);
-	my ($embl_acc) = $old_contig->name =~ /(\S+\.\d+)\.\d+\.\d+/;
-	my ($version) = $embl_acc =~ /\S+\.(\d+)/;
-	my $contig_id = $clone_name.".".$version.".1.".$clone_seq->length;
-	my $time = time;
-	my $contig = &make_Contig($contig_id, $clone_seq->seq, $clone_seq->length);
-	my $clone = &make_Clone($clone_name, 2, $embl_acc, $version, 3, $contig, $time, $time);
-	eval{
-	  $db->get_CloneAdaptor->store($clone);
-	};
-	if($@){
-	  die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
-	}
-	my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
-	my $assembly_sth = $db->prepare($assembly_sql);
-	$assembly_sth->execute($contig->dbID, $old_contig->dbID);
-	my $exon_sql = "update exon set contig_id = ? where contig_id = ?";
-	my $exon_sth = $db->prepare($exon_sql);
-	$exon_sth->execute($contig->dbID, $old_contig->dbID);
-	my $new_seq_gene = $db->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
-	my $checked_gene = &translation_check($new_seq_gene);
-	if(!$checked_gene){
-	  print TRANSLATE "gene ".$new_seq_gene->stable_id." doesn't translate on either embl sequence ".$old_contig->name." or wormbase sequence ".$contig->name." on chromosome ".$chromosome_info->{'chr_name'}."\n";
-	}
+	#my ($clone_name) = $gene->stable_id =~ /(\S+)\.\d+/;
+#	$gene->transform;
+#	my @exons = @{$gene->get_all_Exons};
+#	my $old_contig = $exons[0]->contig;
+#	my $clone_seq = $obda->get_Seq_by_acc($clone_name);
+#	my ($embl_acc) = $old_contig->name =~ /(\S+\.\d+)\.\d+\.\d+/;
+#	my ($version) = $embl_acc =~ /\S+\.(\d+)/;
+#	my $contig_id = $clone_name.".".$version.".1.".$clone_seq->length;
+#	my $time = time;
+#	my $contig = &make_Contig($contig_id, $clone_seq->seq, $clone_seq->length);
+#	my $clone = &make_Clone($clone_name, 2, $embl_acc, $version, 3, $contig, $time, $time);
+#	eval{
+#	  $db->get_CloneAdaptor->store($clone);
+#	};
+#	if($@){
+#	  die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+#	}
+#	my $assembly_sql = "update assembly set contig_id = ? where contig_id = ?";
+#	my $assembly_sth = $db->prepare($assembly_sql);
+#	$assembly_sth->execute($contig->dbID, $old_contig->dbID);
+#	my $exon_sql = "update exon set contig_id = ? where contig_id = ?";
+#	my $exon_sth = $db->prepare($exon_sql);
+#	$exon_sth->execute($contig->dbID, $old_contig->dbID);
+#	my $new_seq_gene = $db->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
+#	my $checked_gene = &translation_check($new_seq_gene);
+#	if(!$checked_gene){
+#	  print TRANSLATE "gene ".$new_seq_gene->stable_id." doesn't translate on either embl sequence ".$old_contig->name." or wormbase sequence ".$contig->name." on chromosome ".$chromosome_info->{'chr_name'}."\n";
+      
+      
+	print TRANSLATE $gene->stable_id." from ".$chromosome_info->{'chr_name'}." doesn't translate\n";
+	next TRANSLATION;
       }
     }
   close(TRANSLATE);
+  
+  if($operon_analysis){
+    my @operons = @{&parse_operons($chromosome_info->{'gff_file'}, $chr, $operon_analysis)};
+    $non_transforming = &write_operons(\@operons, $db);
+  }
+  if($rnai_analysis){
+    my @operons = @{&parse_rnai($chromosome_info->{'gff_file'}, $chr, $rnai_analysis)};
+    $non_transforming = &write_simple_features(\@operons, $db);
+  }
+  if($expr_analysis){
+    my @operons = @{&parse_rnai($chromosome_info->{'gff_file'}, $chr, $expr_analysis)};
+    $non_transforming = &write_simple_features(\@operons, $db);
+  }
+  if($sl1_analysis){
+    my @operons = @{&parse_rnai($chromosome_info->{'gff_file'}, $chr, $sl1_analysis)};
+    $non_transforming = &write_simple_features(\@operons, $db);
+  }
+  if($sl2_analysis){
+    my @operons = @{&parse_rnai($chromosome_info->{'gff_file'}, $chr, $sl2_analysis)};
+    $non_transforming = &write_simple_features(\@operons, $db);
+  }
+
   close($fh);
 }
 
