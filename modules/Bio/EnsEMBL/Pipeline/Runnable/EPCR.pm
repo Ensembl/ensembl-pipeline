@@ -69,8 +69,8 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::Root::RootI;
+use Bio::EnsEMBL::SimpleFeature;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -90,7 +90,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_fplist'}    = [];    # an array of feature pairs
+    $self->{'_sflist'}    = [];    # an array of feature pairs
     $self->{'_query'}     = undef; # location of Bio::Seq object
     $self->{'_epcr'}      = undef; # location of EPCR binary
     $self->{'_workdir'}   = undef; # location of temp directory
@@ -355,35 +355,26 @@ sub parse_results {
     
     foreach (@output) #loop from 3rd line
     {  
-        my @element = split;
-        my (%feat1, %feat2);
-        
-        $feat1 {'name'}         = $element[0];
-        $feat2 {'name'}         = ($element[3]) ? $element[3] : $element[2];
+        my $feat;
+	my ($name, $start, $end, $hit) = $_ =~ m!(\S+)\s+(\d+)\.\.(\d+)\s+(\w+)!;
+
 	# nasty hack - escape the "'" - sql barfs with things
 	# like "3'UTR" - should be fixed in FeatureAdaptor...
-	$feat2{name} =~ s{\'}{\\\'};
-	$self->_add_hit($feat2{name});
-        my ($start, $end)       = split (/\.\./, $element[1]);
-        $feat1 {'start'}        = $start;
-        $feat1 {'end'}          = $end;
-        $feat2 {'start'}        = 1;     
-        $feat2 {'end'}          = $end - $start + 1;
-        $feat1 {'strand'}       = 0;
-        $feat2 {'strand'}       = 0;
-        #misc
-        $feat1 {'score'}        = -1000;
-        $feat2 {'score'}        = -1000;
-        $feat2 {'db'}           = $self->sts || undef;
-        $feat2 {'db_version'}   = 1;
-        $feat2 {'program'}      = 'e-PCR';
-        $feat2 {'p_version'}    ='1';
-        $feat2 {'source'}       = 'e-PCR';
-        $feat2 {'primary'}      = 'sts';
-        $feat1 {'source'}       = 'e-PCR';
-        $feat1 {'primary'}      = 'sts';
-        
-        $self->create_FeaturePair(\%feat1, \%feat2);
+        $hit =~ s{\'}{\\\'};
+
+        $feat->{'name'} = $name;
+        $feat->{'start'} = $start;
+        $feat->{'end'} = $end;
+        $feat->{'strand'} = 0;
+        $feat->{'score'} = -1000;
+        $feat->{'hit'} = $hit;
+        $feat->{'source'} = 'e-PCR';
+        $feat->{'primary'} = 'sts';
+
+
+	print "$name : $start : $end : $hit\n";
+
+	$self->create_SimpleFeature($feat);
     }
     close $filehandle;   
 }
@@ -397,7 +388,7 @@ Returns an array of FeaturePair's (must be called after parse_results()).
 
 sub output {
     my ($self) = @_;
-    return @{$self->{'_fplist'}};
+    return @{$self->{'_sflist'}};
 }
 
 # make a temporary copy of the STS file to run against
