@@ -60,6 +60,8 @@ It will then recursively link the
 Exon pairs into full transcripts. The recursion will also generate alternative splicing.
 The run method returns the generated transcripts.
 
+An alternative to this exist, see doc in run_pfam method
+
 =head1 CONTACT
 
 
@@ -81,6 +83,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Obsolete    qw (
 							       TRANSCRIPT_ID_SUBSCRIPT
 							      );
@@ -171,6 +174,125 @@ sub run{
   print STDERR scalar(@checked_predictions)." checked predictions generated\n";
   return @checked_predictions;
 }  
+
+sub run_pfam {
+    #This run method is an alternative to the default run option. This will take in account all predictions which don't fall in a already existing structure. Run Pfam over the translation, if at least one pfam domain is returned, the transcript is elevated at the rank of final gene. Currently used for anopheles with Snap predictions. This seems well adapted for virgin genomes. Not sure about human.
+
+    my ($self) = @_;
+    
+    my @predictions = $self->predictions;
+    my @newpred;
+    
+    print STDERR "INITIAL PREDICTIONS: ".scalar(@predictions)."\n";
+    
+  PREDICTION:  
+    foreach my $prediction (@predictions) {
+      EXON: 
+	foreach my $prediction_exon (@{$prediction->get_all_Exons}) {
+      
+	    # Don't include any genscans that has one exon in common with annotation
+	    if ($self->annotations){
+	      OTHER_GENES:
+		foreach my $gene ($self->annotations) {
+		    my @exons    = sort {$a->start <=> $b->start} @{$gene->get_all_Exons};
+		    my $g_start  = $exons[0]->start;
+		    my $g_end    = $exons[$#exons]->end;
+		    #my $g_strand = $exons[0]->strand;
+		    
+		    if (!(($g_end < $prediction_exon->start) || $g_start > $prediction_exon->end)) {
+			#if ($g_strand == $prediction_exon->strand) {
+			    next PREDICTION;
+			    #}
+			}
+		}
+	    }
+	}
+	push(@newpred,$prediction);
+    }
+    
+    
+    
+    print STDERR "PREDICTIONS KEPT: ".scalar(@newpred)."\n";
+    
+    my @newannot;
+
+#Doh
+    
+    my $analysis = Bio::EnsEMBL::Analysis->new(
+					       -db           => 'Pfam',
+					       -db_file      => '/data/blastdb/Ensembl/Pfam_ls;/data/blastdb/Ensembl/Pfam_fs',
+					       -program      => '/usr/local/ensembl/bin/hmmpfam',
+					       -program_file => '/usr/local/ensembl/bin/hmmpfam',
+					       -gff_source   => 'Pfam',
+					       -gff_feature  => 'domain',
+					       -module       => 'Protein/Hmmpfam',
+					       -logic_name   => 'Pfam'
+					       
+					       );
+	     
+    
+    foreach my $tr (@newpred) {
+	my $new_transcript = new Bio::EnsEMBL::Transcript;
+	$new_transcript->type($GB_ABINITIO_SUPPORTED_TYPE);
+	
+	
+	foreach my $ex (@{$tr->get_all_Exons}) {
+	    my $new_ex = $self->_make_Exon($ex);
+	    $new_transcript->add_Exon($new_ex);
+	}
+	$self->make_Translation($new_transcript);
+	
+	print STDERR "NB EXONS: ".scalar(@{$new_transcript->get_all_Exons})."\n";
+	
+#If the transcript is not supported but has more than 3 exons ... we take the risk
+#	if (scalar(@{$new_transcript->get_all_Exons}) >= 3) {
+#	    print STDERR "Adding transcript\n";
+#	    push(@newannot,$new_transcript);
+#	}
+	
+	#Else check the pfam domains
+	#else {
+	my $pep = $new_transcript->translation;
+	
+	my $pepseq    = $new_transcript->translate->seq;
+	my $input_id  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
+						'-id'          => "dummy1",
+						'-accession'   => "dummy1",
+						'-moltype'     => 'protein');
+	
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-query     => $input_id,
+									  -analysis  => $analysis	);
+	
+	$run->run;
+	
+	my @output = $run->output;
+	
+	if (@output) { 
+	    
+	    foreach my $o (@output) {
+		
+		print STDERR "$o\n";
+	    }
+	    print STDERR "Adding transcript\n";
+	    push(@newannot,$new_transcript);
+	}
+
+	
+	elsif (scalar(@{$new_transcript->get_all_Exons}) >= 3) {
+	    print STDERR "Adding unssuported transcript\n";
+	    push(@newannot,$new_transcript);
+	}
+    }
+
+    
+    return (@newannot);
+
+	
+#	print STDERR "NEW TRANSLATION: ".$new_transcript->translate->seq."\n";
+}
+
+
+    
 
 ############################################################
 #
