@@ -25,6 +25,7 @@ my $job_submission_verbose;
 my $run_comparison;
 my $comparison_conf;
 my $help;
+my $local = 0;
 &GetOptions(
             'species:s' => \$species,
             'verbose!' => \$verbose,
@@ -35,6 +36,7 @@ my $help;
             'comparison_conf' => \$comparison_conf,
             'conf_file:s' => \$conf_file,
             'dont_cleanup!' => \$dont_cleanup,
+            'local' => \$local,
             'blastdb:s' => \$blastdb,
             'job_submission_verbose!' => \$job_submission_verbose,
             'help!' => \$help,
@@ -59,6 +61,7 @@ my $testdb = TestDB->new(
                          -SPECIES => $species, 
                          -VERBOSE => $verbose,
                          -CONF_FILE => $conf_file,
+                         -LOCAL => $local,
                         );
 my $environment = Environment->new($testdb, $verbose);
 my $extra_perl = $testdb->curr_dir."/config";

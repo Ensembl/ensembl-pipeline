@@ -22,6 +22,7 @@ my $dont_cleanup;
 my $blastdb;
 my $job_submission_verbose;
 my $run_comparison;
+my $local = 0;
 my $comparison_conf;
 my $help;
 
@@ -36,6 +37,7 @@ my $help;
             'rulemanager_verbose!' => \$job_submission_verbose,
             'comparison_conf' => \$comparison_conf,
             'run_comparison!' => \$run_comparison,
+            'local' => \$local,
             'help!' => \$help,
            ) or perldoc();
 
@@ -54,6 +56,7 @@ my $testdb = TestDB->new(
                          -SPECIES => $species, 
                          -VERBOSE => $verbose,
                          -CONF_FILE => $conf_file,
+                         -LOCAL => $local,
                         );
 
 my $environment = Environment->new($testdb, $verbose);
