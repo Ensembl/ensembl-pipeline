@@ -452,7 +452,7 @@ sub parse_results {
                     $name = $1;
                 }
             }
-            elsif ( $name =~ /\S+\|(\S+)\|\S+/ ) {
+            elsif ( $name =~ /^[^\|]+\|([^\|]+)\|/ ) {
                 $name = $1;
             }
             elsif ( $name =~ /^(\S+) (\S+)/ ) {
