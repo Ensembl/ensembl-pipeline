@@ -101,7 +101,7 @@ print STDERR "comp_level              = $comp_level\n";
 print STDERR "splice_mismatch         = $splice_mismatch\n";
 print STDERR "intron_mismatch         = $intron_mismatch\n"; 
 print STDERR "min_order               = $min_order\n";
-print STDERR "internal_splice_overlap =  $internal_splice_overlap\n";
+print STDERR "internal_splice_overlap = $internal_splice_overlap\n";
 
 ############################################################
 
@@ -275,13 +275,15 @@ sub usage {
                        #####-----#####-----#####
 
                        2 --> allow edge exon mismatches. 
-                       Uses the parameter 'exon_match' if is defined. Example:
+                       Uses the parameter 'exon_match' and 'internal_splice_overlap' if defined. 
+                       Example:
     
                          ###-----#####-----#######
                        #####-----#####-----#####-----#####
 
                        3 ---> allow internal mismatches. 
-                       Uses the parameters 'exon_match' and 'splice_mismatch' if defined. Example:
+                       Uses the parameters 'exon_match', 'splice_mismatch' and 'internal_splice_overlap' 
+                       if defined. Example:
 
                        #####---########----######
                        #####-----######----####------#####
@@ -293,11 +295,12 @@ sub usage {
                        #####-----######----####------#####
   
                        5 ---> loose match. It allows intron mismatches if so desired. There is no limitation on
-                       the number of mismatches at the splice-sites. Example
+                       the number of mismatches at the splice-sites. Examples:
 
-                       #################----#######          OR          #######------####----#######  
-                       #####-----######----####------#####                #####-----######----####------#####
-
+                       #################----#######           and      #######------####----#######  
+                       #####-----######----####------#####               #####-----######----####------#####
+                    
+                       would be merged as redundant.
 
      -splice_mismatch: maximum number of non-opverlapping nucleotides allowed in splice sites 
                        ( not used at comp_level = 5 )
