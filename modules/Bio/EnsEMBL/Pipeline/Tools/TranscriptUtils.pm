@@ -724,10 +724,12 @@ sub _clone_Transcript{
   my $newtranscript  = new Bio::EnsEMBL::Transcript;
   my $newtranslation = new Bio::EnsEMBL::Translation;
   
+  my $translation_start_exon;
+  my $translation_end_exon;
 
   if ( defined $transcript->translation ){
-    my $translation_start_exon = $transcript->translation->start_Exon;
-    my $translation_end_exon   = $transcript->translation->end_Exon; 
+    $translation_start_exon = $transcript->translation->start_Exon;
+    $translation_end_exon   = $transcript->translation->end_Exon; 
   }
 
   foreach my $exon ( @{$transcript->get_all_Exons} ){

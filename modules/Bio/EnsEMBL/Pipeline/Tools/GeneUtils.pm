@@ -89,7 +89,7 @@ sub _validate_Transcript {
   }
   
   #    split transcript if necessary
-  my @split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_split_transcript($newtranscript, $maxinton);
+  my @split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_split_transcript($newtranscript, $maxintron);
   push (@valid_transcripts, @split_transcripts); 
   
   return \@valid_transcripts;
