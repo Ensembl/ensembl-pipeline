@@ -361,10 +361,10 @@ sub split_gapped_feature {
   my (@masked_f1, @masked_f2);
 
   #replace bases and gaps with positions and mask number
-  if ($type1 = 'pep' && $type2 == 'dna') {
+  if ($type1 eq 'pep' && $type2 eq 'dna') {
     @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
     @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
-  } elsif ($type1 = 'dna' && $type2 == 'pep') {
+  } elsif ($type1 eq 'dna' && $type2 eq 'pep') {
     @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
     @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
   }
