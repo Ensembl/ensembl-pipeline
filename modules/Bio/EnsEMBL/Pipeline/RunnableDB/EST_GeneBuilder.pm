@@ -105,11 +105,11 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   -host             => $EST_REFDBHOST,
-						   -user             => $EST_REFDBUSER,
-						   -dbname           => $EST_REFDBNAME,
-						   -pass             => $EST_REFDBPASS,
+    my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						   -host             => $EST_GENE_DBHOST,
+						   -user             => $EST_GENE_DBUSER,
+						   -dbname           => $EST_GENE_DBNAME,
+						   -pass             => $EST_GENE_DBPASS,
 						  );
     
     my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -119,19 +119,19 @@ sub new {
 						    -pass             => $EST_DBPASS,
 						   );
     
-    $est_db->dnadb($refdb);
+    $est_db->dnadb($self->db);
     $self->est_db($est_db);
     
-    $self->db->dnadb($refdb);
-   
-   
+    $self->output_db($output_db);
+    $self->output_db->dnadb($self->db);
+   7
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       -host             => $cDNA_DBHOST,
 						       -user             => $cDNA_DBUSER,
 						       -dbname           => $cDNA_DBNAME,
 						       -pass             => $cDNA_DBPASS,
-						       -dnadb            => $refdb,
+						       -dnadb            => $self->db,
 						      );
       
       $self->cdna_db($cdna_db);
@@ -154,6 +154,15 @@ sub est_db{
     }
     return $self->{_est_db};
 }
+
+sub output_db{
+    my ($self, $output_db) = @_;
+    if ($output_db){
+	$self->{_output_db} = $output_db;
+    }
+    return $self->{_output_db};
+}
+
 ############################################################
 
 sub cdna_db{
@@ -183,7 +192,7 @@ sub revcomp_query{
 sub write_output {
   my ($self) = @_;
   
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
+  my $gene_adaptor = $self->output_db->get_GeneAdaptor;
   
  GENE: 
   foreach my $gene ($self->output) {	
