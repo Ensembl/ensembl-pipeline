@@ -245,9 +245,9 @@ sub checkdir {
     my ($self) = @_;
     #check for disk space
     my $spacelimit = 0.01;
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
-                        unless ($self->diskspace('./', $spacelimit));
     my $dir = $self->workdir();
+    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
+                        unless ($self->diskspace($dir, $spacelimit));
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
     open (PWD, 'pwd|');
     print STDERR "Working directory set to: ".<PWD>;
@@ -258,7 +258,7 @@ sub diskspace {
     my $block_size; #could be used where block size != 512 ?
     my $Gb = 1024 ** 3;
     
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe ($!)\n");
+    open DF, "df $dir |" or $self->throw ("Can't open 'df' pipe ($!)\n");
     while (<DF>) 
     {
         if ($block_size) 
