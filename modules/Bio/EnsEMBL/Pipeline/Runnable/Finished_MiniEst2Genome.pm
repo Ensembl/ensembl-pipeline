@@ -18,8 +18,10 @@ sub run_blaste2g {
 
     my $hseq    = $self->get_Sequence($est) or $self->throw("Can't fetch sequence for id '$est'");
 
+    my $genomic = $miniseq->get_cDNA_sequence();
+    $genomic->display_id($features->[0]->seqname);
     my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome(
-        -genomic => $miniseq->get_cDNA_sequence,
+        -genomic => $genomic,
         -est     => $hseq,
     );
     $eg->run;
