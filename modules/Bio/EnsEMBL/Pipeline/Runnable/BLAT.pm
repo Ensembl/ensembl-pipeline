@@ -59,6 +59,7 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 use Carp 'cluck';
+use File::Basename;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -127,6 +128,7 @@ Usage   :   $obj->run($workdir, $args)
 Function:   Runs blat script and puts the results into the file $self->results
             It calls $self->parse_restuls, and results are stored in $self->output
 =cut
+
 sub run {
     my ($self) = @_;
 
@@ -135,25 +137,60 @@ sub run {
     $self->workdir('/tmp') unless ( $self->workdir() );
     $self->checkdir();
     $self->writefile();
+
     my $gen_query = join ( '/', $self->workdir, $self->filename );
     my $options = $self->options;
     my $blat    = $self->blat;
 
     my @db_list = $self->fetch_databases;
+
     #my $command =
-#      "sed 's/>\\([:A-Z0-9:]*\\) \\([:A-Z0-9.:]*\\)/>\\2 \\1/' $db_list[0] | $blat stdin $gen_query $options"
-#      . $self->results;
+    #      "sed 's/>\\([:A-Z0-9:]*\\) \\([:A-Z0-9.:]*\\)/>\\2 \\1/' $db_list[0] | $blat stdin $gen_query $options"
+    #      . $self->results;
 
     foreach my $db (@db_list) {
-        my $command     = "/acari/work7a/keenan/tools/reformat_headers $db | $blat stdin $gen_query $options " . $self->results;
-        print $command, "\n";
-        $self->throw("$command\nFailed during BLAT run $!") unless ( system($command) == 0 );
-        $self->parse_results();
-    }
 
+        my $db_basename = basename($db);
+        my $tmpdb_check;
+        
+        if ( $db_basename =~ /vertrna/ || $db_basename =~ /emew/) {
+            local $/ = "\n>";
+            
+            # open /data/blastdb/Ensembl/dbname for reading
+            open BLASTDB,"<$db";
+            
+            # change $db to /tmp/dbname - this is what is passed 
+            # to blat below 
+            $db    = join ( '/', $self->workdir, $db_basename );
+            
+            open REFORMATTED_BLASTDB, ">$db";
+            print REFORMATTED_BLASTDB ">";
+
+            while (<BLASTDB>) {
+                s/^\S+\s+(\S+\.\d+)\b/$1/;
+                print REFORMATTED_BLASTDB $_;
+            }
+            
+            close(BLASTDB);
+            close(REFORMATTED_BLASTDB);
+            
+            #flag reformated blastdb for deletion
+            $tmpdb_check = 1;
+        }
+    
+    my $command = "$blat $db $gen_query $options " . $self->results;
+    print $command, "\n";
+    $self->throw("$command\nFailed during BLAT run $!") unless ( system($command) == 0 );
+    
+    unlink($db) if $tmpdb_check;
+    
+    }
+    
+    $self->parse_results();
     #close BLAT or die "Error running blat pipe '$cmd' : exit($?)";
-    #$self->deletefiles;
+    $self->deletefiles;
 }
+
 
 
 ############################################################
@@ -239,7 +276,13 @@ sub parse_results {
         unless ( $matches =~ /^\d+$/ ) {
             next;
         }
-
+        
+        #parse ACC.SV from id if dbEST header
+        if ( $t_name =~ /^[^\|]+\|[^\|]+\|[^\|]+\|([^\|]+)\|/ ) {
+                $t_name = $1;
+        }
+        
+        
         #print $_."n";
 
         # create as many features as blocks there are in each output line
@@ -322,7 +365,7 @@ sub parse_results {
 
     }
 
-    close $filehandle;
+    close OUT;
 
 }
 
