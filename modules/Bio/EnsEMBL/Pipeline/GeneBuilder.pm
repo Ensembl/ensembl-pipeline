@@ -261,6 +261,9 @@ sub build_Genes{
   # do a preliminary clustering
   my @preliminary_genes = $self->cluster_into_Genes(@pruned_transcripts);
 
+  # Remove CDS from gene where transcript has no UTR and has same CDS as one with UTR
+  $self->_prune_redundant_CDS(\@preliminary_genes);
+
   # select the best ones per gene (use the GB_MAX_TRANSCRIPTS_PER_GENE )
   my @best_transcripts = $self->_select_best_transcripts( @preliminary_genes );
   
@@ -284,6 +287,117 @@ sub build_Genes{
   print STDERR scalar( @genes )." final genes\n";
   $self->final_genes( @genes );
 }
+
+sub _prune_redundant_CDS {
+  my ( $self, $genes ) = @_;
+
+  my $nremoved = 0;
+
+  my %blessed_genetypes;
+  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+    $blessed_genetypes{$bgt->{'type'}} = 1;
+  }
+
+# For each gene
+  foreach my $gene (@$genes) {
+    my @trans_with_utrs;
+    my @trans_without_utrs;
+
+# Separate into ones with UTRs and ones without
+    foreach my $trans (@{$gene->get_all_Transcripts}) {
+      $trans->sort;
+      my @exons = @{$trans->get_all_Exons};
+      if ($trans->translation) {
+        if ($trans->translation->start_Exon == $exons[0] &&
+            $trans->translation->start == 1 &&
+            $trans->translation->end_Exon == $exons[$#exons] &&
+            $trans->translation->end == $exons[$#exons]->length) {
+          push @trans_without_utrs, $trans;
+        } else {
+          push @trans_with_utrs, $trans;
+        }
+      } else {
+        $self->warn("No translation for transcript");
+      }
+    }
+
+# Generate CDS exons just once (saves CPU time)
+    my %cds_exon_hash;
+    foreach my $trans (@{$gene->get_all_Transcripts}) {
+      # Shouldn't need sort but paranoid about this
+      $trans->sort;
+      if ($trans->translation) {
+        my @cds_exons = @{$trans->get_all_translateable_Exons};
+        $cds_exon_hash{$trans} = \@cds_exons;
+      }
+    }
+      
+# Compare CDSs of ones with UTRs to CDSs of ones without
+    foreach my $utr_trans (@trans_with_utrs) {
+      my $utr_trans_cds_exons = $cds_exon_hash{$utr_trans};
+
+      CDS_TRANS: foreach my $cds_trans (@trans_without_utrs) {
+        my $cds_trans_cds_exons = $cds_exon_hash{$cds_trans};
+
+        if (scalar(@$cds_trans_cds_exons) != scalar(@$utr_trans_cds_exons)) {
+          # print "Different numbers of exons\n";
+          next CDS_TRANS;
+        }
+
+        my @cds_exons = @$cds_trans_cds_exons;
+        foreach my $utr_trans_exon (@$utr_trans_cds_exons) {
+          my $cds_trans_exon = shift @cds_exons;
+          if ($cds_trans_exon->start     != $utr_trans_exon->start  ||
+              $cds_trans_exon->end       != $utr_trans_exon->end    ||
+              $cds_trans_exon->strand    != $utr_trans_exon->strand) {
+            # print "Exon difference for " . $cds_trans_exon->start . "-" . $cds_trans_exon->end . " and " . $utr_trans_exon->start . "-" . $utr_trans_exon->end . "\n";
+            next CDS_TRANS;
+          }
+
+        }
+# Remove non UTR one if CDS is same  (only get to here if all exons match 
+        # print "Removing transcript as redundant CDS\n";
+        # Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($cds_trans);
+
+        if (  exists $blessed_genetypes{$cds_trans->type} && 
+            ! exists $blessed_genetypes{$utr_trans->type}) {
+# Hack to make sure transcript gets through if its like a blessed one
+          # print "Hacking transcript type from " . $utr_trans->type . " to " . $cds_trans->type . "\n";
+          $utr_trans->type($cds_trans->type);
+        }
+
+        $nremoved++;
+        $self->_remove_transcript_from_gene($gene,$cds_trans);
+      }
+    }
+  }
+  print "Removed $nremoved transcripts because of redundant CDS\n";
+}
+
+sub _remove_transcript_from_gene {
+  my ($self, $gene, $trans_to_del)  = @_;
+
+  my @newtrans;
+  foreach my $trans (@{$gene->get_all_Transcripts}) {
+    if ($trans != $trans_to_del) {
+      push @newtrans,$trans;
+    }
+  }
+
+# The naughty bit!
+  $gene->{_transcript_array} = [];
+
+  foreach my $trans (@newtrans) {
+    $gene->add_Transcript($trans);
+  }
+
+  return scalar(@newtrans);
+}
+
+
+
+
+
 
 ############################################################
 
@@ -719,11 +833,11 @@ sub prune_Transcripts {
 	$single_exon_rejects{$tran} = $tran;
       }
       else {
-	#print STDERR "transcript already seen:\n";
+	# print STDERR "transcript already seen:\n";
 	if ( $tran == $transcripts[0] ){
 	  print STDERR "Strange, this is the first transcript in the cluster!\n";
 	}
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
+	# Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 	
 	## transfer supporting feature data. We transfer it to exons
 	foreach my $pair ( @evidence_pairs ){
@@ -862,25 +976,25 @@ sub _bin_sort_transcripts{
 
   # post filter - we want blessed transcripts to be at the top of the list so that 
   # identical build transcripts get properly pruned.
-  my %blessed_genetypes;
-  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
-    $blessed_genetypes{$bgt->{'type'}} = 1;
-  }
-
-  my @blessed_transcripts;
-  my @heathen_transcripts;
-  foreach my $transcript(@transcripts){
-
-    if(exists $blessed_genetypes{$transcript->type}){
-      push(@blessed_transcripts, $transcript);
-    }
-    else{
-      push(@heathen_transcripts, $transcript);
-    }
-  }
-    @transcripts = ();
-    push(@transcripts, @blessed_transcripts);
-    push(@transcripts, @heathen_transcripts);
+#  my %blessed_genetypes;
+#  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+#    $blessed_genetypes{$bgt->{'type'}} = 1;
+#  }
+#
+#  my @blessed_transcripts;
+#  my @heathen_transcripts;
+#  foreach my $transcript(@transcripts){
+#
+#    if(exists $blessed_genetypes{$transcript->type}){
+#      push(@blessed_transcripts, $transcript);
+#    }
+#    else{
+#      push(@heathen_transcripts, $transcript);
+#    }
+#  }
+#    @transcripts = ();
+#    push(@transcripts, @blessed_transcripts);
+#    push(@transcripts, @heathen_transcripts);
 
 
   #test
