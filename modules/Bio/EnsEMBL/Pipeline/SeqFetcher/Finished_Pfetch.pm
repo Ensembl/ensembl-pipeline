@@ -1,43 +1,4 @@
-#
-# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
-#
-# Copyright GRL & EBI
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
 
-=pod 
-
-=head1 NAME
-
-  Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
-
-=head1 SYNOPSIS
-
-    my $obj = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-    								-pfetch_server => '',
-    								-pfetch_port => '',
-    								-options => ''
-							     );
-    my $seq = $obj->get_Seq_by_acc($acc);
-
-=head1 DESCRIPTION
-
-  Object to retrieve sequences as Bio::Seq, using pfetch.
-
-=head1 CONTACT
-
-Describe contact details here
-
-=head1 APPENDIX
-
-The rest of the documentation details each of the object methods. 
-Internal methods are usually preceded with a _
-
-=cut
-
-# Let the code begin...
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 
 use strict;
@@ -51,31 +12,18 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::RootI Bio::DB::RandomAccessI);
 
-BEGIN{
-	print "Finished_Pfetch Loaded\n";
-}
-
 sub new {
     my ( $class, @args ) = @_;
     my $self = bless {}, $class;
 
-    my ( $server, $port, $options ) = $self->_rearrange( [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
+    my ( $server, $port, $options ) = $self->_rearrange(
+        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
-    if ( !defined $server ) {
-        $server = 'cbi2.internal.sanger.ac.uk';
-    }
-    $self->server($server);
+    $self->server($server || 'cbi2.internal.sanger.ac.uk');
+    $self->port($port || 22100);
+    $self->options($options);
 
-    if ( !defined $port ) {
-        $port = '22100';
-    }
-    $self->port($port);
-
-    if ( defined $options ) {
-        $self->options($options);
-    }
-
-    return $self;    # success - we hope!
+    return $self;
 }
 
 =head2 server
@@ -180,8 +128,7 @@ sub get_Seq_by_acc {
     for ( my $i = 0 ; $i < @id_list ; $i++ ) {
         chomp( my $seq_string = <$server> );
         eval {
-            if ( defined $seq_string && $seq_string ne 'no match' )
-            {
+            if (defined $seq_string && $seq_string ne 'no match') {
 
                 my $seq = new Bio::Seq(
                     '-seq'              => $seq_string,
@@ -215,38 +162,40 @@ sub get_Seq_by_acc {
 }
 sub write_descriptions {
     my ( $self, $dbobj, @ids ) = @_;
-    return ;
-    my $sth = $dbobj->prepare( qq{ 
-                                REPLACE DELAYED INTO 
-                                hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
-                                VALUES (?,TRIM(?),?,?,?)}
-    );
+
+    my $sth = $dbobj->prepare(qq{ 
+        REPLACE INTO hit_description (hit_name
+              , hit_description
+              , hit_length
+              , hit_taxon
+              , hit_db)
+        VALUES (?,TRIM(?),?,?,?)
+        });
+
     my $count = 100;
-    while (my @hundred_ids = splice(@ids, @ids > $count ? -$count : 0)){
+    while (my @hundred_ids = splice(@ids, @ids > $count ? -$count : 0)) {
+    
+        printf STDERR "Pfetching %d EMBL sequences\n", scalar(@hundred_ids);
+    
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
-	print  $server "-F " . join(" ", @ids) . "\n";
+	print  $server "-F " . join(" ", @hundred_ids) . "\n";
 	local $/ = "//\n";
-	while(<$server>){
-		#print "**************************************\n";
-		next unless $_ !~ /no match/;
-		$embl_parser->parse($_);
-		my @hit_row = (
-		               $embl_parser->sequence_version || shift(@{$embl_parser->accession}),
-                               $embl_parser->description,
-		               $embl_parser->seq_length,
-		               $embl_parser->taxon,
-		               $embl_parser->which_database
-		);
-		#print "Name                 :" . $hit_row[0] . "\n";
-		#print "Description      : " . $hit_row[1] . "\n";
-		#print "Sequence length: " . $hit_row[2] . "\n";
-		#print "TaxonomyID         : " .$hit_row[3] . "\n";
-		#print "Database           : " . $hit_row[4] . "\n";
-		#print "**************************************\n";
-		$sth->execute(@hit_row);
+	while (<$server>) {
+            next if $_ =~ /no match/;
+            $embl_parser->parse($_);
+            my $name = $embl_parser->sequence_version || $embl_parser->accession->[0];
+            $sth->execute(
+                $name,
+                $embl_parser->description,
+                $embl_parser->seq_length,
+                $embl_parser->taxon,
+                $embl_parser->which_database
+                );
 	}
     }	
 }
+
 1;
+
 __END__
