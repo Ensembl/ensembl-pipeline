@@ -289,16 +289,18 @@ GENE:
       my @transcripts  = $self->_process_Transcripts(\@plus_transcripts,$strand);
       
       # make a genomewise runnable for each cluster of transcripts
+
       foreach my $tran (@transcripts){
 	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic => $contig->primary_seq,
+	  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
+	      						    -genomic => $contig->primary_seq,
       								   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable,$strand);
 #	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
+
       }
     }
     
@@ -1439,7 +1441,6 @@ sub _cluster_Exons{
   # Loop over the rest of the exons
   my $count = 0;
 
-  # PUT THE START AND END OF THE CLUSTER BY HAND, EXPAND DOES nOT SEEM TO WORK?
  EXON:
   foreach my $exon (@exons) {
     if ($count > 0) {
@@ -1613,14 +1614,15 @@ CLUSTER:
       }
       $start{$exon->start}++;
     }
+    # we can as well sort them:
+    my @starts = sort{ $start{ $b } <=> $start{ $a } } keys( %start );
 
     # take the most common start (note that we do not resolve ambiguities here)
-    while ( my ($key,$value) = each %start ){
-      if ($value > $max_start){
-	$new_start = $key;
-	$max_start = $value;
-      }
-    }
+    # at some point we could resolve them by checking for the splice site consensus sequence
+
+    $new_start = shift( @starts );
+    $max_start = $start{ $new_start };
+
     # if we have too little exons to obtain the start, take the original value
     if ( $max_start == 0 ){
       $new_start = $cluster->start;
@@ -1648,15 +1650,14 @@ CLUSTER:
       }
       $end{$exon->end}++;
     }
+    my @ends = sort{ $end{ $b } <=> $end{ $a } } keys( %end );
 
     # take the most common end (note that we do not resolve ambiguities here)
-    while ( my ($key,$value) = each %end ){
-      if ($value > $max_end){
-	$new_end = $key;
-	$max_end = $value;
-      }
-    }
-    # if we have too little exons to obtain the end, take the original value
+
+    $new_end = shift( @ends );
+    $max_end = $end{ $new_end };
+    
+   # if we have too little exons to obtain the end, take the original value
     if ( $max_end == 0 ){
       $new_end = $cluster->end;
     }
@@ -1666,11 +1667,47 @@ CLUSTER:
       $new_end = $cluster->end;  
     }
     
-    # check that start<end
-    if ( $new_start >= $new_end ){
+    print STDERR "new_start: $new_start\n";
+    print STDERR "start array:\n";
+    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
+      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
+    }
+    print STDERR "\n";
+    print STDERR "new_end: $new_end\n";
+    print STDERR "end array:\n";
+    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
+      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
+    }
+    print STDERR "\n";
+
+
+    ######  if new_start> new_end change them in turns until we get start < end ######
+    my $other_start = $new_start;
+    my $other_end   = $new_end;
+    my $trouble     = 0;
+
+    while ( $other_start >= $other_end ){
       print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+      $trouble = 1;
+
+      # take the next one
+      $other_start = shift( @starts );
+      if ( $other_start >= $other_end ){
+	$other_end = shift( @ends );
+      }
     }
 
+    if ($trouble == 1 ){
+      if ($other_end && $other_start){
+	$new_start = $other_start;
+	$new_end   = $other_end;
+	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+      }
+      else{
+	# ok, you tried to change, but you got nothing, what can we do about it?
+	print STDERR "Could not reset the start and end coordinates\n";
+      }
+    }
 
     # reset the cluster start (that's the coordinate used in _produce_Transcript() )
     $cluster->start($new_start);
@@ -2008,10 +2045,19 @@ sub run {
   # plus strand
   $strand = 1;
   my $tcount=0;
+ 
+ RUN1:
   foreach my $gw_runnable( $self->each_runnable($strand) ){
     $tcount++;
-    $gw_runnable->run;
-    
+    eval{
+      $gw_runnable->run;
+    };
+    if ($@){
+      print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+      print STDERR $@;
+      next RUN1;
+    }
+
     # convert_output
     $self->convert_output($gw_runnable, $strand);
   }
@@ -2020,9 +2066,18 @@ sub run {
   # minus strand
   $strand = -1;
   my $tcount2=0;
+ 
+ RUN2:
   foreach my $gw_runnable( $self->each_runnable($strand)) {
     $tcount2++;
-    $gw_runnable->run;
+    eval{
+      $gw_runnable->run;
+    };
+    if ($@){
+      print STDERR "Your runnable $gw_runnable didn't succeed!\n";
+      print STDERR $@;
+      next RUN2;
+    }
     
     # convert_output
     $self->convert_output($gw_runnable, $strand);
