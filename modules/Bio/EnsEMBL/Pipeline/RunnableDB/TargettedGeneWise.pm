@@ -57,6 +57,10 @@ use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_TARGETTED_SINGLE_EXON_COVERAGE
+					 GB_TARGETTED_MULTI_EXON_COVERAGE
+					 GB_TARGETTED_MAX_INTRON
+					 GB_TARGETTED_MIN_SPLIT_COVERAGE
 					 );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -393,23 +397,23 @@ sub make_genes {
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
  MAKE_GENE:  foreach my $tmpf (@$results) {
-    my $gene   = new Bio::EnsEMBL::Gene;
-    $gene->type($genetype);
-
     my $transcript = $self->make_transcript($tmpf,$self->vc,$genetype,$count, $analysis_obj);
 	
-    # validate transcript
+    # validate transcript - validate_transcript returns an array ref
     my $valid_transcripts = $self->validate_transcript($transcript);
     next MAKE_GENE unless defined $valid_transcripts;
       
-    # add transcripts to gene
-    $gene->analysis($analysis_obj);
-    foreach my $t(@$valid_transcripts){
-      $gene->add_Transcript($t);
+    my $gene;
+    # make one gene per valid transcript
+    foreach my $valid (@$valid_transcripts){
+      $gene   = new Bio::EnsEMBL::Gene;
+      $gene->type($genetype);
+      $gene->analysis($analysis_obj);
+      $gene->add_Transcript($valid);
+
+      push(@genes,$gene);
     }
 
-    # and store it
-    push(@genes,$gene);
   }
   return @genes;
 }
@@ -435,11 +439,16 @@ sub validate_transcript {
   my $split = 0;
   
   # check coverage of parent protein
-  my $threshold = 80; # needs to be put in GeneConf
+  my $threshold = $GB_TARGETTED_SINGLE_EXON_COVERAGE; 
   my @exons = $transcript->get_all_Exons;
     if(scalar(@exons) > 1){
-      $threshold = 25;
+      $threshold = $GB_TARGETTED_MULTI_EXON_COVERAGE;
     }
+
+  if(!defined $threshold){
+    print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in GeneConf.pm\n";
+    return undef;
+  }
 
   my $coverage  = $self->check_coverage($transcript);
   if ($coverage < $threshold){
@@ -466,7 +475,9 @@ sub validate_transcript {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-      if ($intron > 250000 && $coverage < 95) {
+#      if ($intron > 250000 && $coverage < 95) {
+
+      if ($intron > $GB_TARGETTED_MAX_INTRON && $coverage < $GB_TARGETTED_MIN_SPLIT_COVERAGE ) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
 	$split = 1;
 	$valid = 0;
@@ -507,7 +518,12 @@ sub validate_transcript {
     push(@valid_transcripts, @$split_transcripts);
   }
 
-  return \@valid_transcripts;
+  if(scalar(@valid_transcripts)){
+    return \@valid_transcripts;
+  }
+  else { 
+    return undef;
+  }
 }
 
 =head2 remap_genes
@@ -637,7 +653,6 @@ sub check_coverage{
     $pend   = 0;
     
     foreach my $f($exon->each_Supporting_Feature){
-      #      print STDERR $f->hseqname . " " . $f->hstart . " " . $f->hend . "\n";
       
       if (!defined($protname)){
 	$protname = $f->hseqname;
@@ -811,5 +826,138 @@ sub validate_exon{
   
   return 1;
 }
+
+=head2 split_transcript
+
+ Title   : split_transcript 
+ Usage   : my @splits = $self->split_transcript($transcript)
+ Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
+           transcripts that result. 
+ Returns : Ref to @Bio::EnsEMBL::Transcript
+ Args    : Bio::EnsEMBL::Transcript
+
+=cut
+
+
+sub split_transcript{
+  my ($self, $transcript) = @_;
+  $transcript->sort;
+  my @split_transcripts   = ();
+
+  if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+    $self->warn("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+    return (); # empty array
+  }
+  
+  my $prev_exon;
+  my $exon_added = 0;
+  my $curr_transcript = new Bio::EnsEMBL::Transcript;
+  my $translation     = new Bio::EnsEMBL::Translation;
+  $curr_transcript->translation($translation);
+
+EXON:   foreach my $exon($transcript->get_all_Exons){
+
+
+    $exon_added = 0;
+      # is this the very first exon?
+    if($exon == $transcript->start_exon){
+
+      $prev_exon = $exon;
+      
+      # set $curr_transcript->translation start and start_exon
+      $curr_transcript->add_Exon($exon);
+      $exon_added = 1;
+      $curr_transcript->translation->start_exon($exon);
+      $curr_transcript->translation->start($transcript->translation->start);
+      push(@split_transcripts, $curr_transcript);
+      next EXON;
+    }
+    
+    if ($exon->strand != $prev_exon->strand){
+      return (); # empty array
+    }
+
+    # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+    my $intron = 0;
+    if ($exon->strand == 1) {
+      $intron = abs($exon->start - $prev_exon->end + 1);
+    } else {
+      $intron = abs($exon->end   - $prev_exon->start + 1);
+    }
+    
+    if ($intron > $GB_TARGETTED_MAX_INTRON) {
+      $curr_transcript->translation->end_exon($prev_exon);
+
+      # need to account for end_phase of $prev_exon when setting translation->end
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
+      
+      # start a new transcript 
+      my $t  = new Bio::EnsEMBL::Transcript;
+      my $tr = new Bio::EnsEMBL::Translation;
+      $t->translation($tr);
+
+      # add exon unless already added, and set translation start and start_exon
+      $t->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+
+      $t->translation->start_exon($exon);
+     
+      if ($exon->phase == 0) {
+	$t->translation->start(1);
+      } elsif ($exon->phase == 1) {
+	$t->translation->start(3);
+      } elsif ($exon->phase == 2) {
+	$t->translation->start(2);
+      }
+
+      # start exon always has phase 0
+      $exon->phase(0);
+
+      # this new transcript becomes the current transcript
+      $curr_transcript = $t;
+
+      push(@split_transcripts, $curr_transcript);
+    }
+
+    if($exon == $transcript->end_exon){
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+
+      $curr_transcript->translation->end_exon($exon);
+      $curr_transcript->translation->end($transcript->translation->end);
+      
+    }
+
+    else{
+      # just add the exon
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+    }
+    foreach my $sf($exon->each_Supporting_Feature){
+	  $sf->feature1->seqname($exon->contig_id);
+
+      }
+    # this exon becomes $prev_exon for the next one
+    $prev_exon = $exon;
+
+  }
+
+  # discard any single exon transcripts
+  my @final_transcripts = ();
+  my $count = 1;
+  
+  foreach my $st(@split_transcripts){
+    $st->sort;
+    my @ex = $st->get_all_Exons;
+    if(scalar(@ex) > 1){
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
+      $count++;
+      push(@final_transcripts, $st);
+    }
+  }
+
+  return \@final_transcripts;
+
+}
+
 
 1;
