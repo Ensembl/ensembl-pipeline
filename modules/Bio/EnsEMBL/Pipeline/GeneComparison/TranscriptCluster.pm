@@ -358,9 +358,9 @@ sub put_Transcripts {
     $self->throw( "Can't accept a [ $new_transcripts[0] ] instead of a Bio::EnsEMBL::Transcript");
   }
   
-#Get bounds of new transcripts
+  #Get bounds of new transcripts
   my $min_start = undef;
-  my $max_end = undef;
+  my $max_end   = undef;
   foreach my $transcript (@new_transcripts) {
     my ($start, $end) = $self->_get_start_end($transcript);
     if (!defined($min_start) || $start < $min_start) {
@@ -474,22 +474,12 @@ sub exon_Density{
 =cut
 
 sub _get_start_end {
-  my ($self, $transcript) = @_;
-  my $start;
-  my $end;
- 
-  my $start_Exon = $transcript->start_Exon;
-  my $end_Exon = $transcript->end_Exon;
- 
-  if ($start_Exon->strand == 1) {
-    $start = $start_Exon->start;
-    $end   = $end_Exon->end;
-  } else {
-    $end   = $start_Exon->end;
-    $start = $end_Exon->start;
-  }
-  return ($start, $end);
-}    
+  my ($self,$t) = @_;
+  my @exons = sort { $a->start <=> $b->start } @{$t->get_all_Exons}; 
+  my $start = $exons[0]->start;
+  my $end   = $exons[-1]->end;
+  return ($start, $end, $exons[0]->strand);
+}
 
 
 1;
