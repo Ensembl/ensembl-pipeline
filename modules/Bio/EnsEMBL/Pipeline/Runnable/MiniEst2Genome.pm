@@ -18,7 +18,8 @@ Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome->new('-genomic'    => $genseq,
 								    '-features'   => $features,
-								    '-seqfetcher' => $seqfetcher
+								    '-seqfetcher' => $seqfetcher,
+								    '-analysis'   => $analysis,
 								   )
 
     $obj->run
@@ -66,9 +67,10 @@ sub new {
   
   $self->{'_fplist'} = []; #create key to an array of feature pairs
   
-  my( $genomic, $features, $seqfetcher ) = $self->_rearrange([qw(GENOMIC
+  my( $genomic, $features, $seqfetcher, $analysis ) = $self->_rearrange([qw(GENOMIC
 								 FEATURES
-								 SEQFETCHER)], @args);
+								 SEQFETCHER
+								 ANALYSIS)], @args);
   
   $self->throw("No genomic sequence input")           
     unless defined($genomic);
@@ -82,7 +84,9 @@ sub new {
     unless $seqfetcher->isa("Bio::DB::RandomAccessI");
   $self->seqfetcher($seqfetcher) if defined($seqfetcher);
   
+  $self->analysis($analysis) if defined $analysis;
   
+
   if (defined($features)) {
     if (ref($features) eq "ARRAY") {
       my @f = @$features;
@@ -136,6 +140,25 @@ sub seqfetcher {
         $self->{'_seqfetcher'} = $value;
     }
     return $self->{'_seqfetcher'};
+}
+
+=head2 analysis
+
+    Title   :   analysis
+    Usage   :   $self->analysis($analysis)
+    Function:   Get/set method for analysis
+    Returns :   Bio::EnsEMBL::Analysis object
+    Args    :   Bio::EnsEMBL::Analysis object
+
+=cut
+
+sub analysis {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        $value->isa("Bio::EnsEMBL::Analysis") || $self->throw("[$value] isn't a Bio::EnsEMBL::Analysis");
+        $self->{'analysis'} = $value;
+    }
+    return $self->{'_analysis'};
 }
 
 =head2 addFeature 
@@ -493,14 +516,6 @@ sub run {
   
   $self->get_all_Sequences(@ests);
 
-  my $analysis_obj    = new Bio::EnsEMBL::Analysis
-    (-db              => undef,
-     -db_version      => undef,
-     -program         => "est2genome",
-     -program_version => 1,
-     -gff_source      => 'est2genome',
-     -gff_feature     => 'similarity',);
-  
  ID: foreach my $est (@ests) {
     
     my $features = $esthash->{$est};
@@ -512,7 +527,7 @@ sub run {
     next ID unless (scalar(@$features) >= 1);
     
     eval {
-      $self->run_blaste2g($est, $features, $analysis_obj);
+      $self->run_blaste2g($est, $features);
     };
 
     if ($@) {
@@ -534,7 +549,7 @@ sub run {
 =cut
 
 sub run_blaste2g {
-  my ($self,$est,$features,$analysis_obj) = @_;
+  my ($self,$est,$features) = @_;
   
   #?? never did fully understand this.
   my @extras  = $self->find_extras (@$features);
@@ -582,7 +597,8 @@ sub run_blaste2g {
       
       # exonerate has no concept of phase, but remapping will fail if this is unset
       $ex->phase(0);
-      
+      $ex->analysis($self->analysis);
+
       # convert back to genomic coords, but leave the EST coordinates alone
       my @converted = $miniseq->convert_FeaturePair($ex);
       if ($#converted > 0) {
@@ -622,6 +638,8 @@ sub run_blaste2g {
 	  
 	  $a->seqname($aln->seqname);
 	  $a->hseqname($aln->hseqname);
+	  $a->analysis($self->analysis);
+
 	  # shouldn't need to expand ... as long as we choose the right parent feature to add to!
 	  foreach my $g(@genomic_exons){
 	    if($a->start >= $g->start && $a->end <=$g->end && !$added){
@@ -640,7 +658,7 @@ sub run_blaste2g {
       $gex->strand($strand);
       #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
       $gex->seqname($gene->seqname); # urrmmmm?
-      $gex->analysis($analysis_obj);
+      $gex->analysis($self->analysis);
       #end BUGFIX
     }
   }   
@@ -651,11 +669,12 @@ sub run_blaste2g {
 
   if(scalar(@genomic_exons)){
     my $fset = new Bio::EnsEMBL::SeqFeature();
+    $fset->analysis($self->analysis);
     
     foreach my $nf (@genomic_exons) {
+      $nf->analysis($self->analysis);
       $fset->add_sub_SeqFeature($nf,'EXPAND');
       $fset->seqname($nf->seqname);
-      $fset->analysis($analysis_obj);
     }
     
     push(@{$self->{'_output'}},$fset);
@@ -711,108 +730,5 @@ sub output {
     return @{$self->{'_output'}};
 }
 
-sub _createfeatures {
-    my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
-    
-    #create analysis object
-    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => 'est2genome',
-                                 -db_version      => 1,
-                                 -program         => "est2genome",
-                                 -program_version => 1,
-                                 -gff_source      => $f1source,
-                                 -gff_feature     => $f1primary,);
-    
-    #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
-                                              -end =>     $f1end,
-                                              -seqname =>      $f1id,
-                                              -strand =>  $f1strand,
-                                              -score =>   $f1score,
-                                              -source =>  $f1source,
-                                              -primary => $f1primary,
-                                              -analysis => $analysis_obj );
- 
-     my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f2start,
-                                                -end =>    $f2end,
-                                                -seqname =>$f2id,
-                                                -strand => $f2strand,
-                                                -score =>  undef,
-                                                -source => $f2source,
-                                                -primary =>$f2primary,
-                                                -analysis => $analysis_obj );
-    #create featurepair
-    my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-                                             -feature2 => $feat2) ;
- 
-    $self->_growfplist($fp); 
-}
-
-sub _growfplist {
-    my ($self, $fp) =@_;
-    
-    #load fp onto array using command _grow_fplist
-    push(@{$self->{'_fplist'}}, $fp);
-}
-
-sub _createfiles {
-    my ($self, $genfile, $estfile, $dirname)= @_;
-    
-    #check for diskspace
-    my $spacelimit = 0.1; # 0.1Gb or about 100 MB
-    my $dir ="./";
-    unless ($self->_diskspace($dir, $spacelimit)) 
-    {
-        $self->throw("Not enough disk space ($spacelimit Gb required)");
-    }
-            
-    #if names not provided create unique names based on process ID    
-    $genfile = $self->_getname("genfile") unless ($genfile);
-    $estfile = $self->_getname("estfile") unless ($estfile);    
-    #create tmp directory    
-    mkdir ($dirname, 0777) or $self->throw ("Cannot make directory '$dirname' ($?)");
-    chdir ($dirname) or $self->throw ("Cannot change to directory '$dirname' ($?)"); 
-    return ($genfile, $estfile);
-}
-    
-
-sub _getname {
-    my ($self, $typename) = @_;
-    return  $typename."_".$$.".fn"; 
-}
-
-sub _diskspace {
-    my ($self, $dir, $limit) =@_;
-    my $block_size; #could be used where block size != 512 ?
-    my $Gb = 1024 ** 3;
-    
-    open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe");
-    while (<DF>) 
-    {
-        if ($block_size) 
-        {
-            my @L = split;
-            my $space_in_Gb = $L[3] * 512 / $Gb;
-            return 0 if ($space_in_Gb < $limit);
-            return 1;
-        } 
-        else 
-        {
-            ($block_size) = /(\d+).+blocks/i
-                || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-    close DF || $self->throw("Error from 'df' : $!");
-}
-
-
-sub _deletefiles {
-    my ($self, $genfile, $estfile, $dirname) = @_;
-    unlink ("$genfile") or $self->throw("Cannot remove $genfile ($?)\n");
-    unlink ("$estfile") or $self->throw("Cannot remove $estfile ($?)\n");
-    chdir ("../");
-    rmdir ($dirname) or $self->throw("Cannot remove $dirname \n");
-}
 
 1;
