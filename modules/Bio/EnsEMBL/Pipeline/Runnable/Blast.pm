@@ -89,8 +89,6 @@ BEGIN {
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 
-# package variable for fasta header regexes
-# probably not best way of doing this
 my %FASTA_HEADER;
 
 foreach my $db (@$DB_CONFIG) {
@@ -298,9 +296,9 @@ sub run_analysis {
         if (defined($::pipeConf{blast}) && $::pipeconf{blast} eq 'ncbi') {
             $command .= " -d $database -i $filename ";
         } else {
-            $command .= " $database $filename -gi ";
+            $command .= " $database $filename ";
         }
-        $command .= ' '.$self->options. ' > '.$self->results . ".$db";
+        $command .= ' -gi '.$self->options. ' > '.$self->results . ".$db";
 
  	# Add the result file to our clean-up list.
  	$self->file($self->results . ".$db");
@@ -457,7 +455,7 @@ sub parse_results {
     unless ($name) {
         $self->throw("Error getting a valid accession from \"" .
         $fasta_header .
-        "\"; check your Config/Blast.pm and / or blast headers");
+        "\"; check your Blast_conf and / or blast headers");
     }
 
     # print STDERR "Name " . $fasta_header . "\n";
@@ -490,8 +488,6 @@ sub parse_results {
   }
  }
 
-  #print STDERR "Have ".$count." hsps after filtering\n";
-  #print STDERR "Pruning set to :" . $self->prune . "\n";
 
 # Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
@@ -1061,8 +1057,6 @@ sub query {
       $self->results($self->filename.".blast.out");
 
       # Add file to list for later cleanup.
-      
-      
     }
     return $self->{'_query'};
 }
