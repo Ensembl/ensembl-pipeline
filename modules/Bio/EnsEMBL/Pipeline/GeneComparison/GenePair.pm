@@ -242,8 +242,8 @@ sub blast_isoforms{
     system("pressdb $database > /dev/null 2>&1");
     
     ############################################################
-    #my $options = "-nogap W=5";
-    my $options = "W=5";
+    my $options = "-nogap W=5";
+    #my $options = "W=5";
     my $blast =  
       Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
 						    '-program'        => 'wublastn',
@@ -290,9 +290,9 @@ sub blast_isoforms{
       }
       # we use query/target as in feature pairs the target=seqname and query=hseqname
       my ($query_coverage,  $query_spliced)  = 
-	$self->process_query( $features[$i], $tran2 );
+	$self->process_query( $features[$i], $tran2 , $coding_exons);
       my ($target_coverage, $target_spliced) = 
-	$self->process_target( $features[$i], $tran1 );
+	$self->process_target( $features[$i], $tran1, $coding_exons);
       my $score = ( $query_coverage + $target_coverage )/2;
       
       ### this is going to let through also spliced cases - it is just a test
@@ -319,9 +319,19 @@ sub blast_isoforms{
 ############################################################
 
 sub process_target{
-    my ($self,$feat, $tran) = @_;
-    my $transcript_length = $tran->seq->length;
-    my @exons = sort { $a->length <=> $b->length } @{$tran->get_all_Exons};
+    my ($self,$feat, $tran, $coding_exons) = @_;
+    my $transcript_length;
+    my @exons;
+
+    if ( $coding_exons ){
+      $transcript_length = length($tran->translateable_seq);
+      @exons = sort { $a->length <=> $b->length } @{$tran->get_all_translateable_Exons};
+    }
+    else{
+      $transcript_length = $tran->seq->length;
+      @exons = sort { $a->length <=> $b->length } @{$tran->get_all_Exons};
+    }
+    
     my $min_exon_length = $exons[0]->length;
     
     my $is_spliced;
@@ -408,12 +418,22 @@ sub process_target{
 # the query 
 ############################################################
 sub process_query{
- my ($self,$feat, $qtran) = @_;
- my $qtranscript_length = $qtran->seq->length;
- my @exons = sort { $a->length <=> $b->length } @{$qtran->get_all_Exons};
- my $min_exon_length = $exons[0]->length;
+  my ($self,$feat, $qtran, $coding_exons) = @_;
 
- my $is_spliced;
+  my $qtranscript_length;
+  my @exons;
+  if ( $coding_exons ){
+    $qtranscript_length = length($qtran->translateable_seq);
+    @exons = sort { $a->length <=> $b->length } @{$qtran->get_all_translateable_Exons};
+  }
+  else{
+    $qtranscript_length = $qtran->seq->length;
+    @exons = sort { $a->length <=> $b->length } @{$qtran->get_all_Exons};
+  }
+  
+  my $min_exon_length = $exons[0]->length;
+  
+  my $is_spliced;
  
  my @clusters;
  my @cluster_hstarts;
@@ -873,7 +893,7 @@ sub blast_Exons{
   system("pressdb $database > /dev/null 2>&1");
   
   ############################################################
-  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na"  S2=13 -nogap';
+  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na"  S2=13';
   $options .= " W=$word ";
   #print STDERR "options: $options\n";
   #my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
