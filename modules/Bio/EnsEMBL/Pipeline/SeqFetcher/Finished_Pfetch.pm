@@ -16,7 +16,9 @@
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-							      -executable => $exe
+    								-pfetch_server => '',
+    								-pfetch_port => '',
+    								-options => ''
 							     );
     my $seq = $obj->get_Seq_by_acc($acc);
 
@@ -224,6 +226,7 @@ sub write_descriptions {
 	local $/ = "//\n";
 	while(<$server>){
 #		print "**************************************\n";
+		next unless $_ !~ /no match/;
 		$embl_parser->parse($_);
 		my @hit_row = (shift(@{$embl_parser->accession}), 
 									$embl_parser->description,
