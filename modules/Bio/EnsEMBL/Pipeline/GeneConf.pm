@@ -142,7 +142,8 @@ my $prefix='COB';
 	     # Combine Genewises_and_E2Gs specific parameters
 	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
-
+	     GB_COMBINED_MAX_INTRON         => 100000,
+	     
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
