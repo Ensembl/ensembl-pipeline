@@ -930,7 +930,6 @@ sub find_transcripts_by_protein_evidence{
     my $transcript_id;
     
     $transcript_sth->bind_columns(\$transcript_id);
-
     
     while($transcript_sth->fetch){
       push(@tranz, $transcript_id);
@@ -944,7 +943,7 @@ sub find_transcripts_by_protein_evidence{
   ############################################################
   # create transcripts in slice coordinates
   my @transcripts;
-  #print STDERR "have ".@tranz." transcript ids\n";
+  print STDERR "have ".@tranz." transcript ids\n";
   foreach my $t_id ( @tranz ){
     my $tran     = $t_adaptor->fetch_by_dbID($t_id);
     my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
@@ -1058,6 +1057,22 @@ sub is_spliced{
 }
 
 ############################################################
+
+sub _real_introns{
+  my ($self,$tran) = @_;
+  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
+  my $real_introns = 0;
+ INTRON:
+  for (my $i=0; $i<$#exons; $i++ ){
+    my $intron_start  = $exons[$i]->end + 1;
+    my $intron_end    = $exons[$i+1]->start - 1;
+    my $intron_length = $intron_end - $intron_start + 1;
+
+    next INTRON unless ( $intron_length > 9 );
+    $real_introns++;
+  }
+  return $real_introns;
+}
 
 ############################################################
 # this method cehcks whether the splice sites are canonical
