@@ -452,6 +452,7 @@ sub validate_transcript {
   
   my $valid = 1;
   my $split = 0;
+  my $MAX_INTRON = 100000;
 
   # check coverage of parent protein
   my $coverage  = $self->check_coverage($transcript);
@@ -487,12 +488,22 @@ sub validate_transcript {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-      if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
-	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
+# this isn't really working - it's letting through too many genes with long introns  - replace 
+# it with a simple split for the moment
+
+#      if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
+#	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
+#	$split = 1;
+#	$valid = 0;
+#      }
+ 
+      if ( $intron > $MAX_INTRON ) {
+	print STDERR "Intron too long $intron  for transcript " . $transcript->dbID . "\n";
 	$split = 1;
 	$valid = 0;
       }
       
+     
       if ($exon->strand != $previous_exon->strand) {
 	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
 	$valid = 0;
