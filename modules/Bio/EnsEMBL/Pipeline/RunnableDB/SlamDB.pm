@@ -50,6 +50,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
+
 package Bio::EnsEMBL::Pipeline::RunnableDB::SlamDB;
 
 use strict;
