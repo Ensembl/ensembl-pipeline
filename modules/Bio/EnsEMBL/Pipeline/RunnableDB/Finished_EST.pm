@@ -72,7 +72,7 @@ sub check_with_seg{
         or $self->throw("Can't create Bio::SeqIO $filename $!");
     $file->write_seq($seqObj_to_test);
 
-    my $seg_cmd = "seg $filename -a";
+    my $seg_cmd = "nseg $filename -x";
     my $seg = Bio::SeqIO->new(-file   => "$seg_cmd |",
                               -format => 'Fasta')
         or $self->throw("Can't create Bio::SeqIO $seg_cmd $!");
@@ -84,7 +84,7 @@ sub check_with_seg{
     if($@){
         $self->throw("There was a problem with SEG masking.\nI tried to '$seg_cmd'");
     }
-    if($seq =~ /[CATG]{3}/){
+    if($seq =~ /[CATG]{3}/i){
         $self->input_is_void(0);
     }else{
         $self->input_is_void(1);
