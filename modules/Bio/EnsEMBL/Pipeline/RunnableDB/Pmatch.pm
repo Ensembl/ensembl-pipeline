@@ -43,23 +43,10 @@ sub fetch_input{
   my ($self) = @_;
   print STDERR "Fetching input\n";
   $self->make_protlist;
-  print STDERR "Trying to parse ".$self->input_id." with ".$GB_INPUTID_REGEX."\n";
-  $self->input_id =~ /$GB_INPUTID_REGEX/;
-  my $chrid = $1;
-  my $chrstart = $2;
-  my $chrend   = $3;
   
-  print STDERR "Fetching ".$chrid." ".$chrstart." ".$chrend."\n";  
-  my $sla       = $self->db->get_SliceAdaptor();
-  my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $genseq;
-  if(@$GB_PMATCH_MASKING){
-    $genseq    = $slice->get_repeatmasked_seq($GB_PMATCH_MASKING, $GB_PMATCH_SOFTMASK);
-  }else{
-    $genseq = $slice;
-  }
+ $self->fetch_sequence($GB_PMATCH_MASKING); 
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Pmatch->new(
-							       '-query' => $genseq,
+							       '-query' => $self->query,
 							       '-protein_file' => $self->protein_file,
 							       '-options' => $self->analysis->parameters,
 							       '-max_intron_size' => $self->max_intron,
