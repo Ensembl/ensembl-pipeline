@@ -104,6 +104,17 @@ sub _check_Transcript{
 	    
 	    
 	    if ( $i>0 ){
+
+	      
+		##############################
+		# check strand consistency:
+		##############################
+	        if($exons[$i]->strand != $exons[$i-1]->strand){
+	            print STDERR "transcript $id has mixed strands\n";
+	            $valid = 0;
+		    last EXON;
+	        }
+	      
 		##############################
 		# check phase consistency:
 		##############################
@@ -302,6 +313,68 @@ sub _check_Translation{
     $self->_print_Transcript($transcript);
   }
   return $valid;
+}
+
+############################################################
+=head2 _check_low_complexity
+
+  Arg [1]   : Bio::EnsEMBL::Transcript $transcript
+  Arg [2]   : int $complexity_threshold
+  Function  : uses seg to find low complexity regions in transcript->translate. 
+              Calculates overall %low complexity of the translation and compares to 
+              $complexity_threshold. A valid transcript has calculated low complexity 
+              is less than $complexity_threshold
+  Returntype: 1/0
+  Exceptions: warns if things checks fail and returns 0
+  Caller    : 
+  Example   : 
+
+=cut
+	  
+sub _check_low_complexity{
+  my ($transcript,$complexity_threshold) = @_;
+	    
+  my $low_complexity;
+  
+  eval{
+    
+    my $protseq = $transcript->translate;
+    
+    # Ugh! 
+    my $analysis = Bio::EnsEMBL::Analysis->new(
+					       -db           => 'low_complexity',
+					       -program      => '/usr/local/ensembl/bin/seg',
+					       -program_file => '/usr/local/ensembl/bin/seg',
+					       -gff_source   => 'Seg',
+					       -gff_feature  => 'annot',
+					       -module       => 'Seg',
+					       -logic_name   => 'Seg'
+					       
+					      );
+    
+    my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
+								  -query    => $protseq,
+								  -analysis => $analysis,
+								 );
+    
+    $seg->run;
+    
+    
+    if($seg->get_low_complexity_length > $complexity_threshold){
+      warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
+      return 0;
+    }
+    
+    return 1;
+    
+    
+  };
+  
+  if($@){
+    print STDERR "problem running seg: \n[$@]\n";
+    return 1;		# let transcript through
+  }
+  
 }
 
 ############################################################
