@@ -244,7 +244,7 @@ sub add_killed{
     }
 }
 
-sub add_exisiting{
+sub add_existing{
     my ($self, $arg) = @_;
     my $idset = $self->_check($arg);
     if(!$self->{'_existing'}){
