@@ -15,9 +15,11 @@ Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
 
 =head1 SYNOPSIS
 
-my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
-(-db_obj => $dbobj,
- -input_id => $input_id);
+my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G(
+                                                                      '-db_obj'      => $dbobj,
+                                                                      '-golden_path' => $gp,
+                                                                      '-input_id'    => $input_id
+                                                                    );
 
 $t_e2g->fetch_input();
 $t_e2g->run();
@@ -46,11 +48,6 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G;
 
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
-					 );
 use Storable qw(dclone);
 # Object preamble - inheriets from Bio::Root::RootI
 
@@ -59,10 +56,12 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-#use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
-use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
+use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -70,16 +69,130 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
+  my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH,
+						      CDNA_SEQFETCHER)], @args);
+
+  # golden path
+  if(!defined $path){
+    # look in GB_conf.pl
+    $path = $::db_conf{'golden_path'};
+  }
+
+  $path = 'UCSC' unless (defined $path && $path ne '');
+  $self->dbobj->static_golden_path_type($path);
+
+  # protein sequence fetcher
   if(!defined $self->seqfetcher) {
-    # will look for pfetch in $PATH - change this once PipeConf up to date
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    my $seqfetcher = $self->make_seqfetcher("protein_index");
     $self->seqfetcher($seqfetcher);
   }
 
+  # cdna sequence fetcher
+  if(defined $cdna_seqfetcher){
+    $self->throw("[$cdna_seqfetcher] is not a Bio::DB::RandomAccessI\n") unless $cdna_seqfetcher->isa("Bio::DB::RandomAccessI");
+    $self->cdna_seqfetcher($cdna_seqfetcher);
+  }
+  else {
+    my $seqfetcher = $self->make_seqfetcher("cdna_index");
+    $self->cdna_seqfetcher($seqfetcher);
+  }
+ 
   return $self;
 }
 
+=head2 make_seqfetcher
 
+ Title   : make_seqfetcher
+ Usage   :
+ Function: get/set
+ Example :
+ Returns : Bio::DB::RandomAccessI
+ Args    :
+
+
+=cut
+
+sub make_seqfetcher{
+  my ( $self, $indexname ) = @_;
+  my $index = $::targetted_conf{$indexname};
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
+								  '-db' => \@db,
+								 );
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+  }
+
+  return $seqfetcher;
+}
+
+=head2 cdna_seqfetcher
+
+ Title   : cdna_seqfetcher
+ Usage   :
+ Function: get/set
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub cdna_seqfetcher {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        #need to check if passed sequence is Bio::DB::RandomAccessI object
+        $value->isa("Bio::DB::RandomAccessI") || 
+	    $self->throw("Input isn't a Bio::DB::RandomAccessI");
+        $self->{'_cdna_seqfetcher'} = $value;
+    }
+    return $self->{'_cdna_seqfetcher'};
+}
+
+=head2 cdna_id
+
+ Title   : cdna_id
+ Usage   :
+ Function: get/set
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub cdna_id {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        $self->{'_cdna_id'} = $value;
+    }
+    return $self->{'_cdna_id'};
+}
+
+=head2 protein_id
+
+ Title   : protein_id
+ Usage   :
+ Function: get/set
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub protein_id {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        $self->{'_protein_id'} = $value;
+    }
+    return $self->{'_protein_id'};
+}
 
 =head2 fetch_input
 
@@ -97,80 +210,74 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my @fps;
-  my $fpc;
-  my $pid; 
-  
+  my $chrname;
   my $start;
   my $end;
+  my $protein_id; 
+  my $cdna_id;
 
-  # input format: chr22:10602496,10603128:Q9UGV6:AC00012
-  # or chr22:10602496,10603128:Q9UGV6 if no cDNA
+  # input format: ctg1234:10602496,10603128:Q9UGV6:AC00012
+  # or ctg1234:10602496,10603128:Q9UGV6 if no cDNA
   if( !(($entry =~ /(\S+):(\d+),(\d+):(\S+):(\S+)/) || ($entry =~ /(\S+):(\d+),(\d+):(\S+):/))) {
       $self->throw("Not a valid input id... $entry");
   }
   
   print STDERR "input: ".$entry . "\n";
   
-  if ($fpc) { $self->throw("mixed fpc contigs") unless $fpc = $1; }
-  if ($pid) { $self->throw("mixed protein hits") unless $pid = $4; }
- 
-  $fpc = $1;
-  $pid = $4;
-  my $dnaid = $5;
+  $chrname    = $1;
+  $protein_id = $4;
+  $cdna_id    = $5;
+  $start   = $2;
+  $end     = $3;
 
-  my $fpcstart   = $2;
-  my $fpcend     = $3;
-  my $fpcstrand  = 1;
-  
   if ($2 > $3) { # let blast sort it out
-      $fpcstart  = $3;
-      $fpcend    = $2;
-      $fpcstrand = -1;
+      $start  = $3;
+      $end    = $2;
   }
+
   
-  $start = $fpcstart unless (defined $start && $start < $fpcstart);
-  $end = $fpcend unless (defined $end && $end > $fpcend);
-  
+#  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
+#  print STDERR "$chrname $chrstart $chrend\n";
+#  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
-
-  print STDERR "$fpc $start $end\n";
-
-  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
-  print STDERR "$chrname $chrstart $chrend\n";
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
   $self->vc($vc);
+  $self->cdna_id($cdna_id);
+  $self->protein_id($protein_id);
   
   # genewise runnable
+  # repmasking?
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc->primary_seq,
-								    '-ids'        => [ $pid ] ,
+								    '-ids'        => [ $protein_id ] ,
 								    '-seqfetcher' => $self->seqfetcher);
  
   $self->runnable($r);
 
   # est2genome runnable
-  return unless defined($dnaid);
+  return unless defined($cdna_id);
 
   my $cdna;
   eval{
-    $cdna = $self->seqfetcher->get_Seq_by_acc($dnaid);
+    $cdna = $self->cdna_seqfetcher->get_Seq_by_acc($cdna_id);
   };
   if($@) {
-    $self->throw("problem fetching [$dnaid]: [$@]\n");
+    $self->warn("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n");
   }
-  
-  $self->{'_tmpfile'} = "/tmp/tge2g_" . $$ . ".fa";
-  my $blastdb = $self->{'_tmpfile'};
-
-  my $seqout = new Bio::SeqIO('-file' => ">$blastdb" , '-format' => 'Fasta');
-  $seqout->write_seq($cdna);
-
-  my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'    => $vc->primary_seq, 
-								      '-queryseq'    => $blastdb,
-								      '-seqfetcher' => $self->seqfetcher);
-
-  $self->e2g_runnable($e2g);
+  else{
+    $self->{'_tmpfile'} = "/tmp/tge2g_" . $$ . ".fa";
+    my $cdnafile = $self->{'_tmpfile'};
+    
+    my $seqout = new Bio::SeqIO('-file' => ">$cdnafile" , '-format' => 'Fasta');
+    $seqout->write_seq($cdna);
+    
+    # repmasking?
+    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome('-genomic'    => $vc->primary_seq, 
+									    '-queryseq'   => $cdnafile,
+									    '-seqfetcher' => $self->cdna_seqfetcher);
+    
+    $self->e2g_runnable($e2g);
+  }
 }
 
 
@@ -192,16 +299,17 @@ sub run {
    $self->runnable->run();
    $self->convert_gw_output;
 
-   if (defined $self->e2g_runnable) {
+   # check to see we have genewise genes before running e2g and trying to combine results
+   my @gw_genes = $self->gw_genes;
+   if (scalar(@gw_genes) && defined $self->e2g_runnable) {
      $self->e2g_runnable->run;
      $self->convert_e2g_output;
      $self->combine_genes;
-
-     # clean up tmpfile
-     my $tmpfile = $self->{'_tmpfile'};
-     unlink $tmpfile;
    }
 
+   # clean up tmpfile
+     my $tmpfile = $self->{'_tmpfile'};
+     unlink $tmpfile;
    # remap to raw contig coords
    my @remapped = $self->remap_genes();
    $self->{'_output'} = \@remapped;
@@ -282,104 +390,13 @@ sub runnable{
 sub write_output {
     my($self) = @_;
 
-#    $self->throw("exiting bfore write");
+    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
-    my $db = $self->dbobj;
-  
-    if( !defined $db ) {
-      $self->throw("unable to make write db");
-    }
-    
-    my %contighash;
-    my $gene_obj = $db->gene_Obj;
-
-
-    my @newgenes = $self->output;
-    return unless ($#newgenes >= 0);
-
-    # get new ids
-    eval {
-
-	my $genecount  = 0;
-	my $transcount = 0;
-	my $translcount = 0;
-	my $exoncount  = 0;
-
-	# get counts of each type of ID we need.
-	
-	foreach my $gene ( @newgenes ) {
-	  $genecount++;
-	  
-#	  print STDERR "genetype: " . $gene->type . "\n";
-	  
-	  
-	  foreach my $trans ( $gene->each_Transcript ) {
-	    $transcount++;
-	    $translcount++;
-	  }
-
-	  foreach my $exon ( $gene->each_unique_Exon() ) {
-	    $exoncount++;
-	    }
-	}
-	
-#	$self->throw("exiting bfore write");
-	
-	# get that number of ids. This locks the database
-	
-	my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-	my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-	my @translids=  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-	my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-
-	# database locks are over.
-
-	# now assign ids. gene and transcripts are easy. Exons are harder.
-	# the code currently assummes that there is one Exon object per unique
-	# exon id. This might not always be the case.
-
-	foreach my $gene ( @newgenes ) {
-	    $gene->id(shift(@geneids));
-	    my %exonhash;
-	    foreach my $exon ( $gene->each_unique_Exon() ) {
-		my $tempid = $exon->id;
-		$exon->id(shift(@exonsid));
-		$exonhash{$tempid} = $exon->id;
-	    }
-	    foreach my $trans ( $gene->each_Transcript ) {
-		$trans->id(shift(@transids));
-		$trans->translation->id(shift(@translids));
-		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-	    }
-	    
-	}
-
-	# paranoia!
-	if( scalar(@geneids)  != 0 || scalar(@exonsid)   != 0 || 
-	    scalar(@transids) != 0 || scalar(@translids) != 0 ) {
-	    $self->throw("In id assignment, left with unassigned ids ".
-			 scalar(@geneids)  . " " .
-			 scalar(@transids) . " " .
-			 scalar(@translids)." " .
-			 scalar(@exonsid));
-	}
-
-    };
-    if( $@ ) {
-	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-    }
-
-
-    # this now assummes that we are building on a single VC.
-
-#    $self->throw("Bailing before real write\n");
-    
-  GENE: foreach my $gene (@newgenes) {	
+  GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
       eval {
-	  print STDERR $gene->id . "\n";
-	  $gene_obj->write($gene);
+	  $gene_adaptor->store($gene);
+	  print STDERR "gene dbID " . $gene->dbID . "\n";
       }; 
       if( $@ ) {
 	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -500,7 +517,6 @@ sub convert_e2g_output {
   }  
 
   my $count = 1;
-  my $time  = time; chomp($time);
   my $genetype = "TGE_e2g";
   
   # get the appropriate analysis from the AnalysisAdaptor
@@ -508,13 +524,16 @@ sub convert_e2g_output {
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
   my $analysis_obj;
+
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
+    print STDERR "fiound one for e2g!\n";
     $analysis_obj = $analyses[0];
   }
   else{
+    print STDERR "making new analysis for e2g!\n";
     # make a new analysis object
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
@@ -562,10 +581,12 @@ sub convert_gw_output {
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
+    print STDERR "fiound one for genewise!\n";
     $analysis_obj = $analyses[0];
   }
   else{
     # make a new analysis object
+    print STDERR "making new one for genewise!\n";
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
        -db_version      => 1,
@@ -580,12 +601,53 @@ sub convert_gw_output {
 
   my @genes    = $self->make_genes($count, $genetype, $analysis_obj, \@results);
 
+  my @checked  = $self->check_gw_genes(@genes);
+
   # check for stops?
-  print STDERR "gw genes: " . scalar(@genes) . "\n";
-  $self->gw_genes(@genes);
+  print STDERR "gw genes: " . scalar(@checked) . "\n";
+  $self->gw_genes(@checked);
   
 }
 
+=head2 check_gw_genes
+
+ Title   : check_gw_genes
+ Usage   :
+ Function: Checks coverage of parent protein, and checks all exons are sane
+ Example :
+ Returns : array of checked Bio::EnsEMBL::Gene
+ Args    : array of Bio::EnsEMBL::Gene
+
+
+=cut
+
+sub check_gw_genes{
+  my ($self, @genes) = @_;
+
+  my @checked;
+
+  GENE:
+  foreach my $gene(@genes) {
+    my $covered = $self->_check_coverage($gene);
+    if(!$covered){
+      my $msg = "rejecting gene because < 80% coverage of parent protein\n";
+      $self->warn($msg);
+      next GENE;
+    };
+
+    if($self->validate_gene($gene)){
+      push (@checked, $gene);
+    }
+    else{
+      my $msg = "rejecting gene\n";
+      $self->warn($msg);
+      next GENE;
+    }
+  }
+  
+  return @checked;
+  
+}
 
 =head2 combine_genes
 
@@ -617,10 +679,12 @@ sub combine_genes{
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
   elsif(scalar(@analyses) == 1){
+    print STDERR "fiound one for combined!\n";
     $analysis_obj = $analyses[0];
   }
   else{
     # make a new analysis object
+    print STDERR "making new one for combined!\n";
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
        -db_version      => 1,
@@ -641,20 +705,18 @@ sub combine_genes{
   # make some lovely genes
   my @genes;
   my $count=0;
-  my $time = time;
-  chomp($time);
 
   foreach my $trans(@newtrans){
+    $trans->sort;
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($self->input_id . "$genetype.$count"); 
-    $gene->version(1);
     $gene->add_Transcript($trans);
     $gene->analysis($analysis_obj);
-    $gene->created($time);
-    $gene->modified($time);
-    push (@genes,$gene);
-    $count++;
+
+    if($self->validate_gene($gene)){
+      push (@genes,$gene);
+      $count++;
+    }
   }
 
   $self->combined_genes(@genes);
@@ -665,7 +727,7 @@ sub combine_genes{
 
  Title   : _merge_gw_genes
  Usage   :
- Function: merges adjacent exons if they are frameshifted; stores component exons
+ Function: merges adjacent exons if they are frameshifted; stores component exons as subSeqFeatures of the merged exon
  Example :
  Returns : 
  Args    :
@@ -678,13 +740,9 @@ sub _merge_gw_genes {
 
   my @merged;
   my $count = 1;
-  my $contig = $self->vc;
   foreach my $gwg($self->gw_genes){
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('combined');
-    #  $gene->id($self->input_id . ".combined.$count");
-    $gene->id($gwg->id);
-    $gene->version(1);
     
     my @pred_exons;
     my $ecount = 0;
@@ -694,67 +752,49 @@ sub _merge_gw_genes {
     if(scalar(@trans) != 1) { $self->throw("expected one transcript for $gwg\n"); }
     
   EXON:      
-    foreach my $exon($trans[0]->each_Exon){
-      my $prev_exon;
+    foreach my $exon($trans[0]->get_all_Exons){
+      my $previous_exon;
       
-#      print STDERR "exon id: " . $exon->id . "\n";
-
       if ($ecount && $pred_exons[$ecount-1]){
-	$prev_exon = $pred_exons[$ecount-1];
+	$previous_exon = $pred_exons[$ecount-1];
       }
       
       $ecount++;
       
-      # frameshift? we treat two exons separated by max 10 bases as a single exon
-      if( defined($prev_exon) && abs($exon->start - $prev_exon->end) <= 10 ){
+      # genewise frameshift? we treat two exons separated by max 10 bases as a single exon
+      if( defined($previous_exon) && abs($exon->start - $previous_exon->end) <= 10 ){
 	# combine the two
-	$prev_exon->end($exon->end);
-	$prev_exon->add_sub_SeqFeature($exon,'');
+	$previous_exon->end($exon->end);
+	$previous_exon->add_sub_SeqFeature($exon,'');
 	next EXON;
       }
       
       else{
 	# make a new Exon - clone $exon
-	my $ne = dclone($exon);
-	$ne->attach_seq($self->vc->primary_seq);
-	$ne->add_sub_SeqFeature($exon,'');
-	push(@pred_exons, $ne);
+	my $cloned_exon = dclone($exon);
+	$cloned_exon->attach_seq($self->vc->primary_seq);
+	$cloned_exon->add_sub_SeqFeature($exon,'');
+	push(@pred_exons, $cloned_exon);
       }
       
     }
 
     # transcript
-    my $transcript   = new Bio::EnsEMBL::Transcript;
-    $transcript->id($contig->id . ".combined.$count");
-    $transcript->version(1);
+    my $merged_transcript   = new Bio::EnsEMBL::Transcript;
     foreach my $pe(@pred_exons){
-      $transcript->add_Exon($pe);
+      $merged_transcript->add_Exon($pe);
     }
     
-    my $gw_translation = dclone($trans[0]->translation);
-    $transcript->translation($gw_translation);
+# ??can't just clone the translation; all the memory addresses will be screwed for the component exons
+    my $cloned_translation = dclone($trans[0]->translation);
+    $merged_transcript->translation($cloned_translation);
     
     # and gene
-    $gene->add_Transcript($transcript);
+    $gene->add_Transcript($merged_transcript);
     push(@merged, $gene);
     $count++;
-
-    # phase check??
-    print STDERR "Phase check\n";
-    $transcript->sort;
-    $trans[0]->sort;
-    print STDERR "new transcript\n";
-    foreach my $e($transcript->each_Exon) {
-      foreach my $sf($e->sub_SeqFeature){
-	print STDERR $sf->start . " - " . $sf->end . " " .$sf->phase . "\t" . $sf->end_phase . "\n";
-      }
-    }
-    print STDERR "original transcript\n";
-    foreach my $e($trans[0]->each_Exon) {
-      print STDERR $e->start . " - " . $e->end . " " . $e->phase . "\t" . $e->end_phase . "\n";
-    }
-
   }
+
   return @merged;
 }
 
@@ -772,79 +812,77 @@ sub _merge_gw_genes {
 
 sub _make_newtranscripts {
   my ($self, $genetype, $analysis_obj, @merged_gw_genes) = @_;
-  my @gw_genes  = $self->gw_genes;
-  my @e2g_genes = $self->e2g_genes;
-  my @newtrans  = ();
+  my @combined_transcripts  = ();
+  
+  # we need to compare each genewise prediction with each est_genome 
+  # prediction and tie them together into "combined" genes
 
-
-
- GENE:
+ GENEWISE:
   foreach my $gene(@merged_gw_genes) {
-    print "\nGENE\n";
-    my @gw_tran = $gene->each_Transcript;
-    my @gw_ex = $gw_tran[0]->each_Exon; # need ordered array
-    my $strand = $gw_ex[0]->strand;
-    $self->warn("first and last gw exons have different strands - odd things will happen\n") if ($gw_ex[$#gw_ex]->strand != $strand);
-    
     my $foundtrans = 0;  
-    if(scalar(@gw_ex) == 1){
-      my $covered = $self->_check_coverage($gene);
-      print STDERR "Single exon\n";
-      next GENE unless $covered;
-    }
 
- E2G:
-    foreach my $eg(@e2g_genes){
-      # yuk yuk yuk only want 1 prediction per cDNA - SP:refseq duplicates
-      next GENE if $foundtrans;
+    # should be only 1 transcript
+    my @gw_tran  = $gene->each_Transcript;
+    my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
+    my $strand   = $gw_exons[0]->strand;
+
+    if($gw_exons[$#gw_exons]->strand != $strand){
+      $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
+      next GENEWISE;
+    }
+    
+  E2G:
+    foreach my $eg($self->e2g_genes){
+      next GENEWISE if $foundtrans;
+
       my @egtran = $eg->each_Transcript;
-      my @eg_ex = $egtran[0]->each_Exon; # need ordered array again
+      my @e2g_exons  = $egtran[0]->get_all_Exons; # ordered array of exons
       
-      print STDERR "comparing " . $gene->id . " with " . $eg->id . "\n";
       # OK, let's see if we need a new gene
       # base it on the existing genewise one
       my $newtranscript = dclone($gw_tran[0]);
-      my $tmpid = $newtranscript->id;
-      $tmpid .= "_combined";
-      $newtranscript->id($tmpid);
-      my $translation  = dclone($gw_tran[0]->translation);
-      $tmpid = $translation->id;
-      $tmpid .= "_combined";
-      $translation->id($tmpid);
+      my $translation   = dclone($gw_tran[0]->translation);
       $newtranscript->translation($translation);
       my $eecount = 0;
-
-      print "e2g exons: " . scalar(@eg_ex) . "\n";
-
-      foreach my $ee(@eg_ex){
-	$self->warn("gw and e2g exons have different strands - odd things will happen\n") 
-	  if ($ee->strand != $strand);
-
+      
+      # check strands are consistent
+      foreach my $ee(@e2g_exons){
+	if ($ee->strand != $strand){
+          $self->warn("gw and e2g exons have different strands - can't combine genes\n") ;
+          next GENEWISE;
+        }
+	
 	# single exon genewise prediction?
-	if(scalar(@gw_ex) == 1) {# eeeep
-
-	  $newtranscript = $self->transcript_from_single_exon_genewise( $ee, $gw_ex[0], $newtranscript, $translation, $eecount, @eg_ex);
+	if(scalar(@gw_exons) == 1) {
+	  $newtranscript = $self->transcript_from_single_exon_genewise( $ee, 
+									$gw_exons[0], 
+									$newtranscript, 
+									$translation, 
+									$eecount, 
+									@e2g_exons);
 	  
 	}
 	
-	# multiple exon genewise prediction
-	else {#multi
-	  $newtranscript = $self->transcript_from_multi_exon_genewise($ee, $newtranscript, 
-								      $translation, $eecount, $gene, $eg)
-	} # end multi exon predictions
-  
+	else {
+	  $newtranscript = $self->transcript_from_multi_exon_genewise($ee, 
+								      $newtranscript, 
+								      $translation, 
+								      $eecount,
+								      $gene, 
+								      $eg)
+	}
+	
 	# increment the exon
 	$eecount++;
 	
       } # end foreach my $ee
-      
+
+      # the new transcript is made from a merged genewise gene
       # check the transcript and expand frameshifts in all but original 3' gw_exon
-      # check translation does not change from original genewise prediction
       if (defined($newtranscript)){
-	foreach my $ex($newtranscript->each_Exon){
+	foreach my $ex($newtranscript->get_all_Exons){
 	  if(scalar($ex->sub_SeqFeature) > 1 ){
-	    print STDERR "frameshift: " . $ex->id . "\n";
-	    my @sf = $ex->sub_SeqFeature;
+	    my @sf    = $ex->sub_SeqFeature;
 	    my $first = shift(@sf);
 	    $ex->end($first->end);
 	    # add back the remaining component exons
@@ -858,7 +896,7 @@ sub _make_newtranscripts {
 	}
 	
 	# dclone messes up database handles
-	foreach my $ex($newtranscript->each_Exon){
+	foreach my $ex($newtranscript->get_all_Exons){
 	  $ex->attach_seq($self->vc);
 	  $ex->contig_id($self->vc->id);
 	  # add new analysis object to the supporting features
@@ -868,81 +906,95 @@ sub _make_newtranscripts {
 	  }
 	}
 	
-	# compare UTR-gene translation with genewise translation NB NOT the merged gw gene 
-	# we have been using for building!!!
-      GWG:	foreach my $gwg($self->gw_genes) {
-	  if ($gwg->id eq $gene->id){
-	    my @gwgtran = $gwg->each_Transcript;
-	    if(scalar(@gwgtran != 1)) {
-	      $self->warn("Panic! Got " . scalar(@gwgtran) . " transcripts from " . $gwg->id . "\n");
-	      next GWG;
-	    }
-	    
-	    my $genewise;
-	    my $combined;
-	    
-	    eval {
-	      $genewise = $gwgtran[0]->translate;
-	      $combined = $newtranscript->translate;
-	    };
-	    
-	    if ($@) {
-	      print STDERR "Couldn't translate: " . $gene->id . " plus " . $eg->id  . "[$@]\n";
-	    }
-	    
-	    print STDERR "translation: \n";
-	    my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
-	    print STDERR "genewise: \n";	      
-	    $seqio->write_seq($genewise);	      
-	    print STDERR "combined: \n";
-	    $seqio->write_seq($combined); 
-	    print STDERR "\n ";
-	    
-	    if($genewise->seq eq $combined->seq) {
-	      $foundtrans = 1;
-	      push (@newtrans, $newtranscript); 	
-	    }
-	    else {
-	      $self->warn("UTR prediction is not the same as genewise prediction - discarding it\n");
-	    }
+      # check translation is the same as for the genewise gene we're built from
+      GWG:	
+	foreach my $gwg($self->gw_genes) {
+	  $foundtrans = $self->compare_transcripts($gwg, $newtranscript);
+ 
+	  if ($foundtrans = 1){
+	    push (@combined_transcripts, $newtranscript); 	
+	    last GWG;
 	  }
 	}
+	# did we find any genewise gene whose translation matched our combined gene?
+	if(!$foundtrans){
+	  $self->warn("UTR prediction is not the same as genewise prediction - discarding it\n");
+	}
+	
       }
     }
   }
-  return @newtrans;
+  return @combined_transcripts;
   
+}
+
+sub compare_transcripts{
+  my ($self, $genewise_gene, $combined_transcript) = @_;
+  my @genewise_transcripts = $genewise_gene->each_Transcript;
+  if(scalar(@genewise_transcripts != 1)) {
+    $self->warn("Panic! Got " . scalar(@genewise_transcripts) . " transcripts, expecting only 1!\n");
+    return 0;
+  }
+	  
+  my $genewise_translation;
+  my $combined_translation;
+  
+  eval {
+    $genewise_translation = $genewise_transcripts[0]->translate;
+  };
+
+  if ($@) {
+#    print STDERR "Couldn't translate genewise gene: [$@]\n";
+    print STDERR "Couldn't translate genewise gene\n";
+    return 0;
+  }
+  $@ = '';
+  eval{
+    $combined_translation = $combined_transcript->translate;
+  };
+
+
+  if ($@) {
+#    print STDERR "Couldn't translate combined gene: [$@]\n";
+    print STDERR "Couldn't translate combined gene\n";
+    return 0;
+  }
+	  
+  print STDERR "translation: \n";
+  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+  print STDERR "genewise: \n";	      
+  $seqio->write_seq($genewise_translation);	      
+  print STDERR "combined: \n";
+  $seqio->write_seq($combined_translation); 
+  print STDERR "\n ";
+  
+  if($genewise_translation->seq eq $combined_translation->seq) {
+    return 1;
+  }
+
+  return 0;
 }
 
 sub transcript_from_single_exon_genewise {
   my ($self, $eg_exon, $gw_exon, $transcript, $translation, $exoncount, @e2g_exons) = @_;
+
   if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
     print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
+
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_exon;
-    
+
     $ex->start($eg_exon->start);
     $ex->end($eg_exon->end);
-    
-    #	    print STDERR "eecount: $eecount\n";
+
+    # need to explicitly set the translation start & end exons here.
+    $translation->start_exon($ex);
+    # end_exon may be adjusted by 3' coding exon frameshift expansion. Ouch.
+    $translation->end_exon($ex);
     
     # need to add back exons, both 5' and 3'
-    my $c = 0;
-    while($c < $exoncount){
-      print STDERR "adding 5' exon\n";
-      $transcript->add_Exon($e2g_exons[$c]);
-      $transcript->sort;
-      $c++;
-    }
-	    
-    # add all the exons from the est2genome transcript, subsequent to this one
-    $c = $#e2g_exons;
-    while($c > $exoncount){
-      print STDERR "adding 3' exon\n";
-      $transcript->add_Exon($e2g_exons[$c]);
-      $transcript->sort;
-      $c--;
-    }
+    $self->add_5prime_exons(\$transcript, $exoncount, @e2g_exons);
+    $self->add_3prime_exons(\$transcript, $exoncount, @e2g_exons);
 	    
     # need to deal with translation start and end this time - varies depending on strand
     if($gw_exon->strand == 1){
@@ -950,32 +1002,20 @@ sub transcript_from_single_exon_genewise {
       my $tstart = $translation->start;
       my $tend = $translation->end;
 	      
-      #	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
       $translation->start($tstart + $diff);
       $translation->end($tend + $diff);
     }
 
     elsif($gw_exon->strand == -1){
-      #	      print STDERR "***reverse\n";
-      #	    my $diff = $e2g_exon->end - $gw_ex[0]->end;
-#      my $diff = $gw_exon->start - $eg_exon->start;
       my $diff = $ex->end - $gw_exon->end;
-      print STDERR "diff $diff\n";
       my $tstart = $translation->start;
       my $tend = $translation->end;
-      print STDERR "***gw  " . $gw_exon->start . " " . $gw_exon->end . "\n";
-      print STDERR "***e2g  " . $ex->start . " " . $ex->end . "\n";
-      print STDERR "*** translation - before  " . $translation->start . " " . $translation->end . "\n";
-      
       $translation->start($tstart+$diff);
       $translation->end($tend + $diff);
- #    $translation->start(18);
- #     $translation->end(1008);
-      print STDERR "*** translation - after  " . $translation->start . " " . $translation->end . "\n";
     }
     
     
-    # frameshifts - if > 1 frameshift we may just be buggered. My brain hurts.
+    # expand frameshifted exons back from one exon to multiple exons
     if(scalar($ex->sub_SeqFeature) > 1){
       print STDERR "uh-oh frameshift\n";
       my @sf = $ex->sub_SeqFeature;
@@ -992,6 +1032,8 @@ sub transcript_from_single_exon_genewise {
       my $last = pop(@sf);
       $last->end($cend);
       $transcript->add_Exon($last);
+      # and adjust translation end
+      $translation->end_exon($last);
       
       # get any remaining exons
       foreach my $s(@sf){
@@ -1002,7 +1044,7 @@ sub transcript_from_single_exon_genewise {
       $ex->flush_sub_SeqFeature;
     }	      
   }
-  return $transcript
+  return $transcript;
 }
 
 
@@ -1010,27 +1052,31 @@ sub transcript_from_multi_exon_genewise {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
   
   my @gwtran  = $gw_gene->each_Transcript;
-  my @gwexons = $gwtran[0]->each_Exon;
+  my @gwexons = $gwtran[0]->get_all_Exons;
   
   my @egtran  = $eg_gene->each_Transcript;
-  my @egexons = $egtran[0]->each_Exon;
+  my @egexons = $egtran[0]->get_all_Exons;
 
+  # explicitly set translation start and end exons
+  $translation->start_exon($transcript->start_exon);
+  # end exon may be changed if there is a frameshift in the 3' genewise exon
+  $translation->end_exon($transcript->end_exon);
+  
   
   # compare to the first genewise exon
   if($gwexons[0]->strand == 1){
+  FORWARD:
     if ($gwexons[0]->end == $current_exon->end && $current_exon->start <= $gwexons[0]->start){
       print STDERR "5' exon match!\n";
       # modify the coordinates of the first exon in $newtranscript
       my $ex = $transcript->start_exon;
       $ex->start($current_exon->start);
+
+      # need to explicitly set the translation start exon for translation to work out
+      $translation->start_exon($ex);
 	      
       # add all the exons from the est2genome transcript, previous to this one
-      my $c = 0;
-      while($c < $exoncount){
-	$transcript->add_Exon($egexons[$c]);
-	$transcript->sort;
-	$c++;
-      }
+      $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
       
       # fix translation start 
       # take what it was for the gw gene, and add on the extra
@@ -1046,64 +1092,38 @@ sub transcript_from_multi_exon_genewise {
       # modify the coordinates of the last exon in $newtranscript
       my $ex = $transcript->end_exon;
       $ex->end($current_exon->end);
-      
-      # is it a frameshifted one?	3' exon is a special case as its end might have changed
-      if(scalar($ex->sub_SeqFeature) > 1){
-	print STDERR "3' exon frameshift + strand\n";
-	my @sf = $ex->sub_SeqFeature;
-	my $last = pop(@sf);
-	
-	# sort out start, id & phase
-	$ex->start($last->start); # but don't you dare touch the end!
-	$ex->id($last->id);
-	$ex->phase($last->phase);
 
-	# add back the remaining component exons
-	foreach my $s(@sf){
-	  $transcript->add_Exon($s);
-	  print STDERR "added exon: " . $s->id . " : " . $s->start . "-" . $s->end . " end phase " . $s->end_phase . "\n";
-	  $transcript->sort;
-	}
-	# flush the sub_SeqFeatures so we don't try to add this one again later
-	$ex->flush_sub_SeqFeature;
-      }
+      $self->expand_3prime_exon(\$ex, \$transcript);
 
-      # add all the exons from the est2genome transcript, subsequent to this one ($current_exon)
-      my $c = $#egexons;
-      while($c > $exoncount){
-	$transcript->add_Exon($egexons[$c]);
-	$c--;
-      }
-      
+      # need to explicitly set the translation end exon for translation to work out
+      my $end_ex = $transcript->end_exon;
+      $translation->end_exon($end_ex);
+
+      $self->add_3prime_exons(\$transcript, $exoncount, @egexons);
+
     } # end 3' exon
     
   }
   
   elsif($gwexons[0]->strand == -1){
-    #	    print STDERR "***reverse strand\n";
-    # first is last and last is first
+  REVERSE:
     if ($gwexons[0]->start == $current_exon->start && $current_exon->end >= $gwexons[0]->end){
       print STDERR "5' exon match!\n";
       
       # modify the coordinates of the first exon in $newtranscript
       my $ex = $transcript->start_exon;
       $ex->end($current_exon->end);
-      #	      print STDERR " here\n";
-      # need to add back exons
-      my $c = 0;
-      while($c < $exoncount){
-	$transcript->add_Exon($egexons[$c]);
-	$transcript->sort;
-	$c++;
-      }
+
+      # need to explicitly set the translation start exon for translation to work out
+      $translation->start_exon($ex);
+
+      $self->add_5prime_exons(\$transcript, $exoncount, @egexons);
       
       # need to deal with translation start
       my $tstart = $translation->start;
       my $diff = $current_exon->end - $gwexons[0]->end;
       $translation->start($tstart+$diff);
-      
-      
-      
+
     } # end 5' exon
     
     elsif ($gwexons[$#gwexons]->end == $current_exon->end && $current_exon->start <= $gwexons[$#gwexons]->start){
@@ -1112,38 +1132,75 @@ sub transcript_from_multi_exon_genewise {
       # modify the coordinates of the last exon in $newtranscript
       my $ex = $transcript->end_exon;
       $ex->start($current_exon->start);
-      
-      # need to deal with frameshifts - 3' exon is a special case as its end might have changed
-      if(scalar($ex->sub_SeqFeature) > 1){
-	print STDERR "3' exon frameshift - strand\n";
-	my @sf = $ex->sub_SeqFeature;
-	my $last = pop(@sf);
 
-	# sort out start, id & phase
-	$ex->start($last->start); # but don't you dare touch the end!
-	$ex->id($last->id);
-	$ex->phase($last->phase);
+      $self->expand_3prime_exon(\$ex, \$transcript);
 
-	# add back the remaining component exons
-	foreach my $s(@sf){
-	  $transcript->add_Exon($s);
-	  $transcript->sort;
-	}
-	# flush the sub_SeqFeatures?
-	$ex->flush_sub_SeqFeature;
-      }
-      
-      # add all the exons from the est2genome transcript, subsequent to this one
-      my $c = $#egexons;
-      while($c > $exoncount){
-	$transcript->add_Exon($egexons[$c]);
-	$c--;
-      }
+      # need to explicitly set the translation end exon for translation to work out
+      my $end_ex = $transcript->end_exon;
+      $translation->end_exon($end_ex);
+
+      $self->add_3prime_exons(\$transcript, $exoncount, @egexons);
       
     } # end 3' exon
   }  
  return $transcript; 
 }
+
+sub add_5prime_exons{
+my ($self, $transcript, $exoncount, @e2g_exons);
+      # add all the exons from the est2genome transcript, previous to this one
+      my $c = 0;
+      while($c < $exoncount){
+	$$transcript->add_Exon($e2g_exons[$c]);
+	$$transcript->sort;
+	$c++;
+      }
+      
+}
+
+# $exon is the terminal exon in the genewise transcript, $transcript. We need
+# to expand any frameshifts we merged in the terminal genewise exon. 
+sub expand_3prime_exon{
+my ($self, $exon, $transcript) = @_;
+      if(scalar($$exon->sub_SeqFeature) > 1){
+	print STDERR "3' exon frameshift\n";
+	my @sf = $$exon->sub_SeqFeature;
+	my $last = pop(@sf);
+
+	# sort out start, id & phase
+	$$exon->start($last->start); # but don't you dare touch the end!
+	$$exon->id($last->id);
+	$$exon->phase($last->phase);
+
+	# add back the remaining component exons
+	foreach my $s(@sf){
+	  $$transcript->add_Exon($s);
+	  $$transcript->sort;
+	}
+	# flush the sub_SeqFeatures so we don't try to re-expand later
+	$$exon->flush_sub_SeqFeature;
+      }
+      
+}
+
+# $exoincount tells us which position in the array 
+# of e2g exons corresponds to the end of the genewise transcript so we add back 
+# exons 3' to that position.
+# $exon and $transcript are references to Exon and Transcript objects.
+sub add_3prime_exons {
+my ($self, $transcript, $exoncount, @e2g_exons) = @_;
+# need to deal with frameshifts - 3' exon is a special case as its end might have changed
+
+      # add all the exons from the est2genome transcript, subsequent to this one
+      my $c = $#e2g_exons;
+      while($c > $exoncount){
+	$$transcript->add_Exon($e2g_exons[$c]);
+	$$transcript->sort;
+	$c--;
+      }
+
+}
+
 
 =head2 make_genes
 
@@ -1166,17 +1223,16 @@ sub make_genes {
   my $contig = $self->vc;
   my @genes;
   
-  my $time = time; chomp($time);
+#$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Pipeline::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Pipeline::Analysis");
+$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
+
+print STDERR "***analysis dbID: " . $analysis_obj->dbID . "\n";
 
   foreach my $tmpf (@$results) {
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($self->input_id . ".$genetype.$count");
-    $gene->version(1);
-    $gene->created($time);
-    $gene->modified($time);
 
-    my $transcript = $self->_make_transcript($tmpf,$self->vc,$genetype,$count);
+    my $transcript = $self->_make_transcript($tmpf,$self->vc,$genetype,$count, $analysis_obj);
 	
     # add transcript to gene
     $gene->analysis($analysis_obj);
@@ -1210,10 +1266,21 @@ sub remap_genes {
   push(@genes, $self->e2g_genes); # ??? do we want these?
   push(@genes, $self->combined_genes);
 
-  foreach my $gene (@genes) {
-    print STDERR "about to remap " . $gene->id . "\n";
+GENE:  foreach my $gene (@genes) {
+    print STDERR "about to remap\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
+
+    # check that it translates - not the est2genome genes
+    if($gene->type eq 'TGE_gw' || $gene->type eq 'combined_gw_e2g'){
+      
+      my $translates = $self->check_translation($tran);
+      if(!$translates){
+	my $msg = "discarding gene - tranlation has stop codons\n";
+	$self->warn($msg);
+	next GENE;
+      }
+  }
     eval {
       my $genetype = $gene->type;
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
@@ -1224,7 +1291,7 @@ sub remap_genes {
 
       # sort out supporting feature coordinates
       foreach my $tran ($newgene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
+	foreach my $exon($tran->get_all_Exons) {
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -1237,23 +1304,28 @@ sub remap_genes {
       }
 
       # is this a special case single coding exon gene with UTRS?
-      if($tran->translation->start_exon_id() eq $tran->translation->end_exon_id() 
+      if($tran->translation->start_exon() eq $tran->translation->end_exon() 
 	 && $gene->type eq 'combined_gw_e2g'){
 	print STDERR "single coding exon, with UTRs\n";
 	
 	# problems come about when we switch from + strand on FPC contig to - strand on raw contig.
 	my $fpc_strand;
 
-	foreach my $exon($tran->each_Exon) {
-	  if ($exon->id eq $tran->translation->start_exon_id()) {
+# may need to compare exon objects ... with new schema
+	foreach my $exon($tran->get_all_Exons) {
+#	  if ($exon->id eq $tran->translation->start_exon_id()) {
+	  if ($exon eq $tran->translation->start_exon()) {
 	    $fpc_strand = $exon->strand;
 	    last;
 	  }
 	}
 	
 	foreach my $tran ($newgene->each_Transcript) {
-	  foreach my $exon($tran->each_Exon) {
-	    if ($exon->id eq $tran->translation->start_exon_id()) {
+	  foreach my $exon($tran->get_all_Exons) {
+
+# oh dear oh dear oh dear
+#	    if ($exon->id eq $tran->translation->start_exon_id()) {
+	    if ($exon eq $tran->translation->start_exon()) {
 	      if($fpc_strand == 1 && $exon->strand == -1){
 		print STDERR "fpc strand 1, raw strand -1 - flipping translation start/end\n";
 		$exon->end($exon->end - ($tran->translation->start -1));
@@ -1268,14 +1340,46 @@ sub remap_genes {
 
     # did we throw exceptions?
     if ($@) {
-      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+      print STDERR "Couldn't reverse map gene:  [$@]\n";
     }
   }
 
   return @newf;
 }
 
+=head2 check_translation
 
+ Title   : check_translation
+ Usage   :
+ Function: checks how much of the parent protein is covered by the genewise prediction
+ Example :
+ Returns : 1 if transcript translates with no stops, otherwise 0
+ Args    :
+
+
+=cut
+
+sub check_translation {
+  my ($self, $transcript) = @_;
+  my $tseq;
+
+  eval{
+    $tseq = $transcript->translate;
+  };
+
+  if((!defined $tseq) || ($@)){
+    my $msg = "problem translating :\n$@\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  if ($tseq->seq =~ /\*/ ) {
+    return 0;
+  }
+  else{
+    return 1;
+  }
+}
 
 =head2 _check_coverage
 
@@ -1293,24 +1397,28 @@ sub _check_coverage{
   my ($self, $gene) = @_;
   my $pstart = 0;
   my $pend = 0;
-  my $protname;
+  my $protname = $self->protein_id;
   my $plength;
   my $fetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
   my @gw_tran = $gene->each_Transcript;
-  my @gw_ex = $gw_tran[0]->each_Exon;
-  return 0 unless scalar(@gw_ex) == 1;
+  
+  my $matches = 0;
 
-  foreach my $f($gw_ex[0]->each_Supporting_Feature){
-#      print STDERR $f->hseqname . " " . $f->hstart . " " . $f->hend . "\n";
-
+  foreach my $exon($gw_tran[0]->get_all_Exons) {
+    $pstart = 0;
+    $pend   = 0;
+    
+    foreach my $f($exon->each_Supporting_Feature){
+      #      print STDERR $f->hseqname . " " . $f->hstart . " " . $f->hend . "\n";
+      
       if (!defined($protname)){
 	$protname = $f->hseqname;
       }
       if($protname ne $f->hseqname){
 	warn("$protname ne " . $f->hseqname . "\n");
       }
-
+      
       if((!$pstart) || $pstart > $f->hstart){
 	$pstart = $f->hstart;
       }
@@ -1319,6 +1427,8 @@ sub _check_coverage{
 	$pend= $f->hend;
       }
     }
+    $matches += ($pend - $pstart + 1);
+  }
   
   my $seq; 
   eval{
@@ -1337,23 +1447,21 @@ sub _check_coverage{
     return 0;
   }
 
-  
-  my $coverage = $pend - $pstart;
-  $coverage /= $plength;
+  my $coverage = $matches/$plength;
   $coverage *= 100;
   if ($coverage < 80){
-    warn "Coverage of $protname by " . $gene->id . " is only $coverage\n";
+    warn "Coverage of $protname is only $coverage\n";
     return 0;
   }
   
-  print STDERR "***Coverage of $protname by " . $gene->id . " is $coverage\n";
+  print STDERR "***Coverage of $protname is $coverage\n";
   return 1;
 }
 
 =head2 _make_transcript
 
  Title   : make_transcript
- Usage   : $self->make_transcript($gene, $contig, $genetype, $count)
+ Usage   : $self->make_transcript($gene, $contig, $genetype, $count, $analysis_obj)
  Function: makes a Bio::EnsEMBL::Transcript from a SeqFeature representing a gene, 
            with sub_SeqFeatures representing exons.
  Example :
@@ -1361,12 +1469,13 @@ sub _check_coverage{
            data), and a Bio::EnsEMBL::translation
  Args    : $gene: Bio::EnsEMBL::SeqFeatureI, $contig: Bio::EnsEMBL::DB::ContigI,
            $genetype: string, $count: integer
+           $analysis_obj: Bio::EnsEMBL::Analysis
 
 
 =cut
 
 sub _make_transcript{
-  my ($self, $gene, $contig, $genetype, $count)=@_;
+  my ($self, $gene, $contig, $genetype, $count, $analysis_obj)=@_;
   $genetype = 'unspecified' unless defined ($genetype);
   $count = 1 unless defined ($count);
 
@@ -1375,17 +1484,8 @@ sub _make_transcript{
   unless ($contig->isa ("Bio::EnsEMBL::DB::ContigI"))
     {print "$contig must be Bio::EnsEMBL::DB::ContigI\n";}
 
-  my $time  = time; 
-  chomp($time);
-
   my $transcript   = new Bio::EnsEMBL::Transcript;
-  $transcript->id($contig->id . ".$genetype.$count");
-  $transcript->version(1);
-
   my $translation  = new Bio::EnsEMBL::Translation;    
-  $translation->id($contig->id . ".$genetype.$count");
-  $translation->version(1);
-
   $transcript->translation($translation);
 
   my $excount = 1;
@@ -1395,12 +1495,7 @@ sub _make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->id($contig->id . ".$genetype.$count.$excount");
     $exon->contig_id($contig->id);
-    $exon->created($time);
-    $exon->modified($time);
-    $exon->version(1);
-      
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -1413,12 +1508,12 @@ sub _make_transcript{
       $subf->feature1->source_tag($genetype);
       $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
-      $subf->feature1->analysis($exon_pred->analysis);
+      $subf->feature1->analysis($analysis_obj);
 	
       $subf->feature2->source_tag($genetype);
       $subf->feature2->primary_tag('similarity');
       $subf->feature2->score(100);
-      $subf->feature2->analysis($exon_pred->analysis);
+      $subf->feature2->analysis($analysis_obj);
       
       $exon->add_Supporting_Feature($subf);
     }
@@ -1445,8 +1540,8 @@ sub _make_transcript{
       $transcript->add_Exon($exon);
     }
     
-    $translation->start_exon_id($exons[0]->id);
-    $translation->end_exon_id  ($exons[$#exons]->id);
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
     
     if ($exons[0]->phase == 0) {
       $translation->start(1);
@@ -1460,6 +1555,78 @@ sub _make_transcript{
   }
   
   return $transcript;
+}
+
+=head2 validate_gene
+
+ Title   : validate_gene
+ Usage   : $self->validate_gene($gene)
+ Function: checks start and end coordinates of each exon of each transcript are sane
+ Example : 
+ Returns : 1 if gene is valid, otherwise zero
+ Args    : $gene: Bio::EnsEMBL::Gene
+
+
+=cut
+
+sub validate_gene{
+  my ($self, $gene) = @_;
+
+  # should be only a single transcript
+  my @transcripts = $gene->each_Transcript;
+  if(scalar(@transcripts) != 1) {
+    my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  foreach my $transcript(@transcripts){
+    foreach my $exon($transcript->get_all_Exons){
+      if(!$self->validate_exon($exon)){
+	my $msg = "Rejecting gene because of invalid exon\n";
+	$self->warn($msg);
+	return 0;
+      }
+    }
+  }
+  
+  return 1;
+}
+
+=head2 validate_exon
+
+ Title   : validate_exon
+ Usage   : $self->validate_exon($exon)
+ Function: checks start and end coordinates of exon are sane
+ Example : 
+ Returns : 1 if exon is valid, otherwise zero
+ Args    : $exon: Bio::EnsEMBL::Exon
+
+
+=cut
+
+sub validate_exon{
+  my ($self, $exon) = @_;
+
+  if($exon->start < 0){
+    my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  elsif($exon->start > $exon->end){
+    my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  elsif($exon->start == $exon->end){
+    my $msg = "rejecting exon, start == end : " . $exon->start . " == " . $exon->end . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+  
+  return 1;
 }
 
 1;
