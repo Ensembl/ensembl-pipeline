@@ -1,3 +1,5 @@
+#!/usr/local/bin/perl5.6.1 
+
 $ENV{'BLASTDB'} = '/usr/local/ensembl/data/blastdb/Ensembl';
 $ENV{'BLASTMAT'} = '/usr/local/ensembl/data/blastmat';
 $ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
@@ -87,7 +89,7 @@ my $jobname   = $::pipeConf{'jobname'};
 
 $| = 1;
 
-my $chunksize    = 1000000;   # How many InputIds to fetch at one time
+my $chunksize    = 1000000; # How many InputIds to fetch at one time
 my $currentStart = 0;       # Running total of job ids
 my $completeRead = 0;       # Have we got all the input ids yet?
 my $local        = 0;       # Run failed jobs locally
@@ -139,7 +141,7 @@ if ($idlist && ! -e $idlist) {
 #
 # This lock should really be in the form of a table in the database
 
-$dbhost = &qualify_hostname($dbhost);
+$dbhost = qualify_hostname($dbhost);
 my $lock_dir = $ENV{"HOME"} . "/.ens-pipe.$dbhost.$dbname";
 my $username = scalar getpwuid($<);
 
@@ -147,7 +149,7 @@ my $username = scalar getpwuid($<);
 
 if (-e $lock_dir) {
     # Another pipeline is running: describe it
-    my($subhost, $pid, $started) = &running_pipeline($lock_dir);
+    my($subhost, $pid, $started) = running_pipeline($lock_dir);
     $started = scalar localtime $started;
 
     print STDERR <<EOF;
@@ -173,8 +175,8 @@ EOF
 }
 
 
-my $host = &qualify_hostname(hostname());
-&create_lock($lock_dir, $host, $$);
+my $host = qualify_hostname(hostname());
+create_lock($lock_dir, $host, $$);
 
 
 my $ruleAdaptor = $db->get_RuleAdaptor;
@@ -260,7 +262,7 @@ while (1) {
         }
     }
 
-    @idList = shuffle(@idList);
+    #@idList = shuffle(@idList);
 
     # Now we loop over all the input ids. We fetch all the analyses
     # from the database that have already run. We then check all the

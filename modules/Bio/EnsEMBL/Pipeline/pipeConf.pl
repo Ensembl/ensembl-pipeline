@@ -21,22 +21,24 @@ package main;
 
 %pipeConf = ( 
 
-    'nfstmp.dir' => '/nfs/disk84/jgrg/temp',
+    #'nfstmp.dir' => '/acari/work7a/keenan/out',
+    'nfstmp.dir' => '/acari/work2/jgrg/pipe',
                                # working directory for err/outfiles
     'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
 
     'DBI.driver' => 'mysql',
 
-    'dbhost'     => 'ecs1b',
-    'dbname'     => 'chr_6_13_updated',
+    'dbhost'     => 'ecs2',
+    'dbname'     => 'human_chr6_fin',
     'dbuser'     => 'ensadmin',
     'dbpass'     => 'ensembl',	     
-    'queue'      => 'acarilong',   # farm queue
-
+    'port'	 => '3310', 
+    'queue'      => 'acari',   # farm queue
+	
     
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bindir'     => '/nfs/disk100/humpub/OSFbin',
-    'datadir'    => '/nfs/disk84/jgrg/temp',
+    'bindir'     => '/usr/local/ensembl/bin',
+    'datadir'    => '/usr/local/ensembl/data',
     'usenodes'   => '',        # farm nodes to use (default all)
     'autoupdate' => 1,         # true->update InputIdAnalysis via Job
     'runner'     => '',        # path to runner.pl, needed by Job.pm

@@ -17,7 +17,7 @@ my $host;
 my $dbname;
 my $dbuser;
 
-my $port            = '3306';
+my $port = $::pipeConf{'port'} || 3306;;
 my $pass            = undef;
 my $module          = undef;
 
