@@ -1204,7 +1204,6 @@ sub parse_rnai{
   my @operons;
   LINE: while(<FH>){
       #CHROMOSOME_IV	RNAi	experimental	3195031	3196094	.	+	.	RNAi "JA:Y67D8A_375.b"
-      #print;
       chomp;
       my @values = split;
       if($values[1] ne 'RNAi'){
@@ -1212,20 +1211,10 @@ sub parse_rnai{
       }
       my ($start, $end, $strand, $id, $count);
       $count = 0;
-#      if($values[2] ne 'experimental'){
-#	#print "have no experimental tag\n";
-#	$start = $values[2];
-#	$end = $values[3];
-#	$strand = $values[5];
-#	$id = $values[8];
-#      }else{
-	$start = $values[3];
-	$end = $values[4];
-	$strand = $values[6];
-	$id = $values[9];
-#      }
-#      print $_."\n";
-#      print "have ".$start." ".$end." ".$strand." ".$id."\n";
+      $start = $values[3];
+      $end = $values[4];
+      $strand = $values[6];
+      $id = $values[9];
       if($strand eq '+'){
 	$strand = 1;
       }else{
