@@ -325,7 +325,7 @@ sub parse_results {
 
       $name =~ s/^>(\S+).*/$1/;
 
-      if ($name =~ s/\|UG\|(\S+)/) {
+      if ($name =~ /\|UG\|(\S+)/) {
          $name = $1;
       } elsif ($name =~ /\S+\|\S+\|(\S+)/) {
          $name = $1;
