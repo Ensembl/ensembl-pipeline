@@ -108,7 +108,7 @@ sub fetch_input {
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
-
+    $self->{'contig'} = $contig;
 }
 
 #get/set for runnable and args
@@ -136,6 +136,49 @@ sub init {
       $self->runnable($runnable);
     }
 }
+
+
+=head2 write_output
+
+  Args      : none
+  Function  : Standard RunnableDB write_output. Writes PredictionTranscripts
+              into the database.
+  Returntype: none
+  Exceptions: none
+  Caller    : Job module in Pipeline
+  Example   :  ( optional )
+
+=cut
+
+sub write_output {
+   my $self = shift;
+
+   my $genscan_runnable = ($self->runnable())[0];
+   my @transcripts = $genscan_runnable->each_Transcript();
+   if( ! @transcripts ) { return; }
+
+   my $ptransAdaptor = $self->dbobj()->get_PredictionTranscriptAdaptor();
+
+   for my $trans ( @transcripts ) {
+     my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
+     my @exons = $trans->get_all_Exons();
+
+     if ($exons[0]->strand == 1) {
+       @exons = sort {$a->start <=> $b->start } @exons;
+     } else {
+       @exons = sort {$b->start <=> $a->start } @exons;
+     }
+     print "ANALYSIS: ",$self->analysis()->dbID,"\n";
+
+     $ptrans->analysis( $self->analysis() );
+     for my $exon ( @exons ) {
+       $exon->contig( $self->{'contig'} );
+       $ptrans->add_Exon( $exon );
+     }
+     $ptransAdaptor->store( $ptrans );
+   }
+}
+
 
 
 =head2 result_quality_tag
