@@ -722,11 +722,6 @@ sub _cluster_Transcripts{
   }
   @transcripts = @sorted_transcripts;
   
-  ## test
-  #foreach my $tran (@transcripts){
-  #  print STDERR "$tran, start: ".$tran->start_Exon->start."\n";
-  #}
-  
   # create a new cluster 
   my $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
   my $cluster_count = 1;
