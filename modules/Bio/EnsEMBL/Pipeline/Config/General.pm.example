@@ -57,9 +57,10 @@ use vars qw(%Config);
 
     # default runner script
     PIPELINE_RUNNER_SCRIPT => '',
-
-    # automatic update in input_id_analysis of completed jobs
-    AUTO_JOB_UPDATE     => 1
+    
+    #regex for spiting up slice input_ids
+    SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',	   
+   
 );
 
 sub import {
