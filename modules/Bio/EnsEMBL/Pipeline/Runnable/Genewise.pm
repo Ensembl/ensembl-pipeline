@@ -403,8 +403,8 @@ sub _align_protein {
     }
   }
   
-#  unlink $genfile;
-#  unlink $protfile;
+  unlink $genfile;
+  unlink $protfile;
   unlink $gwfile;
 }
 
