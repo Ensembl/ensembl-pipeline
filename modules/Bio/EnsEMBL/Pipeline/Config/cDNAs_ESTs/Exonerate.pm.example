@@ -60,23 +60,23 @@ use vars qw( %Exonerate );
 	      
 	      # where the result-directories are going to go	
 	      
-	      EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI33/pseudogenes',
+	      EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI33/structural_rnas',
 	      
 	      # job-queue in the farm
 	      LSF_OPTIONS       => '-q acari -C0',
 	    
 	      # make_bsubs.pl options
-	      EST_EXONERATE_BSUBS   => '/ecs2/scratch3/ensembl/eae/NCBI33/pseudogenes/exonerate_jobs',
+	      EST_EXONERATE_BSUBS   => '/ecs2/scratch3/ensembl/eae/NCBI33/structural_rnas/exonerate_jobs',
 	      
 	      # path to file containing ALL ESTs/cDNAs
-	      EST_FILE                    => '/ecs2/work4/eae/NCBI33/cdnas/Pseudogenes/NCBI33_pseudogene_RNAs.fa',
+	      EST_FILE                    => '/ecs2/work4/eae/NCBI33/cdnas/Structural_RNAs/NCBI33_structural_RNAs.fa',
 	      
 	      # path to directory where EST chunks live
-	      EST_CHUNKDIR                => '/ecs2/work4/eae/NCBI33/cdnas/Pseudogenes/chunks/',
+	      EST_CHUNKDIR                => '/ecs2/work4/eae/NCBI33/cdnas/Structural_RNAs/chunks/',
 	      
 	      # how many chunks?
 	      # for NCBI_28 we have 3690891 ests, at approx. 350 ests per chunk, we estimate
-	      EST_CHUNKNUMBER             => 2, 	 
+	      EST_CHUNKNUMBER             => 1, 	 
 	      
 	      
 	      #####################
@@ -86,7 +86,7 @@ use vars qw( %Exonerate );
 	      # full path fo the dir where we have the masked-dusted chromosomes
 	      EST_GENOMIC                 => '/data/blastdb/Ensembl/NCBI33/genome/',
 	      #EST_GENOMIC                 => '/ecs2/work4/eae/NCBI33/masked_genome/NCBI33_coding_mRNAs_chunk_0001815/',
-	      #EST_GENOMIC                 => '/ecs2/scratch3/ensembl/eae/NCBI33/cdnas/test_chr',
+	      EST_GENOMIC                 => '/ecs2/scratch3/ensembl/eae/NCBI33/cdnas/test_chr',
 	      
 	      # path to file with repeatmasked dusted genomic sequences
 	      # NB this file is huge - distribute it across the farm or 
@@ -130,11 +130,20 @@ use vars qw( %Exonerate );
 	      #EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14',
 	 
 	      # options for pseudogenes:
+	      #EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+
+	      # options for structural rnas:
 	      EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
 
 	      # if set to true, this option rejects unspliced alignments for cdnas that have an spliced
 	      # alignment elsewhere in the genome
 	      REJECT_POTENTIAL_PROCESSED_PSEUDOS => 1,
+
+	      # if set to true, the only the best match in the genome is picked
+	      # if there are several matches with the same coverage
+	      # all of them are taken, except single-exon 
+	      # ones if REJECT_POTENTIAL_PROCESSED_PSEUDOS is switched on 
+	      BEST_IN_GENOME => 1,
 
 	      EST_MIN_COVERAGE            => 90,
 	      EST_MIN_PERCENT_ID          => 97,
@@ -145,7 +154,7 @@ use vars qw( %Exonerate );
 	      ############################################################
 	      
 	      EST_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes',      
-	      EST_EXONERATE_ANALYSIS     => 'pseudogene',
+	      EST_EXONERATE_ANALYSIS     => 'structural_RNA',
 	      
 	      EST_SOURCE                  => 'RefSeq-EMBL',      
 	      	    
