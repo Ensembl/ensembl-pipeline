@@ -167,7 +167,7 @@ sub fetch_input{
   $seqout->write_seq($cdna);
 
   my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'    => $vc->primary_seq, 
-								      '-blastdb'    => $blastdb,
+								      '-queryseq'    => $blastdb,
 								      '-seqfetcher' => $self->seqfetcher);
 
   $self->e2g_runnable($e2g);
@@ -196,6 +196,10 @@ sub run {
      $self->e2g_runnable->run;
      $self->convert_e2g_output;
      $self->combine_genes;
+
+     # clean up tmpfile
+     my $tmpfile = $self->{'_tmpfile'};
+     unlink $tmpfile;
    }
 
    # remap to raw contig coords
@@ -839,7 +843,7 @@ sub _make_newtranscripts {
 sub transcript_from_single_exon_genewise {
   my ($self, $eg_exon, $gw_exon, $transcript, $translation, $exoncount, @e2g_exons) = @_;
   if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
-    print STDERR "single exon gene\n";	    
+    print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_exon;
     
@@ -880,13 +884,20 @@ sub transcript_from_single_exon_genewise {
     elsif($gw_exon->strand == -1){
       #	      print STDERR "***reverse\n";
       #	    my $diff = $e2g_exon->end - $gw_ex[0]->end;
-      my $diff = $gw_exon->start - $eg_exon->start;
+#      my $diff = $gw_exon->start - $eg_exon->start;
+      my $diff = $ex->end - $gw_exon->end;
+      print STDERR "diff $diff\n";
       my $tstart = $translation->start;
       my $tend = $translation->end;
-      #	      print STDERR "***gw  " . $gw_ex[0]->start . " " . $gw_ex[0]->end . "\n";
+      print STDERR "***gw  " . $gw_exon->start . " " . $gw_exon->end . "\n";
+      print STDERR "***e2g  " . $ex->start . " " . $ex->end . "\n";
+      print STDERR "*** translation - before  " . $translation->start . " " . $translation->end . "\n";
       
       $translation->start($tstart+$diff);
       $translation->end($tend + $diff);
+ #    $translation->start(18);
+ #     $translation->end(1008);
+      print STDERR "*** translation - after  " . $translation->start . " " . $translation->end . "\n";
     }
     
     
