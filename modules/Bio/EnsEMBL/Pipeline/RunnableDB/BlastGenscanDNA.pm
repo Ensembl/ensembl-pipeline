@@ -194,8 +194,9 @@ sub run {
         }
     }
 
+    my @databases = split ',', ($self->analysis->db_file);
+
     $parameters{'-genomic'} = $self->genseq;
-    $parameters{'-database'} = $self->analysis->db_file;
     $parameters{'-program'} = $self->analysis->program;
     $parameters{'-options'} = $arguments if $arguments;
     if ($thresh && $thresh_type) {
@@ -207,16 +208,21 @@ sub run {
         $parameters{'-threshold_type'} = 'PVALUE';
     }
 
-    foreach my $transcript ($self->transcripts) {
+    foreach my $db (@databases) {
 
-      $parameters{'-peptide'} = $transcript;
-      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
-	%parameters
-      );
+      $parameters{'-database'} = $db;
 
-      $runnable->run();
-      $self->runnable($runnable);                                        
+      foreach my $transcript ($self->transcripts) {
 
+        $parameters{'-peptide'} = $transcript;
+        my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
+	  %parameters
+        );
+
+        $runnable->run();
+        $self->runnable($runnable);                                        
+
+      }
     }
   
 }

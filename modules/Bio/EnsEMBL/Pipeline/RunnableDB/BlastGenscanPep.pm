@@ -160,8 +160,6 @@ sub runnable {
 
 sub run {
     my ($self) = @_;
-    my @times = times;
-    #print STDERR "started running @times \n";
     #need to pass one peptide at a time
     $self->throw("Input must be fetched before run") unless ($self->genseq);
     #print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
@@ -193,8 +191,9 @@ sub run {
         }
     }
 
+    my @databases = split ',', ($self->analysis->db_file);
+
     $parameters{'-genomic'} = $self->genseq;
-    $parameters{'-database'} = $self->analysis->db_file;
     $parameters{'-program'} = $self->analysis->program;
     $parameters{'-options'} = $arguments if $arguments;
     if ($thresh && $thresh_type) {
@@ -206,18 +205,20 @@ sub run {
 	$parameters{'-threshold_type'} = 'PVALUE';
     }
 
-    foreach my $transcript ($self->transcripts) {
-	$parameters{'-peptide'} = $transcript;
-	my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new(
-	    %parameters
-	);
+    foreach my $db (@databases) {
+	$parameters{'-database'} = $db;
 
-	$runnable->run();
-	$self->runnable($runnable);                                        
+        foreach my $transcript ($self->transcripts) {
+	    $parameters{'-peptide'} = $transcript;
+	    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new(
+	        %parameters
+	    );
 
+	    $runnable->run();
+	    $self->runnable($runnable);                                        
+
+        }
     }
-    @times = times;
-    #print STDERR "finished running @times \n"; 
 }
 
 =head2 output

@@ -304,33 +304,32 @@ sub fetch_databases {
     
     my @databases;
 
-    foreach my $dbname (split ',', $self->database) {
+    my $dbname = $self->database; 
 
-	$dbname =~ s/\s//g;
+    $dbname =~ s/\s//g;
 
-	# prepend the environment variable $BLASTDB if
-	# database name is not an absoloute path
+    # prepend the environment variable $BLASTDB if
+    # database name is not an absoloute path
 
-        unless ($dbname =~ m!^/!) {
-	    $dbname = $ENV{BLASTDB} . "/" . $dbname;
-        }
+    unless ($dbname =~ m!^/!) {
+	$dbname = $ENV{BLASTDB} . "/" . $dbname;
+    }
 
-        # If the expanded database name exists put this in
-        # the database array.
-        #
-        # If it doesn't exist then see if $database-1,$database-2 exist
-        # and put them in the database array
+    # If the expanded database name exists put this in
+    # the database array.
+    #
+    # If it doesn't exist then see if $database-1,$database-2 exist
+    # and put them in the database array
 
-        if (-f $dbname) {
-	    push(@databases,$dbname);
-        } else {
-	    my $count = 1;
+    if (-f $dbname) {
+	push(@databases,$dbname);
+    } else {
+	my $count = 1;
 
-	    while (-f $dbname . "-$count") {
-	        push(@databases,$dbname . "-$count");
-	        $count++;
-	    }
-        }
+	while (-f $dbname . "-$count") {
+	    push(@databases,$dbname . "-$count");
+	    $count++;
+	}
     }
 
     if (scalar(@databases) == 0) {
@@ -484,6 +483,8 @@ sub parse_results {
                                          -hardprune => $self->hardprune,
                                          -coverage  => $self->coverage);
       my @pruned = $search->run(@allfeatures);
+
+      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
