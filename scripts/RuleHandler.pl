@@ -94,6 +94,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   ( -host   => $host,
     -dbname => $dbname,
     -user   => $dbuser,
+    -pass   => $pass,
   );
 
 my $anaAdaptor     = $db->get_AnalysisAdaptor();
