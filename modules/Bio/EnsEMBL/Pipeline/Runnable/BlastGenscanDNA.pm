@@ -348,7 +348,7 @@ sub align_hits_to_contig {
 	#determine which exon this genomic coordinate overlaps
 	my $exon;
 	foreach my $e (@{$self->peptide->get_all_Exons}) {
-	  if($gstart >= $e->start && $gend <= e->end) {
+	  if($gstart >= $e->start && $gend <= $e->end) {
 	    $exon = $e;
 	    last;
 	  }
