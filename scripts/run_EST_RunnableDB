@@ -94,10 +94,12 @@ die "No input id entered" unless defined ($input_id);
 
 my %hparams;
 # eg -parameters param1=value1,param2=value2
-foreach my $p(split /,/, $params){
-  my @sp = split /=/, $p;
-  $sp[0] = '-' . $sp[0];
-  $hparams{$sp[0]} =  $sp[1];
+if (defined $params){
+  foreach my $p(split /,/, $params){
+    my @sp = split /=/, $p;
+    $sp[0] = '-' . $sp[0];
+    $hparams{$sp[0]} =  $sp[1];
+  }
 }
 
 my $runobj = "$runnable"->new(-dbobj    => $db,
