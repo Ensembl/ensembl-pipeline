@@ -46,23 +46,27 @@ use vars qw( %GeneBuilder );
 # Hash containing config info
 %GeneBuilder = (
 
+		GB_FINAL_GENETYPE           => 'ensembl',
+
+
+		# parameters for use of genscan predictions in final build
+		GB_USE_ABINITIO            => '0',
+
 		GB_ABINITIO_TYPE           => 'ab_initio',
+
 		GB_ABINITIO_SUPPORTED_TYPE => 'ab_initio_supported',
 		
+		GB_MIN_GENSCAN_EXONS        => 4,
+
+		GB_GENSCAN_MAX_INTRON       => 15000,
+
 		# lower bound in the 'base align features' retireved in the genebuilder
 		GB_MIN_FEATURE_SCORE        => 50,
 
 		GB_MIN_FEATURE_LENGTH       => 15,
 
+	        # are we running on slices or RawContigs? This may be obsolete
 		GB_VCONTIG                  => 1,
-
-		GB_SKIP_BMG                 => 0,
-
-		GB_MIN_GENSCAN_EXONS        => 4,
-
-		GB_GENSCAN_MAX_INTRON       => 15000,
-
-		GB_FINAL_GENETYPE           => 'ensembl',
 		
 		# maximum number of transcripts per gene
 		GB_MAX_TRANSCRIPTS_PER_GENE => 10,

@@ -57,6 +57,9 @@ use vars qw( %General );
 	    # RepeatMask repeats are available)
 	    GB_REPEAT_MASKING => ['RepeatMask'],
 
+	    # skip blastminigenewise stage? Only relevant for Contig_BMG
+	    GB_SKIP_BMG                 => 0,
+
 	   );
 
 sub import {
