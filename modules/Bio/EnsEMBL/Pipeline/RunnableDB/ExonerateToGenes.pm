@@ -131,7 +131,7 @@ sub new {
 
 
   # can choose which exonerate to use
-  $self->exonerate($EST_EXONERATE);
+  $self->exonerate($EST_EXONERATE->{VERSION});
   
   # can add extra options as a string
   if ($options){
