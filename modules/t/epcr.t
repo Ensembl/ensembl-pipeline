@@ -3,7 +3,6 @@ use Test;
 use strict;
 
 BEGIN { $| = 1; plan test => 8;
-	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
       }
 
 use Bio::EnsEMBL::Pipeline::Runnable::EPCR;
@@ -16,7 +15,6 @@ ok(1);
 
 ok(my $seq =  set_seq());
 
-
 ok(my $clone =  Bio::PrimarySeq->new(
 				     -seq         => $seq,
 				     -id          => 'AC025422.19.99723.113695',
@@ -25,7 +23,7 @@ ok(my $clone =  Bio::PrimarySeq->new(
 				    ));
 
 #create EPCR object    
-ok(my $sts_db = $::pipeConf{'datadir'} . '/mapprimer_maps_130');
+ok(my $sts_db = 'HSa_Marker_W7.dat');
 
 ok(my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
 							  -QUERY   => $clone,
@@ -44,12 +42,7 @@ sub display {
   my @results = @_;
 
   foreach my $obj (@results) {
-    print ($obj->gffstring."\n");
-    if ($obj->sub_SeqFeature) {
-      foreach my $exon ($obj->sub_SeqFeature) {
-	print "Sub: ".$exon->gffstring."\n";
-      }
-    }
+    print STDERR ($obj->gffstring."\n");
   }
   return 1;
 }
