@@ -27,6 +27,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Blast
 							     -program  => 'blastp',
 							     -database => 'swir',
 							     -threshold => 1e-6,
+							     -filter    => $filter,
 							     -options   => 'V=1000000');
 
   $blast->run();
@@ -74,6 +75,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
@@ -89,6 +91,7 @@ use BPlite;
 									-program  => 'blastp',
 								        -database => 'swir',
 								        -threshold => 1e-6,
+									-filter    => $filter,
 								        -options   => 'V=1000000');
     Function:   Initialises Blast object
     Returns :   a Blast Object
@@ -107,7 +110,7 @@ sub _initialize {
     $self->{_database}  = undef;     # name of database
     $self->{_threshold} = undef;     # Threshold for hit filterting
     $self->{_options}   = undef;     # arguments for blast
-
+    $self->{_filter}    = 0;         # Do we filter features?
     $self->{_fplist}    = [];        # an array of feature pairs (the output)
 
     $self->{_workdir}   = undef;     # location of temp directory
@@ -117,8 +120,8 @@ sub _initialize {
       
     # Now parse the input options and store them in the object
 
-    my( $query, $program, $database, $threshold, $options) = 
-	$self->_rearrange(['QUERY', 'PROGRAM', 'DATABASE','THRESHOLD','OPTIONS'], @args);
+    my( $query, $program, $database, $threshold, $filter,$options) = 
+	$self->_rearrange(['QUERY', 'PROGRAM', 'DATABASE','THRESHOLD','FILTER','OPTIONS'], @args);
    
     if ($query) {
       $self->clone($query);
@@ -148,6 +151,10 @@ sub _initialize {
     
     if (defined($threshold)) {
       $self->threshold($threshold);
+    }
+
+    if (defined($filter)) {
+	$self->filter($filter);
     }
 
     return $self; # success - we hope!
@@ -319,10 +326,35 @@ sub parse_results {
   my $parser = new BPlite ($filehandle);
 
   # Loop over each blast hit
-  while(my $sbjct = $parser->nextSbjct)  {
 
+  my %ids;
+
+  if ($self->filter) {
+      %ids = $self->filter_hits($parser);
+  }
+
+  close($filehandle);
+
+  if (defined($fh)) {
+      $filehandle = $fh;
+  } elsif (ref ($self->results) !~ /GLOB/) {
+      open (BLAST, "<".$self->results)
+	  or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+      $filehandle = \*BLAST;
+  } else {
+      $filehandle = $self->results;
+  }    
+
+  $parser = new BPlite ($filehandle);
+
+ NAME: while(my $sbjct = $parser->nextSbjct)  {
+      
       my $name = $sbjct->name ;
-
+  
+      if (($self->filter == 1) && !defined($ids{$name})) {
+	  next NAME;
+      }
+	  
       $name =~ s/^>(\S+).*/$1/;
 
       if ($name =~ /\|UG\|(\S+)/) {
@@ -346,6 +378,66 @@ sub parse_results {
 }
 
 
+sub filter_hits {
+    my ($self,$parser) = @_;
+
+    my %ids;
+
+    my @features;
+  NAME: while(my $sbjct = $parser->nextSbjct)  {
+      
+      my $name = $sbjct->name ;
+      
+    HSP: while (my $hsp = $sbjct->nextHSP) {
+	next HSP if ($hsp->P > $self->threshold);
+	
+	my $qstart = $hsp->queryBegin;      
+	my $hstart = $hsp->sbjctBegin;      
+	
+	my $qend   = $hsp->queryEnd;      
+	my $hend   = $hsp->sbjctEnd;      
+
+	my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
+
+	my $score  = $hsp->score;
+
+	my $feature1 = new Bio::EnsEMBL::SeqFeature();
+	$feature1->start($qstart);
+	$feature1->end  ($qend);
+	$feature1->strand($qstrand);
+	$feature1->score($score);
+	$feature1->source_tag('tmp');
+	$feature1->primary_tag('similarity');
+
+	my $feature2 = new Bio::EnsEMBL::SeqFeature();
+	$feature2->start  ($hstart);
+	$feature2->end    ($hend);
+	$feature2->strand ($hstrand);
+	$feature2->score  ($score);
+	$feature2->seqname($name);
+	$feature2->source_tag('tmp');
+	$feature2->primary_tag('similarity');
+
+	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
+					       -feature2 => $feature2);
+
+	push(@features,$fp);
+    }
+  }
+
+    my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter();
+
+    my @newfeatures = $search->run(@features);
+
+    foreach my $f (@newfeatures) {
+	my $id = $f->hseqname;
+	
+	$ids{$id} = 1;
+    }
+    
+    return %ids;
+}
+    
 =head2 split_HSP
 
     Title   :   split_HSP
@@ -739,6 +831,18 @@ sub options {
     $self->{_options} = $args ;
   }
   return $self->{_options};
+}
+
+sub filter {
+    my ($self,$args) = @_;
+
+    if (defined($args)) {
+	if ($args != 0 && $args != 1) {
+	    $self->throw("Filter option must be 0 or 1");
+	}
+	$self->{_filter} = $args;
+    }
+    return $self->{_filter};
 }
 
 1;
