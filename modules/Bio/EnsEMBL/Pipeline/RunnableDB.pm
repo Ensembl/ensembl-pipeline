@@ -168,8 +168,8 @@ sub db {
     
     if ($value) 
     {
-        $value->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQ::DBAdpator");
+        $value->isa("Bio::EnsEMBL::DBSQL::DBConnection")
+            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DBSQL::DBConnection");
         $self->{'_db'} = $value;
     }
     return $self->{'_db'};
