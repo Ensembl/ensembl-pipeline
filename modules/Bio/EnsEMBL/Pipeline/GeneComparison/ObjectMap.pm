@@ -92,7 +92,7 @@ sub add_to_list2{
 sub list1{
     my ($self) = @_;
     my %obj_hash;
-    foreach my $obj ( $self->{_list1} ){
+    foreach my $obj ( @{$self->{_list1}} ){
 	$obj_hash{$obj} = $obj;
     }
     my @list = values %obj_hash;
@@ -103,7 +103,7 @@ sub list1{
 sub list2{
     my ($self) = @_;
     my %obj_hash;
-    foreach my $obj ( $self->{_list2} ){
+    foreach my $obj ( @{$self->{_list2}} ){
 	$obj_hash{$obj} = $obj;
     }
     my @list = values %obj_hash;
