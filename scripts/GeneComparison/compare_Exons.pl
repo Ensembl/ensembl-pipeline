@@ -61,28 +61,22 @@ my $write  = 0;
 my $check  = 0;
 my $pepfile;
 my $gff_file;
+my $chr_name;
 
 # options
 &GetOptions( 
+	    'chr_name:s'  => \$chr_name,
 	    'input_id:s'  => \$input_id,
 	    'gff_file:s'  => \$gff_file,
 	   );
 
-unless( $input_id){     
+unless( $input_id || $chr_name ){     
   print STDERR "Usage: compare_Exons.pl -input_id < chrname.chrstart-chrend >\n";
+  print STDERR "                        -chr_name <chr_name>  (optional instead of -input_id)\n";
   print STDERR "                        -gff_file <file_name> (optional)\n";
   exit(0);
 }
     
-# get genomic region 
-my $chr      = $input_id;
-$chr         =~ s/\.(.*)-(.*)//;
-my $chrstart = $1;
-my $chrend   = $2;
-
-unless ( $chr && $chrstart && $chrend ){
-       print STDERR "bad input_id option, try something like 20.1-5000000\n";
-}
 
 # connect to the databases 
 my $dna_db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host1,
@@ -130,15 +124,31 @@ print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
 my $sa1 = $db1->get_SliceAdaptor;
 my $sa2 = $db2->get_SliceAdaptor;
 
-$db1->assembly_type($path1); 
-$db2->assembly_type($path2); 
-
 # get a slice with a piece-of chromosome #
 my ($slice1,$slice2);
 
-print STDERR "Fetching region $chr, $chrstart - $chrend\n";
-$slice1 = $sa1->fetch_by_chr_start_end($chr,$chrstart,$chrend);
-$slice2 = $sa2->fetch_by_chr_start_end($chr,$chrstart,$chrend);
+# get genomic region 
+my ($chr,$chrstart,$chrend);
+if ($input_id){
+  $chr      = $input_id;
+  $chr         =~ s/\.(.*)-(.*)//;
+  $chrstart = $1;
+  $chrend   = $2;
+
+  unless ( $chr && $chrstart && $chrend ){
+    print STDERR "bad input_id option, try something like 20.1-5000000\n";
+    exit(0);
+  }
+  
+  print STDERR "Fetching region $chr, $chrstart - $chrend\n";
+  $slice1 = $sa1->fetch_by_chr_start_end($chr,$chrstart,$chrend);
+  $slice2 = $sa2->fetch_by_chr_start_end($chr,$chrstart,$chrend);
+}
+elsif ($chr_name ){
+  $slice1 = $sa1->fetch_by_chr_name($chr_name);
+  $slice2 = $sa2->fetch_by_chr_name($chr_name);
+}
+
 
 # get the genes of type @type1 and @type2 from $slice1 and $slice2, respectively #
 my (@genes1,@genes2);
