@@ -101,6 +101,7 @@ sub write_output{
     $f->attach_seq($contig);
     $repeat_f_a->store($f);
   }
+  1;
 }
 
 
