@@ -460,6 +460,16 @@ sub _align {
     }
   }
 
+foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
+  print STDERR $tracked_deletion . "\t" . 
+    scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
+  foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
+    print STDERR $deletion->[1] ." (" . $deletion->[0] . ")  ";
+  }
+  print STDERR "\n";
+}
+
+
   my @all_deletions = sort {$a <=> $b} keys %all_deletions;
 
   foreach my $deletion_coord (@all_deletions) {
@@ -469,6 +479,7 @@ sub _align {
     # Add a gap to the genomic and exonic sequence
 
     $self->_genomic_sequence->insert_gap($deletion_coord, $length);
+    $self->{_total_inserted_deletions}++; # Naughty, but fast.
     $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, $length);
     $self->_exon_protein_translation->insert_gap($deletion_coord, $length);
 
@@ -1104,7 +1115,11 @@ sub _merge_same_sequences {
 
   foreach my $sequence_name (keys %same_sequences_hash){
 
-    my $chimera = '-' x $self->_slice->length;
+    # The counter $self->{_total_inserted_deletions} is accessed directly to
+    # maintain speed.  The only place that this value should be changed is 
+    # in _align.
+
+    my $chimera = '-' x ($self->_slice->length + $self->{_total_inserted_deletions});
 
     my @chimera = split (//, $chimera);
 
