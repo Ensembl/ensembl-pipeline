@@ -118,7 +118,7 @@ sub new {
   if (defined $len && $len >=0 ) { 
     $self->min_length($len); }
   else { 
-    $self->min_length(1000); } # for parsing output
+    $self->min_length(400); } # for parsing output
   
   if (defined $gc && $gc >=0 ){
     $self->min_gc($gc);}
@@ -315,23 +315,24 @@ sub parse_results {
         {
             my @element = split;
 	    my $oe = $element[7];
-	    if($oe eq "-") { $oe = 0; }
+	    #if($oe eq "-") { $oe = 0; }
 	    next unless (($element[2] - $element[1] + 1 >= $self->min_length)
-			 && ($element[6] >= $self->min_gc) 
-			 && $oe >= $self->min_oe);
+			 && ($element[3] >= 17) 
+			 );
 	  
             my (%feature);
             $feature {name} = $element[0];
-            $feature {score} = $element[3];
+            $feature {score} = $element[5];
             $feature {start} = $element[1];
             $feature {end} = $element[2];
-	    $feature {pvalue} = $element[7]; #oe isn't a pvalue but needs to be stored somewhere
+	    $feature {p_value} = $oe; #oe isn't a pvalue but needs to be stored somewhere
 	    $feature {percent_id} = $element[6]; #gc isn't percent id but this is the only place to store it
             $feature {strand} = 0;
             $feature {source}= 'cpg';
             $feature {primary}= 'cpg_island';
 	    $feature {program} = 'cpg';
 	    $feature {program_version} = '1';
+            
           
 	    $self->create_feature(\%feature);
 
@@ -383,18 +384,21 @@ sub create_feature {
                             -gff_feature     => $feat->{'primary'});
 
     #create and fill Bio::EnsEMBL::Seqfeature object
+    
+    
     my $cpg = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname => $feat->{'name'},
                             -start   => $feat->{'start'},
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
                             -score   => $feat->{'score'},
-			    -p_value => $feat->{pvalue},
+			    -p_value => $feat->{'p_value'},
 			    -percent_id => $feat->{percent_id},
                             -source_tag  => $feat->{'source'},
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
+   
     if ($cpg)
       {
 	$cpg->validate();
