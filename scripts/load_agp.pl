@@ -7,7 +7,7 @@ load_agp.pl
 
 =head1 SYNOPSIS
 
-  load_agp.pl 
+  load_agp.pl
 
 =head1 DESCRIPTION
  
@@ -70,7 +70,7 @@ my $help;
             'assembled_version:s' => \$assembled_version,
             'component_name:s' => \$component_name,
             'component_version:s' => \$component_version,
-            'agpfile:s' => \$agpfile,
+            'agp_file:s' => \$agpfile,
             'h|help'     => \$help,
             ) or ($help = 1);
 
@@ -84,7 +84,7 @@ if(!$host || !$dbuser || !$dbname || !$dbpass){
 if(!$agpfile || !$assembled_name || !$component_name){
   print STDERR ("Can't store assembly without an agp file or ".
                 "coord system names for assembled and component pieces ".
-                "\n -agpfile $agpfile -assembled_name $assembled_name ".
+                "\n -agp_file $agpfile -assembled_name $assembled_name ".
                 "-component_name $component_name\n");
   $help = 1;
 }
