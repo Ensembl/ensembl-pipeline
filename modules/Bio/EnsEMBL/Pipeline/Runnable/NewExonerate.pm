@@ -20,12 +20,13 @@ $exonerate = a location for the binary,
 $options   = a string with options ,
 
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
-								 -database    => $database,
-								 -query_seqs  => \@sequences,
-								 -query_type => 'dna',
-			                                         -target_type=> 'dna',
-                                                                 -exonerate   => $exonerate,
-								 -options     => $options,
+								 -database      => $database,
+								 -query_seqs    => \@sequences,
+								 -query_type    => 'dna',
+			                                         -target_type   => 'dna',
+                                                                 -exonerate     => $exonerate,
+								 -options       => $options,
+								 -analysis_obj  => $analysis_obj,
 								);
 
  $runnable->run; #create and fill Bio::Seq object
@@ -93,7 +94,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = 
+  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options,$analysis_obj) = 
       $self->_rearrange([qw(
 			    DATABASE
 			    QUERY_SEQS
@@ -101,6 +102,7 @@ sub new {
 			    TARGET_TYPE
 			    EXONERATE
 			    OPTIONS
+			    ANALYSIS_OBJ
 			    )
 			 ], @args);
   
@@ -154,6 +156,17 @@ sub new {
     $basic_options .= $options;
   }
   $self->options( $basic_options);
+
+  ############################################################
+  # analysis object for the supporting evidences
+  if( $analysis_obj ){
+    $self->analysis( $analysis_obj);
+  }
+  else{
+    $self->throw("Need analysis object for the supporting evidences");
+  }
+
+
   return $self;
 }
 
@@ -297,7 +310,7 @@ sub run {
     ############################################################
     # initialize the feature
     my (%query, %target);
-    my (%rev_query, %rev_target);
+    my (%rev_query, %rev_target);    
 
     ( $query{score}  , $target{score} )  = ($score,$score);
     ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
@@ -372,6 +385,7 @@ sub run {
 	############################################################
 	# if the query has been inverted we coun from the end and
 	# inver start and end to inforce start < end
+	
 	%rev_query  = %query;
 	%rev_target = %target;
 	if ( $q_strand == -1 ){
@@ -380,7 +394,12 @@ sub run {
 	  
 	  print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
 	  print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
-	  my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);
+	  my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);	
+	  
+          #set analysis object to be the one obtained from the RunnableDB
+	  $feature_pair->feature1->analysis($self->analysis);
+	  $feature_pair->feature2->analysis($self->analysis);
+
 	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
 	}
@@ -388,8 +407,14 @@ sub run {
 	  my $feature_pair = $self->create_FeaturePair(\%target, \%query);
 	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
+
+	  #set analysis object to be the one obtained from the RunnableDB
+	  $feature_pair->feature1->analysis($self->analysis);
+	  $feature_pair->feature2->analysis($self->analysis);
 	}
+		
 	
+
 	# re-set the start:
 	$query{start}  = $query{end}  + 1;
 	$target{start} = $target{end} + 1;
@@ -565,6 +590,15 @@ sub options {
   return $self->{_options};
 }
 
+############################################################
+
+sub analysis {
+  my ($self, $analysis_obj) = @_;
+  if ($analysis_obj) {
+    $self->{_analysis_obj} = $analysis_obj;
+  }
+  return $self->{_analysis_obj};
+}
 ############################################################
 
 sub output {
