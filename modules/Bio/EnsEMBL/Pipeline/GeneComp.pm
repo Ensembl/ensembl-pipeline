@@ -671,20 +671,7 @@ sub map_temp_Genes_to_real_Genes{
 	my @oldtrans;
 	my $largest;
 	my $size = 0;
-	
-	
-	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
-	    $has_moved_old{$oldgeneid} = 1;
-	    if( $oldgeneid ne $largest ) {
-		#Double check this is right...
-		#Killing all genes in merge that are not largest
-		print $log  "GENE MAP KILLED: $oldgeneid merged into $largest\n";
-		my $oldv = $oldg{$oldgeneid}->version;
-		$self->archive->write_deleted_id('gene',$oldgeneid,$oldv,$largest);
-		$killed{$oldgeneid}=1;
-	    }
-	}
-	
+
 	#Into merge code....
 	my %old_tg;
 	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
@@ -717,6 +704,18 @@ sub map_temp_Genes_to_real_Genes{
 	    $newg{$newgeneid}->modified($now);
 	    push (@final_genes,$newg{$newgeneid});
 	}
+	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
+	    $has_moved_old{$oldgeneid} = 1;
+	    if( $oldgeneid ne $largest ) {
+		#Double check this is right...
+		#Killing all genes in merge that are not largest
+		print $log  "GENE MAP KILLED: $oldgeneid merged into $largest\n";
+		my $oldv = $oldg{$oldgeneid}->version;
+		$self->archive->write_deleted_id('gene',$oldgeneid,$oldv,$largest);
+		$killed{$oldgeneid}=1;
+	    }
+	}
+	
     }
 
    # splits **suck** big time
