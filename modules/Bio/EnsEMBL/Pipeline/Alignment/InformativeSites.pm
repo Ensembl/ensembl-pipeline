@@ -186,7 +186,7 @@ sub _derive_informative_site_alignment {
 
   my $gene_string = $seq->seq;
   my $gene_length = length($gene_string);
-print STDERR ">gene seq\n" . $gene_string . "\n";
+#print STDERR ">gene seq\n" . $gene_string . "\n";
   # Take our existing external EvidenceAlignment and
   # put the evidence sequences somewhere accessible.
 
@@ -209,12 +209,12 @@ print STDERR ">gene seq\n" . $gene_string . "\n";
   my %aligned_informative_site_strings;
   my $exon_string = $evidence_strings{'exon_sequence'};
   $exon_string =~ s/intron-truncated/----------------/g;
-print STDERR ">exon seq\n$exon_string\n";
+#print STDERR ">exon seq\n$exon_string\n";
   my $align_coord = 0;
   my $lost = 1;
 
   for (my $gene_coord = 0; $gene_coord < $gene_length; $gene_coord++) {
-print STDERR "Gene coord : " . $gene_coord . "\n";
+#print STDERR "Gene coord : " . $gene_coord . "\n";
     # This prone-to-breakage code loop shuffles along the alignment
     # and tries and place the unaligned gene.  As the gene sequence should be
     # base-for-base identical to the exonic sequence in the alignment (barring
@@ -273,14 +273,14 @@ print STDERR "Sequence FOUND\n";
     }
 
     # Sanity check
-print STDERR "Gene neighbourhood : " . substr($gene_string, $gene_coord, 10) . " Exon neighbourhood : " . substr($exon_string, $align_coord, 10) . "\n";
+#print STDERR "Gene neighbourhood : " . substr($gene_string, $gene_coord, 10) . " Exon neighbourhood : " . substr($exon_string, $align_coord, 10) . "\n";
     throw("Gene and aligned exon sequence have unexpectedly become unaligned.")
       unless substr($gene_string, $gene_coord, 1) eq substr($exon_string, $align_coord, 1);
 
     # Do our work while we are still aligned
-print STDERR "Trying to get some work done.\n";
+#print STDERR "Trying to get some work done.\n";
     if (substr($informative_sites_string, $gene_coord, 1) eq '*'){
-print STDERR "  Found an informative site.\n";
+#print STDERR "  Found an informative site.\n";
       foreach my $evidence_id (keys %evidence_strings) {
 #	next if (($evidence_id eq 'genomic_sequence') ||
 #	  ($evidence_id eq 'exon_sequence'));
@@ -289,7 +289,7 @@ print STDERR "  Found an informative site.\n";
       }
     } 
 else {
-print STDERR "Not an informative site, not interested and moving right along.\n";
+#print STDERR "Not an informative site, not interested and moving right along.\n";
 }
     # Do a quick check that the next base of the gene will 
     # align to the alignment.  If there is gap, try hopping
@@ -298,7 +298,7 @@ print STDERR "Not an informative site, not interested and moving right along.\n"
     my $hop = 1;
     if (($gene_coord + 1 <= $gene_length)&&
        (substr($exon_string, $align_coord + $hop, 1) ne '-')) {
-print STDERR "Next base is not a gap, hence not trying to hop it.\n";
+#print STDERR "Next base is not a gap, hence not trying to hop it.\n";
       # Gene coord is about to be incremented in the next iteration 
       # of this loop, so had better do this to $align_coord as well.
       $align_coord++;
@@ -318,18 +318,19 @@ print STDERR "      Really big hop.\n";
 	}
       }
       $align_coord += $hop;
-print STDERR "Align coord after hop is $align_coord.\n";
-print STDERR "Gene neighbourhood : " . substr($gene_string, $gene_coord + 1, 10) . " Exon neighbourhood : " . substr($exon_string, $align_coord, 10) . "\n";
+#print STDERR "Align coord after hop is $align_coord.\n";
+#print STDERR "Gene neighbourhood : " . substr($gene_string, $gene_coord + 1, 10) . " Exon neighbourhood : " . substr($exon_string, $align_coord, 10) . "\n";
       my $exon_neighbourhood = substr($exon_string, $align_coord, 10);
       $exon_neighbourhood =~ s/-//g;
-      if (! substr($gene_string, $gene_coord + 1, 10) =~ /^$exon_neighbourhood/) {
+      if ((! substr($gene_string, $gene_coord + 1, 10) =~ /^$exon_neighbourhood/) 
+	  && ($gene_coord < (length($gene_string) - 1))) {
 	warning("Erk.  Have managed to become lost.");
 	$lost = 1;
       }
     }
   }
 
-print STDERR "DONE.\n";
+#print STDERR "DONE.\n";
 
   # Finally, quickly make an alignment object out of the
   # informative site strings.

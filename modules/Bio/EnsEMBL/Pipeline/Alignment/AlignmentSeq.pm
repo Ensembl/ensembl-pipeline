@@ -131,7 +131,8 @@ sub store_seq_array {
   my $concat_seq;
 
   for (my $i = 0; $i < scalar @$input_array; $i++){
-    if ($input_array->[$i] eq ''){
+    if (! defined $input_array->[$i] ||
+	$input_array->[$i] eq ''){
       $concat_seq .= '-';
     } else {
       $concat_seq .= $input_array->[$i];
@@ -172,6 +173,15 @@ sub insert_gap {
   # Stick the gap in the sequence
 
   my $seq = $self->seq;
+
+  if (length $seq < ($insert_position - 1)){
+    info("Attempting to insert gap in sequence [" . $self->name . 
+	 "] beyond the end of the sequence.  Sequence length [". 
+	 length($seq) ."]  Insert position [" . 
+	 ($insert_position - 1) . "]\n");
+    return 0
+  }
+
   my $new_seq = substr($seq, 0, $insert_position - 1) . 
     $gap . substr($seq, $insert_position - 1);
 
