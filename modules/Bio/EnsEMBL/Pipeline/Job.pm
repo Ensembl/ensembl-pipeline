@@ -320,7 +320,9 @@ sub flush_runs {
       );
     my $cmd;
   
-    
+    if(!$self->cleanup){
+      $batch_job->stderr_file($lastjob->stderr_file);
+    }
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly otherwise -pass gets the
@@ -570,8 +572,7 @@ sub run_module {
             eval {
               $self->set_status("FAIL_NO_RETRY");
             };
-            $error_msg .= "(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") 
-              if $@;
+            $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
         
             $self->throw($error_msg);
 	}
