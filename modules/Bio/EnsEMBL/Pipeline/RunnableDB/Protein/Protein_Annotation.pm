@@ -44,7 +44,6 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-#use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
 use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General;
 

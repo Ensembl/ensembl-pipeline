@@ -49,7 +49,6 @@ use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite;
-use Bio::EnsEMBL::DBSQL::ProteinAdaptor;
 use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 
 
