@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
 					     -db        => $db,
 					     -input_id  => $id,
-					     -golden_path => $gp,
 					     -type      => $type,
                                              -threshold => $threshold		    
 								    
@@ -59,7 +58,6 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_PROTEIN_INDEX
 					 GB_SIMILARITY_TYPE
 					 GB_SIMILARITY_THRESHOLD
@@ -76,11 +74,7 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-    my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
-
-    if(!defined $path || $path eq ''){
-      $path = $GB_GOLDEN_PATH;
-    }
+    my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
 
     if(!defined $type || $type eq ''){
       $type = $GB_SIMILARITY_TYPE;
@@ -90,11 +84,9 @@ sub new {
       $threshold = $GB_SIMILARITY_THRESHOLD
     }
 
-    $path = 'UCSC' unless (defined $path && $path ne '');
     $type = 'sptr' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
-    $self->db->static_golden_path_type($path);
     $self->type($type);
     $self->threshold($threshold);
 
