@@ -18,11 +18,11 @@ dbname = mcvicker_test_briggsae
 dbname = mcvicker_test_briggsae
 
 [LSF]
-tempdir = /tmp
+tmpdir = /tmp
 path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 [LOCAL]
-tempdir = /tmp
+tmpdir = /tmp
 
 [PIPELINE_MANAGER]
 check_interval = 35
@@ -50,7 +50,7 @@ max_create = 50
 
 [REPEATMASKER_TASK]
 timeout  = 3600
-where = LSF:acari
+where = Local
 retries = 3
 
 [GENSCAN_TASK]
