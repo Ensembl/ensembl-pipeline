@@ -299,7 +299,7 @@ sub get_Genes {
   my @unchecked_genes;
 
   foreach my $type ($self->gene_types) {
-    my @genes = @{$slice->get_all_Genes_by_type($type, 'evidence')};
+    my @genes = @{$slice->get_all_Genes_by_type($type)};
     print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
     foreach my $gene ( @genes ){
     

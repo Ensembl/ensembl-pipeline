@@ -299,13 +299,13 @@ sub fetch_input {
 
   # get ests 
   print STDERR "getting genes of type $EST_GENEBUILDER_INPUT_GENETYPE\n";
-  $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ) });
+  $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE ) });
   print STDERR "got ".scalar( $self->ests )." ests\n";
 
 
 
   # get ensembl genes (from GeneBuilder)
-  $self->ensembl_genes(@{ $self->ensembl_slice->get_all_Genes_by_type( $EST_TARGET_GENETYPE, 'evidence' ) });
+  $self->ensembl_genes(@{ $self->ensembl_slice->get_all_Genes_by_type( $EST_TARGET_GENETYPE ) });
 
 }
   
