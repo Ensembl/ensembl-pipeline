@@ -213,6 +213,10 @@ sub get_Seq_by_acc {
         return $seq_list[0];
     }
 }
+
+
+### This is not the right place for this!
+### Is it used?
 sub write_descriptions {
     my ( $self, $dbobj, @ids ) = @_;
     my $sth = $dbobj->prepare( qq{ 
@@ -245,5 +249,7 @@ sub write_descriptions {
 	}
 	
 }
+
+
 1;
 __END__

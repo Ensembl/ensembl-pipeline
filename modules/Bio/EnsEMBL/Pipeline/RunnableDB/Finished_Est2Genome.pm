@@ -1,6 +1,6 @@
 
 
-package Bio::ensEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
+package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Root;

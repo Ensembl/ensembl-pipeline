@@ -194,7 +194,7 @@ sub agp_parse{
   Arg [2]   : Bio::Seq object
   Arg [3]   : Bio::EnsEMBL::Analysis object
   Function  : parses gff file given into genes
-  Returntype: array ref of Bio::EnEMBL::Genes
+  Returntype: array ref of Bio::EnsEMBL::Genes
   Exceptions: dies if can't open file or seq isn't a Bio::Seq 
   Caller    : 
   Example   : 
