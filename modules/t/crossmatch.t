@@ -53,9 +53,14 @@ print "ok 3\n";
 
 if( scalar(@fp) != 3 ) {	
   print "not ok 4\n";
+  print STDERR "got ",scalar(@fp)," hits\n";
 } else {
   print "ok 4\n";
 }
+
+foreach $s ( @fp ) {
+	print STDERR "got $s ",$s->start,":",$s->end,"\n";
+	}
 
 
 
