@@ -62,7 +62,7 @@ sub new {
     my ( $server, $port, $options ) = $self->_rearrange( [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
     if ( !defined $server ) {
-        $server = 'pubseq.internal.sanger.ac.uk';
+        $server = 'cbi2.internal.sanger.ac.uk';
     }
     $self->server($server);
 
@@ -218,7 +218,7 @@ sub write_descriptions {
     my $sth = $dbobj->prepare( qq{ 
                                 REPLACE DELAYED INTO 
                                 hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
-                                VALUES (?,?,?,?,?)}
+                                VALUES (?,TRIM(?),?,?,?)}
     );
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
