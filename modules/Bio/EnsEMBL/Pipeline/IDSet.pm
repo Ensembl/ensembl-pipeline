@@ -56,9 +56,9 @@ sub ID_list{
 
 sub calculate{
   my ($self, $idlist) = @_;
- # if(!$idlist->isa('Bio::EnsEMBL::Pipeline::IDset')){
-#    $self->throw("Need to passs these methods (and/or/not) an Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work you passed in $idlist : $!");
-#  }
+  
+  $idlist->isa('Bio::EnsEMBL::Pipeline::IDSet') ||$self->throw("Need to passs these methods (and/or/not) an Bio::EnsEMBL::Pipeline::IDSet object otherwise won't work you passed in $idlist : $!");
+  
   my %count;
   my @own_ids =  @{$self->{'_ID_list'}};
   my @comp_ids = @{$idlist->ID_list};
