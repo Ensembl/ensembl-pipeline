@@ -49,6 +49,7 @@ use vars qw(%Config);
 	   DEFAULT_RETRIES    => 3,
 	   DEFAULT_BATCH_QUEUE => 'acarilong', # put in the queue  of your choice, eg. 'acari'
 	   DEFAULT_OUTPUT_DIR => '',
+	   DEFAULT_CLEANUP => 'yes',	
 	   MAX_PENDING_JOBS   => 400,
 	   AUTO_JOB_UPDATE     => 1,
 	   QUEUE_CONFIG       => [
@@ -60,100 +61,34 @@ use vars qw(%Config);
 				   sub_args   => '',
 				   runner     => '',
 				   queue => 'acarilong',
-				   output_dir => '/acari/work1/lec/out/'
+				   output_dir => '/acari/work1/lec/out/',
+				   cleanup => 'yes',	
 				  },
-	{
-	 logic_name => 'Genscan',
-	 batch_size => 10,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong', 
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'CPG',
-	 batch_size => 10,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{		   
-	 logic_name => 'tRNA',
-	 batch_size => 10,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'TRF',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'Swall',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'Human_ESTs',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'Mouse_ESTs',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-	{
-	 logic_name => 'Other_ESTs',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/work1/lec/out/'
-	},
-
-	{
-	 logic_name => 'Snap',
-	 batch_size => 1,
-	 resource   => '',
-	 retries    => 3,
-	 sub_args   => '-m ecs_nodes',
-	 runner     => '',
-	 queue => 'acarilong',
-	 output_dir => '/acari/scratch1/ensembl/mongin/anopheles_mai/pipeline'
-	},
+				  {
+				   logic_name => 'Genscan',	
+				   batch_size => 10,	  
+				   resource   => '',	  
+				   retries    => 3,
+				   sub_args   => '',
+				   runner     => '',
+				   queue => 'acarilong', 
+				   output_dir => '/acari/work1/lec/out/',
+				   cleanup => 'yes',	
+				  },
+				  {
+				   logic_name => 'CPG',
+				   batch_size => 10,
+				   resource   => '',
+				   retries    => 3,
+				   sub_args   => '',
+				   runner     => '',
+				   queue => 'acarilong',
+				   output_dir => '/acari/work1/lec/out/',
+				   cleanup => 'yes',	 
+				  },
+	
 			  				  	  
-    ]
+				 ]
 );
 
 sub import {

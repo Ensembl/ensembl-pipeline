@@ -332,7 +332,8 @@ sub flush_runs {
     $batch_job->open_command_line();
     #print STDERR $batch_job->bsub."\n";
     if( ! defined $batch_job->id ) {
-      print STDERR ( "Couldnt batch submit @job_ids" );
+      print STDERR ( "Couldnt batch submit @job_ids\n" );
+      print STDERR ($batch_job->bsub."\n");
       foreach my $job_id (@job_ids) {
         my $job = $adaptor->fetch_by_dbID($job_id);
         $job->set_status( "FAILED" );
@@ -537,7 +538,7 @@ sub run_module {
     else {
       print STDERR "Updated successful job ".$self->dbID."\n";
       eval {
-        $self->remove;
+        $self->remove($self->analysis->logic_name);
       };
       if ($err = $@) {
          print STDERR "Error deleting job ".$self->dbID." [$err]\n";
@@ -763,10 +764,15 @@ sub retry_count {
 
 sub remove {
   my $self = shift;
-  
-  if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
-  if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
-  
+  my $logic_name = shift;
+
+  if(!$BATCH_QUEUES{$logic_name}){
+     $logic_name = 'default';
+  } 
+  if($BATCH_QUEUES{$logic_name}{'cleanup'} eq 'yes'){
+    if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
+    if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
+  }
 
    if( defined $self->adaptor ) {
      $self->adaptor->remove( $self );
@@ -796,6 +802,7 @@ sub set_up_queues {
 	    $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
 	    $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
             $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+	    $q{$ln}{'cleanup'} ||= $DEFAULT_CLEANUP;
 	}
 
 	# a default queue for everything else
@@ -805,6 +812,7 @@ sub set_up_queues {
 	    $q{'default'}{'last_flushed'} = undef;
 	    $q{'default'}{'queue'} = $DEFAULT_BATCH_QUEUE;
             $q{'default'}{'jobs'} = [];
+            $q{'default'}{'cleanup'} = $DEFAULT_CLEANUP;
 	}
     }
   
