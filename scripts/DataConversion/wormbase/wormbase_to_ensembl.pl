@@ -123,9 +123,36 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
 
   foreach my $clone_name(keys(%$non_translating)){
     my $wormbase_seq = $obda->get_Seq_by_acc($clone_name);
-    my $clone = $db->get_CloneAdaptor->fetch_by_name($clone_name);
+    my $clone_adaptor = $db->get_CloneAdaptor;
+    my $clone = $clone_adaptor->fetch_by_name($clone_name);
     my ($contig) = @{$clone-get_all_Contigs};
-    my $contig_id = $contig->dbID
+    my $contig_id = $contig->dbID;
+    my $embl_acc = $clone->embl_id;
+    my $version = $clone->embl_version;
+    $clone_adaptor->remove($clone);
+    my $clone     = new Bio::EnsEMBL::Clone;
+    my $contig    = new Bio::EnsEMBL::RawContig; 
+    my $clone_name = $WB_ACC_2_CLONE->{$acc};
+    $clone->htg_phase(3);
+    $clone->id($clone_name); 
+    $clone->embl_id($acc);
+    $clone->version(1);
+    $clone->embl_version($version);
+    my $contig_name = $id.".1.".$wormbase_seq->length;
+    $contig->name($contig_name);
+    $contig->seq($wormbase_seq->seq);
+    $contig->length($seq->length);
+    $contig->adaptor($db->get_RawContigAdaptor);
+    $clone->add_Contig($contig);
+    my $time = time;
+    $clone->created($time);
+    $clone->modified($time);
+    eval{
+      $db->get_CloneAdaptor->store($clone);
+    };
+    if($@){
+      die("couldn't store ".$clone->id." ".$clone->embl_id." $!");
+    }
   }
 
 }
