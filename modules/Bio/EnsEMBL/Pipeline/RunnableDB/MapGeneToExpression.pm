@@ -130,14 +130,14 @@ sub new{
   
   # database where the expression vocabularies are.
   # this is also where we are going to store the results
-  my $expression_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-							 '-host'   => $EST_EXPRESSION_DBHOST,
-							 '-user'   => $EST_EXPRESSION_DBUSER,
-							 '-dbname' => $EST_EXPRESSION_DBNAME,
-							 '-pass'   => $EST_EXPRESSION_DBPASS,
-							);
+  my $expression_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor->new(
+									  '-host'   => $EST_EXPRESSION_DBHOST,
+									  '-user'   => $EST_EXPRESSION_DBUSER,
+									  '-dbname' => $EST_EXPRESSION_DBNAME,
+									  #'-pass'   => $EST_EXPRESSION_DBPASS,
+									 );
   
-  $self->expression_db($expression_db);
+  $self->expression_adaptor($expression_adaptor);
   
   return $self;
   
@@ -161,13 +161,13 @@ sub ensembl_db{
 
 ############################################################
 
-sub expression_db{
+sub expression_adaptor{
   my ( $self, $db ) = @_;
   if ( $db ){
-    $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
-    $self->{'_expression_db'} = $db;
+    $db->isa("Bio::EnsEMBL::DBSQL::DBConnection") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBConnection");
+    $self->{_expression_adaptor} = $db;
   }
-  return $self->{'_expression_db'};
+  return $self->{_expression_adaptor};
 }
 
 ############################################################
@@ -353,7 +353,7 @@ sub run{
     
     # if we have genes of either type, let's try to match them
     if ( @genes && @ests ){
-      print STDERR "Matching ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
+      print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
       
       my @est_transcripts;
       foreach my $est ( @ests ){
@@ -385,7 +385,7 @@ sub run{
       next CLUSTER
     }
   } # end of CLUSTER
-
+  
   # before returning, check that we have written anything
   unless( $self->expression_Map ){
     exit(0);
@@ -555,7 +555,8 @@ sub _map_ESTs{
   #} 
 
   # get only the ests that are in the SANBI database
-  my @ests = $self->_in_SANBI( @{ $ests } );
+  #my @ests = $self->_in_SANBI( @{ $ests } );
+  my @ests = @$ests;
 
   # check this transcript first:
   my $check = $self->_check_Transcript($transcript);
@@ -578,7 +579,7 @@ sub _map_ESTs{
     }
 
     # compare this est
-    my $merge = $transcript_comparator->test_for_semiexact_Merge($transcript,$est);
+    my $merge = $transcript_comparator->_test_for_semiexact_Merge($transcript,$est);
 
     # (this method checks exact exon boundary matches but
     # allows mismatches at outer end of the 5' and 3' exons)
@@ -644,8 +645,7 @@ sub _in_SANBI{
     push( @est_ids, $est_id );
     $id_to_transcript{$est_id} = $est;
   }
-  my $db = $self->expression_db;
-  my $expression_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor($db);
+  my $expression_adaptor = $self->expression_adaptor;
   my @pairs = $expression_adaptor->get_libraryId_by_estarray( @est_ids );
   
   my @found_ests;
@@ -881,12 +881,8 @@ sub _find_est_id{
 
 sub write_output {
   my ($self) = @_;
-  
-  my $db = $self->expression_db;
-  my $expression_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor($db);
-  
-  
-  
+  my $expression_adaptor = $self->expression_adaptor;
+    
   # recall we have stored the results in self->expression_Map as push ( @{ $self->{_est_map}{$transcript} }, $est );
   my %expression_map = %{ $self->expression_Map };
   
