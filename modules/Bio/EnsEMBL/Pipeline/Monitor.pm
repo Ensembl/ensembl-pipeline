@@ -608,7 +608,8 @@ sub lock_status{
                                                $self->dbobj->dbc->port,
                                                $self->dbobj->dbc->dbname);
     if (my $lock_str = $self->dbobj->pipeline_lock) {
-            my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+ 
+            my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\S+):(\d+):(\d+)/;
             $self->print_header("This pipeline is LOCKED") if $print;
             @a = ($user, $host, $pid, scalar(localtime($started)), $started);
             printf($str, @a) if $print;
