@@ -21,8 +21,7 @@
 =head1 DESCRIPTION
 
 It creates a graph where the nodes are the transcripts and the vertices is a relation between the
-transcripts. In general this relation is 'having one exon in common'. This will most likely be modified 
-in the future. For instance, to include the realtion 'having one intron in common'.
+transcripts. In general this relation is 'having one exon and one intron in common'.
 
 The method  _find_connected_graphs will retrieve from the graph the connected components
 with more than one element, and returns all the transcripts that are in these connected components.

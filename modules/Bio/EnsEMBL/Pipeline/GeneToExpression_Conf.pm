@@ -112,7 +112,7 @@ use vars qw( %GeneToExpression_Conf );
 	    USE_ONLY_ESTS_IN_EXPRESSION_DB => '1',	  
 			  
 	    # this will put a limit to the number of ests linked to a transcript
-            MAX_ESTS_PER_TRANSCRIPT        => 700,
+            MAX_ESTS_PER_TRANSCRIPT        => 300,
 
 	    ############################################################		  
 	    # you can specify here the database where those genes are

@@ -487,7 +487,7 @@ sub link_Transcripts{
   CLUSTER:
     foreach my $cluster ( @{ $transcript_clusters} ){
 	
-        print STDERR "~~~ CLUSTER ~~~\n";
+        #print STDERR "~~~ CLUSTER ~~~\n";
 	my %overlap_matrix;
 	$self->matrix(\%overlap_matrix);
 	

@@ -60,52 +60,46 @@ my $prefix='COB';
 		     ############################################################
 		     
 		     # db from where we get the est-genes
-		     ESTGENE_DBHOST              => 'ecs1d',
+		     ESTGENE_DBHOST              => 'ecs2f',
 		     ESTGENE_DBUSER              => 'ensro', 
-		     ESTGENE_DBNAME              => 'briggsae_cdna_newschema',
-		     ESTGENE_DBPASS              => 'ensembl',
-		     
+		     ESTGENE_DBNAME              => 'ens_NCBI_31_cdna',
+		     ESTGENE_DBPASS              => '',
 		     # gene type for est-genes
-		     #ESTGENE_TYPE                => 'genomewise',
-		     ESTGENE_TYPE                => 'exonerate_e2g',
+		     ESTGENE_TYPE                => 'genomewise',
 		     
 		     # in case you want to restrict the length of the introns
-		     ESTGENE_MAX_INTRON_LENGTH    => 500000,
-
-
+		     ESTGENE_MAX_INTRON_LENGTH    => 200001,
 		     
 		     # db from which we get ensembl genes
-		     ENSEMBL_DBHOST              => 'ecs1c',
+		     ENSEMBL_DBHOST              => 'ecs2a',
 		     ENSEMBL_DBUSER              => 'ensro',
-		     ENSEMBL_DBNAME              => 'briggsae_test_intermediate',
-		     ENSEMBL_DBPASS              => 'ensembl',
-		     
+		     ENSEMBL_DBNAME              => 'ens_NCBI_31_ensembl_genes',
+		     ENSEMBL_DBPASS              => '',
 		     # gene type for the ensembl genes
-		     #ENSEMBL_TYPE                => 'ensembl',
-		     ENSEMBL_TYPE                => 'combined_gw_e2g',
-		     
+		     ENSEMBL_TYPE                => 'ensembl',
+		     		     
 		     # refdb where the dna is, so that we do not need to have it everywhere
-		     REF_DBHOST              => 'ecs1d',
+		     REF_DBHOST              => 'ecs2b',
 		     REF_DBUSER              => 'ensro',
-		     REF_DBNAME              => 'briggsae_intermediate_newschema',
+		     REF_DBNAME              => 'ens_NCBI_31',
 		     REF_DBPASS              => '',
 		     
 		     # different db for writing final genes to - to get round table locks
 		     # this db needs to have clone & contig & static_golden_path tables populated
-		     FINAL_DBHOST             => 'ecs1c',
-		     FINAL_DBNAME             => 'briggsae_test_intermediate',
+		     FINAL_DBHOST             => 'ecs2b',
+		     FINAL_DBNAME             => 'ens_NCBI_31',
 		     FINAL_DBUSER             => 'ensadmin',
 		     FINAL_DBPASS             => 'ensembl',
 		     
 		     # final gene type
-		     FINAL_TYPE               => 'final_ensembl',
+		     FINAL_TYPE               => 'ensembl',
 		     
 		     ############################################################
 		     # general variables
 		     ############################################################
 
 		     # the input id should give chr_name . start - end
-		     GENECOMBINER_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
+		     GENECOMBINER_INPUTID_REGEX => '(^\S+)\.(\d+)-(\d+)',
 
 
 
@@ -114,22 +108,22 @@ my $prefix='COB';
 		     GENECOMBINER_RUNNABLES    =>  [
 						    {
 						     runnable => 'GeneCombiner',
-						     analysis => 'final_ensembl',
+						     analysis => 'ensembl',
 						    },
 						   ],
 		     
 		     # directory where the output files will go
-		     OUTPUT_DIR  => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
+		     OUTPUT_DIR  => '/ecs2/scratch3/ensembl/eae/NCBI_31',
 		     
 		     # directory where the jobs files will go
-		     JOBS_DIR    => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
+		     JOBS_DIR    => '/ecs2/scratch3/ensembl/eae/NCBI_31',
 		     
 		     # LSF queue plus any options you want to use
 		     QUEUE       => 'acari',
-		     		     
+		     
 		     # size of slices to use in length based build
 		     SLICE_SIZE                  => '5000000',
-
+		     
 		     # GeneBuilder parameters
 		     GC_VCONTIG              => 1,
 		     GC_SKIP_BMG             => 0,
@@ -146,16 +140,6 @@ my $prefix='COB';
 		     GB_MAX_EXONSTRANSCRIPT  => 150, 
 		     GB_MAXTRANSCRIPTS       => 10, 
 		     GB_IGNOREWARNINGS       => 1, 
-		     
-		     # old id generating variables
-		     EXON_ID_SUBSCRIPT       => $prefix.'E',
-		     EXON_ID_DIGITS          => 11,
-		     TRANSCRIPT_ID_SUBSCRIPT => $prefix.'T',
-		     TRANSCRIPT_ID_DIGITS    => 11,
-		     GENE_ID_SUBSCRIPT       => $prefix.'G',
-		     GENE_ID_DIGITS          => 11,
-		     PROTEIN_ID_SUBSCRIPT    => $prefix.'P',
-		     PROTEIN_ID_DIGITS       => 11 ,
 		     
 		    );
 
@@ -188,3 +172,7 @@ sub import {
 }
 
 1;
+
+
+
+
