@@ -96,6 +96,7 @@ sub new {
   $self->{'_fplist'} = []; # an array of feature pairs (the output)
   $self->{'_workdir'} = "/tmp"; # location of temp directory
   $self->{'_results'} = "/tmp/results.".$$; # location of result file
+#  $self->{'_results'} = "/tmp/results.".$$; # location of result file
 
   my ($seq1, $seq2, $program, $alntype, $min_score, $min_eval, $workdir, $results) = 
     $self->_rearrange([qw(SEQ1 SEQ2 PROGRAM ALNTYPE MIN_SCORE MIN_EVAL WORKDIR RESULTS)], @args);
@@ -106,7 +107,10 @@ sub new {
 
   $self->program($self->find_executable($program)) if ($program);
   $self->alntype($alntype) if ($alntype);
-  $self->workdir($workdir) if ($workdir);
+  if ($workdir) {
+    $self->workdir($workdir);
+    $self->results($self->workdir."/results.".$$);
+  }
   $self->results($results) if ($results);
   $self->min_score($min_score) if (defined $min_score);
   $self->min_eval($min_eval) if (defined $min_eval);
@@ -284,7 +288,7 @@ sub run {
   unlink($query);
   unlink($sbjct);
   unlink($self->results);
-
+  
   return 1;
 }
 
@@ -330,7 +334,7 @@ sub parse_results {
   while (my @blocks = $bl2seq_parsing->nextBlocks) {
     last unless (scalar @blocks);
     foreach my $block (@blocks) {
-      my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand) = ($block->qstart,$block->qend,$block->qstrand,$block->sstart,$block->send,$block->sstrand);
+      my ($qstart,$qend,$qstrand,$sstart,$send,$sstrand,$bits) = ($block->qstart,$block->qend,$block->qstrand,$block->sstart,$block->send,$block->sstrand,$block->bits);
       
       my $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
 
@@ -342,8 +346,7 @@ sub parse_results {
       $fp->hend($send);
       $fp->hstrand($sstrand);
       $fp->hseqname($self->seq2->id);
-      $fp->score(0.0);
-      
+      $fp->score($bits);
 
       $self->_add_fp($fp);
     }
@@ -777,6 +780,14 @@ sub nextUngappedBlock {
   my $block_initialized = 0;
   my ($newqseq,$newsseq) = ("","");
   my $block = Bl2seq::Block->new();
+
+# Assigning here to each ungapped block the bits, score, expect and identity
+# of the original gapped block ($self). Not very conventional...
+
+  $block->bits($self->bits);
+  $block->score($self->score);
+  $block->expect($self->expect);
+  $block->identity($self->identity);
 
   for (my $i = 0; $i <= length($self->qseq); $i++) {
 
