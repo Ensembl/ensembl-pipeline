@@ -247,10 +247,11 @@ sub flush_runs {
     @queues = ( $queue );
   }
   
-  my $db = $adaptor->db;
-  my $host = $db->host;
+  my $db       = $adaptor->db;
+  my $host     = $db->host;
   my $username = $db->username;
-  my $dbname = $db->dbname;
+  my $dbname   = $db->dbname;
+
   my ( $lsfid, $job, $stdout, $stderr );
 
   my $runner = __FILE__;
@@ -333,7 +334,7 @@ sub batch_runRemote {
   # and add it to batched_jobs_runtime
   # but for now just
   push( @{$batched_jobs{$queue}}, $self->dbID );
-  if( scalar( @{$batched_jobs{$queue}} ) >= 50 ) {
+  if ( scalar( @{$batched_jobs{$queue}} ) >= $::pipeConf{'batchsize'} ) {
     $self->flush_runs( $self->adaptor, $queue );
   }
 }
@@ -450,33 +451,49 @@ sub runInLSF {
   
 
   eval {
-    if( $module =~ /::/ ) {
-      $module =~ s/::/\//g;
-      require "${module}.pm";
-      $rdb = "${module}"->new
-	( -analysis => $self->analysis,
-	  -input_id => $self->input_id,
-	  -dbobj => $self->adaptor->db );
-    } else {
-      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-	( -analysis => $self->analysis,
-	  -input_id => $self->input_id,
-	  -dbobj => $self->adaptor->db );
-    }
-    $self->set_status( "READING" );
-    $rdb->fetch_input;
-    $self->set_status( "RUNNING" );
-    $rdb->run;
-    $self->set_status( "WRITING" );
-    $rdb->write_output;
-    $self->set_status( "SUCCESSFUL" );
+      if( $module =~ /::/ ) {
+	  $module =~ s/::/\//g;
+	  require "${module}.pm";
+	  $rdb = "${module}"->new
+	      ( -analysis => $self->analysis,
+		-input_id => $self->input_id,
+		-dbobj => $self->adaptor->db );
+      } else {
+	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
+	      ( -analysis => $self->analysis,
+		-input_id => $self->input_id,
+		-dbobj => $self->adaptor->db );
+      }
+  };
+  if ($@) {
+      $self->set_status( "FAILED" );
+      die "Problems creating runnable $module for " . $self->input_id . " [$@]\n";
+  }
+  eval {   
+      $self->set_status( "READING" );
+      $rdb->fetch_input;
+  };
+  if ($@) {
+      $self->set_status( "FAILED" );
+      die "Problems with $module fetching input for " . $self->input_id . " [$@]\n";
+  }
+  eval {
+      $self->set_status( "RUNNING" );
+      $rdb->run;
+  };
+  if ($@) {
+      $self->set_status( "FAILED" );
+      die "Problems running $module for " . $self->input_id . " [$@]\n";
+  }
+  eval {
+      $self->set_status( "WRITING" );
+      $rdb->write_output;
+      $self->set_status( "SUCCESSFUL" );
   }; 
   if( $@ ) {
-    print $@;
-# print STDERR ("Problems with $module\n");
-    $self->set_status( "FAILED" );
-    die "Problems with $module.\nError: $@" ;
+      $self->set_status( "FAILED" );
+      die "Problems for $module writing output for " . $self->input_id . " [$@]" ;
   }
 }
 
