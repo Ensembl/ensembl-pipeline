@@ -7,7 +7,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::SeqIO;
 
-BEGIN { $| = 1; plan test => 13;}
+BEGIN { $| = 1; plan test => 18;}
 
 ok(1);
 
@@ -77,33 +77,31 @@ my $report;
   ok($report->isa("Bio::Tools::BPlite"));
 }
 
-# At time of writing, ncbi-type blast was slightly broken.
+{
+  my $blastdb 
+    = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
+        -dbfile     => 't/data/relaxins.fa',
+        -index_type => 'ncbi',
+        -type       => 'DNA',
+	-workdir    => '/tmp',
+        -copy       => 1);
 
-#{
-#  my $blastdb 
-#    = Bio::EnsEMBL::Pipeline::Runnable::BlastDB->new(
-#        -dbfile     => 't/data/relaxins.fa',
-#        -index_type => 'ncbi',
-#        -type       => 'DNA',
-#	-workdir    => '/tmp',
-#        -copy       => 1);
-#
-#  ok($blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
-#
-#  ok($blastdb->run);
-#
-#  my $blast 
-#    = Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast->new(
-#        -blastdb  => $blastdb,
-#        -queryseq => $input_seq,
-#        -program  => 'blastn');
-#
-#  ok($blast->isa("Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast"));
-#
-#  ok($report = $blast->run);
-#
-#  ok($report->isa("Bio::Tools::BPlite"));
-#}
+  ok($blastdb->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastDB"));
+
+  ok($blastdb->run);
+
+  my $blast 
+    = Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast->new(
+        -blastdb  => $blastdb,
+        -queryseq => $input_seq,
+        -program  => 'blastn');
+
+  ok($blast->isa("Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast"));
+
+  ok($report = $blast->run);
+
+  ok($report->isa("Bio::Tools::BPlite"));
+}
 
 
 if ($verbose){
