@@ -202,11 +202,11 @@ sub write_output {
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;;
     my @featurepairs = $self->output;
 
-    foreach my $feat(@featurepairs) {
-	$proteinFeatureAdaptor->write_Protein_feature($feat);
+    if (@featurepairs) {
+        foreach my $feat(@featurepairs) {
+   	    $proteinFeatureAdaptor->write_Protein_feature($feat);
+        }
     }
-
-    #$proteinFeatureAdaptor->store (@featurepairs);
 }
 
 

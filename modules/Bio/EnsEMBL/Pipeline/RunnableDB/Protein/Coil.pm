@@ -152,12 +152,13 @@ sub write_output {
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
     my @features = $self->output;
 
-    print STDERR "Features: ".$features[0]->feature1->start."\n";
 
-     foreach my $feat(@features) {
-	$proteinFeatureAdaptor->write_Protein_feature($feat);
+    if (@features) { 
+#        print STDERR "Features: ".$features[0]->feature1->start."\n";
+        foreach my $feat(@features) {
+	    $proteinFeatureAdaptor->write_Protein_feature($feat);
+        }
     }
-
 }
 
 
