@@ -208,8 +208,8 @@ sub run {
       $self->convert_output;
 
     };
-    $self->_deletefiles($genfile, $estfile);
-    #$self->_deletefiles($genfile, $estfile, $output_file);
+    #$self->_deletefiles($genfile, $estfile);
+    $self->_deletefiles($genfile, $estfile, $output_file);
     if ($@) {
         $self->throw("Error running est_genome [$@]\n");
     } else {

@@ -171,7 +171,7 @@ sub run {
     $self->run_tRNAscan_SE();
     #parse output of tRNAscan_SE
     $self->parse_results();
-    $self->deletefiles();
+    #$self->deletefiles();
 }
 
 =head2 run_tRNAscan_SE
@@ -245,6 +245,7 @@ sub parse_results {
 	$feature {score} = $element[8];
 	$feature {start} = $start;
 	$feature {end} = $end;
+	$feature {hseqname} = $element[5];
 	$feature {strand} = $strand;
 	$feature {source}= 'tRNAscan-SE';
 	$feature {primary}= 'tRNA';
@@ -313,13 +314,33 @@ sub create_feature {
                             -primary_tag => $feat->{'primary'},
                             -analysis => $analysis_obj);  
 
-    if ($tRNA)
-      {
-	$tRNA->validate();
+    my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $feat->{'name'},
+					 -start   => $feat->{'start'},
+					 -end     => $feat->{'end'},
+					 -strand  => $feat->{'strand'},
+					 -score   => $feat->{'score'},
+					 -source_tag => $feat->{'source'}, 
+					 -primary_tag => $feat->{'primary'},
+					 -analysis     => $analysis_obj);
+    my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname =>  $feat->{'hseqname'},
+					  -start => -1,
+					  -end => -1,
+					  -strand  => $feat->{'strand'},
+					  -score   => $feat->{'score'},
+					  -source_tag =>  $feat->{'source'},
+					  -primary_tag =>  $feat->{'primary'},
+					  -analysis     => $analysis_obj);
 
-	# add to _flist
-	push(@{$self->{'_flist'}}, $tRNA);
-      }
+
+      $f->analysis($analysis_obj);
+      $f2->analysis($analysis_obj);
+
+      my $tRNA = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
+                                             -feature2 => $f2);
+
+   
+    push(@{$self->{'_flist'}}, $tRNA);
+      
 }
 
 1;
