@@ -34,7 +34,7 @@ print("In runner " . `date` );
 my $LSF     = new Bio::EnsEMBL::Pipeline::LSF;
 
 if ($objectfile) {
-    open (IN,"<$objectfile");
+    open (IN,"<$objectfile") || die ("Could not open object file $objectfile");
     while (<IN>) {
 	$object .= $_;
     }
