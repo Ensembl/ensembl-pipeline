@@ -240,7 +240,7 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    print STDERR "RUNNING: ".$self->analysis->program." ".$self->filename." ".$self->results." /tmp ".$self->analysis->db_file." /acari/work1/mongin/superfamily/model.tab /usr/local/ensembl/sam/bin/hmmscore 0.02 y /acari/work1/mongin/superfamily"."\n";
+    print STDERR "RUNNING: ".$self->analysis->program." ".$self->filename." ".$self->results." /tmp ".$self->analysis->db_file." /acari/work1/mongin/superfamily/model.tab  0.02 y /nfs/disk100/pubseq/bin/sam/bin/hmmscore /acari/work1/mongin/superfamily"."\n";
 	$self->throw("Failed during Superfamily run $!\n")
 	    
 	    unless (system ($self->analysis->program . ' ' .
@@ -248,7 +248,7 @@ sub run_analysis {
 			    $self->results.
 			    ' /tmp '.
                             $self->analysis->db_file.
-			    ' /acari/work1/mongin/superfamily/model.tab /usr/local/ensembl/sam/bin/hmmscore 0.02 y /acari/work1/mongin/superfamily') == 0);
+			    ' /acari/work1/mongin/superfamily/model.tab  /nfs/disk100/pubseq/bin/sam/bin/hmmscore 0.02 y /acari/work1/mongin/superfamily') == 0);
 }
 
 
@@ -285,10 +285,9 @@ sub parse_results {
     my %feat;
     while (<CPGOUT>) {
 	chomp;
-	my ($seqid,$a,$familyid,$start,$end,$evalue);
+	my ($seqid,$a,$familyid,$start,$end,$evalue) = split;
 	my $tmp = "$a:$familyid:$start:$end:$evalue";
-
-	print STDERR "$tmp\n";
+ 
 	push(@{$feat{$seqid}},$tmp);
     }
 	
