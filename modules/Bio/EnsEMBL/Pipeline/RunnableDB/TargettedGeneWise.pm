@@ -445,6 +445,7 @@ sub make_genes {
  Args    : Bio::EnsEMBL::Transcript
 
 =cut
+
 sub validate_transcript {
   my ($self, $transcript) = @_;
   
