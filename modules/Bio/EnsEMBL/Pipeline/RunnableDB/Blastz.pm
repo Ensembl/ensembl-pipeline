@@ -86,7 +86,7 @@ sub fetch_input {
     # for consistency
     @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
                  my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 $o <=> $t } @db;
+                 $o cmp $t } @db;
     
   }
   else {
