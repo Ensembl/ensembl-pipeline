@@ -315,7 +315,7 @@ sub parse_results {
 		$strand = -1;
 	    }
 
-	    my $rc = $self->_get_consensus($repeat_name);
+	    my $rc = $self->_get_consensus($repeat_name, $repeat_class);
 
 	    my $rf = Bio::EnsEMBL::RepeatFeature->new;
 	    $rf->score            ($score);
@@ -337,12 +337,13 @@ sub parse_results {
 # to attach to RepeatFeature's
 
 sub _get_consensus {
-    my ($self, $name) = @_;
+    my ($self, $name, $class) = @_;
     my $cons;
 
     unless (defined ($cons = $self->{'_consensi'}{$name})) {
 	$cons = new Bio::EnsEMBL::RepeatConsensus;
 	$cons->name($name);
+	$cons->repeat_class($class);
 	$self->{'_consensi'}{$name} = $cons;
     }
 
