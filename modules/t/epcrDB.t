@@ -30,6 +30,10 @@ use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::EPCR;
 use Bio::EnsEMBL::Pipeline::Analysis;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
     
@@ -42,7 +46,7 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::EPCR';
-my $sts_db   = '/nfs/disk100/humpub/data/sanger_sts.epcr';
+my $sts_db   = $::pipeConf{'datadir'} . "/mapprimer";
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file             => $sts_db,

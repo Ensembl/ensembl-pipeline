@@ -20,6 +20,7 @@
 ## We start with some black magic to print on failure.
 BEGIN { 
         $| = 1; print "1..6\n"; 
+	    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 	    use vars qw($loaded); 
       }
 
@@ -44,11 +45,10 @@ print "ok 2\n";
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'HumanIso',
-                                                    -db_version     => '__NONE__',
-                                                    -db_file        => '/usr/local/ensembl/data/HumanIso.smat',
+                                                    -db_file        => $::pipeConf{'datadir'} . '/HumanIso.smat',
  
                                                     -program        => 'Genscan',
-                                                    -program_file   => '/usr/local/ensembl/bin/genscan',
+						    -program_file   => $::pipeConf{'bindir'} . '/genscan',
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'genscan',

@@ -46,7 +46,7 @@ my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__
                                                     -db_version     => '__NONE__',
                                                     -program        => 'RepeatMasker',
                                                     -program_version=> 1,
-                                                    -program_file   => '/nfs/disk100/humpub/scripts/RepeatMaskerHum',
+						    -program_file   => $::pipeConf{'bindir'} . 'RepeatMasker',
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'RepeatMasker',

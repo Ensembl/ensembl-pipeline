@@ -27,11 +27,11 @@ END {   print "not ok 1\n" unless $loaded;  }
 
 use lib 't';
 use EnsTestDB;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
 use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::DBSQL::Utils;
 use Bio::EnsEMBL::Exon;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Data::Dumper;
 
 $loaded = 1;
@@ -42,9 +42,7 @@ my $ens_test = EnsTestDB->new();
 #$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
     
 # Get an EnsEMBL db object for the test db
-# my $db = $ens_test->get_DBSQL_Obj;
-# my $db = new Bio::EnsEMBL::DBSQL::Obj(-host => 'ensrv4',
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => 'ensrv4',
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ensrv4',
                                       -dbname => 'ensembl_freeze17_michele',
                                       -user => 'ensadmin');
 print "ok 2\n";    
@@ -66,7 +64,11 @@ unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id = 'AP000074.00001';
+my $id = 'AP000074.1.1.100000';
+
+my $contig = $db->get_Contig($id);
+my @genscan_peptides = $contig->get_genscan_peptides;
+
 my $runobj = "$runnable"->new(  -dbobj      => $db,
 			                    -input_id   => $id,
                                 -analysis   => $ana );
@@ -95,7 +97,8 @@ unless (@features)
 else
 { print "ok 6\n"; }
 
-my @genscan_peptides =  $contig->get_genscan_peptides();
+my @genscan_peptides =  $contig->get_genscan_peptides;
+
 unless (@genscan_peptides)
 { print "not ok 7: (Data error or bug in RawContig)\n"; }
 else
@@ -124,8 +127,10 @@ foreach my $feature (@features)
             my $full_pep = $pep->translate->seq;
             my $exon_pep = $exon->translate->seq;
             $exon_pep =~ s/^\M//i; #remove leading M's
-            #print STDERR "PEP: $full_pep\n";
-            #print STDERR "SEQ: $exon_pep\n";
+	    $exon_pep =~ s/\*$//; 
+	    $exon_pep =~ s/X$//; 
+            print STDERR "PEP: $full_pep\n";
+            print STDERR "SEQ: $exon_pep\n";
             
             if (!defined($exon_pep) || index ($full_pep, $exon_pep) > -1)
             {
