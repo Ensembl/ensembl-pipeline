@@ -1,9 +1,4 @@
 #
-#
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -48,41 +43,13 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
 
 use strict;
+
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
+
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker object
-    Args    :    -db:     A Bio::EnsEMBL::DBSQL::DBAdaptor,
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-    # db input_id mandatory and read in by BlastableDB
-    # anlaysis not mandatory for BlastableDB, so we check here 
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    &Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker');
-    return $self;
-}
 
 =head2 fetch_input
 
@@ -97,75 +64,24 @@ sub new {
 sub fetch_input {
     my( $self) = @_;
     
-    #my @times = times;
-    #print STDERR "starting fetching input @times \n";
+
     $self->throw("No input id") unless defined($self->input_id);
     
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-    #my $genseq    = $contig->seq() or $self->throw("Unable to fetch contig");
-    #@times = times;
-    #print STDERR "end fetching input @times\n";
-    #print "have ".$genseq."\n";
-    $self->genseq($contig);
+
+    $self->query($contig);
+
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker(
+	      -query => $self->query,
+              -repm  => $self->analysis->program_file || undef,
+	      -args  => $self->arguments);
+
+    $self->runnable($runnable);
+
+    return 1;
 }
 
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
-    my $arguments = "";
-    
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-		if ($key && $value) {
-		    $parameters{$key} = $value;
-		}
-		else {
-		    $arguments .= " $key ";
-		}
-            }
-        }
-        $parameters{'-repm'} = $self->analysis->program_file || undef;
-        $parameters{'-args'} = $arguments;
-        #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
-        $self->{'_runnable'} = $runnable->new(%parameters);;
-    }
-    return $self->{'_runnable'};
-}
-
-sub write_output{
-  my ($self) = @_;
-
-  my @features = $self->output();
-  my $repeat_f_a = $self->db->get_RepeatFeatureAdaptor();
-  my $contig;
-  eval {
-    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  };
-
-  if ($@ || !defined $contig) {
-    print STDERR "Contig not found, skipping writing output to db: $@\n";
-  }
-
-  foreach my $f(@features){
-    $f->analysis($self->analysis);
-    $f->attach_seq($contig);
-    $repeat_f_a->store($f);
-  }
-
-  return 1;
-}
 
 
 1;
