@@ -143,6 +143,14 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 # final transcript
 			 CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 2,
 
+			 # maximum number of transcripts allowed to 
+			 # be in a gene. Even by tuning the other parameteres
+			 # to keep this low, there will be always cases with more 20 even 50 isoforms
+			 # which, unless what you're doing is really targetted
+			 # to a known case or with very good quality ests/cdnas, it
+			 # is not very reliable.
+			 MAX_TRANSCRIPTS_PER_GENE => 10,
+
 			 
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
