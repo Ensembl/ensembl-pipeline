@@ -284,16 +284,16 @@ sub flush_runs {
   my $pass     = $db->password;
   my $lsfid;
 
-  # runner.pl: first look in same directory as Job.pm
-  # if it's not here use file defined in pipeConf.pl
-  # otherwise fail
+  # runner.pl: first look in pipeConf.pl,
+  # then in same directory as Job.pm,
+  # and fail if not found
 
-  my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  my $runner = $::pipeConf{'runner'} || undef;
 
   unless (-x $runner) {
-    $runner = $::pipeConf{'runner'} || undef;
-    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+    $runner = __FILE__;
+    $runner =~ s:/[^/]*$:/runner.pl:;
+    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
   for my $queue ( @queues ) {
@@ -320,9 +320,14 @@ sub flush_runs {
     }
     $cmd .= " -q $queue " if defined $queue;
     $cmd .= " -J $jobname " if defined $jobname;
-    $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
+    $cmd .= " -r -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+    if (defined $pass) {
+	$cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+    }
+    else {
+	$cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+    }
     
     print STDERR "$cmd\n";
     open (SUB,"$cmd 2>&1 |");
@@ -457,7 +462,7 @@ sub runRemote {
 
   unless (-x $runner) {
     $runner = $::pipeConf{'runner'} || undef;
-    self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
+    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
@@ -528,6 +533,7 @@ sub runInLSF {
 		-dbobj => $self->adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+	  $module =~ s/\//::/g;
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
