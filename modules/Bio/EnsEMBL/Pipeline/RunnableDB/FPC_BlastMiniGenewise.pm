@@ -136,8 +136,8 @@ sub write_output {
     my $chrstart = $2;
     my $chrend   = $3;
 
-    my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
-    my $slice    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+    my $sla       = $self->db->get_SliceAdaptor();
+    my $slice     = $sla->fetch_Slice_by_chr_start_end($chrid,$chrstart,$chrend);
     my $genseq    = $slice->get_repeatmasked_seq;
 
     
