@@ -1,9 +1,3 @@
-#
-#
-# Cared for by Val Curwen  <vac@sanger.ac.uk>
-#
-# Copyright Val Curwen
-#
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
@@ -54,39 +48,13 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::CPG;
 
 use strict;
+
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CPG;
+
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::CPG object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::CPG object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    $self->{'_fplist'}      = []; # ???   
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    &Bio::EnsEMBL::Pipeline::RunnableDB::CPG::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::CPG');
-    return $self;
-}
 
 =head2 fetch_input
 
@@ -102,63 +70,31 @@ sub fetch_input {
     my( $self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
+
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-    $self->genseq($contig);
-}
 
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
-            }
-        }
-        $parameters{'-cpg'} = $self->analysis->program_file;
-        #creates empty Bio::EnsEMBL::Runnable::CPG object
-        $self->{'_runnable'} = $runnable->new
-	    ( '-query' => $parameters{'-query'},
-	      '-length' => $parameters{'-length'},
-	      '-gc' => $parameters{'-gc'},
-	      '-oe' => $parameters{'-oe'},
-	      '-cpg' => $parameters{'-cpg'},
-	      );
-    }
-    return $self->{'_runnable'};
-}
+    $self->query($contig);
 
-sub write_output{
-  my ($self) = @_;
+    my %parameters = $self->parameter_hash;
 
-  my @features = $self->output();
-  my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
-  my $contig;
-  eval {
-    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  };
+    $parameters{'-query'} = $self->query;
+    $parameters{'-cpg'} = $self->analysis->program_file;
 
-  if ($@) {
-      print STDERR "Contig not found, skipping writing output to db: $@\n";
-      return;
-  }
-  foreach my $f(@features){
-    $f->analysis($self->analysis);
-    $f->attach_seq($contig);
-    $simple_f_a->store($f);
-  }
+    my $runname = "Bio::EnsEMBL::Pipeline::Runnable::CPG";
 
+    my $runnable = $runname->new
+      ( '-query'  => $parameters{'-query'},
+	'-length' => $parameters{'-length'},
+	'-gc'     => $parameters{'-gc'},
+	'-oe'     => $parameters{'-oe'},
+	'-cpg'    => $parameters{'-cpg'},
+      );
+
+    $self->runnable($runnable);
+
+    return 1;
 
 }
+
 1;
