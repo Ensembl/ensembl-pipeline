@@ -25,7 +25,7 @@ methods. Internal methods are usually preceded with a _
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::GeneUtils;
+package Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 
 use vars qw(@ISA);
 use strict;
@@ -40,7 +40,7 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
-=head2 _validate_Transcript
+=head2 validate_Transcript
 
   Arg[1]    : Bio::EnsEMBL::Transcript $transcript
   Arg[2]    : Bio::EnsEMBML::Slice $slice
@@ -58,15 +58,18 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 =cut
 
-sub _validate_Transcript {
-  my ($transcript, $slice, $coverage, $low_complexity, $maxintron, $seqfetchers ) = @_;
+sub validate_Transcript {
+  my ($self, $transcript, $slice, $coverage, $low_complexity, $maxintron, $seqfetchers ) = @_;
   
   my @valid_transcripts;
-    
-  return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_check_Transcript ($transcript, $slice);
-  return undef unless Bio::EnsEMBL::Pipeline::Tools::GeneUtils::_check_coverage      ($transcript,$coverage,$seqfetchers);
+
+  return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript ($transcript, $slice);
+
+  return undef unless Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage      ($transcript,$coverage,$seqfetchers);
+
   return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript);
-  return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_check_low_complexity($transcript,$low_complexity);
+
+  return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript,$low_complexity);
 
   # Do we really need to do this? Can we just take out the dbID adaptor stuff
   # make a new transcript that's a copy of all the important parts of the old one
@@ -84,14 +87,13 @@ sub _validate_Transcript {
   foreach my $exon(@{$transcript->get_all_Exons}){
     $newtranscript->add_Exon($exon);
     foreach my $sf(@{$exon->get_all_supporting_features}){
-      $sf->seqname($exon->contig_id);
+      $sf->seqname($exon->contig->name);
     }
   }
-  
+
   #    split transcript if necessary
-  my @split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_split_transcript($newtranscript, $maxintron);
-  push (@valid_transcripts, @split_transcripts); 
-  
+  my $split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::split_Transcript($newtranscript, $maxintron);
+  push (@valid_transcripts, @$split_transcripts);
   return \@valid_transcripts;
 }
 
@@ -110,7 +112,7 @@ sub _validate_Transcript {
 =cut
 
 sub _check_coverage {
-  my ( $transcript, $coverage, $seqfetchers) = @_;
+  my ( $self, $transcript, $coverage, $seqfetchers) = @_;
   
   my $matches = 0;
   my $pstart  = 0;
@@ -176,7 +178,7 @@ sub _check_coverage {
   my $realcoverage = 100 * $matches/$plength;
   
   if ($realcoverage < $coverage){
-    warn("GeneUtils: Rejecting transcript for low coverage: $coverage\n");
+    warn("GeneUtils: Rejecting transcript for low coverage: $realcoverage\n");
     return 0;
   }
   
@@ -201,7 +203,7 @@ sub _check_coverage {
 =cut
 	    
 sub SeqFeature_to_Transcript {
-  my ($gene, $contig, $analysis_obj,$db,$phase) = @_;
+  my ($self, $gene, $contig, $analysis_obj,$db,$phase) = @_;
   
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI")){
     print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";
