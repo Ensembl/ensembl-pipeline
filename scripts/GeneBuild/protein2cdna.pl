@@ -47,13 +47,7 @@ use Bio::SeqIO;
 =cut
 
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  unshift (@INC, $script_dir);
-  require "GB_conf.pl";
-}
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 $| = 1; # disable buffering
 
@@ -98,7 +92,7 @@ sub parse_sptr {
 }
 
 sub identify_rf_embl_pairs {
-  my $refseq   = $::GB_conf{'rf_gnp'};  
+  my $refseq   = $::scripts_conf{'rf_gnp'};  
 
   my %proteins;
   $/ = "//\n"; # record separator
@@ -138,7 +132,7 @@ sub identify_rf_embl_pairs {
 }
 
 sub identify_sp_embl_pairs {
-  my $swiss   = $::GB_conf{'sp_swiss'};  
+  my $swiss   = $::scripts_conf{'sp_swiss'};  
 
   my %proteins;
   $/ = "//\n"; # record separator
@@ -179,7 +173,7 @@ sub identify_sp_embl_pairs {
 
 sub check_embl {
   my ($id, $prot) = @_;
-  my $efetch  = $::GB_conf{'efetch'};
+  my $efetch  = $::scripts_conf{'efetch'};
 
   my $seq;
 
@@ -220,12 +214,15 @@ sub check_embl {
 
 sub write_output {
   my ($prot, $cdna) = @_;
-  my $outfile = $::GB_conf{'cdna_pairs'};
+  my $outfile    = $::scripts_conf{'cdna_pairs'};
+  my $seqoutfile = $::scripts_conf{'cdna_seqs'};
   {
     open (OUT, ">>$outfile") or die "Can't open [$outfile]\n";
     print OUT "$prot : ";
     if (defined $cdna && $cdna->isa("Bio::Seq")){
       print OUT $cdna->accession;
+      my $seqout = new Bio::SeqIO(-file => ">>$seqoutfile", "-format" => "Fasta");
+      $seqout->write_seq($cdna);
     }
     print OUT "\n";
     close OUT;
