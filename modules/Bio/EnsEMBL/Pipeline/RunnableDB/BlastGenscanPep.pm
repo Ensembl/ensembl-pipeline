@@ -92,9 +92,9 @@ sub fetch_input {
     my ($thr, $thr_type);
     my %p = $self->parameter_hash;
 
-    if (defined $p{threshold} && defined $p{threshold_type}) {
-	$thr      = $p{threshold};
-	$thr_type = $p{threshold_type};
+    if (defined $p{-threshold} && defined $p{-threshold_type}) {
+	$thr      = $p{-threshold};
+	$thr_type = $p{-threshold_type};
     }
     else {
 	$thr_type = 'PVALUE';
