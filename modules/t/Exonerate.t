@@ -26,6 +26,10 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
 
@@ -66,7 +70,7 @@ else
 my $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 ";
 
 #create Exonerate object    
-my $exe = '/work2/gs2/gs2/bin/exonerate-0.3d'; # or another version of exonerate that has cigar output ...
+my $exe = $::pipeConf{'bindir'} . '/exonerate';
 my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
 								  -GENOMIC   => $genseq,
 	                                                          -EXONERATE => $exe,
@@ -80,13 +84,13 @@ else
 { print "ok 3\n"; }
 
 #run exonerate
-open(OLDOUT, ">&STDOUT");
-open(STDOUT,  ">& STDERR");
+#open(OLDOUT, ">&STDOUT");
+#open(STDOUT,  ">& STDERR");
 my $ungapped = 1;
 $exonerate->run($ungapped);
-close STDOUT;
-open(STDOUT, ">&OLDOUT");
-close OLDOUT;
+#close STDOUT;
+#open(STDOUT, ">&OLDOUT");
+#close OLDOUT;
 
 print "ok 4\n"; # 4th test passed
 
@@ -99,15 +103,11 @@ unless (@results)
 else
 { print "ok 5\n"; }
 
-my @genes = $exonerate->each_gene;
-print STDERR "found " . scalar(@genes) . " genes\n";
-
 sub display {
   my @results = @_;
 
   foreach my $pair (@results)
   {
-#       print STDERR "$obj\n";
       print STDERR $pair->seqname . "\t" . $pair->start  . "\t" . $pair->end      . "\t" . 
                 $pair->percent_id . "\t" .
 	        $pair->score   . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
