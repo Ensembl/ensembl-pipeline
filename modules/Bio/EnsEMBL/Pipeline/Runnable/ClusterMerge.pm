@@ -59,6 +59,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 
 # config file; parameters searched for here if not passed in as @args
 use Bio::EnsEMBL::Pipeline::ESTConf;
@@ -80,6 +81,8 @@ sub new {
     $self->warn("No transcripts passed it. We cannot go further");
     exit(0);
   }
+
+  print STDERR "we've passed ".scalar(@$transcripts)." trans to ClusterMerge\n";
   $self->input_transcripts(@{$transcripts});
   
   if (defined($exact_merge)){
@@ -89,6 +92,10 @@ sub new {
   return $self;
 }
 
+############################################################
+#
+# RUN METHOD
+#
 ############################################################
 
 =head2 run
@@ -104,7 +111,7 @@ sub run {
 	 
   # cluster the transcripts
   my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
-  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
+  print STDERR scalar(@transcript_clusters)." $transcript_clusters[0] clusters returned from _cluster_Transcripts\n";
 	 
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
@@ -125,7 +132,7 @@ sub run {
 #
 ############################################################
 
-=head2 cluster_Transcripts
+=head2 _cluster_Transcripts
 
  Description : It separates transcripts according to strand and then clusters 
                each set of transcripts by calling _cluster_Transcripts_by_genomic_range()
@@ -134,7 +141,7 @@ sub run {
 
 =cut
 
-sub cluster_Transcripts {
+sub _cluster_Transcripts {
   my ($self,@transcripts) = @_;
  
   my @forward_transcripts;
@@ -153,9 +160,12 @@ sub cluster_Transcripts {
   my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
   my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
   my @clusters;
-  push( @clusters, @forward_clusters);
-  push( @clusters, @reverse_clusters);
-  
+  if ( @forward_clusters ){
+    push( @clusters, @forward_clusters);
+  }
+  if ( @reverse_clusters ){
+    push( @clusters, @reverse_clusters);
+  }
   return @clusters;
 }
 
@@ -172,8 +182,13 @@ sub cluster_Transcripts {
 sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
 
+  unless (@mytranscripts){
+    return;
+  }
+
   # first sort the transcripts
   my @transcripts = sort by_transcript_high @mytranscripts;
+  print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
 
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
@@ -186,7 +201,7 @@ sub _cluster_Transcripts_by_genomic_range{
   $cluster->put_Transcripts( $transcripts[0] );
   
 
-  $cluster_starts[$count] = $self->transcript_low($transcripts[0]);
+  $cluster_starts[$count] = $self->transcript_low( $transcripts[0]);
   $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
   
   # store the list of clusters
@@ -284,7 +299,7 @@ Description: it returns the highest coordinate of a transcript
 sub transcript_high{
   my ($self,$tran) = @_;
   my $high;
-  $tran->sort;
+  
   if ( $tran->start_Exon->strand == 1){
     $high = $tran->end_Exon->end;
   }
@@ -305,7 +320,6 @@ Description: it returns the lowest coordinate of a transcript
 sub transcript_low{
   my ($self,$tran) = @_;
   my $low;
-  $tran->sort;
   if ( $tran->start_Exon->strand == 1){
     $low = $tran->start_Exon->start;
   }
@@ -375,56 +389,64 @@ sub transcript_low{
       for each list_m in L m>0 {   
         if list_m is not included in (or equal to) list_n for n = 0,...,m-1 ==> accept list_m
       }
-    
+   
 =cut
 
+############################################################
+
 sub link_Transcripts{
-  my ($self,$transcript_clusters,$strand) = @_;
+  my ($self,$transcript_clusters) = @_;
 
   my @final_lists;  
 
   # look in each cluster
  CLUSTER:
-  foreach my $cluster ( @{ $transcript_clusters } ){
+  foreach my $cluster ( @{ $transcript_clusters} ){
      
     # keep track of all the lists
     my @lists;
-
+    
     # keep track of every list starting in each transcript:
     my %lists;
 
     # get the transcripts in this cluster
-    my @transcripts = $cluster->get_Transcripts;
+    my @transcripts = @{$cluster->get_Transcripts};
     
     # sort the transcripts by the left most coordinate in ascending order
     # for equal value, order by the right most coordinate in descending order
     @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 	  		  if ($result){
 		 	    return $result;
-			   }
-			   else{
+			  }
+			  else{
 			    return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
 			  }
 			} @transcripts;
     
+    print STDERR "Cluster: (sorted transcripts)\n";
+    foreach my $t ( @transcripts ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+    }
+
     # for each transcript
   TRAN1:
     for (my $i=0; $i<scalar(@transcripts); $i++){
 
       # store this one in the first list
-      my $first_list = [];
-      push (@$first_list, $transcripts[$i]);
+      my @first_list = ();
+      push (@first_list, $transcripts[$i]);
 
-      # keep track of all the lists that start on $transcript[i]
-      push (@{$lists{$i}}, $first_list );
-      
+      # store all the lists created started in this transcript:
+      my @current_lists = ();
+      push (@current_lists, \@first_list );
+            
       # go over the rest
     TRAN2:
       for (my $j=$i+1; $j<scalar(@transcripts); $j++){
 	
 	# loop over each of the lists{i}
       LIST:
-	foreach my $list ( @{$lists{$i}} ){
+	foreach my $list ( @current_lists ){
 	  
 	  # check whether this trans can be linked to this list or to a proper sublist
 	  # or maybe to none of the above
@@ -447,17 +469,24 @@ sub link_Transcripts{
 	    push ( @$new_list , $transcripts[$j] );
 	    
 	    # add this new list to the $lists{$i}
-	    push ( @{$lists{$i}}, $new_list );
+	    push ( @current_lists, $new_list );
 	  }
 	  
 	} # end of LIST
       }   # end of TRAN2
       
-      #put $lists{$i} in @lists
-      push ( @lists, @{$lists{$i}} );
+      #put @current_lists in @lists
+      push ( @lists, @current_lists );
 
+      print STDERR "current lists:\n";
+      foreach my $list ( @current_lists ){
+	foreach my $t (@$list){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+	}
+      }
+      
     }  
-
+    
     # remove lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
     
     # sort the lists in descending by the number of elements
@@ -489,12 +518,26 @@ sub link_Transcripts{
     push (@final_lists, @accepted_lists);
     
   } # end of CLUSTER
-		      
+		     
+	     
   # @final_lists contain a list of listrefs, 
   # each one containing the transcripts that can merge with each other		      
 
 
   $self->sub_clusters( @final_lists );
+
+  print STDERR "final lists:\n";
+  my $count = 0;
+  foreach my $list (@final_lists){
+    $count++;
+    print STDERR "list $count\n";
+    foreach my $t ( @$list ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $t );
+    }
+  }
+
+
+
 		       
   return @final_lists;	      
 }
@@ -515,13 +558,28 @@ description: this method computes the largest proper sublist in $list
 
 sub _test_for_link{
   my ($self, $list, $transcript ) = @_;
-  my $sublist   = undef;
+  
+  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
+  my $sublist;
   my $can_merge = 0;
 
  LINK:
   foreach my $trans_link ( @$list ){
-     my ($merge,$overlaps) = $self->_test_for_Merge( $trans_link, $transcript );
-     if ($merge == 1 ){
+    
+    my ($merge,$overlaps);
+    if ( $EST_GENEBUILDER_MERGE eq 'fuzzy' ){ 
+      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'fuzzy_semiexact_merge',7);
+    }
+    elsif( $EST_GENEBUILDER_MERGE eq 'exact' ){
+      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'semiexact_merge',2);
+    }
+    elsif( $EST_GENEBUILDER_MERGE eq 'loose' ){
+      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript,'merge_allow_gaps',7);
+    }
+    else{
+      $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_MERGE for your ests/cdnas to be compared!")
+    }
+      if ($merge == 1 ){
        $can_merge = 1;
      }
      # the transcript can be appended to this list if
@@ -538,7 +596,7 @@ sub _test_for_link{
         last LINK;
      }
   }  
-  if ( scalar( @$sublist ) == 0 || $can_merge == 0){
+  if ( $can_merge == 0 || scalar( @$sublist ) == 0 ){
      return undef;
   }
   elsif ( scalar( @$sublist ) > 0 &&  scalar( @$sublist ) < scalar( @$list ) ){
@@ -727,14 +785,15 @@ EXON1:
   # if we haven't returned at this point, they don't merge, thus
   return ($merge,$overlaps);
 }
-  
+
+
 ############################################################
 #
 # MERGE TRANSCRIPTS
 #
 ############################################################
 
-=head2 merge_Transcripts
+=head2 _merge_Transcripts
 
 description: make a transcript for every list built above in link_Transcripts().
              the procedure goes by clustering the exons, finding the splice ends
@@ -743,75 +802,75 @@ description: make a transcript for every list built above in link_Transcripts().
 
 =cut
 
-sub merge_Transcripts{
+sub _merge_Transcripts{
     my ($self,$lists) = @_;
 	
     my @merged_transcripts;
     
     foreach my $list ( @$lists ){
+      
+      my @allexons;
+      my %exon2transcript;			
+      my %is_first;
+      my %is_last;			
+      
+      # collect all exons
+      foreach my $tran (@{ $list }){
 	
-	my @allexons;
-	my %exon2transcript;			
-	my %is_first;
-	my %is_last;			
+	my @exons = @{$tran->get_all_Exons};
 	
-	# collect all exons
-	foreach my $tran (@{ $list }){
-	    
-	    my @exons = @{$tran->get_all_Exons};
-	    
-	    # sort them in genomic order regardless of the strand
-	    @exons    = sort { $a->start <=> $b->start } @exons;
-	    
-	    push ( @allexons, @exons );
-	    
-	    # keep track of whether the exons is first or last and the transcript it belongs to
-	    for (my $i = 0; $i< scalar( @exons ); $i++){
-		if ( 0 == $i ){
-		    $is_first{$exons[$i]} = 1;
-		}
-		else{
-		    $is_first{$exons[$i]} = 0;
-		}
-		if ( $#exons == $i ){
-		    $is_last{$exons[$i]} = 1;
-		}
-		else{
-		    $is_last{$exons[$i]} = 0;
-		}
-		$exon2transcript{$exons[$i]} = $tran;
-	    }
+	# sort them in genomic order regardless of the strand
+	@exons    = sort { $a->start <=> $b->start } @exons;
+	
+	push ( @allexons, @exons );
+	
+	# keep track of whether the exons is first or last and the transcript it belongs to
+	for (my $i = 0; $i< scalar( @exons ); $i++){
+	  if ( 0 == $i ){
+	    $is_first{$exons[$i]} = 1;
+	  }
+	  else{
+	    $is_first{$exons[$i]} = 0;
+	  }
+	  if ( $#exons == $i ){
+	    $is_last{$exons[$i]} = 1;
+	  }
+	  else{
+	    $is_last{$exons[$i]} = 0;
+	  }
+	  $exon2transcript{$exons[$i]} = $tran;
 	}
-	
-	# cluster the exons
-	my $first_cluster_list = $self->_cluster_Exons( @allexons );
-	
-	# set start and end of the clusters (using the info collected above)
+      }
+      
+      # cluster the exons
+      my $first_cluster_list = $self->_cluster_Exons( @allexons );
+      
+      # set start and end of the clusters (using the info collected above)
 	my $cluster_list = $self->_set_splice_Ends($first_cluster_list,\%exon2transcript,\%is_first,\%is_last);
+      
+      # we turn each cluster into an exon and create a new transcript with these exons
+      my $transcript    = Bio::EnsEMBL::Transcript->new();
+      my @exon_clusters = $cluster_list->sub_SeqFeature;
+      
+      foreach my $exon_cluster (@exon_clusters){
 	
-	# we turn each cluster into an exon and create a new transcript with these exons
-	my $transcript    = Bio::EnsEMBL::Transcript->new();
-	my @exon_clusters = $cluster_list->sub_SeqFeature;
+	my $new_exon = Bio::EnsEMBL::Exon->new();
+	$new_exon->start ($exon_cluster->start );
+	$new_exon->end   ($exon_cluster->end   );
 	
-	foreach my $exon_cluster (@exon_clusters){
-	    
-	    my $new_exon = Bio::EnsEMBL::Exon->new();
-	    $new_exon->start ($exon_cluster->start );
-	    $new_exon->end   ($exon_cluster->end   );
-	    
-	    # set the strand to be the same as the exon_cluster
-	    $new_exon->strand($exon_cluster->strand);
-	    
-	    my %evidence_hash;
-	    my %evidence_obj;
-	    foreach my $exon ( $exon_cluster->sub_SeqFeature ){
-		$self->_transfer_Supporting_Evidence($exon,$new_exon);
-	    }
-	    
-	    $transcript->add_Exon($new_exon);
+	# set the strand to be the same as the exon_cluster
+	$new_exon->strand($exon_cluster->strand);
+	
+	my %evidence_hash;
+	my %evidence_obj;
+	foreach my $exon ( $exon_cluster->sub_SeqFeature ){
+	  $self->_transfer_Supporting_Evidence($exon,$new_exon);
 	}
 	
-	push ( @merged_transcripts, $transcript );
+	$transcript->add_Exon($new_exon);
+      }
+      
+      push ( @merged_transcripts, $transcript );
     }
     return @merged_transcripts;
     
@@ -859,10 +918,9 @@ sub _cluster_Exons{
  EXON:
   foreach my $exon (@exons) {
     if ($count > 0) {
-      my @overlap = $self->match($exon, $exon_cluster);    
       
       # Add to cluster if overlap AND if strand matches
-      if ( $overlap[0] && ( $exon->strand == $exon_cluster->strand) ) { 
+      if ( $exon_cluster->overlaps($exon) && ( $exon->strand == $exon_cluster->strand) ) { 
 	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
       }  
       else {
