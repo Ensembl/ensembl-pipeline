@@ -1,0 +1,21 @@
+{ 
+ #database details
+ 'port'   => 3306,
+ 'driver' => 'mysql',
+ 'user'   => '',
+ 'pass'   => '',
+ 'host'   => 'ecs1c',
+ 'dbname' => '',
+  #where the table structure files are
+ 'sql_files' => ['../../../ensembl-pipeline/sql/table.sql', 
+                 '../../../ensembl-pipeline/sql/pmatch.sql', 
+                 '../../../ensembl/sql/table.sql']
+  #where the zip file containing all the tab files is
+ 'data_dir' => 'reference_data'
+ #the database already exists and the tables don't need loaded
+ 'preloaded_tables' => 0,
+ #the data doesn't need loaded 
+ 'preloaded_data' => 0,
+ #don't need to unzip the zip file the directory will already exist
+ 'dont_unzip' => 1,
+}
