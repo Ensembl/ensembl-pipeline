@@ -119,7 +119,9 @@ sub store {
   if( !$analysis->logic_name ) {
     $self->throw("Must have a logic name on the analysis object");
   }
-
+  if (!$analysis->input_id_type) {
+    $self->throw("Must have an input_id_type");
+  }
  
   if($analysis->created ) {
     my $sth = $self->prepare( q{
@@ -203,7 +205,7 @@ sub store {
 
   $analysis->adaptor( $self );
   $analysis->dbID( $dbID );
-  
+ 
   if($analysis->input_id_type){
     my $sql = 'insert into input_id_type_analysis(input_id_type, analysis_id) values(?, ?)';
     my $sth = $self->prepare($sql);

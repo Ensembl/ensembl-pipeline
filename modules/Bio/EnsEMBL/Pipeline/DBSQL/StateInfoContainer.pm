@@ -113,7 +113,7 @@ sub fetch_analysis_by_input_id {
 }
 
 
-=head2 store_input_id_analysis
+=head2 store_input_id_type_analysis
 
 Stores an input ID, class and analysis.
 Takes an input ID, class (as strings)
@@ -125,11 +125,14 @@ exception if any of the inputs are invalid.
 sub store_input_id_analysis {
   my ($self, $inputId, $analysis ) = @_;
 
-  $self->throw("[$analysis] is not a Bio::EnsEMBL::Analysis object")
-   unless $analysis->isa("Bio::EnsEMBL::Analysis");
+  $self->throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
+   unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
   $self->throw("Invalid inputId [$inputId]")
    unless $inputId;
+
+  $self->throw("No type defined in analysis obj") 
+   unless defined($analysis->input_id_type);
 
   # do we want to use a default class here?
 

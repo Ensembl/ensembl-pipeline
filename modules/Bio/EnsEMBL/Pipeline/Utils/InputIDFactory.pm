@@ -4,9 +4,6 @@ package Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 
 use vars qw(@ISA);
 
-use Bio::EnsEMBL::Pipeline::IDSet;
-
-
 @ISA = ('Bio::EnsEMBL::Root');
 
 
@@ -68,6 +65,7 @@ sub generate_contig_input_ids{
 
   my @ids  = @{$self->get_contig_names};
 
+  print "Ids @ids\n";
   return @ids;
 
 }
@@ -75,7 +73,13 @@ sub generate_contig_input_ids{
 sub generate_slice_input_ids {
     my ($self,$size,$overlap) = @_;
 
-    my @ids = @{$self->get_slice_names};
+    $overlap = 0 if (!defined($overlap));
+
+    if ($size <= 0) {
+       $self->throw("Slice size must be > 1. Currently " . $size);
+    }
+
+    my @ids = @{$self->get_slice_names($size,$overlap)};
 
     return @ids;
 }
@@ -102,7 +106,7 @@ sub get_contig_names{
 
     my $names = $rawcontig_adaptor->fetch_all_names;
 
-    return $idset;
+    return $names;
 }
 
 
@@ -129,12 +133,31 @@ sub get_slice_names{
 
   my @input_ids;
 
-  my @chromosomes = @{$self->get_Chromosomes};
+  my @chromosomes = @{$self->db->get_ChromosomeAdaptor->fetch_all};
 
-  foreach my $chr(@chromosomes){
+  foreach my $chr (@chromosomes){
 
-    my $length = $chr->length;
-    my $count = 1;
+    my $query = "select min(chr_start) from assembly where chromosome_id = " . $chr->dbID;
+    my $sth   = $self->db->prepare($query);
+    my $res   = $sth->execute;
+
+    my $chrstart;
+   
+    while (my $ref = $sth->fetchrow_arrayref) {
+      $chrstart = $ref->[0];
+    }
+
+    $query = "select max(chr_end) from assembly where chromosome_id = " . $chr->dbID;
+    $sth   = $self->db->prepare($query);
+    $res   = $sth->execute;
+
+    my $length;
+
+    while (my $ref = $sth->fetchrow_arrayref) {
+      $length = $ref->[0];
+    }
+
+    my $count = $chrstart;
 
     while ($count < $length) {
       my $start = $count;
@@ -152,7 +175,7 @@ sub get_slice_names{
     }
   }
 
-  return @input_ids;
+  return \@input_ids;
 
 }
 

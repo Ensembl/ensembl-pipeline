@@ -16,7 +16,7 @@ sub new {
   
   my $self = $class->SUPER::new(@args);
   
-  my ($type) = $self->_rearrange([qw(TYPE)], @args);
+  my ($type) = $self->_rearrange([qw(INPUT_ID_TYPE)], @args);
 
   $self->input_id_type($type);
 

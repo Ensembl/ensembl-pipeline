@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl
 
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use strict;
 use Getopt::Long;
@@ -44,17 +44,17 @@ my $input_type;
             'module:s'           => \$module,
             'module_version:s'   => \$module_version,
             'gff_sources:s'      => \$gff_source,
-            'gff_feature:s'      => \$gff_feature
+            'gff_feature:s'      => \$gff_feature,
 	    'input_type:s'       => \$input_type,
            );
 
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $host,
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
                                                       -user   => $user,
                                                       -pass   => $pass,
                                                       -port   => $port,
                                                       -dbname => $dbname);
 
-my $analysis = new Bio::EnsEMBL::Analysis;
+my $analysis = new Bio::EnsEMBL::Pipeline::Analysis;
 
 if (!defined($logic_name)) {
    die "Analysis must have a logic_name defined";
@@ -80,7 +80,7 @@ if ($parameters)       {$analysis->parameters        ($parameters);}
 if ($program_version)  {$analysis->program_version   ($program_version);}
 if ($gff_source)       {$analysis->gff_source        ($gff_source);}
 if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
-if ($input_type)       {$analysis->input_type        ($input_type);}
+if ($input_type)       {$analysis->input_id_type     ($input_type);}
 
 $db->get_AnalysisAdaptor->store($analysis);
 
