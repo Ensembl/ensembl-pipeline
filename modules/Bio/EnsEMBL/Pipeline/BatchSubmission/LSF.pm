@@ -232,28 +232,16 @@ sub get_job_time{
 
 
 
+
 sub check_existance{
-<<<<<<< LSF.pm
   my ($self, $id_hash, $verbose) = @_;
   my %job_submission_ids = %$id_hash;
   my $command = "bjobs";
   open(BJOB, "$command 2>&1 |") or 
     $self->throw("couldn't open pipe to bjobs");
   my %existing_ids;
-  LINE:while(<BJOB>){
+ LINE:while(<BJOB>){
     print STDERR if($verbose);
-=======
-  my ($self, $id, $verbose) = @_;
-  if(!$id){
-    die("Can't run without an LSF id");
-  }
-  my $command = "bjobs ".$id."\n";
-  #print STDERR "Running ".$command."\n";
-  my $flag = 0; 
-  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
-  while(<BJOB>){
-    # print STDERR if($verbose);
->>>>>>> 1.9.16.4
     chomp;
     if ($_ =~ /No unfinished job found/) {
       last LINE;
@@ -263,7 +251,6 @@ sub check_existance{
       $existing_ids{$values[0]} = 1;
     }
   }
-<<<<<<< LSF.pm
   my @awol_jobs;
   foreach my $job_id(keys(%job_submission_ids)){
     if(!$existing_ids{$job_id}){
@@ -272,14 +259,7 @@ sub check_existance{
   }
   close(BJOB) or $self->throw("Can't close pipe to bjobs");
   return \@awol_jobs;
-=======
-  close(BJOB);
-
-  print STDERR "Have lost ".$id."\n" if($verbose);
-  return undef;
->>>>>>> 1.9.16.4
 }
-
 #sub check_existance{
 #  my ($self, $id, $verbose) = @_;
 #  if(!$id){

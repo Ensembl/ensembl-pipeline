@@ -190,7 +190,11 @@ sub fetch_input{
   # chr12:10602496,10603128:Q9UGV6:
   #  print STDERR $entry."\n";
   ($name, $protein_id) = split /\|/, $self->input_id;
-  
+  if($protein_id eq 'CE00592'){
+    $self->verbose(1);
+  }else{
+    $self->verbose(0);
+  }
   my @array = split(/:/,$name);
 
   if(@array != 6) {
@@ -205,10 +209,10 @@ sub fetch_input{
     $end = $start;
     $start = $tmp_start;
   }
+  #print STDERR "Have pmatch results ".$start." ".$end." ".protein_id."\n";
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
-  $new_start = $start if $new_start < $start;
-  $new_end = $end if $new_end > $end;
+  
   #print STDERR "Fetching ".$seq_region." ".$start." ".$end."\n";
   if($new_start < 1){
     $new_start = 1;
@@ -220,7 +224,7 @@ sub fetch_input{
   
   if($slice->end() > $slice->seq_region_length) {
     #refetch slice, since we went past end, second call is fast
-    $new_end = $slice->seq_region_length();
+   $new_end = $slice->seq_region_length();
     $slice = $sliceadp->fetch_by_region($cs_name, $seq_region,
                                         $new_start, $new_end,
                                         $strand, $cs_version);
@@ -242,7 +246,7 @@ sub fetch_input{
   # genewise runnable
   # repmasking?
 
-  
+  #print STDERR "Have slice ".$new_start." ".$new_end." ".$seq->length."\n";
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
 								    '-ids'            => [ $protein_id ] ,
 								    '-seqfetcher'     => $self->seqfetcher,
@@ -604,7 +608,7 @@ sub validate_transcript {
 		foreach my $exon (@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
       foreach my $sf (@{$exon->get_all_supporting_features}){
-				$sf->feature1->seqname($exon->dbID);
+				$sf->seqname($exon->dbID);
       }
     }
 		
@@ -840,6 +844,8 @@ sub make_transcript{
   my @exons;
   #print "have ".scalar($gene->sub_SeqFeature)." exons\n";
   foreach my $exon_pred ($gene->sub_SeqFeature) {
+    #print STDERR "Exon ".$exon_pred->start." ".$exon_pred->end." ".
+    #  $exon_pred->strand."\n" if($self->verbose);
     # make an exon
     my $exon = Bio::EnsEMBL::Exon->new;
    
@@ -1116,6 +1122,15 @@ sub output_db {
 	$self->{_output_db} = $output_db;
     }
     return $self->{_output_db};
+}
+
+
+sub verbose{
+  my ($self, $verbose) = @_;
+  if(defined $verbose){
+    $self->{'verbose'} = $verbose;
+  }
+  return $self->{'verbose'};
 }
 
 
