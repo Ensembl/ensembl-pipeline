@@ -19,16 +19,23 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 # alignment of an ensembl transcript with the evidence 
 # used to predict it:
 
-my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
-                           '-dbadaptor'         => $db,
-			   '-seqfetcher'        => $seqfetcher,
-			   '-transcript'        => $transcript,
-			   '-padding'           => 10);
+my $evidence_alignment = 
+  Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
+      -transcript          => $transcript,
+      -dbadaptor           => $db,
+      -seqfetcher          => $seqfetcher,
+      -padding             => 0);
 
-my $alignment = $alignment_tool->retrieve_alignment('-type' => 'all');  
-                             # Type can be 'all', 'nucleotide' or 'protein'
+my $alignment = 
+  $evidence_alignment->retrieve_alignment(
+     '-type'            => 'all',
+   # Type can be 'all', 'nucleotide' or 'protein'
+     '-remove_introns'  => 1,
+     '-merge_sequences' => 1);
 
-foreach my $align_seq (@$alignment){
+my $align_seqs = $alignment->fetch_AlignmentSeqs;
+
+foreach my $align_seq (@$align_seqs){
   print $align_seq->seq . "\n";
 }
 
@@ -42,16 +49,20 @@ foreach my $align_seq (@$alignment){
 # regions of the alignment can make it _very_ big.  Introns
 # can be truncated thusly:
 
-my $alignment = $align_tool->retrieve_alignment('-type'            => 'all',
-						'-remove_introns'  => 1,
-                                                '-merge_sequences' => 1);
+my $alignment = 
+  $align_tool->retrieve_alignment(
+      '-type'            => 'all',
+      '-remove_introns'  => 1,
+      '-merge_sequences' => 1);
 
 # Importantly, if you need to see non-aligned portions of 
 # the evidence sequences use the following '-show_unaligned'
 # option:
 
-my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
-						'-show_unaligned' => 1);
+my $alignment = 
+  $align_tool->retrieve_alignment(
+      '-type'           => 'all',
+      '-show_unaligned' => 1);
 
 
 # This turns on an portion of code that generates sequences
@@ -72,23 +83,25 @@ my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
 # the transcript sequence :)  This option is used by passing in 
 # supporting features at the time of object creation.
 
-my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
-                           '-dbadaptor'           => $db,
-			   '-seqfetcher'          => $seqfetcher,
-			   '-transcript'          => $transcript,
-                           '-supporting_features' => \@supporting_features);
+my $alignment_tool = 
+  Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
+     '-dbadaptor'           => $db,
+     '-seqfetcher'          => $seqfetcher,
+     '-transcript'          => $transcript,
+     '-supporting_features' => \@supporting_features);
 
 
 # A few features of the actual alignment can be controled.
 # The fasta line length and the amount of 5-prime and
 # 3-prime padding can be stipulated:
 
-my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
-                           '-dbadaptor'         => $db,
-			   '-seqfetcher'        => $pfetcher,
-			   '-transcript'        => $transcript,
-			   '-padding'           => 50,
-			   '-fasta_line_length' => 60);
+my $alignment_tool = 
+  Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
+     '-dbadaptor'         => $db,
+     '-seqfetcher'        => $pfetcher,
+     '-transcript'        => $transcript,
+     '-padding'           => 50,
+     '-fasta_line_length' => 60);
 
 
 # Once the alignment is generated it is possible to calculate
@@ -165,11 +178,9 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Alignment;
 use Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
-
-# Object preamble - inherits from Bio::Root::Object;
-
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 
 ##### 'Public' methods #####
@@ -203,14 +214,14 @@ sub new {
       $padding, 
       $fasta_line_length, 
       $evidence_identity_cutoff,
-      $supporting_features) = $self->_rearrange([qw(DBADAPTOR
-						    TRANSCRIPT
-						    SEQFETCHER
-						    PADDING
-						    FASTA_LINE_LENGTH
-						    IDENTITY_CUTOFF
-						    SUPPORTING_FEATURES
-						   )],@args);
+      $supporting_features) = rearrange([qw(DBADAPTOR
+					    TRANSCRIPT
+					    SEQFETCHER
+					    PADDING
+					    FASTA_LINE_LENGTH
+					    IDENTITY_CUTOFF
+					    SUPPORTING_FEATURES
+					   )],@args);
 
   # Throw an error if any of the below are undefined or
   # are the wrong thing.
@@ -309,17 +320,25 @@ sub retrieve_alignment {
   my ($type, 
       $remove_introns, 
       $show_missing_evidence,
-      $merge_sequences) = $self->_rearrange([qw(TYPE
-						REMOVE_INTRONS
-						SHOW_UNALIGNED
-						MERGE_SEQUENCES
-					       )],@_);
+      $merge_sequences) = rearrange([qw(TYPE
+					REMOVE_INTRONS
+					SHOW_UNALIGNED
+					MERGE_SEQUENCES
+				       )],@_);
 
   $self->_type($type);
 
   unless ($self->_is_computed($type)){
-    $self->_align($type, $show_missing_evidence, $remove_introns, 
-		  $self->_padding, $merge_sequences);
+    my $alignment_success = $self->_align($type, 
+					  $show_missing_evidence, 
+					  $remove_introns, 
+					  $self->_padding, 
+					  $merge_sequences);
+    unless ($alignment_success) {
+      warning "Alignment generation failed.  There probably were" . 
+	" not any displayable sequences.";
+      return 0
+    }
   }
 
   return $self->_create_Alignment_object($type, $show_missing_evidence);
@@ -429,6 +448,8 @@ sub _align {
 
   my $evidence_sequences = $self->_corroborating_sequences($type);
 
+  return 0 unless $evidence_sequences;
+
   # Insert deletions in the appropriate places in the genomic
   # sequence.  This will complete the alignment of the evidence
   # with the genomic sequence.  A bit of fiddling is needed to 
@@ -537,12 +558,12 @@ sub _align {
   # frameshifts
 
   foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
-    print STDOUT $tracked_deletion . "\t" . 
+#    print STDOUT $tracked_deletion . "\t" . 
       scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
-    foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
-      print STDOUT $deletion->[1] ." (" . $deletion->[0] . ")  ";
-    }
-    print STDOUT "\n";
+#    foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
+#      print STDOUT $deletion->[1] ." (" . $deletion->[0] . ")  ";
+#    }
+#    print STDOUT "\n";
   }
 
 
@@ -1104,7 +1125,7 @@ sub _truncate_introns {
 	      subseq($seq, ($intron_end - 2*$self->_padding + 1), length($seq));
       }
 
-      if (($offcut =~ /atgc/i)&&($align_seq->name ne 'genomic_sequence')) {
+      if (($offcut =~ /[atgc]/)&&($align_seq->name ne 'genomic_sequence')) {
 	warning("Truncating intron sequences has caused some aligned evidence\n" .
 		"to be discarded.  Try again with a higher amount of padding\n".
 		"around the exon sequences.\n");
@@ -1161,7 +1182,7 @@ sub _merge_same_sequences {
 
 	if ($seq_array->[$i] ne '-'){
 	  if ($chimera[$i] && $chimera[$i] ne '-'){
-	    warning("Very bad - evidence from the same sequence overlaps between" .
+	    warning("Very bad - evidence from the same sequence overlaps between " .
 		    "exons.  You should not be merging sequences.  Set : " .
 		    "\$evidence_alignment->retrieve_alignment('-merge_sequences' => 0)");
 	  } else {
@@ -1580,7 +1601,8 @@ sub _corroborating_sequences {
   # alignment.  There could be a better way to do this, of course.
   push (@{$self->{'_corroborating_sequences'}}, @protein_features);
 
-  warning("There are no displayable supporting features for this transcript.  " .
+  warning("There are no displayable supporting features for this transcript [" .
+	  $self->_transcript->stable_id . "].  " .
 	  "Try setting the -type attribute to 'all', instead of just " . 
 	  "'protein' or 'nucleotide'.") 
     unless scalar @{$self->{'_corroborating_sequences'}} > 0;
