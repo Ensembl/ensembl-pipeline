@@ -67,7 +67,7 @@ sub new {
     my (
         $query,    $unmasked,   $program, $database, $threshold,  $threshold_type,
         $filter,   $coverage,   $prune,   $options,  $seqfetcher, $features,
-        $no_blast, $percent_id, $padding, $tandem
+        $no_blast, $percent_id, $padding, $percent_filter, $tandem
       )
       = $self->_rearrange(
         [
@@ -157,7 +157,6 @@ sub new {
         $self->options(' -cpus=1 ');
     }
     if ($percent_id) {
-
         $self->percent_id($percent_id);
     }
     else {
@@ -169,6 +168,13 @@ sub new {
     }
     else {
         $self->padding(400);
+    }
+
+    if ($percent_filter) {
+        $self->percent_filter($percent_filter);
+    }
+    else {
+        $self->percent_filter(0);
     }
 
     #print "options = ".$self->options."\n";
@@ -461,7 +467,7 @@ sub run {
     #print STDERR "ran analysis\n";
     #parse output and create features
     print "there are " . scalar(@blast_output) . " features\n";
-    $self->expand_and_merge_features( \@blast_output );
+    $self->expand_and_merge_features( @blast_output );
     my @features = $self->each_merged_feature;
     my @results;
     foreach my $feature (@features) {
@@ -527,28 +533,29 @@ sub run_blasts {
 =cut
 
 sub expand_and_merge_features {
-    my ( $self, $features ) = @_;
+    my ( $self, @blast_output ) = @_;
 
     my @features;
-    my @unfiltered = @$features;
+    #my @unfiltered = @$feats;
 
-    if ( $self->percent_filter ) {
+    if ( $self->percent_filter > 0 ) {
 
-        #print "filtering on percent_id\n";
-        foreach my $unf (@unfiltered) {
+        print "filtering on percent_id\n";
+        foreach my $unf (@blast_output) {
 
-            #print $unf->percent_id."\n"; 
-            if ( $unf->percent_id >= $self->percent_id ) {
+            print $unf->percent_id."\n"; 
+            if ( $unf->percent_id >= $self->percent_filter ) {
                 push ( @features, $unf );
+                
             }
         }
     }
     else {
-        push ( @features, @unfiltered );
+        push ( @features, @blast_output );
     }
 
     #return @features;
-    #print "there are ".scalar(@features)." unmerged features\n";
+    die "there are ".scalar(@features)." unmerged features\n";
     my %unique_hids;
 
     foreach my $feature (@features) {
@@ -569,19 +576,24 @@ sub expand_and_merge_features {
     my $count          = 0;
     my $padding        = $self->padding;
     my $genomic_length = $self->unmasked->length;
-    foreach my $hid (@hids) {
+    
+    
+    my @hid_seqs = $self->seqfetcher->get_Seq_by_acc(@hids);
+    
+    foreach my $hid_seq (@hid_seqs) {
 
         #print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
-        my $feature_array = $unique_hids{$hid};
+        my $feature_array = $unique_hids{$hid_seq->accession_number};
 
         #print $self->seqfetcher."\n";
-        my $hid_seq = $self->seqfetcher->get_Seq_by_acc($hid);
-
+        #my $hid_seq = $self->seqfetcher->get_Seq_by_acc($hid);
+        
+        
         my $hid_len = $hid_seq->length;
 
         foreach my $feature (@$feature_array) {
 
-#print "before seqname = ".$hid." length = ".$hid_len." start ".$feature->start." end ".$feature->end." strand ".$feature->strand." hstart ".$feature->hstart." hend ".$feature->hend."\n";
+            #print "before seqname = ".$hid." length = ".$hid_len." start ".$feature->start." end ".$feature->end." strand ".$feature->strand." hstart ".$feature->hstart." hend ".$feature->hend."\n";
             my $genomic_start = $feature->start;
             my $genomic_end   = $feature->end;
             my $hstart        = $feature->hstart;
