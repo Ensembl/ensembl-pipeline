@@ -424,23 +424,23 @@ sub show_jobs_by_status_and_analysis {
   my $maxretry;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $jobId = $ref->{'job_Id'};
-    my $input_id = $ref->{'input_id'};
-    my $LSF_id = $ref->{'LSF_id'};
-    my $out    = $ref->{'stdout_file'};
-    my $err    = $ref->{'stderr_file'};
-    my $retry  = $ref->{'retry_count'};
+    my $jobId         = $ref->{'job_Id'};
+    my $input_id      = $ref->{'input_id'};
+    my $submission_id = $ref->{'submission_id'};
+    my $out           = $ref->{'stdout_file'};
+    my $err           = $ref->{'stderr_file'};
+    my $retry         = $ref->{'retry_count'};
 
     if (length($jobId) > $maxjobid) {$maxjobid = length($jobId);}
     if (length($input_id) > $maxinputid) {$maxinputid = length($input_id);}
-    if (length($LSF_id) > $maxlsf) {$maxlsf = length($LSF_id);}
+    if (length($submission_id) > $maxlsf) {$maxlsf = length($submission_id);}
     if (length($out) > $maxout) {$maxout = length($out);}
     if (length($err) > $maxerr) {$maxerr = length($err);}
     if (length($retry) > $maxretry) {$maxretry = length($retry);}
 
     push(@jobIds,$jobId);
     push(@input_ids,$input_id);
-    push(@lsfs,$LSF_id);
+    push(@lsfs,$submission_id);
     push(@out,$out);
     push(@err,$err);
     push(@retry,$retry);
@@ -449,8 +449,8 @@ sub show_jobs_by_status_and_analysis {
 
   $self->print_header("Jobs by status $status and analysis $analysis");
   
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","Input id","Job","LSF id","retry","output file","error file");
-  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","--------","---","------","-----","-----------","----------");
+  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","Input id","Job","submission id","retry","output file","error file");
+  printf("%-${maxinputid}s  %-${maxjobid}s  %-${maxlsf}s  %-${maxretry}s  %-${maxout}s  %-${maxerr}s\n","--------","---","-------------","-----","-----------","----------");
 
   while (my $jobid = shift @jobIds) {
     my $inputid = shift @input_ids;
