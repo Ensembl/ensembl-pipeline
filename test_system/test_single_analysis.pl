@@ -90,6 +90,8 @@ sub table_groups{
   my %tables;
   $tables{'genscan'} = ['core', 'pipeline', 'repeat_feature',
                         'repeat_consensus'];
+  $tables{'fgenesh'} = ['core', 'pipeline', 'repeat_feature',
+                        'repeat_consensus'];
   $tables{'swall'} = ['core', 'pipeline', 'repeat_feature',
                       'repeat_consensus', 'prediction_exon',
                       'prediction_transcript'];
