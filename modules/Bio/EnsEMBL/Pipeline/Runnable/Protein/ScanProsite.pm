@@ -242,8 +242,7 @@ sub run_analysis {
     my ($self) = @_;
 
     my $run = "/usr/local/bin/perl ".$self->analysis->program . 
-	' -pattern ' .$self->analysis->db_file. 
-	    ' -confirm  /acari/analysis/iprscan/data/confirm.patterns' .$self->parameters.' '.
+	' -pattern ' .$self->analysis->db_file.' '.$self->parameters.' '.
 		$self->filename . ' > ' .$self->results;
 
     print STDERR "RUNNING: $run\n";
