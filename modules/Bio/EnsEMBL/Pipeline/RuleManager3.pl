@@ -13,7 +13,7 @@ use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 unless (&config_sanity_check) {
-    exit 1;
+  exit 1;
 }
 
 
@@ -38,10 +38,6 @@ $SIG{INT} = \&termhandler;
 
 
 # dynamically load appropriate queue manager (e.g. LSF)
-
-
-
-
 
 # command line options override 
 # anything set in the environment variables.
@@ -131,6 +127,7 @@ GetOptions(
            'max_pending_jobs:s' => \$max_pending_jobs,
            'perldoc!' => \$perldoc,
            'dont_off_accumulators!' => \$dont_switch_off_accumulators,
+           'wakeup:n' => \$wakeup,
           ) or useage(\@command_args);
 
 
@@ -165,8 +162,7 @@ $max_pending_jobs = $MAX_PENDING_JOBS unless($max_pending_jobs);
 if(!$kill_jobs){
   $killed_file = undef;
 }
-my $batch_q_module = 
-  "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
+my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
 my $file = "$batch_q_module.pm";
 $file =~ s{::}{/}g;
