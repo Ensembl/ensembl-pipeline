@@ -241,12 +241,12 @@ sub show_analysisprocess {
   my $sth = $self->dbobj->prepare("select analysis_id,logic_name,db,program,parameters,module from analysis");
   my $res = $sth->execute;
 
-  my $maxname;
-  my $maxid;
-  my $maxdb;
-  my $maxprog;
-  my $maxparam;
-  my $maxmodule;
+  my $maxname = 0;
+  my $maxid = 0;
+  my $maxdb = 0;
+  my $maxprog = 0;
+  my $maxparam = 0;
+  my $maxmodule = 0;
 
   my @ids;
   my @names;
@@ -328,8 +328,8 @@ sub show_Rules {
   my @names;
   my @ids;
  
-  my $maxname;
-  my $maxid;
+  my $maxname = 0;
+  my $maxid = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $id = $ref->{'rule_id'};
@@ -371,9 +371,9 @@ sub show_Rules_and_Conditions {
   my @ids;
   my @conds;
 
-  my $maxname;
-  my $maxid;
-  my $maxcond;
+  my $maxname = 0;
+  my $maxid = 0;
+  my $maxcond = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $id = $ref->{'rule_id'};

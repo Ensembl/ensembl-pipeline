@@ -144,6 +144,11 @@ sub fetch_input {
 						);
 
     my $transferred_gene = $gene->transfer($chromosome_slice);
+
+######################DODGY#############################################
+######################################################################## 
+    $transferred_gene->type('unset');
+########################################################################
     push @transferred_genes,$transferred_gene;
 
     if (scalar(@{$transferred_gene->get_all_Exons()}) > 1){
