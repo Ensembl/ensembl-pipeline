@@ -246,10 +246,12 @@ sub parse_results {
 	$feature {start} = $start;
 	$feature {end} = $end;
 	$feature {strand} = $strand;
-	$feature {source}= 'tRNAscan-SE';
+	$feature {display_label} = $element[4];
+        $feature {source}= 'tRNAscan-SE';
 	$feature {primary}= 'tRNA';
 	$feature {program} = 'tRNAscan-SE';
 	$feature {program_version} = '1.11';
+        
 	
 # need the tRNA type?
 
@@ -311,11 +313,8 @@ sub create_feature {
                             -score   => $feat->{'score'},
                             -analysis => $analysis_obj);  
 
-    # display_label must be a null string, and not undef
-    # can't be set above as it is not known to SeqFeature
-    # (SimpleFeature->new uses SeqFeature->new)
-    $tRNA->display_label('');
 
+    $tRNA->display_label($feat->{'display_label'});
     if ($tRNA)
       {
 	$tRNA->validate();
