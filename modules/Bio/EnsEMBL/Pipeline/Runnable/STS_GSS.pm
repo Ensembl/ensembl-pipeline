@@ -577,10 +577,8 @@ sub expand_and_merge_features {
     my $padding        = $self->padding;
     my $genomic_length = $self->unmasked->length;
     
-    
-    my @hid_seqs = $self->seqfetcher->get_Seq_by_acc(@hids);
-    
-    foreach my $hid_seq (@hid_seqs) {
+
+    foreach my $hid_seq ( eval {$self->seqfetcher->get_Seq_by_acc(@hids);} ) {
 
         #print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
         my $feature_array = $unique_hids{$hid_seq->accession_number};
@@ -715,6 +713,7 @@ sub run_est2genome {
 
     my ( $self, $feature ) = @_;
 
+   
     my $est    = $self->seqfetcher->get_Seq_by_acc( $feature->hseqname );
     my $seq    = $self->unmasked->subseq( $feature->start, $feature->end );
     my $start  = $feature->start;
