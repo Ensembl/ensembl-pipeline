@@ -144,7 +144,7 @@ sub runnable {
             }
         }
         $parameters {'-db'}      = $self->analysis->db_file();
-        $parameters {'-blast'}   = $self->analysis->program();  
+        $parameters {'-blast'}   = $self->analysis->program_file();  
         #creates empty Bio::EnsEMBL::Runnable::Blast object
         $self->{'_runnable'} = $runnable->new(%parameters);
     }

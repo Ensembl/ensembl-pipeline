@@ -163,7 +163,7 @@ sub formatted_parameters {
                 $parameters{$key} = $value;
             }
         }
-        $parameters {'-blast'}  = $self->analysis->program;
+        $parameters {'-blast'}  = $self->analysis->program_file;
         $parameters {'-db'}     = $self->analysis->db_file;
         
     return %parameters;
@@ -303,7 +303,7 @@ sub align_hit_to_contig {
         my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
-                        
+
         $ex_align {'name'}      = $exon->id;
         $ex_align {'gen_start'} = $exon->start;
         $ex_align {'gen_end'}   = $exon->end;
@@ -326,6 +326,8 @@ sub align_hit_to_contig {
         #        ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
         #        ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
         #        ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
+        #print STDERR "Translated Seq: ".$exon->translate->seq."\n";
+        
     }
     
     $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
@@ -402,7 +404,6 @@ sub create_peptide_featurepairs {
         
         my $start_frac = $ex_align->{'phase'} + 1;
         my $end_frac   = (( 3 - $$ex_align{'end_phase'})%3) + 1;
-        
         my $dna_feat = Bio::EnsEMBL::SeqFeature->new (
                                 -seqname    =>  $ex_align->{'name'},
                                 -start      =>  $ex_start, 
