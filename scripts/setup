@@ -1,8 +1,7 @@
 0) cvs checkout the code
 
-cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl
-cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-pipeline
-cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-otter
+cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl ensembl-pipeline ensembl-otter
+
 bioperl ??
 
 setenv ENSDIR /home/ensuser  (or whereever you have checked out the code to)
@@ -10,7 +9,6 @@ setenv PERL5LIB ${ENSDIR}/ensembl/modules:${ENSDIR}/ensembl-pipeline/modules:${E
 setenv PATH ${ENSDIR}/ensembl-pipeline/scripts:${ENSDIR}/ensembl-otter/scripts:${PATH}
 
 1) First create your database
-
 
 mysql -u ensadmin -pensembl -h ecs2b -e "create database my_database"
 
@@ -49,12 +47,58 @@ If you wan t to keep the existing genes skip this step
 mysql -u ensadmin -pensembl -h ecs2b my_database < ${ENSDIR}/ensembl-pipeline/sql/delete_genes
 
 
-5.5) Configuring the pipeline BatchQueue,General and ?
+5.5) Configuring the pipeline BatchQueue,General and Blast.pm
 
-   output dirs
-   bin
-   data
-   regexes for blast - need default
+The pipeline has several config files that define things such as the locatio of binaries,data, output directories, and blast parameters.
+
+First of all copy the example config files to their proper names
+
+cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/General.pm.example    $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/General.pm
+cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
+cp $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm.example      $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/Blast.pm
+
+All three of these files need to be edited :
+
+
+a) General.pm
+
+  BIN_DIR  - the directory where all the binaries to be used are (genscan,blastall,cpg,RepeatMasker.pm etc)
+  DATA_DIR - the direcotry where all the data files sit (including blast indices)
+  LIB_DIR  - any libraries used (RepeatMasker libraries, eponine jar etc)
+
+  PIPELINE_OUTPUT_DIR    - where the LSF output and error files go
+  PIPELINE_WORK_DIR      - where any temporary files go (*must* be local to the host node - /tmp is a good choice)
+  PIPELINE_RUNNER_SCRIPT - location of the runner script.  In this case it is
+                            $ENSDIR/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/runner.pl
+
+If you are using the pipeline as is the rest of the options can be left
+
+b) BatchQueue.pm
+
+  QUEUE_MANAGER             - LSF (Code as distributed only runs locally or with LSF)
+  DEFAULT_BATCH_QUEUE_SIZE  - number of jobs to send to each node at once.  Default is 10
+                              but for testing use 1
+  DEFAULT_BATCH_QUEUE       - This is site dependent and you should put in your own queue here.
+  DEFAULT_OUTPUT_DIR        - Contains the LSF stdout and stderr - this must exist
+  MAX_PENDING_JOBS          - Only submit jobs if the number of pending jobs is less than this
+
+
+Underneath are per analysis configs if you want to change any of the defaults defined above.  
+
+c) Blast.pm
+
+This is needed if the different databases you are searching have different headers.  You can defined a regexp for the different header types as well as other per database parameters
+
+  name    - the name of the blast database in $DATA_DIR
+  type    - dna if a dna database and protein if a protein database
+  header  - the default is a header like 
+	       >HBA_HUMAN Some descriptiony type thing.  
+            The id will be taken to be HBA_HUMAN.  
+            The default regexp for this is '^(\S+) +'  but other perl regexps can be defined
+  flavour  - wu or ncbi
+  refilter - use filtering (1) or not (0)
+  min_unmasked - It is quite common for almost all a dna sequence to be repeatmasked or dusted.  This is the minimum number of unmasked basepairs to be present in the sequence before blasting will occur.
+
 
 6) Generating input ids
 
@@ -73,10 +117,10 @@ To generate slice input ids (size 1Mb) :
 
 We will first set up a simple pipeline with RepeatMasking , Genscan predictions, CpG prediction and a blast against swall.  These will all be done on contigs.
 
-  add_Analysis -logic_name RepeatMask -module RepeatMasker    -db repbase        -input_type CONTIG
-  add_Analysis -logic_name Genscan    -module Genscan         -db HumanIso.smat  -input_type CONTIG
-  add_Analysis -logic_name Swall      -module BlastGenscanPep -db swall          -input_type CONTIG
-  add_Analysis -logic_name CpG        -module CPG                                -input_type CONTIG
+  add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -module RepeatMasker    -database repbase        -input_type CONTIG
+  add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan    -module Genscan         -database HumanIso.smat  -input_type CONTIG
+  add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG        -module CPG                                      -input_type CONTIG
+  add_Analysis -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall      -module BlastGenscanPep -database swall          -input_type CONTIG -database_file swall -program wublastp -program_file wublastp -parameters ' -cpus=1, -hitdist=40'
 
 
 Note that the first three analyses all have databases defined but the CpG island predictor doesn't need one.
@@ -87,20 +131,20 @@ As it stands we have defined anything to run yet.  All we have a contigs ready a
 
 First of all we want to repeat mask so we do that first
 
-  add_to_Pipeline -logic_name RepeatMask -dependents SubmitContig
+  add_to_Pipeline  -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RepeatMask -dependents SubmitContig
 
 Note the the SubmitContig string is the logic name we gave to the contigs when we put them into the pipeline
 
 Then we want to run genscan and CpG islands on the repeatmasked data
 
-  add_to_Pipeline -logic_name Genscan -dependents RepeatMask
-  add_to_Pipeline -logic_name CpG     -dependents RepeatMask
+  add_to_Pipeline  -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Genscan -dependents RepeatMask
+  add_to_Pipeline  -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name CpG     -dependents RepeatMask
 
 This tells the pipeline to only run genscan and cpg when the repeat masking is finished.
 
 Finally we want to run blast against swall on the genscan predicted peptides
 
-  add_to_Pipeline -logic_name BlastGenscanPep -dependents Genscan
+  add_to_Pipeline  -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name Swall -dependents Genscan
 
 
 All your rules and inputs are now set up and you are ready to run.  First of all let's run the  monitor script to see if everything is ok.
@@ -112,6 +156,44 @@ All your rules and inputs are now set up and you are ready to run.  First of all
 This will print out a summary of any running jobs (there won't be any of course) and a summary of the rules and conditions. 
 
 Example output is shown below.
+Pipeline current status [ecs2b my_database]
+
+Name Status Count
+---- ------ -----
+
+
+Pipeline status summary [ecs2b my_database]
+
+Status Count
+------ -----
+
+
+Finished job summary [ecs2b my_database]
+
+Count Name          Id
+----- ----          --
+11  SubmitSlice   1 
+12  SubmitContig  2 
+
+
+Pipeline rules [ecs2b my_database]
+
+Name        Id
+----        --
+RepeatMask  1 
+Genscan     2 
+CpG         3 
+Swall       4 
+
+
+Rules and Conditions [ecs2b my_database]
+
+Name        Id Condition     
+----        -- ---------     
+RepeatMask  1  SubmitContig  
+Genscan     2  RepeatMask    
+CpG         3  RepeatMask    
+Swall       4  Genscan       
 
 
 This script is very useful in showing you the progress of the pipeline as it is running.
@@ -132,8 +214,8 @@ The gene build pipeline is slightly different in that most analysis is done on s
 
 Before running anything on slices all the analyses on contigs have to finish.  This step is put into the pipeline as an accumulator step as follows
 
-  ./add_Analysis    -host ecs2b -dbname my_database -logic_name RawAccumulator -module PlaceHolder -type ALL
-  ./add_to_Pipeline -host ecs2b -dbname my_database -logic_name RawAccumulator -dependents Swall
+  ./add_Analysis    -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RawAccumulator -module Accumulator -type ALL
+  ./add_to_Pipeline -host ecs2b -user ensadmin -pass ensembl -dbname my_database -logic_name RawAccumulator -dependents Swall
 
 
 Note that the analysis has type ALL.  This means it will wait for all its dependents to finish before starting.  In this case this means waiting for all the Swall jobs to finish before starting.
@@ -152,18 +234,52 @@ The module itself doesn't do anything.  It is just a way of waiting for all cont
   - Final gene build
 
 
-
- 
-
+12.2) Similarity genewise jobs
 
 
+perl ../modules/Bio/EnsEMBL/Pipeline/RuleManager3.pl -dbhost ecs2b -dbname my_database -dbuser ensadmin -dbpass ensembl -start_from 1
 
 
+To configure the gene build
+
+ - Similarity genewise jobs (needs the swall BlastGenscanPep step)
+
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Databases.pm.example  ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Databases.pm
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Targetted.pm.example  ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Targetted.pm
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/General.pm.example    ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/General.pm
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Scripts.pm.example    ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Scripts.pm
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Similarity.pm.example    ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Similarity.pm
+ cp ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Genewise.pm.example    ../modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Genewise.pm
+Pmatch
+GeneBuilder
+Combined
+a) Databases.pm
+
+All fields in here can be left blank and the default database will be your pipeline database.  The different options are
+there to avoid database contention for large numbers of nodes and large databases.
+
+b) General.pm
+
+Nothing needs to be changed
+
+c) Similarity.pm
+
+To run BlastMiniGenewise and TargettedGenewise steps a way of fetching sequences needs to be defined. (Needs more explanation).
+
+All other parameters can be left as they are.
+
+d) Scripts.pm
+
+If some proteins need to be excluded (repeats,virus) GB_KILL_LIST should be set to the file with their ids in.  It can be kept blank otherwise.
 
 
+Adding in the similarity genewises to the pipeline.
 
+It is a *very* good idea to test this before adding to the pipeline.  Testing is done through the test_RunnableDB script as follows
 
+ ./test_RunnableDB -user ensadmin -pass ensembl -host ecs2b -dbname my_database -logic_name BlastMiniGenewise -module FPC_BlastMiniGenewise -input_type Slice100K -input_id 6.45001-145000
 
+Add to pipeline
+Add rule (two dependencies - make sure the SLICE100K type is set)
 
-
-
+run pipeline.
