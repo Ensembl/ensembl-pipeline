@@ -16,11 +16,11 @@ $| = 1;
 my %stats = ( );
 
 
-my $dbhost = $::pipeConf{'dbhost'};
-my $dbname = $::pipeConf{'dbname'};
-my $dbuser = $::pipeConf{'dbuser'};
-my $dbpass = $::pipeConf{'dbpass'};
-my $queue  = $::pipeConf{'queue'};
+my $dbhost;
+my $dbname;
+my $dbuser;
+my $dbpass;
+my $queue;
 
 my $test   = 0;
 my $resubmit = 0;
