@@ -10,6 +10,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Chromosome;
 use Bio::EnsEMBL::Clone;
 use Bio::EnsEMBL::RawContig;
+#ok
 
 $| = 1;
 
