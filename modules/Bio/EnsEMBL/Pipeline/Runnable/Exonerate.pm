@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::Runnable::Exonerate
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
                                              -genomic => $genseq,
                                              -est     => $estseq,
-					     -outfile => $outfile
                                              );
     or
     
@@ -78,19 +77,9 @@ sub new {
   my ($class,@args) = @_;
   my $self = bless {}, $class;
   
-  $self->{'_fplist'}    = []; #create key to an array of feature pairs
-  $self->{'_clone'}     = undef;        #location of Bio::Seq object
-  $self->{'_exonerate'} = undef;     #location of exonerate
-  $self->{'_workdir'}   = undef;     #location of temp directory
-  $self->{'_genfilename'}  =undef;      #file to store Bio::Seq object
-  $self->{'_estfilename'} = undef;   #file to store EST Bio::Seq object
-  $self->{'_results'}     = undef;      #file to store results of analysis
-  $self->{'_protected'}   = [];         #a list of files protected from deletion
-  $self->{'_arguments'}   = undef;      #arguments for exonerate
-  
-  my( $genomic, $est, $exonerate, $arguments) = 
-    $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS)], @args);
-  
+  my( $genomic, $est, $exonerate, $arguments, $print) = 
+    $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS PRINT)], @args);
+
   $self->throw("no genomic sequence given\n") unless defined $genomic;
   $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
 
@@ -103,14 +92,23 @@ sub new {
   }
   else {   
     eval 
-      { $self->exonerate($self->locate_executable('exonerate')); };
-    if ($@)
+      { 
+	$self->exonerate($self->locate_executable('exonerate')); 
+      };
+    if ($@) {
       # need a central installation ...
-      { $self->throw("Can't find exonerate!"); }
+      $self->throw("Can't find exonerate!"); 
+    }
   }
-  if ($arguments) 
-    {   $self->arguments($arguments) ;}
+
+  if (defined $arguments) {   
+    $self->arguments($arguments);
+  }
   
+  if (defined $print) {
+    $self->print_results($print);
+  }
+
   return $self;
 }
 
@@ -215,13 +213,35 @@ sub exonerate {
 
 sub arguments {
   my ($self, $args) = @_;
-  if ($args)
-    {
+  if ($args) {
       $self->{'_arguments'} = $args ;
     }
   return $self->{'_arguments'};
 }
 
+=head2 print_results
+
+    Title   :   print_results
+    Usage   :   $self->print_results(1)
+    Function:   Get/set method for a flag determining whether exonerate output should be dumped to STDOUT
+    Returns :   0 or 1
+    Args    :   1 or nothing
+
+=cut
+
+sub print_results {
+  my ($self, $print) = @_;
+
+  if (!defined $self->{'_print'}) {
+     $self->{'_print'} = 0;
+  }
+
+  if ($print) {
+      $self->{'_print'} = 1 ;
+    }
+
+  return $self->{'_print'};
+}
 
 =head2 estfilename
 
@@ -259,15 +279,37 @@ sub genfilename {
 =head2 run
 
   Title   : run
-  Usage   : $self->run()
-  Function: Runs exonerate and stores results as FeaturePairs
+  Usage   : $self->run
+  Function: Runs exonerate in gapped mode and stores results as FeaturePairs
   Returns : TRUE on success, FALSE on failure.
   Args    : 
 
 =cut
 
-sub run {
-  my ($self, @args) = @_;
+sub run{  
+  my ($self) = @_;
+  $self->warn("presently there is no gapped cigar parser for exonerate");
+
+  # store raw output FeaturePairs in $self->output
+  # store "genes" in $self->add_genes via convert_output
+  # $self->convert_output;
+
+
+}
+
+=head2 run_ungapped
+
+  Title   : run_ungapped
+  Usage   : $self->run_ungapped()
+  Function: Runs exonerate in ungapped mode (-n yes) and stores results as FeaturePairs
+            Here we are only interested in having one FeaturePair per exon
+  Returns : TRUE on success, FALSE on failure.
+  Args    : none 
+
+=cut
+
+sub run_ungapped {
+  my ($self) = @_;
 
   #check inputs
   my $genomicseq = $self->genomic_sequence ||
@@ -297,26 +339,24 @@ sub run {
     }
   }
   
-  # finally we run the beast.
-  my $command = $self->exonerate() . " -w 14 -t 65 -H 100 -D 15 -m 500 -n yes -A false -G yes --cdna $estfile --genomic $genfile";
-  
-STDOUT->autoflush(1);
+  # output parsing requires that we have both gff and cigar outputs. We don't want to do intron
+  # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
+  # are got from $self->arguments.
+  my $command = $self->exonerate() . " " .  $self->arguments . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
+
+  # disable buffering of STDOUT
+  STDOUT->autoflush(1);
 
   eval {
-#    print (STDERR "Running command $command\n");
     open(EXONERATE, "$command |") or $self->throw("Error forking exonerate pipe on ".$self->genfilename."\n"); 
-    # some constant strings
     my $source_tag  = "exonerate";
-    
-    #read output
     my $estname   = undef;
     my $genname   = "";
     my %gff;
     my $prevstate = "cigar";
 
     # exonerate output is split up by est.
-    # gff comes first, then all the cigar lines
-    # so we can process all the gff, then all the cigar lines.
+    # gff comes first, then all the cigar lines, so we can process all the gff, then all the cigar lines.
     # if we keep track of when we flip from cigar to gff, we know we're moving on to the next est.
     while(<EXONERATE>){
       # gff
@@ -331,9 +371,6 @@ STDOUT->autoflush(1);
 	  }
 	}
 
-	# M93650  exonerate       exon    14193   14292   .       +       .       gene_id 8       ;       
-	# exon_id 1       ;       insertions      0       ;       deletions 0       ;       
-	# percent_id      100.000
 	my @cols = split /;/;
 	my $pid = $cols[$#cols];
 	$pid =~ /(\d+)\./;
@@ -356,9 +393,7 @@ STDOUT->autoflush(1);
 	
 	$prevstate = 'cigar';
 
-	#split on whitespace
 	my @elements = split;
-	
 	next unless $elements[0] eq 'cigar:';
 	
 	my $primary_tag    = 'exonerate';
@@ -400,18 +435,21 @@ STDOUT->autoflush(1);
 	my $genomic_primary = $primary_tag;
 	my $est_primary = $primary_tag;
 
-	my $pair = $self->_createfeatures ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
+	my $pair = $self->_create_featurepair ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
 					 $est_start, $est_end, $est_id, 
 					 $genomic_source, $est_source, 
 					 $genomic_strand, $est_strand, 
 					 $genomic_primary, $est_primary);
 
-# needed for overall run, otherwise not
-	print $pair->seqname  . "\t" . $pair->start        . "\t" . $pair->end    . "\t" . 
-	          $pair->score    . "\t" . $pair->percent_id   . "\t" . $pair->strand . "\t" . 
-		  $pair->hseqname . "\t" . $pair->hstart       . "\t" . $pair->hend   . "\t" . 
-                  $pair->hstrand  . "\n";
+	$self->output($pair);
 
+	if($self->print_results) {
+	  print $pair->seqname  . "\t" . $pair->start        . "\t" . $pair->end    . "\t" . 
+	        $pair->score    . "\t" . $pair->percent_id   . "\t" . $pair->strand . "\t" . 
+	        $pair->hseqname . "\t" . $pair->hstart       . "\t" . $pair->hend   . "\t" . 
+                $pair->hstrand  . "\n";
+	}
+	
       }    
     }
     
@@ -419,8 +457,6 @@ STDOUT->autoflush(1);
     close (EXONERATE) or $self->throw("Error running exonerate: $command");
     
   };  
-
-#  close (OUT);
 
   #clean up temp files
   if(ref($estseq) eq 'ARRAY' ) {
@@ -445,20 +481,17 @@ STDOUT->autoflush(1);
     Usage   :   $obj->convert_output
     Function:   Parses exonerate output to make "gene" features with exons as subfeatures
                 At present pretty hopeless supporting data for exons themselves ...
-    Returns :   none
-    Args    :   
+    Returns :   none, but genes can be retrieved using each_gene
+    Args    :   none
 
 =cut
 
 sub convert_output {
   my($self) = @_;
 
-  my @tmpf = @{$self->{'_fplist'}};
-
-  #ought to be done here but will probably break Exonerate RunnableDB ...
   my $curr_gene;
   my @genes;
-  foreach my $fp(@tmpf){
+  foreach my $fp($self->output){
     # if it's a gene line, make a gene
     if($fp->primary_tag eq 'gene'){
       $curr_gene = $fp->feature1;
@@ -472,12 +505,58 @@ sub convert_output {
     }
     # otherwise skip it
   }
-  
-  if (!defined($self->{'_output'})) {
-      $self->{'_output'} = [];
+
+  $self->add_genes(@genes);
+}
+
+=head2 add_genes
+
+  Title   : add_genes
+  Usage   : $self->add_genes
+  Function: Adds an array of FeaturePairs representing genes, with exons as subFeatures, 
+            into $self->{_'genelist'}. They can be retrieved using each_gene.
+            NB this method is add_genes not add_Genes as these are not Gene objects ...
+  Returns : nothing
+  Args    : @genes: an array of Bio::EnsEMBL:FeaturePair
+
+=cut
+
+sub add_genes {
+
+  my ($self, @genes) = @_;
+    if (!defined($self->{'_genelist'})) {
+      $self->{'_genelist'} = [];
   }
-  print "genes are @genes\n";
-  push(@{$self->{'_output'}},@genes);
+
+   if (@genes) {
+    push(@{$self->{'_genelist'}},@genes);
+  }
+  
+}
+
+=head2 each_gene
+
+  Title   : each_genes
+  Usage   : $self->each_genes
+  Function: Returns results of exonerate as an array of FeaturePair, one per gene. Exons
+            are added as subSeqfeatures of genes, and supporting evidence as subSeqFeatures 
+            of Exons.
+            If you want just the raw Exonerate results as a set of FeaturePairs, use output 
+            instead of each_gene
+            NB this method is each_gene not each_Gene as these are not Gene objects ...
+  Returns : An array of Bio::EnsEMBL::FeaturePair
+  Args    : none
+
+=cut
+
+sub each_gene{
+  my ($self) = @_;
+      
+  if (!defined($self->{'_genelist'})) {
+    $self->{'_genelist'} = [];
+  }
+  
+  return @{$self->{'_genelist'}};
 
 }
 
@@ -485,38 +564,47 @@ sub convert_output {
 
   Title   : output
   Usage   : $self->output
-  Function: Returns results of exonerate as array of FeaturePair, one per gene, 
-            with exons as sub_seqfeatures
+  Function: Get/set method - can optionally add a FeaturePair to $self->{'_output'}
+            Returns results of exonerate as array of FeaturePair, one per alignment
+            If you want the results returned organised with one FeaturePair per "gene", 
+            with associated exons and supporting features, use each_gene
   Returns : An array of Bio::EnsEMBL::FeaturePair
-  Args    : none
+  Args    : either none, or $featpair: a Bio:EnsEMBL::FeaturePair
 
 =cut
 
 sub output {
-  my ($self) = @_;
+  my ($self, $featpair) = @_;
 
-  #  could return a list of featurepairs, one per gene, as with Genewise.
+  if (!defined($self->{'_output'})) {
+    $self->{'_output'} = [];
+  }
 
-# TEMPORARY FIXME
-#  return @{$self->{'_output'}};
-#  return @{$self->{'_fplist'}};
-  return $self->{'_fplist'}; # ref to an array
+  if (defined $featpair) {
+    push(@{$self->{'_output'}}, $featpair);
+  }
+  
+  return @{$self->{'_output'}};
+
 }
 
-=head2 _create_features
+=head2 _create_featurepair
 
-  Title   : _create_features
-  Usage   : $self->_create_features($f1score, $f1pid$f1start, $f1end, $f1id, 
+  Title   : _create_featurepair
+  Usage   : $self->_create_featurepair($f1score, $f1pid$f1start, $f1end, $f1id, 
 				    $f2start, $f2end, $f2id, $f1source, 
 				    $f2source, $f1strand, $f2strand, 
 				    $f1primary, $f2primary)
-  Function: Returns results of exonerate as array of FeaturePair
-  Returns : Nothing, but $self->{'_fplist'} contains a new FeaturePair
-  Args    : 
+  Function: Makes and returns a FeaturePair
+  Returns : Bio::EnsEMBL::FeaturePair
+  Args    : $f1score, $f1pid, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
+            $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary:
+            strings and ints representing the various fileds to be filled in
+            when creating a Bio::EnsEMBL::FeaturePair
 
 =cut
 
-sub _createfeatures {
+sub _create_featurepair {
   my ($self, $f1score, $f1pid, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
       $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
 
@@ -556,65 +644,15 @@ sub _createfeatures {
   
   if ($fp) {
     $self->throw("Can't validate") unless $fp->validate();
-    push(@{$self->{'_fplist'}}, $fp);
+#    push(@{$self->{'_fplist'}}, $fp);
   }
   return $fp;
 }
 
 #####################################
-# creating and clearing up temp files
+# clearing up temp files
 #####################################
 
-# a lot of this is shared with eg Vert_Est2Genome. Need a common parent ...
-sub _createfiles {
-  my ($self, $genfile, $estfile, $dirname)= @_;
-  
-  #check for diskspace
-  my $spacelimit = 0.01; # 0.01Gb or about 10 MB
-  my $dir ="./";
-  unless ($self->_diskspace($dir, $spacelimit)) 
-    {
-      $self->throw("Not enough disk space ($spacelimit Gb required)");
-    }
-  
-  #if names not provided create unique names based on process ID    
-  $genfile = $self->_getname("genfile") unless ($genfile);
-  $estfile = $self->_getname("estfile") unless ($estfile);    
-  
-  # Should check we can write to this directory 
-  $self->throw("No directory $dirname") unless -e $dirname;
-  
-  return ($genfile, $estfile);
-}
-
-sub _getname {
-  my ($self, $typename) = @_;
-  return  $typename."_".$$.".fn"; 
-}
-
-sub _diskspace {
-  my ($self, $dir, $limit) =@_;
-  my $block_size; #could be used where block size != 512 ?
-  my $Gb = 1024 ** 3;
-  
-  open DF, "df $dir |" or $self->throw ("Can't open 'du' pipe");
-  while (<DF>) 
-    {
-      if ($block_size) 
-        {
-	  my @L = split;
-	  my $space_in_Gb = $L[3] * 512 / $Gb;
-	  return 0 if ($space_in_Gb < $limit);
-	  return 1;
-        } 
-      else 
-        {
-	  ($block_size) = /(\d+).+blocks/i
-	    || $self->throw ("Can't determine block size from:\n$_");
-        }
-    }
-  close DF || $self->throw("Error from 'df' : $!");
-}
 
 sub _deletefiles {
   my ($self, @files) = @_;
