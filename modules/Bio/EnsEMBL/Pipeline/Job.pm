@@ -111,6 +111,7 @@ sub create_by_analysis_inputId {
   my $job = Bio::EnsEMBL::Pipeline::Job->new
     ( -input_id => $inputId,
       -analysis => $analysis,
+      -retry_count => 0 
     );
   $job->make_filenames;
   return $job;
@@ -276,6 +277,7 @@ sub runRemote {
   if( $self->LSF_id == -1 ) {
     print STDERR ( "Couldnt submit ".$self->dbID." to LSF" );
   } else {
+    $self->retry_count( $self->retry_count + 1 );
     $self->set_status( "SUBMITTED" );
   }
 
@@ -353,23 +355,6 @@ sub write_object_file {
 	print(OUT $str);
 	close(OUT);
     }
-}
-
-=head2 LSF_id
-
-  Title   : LSF_id
-  Usage   : $self->LSF_id($id)
-  Function: Get/set method for the LSF id of the job
-  Returns : int
-  Args    : int
-
-=cut
-
-
-sub LSF_id {
-    my ($self,$arg) = @_;
-
-    return $self->_LSFJob->id($arg);
 }
 
 

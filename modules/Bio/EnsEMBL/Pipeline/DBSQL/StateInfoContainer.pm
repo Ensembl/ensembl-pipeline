@@ -143,47 +143,6 @@ sub list_inputId_class_by_start_count {
 }
 
 
-sub list_inputId_Analysis_start_count {
-  my $self = shift;
-  my ($start,$count) = @_;
-  my @result;
-  my @row;
-
-  my ( $class, $inputId, $sth );
-  my $anaAdaptor = $db->get_AnalysisAdaptor;
-
-  my $query = q{
-    SELECT inputId, class, analysisId
-      FROM InputIdAnalysis
-  ORDER BY inputId, class };
-
-  if( defined $start && defined $count ) {
-    $query .= "LIMIT $start,$count";
-  }
-  my $sth = $self->prepare( $query );
-
-  $sth->execute;
-
-  my $analist;
-
-  while( @row = $sth->fetchrow_array ) {
-    if(( $row[0] ne $inputId ) ||
-       ( $row[1] ne $class )) {
-      if( defined $inputId ) {
-	push( @result, ( $inputId, $analist ));
-      }
-      $inputId = $row[0];
-      $class = $row[1];
-      $analist = [ $anaAdaptor->fetch_by_dbID( $row[2] ) ];
-    } else {
-      push( @$analist, $anaAdaptor->fetch_by_dbID( $row[2] ));
-    }
-  }
-
-  push( @result, ( $inputId, $analist ));
-  return @result;
-}
-
 
 
 sub db {

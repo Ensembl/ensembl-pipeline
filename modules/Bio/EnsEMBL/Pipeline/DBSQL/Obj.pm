@@ -44,6 +44,7 @@ use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::Root::Object;
 
@@ -131,6 +132,30 @@ sub get_RuleAdaptor {
 
   return $self->{_RuleAdaptor};
 }
+
+=head2 get_StateInfoContainer
+
+ Title   : get_StateInfoContainer
+ Usage   : $db->get_StateInfoContainer
+ Function: 
+ Example : 
+ Returns : Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
+ Args    : 
+
+
+=cut
+
+sub get_StateInfoContainer {
+  my ($self) = @_;
+
+  if( ! defined $self->{_StateInfoContainer} ) {
+    $self->{_StateInfoContainer} = Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer->new
+      ( $self );
+  }
+
+  return $self->{_StateInfoContainer};
+}
+
 
 sub get_JobsByCurrentStatus {
     my ($self,$status) = @_;
