@@ -31,9 +31,9 @@ Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
 
 =head1 DESCRIPTION
 
-RepeatMasker takes a Bio::Seq (or Bio::PrimarySeq) object and runs RepeatMaskerHum on it. The
+RepeatMasker takes a Bio::Seq (or Bio::PrimarySeq) object and runs RepeatMasker on it. The
 resulting .out file is parsed to produce a set of feature pairs.
-Arguments can be passed to RepeatMaskerHum through the arguments() method. 
+Arguments can be passed to RepeatMasker through the arguments() method. 
 
 =head2 Methods:
 
@@ -41,7 +41,7 @@ Arguments can be passed to RepeatMaskerHum through the arguments() method.
 
 =item new($seq_obj)
 
-=item repeatmasker($path_to_RepeatMaskerHum)
+=item repeatmasker($path_to_RepeatMasker)
 
 =item workdir($directory_name)
 
@@ -87,7 +87,7 @@ use Bio::SeqIO;
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
     Function:   Initialises RepeatMasker object
     Returns :   a RepeatMasker Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for RepeatMaskerHum (-ARGS) 
+    Args    :   A Bio::Seq object (-CLONE), any arguments for RepeatMasker (-ARGS) 
 
 =cut
 
@@ -97,25 +97,22 @@ sub _initialize {
            
     $self->{_fplist} = [];           #an array of feature pairs
     $self->{_clone}  = undef;        #location of Bio::Seq object
-    $self->{_repeatmasker} = undef;  #location of RepeatMaskerHum script
+    $self->{_repeatmasker} = undef;  #location of RepeatMasker executable
     $self->{_workdir}   = undef;     #location of temp directory
     $self->{_filename}  =undef;      #file to store Bio::Seq object
     $self->{_results}   =undef;      #file to store results of RepeatMaskerHum
     $self->{_protected} =[];         #a list of files protected from deletion
-    $self->{_arguments} =undef;      #arguments for RepeatMaskerHum
+    $self->{_arguments} =undef;      #arguments for RepeatMasker
     
     my( $clone, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
     
     $self->clone($clone) if ($clone);       
+
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
     else
-    {   
-        eval 
-        { $self->repeatmasker($self->locate_executable('RepeatMaskerHum')); };
-        if ($@)
-        { $self->repeatmasker('/nfs/disk100/humpub/scripts/RepeatMaskerHum'); }
-    }
+    {   $self->repeatmasker($self->locate_executable('RepeatMaskerHum')); }
+    
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
@@ -139,7 +136,7 @@ sub clone {
         
         $self->clonename($self->clone->id);
         $self->filename($self->clone->id.".$$.seq");
-        $self->results($self->filename.".RepMask.out");
+        $self->results($self->filename.".out");
     }
     return $self->{_clone};
 }
@@ -156,8 +153,8 @@ sub clone {
 =head2 repeatmasker
 
     Title   :   repeatmasker
-    Usage   :   $obj->repeatmasker('~humpub/scripts/RepeatMaskerHum');
-    Function:   Get/set method for the location of RepeatMaskerHum script
+    Usage   :   $obj->repeatmasker('~humpub/scripts/RepeatMasker');
+    Function:   Get/set method for the location of RepeatMasker script
     Args    :   File path (optional)
 
 =cut
@@ -166,7 +163,7 @@ sub repeatmasker {
     my ($self, $location) = @_;
     if ($location)
     {
-        $self->throw("RepeatMaskerHum not found at $location: $!\n") 
+        $self->throw("RepeatMasker not found at $location: $!\n") 
                                                     unless (-e $location);
         $self->{_repeatmasker} = $location ;
     }
@@ -256,22 +253,19 @@ sub run_repeatmasker {
     my ($self) = @_;
     #run RepeatMaskerHum
     print "Running RepeatMasker\n";
-    system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename); 
-    #or $self->throw("Error running RepeatMasker: $!\n")
-    #open repeat predictions
-    open (REPOUT, "<".$self->results)
-            or $self->throw($self->results." not created by RepeatMaskerHum\n");   
-    close REPOUT;
+    $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
+        if (system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename)); 
 }
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
 sub parse_results {
     my ($self) = @_;
     my $filehandle;
+    #The results filename is different in RepeatMasker (8/14/2000) and RepeatMaskerHum
+    my $results = (-e $self->results) ? $self->results : $self->filename.".RepMask.out";
     if (ref ($self->results) !~ /GLOB/)
     {
-        open (REPOUT, "<".$self->results)
-            or $self->throw("Error opening ".$self->results."\n");
+        open (REPOUT, "<$results") or $self->throw("Error opening $results \n");
         $filehandle = \*REPOUT;
     }
     else
@@ -283,48 +277,57 @@ sub parse_results {
     #check if no repeats found
     if (<$filehandle> =~ /no repetitive sequences detected/)
     {
-        print STDERR "RepeatMaskerHum didn't find any repetitive sequences\n";
+        print STDERR "RepeatMasker didn't find any repetitive sequences\n";
         close $filehandle;
         return;
     }
     #extract values
-    my @output = <$filehandle>;
-    for (my $index = 2; $index < scalar(@output); $index++) #loop from 3rd line
+    
+    while (<$filehandle>)
     {  
-        my @element = split (/\s+/, $output[$index]);  
-        next if ($element[12-14] =~ /-/); # ignore features with negatives
-        my (%feat1, %feat2);
-        $feat1 {name} = $element[5];
-        $feat1 {score} = $element[1];
-        $feat1 {start} = $element[6];
-        $feat1 {end} = $element[7];
-        #The start and end values are in different columns depending on orientation!
-        if ($element[9] eq '+')
+        if (/\d+/) #ignore introductory lines
         {
-            $feat2 {strand} = 1;
-            $feat2 {start} = $element[12];     
-            $feat2 {end} = $element[13];
+            my @element = split (/\s+/, $_); 
+            # ignore features with negatives 
+            next if ($element[12-14] =~ /-/); 
+            my (%feat1, %feat2);
+            $feat1 {name} = $element[5];
+            $feat1 {score} = $element[1];
+            $feat1 {start} = $element[6];
+            $feat1 {end} = $element[7];
+            #The start and end values are in different columns depending 
+            #on orientation!
+            if ($element[9] eq '+')
+            {
+                $feat2 {strand} = 1;
+                $feat2 {start} = $element[12];     
+                $feat2 {end} = $element[13];
+            }
+            elsif ($element[9] eq 'C')
+            {
+                $feat2 {strand} = -1 ;
+                $feat2 {start} = $element[14];     
+                $feat2 {end} = $element[13];
+            }
+            $feat2 {name} = $element[10];
+            $feat2 {score} = $feat1 {score};
+            $feat1 {strand} = 1;
+            #misc
+            $feat2 {db} = undef;
+            $feat2 {db_version} = undef;
+            $feat2 {program} = 'RepeatMasker';
+            $feat2 {p_version}='1';
+            $feat2 {source}= 'RepeatMasker';
+            $feat2 {primary}= 'repeat';
+            $feat1 {source}= 'RepeatMasker';
+            $feat1 {primary}= 'repeat';
+            print STDERR "F1: ".$element[5]." ".$feat1 {start}." - "
+                         .$feat1{end}." Strand ".$feat1{strand}
+                         ." Score ".$feat1{score}." F2 ".$element[10]
+                         ." ".$feat2{start}." - ".$feat2{end}
+                         ." Strand ".$feat2{strand}."\n";
+            $self->create_repeat(\%feat1, \%feat2);
         }
-        elsif ($element[9] eq 'C')
-        {
-            $feat2 {strand} = -1 ;
-            $feat2 {start} = $element[14];     
-            $feat2 {end} = $element[13];
-        }
-        $feat2 {name} = $element[10];
-        $feat2 {score} = $element[1];
-        $feat1 {strand} = 1;
-        #misc
-        $feat2 {db} = undef;
-        $feat2 {db_version} = undef;
-        $feat2 {program} = 'RepeatMasker';
-        $feat2 {p_version}='1';
-        $feat2 {source}= 'RepeatMasker';
-        $feat2 {primary}= 'repeat';
-        $feat1 {source}= 'RepeatMasker';
-        $feat1 {primary}= 'repeat';
-        
-        $self->create_repeat(\%feat1, \%feat2);
     }
     close $filehandle;   
 }
