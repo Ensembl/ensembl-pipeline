@@ -63,7 +63,7 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$submission_id,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count) 
+    my ($adaptor,$dbID,$submission_id,$input_id,$cls,$analysis,$stdout,$stderr,$retry_count) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				SUBMISSION_ID
@@ -74,25 +74,25 @@ sub new {
 				STDERR
 				RETRY_COUNT
 				)],@args);
-
+    print STDERR "creating job with @args\n";
     $dbID    = -1 unless defined($dbID);
     $submission_id   = -1 unless defined($submission_id);
     $cls     = 'contig' unless defined($cls);
-
+    print STDERR "retry count is passed in as".$retry_count."\n";
     $input_id   || $self->throw("Can't create a job object without an input_id");
     $analysis   || $self->throw("Can't create a job object without an analysis object");
 
     $analysis->isa("Bio::EnsEMBL::Analysis") ||
 	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
 
-    $self->dbID             ($dbID);
-    $self->adaptor          ($adaptor);
-    $self->input_id         ($input_id);
-    $self->class            ($cls);
-    $self->analysis         ($analysis);
-    $self->stdout_file      ($stdout);
-    $self->stderr_file      ($stderr);
-    $self->retry_count      ($retry_count );
+    $self->dbID($dbID);
+    $self->adaptor($adaptor);
+    $self->input_id($input_id);
+    $self->class($cls);
+    $self->analysis($analysis);
+    $self->stdout_file($stdout);
+    $self->stderr_file($stderr);
+    $self->retry_count($retry_count);
     $self->submission_id           ($submission_id);
 
     return $self;
@@ -253,7 +253,7 @@ sub flush_runs {
   my $queue    = $LSF_params->{'queue'}   || undef;
   my $jobname  = $LSF_params->{'jobname'} || undef;
   my $bsub_opt = $LSF_params->{'bsub'}    || undef;
-  print STDERR "running flushruns\n";
+  print STDERR "running flushruns for job\n";
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
@@ -341,7 +341,9 @@ sub flush_runs {
           }
         }
 	$job->submission_id( $LSF->id );
+	print STDERR "retry count ".$job->retry_count."\n";
         $job->retry_count( $job->retry_count + 1 );
+	print STDERR "retry count ".$job->retry_count."\n";
         $job->set_status( "SUBMITTED" );
       }
       $adaptor->update(@jobs);
@@ -701,8 +703,11 @@ sub submission_id {
 
 sub retry_count {
   my ($self, $arg) = @_;
-  (defined $arg) &&
-    ( $self->{'_retry_count'} = $arg );
+  if(defined $arg) {
+    print STDERR "setting retry count to ".$arg."\n"; 
+    $self->{'_retry_count'} = $arg; 
+   }
+  print STDERR "retry count is = ".$self->{'_retry_count'}."\n";;
   $self->{'_retry_count'};
 }
 
@@ -714,7 +719,7 @@ sub remove {
   
 
    if( defined $self->adaptor ) {
-   $self->adaptor->remove( $self );
+     $self->adaptor->remove( $self );
    }
 }
 
