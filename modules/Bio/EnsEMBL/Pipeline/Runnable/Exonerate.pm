@@ -330,7 +330,14 @@ sub run_gapped {
   
   # finally we run the beast.
   my $resfile = "/tmp/exonerate_resfile_" . $$;
-  my $exonerate_command = $self->exonerate() . " -n true -A false --cdna $estfile --genomic $genfile >" . $resfile;
+  my $user_args;
+  if ($self->arguments) {
+    $user_args = $self->arguments;
+  } else {
+    $user_args = "";
+  }
+  my $exonerate_command = $self->exonerate() . " " . $user_args
+    . " -n true -A false --cdna $estfile --genomic $genfile >" . $resfile;
   
   eval {
     # better to do this as a pipe?
@@ -481,7 +488,13 @@ sub run_ungapped {
   # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
   # are got from $self->arguments.
 
-  my $command = $self->exonerate() . " " .  $self->arguments . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
+  my $user_args;
+  if ($self->arguments) {
+    $user_args = $self->arguments;
+  } else {
+    $user_args = "";
+  }
+  my $command = $self->exonerate() . " " . $user_args . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
 
   print STDERR "command is $command\n";
 
