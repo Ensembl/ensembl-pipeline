@@ -77,9 +77,6 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
-use Bio::PrimarySeq; 
-use Bio::Seq;
-use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
 
@@ -1113,10 +1110,8 @@ sub ungapped {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
-    #print STDERR "setting ungapped = ".$arg."\n";
     $self->{_ungapped} = $arg;
   }
-  #print STDERR "ungapped  is = ".$self->{_ungapped}."\n";
   return $self->{_ungapped};
 }
 
@@ -1143,36 +1138,18 @@ sub get_threshold_types {
 sub threshold_type {
   my ($self,$type) = @_;
 
-  my @types = $self->get_threshold_types;
+  my %allowed = map { $_, 1 } $self->get_threshold_types;
   
-  if (defined($type)) {
-    my $found = 0;
-    foreach my $allowed_type ($self->get_threshold_types) {
-      if ($type eq $allowed_type) {
-        $found = 1;
-      }
+  if ($type) {
+    unless (defined $allowed{$type}) {
+      $self->throw("Unallowed threshold type $type");
     }
-    if ($found == 0) {
-
-      $self->throw("Type [$type] is not an allowed type.  Allowed types are [@types]");
-    } else {
-      $self->{_threshold_type} = $type;
-    }
+    $self->{'_threshold_type'} = $type;
   }
-  return $self->{_threshold_type} || $types[0];
+
+  return $self->{'_threshold_type'};
 }
 
-
-sub get_pars {
-  my ($self) = @_;
-
-  if (!defined($self->{_hits})) {
-     $self->{_hits} = [];
-  }
-        
-  return @{$self->{_hits}};
-
-}
 
 sub blast_re {
   my ($self, $re_string) = @_;
