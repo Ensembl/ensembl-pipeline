@@ -88,13 +88,15 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
+  my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
+
   # makes it easier to run standalone if required
-  my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						     '-host'   => $GB_GW_DBHOST,
-						     '-user'   => $GB_GW_DBUSER,
-						     '-pass'   => $GB_GW_DBPASS,
-						     '-dbname' => $GB_GW_DBNAME,
-						    );
+  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						  '-host'   => $GB_GW_DBHOST,
+						  '-user'   => $GB_GW_DBUSER,
+						  '-pass'   => $GB_GW_DBPASS,
+						  '-dbname' => $GB_GW_DBNAME,
+						 ) if(!$output_db);
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
