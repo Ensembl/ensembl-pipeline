@@ -6,9 +6,6 @@ use Bio::EnsEMBL::Pipeline::Alignment::InformativeSites;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 use Bio::EnsEMBL::Pipeline::Alignment;
 use Bio::Seq;
-use Bio::Align::DNAStatistics;
-use Bio::AlignIO;
-use Bio::LocatableSeq;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info); 
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
@@ -129,7 +126,7 @@ sub _cluster_ests_with_genes {
       # EST vs gene distances
 
     foreach my $gene_id (@$genes_that_share_this_est){
-#print STDERR "Est-gene pairwise distance [".$gene_id."][".$est_id."] " . $self->_pairwise_distance($gene_id, $est_id, undef, 1) . "\n";
+
       my %pairwise_comparison = 
 	('type'     => 'est_vs_gene',
 	 'gene_ids'  => [$gene_id],
@@ -138,8 +135,6 @@ sub _cluster_ests_with_genes {
     }
 
       # Inter-gene distances
-
-#print STDERR "Genes that share EST [$est_id] : @$genes_that_share_this_est\n";
 
     for (my $i = 0; $i < scalar @$genes_that_share_this_est; $i++) {
       for (my $k = $i + 1; $k < scalar @$genes_that_share_this_est; $k++) {
@@ -176,38 +171,30 @@ sub _cluster_ests_with_genes {
     #     another.  THIS IS PRESENTLY NOT IMPLEMENTED.
 
 
-    my $closest_gene_id;
-    my @closely_related_genes;
+    my %closest_gene_ids;
     my $last_dist;
     foreach my $comparison (@est_gene_distances){
       if ($comparison->{type} eq 'est_vs_gene') {
-	$closest_gene_id = $comparison->{gene_ids}->[0];
-	last 
-	  if (defined $last_dist && 
-	      $last_dist < $comparison->{distance})
+	last if (defined $last_dist && 
+		 $comparison->{distance} > $last_dist);
+
+	$last_dist = $comparison->{distance};
+	$closest_gene_ids{$comparison->{gene_ids}->[0]}++;
+
       } elsif ($comparison->{type} eq 'inter_gene') {
-	push (@closely_related_genes, $comparison)
-	  unless (defined $last_dist && 
-		  $last_dist < $comparison->{distance})
+	last if (defined $last_dist && 
+		 $comparison->{distance} > $last_dist);
+
+	$closest_gene_ids{$comparison->{gene_ids}->[0]}++;
+	$closest_gene_ids{$comparison->{gene_ids}->[1]}++;
       }
-      $last_dist = $comparison->{distance}
     }
 
     throw("Failed to find most closely related gene.")
-      unless defined $closest_gene_id;
+      unless keys %closest_gene_ids;
 
-    push @{$ests_clustered_to_genes{$est_id}}, $closest_gene_id;
-
-    if (scalar @closely_related_genes == 0){
-      next
-    }
-
-    foreach my $gene_pair (@closely_related_genes){
-      if ($gene_pair->{gene_ids}->[0] eq $closest_gene_id) {
-	push @{$ests_clustered_to_genes{$est_id}}, $gene_pair->{gene_ids}->[1]
-      } elsif ($gene_pair->{gene_ids}->[1] eq $closest_gene_id) {
-	push @{$ests_clustered_to_genes{$est_id}}, $gene_pair->{gene_ids}->[0]
-      }
+    foreach my $close_gene_id (keys %closest_gene_ids){
+      push @{$ests_clustered_to_genes{$est_id}}, $close_gene_id;
     }
 
     throw("Erroneously didn't map EST to any gene.")
@@ -229,11 +216,11 @@ sub _calculate_gene_vs_est_distances {
     my ($distances, $sequence_order) = $self->_compute_distances($align);
 
     # Store result of first column of result matrix (ie. gene vs ests)
-print STDERR "Pairwise distances between gene sequence [$gene_id] and ESTs : \n";
+
     for (my $row = 1; $row < scalar @$distances; $row++) {
       next if $sequence_order->[$row-1] eq 'exon_sequence';
       next unless defined $distances->[$row];
-print STDERR "Pairwise distance : [" . $sequence_order->[$row-1] . "] : " . $distances->[$row]->[1] . "\n";
+
       $self->_pairwise_distance($gene_id, 
 				$sequence_order->[$row-1], 
 				$distances->[$row]->[1])
@@ -291,12 +278,9 @@ sub _calculate_intergene_distances {
   my ($distances, $sequence_order) = $self->_compute_distances($align);
 
   # Matrix of gene vs gene distances
-print STDERR "Gene-gene pairwise distances : \n";
   for (my $row = 1; $row < scalar @$distances; $row++) {
     next unless defined $distances->[$row];
     for (my $column = $row + 1; $column < scalar @{$distances->[$row]}; $column++){
-print STDERR "Pairwise distance : [". $sequence_order->[$column - 1] ."] [". 
-$sequence_order->[$row - 1] ."] : " . $distances->[$row]->[$column] . "\n";
       $self->_pairwise_distance($sequence_order->[$column - 1], 
 				$sequence_order->[$row - 1], 
 				$distances->[$row]->[$column])
@@ -328,7 +312,9 @@ sub _calculate_inf_site_gene_vs_est_distances {
       foreach my $other_gene (@{$self->_find_genes_by_est_id($est_id)}){
 	next if $other_gene eq $gene_id;
 	$gene_vs_gene{$gene_id}->{$other_gene}++;
-	if ($gene_vs_gene{$gene_id}->{$other_gene} == 1){
+	$gene_vs_gene{$other_gene}->{$gene_id}++;
+	if (($gene_vs_gene{$gene_id}->{$other_gene} + 
+	     $gene_vs_gene{$other_gene}->{$gene_id}) == 2){
 	  push @gene_pair, [$gene_id, $other_gene];
 	}
       }
@@ -337,6 +323,8 @@ sub _calculate_inf_site_gene_vs_est_distances {
 
   # Foreach pair, find informative sites in gene and ESTs
   # and calculate the informative site distances.
+
+  my %seen_genes;
 
   foreach my $gene_pair (@gene_pair){
 
@@ -362,50 +350,21 @@ sub _calculate_inf_site_gene_vs_est_distances {
 
     my $hr_inf_site_aligns = $inf_sites->informative_sites;
 
-    # Calculate and store inter-gene distances from informative 
-    # site alignments.  The gene-sequence informative sites can
-    # be extracted from the gene specific evidence alignments
-    # and added to a new alignment.
+    # When calculating gene-gene distances from the informative
+    # sites for a gene pair, the distance by definition must be 1,
+    # meaning complete divergence.  Hence, we may as well just set
+    # this value manually.
 
-      # Extract relevant exon sequences from alignment.
-
-    my $gene_alignment = Bio::EnsEMBL::Pipeline::Alignment->new();
-
-  GENE_ID:
-    foreach my $gene_id (($gene_pair->[0], $gene_pair->[1])){
-      my $inf_site_align = $hr_inf_site_aligns->{$gene_id};
-
-      foreach my $align_seq (@{$inf_site_align->fetch_AlignmentSeqs}){
-	
-	if ($align_seq->name eq 'exon_sequence'){
-	  $align_seq->name($gene_id);
-	  $gene_alignment->add_sequence($align_seq);
-	  next GENE_ID
-	}
-      }
-    }
-
-      # Compute distances.
-
-    my ($distances, $sequence_order) = 
-      $self->_compute_distances($gene_alignment);
-
-      # Store newly computed distances.
-
-    for (my $row = 1; $row < scalar @$distances; $row++) {
-      next unless defined $distances->[$row];
-      for (my $column = 1; $column < scalar @{$distances->[$row]}; $column++){
-	$self->_pairwise_distance($sequence_order->[$column - 1], 
-				  $sequence_order->[$row - 1], 
-				  $distances->[$row]->[$column],
-				  1);
-      }
-    }
+    $self->_pairwise_distance($gene_pair->[0], $gene_pair->[1], 1, 1);
 
     # Calculate and store gene-est distances from informative 
     # site alignments.
 
     foreach my $gene_id (@$gene_pair){
+
+      next if $seen_genes{$gene_id};
+      $seen_genes{$gene_id}++;
+
       my ($distances, $sequence_order) = 
 	$self->_compute_distances($hr_inf_site_aligns->{$gene_id});
 
@@ -414,9 +373,9 @@ sub _calculate_inf_site_gene_vs_est_distances {
 	for (my $column = 1; $column < scalar @{$distances->[$row]}; $column++){
 	  my $est_id;
 
-	  if ($sequence_order->[$row - 1] eq $gene_id){
+	  if ($sequence_order->[$row - 1] eq 'exon_sequence'){
 	    $est_id = $sequence_order->[$column - 1];
-	  } elsif ($sequence_order->[$column - 1] eq $gene_id){
+	  } elsif ($sequence_order->[$column - 1] eq 'exon_sequence'){
 	    $est_id = $sequence_order->[$row - 1];
 	  } else {
 	    next
@@ -482,38 +441,42 @@ sub _compute_distances {
   return (\@distances, \@sequence_order);
 }
 
+#use Bio::Align::DNAStatistics;
+#use Bio::AlignIO;
+#use Bio::LocatableSeq;
+#
 #sub _compute_distances {
 #  my ($self, $align) = @_;
-
+#
 #  # Convert this alignment into a bioperl AlignI object.
 #  my $bp_align = Bio::SimpleAlign->new();
-
+#
 #  my @sequence_order;
 #  foreach my $align_seq (@{$align->fetch_AlignmentSeqs}){
-
-
+#
+#
 #    # Skip the genomic sequence in our alignment - use the exon
 #    # sequence for calculating distance
 #    next if $align_seq->name eq 'genomic_sequence';
-
+#
 #    my $locatable_seq = Bio::LocatableSeq->new(
 #			    -id       => $align_seq->name,
 #                            -seq      => $align_seq->seq,
 #                            -start    => 1,
 #                            -end      => length($align_seq->seq),
 #                            -alphabet => 'dna');
-
+#
 #    $bp_align->add_seq($locatable_seq);
-
+#
 #    push @sequence_order, $align_seq->name;
 #  }
-
+#
 #  # Use bioperl object to calculate our pairwise sequence distances.
 #  my $dna_stat = Bio::Align::DNAStatistics->new;
-
+#
 #  my $distances = $dna_stat->distance(-align  => $bp_align,
 #                                      -method => 'Kimura');
-
+#
 #  return ($distances, \@sequence_order);
 #}
 
@@ -741,7 +704,11 @@ sub _pairwise_distance {
   my $dist_set = $inf ? 'inf' : 'norm';
 
   if (defined $distance){
-#print STDERR "Storing [$dist_set][$id1][$id2][$distance]\n";
+    print "Storing [$dist_set][$id1][$id2][$distance]\n";
+    warning("Trying to store an already stored value [" . $dist_set . 
+	    "][" . $id1 . "][" . $id2 . "][" . $distance . "]")
+      if defined $self->{_pairwise_distances}->{$dist_set}->{$id1}->{$id2};
+
     $self->{_pairwise_distances}->{$dist_set}->{$id1}->{$id2} = $distance;
     return $distance
   }
@@ -914,8 +881,5 @@ sub _seqfetcher {
 
   return $self->{_seqfetcher}
 }
-
-
-
 
 1;
