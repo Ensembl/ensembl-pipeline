@@ -60,7 +60,7 @@ use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -68,6 +68,12 @@ use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
+
+  if(!defined $self->seqfetcher) {
+    # will look for pfetch in $PATH - change this once PipeConf up to date
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    $self->seqfetcher($seqfetcher);
+  }
 
   # input_id and dbobj are handled in RunnableDB new
   return $self; 
@@ -139,16 +145,20 @@ sub fetch_input{
   
   $self->vc($vc);
   
-  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( -genomic => $vc->primary_seq,
-								    -ids => [ $pid ] );
- 
-  # this won;t run on the farm BUGGER 
-  #  my $cdna = $seqfetcher->run_efetch($dnaid);
-    my $cdna = $seqfetcher->run_pfetch($dnaid);
-
-  my $ex = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new( -genomic => $vc->primary_seq,
-							     -est => [$cdna],
-#							     -exonerate => "/work2/gs2/gs2/bin/exonerate-0.2"
+  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc->primary_seq,
+								    '-ids'        => [ $pid ] ,
+								    '-seqfetcher' => $self->seqfetcher);
+  my $cdna;
+  eval{
+    $cdna = $self->seqfetcher->get_Seq_by_acc($dnaid);
+  };
+  if($@) {
+    $self->throw("problem fetching [$dnaid]: [$@]\n");
+  }
+  
+  my $ex = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new( '-genomic'   => $vc->primary_seq,
+							     '-est'       => [$cdna],
+#							     '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.2"
 							     );
 
 
