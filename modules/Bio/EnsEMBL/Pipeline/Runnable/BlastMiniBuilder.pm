@@ -174,6 +174,7 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
 
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
 
+      
       # Determine the extreme start and ends of each gene
       # cluster.  Decide on positions to split the genomic
       # sequence for genomewise - mid-way between 
@@ -219,22 +220,29 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
 	# may be returned.  Another way of looking at this is
 	# that we make a genomic sequence where the regions 
 	# flanking our gene are masked.
-	my $string_seq = ('N' x ($cluster_start - 1)) . 
-	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
-		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
-
-#print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
-
-	my $genomic_subseq = Bio::EnsEMBL::Slice->new
-    (
-     -seq => $string_seq,
-     -seq_region_name  => $self->genomic_sequence->seq_region_name,
-     -start => 1,
-     -end => length($string_seq),
-     -coord_system => $self->genomic_sequence->coord_system,
-    );
+  #	my $string_seq = ('N' x ($cluster_start - 1)) . 
+  #	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
+  #		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
+  
+  #print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
+  
+  #print "Length of string_seq = " . length($string_seq) . "\n";
+  
+  #	my $genomic_subseq = Bio::EnsEMBL::Slice->new
+  #    (
+  #     -seq => $string_seq,
+  #     -seq_region_name  => $self->genomic_sequence->seq_region_name,
+  #     -start => 1,
+  #     -end => length($string_seq),
+  #     -coord_system => $self->genomic_sequence->coord_system,
+  #    );
   #print STDERR "Have genomic subseq ".$genomic_subseq->name."\n";
-	my $runnable = $self->make_object($genomic_subseq, $unfiltered_partitioned_features{$seqname});
+  
+  #	my $runnable = $self->make_object($genomic_subseq, $unfiltered_partitioned_features{$seqname});
+  
+	my $runnable = $self->make_object($self->genomic_sequence, $unfiltered_partitioned_features{$seqname}, 
+                                          $cluster_start, $cluster_end);
+
 	push (@runnables, $runnable);
 
 	$runnable_featids{$seqname}++;
@@ -567,6 +575,7 @@ sub check_coverage {
 
   my $tally = 0;
 
+  #print "Have " . scalar(@score_keeper) . " 1s and 0s!\n";
   foreach my $score (@score_keeper){
     $tally++ if $score;
   }

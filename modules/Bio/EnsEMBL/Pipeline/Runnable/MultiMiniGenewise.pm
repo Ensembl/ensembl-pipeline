@@ -47,7 +47,8 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@_);    
            
-    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, $endbias, $gap, $extension, $matrix, $exon_padding, $minimum_feature_length) = 
+    my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, 
+        $endbias, $gap, $extension, $matrix, $minimum_feature_length, $cluster_start, $cluster_end) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
@@ -58,8 +59,9 @@ sub new {
                             GAP  
                             EXTENSION  
                             MATRIX  
-                            EXON_PADDING
                             MINIMUM_FEATURE_LENGTH
+                            CLUSTER_START
+                            CLUSTER_END
 			   )],
 			@args);
 
@@ -71,16 +73,21 @@ sub new {
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") unless $seqfetcher->isa("Bio::DB::RandomAccessI");
     
-    $self->genomic_sequence($genomic)           if defined($genomic);
-    $self->seqfetcher($seqfetcher)              if defined($seqfetcher);
-    $self->endbias($endbias)                    if defined($endbias);
+    $self->genomic_sequence($genomic)       if defined($genomic);
+    $self->seqfetcher($seqfetcher)          if defined($seqfetcher);
+    $self->endbias($endbias)                if defined($endbias);
     $self->gap($gap)                        if defined($gap);
-    $self->extension($extension)                  if defined($extension);
-    $self->matrix($matrix)                     if defined($matrix);
-    $self->features($features)                  if defined($features);
-    $self->_minimum_intron($minimum_intron)     if defined($minimum_intron);
-    $self->_exon_padding($exon_padding)         if defined($exon_padding);
+    $self->extension($extension)            if defined($extension);
+    $self->matrix($matrix)                  if defined($matrix);
+    $self->features($features)              if defined($features);
+    $self->_minimum_intron($minimum_intron) if defined($minimum_intron);
+    $self->_exon_padding($exon_padding)     if defined($exon_padding);
+
     $self->_minimum_feature_length($minimum_feature_length)   if defined($minimum_feature_length);
+
+    $self->cluster_start($cluster_start)    if defined($cluster_start);
+    $self->cluster_end($cluster_end)        if defined($cluster_end);
+
     #print STDERR @$features." have be passed into MultiMiniGenewise\n";
     return $self;
   }
@@ -268,11 +275,14 @@ sub get_Sequence {
 
 sub run {
   my ($self) = @_;
-
   my ($fhash,$ids) = $self->get_all_features_by_id;
+
   #print STDERR "have ".@$ids." ids\n";
+
   my $failed_count = 0;
+
   foreach my $id (@$ids) {
+
     my @features = @{$fhash->{$id}};
 
     printf STDERR "Doing $id (%d feats)\n", scalar(@features);
@@ -282,79 +292,109 @@ sub run {
     my @forward;
     my @reverse;
     if ($pepseq) {
+
+      my $genomic_subseq;
+      if (defined($self->cluster_end)) {
+        my $string_seq = ('N' x ($self->cluster_start - 1)) .
+                         $self->genomic_sequence->subseq($self->cluster_start, $self->cluster_end) .
+                         ('N' x ($self->genomic_sequence->length - ($self->cluster_end + 1)));
+  
+        $genomic_subseq = Bio::EnsEMBL::Slice->new (
+                   -seq => $string_seq,
+                   -seq_region_name  => $self->genomic_sequence->seq_region_name,
+                   -start => 1,
+                   -end => length($string_seq),
+                   -coord_system => $self->genomic_sequence->coord_system,
+                   );
+      } else {
+        $genomic_subseq = $self->genomic_sequence;
+      }
+
+
+
       foreach my $f (@features){
-        if($f->strand == 1){
+        if ($f->strand == 1) {
           push(@forward, $f);
-        }elsif($f->strand == -1){
+        } elsif($f->strand == -1) {
           push(@reverse, $f);
-        }else{
+        } else {
           $self->throw("unstranded feature not much use for gene building\n") 
         }
       }
       if(scalar(@forward)){
-	my @extras = $self->_find_extras(@forward);
-	#print STDERR "Number of features       = ".scalar(@forward)."\n";
-	#print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
-	if(@extras){
-	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
-									     -genomic => $self->genomic_sequence,
-									     -protein => $pepseq,
-									     -features=> \@forward,
-									     -terminal_padding => $self->_terminal_padding,
-									     -minimum_intron   => $self->_minimum_intron,
-									     -exon_padding     => $self->_exon_padding,
-									     -endbias => $self->endbias,
-									     -gap              => $self->gap,
-									     -extension        => $self->extension,
-									     -matrix           => $self->matrix,
-									    );
-	  
-	  $runnable->run;
-	  ##print STDERR "MiniGenewise output " . $runnable->output . "\n";
-	
-	  push(@{$self->{_output}},$runnable->output);
-	}else{
-	  print STDERR $id." had no extra features on the forward strand\n";
-    
-	}
+        my @extras = $self->_find_extras(@forward);
+
+        #print STDERR "Number of features       = ".scalar(@forward)."\n";
+        #print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+
+        if (@extras) {
+          my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
+                                     -genomic          => $genomic_subseq,
+                                     -protein          => $pepseq,
+                                     -features         => \@forward,
+                                     -terminal_padding => $self->_terminal_padding,
+                                     -minimum_intron   => $self->_minimum_intron,
+                                     -exon_padding     => $self->_exon_padding,
+                                     -endbias          => $self->endbias,
+                                     -gap              => $self->gap,
+                                     -extension        => $self->extension,
+                                     -matrix           => $self->matrix,
+                                    );
+          $runnable->run;
+
+          ##print STDERR "MiniGenewise output " . $runnable->output . "\n";
+        
+          if (defined($self->cluster_end)) {
+            $self->to_genomic_slice($runnable->output);
+          }
+            
+          push(@{$self->{_output}},$runnable->output);
+
+        } else {
+          print STDERR $id." had no extra features on the forward strand\n";
+        }
       }
 
-      if(scalar(@reverse)){
-	print STDERR "Number of features       = ".scalar(@reverse)."\n";
-	my @extras = $self->_find_extras(@reverse);
-#	print STDERR "Number of features       = ".scalar(@reverse)."\n";
-#	print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
-	if(@extras){
-	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
-									     -genomic => $self->genomic_sequence,
-									     -protein => $pepseq,
-									     -features=> \@reverse,
-									     -terminal_padding   => $self->_terminal_padding,
-									     -minimum_intron => $self->_minimum_intron,
-									     -exon_padding   => $self->_exon_padding,
-									     -endbias => $self->endbias,
-									     -gap            => $self->gap,
-									     -extension      => $self->extension,
-									     -matrix         => $self->matrix,
-									    );
-	
-	  $runnable->run;
-	  #print STDERR "MiniGenewise output " . $runnable->output . "\n";
-	
-	  push(@{$self->{_output}},$runnable->output);
-	}else{
-	  print STDERR $id." had no extra features on the reverse strand\n";
-	 
-	}
+      if (scalar(@reverse)) {
+        print STDERR "Number of features       = ".scalar(@reverse)."\n";
+
+        my @extras = $self->_find_extras(@reverse);
+
+#        print STDERR "Number of features       = ".scalar(@reverse)."\n";
+#        print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+
+        if (@extras) {
+          my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
+                                                -genomic          => $genomic_subseq,
+                                                -protein          => $pepseq,
+                                                -features         => \@reverse,
+                                                -terminal_padding => $self->_terminal_padding,
+                                                -minimum_intron   => $self->_minimum_intron,
+                                                -exon_padding     => $self->_exon_padding,
+                                                -endbias          => $self->endbias,
+                                                -gap              => $self->gap,
+                                                -extension        => $self->extension,
+                                                -matrix           => $self->matrix,
+                                                );
+        
+          $runnable->run;
+          #print STDERR "MiniGenewise output " . $runnable->output . "\n";
+
+          if (defined($self->cluster_end)) {
+            $self->to_genomic_slice($runnable->output);
+          }
+        
+          push(@{$self->{_output}},$runnable->output);
+        } else {
+          print STDERR $id." had no extra features on the reverse strand\n";
+        }
       }
-      
     } else {
-      $self->warn("Can't fetch sequence for " 
-                  . $features[0]->hseqname . "\n");
+      $self->warn("Can't fetch sequence for " . $features[0]->hseqname . "\n");
       $failed_count++;
     }
-  
   }
+
   if($failed_count == @$ids){
     $self->throw("Can't find any sequences for the ids which match ".
                  $self->genomic_sequence->name); 
@@ -364,6 +404,25 @@ sub run {
 }
 
 
+sub to_genomic_slice {
+  my ($self, @output) = @_;
+
+  foreach my $g (@output) {
+    $g->slice($self->genomic_sequence);
+
+    foreach my $t (@{$g->get_all_Transcripts}) {
+      $t->slice($self->genomic_sequence);
+
+      foreach my $e (@{$t->get_all_Exons}) {
+        $e->slice($self->genomic_sequence);
+
+        foreach my $sf (@{$e->get_all_supporting_features}) {
+          $sf->slice($self->genomic_sequence);
+        }
+      }
+    }
+  }
+}
 
 
 =head2 _find_extras
@@ -376,8 +435,6 @@ sub run {
   Example   : @new_features = $self->_find_extras(@features);
 
 =cut
-
-
 
 #
 # checks feature length is long enough then that feature doesn't overlapped with any of output evidence from genewise 
@@ -421,9 +478,6 @@ sub _find_extras {
 }
 
 
-
-
-
 =head2 accessors this is pod for the simple acessors
 
   Arg [1]   : int (value to be set)
@@ -434,10 +488,6 @@ sub _find_extras {
   Example   : $self->_minimum_intron;
 
 =cut
-
-
-
-
 
 sub _minimum_intron {
   my ($self,$arg) = @_;
@@ -531,6 +581,23 @@ sub matrix {
   return $self->{'_matrix'};
 }
 
+sub cluster_start {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{_cluster_start} = $arg;
+  }
+  return $self->{_cluster_start};
+}
+
+sub cluster_end {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{_cluster_end} = $arg;
+  }
+  return $self->{_cluster_end};
+}
 
 1;
 
