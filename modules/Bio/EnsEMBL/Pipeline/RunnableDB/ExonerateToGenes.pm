@@ -321,7 +321,9 @@ sub make_genes{
 	my $gene       = Bio::EnsEMBL::Gene->new();
 	$gene->analysis($self->analysis);
 	$gene->type($self->analysis->gff_feature);
-        $gene->add_Transcript($tran);
+        
+	my $checked_transcript = $self->check_splice_sites( $tran );
+	$gene->add_Transcript($checked_transcript);
 	push( @genes, $gene);
     }
     return @genes;
@@ -392,7 +394,7 @@ sub get_chr_names{
   my ($self) = @_;
   my @chr_names;
   
-  print STDERR "featching chromosomes info\n";
+  print STDERR "fetching chromosomes info\n";
   my $chr_adaptor = $self->db->get_ChromosomeAdaptor;
   my @chromosomes = @{$chr_adaptor->fetch_all};
   
@@ -401,6 +403,166 @@ sub get_chr_names{
   }
   print STDERR "retrieved ".scalar(@chr_names)." chromosome names\n";
   return @chr_names;
+}
+############################################################
+
+=head2 check_splice_sites
+
+We want introns of the form:
+    
+    ...###GT...AG###...   ...###AT...AC###...   ...###GC...AG###...
+    
+if we see introns like these:
+    
+    ...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+
+we need to set the strand to the opposite. This can happen when 
+an est/cdna is annotated backwards in the db, if blat reverse 
+complement it to map it, it will find exactily the same exon 
+sequence of an homolog annotated forward, but in the opposite 
+strand. As blat does not reconfirm splice sites like est2genome,
+we need to do it ourselves. Exonerate will do this work for you.
+
+=cut
+
+sub check_splice_sites{
+  my ($self,$transcript) = @_;
+  $transcript->sort;
+  
+  #print STDERR "checking splice sites in transcript:\n";
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+  
+  my $strand = $transcript->start_Exon->strand;
+  my @exons  = @{$transcript->get_all_Exons};
+  
+  my $introns  = scalar(@exons) - 1 ; 
+  if ( $introns <= 0 ){
+    return $transcript;
+  }
+  
+  my $correct  = 0;
+  my $wrong    = 0;
+  my $other    = 0;
+  
+  # all exons in the transcripts are in the same seqname coordinate system:
+  my $slice = $transcript->start_Exon->contig;
+  
+  if ($strand == 1 ){
+    
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+      my $upstream_site;
+      my $downstream_site;
+      eval{
+	$upstream_site = 
+	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+	$downstream_site = 
+	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+      };
+      unless ( $upstream_site && $downstream_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+      
+      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+      ## good pairs of upstream-downstream intron sites:
+      ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
+      
+      ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
+      ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
+      
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+      }
+      else{
+	$other++;
+      }
+	} # end of INTRON
+  }
+  elsif ( $strand == -1 ){
+    
+    #  example:
+    #                                  ------CT...AC---... 
+    #  transcript in reverse strand -> ######GA...TG###... 
+    # we calculate AC in the slice and the revcomp to get GT == good site
+    
+  INTRON:
+    for (my $i=0; $i<$#exons; $i++ ){
+      my $upstream_exon   = $exons[$i];
+      my $downstream_exon = $exons[$i+1];
+      my $upstream_site;
+      my $downstream_site;
+      my $up_site;
+      my $down_site;
+      eval{
+	$up_site = 
+	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+	$down_site = 
+	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+      };
+      unless ( $up_site && $down_site ){
+	print STDERR "problems retrieving sequence for splice sites\n$@";
+	next INTRON;
+      }
+      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
+      
+      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+	$correct++;
+      }
+      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
+	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
+	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
+	$wrong++;
+      }
+      else{
+	$other++;
+      }
+      
+    } # end of INTRON
+  }
+  unless ( $introns == $other + $correct + $wrong ){
+    print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
+  }
+  if ( $wrong > $correct ){
+    print STDERR "changing strand\n";
+    return  $self->change_strand($transcript);
+  }
+  else{
+    return $transcript;
+  }
+}
+
+############################################################
+
+=head2 change_strand
+
+    this method changes the strand of the exons
+
+=cut
+
+sub change_strand{
+    my ($self,$transcript) = @_;
+    my $original_strand = $transcript->start_Exon->strand;
+    my $new_strand      = (-1)*$original_strand;
+    foreach my $exon (@{$transcript->get_all_Exons}){
+	$exon->strand($new_strand);
+    }
+    $transcript->sort;
+    return $transcript;
 }
 
 ############################################################
