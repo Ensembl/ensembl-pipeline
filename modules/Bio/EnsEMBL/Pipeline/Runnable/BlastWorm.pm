@@ -19,10 +19,9 @@
   my $query = new Bio::Seq(-file   => $clonefile,
 			   -format => 'Fasta');
 
-  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
+  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::BlastWorm->new 
     ('-clone'          => $query,
      '-program'        => 'wublastp' or '/usr/local/pubseq/bin/wublastp',
-     '-analysisid'     => $analysisId,
      '-database'       => 'swissprot',
      '-threshold'      => 1e-3,
      '-threshold_type' => 'PVALUE'
@@ -38,7 +37,7 @@
 
   # If you have blast runs lying around that need parsing, you can do
   open(BLAST,"<blast.out");
-  my @featurepairs = Bio::EnsEMBL::Pipeline::Runnable::Blast->parse_results(\*BLAST);
+  my @featurepairs = Bio::EnsEMBL::Pipeline::Runnable::BlastWorm->parse_results(\*BLAST);
   close(BLAST);
 
 
@@ -75,8 +74,8 @@ use Bio::Tools::BPlite;
 =head2 new
 
  Title    : new
- Usage    : my $seg =  Bio::EnsEMBL::Pipeline::Runnable::Blastp->new ()
- Function : initialises Blastp object
+ Usage    : my $seg =  Bio::EnsEMBL::Pipeline::Runnable::BlastpWorm->new ()
+ Function : initialises BlastWorm object
  Returns  : a BlastWorm object
  Args     : 
  Throws   :
@@ -100,10 +99,9 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of seg run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $program, $analysisid, $database,
+    my ($clone, $program, $database,
         $threshold,  $threshold_type, $options, $filter) = $self->_rearrange([qw(CLONE 
                                                                                  PROGRAM
-                                                                                 ANALYSISID
                                                                                  DATABASE
                                                                                  THRESHOLD
                                                                                  THRESHOLD_TYPE
@@ -112,7 +110,6 @@ sub new {
                                                                               @args);
   
     $self->clone ($clone) if ($clone);       
-    $self->analysisid ($analysisid) if ($analysisid);
     $self->program ($self->find_executable ($program));
   
     if ($database) {
@@ -159,27 +156,6 @@ sub clone {
     }
     return $self->{'_sequence'};
 }
-
-
-=head2 analysisid
-
- Title    : analysisid
- Usage    : $self->analysisid ($analysisid);
- Function : get/set method for the analysisId
- Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
- Throws   :
-
-=cut
-
-sub analysisid {
-    my $self = shift;
-    if (@_) {
-        $self->{'_analysisid'} = shift;
-    }
-    return $self->{'_analysisid'};
-} 
 
 
 =head2 program
