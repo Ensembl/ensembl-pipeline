@@ -90,7 +90,7 @@ BEGIN {
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
     (-query    => $seq,
      -database => $database,
-     -options   => 'T=2');
+     -options   => 'C=2 K=3000 H=2200');
 
     Function:   Initialises Blastz object
     Returns :   a Blastz Object
@@ -110,18 +110,17 @@ sub new {
     $self->{'_filename'}  = undef;     # file to store Bio::Seq object
     $self->{'_program'}   = "blastz";     # location of Blast
     $self->{'_database'}  = undef;     # name of database filename
-    $self->{'_options'}   = "";     # arguments for blast
+    $self->{'_options'}   = "";     # options for blastz
     $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
-
     $self->{'_workdir'}   = "/tmp";     # location of temp directory
     $self->{'_results'}   = $self->{'_workdir'}."/results.".$$; # location of result file
 
     # Now parse the input options and store them in the object
-    my($query,$program, $database,$options) = $self->_rearrange([qw(QUERY 
-								    PROGRAM 
-								    DATABASE 
-								    OPTIONS)], 
-								@args);
+    my($program,$query,$database,$options) = $self->_rearrange([qw(PROGRAM
+								   QUERY 
+								   DATABASE 
+								   OPTIONS)], 
+							       @args);
 
     if ($query) {
       $self->query($query);
@@ -230,21 +229,21 @@ sub database {
   my($self, $value) = @_;    
   
   if (defined $value) {
-    if (!ref($value)){
+
+     if (! ref($value)) {
       # assume it's a filename - check the file exists
       $self->throw("[$value] : file does not exist\n") unless -e $value;
       $self->genfilename($value);
       $self->{'_database'} = $value;
     }
-    elsif( $value->isa("Bio::PrimarySeqI") ){
-      $self->{'_database'} = $value;
+    elsif ($value->isa("Bio::PrimarySeqI")) {
       my $filename = "/tmp/genfile_$$.fn";
       $self->genfilename($filename);
       my $genOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => "Fasta")
-      or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
+	or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
     
-      $self->throw ("problem writing genomic seqeunce to $filename\n" ) unless $genOutput->write_seq($value);
-      
+      $self->throw ("problem writing genomic sequence to $filename\n" ) unless $genOutput->write_seq($value);
+      $self->{'_database'} = $self->genfilename;
     }
     else {
       $self->throw("$value is neither a Bio::Seq  nor a filename\n");
