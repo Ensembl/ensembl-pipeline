@@ -47,23 +47,43 @@ sub new {
   my $self = $class->SUPER::new(@args);    
   
   my( $query_seq,
+      $db,
       $firstef_dir,
       $param_dir,
-      $work_dir) = $self->_rearrange([qw(QUERY 
+      $workdir) = $self->_rearrange([qw(QUERY
+					 DB
 					 FIRSTEF_DIR
 					 PARAM_DIR
 					 WORK_DIR)],
 				     @args);
   
   $self->_query_seq($query_seq)     if $query_seq;
+  $self->_db($db)                   if $db;
   $self->_firstef_dir($firstef_dir) if $firstef_dir;
   $self->_param_dir($param_dir)     if $param_dir;
-  $self->work_dir($work_dir)        if $work_dir;
+  $self->workdir($workdir)          if $workdir;
+
+  # Derive our analysis
   
-  return $self; # success - we hope!
+  my $analysis_adaptor = $self->_db->get_AnalysisAdaptor;
+  my $analysis = $analysis_adaptor->fetch_by_logic_name('firstef');
+  $self->_analysis($analysis);
+
+
+  return $self
 }
 
 ### Internal methods
+
+sub DESTROY {
+  my $self = shift;
+
+  print "Cleaning up\n";
+
+  $self->deletefiles;
+
+}
+
 
 sub _query_seq {
   my $self = shift;
@@ -86,6 +106,27 @@ sub _query_seq {
   return $self->{_query_seq}
 }
 
+sub _db {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_dbadaptor} = shift;
+  }
+
+  return $self->{_dbadaptor}
+}
+
+sub _analysis {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_analysis} = shift;
+  }
+
+  return $self->{_analysis}
+}
+
+
 sub _write_seqs_for_firstef {
   my $self = shift;
 
@@ -101,6 +142,7 @@ sub _write_seqs_for_firstef {
 
   $self->_seqfile($seqfile);
 
+  $self->file($seqfile); # For final cleanup
 
   # Write the listfile that firstef likes to use.
 
@@ -108,12 +150,13 @@ sub _write_seqs_for_firstef {
 
   open(LISTFILE, ">$listfile") or die "Cant write to file [$listfile]";
 
-  print LISTFILE "$listfile   -1500\n";
+  print LISTFILE "$seqfile   -1500\n";
 
   close(LISTFILE);
 
   $self->_listfile($listfile);
 
+  $self->file($listfile); # For final cleanup
 
   # While we are at it, generate the outfile name.
   # This filename is not something that the user can control.
@@ -122,6 +165,8 @@ sub _write_seqs_for_firstef {
   my $outfile = $listfile . '_out';
 
   $self->_outfile($outfile);
+
+  $self->file($outfile); # For final cleanup
 
   return 1
 }
@@ -188,8 +233,14 @@ sub _firstef {
     
     ### Fiddling around to get the correct executable for the operating system
 
-    my $hosttype = `echo $HOSTTYPE`;
+    open(HOSTTYPE, "echo \$HOSTTYPE |") 
+      or die "Problem determining the runtime hosttype";
+
+    my $hosttype = <HOSTTYPE>;
+    chomp $hosttype;
     
+    close (HOSTTYPE);
+
     $self->{_firstef} = $self->_firstef_dir . "/firstef.$hosttype";
     
     $self->throw("firstef not found at " . $self->{_firstef} . ": $!\n" .
@@ -214,6 +265,8 @@ sub _param_dir {
     
     $self->{_param_dir} = shift;
     
+    $self->{_param_dir} .= '/' unless $self->{_param_dir} =~ /\/$/;
+
     return unless $self->{_param_dir}; # Allows us to set to undef.
 
     my @known_param_files = ('donor.3mer_wts_GChighDown',
@@ -247,9 +300,11 @@ sub _param_dir {
 
     foreach my $param_file (@known_param_files) {
       
-      push (@missing_files, $param_file) unless (-e $self->{_param_dir} . "/$param_file");
-      
-      print "Missing parameter file : " . $self->{_param_dir} . "/$param_file\n";
+      unless (-e $self->{_param_dir} . "/$param_file"){
+	push (@missing_files, $param_file);
+
+	print "Missing parameter file : " . $self->{_param_dir} . "/$param_file\n";
+      }
     }
     
     $self->throw("The above parameter files are missing.") if @missing_files;
@@ -302,14 +357,13 @@ sub run_firstef {
   my $command = $self->_firstef . ' 1500 ' . $self->_listfile . ' ' . 
     $self->_param_dir . ' 0 0.4 0.4 0.5';
 
+  print $command . "\n";
+
   $self->throw("A fatal error was encountered while running firstef.") 
     if system($command);
 
   return 1
 }
-
-
-
 
 
 sub parse_results {
@@ -334,21 +388,25 @@ sub parse_results {
   while (<OUTPUT>) {
     
     $strand = 1 if (/direct strand/);
-    $strand = 0 if (/complimentary strand/);
+    $strand = -1 if (/complementary strand/);
+
 
     # E.G.:
     #No.     Promoter     P(promoter)     Exon          P(exon) P(donor)  CpG Window        Rank
     #1  00023223..00023792  1.0000  00023723..00023784  1.0000  0.9940  00023779..00023980  	1
     #1  00023425..00023994  1.0000  00023925..00024627  1.0000  0.9863  00023779..00023980  	2
 
-    if (/\d+\s+\d+\.\.\d+\s+\S+(\d+)\.\.(\d+)\s+(\S+)\s+\S+\s+\S+\s+(\d+)/){
+
+    if (/\d+\s+\S+\s+\S+([^\.]+)\.\.(\d+)\s+(\S+)\s+\S+\s+\S+\s+(\d+)/) {
 
       my %feature;
 
+      my ($start, $end) = sort {$a <=> $b} ($1 * 1 , $2 * 1);
+
       $feature{name}            = 'firstef_exon';
       $feature{score}           = $3;
-      $feature{start}           = $1;
-      $feature{end}             = $2;
+      $feature{start}           = $start;
+      $feature{end}             = $end;
       $feature{strand}          = $strand;
       $feature{program}         = 'firstef';
       $feature{program_version} = '1';
@@ -390,57 +448,47 @@ sub _first_parse {
 # input/output methods
 #############
 
-=head2 output
-
-    Title   :   output
-    Usage   :   obj->output()
-    Function:   Returns an array of features
-    Returns :   Returns an array of features
-    Args    :   none
-
-=cut
-
 sub output {
-    my ($self) = @_;
-    return @{$self->{'_flist'}};
+    my $self = shift;
+
+    if (!defined $self->{_flist}) {
+      $self->{_flist} = [];
+    }
+
+
+    if (@_) {
+
+      my $incoming = shift;
+
+      if ($incoming =~ /flush/){
+	$self->{_flist} = [];
+	return 1
+      }
+
+      push (@{$self->{_flist}}, $incoming);
+      
+      return 1
+    }
+
+    return @{$self->{_flist}};
 }
 
-=head2 create_feature
 
-    Title   :   create_feature
-    Usage   :   obj->create_feature($feature)
-    Function:   Returns an array of features
-    Returns :   Returns an array of features
-    Args    :   none
-
-=cut
 sub create_feature {
     my ($self, $feat) = @_;
 
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => $feat->{'program'},
-                            -program_version => $feat->{'program_version'},
-                            -gff_source      => $feat->{'source'},
-                            -gff_feature     => $feat->{'primary'});
-
-    #create and fill Bio::EnsEMBL::Seqfeature object
-    my $first_exon = Bio::EnsEMBL::SimpleFeature->new(-seqname => $feat->{'name'},
-						      -start   => $feat->{'start'},
-						      -end     => $feat->{'end'},
-						      -strand  => $feat->{'strand'},
-						      -score   => $feat->{'score'},
-						      -analysis => $analysis_obj);  
+    my $first_exon = Bio::EnsEMBL::SimpleFeature->new(-seqname =>  $feat->{name},
+						      -start   =>  $feat->{start},
+						      -end     =>  $feat->{end},
+						      -strand  =>  $feat->{strand},
+						      -score   =>  $feat->{score},
+						      -analysis => $self->{_analysis});  
     
     $first_exon->display_label($feat->{'display_label'});
 
-    if ($first_exon)
-      {
-	$first_exon->validate();
+    $first_exon->validate();
 
-	# add to _flist
-	push(@{$self->{'_flist'}}, $first_exon);
-      }
+    $self->output($first_exon);
+
+    return 1
 }
