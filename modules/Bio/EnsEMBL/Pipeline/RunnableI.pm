@@ -39,6 +39,7 @@ package Bio::EnsEMBL::Pipeline::RunnableI;
 
 use vars qw(@ISA);
 use strict;
+use Bio::EnsEMBL::Analysis::Programs;
 
 # Object preamble - inherits from Bio::Root::Object;
 
@@ -46,7 +47,7 @@ use Bio::Root::Object;
 
 @ISA = qw(Bio::Root::Object);
 
-=head1 ABSTRACT MEHTHODS
+=head1 ABSTRACT METHODS
 
 These methods need to be implemented in any
 module which implements
@@ -82,3 +83,17 @@ sub output {
     $self->throw("output not implemented");
 }
 
+#########################
+# Added by MAQ 
+# functions used by Runnable modules replacing hp.pl functions
+#########################
+
+
+sub locate_runnable {
+    my ($self, $runnable) = @_;
+    if ($runnable)
+    {
+        Bio::EnsEMBL::Programs->import($runnable);
+        return Bio::EnsEMBL::Programs::Program_Paths{$runnable};
+    }
+}

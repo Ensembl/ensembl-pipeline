@@ -282,11 +282,6 @@ sub run {
     }
     
     foreach my $f (@features) {
-	print $f->analysis;
-    print $f->score;
-    print $f->analysis->db;
-    print $f->score;
-    
     if (defined($f->analysis) && defined($f->score) && defined ($f->analysis->db) 
             && $f->analysis->db eq "vert"  && $f->score > 100) {
 
