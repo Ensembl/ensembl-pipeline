@@ -305,12 +305,13 @@ sub align_hits_to_contig {
     my $trans = $self->peptide;
     $trans->sort;
 
+    my $pep = $trans->translate->seq;
+
     #calculate boundaries and map exons to translated peptide
     #Note: Exons have an extra 3 bases for the stop codon. Peptides lack this
     foreach my $exon ($trans->each_Exon) {
 
         my %ex_align;
-        my $pep = $trans->translate->seq;
 
 	my $strand = "+";
 	if ($exon->strand == -1) {
