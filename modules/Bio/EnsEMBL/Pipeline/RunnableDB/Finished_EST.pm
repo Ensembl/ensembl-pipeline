@@ -13,6 +13,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::PrimarySeq;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -38,9 +39,12 @@ sub fetch_input {
     my $rawContigAdaptor = $self->db->get_RawContigAdaptor();
     my $contig   = $rawContigAdaptor->fetch_by_name($contigid);
     
-    my $genseq   = $contig;
     my $masked   = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING,$SOFT_MASKING) or $self->throw("Unable to fetch contig");
-    
+    # make a Bio::PrimarySeq obj to remove some db intensive queries later on
+    my $unmasked = Bio::PrimarySeq->new(-display_id => $contig->display_id(),
+					-id         => $contig->id(),
+					-seq        => $contig->seq()
+					);
     my $seq = $masked->seq;
     if( scalar($seq =~ s/([CATG])/$1/g) > 3 ){
         $self->input_is_void(0);
@@ -48,11 +52,10 @@ sub fetch_input {
         $self->input_is_void(1);
         $self->warn("Need at least 3 nucleotides");
     }
-   
+
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_EST->new(
         '-query'      => $masked,
-        '-unmasked'   => $genseq,
-#        '-seqfetcher' => $seqfetcher,
+        '-unmasked'   => $unmasked,
         '-analysis'   => $self->analysis,
     );
     $self->runnable($runnable);
