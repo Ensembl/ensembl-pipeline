@@ -1,7 +1,3 @@
-#
-#
-# Written by Simon Potter
-#
 # Copyright GRL/EBI
 #
 # You may distribute this module under the same terms as perl itself
@@ -49,39 +45,13 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::TRF;
 
 use strict;
+
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::TRF;
+
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
-
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::TRF object
-    Args    :    -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::TRF');
-    return $self;
-}
 
 =head2 fetch_input
 
@@ -95,50 +65,29 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
 
-    $self->genseq($contig);
-    
-}
+    $self->query($contig);
 
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
-    my $arguments = "";
-    
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-		if ($key && $value) {
-		    $parameters{$key} = $value;
-		}
-		else {
-		    $arguments .= " $key ";
-		}
-            }
-        }
-        $parameters{'-trf'} = $self->analysis->program_file || undef;
-        #creates empty Bio::EnsEMBL::Runnable::TRF object
-        $self->{'_runnable'} = $runnable->new(%parameters);;
-    }
-    return $self->{'_runnable'};
+    my %parameters      = $self->parameter_hash;
+    $parameters{-trf}   = $self->analysis->program_file || undef;
+    $parameters{-query} = $self->query;
+
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::TRF(%parameters);
+
+    $self->runnable($runnable);
+
+    return 1;
+							     
+
 }
 
 
 sub write_output{
   my ($self) = @_;
 
-  my @features = $self->output();
+  my @features   = $self->output();
   my $repeat_f_a = $self->db->get_RepeatFeatureAdaptor();
   my $contig;
+
   eval {
     $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
   };
@@ -146,13 +95,12 @@ sub write_output{
   if ($@) {
     print STDERR "Contig not found, skipping writing output to db: $@\n";
   }
+
   foreach my $f(@features){
     $f->analysis($self->analysis);
     $f->attach_seq($contig);
     $repeat_f_a->store($f);
   }
-
-
 }
 
 
