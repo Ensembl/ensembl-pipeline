@@ -176,12 +176,21 @@ sub analyses_from_pipeline {
 
 sub analyses_from_config{
 
+  # track logic names to make sure we don't try to insert with the same one more than once
+  my %logic_names;
   
   # from genebuild configs
   foreach my $runnable_hash(@{$GB_LENGTH_RUNNABLES}){
     my $entry = $insert_prefix;
     my $analysis = $runnable_hash->{analysis};
     my $runnable = $runnable_hash->{runnable};
+
+    if(defined $logic_names{$analysis}){
+      print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
+      exit(0);
+    }
+    $logic_names{$analysis} = $runnable;
+    
 
     $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
     $entry .= $insert_postfix;
@@ -196,6 +205,12 @@ sub analyses_from_config{
     my $entry = $insert_prefix;
     my $analysis = $runnable_hash->{analysis};
     my $runnable = $runnable_hash->{runnable};
+
+    if(defined $logic_names{$analysis}){
+      print STDERR "Already have an entry for $analysis (" . $logic_names{$analysis} . "); please fix this in the config file and rerun the script!\n";
+      exit(0);
+    }
+    $logic_names{$analysis} = $runnable;
 
     $entry .= "'\\N', now(), '$analysis', 'NULL', '1', 'NULL', '$analysis', '1', 'NULL', 'NULL', '$runnable', 'NULL', '$analysis', 'gene'";
     $entry .= $insert_postfix;
