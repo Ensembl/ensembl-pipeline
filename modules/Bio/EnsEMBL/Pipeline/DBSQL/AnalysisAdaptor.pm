@@ -355,6 +355,8 @@ sub _objFromHashref {
 sub removeInputId_analysis {
   my ($self,$inputid,$class,$analysis) = @_;
 
+  $self->warn("Should delete IDs via StateInfoContainer");
+
   if (!defined($inputid)) {
     $self->throw("No input id defined");
   }
@@ -372,6 +374,8 @@ sub removeInputId_analysis {
 sub removeInputId {
   my ($self,$inputid,$class) = @_;
 
+  $self->warn("Should delete IDs via StateInfoContainer");
+
   if (!defined($inputid)) {
     $self->throw("No input id defined");
   }
@@ -384,6 +388,8 @@ sub removeInputId {
 
 sub submitInputId {
   my ($self,$inputid,$class,$analysis) = @_;
+
+  $self->warn("Should submit IDs via StateInfoContainer");
 
   if (!defined($inputid)) {
     $self->throw("No input id defined");

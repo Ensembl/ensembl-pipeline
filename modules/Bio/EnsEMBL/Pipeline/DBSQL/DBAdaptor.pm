@@ -92,7 +92,7 @@ sub get_JobAdaptor {
  Usage   : $db->get_AnalysisAdaptor
  Function: The Adaptor for Analysis objects in this db
  Example :
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor
+ Returns : Bio::EnsEMBL::DBSQL::AnalysisAdaptor
  Args    : nothing
 
 =cut
