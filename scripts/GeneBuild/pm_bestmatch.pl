@@ -55,18 +55,19 @@ use File::Find;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-my %conf =  %::scripts_conf; # configuration options
+my %conf    =  %::scripts_conf; # configuration options
 my %db_conf =  %::db_conf; # configuration options
 
 # global vars
-my %plengths; # stores lengths of all proteins in $protfile 
 my @hits;     # stores the hits from pmatch runs
 my $outdir   = $conf{'pm_output'};
 my $check    = 0;
+my $chromo_coords = 0;
 my $outfile  = "pm_best.out";
 
 &GetOptions( 
-	    'check' => \$check
+	    'check'         => \$check,
+	    'chromo_coords' => \$chromo_coords,
 	   );
 
 if ($check) {
@@ -78,7 +79,14 @@ if (defined ($outdir) && $outdir ne '') {
 }
 
 open (OUT, ">$outfile") or die "Can't open $outfile:$!\n";
-my $sgpa = &get_static_golden_path_adaptor;
+
+my $sgpa;
+if($chromo_coords){
+  $sgpa = &get_static_golden_path_adaptor;
+}
+else{
+  print "Output will not be converted to chromosomal coords\n";
+}
 
 
 # read pmatch results from STDIN
@@ -137,14 +145,24 @@ print STDERR "finished reading\n";
  # output the results
 
  foreach my $hit($pmf2->output) {
-   my ($chrname, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome($hit->query, $hit->qstart,$hit->qend);
-   print OUT $chrname  . ":" . 
-         $chrstart . "," . 
-         $chrend   . ":" . 
-         $hit->target . ":" .
-         $hit->coverage . "\n";
+  if($chromo_coords){
+    my ($chrname, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome(
+									 $hit->query, 
+									 $hit->qstart,
+									 $hit->qend
+									);
 
- }
+    print OUT $chrname       . ":" . $chrstart      . "," . $chrend        . ":" . 
+	      $hit->target   . ":" . $hit->coverage . "\n";
+  }
+  
+  else{
+    print OUT $hit->query    . ":" . $hit->qstart   . "," . $hit->qend     . ":" . 
+	      $hit->target   . ":" . $hit->coverage . "\n";
+  }
+
+}
+
 
 close (OUT) or die "Can't close $outfile:$!\n";
 
