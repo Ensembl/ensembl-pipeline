@@ -361,7 +361,7 @@ sub _print_Transcript{
   foreach my $exon ( @exons){
     print STDERR $exon->gffstring."\n";
   }
-  if ($transcript->translation){
+  if ( $transcript->can('translation') && $transcript->translation){
     $self->_print_Translation($transcript->translation);
   }
 }
@@ -371,17 +371,27 @@ sub _print_Transcript{
 sub _print_Translation{
   my ($self,$translation) = @_;
   
-  print STDERR "translation start exon: ".
-    $translation->start_Exon->start."-".$translation->start_Exon->end.
-      " start: ".$translation->start."\t phase: ".$translation->start_Exon->phase.
-	" end_phase: ".$translation->start_Exon->end_phase."\n";
   
-  print STDERR "translation end exon: ".
-    $translation->end_Exon->start."-".$translation->end_Exon->end.
-	" end: ".$translation->end."\t phase: ".$translation->end_Exon->phase.
-	  " end_phase: ".$translation->end_Exon->end_phase."\n";
+  if ( $translation->start_Exon ){
+      print STDERR "translation start exon: ".
+	  $translation->start_Exon->start."-".$translation->start_Exon->end.
+	      " start: ".$translation->start."\t phase: ".$translation->start_Exon->phase.
+		  " end_phase: ".$translation->start_Exon->end_phase."\n";
+  }
+  else{
+      print STDERR "translation->start_Exon does not exist\n";
+  }
 
-
+  if ( $translation->end_Exon ){
+      print STDERR "translation end exon: ".
+	  $translation->end_Exon->start."-".$translation->end_Exon->end.
+	      " end: ".$translation->end."\t phase: ".$translation->end_Exon->phase.
+		  " end_phase: ".$translation->end_Exon->end_phase."\n";
+  }
+  else{
+      print STDERR "translation->end_Exon does not exist\n";
+  }
+  
 }
 
 ############################################################
