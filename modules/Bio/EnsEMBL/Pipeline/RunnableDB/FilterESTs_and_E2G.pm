@@ -60,7 +60,7 @@ use Bio::Tools::BPlite;
 use FileHandle;
 
 # config file; parameters searched for here if not passed in as @args
-require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
+do "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -111,22 +111,24 @@ sub new {
 
     $path = $::db_conf{'golden_path'};
     $path = 'UCSC' unless (defined $path && $path ne '');
-    print STDERR "path: $path\n";
+#    print STDERR "path: $path\n";
     $self->dbobj->static_golden_path_type($path);
+
+#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
     $refdbname = $::db_conf{'refdbname'} unless (defined $refdbname && $refdbname ne '');
     $refdbuser = $::db_conf{'refdbuser'} unless (defined $refdbuser && $refdbuser ne '');
     $refdbhost = $::db_conf{'refdbhost'} unless (defined $refdbhost && $refdbhost ne '');
     $refpass   = $::db_conf{'refdbpass'} unless (defined $refpass   && $refpass   ne '');
 
-print "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
+#print STDERR "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 
     my $estdbname = $::db_conf{'estdbname'};
     my $estdbuser = $::db_conf{'estdbuser'};
     my $estdbhost = $::db_conf{'estdbhost'};
     my $estpass   = $::db_conf{'estdbpass'};
 
-
+#print STDERR "estdb: $estdbname $estdbhost $estdbuser $estpass\n";
     # if we have all the parameters for a refdb, make one
 
     # otherwise, assume the refdb must be the same as the dbobj
@@ -211,7 +213,7 @@ sub write_output {
     }
     
     $self->write_genes();
-    $self->write_exons_as_features();
+#    $self->write_exons_as_features();
 }
 
 =head2 write_genes
@@ -428,13 +430,11 @@ sub fetch_input {
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
   $self->vcontig($contig);
-  print STDERR "contig: " . $contig  ."\n";
 
   # find exonerate features amongst all the other features  
   my @allfeatures = $contig->get_all_ExternalFeatures();
 
   print STDERR "got " . scalar(@allfeatures) . " external features\n";
-
   my @exonerate_features;
   my %exonerate_ests;
   my $est_source = $::est_genome_conf{'est_source'};
@@ -442,7 +442,7 @@ sub fetch_input {
   foreach my $feat(@allfeatures){
     if (defined($feat->analysis)      && defined($feat->score) && 
 	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
-      # only take ests that score > 97% for EVERY feature
+      # only take high scoring ests
       if($feat->percent_id >= 97){
 	if(!defined $exonerate_ests{$feat->hseqname}){
 	  push (@{$exonerate_ests{$feat->hseqname}}, $feat);
@@ -455,7 +455,7 @@ sub fetch_input {
   # empty out massive arrays
   @allfeatures = ();
 
-  print STDERR "exonerate features: " . scalar(@exonerate_features) . "\n";
+  print STDERR "exonerate features left after filter: " . scalar(@exonerate_features) . "\n";
   print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n";
   
   # filter features, current depth of coverage 10, and group successful ones by est id
