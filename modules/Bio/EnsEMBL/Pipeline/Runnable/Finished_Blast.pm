@@ -329,17 +329,15 @@ sub fetch_databases {
     
     my @databases;
 
-    my $dbname = $self->database; 
-    #print "fetching databases for ".$dbname."\n";
-    $dbname =~ s/\s//g;
-    foreach my $dbname(split(",", $dbname)){ # allows the use of a comma separated list in $self->database
+    my $db_names = $self->database; 
+    $db_names =~ s/\s//g;
+    # print STDERR "fetching databases for ".$db_names."\n";
+    foreach my $dbname(split(",", $db_names)){ # allows the use of a comma separated list in $self->database
 	# prepend the environment variable $BLASTDB if
 	# database name is not an absoloute path
-
 	unless ($dbname =~ m!^/!) {
 	    $dbname = $ENV{BLASTDB} . "/" . $dbname;
 	}
-
 	# If the expanded database name exists put this in
 	# the database array.
 	#
@@ -347,32 +345,68 @@ sub fetch_databases {
 	# and put them in the database array
 	if (-f $dbname) {
 	    push(@databases,$dbname);
-	    $self->db_version_searched($dbname);
+	    $self->get_db_version( $dbname );
 	} else {
 	    my $count = 1;
-
-	    while (-f $dbname . "-$count") {
-		push(@databases,$dbname . "-$count");
-		$self->db_version_searched($dbname ."-".$count);
+            my $db_filename;
+	    while (-f ( $db_filename = "${dbname}-${count}" )) {
+		push(@databases, $db_filename);
+		$self->get_db_version( $db_filename );
 		$count++;
 	    }
 	    $! = undef; # to stop pollution as it will be "No such file or directory" after while loop above.
 	}
     }
     if (scalar(@databases) == 0) {
-	$self->throw("No databases exist for " . $dbname);
+	$self->throw("No databases exist for " . $db_names);
     }
 
     return @databases;
 
 }
-sub db_version_searched{
-    my $self = shift;
-    my $db = shift;
-    unless($self->{'_db_version_searched'} && !$db){
-    	my $ver = BlastableVersion->new();
-    	my $dbv = $ver->get_version($db);
-    	$self->{'_db_version_searched'} = $dbv;
+
+=head2 get_db_version
+
+    Title   :  get_db_version 
+               [ distinguished from RunnableDB::*::db_version_searched() ]
+    Useage  :  $self->get_db_version('/data/base/path')
+               $obj->get_db_version()
+    Function:  Set a blast database version from the supplied path
+               Get a blast database version from previously supplied path
+               Uses tjrc''s BlastableVersion module.
+    Returns :  String
+    Args    :  String (should be a full database path)
+    Caller  :  $self::fetch_databases()
+               RunnableDB::Finished_EST::db_version_searched()
+
+=cut
+
+sub get_db_version{
+    my ($self, $db) = @_;
+    unless($self->{'_db_version_searched'}){
+        if($db){
+            my $ver = eval { BlastableVersion->new($db) };
+            $self->throw("I failed to get a BlastableVersion for $db") if $@;
+            my $dbv = $ver->version();
+            my $sgv = $ver->sanger_version();
+            my $name = $ver->name();
+            my $date = $ver->date();
+            unless ($dbv){
+                warn "I know nothing about $db I tried to find out:\n" .
+                    " - name <" . $name . ">\n" .
+                    " - date <" . $date . ">\n" .
+                    " - version <" . $dbv . ">\n" .
+                    " - sanger_version <" . $sgv . ">\n";
+            }
+            $self->{'_db_version_searched'} = $dbv;
+        }else{
+            $self->throw("You've asked about what I searched, but I don't know." . 
+                         " It's not set. I need to be called with a database filename first");
+            # The code probably got here because of a problem with the MLDBM
+            # cache file on the machine this was running on.  
+            # the cache file is stored @ /var/tmp/blast_versions
+            # try <rm -f /var/tmp/blast_versions>
+        }
     }
     return $self->{'_db_version_searched'};
 }
