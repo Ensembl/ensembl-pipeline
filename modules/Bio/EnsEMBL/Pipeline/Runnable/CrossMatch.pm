@@ -46,13 +46,14 @@ The rest of the documentation details each of the object methods. Internal metho
 
 
 package Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
+use Bio::EnsEMBL::FeaturePair;
+
 use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::EnsEMBL::RunnableI
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::FeatureFactory;
 use Bio::SeqIO;
 # no need to 'use CrossMatch' as we embed the relevant pacakges here
 
@@ -190,7 +191,7 @@ sub run{
        }
 
 
-       $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
+       $fp = Bio::EnsEMBL::FeaturePair->new();
        #print STDERR "Processing FP with $start-$end to $hstart-$hend\n";
 
        $fp->start($start);
