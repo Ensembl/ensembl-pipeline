@@ -316,11 +316,11 @@ sub run_blast {
 
     # default to tblastn
     if(!defined $tblastn || $tblastn eq ''){
-      $tblastn = 'tblastn';
+      $tblastn = 'wutblastn.new';
     }
-    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 > $blastout";
+    my $command  = "$tblastn $db $seqfile B=500 -hspmax 1000 -hitdist=40 > $blastout";
 
-   print (STDERR "Running command $command\n");
+   #print (STDERR "Running command $command\n");
     my $status = system($command );
 
 #    print("Exit status of blast is $status\n");

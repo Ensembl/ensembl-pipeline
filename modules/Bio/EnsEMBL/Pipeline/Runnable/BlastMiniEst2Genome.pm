@@ -83,7 +83,7 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $queryseq, $seqfetcher, $id, $length) = $self->_rearrange([qw(GENOMIC
+    my( $genomic, $queryseq, $seqfetcher, $threshold) = $self->_rearrange([qw(GENOMIC
 									       QUERYSEQ
 									       SEQFETCHER
 									       THRESHOLD)],
@@ -245,7 +245,7 @@ sub run {
     # filter ESTs using blast
     my @blast_res = $self->run_blast();
 
-    print STDERR "**got " . scalar(@blast_res) . "blast hits\n";
+    #print STDERR "**got " . scalar(@blast_res) . "blast hits\n";
     
     my %blast_ests;
     my @feat;
@@ -256,8 +256,8 @@ sub run {
       $res->hseqname($seqname);
 
       # may move this out of here.
-
-      if($res->p_value > $self->threshold || defined $blast_ests{$seqname}) {
+      #print "p value = ".$res->p_value." threshold = ".$self->blast_threshold."\n";
+      if($res->p_value > $self->blast_threshold || defined $blast_ests{$seqname}) {
 	push(@{$blast_ests{$seqname}}, $res);
       }
     }
@@ -300,20 +300,20 @@ sub run_blast {
     $seqio->write_seq($genomic);
     close($seqio->_filehandle);
 
-    my $command  = "wublastn $blastdb $seqfile B=500 -hspmax 1000  2> /dev/null >  $blastout";
+    my $command  = "wublastn.new $blastdb $seqfile B=500 -hitdist=40  2> /dev/null >  $blastout";
 
-    print (STDERR "Running command $command\n");
+    #print (STDERR "Running command $command\n");
     my $status = system( $command );
 
-    print("Exit status of blast is $status\n");
+    #print("Exit status of blast is $status\n");
     my $report = new Bio::Tools::BPlite('-file'=>$blastout);
 
-    unlink $blastout;
-    unlink $blastdb;
-    unlink $blastdb.".csq";
-    unlink $blastdb.".nhd";
-    unlink $blastdb.".ntb";
-    unlink $seqfile;
+    #unlink $blastout;
+    #unlink $blastdb;
+    #unlink $blastdb.".csq";
+    #unlink $blastdb.".nhd";
+    #unlink $blastdb.".ntb";
+    #unlink $seqfile;
 
     # parse blast report
     my @blast_feat = $self->parse_blast_report($report);
@@ -363,7 +363,7 @@ sub parse_blast_report{
 							-feature1 => $genomic,
 							-feature2 => $est
 						       );
-      push (@blastfeat, $featurepair);
+      push (@blast_feat, $featurepair);
     }
   }
 
@@ -391,7 +391,7 @@ sub make_blast_db {
 	my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
 	  or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
 	
-	foreach my $eseq(@$estseq) {
+	foreach my $eseq(@$estseq) { 
 	  $estOutput->write_seq($eseq);
 	}
       };
@@ -403,10 +403,11 @@ sub make_blast_db {
       
     }
 
-    print STDERR "Blast db file is $estfile\n";
+    
+    #print STDERR "Blast db file is $estfile\n";
 
     my $status = system("pressdb $estfile");
-    print (STDERR "Status from pressdb $status\n");
+    #print (STDERR "Status from pressdb $status\n");
 
     return $estfile;
 }

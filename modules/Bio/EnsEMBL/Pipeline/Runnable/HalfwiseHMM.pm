@@ -92,7 +92,7 @@ sub new {
     $self->{'_hmmfilename'} = undef; #file to store protein profile hmms 
     $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throw
     $self->{'_dbm_file'} = undef;
-    #print"args = @args\n";
+    #print STDERR "args = @args\n";
     my ($genomic, $features, $hmmfetch, $hmmdb, $dbmfile, $memory) = $self->_rearrange([qw(QUERY
 											   FEATURES
 											   HMMFETCH
@@ -113,7 +113,7 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensembl/Pfam');
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensembl/Pfam_ls');
 	
     }
     if($dbmfile){

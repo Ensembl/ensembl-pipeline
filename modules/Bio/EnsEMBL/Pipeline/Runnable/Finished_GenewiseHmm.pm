@@ -316,8 +316,7 @@ sub _align_protein {
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->query->id);
       $curr_exon->id        ($hmmname);
-      $curr_exon->source_tag('genewise');
-      $curr_exon->primary_tag('similarity');
+      
 
       $curr_exon->phase($f[4]);
 
