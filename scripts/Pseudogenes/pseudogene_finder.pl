@@ -50,9 +50,9 @@ print STDERR "REFDB: $EST_REFDBHOST : $EST_REFDBUSER : $EST_REFDBNAME\n";
 ############################################################
 # this is just a refdb where we get dna/assembly/chromosomes from
 my $refdb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       -host             => $EST_REFDBHOST,
+					       -host             => $REF_DBHOST,
 					       -user             => 'ensro',
-					       -dbname           => $EST_REFDBNAME,
+					       -dbname           => $REF_DBNAME,
 					      );
 
 ############################################################
