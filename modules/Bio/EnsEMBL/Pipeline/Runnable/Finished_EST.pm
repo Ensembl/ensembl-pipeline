@@ -9,7 +9,7 @@ use Data::Dumper;
 use vars qw(@ISA);
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 @ISA = ('Bio::EnsEMBL::Pipeline::RunnableI');
@@ -29,17 +29,6 @@ sub new {
             ANALYSIS
             SEQFETCHER
             }], @args);
-
-        #$database,
-        #$program,
-        #$options,
-        #$threshold,
-        #$thres_type,
-        #    DATABASE
-        #    PROGRAM
-        #    OPTIONS
-        #    THRESHOLD
-        #    THRESHOLD_TYPE
     
     die "No QUERY (masked genomic sequence) given" unless $query;
     die "No UNMASKED (genomic sequence) given"     unless $unmasked;
@@ -48,11 +37,6 @@ sub new {
     $self->unmasked         ($unmasked);
     $self->analysis         ($analysis);
     $self->seqfetcher       ($seqfetcher);
-    #$self->database         ($database);
-    #$self->program          ($program);
-    #$self->options          ($options);
-    #$self->threshold        ($threshold);
-    #$self->threshold_type   ($thres_type);
     
     return $self;
 }
@@ -99,69 +83,6 @@ sub analysis {
     return $self->{'_analysis'};
 }
 
-#sub database {
-#    my( $self, $database ) = @_;
-#    
-#    if ($database) {
-#        $self->{'_database'} = $database;
-#    }
-#    return $self->{'_database'} || 'dbEST';
-#}
-#
-#sub program {
-#    my( $self, $program ) = @_;
-#    
-#    if ($program) {
-#        $self->{'_program'} = $program;
-#    }
-#    return $self->{'_program'} || 'wublastn';
-#}
-#
-#sub options {
-#    my( $self, $options ) = @_;
-#    
-#    if ($options) {
-#        $self->{'_options'} = $options;
-#    }
-#    return $self->{'_options'} || 'Z=500000000';
-#}
-#
-#sub threshold {
-#    my( $self, $threshold ) = @_;
-#    
-#    if ($threshold) {
-#        $self->{'_threshold'} = $threshold;
-#    }
-#    return $self->{'_threshold'} || 1e-4;
-#}
-#
-#sub threshold_type {
-#    my( $self, $threshold_type ) = @_;
-#    
-#    if ($threshold_type) {
-#        $self->{'_threshold_type'} = $threshold_type;
-#    }
-#    return $self->{'_threshold_type'} || 'PVALUE';
-#}
-
-#sub _make_blast_paramters {
-#    my( $self ) = @_;
-#    
-#    my @param;
-#    foreach my $meth (qw{
-#        query
-#        database
-#        program
-#        options
-#        threshold
-#        threshold_type
-#        })
-#    {
-#        push(@param, "-$meth", $self->$meth());
-#    }
-#    return @param;
-#}
-
 sub _make_blast_paramters {
     my( $self ) = @_;
     
@@ -179,7 +100,7 @@ sub _make_blast_paramters {
     
     my( $arguments );
     foreach my $ele (split /\s*,\s*/, $ana->parameters) {
-        if (my ($key, $value) = split (/\s*=>\s*/, $ele);
+        if (my ($key, $value) = split /\s*=>\s*/, $ele) {
             if (defined $value) {
                 if ($key eq '-threshold_type' or $key eq '-threshold') {
                     $param{$key} = $value;
@@ -205,7 +126,10 @@ sub run {
     $blast->run;
     my $features = [$blast->output];
     
+    print STDERR "\nPlus strand est_genome\n";
     $self->run_est_genome_on_strand( 1, $features);
+    
+    print STDERR "\nMinus strand est_genome\n";
     $self->run_est_genome_on_strand(-1, $features);
 }
 
@@ -232,13 +156,14 @@ sub run_est_genome_on_strand {
         $is_linear = sub {
             my( $x, $y ) = @_;
             
-            return $x->hstart > $y->hstart;
+            return $x->hend > $y->hend;
         };
     }
     
-    my $count = 0;
     while (my ($hid, $flist) = each %$hit_features) {
-        $count++;
+        #print STDERR "$hid\n";
+        #next unless $hid =~ /BF965645/;
+    
         # Sort features by start/end in genomic
         @$flist = sort {$a->start <=> $b->start or $a->end <=> $b->end} @$flist;
         
@@ -256,47 +181,42 @@ sub run_est_genome_on_strand {
             }
         }
         
+        #print STDERR "Made ", scalar(@sets), " sets\n";
+        
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
         }
-        last if $count >= 10;
     }
 }
 
 sub do_mini_est_genome {
     my( $self, $linear ) = @_;
     
-    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
+    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome(
         '-genomic'    => $self->unmasked,
         '-features'   => $linear,
         '-seqfetcher' => $self->seqfetcher,
         );
     $e2g->run;
     
-    # Could possibly get matches out of MiniEst2Genome on
-    # opposite strand to the features fed into it!
-    # Should fix properly in MiniEst2Genome a la Finished_Est2Genome
-    my $est_strand = $linear->[0]->strand;
+    #print STDERR "\n";
+    #foreach my $lin (@$linear) {
+    #    printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
+    #        $lin->start, $lin->end, $lin->hstart, $lin->hend;
+    #}
 
-    foreach my $e2g_gene ($e2g->output) {
-        my @exons = $e2g_gene->sub_SeqFeature;
-        foreach my $exon (@exons){
-            my @supp_evidence = $exon->sub_SeqFeature;
-            #display(@sub_Feats);                    
-            foreach my $sp (@supp_evidence) {
+    foreach my $fp ($e2g->output) {
 
-                # Fix strand
-                $sp->strand($est_strand);
+        #printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
+        #    $fp->start, $fp->end, $fp->hstart, $fp->hend;
 
-                # source_tag and primary_tag have to be set to
-                # something, or validate method in FeaturePair
-                # (callled by RunnableDB) throws!
-                $sp->feature2->source_tag ('I_am_valid');
-                $sp->feature2->primary_tag('I_am_valid');
-                
-                $self->add_output($sp);
-            }
-        }
+        # source_tag and primary_tag have to be set to
+        # something, or validate method in FeaturePair
+        # (callled by RunnableDB) throws!
+        $fp->feature2->source_tag ('I_am_valid');
+        $fp->feature2->primary_tag('I_am_valid');
+
+        $self->add_output($fp);
     }
 }
 

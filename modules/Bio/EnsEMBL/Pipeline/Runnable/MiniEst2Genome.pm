@@ -551,6 +551,7 @@ sub run {
 
 sub run_blaste2g {
   my ($self,$est,$features) = @_;
+
   
   #?? never did fully understand this.
   my @extras  = $self->find_extras (@$features);
@@ -678,7 +679,7 @@ sub run_blaste2g {
       $fset->seqname($nf->seqname);
     }
     
-    push(@{$self->{'_output'}},$fset);
+    $self->add_output($fset);
   }
 
 }
@@ -691,6 +692,8 @@ sub find_extras {
   
  FEAT: foreach my $f (@features) {
     my $found = 0;
+    
+    # Skip features shorter than 50bp
     if (($f->end - $f->start) < 50) {
       next FEAT;
     }
@@ -729,6 +732,12 @@ sub output {
 	$self->{'_output'} = [];
     }
     return @{$self->{'_output'}};
+}
+
+sub add_output {
+    my( $self, @feat_pairs ) = @_;
+    
+    push(@{$self->{'_output'}}, @feat_pairs);
 }
 
 

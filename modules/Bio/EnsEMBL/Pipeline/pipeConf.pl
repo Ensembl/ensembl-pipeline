@@ -21,7 +21,7 @@ package main;
 
 %pipeConf = ( 
 
-    'nfstmp.dir' => '/work1/lec/out',
+    'nfstmp.dir' => '/nfs/disk84/jgrg/temp',
                                # working directory for err/outfiles
     'pep_file'   => '/scratch1/ensembl/mongin/pep_tmp.fa',
 
@@ -35,8 +35,8 @@ package main;
 
     
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bindir'     => '/usr/local/ensembl/bin',
-    'datadir'    => '/usr/local/ensembl/data',
+    'bindir'     => '/nfs/disk100/humpub/OSFbin',
+    'datadir'    => '/nfs/disk84/jgrg/temp',
     'usenodes'   => '',        # farm nodes to use (default all)
     'autoupdate' => 1,         # true->update InputIdAnalysis via Job
     'runner'     => '',        # path to runner.pl, needed by Job.pm

@@ -38,7 +38,7 @@ Manipulation:
 # we now pass them back to the miniseq to convert them into 
 # genomic coordinates.
 
-    my  @newfeatures = $mini->convert_FeaturePairs(@featurepairs);
+    my  @newfeatures = $mini->convert_FeaturePair(@featurepairs);
 
 
 =head1 CONTACT
@@ -183,7 +183,7 @@ sub get_cDNA_sequence {
 =head2 convert_FeaturePair
 
  Title   : convert_FeaturePair
- Usage   : my @newfeatures = $self->convert_FeaturePairs($feature)
+ Usage   : my @newfeatures = $self->convert_FeaturePair($feature)
  Function: Converts feature pair coordinates on the cDNA sequence
            into an array of feature pairs on the genomic sequence
  Example : 
@@ -207,7 +207,7 @@ sub convert_FeaturePair {
 =head2 convert_SeqFeature
 
  Title   : convert_FeaturePair
- Usage   : my @newfeatures = $self->convert_FeaturePairs($feature)
+ Usage   : my @newfeatures = $self->convert_SeqFeature($feature)
  Function: Converts feature coordinates on the cDNA sequence
            into an array of features on the genomic sequence
  Example : 

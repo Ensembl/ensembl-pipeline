@@ -102,7 +102,7 @@ sub new {
     
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
-    print STDERR "Genomic $genomic\n"; 
+    #print STDERR "Genomic $genomic\n"; 
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq    
    $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
