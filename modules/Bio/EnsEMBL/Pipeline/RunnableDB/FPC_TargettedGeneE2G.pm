@@ -237,14 +237,39 @@ sub targetted_runnable{
 sub run {
   my ($self) = @_;
 
-print STDERR "***Running targetted build***\n";
+  print STDERR "***Running targetted build***\n";
+ TGE:   
   foreach my $tge($self->targetted_runnable){
-    $tge->fetch_input;
-    $tge->run;
-    $tge->write_output;
+    
+    eval{
+      $tge->fetch_input;
+    };
+    
+    if($@){
+      $self->warn("problems fetching input for TargettedGeneE2G: [$@]\n");
+      next TGE;
+    }
+
+    eval{
+      $tge->run;
+    };
+
+    if($@){
+      $self->warn("problems running TargettedGeneE2G: [$@]\n");
+      next TGE;
+    }
+    
+    eval{
+      $tge->write_output;
+    };
+
+    if($@){
+      $self->warn("problems writing output for TargettedGeneE2G: [$@]\n");
+      next TGE;
+    }
   }
 
-$self->{'_targetted_runnables'} = [];
+  $self->{'_targetted_runnables'} = [];
 
 }
 
