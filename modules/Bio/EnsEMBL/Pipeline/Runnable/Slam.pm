@@ -3,7 +3,7 @@
 #
 # jhv [at] sanger.ac.uk
 #
-# Copyright GRL/EBI 2004
+# Copyright GRL/EBI 2004 a
 #
 # You may distribute this module under the same terms as perl itself
 
