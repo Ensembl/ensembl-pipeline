@@ -17,6 +17,8 @@ use Getopt::Long;
 
 #parameters for Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 
+$| = 1;
+
 my $dbname;
 my $host;
 my $dbuser;
