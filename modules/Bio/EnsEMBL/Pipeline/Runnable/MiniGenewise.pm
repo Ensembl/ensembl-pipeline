@@ -69,15 +69,17 @@ sub _initialize {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $features,$forder) = $self->_rearrange(['GENOMIC',
-						   'FEATURES',
-						   'FORDER'], @args);
+    my( $genomic, $features,$endbias,$forder) = $self->_rearrange(['GENOMIC',
+						                   'FEATURES',
+						                   'ENDBIAS',
+						                   'FORDER'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
 
     $self->genomic_sequence($genomic) if defined($genomic);
     $self->{_forder} = $forder        if defined($forder);
+    $self->endbias($endbias)          if defined($endbias);
 
     if (defined($features)) {
 	if (ref($features) eq "ARRAY") {
@@ -113,6 +115,29 @@ sub genomic_sequence {
     }
     return $self->{'_genomic_sequence'};
 }
+
+=head2 endbias
+
+    Title   :   endbias
+    Usage   :   $self->endbias($endbias)
+    Function:   Get/set method for endbias
+    Returns :   
+    Args    :   
+
+=cut
+
+sub endbias {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{_endbias} = $arg;
+  }
+  if (!defined($self->{_endbias})) {
+    $self->{_endbias} = 0;
+  }
+  return $self->{_endbias};
+  }
+
 
 =head2 addFeature 
 
@@ -216,7 +241,6 @@ sub get_all_FeatureIds {
 
     return keys %idhash;
 }
-
 
 sub make_miniseq {
     my ($self,@features) = @_;
@@ -383,8 +407,10 @@ sub get_Sequence {
       return $self->{_seq_cache}{$id};
     } 
     
+    # try pfetch
     $seq = $seqfetcher->run_pfetch($id);
-        
+    
+    
     if (!defined($seq)) {
       # try efetch
       $seq = $seqfetcher->run_efetch($id);
@@ -494,7 +520,7 @@ sub minirun {
   if (defined($self->{_forder})) {
     @ids = @{$self->{_forder}};
   }
-  
+ 
   $self->get_all_Sequences(@ids);
 
   my $analysis_obj    = new Bio::EnsEMBL::Analysis
@@ -571,6 +597,8 @@ sub run_blastwise {
   
   my $reverse = $self->is_reversed(@$features);
   
+  my $endbias = $self->endbias;
+     
   print STDERR "Reverse 2 $reverse\n";
   
   if (!defined($hseq)) {
@@ -580,7 +608,8 @@ sub run_blastwise {
   my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $miniseq->get_cDNA_sequence,
 							    -protein => $hseq,
 							    -memory  => 400000,
-							    "-reverse" => $reverse);
+							    "-reverse" => $reverse,
+							    -endbias  => $endbias);
   
   $eg->run;
   
@@ -608,13 +637,17 @@ sub run_blastwise {
     my $phase = $f->feature1->{_phase};
 
     # VC $f->feature2->{_phase} is not set
-    print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
+    #    print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
+
     #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
-    my @newfeatures = $miniseq->convert_FeaturePair($f);         
-    
+
+    # need to conv rt back to genomic coordinates
+    my @newfeatures = $miniseq->convert_PepFeaturePair($f);         
+
     if ($#newfeatures > 0) {
       print STDERR "Warning : feature converts into > 1 features " . scalar(@newfeatures) . "\n";
     }
+
     push(@newf,@newfeatures);
     
     foreach my $nf (@newfeatures) {
@@ -632,8 +665,6 @@ sub run_blastwise {
   }
   
   my $fset = new Bio::EnsEMBL::SeqFeature();
-  
-  
   
   foreach my $nf (@newf) {
     $fset->add_sub_SeqFeature($nf,'EXPAND');
