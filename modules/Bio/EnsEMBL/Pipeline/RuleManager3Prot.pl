@@ -569,7 +569,7 @@ sub check_lsf_status {
         $lsf_id{$id} = 1;
     }
 
-    foreach my $job ($db->fetch_by_Age($age)) {
+    foreach my $job ($db->fetch_by_age($age)) {
         my $lsf = $job->LSF_id;
         local $_ = $job->get_last_status->status;   # Are you local?
         STAT: {
