@@ -22,7 +22,8 @@ my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq    => $
 
 where 
 -seq    is the sequence where we are going to run genomewise on
--switch is the cost to switch evidence
+-switch is the cost to switch evidence. It is irrelevant if one only passes 1 transcript to Genomewise.
+        With more than one transcript, it is the cost of jumping from one to the other to find the CDS.
 -smell  is the space allowed to move off the splice site of the evidence
 
 add evidence in the form of a transcript:
@@ -194,24 +195,25 @@ sub run{
 
  GENE:
   while( <GW> ) {
-    #print STDERR $_;
-
-      /\/\// && last;
-      if( /Gene/ ) {
+    /\/\// && last;
+    if( /Gene/ ) {
+      
+      my $t = Bio::EnsEMBL::Transcript->new();
+      my $trans = Bio::EnsEMBL::Translation->new();
+      $t->translation($trans);
+      $self->output($t);
+      #push(@{$self->{'_output_array'}},$t);
+      
+      my $seen_cds = 0;
+      my $seen_utr3 = 0;
+      my $prev = undef;
+      while( <GW> ) {
 	
-	my $t = Bio::EnsEMBL::Transcript->new();
-	my $trans = Bio::EnsEMBL::Translation->new();
-	$t->translation($trans);
-	$self->output($t);
-	#push(@{$self->{'_output_array'}},$t);
-	
-	my $seen_cds = 0;
-	my $seen_utr3 = 0;
-	my $prev = undef;
-	while( <GW> ) {
-	  print STDERR "$_";
-	  chomp;
-	  #print "Seen $_\n";
+	## this will print out the structure foudn by genomewise
+	#print STDERR "$_";
+	#
+	chomp;
+	#print "Seen $_\n";
 	  if( /End/ ) {
 	    if( $seen_utr3 == 0 ) {
 	      #  print STDERR "Seen utr - setting end to prev\n";
@@ -221,9 +223,9 @@ sub run{
 	    }
 	    next GENE;
 	  }
-	  
-	  if( /utr5\s+(\d+)\s+(\d+)/) {
-	    my $start = $1;
+	
+	if( /utr5\s+(\d+)\s+(\d+)/) {
+	  my $start = $1;
 	    my $end   = $2;
 	    my $strand = 1;
 	    
@@ -341,17 +343,17 @@ sub run{
 	    $seen_utr3 = 1;
 	    next;
 	  }
-	  
-	  # else - worrying 
-	  
-	  chomp;
-	  $self->throw("Should not able to happen - unparsable line in geneutr $_");
-	}
+	
+	# else - worrying 
+	
+	chomp;
+	$self->throw("Should not able to happen - unparsable line in geneutr $_");
       }
-      chomp;
-      #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
-      $self->throw("Should not able to happen - unparsable in between gene line $_");
     }
+    chomp;
+    #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
+    $self->throw("Should not able to happen - unparsable in between gene line $_");
+  }
   #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
   
 
