@@ -11,7 +11,6 @@
 use strict;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Config::General;
 use Sys::Hostname;
 use Getopt::Long;
 
@@ -27,6 +26,7 @@ my $pass            = undef;
 my $jobname;
 my $index;
 my $check;
+my $output_dir;
 
 GetOptions(
     'host=s'       => \$host,
@@ -34,8 +34,8 @@ GetOptions(
     'dbname=s'     => \$dbname,
     'dbuser=s'     => \$dbuser,
     'pass=s'       => \$pass,
-    'index'        => \$array_index,
-    'jobname'      => \$job_name,
+    'index'        => \$index,
+    'jobname'      => \$jobname,
     'check!'       => \$check,
     'output_dir=s' => \$output_dir
 )
