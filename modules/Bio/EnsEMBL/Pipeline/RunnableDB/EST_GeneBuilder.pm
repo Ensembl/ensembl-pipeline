@@ -775,18 +775,42 @@ sub _cluster_Transcripts{
   $cluster->put_Transcripts( $sorted_transcripts[0] );
   push( @clusters, $cluster );
     
+  # keep track of the edges of the cluster, useful for a negative check
+  my %start;
+  my %end;
+  $sorted_transcripts->sort;
+  $start{ $cluster } = $sorted_transcripts[0]->start_exon->start;
+  $end{ $cluster }   = $sorted_transcripts[0]->end_exon->end;
+
   # loop over the rest of the genes
  LOOP1:
   for (my $c=1; $c<=$#sorted_transcripts; $c++){
     my $found=0;
 
-    # compare with the transcripts in this cluster
-  LOOP2:
-    foreach my $t_in_cluster ( $cluster->get_Transcripts ){       
-      if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
-	$cluster->put_Transcripts( $sorted_transcripts[$c] );                       
-	$found=1;
-	next LOOP1;
+    # first do a negative-check on this cluster
+    $sorted_transcripts[$c]->sort;
+    my $this_start = $sorted_transcripts[$c]->start_exon->start;
+    my $this_end   = $sorted_transcripts[$c]->end_exon->end;
+    
+    # only look if they potentially overlap
+    if ( !( $end{ $cluster } < $this_start || $this_end < $start{ $cluster } ) ){
+      
+      # compare with the transcripts in this cluster
+    LOOP2:
+      foreach my $t_in_cluster ( $cluster->get_Transcripts ){       
+	if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
+	  $cluster->put_Transcripts( $sorted_transcripts[$c] );                       
+	  $found=1;
+	  
+	  # reset start/end if necessary
+	  if ( $this_start < $start{ $cluster} ){
+	    $start{ $cluster } = $this_start;
+	  }
+	  if ( $this_end   > $end{ $cluster }  ){
+	    $end{ $cluster } = $this_end;
+	  }
+	  next LOOP1;
+	}
       }
     }
     # if not in this cluster compare to the previous clusters:
@@ -797,14 +821,30 @@ sub _cluster_Transcripts{
 
     if ( $found == 0 && $cluster_count > 1 ) {
       my $lookup = 1;
+
+      # loop through the clusters backwards
       while ( !($cluster_count <= $lookup ) ){ 
 	#print STDERR "cluster_count: $cluster_count, looking at ".($cluster_count - $lookup)."\n";
 	my $previous_cluster = $clusters[ $cluster_count - 1 - $lookup ];
-	foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
-	  if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
-	    $previous_cluster->put_Transcripts( $sorted_transcripts[$c] );                       
-	    $found=1;
-	    next LOOP1;
+	
+	# only look if it is potentially overlapping
+	if ( !( $end{ $previous_cluster } < $this_start || $this_end < $start{ $previous_cluster } ) ){
+	  
+	  # loop over the transcripts in this previous cluster
+	  foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
+	    if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
+	      $previous_cluster->put_Transcripts( $sorted_transcripts[$c] );                       
+	      $found=1;
+	      
+	      # reset start/end if necessary
+	      if ( $this_start < $start{ $cluster} ){
+		$start{ $cluster } = $this_start;
+	      }
+	      if ( $this_end   > $end{ $cluster }  ){
+		$end{ $cluster } = $this_end;
+	      }
+	      next LOOP1;
+	    }
 	  }
 	}
 	$lookup++;
@@ -814,6 +854,8 @@ sub _cluster_Transcripts{
     if ( $found == 0 ){  
       $cluster = new Bio::EnsEMBL::Utils::TranscriptCluster; 
       $cluster->put_Transcripts( $sorted_transcripts[$c] );
+      $start{ $cluster } = $sorted_transcripts[$c]->start_exon->start;
+      $end{ $cluster }   = $sorted_transcripts[$c]->end_exon->end;
       push( @clusters, $cluster );
       $cluster_count++;
     }
