@@ -67,7 +67,6 @@ sub make_directories {
   makedir($bsubdir);
   makedir($bsuberr);
   makedir($bsubout);
-
 }
 
 ############################################################
@@ -77,13 +76,13 @@ sub make_exonerate_bsubs {
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
   
   my $lsf_options   = $LSF_OPTIONS;
-  
-  my $refdb_host = $EST_REFDBHOST;
-  my $est_host   = $EST_DBHOST;
+  my $refdb_host    = "my".$EST_REFDBHOST;
+  my $est_host      = "my".$EST_DBHOST;
   
   #$lsf_options .= " -R\"select[$refdb_host < 440 && $est_host < 440] rusage[$refdb_host=10]\" ";
-  $lsf_options .= " -R\"select[$refdb_host < 440 && $est_host < 440] rusage[$refdb_host=10:duration=2:decay=1:$est_host=10:duration=2:decay=1]\"";
-    
+  #$lsf_options .= " -R\"select[$refdb_host < 440 && $est_host < 440] rusage[$refdb_host=10:duration=2:decay=1:$est_host=10:duration=2:decay=1]\"";
+  #$lsf_options .= " -R\"select[$est_host < 440]\" ";
+  
   my $scriptdir     = $EST_SCRIPTDIR;
   my $check         = $scriptdir . "check_node.pl";
   my $exonerate     = $scriptdir . "run_exonerate.pl";
