@@ -969,7 +969,7 @@ sub _process_comparison{
 	     abs( $exon1->end - $exon2->end ) <= $splice_mismatch
 	   )
 	 ){
-	print STDERR "yes1\n";
+	#print STDERR "yes1\n";
 	next PAIR;
       }
       else{
@@ -985,7 +985,7 @@ sub _process_comparison{
 	    &&
 	    abs( $exon2->start - $exon1->start ) <= $splice_mismatch
 	  ){
-      print STDERR "yes2\n";
+      #print STDERR "yes2\n";
       next PAIR;
     }
     ############################################################
@@ -1007,7 +1007,7 @@ sub _process_comparison{
 	     abs( $exon1->start - $exon2->start ) <= $splice_mismatch
 	   )
 	 ){
-	print STDERR "yes3\n";
+	#print STDERR "yes3\n";
 	next PAIR;
       }
       else{
@@ -1023,7 +1023,7 @@ sub _process_comparison{
 	   &&
 	   abs( $exon1->end - $exon2->end ) <= $splice_mismatch
 	 ){
-      print STDERR "yes4\n";
+      #print STDERR "yes4\n";
       next PAIR;
     }
     else{	    
