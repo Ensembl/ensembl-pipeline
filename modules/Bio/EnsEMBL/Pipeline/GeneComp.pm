@@ -371,6 +371,13 @@ sub map_temp_Genes_to_real_Genes{
        my $currentgeneid = undef;
 
        foreach my $oe ( $og->each_unique_Exon ) {
+	   print STDERR "Looking at ",$oe->id,"which is [",$newe2g{$oe->id},"]\n";
+	   if( ! exists $newe2g{$oe->id} ) {
+	       # this exon does not exist in the new transcripts!
+	       next;
+	   }
+
+
 	   my $tgeneid = $newe2g{$oe->id}->id;
 	   
 	   # if the tgeneid is the same as current then we have already 
@@ -500,6 +507,8 @@ sub map_temp_Genes_to_real_Genes{
 	       push(@dead_gene_ids,$oldgeneid);
 	   }
        }
+
+       print STDERR "Into merge code....\n";
 
        foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
 	   my $tsize = scalar ( $oldg{$oldgeneid}->each_unique_Exon );
@@ -685,8 +694,15 @@ sub map_temp_Transcripts_to_real_Transcripts{
    my $should_change = 0;
    my @dead;
 
+   my %newt;
+
+   foreach my $t ( @newt ) {
+       $newt{$t->id} = $t;
+   }
+   
+
    # sort old by number of exons - largest first
-   @oldt = sort { $a->number <=> $b->number } @oldt;
+   @oldt = sort { $b->number <=> $a->number } @oldt;
 
    my %fitted;
    my $now = time();
@@ -695,12 +711,16 @@ sub map_temp_Transcripts_to_real_Transcripts{
    foreach my $oldt ( @oldt ) {
        my $score = 0;
        my $fitted = undef;
+
+       print STDERR "Looking at old transcript ",$oldt->id,"\n";
+
        foreach my $newt ( @newt ) {
 	   if( exists $fitted{$newt->id} ) {
 	       next;
 	   }
-
 	   my ($tscore,$perfect) = Bio::EnsEMBL::Pipeline::GeneComp::overlap_Transcript($oldt,$newt);
+	   print STDERR "Looking at newt ",$newt->id," score $tscore\n";
+
 	   if( $perfect ) {
 	       $fitted = $newt;
 	       last;
@@ -711,8 +731,10 @@ sub map_temp_Transcripts_to_real_Transcripts{
        }
 
        if ( defined $fitted ) {
-	   $fitted{$fitted->id} = 1;
+	   print STDERR "Fitting transcript",$fitted->id,"\n";
+
 	   $fitted->id($oldt->id);
+	   $fitted{$fitted->id} = 1;
 
 	   if( Bio::EnsEMBL::Pipeline::GeneComp::increment_Transcript($oldt,$fitted) == 1 ) {
 	       $fitted->version($oldt->version()+1);
@@ -732,6 +754,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
        if( exists $fitted{$newt->id} ) {
 	   next;
        }
+
        $should_change = 1;
        $newt->id($dbobj->get_new_TranscriptID);
        $newt->version(1);
