@@ -1,11 +1,11 @@
 #!/usr/local/ensembl/bin/perl  -w
 
-
 package FlyBaseGff;
 
 use strict;
 use warnings;
 use FlyBaseConf;
+use FlyBaseToolbox;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate verbose);
 use Bio::EnsEMBL::SimpleFeature;
@@ -38,7 +38,7 @@ sub new  {
   $self->slice($slice);
   $self->{_gene}=[];
   $self->{non_unique_id}={};
-
+  $self->{exons}={};
 
   $self->parse_gff();
   print "gff $gff parsed\n";
@@ -51,15 +51,33 @@ sub new  {
 #
  ################################################################################
 
+
+# processed_exon($exon) returns ref. to exon if the exon was already stored or null otherwise
+
+sub processed_exon{
+  my ($self,$exon)=@_;
+
+  my %tmp = %{$self->{exons}};
+
+  if(exists $tmp{$exon->stable_id}){
+    return $tmp{$exon->stable_id};
+  }
+  $tmp{$exon->stable_id}=$exon;
+  $self->{exons}=\%tmp;
+  return 0;
+}
+
+
+
 =pod
 
-=head3 getting attributes by their feature-id ('ID=CG0923')
+=head3 getting attributes by their type ('gene')
 
 =head2 get_ids_by_type
 
   Title       : get_ids_by_type
-  Usage       : $obj->get_ids_by_type('ID')
-  Function    : returns an Arrayref to all known types of a given ID (in the scope of the gff)
+  Usage       : $obj->get_ids_by_type('gene')
+  Function    : returns an Arrayref to all known IDs of a given type (in the scope of the gff)
   Arguments   : ID
   Return-Val  : Arrayref
 
@@ -67,10 +85,10 @@ sub new  {
 
 
 sub get_ids_by_type{
-  my ($self,$id) = @_;
+  my ($self,$type) = @_;
   # get hash in which the types of the features are stored as keys
   # and return array-ref to all feature-identifiers of this TYPE
-  return ${$self->type2id}{$id};
+  return ${$self->type2id}{$type};
 }
 
 
@@ -96,10 +114,10 @@ sub get_attributes_by_id{
 
 =pod
 
-=head2 get_childs_of_id
+=head2 get_all_childs_of_id
 
-  Title       : get_childs_of_id
-  Usage       : $obj->get_childs_of_id'ID')
+  Title       : get_all_childs_of_id
+  Usage       : $obj->get_all_childs_of_id'ID')
   Function    : returns child(s)-ID of a given parent-ID
   Arguments   : String describing id
   Return-Val  : arrayref
@@ -107,12 +125,42 @@ sub get_attributes_by_id{
 =cut
 
 
-sub get_childs_of_id{
+sub get_all_childs_of_id{
   my ($self,$id) = @_;
   return ${$self->parent2childs}{$id};
 }
 
 
+=pod
+
+=head2 get_spec_childs_of_id
+
+  Title       : get_spec_childs_of_id
+  Usage       : $obj->get_spec_childs_of_id('ID','type')
+  Function    : returns child(s)-IDs of a given parent-ID which have the specified type
+  Arguments   : String describing ID and type
+  Return-Val  : arrayref
+
+=cut
+
+
+sub get_spec_child_of_id{
+  my ($self,$parent_id,$spec_type) = @_;
+  my @matching_ids;
+  if( ${ $self->parent2childs} {$parent_id} ){
+    my @poss_child_ids = @{${$self->parent2childs}{$parent_id}};
+    for my $child (@poss_child_ids){
+      for my $typ(@{ $self->get_type_of_id($child) } ){
+        if ($typ =~ m/$spec_type/){
+          push @matching_ids,$child;
+        }
+      }
+    }
+   return \@matching_ids;
+  }else{
+    return undef;
+  }
+}
 
 =pod
 
@@ -159,95 +207,258 @@ sub get_type_of_id{
 
 sub store_genes{
   my ($self) = @_;
-
   my @gene_ids =@{$self->get_ids_by_type("gene")};
-  my @real_genes;
+
+  my %all_processed_exons;
   for my $gene_id (@gene_ids){
-#    print "\nprocessing gene: $gene_id\nChilds:";
-
-
-    my @poss_trans = @{$self->get_childs_of_id($gene_id)};
-
-    # process all childs-relations of a gene
-    my @real_trans;
-    for my $poss_trans_id(@poss_trans){
-      # filter out all childs whch are not transcripts, type !~ "mRNA" i.e.rescue_fragment
-      for my $typ(@{ $self->get_type_of_id($poss_trans_id) } ){
-        push @real_trans, $poss_trans_id  if ($typ =~ /mRNA/);
-      }
-    }
-
-
-    # process all transcripts (of type mRNA) and get all exons
-    ################################################################################
-
     my @all_nw_transcripts;
-    for my $trans_id (@real_trans){
-      # for every transcript
-      my @poss_exons = @{$self->get_childs_of_id($trans_id)};
 
-      my $nw_transcript = new Bio::EnsEMBL::Transcript();
+    print "....processing Gene $gene_id:\n";
+    #---- start process each alternative transcript of gene ("mRNA") ----
 
+    unless ($self->get_spec_child_of_id($gene_id,"mRNA")){
+      print "gene_id $gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
+    }else{ 
+ 
+    for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"mRNA")}){
+      my $nw_transcript = new Bio::EnsEMBL::Transcript(
+                                                       -STABLE_ID => $trans_id,
+                                                       -VERSION => 3,
+                                                      );
 
-      # for every exon of transcript
-      for my $pe (@poss_exons){
-        for my $typ(@{ $self->get_type_of_id($pe) } ){
-          if ($typ =~ /exon/){
-            # we got a real exons, let's get coordinates
-            my @gff_line = @{$self->get_attributes_by_id($pe)};
-            my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$gff_line[0]};
+      #---- start store each exon ----
+      my @exons =  @{$self->get_spec_child_of_id($trans_id,"exon")};
 
-            warn_inconsistency("There is an exon ($pe)with more than one (unique?) position\n") if (exists $gff_line[1]);
+      for my $exon (@exons){
+        my @gff_line = @{$self->get_attributes_by_id($exon)};
+        my ($seqid,$source,$type,$ex_start,$ex_end,$score,$ex_strand,$phase,$attrib) = @{$gff_line[0]};
+        warn_inconsistency("ID of exon $exon is not unique \n") if (exists $gff_line[1]);
 
-            my $ex = Bio::EnsEMBL::Exon->new(
-                                             -START     => $start,
-                                             -END       => $end,
-                                             -STRAND    => $strand,
-                                             -PHASE     => 1,
-                                             -END_PHASE => 0,
-                                             -SLICE     => $self->slice,
-                                             -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
-                                             # -STABLE_ID => 'ENSE000000123',
-                                             # -VERSION   => 2
-                                            );
-            $nw_transcript->add_Exon($ex)
-          }
-        }
+        my $ex = Bio::EnsEMBL::Exon->new(
+                                         -START     => $ex_start,
+                                         -END       => $ex_end,
+                                         -STRAND    => $ex_strand,
+                                         -PHASE     => 0,
+                                         -END_PHASE => 0,
+                                         -SLICE     => $self->slice,
+                                         -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
+                                         -STABLE_ID => ${  ${ $attrib }{'ID'} }[0] ,
+                                         -VERSION   => 3
+                                        );
+
+       my $esid = ${  ${ $attrib }{'ID'} }[0] ;
+       $nw_transcript->add_Exon($ex);
       }
-      push @all_nw_transcripts, $nw_transcript;
+
+
+     #debug
+#       print "\n----------Transcript: -$trans_id:--------------------\n";
+#       for( @{$nw_transcript->get_all_Exons}){
+#        print "EXON:".$_->stable_id . $_->hashkey . "Sphase:".$_->phase."Ephase:".$_->end_phase."\n";
+#      }
+
+      #---- add Translation to transcript if CDS exists
+
+       #  check if there is a CDS annotated for the mRNA and get coordiantes
+        my $cds_id = ${$self->get_spec_child_of_id($trans_id,"CDS")}[0];
+
+	if ($cds_id){
+          warn_inconsistency("There is a mRNA with more than one CDS\n") if exists ${$self->get_spec_child_of_id($trans_id,"CDS")}[1];
+          my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_attributes_by_id($cds_id)}[0]}[3,4,6];   # get 3,4 and 6th attribute of gff-line
+
+          # add Translatio to transcript
+          $nw_transcript = addTranslationObject($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand);
+          # set phases of other exons if there is more than one exon
+        
+          $nw_transcript =  $self->setExonPhases($nw_transcript);
+          
+          # new method which stores processed exons in a object-variable
+
+      }else{
+         print "mRNA $trans_id has no CDS\n";         # mRNA has no CDS
+      }
+       push @all_nw_transcripts, $nw_transcript;
+
+    } #--- end each alternative transcript ---
+
+
+
+    # renaming of exons if the have the same coordiantes but different phases
+    ################################################################################
+    my (%hk_name,%exoncheck);
+
+    # check for exons which have same name but different phases 
+    # by getting all exon-hashkeys of one flybase-exon-identifer CG100: hk1, hk2,..
+
+    foreach my $trans ( @all_nw_transcripts ) {
+      foreach my $e ( @{$trans->get_all_Exons} ) {
+        if(exists $exoncheck{$e->stable_id}){
+          ${$exoncheck{$e->stable_id}}{$e->hashkey} = $e->stable_id;;
+        }else{
+          ${ $exoncheck{$e->stable_id} }  {$e->hashkey} = $e->stable_id;
+        }
+        $hk_name{$e->hashkey}= $e->stable_id;
+        my @line = split /\-/,$e->hashkey;
+       ${$all_processed_exons{"$line[0]-$line[1]-$line[2]"}}{$gene_id}=();
+     }
+   }
+   # find exons which have the same id (CG923:1) but different hashkeys
+   my @multiple_hashkey;
+   for (keys %exoncheck){
+     if (scalar (keys %{$exoncheck{$_}} )  > 1){
+       for my $hashkey (keys %{$exoncheck{$_}}){
+         push @multiple_hashkey, $hashkey;
+       }
+     }
+   }
+
+   # make new names for exon with same bounds but different phases
+   my %same_bounds;
+
+   for my $mh(@multiple_hashkey){
+     my @line = split /\-/,$mh;
+     ${$same_bounds{"$line[0]-$line[1]-$line[2]"}}{$mh}=();
+   }
+
+   # construct new name for each of the diffrent hahskeys
+   for(keys %same_bounds){
+     my %exon_hk = %{$same_bounds{$_}};
+     my $cnt = "A";
+     for my $ehk(keys %exon_hk){
+       $hk_name{$ehk} = $hk_name{$ehk}."-$cnt";
+       $cnt++;
+     }
+   }
+
+   # rename the exons with diff. hashkeys
+   for my $mh(@multiple_hashkey){
+     foreach my $trans ( @all_nw_transcripts ) {
+       foreach my $e ( @{$trans->get_all_Exons} ) {
+         # change stable_id
+         if ($e->hashkey eq $mh){
+           $e->stable_id($hk_name{$mh});
+
+         }
+       }
+     }
+   }
+
+
+# renaming exons which have different phases and which are shared by different genes
+
+foreach my $trans ( @all_nw_transcripts ) {
+  foreach my $e ( @{$trans->get_all_Exons} ) {
+    # rename exons which are shared by different genes
+    my @line = split /\-/,$e->hashkey; # get "root" of exon-hashkey without phase and strand-information
+    # get all unique genes which share this exon
+    my %genes_of_exon = %{$all_processed_exons{"$line[0]-$line[1]-$line[2]"} };
+
+    for my $gid (keys %genes_of_exon){
+      print "gid  $gid \n";
+      if($gid ne $gene_id){
+        # if the exon is shared by another gene than the actual one rename the exon
+        # processed_gene : CG233
+        # name of exon CG100:4
+        # new name of exon: CG100:4
+        my $new_name = $e->stable_id . "--" . $gene_id ;
+        $e->stable_id ($new_name);
+      }
     }
-
-    # got all alternative transcritps, add them to gene
-
-    my @gff_line = @{$self->get_attributes_by_id($gene_id)};
-    my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$gff_line[0]};
-
-    print $LOGIC_NAME_EXON ."\n";
-
-    my $gene = Bio::EnsEMBL::Gene->new( 
-                                       -START     => $start,
-                                       -END       => $end,
-                                       -STRAND    => $strand,
-                                       -SLICE     => $self->slice,
-                                       -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
-#                                       -STABLE_ID => ,
-#                                       -VERSION => ,
-#                                       -EXTERNAL_NAME => ,
-#                                       -TYPE =>
-#                                       -EXTERNAL_DB =>
-#                                       -EXTERNAL_STATUS =>
-#                                       -DISPLAY_XREF =>
-#                                       -DESCRIPTION =>
-                                      );
-
-    $gene->add_Transcript(@all_nw_transcripts);
-    $self->db->get_GeneAdaptor()->store($gene);
-
   }
 }
 
 
 
+
+
+################################################################################
+
+
+
+
+
+
+
+
+  # got all alternative transcripts and make genes
+  my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$self->get_attributes_by_id($gene_id)};
+
+  my $gene = Bio::EnsEMBL::Gene->new(
+                                     -START     => $start,
+                                     -END       => $end,
+                                     -STRAND    => $strand,
+                                     -SLICE     => $self->slice,
+                                     -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
+                                     -STABLE_ID => $gene_id,
+                                     -VERSION => 3,
+                                    );
+
+ # getting attributes: ${${$attrib}{'ID'}}[0],
+
+   map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
+
+   print "--->all exons added to transc and transc added to gene,calling self->db-> GeneAdaptor->store(gene $gene_id)\n\n";
+   $self->db->get_GeneAdaptor->store($gene);
+  } #end foreach gene
+ } #end unless...else
+}
+
+
+
+
+=head2 prune_Exons
+
+  Arg [1]   : Bio::EnsEMBL::Gene
+  Function  : remove duplicate exons between two transcripts
+  Returntype: Bio::EnsEMBL::Gene
+
+
+=cut
+
+
+sub prune_Exons {
+  my ($gene) = @_;
+  my @unique_Exons;
+
+  # keep track of all unique exons found so far to avoid making duplicates
+  # need to be very careful about translation->start_Exon and translation->end_Exon
+
+  foreach my $tran (@{$gene->get_all_Transcripts}) {
+    my @newexons;
+    foreach my $exon (@{$tran->get_all_Exons}) {
+      my $found;
+      #always empty
+    UNI:foreach my $uni (@unique_Exons) {
+        if ($uni->start  == $exon->start  &&
+            $uni->end    == $exon->end    &&
+            $uni->strand == $exon->strand &&
+            $uni->phase  == $exon->phase  &&
+            $uni->end_phase == $exon->end_phase
+           ) {
+          $found = $uni;
+          last UNI;
+        }
+      }
+      if (defined($found)) {
+        push(@newexons,$found);
+        if ($exon == $tran->translation->start_Exon){
+          $tran->translation->start_Exon($found);
+        }
+        if ($exon == $tran->translation->end_Exon){
+          $tran->translation->end_Exon($found);
+        }
+      } else {
+        push(@newexons,$exon);
+        push(@unique_Exons, $exon);
+      }
+    }
+    $tran->flush_Exons;
+    foreach my $exon (@newexons) {
+      $tran->add_Exon($exon);
+    }
+  }
+  return $gene;
+}
 
 
 
@@ -276,9 +487,6 @@ sub store_as_simple_feature{
 
   # add analysis to db (the storage of the analysis is handeled by SimpleFeatureAdaptor
   my $analysis = $self->create_analysis($logic_name);
-
-
-
 
   # check if there is such a feature in gff
   if ($self->get_ids_by_type($type)){
@@ -633,7 +841,7 @@ sub type2id{
 
 =pod
 
-=head2 parent2childs (used by get_childs_of_id)
+=head2 parent2childs (used by get_all_childs_of_id)
 
   Title       : parent2childs
   Usage       : $obj->parent2childs( \%HASH ) || $obj->parent2childs()
@@ -750,7 +958,7 @@ sub gff{
 
 =head2 warn_inconsistency( $warning )
 
-  Usage       : $obj->warn_inconsistency($warning)
+  Usage       : warn_inconsistency($warning)
   Function    : prints out warning-statement
 
 =cut
@@ -758,9 +966,12 @@ sub gff{
 
 sub warn_inconsistency{
   my $error = shift;
-  print STDERR "\tWARNING: UNEXPECTED INCONSISTENCY !!\t\t$error";
+  print STDERR "\tWARNING: UNEXPECTED INCONSISTENCY IN GFF-FILE !!\t\t$error";
   return;
 }
+
+
+
 
 
 1;

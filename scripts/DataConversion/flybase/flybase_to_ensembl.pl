@@ -12,6 +12,8 @@ $| = 1;
 
 
 
+
+
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
                                             -host => $FB_DBHOST,
                                             -user => $FB_DBUSER,
