@@ -432,6 +432,8 @@ sub calculate_and_set_phases_new {
 
 #      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 
+      my $translation_found = 0;
+
       foreach my $tran (@newtran) {
 
 	my $temp_tran = $tran->translate->seq;
@@ -449,10 +451,10 @@ sub calculate_and_set_phases_new {
 	# remove any terminal X's from the translation
 	$temp_tran =~ s/x$//i;
 
-
 	if (index($peptides[$i],$temp_tran) >= 0) {
 #	  print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
 
+	  $translation_found = 1;
 	  foreach my $exon ($tran->get_all_Exons) {
 #	    print $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
 	  }
@@ -462,6 +464,11 @@ sub calculate_and_set_phases_new {
 	  $i++;
 	  next GENE;
 	}
+      }
+      
+      unless ($translation_found) {
+	$self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
+	             " in a translation\n");
       }
 
 #      print "\n";
