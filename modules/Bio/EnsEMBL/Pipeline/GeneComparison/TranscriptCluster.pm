@@ -414,8 +414,7 @@ sub put_Transcripts {
 
 sub get_Transcripts {
   my $self = shift @_;
-  my @transcripts = @{ $self->{'_transcript_array'} };
-  return @transcripts;
+  return $self->{'_transcript_array'};
 }
 
 #########################################################################
@@ -479,15 +478,15 @@ sub _get_start_end {
   my $start;
   my $end;
  
-  my $start_exon = $transcript->start_exon;
-  my $end_exon = $transcript->end_exon;
+  my $start_Exon = $transcript->start_Exon;
+  my $end_Exon = $transcript->end_Exon;
  
-  if ($start_exon->strand == 1) {
-    $start = $start_exon->start;
-    $end   = $end_exon->end;
+  if ($start_Exon->strand == 1) {
+    $start = $start_Exon->start;
+    $end   = $end_Exon->end;
   } else {
-    $end   = $start_exon->end;
-    $start = $end_exon->start;
+    $end   = $start_Exon->end;
+    $start = $end_Exon->start;
   }
   return ($start, $end);
 }    
