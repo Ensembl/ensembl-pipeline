@@ -64,7 +64,18 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   #
   # ###############################################################################
 
-  $gff->store_genes();
+ #   $gff->store_as_gene_object("gene");
+
+
+  #
+  # store ncRNA, snRNA, rRNA
+  #
+
+
+  my @ftr =qw( ncRNA rRNA snRNA snoRNA tRNA pseudogene);
+
+  map ( $gff->store_as_gene_object($_) ,@ftr);
+
 
 
 
@@ -76,49 +87,15 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   # store all simplefeatures as referenced in the FlyBaseConf.pm
   #
   # ###############################################################################
-  if($store_simple_features){
-    foreach my $feat (@{$SIMPLE_FEATURES}) {
-      my $feature_type = $feat->{type};
-      my $feature_label = $feat->{label};
-      my $logic_name = $feat->{logic_name};
-      print "searching for simple features of type $feature_type ... ";
-      my $sf_num = $gff->store_as_simple_feature($sa, $feature_type,  $logic_name, $feature_label);
-      print "$sf_num features found and stored in db.\n";
-    }
-  }
+#  if($store_simple_features){
+#    foreach my $feat (@{$SIMPLE_FEATURES}) {
+#      my $feature_type = $feat->{type};
+#      my $feature_label = $feat->{label};
+#      my $logic_name = $feat->{logic_name};
+#      print "searching for simple features of type $feature_type ... ";
+#      my $sf_num = $gff->store_as_simple_feature($sa, $feature_type,  $logic_name, $feature_label);
+#      print "$sf_num features found and stored in db.\n";
+#    }
+#  }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
