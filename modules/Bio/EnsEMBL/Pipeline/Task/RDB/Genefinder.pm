@@ -4,9 +4,9 @@ package Bio::EnsEMBL::Pipeline::Task::RDB::Genefinder;
 
 use vars qw(@ISA);
 
-use Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant;
+use Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMaskerDependant;
 
-@ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant');
+@ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMaskerDependant');
 
 #this should beable to use the new method from RDB
 
@@ -15,10 +15,6 @@ sub name{
   return 'genefinder_task';
 }
 
-sub logic_name{
-  my $self = shift;
-  return 'Genefinder';
-}
 
 sub module{
   my $self = shift;

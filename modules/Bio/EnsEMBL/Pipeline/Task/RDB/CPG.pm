@@ -16,11 +16,6 @@ sub name{
   return 'cpg_task';
 }
 
-sub logic_name{
-  my $self = shift;
-  return 'CpG';
-}
-
 sub module{
   my $self = shift;
   return 'Bio::EnsEMBL::Pipeline::RunnableDB::CPG';

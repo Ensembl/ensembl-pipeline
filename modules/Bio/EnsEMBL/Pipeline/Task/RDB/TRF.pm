@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-package Bio::EnsEMBL::Pipeline::Task::RDB::tRNAscan_SE;
+package Bio::EnsEMBL::Pipeline::Task::RDB::TRF;
 
 use vars qw(@ISA);
 
@@ -13,14 +13,14 @@ use Bio::EnsEMBL::Pipeline::Task::RDB::NoDependancies;
 
 sub name{
   my $self = shift;
-  return 'trnascan_task';
+  return 'trf_task';
 }
 
 sub module{
   my $self = shift;
-  return 'Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE';
+  return 'Bio::EnsEMBL::Pipeline::RunnableDB::TRF';
 }
 
 sub description{
-  print STDERR "tRNAscan runs the runnable tRNAscan_SE and has no dependancies\n";
+  print STDERR "TRF runs the runnabledb TRF and has no dependancies\n";
 }

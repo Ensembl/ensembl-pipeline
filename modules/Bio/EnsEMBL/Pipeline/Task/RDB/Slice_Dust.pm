@@ -16,11 +16,6 @@ sub name{
   return 'slice_dust_task';
 }
 
-sub logic_name{
-  my $self = shift;
-  return 'Dust';
-}
-
 sub module{
   my $self = shift;
   return 'Bio::EnsEMBL::Pipeline::RunnableDB::Slice_Dust';

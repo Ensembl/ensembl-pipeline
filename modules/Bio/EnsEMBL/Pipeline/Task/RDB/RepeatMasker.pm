@@ -13,17 +13,9 @@ use Bio::EnsEMBL::Pipeline::Task::RDB::NoDependancies;
 
 #this should beable to use the new method from RDB
 
-
-
-
 sub name{
   my $self = shift;
   return 'repeatmasker_task';
-}
-
-sub logic_name{
-  my $self = shift;
-  return 'RepeatMask';
 }
 
 sub module{

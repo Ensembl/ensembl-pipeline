@@ -4,9 +4,9 @@ package Bio::EnsEMBL::Pipeline::Task::RDB::Fgenesh;
 
 use vars qw(@ISA);
 
-use Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant;
+use Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMaskerDependant;
 
-@ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant');
+@ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMaskerDependant');
 
 
 #this should beable to use the new method from RDB
@@ -15,11 +15,6 @@ use Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant;
 sub name{
   my $self = shift;
   return 'fgenesh_task';
-}
-
-sub logic_name{
-  my $self = shift;
-  return 'Fgenesh';
 }
 
 sub module{
