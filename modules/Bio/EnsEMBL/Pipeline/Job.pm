@@ -100,7 +100,6 @@ sub new {
     $self->retry_count($retry_count);
     $self->submission_id($submission_id);
     $self->output_dir($output_dir);
-    $self->output_dir($output_dir);
     if($self->output_dir){
       $self->make_filenames;
     }else{
