@@ -385,7 +385,7 @@ GENE:
     
     if ( $USE_cDNA_DB ){
       my $cdna_revslice = $cdna_slice->invert;
-      my $cdna_revgenes  = $cdna_revslice->get__all_Genes_by_type($cDNA_GENETYPE,'evidence');
+      my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE,'evidence');
       print STDERR "Number of genes from cdnas = " . scalar(@$cdna_revgenes) . "\n";
       push ( @$revgenes, @$cdna_revgenes ); 
     }
@@ -1472,7 +1472,14 @@ sub _produce_Transcript{
 
     # sort them in genomic order
     @exons    = sort { $a->start <=> $b->start } @exons;
-    
+ 
+###foreach my $exon (@exons){
+#print STDERR $exon . "\n";
+#while (my ($k, $v) = each %$exon){
+#print STDERR "     $k => $v\n";
+#}
+#}
+
     push ( @allexons, @exons );
     
     # keep track of whether the exons is first or last and the transcript it belongs to
@@ -1504,10 +1511,7 @@ sub _produce_Transcript{
   my @exon_clusters = $cluster_list->sub_SeqFeature;
 
   foreach my $exon_cluster (@exon_clusters){
-###print STDERR "Exon Cluster " . $exon_cluster . "\n";
-#while (my ($k, $v) = each %$exon_cluster){
-#print "     $k => $v\n";
-#}
+
     my $new_exon = Bio::EnsEMBL::Exon->new();
     $new_exon->start ($exon_cluster->start );
     $new_exon->end   ($exon_cluster->end   );
@@ -1524,10 +1528,8 @@ sub _produce_Transcript{
       #print STDERR "\ntransferring evidence from $exon to $new_exon\n";
       $self->_transfer_Supporting_Evidence($exon,$new_exon);
     }
-###print STDERR "EST_GeneBuilder - ADDING " . $new_exon . "\n";
-#while (my ($k, $v) = each %$new_exon){
-#print "     $k => $v\n";
-#}
+
+$new_exon->end_phase(5);
     $transcript->add_Exon($new_exon);
   }
  			
@@ -2450,7 +2452,6 @@ sub make_genes {
   
  TRANSCRIPT:
   foreach my $transcript (@trans) {
-    $count++;
 
     # create a new gene object out of this transcript
     my $gene   = new Bio::EnsEMBL::Gene;
@@ -2473,7 +2474,6 @@ sub make_genes {
     }
     
     #print STDERR "In _make_genes() before translate():\n\n";
-    my $excount = 1;
   EXON:
     foreach my $exon(@exons){
       
@@ -2485,8 +2485,6 @@ sub make_genes {
       # if strand = -1 we have inverted the contig, thus
       $exon->strand(1);
       # when the gene gets stored, the strand is flipped automatically
-
-      $excount++;
   }
 
     my $translation = $transcript->translation;
@@ -2538,7 +2536,7 @@ sub make_genes {
 	push(@genes,$gene);
       }
       
-      print STDERR "\n";
+      print STDERR "\n"; # ?!?
 
     }
   } # end of TRANSCRIPT
@@ -2561,25 +2559,28 @@ sub make_genes {
 =cut
 
 sub remap_genes {
-  my ($self, $genes, $strand) = @_;
-  my $contig = $self->vcontig;
-  if ( $strand == -1 ){
-    $contig = $contig->invert;
-  }
+  my ($self, $genes, $strand) = @_;#
+#  my $slice = $self->vcontig;
+#  if ( $strand == -1 ){
+#    $slice = $slice->invert;
+#  }
   
   my @newf;
   my $trancount=1;
   foreach my $gene (@$genes) {
     my @trans = @{$gene->get_all_Transcripts};
     my $newgene;
-    
+
     # convert to raw contig coords
     eval {
-      $newgene = $contig->convert_Gene_to_raw_contig($gene);
+
+      # transforming gene to raw contig coordinates.
+      $newgene = $gene->transform;
       
       # need to explicitly add back genetype and analysis.
       $newgene->type($gene->type);
       $newgene->analysis($gene->analysis);
+
       push(@newf,$newgene);
       
     };
@@ -2589,27 +2590,6 @@ sub remap_genes {
 	$self->_print_Transcript($t);
       }
     }
-    
-    ### check that supporting evidence has been preserved:
-    #foreach my $tran ( $newgene->get_all_Transcripts ){
-    #  print STDERR "after convert_to_raw_contig:\n";
-    #  my $excount = 0;
-    #  foreach my $exon ( $tran->get_all_Exons ){
-    #  $excount++;
-    #  my @evi = $exon->get_all_supporting_features;
-    #  print "Exon $excount: ".scalar(@evi)." features\t"
-    #  ."start: ".$exon->start." end: ".$exon->end."\n";
-    #  if ( @evi ){
-    #   foreach my $evi (@evi){
-    #    print STDERR $evi." - ".$evi->gffstring."\n";
-    #   }
-    #  }
-    #  else{
-    #   print STDERR "No supporting evidence\n";
-    #  }
-    # }
-    #}
-
   }
   return @newf
 }
