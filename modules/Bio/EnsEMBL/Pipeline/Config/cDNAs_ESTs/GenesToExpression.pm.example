@@ -46,7 +46,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::GenesToExpression;
+package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression;
 
 use strict;
 use vars qw( %GenesToExpression );
