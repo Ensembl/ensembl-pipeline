@@ -75,7 +75,6 @@ sub new {
 sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
-  print STDERR "fetching job by ".$id."\n";
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, class, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
@@ -89,7 +88,6 @@ sub fetch_by_dbID {
     return undef;
   }
   my $job = $self->_objFromHashref( $rowHashRef );
-  print "have got back ".$job."\n";
   return $job;
 }
 
@@ -433,7 +431,6 @@ sub _objFromHashref {
       '-analysis'  => $analysis,
       '-retry_count' => $hashref->{'retry_count'}
   );
-  print "have created ".$job." from hash ref\n";
   return $job;
 }
 

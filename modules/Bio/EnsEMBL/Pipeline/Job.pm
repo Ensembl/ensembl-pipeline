@@ -99,18 +99,18 @@ sub new {
 }
 
 
-=head2 create_by_analysis_inputId
+=head2 create_by_analysis_input_id
 
-  Title   : create_by_analysis_inputId
+  Title   : create_by_analysis_input_id
   Usage   : $class->create_by.....
-  Function: Creates a job given an analysis object and an inputId
+  Function: Creates a job given an analysis object and an input_id
             Recommended way of creating job objects!
   Returns : a job object, not connected to db
   Args    : 
 
 =cut
 
-sub create_by_analysis_inputId {
+sub create_by_analysis_input_id {
   my ($dummy, $analysis, $inputId, $class) = @_;
 
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
@@ -253,7 +253,6 @@ sub flush_runs {
   my $queue    = $LSF_params->{'queue'}   || undef;
   my $jobname  = $LSF_params->{'jobname'} || undef;
   my $bsub_opt = $LSF_params->{'bsub'}    || undef;
-  print STDERR "running flushruns for job\n";
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
@@ -313,14 +312,12 @@ sub flush_runs {
     # check if the password has been defined, and write the
     # "connect" command line accordingly (otherwise -pass gets the
     # first job id as password, instead of remaining undef)
-    print STDERR "have to submit these jobs @{$batched_jobs{$queue}}\n";
     if ($pass) {
       $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
     }
     else {
       $cmd = $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
     }
-    print STDERR "giving ".$cmd." to lsf\n";
     $LSF->construct_command_line($cmd);
     $LSF->open_command_line();
 
@@ -341,9 +338,7 @@ sub flush_runs {
           }
         }
 	$job->submission_id( $LSF->id );
-	print STDERR "retry count ".$job->retry_count."\n";
         $job->retry_count( $job->retry_count + 1 );
-	print STDERR "retry count ".$job->retry_count."\n";
         $job->set_status( "SUBMITTED" );
       }
       $adaptor->update(@jobs);
@@ -374,7 +369,6 @@ sub batch_runRemote {
   # should check job->analysis->runtime
   # and add it to batched_jobs_runtime
   # but for now just
-  print STDERR "adding to array, job id = ".$self->dbID."\n";
   push( @{$batched_jobs{$queue}}, $self->dbID );
   if ( scalar( @{$batched_jobs{$queue}} ) >= $batchsize ) {
     $self->flush_runs( $self->adaptor, $LSF_params );
@@ -506,7 +500,7 @@ sub runInLSF {
   if ($autoupdate) {
     eval {
       my $sic = $self->adaptor->db->get_StateInfoContainer;
-      $sic->store_inputId_class_analysis(
+      $sic->store_input_id_class_analysis(
         $self->input_id,
         $self->class,
         $self->analysis
