@@ -458,7 +458,11 @@ while (1) {
       }
     }
     
-    &shut_down($db) if $done || $once;
+    if($done || $once){
+      &shut_down($db);
+    }else{
+      &cleanup_waiting_jobs($db);
+    }
     sleep($rerun_sleep) if $submitted == 0;
     @id_list = ();
     print "Waking up and run again!\n" if $verbose;
@@ -542,6 +546,18 @@ sub shut_down {
     exit 0;
 }
 
+
+#this method should ensure any jobs hanging around after a complete
+#cycle of the central loop are run regardless whether batch size is met
+#or not
+sub cleanup_waiting_jobs{
+  my ($db) = @_;
+
+    my ($a_job) = $db->get_JobAdaptor->fetch_by_Status("CREATED");
+    if ($a_job) {
+        $a_job->flush_runs($db->get_JobAdaptor);
+    } 
+}
 
 # handler for SIGTERM
 sub termhandler {
@@ -784,7 +800,8 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head1 OPTIONS
 
-=head2 [DB Connection Details]
+=head2 DB Connection Details
+
 
    -dbhost     The host where the pipeline database is.
    -dbport     The port.
@@ -792,13 +809,7 @@ A Simple script using the Monitor.pm module to display information on the status
    -dbpass     The password to use.
    -dbname   The database name.
 
-=head2 [Other Options]
-
-   
-   
--h or -help will print out the help again
-
-=head1 EXAMPLES
+=head2 Other Options
 
    -local run the pipeline locally and not using the batch submission 
     system
