@@ -52,6 +52,7 @@ use diagnostics;
 use vars qw(@ISA);
 use strict;
 
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
@@ -112,7 +113,6 @@ sub new{
   
 
   # where the ests are (we actually want exonerate_e2g transcripts )
-  
   unless( $self->dbobj){
     my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						    '-host'   => $EST_E2G_DBHOST,
@@ -124,12 +124,20 @@ sub new{
   }
   $self->est_db( $self->dbobj);
   $self->est_db->dnadb($refdb);
-
-  # needs to read from two databases and write into another one (possibly a third?)
-  
   $self->ensembl_db( $ensembl_db );
   $self->dna_db( $refdb );
-
+  
+  # database where the expression vocabularies are.
+  # this is also where we are going to store the results
+  my $expression_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+							 '-host'   => $EST_EXPRESSION_DBHOST,
+							 '-user'   => $EST_EXPRESSION_DBUSER,
+							 '-dbname' => $EST_EXPRESSION_DBNAME,
+							 '-pass'   => $EST_EXPRESSION_DBPASS,
+							);
+  
+  $self->expression_db($expression_db);
+  
   return $self;
   
 }
@@ -148,6 +156,17 @@ sub ensembl_db{
     $self->{'_ensembl_db'} = $db;
   }
   return $self->{'_ensembl_db'};
+}
+
+############################################################
+
+sub expression_db{
+  my ( $self, $db ) = @_;
+  if ( $db ){
+    $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor") || $self->throw("Input [$db] is not a Bio::EnsEMBL::DBSQL::DBAdaptor");
+    $self->{'_expression_db'} = $db;
+  }
+  return $self->{'_expression_db'};
 }
 
 ############################################################
@@ -331,16 +350,17 @@ sub run{
       
       my @est_transcripts;
       foreach my $est ( @ests ){
-	push ( @est_transcripts, $est->each_Transcript );
+	push ( @est_transcripts, $est->get_all_Transcripts );
       }
-
+      
       foreach my $gene ( @genes ){
-	foreach my $transcript ( $gene->each_Transcript ){
+	foreach my $transcript ( $gene->get_all_Transcripts ){
+	 
 	  $self->_map_ESTs( $transcript, \@est_transcripts );
 	}
       }
     }
-     
+    
     # else we could have only ensembl genes
     elsif(  @genes && !@ests ){
       # we have nothing to modify them, hence we accept them...
@@ -447,7 +467,7 @@ sub cluster_Genes{
 sub _get_start_of_Gene{  
   my ($self,$gene) = @_;
   my $start;
-  foreach my $tran ( $gene->each_Transcript){
+  foreach my $tran ( $gene->get_all_Transcripts){
     foreach my $exon ( $tran->get_all_Exons ){
       unless ($start){
 	$start = $exon->start;
@@ -468,7 +488,7 @@ sub _get_start_of_Gene{
 sub _get_end_of_Gene{  
   my ($self,$gene) = @_;
   my $end;
-  foreach my $tran ( $gene->each_Transcript){
+  foreach my $tran ( $gene->get_all_Transcripts){
     foreach my $exon ( $tran->get_all_Exons ){
       unless ($end){
 	$end = $exon->end;
@@ -523,11 +543,13 @@ sub _get_end_of_Gene{
 
 sub _map_ESTs{
   my ($self,$transcript,$ests) = @_;
-  my @ests = @{ $ests };
-  if (  !( $ests[0]->isa('Bio::EnsEMBL::Transcript')) || !( $transcript->isa('Bio::EnsEMBL::Transcript')) ){
-    $self->throw('expecting only transcripts, you have est = $ests[0] and transcript = $transcript');
-  } 
-  
+  #if (  !( $ests[0]->isa('Bio::EnsEMBL::Transcript')) || !( $transcript->isa('Bio::EnsEMBL::Transcript')) ){
+  #  $self->throw('expecting only transcripts, you have est = $ests[0] and transcript = $transcript');
+  #} 
+
+  # get only the ests that are in the SANBI database
+  my @ests = $self->_in_SANBI( @{ $ests } );
+
   # check this transcript first:
   my $check = $self->_check_Transcript($transcript);
   unless ($check){
@@ -540,24 +562,6 @@ sub _map_ESTs{
   # a comparison tool
   my $transcript_comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
   
-  # find out everything about the transcript before starting to compare
-  my $translation = $transcript->translation;
-  my $id;
-  if ( $transcript->stable_id ){
-    $id = $transcript->stable_id;
-  }
-  elsif( $transcript->dbID ){
-    $id = $transcript->dbID;
-  }
-  unless( $translation ){
-    print STDERR "Need a translation for $transcript ( $id ), skipping it...\n";
-    return;
-  }
-  my $start = $translation->start;
-  my $end   = $translation->end;
-  my $start_exon = $translation->start_exon;
-  my $end_exon   = $translation->end_exon;
-
  EST:
   foreach my $est (@ests){
     
@@ -566,11 +570,6 @@ sub _map_ESTs{
       next EST;
     }
 
-    # check that this transcript is in the SANBI database
-    #unless ($self->_is_in_SANBI($est)){
-    #  next EST;
-    #}
-   
     # compare this est
     my $merge = $transcript_comparator->test_for_semiexact_Merge($transcript,$est);
 
@@ -582,7 +581,12 @@ sub _map_ESTs{
     if ($merge){
       my $alt_start = $self->_check_5prime($transcript,$est);
       my $alt_polyA = $self->_check_3prime($transcript,$est);
+      if ( $alt_start || $alt_polyA ){
+	$self->_print_Transcript($transcript);
+	$self->_print_Transcript($est);
+      }
     }
+
 
     # if match, put est in $expression_map{ $transcript }
     if ($merge){
@@ -612,32 +616,38 @@ sub _map_ESTs{
 
 #########################################################################
 
-sub _is_in_SANBI{
-  my ($self,$est) = @_;
-  my $est_id = $self->_find_est_id($est);
-  unless ( $est_id ){
-    return 0;
-  }
-  if ( $est_id =~/(\S+)\.(\d+)/ ){
-    $est_id = $1;
-  }
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					      '-host'   => $EST_EXPRESSION_DBHOST,
-					      '-user'   => $EST_EXPRESSION_DBUSER,
-					      '-dbname' => $EST_EXPRESSION_DBNAME,
-					      '-pass'   => $EST_EXPRESSION_DBPASS,
-					     );
+sub _in_SANBI{
+  my ($self,@ests) = @_;
   
+  # @ests are transcript objects
+  my %id_to_transcript;
+
+  my @est_ids;
+ EST:
+  foreach my $est ( @ests ){
+    my $est_id = $self->_find_est_id($est);
+    unless ($est_id){
+      #print STDERR "No accession found for ".$est->dbID."\n";
+      next EST;
+    }
+    #print STDERR "est: $est, est_id: $est_id\n";
+    if ( $est_id =~/(\S+)\.(\d+)/ ){
+      $est_id = $1;
+    }
+    push( @est_ids, $est_id );
+    $id_to_transcript{$est_id} = $est;
+  }
+  my $db = $self->expression_db;
   my $expression_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor($db);
-  my $library = $expression_adaptor->get_library_by_est( $est_id );
-  if ( $library ){
-    #print STDERR "library found = $library\n";
-    return 1;
+  my @pairs = $expression_adaptor->get_libraryId_by_estarray( @est_ids );
+  
+  my @found_ests;
+  foreach my $pair ( @pairs ){
+    if ( $$pair[1] ){
+      push ( @found_ests, $id_to_transcript{ $$pair[0] } );
+    }
   }
-  else{
-    print STDERR "library NOT found for $est_id\n";
-    return 0;
-  }
+  return @found_ests;
 }
 
 
@@ -852,6 +862,9 @@ sub _find_est_id{
     }
   }
   my @evidence = keys %is_evidence;
+  unless ( $evidence[0] ){
+    print STDERR "No evidence for ".$est->dbID.", hmm... possible sticky single exon gene\n";
+  }
   return $evidence[0];
 }
  
@@ -862,45 +875,34 @@ sub _find_est_id{
 sub write_output {
   my ($self) = @_;
   
-  my $db            = $self->ensembl_db;
-  my $trans_adaptor = $db->get_TranscriptAdaptor;
-  my $entry_adaptor = $db->get_DBEntryAdaptor();
-  #my $est_adaptor   = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->est_db);
+  my $db = $self->expression_db;
+  my $expression_adaptor = new Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor($db);
+  
+  
   
   # recall we have stored the results in self->expression_Map as push ( @{ $self->{_est_map}{$transcript} }, $est );
   my %expression_map = %{ $self->expression_Map };
   
   foreach my $transcript_id ( keys %expression_map ){
     
-    my $transcript = $trans_adaptor->fetch_by_stable_id($transcript_id);
-    my $trans_dbID = $transcript->dbID;
+    # $transcript_id should be a stable_id
+    my @est_ids;
     foreach my $est ( @{ $expression_map{$transcript_id} }  ){
-      
       my $est_id = $self->_find_est_id($est);
-      my $est_id_no_version;
-      if ( $est_id =~/(\S+)\.(\d+)/){
-	$est_id_no_version = $1;
+      if ( $est_id){
+	my $est_id_no_version;
+	if ( $est_id =~/(\S+)\.(\d+)/){
+	  $est_id_no_version = $1;
+	}
+	else{
+	  $est_id_no_version = $est_id;
+	}
+	push (@est_ids, $est_id_no_version);
       }
-      else{
-	$est_id_no_version = $est_id;
-      }
-
-      print STDERR "Storing pair $transcript_id, $est_id\n";
-      
-      # need to find the est_id from est table for this est accession
-      #my $est_dbID = $est_adaptor->get_est_dbID_by_hid($est_id);
-      
-      my $dbentry = Bio::EnsEMBL::IdentityXref->new( -adaptor    => $entry_adaptor,
-						     -primary_id => $est_id,
-						     -display_id => $est_id_no_version,
-						     -version    => 1,
-						     -release    => 1,
-						     -dbname     => 'dbEST',
-						   );
-      
-      $dbentry->status('XREF');
-      $entry_adaptor->store($dbentry,$trans_dbID,"Transcript");
     }
+    print STDERR "Storing pair $transcript_stable_id, $est_id\n";
+      
+    $expression_adaptor->store_ensembl_link($transcript_id,\@$est_ids);
   }
 }
 
