@@ -1,5 +1,4 @@
 #
-#
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
 # Copyright GRL & EBI
@@ -50,6 +49,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
+use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -256,7 +256,7 @@ GENE:
       my @transcripts  = $self->cluster_transcripts(@plus_transcripts);
       print "transcripts are ".ref( $transcripts[0] )."\n";
       
-      print STDERR scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
+      print STDERR "In EST_GneBuilder: ".scalar(@plus_transcripts) . " forward strand genes, and $single single exon genes\n";
       my $num1=1;
       foreach my $tran (@transcripts){
 	my @exons = $tran->get_all_Exons;
@@ -270,9 +270,11 @@ GENE:
 
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $contig->primary_seq,
-									   );
+      								   );
+#	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable);
+#	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
       }
     }
@@ -332,9 +334,11 @@ GENE:
 	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $revcontig->primary_seq,
-									   );
+      								   );
+#	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable, $reverse);
+#	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
       }
     }
@@ -418,10 +422,11 @@ sub check_transcripts {
     my $hid;
     my $strand;
     
+    my $num4=0;
     foreach my $exon(@exons){
       my $hstart;
       my $hend;
-
+      $num4++;
       # check strand consistency
       if(!defined $strand) { 
 	$strand = $exon->strand; 
@@ -437,11 +442,14 @@ sub check_transcripts {
       $exon_adaptor->fetch_evidence_by_Exon($exon);
       my @sf = $exon->each_Supporting_Feature;      
     SF:
+      my $check=0;
       foreach my $feature ( @sf ) {
 	# because we get all the supporting features indiscriminately
 	next SF unless $feature->source_tag eq 'exonerate_e2g';
-	
-	print STDERR "Supporting Feature ".$num3." is a ".ref( $feature )."\t".$feature->source_tag."\n";	
+	$check=1;
+	#print STDERR "check = ".$check."\n";
+	#print STDERR "Supporting Feature ".$num4."-".$num3." is a ".ref( $feature )
+        #             ."\t".$feature->source_tag."\n";	
 	$num3++;
 
 	if(!defined $hid) { $hid = $feature->hseqname; }
@@ -456,11 +464,14 @@ sub check_transcripts {
 	#print STDERR scalar(@sf)."@sf is defined!!?\n";
 	$hstart = $sf[0]->hstart;
 	$hend   = $sf[$#sf]->hend;
-	print STDERR "hstart: ".$hstart."\thend: ".$hend."\n";
+	#print STDERR "hstart:                 ".$hstart.
+	#         "\thend:                 ".$hend."\n";
       }
       $$exon_hid{$exon}{"hid"} = $hid;
       $$exon_hid{$exon}{"hstart"} = $hstart;
       $$exon_hid{$exon}{"hend"} = $hend;
+      #print   STDERR "exon_hid{exon}{hstart}: ".$$exon_hid{$exon}{"hstart"}.
+      #           "\texon_hid{exon}{hend}: ".$$exon_hid{$exon}{"hend"}."\n";
       # make sure we can get out the hid corresponding to this exon
     }
 
@@ -517,7 +528,7 @@ sub make_clusters {
 	  
 	  # And add to the top cluster feature
 	  $main_cluster->add_sub_SeqFeature($subcluster,'EXPAND');	
-      }
+	}
     }
     $count++;
   }
@@ -634,6 +645,7 @@ sub find_common_ends {
         
     # take the 2 bases right before the exon and after the exon
     if ($cluster->strand == 1){
+      print STDERR "getting subseq in ( ".(($cluster->start)-2).",".(($cluster->start)-1).")\n";
       $upstream   = $seq->subseq( ($cluster->start)-2 , ($cluster->start)-1 ); 
       $downstream = $seq->subseq( ($cluster->end)+1   , ($cluster->end)+2   ); 
     }
@@ -718,7 +730,7 @@ sub link_clusters{
   # Loop over all clusters
  CLUSTER1:  
   for (my $c1 = 0; $c1 < $#clusters; $c1++) {
-    print("Finding links in cluster number $c1... \n");
+    print "\nFinding links in cluster number $c1... \n";
     my $cluster1 = $clusters[$c1];             
     my @exons1   = $cluster1->sub_SeqFeature; 
     my $c2       = $c1 + 1;
@@ -756,15 +768,19 @@ sub link_clusters{
 	    print("  Found ids in two clusters: " . $exon1->dbID . " " . $exon_link->dbID  . "\n");
 	    
 	    # Check the strand is the same and only allow a $tol discontinuity in the h-sequence
-	    if ( $exon1->strand == $exon_link->strand &&
-		( abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'}) < $tol || 
-		  abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'})   < $tol   ) ) {
+	    my $tol1 = abs($$exon_hid{$exon1}{'hend'}   - $$exon_hid{$exon_link}{'hstart'});
+	    my $tol2 = abs($$exon_hid{$exon1}{'hstart'} - $$exon_hid{$exon_link}{'hend'});
+	    
+	    if ( $exon1->strand == $exon_link->strand && ( $tol1 < $tol || $tol2 < $tol ) ) {
 	      $foundlink = 1;
+	      print STDERR "   tol1: ".$tol1." tol2: ".$tol2."\n";
 	    }
 	    else {
 	      print STDERR "--- not going to be able to link cluster $c1 and $c2\n";
-	      print STDERR "  exon1 : " . $exon1->start . " - " .$exon1->end 
-		. " potential link : " . $exon_link->start . " - ". $exon_link->end . " tol " . $tol . "\n";
+	      print STDERR "   exon1 : ". $exon1->start . " - " .$exon1->end 
+		." potential link : ". $exon_link->start." - ".$exon_link->end."\n";
+	      print STDERR "   Exonerate hit - start: ".$$exon_hid{$exon1}{'hstart'}." - end: "
+		.$$exon_hid{$exon1}{'hend'}." tol1: ".$tol1." tol2: ".$tol2."\n";
 	    }
 	    if ($foundlink == 1) {
 	      print STDERR "*** linking cluster $c1 to cluster $c2 ***\n";
@@ -989,7 +1005,6 @@ sub _put_Transcript {
   my ($self,$transcript) = @_;
   $self->throw("No transcript input") unless defined($transcript);
   $self->throw("Input must be Bio::EnsEMBL::Transcript") unless $transcript->isa("Bio::EnsEMBL::Transcript");
-  #print STDERR "putting transcripts\n";
   if ( !defined( $self->{'_transcripts'} ) ){
     @{ $self->{'_transcripts'} } = ();
   }
@@ -1071,7 +1086,7 @@ sub run {
 
   # sort out analysis & genetype here or we will get into trouble with duplicate analyses
 #  my $genetype = 'genomewise'; 
-  my $genetype = 'new_genomewise';    # genes get written in the database with this name-type
+  my $genetype = "Genomewise+UTR";   # genes get written in the database with this type-name
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis_obj;
@@ -1100,7 +1115,7 @@ sub run {
 
   # plus strand
   foreach my $gw_runnable( $self->each_runnable) {
-    print STDERR "about to run genomewise\n";
+    print STDERR "\nabout to run genomewise\n";
     $gw_runnable->run;
 
     # convert_output
@@ -1149,7 +1164,6 @@ sub convert_output {
   my @remapped = $self->remap_genes(\@genes, $reverse);
 
   # store genes
- 
   $self->output(@remapped);
  
 }
@@ -1171,10 +1185,28 @@ sub make_genes {
   if(defined $reverse){
     $contig = $contig->invert;
   }
+  # transcripts come with a translation, that's sorted out in MiniGenomwise and Genomewise
   my @trans = $runnable->output;
-  print "transcripts: " . scalar(@trans) . "\n";
+  
+  
+  
+  #print STDERR "runnable is a ".ref($runnable)."\n";
+  #print "transcripts: " . scalar(@trans) . "\n";
 
-  foreach my $transcript ($runnable->output) {
+  foreach my $transcript (@trans) {
+  
+   ##test
+#    print STDERR "\nIn EST_GeneBuilder.make_genes\n";
+#    print STDERR " Transcript        : ".$transcript."\n";
+#    print STDERR " Translation       : ".$transcript->translation."\n";
+#    print STDERR " translation starts: ".$transcript->translation->start."\n";
+#    print STDERR " translation ends  : ".$transcript->translation->end."\n";
+#    print STDERR " start exon: ".$transcript->translation->start_exon
+#      ." starts: ".$transcript->translation->start_exon->start
+#      ." ends: ".$transcript->translation->start_exon->end."\n";
+#    print STDERR " end  exon : ".$transcript->translation->end_exon
+#      ." starts: ".$transcript->translation->end_exon->start
+#      ." ends: ".$transcript->translation->end_exon->end."\n";
     $count++;
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
@@ -1196,38 +1228,23 @@ sub make_genes {
 
     foreach my $exon(@exons){
 
+      #print STDERR "  Exon ".$excount." : ".$exon."  start: ".$exon->start." end: ".$exon->end."\n";
       $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
       $exon->contig_id($contig->id);
       $exon->attach_seq($contig->primary_seq);
       $excount++;
-      }
-    
-    print STDERR "exons: " . scalar(@exons) . "\n";
-
-    # sort out translation
-    my $translation  = new Bio::EnsEMBL::Translation;    
-    $translation->temporary_id($contig->id . ".$genetype.$count");
-    $translation->start_exon($exons[0]);
-
-    $translation->end_exon  ($exons[$#exons]);
-    if ($exons[0]->phase == 0) {
-      $translation->start(1);
-    } elsif ($exons[0]->phase == 1) {
-      $translation->start(3);
-    } elsif ($exons[0]->phase == 2) {
-      $translation->start(2);
     }
-    $translation->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
-
-    $transcript->translation($translation);
+    #put temporary_id (this hasn't been put in neither Genomewise nor MiniGenomewise
+    my $translation = $transcript->translation;
+    $translation->temporary_id($contig->id . ".$genetype.$count");
   }
   return @genes;
 }
 
-=head2 _remap_genes
+=head2 remap_genes
 
-    Title   :   _remap_genes
-    Usage   :   $self->_remap_genes(@genes)
+    Title   :   remap_genes
+    Usage   :   $self->remap_genes(@genes)
     Function:   Remaps predicted genes into genomic coordinates
     Returns :   array of Bio::EnsEMBL::Gene
     Args    :   Bio::EnsEMBL::Virtual::Contig, array of Bio::EnsEMBL::Gene
@@ -1246,6 +1263,28 @@ sub remap_genes {
   my @newf;
   my $trancount=1;
   foreach my $gene (@$genes) {
+    #test2
+    my @trans = $gene->each_Transcript;
+
+# test
+#    
+foreach my $tran (@trans){
+#      print STDERR "In EST_GeneBuilder.remap_genes: \n";
+#      print STDERR "  transcript        : ".$tran."\n";
+#      print STDERR "  translation       : ".$tran->translation."\n";
+#      print STDERR "  translation starts: ".$tran->translation->start."\n";
+#      print STDERR "  translation ends  : ".$tran->translation->end."\n";
+#      print STDERR "  start exon        : ".$tran->translation->start_exon
+#                  ."\tstart: ".$tran->translation->start_exon->start."\tends: "
+#		  .$tran->translation->start_exon->end."\n";
+#      print STDERR "  end  exon         : ".$tran->translation->end_exon
+#	          ."\tstart: ".$tran->translation->end_exon->start."\tends: "
+#		  .$tran->translation->end_exon->end."\n";
+#      print STDERR "  temporary_id      : ".$tran->translation->temporary_id."\n";
+   }
+
+
+    
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
       # need to explicitly add back genetype and analysis.
