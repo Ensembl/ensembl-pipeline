@@ -303,28 +303,29 @@ GENE:
       # make a genomewise runnable for each cluster of transcripts
 
       foreach my $tran (@transcripts){
-	print STDERR "In EST_GeneBuilder, creating a Runnable::MiniGenomewise for\n";
-	my $excount = 0;
-	foreach my $exon ($tran->get_all_Exons){
-	  $excount++;
-	  #$exon_adaptor->fetch_evidence_by_Exon($exon);
-	  my @evi = $exon->each_Supporting_Feature;
-	  print STDERR "Exon: $excount, ".scalar(@evi)." features\t"
-	    ."start: ".$exon->start." end: ".$exon->end."\n";
-	  foreach my $evi (@evi){
-	    print STDERR $evi." - ".$evi->gffstring."\n";
-	  }
-	}
+	#print STDERR "In EST_GeneBuilder, creating a Runnable::MiniGenomewise for\n";
+	#my $excount = 0;
+	#foreach my $exon ($tran->get_all_Exons){
+	#  $excount++;
+	#my @evi = $exon->each_Supporting_Feature;
+	#  print STDERR "Exon: $excount, ".scalar(@evi)." features\t"
+	#    ."start: ".$exon->start." end: ".$exon->end."\n";
+	#  foreach my $evi (@evi){
+	#    print STDERR $evi." - ".$evi->gffstring."\n";
+	#  }
+	#}
+      
 
-
+	# use MiniSeq
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
 									    -genomic => $contig->primary_seq,
 									   );
-#	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable,$strand);
-#	$runnable->seq($contig->primary_seq);
 	$runnable->add_Transcript($tran);
+
+	#my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
+	#$runnable->seq($contig->primary_seq);
 
       }
     }
@@ -525,7 +526,8 @@ sub _check_Transcripts {
       }
 
       # get the supporting_evidence for each exon
-      #$exon_adaptor->fetch_evidence_by_Exon($exon);
+      # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
+
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
       my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
             
@@ -535,7 +537,7 @@ sub _check_Transcripts {
 		    "exon_id =".$exon->dbID."\n");
       }
 
-######## some of the checks are commented out, as we didn't need to use them any longer
+######## some of the checks are commented out, maybe resurrected later when we switch to pure exonerate
 
 
 ######## check consitency of supporting evidence
@@ -781,7 +783,7 @@ sub _cluster_Transcripts{
   $sorted_transcripts->sort;
   $start{ $cluster } = $sorted_transcripts[0]->start_exon->start;
   $end{ $cluster }   = $sorted_transcripts[0]->end_exon->end;
-
+    
   # loop over the rest of the genes
  LOOP1:
   for (my $c=1; $c<=$#sorted_transcripts; $c++){
@@ -821,7 +823,7 @@ sub _cluster_Transcripts{
 
     if ( $found == 0 && $cluster_count > 1 ) {
       my $lookup = 1;
-
+      
       # loop through the clusters backwards
       while ( !($cluster_count <= $lookup ) ){ 
 	#print STDERR "cluster_count: $cluster_count, looking at ".($cluster_count - $lookup)."\n";
@@ -829,7 +831,7 @@ sub _cluster_Transcripts{
 	
 	# only look if it is potentially overlapping
 	if ( !( $end{ $previous_cluster } < $this_start || $this_end < $start{ $previous_cluster } ) ){
-	  
+
 	  # loop over the transcripts in this previous cluster
 	  foreach my $t_in_cluster ( $previous_cluster->get_Transcripts ){
 	    if ( $self->_compare_Transcripts( $sorted_transcripts[$c], $t_in_cluster ) ){	
@@ -862,21 +864,21 @@ sub _cluster_Transcripts{
   }
 
   ## print out the clusters
-  #my $number  = 1;
-  #foreach my $cluster (@clusters){
-  #  my $count = 1;
-  #  print STDERR "cluster $number :\n";
-  #  foreach my $tran ($cluster->get_Transcripts){
-  #    print STDERR "$count:\n";
-  #    print STDERR $tran->dbID." >";
-  #    foreach my $exon ( $tran->get_all_Exons ){
-  #	print STDERR $exon->start.":".$exon->end." ";
-  #    }
-  #    print STDERR "\n";
-  #    $count++;
-  #  }
-  #  $number++;
-  #}		
+  my $number  = 1;
+  foreach my $cluster (@clusters){
+    my $count = 1;
+    print STDERR "cluster $number :\n";
+    foreach my $tran ($cluster->get_Transcripts){
+      print STDERR "$count:\n";
+      print STDERR $tran->dbID." >";
+      foreach my $exon ( $tran->get_all_Exons ){
+  	print STDERR $exon->start.":".$exon->end." ";
+      }
+      print STDERR "\n";
+      $count++;
+    }
+    $number++;
+  }		
   
   return @clusters;
 }
@@ -886,7 +888,8 @@ sub _cluster_Transcripts{
 =head2 _compare_Transcripts()
 
  Title: _compare_Transcripts()
- Usage: compares the exons of two transcripts according to overlap and returns the number of overlaps
+ Usage: compares the exons of two transcripts according to overlap and returns 1 if they have at least
+        one exon overlap, and 0 otherwise
 
 =cut
 
@@ -1043,8 +1046,6 @@ sub _merge_Transcripts{
     }
  
     # at this point we have $created_transcripts{u=0,1,...,$#transcripts} transcripts
-    
-    # first of all, sort them again
     my @created_transcripts = values ( %created_transcripts );
     
 #    # print created transcripts
