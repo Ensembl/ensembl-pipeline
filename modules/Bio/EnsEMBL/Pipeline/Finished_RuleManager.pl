@@ -111,6 +111,7 @@ my $runner;
 my $shuffle;  
 my $output_dir;
 my @start_from;
+my @assembly_types = ();
 my $db_sanity      = 1;
 my %analyses;
 my $verbose        = 1;
@@ -139,6 +140,7 @@ GetOptions(
     'shuffle!'      => \$shuffle,
     'norun'         => \$no_run,
     'start_from=s@' => \@start_from,
+    'assembly=s@'   => \@assembly_types,
     'analysis=s@'   => \@analyses,
     'dbsanity!'     => \$db_sanity,
     'v!'            => \$verbose,
@@ -292,7 +294,7 @@ while (1) {
         print "Reading IDs ... ";
 
         foreach my $a (@start_from) {
-	    push @id_list, @{$sic->list_input_id_by_Analysis($a)};
+	    push @id_list, @{$sic->list_input_id_by_Analysis_assembly_type($a, \@assembly_types)};
 	}
     }
 
@@ -819,8 +821,32 @@ sub useage{
 
 =pod
 
-=head1
+=head1 Useage
 
-FinishedRuleManager
+FinishedRuleManager [-options]
+
+(general)
+
+ -help      (show this pod)
+ -start_from __ANALYSIS_ID__ (analysis id to start from)
+ -once      (only go through main loop once)
+ -norun     (just create jobs in job & job_status tables, useful for debug)
+ -idlist __IDLISTFILE__      (file of input_ids to use)
+ -assembly __ASSEMBLY_TYPE__ (assembly type of input_ids to use)
+
+(database stuff)
+
+ -dbhost __HOSTNAME__
+ -dbport __PORT__    
+ -dbname __DBNAME__  
+ -dbuser __USERNAME__
+ -dbpass __PASSWORD__
+   
+(control stuff pick one)
+ -start   (starts the script as a daemon)
+ -stop    (stops the daemon previously started)
+ -restart (tries to restart, not recommended, use -stop then -start)
+ -status  (tries to work out the status of the daemon)
+ -buffy   (just runs the script without any vampires)
 
 =cut
