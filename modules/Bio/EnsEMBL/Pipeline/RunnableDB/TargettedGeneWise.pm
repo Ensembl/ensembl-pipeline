@@ -333,7 +333,7 @@ sub convert_gw_output {
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
-
+  
   my $analysis_obj;
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $genetype\n");
@@ -536,7 +536,8 @@ sub remap_genes {
 
   my @genes = $self->gw_genes;
 
-GENE:  foreach my $gene (@genes) {
+GENE:  
+  foreach my $gene (@genes) {
 
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
@@ -728,6 +729,7 @@ sub make_transcript{
     $exon->strand($exon_pred->strand);
     
     $exon->phase($exon_pred->phase);
+    $exon->end_phase($exon_pred->end_phase);
     $exon->attach_seq($contig);
     
     # sort out supporting evidence for this exon prediction
