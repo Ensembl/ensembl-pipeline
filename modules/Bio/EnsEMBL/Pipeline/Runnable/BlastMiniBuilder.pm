@@ -582,8 +582,8 @@ sub check_coverage {
     Title   :   check_repeated
     Usage   :   $self->check_repeated(1)
     Function:   Get/Set method for check_repeated
-    Returns :   0 (False) or 1 (True)
-    Args    :   0 (False) or 1 (True)
+    Returns :   0 (Off) or 1 (On)
+    Args    :   0 (Off) or 1 (On)
 
 =cut
 

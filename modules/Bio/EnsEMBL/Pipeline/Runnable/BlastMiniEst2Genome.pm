@@ -110,10 +110,11 @@ sub new {
       $self->blast_threshold(10e-60);
     } 
 
+    # Checking for joined repeated genes by default.
     if (defined $check_repeated){
       $self->check_repeated($check_repeated);
     }else {
-      $self->check_repeated(0);
+      $self->check_repeated(1);
     }
 
 
@@ -286,7 +287,7 @@ sub run {
       
     my $me2g_runnables;
 
-    if ($self->check_repeated > 0){ 
+    if ($self->check_repeated){ 
       $me2g_runnables = $self->build_runnables(@feature_pairs);
     } else {
       my $runnable = $self->make_object($self->genomic_sequence, \@feature_pairs);

@@ -88,10 +88,12 @@ sub new {
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
+
+  # Repeated genes are checked by default.
   if (defined $check_repeated){
     $self->check_repeated($check_repeated);
   }else {
-    $self->check_repeated(0);
+    $self->check_repeated(1);
   }
 
   return $self;
