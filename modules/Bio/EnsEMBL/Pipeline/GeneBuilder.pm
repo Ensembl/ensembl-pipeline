@@ -986,7 +986,7 @@ sub prune_Exons {
 	push(@unique_Exons, $exon);
       }
     }          
-    $tran->flush_Exon;
+    $tran->flush_Exons;
     foreach my $exon (@newexons) {
       $tran->add_Exon($exon);
     }
