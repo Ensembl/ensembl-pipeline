@@ -22,111 +22,117 @@ my $dbpass    = $ENV{'ENS_DBPASS'};
 my $dbport    = $ENV{'ENS_DBPORT'} || 3306;
 
 #command line args
-my $help; #get docs about script
-my $verbose; #print statements about the running script
-my $queue_manager; #what Bio::EnsEMBL::BatchSubmission module to use
+my $help;           #get docs about script
+my $verbose;        #print statements about the running script
+my $queue_manager;  #what Bio::EnsEMBL::BatchSubmission module to use
+
 #The rulemanger sleeps when a predefined number of jobs has been reached
-my $max_job_time; # the longest time the rulemanger should sleep for
-my $min_job_time; # the shortest time the rulemanger sleeps for
-my $sleep_per_job; #the length of time to sleep per job when limit is 
-#reached
-my $runner; #the runner script to use when running jobs (this will be
-#over ridden by anything in config
-my $output_dir; #the output_dir to use when running jobs (this won't be
-#over ridden when running jobs
-my $job_limit; #the maximum number of jobs of a perdefined status that are
-#in the system. The predefined statuses are set in the BatchQueue.pm config
-#module and currently refer to LSF
-my $mark_awol = 1; #Flag as whether to mark jobs which have gone missing 
-#from the system
+my $max_job_time;   # the longest time the rulemanger should sleep for
+my $min_job_time;   # the shortest time the rulemanger sleeps for
+my $sleep_per_job;  # the length of time to sleep per job when limit is 
+                    # reached
+my $runner;         # the runner script to use when running jobs (this will be
+                    # over ridden by anything in config
+my $output_dir;     # the output_dir to use when running jobs (this won't be
+                    # over ridden when running jobs
+my $job_limit;      # the maximum number of jobs of a perdefined status that are
+                    # in the system. The predefined statuses are set in the BatchQueue.pm config
+                    # module and currently refer to LSF
+my $mark_awol = 1;  # Flag as whether to mark jobs which have gone missing 
+                    # from the system
 my $rename_on_retry = 1; #Whether to rename jobs stdout/err which are 
-#being retried
-my $once; #Only run the loop once
-my @starts_from; #array of logic_names which are used to get the starting
-#input_id hash
-my @analyses_to_run; #array of logic_names of analyses to run
-my @analyses_to_skip; #array of logic_names of analyses to skip
-my @types_to_run; #array of input_id_types to consider for the run
-my @types_to_skip; #array of input_id_types to not consider for the run
-my $ids_to_run; #filepath to file of input_ids to run
-my $ids_to_skip; #filepath to file of input_ids to skip
+                         #being retried
+my $once;           # Only run the loop once
+my @starts_from;    # array of logic_names which are used to get the starting
+                    # input_id hash
+my @analyses_to_run;  # array of logic_names of analyses to run
+my @analyses_to_skip; # array of logic_names of analyses to skip
+my @types_to_run;   # array of input_id_types to consider for the run
+my @types_to_skip;  # array of input_id_types to not consider for the run
+my $ids_to_run;     # filepath to file of input_ids to run
+my $ids_to_skip;    # filepath to file of input_ids to skip
 my $config_sanity = 1; #flag as to whether to check configuration sanity
 my $accumulator_sanity = 1; #as above for accumulators
-my $rules_sanity = 1;#same for rules
-my $db_sanity = 1;#same for the database tables
-my $kill_jobs; #whether to kill jobs which have been running for to long
-my $killed_time;#how long to let jobs have before being killed
-my $kill_file; #a path to a file to record what jobs have been killed
+my $rules_sanity = 1; #same for rules
+my $db_sanity = 1;  # same for the database tables
+my $kill_jobs;      # whether to kill jobs which have been running for to long
+my $killed_time;    # how long to let jobs have before being killed
+my $kill_file;      # a path to a file to record what jobs have been killed
 my $rerun_sleep = 300; #how long to sleep for at the end of a loop if no 
-#jobs get submitted
+                       #jobs get submitted
 my $utils_verbosity = 'WARNING'; #how verbose do you want the 
-#Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
-#WARNING as this gives warning and throws but not deprecates or infos
+                                 #Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
+                                 #WARNING as this gives warning and throws but not deprecates or infos
+
 my $shuffle;
 my $accumulators = 1;
 my $force_accumulators = 0;
-my $reread_input_ids = 0; #toggle whether to reread input_id each time the
-#script loops
-my $reread_rules = 0; #toggle whether to reread rules each time the script
-#loops
+my $reread_input_ids = 0; # toggle whether to reread input_id each time the
+                          # script loops
+my $reread_rules = 0; # toggle whether to reread rules each time the script
+                      # loops
 my $perldoc = 0;
 my @command_args = @ARGV;
+
 GetOptions(
-           'dbhost=s'      => \$dbhost,
-           'dbname=s'      => \$dbname,
-           'dbuser=s'      => \$dbuser,
-           'dbpass=s'      => \$dbpass,
-           'dbport=s'      => \$dbport,
-           'help!' => \$help,
-           'verbose!' => \$verbose,
-           'queue_manager=s' => \$queue_manager,
-           'max_job_time=s' => \$max_job_time,
-           'min_job_job=s' => \$min_job_time,
-           'sleep_per_job=s' => \$sleep_per_job,
-           'runner=s' => \$runner,
-           'output_dir=s' => \$output_dir,
-           'job_limit=s' => \$job_limit,
-           'mark_awol!' => \$mark_awol,
-           'rename_on_retry' => \$rename_on_retry,
-           'starts_from=s@' => \@starts_from,
-           'analysis=s@' => \@analyses_to_run,
-           'skip_analysis=s@' => \@analyses_to_skip,
-           'input_id_type=s@' => \@types_to_run,
+           'dbhost=s'              => \$dbhost,
+           'dbname=s'              => \$dbname,
+           'dbuser=s'              => \$dbuser,
+           'dbpass=s'              => \$dbpass,
+           'dbport=s'              => \$dbport,
+           'help!'                 => \$help,
+           'verbose!'              => \$verbose,
+           'queue_manager=s'       => \$queue_manager,
+           'max_job_time=s'        => \$max_job_time,
+           'min_job_job=s'         => \$min_job_time,
+           'sleep_per_job=s'       => \$sleep_per_job,
+           'runner=s'              => \$runner,
+           'output_dir=s'          => \$output_dir,
+           'job_limit=s'           => \$job_limit,
+           'mark_awol!'            => \$mark_awol,
+           'rename_on_retry'       => \$rename_on_retry,
+           'starts_from=s@'        => \@starts_from,
+           'analysis=s@'           => \@analyses_to_run,
+           'skip_analysis=s@'      => \@analyses_to_skip,
+           'input_id_type=s@'      => \@types_to_run,
            'skip_input_id_type=s@' => \@types_to_skip,
-           'input_id_file=s' => \$ids_to_run,
-           'skip_input_id_file=s' => \$ids_to_skip,
-           'config_sanity!' => \$config_sanity,
-           'accumulator_sanity!' => \$accumulator_sanity,
-           'db_sanity!' => \$db_sanity,
-           'rules_sanity!' => \$rules_sanity,
-           'kill_jobs!' => \$kill_jobs,
-           'killed_time=s' => \$killed_time,
-           'kill_file=s' => \$kill_file,
-           'rerun_sleep=s' => \$rerun_sleep,
-           'utils_verbosity=s' => \$utils_verbosity,
-           'shuffle!' => \$shuffle,
-           'accumulators!' => \$accumulators,
-           'force_accumulators!' => \$force_accumulators,
-           'reread_input_ids!' => \$reread_input_ids,
-           'reread_rules!' => \$reread_rules,
-           'once!' => \$once,
-           'perldoc!' => \$perldoc,
+           'input_id_file=s'       => \$ids_to_run,
+           'skip_input_id_file=s'  => \$ids_to_skip,
+           'config_sanity!'        => \$config_sanity,
+           'accumulator_sanity!'   => \$accumulator_sanity,
+           'db_sanity!'            => \$db_sanity,
+           'rules_sanity!'         => \$rules_sanity,
+           'kill_jobs!'            => \$kill_jobs,
+           'killed_time=s'         => \$killed_time,
+           'kill_file=s'           => \$kill_file,
+           'rerun_sleep=s'         => \$rerun_sleep,
+           'utils_verbosity=s'     => \$utils_verbosity,
+           'shuffle!'              => \$shuffle,
+           'accumulators!'         => \$accumulators,
+           'force_accumulators!'   => \$force_accumulators,
+           'reread_input_ids!'     => \$reread_input_ids,
+           'reread_rules!'         => \$reread_rules,
+           'once!'                 => \$once,
+           'perldoc!'              => \$perldoc,
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
 verbose($utils_verbosity);
+
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
-      "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
+                 "-dbuser $dbuser -dbpass $dbpass -dbport $dbport\n";
     $help = 1;
 }
-if($help){
+if ($help) {
   useage(\@command_args);
 }
-if(!defined($mark_awol)){
+
+if (!defined($mark_awol)) {
   $mark_awol = 0;
 }
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                        -host   => $dbhost,
                                                        -dbname => $dbname,
@@ -139,6 +145,7 @@ my $sanity = Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new
   (
    -DB => $db,
   );
+
 my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
   (
    -DB => $db,
@@ -158,54 +165,55 @@ my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
 my $done;
 my $reset;
 
-if($config_sanity){
+if ($config_sanity) {
   $sanity->config_sanity_check;
 }
-if($db_sanity){
+
+if ($db_sanity) {
   $sanity->db_sanity_check;
 }
 
 
 my %analyses_to_run = %{$rulemanager->logic_name2dbID(\@analyses_to_run)};
-my %analyses_to_skip = %{$rulemanager->
-                           logic_name2dbID(\@analyses_to_skip)};
-
-
+my %analyses_to_skip = %{$rulemanager->logic_name2dbID(\@analyses_to_skip)};
 
 if ($ids_to_run && ! -e $ids_to_run) {
   throw("Must be able to read $ids_to_run");
 }
-if($ids_to_skip && ! -e $ids_to_skip){
+
+if ($ids_to_skip && ! -e $ids_to_skip) {
   throw("Must be able to read $ids_to_skip");
 }
-if($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
-   @analyses_to_skip || @types_to_skip || $ids_to_skip){
-  print STDERR "You are running with options which may break ".
-    "accumulators they are being switched off. You can prevent this with ".
-      "the -force_accumulators option\n";
+
+if ($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
+    @analyses_to_skip || @types_to_skip || $ids_to_skip) {
+  print STDERR "You are running with options which may break " .
+               "accumulators they are being switched off. You can prevent this with " .
+               "the -force_accumulators option\n";
   $accumulators = 0;
 }
+
 $accumulators = 1 if($force_accumulators);
+
 my $all_rules = $rulemanager->rules;
 
-if($accumulators && $accumulator_sanity){
-  $accumulators = $sanity->accumulator_sanity_check($all_rules, 
-                                                    $accumulators);
+if ($accumulators && $accumulator_sanity) {
+  $accumulators = $sanity->accumulator_sanity_check($all_rules, $accumulators);
 }
-if($rules_sanity){
+
+if ($rules_sanity) {
   $sanity->rule_type_sanity($all_rules, $verbose);
 }
 
 $rulemanager->add_created_jobs_back; # a method to ensure unsubmitted jobs
-#are readded to the system
+                                     # are readded to the system
 
 my %always_incomplete_accumulators;
 my %accumulator_analyses;
 
 foreach my $rule (@$all_rules) {
   if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
-    $accumulator_analyses{$rule->goalAnalysis->logic_name}
-      = $rule->goalAnalysis;
+    $accumulator_analyses{$rule->goalAnalysis->logic_name} = $rule->goalAnalysis;
   }
 }
 
@@ -215,92 +223,106 @@ setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules,
                \@starts_from, $rulemanager);
 
 my %completed_accumulator_analyses;
-while(1){
+
+while (1) {
   print "Reading IDs \n" if $verbose;
   my $submitted = 0;
+
   %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
   my %incomplete_accumulator_analyses = %always_incomplete_accumulators;
-  if($reread_input_ids){
+
+  if ($reread_input_ids) {
     $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                  \@types_to_run, \@types_to_skip,
                                  \@starts_from); 
   }
-  if($reread_rules){
+  if ($reread_rules) {
     $rulemanager->empty_rules;
     $all_rules = $rulemanager->rules;
     $rulemanager->rules_setup(\%analyses_to_run, \%analyses_to_skip, 
                               $all_rules, \%accumulator_analyses, 
                               \%always_incomplete_accumulators);
   }
+
   my $id_hash = $rulemanager->input_ids;
- INPUT_ID_TYPE:foreach my $type(keys(%$id_hash)){
+
+ INPUT_ID_TYPE:
+  foreach my $type (keys(%$id_hash)){
     next INPUT_ID_TYPE if ($type eq 'ACCUMULATOR');
+
     my @id_list = keys(%{$id_hash->{$type}});
     @id_list = shuffle(@id_list) if $shuffle;
-   INPUT_ID:foreach my $input_id(@id_list){
-       if ($term_sig) {
-         print "Got term signal\n" if($verbose);
-         $done = 1;
-         last INPUT_ID_TYPE;
-       }
-       print "Input id ".$input_id."\n" if($verbose);
-       my %analHash;
-       my @anals = @{$rulemanager->stateinfocontainer->
-                       fetch_analysis_by_input_id($input_id)};
-       foreach my $rule(@{$rulemanager->rules}){
-         my $anal = $rule->check_for_analysis
-           (\@anals, $type, \%completed_accumulator_analyses, $verbose);
-         if(UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')){
-           if($anal->input_id_type ne 'ACCUMULATOR'){
+
+   INPUT_ID:
+    foreach my $input_id (@id_list){
+
+      if ($term_sig) {
+        print "Got term signal\n" if($verbose);
+        $done = 1;
+        last INPUT_ID_TYPE;
+      }
+
+      print "\n===\nInput id ".$input_id."\n" if($verbose);
+
+      my %analHash;
+      my @anals = @{$rulemanager->stateinfocontainer->fetch_analysis_by_input_id($input_id)};
+
+      foreach my $rule (@{$rulemanager->rules}){
+        my $anal = $rule->check_for_analysis(\@anals, $type, \%completed_accumulator_analyses, $verbose);
+        if (UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')) {
+          if ($anal->input_id_type ne 'ACCUMULATOR') {
              $analHash{$anal->dbID} = $anal;
-           }
-         }else{
-           if($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
-              $rule->has_condition_of_input_id_type($type) ) {
-             $incomplete_accumulator_analyses
-               {$rule->goalAnalysis->logic_name} = 1;
-           }
-         }
-       }
-     ANAL: for my $anal (values %analHash) {
-         if($rulemanager->can_job_run($input_id, $anal)){
-           $submitted++;
-         }
-       }
-     }
-   }
-  if(!$done && !$reset){
-    if($accumulators){
+          }
+        } else {
+          if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
+              $rule->has_condition_of_input_id_type($type)) {
+            $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
+          }
+        }
+      }
+      my $current_jobs = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
+
+      print "\n\n Ended up with " . scalar(keys %analHash) . " analyses which pass conditions\n";
+      for my $anal (values %analHash) {
+        if ($rulemanager->can_job_run($input_id, $anal,$current_jobs)) {
+          $submitted++;
+        }
+      }
+    }
+  }
+
+  if (!$done && !$reset) {
+    if ($accumulators) {
       %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
       foreach my $logic_name (keys %accumulator_analyses) {
         if (!exists($incomplete_accumulator_analyses{$logic_name}) &&
             !exists($completed_accumulator_analyses{$logic_name})) {
-          if($rulemanager->can_job_run('ACCUMULATOR', 
-                                       $accumulator_analyses{$logic_name}
-                                      )){
+          if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name})){
             $submitted++;
-          } elsif (exists($incomplete_accumulator_analyses
-                         {$logic_name})) {
+          } elsif (exists($incomplete_accumulator_analyses{$logic_name})) {
             print "Accumulator type analysis $logic_name ".
-              "conditions unsatisfied\n" if $verbose;
+                  "conditions unsatisfied\n" if $verbose;
           } else {
             print "Accumulator type analysis $logic_name ".
-              "already run\n" if $verbose;
+                  "already run\n" if $verbose;
           }
         }
       }
     }
   }
+
   $rulemanager->job_stats($job_limit);
-  if(!$done){
-    if(!$rulemanager->check_if_done){
+
+  if (!$done) {
+    if (!$rulemanager->check_if_done) {
       $done = 1;
     }else{
       $done = 0;
     }
   }
+
   $rulemanager->cleanup_waiting_jobs();
-  if($done || $once){
+  if ($done || $once) {
     $rulemanager->db->pipeline_unlock;
     exit 0;
   }
