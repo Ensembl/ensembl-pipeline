@@ -71,28 +71,4 @@ sub fetch_input {
     return 1;
 }
 
-
-sub write_output{
-    my ($self) = @_;
-
-    my @features   = $self->output();
-    my $repeat_f_a = $self->db->get_RepeatFeatureAdaptor();
-    my $contig;
-
-    eval {
-        $contig = $self->db->get_RawContigAdaptor->
-	 fetch_by_name($self->input_id);
-    };
-
-    if ($@) {
-        print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
-
-    foreach my $f (@features) {
-        $f->analysis($self->analysis);
-        $f->attach_seq($contig);
-        $repeat_f_a->store($f);
-    }
-}
-
 1;

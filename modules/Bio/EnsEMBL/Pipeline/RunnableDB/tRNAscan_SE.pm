@@ -36,7 +36,7 @@ required for database access.
 
 =head1 CONTACT
 
-Describe contact details here
+Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -54,49 +54,8 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-=head2 new
-
-    Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
-                           
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    $self->{'_fplist'}      = [];  
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    # set up cpg specific parameters
-    my $params = $self->parameters();
-    if ($params ne "") { $params .= " , "; }
-    $params .= "-tRNAscan_SE=>".$self->analysis->program_file();
-    $self->parameters($params);
-
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE');
-    return $self;
-}
 
 =head2 fetch_input
-
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for tRNAscan_SE from the database
-    Returns :   none
-    Args    :   none
 
 =cut
 
@@ -109,69 +68,14 @@ sub fetch_input {
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
 	or $self->throw("Unable to fetch contig");
 
-    $self->genseq($contig);
-  
+    $self->query($contig);
 
-}
+    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new(
+        '-query'       => $self->query,
+        '-trnascan_se' => $self->analysis->program_file || undef
+    );
 
-=head2 runnable
-
-    Title   :   runnable
-    Usage   :   $self->runnable($arg)
-    Function:   Sets a runnable for this RunnableDB
-    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
-    Args    :   Bio::EnsEMBL::Pipeline::RunnableI
-
-=cut
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
-    
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-#            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-		$key =~ s/\s+//g;
-                $parameters{$key} = $value;
-            }
-        }
-
-        $self->{'_runnable'} = $runnable->new(%parameters);
-    }
-    return $self->{'_runnable'};
-}
-
-
-sub write_output{
-  my ($self) = @_;
-
-  my @features = $self->output();
-  my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
-  my $contig;
-  eval {
-    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-  };
-
-  if ($@) {
-    print STDERR "Contig not found, skipping writing output to db: $@\n";
-    return;
-  }
-
-  foreach my $f(@features){
-    $f->attach_seq($contig);
-    $f->analysis($self->analysis);
-    $simple_f_a->store($f);
-  }
-
-
+    $self->runnable($runnable);
 }
 
 1;
