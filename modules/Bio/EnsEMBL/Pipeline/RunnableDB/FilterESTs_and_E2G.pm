@@ -16,8 +16,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G->new(
-									  -dbobj     => $db,
-									  -input_id  => $id,
+									  -dbobj       => $db,
+									  -input_id    => $id,
+									  -seq_index   => $index,
+									  -golden_path => $gp,
 									 );
     $obj->fetch_input
     $obj->run
@@ -26,11 +28,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 
 
 =head1 DESCRIPTION
-Reads in all files with given subscript from given directory, parses out features, refilters and
-passes them to MiniEst2Genome for alignment.
-NB This relies on you having previously run ExonerateESTs OVER THE SAME GENOMIC CHUNK.
-
-All a bit of a kludge at the moment :-(
 
 =head1 CONTACT
 
@@ -54,15 +51,14 @@ use POSIX;
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::Tools::BPlite;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
-					 TRANSCRIPT_ID_SUBSCRIPT
-					 GENE_ID_SUBSCRIPT
-					 PROTEIN_ID_SUBSCRIPT
-					 );
+
+# config file; parameters searched for here if not passed in as @args
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -71,7 +67,12 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
     Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db
                            -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
+                           -ANALYSIS      => $analysis
+			   -ESTDBNAME     => $estdbname
+			   -ESTDBHOST     => $estdbhost
+			   -ESTDBUSER     => $estdbuser
+			   -SEQ_INDEX     => $seq_index
+);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
@@ -91,20 +92,30 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-    my( $estdbname, $estdbhost, $estdbuser) = $self->_rearrange([qw(ESTDBNAME
-								    ESTDBHOST
-   							            ESTDBUSER)],
-								 @args);
+     my( $estdbname, $estdbhost, $estdbuser, $estpass, $path ) = $self->_rearrange([qw(ESTDBNAME
+										       ESTDBHOST
+										       ESTDBUSER
+										       ESTPASS
+										       GOLDEN_PATH)],
+										   @args);
 
+    	 
+    # check options in EST_conf.pl 
     if(!defined $self->seqfetcher) {
-      # hard code to humanest blast2 databases for the moment - v naughty.
-
-     my @dbs = qw ( /data/blastdb/humanest );
-     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
-								'-db'    => \@dbs,
-							       );
+      my $seqfetcher = $self->make_seqfetcher();
       $self->seqfetcher($seqfetcher);
+      
     }
+
+    $path = $::db_conf{'golden_path'};
+    $path = 'UCSC' unless (defined $path && $path ne '');
+    $self->dbobj->static_golden_path_type($path);
+
+    $estdbname = $::db_conf{'estdbname'} unless (defined $estdbname && $estdbname ne '');
+    $estdbuser = $::db_conf{'estdbuser'} unless (defined $estdbuser && $estdbuser ne '');
+    $estdbhost = $::db_conf{'estdbhost'} unless (defined $estdbhost && $estdbhost ne '');
+    $estpass   = $::db_conf{'estdbpass'} unless (defined $estpass && $estpass ne '');
+
 
     # if we have all the parameters for a estdb, make one
     # otherwise, assume the estdb must be the same as the dbobj
@@ -112,6 +123,7 @@ sub new {
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
+								    -pass   => $estpass,
 								   );
       my $est_ext_feature_factory = $estdb->get_EstAdaptor();
       $self->dbobj->add_ExternalFeatureFactory($est_ext_feature_factory);
@@ -120,11 +132,14 @@ sub new {
       my $edba = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $estdbhost,		
 						    -user   => $estdbuser,
 						    -dbname => $estdbname,
+						    -pass   => $estpass,
+						    -dnadb  => $self->dbobj,
 						   );
       $self->estdb($edba);
-
     }
     else { $self->throw("expecting exonerate data in an external feature factory\n"); };
+
+    if(!defined $self->analysis){ $self->make_analysis; }
 
     return $self;
 }
@@ -169,18 +184,13 @@ sub write_output {
     #    $self->throw("exiting before write");
     
     my $estdb = $self->estdb;
-    my $refdb = $self->dbobj;
 
     if( !defined $estdb ) {
       $self->throw("unable to make write db");
     }
     
-    if( !defined $refdb ) {
-      $self->throw("unable to make ref db");
-    }
-
     $self->write_genes();
-    $self->write_exons_as_features();
+#    $self->write_exons_as_features();
 }
 
 =head2 write_genes
@@ -195,93 +205,12 @@ sub write_output {
 
 sub write_genes {
   my ($self) = @_;
-  my $gene_obj = $self->estdb->gene_Obj;
+  my $gene_adaptor = $self->estdb->get_GeneAdaptor;
 
-  my @newgenes = $self->output;
-  print STDERR "genes: " . scalar(@newgenes) . "\n";
-  return unless ($#newgenes >= 0);
-  
-  # get new ids
-  eval {
-    
-    my $genecount  = 0;
-    my $transcount = 0;
-    my $translcount = 0;
-    my $exoncount  = 0;
-    
-    # get counts of each type of ID we need.
-    
-    foreach my $gene ( @newgenes ) {
-      $genecount++;
-      
-      foreach my $trans ( $gene->each_Transcript ) {
-	$transcount++;
-	$translcount++;
-      }
-      
-      foreach my $exon ( $gene->each_unique_Exon() ) {
-	$exoncount++;
-      }
-    }
-    
-    #	$self->throw("exiting bfore write");
-    
-    # get that number of ids. This locks the database
-    
-    my @geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
-    my @transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
-    my @translids=  $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,$translcount);
-    my @exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
-    
-    # database locks are over.
-    
-    # now assign ids. gene and transcripts are easy. Exons are harder.
-    # the code currently assummes that there is one Exon object per unique
-    # exon id. This might not always be the case.
-    
-    foreach my $gene ( @newgenes ) {
-      $gene->id(shift(@geneids));
-      my %exonhash;
-      foreach my $exon ( $gene->each_unique_Exon() ) {
-	my $tempid = $exon->id;
-	$exon->id(shift(@exonsid));
-	$exonhash{$tempid} = $exon->id;
-      }
-      foreach my $trans ( $gene->each_Transcript ) {
-	$trans->id(shift(@transids));
-	$trans->translation->id(shift(@translids));
-	$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
-	$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
-      }
-      
-    }
-    
-    # paranoia!
-    if( scalar(@geneids)  != 0 || scalar(@exonsid)   != 0 || 
-	scalar(@transids) != 0 || scalar(@translids) != 0 ) {
-      $self->throw("In id assignment, left with unassigned ids ".
-		   scalar(@geneids)  . " " .
-		   scalar(@transids) . " " .
-		   scalar(@translids)." " .
-		   scalar(@exonsid));
-    }
-    
-  };
-  if( $@ ) {
-    $self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
-  }
-  
-  
-  # this now assummes that we are building on a single VC.
-  
-  #    $self->throw("Bailing before real write\n");
-    
- GENE: foreach my $gene (@newgenes) {	
-    # do a per gene eval...
+ GENE: foreach my $gene ($self->output) {	
     eval {
-      print STDERR $gene->id . "\n";
-      # need to do EVIL things to gene_obj to get this to work	  
-      $gene_obj->write($gene);
+      $gene_adaptor->store($gene);
+      print STDERR "wrote gene " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -290,6 +219,7 @@ sub write_genes {
   }
 }
 
+# not yet ported
 =head2 write_exons_as_features
 
     Title   :   write_exons_as_features
@@ -330,7 +260,7 @@ sub write_exons_as_features {
 	foreach my $sf($exon->each_Supporting_Feature){
 	  if(defined $hid){
 	    if ($hid ne $sf->hseqname){
-	      $self->warn("trying to change hid between supporting features for same exon: " . $exon->id . "\n");
+	      $self->warn("trying to change hid between supporting features for same exon: " . $exon->temporary_id . "\n");
 	      next EXON;
 	    }
 	  }
@@ -417,7 +347,8 @@ sub get_exon_analysis{
   my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
-  
+  my $est_source = $::est_genome_conf{'est_source'};
+
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $logicname\n");
   }
@@ -427,7 +358,7 @@ sub get_exon_analysis{
   else{
     # only need to insert ONCE.
     $analysis = new Bio::EnsEMBL::Analysis(
-					   -db              => 'dbEST',
+					   -db              => $est_source,
 					   -db_version      => 1,
 					   -program         => 'exonerate_e2g',
 					   -program_version => 3,
@@ -462,7 +393,7 @@ sub fetch_input {
      $chrid     =~ s/\.(.*)-(.*)//;
   my $chrstart  = $1;
   my $chrend    = $2;
-  $self->dbobj->static_golden_path_type('UCSC');
+
   my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
@@ -471,16 +402,16 @@ sub fetch_input {
 
   # find exonerate features amongst all the other features  
   my @allfeatures = $contig->get_all_ExternalFeatures();
-#  my @allfeatures = $self->cheat_with_feature_load();
 
   print STDERR "got " . scalar(@allfeatures) . " external features\n";
 
   my @exonerate_features;
   my %exonerate_ests;
+  my $est_source = $::est_genome_conf{'est_source'};
 
   foreach my $feat(@allfeatures){
     if (defined($feat->analysis)      && defined($feat->score) && 
-	defined($feat->analysis->db)  && $feat->analysis->db eq "dbEST") {
+	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
       # percent_id cutoff 90% for exonerate ... take all features for a sequence as long as 
       # one of them gets over this threshold
       if(($feat->percent_id > 89 || defined $exonerate_ests{$feat->hseqname})){ 
@@ -490,16 +421,6 @@ sub fetch_input {
     }
   }
 
-# temporary
-#  foreach (my $i = 0; $i < 40; $i++){
-#    my $feat = $allfeatures[$i];
-#    if(($feat->percent_id > 89 || defined $exonerate_ests{$feat->hseqname})){ 
-#      push (@{$exonerate_ests{$feat->hseqname}}, $feat);
-#      push (@exonerate_features, $feat);
-#    }
-#    else {print STDERR "rejecting " . $feat->hseqname . " percid: " . $feat->percent_id . "\n"; }
-#  }
-  
   print STDERR "exonerate features: " . scalar(@exonerate_features) . "\n";
   print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n";
   
@@ -541,7 +462,7 @@ sub fetch_input {
 
   foreach my $id(keys %final_ests) {
     # I have thought about doing a strand split here - sending plus and minus features separately - but
-    # currently have decided to just use al the features to make a MiniSeq and let Est2Genome find the 
+    # currently have decided to just use all the features to make a MiniSeq and let Est2Genome find the 
     # best alignment over the whole region. Otherwise we will end up with squillions of extra genes.
 
     my @features = @{$final_ests{$id}};
@@ -557,12 +478,36 @@ sub fetch_input {
 	next ID;
       }
     }
-    
+
+#    my $analysis_obj;    
+#    my $logicname = 'MiniEst2Genome';
+#    # get the appropriate analysis from the AnalysisAdaptor
+#    my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
+#    my @analyses = $anaAdaptor->fetch_by_logic_name($logicname);
+#    
+#    my $analysis;
+#    if(scalar(@analyses) > 1){
+#      $self->throw("panic! > 1 analysis for $logicname\n");
+#    }
+#    elsif(scalar(@analyses) == 1){
+#      $analysis = $analyses[0];
+#    }
+#    else{
+#      $analysis = new Bio::EnsEMBL::Analysis
+#	(-db              => undef,
+#	 -db_version      => undef,
+#	 -program         => "est2genome",
+#	 -program_version => 1,
+#	 -gff_source      => 'est2genome',
+#	 -gff_feature     => 'similarity',
+#	 -logic_name      => $logicname);
+#    }
     # make MiniEst2Genome runnables
-# to repmask or not to repmask?    
+    # to repmask or not to repmask?    
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->vc->get_repeatmasked_seq,
 								   '-features' => \@features,
-								   '-seqfetcher' => $self->seqfetcher);
+								   '-seqfetcher' => $self->seqfetcher,
+								   '-analysis' => $self->analysis);
     $self->runnable($e2g);
 
   }
@@ -607,38 +552,12 @@ sub convert_output {
   my ($self) = @_;
   my $count  = 1;
   my $time   = time; chomp($time);
-  my $genetype = 'exonerate_e2g';
   my @genes;
-
-# get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
-  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
-
-  my $analysis_obj;
-  if(scalar(@analyses) > 1){
-    $self->throw("panic! > 1 analysis for $genetype\n");
-  }
-  elsif(scalar(@analyses) == 1){
-    $analysis_obj = $analyses[0];
-  }
-  else{
-    # make a new analysis object
-    $analysis_obj = new Bio::EnsEMBL::Analysis
-      (-db              => 'dbEST',
-       -db_version      => 1,
-       -program         => $genetype,
-       -program_version => 1,
-       -gff_source      => $genetype,
-       -gff_feature     => 'gene',
-       -logic_name      => $genetype,
-       -module          => 'FilterESTs_and_E2G',
-      );
-  }
 
   # make an array of genes for each runnable
   foreach my $runnable ($self->runnable) {
     my @results = $runnable->output;
-    my @g = $self->make_genes($count, $genetype, $analysis_obj, \@results);
+    my @g = $self->make_genes($count, \@results);
     $count++;
     push(@genes, @g);
   }
@@ -656,25 +575,24 @@ sub convert_output {
            and have $analysis_obj attached. Each Gene has a single Transcript, 
            which in turn has Exons(with supporting features) and a Translation
     Returns :   array of Bio::EnsEMBL::Gene
-    Args    :   $count: integer, $genetype: string, $analysis_obj: Bio::EnsEMBL::Analysis, 
-           $runnable: Bio::EnsEMBL::Pipeline::RunnableI
+    Args    :   $count: integer, $runnable: Bio::EnsEMBL::Pipeline::RunnableI
 
 =cut
 
 sub make_genes {
-  my ($self, $count, $genetype, $analysis_obj, $results) = @_;
+  my ($self, $count, $results) = @_;
   my $contig = $self->vc;
+  my $genetype = 'exonerate_e2g';
   my @genes;
   
   foreach my $tmpf(@$results) {
 
     my $gene   = new Bio::EnsEMBL::Gene;
     $gene->type($genetype);
-    $gene->id($self->input_id . ".$genetype.$count");
-    $gene->version(1);
+    $gene->temporary_id($self->input_id . ".$genetype.$count");
 
-    my $transcript = $self->make_transcript($tmpf,$self->vc,$genetype,$count);
-    $gene->analysis($analysis_obj);
+    my $transcript = $self->make_transcript($tmpf, $self->vc, $genetype, $count);
+    $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
     $count++;
 
@@ -711,12 +629,10 @@ sub make_transcript{
   chomp($time);
 
   my $transcript   = new Bio::EnsEMBL::Transcript;
-  $transcript->id($contig->id . ".$genetype.$count");
-  $transcript->version(1);
+  $transcript->temporary_id($contig->id . ".$genetype.$count");
 
   my $translation  = new Bio::EnsEMBL::Translation;    
-  $translation->id($contig->id . ".$genetype.$count");
-  $translation->version(1);
+  $translation->temporary_id($contig->id . ".$genetype.$count");
 
   $transcript->translation($translation);
 
@@ -727,12 +643,8 @@ sub make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->id($contig->id . ".$genetype.$count.$excount");
+    $exon->temporary_id($contig->id . ".$genetype.$count.$excount");
     $exon->contig_id($contig->id);
-    $exon->created($time);
-    $exon->modified($time);
-    $exon->version(1);
-      
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -745,11 +657,11 @@ sub make_transcript{
     foreach my $subf($exon_pred->sub_SeqFeature){
       $subf->feature1->source_tag($genetype);
       $subf->feature1->primary_tag('similarity');
-      $subf->feature1->analysis($exon_pred->analysis);
+      $subf->feature1->analysis($self->analysis);
 	
       $subf->feature2->source_tag($genetype);
       $subf->feature2->primary_tag('similarity');
-      $subf->feature2->analysis($exon_pred->analysis);
+      $subf->feature2->analysis($self->analysis);
       
       $exon->add_Supporting_Feature($subf);
     }
@@ -776,8 +688,8 @@ sub make_transcript{
       $transcript->add_Exon($exon);
     }
     
-    $translation->start_exon_id($exons[0]->id);
-    $translation->end_exon_id  ($exons[$#exons]->id);
+    $translation->start_exon($exons[0]);
+    $translation->end_exon  ($exons[$#exons]);
     
     if ($exons[0]->phase == 0) {
       $translation->start(1);
@@ -811,7 +723,7 @@ sub remap_genes {
 
  GENEMAP:
   foreach my $gene(@genes) {
-     print STDERR "about to remap " . $gene->id . "\n";
+     print STDERR "about to remap " . $gene->temporary_id . "\n";
     my @t = $gene->each_Transcript;
     my $tran = $t[0];
     eval {
@@ -823,10 +735,10 @@ sub remap_genes {
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
 
       my @oldtrans = $gene->each_Transcript;
-      my @oldexons  = $oldtrans[0]->each_Exon;
+      my @oldexons  = $oldtrans[0]->get_all_Exons;
 
       my @newtrans = $newgene->each_Transcript;
-      my @newexons  = $newtrans[0]->each_Exon;
+      my @newexons  = $newtrans[0]->get_all_Exons;
 
       if($#oldexons == $#newexons){
 	# 1:1 mapping; each_Exon gives ordered array of exons
@@ -843,7 +755,7 @@ sub remap_genes {
       
     };
      if ($@) {
-       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
+       print STDERR "Couldn't reverse map gene " . $gene->temporary_id . " [$@]\n";
      }
    }
 
@@ -1149,53 +1061,75 @@ sub run_blast {
     
 }
 
-# temporary
-sub cheat_with_feature_load{
-  my ($self) = @_;
-  my @features;
+=head2 make_seqfetcher
 
-  my $featfile = "469909_est_feat";
-#  my $featfile = "all_est_feat";
-  open(FEAT, "<$featfile");
+ Title   : make_seqfetcher
+ Usage   :
+ Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching EST sequences. If 
+           $est_genome_conf{'est_index'} is specified in EST_conf.pl, then a Getseqs 
+           fetcher is made, otherwise it will be Pfetch. NB for analysing large numbers 
+           of ESTs eg all human ESTs, pfetch is far too slow ...
+ Example :
+ Returns : Bio::EnsEMBL::SeqFetcher
+ Args    :
 
-  while(<FEAT>){
-    my ($id, $contig, $seq_start, $seq_end, $score, $strand, $analysis, 
-	$name, $hstart, $hend, $hid, $evalue, $perc_id, $phase, $end_phase) = split;
 
-    my $f1 = new Bio::EnsEMBL::SeqFeature(
-					  -start       => $seq_start,
-					  -end         => $seq_end,
-					  -seqname     => $contig,
-					  -strand      => $strand,
-					  -score       => $score,
-					  -source_tag  => 'est',
-					  -primary_tag => 'est',
-					 );
-    my $f2 = new Bio::EnsEMBL::SeqFeature(
-					  -start       => $hstart,
-					  -end         => $hend,
-					  -seqname     => $hid,
-					  -strand      => '1',
-					  -score       => $score,
-					  -source_tag  => 'est',
-					  -primary_tag => 'est',);
-    my $fp = new Bio::EnsEMBL::FeaturePair(
-					   -feature1 => $f1,
-					   -feature2 => $f2,
-					  );
+=cut
 
-    $fp->p_value($evalue);
-    $fp->phase($phase);
-    $fp->end_phase($end_phase);
-    $fp->percent_id($perc_id);
-    push (@features, $fp);
+sub make_seqfetcher {
+  my ( $self ) = @_;
+  my $index   = $::est_genome_conf{'est_index'};
+
+  my $seqfetcher;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+  }
+  else{
+    # default to Pfetch
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   }
 
-  close FEAT;
+  return $seqfetcher;
 
-  return @features;
+}
+
+sub make_analysis {
+  my ($self) = @_;
+  
+  # get the appropriate analysis from the AnalysisAdaptor
+  my $anaAdaptor = $self->estdb->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($self->genetype);
+  
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for " . $self->genetype . "\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'dbEST',
+       -db_version      => 1,
+       -program         => $self->genetype,
+       -program_version => 1,
+       -gff_source      => $self->genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $self->genetype,
+       -module          => 'FilterESTs_and_E2G',
+      );
+  }
+
+  $self->analysis($analysis_obj);
+
+}
+
+sub genetype {
+  my ($self) = @_;
+  return 'exonerate_e2g';
 }
 
 1;
-
-
