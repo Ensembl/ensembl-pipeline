@@ -252,11 +252,13 @@ sub score_Transcripts{
 	
 	my $score = sprintf "%.2f", ( 100/$inv_score );
 	$average_score += $score;
-	
+	my $exons = scalar( @{$tran->get_all_Exons} );
+
 	############################################################
 	# TRAN number_ests number_sites max_num_sites_covered:
 	
 	print STDERR "TRAN\t".
+	  "exons:".$exons."\t".
 	    "ests:".scalar(@list)."\t".
 		"sites:".$n."\t".
 		    "covered:".$covered_sites."\t".
