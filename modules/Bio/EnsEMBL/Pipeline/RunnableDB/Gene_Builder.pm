@@ -104,7 +104,6 @@ sub new {
     $path = 'UCSC' unless (defined $path && $path ne '');
     $self->dbobj->static_golden_path_type($path);
 
-
     return $self;
 }
 
@@ -170,17 +169,19 @@ sub fetch_output {
 sub write_output {
     my($self,@genes) = @_;
 
-#    my $dblocator = "Bio::EnsEMBL::DBSQL::DBAdaptor/host=ecs1e.sanger.ac.uk;dbname=ens_apr01_gb;user=ensadmin";
-#    
-#    my $db = Bio::EnsEMBL::DBLoader->new($dblocator);
-   
-#    if( !defined $db ) {
-#	$self->throw("unable to make write db");
-#    }
+    # write genes out to a different database from the one we read genewise genes from.
+    my $dbname = $::db_conf{'finaldbname'};
+    my $dbhost = $::db_conf{'finaldbhost'};
+    my $dbuser = $::db_conf{'dbuser'};
+    my $dbpass = $::db_conf{'dbpass'};
 
-    # not ideal, but temporarily write to the same database
-    my $db = $self->dbobj;
-
+    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						'-host'   => $dbhost,
+						'-user'   => $dbuser,
+						'-dbname' => $dbname,
+						'-pass'   => $dbpass,
+						'-dnadb'  => $self->dbobj,
+					       );
     # sort out analysis
     my $genetype = 'ensembl';
     my $anaAdaptor = $db->get_AnalysisAdaptor;
@@ -270,25 +271,16 @@ sub fetch_input {
     my $start = $2;
     my $end   = $3;
     
-    print STDERR "Chr $chr - $start : $end\n";
+#    print STDERR "Chr $chr - $start : $end\n";
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
-
-#	$contigid =~ s/\.(.*)//;
-#    my $contignum = $1;
-
-    #print STDERR "Contig id = $contigid \n";
-
-    #my @contig	  = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
-
-    #my $contig	  = $self->dbobj->get_Contig($contigid);
-
 
     $contig->primary_seq;
 
-    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
+#    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
 
-    my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig   => $contig,
-							      -input_id => $self->input_id,
+    my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
+							      '-contig'   => $contig,
+							      '-input_id' => $self->input_id,
 							      );
 
 
@@ -365,13 +357,13 @@ sub run {
     my @vcgenes;
     foreach my $contig (keys %$genebuilders) {
         my $vc = $genebuilders->{$contig}->contig;
-	print(STDERR "Building for $contig\n");
+#	print(STDERR "Building for $contig\n");
 	$genebuilders->{$contig}->build_Genes;
 	@vcgenes = @{$genebuilders->{$contig}{_genes}};
-        print STDERR "Genes before conversion\n";
+#       print STDERR "Genes before conversion\n";
 #	$vc->_dump_map(\*STDERR);
-        $genebuilders->{$contig}->print_Genes(@vcgenes);
-        print STDERR "Converting coordinates\n";
+#        $genebuilders->{$contig}->print_Genes(@vcgenes);
+#        print STDERR "Converting coordinates\n";
         #foreach my $g (@vcgenes) {
         #   my $newgene = $vc->convert_Gene_to_raw_contig($g);
            #$self->check_gene($newgene);
