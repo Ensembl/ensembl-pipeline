@@ -749,7 +749,7 @@ sub output {
   if (defined $featpair) {
     push(@{$self->{'_output'}}, $featpair);
   }
-  
+
   return @{$self->{'_output'}};
 
 }
@@ -792,8 +792,8 @@ sub _create_featurepair {
 					     -strand      =>   $f1strand,
 					     -score       =>   $f1score,
 					     -percent_id  =>   $f1pid, 
-					     -source_tag  =>   $f1source,
-					     -primary_tag =>   $f1primary,
+#					     -source_tag  =>   $f1source,
+#					     -primary_tag =>   $f1primary,
 					     -analysis    =>   $analysis_obj );
   
   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
@@ -802,8 +802,8 @@ sub _create_featurepair {
 					     -strand      =>   $f2strand,
 					     -score       =>   $f1score,
 					     -percent_id  =>   $f1pid, 
-					     -source_tag  =>   $f2source,
-					     -primary_tag =>   $f2primary,
+#					     -source_tag  =>   $f2source,
+#					     -primary_tag =>   $f2primary,
 					     -analysis    =>   $analysis_obj );
   #create featurepair
   my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
