@@ -63,6 +63,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 # config file; parameters searched for here if not passed in as @args
+#use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf;
 use Bio::EnsEMBL::Pipeline::ESTConf;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -91,7 +92,7 @@ sub new {
   }
   
   if ( $EST_GENEBUILDER_COMPARISON_LEVEL ){
-    $self->_merge_level($EST_GENEBUILDER_COMPARISON_LEVEL);
+    $self->_comparison_level($EST_GENEBUILDER_COMPARISON_LEVEL);
   }
   else{
     $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_COMPARISON_LEVEL for your ests/cdnas to be compared!")
@@ -130,7 +131,7 @@ sub run {
 	 
   # cluster the transcripts
   my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
-  print STDERR scalar(@transcript_clusters)." $transcript_clusters[0] clusters returned from _cluster_Transcripts\n";
+  print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
@@ -140,6 +141,10 @@ sub run {
   my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
   print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
 	 
+  foreach my $tran ( @merged_transcripts ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+  }
+
   $self->output(@merged_transcripts);
 }
 
@@ -178,6 +183,13 @@ sub _cluster_Transcripts {
   
   my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
   my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
+  if ( @forward_clusters){
+      print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
+  }
+  if ( @reverse_clusters){
+      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
+  }
+  
   my @clusters;
   if ( @forward_clusters ){
     push( @clusters, @forward_clusters);
@@ -206,9 +218,17 @@ sub _cluster_Transcripts_by_genomic_range{
   }
 
   # first sort the transcripts
-  my @transcripts = sort by_transcript_high @mytranscripts;
+  my @transcripts = sort  sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+				 if ($result){
+				     return $result;
+				 }
+				 else{
+				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+				 }
+			     } @mytranscripts;
+  
   print STDERR "clustering ".scalar(@transcripts)." transcripts\n";
-
+  
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
   my $count = 0;
@@ -218,7 +238,8 @@ sub _cluster_Transcripts_by_genomic_range{
   
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
-  
+  print STDERR "first cluster:\n";
+ Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[0] );
 
   $cluster_starts[$count] = $self->transcript_low( $transcripts[0]);
   $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
@@ -230,10 +251,10 @@ sub _cluster_Transcripts_by_genomic_range{
  LOOP1:
   for (my $c=1; $c<=$#transcripts; $c++){
     
-    #print STDERR "\nIn cluster ".($count+1)."\n";
-    #print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
-    #print STDERR "comparing:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcripts[$c] );
+    print STDERR "\nIn cluster ".($count+1)."\n";
+    print STDERR "start: $cluster_starts[$count] end: $cluster_ends[$count]\n";
+    print STDERR "comparing:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$c] );
     
     if ( !( $transcripts[$c]->end < $cluster_starts[$count] ||
 	    $transcripts[$c]->start > $cluster_ends[$count] ) ){
@@ -271,7 +292,7 @@ Description:  it returns the comparison ( $a <=> $b ) of the right-most coordina
 =cut
 
 sub by_transcript_high {
-  my $alow;
+    my $alow;
   my $blow;
 
   my $ahigh;
@@ -299,7 +320,7 @@ sub by_transcript_high {
 
   # return the ascending comparison of the right-most coordinates if they're different
   if ($ahigh != $bhigh) {
-    return $ahigh <=> $bhigh;
+      return $ahigh <=> $bhigh;
   } 
   # if they'r equal, return the ascending comparison of the left most coordinate
   else {
@@ -448,7 +469,7 @@ sub link_Transcripts{
     
     print STDERR "Cluster: (sorted transcripts)\n";
     foreach my $t ( @transcripts ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
     }
 
     # for each transcript
@@ -504,7 +525,7 @@ sub link_Transcripts{
       #print STDERR "current lists:\n";
       #foreach my $list ( @current_lists ){
       # foreach my $t (@$list){
-      #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+      #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
       # }
       #}
       
@@ -555,7 +576,7 @@ sub link_Transcripts{
     $count++;
     print STDERR "list $count\n";
     foreach my $t ( @$list ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $t );
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
     }
   }
 
@@ -597,13 +618,13 @@ sub _test_for_link{
     my ($merge,$overlaps);
     
     if ( defined( $overlap_matrix{$transcript}{$trans_link} ) ){
-      ($merge,$overlaps) = @{$overlap_matrix{$transcript}{$trans_link}};
-      print STDERR "using cached matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
+	($merge,$overlaps) = @{$overlap_matrix{$transcript}{$trans_link}};
+	#print STDERR "using cached matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
     else{
-      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript);
-      $overlap_matrix{$transcript}{$trans_link} = [$merge,$overlaps];
-      print STDERR "calculating matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
+	($merge,$overlaps) = $comparator->compare($trans_link, $transcript);
+	$overlap_matrix{$transcript}{$trans_link} = [$merge,$overlaps];
+	#print STDERR "calculating matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
     
     if ($merge == 1 ){
