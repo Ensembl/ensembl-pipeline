@@ -51,7 +51,7 @@ use vars qw(@ISA);
 my $fdbtype = 'rdb';
 my $fhost   = 'obi-wan';
 my $fport   = '410000';
-my $fdbname = 'pogtest';
+my $fdbname = 'ens500';
 my $fdbuser = 'ensro';
 my $fpass   = undef;
 my $fmodule  = "Bio::EnsEMBL::DBSQL::Obj";
@@ -81,27 +81,46 @@ $| = 1;
 # Connect to the rdb
 my $locator = make_locator_string($fdbtype,$fmodule,$fhost,$fport,$fdbname,$fdbuser,$fpass);
 my $db      = new Bio::EnsEMBL::DBLoader($locator);
+my $clone   = $db->get_Clone($cloneid);
 
-
-my $clone  = $db->get_Clone($cloneid);
+my $contigcount  = 0;
 
 foreach my $contig ($clone->get_all_Contigs) {
-    my @features = $contig->get_all_SimilarityFeatures;
-    
-    my $af = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature(-genomic   => $contig->primary_seq,
-								-features  => \@features);
+    print STDERR "Processing contig " . $contig->id . "\n";
+    my @tmpfeatures = $contig->get_all_SimilarityFeatures;
+    my @features;
 
-    if ($mini) {
-	$af->minirun;
+    my $count = 0;
+
+    foreach my $f (@tmpfeatures) {
+	if($f->isa("Bio::EnsEMBL::FeaturePair")) {
+
+	    if ($f->hseqname =~ "HSU51269") {
+		push(@features,$f);
+	    }
+	}
+    }
+
+    if ($#features >= 0) {
+	my $af = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature(-genomic   => $contig->primary_seq,
+								    -features  => \@features);
+
+	if ($mini) {
+	    $af->minirun;
+	} else {
+	    $af->run;
+	}
+
+	my @newfeatures = $af->output;
+	
+	foreach my $f (@newfeatures) {
+	    print("Feature is " . $f->hseqname  . "\t" . $f->start . "\t" . $f->end . "\t(" . $f->strand . ")\t" . $f->hstart . "\t" . $f->hend . "\t(" . $f->hstrand  .")\n");
+	}
     } else {
-	$af->run;
+	print STDERR "No features found - not running est2genome\n";
     }
-
-    my @newfeatures = $af->output;
-
-    foreach my $f (@newfeatures) {
-	print("Feature is " . $f->id  . "\t" . $f->start . "\t" . $f->end . "\n");
-    }
+    $contigcount++;
+    exit(0) if $contigcount > 10;
 }
 
 
