@@ -1,0 +1,1 @@
+insert into analysis(analysis_id, created, logic_name, db, db_version, db_file, program, program_version, program_file, parameters, module, module_version, gff_source, gff_feature ) values (\N, now(), 'WormBase', NULL, 1, NULL, 'WormBase', 1, NULL, NULL, NULL, NULL, 'WormBase', 'gene');
