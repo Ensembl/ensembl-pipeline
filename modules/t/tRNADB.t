@@ -24,7 +24,9 @@ ok(my $ana = $ana_adaptor->fetch_by_logic_name('tRNAscan'));
 
 ok($ana_adaptor->exists( $ana ));
 
-ok(my $runobj = "$runnable"->new(  -db      => $db,
+my $id = 'AL009179.00001';
+
+ok(my $runobj = "$runnable"->new(  -db         => $db,
 				   -input_id   => $id,
 				   -analysis   => $ana ));
 
@@ -33,6 +35,10 @@ ok($runobj->fetch_input());
 ok($runobj->run());
 
 ok(my @out = $runobj->output());
+
+foreach my $obj (@out) {
+  print ($obj->gffstring."\n");
+}
 
 ok($runobj->write_output());
 
