@@ -87,7 +87,7 @@ while( my $cdna = $seqin->next_seq ){
   
   my $display_id  = $cdna->display_id;
   my $description = $cdna->desc;
-
+  
   # First select the species:
   next SEQFETCH unless (   $description =~ /Homo sapiens/
 			   || $description =~ /DNA.*coding.*human/
@@ -157,6 +157,11 @@ while( my $cdna = $seqin->next_seq ){
   # GenBank
   if ( $display_id =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ || $description =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ ){
     $display_id = $1;
+ 
+    if ($display_id =~ /NG/){
+      print STDERR "rejecting $display_id\n";
+      next SEQFETCH;
+    }
   }
   # EMBL vert-RNA
   else{
