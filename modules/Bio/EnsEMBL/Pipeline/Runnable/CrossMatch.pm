@@ -1,4 +1,3 @@
-
 #
 # Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::CrossMatch
 #
@@ -68,7 +67,7 @@ sub new {
   bless $self,$class;
   
   $self->{'_fp_array'} =[];
-  my ($seq1,$seq2,$workdir,$score) = $self->_rearrange([qw(SEQ1 SEQ2 WORKDIR SCORE)],@args);
+  my ($seq1,$seq2,$workdir,$score,$minmatch,$masklevel) = $self->_rearrange([qw(SEQ1 SEQ2 WORKDIR SCORE MINMATCH MASKLEVEL)],@args);
   if( !defined $seq1 || !defined $seq2 ) {
       $self->throw("Must pass in both seq1 and seq1 args");
   }
@@ -85,7 +84,14 @@ sub new {
   } else {
       $self->score(5000);
   }
-  
+  if( defined $minmatch ) {
+    $self->minmatch($minmatch);
+  }
+  if( defined $masklevel ) {
+    $self->masklevel($masklevel);
+  }
+
+
   
 # set stuff in self from @args
   return $self;
@@ -122,7 +128,7 @@ sub run{
    close(F);
    
    #build crossmatch factory
-   my $cmf = CrossMatch::Factory->new($self->score);
+   my $cmf = CrossMatch::Factory->new($self->score,$self->minmatch,$self->masklevel);
    $cmf->dir($self->workdir);
    $cmf->alignments(1);
 
@@ -254,9 +260,9 @@ sub workdir{
 
  Title   : score
  Usage   : $obj->score($newval)
- Function: 
+ Function: could set and return the score value
  Example : 
- Returns : value of score
+ Returns : value of minscore option used by crossmatch
  Args    : newvalue (optional)
 
 
@@ -268,6 +274,48 @@ sub score{
       $obj->{'score'} = $value;
     }
     return $obj->{'score'};
+}
+
+
+=head2 minmatch
+
+ Title   : minmatch
+ Usage   : $obj->minmatch($newval)
+ Function: could set and return the minmatch value
+ Example : 
+ Returns : value of minmatch option used by crossmatch
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub minmatch {
+   my ($obj,$value) = @_;
+   if( defined $value) {
+      $obj->{'minmatch'} = $value;
+    }
+    return $obj->{'minmatch'};
+
+}
+
+=head2 masklevel
+
+ Title   : masklevel
+ Usage   : $obj->masklevel($newval)
+ Function: could set and return the masklevel value
+ Example : 
+ Returns : value of masklevel option used by crossmatch
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub masklevel {
+   my ($obj,$value) = @_;
+   if( defined $value) {
+      $obj->{'masklevel'} = $value;
+    }
+    return $obj->{'masklevel'};
 
 }
 
@@ -349,7 +397,8 @@ use Cwd;
 
 # Makes a new CrossMatch factory object
 sub new {
-    my ($pkg,$score) = @_;
+    # order here is important, as we used to only specify min score
+    my ($pkg,$minscore,$minmatch,$masklevel) = @_;
     my( @dir );
 
     # Default to cwd if no directories supplied
@@ -359,11 +408,15 @@ sub new {
 	$dir[0] = cwd();
     }
 
+    $minmatch = $minscore unless (defined $minmatch); # $minmatch = $minscore compatatible with cvs version 1.7
+    $minscore = 30 unless (defined $minscore); 
+    $masklevel = 101 unless (defined $masklevel);
+
     return bless {
 	dir => [ @dir ],
-	minMatch  => $score,
-	minScore  => $score,
-	maskLevel => 101, # Show all matches
+	minMatch  => $minmatch,
+	minScore  => $minscore,
+	maskLevel => $masklevel, # 101, Show all matches
 	alignments => 0,  # don't keep/parse alignments by default
 	_extn => ['']
 	}, $pkg;
@@ -581,6 +634,7 @@ sub crossMatch {
     my @align;
     my $ialign;
     my $match = CrossMatch->new(@seq, $minM, $minS, $mask);
+    print STDERR "Options used by crossmatch -minmatch $minM -minscore $minS -masklevel $mask\n";
     my $cross_command="/work2/elia/bin/cross_match -minmatch $minM -minscore $minS -masklevel $mask";
     if($matcher->{'alignments'}){
 	$cross_command.=" -alignments";
