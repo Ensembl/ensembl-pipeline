@@ -117,10 +117,13 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 EST_GENEBUILDER_INTRON_MISMATCH => 20,
 
 			 # you can bridge over small introns: we difuse the small intron into one exon
-			 # Note that this number correlates with EST_MAX_EVIDENCE_DISCONTINUITY
-			 # If you use this one, you will not need EST_GENEBUILDER_INTRON_MISMATC
+			 # if set to false transcripts with small introns will be rejected
+			 BRIDGE_OVER_SMALL_INTRONS => 0,
+
+			 # the maximum size of introns to bridge over
 			 EST_MIN_INTRON_SIZE  => 20,
 			 
+
 			 # you can choose whether you only want tw ests/cdnas to merge if
 			 # they have the same number of exons
 			 EST_GENEBUILDER_EXON_MATCH     => 0,
@@ -176,8 +179,8 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 EST_DBHOST                  => 'ecs2f',
 			 #EST_DBNAME                  => 'homo_sapiens_est_12_31',
 			 #EST_DBHOST                  => 'ecs2d',
-	    EST_DBUSER                  => 'ensro',
-	    EST_DBPASS                  => '',
+			 EST_DBUSER                  => 'ensro',
+			 EST_DBPASS                  => '',
 
 	    # est_gene_db = where we write the genes we produce from e2g transcripts
 	    EST_GENE_DBNAME                  => 'NCBI31_estgene_rerun',
