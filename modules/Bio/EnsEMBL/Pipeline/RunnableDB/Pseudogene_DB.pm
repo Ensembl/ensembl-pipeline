@@ -8,14 +8,35 @@
 
 Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB.pm
 
+
 =head1 SYNOPSIS
 
+my $runnabledb = Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB->new(
+									-db => $db_adaptor,
+									-input_id => $slice_id,		
+									-analysis => $analysis,
+								       );
 
+$runnabledb->fetch_input();
+$runnabledb->run();
+my @array = @{$runnabledb->output};
+$runnabledb->write_output();
+
+array ref returned by output contain all the genes found on the slice, modified to relflect pseudogene status
 
 =head1 DESCRIPTION
 
-This object wraps Bio::EnsEMBL::Pipeline::Runnable::Pseudogene.pm to add
-functionality to read from databases (so far).
+This object wraps Bio::EnsEMBL::Pipeline::Runnable::Pseudogene.pm 
+
+Opens connections to 3 dbs:
+1 for repeat sequences (GB_DB)
+1 for fetching genes from (GB_FINAL)
+1 db connection for querying align_feature tables for spliced elsewhere tests
+
+fetches all the genes on the slice, all the repeats associtaed with each gene and 
+collects alignment feature evidence for single exon genes and passes them to the 
+runnable.
+
 
 =head1 CONTACT
 
@@ -30,10 +51,10 @@ Describe contact details here
 package Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB;
 
 use strict;
-use Carp qw(cluck);
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Pseudogene;
 use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::DBSQL::DBConnection;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pseudogene_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
@@ -43,45 +64,6 @@ use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 
-=head2 gene_db
-
-  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
-  Description: get/set gene db adaptor
-  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
-  Exceptions : none
-  Caller     : general
-
-=cut
-
-sub gene_db {
-  my ($self, $gene_db) = @_;
-  
-  unless ($gene_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
-  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $gene_db");
-}
-    $self->{'_gene_db'} = $gene_db;
-  return $self->{'_gene_db'};
-}
-
-=head2 rep_db
-
-  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
-  Description: get/set gene db adaptor
-  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
-  Exceptions : none
-  Caller     : general
-
-=cut
-
-sub rep_db {
-  my ($self, $rep_db) = @_;
-  
-  unless ($rep_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
-  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $rep_db");
-}
-  $self->{'_rep_db'} = $rep_db;
-  return $self->{'_rep_db'};
-}
 
 =head2 fetch_input
 
@@ -103,6 +85,7 @@ sub fetch_input {
   my $results = [];		# array ref to store the output
   my %parameters = $self->parameter_hash;
   my %repeat_blocks;
+  my %homolog_hash;
   $parameters{'-query'} = $self->query;
   $self->fetch_sequence;
   my $runname = "Bio::EnsEMBL::Pipeline::Runnable::Pseudogene";
@@ -126,17 +109,29 @@ sub fetch_input {
      '-pass'   => $GB_FINALDBPASS,
      '-port'   => $GB_FINALDBPORT,
     );
-  #store gene db internally
-  $self->gene_db($genes_db); 
 
   #genes come from final genebuild database
+  my $gene_db_connection = new Bio::EnsEMBL::DBSQL::DBConnection
+    (
+     '-host'   => $GB_FINALDBHOST,
+     '-user'   => $GB_FINALDBUSER,
+     '-dbname' => $GB_FINALDBNAME,
+     '-pass'   => $GB_FINALDBPASS,
+     '-port'   => $GB_FINALDBPORT,
+    );
 
-  my $genes_slice = $genes_db->get_SliceAdaptor->fetch_by_region(
-								 'chromosome',
-								 $self->query->chr_name,
-								 $self->query->start,
-								 $self->query->end
-								);
+
+  #store gene db internally
+  $self->gene_db($genes_db);
+  $self->gene_db_connection($gene_db_connection); 
+
+  my $genedb_sa = $genes_db->get_SliceAdaptor;
+  my $genes_slice = $genedb_sa->fetch_by_region(
+						'chromosome',
+						$self->query->chr_name,
+						$self->query->start,
+						$self->query->end
+					       );
   my $genes = $genes_slice->get_all_Genes;
   my @transferred_genes;
 
@@ -144,7 +139,6 @@ sub fetch_input {
     my $rsa = $rep_db->get_SliceAdaptor;
 
     #repeats come from core database
-
     my $rep_gene_slice = $rsa->fetch_by_region(
 					       'chromosome',
 					       $self->query->chr_name,
@@ -156,25 +150,37 @@ sub fetch_input {
     #transfer gene coordinates to entire chromosome to prevent problems arising 
     # due to offset with repeat features 
 
-    my $chromosome_slice = $self->query->adaptor->fetch_by_region(
-								  'chromosome',
-								  $self->query->chr_name,
-								 );
-
+    my $chromosome_slice = $rsa->fetch_by_region(
+						 'chromosome',
+						 $self->query->chr_name,
+						);
+    
     my $transferred_gene = $gene->transfer($chromosome_slice);
+
+    # for testing purposes
+###########################################################
+##########################################################
+    $transferred_gene->type('unset');                   #
+##########################################################
+###########################################################
     push @transferred_genes,$transferred_gene;
 
-    $repeat_blocks{$transferred_gene} = $self->get_all_repeat_blocks($rep_gene_slice->get_all_RepeatFeatures);
+    if (scalar(@{$transferred_gene->get_all_Exons()})==1){
+      # single exon - check for retrotransposition
+      $homolog_hash{$transferred_gene} = $self->spliced_elsewhere($transferred_gene,$genedb_sa);
+    }
+    else{
+      # multiexon - check for repeats in introns
+      $repeat_blocks{$transferred_gene} = $self->get_all_repeat_blocks($rep_gene_slice->get_all_RepeatFeatures);
+    }
   }
-
   if ($self->validate_genes(\@transferred_genes)) {
+
     my $runnable = $runname->new
       ( 
-       '-max_intron_length' => $PS_MAX_INTRON_LENGTH,
-       '-max_intron_coverage' => $PS_MAX_INTRON_COVERAGE,
-       '-max_exon_coverage' => $PS_MAX_EXON_COVERAGE,
        '-genes' => \@transferred_genes,
-       '-repeat_features' => \%repeat_blocks
+       '-repeat_features' => \%repeat_blocks,
+       '-homologs'        => \%homolog_hash,
       );
     $self->runnable($runnable);
     $self->results($runnable->output);
@@ -335,5 +341,136 @@ sub output{
   }
   return $self->{_genes};
 }
+
+sub spliced_elsewhere{
+  my ($self,$gene,$sa) = @_;
+  my $table;
+  my %identified_genes;
+  my $connection = $self->gene_db_connection;
+  my $exon = @{$gene->get_all_Exons()}[0];
+  my %homolog;
+  
+
+#####################################################
+# Fetch supporting features for the single exon
+
+  foreach my $sf (@{$exon->get_all_supporting_features}){
+
+    if ($sf->isa('Bio::EnsEMBL::DnaDnaAlignFeature')){
+	$table = "dna_align_feature";
+      }
+    if ($sf->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
+      $table = "protein_align_feature";
+    }
+    my $sql = "select seq_region.name,$table.seq_region_start,$table.seq_region_end,$table.hit_name,$table.score
+from $table,seq_region
+where $table.hit_name ='".$sf->hseqname."' 
+and $table.score > $PS_FEATURE_SCORE
+and $table.seq_region_id = seq_region.seq_region_id 
+limit $PS_SQL_LIMIT;";
+    
+    my $sth = $connection->prepare($sql);
+    $sth->execute;
+    while (my @row = $sth->fetchrow_array()) {
+      my $slice = $sa->fetch_by_region('seqlevel',
+				       $row[0],
+				       $row[1],
+				       $row[2],
+				      );
+
+      ############################################################
+      # For each hit in the protein / dna align feature table
+      # get a slice for each locus that the feature aligns to 
+      # return all the genes in that slice and store them in a hash
+
+      my @homologs = @{$slice->get_all_Genes};
+      foreach my $homologous_gene(@homologs){ 
+	# only look at each homologous gene once
+	# print $homologous_gene->display_id."\n";
+	next unless ($identified_genes{$homologous_gene->dbID} == 0);
+	$identified_genes{$homologous_gene->dbID} = 10;
+	if ($gene->stable_id ne $homologous_gene->stable_id){
+	  # dont look at self alignments
+	  foreach my $homologous_transcript(@{$homologous_gene->get_all_Transcripts}){
+	    # homologs trascript must have more than 1 exon
+	    next unless scalar(@{$homologous_transcript->get_all_Exons()}) > 1;
+	    $homolog{$homologous_transcript} = $homologous_transcript;
+	  }
+	}
+      }
+    }
+    $sth->finish();
+  }
+
+return \%homolog;
+}
+
+
+############################################################################
+# container methods
+
+=head2 gene_db
+
+  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Description: get/set gene db adaptor
+  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub gene_db {
+  my ($self, $gene_db) = @_;
+  
+  unless ($gene_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
+  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $gene_db");
+}
+    $self->{'_gene_db'} = $gene_db;
+  return $self->{'_gene_db'};
+}
+
+=head2 gene_db_connection
+
+  Arg [1]    : Bio::EnsEMBL::DBSQL::DBConnection
+  Description: get/set gene db conection used for sql query in spliced_elsewhere
+  Returntype : Bio::EnsEMBL::DBSQL::DBConnection
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub gene_db_connection {
+  my ($self, $gene_db_connection) = @_;
+  if ($gene_db_connection){
+  unless ($gene_db_connection->isa("Bio::EnsEMBL::DBSQL::DBConnection")){
+    $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBConnection, it is a $gene_db_connection");
+    }
+    $self->{'_gene_db_connection'} = $gene_db_connection;
+  }
+  return $self->{'_gene_db_connection'};
+}
+
+=head2 rep_db
+
+  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Description: get/set gene db adaptor
+  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub rep_db {
+  my ($self, $rep_db) = @_;
+  
+  unless ($rep_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
+  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $rep_db");
+}
+  $self->{'_rep_db'} = $rep_db;
+  return $self->{'_rep_db'};
+}
+
+
+
 
 1;
