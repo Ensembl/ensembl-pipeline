@@ -192,6 +192,8 @@ sub score_Transcripts{
       print STDERR "number of covered site-pairs: ".scalar( @covered_sites )."\n";
       
       my $score = 100;
+      # score of a transcript is calculated as the fraction of 
+      # pairs of sites of alternative splicing which are covered by ests
       if ( @site_pairs ){
 	$score = sprintf "%.2f", 100*scalar( @covered_sites )/scalar( @site_pairs );
 	print STDERR "score: $score\n";
@@ -366,8 +368,8 @@ sub _cluster_Exons{
 # start: lowest coordinate
 # end  : highest coordinate
 
-sub get_transcript_start_end_strand {
-  my ($t) = @_;
+sub get_transcript_start_end_strand_of_transcript {
+  my ($self,$t) = @_;
   my @exons = sort { $a->start <=> $b->start } @{$t->get_all_Exons}; 
   my $start = $exons[0]->start;
   my $end   = $exons[-1]->end;
