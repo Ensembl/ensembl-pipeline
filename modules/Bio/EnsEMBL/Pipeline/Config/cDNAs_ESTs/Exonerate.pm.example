@@ -53,57 +53,29 @@ use vars qw( %Exonerate );
 
 # Hash containing config info
 %Exonerate = (
-	
-	      EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	      EST_RUNNER        => '',
 
-	      # path to ensembl-pipeline/scripts/EST
-	      EST_SCRIPTDIR     => '',
-	
-	      # where the result-directories are going to go	
-	
-	      EST_TMPDIR        => '',
-	
-	      # job-queue in the farm
-	      LSF_OPTIONS       => '',
+              ############################################################
+              # est_db = where we write the exonerate results as genes/transcripts
+              ############################################################
+              
+              EST_DBNAME                  => '',
+              EST_DBHOST                  => '',
+              EST_DBUSER                  => '',
+              EST_DBPASS                  => '',
+              EST_DBPORT                  => '',
 
-	      # make_bsubs.pl options
-	      EST_EXONERATE_BSUBS   => '',
-
-	      # path to file containing ALL ESTs/cDNAs
-	      EST_FILE                    => '/nfs/acari/dta/work1/Hsa_Apr04/est_build/human_ests250204',
-
+	      EST_INPUTID_REGEX => '(\S+)\.(\d+)\.(\d+)',
+	      
 	      # path to directory where EST chunks live
-	      EST_CHUNKDIR                => '/ecs4/scratch3/ensembl/dta/Hsa_Apr04/est_chunks',
-	
-	      # how many chunks?
-	      # for NCBI_28 we have 3690891 ests, at approx. 350 ests per chunk, we estimate
-	      EST_CHUNKNUMBER             => 15000,
-	
-      	      #####################
-	      # EXONERATE OPTIONS #
-	      #####################
-	
+	      EST_CHUNKDIR                => '',
 	      # full path fo the dir where we have the masked-dusted chromosomes
-	      EST_GENOMIC                 => '/data/blastdb/Ensembl/Human/NCBI34/genome/masked_dusted/',
+	      EST_GENOMIC                 => '',
 
 	      # Is the above a directory that contains one file per chromosome? If so, 
 	      # we can use a fast program to look up the DNA for the splice sites in
 	      # order to determine strand. Otherwise, the API will be used to get the DNA
-	      EST_ONE_FILE_PER_CHROMOSOME => 1,
-
-
-	      # Exonerate options.  Note that some options are version specific, hence the
-	      # bonding of version with options here.
-
-#	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.6.7',
-#				'OPTIONS' => ' --exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --showalignment FALSE --showvulgar FALSE',
-#			       },
-
-	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.8.2',
-				'OPTIONS' => ' --exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --showalignment FALSE --showvulgar FALSE',
-			       },
-
+	      EST_ONE_FILE_PER_CHROMOSOME => 0,
+	      	      
 	      ### new exonerate options ####
 	      #
 	      # score: min scores to report. 
@@ -132,15 +104,22 @@ use vars qw( %Exonerate );
 	      #
 	      # 6. Generate ungapped Protein <---> DNA alignments:
 	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
-	      #
-	      #optimal options are:
-	      #' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14',
-	      #
-	      # options for pseudogenes:
-	      #' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
-              #
-	      # options for structural rnas:
-	      #' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+	      
+	      # Exonerate options.  Note that some options are version specific, hence the
+	      # bonding of version with options here.
+
+#	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.6.7',
+#				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+#			       },
+
+#	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.7.1',
+#				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --forcegtag FALSE --joinrangeext 6',
+#
+
+	      EST_EXONERATE => {'VERSION' => '/usr/local/ensembl/bin/exonerate-0.8.2',
+				'OPTIONS' => '--exhaustive FALSE --model est2genome --softmasktarget --score 500 --fsmmemory 800  --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14',
+			       },
+
 
 	      # if set to true, this option rejects unspliced alignments for cdnas that have an spliced
 	      # alignment elsewhere in the genome
@@ -150,8 +129,7 @@ use vars qw( %Exonerate );
 	      # if there are several matches with the same coverage
 	      # all of them are taken, except single-exon 
 	      # ones if REJECT_POTENTIAL_PROCESSED_PSEUDOS is switched on 
-	      BEST_IN_GENOME => 1,
-
+	      BEST_IN_GENOME              =>  1,
 	      EST_MIN_COVERAGE            => 90,
 	      EST_MIN_PERCENT_ID          => 97,
 
@@ -161,37 +139,10 @@ use vars qw( %Exonerate );
 	      # database.  You probably need a good reason for not setting this 
 	      # to 1.
 	      EST_USE_DENORM_GENES	=> 0,
-
-
-	      ############################################################
-	      # each runnable has an analysis
-	      ############################################################
-
-	      EST_EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes',
-	      EST_EXONERATE_ANALYSIS     => 'Exonerate_EST',
-
-	      EST_SOURCE                  => '',
-	
-	      ############################################################
-	      # ref_db - holds the static golden path, contig and dna information
-	      ############################################################
-	
-	      EST_REFDBNAME               => 'xxxx',
-	      EST_REFDBHOST               => 'xxxx',
-	      EST_REFDBUSER               => 'xxxx',
-	      EST_REFDBPASS               => '',
-	      EST_REFDBPORT               => '0000',
-	
-	      ############################################################
-	      # est_db = where we write the exonerate results as genes/transcripts
-	      ############################################################
-
-	      EST_DBNAME                  => 'xxxx',
-	      EST_DBHOST                  => 'xxxx',
-	      EST_DBUSER                  => 'xxxx',
-	      EST_DBPASS                  => 'xxxx',
-	      EST_DBPORT                  => '0000',
-);
+	      # the following is used by the denormalised gene adaptor to
+	      # fetch an analysis for attaching to thawed genes
+	      EST_EXONERATE_ANALYSIS    => "Exonerate_cdna",
+	     );
 
 sub import {
   my ($callpack) = caller(0); # Name of the calling package
