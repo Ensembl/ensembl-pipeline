@@ -299,7 +299,7 @@ sub flush_runs {
     $cmd .= " @job_ids";
 
     $batch_job->construct_command_line($cmd);
-    #$batch_job->open_command_line();
+    $batch_job->open_command_line();
     print STDERR "RUNNING :".$batch_job->bsub."\n";
     if( ! defined $batch_job->id ) {
       print STDERR ( "Couldnt batch submit @job_ids" );
