@@ -73,7 +73,7 @@ sub pseudogene_test{
        $compara_db, 
        $focus_db, $focus_species, 
        $target_db, $target_species,
-       $target_db2, $target_species2
+       $target_db2, $target_species2,
        $threshold
      ) = @_;
   
@@ -238,13 +238,18 @@ sub has_polyA_track{
   my $chr_name  =  $exons[0]->contig->chr_name;
   my $end   =  $exons[0]->contig->chr_start + $exons[$#exons]->start - 1;
   
-  # we take 20 bases downstream:
-  my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $end - 5, $end + 10 )->seq;
-  print STDERR "20bp downstream: $seq\n";
+  ############################################################
+  # we take X bases downstream:
+  my $poly_start = $end - 4;
+  my $poly_end   = $end + 16;
+  my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $poly_start, $poly_end )->seq;
+  
+  #####################################################################
+  print STDERR ($poly_end-$poly_start+1)."bp downstream: $seq\n";
   my $length = length($seq);
   my $a_count = $seq =~ tr/Aa//;
   
-  if ( ($a_count/$length) >=7/10 ){
+  if ( ($a_count/$length) >=6/10 ){
     return 1;
   }
   else{
