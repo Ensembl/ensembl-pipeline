@@ -2,22 +2,63 @@
 
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
+use Bio::EnsEMBL::DB::VirtualContig;
+
+use Getopt::Long;
+
+my $infile;
+
+&GetOptions('infile:s' => \$infile,
+	    );
 
 
 my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'ensrv3',
 				      -user   => 'ensro',
 				      -dbname => 'ensembl07',
                                       -perlonlyfeatures => 1,
-				      );
+ 				      );
 
 $| = 1;
 
-die ("No clone input") unless $#ARGV >= 0;
+my @contigs = get_contigs($infile,@ARGV);
 
-my $clone       = $db->get_Clone($ARGV[0]);
-my @contigs     = $clone->get_all_Contigs;
+foreach my $contigid (@contigss) {
+    eval {
+	
+	my $contig = $db->get_Contig($contigid);
+	
+	my $vc     = new Bio::EnsEMBL::DB::VirtualContig(-focuscontig   => $contig,
+							 -focusposition => 1,
+							 -ori           => 1,
+							 -left          => 200000,
+							 -right         => 200000);
+    
+	my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $vc);
+	$genebuilder->build_Genes;
+    };
+    if ($@) {
+	print STDERR "Error building genes on : $cloneid [$@]\n";
+    }
+}
 
-my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contigs => \@contigs);
-   $genebuilder->build_Genes;
 
+sub get_contigs {
+    my ($infile,@args) = @_;
+    
+    my @contigs;
+    
+    if (-e $infile) {
+	open(IN,"<$infile") || die "Couldn't open $infile";
+	
+	while (<IN>) {
+	    chomp;
+	    push(@contigs,$_);
+	}
+	
+    }
+    
+    push(@contigss,@args);
+    
+    return @contigss;
+}
 

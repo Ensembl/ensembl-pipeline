@@ -1,12 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN {
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
-  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-live");
-}
-
-
 =head1 NAME
 
 Job_creator - takes a list of input_ids and an analysis id
@@ -47,7 +40,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Job;
 
 my $host     = 'localhost';
 my $port     = '410000';
-my $dbname   = 'pipeline';
+my $dbname   = 'ensembl_freeze24';
 my $dbuser   = 'root';
 my $pass     =  undef;
 my $queue    = 'ultra_blast_farm';

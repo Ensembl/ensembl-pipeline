@@ -44,7 +44,7 @@ use vars qw(@ISA);
 my $dbtype = 'rdb';
 my $host   = 'localhost';
 my $port   = '410000';
-my $dbname = 'ensembl07';
+my $dbname = 'ensembl_freeze24';
 my $dbuser = 'root';
 my $pass   = undef;
 my $runnable;
@@ -62,20 +62,16 @@ my $input_id;
 
 $| = 1;
 
-my $module1  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
-my $module2  = "Bio::EnsEMBL::DBSQL::Obj";
+my $module  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
 
-my $locator1 = make_locator_string($dbtype,$module1,$host,$port,$dbname,$dbuser,$pass);
-my $locator2 = make_locator_string($dbtype,$module2,'localhost',$port,'ensembl07','ensro',$pass);
+my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
 
-my $db1      = new Bio::EnsEMBL::DBLoader($locator1);
-my $db2      = new Bio::EnsEMBL::DBLoader($locator2);
+my $db      = new Bio::EnsEMBL::DBLoader($locator);
 
 die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
 
-my $runobj = "$runnable"->new(-dbobj => $db1,
-			      -db2   => $db2,
+my $runobj = "$runnable"->new(-dbobj => $db,
 			      -input_id => $input_id,
 			     );
 $runobj->fetch_input;
@@ -84,13 +80,17 @@ $runobj->run;
 my @out = $runobj->output;
 
 foreach my $out (@out) {
-    print ($out . "\n");
+    if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
+      print ($out->gffstring . "\n");
+    } else {
+      print $out . "\n";
+    }
 }
 
 sub make_locator_string {
     my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
 
-    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass;perlonlyfeatures=1";
 
 }
 
