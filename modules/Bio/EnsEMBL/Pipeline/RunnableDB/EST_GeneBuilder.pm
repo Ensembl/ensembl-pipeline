@@ -534,6 +534,9 @@ sub _check_Transcripts {
   my @alltranscripts; # here we'll put all the transcripts that pass the check
   my %hid_trans;
   my $total_rejected        = 0;
+
+  # use ExonAdaptor to get evidence from stickies if they haven't any
+  my $exon_adaptor    = $self->est_e2g_db->get_ExonAdaptor;
   
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
@@ -581,24 +584,45 @@ sub _check_Transcripts {
       # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
 
       my @nonsorted_sf = $exon->each_Supporting_Feature;      
-      my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
-            
+                  
       # check that you get suporting_evidence at all
-      if ( scalar( @sf ) == 0 ){
-	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
-		    "exon_id =".$exon->dbID."\n");
+      unless(@nonsorted_sf ){
+	$self->warn("exon with no supporting evidence, possible sticky exon, ".
+		    "exon_id =".$exon->dbID.", getting evidence with ExonAdaptor\n");
+	
+	#try with the exon adaptor
+	$exon_adaptor->fetch_evidence_by_Exon($exon);
+	@nonsorted_sf = $exon->each_Supporting_Feature; 
+	if ( @nonsorted_sf){
+	  print STDERR "succeeded\n";
+	}
       }
       
       ####### check the gap with the evidence of the next exon
       # if the ESTs are of good quality, this should not reject any
-      if ( $exon_count > 1 ){
+      if ( @nonsorted_sf && $exon_count > 1 ){
+	
+	my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
+	
 	my $est_gap = 0;
-		
+	
 	my @prev_nonsorted_sf = $previous_exon->each_Supporting_Feature; 
-	my @previous_sf = sort { $a->hstart <=> $b->hstart } @prev_nonsorted_sf;
-
-	if ( scalar( @previous_sf ) != 0 ){
-
+	
+	unless ( @prev_nonsorted_sf ){
+	  $self->warn("exon with no supporting evidence, possible sticky exon, ".
+		      "exon_id =".$previous_exon->dbID.", getting evidence with ExonAdaptor\n");
+	  
+	  #try with the exon adaptor
+	  $exon_adaptor->fetch_evidence_by_Exon($previous_exon);
+	  @prev_nonsorted_sf = $exon->each_Supporting_Feature;      
+	  if ( @prev_nonsorted_sf){
+	    print STDERR "succeeded\n";
+	  }     	
+	}
+	if ( @prev_nonsorted_sf ){
+	  
+	  my @previous_sf = sort { $a->hstart <=> $b->hstart } @prev_nonsorted_sf;
+	  
 	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
 	  if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
 	    $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
