@@ -43,8 +43,8 @@ print "ok 2\n";
 my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'dbSTS-1',
-                                                    -db_file        => 'dbSTS-1',
+my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'embl_vertrna',
+                                                    -db_file        => 'embl_vertrna',
                                                     -db_version     => '1',                  
                                                     -program        => 'wublastn',
                                                     -program_file   => 'wublastn',
