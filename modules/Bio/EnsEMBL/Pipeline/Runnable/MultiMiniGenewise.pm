@@ -73,7 +73,7 @@ sub new {
     $self->_minimum_intron($features)           if defined($minimum_intron);
     $self->_exon_padding($features)             if defined($exon_padding);
     $self->_minimum_feature_length($features)   if defined($minimum_feature_length);
-    
+    #print STDERR @$features." have be passed into MultiMiniGenewise\n";
     return $self;
   }
 
@@ -173,8 +173,9 @@ sub get_all_features_by_id {
     
     my  %idhash;
     my  %scorehash;
-    
+    my $feature_count = 0;
   FEAT: foreach my $f (@{$self->features}) {
+      $feature_count++;
       if (!(defined($f->hseqname))) {
 	$self->warn("No hit name for " . $f->seqname . "\n");
 	next FEAT;
@@ -195,7 +196,7 @@ sub get_all_features_by_id {
     }
     
     my @sorted_ids = keys %idhash;
-    
+    #print STDERR "there are ".$feature_count." features being sorted\n";
     @sorted_ids = sort {$scorehash{$b} <=> $scorehash{$a}} @sorted_ids;
     
     return (\%idhash,\@sorted_ids);
@@ -259,62 +260,77 @@ sub run {
 
   my ($fhash,$ids) = $self->get_all_features_by_id;
  # print STDERR "have ".@$ids." ids\n";
-  my @forward;
-  my @reverse;
+ 
   foreach my $id (@$ids) {
-    print STDERR "$id\n";
+    #print STDERR "$id\n";
     
     my @features = @{$fhash->{$id}};
-    my @extras   = $self->_find_extras (@features);
-    
-    if (scalar(@extras) > 0) {
-      my $pepseq = $self->get_Sequence($features[0]->hseqname);
+    #print STDERR "have ".@features." features\n";
+   
+  
+    my $pepseq = $self->get_Sequence($features[0]->hseqname);
       
-
-      if (defined($pepseq)) {
-
-	foreach my $f (@extras){
-	  if($f->strand == 1){
-	    push(@forward, $f);
-	  }elsif($f->strand == -1){
-	    push(@reverse, $f);
-	  }else{
-	    $self->throw("unstranded feature not much use for gene building\n") 
-	  }
+    my @forward;
+    my @reverse;
+    if ($pepseq) {
+      foreach my $f (@features){
+	if($f->strand == 1){
+	  push(@forward, $f);
+	}elsif($f->strand == -1){
+	  push(@reverse, $f);
+	}else{
+	  $self->throw("unstranded feature not much use for gene building\n") 
 	}
-	if(@forward){
-	my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
-									   -genomic => $self->genomic_sequence,
-									   -protein => $pepseq,
-									   -features=> \@forward,
-									   -endbias => $self->endbias);
-	
-	$runnable->run;
-	#print STDERR "MiniGenewise output " . $runnable->output . "\n";
-	
-	push(@{$self->{_output}},$runnable->output);
       }
-	if(@reverse){
+      if(@forward){
+	my @extras = $self->_find_extras(@forward);
+	#print STDERR "Number of features       = ".scalar(@forward)."\n";
+	#print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+	if(@extras){
+	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
+									     -genomic => $self->genomic_sequence,
+									     -protein => $pepseq,
+									     -features=> \@forward,
+									     -endbiqas => $self->endbias);
+	  
+	  $runnable->run;
+	  ##print STDERR "MiniGenewise output " . $runnable->output . "\n";
+	
+	  push(@{$self->{_output}},$runnable->output);
+	}else{
+	  print STDERR $id." had no extra features on the forward strand\n";
+    
+	}
+      }
+
+      if(@reverse){
+	my @extras = $self->_find_extras(@reverse);
+	#print STDERR "Number of features       = ".scalar(@reverse)."\n";
+	#print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+	if(@extras){
 	  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
 									     -genomic => $self->genomic_sequence,
 									     -protein => $pepseq,
 									     -features=> \@reverse,
 									     -endbias => $self->endbias);
-	  
+	
 	  $runnable->run;
 	  #print STDERR "MiniGenewise output " . $runnable->output . "\n";
 	
-	  push(@{$self->{_output}},$runnable->output); 
+	  push(@{$self->{_output}},$runnable->output);
+	}else{
+	  print STDERR $id." had no extra features on the reverse strand\n";
+	 
 	}
-	  
-      } else {
-	$self->throw("Can't fetch sequence for " . $features[0]->hseqname . "\n");
       }
+      
     } else {
-      print "No extra features - skipping " . $features[0]->hseqname . "\n";
+      $self->throw("Can't fetch sequence for " . $features[0]->hseqname . "\n");
     }
-  }
+  
+  } 
   return 1;
+  
 }
 
 
