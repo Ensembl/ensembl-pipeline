@@ -73,8 +73,8 @@ my $prefix='COB';
 	     # IMPORTANT: we should have copied the genewise genes to this db before hand:
 	     GB_COMB_DBHOST                  => 'ecs1f',
 	     GB_COMB_DBNAME                  => 'ens_NCBI_30_combined_genes',
-	     GB_COMB_DBUSER                  => 'ensro',
-	     GB_COMB_DBPASS                  => '',
+	     GB_COMB_DBUSER                  => 'ensadmin',
+	     GB_COMB_DBPASS                  => 'ensembl',
 	     
 	     # database containing the cdnas mapped, to be combined with the genewises
 	     # by putting this info here, we free up ESTConf.pm so that two analysis can
@@ -92,7 +92,10 @@ my $prefix='COB';
 	     # general variables
 	     # path to run_GeneBuild_RunnableDB
 	     GB_RUNNER      => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
-	     GB_TMPDIR      => '/ecs2/scratch1/ensembl/eae/NCBI_30/',
+	     
+	     # directory where the output files will go
+	     GB_OUTPUT_DIR  => '/ecs2/scratch1/ensembl/eae/NCBI_30/test_genecombiner/',
+
 	     # LSF queue plus any options you want to use
 	     GB_QUEUE       => 'acari',
 	     GB_TBLASTN     => '',
