@@ -201,7 +201,7 @@ sub get_genes_by_Slice_and_type {
   # Make an appropriate analysis object
 
   my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($EST_EXONERATE_ANALYSIS);
-
+$self->throw("no analysis object found for $EST_EXONERATE_ANALYSIS from " . $self->db->dbname . "\n") unless defined ($analysis);
  DUMPED_GENE:
   while (my ($dumped_gene_id, $retrieved_gene, $already_mapped) = $sth->fetchrow_array) {
 
@@ -217,7 +217,6 @@ sub get_genes_by_Slice_and_type {
     eval $gene_dump;
 
     # Tack on a fresh analysis object.
-
     $gene->analysis($analysis);
 
     # Replace the adaptor objects that we removed before 
@@ -268,7 +267,6 @@ sub get_genes_by_Slice_and_type {
     }
 
     # Store our newly revived and remapped gene:
-
     my $gene_dbID = $gene_adaptor->store($transformed_gene);
 
     if ($gene_dbID) {
