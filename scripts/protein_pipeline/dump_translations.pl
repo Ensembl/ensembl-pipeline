@@ -67,37 +67,39 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
     my $gene_id = $gene->dbID();
     
     foreach my $trans ( @{$gene->get_all_Transcripts}) {
-      # get out first exon. Tag it to clone and gene on this basis
-      my @exon = @{$trans->get_all_Exons};
-      my $fe = $exon[0];
-      
-      my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
-      my $identifier;
-      if($db_id){
-	$identifier = $trans->dbID;
+      if ($trans->translation) {
+        # get out first exon. Tag it to clone and gene on this basis
+        my @exon = @{$trans->get_all_Exons};
+        my $fe = $exon[0];
+        
+        my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
+        my $identifier;
+        if($db_id){
+          $identifier = $trans->translation->dbID;
+        }
+        if($stable_id){
+          if(!$db_id){
+            $identifier = $trans->stable_id;
+          }else{
+            $identifier .= ".".$trans->stable_id;
+          }
+        }
+        my $tseq = $trans->translate();
+        if ( $tseq->seq =~ /\*/ ) {
+          print STDERR "translation of ".$identifier." has stop codons. Skipping! (in clone". $fe->contig->dbID .")\n";
+          next;
+        }
+        
+        $tseq->display_id($identifier);
+        $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
+        $seqio->write_seq($tseq);
       }
-      if($stable_id){
-	if(!$db_id){
-	  $identifier = $trans->stable_id;
-	}else{
-	  $identifier .= ".".$trans->stable_id;
-	}
-      }
-      my $tseq = $trans->translate();
-      if ( $tseq->seq =~ /\*/ ) {
-	print STDERR "translation of ".$identifier." has stop codons. Skipping! (in clone". $fe->contig->dbID .")\n";
-	next;
-      }
-      
-      $tseq->display_id($identifier);
-      $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
-      $seqio->write_seq($tseq);
     }
   };
   
   if( $@ ) {
     print STDERR "unable to process $gene_id, due to \n$@\n";
-    }
+  }
 }
 
 sub  find_trans_start {
